@@ -1,0 +1,330 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import Nav from "@/components/Nav";
+import { currentWeek } from "@/lib/mock-data";
+import { Game, UserPick } from "@/lib/types";
+
+function formatSpread(spread: number, favorite: "home" | "away", side: "home" | "away") {
+  const isFavorite = favorite === side;
+  if (isFavorite) {
+    return spread < 0 ? `${spread}` : `-${Math.abs(spread)}`;
+  }
+  return `+${Math.abs(spread)}`;
+}
+
+const STORAGE_KEY = "warroom-picks-week-1";
+const CARD_KEY = "warroom-card-week-1";
+
+export default function PicksPage() {
+  const [games, setGames] = useState<Game[]>(currentWeek.games);
+  const [picks, setPicks] = useState<Record<string, UserPick>>({});
+  const [bestBetId, setBestBetId] = useState<string | null>(null);
+  const [propChoice, setPropChoice] = useState<string | null>(null);
+  const [usedConfidence, setUsedConfidence] = useState<number[]>([]);
+  const [saved, setSaved] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [prop] = useState(currentWeek.prop);
+
+  useEffect(() => {
+    try {
+      // Load published card if commissioner has set one
+      const cardRaw = localStorage.getItem(CARD_KEY);
+      if (cardRaw) {
+        const data = JSON.parse(cardRaw);
+        if (data.games?.length) setGames(data.games);
+      }
+
+      // Load existing picks
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const data = JSON.parse(raw);
+        setPicks(data.picks || {});
+        setBestBetId(data.bestBetId || null);
+        setPropChoice(data.propChoice || null);
+        setUsedConfidence(data.usedConfidence || []);
+        setSaved(!!data.lockedAt);
+      }
+    } catch {}
+    setLoaded(true);
+  }, []);
+
+  const confidenceOptions = [1, 2, 3, 4, 5];
+
+  function selectSide(gameId: string, side: "home" | "away") {
+    if (saved) return; // locked
+    const game = games.find((g) => g.id === gameId);
+    if (!game) return;
+
+    setPicks((prev) => ({
+      ...prev,
+      [gameId]: {
+        gameId,
+        pick: side,
+        confidence: prev[gameId]?.confidence ?? 0,
+        isBestBet: bestBetId === gameId,
+        lockedSpread: game.spread,
+        lockedFavorite: game.favorite,
+      },
+    }));
+  }
+
+  function selectConfidence(gameId: string, conf: number) {
+    if (saved) return;
+    const oldConf = picks[gameId]?.confidence;
+    let newUsed = usedConfidence.filter((c) => c !== oldConf);
+    if (newUsed.includes(conf)) return;
+    newUsed = [...newUsed, conf];
+    setUsedConfidence(newUsed);
+
+    const game = games.find((g) => g.id === gameId);
+    setPicks((prev) => ({
+      ...prev,
+      [gameId]: {
+        gameId,
+        pick: prev[gameId]?.pick ?? "home",
+        confidence: conf,
+        isBestBet: bestBetId === gameId,
+        lockedSpread: game?.spread ?? 0,
+        lockedFavorite: game?.favorite ?? "home",
+      },
+    }));
+  }
+
+  function toggleBestBet(gameId: string) {
+    if (saved) return;
+    if (bestBetId === gameId) {
+      setBestBetId(null);
+      setPicks((prev) => {
+        const existing = prev[gameId];
+        if (!existing) return prev;
+        return { ...prev, [gameId]: { ...existing, isBestBet: false } };
+      });
+    } else {
+      setPicks((prev) => {
+        const next = { ...prev };
+        if (bestBetId && next[bestBetId]) {
+          next[bestBetId] = { ...next[bestBetId], isBestBet: false };
+        }
+        const game = games.find((g) => g.id === gameId);
+        next[gameId] = {
+          gameId,
+          pick: next[gameId]?.pick ?? "home",
+          confidence: next[gameId]?.confidence ?? 0,
+          isBestBet: true,
+          lockedSpread: game?.spread ?? 0,
+          lockedFavorite: game?.favorite ?? "home",
+        };
+        return next;
+      });
+      setBestBetId(gameId);
+    }
+  }
+
+  function lockIn() {
+    // Snapshot current spreads into every pick at lock time
+    const lockedPicks: Record<string, UserPick> = {};
+    for (const g of games) {
+      const p = picks[g.id];
+      if (!p) continue;
+      lockedPicks[g.id] = {
+        ...p,
+        lockedSpread: g.spread,
+        lockedFavorite: g.favorite,
+        isBestBet: bestBetId === g.id,
+      };
+    }
+
+    const payload = {
+      picks: lockedPicks,
+      bestBetId,
+      propChoice,
+      usedConfidence,
+      lockedAt: new Date().toISOString(),
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    setPicks(lockedPicks);
+    setSaved(true);
+  }
+
+  const allGamesPicked =
+    games.every((g) => picks[g.id]?.pick && (picks[g.id]?.confidence ?? 0) > 0) &&
+    propChoice !== null &&
+    bestBetId !== null;
+
+  if (!loaded) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Nav />
+        <main className="flex-1 flex items-center justify-center text-muted">Loading…</main>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen flex flex-col">
+      <Nav />
+
+      <main className="flex-1 max-w-3xl mx-auto w-full px-4 py-8">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold">Week 1 Picks</h1>
+          <p className="text-sm text-muted">
+            {saved
+              ? "Picks locked — lines frozen at the moment you submitted"
+              : "Lines lock when you hit Lock In. You can change picks until then."}
+          </p>
+        </div>
+
+        {saved && (
+          <div className="mb-4 rounded-lg border border-primary/40 bg-primary/10 px-4 py-2 text-sm text-primary">
+            ✓ Picks locked. Your spreads are frozen and will be used for scoring.
+          </div>
+        )}
+
+        <div className="space-y-4 mb-8">
+          {games.map((game) => {
+            const pick = picks[game.id];
+            const isBest = bestBetId === game.id;
+            // Show locked spread if already saved, otherwise current
+            const displaySpread = pick?.lockedSpread ?? game.spread;
+            const displayFavorite = pick?.lockedFavorite ?? game.favorite;
+
+            return (
+              <div
+                key={game.id}
+                className={`rounded-xl border bg-card p-4 transition ${
+                  isBest ? "border-primary/60 ring-1 ring-primary/30" : "border-border"
+                } ${saved ? "opacity-90" : ""}`}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs text-muted">{game.startTime}</span>
+                  {isBest && (
+                    <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                      BEST BET (2×)
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  <button
+                    disabled={saved}
+                    onClick={() => selectSide(game.id, "away")}
+                    className={`p-3 rounded-lg border text-left transition ${
+                      pick?.pick === "away"
+                        ? "border-primary bg-primary/10"
+                        : "border-border hover:border-muted"
+                    } ${saved ? "cursor-default" : ""}`}
+                  >
+                    <div className="font-medium">{game.awayTeam}</div>
+                    <div className="text-xs text-muted mt-0.5">
+                      {formatSpread(displaySpread, displayFavorite, "away")}
+                    </div>
+                  </button>
+
+                  <button
+                    disabled={saved}
+                    onClick={() => selectSide(game.id, "home")}
+                    className={`p-3 rounded-lg border text-left transition ${
+                      pick?.pick === "home"
+                        ? "border-primary bg-primary/10"
+                        : "border-border hover:border-muted"
+                    } ${saved ? "cursor-default" : ""}`}
+                  >
+                    <div className="font-medium">{game.homeTeam}</div>
+                    <div className="text-xs text-muted mt-0.5">
+                      {formatSpread(displaySpread, displayFavorite, "home")}
+                    </div>
+                  </button>
+                </div>
+
+                {!saved && (
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex gap-1.5">
+                      {confidenceOptions.map((c) => {
+                        const usedElsewhere =
+                          usedConfidence.includes(c) && pick?.confidence !== c;
+                        return (
+                          <button
+                            key={c}
+                            disabled={usedElsewhere}
+                            onClick={() => selectConfidence(game.id, c)}
+                            className={`w-8 h-8 rounded text-sm font-medium transition ${
+                              pick?.confidence === c
+                                ? "bg-primary text-black"
+                                : usedElsewhere
+                                  ? "bg-border text-muted cursor-not-allowed"
+                                  : "bg-card-hover hover:bg-border"
+                            }`}
+                          >
+                            {c}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <button
+                      onClick={() => toggleBestBet(game.id)}
+                      className={`text-xs px-3 py-1.5 rounded-full border transition ${
+                        isBest
+                          ? "border-primary bg-primary/20 text-primary"
+                          : "border-border text-muted"
+                      }`}
+                    >
+                      {isBest ? "★ Best Bet" : "Set Best Bet"}
+                    </button>
+                  </div>
+                )}
+
+                {saved && pick && (
+                  <div className="text-xs text-muted">
+                    Confidence {pick.confidence}
+                    {pick.isBestBet ? " • Best Bet" : ""} • Line locked at{" "}
+                    {formatSpread(pick.lockedSpread, pick.lockedFavorite, pick.pick)}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="rounded-xl border border-border bg-card p-4 mb-8">
+          <div className="text-xs text-muted mb-1">Weekly Prop • {prop.points} pts</div>
+          <div className="font-medium mb-3">{prop.question}</div>
+          <div className="grid grid-cols-2 gap-3">
+            {prop.options.map((opt) => (
+              <button
+                key={opt}
+                disabled={saved}
+                onClick={() => setPropChoice(opt)}
+                className={`p-3 rounded-lg border text-sm transition ${
+                  propChoice === opt
+                    ? "border-primary bg-primary/10"
+                    : "border-border hover:border-muted"
+                }`}
+              >
+                {opt}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {!saved ? (
+          <button
+            disabled={!allGamesPicked}
+            onClick={lockIn}
+            className={`w-full py-3 rounded-xl font-semibold transition ${
+              allGamesPicked
+                ? "bg-primary text-black hover:bg-primary-dim"
+                : "bg-border text-muted cursor-not-allowed"
+            }`}
+          >
+            {allGamesPicked ? "Lock In Picks (freeze lines)" : "Finish all picks + Best Bet + Prop"}
+          </button>
+        ) : (
+          <div className="w-full py-3 rounded-xl font-semibold text-center bg-primary/20 text-primary border border-primary">
+            ✓ Picks Locked
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
