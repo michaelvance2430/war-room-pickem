@@ -1,27 +1,42 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Nav from "@/components/Nav";
 import { currentWeek } from "@/lib/mock-data";
 import { Game, Prop } from "@/lib/types";
 import { getMockOddsGames, fetchNcaafOdds } from "@/lib/odds";
 import { scoreWeek, GameResult } from "@/lib/scoring";
-import { isCommissioner, getSession } from "@/lib/league";
 import { applyWeekScores } from "@/lib/store";
+import {
+  isCommissioner,
+  getLeague,
+  getSession,
+  updateLeagueName,
+  updateLeagueSettings,
+  regenerateCode,
+  resetLeague,
+  League,
+} from "@/lib/league";
 
 const PICKS_KEY = "warroom-picks-week-1";
 const RESULTS_KEY = "warroom-results-week-1";
 const CARD_KEY = "warroom-card-week-1";
 
 export default function CommissionerPage() {
+  const router = useRouter();
   const [allowed, setAllowed] = useState<boolean | null>(null);
-  const [tab, setTab] = useState<"card" | "results">("card");
+  const [tab, setTab] = useState<"card" | "results" | "settings">("settings");
 
-  useEffect(() => {
-    setAllowed(isCommissioner());
-  }, []);
+  // League settings
+  const [league, setLeague] = useState<League | null>(null);
+  const [leagueNameEdit, setLeagueNameEdit] = useState("");
+  const [cutPercent, setCutPercent] = useState(50);
+  const [seasonWeeks, setSeasonWeeks] = useState(12);
+  const [settingsSaved, setSettingsSaved] = useState(false);
+  const [copied, setCopied] = useState(false);
 
-  // Card building
+  // Card
   const [availableGames, setAvailableGames] = useState<Game[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [publishedGames, setPublishedGames] = useState<Game[]>(currentWeek.games);
@@ -38,6 +53,14 @@ export default function CommissionerPage() {
   const [hasPlayerPicks, setHasPlayerPicks] = useState(false);
 
   useEffect(() => {
+    setAllowed(isCommissioner());
+    const lg = getLeague();
+    if (lg) {
+      setLeague(lg);
+      setLeagueNameEdit(lg.name);
+      setCutPercent(lg.settings?.cutPercent ?? 50);
+      setSeasonWeeks(lg.settings?.regularSeasonWeeks ?? 12);
+    }
     try {
       const cardRaw = localStorage.getItem(CARD_KEY);
       if (cardRaw) {
@@ -60,21 +83,19 @@ export default function CommissionerPage() {
     setLoadingOdds(true);
     setOddsError(null);
     try {
-      // Try real API first if key exists, otherwise use rich mock
-      const key = typeof process !== "undefined" ? process.env.NEXT_PUBLIC_ODDS_API_KEY : undefined;
+      const key =
+        typeof process !== "undefined" ? process.env.NEXT_PUBLIC_ODDS_API_KEY : undefined;
       let games: Game[];
       if (key) {
         games = await fetchNcaafOdds(key);
       } else {
-        // Simulated network delay
-        await new Promise((r) => setTimeout(r, 600));
+        await new Promise((r) => setTimeout(r, 500));
         games = getMockOddsGames();
       }
       setAvailableGames(games);
       setSelectedIds(new Set());
-    } catch (e: any) {
-      setOddsError(e.message || "Failed to pull odds");
-      // fallback
+    } catch (e: unknown) {
+      setOddsError(e instanceof Error ? e.message : "Failed to pull odds");
       setAvailableGames(getMockOddsGames());
     } finally {
       setLoadingOdds(false);
@@ -84,12 +105,8 @@ export default function CommissionerPage() {
   function toggleGame(id: string) {
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        if (next.size >= 5) return prev; // max 5
-        next.add(id);
-      }
+      if (next.has(id)) next.delete(id);
+      else if (next.size < 5) next.add(id);
       return next;
     });
   }
@@ -98,8 +115,7 @@ export default function CommissionerPage() {
     const selected = availableGames.filter((g) => selectedIds.has(g.id));
     if (selected.length !== 5) return;
     setPublishedGames(selected);
-    const payload = { games: selected, prop };
-    localStorage.setItem(CARD_KEY, JSON.stringify(payload));
+    localStorage.setItem(CARD_KEY, JSON.stringify({ games: selected, prop }));
     setCardSaved(true);
   }
 
@@ -112,10 +128,7 @@ export default function CommissionerPage() {
   function handleSaveResults() {
     localStorage.setItem(RESULTS_KEY, JSON.stringify({ results, propResult }));
     setResultsSaved(true);
-
-    // Update standings with this week's points
     applyWeekScores();
-
     try {
       const raw = localStorage.getItem(PICKS_KEY);
       if (raw) {
@@ -139,6 +152,42 @@ export default function CommissionerPage() {
     }
   }
 
+  function saveSettings() {
+    updateLeagueName(leagueNameEdit);
+    const updated = updateLeagueSettings({
+      cutPercent,
+      regularSeasonWeeks: seasonWeeks,
+      gamesPerWeek: 5,
+    });
+    if (updated) setLeague(updated);
+    setSettingsSaved(true);
+    setTimeout(() => setSettingsSaved(false), 1500);
+  }
+
+  function handleRegenCode() {
+    if (!confirm("Generate a new code? The old code will stop working.")) return;
+    const updated = regenerateCode();
+    if (updated) setLeague(updated);
+  }
+
+  function handleReset() {
+    if (
+      !confirm(
+        "Delete this league and all local data? You will need to create or join again."
+      )
+    )
+      return;
+    resetLeague();
+    router.push("/join");
+  }
+
+  function copyCode() {
+    if (!league) return;
+    navigator.clipboard?.writeText(league.code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
+
   const allResultsIn =
     publishedGames.every((g) => results[g.id]?.winner) && propResult !== null;
 
@@ -146,7 +195,9 @@ export default function CommissionerPage() {
     return (
       <div className="min-h-screen flex flex-col">
         <Nav />
-        <main className="flex-1 flex items-center justify-center text-muted">Loading…</main>
+        <main className="flex-1 flex items-center justify-center text-muted">
+          Loading…
+        </main>
       </div>
     );
   }
@@ -167,6 +218,8 @@ export default function CommissionerPage() {
     );
   }
 
+  const session = getSession();
+
   return (
     <div className="min-h-screen flex flex-col">
       <Nav />
@@ -174,44 +227,151 @@ export default function CommissionerPage() {
       <main className="flex-1 max-w-3xl mx-auto w-full px-4 py-8">
         <div className="mb-6">
           <h1 className="text-2xl font-bold">Commissioner Tools</h1>
-          <p className="text-sm text-muted">Pull live odds • Build the card • Enter results</p>
+          <p className="text-sm text-muted">
+            Settings • Build the card • Enter results
+          </p>
         </div>
 
-        <div className="flex gap-2 mb-6">
-          <button
-            onClick={() => setTab("card")}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
-              tab === "card" ? "bg-primary text-black" : "bg-card border border-border text-muted"
-            }`}
-          >
-            Build Card
-          </button>
-          <button
-            onClick={() => setTab("results")}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
-              tab === "results" ? "bg-primary text-black" : "bg-card border border-border text-muted"
-            }`}
-          >
-            Enter Results
-          </button>
+        <div className="flex flex-wrap gap-2 mb-6">
+          {(
+            [
+              ["settings", "Settings"],
+              ["card", "Build Card"],
+              ["results", "Enter Results"],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              onClick={() => setTab(id)}
+              className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
+                tab === id
+                  ? "bg-primary text-black"
+                  : "bg-card border border-border text-muted"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
 
+        {/* SETTINGS */}
+        {tab === "settings" && league && (
+          <div className="space-y-6">
+            <div className="rounded-xl border border-border bg-card p-5 space-y-4">
+              <h2 className="font-semibold">League</h2>
+              <div>
+                <label className="text-xs text-muted block mb-1">League name</label>
+                <input
+                  value={leagueNameEdit}
+                  onChange={(e) => setLeagueNameEdit(e.target.value)}
+                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-muted block mb-1">Invite code</label>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 font-mono text-2xl tracking-[0.25em] text-primary font-bold">
+                    {league.code}
+                  </div>
+                  <button
+                    onClick={copyCode}
+                    className="px-3 py-2 text-xs rounded-lg border border-border hover:bg-card-hover"
+                  >
+                    {copied ? "Copied" : "Copy"}
+                  </button>
+                  <button
+                    onClick={handleRegenCode}
+                    className="px-3 py-2 text-xs rounded-lg border border-border hover:bg-card-hover"
+                  >
+                    New code
+                  </button>
+                </div>
+                <p className="text-xs text-muted mt-2">
+                  Friends join at /join with this code (same device in demo mode).
+                </p>
+              </div>
+              <div className="text-sm text-muted">
+                Commissioner:{" "}
+                <span className="text-foreground font-medium">
+                  {session?.playerName || "You"}
+                </span>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-border bg-card p-5 space-y-4">
+              <h2 className="font-semibold">Season rules</h2>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-muted block mb-1">
+                    Cut line (% to Toilet Bowl)
+                  </label>
+                  <input
+                    type="number"
+                    min={10}
+                    max={75}
+                    value={cutPercent}
+                    onChange={(e) => setCutPercent(parseInt(e.target.value) || 50)}
+                    className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted block mb-1">
+                    Regular season weeks
+                  </label>
+                  <input
+                    type="number"
+                    min={4}
+                    max={16}
+                    value={seasonWeeks}
+                    onChange={(e) => setSeasonWeeks(parseInt(e.target.value) || 12)}
+                    className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-muted">
+                Games per week is fixed at 5. Bottom {cutPercent}% of each division
+                goes to the Toilet Bowl after week {seasonWeeks}.
+              </p>
+              <button
+                onClick={saveSettings}
+                className={`w-full py-3 rounded-xl font-semibold transition ${
+                  settingsSaved
+                    ? "bg-primary/20 text-primary border border-primary"
+                    : "bg-primary text-black"
+                }`}
+              >
+                {settingsSaved ? "✓ Settings saved" : "Save settings"}
+              </button>
+            </div>
+
+            <div className="rounded-xl border border-danger/40 bg-card p-5 space-y-3">
+              <h2 className="font-semibold text-danger">Danger zone</h2>
+              <p className="text-xs text-muted">
+                Resets league, players, picks, and results on this device.
+              </p>
+              <button
+                onClick={handleReset}
+                className="px-4 py-2 rounded-lg border border-danger text-danger text-sm hover:bg-danger/10"
+              >
+                Delete league & reset app
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* BUILD CARD */}
         {tab === "card" && (
           <>
             <div className="rounded-xl border border-border bg-card p-5 mb-6">
               <div className="flex items-center justify-between mb-3">
                 <div>
                   <h2 className="font-semibold">Pull Live Odds</h2>
-                  <p className="text-xs text-muted">
-                    {process.env.NEXT_PUBLIC_ODDS_API_KEY
-                      ? "Using The Odds API"
-                      : "Using demo data (add API key for live lines)"}
-                  </p>
+                  <p className="text-xs text-muted">Demo data unless API key is set</p>
                 </div>
                 <button
                   onClick={pullOdds}
                   disabled={loadingOdds}
-                  className="px-4 py-2 rounded-lg bg-primary text-black text-sm font-medium hover:bg-primary-dim disabled:opacity-50"
+                  className="px-4 py-2 rounded-lg bg-primary text-black text-sm font-medium disabled:opacity-50"
                 >
                   {loadingOdds ? "Pulling…" : "Pull Odds"}
                 </button>
@@ -224,10 +384,7 @@ export default function CommissionerPage() {
                 <h2 className="font-semibold mb-1">
                   Select 5 Games ({selectedIds.size}/5)
                 </h2>
-                <p className="text-xs text-muted mb-4">
-                  Click games to add them to this week’s card
-                </p>
-                <div className="space-y-2 max-h-96 overflow-y-auto">
+                <div className="space-y-2 max-h-96 overflow-y-auto mt-4">
                   {availableGames.map((g) => {
                     const selected = selectedIds.has(g.id);
                     return (
@@ -241,51 +398,40 @@ export default function CommissionerPage() {
                         }`}
                       >
                         <div className="flex justify-between items-center">
-                          <div>
-                            <span className="font-medium">
-                              {g.awayTeam} @ {g.homeTeam}
-                            </span>
-                            <span className="text-xs text-muted ml-2">{g.startTime}</span>
-                          </div>
-                          <div className="text-sm">
-                            {g.favorite === "home" ? g.homeTeam : g.awayTeam}{" "}
-                            <span className="text-primary">
-                              {g.spread > 0 ? `+${g.spread}` : g.spread}
-                            </span>
-                          </div>
+                          <span className="font-medium">
+                            {g.awayTeam} @ {g.homeTeam}
+                          </span>
+                          <span className="text-sm text-primary">
+                            {g.spread > 0 ? `+${g.spread}` : g.spread}
+                          </span>
                         </div>
-                        {g.bookmaker && (
-                          <div className="text-xs text-muted mt-1">{g.bookmaker}</div>
-                        )}
                       </button>
                     );
                   })}
                 </div>
-
                 <button
                   disabled={selectedIds.size !== 5}
                   onClick={publishCard}
-                  className={`w-full mt-4 py-3 rounded-xl font-semibold transition ${
+                  className={`w-full mt-4 py-3 rounded-xl font-semibold ${
                     selectedIds.size === 5
-                      ? "bg-primary text-black hover:bg-primary-dim"
+                      ? "bg-primary text-black"
                       : "bg-border text-muted cursor-not-allowed"
                   }`}
                 >
-                  {selectedIds.size === 5
-                    ? "Publish These 5 Games"
-                    : `Select ${5 - selectedIds.size} more`}
+                  Publish These 5 Games
                 </button>
               </div>
             )}
 
             {cardSaved && (
               <div className="rounded-xl border border-primary/40 bg-card p-4 text-sm text-primary">
-                ✓ Week card published with {publishedGames.length} games. Players can now pick.
+                ✓ Week card published ({publishedGames.length} games)
               </div>
             )}
           </>
         )}
 
+        {/* RESULTS */}
         {tab === "results" && (
           <>
             <div className="rounded-xl border border-border bg-card p-5 mb-6">
@@ -303,11 +449,9 @@ export default function CommissionerPage() {
                           <button
                             key={side}
                             onClick={() => setGameWinner(game.id, side)}
-                            className={`py-2 rounded-lg text-sm border transition ${
+                            className={`py-2 rounded-lg text-sm border ${
                               res?.winner === side
-                                ? side === "push"
-                                  ? "border-warning bg-warning/10 text-warning"
-                                  : "border-primary bg-primary/10 text-primary"
+                                ? "border-primary bg-primary/10 text-primary"
                                 : "border-border"
                             }`}
                           >
@@ -363,12 +507,14 @@ export default function CommissionerPage() {
             {demoScore && (
               <div className="rounded-xl border border-border bg-card p-5">
                 <h3 className="font-semibold mb-3">Your Picks Scored</h3>
-                <div className="text-2xl font-bold text-primary">{demoScore.totalPoints} pts</div>
+                <div className="text-2xl font-bold text-primary">
+                  {demoScore.totalPoints} pts
+                </div>
               </div>
             )}
             {resultsSaved && !hasPlayerPicks && (
               <p className="text-sm text-muted mt-3">
-                No picks found. Make picks first, then re-save results.
+                No picks found. Lock picks first, then re-save results.
               </p>
             )}
           </>

@@ -4,12 +4,19 @@ import { loadPlayers, savePlayers } from "./store";
 const LEAGUE_KEY = "warroom-league";
 const SESSION_KEY = "warroom-session";
 
+export interface LeagueSettings {
+  cutPercent: number; // bottom X% to Toilet Bowl
+  regularSeasonWeeks: number;
+  gamesPerWeek: number;
+}
+
 export interface League {
   id: string;
   name: string;
   code: string;
   commissionerId: string;
   createdAt: string;
+  settings: LeagueSettings;
 }
 
 export interface Session {
@@ -18,6 +25,12 @@ export interface Session {
   isCommissioner: boolean;
   leagueId: string;
 }
+
+const DEFAULT_SETTINGS: LeagueSettings = {
+  cutPercent: 50,
+  regularSeasonWeeks: 12,
+  gamesPerWeek: 5,
+};
 
 function canUseStorage() {
   return typeof window !== "undefined" && typeof localStorage !== "undefined";
@@ -36,7 +49,10 @@ export function getLeague(): League | null {
   if (!canUseStorage()) return null;
   try {
     const raw = localStorage.getItem(LEAGUE_KEY);
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+    const league = JSON.parse(raw) as League;
+    if (!league.settings) league.settings = { ...DEFAULT_SETTINGS };
+    return league;
   } catch {
     return null;
   }
@@ -57,6 +73,36 @@ export function isCommissioner(): boolean {
   return !!session?.isCommissioner;
 }
 
+export function updateLeagueName(name: string): League | null {
+  const league = getLeague();
+  if (!league) return null;
+  league.name = name.trim() || league.name;
+  if (canUseStorage()) {
+    localStorage.setItem(LEAGUE_KEY, JSON.stringify(league));
+  }
+  return league;
+}
+
+export function updateLeagueSettings(partial: Partial<LeagueSettings>): League | null {
+  const league = getLeague();
+  if (!league) return null;
+  league.settings = { ...DEFAULT_SETTINGS, ...(league.settings || {}), ...partial };
+  if (canUseStorage()) {
+    localStorage.setItem(LEAGUE_KEY, JSON.stringify(league));
+  }
+  return league;
+}
+
+export function regenerateCode(): League | null {
+  const league = getLeague();
+  if (!league) return null;
+  league.code = generateCode();
+  if (canUseStorage()) {
+    localStorage.setItem(LEAGUE_KEY, JSON.stringify(league));
+  }
+  return league;
+}
+
 export function createLeague(leagueName: string, commissionerName: string): {
   league: League;
   session: Session;
@@ -68,6 +114,7 @@ export function createLeague(leagueName: string, commissionerName: string): {
     code: generateCode(),
     commissionerId: playerId,
     createdAt: new Date().toISOString(),
+    settings: { ...DEFAULT_SETTINGS },
   };
 
   const session: Session = {
@@ -77,7 +124,6 @@ export function createLeague(leagueName: string, commissionerName: string): {
     leagueId: league.id,
   };
 
-  // Seed commissioner as player id "1" for scoring compatibility + fresh roster
   const commissioner: Player = {
     id: "1",
     name: session.playerName,
@@ -100,7 +146,6 @@ export function createLeague(leagueName: string, commissionerName: string): {
   if (canUseStorage()) {
     localStorage.setItem(LEAGUE_KEY, JSON.stringify(league));
     localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-    // Keep mock field for demo depth, but put commissioner first as id 1
     const existing = loadPlayers().filter((p) => p.id !== "1");
     savePlayers([commissioner, ...existing]);
   }
@@ -128,7 +173,6 @@ export function joinLeague(
 
   const players = loadPlayers();
   if (players.some((p) => p.name.toLowerCase() === name.toLowerCase())) {
-    // Re-join as existing name
     const existing = players.find(
       (p) => p.name.toLowerCase() === name.toLowerCase()
     )!;
@@ -189,4 +233,8 @@ export function resetLeague() {
   if (!canUseStorage()) return;
   localStorage.removeItem(LEAGUE_KEY);
   localStorage.removeItem(SESSION_KEY);
+  localStorage.removeItem("warroom-players");
+  localStorage.removeItem("warroom-picks-week-1");
+  localStorage.removeItem("warroom-results-week-1");
+  localStorage.removeItem("warroom-card-week-1");
 }

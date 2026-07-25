@@ -2,48 +2,184 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import {
-  createLeague,
-  joinLeague,
-  getLeague,
-  getSession,
-} from "@/lib/league";
+import { createClient } from "@/lib/supabase/client";
+import Link from "next/link";
+
+function generateCode(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "";
+  for (let i = 0; i < 6; i++) {
+    code += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return code;
+}
 
 export default function JoinPage() {
   const router = useRouter();
+  const [userId, setUserId] = useState<string | null>(null);
+  const [displayName, setDisplayName] = useState("");
   const [mode, setMode] = useState<"choose" | "create" | "join">("choose");
   const [leagueName, setLeagueName] = useState("War Room");
-  const [displayName, setDisplayName] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const [createdCode, setCreatedCode] = useState<string | null>(null);
+  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    const session = getSession();
-    const league = getLeague();
-    if (session && league) {
-      router.replace("/");
-    }
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => {
+      if (!data.user) {
+        router.replace("/login");
+        return;
+      }
+      setUserId(data.user.id);
+      const metaName = data.user.user_metadata?.display_name as string | undefined;
+      setDisplayName(metaName || data.user.email?.split("@")[0] || "Player");
+      setChecking(false);
+    });
   }, [router]);
 
-  function handleCreate() {
+  async function handleCreate() {
+    if (!userId) return;
     setError(null);
-    if (!displayName.trim()) {
-      setError("Enter your name.");
-      return;
+    setLoading(true);
+    const supabase = createClient();
+    const newCode = generateCode();
+
+    try {
+      // Ensure profile exists
+      await supabase.from("profiles").upsert({
+        id: userId,
+        display_name: displayName.trim() || "Commissioner",
+      });
+
+      const { data: league, error: leagueError } = await supabase
+        .from("leagues")
+        .insert({
+          name: leagueName.trim() || "War Room",
+          code: newCode,
+          commissioner_id: userId,
+        })
+        .select()
+        .single();
+
+      if (leagueError) throw leagueError;
+
+      const { error: memError } = await supabase.from("memberships").insert({
+        league_id: league.id,
+        user_id: userId,
+        role: "commissioner",
+        division: "North",
+      });
+      if (memError) throw memError;
+
+      localStorage.setItem(
+        "warroom-session",
+        JSON.stringify({
+          playerId: userId,
+          playerName: displayName.trim() || "Commissioner",
+          isCommissioner: true,
+          leagueId: league.id,
+        })
+      );
+      localStorage.setItem(
+        "warroom-league",
+        JSON.stringify({
+          id: league.id,
+          name: league.name,
+          code: league.code,
+          commissionerId: userId,
+          createdAt: league.created_at,
+          settings: {
+            cutPercent: league.cut_percent,
+            regularSeasonWeeks: league.regular_season_weeks,
+            gamesPerWeek: league.games_per_week,
+          },
+        })
+      );
+
+      setCreatedCode(newCode);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Could not create league");
+    } finally {
+      setLoading(false);
     }
-    const { league } = createLeague(leagueName, displayName);
-    setCreatedCode(league.code);
   }
 
-  function handleJoin() {
+  async function handleJoin() {
+    if (!userId) return;
     setError(null);
-    const result = joinLeague(code, displayName);
-    if (!result.ok) {
-      setError(result.error || "Could not join.");
-      return;
+    setLoading(true);
+    const supabase = createClient();
+
+    try {
+      await supabase.from("profiles").upsert({
+        id: userId,
+        display_name: displayName.trim() || "Player",
+      });
+
+      const { data: league, error: findError } = await supabase
+        .from("leagues")
+        .select("*")
+        .eq("code", code.trim().toUpperCase())
+        .single();
+
+      if (findError || !league) {
+        throw new Error("Invalid league code");
+      }
+
+      const { error: memError } = await supabase.from("memberships").upsert(
+        {
+          league_id: league.id,
+          user_id: userId,
+          role: "player",
+          division: "North",
+        },
+        { onConflict: "league_id,user_id" }
+      );
+      if (memError) throw memError;
+
+      localStorage.setItem(
+        "warroom-session",
+        JSON.stringify({
+          playerId: userId,
+          playerName: displayName.trim() || "Player",
+          isCommissioner: league.commissioner_id === userId,
+          leagueId: league.id,
+        })
+      );
+      localStorage.setItem(
+        "warroom-league",
+        JSON.stringify({
+          id: league.id,
+          name: league.name,
+          code: league.code,
+          commissionerId: league.commissioner_id,
+          createdAt: league.created_at,
+          settings: {
+            cutPercent: league.cut_percent,
+            regularSeasonWeeks: league.regular_season_weeks,
+            gamesPerWeek: league.games_per_week,
+          },
+        })
+      );
+
+      router.push("/");
+      router.refresh();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Could not join");
+    } finally {
+      setLoading(false);
     }
-    router.push("/");
+  }
+
+  if (checking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-muted">
+        Loading…
+      </div>
+    );
   }
 
   if (createdCode) {
@@ -52,13 +188,16 @@ export default function JoinPage() {
         <div className="max-w-md w-full rounded-xl border border-border bg-card p-6 text-center">
           <h1 className="text-2xl font-bold mb-2">League created</h1>
           <p className="text-sm text-muted mb-4">
-            You&apos;re the commissioner. Share this code with friends:
+            Share this code with your friend:
           </p>
           <div className="text-3xl font-bold tracking-[0.3em] text-primary mb-6">
             {createdCode}
           </div>
           <button
-            onClick={() => router.push("/")}
+            onClick={() => {
+              router.push("/");
+              router.refresh();
+            }}
             className="w-full py-3 rounded-xl bg-primary text-black font-semibold"
           >
             Enter the War Room
@@ -77,7 +216,7 @@ export default function JoinPage() {
           </div>
           <h1 className="text-2xl font-bold">War Room Pick&apos;Em</h1>
           <p className="text-sm text-muted mt-1">
-            Create a league or join with a code
+            Signed in as {displayName}
           </p>
         </div>
 
@@ -95,6 +234,9 @@ export default function JoinPage() {
             >
               Join with code
             </button>
+            <Link href="/login" className="block text-center text-xs text-muted mt-4">
+              Switch account
+            </Link>
           </div>
         )}
 
@@ -114,21 +256,18 @@ export default function JoinPage() {
               <input
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="Commissioner"
                 className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary"
               />
             </div>
             {error && <p className="text-sm text-danger">{error}</p>}
             <button
               onClick={handleCreate}
-              className="w-full py-3 rounded-xl bg-primary text-black font-semibold"
+              disabled={loading}
+              className="w-full py-3 rounded-xl bg-primary text-black font-semibold disabled:opacity-50"
             >
-              Create & get code
+              {loading ? "Creating…" : "Create & get code"}
             </button>
-            <button
-              onClick={() => setMode("choose")}
-              className="w-full text-sm text-muted"
-            >
+            <button onClick={() => setMode("choose")} className="w-full text-sm text-muted">
               Back
             </button>
           </div>
@@ -152,24 +291,18 @@ export default function JoinPage() {
               <input
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="Display name"
                 className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary"
               />
             </div>
             {error && <p className="text-sm text-danger">{error}</p>}
-            <p className="text-xs text-muted">
-              Demo note: join works on the same device/browser that created the league (shared local data). Real multi-device needs a backend later.
-            </p>
             <button
               onClick={handleJoin}
-              className="w-full py-3 rounded-xl bg-primary text-black font-semibold"
+              disabled={loading}
+              className="w-full py-3 rounded-xl bg-primary text-black font-semibold disabled:opacity-50"
             >
-              Join
+              {loading ? "Joining…" : "Join"}
             </button>
-            <button
-              onClick={() => setMode("choose")}
-              className="w-full text-sm text-muted"
-            >
+            <button onClick={() => setMode("choose")} className="w-full text-sm text-muted">
               Back
             </button>
           </div>

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Nav from "@/components/Nav";
 import Link from "next/link";
 import { getSession, getLeague } from "@/lib/league";
+import { createClient } from "@/lib/supabase/client";
 
 export default function Home() {
   const router = useRouter();
@@ -13,15 +14,22 @@ export default function Home() {
   const [isCommish, setIsCommish] = useState(false);
 
   useEffect(() => {
-    const session = getSession();
-    const league = getLeague();
-    if (!session || !league) {
-      router.replace("/join");
-      return;
-    }
-    setLeagueCode(league.code);
-    setIsCommish(!!session.isCommissioner);
-    setReady(true);
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => {
+      if (!data.user) {
+        router.replace("/login");
+        return;
+      }
+      const session = getSession();
+      const league = getLeague();
+      if (!session || !league) {
+        router.replace("/join");
+        return;
+      }
+      setLeagueCode(league.code);
+      setIsCommish(!!session.isCommissioner);
+      setReady(true);
+    });
   }, [router]);
 
   if (!ready) {
@@ -97,16 +105,6 @@ export default function Home() {
             <div className="text-xs text-muted relative">Single elimination • Flush or be flushed</div>
           </Link>
         </section>
-
-        <section className="rounded-xl border border-border bg-card p-6">
-          <h2 className="font-semibold mb-4">How the War Room Works</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-            <Step num="1" title="Weekly Card" desc="5 ATS games + confidence 1-5 + Best Bet + one prop" />
-            <Step num="2" title="Divisions" desc="Four equal groups. Rank inside your division matters." />
-            <Step num="3" title="The Cut" desc="Bottom 50% of each division gets sent to the Toilet Bowl." />
-            <Step num="4" title="Brackets" desc="Heads-up single elim. Higher score advances every week." />
-          </div>
-        </section>
       </main>
 
       <footer className="border-t border-border py-6 text-center text-xs text-muted">
@@ -139,20 +137,6 @@ function StatusCard({
       <div className="text-xs text-muted mb-1">{label}</div>
       <div className={`text-2xl font-bold ${accentClass}`}>{value}</div>
       <div className="text-xs text-muted mt-1">{sub}</div>
-    </div>
-  );
-}
-
-function Step({ num, title, desc }: { num: string; title: string; desc: string }) {
-  return (
-    <div>
-      <div className="flex items-center gap-2 mb-1">
-        <span className="w-5 h-5 rounded-full bg-primary/20 text-primary text-xs flex items-center justify-center font-bold">
-          {num}
-        </span>
-        <span className="font-medium">{title}</span>
-      </div>
-      <p className="text-muted text-xs leading-relaxed pl-7">{desc}</p>
     </div>
   );
 }
