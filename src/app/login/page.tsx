@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import Link from "next/link";
 
 export default function LoginPage() {
@@ -21,9 +21,12 @@ export default function LoginPage() {
     setMessage(null);
     setLoading(true);
 
-    const supabase = createClient();
-
     try {
+      if (!hasSupabaseConfig()) {
+        throw new Error("Supabase is not configured on this deployment.");
+      }
+      const supabase = createClient();
+
       if (mode === "signup") {
         const { data, error: signError } = await supabase.auth.signUp({
           email: email.trim(),
@@ -37,7 +40,9 @@ export default function LoginPage() {
           router.push("/join");
           router.refresh();
         } else {
-          setMessage("Check your email to confirm, then log in. (Or disable email confirm in Supabase for testing.)");
+          setMessage(
+            "Check your email to confirm, then log in. (Or disable email confirm in Supabase Auth settings for testing.)"
+          );
         }
       } else {
         const { error: loginError } = await supabase.auth.signInWithPassword({

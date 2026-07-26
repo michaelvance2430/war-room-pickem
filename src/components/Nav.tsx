@@ -64,14 +64,17 @@ export default function Nav() {
               Commissioner
             </Link>
           )}
+          <Link href="/account" className="hover:text-foreground transition">
+            Account
+          </Link>
         </nav>
 
-        <div className="text-sm text-muted">
+        <Link href="/account" className="text-sm text-muted hover:text-foreground">
           {name}
           {isCommish && (
             <span className="ml-1 text-xs text-primary">(Commish)</span>
           )}
-        </div>
+        </Link>
       </div>
     </header>
   );

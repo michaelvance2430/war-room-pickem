@@ -5,32 +5,134 @@ import { useRouter } from "next/navigation";
 import Nav from "@/components/Nav";
 import Link from "next/link";
 import { getSession, getLeague } from "@/lib/league";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
+import {
+  restoreSessionFromCloud,
+  switchToLeague,
+  LeagueMembership,
+} from "@/lib/session-restore";
 
 export default function Home() {
   const router = useRouter();
   const [ready, setReady] = useState(false);
   const [leagueCode, setLeagueCode] = useState<string | null>(null);
+  const [leagueName, setLeagueName] = useState<string | null>(null);
   const [isCommish, setIsCommish] = useState(false);
+  const [bootError, setBootError] = useState<string | null>(null);
+  const [pickList, setPickList] = useState<LeagueMembership[] | null>(null);
 
   useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data }) => {
-      if (!data.user) {
-        router.replace("/login");
-        return;
+    async function boot() {
+      try {
+        if (!hasSupabaseConfig()) {
+          setBootError("Supabase keys missing on this deployment.");
+          return;
+        }
+
+        const supabase = createClient();
+        const { data, error } = await supabase.auth.getUser();
+        if (error) {
+          setBootError(error.message);
+          return;
+        }
+        if (!data.user) {
+          router.replace("/login");
+          return;
+        }
+
+        // Prefer existing local session if present
+        let session = getSession();
+        let league = getLeague();
+
+        if (!session || !league) {
+          const restored = await restoreSessionFromCloud();
+          if (restored.status === "no_auth") {
+            router.replace("/login");
+            return;
+          }
+          if (restored.status === "no_leagues") {
+            router.replace("/join");
+            return;
+          }
+          if (restored.status === "pick_league") {
+            setPickList(restored.memberships);
+            return;
+          }
+          session = restored.session;
+          league = restored.league;
+        }
+
+        setLeagueCode(league.code);
+        setLeagueName(league.name);
+        setIsCommish(!!session.isCommissioner);
+        setReady(true);
+      } catch (e: unknown) {
+        setBootError(e instanceof Error ? e.message : "Failed to start");
       }
-      const session = getSession();
-      const league = getLeague();
-      if (!session || !league) {
-        router.replace("/join");
-        return;
-      }
-      setLeagueCode(league.code);
-      setIsCommish(!!session.isCommissioner);
-      setReady(true);
-    });
+    }
+    boot();
   }, [router]);
+
+  async function chooseLeague(leagueId: string) {
+    const ok = await switchToLeague(leagueId);
+    if (!ok) {
+      setBootError("Could not switch league");
+      return;
+    }
+    const session = getSession();
+    const league = getLeague();
+    if (!session || !league) {
+      setBootError("Session missing after switch");
+      return;
+    }
+    setPickList(null);
+    setLeagueCode(league.code);
+    setLeagueName(league.name);
+    setIsCommish(!!session.isCommissioner);
+    setReady(true);
+  }
+
+  if (bootError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4">
+        <div className="max-w-md text-center text-sm text-danger">{bootError}</div>
+      </div>
+    );
+  }
+
+  if (pickList) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4">
+        <div className="max-w-md w-full rounded-xl border border-border bg-card p-6">
+          <h1 className="text-xl font-bold mb-2">Choose a league</h1>
+          <p className="text-sm text-muted mb-4">
+            You belong to more than one. Pick which War Room to open.
+          </p>
+          <div className="space-y-2">
+            {pickList.map((m) => (
+              <button
+                key={m.leagueId}
+                onClick={() => chooseLeague(m.leagueId)}
+                className="w-full text-left px-4 py-3 rounded-lg border border-border hover:border-primary transition"
+              >
+                <div className="font-medium">{m.leagueName}</div>
+                <div className="text-xs text-muted">
+                  Code {m.code}
+                  {m.role === "commissioner" ? " · Commissioner" : ""}
+                </div>
+              </button>
+            ))}
+          </div>
+          <Link
+            href="/join"
+            className="block text-center text-sm text-muted mt-4 hover:text-foreground"
+          >
+            Create or join another league
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   if (!ready) {
     return (
@@ -43,7 +145,6 @@ export default function Home() {
   return (
     <div className="min-h-screen flex flex-col">
       <Nav />
-
       <main className="flex-1 max-w-6xl mx-auto w-full px-4 py-8">
         <section className="mb-10">
           <h1 className="text-3xl sm:text-4xl font-bold tracking-tight mb-2">
@@ -51,92 +152,34 @@ export default function Home() {
           </h1>
           <p className="text-muted max-w-xl">
             Pick against the spread. Stack confidence. Hit the Best Bet.
-            Survive your division… or get flushed into the Toilet Bowl.
           </p>
-          {isCommish && leagueCode && (
-            <p className="text-sm mt-3">
-              <span className="text-muted">League code: </span>
-              <span className="font-mono font-bold text-primary tracking-widest">
-                {leagueCode}
-              </span>
-              <span className="text-muted text-xs ml-2">Share with friends</span>
+          {leagueName && (
+            <p className="text-sm mt-3 text-muted">
+              League: <span className="text-foreground font-medium">{leagueName}</span>
+              {isCommish && leagueCode && (
+                <>
+                  {" · "}
+                  <span className="font-mono text-primary tracking-widest">{leagueCode}</span>
+                </>
+              )}
             </p>
           )}
         </section>
-
-        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-          <StatusCard label="Current Week" value="Week 1" sub="Picks lock Saturday" accent="primary" />
-          <StatusCard label="Your Division" value="North" sub="See Players" accent="primary" />
-          <StatusCard label="Your Rank" value="—" sub="Season not started" accent="muted" />
-          <StatusCard label="Power Rank" value="—" sub="Form ranking" accent="muted" />
-        </section>
-
-        <section className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Link
             href="/championship"
-            className="rounded-xl border border-border bg-card p-6 hover:bg-card-hover transition block"
+            className="rounded-xl border border-border bg-card p-6 block"
           >
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-primary font-semibold">Championship Bracket</span>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
-                Top 50%
-              </span>
-            </div>
-            <p className="text-sm text-muted mb-4">
-              Division winners locked as seeds 1–4. Survive the cut and fight for the title.
-            </p>
-            <div className="text-xs text-muted">Single elimination • Same weekly card</div>
+            <span className="text-primary font-semibold">Championship Bracket</span>
           </Link>
-
           <Link
             href="/toilet-bowl"
-            className="rounded-xl border border-toilet/40 bg-card p-6 relative overflow-hidden hover:bg-card-hover transition block"
+            className="rounded-xl border border-toilet/40 bg-card p-6 block"
           >
-            <div className="absolute top-0 right-0 w-24 h-24 bg-toilet/10 rounded-full -translate-y-8 translate-x-8" />
-            <div className="flex items-center gap-2 mb-3 relative">
-              <span className="text-toilet font-semibold">Toilet Bowl</span>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-toilet/10 text-toilet">
-                Bottom 50%
-              </span>
-            </div>
-            <p className="text-sm text-muted mb-4 relative">
-              Worst record gets the easiest path. Full chaotic energy.
-            </p>
-            <div className="text-xs text-muted relative">Single elimination • Flush or be flushed</div>
+            <span className="text-toilet font-semibold">Toilet Bowl</span>
           </Link>
         </section>
       </main>
-
-      <footer className="border-t border-border py-6 text-center text-xs text-muted">
-        War Room Pick&apos;Em • Fun. Shit-talking. Camaraderie.
-      </footer>
-    </div>
-  );
-}
-
-function StatusCard({
-  label,
-  value,
-  sub,
-  accent,
-}: {
-  label: string;
-  value: string;
-  sub: string;
-  accent: "primary" | "muted" | "toilet";
-}) {
-  const accentClass =
-    accent === "primary"
-      ? "text-primary"
-      : accent === "toilet"
-        ? "text-toilet"
-        : "text-muted";
-
-  return (
-    <div className="rounded-xl border border-border bg-card p-4 hover:bg-card-hover transition">
-      <div className="text-xs text-muted mb-1">{label}</div>
-      <div className={`text-2xl font-bold ${accentClass}`}>{value}</div>
-      <div className="text-xs text-muted mt-1">{sub}</div>
     </div>
   );
 }

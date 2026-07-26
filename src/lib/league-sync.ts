@@ -7,6 +7,7 @@ import {
 } from "@/lib/league";
 
 const LEAGUE_KEY = "warroom-league";
+const SESSION_KEY = "warroom-session";
 
 function canUseStorage() {
   return typeof window !== "undefined" && typeof localStorage !== "undefined";
@@ -36,6 +37,7 @@ function toLocalLeague(row: {
   };
 }
 
+/** Load league from Supabase by id and cache in localStorage */
 export async function fetchLeagueFromCloud(
   leagueId: string
 ): Promise<League | null> {
@@ -55,12 +57,14 @@ export async function fetchLeagueFromCloud(
   return league;
 }
 
+/** Refresh current session league from Supabase */
 export async function syncLeagueFromCloud(): Promise<League | null> {
   const session = getSession();
   if (!session?.leagueId) return getLeague();
   return fetchLeagueFromCloud(session.leagueId);
 }
 
+/** Push name + settings to Supabase and update local cache */
 export async function saveLeagueToCloud(opts: {
   name?: string;
   settings?: Partial<LeagueSettings>;
@@ -104,6 +108,7 @@ export async function saveLeagueToCloud(opts: {
   return { ok: true, league };
 }
 
+/** Regenerate invite code in cloud */
 export async function regenerateCodeInCloud(): Promise<{
   ok: boolean;
   league?: League;

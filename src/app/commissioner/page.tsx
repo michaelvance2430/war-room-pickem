@@ -1,376 +1,597 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Nav from "@/components/Nav";
 import { currentWeek } from "@/lib/mock-data";
-import { Game, UserPick, Prop } from "@/lib/types";
-import { loadWeekCard, savePicksToCloud, loadMyPicks } from "@/lib/cloud";
+import { Game, Prop } from "@/lib/types";
+import { getMockOddsGames, fetchNcaafOdds } from "@/lib/odds";
+import { scoreWeek, GameResult } from "@/lib/scoring";
+import { applyWeekScores } from "@/lib/store";
+import {
+  isCommissioner,
+  getLeague,
+  getSession,
+  resetLeague,
+  League,
+} from "@/lib/league";
+import {
+  syncLeagueFromCloud,
+  saveLeagueToCloud,
+  regenerateCodeInCloud,
+} from "@/lib/league-sync";
+import {
+  publishWeekCard,
+  loadWeekCard,
+  saveResultsAndScoreWeek,
+} from "@/lib/cloud";
 
-function formatSpread(spread: number, favorite: "home" | "away", side: "home" | "away") {
-  const isFavorite = favorite === side;
-  if (isFavorite) {
-    return spread < 0 ? `${spread}` : `-${Math.abs(spread)}`;
-  }
-  return `+${Math.abs(spread)}`;
-}
-
-const STORAGE_KEY = "warroom-picks-week-1";
+const PICKS_KEY = "warroom-picks-week-1";
+const RESULTS_KEY = "warroom-results-week-1";
 const CARD_KEY = "warroom-card-week-1";
 
-export default function PicksPage() {
-  const [games, setGames] = useState<Game[]>(currentWeek.games);
-  const [picks, setPicks] = useState<Record<string, UserPick>>({});
-  const [bestBetId, setBestBetId] = useState<string | null>(null);
-  const [propChoice, setPropChoice] = useState<string | null>(null);
-  const [usedConfidence, setUsedConfidence] = useState<number[]>([]);
-  const [saved, setSaved] = useState(false);
-  const [loaded, setLoaded] = useState(false);
+export default function CommissionerPage() {
+  const router = useRouter();
+  const [allowed, setAllowed] = useState<boolean | null>(null);
+  const [tab, setTab] = useState<"card" | "results" | "settings">("settings");
+  const [league, setLeague] = useState<League | null>(null);
+  const [leagueNameEdit, setLeagueNameEdit] = useState("");
+  const [cutPercent, setCutPercent] = useState(50);
+  const [seasonWeeks, setSeasonWeeks] = useState(12);
+  const [settingsSaved, setSettingsSaved] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [availableGames, setAvailableGames] = useState<Game[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [publishedGames, setPublishedGames] = useState<Game[]>(currentWeek.games);
   const [prop, setProp] = useState<Prop>(currentWeek.prop);
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
+  const [loadingOdds, setLoadingOdds] = useState(false);
+  const [oddsError, setOddsError] = useState<string | null>(null);
+  const [cardSaved, setCardSaved] = useState(false);
+  const [results, setResults] = useState<Record<string, GameResult>>({});
+  const [propResult, setPropResult] = useState<string | null>(null);
+  const [resultsSaved, setResultsSaved] = useState(false);
+  const [demoScore, setDemoScore] = useState<{ totalPoints: number } | null>(null);
+  const [hasPlayerPicks, setHasPlayerPicks] = useState(false);
+  const [scoring, setScoring] = useState(false);
+  const [scoreReport, setScoreReport] = useState<string | null>(null);
 
   useEffect(() => {
+    setAllowed(isCommissioner());
     async function load() {
-      try {
-        const cloud = await loadWeekCard(1);
-        if (cloud) {
-          setGames(cloud.games);
-          setProp(cloud.prop);
-        } else {
-          const cardRaw = localStorage.getItem(CARD_KEY);
-          if (cardRaw) {
-            const data = JSON.parse(cardRaw);
-            if (data.games?.length) setGames(data.games);
-            if (data.prop) setProp(data.prop);
-          }
-        }
-
-        const mine = await loadMyPicks(1);
-        if (mine) {
-          setPicks(mine.picks || {});
-          setBestBetId(mine.bestBetId || null);
-          setPropChoice(mine.propChoice || null);
-          setSaved(!!mine.lockedAt);
-          const used = Object.values(mine.picks || {})
-            .map((p) => p.confidence)
-            .filter((c) => c > 0);
-          setUsedConfidence(used);
-        } else {
-          const raw = localStorage.getItem(STORAGE_KEY);
-          if (raw) {
-            const data = JSON.parse(raw);
-            setPicks(data.picks || {});
-            setBestBetId(data.bestBetId || null);
-            setPropChoice(data.propChoice || null);
-            setUsedConfidence(data.usedConfidence || []);
-            setSaved(!!data.lockedAt);
-          }
-        }
-      } catch {
-        // fall back silent
+      const lg = (await syncLeagueFromCloud()) || getLeague();
+      if (lg) {
+        setLeague(lg);
+        setLeagueNameEdit(lg.name);
+        setCutPercent(lg.settings?.cutPercent ?? 50);
+        setSeasonWeeks(lg.settings?.regularSeasonWeeks ?? 12);
       }
-      setLoaded(true);
     }
     load();
+    loadWeekCard(1).then((cloud) => {
+      if (cloud) {
+        setPublishedGames(cloud.games);
+        setProp(cloud.prop);
+        setCardSaved(true);
+      }
+    });
+    try {
+      const cardRaw = localStorage.getItem(CARD_KEY);
+      if (cardRaw) {
+        const data = JSON.parse(cardRaw);
+        if (data.games) setPublishedGames(data.games);
+        if (data.prop) setProp(data.prop);
+        setCardSaved(true);
+      }
+      const resRaw = localStorage.getItem(RESULTS_KEY);
+      if (resRaw) {
+        const data = JSON.parse(resRaw);
+        setResults(data.results || {});
+        setPropResult(data.propResult || null);
+        setResultsSaved(true);
+      }
+    } catch {
+      // ignore
+    }
   }, []);
 
-  const confidenceOptions = [1, 2, 3, 4, 5];
-
-  function selectSide(gameId: string, side: "home" | "away") {
-    /* editable until kickoff */
-    const game = games.find((g) => g.id === gameId);
-    if (!game) return;
-
-    setPicks((prev) => ({
-      ...prev,
-      [gameId]: {
-        gameId,
-        pick: side,
-        confidence: prev[gameId]?.confidence ?? 0,
-        isBestBet: bestBetId === gameId,
-        lockedSpread: game.spread,
-        lockedFavorite: game.favorite,
-      },
-    }));
-  }
-
-  function selectConfidence(gameId: string, conf: number) {
-    /* editable until kickoff */
-    const oldConf = picks[gameId]?.confidence;
-    let newUsed = usedConfidence.filter((c) => c !== oldConf);
-    if (newUsed.includes(conf)) return;
-    newUsed = [...newUsed, conf];
-    setUsedConfidence(newUsed);
-
-    const game = games.find((g) => g.id === gameId);
-    setPicks((prev) => ({
-      ...prev,
-      [gameId]: {
-        gameId,
-        pick: prev[gameId]?.pick ?? "home",
-        confidence: conf,
-        isBestBet: bestBetId === gameId,
-        lockedSpread: game?.spread ?? 0,
-        lockedFavorite: game?.favorite ?? "home",
-      },
-    }));
-  }
-
-  function toggleBestBet(gameId: string) {
-    /* editable until kickoff */
-    if (bestBetId === gameId) {
-      setBestBetId(null);
-      setPicks((prev) => {
-        const existing = prev[gameId];
-        if (!existing) return prev;
-        return { ...prev, [gameId]: { ...existing, isBestBet: false } };
-      });
-    } else {
-      setPicks((prev) => {
-        const next = { ...prev };
-        if (bestBetId && next[bestBetId]) {
-          next[bestBetId] = { ...next[bestBetId], isBestBet: false };
-        }
-        const game = games.find((g) => g.id === gameId);
-        next[gameId] = {
-          gameId,
-          pick: next[gameId]?.pick ?? "home",
-          confidence: next[gameId]?.confidence ?? 0,
-          isBestBet: true,
-          lockedSpread: game?.spread ?? 0,
-          lockedFavorite: game?.favorite ?? "home",
-        };
-        return next;
-      });
-      setBestBetId(gameId);
+  async function pullOdds() {
+    setLoadingOdds(true);
+    setOddsError(null);
+    try {
+      const key = process.env.NEXT_PUBLIC_ODDS_API_KEY;
+      let games: Game[];
+      if (key) {
+        games = await fetchNcaafOdds(key);
+      } else {
+        await new Promise((r) => setTimeout(r, 500));
+        games = getMockOddsGames();
+      }
+      setAvailableGames(games);
+      setSelectedIds(new Set());
+    } catch (e: unknown) {
+      setOddsError(e instanceof Error ? e.message : "Failed to pull odds");
+      setAvailableGames(getMockOddsGames());
+    } finally {
+      setLoadingOdds(false);
     }
   }
 
-  async function savePicks() {
-    if (saving) return;
-    const lockedPicks: Record<string, UserPick> = {};
-    for (const g of games) {
-      const p = picks[g.id];
-      if (!p) continue;
-      lockedPicks[g.id] = {
-        ...p,
-        lockedSpread: g.spread,
-        lockedFavorite: g.favorite,
-        isBestBet: bestBetId === g.id,
-      };
-    }
+  function toggleGame(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else if (next.size < 5) next.add(id);
+      return next;
+    });
+  }
 
-    setSaving(true);
-    setSaveError(null);
-    const cloud = await savePicksToCloud({
+  async function publishCard() {
+    const selected = availableGames.filter((g) => selectedIds.has(g.id));
+    if (selected.length !== 5) return;
+    const result = await publishWeekCard({
       weekNumber: 1,
-      picks: lockedPicks,
-      bestBetId,
-      propChoice,
+      games: selected,
+      prop,
+    });
+    if (!result.ok) {
+      alert(result.error || "Failed to publish to cloud");
+      // still save locally
+      setPublishedGames(selected);
+      localStorage.setItem(CARD_KEY, JSON.stringify({ games: selected, prop }));
+      setCardSaved(true);
+      return;
+    }
+    const games = result.games || selected;
+    setPublishedGames(games);
+    setCardSaved(true);
+  }
+
+  function setGameWinner(gameId: string, side: "home" | "away" | "push") {
+    setResults((prev) => ({ ...prev, [gameId]: { gameId, winner: side } }));
+    setResultsSaved(false);
+    setDemoScore(null);
+  }
+
+  async function handleSaveResults() {
+    if (scoring) return;
+    setScoring(true);
+    setScoreReport(null);
+    localStorage.setItem(RESULTS_KEY, JSON.stringify({ results, propResult }));
+
+    // Local demo score for this browser's picks
+    try {
+      const raw = localStorage.getItem(PICKS_KEY);
+      if (raw) {
+        const data = JSON.parse(raw);
+        const scored = scoreWeek(
+          data.picks || {},
+          data.bestBetId || null,
+          data.propChoice || null,
+          publishedGames,
+          results,
+          prop,
+          propResult
+        );
+        setDemoScore({ totalPoints: scored.totalPoints });
+        setHasPlayerPicks(true);
+      } else {
+        setHasPlayerPicks(false);
+      }
+    } catch {
+      setHasPlayerPicks(false);
+    }
+
+    const cloud = await saveResultsAndScoreWeek({
+      weekNumber: 1,
+      games: publishedGames,
+      prop,
+      results,
+      propResult,
     });
 
-    const payload = {
-      picks: lockedPicks,
-      bestBetId,
-      propChoice,
-      usedConfidence,
-      lockedAt: new Date().toISOString(),
-    };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-    setPicks(lockedPicks);
+    setResultsSaved(true);
+    setScoring(false);
 
     if (!cloud.ok) {
-      setSaveError(cloud.error || "Cloud save failed — picks kept on this device");
+      setScoreReport(cloud.error || "Cloud scoring failed");
+      applyWeekScores();
+      return;
     }
-    setSaved(true);
-    setSaving(false);
+
+    if (cloud.scoredCount === 0) {
+      setScoreReport(cloud.error || "Saved results. No locked cloud picks to score yet.");
+      applyWeekScores();
+      return;
+    }
+
+    const lines = (cloud.details || [])
+      .map((d) => `${d.name}: ${d.points} pts`)
+      .join(" · ");
+    setScoreReport(`Scored ${cloud.scoredCount} player(s). ${lines}`);
   }
 
-  const allGamesPicked =
-    games.every((g) => picks[g.id]?.pick && (picks[g.id]?.confidence ?? 0) > 0) &&
-    propChoice !== null &&
-    bestBetId !== null;
+  async function saveSettings() {
+    const result = await saveLeagueToCloud({
+      name: leagueNameEdit,
+      settings: {
+        cutPercent,
+        regularSeasonWeeks: seasonWeeks,
+        gamesPerWeek: 5,
+      },
+    });
+    if (result.ok && result.league) {
+      setLeague(result.league);
+      setSettingsSaved(true);
+      setTimeout(() => setSettingsSaved(false), 1500);
+    } else {
+      alert(result.error || "Failed to save settings");
+    }
+  }
 
-  if (!loaded) {
+  async function handleRegenCode() {
+    if (!confirm("Generate a new code? The old code will stop working.")) return;
+    const result = await regenerateCodeInCloud();
+    if (result.ok && result.league) setLeague(result.league);
+    else alert(result.error || "Failed to regenerate code");
+  }
+
+  function handleReset() {
+    if (!confirm("Delete this league and all local data?")) return;
+    resetLeague();
+    router.push("/join");
+  }
+
+  function copyCode() {
+    if (!league) return;
+    navigator.clipboard?.writeText(league.code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
+
+  const allResultsIn =
+    publishedGames.every((g) => results[g.id]?.winner) && propResult !== null;
+
+  if (allowed === null) {
     return (
       <div className="min-h-screen flex flex-col">
         <Nav />
-        <main className="flex-1 flex items-center justify-center text-muted">Loading…</main>
+        <main className="flex-1 flex items-center justify-center text-muted">
+          Loading…
+        </main>
       </div>
     );
   }
 
+  if (!allowed) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Nav />
+        <main className="flex-1 flex items-center justify-center px-4">
+          <div className="max-w-md text-center rounded-xl border border-border bg-card p-6">
+            <h1 className="text-xl font-bold mb-2">Commissioner only</h1>
+            <p className="text-sm text-muted">
+              Only the league commissioner can open these tools.
+            </p>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  const session = getSession();
+
   return (
     <div className="min-h-screen flex flex-col">
       <Nav />
-
       <main className="flex-1 max-w-3xl mx-auto w-full px-4 py-8">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold">Week 1 Picks</h1>
-          <p className="text-sm text-muted">
-            {saved
-              ? "Picks saved. You can change them anytime before kickoff — lines freeze at game start."
-              : "Save your picks anytime. Change them until kickoff; lines freeze when each game starts."}
-          </p>
+          <h1 className="text-2xl font-bold">Commissioner Tools</h1>
+          <p className="text-sm text-muted">Settings • Build the card • Enter results</p>
         </div>
 
-        {saveError && (
-          <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-4 py-2 text-sm text-danger">
-            {saveError}
-          </div>
-        )}
-        {saved && (
-          <div className="mb-4 rounded-lg border border-primary/40 bg-primary/10 px-4 py-2 text-sm text-primary">
-            ✓ Picks saved to the league. Edit below and Save again before kickoff if you change your mind.
-          </div>
-        )}
+        <div className="flex flex-wrap gap-2 mb-6">
+          <button
+            onClick={() => setTab("settings")}
+            className={
+              tab === "settings"
+                ? "px-4 py-1.5 rounded-full text-sm font-medium bg-primary text-black"
+                : "px-4 py-1.5 rounded-full text-sm font-medium bg-card border border-border text-muted"
+            }
+          >
+            Settings
+          </button>
+          <button
+            onClick={() => setTab("card")}
+            className={
+              tab === "card"
+                ? "px-4 py-1.5 rounded-full text-sm font-medium bg-primary text-black"
+                : "px-4 py-1.5 rounded-full text-sm font-medium bg-card border border-border text-muted"
+            }
+          >
+            Build Card
+          </button>
+          <button
+            onClick={() => setTab("results")}
+            className={
+              tab === "results"
+                ? "px-4 py-1.5 rounded-full text-sm font-medium bg-primary text-black"
+                : "px-4 py-1.5 rounded-full text-sm font-medium bg-card border border-border text-muted"
+            }
+          >
+            Enter Results
+          </button>
+        </div>
 
-        <div className="space-y-4 mb-8">
-          {games.map((game) => {
-            const pick = picks[game.id];
-            const isBest = bestBetId === game.id;
-            // Show locked spread if already saved, otherwise current
-            const displaySpread = pick?.lockedSpread ?? game.spread;
-            const displayFavorite = pick?.lockedFavorite ?? game.favorite;
-
-            return (
-              <div
-                key={game.id}
-                className={`rounded-xl border bg-card p-4 transition ${
-                  isBest ? "border-primary/60 ring-1 ring-primary/30" : "border-border"
-                } `}
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs text-muted">{game.startTime}</span>
-                  {isBest && (
-                    <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
-                      BEST BET (2×)
-                    </span>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 mb-4">
-                  <button
-                    disabled={false}
-                    onClick={() => selectSide(game.id, "away")}
-                    className={`p-3 rounded-lg border text-left transition ${
-                      pick?.pick === "away"
-                        ? "border-primary bg-primary/10"
-                        : "border-border hover:border-muted"
-                    } `}
-                  >
-                    <div className="font-medium">{game.awayTeam}</div>
-                    <div className="text-xs text-muted mt-0.5">
-                      {formatSpread(displaySpread, displayFavorite, "away")}
-                    </div>
-                  </button>
-
-                  <button
-                    disabled={false}
-                    onClick={() => selectSide(game.id, "home")}
-                    className={`p-3 rounded-lg border text-left transition ${
-                      pick?.pick === "home"
-                        ? "border-primary bg-primary/10"
-                        : "border-border hover:border-muted"
-                    } `}
-                  >
-                    <div className="font-medium">{game.homeTeam}</div>
-                    <div className="text-xs text-muted mt-0.5">
-                      {formatSpread(displaySpread, displayFavorite, "home")}
-                    </div>
-                  </button>
-                </div>
-
-                {true && (
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex gap-1.5">
-                      {confidenceOptions.map((c) => {
-                        const usedElsewhere =
-                          usedConfidence.includes(c) && pick?.confidence !== c;
-                        return (
-                          <button
-                            key={c}
-                            disabled={usedElsewhere}
-                            onClick={() => selectConfidence(game.id, c)}
-                            className={`w-8 h-8 rounded text-sm font-medium transition ${
-                              pick?.confidence === c
-                                ? "bg-primary text-black"
-                                : usedElsewhere
-                                  ? "bg-border text-muted cursor-not-allowed"
-                                  : "bg-card-hover hover:bg-border"
-                            }`}
-                          >
-                            {c}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <button
-                      onClick={() => toggleBestBet(game.id)}
-                      className={`text-xs px-3 py-1.5 rounded-full border transition ${
-                        isBest
-                          ? "border-primary bg-primary/20 text-primary"
-                          : "border-border text-muted"
-                      }`}
-                    >
-                      {isBest ? "★ Best Bet" : "Set Best Bet"}
-                    </button>
-                  </div>
-                )}
-
-                {saved && pick && (
-                  <div className="text-xs text-muted">
-                    Last saved line for scoring snapshot:{" "}
-                    {formatSpread(pick.lockedSpread, pick.lockedFavorite, pick.pick)}
-                    {" "}(updates when you Save again)
-                  </div>
-                )}
+        {tab === "settings" && league && (
+          <div className="space-y-6">
+            <div className="rounded-xl border border-border bg-card p-5 space-y-4">
+              <h2 className="font-semibold">League</h2>
+              <div>
+                <label className="text-xs text-muted block mb-1">League name</label>
+                <input
+                  value={leagueNameEdit}
+                  onChange={(e) => setLeagueNameEdit(e.target.value)}
+                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm"
+                />
               </div>
-            );
-          })}
-        </div>
+              <div>
+                <label className="text-xs text-muted block mb-1">Invite code</label>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 font-mono text-2xl tracking-[0.25em] text-primary font-bold">
+                    {league.code}
+                  </div>
+                  <button
+                    onClick={copyCode}
+                    className="px-3 py-2 text-xs rounded-lg border border-border"
+                  >
+                    {copied ? "Copied" : "Copy"}
+                  </button>
+                  <button
+                    onClick={handleRegenCode}
+                    className="px-3 py-2 text-xs rounded-lg border border-border"
+                  >
+                    New code
+                  </button>
+                </div>
+              </div>
+              <div className="text-sm text-muted">
+                Commissioner:{" "}
+                <span className="text-foreground font-medium">
+                  {session?.playerName || "You"}
+                </span>
+              </div>
+            </div>
 
-        <div className="rounded-xl border border-border bg-card p-4 mb-8">
-          <div className="text-xs text-muted mb-1">Weekly Prop • {prop.points} pts</div>
-          <div className="font-medium mb-3">{prop.question}</div>
-          <div className="grid grid-cols-2 gap-3">
-            {prop.options.map((opt) => (
+            <div className="rounded-xl border border-border bg-card p-5 space-y-4">
+              <h2 className="font-semibold">Season rules</h2>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-muted block mb-1">
+                    Cut line (% to Toilet Bowl)
+                  </label>
+                  <input
+                    type="number"
+                    min={10}
+                    max={75}
+                    value={cutPercent}
+                    onChange={(e) => setCutPercent(parseInt(e.target.value) || 50)}
+                    className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted block mb-1">
+                    Regular season weeks
+                  </label>
+                  <input
+                    type="number"
+                    min={4}
+                    max={16}
+                    value={seasonWeeks}
+                    onChange={(e) => setSeasonWeeks(parseInt(e.target.value) || 12)}
+                    className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
               <button
-                key={opt}
-                disabled={false}
-                onClick={() => setPropChoice(opt)}
-                className={`p-3 rounded-lg border text-sm transition ${
-                  propChoice === opt
-                    ? "border-primary bg-primary/10"
-                    : "border-border hover:border-muted"
-                }`}
+                onClick={saveSettings}
+                className={
+                  settingsSaved
+                    ? "w-full py-3 rounded-xl font-semibold bg-primary/20 text-primary border border-primary"
+                    : "w-full py-3 rounded-xl font-semibold bg-primary text-black"
+                }
               >
-                {opt}
+                {settingsSaved ? "Settings saved" : "Save settings"}
               </button>
-            ))}
-          </div>
-        </div>
+            </div>
 
-        <button
-          disabled={!allGamesPicked || saving}
-          onClick={savePicks}
-          className={`w-full py-3 rounded-xl font-semibold transition ${
-            allGamesPicked
-              ? "bg-primary text-black hover:bg-primary-dim"
-              : "bg-border text-muted cursor-not-allowed"
-          }`}
-        >
-          {allGamesPicked
-            ? saving
-              ? "Saving…"
-              : saved
-                ? "Save changes"
-                : "Save picks"
-            : "Finish all picks + Best Bet + Prop"}
-        </button>
-        <p className="text-center text-xs text-muted mt-3">
-          Final lock is at kickoff for each game. Save as often as you want until then.
-        </p>
+            <div className="rounded-xl border border-danger/40 bg-card p-5 space-y-3">
+              <h2 className="font-semibold text-danger">Danger zone</h2>
+              <button
+                onClick={handleReset}
+                className="px-4 py-2 rounded-lg border border-danger text-danger text-sm"
+              >
+                Delete league and reset app
+              </button>
+            </div>
+          </div>
+        )}
+
+        {tab === "card" && (
+          <div>
+            <div className="rounded-xl border border-border bg-card p-5 mb-6">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h2 className="font-semibold">Pull Live Odds</h2>
+                  <p className="text-xs text-muted">Demo data unless API key is set</p>
+                </div>
+                <button
+                  onClick={pullOdds}
+                  disabled={loadingOdds}
+                  className="px-4 py-2 rounded-lg bg-primary text-black text-sm font-medium disabled:opacity-50"
+                >
+                  {loadingOdds ? "Pulling..." : "Pull Odds"}
+                </button>
+              </div>
+              {oddsError && <p className="text-sm text-danger">{oddsError}</p>}
+            </div>
+
+            {availableGames.length > 0 && (
+              <div className="rounded-xl border border-border bg-card p-5 mb-6">
+                <h2 className="font-semibold mb-1">
+                  Select 5 Games ({selectedIds.size}/5)
+                </h2>
+                <div className="space-y-2 max-h-96 overflow-y-auto mt-4">
+                  {availableGames.map((g) => {
+                    const selected = selectedIds.has(g.id);
+                    return (
+                      <button
+                        key={g.id}
+                        onClick={() => toggleGame(g.id)}
+                        className={
+                          selected
+                            ? "w-full text-left p-3 rounded-lg border border-primary bg-primary/10"
+                            : "w-full text-left p-3 rounded-lg border border-border"
+                        }
+                      >
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium">
+                            {g.awayTeam} @ {g.homeTeam}
+                          </span>
+                          <span className="text-sm text-primary">
+                            {g.spread > 0 ? `+${g.spread}` : g.spread}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+                <button
+                  disabled={selectedIds.size !== 5}
+                  onClick={publishCard}
+                  className={
+                    selectedIds.size === 5
+                      ? "w-full mt-4 py-3 rounded-xl font-semibold bg-primary text-black"
+                      : "w-full mt-4 py-3 rounded-xl font-semibold bg-border text-muted cursor-not-allowed"
+                  }
+                >
+                  Publish / Update Card
+                </button>
+              </div>
+            )}
+
+            {cardSaved && (
+              <div className="rounded-xl border border-primary/40 bg-card p-4 text-sm text-primary">
+                Week card saved ({publishedGames.length} games). Publish again anytime to change games.
+              </div>
+            )}
+          </div>
+        )}
+
+        {tab === "results" && (
+          <div>
+            <div className="rounded-xl border border-border bg-card p-5 mb-6">
+              <h2 className="font-semibold mb-4">Enter Results</h2>
+              <div className="space-y-4">
+                {publishedGames.map((game) => {
+                  const res = results[game.id];
+                  return (
+                    <div key={game.id} className="border border-border rounded-lg p-4">
+                      <div className="font-medium mb-3">
+                        {game.awayTeam} @ {game.homeTeam}
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <button
+                          onClick={() => setGameWinner(game.id, "away")}
+                          className={
+                            res?.winner === "away"
+                              ? "py-2 rounded-lg text-sm border border-primary bg-primary/10 text-primary"
+                              : "py-2 rounded-lg text-sm border border-border"
+                          }
+                        >
+                          {game.awayTeam}
+                        </button>
+                        <button
+                          onClick={() => setGameWinner(game.id, "push")}
+                          className={
+                            res?.winner === "push"
+                              ? "py-2 rounded-lg text-sm border border-primary bg-primary/10 text-primary"
+                              : "py-2 rounded-lg text-sm border border-border"
+                          }
+                        >
+                          Push
+                        </button>
+                        <button
+                          onClick={() => setGameWinner(game.id, "home")}
+                          className={
+                            res?.winner === "home"
+                              ? "py-2 rounded-lg text-sm border border-primary bg-primary/10 text-primary"
+                              : "py-2 rounded-lg text-sm border border-border"
+                          }
+                        >
+                          {game.homeTeam}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-border bg-card p-5 mb-6">
+              <h2 className="font-semibold mb-2">Prop Result</h2>
+              <p className="text-sm text-muted mb-3">{prop.question}</p>
+              <div className="grid grid-cols-2 gap-3">
+                {prop.options.map((opt) => (
+                  <button
+                    key={opt}
+                    onClick={() => {
+                      setPropResult(opt);
+                      setResultsSaved(false);
+                    }}
+                    className={
+                      propResult === opt
+                        ? "py-2.5 rounded-lg text-sm border border-primary bg-primary/10 text-primary"
+                        : "py-2.5 rounded-lg text-sm border border-border"
+                    }
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button
+              disabled={!allResultsIn}
+              onClick={handleSaveResults}
+              className={
+                !allResultsIn
+                  ? "w-full py-3 rounded-xl font-semibold mb-6 bg-border text-muted cursor-not-allowed"
+                  : "w-full py-3 rounded-xl font-semibold mb-6 bg-primary text-black"
+              }
+            >
+              {scoring ? "Scoring…" : resultsSaved ? "Results Saved — Score Again" : "Save Results & Score League"}
+            </button>
+
+            {scoreReport && (
+              <div className="rounded-xl border border-primary/40 bg-card p-4 text-sm text-primary mb-4">
+                {scoreReport}
+              </div>
+            )}
+            {demoScore && (
+              <div className="rounded-xl border border-border bg-card p-5">
+                <h3 className="font-semibold mb-3">Your Picks Scored</h3>
+                <div className="text-2xl font-bold text-primary">
+                  {demoScore.totalPoints} pts
+                </div>
+              </div>
+            )}
+            {resultsSaved && !hasPlayerPicks && (
+              <p className="text-sm text-muted mt-3">
+                No picks found. Lock picks first, then re-save results.
+              </p>
+            )}
+          </div>
+        )}
       </main>
     </div>
   );

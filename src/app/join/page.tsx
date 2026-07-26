@@ -2,15 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import Link from "next/link";
 
 function generateCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let code = "";
-  for (let i = 0; i < 6; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)];
-  }
+  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
   return code;
 }
 
@@ -27,17 +25,27 @@ export default function JoinPage() {
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data }) => {
-      if (!data.user) {
-        router.replace("/login");
+    try {
+      if (!hasSupabaseConfig()) {
+        setError("Supabase is not configured.");
+        setChecking(false);
         return;
       }
-      setUserId(data.user.id);
-      const metaName = data.user.user_metadata?.display_name as string | undefined;
-      setDisplayName(metaName || data.user.email?.split("@")[0] || "Player");
+      const supabase = createClient();
+      supabase.auth.getUser().then(({ data }) => {
+        if (!data.user) {
+          router.replace("/login");
+          return;
+        }
+        setUserId(data.user.id);
+        const metaName = data.user.user_metadata?.display_name as string | undefined;
+        setDisplayName(metaName || data.user.email?.split("@")[0] || "Player");
+        setChecking(false);
+      });
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to load");
       setChecking(false);
-    });
+    }
   }, [router]);
 
   async function handleCreate() {
@@ -46,14 +54,11 @@ export default function JoinPage() {
     setLoading(true);
     const supabase = createClient();
     const newCode = generateCode();
-
     try {
-      // Ensure profile exists
       await supabase.from("profiles").upsert({
         id: userId,
         display_name: displayName.trim() || "Commissioner",
       });
-
       const { data: league, error: leagueError } = await supabase
         .from("leagues")
         .insert({
@@ -63,9 +68,7 @@ export default function JoinPage() {
         })
         .select()
         .single();
-
       if (leagueError) throw leagueError;
-
       const { error: memError } = await supabase.from("memberships").insert({
         league_id: league.id,
         user_id: userId,
@@ -73,7 +76,6 @@ export default function JoinPage() {
         division: "North",
       });
       if (memError) throw memError;
-
       localStorage.setItem(
         "warroom-session",
         JSON.stringify({
@@ -98,7 +100,6 @@ export default function JoinPage() {
           },
         })
       );
-
       setCreatedCode(newCode);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Could not create league");
@@ -112,23 +113,17 @@ export default function JoinPage() {
     setError(null);
     setLoading(true);
     const supabase = createClient();
-
     try {
       await supabase.from("profiles").upsert({
         id: userId,
         display_name: displayName.trim() || "Player",
       });
-
       const { data: league, error: findError } = await supabase
         .from("leagues")
         .select("*")
         .eq("code", code.trim().toUpperCase())
         .single();
-
-      if (findError || !league) {
-        throw new Error("Invalid league code");
-      }
-
+      if (findError || !league) throw new Error("Invalid league code");
       const { error: memError } = await supabase.from("memberships").upsert(
         {
           league_id: league.id,
@@ -139,7 +134,6 @@ export default function JoinPage() {
         { onConflict: "league_id,user_id" }
       );
       if (memError) throw memError;
-
       localStorage.setItem(
         "warroom-session",
         JSON.stringify({
@@ -164,7 +158,6 @@ export default function JoinPage() {
           },
         })
       );
-
       router.push("/");
       router.refresh();
     } catch (err: unknown) {
@@ -176,9 +169,7 @@ export default function JoinPage() {
 
   if (checking) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-muted">
-        Loading…
-      </div>
+      <div className="min-h-screen flex items-center justify-center text-muted">Loading…</div>
     );
   }
 
@@ -187,12 +178,8 @@ export default function JoinPage() {
       <div className="min-h-screen flex items-center justify-center px-4">
         <div className="max-w-md w-full rounded-xl border border-border bg-card p-6 text-center">
           <h1 className="text-2xl font-bold mb-2">League created</h1>
-          <p className="text-sm text-muted mb-4">
-            Share this code with your friend:
-          </p>
-          <div className="text-3xl font-bold tracking-[0.3em] text-primary mb-6">
-            {createdCode}
-          </div>
+          <p className="text-sm text-muted mb-4">Share this code with your friend:</p>
+          <div className="text-3xl font-bold tracking-[0.3em] text-primary mb-6">{createdCode}</div>
           <button
             onClick={() => {
               router.push("/");
@@ -215,96 +202,44 @@ export default function JoinPage() {
             WR
           </div>
           <h1 className="text-2xl font-bold">War Room Pick&apos;Em</h1>
-          <p className="text-sm text-muted mt-1">
-            Signed in as {displayName}
-          </p>
+          <p className="text-sm text-muted mt-1">Signed in as {displayName}</p>
         </div>
 
         {mode === "choose" && (
           <div className="space-y-3">
-            <button
-              onClick={() => setMode("create")}
-              className="w-full py-3 rounded-xl bg-primary text-black font-semibold"
-            >
+            <button onClick={() => setMode("create")} className="w-full py-3 rounded-xl bg-primary text-black font-semibold">
               Create league (you&apos;re commissioner)
             </button>
-            <button
-              onClick={() => setMode("join")}
-              className="w-full py-3 rounded-xl border border-border bg-card font-semibold hover:bg-card-hover"
-            >
+            <button onClick={() => setMode("join")} className="w-full py-3 rounded-xl border border-border bg-card font-semibold">
               Join with code
             </button>
-            <Link href="/login" className="block text-center text-xs text-muted mt-4">
-              Switch account
-            </Link>
+            <Link href="/login" className="block text-center text-xs text-muted mt-4">Switch account</Link>
           </div>
         )}
 
         {mode === "create" && (
           <div className="rounded-xl border border-border bg-card p-5 space-y-4">
             <h2 className="font-semibold">Create league</h2>
-            <div>
-              <label className="text-xs text-muted block mb-1">League name</label>
-              <input
-                value={leagueName}
-                onChange={(e) => setLeagueName(e.target.value)}
-                className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-muted block mb-1">Your name</label>
-              <input
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary"
-              />
-            </div>
+            <input value={leagueName} onChange={(e) => setLeagueName(e.target.value)} placeholder="League name" className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm" />
+            <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Your name" className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm" />
             {error && <p className="text-sm text-danger">{error}</p>}
-            <button
-              onClick={handleCreate}
-              disabled={loading}
-              className="w-full py-3 rounded-xl bg-primary text-black font-semibold disabled:opacity-50"
-            >
+            <button onClick={handleCreate} disabled={loading} className="w-full py-3 rounded-xl bg-primary text-black font-semibold disabled:opacity-50">
               {loading ? "Creating…" : "Create & get code"}
             </button>
-            <button onClick={() => setMode("choose")} className="w-full text-sm text-muted">
-              Back
-            </button>
+            <button onClick={() => setMode("choose")} className="w-full text-sm text-muted">Back</button>
           </div>
         )}
 
         {mode === "join" && (
           <div className="rounded-xl border border-border bg-card p-5 space-y-4">
             <h2 className="font-semibold">Join league</h2>
-            <div>
-              <label className="text-xs text-muted block mb-1">League code</label>
-              <input
-                value={code}
-                onChange={(e) => setCode(e.target.value.toUpperCase())}
-                placeholder="ABC123"
-                maxLength={6}
-                className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm tracking-widest uppercase focus:outline-none focus:border-primary"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-muted block mb-1">Your name</label>
-              <input
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary"
-              />
-            </div>
+            <input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="CODE" maxLength={6} className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm tracking-widest uppercase" />
+            <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Your name" className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm" />
             {error && <p className="text-sm text-danger">{error}</p>}
-            <button
-              onClick={handleJoin}
-              disabled={loading}
-              className="w-full py-3 rounded-xl bg-primary text-black font-semibold disabled:opacity-50"
-            >
+            <button onClick={handleJoin} disabled={loading} className="w-full py-3 rounded-xl bg-primary text-black font-semibold disabled:opacity-50">
               {loading ? "Joining…" : "Join"}
             </button>
-            <button onClick={() => setMode("choose")} className="w-full text-sm text-muted">
-              Back
-            </button>
+            <button onClick={() => setMode("choose")} className="w-full text-sm text-muted">Back</button>
           </div>
         )}
       </div>
