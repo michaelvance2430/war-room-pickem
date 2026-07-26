@@ -20,6 +20,11 @@ import {
   saveLeagueToCloud,
   regenerateCodeInCloud,
 } from "@/lib/league-sync";
+import {
+  publishWeekCard,
+  loadWeekCard,
+  saveResultsAndScoreWeek,
+} from "@/lib/cloud";
 
 const PICKS_KEY = "warroom-picks-week-1";
 const RESULTS_KEY = "warroom-results-week-1";
@@ -47,6 +52,8 @@ export default function CommissionerPage() {
   const [resultsSaved, setResultsSaved] = useState(false);
   const [demoScore, setDemoScore] = useState<{ totalPoints: number } | null>(null);
   const [hasPlayerPicks, setHasPlayerPicks] = useState(false);
+  const [scoring, setScoring] = useState(false);
+  const [scoreReport, setScoreReport] = useState<string | null>(null);
 
   useEffect(() => {
     setAllowed(isCommissioner());
@@ -60,6 +67,13 @@ export default function CommissionerPage() {
       }
     }
     load();
+    loadWeekCard(1).then((cloud) => {
+      if (cloud) {
+        setPublishedGames(cloud.games);
+        setProp(cloud.prop);
+        setCardSaved(true);
+      }
+    });
     try {
       const cardRaw = localStorage.getItem(CARD_KEY);
       if (cardRaw) {
@@ -111,11 +125,24 @@ export default function CommissionerPage() {
     });
   }
 
-  function publishCard() {
+  async function publishCard() {
     const selected = availableGames.filter((g) => selectedIds.has(g.id));
     if (selected.length !== 5) return;
-    setPublishedGames(selected);
-    localStorage.setItem(CARD_KEY, JSON.stringify({ games: selected, prop }));
+    const result = await publishWeekCard({
+      weekNumber: 1,
+      games: selected,
+      prop,
+    });
+    if (!result.ok) {
+      alert(result.error || "Failed to publish to cloud");
+      // still save locally
+      setPublishedGames(selected);
+      localStorage.setItem(CARD_KEY, JSON.stringify({ games: selected, prop }));
+      setCardSaved(true);
+      return;
+    }
+    const games = result.games || selected;
+    setPublishedGames(games);
     setCardSaved(true);
   }
 
@@ -125,10 +152,13 @@ export default function CommissionerPage() {
     setDemoScore(null);
   }
 
-  function handleSaveResults() {
+  async function handleSaveResults() {
+    if (scoring) return;
+    setScoring(true);
+    setScoreReport(null);
     localStorage.setItem(RESULTS_KEY, JSON.stringify({ results, propResult }));
-    setResultsSaved(true);
-    applyWeekScores();
+
+    // Local demo score for this browser's picks
     try {
       const raw = localStorage.getItem(PICKS_KEY);
       if (raw) {
@@ -150,6 +180,34 @@ export default function CommissionerPage() {
     } catch {
       setHasPlayerPicks(false);
     }
+
+    const cloud = await saveResultsAndScoreWeek({
+      weekNumber: 1,
+      games: publishedGames,
+      prop,
+      results,
+      propResult,
+    });
+
+    setResultsSaved(true);
+    setScoring(false);
+
+    if (!cloud.ok) {
+      setScoreReport(cloud.error || "Cloud scoring failed");
+      applyWeekScores();
+      return;
+    }
+
+    if (cloud.scoredCount === 0) {
+      setScoreReport(cloud.error || "Saved results. No locked cloud picks to score yet.");
+      applyWeekScores();
+      return;
+    }
+
+    const lines = (cloud.details || [])
+      .map((d) => `${d.name}: ${d.points} pts`)
+      .join(" · ");
+    setScoreReport(`Scored ${cloud.scoredCount} player(s). ${lines}`);
   }
 
   async function saveSettings() {
@@ -511,9 +569,14 @@ export default function CommissionerPage() {
                   : "w-full py-3 rounded-xl font-semibold mb-6 bg-primary text-black"
               }
             >
-              {resultsSaved ? "Results Saved" : "Save Results and Score"}
+              {scoring ? "Scoring…" : resultsSaved ? "Results Saved — Score Again" : "Save Results & Score League"}
             </button>
 
+            {scoreReport && (
+              <div className="rounded-xl border border-primary/40 bg-card p-4 text-sm text-primary mb-4">
+                {scoreReport}
+              </div>
+            )}
             {demoScore && (
               <div className="rounded-xl border border-border bg-card p-5">
                 <h3 className="font-semibold mb-3">Your Picks Scored</h3>

@@ -3,6 +3,7 @@
 import { useState, useEffect, Fragment } from "react";
 import Nav from "@/components/Nav";
 import { loadPlayers } from "@/lib/store";
+import { loadLeagueStandings } from "@/lib/cloud";
 import { compareForSeed } from "@/lib/brackets";
 import { Division, Player } from "@/lib/types";
 
@@ -24,7 +25,34 @@ export default function StandingsPage() {
   const [active, setActive] = useState<Division | "Overall">("Overall");
 
   useEffect(() => {
-    setPlayers(loadPlayers());
+    async function load() {
+      const cloud = await loadLeagueStandings();
+      if (cloud.length) {
+        setPlayers(
+          cloud.map((c, i) => ({
+            id: c.userId || String(i),
+            name: c.name,
+            division: (c.division as Player["division"]) || "North",
+            totalPoints: c.totalPoints,
+            weeklyPoints: c.weeklyPoints,
+            atsCorrect: c.atsCorrect,
+            atsTotal: c.atsTotal,
+            currentStreak: c.currentStreak,
+            bestWeek: c.bestWeek,
+            worstWeek: c.worstWeek,
+            perfectWeeks: c.perfectWeeks,
+            bestBetHits: c.bestBetHits,
+            bestBetTotal: c.bestBetTotal,
+            propHits: c.propHits,
+            propTotal: c.propTotal,
+            weeksPlayed: c.weeksPlayed,
+          }))
+        );
+      } else {
+        setPlayers(loadPlayers());
+      }
+    }
+    load();
   }, []);
 
   const filtered =

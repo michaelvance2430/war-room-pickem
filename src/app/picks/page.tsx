@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import Nav from "@/components/Nav";
 import { currentWeek } from "@/lib/mock-data";
-import { Game, UserPick } from "@/lib/types";
+import { Game, UserPick, Prop } from "@/lib/types";
+import { loadWeekCard, savePicksToCloud, loadMyPicks } from "@/lib/cloud";
 
 function formatSpread(spread: number, favorite: "home" | "away", side: "home" | "away") {
   const isFavorite = favorite === side;
@@ -24,29 +25,53 @@ export default function PicksPage() {
   const [usedConfidence, setUsedConfidence] = useState<number[]>([]);
   const [saved, setSaved] = useState(false);
   const [loaded, setLoaded] = useState(false);
-  const [prop] = useState(currentWeek.prop);
+  const [prop, setProp] = useState<Prop>(currentWeek.prop);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
-    try {
-      // Load published card if commissioner has set one
-      const cardRaw = localStorage.getItem(CARD_KEY);
-      if (cardRaw) {
-        const data = JSON.parse(cardRaw);
-        if (data.games?.length) setGames(data.games);
-      }
+    async function load() {
+      try {
+        const cloud = await loadWeekCard(1);
+        if (cloud) {
+          setGames(cloud.games);
+          setProp(cloud.prop);
+        } else {
+          const cardRaw = localStorage.getItem(CARD_KEY);
+          if (cardRaw) {
+            const data = JSON.parse(cardRaw);
+            if (data.games?.length) setGames(data.games);
+            if (data.prop) setProp(data.prop);
+          }
+        }
 
-      // Load existing picks
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const data = JSON.parse(raw);
-        setPicks(data.picks || {});
-        setBestBetId(data.bestBetId || null);
-        setPropChoice(data.propChoice || null);
-        setUsedConfidence(data.usedConfidence || []);
-        setSaved(!!data.lockedAt);
+        const mine = await loadMyPicks(1);
+        if (mine) {
+          setPicks(mine.picks || {});
+          setBestBetId(mine.bestBetId || null);
+          setPropChoice(mine.propChoice || null);
+          setSaved(!!mine.lockedAt);
+          const used = Object.values(mine.picks || {})
+            .map((p) => p.confidence)
+            .filter((c) => c > 0);
+          setUsedConfidence(used);
+        } else {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (raw) {
+            const data = JSON.parse(raw);
+            setPicks(data.picks || {});
+            setBestBetId(data.bestBetId || null);
+            setPropChoice(data.propChoice || null);
+            setUsedConfidence(data.usedConfidence || []);
+            setSaved(!!data.lockedAt);
+          }
+        }
+      } catch {
+        // fall back silent
       }
-    } catch {}
-    setLoaded(true);
+      setLoaded(true);
+    }
+    load();
   }, []);
 
   const confidenceOptions = [1, 2, 3, 4, 5];
@@ -121,8 +146,8 @@ export default function PicksPage() {
     }
   }
 
-  function lockIn() {
-    // Snapshot current spreads into every pick at lock time
+  async function lockIn() {
+    if (saving) return;
     const lockedPicks: Record<string, UserPick> = {};
     for (const g of games) {
       const p = picks[g.id];
@@ -135,6 +160,15 @@ export default function PicksPage() {
       };
     }
 
+    setSaving(true);
+    setSaveError(null);
+    const cloud = await savePicksToCloud({
+      weekNumber: 1,
+      picks: lockedPicks,
+      bestBetId,
+      propChoice,
+    });
+
     const payload = {
       picks: lockedPicks,
       bestBetId,
@@ -144,7 +178,12 @@ export default function PicksPage() {
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
     setPicks(lockedPicks);
+
+    if (!cloud.ok) {
+      setSaveError(cloud.error || "Cloud save failed — picks kept on this device");
+    }
     setSaved(true);
+    setSaving(false);
   }
 
   const allGamesPicked =
@@ -175,6 +214,11 @@ export default function PicksPage() {
           </p>
         </div>
 
+        {saveError && (
+          <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-4 py-2 text-sm text-danger">
+            {saveError}
+          </div>
+        )}
         {saved && (
           <div className="mb-4 rounded-lg border border-primary/40 bg-primary/10 px-4 py-2 text-sm text-primary">
             ✓ Picks locked. Your spreads are frozen and will be used for scoring.
@@ -309,7 +353,7 @@ export default function PicksPage() {
 
         {!saved ? (
           <button
-            disabled={!allGamesPicked}
+            disabled={!allGamesPicked || saving}
             onClick={lockIn}
             className={`w-full py-3 rounded-xl font-semibold transition ${
               allGamesPicked
@@ -317,7 +361,7 @@ export default function PicksPage() {
                 : "bg-border text-muted cursor-not-allowed"
             }`}
           >
-            {allGamesPicked ? "Lock In Picks (freeze lines)" : "Finish all picks + Best Bet + Prop"}
+            {allGamesPicked ? (saving ? "Saving…" : "Lock In Picks (freeze lines)") : "Finish all picks + Best Bet + Prop"}
           </button>
         ) : (
           <div className="w-full py-3 rounded-xl font-semibold text-center bg-primary/20 text-primary border border-primary">
