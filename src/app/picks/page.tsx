@@ -95,25 +95,36 @@ export default function PicksPage() {
   }
 
   function selectConfidence(gameId: string, conf: number) {
-    /* editable until kickoff */
-    const oldConf = picks[gameId]?.confidence;
-    let newUsed = usedConfidence.filter((c) => c !== oldConf);
-    if (newUsed.includes(conf)) return;
-    newUsed = [...newUsed, conf];
-    setUsedConfidence(newUsed);
+    // Must pick a side first
+    if (!picks[gameId]?.pick) {
+      return;
+    }
+    // Confidence 1-5 must be unique across the 5 games
+    const takenByOther = Object.entries(picks).some(
+      ([id, p]) => id !== gameId && p.confidence === conf
+    );
+    if (takenByOther) return;
 
     const game = games.find((g) => g.id === gameId);
-    setPicks((prev) => ({
-      ...prev,
-      [gameId]: {
-        gameId,
-        pick: prev[gameId]?.pick ?? "home",
-        confidence: conf,
-        isBestBet: bestBetId === gameId,
-        lockedSpread: game?.spread ?? 0,
-        lockedFavorite: game?.favorite ?? "home",
-      },
-    }));
+    setPicks((prev) => {
+      const next = {
+        ...prev,
+        [gameId]: {
+          gameId,
+          pick: prev[gameId]?.pick ?? "home",
+          confidence: conf,
+          isBestBet: bestBetId === gameId,
+          lockedSpread: game?.spread ?? prev[gameId]?.lockedSpread ?? 0,
+          lockedFavorite: game?.favorite ?? prev[gameId]?.lockedFavorite ?? "home",
+        },
+      };
+      // Keep usedConfidence in sync from picks
+      const used = Object.values(next)
+        .map((p) => p.confidence)
+        .filter((c) => c >= 1 && c <= 5);
+      setUsedConfidence(used);
+      return next;
+    });
   }
 
   function toggleBestBet(gameId: string) {
@@ -283,14 +294,19 @@ export default function PicksPage() {
 
                 {true && (
                   <div className="flex items-center justify-between gap-3">
-                    <div className="flex gap-1.5">
+                    <div className="flex gap-1.5 items-center">
+                      {!pick?.pick && (
+                        <span className="text-xs text-muted mr-2">Pick a team first</span>
+                      )}
                       {confidenceOptions.map((c) => {
-                        const usedElsewhere =
-                          usedConfidence.includes(c) && pick?.confidence !== c;
+                        const usedElsewhere = Object.entries(picks).some(
+                          ([id, p]) => id !== game.id && p.confidence === c
+                        );
                         return (
                           <button
                             key={c}
-                            disabled={usedElsewhere}
+                            type="button"
+                            disabled={usedElsewhere || !pick?.pick}
                             onClick={() => selectConfidence(game.id, c)}
                             className={`w-8 h-8 rounded text-sm font-medium transition ${
                               pick?.confidence === c
