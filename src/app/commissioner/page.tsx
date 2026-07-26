@@ -12,12 +12,14 @@ import {
   isCommissioner,
   getLeague,
   getSession,
-  updateLeagueName,
-  updateLeagueSettings,
-  regenerateCode,
   resetLeague,
   League,
 } from "@/lib/league";
+import {
+  syncLeagueFromCloud,
+  saveLeagueToCloud,
+  regenerateCodeInCloud,
+} from "@/lib/league-sync";
 
 const PICKS_KEY = "warroom-picks-week-1";
 const RESULTS_KEY = "warroom-results-week-1";
@@ -27,16 +29,12 @@ export default function CommissionerPage() {
   const router = useRouter();
   const [allowed, setAllowed] = useState<boolean | null>(null);
   const [tab, setTab] = useState<"card" | "results" | "settings">("settings");
-
-  // League settings
   const [league, setLeague] = useState<League | null>(null);
   const [leagueNameEdit, setLeagueNameEdit] = useState("");
   const [cutPercent, setCutPercent] = useState(50);
   const [seasonWeeks, setSeasonWeeks] = useState(12);
   const [settingsSaved, setSettingsSaved] = useState(false);
   const [copied, setCopied] = useState(false);
-
-  // Card
   const [availableGames, setAvailableGames] = useState<Game[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [publishedGames, setPublishedGames] = useState<Game[]>(currentWeek.games);
@@ -44,8 +42,6 @@ export default function CommissionerPage() {
   const [loadingOdds, setLoadingOdds] = useState(false);
   const [oddsError, setOddsError] = useState<string | null>(null);
   const [cardSaved, setCardSaved] = useState(false);
-
-  // Results
   const [results, setResults] = useState<Record<string, GameResult>>({});
   const [propResult, setPropResult] = useState<string | null>(null);
   const [resultsSaved, setResultsSaved] = useState(false);
@@ -54,13 +50,15 @@ export default function CommissionerPage() {
 
   useEffect(() => {
     setAllowed(isCommissioner());
-    const lg = getLeague();
-    if (lg) {
-      setLeague(lg);
-      setLeagueNameEdit(lg.name);
-      setCutPercent(lg.settings?.cutPercent ?? 50);
-      setSeasonWeeks(lg.settings?.regularSeasonWeeks ?? 12);
-    }
+    (async () => {
+      const lg = (await syncLeagueFromCloud()) || getLeague();
+      if (lg) {
+        setLeague(lg);
+        setLeagueNameEdit(lg.name);
+        setCutPercent(lg.settings?.cutPercent ?? 50);
+        setSeasonWeeks(lg.settings?.regularSeasonWeeks ?? 12);
+      }
+    })();
     try {
       const cardRaw = localStorage.getItem(CARD_KEY);
       if (cardRaw) {
@@ -152,22 +150,29 @@ export default function CommissionerPage() {
     }
   }
 
-  function saveSettings() {
-    updateLeagueName(leagueNameEdit);
-    const updated = updateLeagueSettings({
-      cutPercent,
-      regularSeasonWeeks: seasonWeeks,
-      gamesPerWeek: 5,
+  async function saveSettings() {
+    const result = await saveLeagueToCloud({
+      name: leagueNameEdit,
+      settings: {
+        cutPercent,
+        regularSeasonWeeks: seasonWeeks,
+        gamesPerWeek: 5,
+      },
     });
-    if (updated) setLeague(updated);
-    setSettingsSaved(true);
-    setTimeout(() => setSettingsSaved(false), 1500);
+    if (result.ok && result.league) {
+      setLeague(result.league);
+      setSettingsSaved(true);
+      setTimeout(() => setSettingsSaved(false), 1500);
+    } else {
+      alert(result.error || "Failed to save settings");
+    }
   }
 
-  function handleRegenCode() {
+  async function handleRegenCode() {
     if (!confirm("Generate a new code? The old code will stop working.")) return;
-    const updated = regenerateCode();
-    if (updated) setLeague(updated);
+    const result = await regenerateCodeInCloud();
+    if (result.ok && result.league) setLeague(result.league);
+    else alert(result.error || "Failed to regenerate code");
   }
 
   function handleReset() {
@@ -195,9 +200,7 @@ export default function CommissionerPage() {
     return (
       <div className="min-h-screen flex flex-col">
         <Nav />
-        <main className="flex-1 flex items-center justify-center text-muted">
-          Loading…
-        </main>
+        <main className="flex-1 flex items-center justify-center text-muted">Loading…</main>
       </div>
     );
   }
@@ -209,9 +212,7 @@ export default function CommissionerPage() {
         <main className="flex-1 flex items-center justify-center px-4">
           <div className="max-w-md text-center rounded-xl border border-border bg-card p-6">
             <h1 className="text-xl font-bold mb-2">Commissioner only</h1>
-            <p className="text-sm text-muted">
-              Only the league commissioner can open these tools.
-            </p>
+            <p className="text-sm text-muted">Only the league commissioner can open these tools.</p>
           </div>
         </main>
       </div>
@@ -223,13 +224,10 @@ export default function CommissionerPage() {
   return (
     <div className="min-h-screen flex flex-col">
       <Nav />
-
       <main className="flex-1 max-w-3xl mx-auto w-full px-4 py-8">
         <div className="mb-6">
           <h1 className="text-2xl font-bold">Commissioner Tools</h1>
-          <p className="text-sm text-muted">
-            Settings • Build the card • Enter results
-          </p>
+          <p className="text-sm text-muted">Settings • Build the card • Enter results</p>
         </div>
 
         <div className="flex flex-wrap gap-2 mb-6">
@@ -244,9 +242,7 @@ export default function CommissionerPage() {
               key={id}
               onClick={() => setTab(id)}
               className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
-                tab === id
-                  ? "bg-primary text-black"
-                  : "bg-card border border-border text-muted"
+                tab === id ? "bg-primary text-black" : "bg-card border border-border text-muted"
               }`}
             >
               {label}
@@ -254,7 +250,6 @@ export default function CommissionerPage() {
           ))}
         </div>
 
-        {/* SETTINGS */}
         {tab === "settings" && league && (
           <div className="space-y-6">
             <div className="rounded-xl border border-border bg-card p-5 space-y-4">
@@ -273,28 +268,17 @@ export default function CommissionerPage() {
                   <div className="flex-1 font-mono text-2xl tracking-[0.25em] text-primary font-bold">
                     {league.code}
                   </div>
-                  <button
-                    onClick={copyCode}
-                    className="px-3 py-2 text-xs rounded-lg border border-border hover:bg-card-hover"
-                  >
+                  <button onClick={copyCode} className="px-3 py-2 text-xs rounded-lg border border-border hover:bg-card-hover">
                     {copied ? "Copied" : "Copy"}
                   </button>
-                  <button
-                    onClick={handleRegenCode}
-                    className="px-3 py-2 text-xs rounded-lg border border-border hover:bg-card-hover"
-                  >
+                  <button onClick={handleRegenCode} className="px-3 py-2 text-xs rounded-lg border border-border hover:bg-card-hover">
                     New code
                   </button>
                 </div>
-                <p className="text-xs text-muted mt-2">
-                  Friends join at /join with this code (same device in demo mode).
-                </p>
               </div>
               <div className="text-sm text-muted">
                 Commissioner:{" "}
-                <span className="text-foreground font-medium">
-                  {session?.playerName || "You"}
-                </span>
+                <span className="text-foreground font-medium">{session?.playerName || "You"}</span>
               </div>
             </div>
 
@@ -302,9 +286,7 @@ export default function CommissionerPage() {
               <h2 className="font-semibold">Season rules</h2>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs text-muted block mb-1">
-                    Cut line (% to Toilet Bowl)
-                  </label>
+                  <label className="text-xs text-muted block mb-1">Cut line (% to Toilet Bowl)</label>
                   <input
                     type="number"
                     min={10}
@@ -315,9 +297,7 @@ export default function CommissionerPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-muted block mb-1">
-                    Regular season weeks
-                  </label>
+                  <label className="text-xs text-muted block mb-1">Regular season weeks</label>
                   <input
                     type="number"
                     min={4}
@@ -328,10 +308,6 @@ export default function CommissionerPage() {
                   />
                 </div>
               </div>
-              <p className="text-xs text-muted">
-                Games per week is fixed at 5. Bottom {cutPercent}% of each division
-                goes to the Toilet Bowl after week {seasonWeeks}.
-              </p>
               <button
                 onClick={saveSettings}
                 className={`w-full py-3 rounded-xl font-semibold transition ${
@@ -346,9 +322,6 @@ export default function CommissionerPage() {
 
             <div className="rounded-xl border border-danger/40 bg-card p-5 space-y-3">
               <h2 className="font-semibold text-danger">Danger zone</h2>
-              <p className="text-xs text-muted">
-                Resets league, players, picks, and results on this device.
-              </p>
               <button
                 onClick={handleReset}
                 className="px-4 py-2 rounded-lg border border-danger text-danger text-sm hover:bg-danger/10"
@@ -359,7 +332,6 @@ export default function CommissionerPage() {
           </div>
         )}
 
-        {/* BUILD CARD */}
         {tab === "card" && (
           <>
             <div className="rounded-xl border border-border bg-card p-5 mb-6">
@@ -371,155 +343,4 @@ export default function CommissionerPage() {
                 <button
                   onClick={pullOdds}
                   disabled={loadingOdds}
-                  className="px-4 py-2 rounded-lg bg-primary text-black text-sm font-medium disabled:opacity-50"
-                >
-                  {loadingOdds ? "Pulling…" : "Pull Odds"}
-                </button>
-              </div>
-              {oddsError && <p className="text-sm text-danger">{oddsError}</p>}
-            </div>
-
-            {availableGames.length > 0 && (
-              <div className="rounded-xl border border-border bg-card p-5 mb-6">
-                <h2 className="font-semibold mb-1">
-                  Select 5 Games ({selectedIds.size}/5)
-                </h2>
-                <div className="space-y-2 max-h-96 overflow-y-auto mt-4">
-                  {availableGames.map((g) => {
-                    const selected = selectedIds.has(g.id);
-                    return (
-                      <button
-                        key={g.id}
-                        onClick={() => toggleGame(g.id)}
-                        className={`w-full text-left p-3 rounded-lg border transition ${
-                          selected
-                            ? "border-primary bg-primary/10"
-                            : "border-border hover:border-muted"
-                        }`}
-                      >
-                        <div className="flex justify-between items-center">
-                          <span className="font-medium">
-                            {g.awayTeam} @ {g.homeTeam}
-                          </span>
-                          <span className="text-sm text-primary">
-                            {g.spread > 0 ? `+${g.spread}` : g.spread}
-                          </span>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-                <button
-                  disabled={selectedIds.size !== 5}
-                  onClick={publishCard}
-                  className={`w-full mt-4 py-3 rounded-xl font-semibold ${
-                    selectedIds.size === 5
-                      ? "bg-primary text-black"
-                      : "bg-border text-muted cursor-not-allowed"
-                  }`}
-                >
-                  Publish These 5 Games
-                </button>
-              </div>
-            )}
-
-            {cardSaved && (
-              <div className="rounded-xl border border-primary/40 bg-card p-4 text-sm text-primary">
-                ✓ Week card published ({publishedGames.length} games)
-              </div>
-            )}
-          </>
-        )}
-
-        {/* RESULTS */}
-        {tab === "results" && (
-          <>
-            <div className="rounded-xl border border-border bg-card p-5 mb-6">
-              <h2 className="font-semibold mb-4">Enter Results</h2>
-              <div className="space-y-4">
-                {publishedGames.map((game) => {
-                  const res = results[game.id];
-                  return (
-                    <div key={game.id} className="border border-border rounded-lg p-4">
-                      <div className="font-medium mb-3">
-                        {game.awayTeam} @ {game.homeTeam}
-                      </div>
-                      <div className="grid grid-cols-3 gap-2">
-                        {(["away", "push", "home"] as const).map((side) => (
-                          <button
-                            key={side}
-                            onClick={() => setGameWinner(game.id, side)}
-                            className={`py-2 rounded-lg text-sm border ${
-                              res?.winner === side
-                                ? "border-primary bg-primary/10 text-primary"
-                                : "border-border"
-                            }`}
-                          >
-                            {side === "away"
-                              ? game.awayTeam
-                              : side === "home"
-                                ? game.homeTeam
-                                : "Push"}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-border bg-card p-5 mb-6">
-              <h2 className="font-semibold mb-2">Prop Result</h2>
-              <p className="text-sm text-muted mb-3">{prop.question}</p>
-              <div className="grid grid-cols-2 gap-3">
-                {prop.options.map((opt) => (
-                  <button
-                    key={opt}
-                    onClick={() => {
-                      setPropResult(opt);
-                      setResultsSaved(false);
-                    }}
-                    className={`py-2.5 rounded-lg text-sm border ${
-                      propResult === opt
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "border-border"
-                    }`}
-                  >
-                    {opt}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <button
-              disabled={!allResultsIn}
-              onClick={handleSaveResults}
-              className={`w-full py-3 rounded-xl font-semibold mb-6 ${
-                !allResultsIn
-                  ? "bg-border text-muted cursor-not-allowed"
-                  : "bg-primary text-black"
-              }`}
-            >
-              {resultsSaved ? "✓ Results Saved" : "Save Results & Score"}
-            </button>
-
-            {demoScore && (
-              <div className="rounded-xl border border-border bg-card p-5">
-                <h3 className="font-semibold mb-3">Your Picks Scored</h3>
-                <div className="text-2xl font-bold text-primary">
-                  {demoScore.totalPoints} pts
-                </div>
-              </div>
-            )}
-            {resultsSaved && !hasPlayerPicks && (
-              <p className="text-sm text-muted mt-3">
-                No picks found. Lock picks first, then re-save results.
-              </p>
-            )}
-          </>
-        )}
-      </main>
-    </div>
-  );
-}
+                  className="px-4 py-2 rounded-lg bg-primary text-black text-sm font-medium disabled
