@@ -77,7 +77,7 @@ export default function PicksPage() {
   const confidenceOptions = [1, 2, 3, 4, 5];
 
   function selectSide(gameId: string, side: "home" | "away") {
-    if (saved) return; // locked
+    /* editable until kickoff */
     const game = games.find((g) => g.id === gameId);
     if (!game) return;
 
@@ -95,7 +95,7 @@ export default function PicksPage() {
   }
 
   function selectConfidence(gameId: string, conf: number) {
-    if (saved) return;
+    /* editable until kickoff */
     const oldConf = picks[gameId]?.confidence;
     let newUsed = usedConfidence.filter((c) => c !== oldConf);
     if (newUsed.includes(conf)) return;
@@ -117,7 +117,7 @@ export default function PicksPage() {
   }
 
   function toggleBestBet(gameId: string) {
-    if (saved) return;
+    /* editable until kickoff */
     if (bestBetId === gameId) {
       setBestBetId(null);
       setPicks((prev) => {
@@ -146,7 +146,7 @@ export default function PicksPage() {
     }
   }
 
-  async function lockIn() {
+  async function savePicks() {
     if (saving) return;
     const lockedPicks: Record<string, UserPick> = {};
     for (const g of games) {
@@ -209,8 +209,8 @@ export default function PicksPage() {
           <h1 className="text-2xl font-bold">Week 1 Picks</h1>
           <p className="text-sm text-muted">
             {saved
-              ? "Picks locked — lines frozen at the moment you submitted"
-              : "Lines lock when you hit Lock In. You can change picks until then."}
+              ? "Picks saved. You can change them anytime before kickoff — lines freeze at game start."
+              : "Save your picks anytime. Change them until kickoff; lines freeze when each game starts."}
           </p>
         </div>
 
@@ -221,7 +221,7 @@ export default function PicksPage() {
         )}
         {saved && (
           <div className="mb-4 rounded-lg border border-primary/40 bg-primary/10 px-4 py-2 text-sm text-primary">
-            ✓ Picks locked. Your spreads are frozen and will be used for scoring.
+            ✓ Picks saved to the league. Edit below and Save again before kickoff if you change your mind.
           </div>
         )}
 
@@ -238,7 +238,7 @@ export default function PicksPage() {
                 key={game.id}
                 className={`rounded-xl border bg-card p-4 transition ${
                   isBest ? "border-primary/60 ring-1 ring-primary/30" : "border-border"
-                } ${saved ? "opacity-90" : ""}`}
+                } `}
               >
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-xs text-muted">{game.startTime}</span>
@@ -251,13 +251,13 @@ export default function PicksPage() {
 
                 <div className="grid grid-cols-2 gap-3 mb-4">
                   <button
-                    disabled={saved}
+                    disabled={false}
                     onClick={() => selectSide(game.id, "away")}
                     className={`p-3 rounded-lg border text-left transition ${
                       pick?.pick === "away"
                         ? "border-primary bg-primary/10"
                         : "border-border hover:border-muted"
-                    } ${saved ? "cursor-default" : ""}`}
+                    } `}
                   >
                     <div className="font-medium">{game.awayTeam}</div>
                     <div className="text-xs text-muted mt-0.5">
@@ -266,13 +266,13 @@ export default function PicksPage() {
                   </button>
 
                   <button
-                    disabled={saved}
+                    disabled={false}
                     onClick={() => selectSide(game.id, "home")}
                     className={`p-3 rounded-lg border text-left transition ${
                       pick?.pick === "home"
                         ? "border-primary bg-primary/10"
                         : "border-border hover:border-muted"
-                    } ${saved ? "cursor-default" : ""}`}
+                    } `}
                   >
                     <div className="font-medium">{game.homeTeam}</div>
                     <div className="text-xs text-muted mt-0.5">
@@ -281,7 +281,7 @@ export default function PicksPage() {
                   </button>
                 </div>
 
-                {!saved && (
+                {true && (
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex gap-1.5">
                       {confidenceOptions.map((c) => {
@@ -320,9 +320,9 @@ export default function PicksPage() {
 
                 {saved && pick && (
                   <div className="text-xs text-muted">
-                    Confidence {pick.confidence}
-                    {pick.isBestBet ? " • Best Bet" : ""} • Line locked at{" "}
+                    Last saved line for scoring snapshot:{" "}
                     {formatSpread(pick.lockedSpread, pick.lockedFavorite, pick.pick)}
+                    {" "}(updates when you Save again)
                   </div>
                 )}
               </div>
@@ -337,7 +337,7 @@ export default function PicksPage() {
             {prop.options.map((opt) => (
               <button
                 key={opt}
-                disabled={saved}
+                disabled={false}
                 onClick={() => setPropChoice(opt)}
                 className={`p-3 rounded-lg border text-sm transition ${
                   propChoice === opt
@@ -351,23 +351,26 @@ export default function PicksPage() {
           </div>
         </div>
 
-        {!saved ? (
-          <button
-            disabled={!allGamesPicked || saving}
-            onClick={lockIn}
-            className={`w-full py-3 rounded-xl font-semibold transition ${
-              allGamesPicked
-                ? "bg-primary text-black hover:bg-primary-dim"
-                : "bg-border text-muted cursor-not-allowed"
-            }`}
-          >
-            {allGamesPicked ? (saving ? "Saving…" : "Lock In Picks (freeze lines)") : "Finish all picks + Best Bet + Prop"}
-          </button>
-        ) : (
-          <div className="w-full py-3 rounded-xl font-semibold text-center bg-primary/20 text-primary border border-primary">
-            ✓ Picks Locked
-          </div>
-        )}
+        <button
+          disabled={!allGamesPicked || saving}
+          onClick={savePicks}
+          className={`w-full py-3 rounded-xl font-semibold transition ${
+            allGamesPicked
+              ? "bg-primary text-black hover:bg-primary-dim"
+              : "bg-border text-muted cursor-not-allowed"
+          }`}
+        >
+          {allGamesPicked
+            ? saving
+              ? "Saving…"
+              : saved
+                ? "Save changes"
+                : "Save picks"
+            : "Finish all picks + Best Bet + Prop"}
+        </button>
+        <p className="text-center text-xs text-muted mt-3">
+          Final lock is at kickoff for each game. Save as often as you want until then.
+        </p>
       </main>
     </div>
   );
