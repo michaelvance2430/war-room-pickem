@@ -40,7 +40,6 @@ export default function Home() {
           return;
         }
 
-        // Prefer existing local session if present
         let session = getSession();
         let league = getLeague();
 
@@ -94,7 +93,7 @@ export default function Home() {
 
   if (bootError) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4">
+      <div className="min-h-screen flex items-center justify-center px-4 bg-background">
         <div className="max-w-md text-center text-sm text-danger">{bootError}</div>
       </div>
     );
@@ -102,7 +101,7 @@ export default function Home() {
 
   if (pickList) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4">
+      <div className="min-h-screen flex items-center justify-center px-4 bg-background">
         <div className="max-w-md w-full rounded-xl border border-border bg-card p-6">
           <h1 className="text-xl font-bold mb-2">Choose a league</h1>
           <p className="text-sm text-muted mb-4">
@@ -136,48 +135,165 @@ export default function Home() {
 
   if (!ready) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-muted">
+      <div className="min-h-screen flex items-center justify-center text-muted bg-background">
         Loading…
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col relative overflow-hidden">
+      {/* War room atmosphere layers */}
+      <div
+        className="pointer-events-none absolute inset-0 -z-10"
+        style={{
+          background:
+            "radial-gradient(ellipse 80% 60% at 50% 0%, rgba(34, 197, 94, 0.12), transparent 55%), radial-gradient(ellipse 70% 50% at 100% 100%, rgba(120, 40, 40, 0.18), transparent 50%), radial-gradient(ellipse 50% 40% at 0% 80%, rgba(20, 40, 30, 0.5), transparent 45%), #050805",
+        }}
+      />
+      <div
+        className="pointer-events-none absolute inset-0 -z-10 opacity-[0.35]"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(34,197,94,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(34,197,94,0.04) 1px, transparent 1px)",
+          backgroundSize: "48px 48px",
+        }}
+      />
+      <div
+        className="pointer-events-none absolute inset-0 -z-10"
+        style={{
+          background:
+            "radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.75) 100%)",
+        }}
+      />
+      {/* faint scanline */}
+      <div
+        className="pointer-events-none absolute inset-0 -z-10 opacity-[0.07]"
+        style={{
+          backgroundImage:
+            "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.35) 3px)",
+        }}
+      />
+
       <Nav />
-      <main className="flex-1 max-w-6xl mx-auto w-full px-4 py-8">
-        <section className="mb-10">
-          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight mb-2">
+      <main className="flex-1 max-w-6xl mx-auto w-full px-4 py-10 relative">
+        <section className="mb-12">
+          <div className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-primary/80 mb-4 border border-primary/25 bg-primary/5 px-3 py-1 rounded-full">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+            Situation room live
+          </div>
+          <h1 className="text-3xl sm:text-5xl font-bold tracking-tight mb-3 text-white drop-shadow-[0_0_30px_rgba(34,197,94,0.15)]">
             Welcome to the War Room
           </h1>
-          <p className="text-muted max-w-xl">
-            Pick against the spread. Stack confidence. Hit the Best Bet.
+          <p className="text-muted max-w-xl text-base sm:text-lg leading-relaxed">
+            Lights down. Spreads up. Confidence locked. This is where the week
+            gets decided.
           </p>
           {leagueName && (
-            <p className="text-sm mt-3 text-muted">
-              League: <span className="text-foreground font-medium">{leagueName}</span>
+            <p className="text-sm mt-5 text-muted/90">
+              <span className="text-foreground/90 font-medium">{leagueName}</span>
               {isCommish && leagueCode && (
                 <>
-                  {" · "}
-                  <span className="font-mono text-primary tracking-widest">{leagueCode}</span>
+                  <span className="mx-2 text-border">|</span>
+                  <span className="font-mono text-primary tracking-[0.2em]">
+                    {leagueCode}
+                  </span>
                 </>
               )}
             </p>
           )}
         </section>
-        <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <Link
+            href="/picks"
+            className="group rounded-xl border border-border/80 bg-black/40 backdrop-blur-sm p-6 hover:border-primary/50 hover:bg-primary/5 transition shadow-[0_0_40px_rgba(0,0,0,0.35)]"
+          >
+            <div className="text-xs uppercase tracking-wider text-muted mb-2">
+              This week
+            </div>
+            <div className="text-lg font-semibold text-white group-hover:text-primary transition">
+              Make your picks
+            </div>
+            <p className="text-sm text-muted mt-2">
+              ATS · confidence · Best Bet · prop
+            </p>
+          </Link>
+
+          <Link
+            href="/standings"
+            className="group rounded-xl border border-border/80 bg-black/40 backdrop-blur-sm p-6 hover:border-primary/50 hover:bg-primary/5 transition shadow-[0_0_40px_rgba(0,0,0,0.35)]"
+          >
+            <div className="text-xs uppercase tracking-wider text-muted mb-2">
+              Board
+            </div>
+            <div className="text-lg font-semibold text-white group-hover:text-primary transition">
+              Standings
+            </div>
+            <p className="text-sm text-muted mt-2">
+              Divisions · cut line · season points
+            </p>
+          </Link>
+
+          <Link
+            href="/power-rankings"
+            className="group rounded-xl border border-border/80 bg-black/40 backdrop-blur-sm p-6 hover:border-primary/50 hover:bg-primary/5 transition shadow-[0_0_40px_rgba(0,0,0,0.35)]"
+          >
+            <div className="text-xs uppercase tracking-wider text-muted mb-2">
+              Pulse
+            </div>
+            <div className="text-lg font-semibold text-white group-hover:text-primary transition">
+              Power Rankings
+            </div>
+            <p className="text-sm text-muted mt-2">
+              Who&apos;s actually playing the best right now
+            </p>
+          </Link>
+
           <Link
             href="/championship"
-            className="rounded-xl border border-border bg-card p-6 block"
+            className="group rounded-xl border border-primary/30 bg-black/40 backdrop-blur-sm p-6 hover:border-primary hover:bg-primary/10 transition shadow-[0_0_40px_rgba(34,197,94,0.08)]"
           >
-            <span className="text-primary font-semibold">Championship Bracket</span>
+            <div className="text-xs uppercase tracking-wider text-primary/70 mb-2">
+              Postseason
+            </div>
+            <div className="text-lg font-semibold text-primary">
+              Championship Bracket
+            </div>
+            <p className="text-sm text-muted mt-2">Top half. One path. No excuses.</p>
           </Link>
+
           <Link
             href="/toilet-bowl"
-            className="rounded-xl border border-toilet/40 bg-card p-6 block"
+            className="group rounded-xl border border-purple-500/30 bg-black/40 backdrop-blur-sm p-6 hover:border-purple-400/60 hover:bg-purple-500/10 transition shadow-[0_0_40px_rgba(0,0,0,0.35)]"
           >
-            <span className="text-toilet font-semibold">Toilet Bowl</span>
+            <div className="text-xs uppercase tracking-wider text-purple-300/70 mb-2">
+              Bottom half
+            </div>
+            <div className="text-lg font-semibold text-purple-300">
+              Toilet Bowl
+            </div>
+            <p className="text-sm text-muted mt-2">
+              Shame bracket. Still matters.
+            </p>
           </Link>
+
+          {isCommish && (
+            <Link
+              href="/commissioner"
+              className="group rounded-xl border border-border/80 bg-black/40 backdrop-blur-sm p-6 hover:border-primary/50 hover:bg-primary/5 transition"
+            >
+              <div className="text-xs uppercase tracking-wider text-muted mb-2">
+                Ops
+              </div>
+              <div className="text-lg font-semibold text-white group-hover:text-primary transition">
+                Commissioner tools
+              </div>
+              <p className="text-sm text-muted mt-2">
+                Card · results · settings
+              </p>
+            </Link>
+          )}
         </section>
       </main>
     </div>
