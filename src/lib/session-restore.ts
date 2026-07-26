@@ -176,3 +176,58 @@ export async function signOutFully() {
     localStorage.removeItem(LEAGUE_KEY);
   }
 }
+
+
+export async function leaveLeague(leagueId: string): Promise<{ ok: boolean; error?: string }> {
+  const supabase = createClient();
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) return { ok: false, error: "Not signed in" };
+
+  const { error } = await supabase
+    .from("memberships")
+    .delete()
+    .eq("league_id", leagueId)
+    .eq("user_id", auth.user.id);
+
+  if (error) return { ok: false, error: error.message };
+
+  if (canUseStorage()) {
+    const active = localStorage.getItem(ACTIVE_LEAGUE_KEY);
+    if (active === leagueId) {
+      localStorage.removeItem(SESSION_KEY);
+      localStorage.removeItem(LEAGUE_KEY);
+      localStorage.removeItem(ACTIVE_LEAGUE_KEY);
+    }
+  }
+  return { ok: true };
+}
+
+/** Commissioner only — deletes the league (cascades memberships, cards, etc.) */
+export async function deleteLeague(leagueId: string): Promise<{ ok: boolean; error?: string }> {
+  const supabase = createClient();
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) return { ok: false, error: "Not signed in" };
+
+  const { data: league } = await supabase
+    .from("leagues")
+    .select("commissioner_id")
+    .eq("id", leagueId)
+    .maybeSingle();
+
+  if (!league || league.commissioner_id !== auth.user.id) {
+    return { ok: false, error: "Only the commissioner can delete this league" };
+  }
+
+  const { error } = await supabase.from("leagues").delete().eq("id", leagueId);
+  if (error) return { ok: false, error: error.message };
+
+  if (canUseStorage()) {
+    const active = localStorage.getItem(ACTIVE_LEAGUE_KEY);
+    if (active === leagueId) {
+      localStorage.removeItem(SESSION_KEY);
+      localStorage.removeItem(LEAGUE_KEY);
+      localStorage.removeItem(ACTIVE_LEAGUE_KEY);
+    }
+  }
+  return { ok: true };
+}
