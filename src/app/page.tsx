@@ -142,7 +142,7 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col relative overflow-hidden">
+    <div className="min-h-screen flex flex-col relative overflow-hidden crt-frame scan-sweep">
       {/* War room atmosphere layers */}
       <div
         className="pointer-events-none absolute inset-0 -z-10"
