@@ -32,7 +32,8 @@ export default function JoinPage() {
         return;
       }
       const supabase = createClient();
-      supabase.auth.getUser().then(({ data }) => {
+      supabase.auth.getSession().then(({ data: sessionData }) => {
+        const data = { user: sessionData.session?.user ?? null };
         if (!data.user) {
           router.replace("/login");
           return;
