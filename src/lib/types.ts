@@ -29,6 +29,9 @@ export interface Game {
   startTime: string;
   bookmaker?: string;
   lastUpdate?: string;
+  /** AP Top 25 rank when available (1–25) */
+  awayRank?: number | null;
+  homeRank?: number | null;
 }
 
 export interface Prop {

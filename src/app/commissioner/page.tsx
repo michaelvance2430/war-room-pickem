@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Nav from "@/components/Nav";
 import { Game, Prop } from "@/lib/types";
 import { fetchNcaafOdds } from "@/lib/odds";
+import { formatRankedTeam } from "@/lib/rankings";
 import { scoreWeek, GameResult } from "@/lib/scoring";
 import { applyWeekScores } from "@/lib/store";
 import {
@@ -458,8 +459,10 @@ export default function CommissionerPage() {
                 <div className="space-y-2 max-h-96 overflow-y-auto mt-4">
                   {availableGames.map((g) => {
                     const selected = selectedIds.has(g.id);
-                    const favLabel =
-                      g.favorite === "home" ? g.homeTeam : g.awayTeam;
+                    const favLabel = formatRankedTeam(
+                      g.favorite === "home" ? g.homeTeam : g.awayTeam,
+                      g.favorite === "home" ? g.homeRank : g.awayRank
+                    );
                     return (
                       <button
                         key={g.id}
@@ -473,11 +476,13 @@ export default function CommissionerPage() {
                         <div className="flex justify-between items-center gap-2">
                           <div className="min-w-0">
                             <div className="font-medium truncate">
-                              {g.awayTeam} @ {g.homeTeam}
+                              {formatRankedTeam(g.awayTeam, g.awayRank)} @{" "}
+                              {formatRankedTeam(g.homeTeam, g.homeRank)}
                             </div>
                             <div className="text-xs text-muted">
                               {g.startTime}
                               {g.bookmaker ? ` • ${g.bookmaker}` : ""}
+                              {(g.awayRank || g.homeRank) ? " • AP ranked" : ""}
                             </div>
                           </div>
                           <span className="text-sm text-primary shrink-0">

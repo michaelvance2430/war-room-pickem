@@ -25,6 +25,8 @@ function mapCardGame(row: {
   favorite: string;
   start_time: string | null;
   bookmaker: string | null;
+  away_rank?: number | null;
+  home_rank?: number | null;
 }): Game {
   return {
     id: row.id,
@@ -34,6 +36,8 @@ function mapCardGame(row: {
     favorite: row.favorite === "away" ? "away" : "home",
     startTime: row.start_time || "",
     bookmaker: row.bookmaker || undefined,
+    awayRank: row.away_rank ?? null,
+    homeRank: row.home_rank ?? null,
   };
 }
 
@@ -102,6 +106,8 @@ export async function publishWeekCard(opts: {
     favorite: g.favorite,
     start_time: g.startTime || null,
     bookmaker: g.bookmaker || null,
+    away_rank: g.awayRank ?? null,
+    home_rank: g.homeRank ?? null,
   }));
 
   const { data: inserted, error: gamesError } = await supabase

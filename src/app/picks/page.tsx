@@ -6,6 +6,7 @@ import Nav from "@/components/Nav";
 import { Game, UserPick, Prop } from "@/lib/types";
 import { getSession, getLeague } from "@/lib/league";
 import { loadWeekCard, savePicksToCloud, loadMyPicks } from "@/lib/cloud";
+import { formatRankedTeam } from "@/lib/rankings";
 
 function formatSpread(
   spread: number,
@@ -320,7 +321,9 @@ export default function PicksPage() {
                         <div className="text-[10px] uppercase tracking-wider text-muted mb-1">
                           Away
                         </div>
-                        <div className="font-medium">{game.awayTeam}</div>
+                        <div className="font-medium">
+                          {formatRankedTeam(game.awayTeam, game.awayRank)}
+                        </div>
                         <div className="text-xs text-muted mt-0.5">
                           {formatSpread(displaySpread, displayFavorite, "away")}
                         </div>
@@ -338,7 +341,9 @@ export default function PicksPage() {
                         <div className="text-[10px] uppercase tracking-wider text-muted mb-1">
                           Home
                         </div>
-                        <div className="font-medium">{game.homeTeam}</div>
+                        <div className="font-medium">
+                          {formatRankedTeam(game.homeTeam, game.homeRank)}
+                        </div>
                         <div className="text-xs text-muted mt-0.5">
                           {formatSpread(displaySpread, displayFavorite, "home")}
                         </div>

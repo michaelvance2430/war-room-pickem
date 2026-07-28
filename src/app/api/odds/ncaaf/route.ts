@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { mapOddsApiToGames } from "@/lib/odds";
+import { applyApRanks, fetchApRankMap } from "@/lib/rankings";
 import type { OddsApiGame } from "@/lib/types";
 
 /**
@@ -50,9 +51,17 @@ export async function GET() {
     }
 
     const data = (await res.json()) as OddsApiGame[];
-    const games = mapOddsApiToGames(data).filter(
+    let games = mapOddsApiToGames(data).filter(
       (g) => g.bookmaker && Number.isFinite(g.spread)
     );
+
+    // Merge AP Top 25 ranks (best-effort; pull still works if ESPN is down)
+    try {
+      const rankMap = await fetchApRankMap();
+      games = applyApRanks(games, rankMap);
+    } catch {
+      // ignore ranking failures
+    }
 
     return NextResponse.json({
       games,
