@@ -25,6 +25,8 @@ import {
   publishWeekCard,
   loadWeekCard,
   saveResultsAndScoreWeek,
+  loadPickSubmissionStatus,
+  PickSubmissionStatus,
 } from "@/lib/cloud";
 import {
   formatKickoff,
@@ -57,7 +59,7 @@ function storageKeys(week: number) {
 export default function CommissionerPage() {
   const router = useRouter();
   const [allowed, setAllowed] = useState<boolean | null>(null);
-  const [tab, setTab] = useState<"card" | "results" | "settings">("settings");
+  const [tab, setTab] = useState<"card" | "results" | "settings" | "picks">("settings");
   const [league, setLeague] = useState<League | null>(null);
   const [leagueNameEdit, setLeagueNameEdit] = useState("");
   const [cutPercent, setCutPercent] = useState(50);
@@ -89,6 +91,9 @@ export default function CommissionerPage() {
   const [scoreReport, setScoreReport] = useState<string | null>(null);
   const [syncingScores, setSyncingScores] = useState(false);
   const [syncReport, setSyncReport] = useState<string | null>(null);
+  const [pickStatus, setPickStatus] = useState<PickSubmissionStatus[]>([]);
+  const [pickStatusLoading, setPickStatusLoading] = useState(false);
+  const [pickStatusError, setPickStatusError] = useState<string | null>(null);
 
   useEffect(() => {
     setAllowed(isCommissioner());
@@ -168,6 +173,21 @@ export default function CommissionerPage() {
       /* ignore */
     }
     await loadWeekState(week);
+    if (tab === "picks") await refreshPickStatus(week);
+  }
+
+  async function refreshPickStatus(week = activeWeek) {
+    setPickStatusLoading(true);
+    setPickStatusError(null);
+    const expected = publishedGames.length || 5;
+    const res = await loadPickSubmissionStatus(week, expected);
+    if (!res.ok) {
+      setPickStatusError(res.error || "Failed to load pick status");
+      setPickStatus([]);
+    } else {
+      setPickStatus(res.rows);
+    }
+    setPickStatusLoading(false);
   }
 
   async function pullOdds() {
@@ -503,7 +523,9 @@ export default function CommissionerPage() {
       <main className="flex-1 max-w-3xl mx-auto w-full px-4 py-8">
         <div className="mb-6">
           <h1 className="text-2xl font-bold">Commissioner Tools</h1>
-          <p className="text-sm text-muted">Settings • Build the card • Enter results</p>
+          <p className="text-sm text-muted">
+            Settings • Build card • Who&apos;s in • Results
+          </p>
         </div>
 
         <div className="flex flex-wrap gap-2 mb-6">
@@ -526,6 +548,19 @@ export default function CommissionerPage() {
             }
           >
             Build Card
+          </button>
+          <button
+            onClick={() => {
+              setTab("picks");
+              void refreshPickStatus();
+            }}
+            className={
+              tab === "picks"
+                ? "px-4 py-1.5 rounded-full text-sm font-medium bg-primary text-black"
+                : "px-4 py-1.5 rounded-full text-sm font-medium bg-card border border-border text-muted"
+            }
+          >
+            Who&apos;s in
           </button>
           <button
             onClick={() => setTab("results")}
@@ -860,6 +895,141 @@ export default function CommissionerPage() {
                 ). Publish again anytime to change games.
               </div>
             )}
+          </div>
+        )}
+
+        {tab === "picks" && (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-border bg-card p-5">
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-3">
+                <div>
+                  <h2 className="font-semibold">
+                    Who&apos;s in — {weekTitle(activeWeek)}
+                  </h2>
+                  <p className="text-xs text-muted mt-1">
+                    Shows who submitted a full card. You never see their
+                    sides, confidence, or prop choice here — only status.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => refreshPickStatus()}
+                  disabled={pickStatusLoading}
+                  className="px-4 py-2 rounded-lg bg-primary text-black text-sm font-medium disabled:opacity-50 shrink-0"
+                >
+                  {pickStatusLoading ? "Refreshing…" : "Refresh"}
+                </button>
+              </div>
+
+              <div className="flex flex-wrap gap-2 mb-4">
+                {Array.from({ length: seasonWeeks + 1 }, (_, i) => i).map(
+                  (w) => (
+                    <button
+                      key={w}
+                      type="button"
+                      onClick={() => changeActiveWeek(w)}
+                      className={
+                        activeWeek === w
+                          ? "px-3 py-1 rounded-full text-xs font-medium bg-primary text-black"
+                          : "px-3 py-1 rounded-full text-xs font-medium bg-card-hover border border-border text-muted"
+                      }
+                    >
+                      {weekTitle(w)}
+                    </button>
+                  )
+                )}
+              </div>
+
+              {pickStatusError && (
+                <div className="text-sm text-danger mb-3">
+                  {pickStatusError}
+                  {pickStatusError.toLowerCase().includes("policy") ||
+                  pickStatusError.toLowerCase().includes("permission") ||
+                  pickStatusError.toLowerCase().includes("rls") ? (
+                    <span className="block text-xs mt-1 text-muted">
+                      Run supabase/picks-privacy.sql in Supabase if you
+                      haven&apos;t yet.
+                    </span>
+                  ) : null}
+                </div>
+              )}
+
+              {!pickStatusLoading && pickStatus.length > 0 && (
+                <div className="flex flex-wrap gap-3 text-xs mb-4">
+                  <span className="text-primary">
+                    Complete: {pickStatus.filter((r) => r.complete).length}
+                  </span>
+                  <span className="text-warning">
+                    Partial:{" "}
+                    {
+                      pickStatus.filter((r) => r.submitted && !r.complete)
+                        .length
+                    }
+                  </span>
+                  <span className="text-danger">
+                    Missing: {pickStatus.filter((r) => !r.submitted).length}
+                  </span>
+                  <span className="text-muted">
+                    of {pickStatus.length} players
+                  </span>
+                </div>
+              )}
+
+              {pickStatusLoading && (
+                <p className="text-sm text-muted py-6 text-center">
+                  Loading…
+                </p>
+              )}
+
+              {!pickStatusLoading && pickStatus.length === 0 && !pickStatusError && (
+                <p className="text-sm text-muted py-6 text-center">
+                  No members found. Invite players from Players.
+                </p>
+              )}
+
+              {!pickStatusLoading && pickStatus.length > 0 && (
+                <ul className="divide-y divide-border rounded-lg border border-border overflow-hidden">
+                  {pickStatus.map((r) => (
+                    <li
+                      key={r.userId}
+                      className="flex items-center gap-3 px-3 py-2.5 bg-card hover:bg-card-hover"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate">
+                          {r.name}
+                          {r.role === "commissioner" && (
+                            <span className="text-primary text-xs ml-1">
+                              Commish
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-muted">
+                          {r.division}
+                          {r.submitted
+                            ? ` · ${r.gamePickCount} game picks`
+                            : ""}
+                          {r.submitted && !r.hasProp ? " · no prop" : ""}
+                          {r.submitted && !r.hasBestBet ? " · no best bet" : ""}
+                        </div>
+                      </div>
+                      {r.complete ? (
+                        <span className="text-xs font-medium text-primary shrink-0">
+                          ✓ In
+                        </span>
+                      ) : r.submitted ? (
+                        <span className="text-xs font-medium text-warning shrink-0">
+                          Partial
+                        </span>
+                      ) : (
+                        <span className="text-xs font-medium text-danger shrink-0">
+                          Not in
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
         )}
 

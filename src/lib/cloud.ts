@@ -314,6 +314,106 @@ export async function loadMyPicks(weekNumber = 1) {
   };
 }
 
+export type PickSubmissionStatus = {
+  userId: string;
+  name: string;
+  division: string;
+  role: "commissioner" | "player";
+  /** Has a picks row for this week */
+  submitted: boolean;
+  /** Full card: 5 sides + confidence + best bet + prop */
+  complete: boolean;
+  gamePickCount: number;
+  hasProp: boolean;
+  hasBestBet: boolean;
+  lockedAt: string | null;
+};
+
+/**
+ * Commissioner only — who has locked picks for a week.
+ * Does not return sides/confidence (privacy). Use for "who hasn't picked".
+ */
+export async function loadPickSubmissionStatus(
+  weekNumber: number,
+  expectedGames = 5
+): Promise<{ ok: boolean; rows: PickSubmissionStatus[]; error?: string }> {
+  const session = getSession();
+  if (!session?.leagueId || !session.isCommissioner) {
+    return { ok: false, rows: [], error: "Commissioner only" };
+  }
+
+  const supabase = createClient();
+  const leagueId = session.leagueId;
+
+  const { data: members, error: memErr } = await supabase
+    .from("memberships")
+    .select("user_id, role, division, profiles(display_name)")
+    .eq("league_id", leagueId);
+
+  if (memErr) return { ok: false, rows: [], error: memErr.message };
+
+  const { data: pickRows, error: pickErr } = await supabase
+    .from("picks")
+    .select("id, user_id, prop_choice, best_bet_game_id, locked_at")
+    .eq("league_id", leagueId)
+    .eq("week_number", weekNumber);
+
+  if (pickErr) return { ok: false, rows: [], error: pickErr.message };
+
+  const pickByUser = new Map(
+    (pickRows || []).map((p) => [p.user_id as string, p])
+  );
+  const pickIds = (pickRows || []).map((p) => p.id as string);
+
+  const countByPickId = new Map<string, number>();
+  if (pickIds.length) {
+    const { data: pgs } = await supabase
+      .from("pick_games")
+      .select("pick_id")
+      .in("pick_id", pickIds);
+    for (const row of pgs || []) {
+      const id = row.pick_id as string;
+      countByPickId.set(id, (countByPickId.get(id) || 0) + 1);
+    }
+  }
+
+  const rows: PickSubmissionStatus[] = (members || []).map((m) => {
+    const profile = m.profiles as { display_name?: string } | null;
+    const userId = m.user_id as string;
+    const pick = pickByUser.get(userId);
+    const gamePickCount = pick ? countByPickId.get(pick.id as string) || 0 : 0;
+    const hasProp = !!(pick?.prop_choice);
+    const hasBestBet = !!(pick?.best_bet_game_id);
+    const complete =
+      !!pick &&
+      gamePickCount >= expectedGames &&
+      hasProp &&
+      hasBestBet;
+
+    return {
+      userId,
+      name: profile?.display_name || "Player",
+      division: (m.division as string) || "North",
+      role: m.role === "commissioner" ? "commissioner" : "player",
+      submitted: !!pick,
+      complete,
+      gamePickCount,
+      hasProp,
+      hasBestBet,
+      lockedAt: (pick?.locked_at as string) || null,
+    };
+  });
+
+  rows.sort((a, b) => {
+    // Incomplete first, then by name
+    if (a.complete !== b.complete) return a.complete ? 1 : -1;
+    if (a.submitted !== b.submitted) return a.submitted ? 1 : -1;
+    return a.name.localeCompare(b.name);
+  });
+
+  return { ok: true, rows };
+}
+
 export async function saveResultsAndScoreWeek(opts: {
   weekNumber: number;
   games: Game[];

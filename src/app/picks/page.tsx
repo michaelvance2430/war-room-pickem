@@ -274,6 +274,9 @@ export default function PicksPage() {
               ? ` • ${formatCardDateRange(games) || "dates on each game"}`
               : ""}
           </p>
+          <p className="text-xs text-muted mt-1">
+            Private: only you see your picks. League mates cannot view them.
+          </p>
         </div>
 
         {loadError && (
