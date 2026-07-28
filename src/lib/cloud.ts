@@ -414,6 +414,64 @@ export async function loadPickSubmissionStatus(
   return { ok: true, rows };
 }
 
+/**
+ * Commissioner posts a public announcement naming who still needs picks.
+ * Does not reveal actual picks — only names + complete/partial/missing.
+ */
+export async function postMissingPicksAnnouncement(
+  weekNumber: number,
+  expectedGames = 5
+): Promise<{ ok: boolean; error?: string; missingCount?: number }> {
+  const session = getSession();
+  if (!session?.leagueId || !session.isCommissioner || !session.playerId) {
+    return { ok: false, error: "Commissioner session required" };
+  }
+
+  const status = await loadPickSubmissionStatus(weekNumber, expectedGames);
+  if (!status.ok) {
+    return { ok: false, error: status.error || "Could not load pick status" };
+  }
+
+  const incomplete = status.rows.filter((r) => !r.complete);
+  if (!incomplete.length) {
+    return {
+      ok: false,
+      error: "Everyone has a complete card — nothing to announce.",
+      missingCount: 0,
+    };
+  }
+
+  const weekLabel =
+    weekNumber === 0 ? "Week 0" : `Week ${weekNumber}`;
+  const lines = incomplete.map((r) => {
+    if (!r.submitted) return `• ${r.name} — not submitted`;
+    const bits = [`${r.gamePickCount} game picks`];
+    if (!r.hasBestBet) bits.push("no Best Bet");
+    if (!r.hasProp) bits.push("no prop");
+    return `• ${r.name} — partial (${bits.join(", ")})`;
+  });
+
+  const title = `${weekLabel}: Still need picks`;
+  const body = [
+    `Commissioner call-out — these players still need a complete ${weekLabel} card (all games + confidence + Best Bet + prop):`,
+    "",
+    ...lines,
+    "",
+    "Lock them in on My Picks before kickoff.",
+  ].join("\n");
+
+  const supabase = createClient();
+  const { error } = await supabase.from("announcements").insert({
+    league_id: session.leagueId,
+    author_id: session.playerId,
+    title,
+    body,
+  });
+
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, missingCount: incomplete.length };
+}
+
 export async function saveResultsAndScoreWeek(opts: {
   weekNumber: number;
   games: Game[];

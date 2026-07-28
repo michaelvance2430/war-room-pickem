@@ -26,6 +26,7 @@ import {
   loadWeekCard,
   saveResultsAndScoreWeek,
   loadPickSubmissionStatus,
+  postMissingPicksAnnouncement,
   PickSubmissionStatus,
 } from "@/lib/cloud";
 import {
@@ -94,6 +95,8 @@ export default function CommissionerPage() {
   const [pickStatus, setPickStatus] = useState<PickSubmissionStatus[]>([]);
   const [pickStatusLoading, setPickStatusLoading] = useState(false);
   const [pickStatusError, setPickStatusError] = useState<string | null>(null);
+  const [postingNudge, setPostingNudge] = useState(false);
+  const [nudgeMessage, setNudgeMessage] = useState<string | null>(null);
 
   useEffect(() => {
     setAllowed(isCommissioner());
@@ -179,6 +182,7 @@ export default function CommissionerPage() {
   async function refreshPickStatus(week = activeWeek) {
     setPickStatusLoading(true);
     setPickStatusError(null);
+    setNudgeMessage(null);
     const expected = publishedGames.length || 5;
     const res = await loadPickSubmissionStatus(week, expected);
     if (!res.ok) {
@@ -188,6 +192,37 @@ export default function CommissionerPage() {
       setPickStatus(res.rows);
     }
     setPickStatusLoading(false);
+  }
+
+  async function announceMissingPicks() {
+    const incomplete = pickStatus.filter((r) => !r.complete);
+    if (!incomplete.length) {
+      setNudgeMessage("Everyone is in — nothing to announce.");
+      return;
+    }
+    const names = incomplete.map((r) => r.name).join(", ");
+    if (
+      !confirm(
+        `Post an announcement naming who still needs picks for ${weekTitle(activeWeek)}?\n\n${names}`
+      )
+    ) {
+      return;
+    }
+
+    setPostingNudge(true);
+    setNudgeMessage(null);
+    const expected = publishedGames.length || 5;
+    const res = await postMissingPicksAnnouncement(activeWeek, expected);
+    setPostingNudge(false);
+
+    if (!res.ok) {
+      setNudgeMessage(res.error || "Failed to post announcement");
+      return;
+    }
+    setNudgeMessage(
+      `Announcement posted — ${res.missingCount} player(s) called out. Check Announcements.`
+    );
+    await refreshPickStatus();
   }
 
   async function pullOdds() {
@@ -909,17 +944,47 @@ export default function CommissionerPage() {
                   <p className="text-xs text-muted mt-1">
                     Shows who submitted a full card. You never see their
                     sides, confidence, or prop choice here — only status.
+                    Post an announcement any day/time you want.
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => refreshPickStatus()}
-                  disabled={pickStatusLoading}
-                  className="px-4 py-2 rounded-lg bg-primary text-black text-sm font-medium disabled:opacity-50 shrink-0"
-                >
-                  {pickStatusLoading ? "Refreshing…" : "Refresh"}
-                </button>
+                <div className="flex flex-wrap gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => refreshPickStatus()}
+                    disabled={pickStatusLoading || postingNudge}
+                    className="px-4 py-2 rounded-lg border border-border text-sm font-medium text-muted hover:text-foreground disabled:opacity-50"
+                  >
+                    {pickStatusLoading ? "Refreshing…" : "Refresh"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => announceMissingPicks()}
+                    disabled={
+                      pickStatusLoading ||
+                      postingNudge ||
+                      pickStatus.filter((r) => !r.complete).length === 0
+                    }
+                    className="px-4 py-2 rounded-lg bg-primary text-black text-sm font-medium disabled:opacity-50"
+                  >
+                    {postingNudge
+                      ? "Posting…"
+                      : "Announce who hasn't picked"}
+                  </button>
+                </div>
               </div>
+
+              {nudgeMessage && (
+                <div
+                  className={`text-sm mb-3 rounded-lg border px-3 py-2 ${
+                    nudgeMessage.toLowerCase().includes("failed") ||
+                    nudgeMessage.toLowerCase().includes("error")
+                      ? "border-danger/40 bg-danger/10 text-danger"
+                      : "border-primary/40 bg-primary/10 text-primary"
+                  }`}
+                >
+                  {nudgeMessage}
+                </div>
+              )}
 
               <div className="flex flex-wrap gap-2 mb-4">
                 {Array.from({ length: seasonWeeks + 1 }, (_, i) => i).map(
