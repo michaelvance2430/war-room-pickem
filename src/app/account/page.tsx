@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Nav from "@/components/Nav";
+import Avatar from "@/components/Avatar";
 import { getSession, getLeague } from "@/lib/league";
 import {
   fetchMyMemberships,
@@ -13,23 +14,37 @@ import {
   deleteLeague,
   LeagueMembership,
 } from "@/lib/session-restore";
+import {
+  loadMyProfile,
+  uploadMyAvatar,
+  removeMyAvatar,
+} from "@/lib/profile";
 
 export default function AccountPage() {
   const router = useRouter();
+  const fileRef = useRef<HTMLInputElement>(null);
   const [memberships, setMemberships] = useState<LeagueMembership[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [name, setName] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   async function reload() {
     const session = getSession();
     const league = getLeague();
-    setName(session?.playerName || "");
     setUserId(session?.playerId || null);
     setActiveId(league?.id || session?.leagueId || null);
+    const profile = await loadMyProfile();
+    if (profile) {
+      setName(profile.displayName);
+      setAvatarUrl(profile.avatarUrl);
+    } else {
+      setName(session?.playerName || "");
+    }
     const list = await fetchMyMemberships();
     setMemberships(list);
     setLoading(false);
@@ -38,6 +53,35 @@ export default function AccountPage() {
   useEffect(() => {
     reload();
   }, []);
+
+  async function onPickFile(file: File | null) {
+    if (!file) return;
+    setUploading(true);
+    setMessage(null);
+    const res = await uploadMyAvatar(file);
+    setUploading(false);
+    if (!res.ok) {
+      setMessage(res.error || "Upload failed");
+      return;
+    }
+    setAvatarUrl(res.avatarUrl || null);
+    setMessage("Profile photo updated");
+    if (fileRef.current) fileRef.current.value = "";
+  }
+
+  async function onRemovePhoto() {
+    if (!confirm("Remove your profile photo?")) return;
+    setUploading(true);
+    setMessage(null);
+    const res = await removeMyAvatar();
+    setUploading(false);
+    if (!res.ok) {
+      setMessage(res.error || "Could not remove photo");
+      return;
+    }
+    setAvatarUrl(null);
+    setMessage("Profile photo removed");
+  }
 
   async function onSwitch(leagueId: string) {
     setMessage(null);
@@ -118,7 +162,7 @@ export default function AccountPage() {
       <main className="flex-1 max-w-lg mx-auto w-full px-4 py-8">
         <h1 className="text-2xl font-bold mb-1">Account</h1>
         <p className="text-sm text-muted mb-6">
-          {name ? `Signed in as ${name}` : "Manage leagues and sign out"}
+          {name ? `Signed in as ${name}` : "Manage profile, leagues, and sign out"}
         </p>
 
         {message && (
@@ -126,6 +170,46 @@ export default function AccountPage() {
             {message}
           </div>
         )}
+
+        <section className="rounded-xl border border-border bg-card p-5 mb-6">
+          <h2 className="font-semibold mb-3">Profile photo</h2>
+          <div className="flex items-center gap-4">
+            <Avatar name={name || "You"} avatarUrl={avatarUrl} size="lg" />
+            <div className="flex-1 min-w-0 space-y-2">
+              <p className="text-sm font-medium truncate">{name || "Player"}</p>
+              <p className="text-xs text-muted">
+                JPG, PNG, or WebP. We resize to a square-friendly size (max 2 MB).
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="hidden"
+                  onChange={(e) => onPickFile(e.target.files?.[0] || null)}
+                />
+                <button
+                  type="button"
+                  disabled={uploading}
+                  onClick={() => fileRef.current?.click()}
+                  className="text-xs px-3 py-1.5 rounded-lg bg-primary text-black font-medium disabled:opacity-50"
+                >
+                  {uploading ? "Uploading…" : avatarUrl ? "Change photo" : "Upload photo"}
+                </button>
+                {avatarUrl && (
+                  <button
+                    type="button"
+                    disabled={uploading}
+                    onClick={onRemovePhoto}
+                    className="text-xs px-3 py-1.5 rounded-lg border border-border text-muted hover:text-foreground disabled:opacity-50"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
 
         <section className="rounded-xl border border-border bg-card p-5 mb-6">
           <h2 className="font-semibold mb-3">Your leagues</h2>

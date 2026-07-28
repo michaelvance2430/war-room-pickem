@@ -739,6 +739,7 @@ export type LeagueRosterMember = {
   division: "North" | "South" | "East" | "West";
   role: "commissioner" | "player";
   totalPoints: number;
+  avatarUrl?: string | null;
 };
 
 /** Live league roster from Supabase memberships (not local mock players). */
@@ -748,14 +749,19 @@ export async function loadLeagueRoster(): Promise<LeagueRosterMember[]> {
   const supabase = createClient();
   const { data: rows, error } = await supabase
     .from("memberships")
-    .select("id, user_id, role, division, total_points, profiles(display_name)")
+    .select(
+      "id, user_id, role, division, total_points, profiles(display_name, avatar_url)"
+    )
     .eq("league_id", session.leagueId);
 
   if (error || !rows) return [];
 
   return rows
     .map((m: Record<string, unknown>) => {
-      const profile = m.profiles as { display_name?: string } | null;
+      const profile = m.profiles as {
+        display_name?: string;
+        avatar_url?: string | null;
+      } | null;
       const role = m.role === "commissioner" ? "commissioner" : "player";
       const division = (m.division as LeagueRosterMember["division"]) || "North";
       return {
@@ -765,6 +771,7 @@ export async function loadLeagueRoster(): Promise<LeagueRosterMember[]> {
         division,
         role,
         totalPoints: (m.total_points as number) || 0,
+        avatarUrl: profile?.avatar_url || null,
       };
     })
     .sort((a, b) => a.name.localeCompare(b.name));

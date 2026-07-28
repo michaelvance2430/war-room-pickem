@@ -4,10 +4,13 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getSession, getLeague } from "@/lib/league";
 import { createClient } from "@/lib/supabase/client";
+import Avatar from "@/components/Avatar";
+import { loadMyProfile } from "@/lib/profile";
 
 export default function Nav() {
   const [isCommish, setIsCommish] = useState(false);
   const [name, setName] = useState("You");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [leagueName, setLeagueName] = useState("");
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -17,6 +20,13 @@ export default function Nav() {
     setIsCommish(!!session?.isCommissioner);
     setName(session?.playerName || "You");
     setLeagueName(league?.name || "");
+
+    loadMyProfile().then((p) => {
+      if (p) {
+        setName(p.displayName);
+        setAvatarUrl(p.avatarUrl);
+      }
+    });
 
     async function loadUnread() {
       if (!session?.playerId || !league?.id) return;
@@ -110,11 +120,17 @@ export default function Nav() {
           </Link>
         </nav>
 
-        <Link href="/account" className="text-sm text-muted hover:text-foreground">
-          {name}
-          {isCommish && (
-            <span className="ml-1 text-xs text-primary">(Commish)</span>
-          )}
+        <Link
+          href="/account"
+          className="flex items-center gap-2 text-sm text-muted hover:text-foreground"
+        >
+          <Avatar name={name} avatarUrl={avatarUrl} size="sm" />
+          <span className="hidden sm:inline">
+            {name}
+            {isCommish && (
+              <span className="ml-1 text-xs text-primary">(Commish)</span>
+            )}
+          </span>
         </Link>
       </div>
     </header>

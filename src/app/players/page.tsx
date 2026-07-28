@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Nav from "@/components/Nav";
+import Avatar from "@/components/Avatar";
 import { getSession, getLeague } from "@/lib/league";
 import {
   loadLeagueRoster,
@@ -209,6 +210,11 @@ export default function PlayersPage() {
                       key={p.userId}
                       className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-card-hover group"
                     >
+                      <Avatar
+                        name={p.name}
+                        avatarUrl={p.avatarUrl}
+                        size="sm"
+                      />
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium truncate">
                           {p.name}
