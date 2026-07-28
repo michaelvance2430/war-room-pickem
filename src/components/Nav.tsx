@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { getSession, getLeague } from "@/lib/league";
 import { createClient } from "@/lib/supabase/client";
 import Avatar from "@/components/Avatar";
+import RulesOnboardingModal from "@/components/RulesOnboardingModal";
 import { loadMyProfile } from "@/lib/profile";
 
 export default function Nav() {
@@ -61,78 +62,95 @@ export default function Nav() {
   }, []);
 
   return (
-    <header className="border-b border-border bg-card/80 backdrop-blur sticky top-0 z-50">
-      <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded bg-primary flex items-center justify-center font-bold text-black text-sm">
-            WR
-          </div>
-          <div className="flex flex-col">
-            <span className="font-semibold tracking-tight leading-tight">
-              War Room Pick&apos;Em
-            </span>
-            {leagueName && (
-              <span className="text-[10px] text-muted leading-tight">{leagueName}</span>
-            )}
-          </div>
-        </Link>
-
-        <nav className="hidden md:flex items-center gap-4 text-sm text-muted">
-          <Link href="/picks" className="hover:text-foreground transition">
-            My Picks
-          </Link>
-          <Link href="/standings" className="hover:text-foreground transition">
-            Standings
-          </Link>
-          <Link href="/power-rankings" className="hover:text-foreground transition">
-            Power Rankings
-          </Link>
-          <Link href="/announcements" className="hover:text-foreground transition relative">
-            Announcements
-            {unreadCount > 0 && (
-              <span className="absolute -top-2 -right-3 min-w-[18px] h-[18px] px-1 rounded-full bg-primary text-black text-[10px] font-bold flex items-center justify-center">
-                {unreadCount}
+    <>
+      <header className="border-b border-border bg-card/80 backdrop-blur sticky top-0 z-50">
+        <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded bg-primary flex items-center justify-center font-bold text-black text-sm">
+              WR
+            </div>
+            <div className="flex flex-col">
+              <span className="font-semibold tracking-tight leading-tight">
+                War Room Pick&apos;Em
               </span>
-            )}
+              {leagueName && (
+                <span className="text-[10px] text-muted leading-tight">
+                  {leagueName}
+                </span>
+              )}
+            </div>
           </Link>
-          <Link href="/stats" className="hover:text-foreground transition">
-            Stats
-          </Link>
-          <Link href="/players" className="hover:text-foreground transition">
-            Players
-          </Link>
-          <Link href="/championship" className="hover:text-foreground transition">
-            Championship
-          </Link>
-          <Link href="/toilet-bowl" className="hover:text-toilet transition">
-            Toilet Bowl
-          </Link>
-          {isCommish && (
-            <Link
-              href="/commissioner"
-              className="hover:text-foreground transition text-primary"
-            >
-              Commissioner
-            </Link>
-          )}
-          <Link href="/account" className="hover:text-foreground transition">
-            Account
-          </Link>
-        </nav>
 
-        <Link
-          href="/account"
-          className="flex items-center gap-2 text-sm text-muted hover:text-foreground"
-        >
-          <Avatar name={name} avatarUrl={avatarUrl} size="sm" />
-          <span className="hidden sm:inline">
-            {name}
+          <nav className="hidden md:flex items-center gap-4 text-sm text-muted">
+            <Link href="/picks" className="hover:text-foreground transition">
+              My Picks
+            </Link>
+            <Link href="/standings" className="hover:text-foreground transition">
+              Standings
+            </Link>
+            <Link
+              href="/power-rankings"
+              className="hover:text-foreground transition"
+            >
+              Power Rankings
+            </Link>
+            <Link
+              href="/announcements"
+              className="hover:text-foreground transition relative"
+            >
+              Announcements
+              {unreadCount > 0 && (
+                <span className="absolute -top-2 -right-3 min-w-[18px] h-[18px] px-1 rounded-full bg-primary text-black text-[10px] font-bold flex items-center justify-center">
+                  {unreadCount}
+                </span>
+              )}
+            </Link>
+            <Link href="/stats" className="hover:text-foreground transition">
+              Stats
+            </Link>
+            <Link href="/players" className="hover:text-foreground transition">
+              Players
+            </Link>
+            <Link href="/rules" className="hover:text-foreground transition">
+              Rules
+            </Link>
+            <Link
+              href="/championship"
+              className="hover:text-foreground transition"
+            >
+              Championship
+            </Link>
+            <Link href="/toilet-bowl" className="hover:text-toilet transition">
+              Toilet Bowl
+            </Link>
             {isCommish && (
-              <span className="ml-1 text-xs text-primary">(Commish)</span>
+              <Link
+                href="/commissioner"
+                className="hover:text-foreground transition text-primary"
+              >
+                Commissioner
+              </Link>
             )}
-          </span>
-        </Link>
-      </div>
-    </header>
+            <Link href="/account" className="hover:text-foreground transition">
+              Account
+            </Link>
+          </nav>
+
+          <Link
+            href="/account"
+            className="flex items-center gap-2 text-sm text-muted hover:text-foreground"
+          >
+            <Avatar name={name} avatarUrl={avatarUrl} size="sm" />
+            <span className="hidden sm:inline">
+              {name}
+              {isCommish && (
+                <span className="ml-1 text-xs text-primary">(Commish)</span>
+              )}
+            </span>
+          </Link>
+        </div>
+      </header>
+      <RulesOnboardingModal />
+    </>
   );
 }

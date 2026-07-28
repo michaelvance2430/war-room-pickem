@@ -249,6 +249,21 @@ export default function Home() {
           </Link>
 
           <Link
+            href="/rules"
+            className="group rounded-xl border border-border/80 bg-black/40 backdrop-blur-sm p-6 hover:border-primary/50 hover:bg-primary/5 transition shadow-[0_0_40px_rgba(0,0,0,0.35)]"
+          >
+            <div className="text-xs uppercase tracking-wider text-muted mb-2">
+              Playbook
+            </div>
+            <div className="text-lg font-semibold text-white group-hover:text-primary transition">
+              Rules
+            </div>
+            <p className="text-sm text-muted mt-2">
+              Spreads · confidence · Best Bet · prop · how to save
+            </p>
+          </Link>
+
+          <Link
             href="/championship"
             className="group rounded-xl border border-primary/30 bg-black/40 backdrop-blur-sm p-6 hover:border-primary hover:bg-primary/10 transition shadow-[0_0_40px_rgba(34,197,94,0.08)]"
           >
