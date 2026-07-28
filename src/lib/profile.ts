@@ -88,12 +88,16 @@ export async function uploadMyAvatar(
 ): Promise<{ ok: boolean; avatarUrl?: string; error?: string }> {
   try {
     const supabase = createClient();
-    const { data: auth } = await supabase.auth.getUser();
-    if (!auth.user) return { ok: false, error: "Not signed in" };
+    const { data: auth, error: authErr } = await supabase.auth.getUser();
+    if (authErr || !auth.user) {
+      return { ok: false, error: "Not signed in — log out and log back in." };
+    }
 
+    const userId = auth.user.id;
     const blob = await prepareAvatarFile(file);
-    const path = `${auth.user.id}/avatar.jpg`;
+    const path = `${userId}/avatar.jpg`;
 
+    // --- Step 1: storage upload ---
     const { error: upErr } = await supabase.storage
       .from(BUCKET)
       .upload(path, blob, {
@@ -103,18 +107,25 @@ export async function uploadMyAvatar(
       });
 
     if (upErr) {
-      return {
-        ok: false,
-        error:
-          upErr.message.includes("Bucket not found") ||
-          upErr.message.includes("not found")
-            ? "Avatar storage is not set up. Run supabase/avatars.sql in Supabase."
-            : upErr.message,
-      };
+      const msg = upErr.message || "";
+      if (/row-level security|violates|policy/i.test(msg)) {
+        return {
+          ok: false,
+          error:
+            "Storage blocked (RLS). In Supabase run the FULL file supabase/avatars-rls-fix.sql, then try again.",
+        };
+      }
+      if (/bucket|not found/i.test(msg)) {
+        return {
+          ok: false,
+          error:
+            "Avatars bucket missing. Run supabase/avatars-rls-fix.sql in Supabase.",
+        };
+      }
+      return { ok: false, error: `Upload failed: ${msg}` };
     }
 
     const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(path);
-    // Cache-bust so the UI refreshes immediately after replace
     const avatarUrl = `${pub.publicUrl}?v=${Date.now()}`;
 
     const displayName =
@@ -122,38 +133,53 @@ export async function uploadMyAvatar(
       auth.user.email?.split("@")[0] ||
       "Player";
 
-    // Prefer UPDATE (profile usually exists from signup trigger)
-    const { data: updated, error: updateErr } = await supabase
+    // --- Step 2: save URL on profile (update, then insert if needed) ---
+    const { data: existing } = await supabase
       .from("profiles")
-      .update({ avatar_url: avatarUrl })
-      .eq("id", auth.user.id)
       .select("id")
+      .eq("id", userId)
       .maybeSingle();
 
-    if (updateErr) {
-      if (/avatar_url|column/i.test(updateErr.message)) {
-        return {
-          ok: false,
-          error: "Run supabase/avatars-rls-fix.sql in Supabase.",
-        };
-      }
-      // Fall through to insert if no row
-    }
+    if (existing?.id) {
+      const { error: updateErr } = await supabase
+        .from("profiles")
+        .update({ avatar_url: avatarUrl })
+        .eq("id", userId);
 
-    if (!updated) {
+      if (updateErr) {
+        const msg = updateErr.message || "";
+        if (/row-level security|violates|policy/i.test(msg)) {
+          return {
+            ok: false,
+            error:
+              "Profile update blocked (RLS). Run supabase/avatars-rls-fix.sql (profiles policies).",
+          };
+        }
+        if (/avatar_url|column/i.test(msg)) {
+          return {
+            ok: false,
+            error: "avatar_url column missing. Run supabase/avatars-rls-fix.sql.",
+          };
+        }
+        return { ok: false, error: `Profile save failed: ${msg}` };
+      }
+    } else {
       const { error: insertErr } = await supabase.from("profiles").insert({
-        id: auth.user.id,
+        id: userId,
         display_name: displayName,
         avatar_url: avatarUrl,
       });
+
       if (insertErr) {
-        return {
-          ok: false,
-          error:
-            insertErr.message.includes("row-level security")
-              ? "Profile RLS blocked save. Run supabase/avatars-rls-fix.sql in Supabase."
-              : insertErr.message,
-        };
+        const msg = insertErr.message || "";
+        if (/row-level security|violates|policy/i.test(msg)) {
+          return {
+            ok: false,
+            error:
+              "Profile insert blocked (RLS). Run supabase/avatars-rls-fix.sql (Users insert own profile).",
+          };
+        }
+        return { ok: false, error: `Profile create failed: ${msg}` };
       }
     }
 
