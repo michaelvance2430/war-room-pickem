@@ -57,40 +57,28 @@ export function mapOddsApiToGames(apiGames: OddsApiGame[]): Game[] {
 }
 
 /**
- * Mock NCAAF games with realistic spreads so the UI works without an API key.
- * Replace this with a real fetch when you add your The Odds API key.
+ * Fetch live NCAAF spreads via our server route (keeps API key off the client).
+ * Configure ODDS_API_KEY on Vercel (or .env.local for local dev).
+ * Free key: https://the-odds-api.com
  */
-export function getMockOddsGames(): Game[] {
-  return [
-    { id: "mock1", awayTeam: "Georgia", homeTeam: "Clemson", spread: -3.5, favorite: "home", startTime: "Sat 12:00 PM ET", bookmaker: "DraftKings", lastUpdate: new Date().toISOString() },
-    { id: "mock2", awayTeam: "Ohio State", homeTeam: "Michigan", spread: 2.5, favorite: "away", startTime: "Sat 3:30 PM ET", bookmaker: "FanDuel", lastUpdate: new Date().toISOString() },
-    { id: "mock3", awayTeam: "Texas", homeTeam: "Oklahoma", spread: 6.5, favorite: "away", startTime: "Sat 7:30 PM ET", bookmaker: "DraftKings", lastUpdate: new Date().toISOString() },
-    { id: "mock4", awayTeam: "Alabama", homeTeam: "LSU", spread: -1.5, favorite: "home", startTime: "Sat 8:00 PM ET", bookmaker: "BetMGM", lastUpdate: new Date().toISOString() },
-    { id: "mock5", awayTeam: "Oregon", homeTeam: "Washington", spread: 4.0, favorite: "away", startTime: "Sat 10:30 PM ET", bookmaker: "FanDuel", lastUpdate: new Date().toISOString() },
-    { id: "mock6", awayTeam: "Penn State", homeTeam: "USC", spread: -7.5, favorite: "home", startTime: "Sat 3:30 PM ET", bookmaker: "DraftKings", lastUpdate: new Date().toISOString() },
-    { id: "mock7", awayTeam: "Florida", homeTeam: "Tennessee", spread: 3.0, favorite: "away", startTime: "Sat 7:00 PM ET", bookmaker: "Caesars", lastUpdate: new Date().toISOString() },
-    { id: "mock8", awayTeam: "Notre Dame", homeTeam: "Miami", spread: -2.5, favorite: "home", startTime: "Sun 2:30 PM ET", bookmaker: "DraftKings", lastUpdate: new Date().toISOString() },
-    { id: "mock9", awayTeam: "Utah", homeTeam: "Oregon State", spread: -10.5, favorite: "home", startTime: "Sat 6:00 PM ET", bookmaker: "FanDuel", lastUpdate: new Date().toISOString() },
-    { id: "mock10", awayTeam: "Kansas State", homeTeam: "Iowa State", spread: 1.5, favorite: "away", startTime: "Sat 4:00 PM ET", bookmaker: "BetMGM", lastUpdate: new Date().toISOString() },
-  ];
-}
+export async function fetchNcaafOdds(): Promise<{
+  games: Game[];
+  remaining?: string | null;
+  used?: string | null;
+}> {
+  const res = await fetch("/api/odds/ncaaf", { cache: "no-store" });
+  const body = await res.json().catch(() => ({}));
 
-/**
- * Real fetch from The Odds API.
- * Get a free key at https://the-odds-api.com
- * Then set NEXT_PUBLIC_ODDS_API_KEY in .env.local
- */
-export async function fetchNcaafOdds(apiKey: string): Promise<Game[]> {
-  const url = new URL("https://api.the-odds-api.com/v4/sports/americanfootball_ncaaf/odds");
-  url.searchParams.set("apiKey", apiKey);
-  url.searchParams.set("regions", "us");
-  url.searchParams.set("markets", "spreads");
-  url.searchParams.set("oddsFormat", "american");
-
-  const res = await fetch(url.toString());
   if (!res.ok) {
-    throw new Error(`Odds API error: ${res.status}`);
+    throw new Error(
+      (body as { error?: string }).error ||
+        `Odds API error: ${res.status}`
+    );
   }
-  const data: OddsApiGame[] = await res.json();
-  return mapOddsApiToGames(data);
+
+  return {
+    games: ((body as { games?: Game[] }).games || []) as Game[],
+    remaining: (body as { remaining?: string | null }).remaining,
+    used: (body as { used?: string | null }).used,
+  };
 }

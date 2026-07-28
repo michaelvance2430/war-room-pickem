@@ -3,9 +3,8 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Nav from "@/components/Nav";
-import { currentWeek } from "@/lib/mock-data";
 import { Game, Prop } from "@/lib/types";
-import { getMockOddsGames, fetchNcaafOdds } from "@/lib/odds";
+import { fetchNcaafOdds } from "@/lib/odds";
 import { scoreWeek, GameResult } from "@/lib/scoring";
 import { applyWeekScores } from "@/lib/store";
 import {
@@ -42,8 +41,13 @@ export default function CommissionerPage() {
   const [copied, setCopied] = useState(false);
   const [availableGames, setAvailableGames] = useState<Game[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [publishedGames, setPublishedGames] = useState<Game[]>(currentWeek.games);
-  const [prop, setProp] = useState<Prop>(currentWeek.prop);
+  const [publishedGames, setPublishedGames] = useState<Game[]>([]);
+  const [prop, setProp] = useState<Prop>({
+    id: "prop-w1",
+    question: "Will the highest scoring game go over 55.5 total points?",
+    options: ["Over", "Under"],
+    points: 3,
+  });
   const [loadingOdds, setLoadingOdds] = useState(false);
   const [oddsError, setOddsError] = useState<string | null>(null);
   const [cardSaved, setCardSaved] = useState(false);
@@ -98,19 +102,25 @@ export default function CommissionerPage() {
     setLoadingOdds(true);
     setOddsError(null);
     try {
-      const key = process.env.NEXT_PUBLIC_ODDS_API_KEY;
-      let games: Game[];
-      if (key) {
-        games = await fetchNcaafOdds(key);
-      } else {
-        await new Promise((r) => setTimeout(r, 500));
-        games = getMockOddsGames();
+      const { games, remaining } = await fetchNcaafOdds();
+      if (!games.length) {
+        setAvailableGames([]);
+        setSelectedIds(new Set());
+        setOddsError(
+          "No NCAAF games with spreads right now (offseason, or books not posting lines yet). Try again closer to kickoff week."
+        );
+        return;
       }
       setAvailableGames(games);
       setSelectedIds(new Set());
+      if (remaining != null) {
+        // Soft notice only — not an error
+        setOddsError(null);
+      }
     } catch (e: unknown) {
       setOddsError(e instanceof Error ? e.message : "Failed to pull odds");
-      setAvailableGames(getMockOddsGames());
+      setAvailableGames([]);
+      setSelectedIds(new Set());
     } finally {
       setLoadingOdds(false);
     }
@@ -422,7 +432,9 @@ export default function CommissionerPage() {
               <div className="flex items-center justify-between mb-3">
                 <div>
                   <h2 className="font-semibold">Pull Live Odds</h2>
-                  <p className="text-xs text-muted">Demo data unless API key is set</p>
+                  <p className="text-xs text-muted">
+                    Real NCAAF spreads from The Odds API (no mock games)
+                  </p>
                 </div>
                 <button
                   onClick={pullOdds}
@@ -432,7 +444,7 @@ export default function CommissionerPage() {
                   {loadingOdds ? "Pulling..." : "Pull Odds"}
                 </button>
               </div>
-              {oddsError && <p className="text-sm text-danger">{oddsError}</p>}
+              {oddsError && <p className="text-sm text-danger mt-2">{oddsError}</p>}
             </div>
 
             {availableGames.length > 0 && (
@@ -440,9 +452,14 @@ export default function CommissionerPage() {
                 <h2 className="font-semibold mb-1">
                   Select 5 Games ({selectedIds.size}/5)
                 </h2>
+                <p className="text-xs text-muted mb-2">
+                  {availableGames.length} live games with spreads
+                </p>
                 <div className="space-y-2 max-h-96 overflow-y-auto mt-4">
                   {availableGames.map((g) => {
                     const selected = selectedIds.has(g.id);
+                    const favLabel =
+                      g.favorite === "home" ? g.homeTeam : g.awayTeam;
                     return (
                       <button
                         key={g.id}
@@ -453,12 +470,21 @@ export default function CommissionerPage() {
                             : "w-full text-left p-3 rounded-lg border border-border"
                         }
                       >
-                        <div className="flex justify-between items-center">
-                          <span className="font-medium">
-                            {g.awayTeam} @ {g.homeTeam}
-                          </span>
-                          <span className="text-sm text-primary">
-                            {g.spread > 0 ? `+${g.spread}` : g.spread}
+                        <div className="flex justify-between items-center gap-2">
+                          <div className="min-w-0">
+                            <div className="font-medium truncate">
+                              {g.awayTeam} @ {g.homeTeam}
+                            </div>
+                            <div className="text-xs text-muted">
+                              {g.startTime}
+                              {g.bookmaker ? ` • ${g.bookmaker}` : ""}
+                            </div>
+                          </div>
+                          <span className="text-sm text-primary shrink-0">
+                            {favLabel}{" "}
+                            {g.spread < 0
+                              ? g.spread
+                              : `-${Math.abs(g.spread)}`}
                           </span>
                         </div>
                       </button>
