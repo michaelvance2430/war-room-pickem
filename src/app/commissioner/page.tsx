@@ -784,16 +784,15 @@ export default function CommissionerPage() {
                   >
                     {PROP_PRESETS.map((p) => (
                       <option key={p.id} value={p.id}>
-                        {p.vibe === "chaos"
-                          ? "🔥 "
-                          : p.vibe === "spicy"
-                            ? "⚡ "
-                            : "· "}
                         {p.label}
                       </option>
                     ))}
-                    <option value={CUSTOM_PROP_ID}>✏️ Custom prop…</option>
+                    <option value={CUSTOM_PROP_ID}>Custom prop (write your own)…</option>
                   </select>
+                  <p className="text-[11px] text-muted">
+                    All presets refer only to the five games on this week&apos;s
+                    card. Worded so finals settle arguments.
+                  </p>
 
                   {propPresetId === CUSTOM_PROP_ID ? (
                     <div className="space-y-2 rounded-lg border border-border bg-background p-3">

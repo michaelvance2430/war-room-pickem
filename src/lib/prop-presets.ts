@@ -7,116 +7,126 @@ export type PropPreset = {
   question: string;
   options: [string, string];
   points: number;
-  /** Fun / serious tag for the list */
-  vibe: "chaos" | "classic" | "spicy";
+  vibe: "totals" | "margins" | "covers" | "scoring";
 };
 
 /**
  * Commissioner prop menu — pick one, or use Custom.
- * Keep options binary so the pick sheet stays simple.
+ *
+ * Rules for wording (no arguments later):
+ * - Always says "on this week's 5-game card" (or equivalent)
+ * - Objective, final-score stats only
+ * - Binary Yes/No or Over/Under
+ * - No "league chat decides", no vibes, no viral clips
  */
 export const PROP_PRESETS: PropPreset[] = [
   {
-    id: "highest-total",
-    label: "Highest-scoring game goes Over 55.5",
-    question: "Will the highest-scoring game on the card go Over 55.5 total points?",
-    options: ["Over 55.5", "Under 55.5"],
-    points: 3,
-    vibe: "classic",
-  },
-  {
-    id: "blowout",
-    label: "Any game decided by 21+ points?",
-    question: "Will any game on this week's card be decided by 21 or more points?",
-    options: ["Yes", "No"],
-    points: 3,
-    vibe: "classic",
-  },
-  {
-    id: "upset",
-    label: "Dog covers (or wins outright)",
-    question: "Will at least one underdog on the card cover the spread?",
-    options: ["Yes", "No"],
-    points: 3,
-    vibe: "classic",
-  },
-  {
-    id: "shutout-half",
-    label: "Any team held under 10 points?",
-    question: "Will any team on the card score fewer than 10 points?",
-    options: ["Yes", "No"],
-    points: 3,
-    vibe: "spicy",
-  },
-  {
-    id: "ot",
-    label: "Any game goes to overtime?",
-    question: "Will any game on this week's card go to overtime?",
-    options: ["Yes", "No"],
-    points: 3,
-    vibe: "spicy",
-  },
-  {
-    id: "combined-total",
-    label: "All 5 games combined Over 280.5?",
-    question: "Will the combined total points of all 5 games go Over 280.5?",
-    options: ["Over 280.5", "Under 280.5"],
-    points: 3,
-    vibe: "classic",
-  },
-  {
-    id: "coach-rant",
-    label: "Coach mic'd-up meltdown vibes",
+    id: "any-total-over-55",
+    label: "Any of the 5 games finishes Over 55.5 total?",
     question:
-      "Will a coach on this card have a postgame soundbite that goes viral (league chat decides)?",
-    options: ["Yes — chaos", "No — boring"],
+      "Will ANY of the five games on this week's card finish with a combined score of 56 or more points (Over 55.5)?",
+    options: ["Yes — at least one game ≥ 56", "No — every game ≤ 55"],
     points: 3,
-    vibe: "chaos",
+    vibe: "totals",
   },
   {
-    id: "trash-talk",
-    label: "Flag / ejections / drama",
+    id: "any-total-under-40",
+    label: "Any of the 5 games finishes Under 40.5 total?",
     question:
-      "Will there be a targeting ejection OR a player ejection on any card game?",
-    options: ["Yes", "No"],
+      "Will ANY of the five games on this week's card finish with a combined score of 40 or fewer points (Under 40.5)?",
+    options: ["Yes — at least one game ≤ 40", "No — every game ≥ 41"],
     points: 3,
-    vibe: "chaos",
+    vibe: "totals",
   },
   {
-    id: "ranked-lose",
-    label: "Ranked team loses outright?",
+    id: "highest-total-over-60",
+    label: "Highest of the 5 game totals Over 60.5?",
     question:
-      "Will a ranked team (AP/FPI Top 25) on this card lose the game outright?",
-    options: ["Yes", "No"],
+      "Among the five games on this week's card, will the single highest combined final score be 61 or more points (Over 60.5)?",
+    options: ["Yes — highest total ≥ 61", "No — highest total ≤ 60"],
     points: 3,
-    vibe: "spicy",
+    vibe: "totals",
   },
   {
-    id: "fg-decides",
-    label: "Game decided by a field goal?",
+    id: "all-five-combined-over-280",
+    label: "All 5 games' totals combined Over 280.5?",
     question:
-      "Will any game on the card be decided by a field goal (margin of 1–3)?",
-    options: ["Yes", "No"],
+      "Will the sum of the five final combined scores on this week's card be 281 or more points (Over 280.5)?",
+    options: ["Yes — combined ≥ 281", "No — combined ≤ 280"],
     points: 3,
-    vibe: "classic",
+    vibe: "totals",
   },
   {
-    id: "special-teams",
-    label: "Special teams / defensive TD?",
+    id: "any-margin-21",
+    label: "Any of the 5 decided by 21+ points?",
     question:
-      "Will any card game feature a special teams or defensive touchdown?",
-    options: ["Yes", "No"],
+      "Will ANY of the five games on this week's card be decided by a final margin of 21 or more points (winner score minus loser score ≥ 21)?",
+    options: ["Yes — at least one margin ≥ 21", "No — every margin ≤ 20"],
     points: 3,
-    vibe: "spicy",
+    vibe: "margins",
   },
   {
-    id: "toilet-energy",
-    label: "Toilet Bowl energy (chaos prop)",
+    id: "any-margin-3-or-less",
+    label: "Any of the 5 decided by 3 or fewer points?",
     question:
-      "Will the War Room group chat need a formal apology from someone this week?",
-    options: ["Yes — own it", "No — angels only"],
+      "Will ANY of the five games on this week's card be decided by a final margin of 1, 2, or 3 points?",
+    options: ["Yes — at least one margin is 1–3", "No — every margin ≥ 4"],
     points: 3,
-    vibe: "chaos",
+    vibe: "margins",
+  },
+  {
+    id: "any-dog-covers",
+    label: "Any underdog covers the posted spread?",
+    question:
+      "Using the spread locked on this week's card when picks closed: will ANY of the five underdogs cover (or win outright if the favorite fails to cover)? A push on that game does NOT count as a cover.",
+    options: ["Yes — at least one dog covers", "No — no dog covers"],
+    points: 3,
+    vibe: "covers",
+  },
+  {
+    id: "favorites-go-3-2-or-better",
+    label: "Favorites cover in 3+ of the 5 games?",
+    question:
+      "Using the spreads locked on this week's card: will the favorite cover in at least 3 of the 5 games? (Push = neither side covers for that game.)",
+    options: ["Yes — favorites cover ≥ 3", "No — favorites cover ≤ 2"],
+    points: 3,
+    vibe: "covers",
+  },
+  {
+    id: "any-team-under-10",
+    label: "Any team on the card scores ≤ 9 points?",
+    question:
+      "Will ANY of the ten teams playing on this week's 5-game card finish with 9 or fewer points?",
+    options: ["Yes — at least one team ≤ 9", "No — every team ≥ 10"],
+    points: 3,
+    vibe: "scoring",
+  },
+  {
+    id: "any-team-over-45",
+    label: "Any team on the card scores ≥ 46 points?",
+    question:
+      "Will ANY of the ten teams playing on this week's 5-game card finish with 46 or more points?",
+    options: ["Yes — at least one team ≥ 46", "No — every team ≤ 45"],
+    points: 3,
+    vibe: "scoring",
+  },
+  {
+    id: "any-ot",
+    label: "Any of the 5 games goes to overtime?",
+    question:
+      "Will ANY of the five games on this week's card be tied at the end of regulation and play at least one overtime period (official final includes OT)?",
+    options: ["Yes — at least one game goes to OT", "No — none go to OT"],
+    points: 3,
+    vibe: "scoring",
+  },
+  {
+    id: "both-teams-25-any-game",
+    label: "Any game has BOTH teams ≥ 25 points?",
+    question:
+      "Will ANY of the five games on this week's card end with both the home team and the away team scoring 25 or more points each?",
+    options: ["Yes — at least one game both ≥ 25", "No — never both ≥ 25"],
+    points: 3,
+    vibe: "scoring",
   },
 ];
 
@@ -134,9 +144,7 @@ export function propFromPreset(preset: PropPreset, weekNumber = 1): Prop {
 export function matchPresetId(prop: Prop | null | undefined): string {
   if (!prop?.question) return PROP_PRESETS[0].id;
   const hit = PROP_PRESETS.find(
-    (p) =>
-      p.question === prop.question ||
-      prop.id.includes(p.id)
+    (p) => p.question === prop.question || prop.id.includes(p.id)
   );
   return hit?.id || CUSTOM_PROP_ID;
 }
