@@ -37,6 +37,12 @@ import {
   fetchNcaafScores,
   buildResultsFromScores,
 } from "@/lib/scores";
+import {
+  PROP_PRESETS,
+  CUSTOM_PROP_ID,
+  propFromPreset,
+  matchPresetId,
+} from "@/lib/prop-presets";
 
 const ACTIVE_WEEK_KEY = "warroom-active-week";
 
@@ -63,12 +69,13 @@ export default function CommissionerPage() {
   const [availableGames, setAvailableGames] = useState<Game[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [publishedGames, setPublishedGames] = useState<Game[]>([]);
-  const [prop, setProp] = useState<Prop>({
-    id: "prop-w1",
-    question: "Will the highest scoring game go over 55.5 total points?",
-    options: ["Over", "Under"],
-    points: 3,
-  });
+  const [prop, setProp] = useState<Prop>(() =>
+    propFromPreset(PROP_PRESETS[0], 1)
+  );
+  const [propPresetId, setPropPresetId] = useState(PROP_PRESETS[0].id);
+  const [customQuestion, setCustomQuestion] = useState("");
+  const [customOptA, setCustomOptA] = useState("Yes");
+  const [customOptB, setCustomOptB] = useState("No");
   const [loadingOdds, setLoadingOdds] = useState(false);
   const [oddsError, setOddsError] = useState<string | null>(null);
   const [rankLabel, setRankLabel] = useState<string | null>(null);
@@ -122,6 +129,7 @@ export default function CommissionerPage() {
     if (cloud) {
       setPublishedGames(cloud.games);
       setProp(cloud.prop);
+      setPropPresetId(matchPresetId(cloud.prop));
       setCardSaved(true);
     } else {
       try {
@@ -129,7 +137,10 @@ export default function CommissionerPage() {
         if (cardRaw) {
           const data = JSON.parse(cardRaw);
           if (data.games) setPublishedGames(data.games);
-          if (data.prop) setProp(data.prop);
+          if (data.prop) {
+            setProp(data.prop);
+            setPropPresetId(matchPresetId(data.prop));
+          }
           setCardSaved(true);
         }
       } catch {
@@ -194,9 +205,47 @@ export default function CommissionerPage() {
     });
   }
 
+  function applyPropPreset(id: string) {
+    setPropPresetId(id);
+    if (id === CUSTOM_PROP_ID) {
+      setProp({
+        id: `prop-custom-w${activeWeek}`,
+        question: customQuestion.trim() || "Custom prop — edit before publish",
+        options: [
+          customOptA.trim() || "Yes",
+          customOptB.trim() || "No",
+        ] as [string, string],
+        points: 3,
+      });
+      return;
+    }
+    const preset = PROP_PRESETS.find((p) => p.id === id);
+    if (preset) setProp(propFromPreset(preset, activeWeek));
+  }
+
+  function syncCustomProp() {
+    if (propPresetId !== CUSTOM_PROP_ID) return;
+    setProp({
+      id: `prop-custom-w${activeWeek}`,
+      question: customQuestion.trim() || "Custom prop",
+      options: [
+        customOptA.trim() || "Yes",
+        customOptB.trim() || "No",
+      ] as [string, string],
+      points: 3,
+    });
+  }
+
   async function publishCard() {
     const selected = availableGames.filter((g) => selectedIds.has(g.id));
     if (selected.length !== 5) return;
+    if (propPresetId === CUSTOM_PROP_ID) {
+      if (!customQuestion.trim()) {
+        alert("Enter a custom prop question before publishing.");
+        return;
+      }
+      syncCustomProp();
+    }
     // Sort selected by kickoff so the card reads chronologically
     selected.sort((a, b) => {
       const ta = new Date(a.commenceTime || a.startTime || 0).getTime();
@@ -694,6 +743,73 @@ export default function CommissionerPage() {
                     </div>
                   ))}
                 </div>
+                {/* Weekly prop picker */}
+                <div className="mt-6 pt-5 border-t border-border space-y-3">
+                  <div>
+                    <h3 className="font-semibold text-sm">Weekly prop</h3>
+                    <p className="text-xs text-muted">
+                      Pick a fun preset (or custom). Worth {prop.points} pts.
+                    </p>
+                  </div>
+                  <select
+                    value={propPresetId}
+                    onChange={(e) => applyPropPreset(e.target.value)}
+                    className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-primary"
+                  >
+                    {PROP_PRESETS.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.vibe === "chaos"
+                          ? "🔥 "
+                          : p.vibe === "spicy"
+                            ? "⚡ "
+                            : "· "}
+                        {p.label}
+                      </option>
+                    ))}
+                    <option value={CUSTOM_PROP_ID}>✏️ Custom prop…</option>
+                  </select>
+
+                  {propPresetId === CUSTOM_PROP_ID ? (
+                    <div className="space-y-2 rounded-lg border border-border bg-background p-3">
+                      <input
+                        type="text"
+                        value={customQuestion}
+                        onChange={(e) => {
+                          setCustomQuestion(e.target.value);
+                        }}
+                        onBlur={syncCustomProp}
+                        placeholder="Prop question"
+                        className="w-full bg-card border border-border rounded-lg px-3 py-2 text-sm"
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="text"
+                          value={customOptA}
+                          onChange={(e) => setCustomOptA(e.target.value)}
+                          onBlur={syncCustomProp}
+                          placeholder="Option A"
+                          className="bg-card border border-border rounded-lg px-3 py-2 text-sm"
+                        />
+                        <input
+                          type="text"
+                          value={customOptB}
+                          onChange={(e) => setCustomOptB(e.target.value)}
+                          onBlur={syncCustomProp}
+                          placeholder="Option B"
+                          className="bg-card border border-border rounded-lg px-3 py-2 text-sm"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-border bg-background px-3 py-2.5 text-sm">
+                      <p className="text-foreground">{prop.question}</p>
+                      <p className="text-xs text-muted mt-1">
+                        Choices: {prop.options[0]} · {prop.options[1]}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
                 <button
                   type="button"
                   disabled={selectedIds.size !== 5}
