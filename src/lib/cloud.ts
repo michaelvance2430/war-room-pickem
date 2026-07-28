@@ -31,6 +31,7 @@ function mapCardGame(row: {
   const start = row.start_time || "";
   // If we stored ISO, keep it on commenceTime for date formatting
   const isIso = start.includes("T") || /^\d{4}-\d{2}-\d{2}/.test(start);
+  const oddsId = (row as { odds_event_id?: string | null }).odds_event_id;
   return {
     id: row.id,
     awayTeam: row.away_team,
@@ -39,6 +40,7 @@ function mapCardGame(row: {
     favorite: row.favorite === "away" ? "away" : "home",
     startTime: start,
     commenceTime: isIso ? start : undefined,
+    oddsEventId: oddsId || undefined,
     bookmaker: row.bookmaker || undefined,
     awayRank: row.away_rank ?? null,
     homeRank: row.home_rank ?? null,
@@ -113,12 +115,35 @@ export async function publishWeekCard(opts: {
     bookmaker: g.bookmaker || null,
     away_rank: g.awayRank ?? null,
     home_rank: g.homeRank ?? null,
+    // Best-effort: only works after card-game-odds-id.sql is run
+    odds_event_id: g.oddsEventId || g.id || null,
   }));
 
-  const { data: inserted, error: gamesError } = await supabase
-    .from("card_games")
-    .insert(rows)
-    .select("id, sort_order");
+  let inserted: { id: string; sort_order: number }[] | null = null;
+  let gamesError: { message: string } | null = null;
+
+  {
+    const first = await supabase
+      .from("card_games")
+      .insert(rows)
+      .select("id, sort_order");
+    if (
+      first.error &&
+      /odds_event_id|column/i.test(first.error.message || "")
+    ) {
+      // Column not added yet — retry without odds_event_id
+      const slim = rows.map(({ odds_event_id: _o, ...rest }) => rest);
+      const second = await supabase
+        .from("card_games")
+        .insert(slim)
+        .select("id, sort_order");
+      inserted = second.data;
+      gamesError = second.error;
+    } else {
+      inserted = first.data;
+      gamesError = first.error;
+    }
+  }
 
   if (gamesError) {
     return { ok: false, error: gamesError.message };
@@ -126,7 +151,9 @@ export async function publishWeekCard(opts: {
 
   const gamesWithIds = opts.games.map((g, i) => {
     const row = inserted?.find((r) => r.sort_order === i);
-    return row ? { ...g, id: row.id } : g;
+    return row
+      ? { ...g, id: row.id, oddsEventId: g.oddsEventId || g.id }
+      : g;
   });
 
   try {

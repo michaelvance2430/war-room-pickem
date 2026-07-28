@@ -30,6 +30,8 @@ export interface Game {
   startTime: string;
   /** ISO kickoff from odds API — use for date under matchup */
   commenceTime?: string;
+  /** The Odds API event id (for score matching) */
+  oddsEventId?: string;
   bookmaker?: string;
   lastUpdate?: string;
   /** AP / FPI rank when available (1–25) */

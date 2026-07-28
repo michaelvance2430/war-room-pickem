@@ -33,6 +33,10 @@ import {
   weekTitle,
   weekSubtitle,
 } from "@/lib/dates";
+import {
+  fetchNcaafScores,
+  buildResultsFromScores,
+} from "@/lib/scores";
 
 const ACTIVE_WEEK_KEY = "warroom-active-week";
 
@@ -76,6 +80,8 @@ export default function CommissionerPage() {
   const [hasPlayerPicks, setHasPlayerPicks] = useState(false);
   const [scoring, setScoring] = useState(false);
   const [scoreReport, setScoreReport] = useState<string | null>(null);
+  const [syncingScores, setSyncingScores] = useState(false);
+  const [syncReport, setSyncReport] = useState<string | null>(null);
 
   useEffect(() => {
     setAllowed(isCommissioner());
@@ -231,6 +237,57 @@ export default function CommissionerPage() {
     setResults((prev) => ({ ...prev, [gameId]: { gameId, winner: side } }));
     setResultsSaved(false);
     setDemoScore(null);
+  }
+
+  /**
+   * Pull final scores from The Odds API and auto-fill ATS winners
+   * using the locked home spread on each card game.
+   * Prop result still needs a manual click.
+   */
+  async function syncFinalScores(andScore = false) {
+    if (!publishedGames.length) {
+      setSyncReport("Publish a week card first.");
+      return;
+    }
+    setSyncingScores(true);
+    setSyncReport(null);
+    try {
+      const events = await fetchNcaafScores(3);
+      const built = buildResultsFromScores(publishedGames, events);
+      setResults((prev) => ({ ...prev, ...built.results }));
+      setResultsSaved(false);
+
+      const lines = built.details
+        .map((d) => {
+          if (d.status === "final") {
+            return `✓ ${d.label}: ${d.scoreLine} → ${d.winner?.toUpperCase()} covers`;
+          }
+          if (d.status === "live") return `… ${d.label}: still live`;
+          if (d.status === "unmatched") return `? ${d.label}: no score feed match`;
+          return `– ${d.label}: not started / no score yet`;
+        })
+        .join("\n");
+
+      setSyncReport(
+        `Auto-filled ${built.filled} of ${publishedGames.length} games (last 3 days of scores).\n${lines}`
+      );
+
+      if (andScore && built.filled === publishedGames.length) {
+        // Keep current propResult; user may still need to set prop
+        setSyncingScores(false);
+        // Defer to next tick so results state is applied
+        setTimeout(() => {
+          void handleSaveResults();
+        }, 50);
+        return;
+      }
+    } catch (e: unknown) {
+      setSyncReport(
+        e instanceof Error ? e.message : "Failed to sync scores"
+      );
+    } finally {
+      setSyncingScores(false);
+    }
   }
 
   async function handleSaveResults() {
@@ -668,15 +725,36 @@ export default function CommissionerPage() {
         {tab === "results" && (
           <div>
             <div className="rounded-xl border border-border bg-card p-5 mb-6">
-              <h2 className="font-semibold mb-1">
-                Enter Results — {weekTitle(activeWeek)}
-              </h2>
-              <p className="text-xs text-muted mb-4">
-                {weekSubtitle(activeWeek)}
-                {formatCardDateRange(publishedGames)
-                  ? ` · ${formatCardDateRange(publishedGames)}`
-                  : ""}
-              </p>
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
+                <div>
+                  <h2 className="font-semibold mb-1">
+                    Enter Results — {weekTitle(activeWeek)}
+                  </h2>
+                  <p className="text-xs text-muted">
+                    {weekSubtitle(activeWeek)}
+                    {formatCardDateRange(publishedGames)
+                      ? ` · ${formatCardDateRange(publishedGames)}`
+                      : ""}
+                  </p>
+                  <p className="text-[11px] text-muted mt-1">
+                    Auto-sync uses The Odds API finals (last 3 days) + your
+                    locked spreads for ATS. Prop still needs a manual pick.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => syncFinalScores(false)}
+                  disabled={syncingScores || !publishedGames.length}
+                  className="px-4 py-2 rounded-lg bg-primary text-black text-sm font-medium disabled:opacity-50 shrink-0"
+                >
+                  {syncingScores ? "Syncing…" : "Sync final scores"}
+                </button>
+              </div>
+              {syncReport && (
+                <pre className="text-xs text-muted whitespace-pre-wrap mb-4 rounded-lg border border-border bg-background p-3 max-h-40 overflow-y-auto">
+                  {syncReport}
+                </pre>
+              )}
               <div className="space-y-4">
                 {publishedGames.map((game) => {
                   const res = results[game.id];

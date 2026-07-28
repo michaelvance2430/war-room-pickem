@@ -48,6 +48,7 @@ export function mapOddsApiToGames(apiGames: OddsApiGame[]): Game[] {
 
     return {
       id: g.id,
+      oddsEventId: g.id,
       awayTeam: g.away_team,
       homeTeam: g.home_team,
       spread,
