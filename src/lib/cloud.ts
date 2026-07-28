@@ -28,13 +28,17 @@ function mapCardGame(row: {
   away_rank?: number | null;
   home_rank?: number | null;
 }): Game {
+  const start = row.start_time || "";
+  // If we stored ISO, keep it on commenceTime for date formatting
+  const isIso = start.includes("T") || /^\d{4}-\d{2}-\d{2}/.test(start);
   return {
     id: row.id,
     awayTeam: row.away_team,
     homeTeam: row.home_team,
     spread: Number(row.spread),
     favorite: row.favorite === "away" ? "away" : "home",
-    startTime: row.start_time || "",
+    startTime: start,
+    commenceTime: isIso ? start : undefined,
     bookmaker: row.bookmaker || undefined,
     awayRank: row.away_rank ?? null,
     homeRank: row.home_rank ?? null,
@@ -104,7 +108,8 @@ export async function publishWeekCard(opts: {
     home_team: g.homeTeam,
     spread: g.spread,
     favorite: g.favorite,
-    start_time: g.startTime || null,
+    // Prefer ISO commenceTime so dates survive reload
+    start_time: g.commenceTime || g.startTime || null,
     bookmaker: g.bookmaker || null,
     away_rank: g.awayRank ?? null,
     home_rank: g.homeRank ?? null,

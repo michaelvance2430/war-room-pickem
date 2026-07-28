@@ -54,7 +54,7 @@ export function writeSessionAndLeague(
     createdAt: membership.createdAt,
     settings: {
       cutPercent: membership.cutPercent ?? 50,
-      regularSeasonWeeks: membership.regularSeasonWeeks ?? 12,
+      regularSeasonWeeks: membership.regularSeasonWeeks ?? 13,
       gamesPerWeek: membership.gamesPerWeek ?? 5,
     },
   };
@@ -100,7 +100,7 @@ export async function fetchMyMemberships(): Promise<LeagueMembership[]> {
       commissionerId: L.commissioner_id as string,
       createdAt: (L.created_at as string) || "",
       cutPercent: (L.cut_percent as number) ?? 50,
-      regularSeasonWeeks: (L.regular_season_weeks as number) ?? 12,
+      regularSeasonWeeks: (L.regular_season_weeks as number) ?? 13,
       gamesPerWeek: (L.games_per_week as number) ?? 5,
       role: (row.role as string) || "player",
       displayName: metaName,

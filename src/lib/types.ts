@@ -26,10 +26,13 @@ export interface Game {
   homeTeam: string;
   spread: number;
   favorite: "home" | "away";
+  /** Display string (legacy + short); prefer commenceTime for real dates */
   startTime: string;
+  /** ISO kickoff from odds API — use for date under matchup */
+  commenceTime?: string;
   bookmaker?: string;
   lastUpdate?: string;
-  /** AP Top 25 rank when available (1–25) */
+  /** AP / FPI rank when available (1–25) */
   awayRank?: number | null;
   homeRank?: number | null;
 }

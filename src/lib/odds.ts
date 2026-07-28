@@ -38,9 +38,12 @@ export function mapOddsApiToGames(apiGames: OddsApiGame[]): Game[] {
     const start = new Date(g.commence_time);
     const startTime = start.toLocaleString("en-US", {
       weekday: "short",
+      month: "short",
+      day: "numeric",
       hour: "numeric",
       minute: "2-digit",
       timeZoneName: "short",
+      timeZone: "America/New_York",
     });
 
     return {
@@ -50,6 +53,7 @@ export function mapOddsApiToGames(apiGames: OddsApiGame[]): Game[] {
       spread,
       favorite,
       startTime,
+      commenceTime: g.commence_time,
       bookmaker,
       lastUpdate,
     };

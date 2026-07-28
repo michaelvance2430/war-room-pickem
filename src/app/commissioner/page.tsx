@@ -26,10 +26,23 @@ import {
   loadWeekCard,
   saveResultsAndScoreWeek,
 } from "@/lib/cloud";
+import {
+  formatKickoff,
+  formatCardDateRange,
+  groupGamesByDate,
+  weekTitle,
+  weekSubtitle,
+} from "@/lib/dates";
 
-const PICKS_KEY = "warroom-picks-week-1";
-const RESULTS_KEY = "warroom-results-week-1";
-const CARD_KEY = "warroom-card-week-1";
+const ACTIVE_WEEK_KEY = "warroom-active-week";
+
+function storageKeys(week: number) {
+  return {
+    picks: `warroom-picks-week-${week}`,
+    results: `warroom-results-week-${week}`,
+    card: `warroom-card-week-${week}`,
+  };
+}
 
 export default function CommissionerPage() {
   const router = useRouter();
@@ -38,7 +51,9 @@ export default function CommissionerPage() {
   const [league, setLeague] = useState<League | null>(null);
   const [leagueNameEdit, setLeagueNameEdit] = useState("");
   const [cutPercent, setCutPercent] = useState(50);
-  const [seasonWeeks, setSeasonWeeks] = useState(12);
+  const [seasonWeeks, setSeasonWeeks] = useState(13);
+  /** CFB week number: 0 = openers, 1..N regular (Week 1 may span two Saturdays) */
+  const [activeWeek, setActiveWeek] = useState(1);
   const [settingsSaved, setSettingsSaved] = useState(false);
   const [copied, setCopied] = useState(false);
   const [availableGames, setAvailableGames] = useState<Game[]>([]);
@@ -70,26 +85,53 @@ export default function CommissionerPage() {
         setLeague(lg);
         setLeagueNameEdit(lg.name);
         setCutPercent(lg.settings?.cutPercent ?? 50);
-        setSeasonWeeks(lg.settings?.regularSeasonWeeks ?? 12);
+        setSeasonWeeks(lg.settings?.regularSeasonWeeks ?? 13);
       }
+      let week = 1;
+      try {
+        const saved = localStorage.getItem(ACTIVE_WEEK_KEY);
+        if (saved != null && saved !== "") week = parseInt(saved, 10);
+        if (Number.isNaN(week)) week = 1;
+      } catch {
+        /* ignore */
+      }
+      setActiveWeek(week);
+      await loadWeekState(week);
     }
     load();
-    loadWeekCard(1).then((cloud) => {
-      if (cloud) {
-        setPublishedGames(cloud.games);
-        setProp(cloud.prop);
-        setCardSaved(true);
+  }, []);
+
+  async function loadWeekState(week: number) {
+    setCardSaved(false);
+    setPublishedGames([]);
+    setResults({});
+    setPropResult(null);
+    setResultsSaved(false);
+    setDemoScore(null);
+    setScoreReport(null);
+    setSelectedIds(new Set());
+
+    const keys = storageKeys(week);
+    const cloud = await loadWeekCard(week);
+    if (cloud) {
+      setPublishedGames(cloud.games);
+      setProp(cloud.prop);
+      setCardSaved(true);
+    } else {
+      try {
+        const cardRaw = localStorage.getItem(keys.card);
+        if (cardRaw) {
+          const data = JSON.parse(cardRaw);
+          if (data.games) setPublishedGames(data.games);
+          if (data.prop) setProp(data.prop);
+          setCardSaved(true);
+        }
+      } catch {
+        /* ignore */
       }
-    });
+    }
     try {
-      const cardRaw = localStorage.getItem(CARD_KEY);
-      if (cardRaw) {
-        const data = JSON.parse(cardRaw);
-        if (data.games) setPublishedGames(data.games);
-        if (data.prop) setProp(data.prop);
-        setCardSaved(true);
-      }
-      const resRaw = localStorage.getItem(RESULTS_KEY);
+      const resRaw = localStorage.getItem(keys.results);
       if (resRaw) {
         const data = JSON.parse(resRaw);
         setResults(data.results || {});
@@ -97,9 +139,19 @@ export default function CommissionerPage() {
         setResultsSaved(true);
       }
     } catch {
-      // ignore
+      /* ignore */
     }
-  }, []);
+  }
+
+  async function changeActiveWeek(week: number) {
+    setActiveWeek(week);
+    try {
+      localStorage.setItem(ACTIVE_WEEK_KEY, String(week));
+    } catch {
+      /* ignore */
+    }
+    await loadWeekState(week);
+  }
 
   async function pullOdds() {
     setLoadingOdds(true);
@@ -139,22 +191,40 @@ export default function CommissionerPage() {
   async function publishCard() {
     const selected = availableGames.filter((g) => selectedIds.has(g.id));
     if (selected.length !== 5) return;
+    // Sort selected by kickoff so the card reads chronologically
+    selected.sort((a, b) => {
+      const ta = new Date(a.commenceTime || a.startTime || 0).getTime();
+      const tb = new Date(b.commenceTime || b.startTime || 0).getTime();
+      return (Number.isNaN(ta) ? 0 : ta) - (Number.isNaN(tb) ? 0 : tb);
+    });
     const result = await publishWeekCard({
-      weekNumber: 1,
+      weekNumber: activeWeek,
       games: selected,
       prop,
     });
+    const keys = storageKeys(activeWeek);
     if (!result.ok) {
       alert(result.error || "Failed to publish to cloud");
-      // still save locally
       setPublishedGames(selected);
-      localStorage.setItem(CARD_KEY, JSON.stringify({ games: selected, prop }));
+      localStorage.setItem(
+        keys.card,
+        JSON.stringify({ games: selected, prop, weekNumber: activeWeek })
+      );
       setCardSaved(true);
       return;
     }
     const games = result.games || selected;
     setPublishedGames(games);
     setCardSaved(true);
+    try {
+      localStorage.setItem(ACTIVE_WEEK_KEY, String(activeWeek));
+      localStorage.setItem(
+        keys.card,
+        JSON.stringify({ games, prop, weekNumber: activeWeek })
+      );
+    } catch {
+      /* ignore */
+    }
   }
 
   function setGameWinner(gameId: string, side: "home" | "away" | "push") {
@@ -167,11 +237,15 @@ export default function CommissionerPage() {
     if (scoring) return;
     setScoring(true);
     setScoreReport(null);
-    localStorage.setItem(RESULTS_KEY, JSON.stringify({ results, propResult }));
+    const keys = storageKeys(activeWeek);
+    localStorage.setItem(
+      keys.results,
+      JSON.stringify({ results, propResult })
+    );
 
     // Local demo score for this browser's picks
     try {
-      const raw = localStorage.getItem(PICKS_KEY);
+      const raw = localStorage.getItem(keys.picks);
       if (raw) {
         const data = JSON.parse(raw);
         const scored = scoreWeek(
@@ -193,7 +267,7 @@ export default function CommissionerPage() {
     }
 
     const cloud = await saveResultsAndScoreWeek({
-      weekNumber: 1,
+      weekNumber: activeWeek,
       games: publishedGames,
       prop,
       results,
@@ -391,16 +465,21 @@ export default function CommissionerPage() {
                 </div>
                 <div>
                   <label className="text-xs text-muted block mb-1">
-                    Regular season weeks
+                    Regular season weeks (default 13)
                   </label>
                   <input
                     type="number"
                     min={4}
                     max={16}
                     value={seasonWeeks}
-                    onChange={(e) => setSeasonWeeks(parseInt(e.target.value) || 12)}
+                    onChange={(e) =>
+                      setSeasonWeeks(parseInt(e.target.value) || 13)
+                    }
                     className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm"
                   />
+                  <p className="text-[11px] text-muted mt-1">
+                    Plus optional Week 0 openers. Week 1 can cover two Saturdays.
+                  </p>
                 </div>
               </div>
               <button
@@ -430,11 +509,40 @@ export default function CommissionerPage() {
         {tab === "card" && (
           <div>
             <div className="rounded-xl border border-border bg-card p-5 mb-6">
+              <h2 className="font-semibold mb-1">Pick&apos;em week</h2>
+              <p className="text-xs text-muted mb-3">
+                {weekSubtitle(activeWeek)}. Games on different dates are fine —
+                each shows its own kickoff below the matchup.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {Array.from({ length: seasonWeeks + 1 }, (_, i) => i).map(
+                  (w) => (
+                    <button
+                      key={w}
+                      type="button"
+                      onClick={() => changeActiveWeek(w)}
+                      className={
+                        activeWeek === w
+                          ? "px-3 py-1.5 rounded-full text-xs font-medium bg-primary text-black"
+                          : "px-3 py-1.5 rounded-full text-xs font-medium bg-card-hover border border-border text-muted hover:text-foreground"
+                      }
+                    >
+                      {weekTitle(w)}
+                    </button>
+                  )
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-border bg-card p-5 mb-6">
               <div className="flex items-center justify-between mb-3">
                 <div>
-                  <h2 className="font-semibold">Pull Live Odds</h2>
+                  <h2 className="font-semibold">
+                    Pull Live Odds — {weekTitle(activeWeek)}
+                  </h2>
                   <p className="text-xs text-muted">
-                    Live NCAA FBS only — SEC, Big Ten, ACC, Big 12, G5, Independents
+                    Live NCAA FBS only — SEC, Big Ten, ACC, Big 12, G5,
+                    Independents
                   </p>
                 </div>
                 <button
@@ -445,63 +553,92 @@ export default function CommissionerPage() {
                   {loadingOdds ? "Pulling..." : "Pull Odds"}
                 </button>
               </div>
-              {oddsError && <p className="text-sm text-danger mt-2">{oddsError}</p>}
+              {oddsError && (
+                <p className="text-sm text-danger mt-2">{oddsError}</p>
+              )}
             </div>
 
             {availableGames.length > 0 && (
               <div className="rounded-xl border border-border bg-card p-5 mb-6">
                 <h2 className="font-semibold mb-1">
-                  Select 5 Games ({selectedIds.size}/5)
+                  Select 5 Games for {weekTitle(activeWeek)} (
+                  {selectedIds.size}/5)
                 </h2>
                 <p className="text-xs text-muted mb-2">
-                  {availableGames.length} FBS games with spreads (Power conf first)
+                  {availableGames.length} FBS games • Grouped by kickoff date
+                  (ET)
                   {rankLabel ? ` • Ranks: ${rankLabel}` : ""}
                 </p>
-                <div className="space-y-2 max-h-96 overflow-y-auto mt-4">
-                  {availableGames.map((g) => {
-                    const selected = selectedIds.has(g.id);
-                    const favLabel = formatRankedTeam(
-                      g.favorite === "home" ? g.homeTeam : g.awayTeam,
-                      g.favorite === "home" ? g.homeRank : g.awayRank
-                    );
-                    const confLine = formatMatchupConferences(
-                      g.awayTeam,
-                      g.homeTeam
-                    );
-                    return (
-                      <button
-                        key={g.id}
-                        onClick={() => toggleGame(g.id)}
-                        className={
-                          selected
-                            ? "w-full text-left p-3 rounded-lg border border-primary bg-primary/10"
-                            : "w-full text-left p-3 rounded-lg border border-border"
-                        }
-                      >
-                        <div className="flex justify-between items-center gap-2">
-                          <div className="min-w-0">
-                            <div className="font-medium truncate">
-                              {formatRankedTeam(g.awayTeam, g.awayRank)} @{" "}
-                              {formatRankedTeam(g.homeTeam, g.homeRank)}
-                            </div>
-                            <div className="text-xs text-muted">
-                              {confLine ? `${confLine} • ` : ""}
-                              {g.startTime}
-                              {g.bookmaker ? ` • ${g.bookmaker}` : ""}
-                            </div>
-                          </div>
-                          <span className="text-sm text-primary shrink-0">
-                            {favLabel}{" "}
-                            {g.spread < 0
-                              ? g.spread
-                              : `-${Math.abs(g.spread)}`}
-                          </span>
-                        </div>
-                      </button>
-                    );
-                  })}
+                <div className="space-y-4 max-h-[28rem] overflow-y-auto mt-4">
+                  {groupGamesByDate(availableGames).map((group) => (
+                    <div key={group.dateKey}>
+                      <div className="sticky top-0 bg-card/95 backdrop-blur py-1.5 mb-2 border-b border-border">
+                        <span className="text-xs font-semibold text-primary">
+                          {group.dateLabel}
+                        </span>
+                        <span className="text-[11px] text-muted ml-2">
+                          {group.games.length} game
+                          {group.games.length === 1 ? "" : "s"}
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        {group.games.map((g) => {
+                          const selected = selectedIds.has(g.id);
+                          const kick = formatKickoff(
+                            g.commenceTime || g.startTime
+                          );
+                          const favLabel = formatRankedTeam(
+                            g.favorite === "home" ? g.homeTeam : g.awayTeam,
+                            g.favorite === "home" ? g.homeRank : g.awayRank
+                          );
+                          const confLine = formatMatchupConferences(
+                            g.awayTeam,
+                            g.homeTeam
+                          );
+                          return (
+                            <button
+                              key={g.id}
+                              type="button"
+                              onClick={() => toggleGame(g.id)}
+                              className={
+                                selected
+                                  ? "w-full text-left p-3 rounded-lg border border-primary bg-primary/10"
+                                  : "w-full text-left p-3 rounded-lg border border-border"
+                              }
+                            >
+                              <div className="flex justify-between items-start gap-2">
+                                <div className="min-w-0">
+                                  <div className="font-medium truncate">
+                                    {formatRankedTeam(g.awayTeam, g.awayRank)}{" "}
+                                    @{" "}
+                                    {formatRankedTeam(g.homeTeam, g.homeRank)}
+                                  </div>
+                                  <div className="text-xs text-primary mt-0.5">
+                                    {kick.full}
+                                  </div>
+                                  <div className="text-[11px] text-muted mt-0.5">
+                                    {confLine}
+                                    {g.bookmaker
+                                      ? `${confLine ? " • " : ""}${g.bookmaker}`
+                                      : ""}
+                                  </div>
+                                </div>
+                                <span className="text-sm text-primary shrink-0">
+                                  {favLabel}{" "}
+                                  {g.spread < 0
+                                    ? g.spread
+                                    : `-${Math.abs(g.spread)}`}
+                                </span>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
                 </div>
                 <button
+                  type="button"
                   disabled={selectedIds.size !== 5}
                   onClick={publishCard}
                   className={
@@ -510,14 +647,19 @@ export default function CommissionerPage() {
                       : "w-full mt-4 py-3 rounded-xl font-semibold bg-border text-muted cursor-not-allowed"
                   }
                 >
-                  Publish / Update Card
+                  Publish / Update {weekTitle(activeWeek)} Card
                 </button>
               </div>
             )}
 
             {cardSaved && (
               <div className="rounded-xl border border-primary/40 bg-card p-4 text-sm text-primary">
-                Week card saved ({publishedGames.length} games). Publish again anytime to change games.
+                {weekTitle(activeWeek)} card saved ({publishedGames.length}{" "}
+                games
+                {formatCardDateRange(publishedGames)
+                  ? ` · ${formatCardDateRange(publishedGames)}`
+                  : ""}
+                ). Publish again anytime to change games.
               </div>
             )}
           </div>
@@ -526,15 +668,27 @@ export default function CommissionerPage() {
         {tab === "results" && (
           <div>
             <div className="rounded-xl border border-border bg-card p-5 mb-6">
-              <h2 className="font-semibold mb-4">Enter Results</h2>
+              <h2 className="font-semibold mb-1">
+                Enter Results — {weekTitle(activeWeek)}
+              </h2>
+              <p className="text-xs text-muted mb-4">
+                {weekSubtitle(activeWeek)}
+                {formatCardDateRange(publishedGames)
+                  ? ` · ${formatCardDateRange(publishedGames)}`
+                  : ""}
+              </p>
               <div className="space-y-4">
                 {publishedGames.map((game) => {
                   const res = results[game.id];
+                  const kick = formatKickoff(
+                    game.commenceTime || game.startTime
+                  );
                   return (
                     <div key={game.id} className="border border-border rounded-lg p-4">
-                      <div className="font-medium mb-3">
+                      <div className="font-medium">
                         {game.awayTeam} @ {game.homeTeam}
                       </div>
+                      <div className="text-xs text-primary mb-3">{kick.full}</div>
                       <div className="grid grid-cols-3 gap-2">
                         <button
                           onClick={() => setGameWinner(game.id, "away")}

@@ -7,6 +7,12 @@ import { Game, UserPick, Prop } from "@/lib/types";
 import { getSession, getLeague } from "@/lib/league";
 import { loadWeekCard, savePicksToCloud, loadMyPicks } from "@/lib/cloud";
 import { formatRankedTeam } from "@/lib/rankings";
+import {
+  formatKickoff,
+  formatCardDateRange,
+  weekTitle,
+  weekSubtitle,
+} from "@/lib/dates";
 
 function formatSpread(
   spread: number,
@@ -56,12 +62,34 @@ export default function PicksPage() {
         return;
       }
 
-      // Prefer league current week from settings cache if present later; default 1
-      const week = 1;
-      setWeekNumber(week);
+      // Active week from commissioner, else find first published card (0..13)
+      let week = 1;
+      try {
+        const saved = localStorage.getItem("warroom-active-week");
+        if (saved != null && saved !== "") {
+          const n = parseInt(saved, 10);
+          if (!Number.isNaN(n)) week = n;
+        }
+      } catch {
+        /* ignore */
+      }
 
       try {
-        const cloud = await loadWeekCard(week);
+        let cloud = await loadWeekCard(week);
+        if (!cloud?.games?.length) {
+          const max = league?.settings?.regularSeasonWeeks ?? 13;
+          for (let w = 0; w <= max; w++) {
+            const tryCard = await loadWeekCard(w);
+            if (tryCard?.games?.length) {
+              cloud = tryCard;
+              week = w;
+              break;
+            }
+          }
+        }
+
+        setWeekNumber(week);
+
         if (!cloud || !cloud.games.length) {
           setHasCard(false);
           setGames([]);
@@ -238,10 +266,13 @@ export default function PicksPage() {
 
       <main className="flex-1 max-w-3xl mx-auto w-full px-4 py-8">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold">Week {weekNumber} Picks</h1>
+          <h1 className="text-2xl font-bold">{weekTitle(weekNumber)} Picks</h1>
           <p className="text-sm text-muted">
             {leagueName ? `${leagueName} • ` : ""}
-            Live league card • Saves to the cloud for everyone
+            {weekSubtitle(weekNumber)}
+            {games.length
+              ? ` • ${formatCardDateRange(games) || "dates on each game"}`
+              : ""}
           </p>
         </div>
 
@@ -255,7 +286,7 @@ export default function PicksPage() {
           <div className="rounded-xl border border-border bg-card p-8 text-center">
             <p className="font-medium mb-2">No week card published yet</p>
             <p className="text-sm text-muted mb-4">
-              The commissioner has to publish Week {weekNumber} games and the prop
+              The commissioner has to publish a {weekTitle(weekNumber)} card
               before anyone can pick.
             </p>
             <Link
@@ -297,15 +328,21 @@ export default function PicksPage() {
                         : "border-border"
                     }`}
                   >
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-xs text-muted">
-                        {game.startTime || "TBD"}
-                      </span>
-                      {isBest && (
-                        <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
-                          BEST BET (2×)
-                        </span>
-                      )}
+                    <div className="mb-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="font-medium text-sm">
+                          {formatRankedTeam(game.awayTeam, game.awayRank)} @{" "}
+                          {formatRankedTeam(game.homeTeam, game.homeRank)}
+                        </div>
+                        {isBest && (
+                          <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full shrink-0">
+                            BEST BET (2×)
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-primary mt-1">
+                        {formatKickoff(game.commenceTime || game.startTime).full}
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-3 mb-4">

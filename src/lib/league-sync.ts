@@ -31,7 +31,7 @@ function toLocalLeague(row: {
     createdAt: row.created_at,
     settings: {
       cutPercent: row.cut_percent ?? 50,
-      regularSeasonWeeks: row.regular_season_weeks ?? 12,
+      regularSeasonWeeks: row.regular_season_weeks ?? 13,
       gamesPerWeek: row.games_per_week ?? 5,
     },
   };

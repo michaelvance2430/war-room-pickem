@@ -28,7 +28,8 @@ export interface Session {
 
 const DEFAULT_SETTINGS: LeagueSettings = {
   cutPercent: 50,
-  regularSeasonWeeks: 12,
+  /** Typical CFB regular season length (plus optional Week 0 in the app). */
+  regularSeasonWeeks: 13,
   gamesPerWeek: 5,
 };
 
