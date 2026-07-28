@@ -27,6 +27,7 @@ import {
   saveResultsAndScoreWeek,
   loadPickSubmissionStatus,
   postMissingPicksAnnouncement,
+  setLeagueActiveWeek,
   PickSubmissionStatus,
 } from "@/lib/cloud";
 import {
@@ -259,6 +260,8 @@ export default function CommissionerPage() {
     } catch {
       /* ignore */
     }
+    // Push active week to cloud so every player's My Picks follows it
+    void setLeagueActiveWeek(week);
     await loadWeekState(week);
     if (tab === "picks") await refreshPickStatus(week);
   }
@@ -448,6 +451,8 @@ export default function CommissionerPage() {
     } catch {
       /* ignore */
     }
+    // Active week already written in publishWeekCard; double-ensure for clients
+    void setLeagueActiveWeek(activeWeek);
   }
 
   function setGameWinner(gameId: string, side: "home" | "away" | "push") {
@@ -1019,7 +1024,8 @@ export default function CommissionerPage() {
                 {formatCardDateRange(publishedGames)
                   ? ` · ${formatCardDateRange(publishedGames)}`
                   : ""}
-                ). Publish again anytime to change games.
+                ). Everyone&apos;s My Picks refreshes automatically when you
+                publish or change games — no need to tell them to reload.
               </div>
             )}
           </div>

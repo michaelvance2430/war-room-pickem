@@ -8,6 +8,91 @@ export interface CloudCard {
   weekNumber: number;
   games: Game[];
   prop: Prop;
+  /** ISO time card was last published/updated — used for live refresh */
+  publishedAt?: string | null;
+}
+
+/** Stable string so clients can detect when the commissioner changes the card. */
+export function cardRevision(card: {
+  weekNumber: number;
+  publishedAt?: string | null;
+  games: Game[];
+  prop: Prop;
+}): string {
+  const gamesKey = card.games
+    .map(
+      (g) =>
+        `${g.id}|${g.awayTeam}|${g.homeTeam}|${g.spread}|${g.favorite}|${g.commenceTime || g.startTime || ""}`
+    )
+    .join(";");
+  return [
+    card.weekNumber,
+    card.publishedAt || "",
+    card.prop.question,
+    card.prop.options.join("|"),
+    gamesKey,
+  ].join("::");
+}
+
+/** Commissioner sets which week everyone should see (leagues.current_week). */
+export async function setLeagueActiveWeek(
+  weekNumber: number
+): Promise<{ ok: boolean; error?: string }> {
+  const session = getSession();
+  if (!session?.leagueId || !session.isCommissioner) {
+    return { ok: false, error: "Commissioner session required" };
+  }
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("leagues")
+    .update({ current_week: weekNumber })
+    .eq("id", session.leagueId);
+  if (error) return { ok: false, error: error.message };
+  try {
+    localStorage.setItem("warroom-active-week", String(weekNumber));
+  } catch {
+    /* ignore */
+  }
+  return { ok: true };
+}
+
+/** Active pick'em week for the league (cloud first, then localStorage). */
+export async function loadLeagueActiveWeek(): Promise<number> {
+  const session = getSession();
+  let week = 1;
+  try {
+    const saved = localStorage.getItem("warroom-active-week");
+    if (saved != null && saved !== "") {
+      const n = parseInt(saved, 10);
+      if (!Number.isNaN(n)) week = n;
+    }
+  } catch {
+    /* ignore */
+  }
+  if (!session?.leagueId) return week;
+
+  try {
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("leagues")
+      .select("current_week")
+      .eq("id", session.leagueId)
+      .maybeSingle();
+    if (data && data.current_week != null) {
+      const n = Number(data.current_week);
+      if (!Number.isNaN(n)) {
+        week = n;
+        try {
+          localStorage.setItem("warroom-active-week", String(week));
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return week;
 }
 
 export interface ScoreWeekResult {
@@ -72,6 +157,8 @@ export async function publishWeekCard(opts: {
 
   let weekCardId: string;
 
+  const publishedAt = new Date().toISOString();
+
   if (existing?.id) {
     weekCardId = existing.id;
     const { error: propErr } = await supabase
@@ -81,6 +168,8 @@ export async function publishWeekCard(opts: {
         prop_option_a: opts.prop.options[0],
         prop_option_b: opts.prop.options[1],
         prop_points: opts.prop.points,
+        // Bump so every client can detect a card refresh
+        published_at: publishedAt,
       })
       .eq("id", weekCardId);
     if (propErr) {
@@ -97,6 +186,7 @@ export async function publishWeekCard(opts: {
         prop_option_a: opts.prop.options[0],
         prop_option_b: opts.prop.options[1],
         prop_points: opts.prop.points,
+        published_at: publishedAt,
       })
       .select("id")
       .single();
@@ -104,6 +194,17 @@ export async function publishWeekCard(opts: {
       return { ok: false, error: error?.message || "Failed to create week card" };
     }
     weekCardId = card.id;
+  }
+
+  // Broadcast active week so My Picks / all devices follow this card
+  await supabase
+    .from("leagues")
+    .update({ current_week: opts.weekNumber })
+    .eq("id", leagueId);
+  try {
+    localStorage.setItem("warroom-active-week", String(opts.weekNumber));
+  } catch {
+    /* ignore */
   }
 
   const rows = opts.games.map((g, i) => ({
@@ -205,6 +306,7 @@ export async function loadWeekCard(weekNumber = 1): Promise<CloudCard | null> {
   return {
     weekCardId: card.id,
     weekNumber: card.week_number,
+    publishedAt: (card.published_at as string) || null,
     games: games.map(mapCardGame),
     prop: {
       // Stable id from question text so preset matching works after reload

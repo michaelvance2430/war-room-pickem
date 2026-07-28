@@ -1,11 +1,18 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import Nav from "@/components/Nav";
 import { Game, UserPick, Prop } from "@/lib/types";
 import { getSession, getLeague } from "@/lib/league";
-import { loadWeekCard, savePicksToCloud, loadMyPicks } from "@/lib/cloud";
+import {
+  loadWeekCard,
+  savePicksToCloud,
+  loadMyPicks,
+  loadLeagueActiveWeek,
+  cardRevision,
+} from "@/lib/cloud";
+import { createClient } from "@/lib/supabase/client";
 import { formatRankedTeam } from "@/lib/rankings";
 import {
   formatKickoff,
@@ -33,6 +40,8 @@ const EMPTY_PROP: Prop = {
   points: 3,
 };
 
+const POLL_MS = 12_000;
+
 export default function PicksPage() {
   const [weekNumber, setWeekNumber] = useState(1);
   const [games, setGames] = useState<Game[]>([]);
@@ -48,34 +57,148 @@ export default function PicksPage() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [leagueName, setLeagueName] = useState("");
+  const [cardNotice, setCardNotice] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function load() {
+  const revisionRef = useRef<string>("");
+  const picksRef = useRef(picks);
+  const bestBetRef = useRef(bestBetId);
+  const propChoiceRef = useRef(propChoice);
+  const savedRef = useRef(saved);
+  picksRef.current = picks;
+  bestBetRef.current = bestBetId;
+  propChoiceRef.current = propChoice;
+  savedRef.current = saved;
+
+  const applyCard = useCallback(
+    async (
+      cloud: NonNullable<Awaited<ReturnType<typeof loadWeekCard>>>,
+      opts: { isInitial: boolean }
+    ) => {
+      const rev = cardRevision(cloud);
+      const changed =
+        !!revisionRef.current && revisionRef.current !== rev;
+
+      setWeekNumber(cloud.weekNumber);
+      setHasCard(true);
+      setGames(cloud.games);
+      setProp(cloud.prop);
       setLoadError(null);
-      const session = getSession();
-      const league = getLeague();
-      setLeagueName(league?.name || "");
 
-      if (!session?.leagueId) {
-        setLoadError("No league selected. Go home and join or create a league.");
-        setLoaded(true);
+      if (opts.isInitial || !revisionRef.current) {
+        revisionRef.current = rev;
+        const mine = await loadMyPicks(cloud.weekNumber);
+        if (mine) {
+          // Keep only picks that still match current card game ids
+          const validIds = new Set(cloud.games.map((g) => g.id));
+          const filtered: Record<string, UserPick> = {};
+          for (const [id, p] of Object.entries(mine.picks || {})) {
+            if (validIds.has(id)) filtered[id] = p;
+          }
+          picksRef.current = filtered;
+          setPicks(filtered);
+          const bb =
+            mine.bestBetId && validIds.has(mine.bestBetId)
+              ? mine.bestBetId
+              : null;
+          bestBetRef.current = bb;
+          setBestBetId(bb);
+          const propOk =
+            mine.propChoice &&
+            cloud.prop.options.includes(mine.propChoice)
+              ? mine.propChoice
+              : null;
+          propChoiceRef.current = propOk;
+          setPropChoice(propOk);
+          setSaved(
+            !!mine.lockedAt &&
+              Object.keys(filtered).length === cloud.games.length
+          );
+          const used = Object.values(filtered)
+            .map((p) => p.confidence)
+            .filter((c) => c > 0);
+          setUsedConfidence(used);
+        } else {
+          picksRef.current = {};
+          bestBetRef.current = null;
+          propChoiceRef.current = null;
+          setPicks({});
+          setBestBetId(null);
+          setPropChoice(null);
+          setSaved(false);
+          setUsedConfidence([]);
+        }
         return;
       }
 
-      // Active week from commissioner, else find first published card (0..13)
-      let week = 1;
-      try {
-        const saved = localStorage.getItem("warroom-active-week");
-        if (saved != null && saved !== "") {
-          const n = parseInt(saved, 10);
-          if (!Number.isNaN(n)) week = n;
+      if (!changed) return;
+
+      revisionRef.current = rev;
+      const validIds = new Set(cloud.games.map((g) => g.id));
+      const prev = picksRef.current;
+      const kept: Record<string, UserPick> = {};
+      for (const [id, p] of Object.entries(prev)) {
+        if (validIds.has(id)) kept[id] = p;
+      }
+      const dropped = Object.keys(prev).length - Object.keys(kept).length;
+      picksRef.current = kept;
+      setPicks(kept);
+
+      let bb = bestBetRef.current;
+      if (bb && !validIds.has(bb)) {
+        bb = null;
+        bestBetRef.current = null;
+        setBestBetId(null);
+      }
+
+      if (
+        propChoiceRef.current &&
+        !cloud.prop.options.includes(propChoiceRef.current)
+      ) {
+        propChoiceRef.current = null;
+        setPropChoice(null);
+      }
+
+      const used = Object.values(kept)
+        .map((p) => p.confidence)
+        .filter((c) => c > 0);
+      setUsedConfidence(used);
+
+      if (dropped > 0 || Object.keys(kept).length < cloud.games.length) {
+        setSaved(false);
+        setCardNotice(
+          "Commissioner updated this week’s games. Your card refreshed automatically — re-check picks and Save again."
+        );
+      } else {
+        setCardNotice(
+          "Commissioner updated the card (lines/prop). Review and Save if needed."
+        );
+      }
+    },
+    []
+  );
+
+  const refreshFromCloud = useCallback(
+    async (opts: { isInitial?: boolean } = {}) => {
+      const session = getSession();
+      const league = getLeague();
+      if (!session?.leagueId) {
+        if (opts.isInitial) {
+          setLoadError("No league selected. Go home and join or create a league.");
+          setLoaded(true);
         }
-      } catch {
-        /* ignore */
+        return null;
+      }
+
+      if (opts.isInitial) {
+        setLeagueName(league?.name || "");
+        setLoadError(null);
       }
 
       try {
+        let week = await loadLeagueActiveWeek();
         let cloud = await loadWeekCard(week);
+
+        // Fallback: find any published week if active week has no card yet
         if (!cloud?.games?.length) {
           const max = league?.settings?.regularSeasonWeeks ?? 13;
           for (let w = 0; w <= max; w++) {
@@ -88,39 +211,109 @@ export default function PicksPage() {
           }
         }
 
-        setWeekNumber(week);
-
         if (!cloud || !cloud.games.length) {
           setHasCard(false);
           setGames([]);
-          setLoaded(true);
-          return;
+          setWeekNumber(week);
+          if (opts.isInitial) setLoaded(true);
+          return null;
         }
 
-        setHasCard(true);
-        setGames(cloud.games);
-        setProp(cloud.prop);
-
-        const mine = await loadMyPicks(week);
-        if (mine) {
-          setPicks(mine.picks || {});
-          setBestBetId(mine.bestBetId || null);
-          setPropChoice(mine.propChoice || null);
-          setSaved(!!mine.lockedAt);
-          const used = Object.values(mine.picks || {})
-            .map((p) => p.confidence)
-            .filter((c) => c > 0);
-          setUsedConfidence(used);
-        }
+        await applyCard(cloud, { isInitial: !!opts.isInitial });
+        return cloud;
       } catch (e: unknown) {
-        setLoadError(
-          e instanceof Error ? e.message : "Failed to load weekly card"
-        );
+        if (opts.isInitial) {
+          setLoadError(
+            e instanceof Error ? e.message : "Failed to load weekly card"
+          );
+        }
+        return null;
+      } finally {
+        if (opts.isInitial) setLoaded(true);
       }
-      setLoaded(true);
+    },
+    [applyCard]
+  );
+
+  useEffect(() => {
+    void refreshFromCloud({ isInitial: true });
+
+    const poll = setInterval(() => {
+      void refreshFromCloud({ isInitial: false });
+    }, POLL_MS);
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        void refreshFromCloud({ isInitial: false });
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+
+    // Live push when Supabase Realtime is enabled on the project
+    let channel: ReturnType<ReturnType<typeof createClient>["channel"]> | null =
+      null;
+    try {
+      const session = getSession();
+      if (session?.leagueId) {
+        const supabase = createClient();
+        channel = supabase
+          .channel(`week-card-${session.leagueId}`)
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema: "public",
+              table: "week_cards",
+              filter: `league_id=eq.${session.leagueId}`,
+            },
+            () => {
+              void refreshFromCloud({ isInitial: false });
+            }
+          )
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema: "public",
+              table: "card_games",
+            },
+            () => {
+              void refreshFromCloud({ isInitial: false });
+            }
+          )
+          .on(
+            "postgres_changes",
+            {
+              event: "UPDATE",
+              schema: "public",
+              table: "leagues",
+              filter: `id=eq.${session.leagueId}`,
+            },
+            () => {
+              void refreshFromCloud({ isInitial: false });
+            }
+          )
+          .subscribe();
+      }
+    } catch {
+      /* polling still works */
     }
-    load();
-  }, []);
+
+    return () => {
+      clearInterval(poll);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+      if (channel) {
+        try {
+          const supabase = createClient();
+          void supabase.removeChannel(channel);
+        } catch {
+          /* ignore */
+        }
+      }
+    };
+  }, [refreshFromCloud]);
 
   const confidenceOptions = [1, 2, 3, 4, 5];
 
@@ -204,40 +397,58 @@ export default function PicksPage() {
 
   async function savePicks() {
     if (saving || !hasCard) return;
+    setSaving(true);
+    setSaveError(null);
+
+    // Pull latest card so we never save against a stale slate
+    const latest = await refreshFromCloud({ isInitial: false });
+    const cardGames = latest?.games ?? games;
+    const cardWeek = latest?.weekNumber ?? weekNumber;
+    const currentPicks = picksRef.current;
+    const currentBest = bestBetRef.current;
+    const currentProp = propChoiceRef.current;
+
     const lockedPicks: Record<string, UserPick> = {};
-    for (const g of games) {
-      const p = picks[g.id];
+    for (const g of cardGames) {
+      const p = currentPicks[g.id];
       if (!p) continue;
       lockedPicks[g.id] = {
         ...p,
         lockedSpread: g.spread,
         lockedFavorite: g.favorite,
-        isBestBet: bestBetId === g.id,
+        isBestBet: currentBest === g.id,
       };
     }
 
-    if (Object.keys(lockedPicks).length !== games.length) {
-      setSaveError("Pick a side and confidence for every game.");
+    if (Object.keys(lockedPicks).length !== cardGames.length) {
+      setSaveError(
+        "Pick a side and confidence for every game on the current card."
+      );
+      setSaving(false);
+      return;
+    }
+    if (!currentProp || !currentBest) {
+      setSaveError("Need a Best Bet and a prop choice.");
+      setSaving(false);
       return;
     }
 
-    setSaving(true);
-    setSaveError(null);
-    const cloud = await savePicksToCloud({
-      weekNumber,
+    const result = await savePicksToCloud({
+      weekNumber: cardWeek,
       picks: lockedPicks,
-      bestBetId,
-      propChoice,
+      bestBetId: currentBest,
+      propChoice: currentProp,
     });
 
-    if (!cloud.ok) {
-      setSaveError(cloud.error || "Cloud save failed — try again");
+    if (!result.ok) {
+      setSaveError(result.error || "Cloud save failed — try again");
       setSaving(false);
       return;
     }
 
     setPicks(lockedPicks);
     setSaved(true);
+    setCardNotice(null);
     setSaving(false);
   }
 
@@ -275,7 +486,8 @@ export default function PicksPage() {
               : ""}
           </p>
           <p className="text-xs text-muted mt-1">
-            Private: only you see your picks. League mates cannot view them.
+            Private: only you see your picks. Card updates from the commissioner
+            show up automatically.
           </p>
         </div>
 
@@ -285,19 +497,33 @@ export default function PicksPage() {
           </div>
         )}
 
+        {cardNotice && (
+          <div className="mb-4 rounded-lg border border-primary/40 bg-primary/10 px-4 py-2 text-sm text-primary flex items-start justify-between gap-3">
+            <span>{cardNotice}</span>
+            <button
+              type="button"
+              className="text-xs shrink-0 underline"
+              onClick={() => setCardNotice(null)}
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+
         {!loadError && !hasCard && (
           <div className="rounded-xl border border-border bg-card p-8 text-center">
             <p className="font-medium mb-2">No week card published yet</p>
             <p className="text-sm text-muted mb-4">
               The commissioner has to publish a {weekTitle(weekNumber)} card
-              before anyone can pick.
+              before anyone can pick. This page will pick it up automatically.
             </p>
-            <Link
-              href="/commissioner"
+            <button
+              type="button"
+              onClick={() => void refreshFromCloud({ isInitial: false })}
               className="text-sm text-primary hover:underline"
             >
-              Go to Commissioner tools →
-            </Link>
+              Check again
+            </button>
           </div>
         )}
 
