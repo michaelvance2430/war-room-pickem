@@ -239,13 +239,31 @@ export default function CommissionerPage() {
   async function publishCard() {
     const selected = availableGames.filter((g) => selectedIds.has(g.id));
     if (selected.length !== 5) return;
+
+    let propToPublish = prop;
     if (propPresetId === CUSTOM_PROP_ID) {
       if (!customQuestion.trim()) {
         alert("Enter a custom prop question before publishing.");
         return;
       }
-      syncCustomProp();
+      propToPublish = {
+        id: `prop-custom-w${activeWeek}`,
+        question: customQuestion.trim(),
+        options: [
+          customOptA.trim() || "Yes",
+          customOptB.trim() || "No",
+        ] as [string, string],
+        points: 3,
+      };
+      setProp(propToPublish);
+    } else {
+      const preset = PROP_PRESETS.find((p) => p.id === propPresetId);
+      if (preset) {
+        propToPublish = propFromPreset(preset, activeWeek);
+        setProp(propToPublish);
+      }
     }
+
     // Sort selected by kickoff so the card reads chronologically
     selected.sort((a, b) => {
       const ta = new Date(a.commenceTime || a.startTime || 0).getTime();
@@ -255,7 +273,7 @@ export default function CommissionerPage() {
     const result = await publishWeekCard({
       weekNumber: activeWeek,
       games: selected,
-      prop,
+      prop: propToPublish,
     });
     const keys = storageKeys(activeWeek);
     if (!result.ok) {
@@ -263,7 +281,11 @@ export default function CommissionerPage() {
       setPublishedGames(selected);
       localStorage.setItem(
         keys.card,
-        JSON.stringify({ games: selected, prop, weekNumber: activeWeek })
+        JSON.stringify({
+          games: selected,
+          prop: propToPublish,
+          weekNumber: activeWeek,
+        })
       );
       setCardSaved(true);
       return;
@@ -275,7 +297,11 @@ export default function CommissionerPage() {
       localStorage.setItem(ACTIVE_WEEK_KEY, String(activeWeek));
       localStorage.setItem(
         keys.card,
-        JSON.stringify({ games, prop, weekNumber: activeWeek })
+        JSON.stringify({
+          games,
+          prop: propToPublish,
+          weekNumber: activeWeek,
+        })
       );
     } catch {
       /* ignore */
