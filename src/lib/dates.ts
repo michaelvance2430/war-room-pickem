@@ -49,7 +49,8 @@ export function kickoffMs(g: Game): number {
 
 /**
  * Human label for a pick'em week.
- * CFB Week 0 = early openers; Week 1 often spans two Saturdays.
+ * Week 0 and Week 1 are separate cards — run them as two different weeks
+ * if you want (e.g. Week 0 this Saturday, only Week 1 next week).
  */
 export function weekTitle(weekNumber: number): string {
   if (weekNumber === 0) return "Week 0";
@@ -58,10 +59,10 @@ export function weekTitle(weekNumber: number): string {
 
 export function weekSubtitle(weekNumber: number): string {
   if (weekNumber === 0) {
-    return "Early openers (first Saturday slate)";
+    return "Early openers only — its own card, picks, and scores (separate from Week 1)";
   }
   if (weekNumber === 1) {
-    return "Main openers — often covers two Saturdays (Week 0 + Week 1 slate)";
+    return "Week 1 only — separate from Week 0. Pick 5 games for this week’s card";
   }
   return "Regular-season slate";
 }

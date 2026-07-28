@@ -771,7 +771,8 @@ export default function CommissionerPage() {
                     className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm"
                   />
                   <p className="text-[11px] text-muted mt-1">
-                    Plus optional Week 0 openers. Week 1 can cover two Saturdays.
+                    Plus optional Week 0. Each week (0, 1, 2…) is its own card —
+                    run Week 0 one weekend and Week 1 the next if you want.
                   </p>
                 </div>
               </div>

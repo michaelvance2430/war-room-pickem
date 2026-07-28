@@ -605,7 +605,8 @@ export async function saveResultsAndScoreWeek(opts: {
     let weekly: number[] = Array.isArray(membership.weekly_points)
       ? [...membership.weekly_points]
       : [];
-    const idx = weekNumber - 1;
+    // Week 0 → index 0, Week 1 → index 1, … (do NOT use weekNumber-1; that breaks Week 0)
+    const idx = weekNumber;
     while (weekly.length <= idx) weekly.push(0);
 
     let totalPoints = membership.total_points || 0;
