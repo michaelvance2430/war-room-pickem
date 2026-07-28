@@ -3,6 +3,7 @@
 import { useState, useEffect, Fragment } from "react";
 import Nav from "@/components/Nav";
 import { loadLeaguePlayers } from "@/lib/cloud";
+import { getSession } from "@/lib/league";
 import { compareForSeed } from "@/lib/brackets";
 import { Division, Player } from "@/lib/types";
 
@@ -21,10 +22,12 @@ function streakDisplay(streak: number) {
 
 export default function StandingsPage() {
   const [players, setPlayers] = useState<Player[]>([]);
+  const [selfId, setSelfId] = useState<string | null>(null);
   const [active, setActive] = useState<Division | "Overall">("Overall");
 
   useEffect(() => {
     async function load() {
+      setSelfId(getSession()?.playerId || null);
       setPlayers(await loadLeaguePlayers());
     }
     load();
@@ -102,7 +105,7 @@ export default function StandingsPage() {
                     <td className="px-4 py-3 text-muted">{idx + 1}</td>
                     <td className="px-4 py-3 font-medium">
                       {player.name}
-                      {player.id === "1" && (
+                      {player.id === selfId && (
                         <span className="ml-2 text-xs text-primary">(You)</span>
                       )}
                     </td>
