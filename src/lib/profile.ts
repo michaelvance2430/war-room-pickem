@@ -117,26 +117,44 @@ export async function uploadMyAvatar(
     // Cache-bust so the UI refreshes immediately after replace
     const avatarUrl = `${pub.publicUrl}?v=${Date.now()}`;
 
-    const { error: profErr } = await supabase
-      .from("profiles")
-      .upsert({
-        id: auth.user.id,
-        display_name:
-          (auth.user.user_metadata?.display_name as string) ||
-          auth.user.email?.split("@")[0] ||
-          "Player",
-        avatar_url: avatarUrl,
-      });
+    const displayName =
+      (auth.user.user_metadata?.display_name as string) ||
+      auth.user.email?.split("@")[0] ||
+      "Player";
 
-    if (profErr) {
-      // Column missing?
-      if (/avatar_url|column/i.test(profErr.message)) {
+    // Prefer UPDATE (profile usually exists from signup trigger)
+    const { data: updated, error: updateErr } = await supabase
+      .from("profiles")
+      .update({ avatar_url: avatarUrl })
+      .eq("id", auth.user.id)
+      .select("id")
+      .maybeSingle();
+
+    if (updateErr) {
+      if (/avatar_url|column/i.test(updateErr.message)) {
         return {
           ok: false,
-          error: "Run supabase/avatars.sql in Supabase (adds avatar_url).",
+          error: "Run supabase/avatars-rls-fix.sql in Supabase.",
         };
       }
-      return { ok: false, error: profErr.message };
+      // Fall through to insert if no row
+    }
+
+    if (!updated) {
+      const { error: insertErr } = await supabase.from("profiles").insert({
+        id: auth.user.id,
+        display_name: displayName,
+        avatar_url: avatarUrl,
+      });
+      if (insertErr) {
+        return {
+          ok: false,
+          error:
+            insertErr.message.includes("row-level security")
+              ? "Profile RLS blocked save. Run supabase/avatars-rls-fix.sql in Supabase."
+              : insertErr.message,
+        };
+      }
     }
 
     return { ok: true, avatarUrl };
