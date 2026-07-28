@@ -52,6 +52,7 @@ export default function CommissionerPage() {
   });
   const [loadingOdds, setLoadingOdds] = useState(false);
   const [oddsError, setOddsError] = useState<string | null>(null);
+  const [rankLabel, setRankLabel] = useState<string | null>(null);
   const [cardSaved, setCardSaved] = useState(false);
   const [results, setResults] = useState<Record<string, GameResult>>({});
   const [propResult, setPropResult] = useState<string | null>(null);
@@ -104,7 +105,8 @@ export default function CommissionerPage() {
     setLoadingOdds(true);
     setOddsError(null);
     try {
-      const { games } = await fetchNcaafOdds();
+      const { games, rankLabel: pollLabel } = await fetchNcaafOdds();
+      setRankLabel(pollLabel || null);
       if (!games.length) {
         setAvailableGames([]);
         setSelectedIds(new Set());
@@ -453,6 +455,7 @@ export default function CommissionerPage() {
                 </h2>
                 <p className="text-xs text-muted mb-2">
                   {availableGames.length} FBS games with spreads (Power conf first)
+                  {rankLabel ? ` • Ranks: ${rankLabel}` : ""}
                 </p>
                 <div className="space-y-2 max-h-96 overflow-y-auto mt-4">
                   {availableGames.map((g) => {

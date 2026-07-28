@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { mapOddsApiToGames } from "@/lib/odds";
 import { filterToFbsGames } from "@/lib/fbs-teams";
-import { applyApRanks, fetchApRankMap } from "@/lib/rankings";
+import { applyApRanks, fetchApRankSource } from "@/lib/rankings";
 import type { OddsApiGame } from "@/lib/types";
 
 /**
@@ -65,9 +65,11 @@ export async function GET() {
     const fbsCount = games.length;
 
     // Merge AP Top 25 ranks (best-effort)
+    let rankLabel = "AP ranks unavailable";
     try {
-      const rankMap = await fetchApRankMap();
-      games = applyApRanks(games, rankMap);
+      const source = await fetchApRankSource();
+      games = applyApRanks(games, source.map);
+      rankLabel = source.label;
     } catch {
       // ignore ranking failures
     }
@@ -80,6 +82,7 @@ export async function GET() {
       fbsCount,
       remaining,
       used,
+      rankLabel,
       filter:
         "NCAA FBS only (SEC, Big Ten, ACC, Big 12, Independents, Group of 5)",
     });

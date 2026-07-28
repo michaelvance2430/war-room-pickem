@@ -65,6 +65,7 @@ export async function fetchNcaafOdds(): Promise<{
   games: Game[];
   remaining?: string | null;
   used?: string | null;
+  rankLabel?: string;
 }> {
   const res = await fetch("/api/odds/ncaaf", { cache: "no-store" });
   const body = await res.json().catch(() => ({}));
@@ -80,5 +81,6 @@ export async function fetchNcaafOdds(): Promise<{
     games: ((body as { games?: Game[] }).games || []) as Game[],
     remaining: (body as { remaining?: string | null }).remaining,
     used: (body as { used?: string | null }).used,
+    rankLabel: (body as { rankLabel?: string }).rankLabel,
   };
 }
