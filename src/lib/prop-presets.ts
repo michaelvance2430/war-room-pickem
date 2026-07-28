@@ -143,8 +143,15 @@ export function propFromPreset(preset: PropPreset, weekNumber = 1): Prop {
 
 export function matchPresetId(prop: Prop | null | undefined): string {
   if (!prop?.question) return PROP_PRESETS[0].id;
-  const hit = PROP_PRESETS.find(
-    (p) => p.question === prop.question || prop.id.includes(p.id)
+  // Prefer exact question text (what we store in week_cards.prop_question)
+  const byQuestion = PROP_PRESETS.find((p) => p.question === prop.question);
+  if (byQuestion) return byQuestion.id;
+  // ids look like prop-<presetId>-w3
+  const byId = PROP_PRESETS.find(
+    (p) =>
+      prop.id === `prop-${p.id}` ||
+      prop.id.startsWith(`prop-${p.id}-`) ||
+      prop.id.includes(`-${p.id}-`)
   );
-  return hit?.id || CUSTOM_PROP_ID;
+  return byId?.id || CUSTOM_PROP_ID;
 }

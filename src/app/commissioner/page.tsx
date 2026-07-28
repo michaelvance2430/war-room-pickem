@@ -122,6 +122,18 @@ export default function CommissionerPage() {
     load();
   }, []);
 
+  /** Apply published prop to UI (Build + Finalize Scores share this state). */
+  function applyLoadedProp(loaded: Prop) {
+    setProp(loaded);
+    const presetId = matchPresetId(loaded);
+    setPropPresetId(presetId);
+    if (presetId === CUSTOM_PROP_ID) {
+      setCustomQuestion(loaded.question || "");
+      setCustomOptA(loaded.options?.[0] || "Yes");
+      setCustomOptB(loaded.options?.[1] || "No");
+    }
+  }
+
   async function loadWeekState(week: number) {
     setCardSaved(false);
     setPublishedGames([]);
@@ -131,25 +143,52 @@ export default function CommissionerPage() {
     setDemoScore(null);
     setScoreReport(null);
     setSelectedIds(new Set());
+    // Reset prop so a previous week's selection never bleeds into this week
+    setProp(propFromPreset(PROP_PRESETS[0], week));
+    setPropPresetId(PROP_PRESETS[0].id);
 
     const keys = storageKeys(week);
+    let loadedProp: Prop | null = null;
+
     const cloud = await loadWeekCard(week);
     if (cloud) {
       setPublishedGames(cloud.games);
-      setProp(cloud.prop);
-      setPropPresetId(matchPresetId(cloud.prop));
+      applyLoadedProp(cloud.prop);
+      loadedProp = cloud.prop;
       setCardSaved(true);
+      // Keep local cache in sync for this week (correct key)
+      try {
+        localStorage.setItem(
+          keys.card,
+          JSON.stringify({
+            games: cloud.games,
+            prop: cloud.prop,
+            weekCardId: cloud.weekCardId,
+            weekNumber: week,
+          })
+        );
+      } catch {
+        /* ignore */
+      }
     } else {
       try {
         const cardRaw = localStorage.getItem(keys.card);
         if (cardRaw) {
           const data = JSON.parse(cardRaw);
-          if (data.games) setPublishedGames(data.games);
-          if (data.prop) {
-            setProp(data.prop);
-            setPropPresetId(matchPresetId(data.prop));
+          // Ignore cache written for a different week (old cloud.ts bug)
+          if (
+            data.weekNumber != null &&
+            Number(data.weekNumber) !== week
+          ) {
+            /* stale wrong-week cache — skip */
+          } else {
+            if (data.games) setPublishedGames(data.games);
+            if (data.prop?.question) {
+              applyLoadedProp(data.prop);
+              loadedProp = data.prop;
+            }
+            setCardSaved(true);
           }
-          setCardSaved(true);
         }
       } catch {
         /* ignore */
@@ -160,9 +199,54 @@ export default function CommissionerPage() {
       if (resRaw) {
         const data = JSON.parse(resRaw);
         setResults(data.results || {});
-        setPropResult(data.propResult || null);
-        setResultsSaved(true);
+        const savedPropResult = data.propResult || null;
+        // Drop prop result if it doesn't match either option of the loaded prop
+        if (
+          savedPropResult &&
+          loadedProp &&
+          !loadedProp.options?.includes(savedPropResult)
+        ) {
+          setPropResult(null);
+          setResultsSaved(false);
+        } else {
+          setPropResult(savedPropResult);
+          setResultsSaved(true);
+        }
       }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  /** Re-pull published prop/games from cloud when opening Finalize Scores. */
+  async function refreshPublishedProp(week: number) {
+    const cloud = await loadWeekCard(week);
+    if (cloud?.prop) {
+      setPublishedGames(cloud.games);
+      applyLoadedProp(cloud.prop);
+      setCardSaved(true);
+      try {
+        localStorage.setItem(
+          storageKeys(week).card,
+          JSON.stringify({
+            games: cloud.games,
+            prop: cloud.prop,
+            weekCardId: cloud.weekCardId,
+            weekNumber: week,
+          })
+        );
+      } catch {
+        /* ignore */
+      }
+      return;
+    }
+    try {
+      const cardRaw = localStorage.getItem(storageKeys(week).card);
+      if (!cardRaw) return;
+      const data = JSON.parse(cardRaw);
+      if (data.weekNumber != null && Number(data.weekNumber) !== week) return;
+      if (data.games) setPublishedGames(data.games);
+      if (data.prop?.question) applyLoadedProp(data.prop);
     } catch {
       /* ignore */
     }
@@ -334,6 +418,7 @@ export default function CommissionerPage() {
     if (!result.ok) {
       alert(result.error || "Failed to publish to cloud");
       setPublishedGames(selected);
+      applyLoadedProp(propToPublish);
       localStorage.setItem(
         keys.card,
         JSON.stringify({
@@ -347,6 +432,7 @@ export default function CommissionerPage() {
     }
     const games = result.games || selected;
     setPublishedGames(games);
+    applyLoadedProp(propToPublish);
     setCardSaved(true);
     try {
       localStorage.setItem(ACTIVE_WEEK_KEY, String(activeWeek));
@@ -355,6 +441,7 @@ export default function CommissionerPage() {
         JSON.stringify({
           games,
           prop: propToPublish,
+          weekCardId: result.weekCardId,
           weekNumber: activeWeek,
         })
       );
@@ -598,7 +685,11 @@ export default function CommissionerPage() {
             Who&apos;s in
           </button>
           <button
-            onClick={() => setTab("results")}
+            onClick={() => {
+              setTab("results");
+              // Always re-load published prop so Finalize Scores matches the card
+              void refreshPublishedProp(activeWeek);
+            }}
             className={
               tab === "results"
                 ? "px-4 py-1.5 rounded-full text-sm font-medium bg-primary text-black"
@@ -1183,7 +1274,10 @@ export default function CommissionerPage() {
 
             <div className="rounded-xl border border-border bg-card p-5 mb-6">
               <h2 className="font-semibold mb-2">Prop Result</h2>
-              <p className="text-sm text-muted mb-3">{prop.question}</p>
+              <p className="text-xs text-muted mb-1">
+                From the published {weekTitle(activeWeek)} card
+              </p>
+              <p className="text-sm text-foreground mb-3">{prop.question}</p>
               <div className="grid grid-cols-2 gap-3">
                 {prop.options.map((opt) => (
                   <button

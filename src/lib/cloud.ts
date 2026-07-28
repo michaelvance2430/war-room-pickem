@@ -74,7 +74,7 @@ export async function publishWeekCard(opts: {
 
   if (existing?.id) {
     weekCardId = existing.id;
-    await supabase
+    const { error: propErr } = await supabase
       .from("week_cards")
       .update({
         prop_question: opts.prop.question,
@@ -83,6 +83,9 @@ export async function publishWeekCard(opts: {
         prop_points: opts.prop.points,
       })
       .eq("id", weekCardId);
+    if (propErr) {
+      return { ok: false, error: propErr.message || "Failed to update prop on week card" };
+    }
     await supabase.from("card_games").delete().eq("week_card_id", weekCardId);
   } else {
     const { data: card, error } = await supabase
@@ -157,8 +160,9 @@ export async function publishWeekCard(opts: {
   });
 
   try {
+    // Always key by the week being published (never hardcode week 1)
     localStorage.setItem(
-      "warroom-card-week-1",
+      `warroom-card-week-${opts.weekNumber}`,
       JSON.stringify({
         games: gamesWithIds,
         prop: opts.prop,
@@ -193,15 +197,21 @@ export async function loadWeekCard(weekNumber = 1): Promise<CloudCard | null> {
 
   if (!games?.length) return null;
 
+  const question = (card.prop_question as string) || "Prop";
+  const optionA = (card.prop_option_a as string) || "Over";
+  const optionB = (card.prop_option_b as string) || "Under";
+  const points = (card.prop_points as number) ?? 3;
+
   return {
     weekCardId: card.id,
     weekNumber: card.week_number,
     games: games.map(mapCardGame),
     prop: {
+      // Stable id from question text so preset matching works after reload
       id: `prop-w${weekNumber}`,
-      question: card.prop_question || "Prop",
-      options: [card.prop_option_a || "Over", card.prop_option_b || "Under"],
-      points: card.prop_points ?? 3,
+      question,
+      options: [optionA, optionB] as [string, string],
+      points,
     },
   };
 }
