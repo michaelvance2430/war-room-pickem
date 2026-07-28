@@ -2,14 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { runFridayPickNudge } from "@/lib/nudge-picks";
 
 /**
- * Friday noon ET: post "who still needs picks" announcements for leagues
- * that have a published week card in the current CFB window.
+ * Friday NOON Eastern only — who still needs picks.
+ *
+ * Vercel Cron is UTC:
+ *   Fri 16:00 UTC = 12:00 PM Eastern Daylight (EDT, summer)
+ *   Fri 17:00 UTC = 12:00 PM Eastern Standard (EST, winter)
+ * Handler only posts when America/New_York hour === 12 on Friday
+ * (so a wrong-time fire at e.g. 9pm ET will no-op).
  *
  * Auth: Authorization: Bearer <CRON_SECRET>
- * Env: CRON_SECRET, SUPABASE_SERVICE_ROLE_KEY, NEXT_PUBLIC_SUPABASE_URL
- *
- * Test: GET /api/cron/nudge-picks?force=1  (with Bearer secret)
- * Vercel Cron: see vercel.json (Fri 16:00 & 17:00 UTC → covers ET noon year-round)
+ * Test: ?force=1&secret=CRON_SECRET
  */
 function authorized(req: NextRequest): boolean {
   const secret = (process.env.CRON_SECRET || "").trim();
@@ -31,6 +33,7 @@ export async function GET(req: NextRequest) {
     const outcome = await runFridayPickNudge({ force });
     return NextResponse.json({
       ok: true,
+      target: "Friday 12:00–12:59 America/New_York (noon Eastern)",
       ...outcome,
       at: new Date().toISOString(),
     });

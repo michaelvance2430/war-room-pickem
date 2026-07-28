@@ -16,17 +16,40 @@ export function createServiceClient(): SupabaseClient {
   });
 }
 
-/** True if now is Friday 12:00–12:59 America/New_York. */
-export function isFridayNoonHourET(now = new Date()): boolean {
-  const parts = new Intl.DateTimeFormat("en-US", {
+/** Eastern (America/New_York) clock parts — always use h23 so noon = 12, not 0/24 confusion. */
+export function getEasternClock(now = new Date()): {
+  weekday: string;
+  hour: number;
+  minute: number;
+  label: string;
+} {
+  const dtf = new Intl.DateTimeFormat("en-US", {
     timeZone: ET,
     weekday: "short",
-    hour: "numeric",
-    hour12: false,
-  }).formatToParts(now);
-  const weekday = parts.find((p) => p.type === "weekday")?.value;
-  const hour = Number(parts.find((p) => p.type === "hour")?.value);
-  // hour12:false can still give 24 as midnight in some engines — treat 12 only
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  });
+  const map = Object.fromEntries(
+    dtf
+      .formatToParts(now)
+      .filter((p) => p.type !== "literal")
+      .map((p) => [p.type, p.value])
+  ) as Record<string, string>;
+
+  const weekday = map.weekday || "";
+  const hour = Number(map.hour);
+  const minute = Number(map.minute);
+  const label = `${weekday} ${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")} ET`;
+  return { weekday, hour, minute, label };
+}
+
+/**
+ * True only during Friday 12:00–12:59 America/New_York (noon Eastern).
+ * Not 9pm — hour must be exactly 12.
+ */
+export function isFridayNoonHourET(now = new Date()): boolean {
+  const { weekday, hour } = getEasternClock(now);
   return weekday === "Fri" && hour === 12;
 }
 
@@ -252,15 +275,17 @@ export async function runFridayPickNudge(opts?: {
 }): Promise<{
   ran: boolean;
   reason?: string;
+  easternTime?: string;
   results: NudgeLeagueResult[];
 }> {
   const now = opts?.now || new Date();
+  const et = getEasternClock(now);
 
   if (!opts?.force && !isFridayNoonHourET(now)) {
     return {
       ran: false,
-      reason:
-        "Not Friday noon America/New_York (use force=1 with CRON_SECRET to test)",
+      easternTime: et.label,
+      reason: `Skipped: only runs Friday 12:00–12:59 ET (noon). Right now it is ${et.label}. Use force=1 to test.`,
       results: [],
     };
   }
