@@ -94,4 +94,29 @@ export default function Nav() {
           <Link href="/championship" className="hover:text-foreground transition">
             Championship
           </Link>
-          <Link href="/toilet-bowl" className="hover:text-
+          <Link href="/toilet-bowl" className="hover:text-toilet transition">
+            Toilet Bowl
+          </Link>
+          {isCommish && (
+            <Link
+              href="/commissioner"
+              className="hover:text-foreground transition text-primary"
+            >
+              Commissioner
+            </Link>
+          )}
+          <Link href="/account" className="hover:text-foreground transition">
+            Account
+          </Link>
+        </nav>
+
+        <Link href="/account" className="text-sm text-muted hover:text-foreground">
+          {name}
+          {isCommish && (
+            <span className="ml-1 text-xs text-primary">(Commish)</span>
+          )}
+        </Link>
+      </div>
+    </header>
+  );
+}

@@ -285,3 +285,20 @@ create policy "Commissioner manages game results"
       where wr.id = week_result_id and l.commissioner_id = auth.uid()
     )
   );
+
+-- Announcements (also in announcements.sql for incremental runs)
+create table if not exists public.announcements (
+  id uuid primary key default gen_random_uuid(),
+  league_id uuid not null references public.leagues (id) on delete cascade,
+  author_id uuid not null references public.profiles (id) on delete cascade,
+  title text not null,
+  body text not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists announcements_league_idx on public.announcements (league_id, created_at desc);
+create table if not exists public.announcement_reads (
+  announcement_id uuid not null references public.announcements (id) on delete cascade,
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  read_at timestamptz not null default now(),
+  primary key (announcement_id, user_id)
+);
