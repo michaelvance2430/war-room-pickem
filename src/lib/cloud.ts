@@ -511,6 +511,31 @@ export async function loadLeagueStandings() {
     .sort((a, b) => b.totalPoints - a.totalPoints);
 }
 
+/** Cloud standings mapped to Player shape for Standings / Power Rankings / Stats. */
+export async function loadLeaguePlayers(): Promise<
+  import("./types").Player[]
+> {
+  const cloud = await loadLeagueStandings();
+  return cloud.map((c) => ({
+    id: c.userId,
+    name: c.name,
+    division: (c.division as import("./types").Player["division"]) || "North",
+    totalPoints: c.totalPoints,
+    weeklyPoints: c.weeklyPoints || [],
+    atsCorrect: c.atsCorrect,
+    atsTotal: c.atsTotal,
+    currentStreak: c.currentStreak,
+    bestWeek: c.bestWeek,
+    worstWeek: c.worstWeek,
+    perfectWeeks: c.perfectWeeks,
+    bestBetHits: c.bestBetHits,
+    bestBetTotal: c.bestBetTotal,
+    propHits: c.propHits,
+    propTotal: c.propTotal,
+    weeksPlayed: c.weeksPlayed,
+  }));
+}
+
 export type LeagueRosterMember = {
   membershipId: string;
   userId: string;

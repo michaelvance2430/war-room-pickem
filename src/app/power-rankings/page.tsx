@@ -2,12 +2,15 @@
 
 import { useState, useEffect } from "react";
 import Nav from "@/components/Nav";
-import { loadPlayers } from "@/lib/store";
+import { loadLeaguePlayers } from "@/lib/cloud";
+import { getSession } from "@/lib/league";
 import { Player } from "@/lib/types";
 
 function computePowerScore(p: Player): number {
   const last4 = p.weeklyPoints.slice(-4);
-  const last4Avg = last4.length ? last4.reduce((a, b) => a + b, 0) / last4.length : 0;
+  const last4Avg = last4.length
+    ? last4.reduce((a, b) => a + b, 0) / last4.length
+    : 0;
   const ats = p.atsTotal ? p.atsCorrect / p.atsTotal : 0;
   const streakBonus = p.currentStreak * 1.5;
   const seasonAvg = p.weeklyPoints.length
@@ -19,13 +22,20 @@ function computePowerScore(p: Player): number {
 
 export default function PowerRankingsPage() {
   const [ranked, setRanked] = useState<(Player & { power: number })[]>([]);
+  const [selfId, setSelfId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const players = loadPlayers();
-    const withPower = players
-      .map((p) => ({ ...p, power: computePowerScore(p) }))
-      .sort((a, b) => b.power - a.power);
-    setRanked(withPower);
+    async function load() {
+      setSelfId(getSession()?.playerId || null);
+      const players = await loadLeaguePlayers();
+      const withPower = players
+        .map((p) => ({ ...p, power: computePowerScore(p) }))
+        .sort((a, b) => b.power - a.power);
+      setRanked(withPower);
+      setLoading(false);
+    }
+    load();
   }, []);
 
   return (
@@ -36,9 +46,21 @@ export default function PowerRankingsPage() {
         <div className="mb-6">
           <h1 className="text-2xl font-bold">Power Rankings</h1>
           <p className="text-sm text-muted">
-            Who is actually playing the best right now?
+            Who is actually playing the best right now? • Live league data
           </p>
         </div>
+
+        {loading && (
+          <p className="text-sm text-muted py-8 text-center">Loading…</p>
+        )}
+
+        {!loading && ranked.length === 0 && (
+          <div className="rounded-xl border border-border bg-card px-4 py-10 text-center">
+            <p className="text-sm text-muted">
+              No players in this league yet. Invite friends from Players.
+            </p>
+          </div>
+        )}
 
         <div className="space-y-2">
           {ranked.map((player, idx) => {
@@ -52,7 +74,9 @@ export default function PowerRankingsPage() {
               >
                 <div
                   className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                    idx < 3 ? "bg-primary text-black" : "bg-card-hover text-muted"
+                    idx < 3
+                      ? "bg-primary text-black"
+                      : "bg-card-hover text-muted"
                   }`}
                 >
                   {idx + 1}
@@ -61,7 +85,7 @@ export default function PowerRankingsPage() {
                 <div className="flex-1 min-w-0">
                   <div className="font-medium truncate">
                     {player.name}
-                    {player.id === "1" && (
+                    {player.id === selfId && (
                       <span className="ml-2 text-xs text-primary">(You)</span>
                     )}
                   </div>
@@ -75,7 +99,9 @@ export default function PowerRankingsPage() {
                 </div>
 
                 <div className="text-right">
-                  <div className="text-sm font-semibold">{player.power.toFixed(1)}</div>
+                  <div className="text-sm font-semibold">
+                    {player.power.toFixed(1)}
+                  </div>
                   <div className="text-xs text-muted">
                     {player.currentStreak > 0
                       ? `W${player.currentStreak}`

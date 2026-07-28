@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import Nav from "@/components/Nav";
-import { loadPlayers } from "@/lib/store";
+import { loadLeaguePlayers } from "@/lib/cloud";
+import { getSession } from "@/lib/league";
 import { Player } from "@/lib/types";
 
 type StatKey =
@@ -26,7 +27,9 @@ function atsPct(p: Player) {
 }
 
 function bestBetPct(p: Player) {
-  return p.bestBetTotal ? Math.round((p.bestBetHits / p.bestBetTotal) * 100) : 0;
+  return p.bestBetTotal
+    ? Math.round((p.bestBetHits / p.bestBetTotal) * 100)
+    : 0;
 }
 
 function propPct(p: Player) {
@@ -35,10 +38,17 @@ function propPct(p: Player) {
 
 export default function StatsPage() {
   const [players, setPlayers] = useState<Player[]>([]);
+  const [selfId, setSelfId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<StatKey>("totalPoints");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setPlayers(loadPlayers());
+    async function load() {
+      setSelfId(getSession()?.playerId || null);
+      setPlayers(await loadLeaguePlayers());
+      setLoading(false);
+    }
+    load();
   }, []);
 
   const sorted = [...players].sort((a, b) => {
@@ -81,7 +91,7 @@ export default function StatsPage() {
         <div className="mb-6">
           <h1 className="text-2xl font-bold">Player Stats</h1>
           <p className="text-sm text-muted">
-            Season-long tracking • Click a column to sort
+            Season-long tracking • Live league data • Click a column to sort
           </p>
         </div>
 
@@ -101,75 +111,96 @@ export default function StatsPage() {
           ))}
         </div>
 
-        <div className="rounded-xl border border-border overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-card text-muted text-xs uppercase tracking-wide">
-                <tr>
-                  <th className="text-left px-3 py-3 font-medium">#</th>
-                  <th className="text-left px-3 py-3 font-medium">Player</th>
-                  <th className="text-right px-3 py-3 font-medium">Pts</th>
-                  <th className="text-right px-3 py-3 font-medium">Avg</th>
-                  <th className="text-right px-3 py-3 font-medium">Best</th>
-                  <th className="text-right px-3 py-3 font-medium">ATS</th>
-                  <th className="text-right px-3 py-3 font-medium">BB%</th>
-                  <th className="text-right px-3 py-3 font-medium">Prop</th>
-                  <th className="text-right px-3 py-3 font-medium">Perf</th>
-                  <th className="text-right px-3 py-3 font-medium">Streak</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sorted.map((p, idx) => (
-                  <tr
-                    key={p.id}
-                    className="border-t border-border hover:bg-card-hover transition"
-                  >
-                    <td className="px-3 py-2.5 text-muted">{idx + 1}</td>
-                    <td className="px-3 py-2.5 font-medium">
-                      {p.name}
-                      {p.id === "1" && (
-                        <span className="text-primary text-xs ml-1">(You)</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2.5 text-right font-semibold">
-                      {p.totalPoints}
-                    </td>
-                    <td className="px-3 py-2.5 text-right text-muted">
-                      {avg(p).toFixed(1)}
-                    </td>
-                    <td className="px-3 py-2.5 text-right">{p.bestWeek || "—"}</td>
-                    <td className="px-3 py-2.5 text-right text-muted">
-                      {atsPct(p)}%
-                    </td>
-                    <td className="px-3 py-2.5 text-right text-muted">
-                      {bestBetPct(p)}%
-                    </td>
-                    <td className="px-3 py-2.5 text-right text-muted">
-                      {propPct(p)}%
-                    </td>
-                    <td className="px-3 py-2.5 text-right">
-                      {p.perfectWeeks || 0}
-                    </td>
-                    <td className="px-3 py-2.5 text-right">
-                      {p.currentStreak > 0 ? (
-                        <span className="text-primary">W{p.currentStreak}</span>
-                      ) : p.currentStreak < 0 ? (
-                        <span className="text-danger">
-                          L{Math.abs(p.currentStreak)}
-                        </span>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        {loading && (
+          <p className="text-sm text-muted py-8 text-center">Loading…</p>
+        )}
+
+        {!loading && players.length === 0 && (
+          <div className="rounded-xl border border-border bg-card px-4 py-10 text-center">
+            <p className="text-sm text-muted">
+              No players in this league yet. Invite friends from Players.
+            </p>
           </div>
-        </div>
+        )}
+
+        {!loading && players.length > 0 && (
+          <div className="rounded-xl border border-border overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-card text-muted text-xs uppercase tracking-wide">
+                  <tr>
+                    <th className="text-left px-3 py-3 font-medium">#</th>
+                    <th className="text-left px-3 py-3 font-medium">Player</th>
+                    <th className="text-right px-3 py-3 font-medium">Pts</th>
+                    <th className="text-right px-3 py-3 font-medium">Avg</th>
+                    <th className="text-right px-3 py-3 font-medium">Best</th>
+                    <th className="text-right px-3 py-3 font-medium">ATS</th>
+                    <th className="text-right px-3 py-3 font-medium">BB%</th>
+                    <th className="text-right px-3 py-3 font-medium">Prop</th>
+                    <th className="text-right px-3 py-3 font-medium">Perf</th>
+                    <th className="text-right px-3 py-3 font-medium">Streak</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sorted.map((p, idx) => (
+                    <tr
+                      key={p.id}
+                      className="border-t border-border hover:bg-card-hover transition"
+                    >
+                      <td className="px-3 py-2.5 text-muted">{idx + 1}</td>
+                      <td className="px-3 py-2.5 font-medium">
+                        {p.name}
+                        {p.id === selfId && (
+                          <span className="text-primary text-xs ml-1">
+                            (You)
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-semibold">
+                        {p.totalPoints}
+                      </td>
+                      <td className="px-3 py-2.5 text-right text-muted">
+                        {avg(p).toFixed(1)}
+                      </td>
+                      <td className="px-3 py-2.5 text-right">
+                        {p.bestWeek || "—"}
+                      </td>
+                      <td className="px-3 py-2.5 text-right text-muted">
+                        {atsPct(p)}%
+                      </td>
+                      <td className="px-3 py-2.5 text-right text-muted">
+                        {bestBetPct(p)}%
+                      </td>
+                      <td className="px-3 py-2.5 text-right text-muted">
+                        {propPct(p)}%
+                      </td>
+                      <td className="px-3 py-2.5 text-right">
+                        {p.perfectWeeks || 0}
+                      </td>
+                      <td className="px-3 py-2.5 text-right">
+                        {p.currentStreak > 0 ? (
+                          <span className="text-primary">
+                            W{p.currentStreak}
+                          </span>
+                        ) : p.currentStreak < 0 ? (
+                          <span className="text-danger">
+                            L{Math.abs(p.currentStreak)}
+                          </span>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         <p className="text-xs text-muted mt-4 text-center">
-          BB% = Best Bet hit rate • Perf = weeks scoring 18+ • Stats update when results are saved
+          BB% = Best Bet hit rate • Perf = weeks scoring 18+ • Stats update when
+          results are scored
         </p>
       </main>
     </div>
