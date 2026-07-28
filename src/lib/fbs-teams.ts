@@ -209,12 +209,6 @@ const SCHOOL_MODIFIERS = new Set([
   "southern",
   "international",
   "christian",
-  "a",
-  "and",
-  "m",
-  "am",
-  "ohio", // Miami Ohio vs Miami
-  "florida", // Miami Florida vs Miami Ohio when key is just miami + wrong next
 ]);
 
 type Match = { entry: FbsEntry; score: number; key: string };
