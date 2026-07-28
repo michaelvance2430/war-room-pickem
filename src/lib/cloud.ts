@@ -510,3 +510,128 @@ export async function loadLeagueStandings() {
     })
     .sort((a, b) => b.totalPoints - a.totalPoints);
 }
+
+export type LeagueRosterMember = {
+  membershipId: string;
+  userId: string;
+  name: string;
+  division: "North" | "South" | "East" | "West";
+  role: "commissioner" | "player";
+  totalPoints: number;
+};
+
+/** Live league roster from Supabase memberships (not local mock players). */
+export async function loadLeagueRoster(): Promise<LeagueRosterMember[]> {
+  const session = getSession();
+  if (!session?.leagueId) return [];
+  const supabase = createClient();
+  const { data: rows, error } = await supabase
+    .from("memberships")
+    .select("id, user_id, role, division, total_points, profiles(display_name)")
+    .eq("league_id", session.leagueId);
+
+  if (error || !rows) return [];
+
+  return rows
+    .map((m: Record<string, unknown>) => {
+      const profile = m.profiles as { display_name?: string } | null;
+      const role = m.role === "commissioner" ? "commissioner" : "player";
+      const division = (m.division as LeagueRosterMember["division"]) || "North";
+      return {
+        membershipId: m.id as string,
+        userId: m.user_id as string,
+        name: profile?.display_name || "Player",
+        division,
+        role,
+        totalPoints: (m.total_points as number) || 0,
+      };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export async function updateMemberDivision(
+  userId: string,
+  division: "North" | "South" | "East" | "West"
+): Promise<{ ok: boolean; error?: string }> {
+  const session = getSession();
+  if (!session?.leagueId || !session.isCommissioner) {
+    return { ok: false, error: "Only the commissioner can change divisions" };
+  }
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("memberships")
+    .update({ division })
+    .eq("league_id", session.leagueId)
+    .eq("user_id", userId);
+
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+export async function removeLeagueMember(
+  userId: string
+): Promise<{ ok: boolean; error?: string }> {
+  const session = getSession();
+  if (!session?.leagueId || !session.isCommissioner) {
+    return { ok: false, error: "Only the commissioner can remove players" };
+  }
+  if (userId === session.playerId) {
+    return { ok: false, error: "Can't remove yourself (use Account to leave or delete the league)" };
+  }
+
+  const supabase = createClient();
+  const { data: league } = await supabase
+    .from("leagues")
+    .select("commissioner_id")
+    .eq("id", session.leagueId)
+    .maybeSingle();
+
+  if (league?.commissioner_id === userId) {
+    return { ok: false, error: "Can't remove the commissioner" };
+  }
+
+  const { error } = await supabase
+    .from("memberships")
+    .delete()
+    .eq("league_id", session.leagueId)
+    .eq("user_id", userId);
+
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+/** Round-robin assign North/South/East/West by name. Commissioner only. */
+export async function autoBalanceDivisions(): Promise<{
+  ok: boolean;
+  error?: string;
+}> {
+  const session = getSession();
+  if (!session?.leagueId || !session.isCommissioner) {
+    return { ok: false, error: "Only the commissioner can auto-balance" };
+  }
+
+  const roster = await loadLeagueRoster();
+  if (!roster.length) return { ok: false, error: "No players in this league" };
+
+  const divisions: LeagueRosterMember["division"][] = [
+    "North",
+    "South",
+    "East",
+    "West",
+  ];
+  const sorted = [...roster].sort((a, b) => a.name.localeCompare(b.name));
+  const supabase = createClient();
+
+  for (let i = 0; i < sorted.length; i++) {
+    const member = sorted[i];
+    const division = divisions[i % 4];
+    if (member.division === division) continue;
+    const { error } = await supabase
+      .from("memberships")
+      .update({ division })
+      .eq("id", member.membershipId);
+    if (error) return { ok: false, error: error.message };
+  }
+
+  return { ok: true };
+}
