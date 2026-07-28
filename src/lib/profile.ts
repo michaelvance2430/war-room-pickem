@@ -40,14 +40,27 @@ export async function loadMyProfile(): Promise<Profile | null> {
 
 /** Resize image in browser → JPEG blob under size limit. */
 export async function prepareAvatarFile(file: File): Promise<Blob> {
-  if (!file.type.startsWith("image/")) {
+  if (!file.type.startsWith("image/") && file.type !== "") {
     throw new Error("Please choose an image file (JPG, PNG, or WebP).");
+  }
+  // iPhone HEIC often fails in canvas — ask for a normal photo
+  if (/heic|heif/i.test(file.type) || /\.heic$/i.test(file.name)) {
+    throw new Error(
+      "HEIC photos aren't supported. In iPhone Photos, share as JPEG, or take a screenshot and upload that."
+    );
   }
   if (file.size > 8 * 1024 * 1024) {
     throw new Error("Image is too large (max 8 MB before resize).");
   }
 
-  const bitmap = await createImageBitmap(file);
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    throw new Error(
+      "Could not read that image. Try a JPG or PNG (not HEIC/Live Photo)."
+    );
+  }
   const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height));
   const w = Math.max(1, Math.round(bitmap.width * scale));
   const h = Math.max(1, Math.round(bitmap.height * scale));
@@ -82,44 +95,94 @@ export async function prepareAvatarFile(file: File): Promise<Blob> {
 /**
  * Upload avatar for the signed-in user and save public URL on profiles.
  * Path: avatars/{userId}/avatar.jpg
+ * Works for every authenticated player (not just commissioner).
  */
 export async function uploadMyAvatar(
   file: File
 ): Promise<{ ok: boolean; avatarUrl?: string; error?: string }> {
   try {
     const supabase = createClient();
-    const { data: auth, error: authErr } = await supabase.auth.getUser();
-    if (authErr || !auth.user) {
-      return { ok: false, error: "Not signed in — log out and log back in." };
+
+    // Prefer a fresh session so storage JWT is valid for non-commissioners too
+    const { data: refreshed, error: refreshErr } =
+      await supabase.auth.refreshSession();
+    let user = refreshed.session?.user ?? null;
+    if (!user) {
+      const { data: auth, error: authErr } = await supabase.auth.getUser();
+      if (authErr || !auth.user) {
+        return {
+          ok: false,
+          error: "Not signed in — log out and log back in, then try again.",
+        };
+      }
+      user = auth.user;
+    }
+    if (refreshErr && !user) {
+      return {
+        ok: false,
+        error: "Session expired — log out and log back in.",
+      };
     }
 
-    const userId = auth.user.id;
+    const userId = user.id;
     const blob = await prepareAvatarFile(file);
+    // Path must start with auth.uid() for storage RLS
     const path = `${userId}/avatar.jpg`;
 
-    // --- Step 1: storage upload ---
-    const { error: upErr } = await supabase.storage
-      .from(BUCKET)
-      .upload(path, blob, {
-        upsert: true,
-        contentType: "image/jpeg",
-        cacheControl: "3600",
-      });
+    // Ensure profile row exists before we attach avatar_url
+    const displayName =
+      (user.user_metadata?.display_name as string) ||
+      user.email?.split("@")[0] ||
+      "Player";
 
-    if (upErr) {
-      const msg = upErr.message || "";
+    const { error: ensureErr } = await supabase.from("profiles").upsert(
+      {
+        id: userId,
+        display_name: displayName,
+      },
+      { onConflict: "id" }
+    );
+    if (ensureErr) {
+      const msg = ensureErr.message || "";
       if (/row-level security|violates|policy/i.test(msg)) {
         return {
           ok: false,
           error:
-            "Storage blocked (RLS). In Supabase run the FULL file supabase/avatars-rls-fix.sql, then try again.",
+            "Profile access blocked. Commissioner: run supabase/avatars-everyone.sql in Supabase SQL Editor.",
+        };
+      }
+      // Non-fatal if row already exists and upsert is picky — continue
+    }
+
+    // Remove first so we always do a clean INSERT (avoids upsert policy quirks)
+    await supabase.storage.from(BUCKET).remove([path]);
+
+    const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, blob, {
+      upsert: true,
+      contentType: "image/jpeg",
+      cacheControl: "3600",
+    });
+
+    if (upErr) {
+      const msg = upErr.message || "";
+      if (/row-level security|violates|policy|unauthorized|403|jwt/i.test(msg)) {
+        return {
+          ok: false,
+          error:
+            "Photo upload blocked for your account. Commissioner must run supabase/avatars-everyone.sql in Supabase (SQL Editor), then everyone can re-try.",
         };
       }
       if (/bucket|not found/i.test(msg)) {
         return {
           ok: false,
           error:
-            "Avatars bucket missing. Run supabase/avatars-rls-fix.sql in Supabase.",
+            "Avatars bucket missing. Run supabase/avatars-everyone.sql in Supabase.",
+        };
+      }
+      if (/mime|type|not supported/i.test(msg)) {
+        return {
+          ok: false,
+          error: "Image type not allowed. Use JPG or PNG.",
         };
       }
       return { ok: false, error: `Upload failed: ${msg}` };
@@ -128,12 +191,7 @@ export async function uploadMyAvatar(
     const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(path);
     const avatarUrl = `${pub.publicUrl}?v=${Date.now()}`;
 
-    const displayName =
-      (auth.user.user_metadata?.display_name as string) ||
-      auth.user.email?.split("@")[0] ||
-      "Player";
-
-    // --- Step 2: save URL on profile (update, then insert if needed) ---
+    // Save URL on profile (update preferred; insert if missing)
     const { data: existing } = await supabase
       .from("profiles")
       .select("id")
@@ -152,13 +210,13 @@ export async function uploadMyAvatar(
           return {
             ok: false,
             error:
-              "Profile update blocked (RLS). Run supabase/avatars-rls-fix.sql (profiles policies).",
+              "Profile update blocked. Run supabase/avatars-everyone.sql (profiles policies).",
           };
         }
         if (/avatar_url|column/i.test(msg)) {
           return {
             ok: false,
-            error: "avatar_url column missing. Run supabase/avatars-rls-fix.sql.",
+            error: "avatar_url column missing. Run supabase/avatars-everyone.sql.",
           };
         }
         return { ok: false, error: `Profile save failed: ${msg}` };
@@ -176,7 +234,7 @@ export async function uploadMyAvatar(
           return {
             ok: false,
             error:
-              "Profile insert blocked (RLS). Run supabase/avatars-rls-fix.sql (Users insert own profile).",
+              "Profile insert blocked. Run supabase/avatars-everyone.sql.",
           };
         }
         return { ok: false, error: `Profile create failed: ${msg}` };

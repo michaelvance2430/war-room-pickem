@@ -178,7 +178,9 @@ export default function AccountPage() {
             <div className="flex-1 min-w-0 space-y-2">
               <p className="text-sm font-medium truncate">{name || "Player"}</p>
               <p className="text-xs text-muted">
-                JPG, PNG, or WebP. We resize to a square-friendly size (max 2 MB).
+                Any player can upload. JPG or PNG works best (max 2 MB after
+                resize). On iPhone, avoid HEIC — use &quot;Most Compatible&quot;
+                or a screenshot.
               </p>
               <div className="flex flex-wrap gap-2">
                 <input

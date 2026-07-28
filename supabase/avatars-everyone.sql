@@ -1,13 +1,15 @@
--- Avatar upload fix — EVERY signed-in player (not only commissioner)
--- Prefer the full script: avatars-everyone.sql (same content, clearer name)
--- Run ALL of this in Supabase SQL Editor
+-- ============================================================
+-- EVERYONE can upload a profile photo (not just commissioner)
+-- Run this ENTIRE file once in Supabase → SQL Editor → Run
+-- ============================================================
 
--- ========== PROFILES ==========
+-- 1) Profile column
 alter table public.profiles
   add column if not exists avatar_url text;
 
 alter table public.profiles enable row level security;
 
+-- 2) Profiles: every signed-in user manages ONLY their own row
 drop policy if exists "Profiles viewable authenticated" on public.profiles;
 drop policy if exists "Users insert own profile" on public.profiles;
 drop policy if exists "Users update own profile" on public.profiles;
@@ -28,7 +30,7 @@ create policy "profiles_update_own"
   using (id = auth.uid())
   with check (id = auth.uid());
 
--- ========== STORAGE BUCKET ==========
+-- 3) Public avatars bucket (2 MB, common image types)
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
   'avatars',
@@ -42,7 +44,7 @@ on conflict (id) do update set
   file_size_limit = 2097152,
   allowed_mime_types = array['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
 
--- ========== STORAGE POLICIES ==========
+-- 4) Drop every known avatar storage policy name (old + new)
 drop policy if exists "Avatar images are publicly accessible" on storage.objects;
 drop policy if exists "Users can upload own avatar" on storage.objects;
 drop policy if exists "Users can update own avatar" on storage.objects;
@@ -55,14 +57,22 @@ drop policy if exists "avatars_public_read" on storage.objects;
 drop policy if exists "avatars_authenticated_insert" on storage.objects;
 drop policy if exists "avatars_authenticated_update" on storage.objects;
 drop policy if exists "avatars_authenticated_delete" on storage.objects;
+drop policy if exists "Give users access to own folder 1oj01fe_0" on storage.objects;
+drop policy if exists "Give users access to own folder 1oj01fe_1" on storage.objects;
+drop policy if exists "Give users access to own folder 1oj01fe_2" on storage.objects;
 
+-- Helper: own file under {auth.uid()}/...
+-- Uses several checks because storage.foldername() is flaky on some projects.
+
+-- Anyone can READ avatars (public bucket + <img> tags)
 create policy "avatars_public_read"
   on storage.objects for select
   using (bucket_id = 'avatars');
 
--- Path: {userId}/avatar.jpg — every authenticated user, own folder only
+-- Any authenticated user can UPLOAD into their own folder only
 create policy "avatars_authenticated_insert"
-  on storage.objects for insert to authenticated
+  on storage.objects for insert
+  to authenticated
   with check (
     bucket_id = 'avatars'
     and (
@@ -72,8 +82,10 @@ create policy "avatars_authenticated_insert"
     )
   );
 
+-- Update (needed for upsert / replace photo)
 create policy "avatars_authenticated_update"
-  on storage.objects for update to authenticated
+  on storage.objects for update
+  to authenticated
   using (
     bucket_id = 'avatars'
     and (
@@ -91,8 +103,10 @@ create policy "avatars_authenticated_update"
     )
   );
 
+-- Delete own avatar
 create policy "avatars_authenticated_delete"
-  on storage.objects for delete to authenticated
+  on storage.objects for delete
+  to authenticated
   using (
     bucket_id = 'avatars'
     and (
@@ -101,3 +115,6 @@ create policy "avatars_authenticated_delete"
       or split_part(name, '/', 1) = auth.uid()::text
     )
   );
+
+-- Done. Every signed-in player (not just commissioner) can upload under:
+--   avatars/{their-user-id}/avatar.jpg
