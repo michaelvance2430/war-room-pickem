@@ -188,16 +188,47 @@ function normalize(s: string): string {
     .toLowerCase()
     .replace(/\./g, "")
     .replace(/&/g, "and")
+    .replace(/\(oh\)/g, "ohio")
+    .replace(/\(fl\)/g, "florida")
     .replace(/[^a-z0-9\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
 
-type Match = { entry: FbsEntry; score: number };
+/** Words that mean "this is a different school" if they appear after a short key. */
+const SCHOOL_MODIFIERS = new Set([
+  "state",
+  "tech",
+  "technological",
+  "pine",
+  "bluff",
+  "central",
+  "eastern",
+  "western",
+  "northern",
+  "southern",
+  "international",
+  "christian",
+  "a",
+  "and",
+  "m",
+  "am",
+  "ohio", // Miami Ohio vs Miami
+  "florida", // Miami Florida vs Miami Ohio when key is just miami + wrong next
+]);
 
+type Match = { entry: FbsEntry; score: number; key: string };
+
+/**
+ * Strict match: key must appear as consecutive whole words at the START of the
+ * odds team name. "indiana" matches "Indiana Hoosiers" but NOT "Indiana State".
+ * Longer keys always beat shorter ones ("ohio state" > "ohio").
+ */
 function matchTeam(teamName: string): Match | null {
   const n = normalize(teamName);
   if (!n) return null;
+  const nWords = n.split(" ").filter(Boolean);
+  if (!nWords.length) return null;
 
   let best: Match | null = null;
 
@@ -205,25 +236,41 @@ function matchTeam(teamName: string): Match | null {
     for (const rawKey of entry.keys) {
       const key = normalize(rawKey);
       if (!key) continue;
+      const kWords = key.split(" ").filter(Boolean);
+      if (!kWords.length || kWords.length > nWords.length) continue;
 
-      let score = 0;
-      if (n === key) score = 100;
-      else if (n.startsWith(key + " ") || n.endsWith(" " + key) || n.includes(" " + key + " "))
-        score = 80;
-      else if (n.includes(key)) score = 60 + Math.min(key.length, 20);
-      else if (key.includes(n) && n.length >= 6) score = 40;
+      // Key must be a prefix of the team name as whole words
+      let prefixOk = true;
+      for (let i = 0; i < kWords.length; i++) {
+        if (nWords[i] !== kWords[i]) {
+          prefixOk = false;
+          break;
+        }
+      }
+      if (!prefixOk) continue;
 
-      // Prefer longer key matches (avoid "miami" eating "miami ohio" wrong — handled by order)
-      if (score > 0) {
-        score += Math.min(key.length, 15);
-        if (!best || score > best.score) best = { entry, score };
+      // If the school key does not already end with a modifier, reject
+      // "Indiana State", "Arkansas Pine Bluff", "Georgia Southern", etc.
+      const keyEndsWithModifier = SCHOOL_MODIFIERS.has(kWords[kWords.length - 1]);
+      const next = nWords[kWords.length];
+      if (next && !keyEndsWithModifier && SCHOOL_MODIFIERS.has(next)) {
+        continue;
+      }
+
+      // Score: longer, more specific keys win
+      const score = 100 + kWords.length * 30 + key.length;
+      if (!best || score > best.score) {
+        best = { entry, score, key };
       }
     }
   }
 
-  // Require a decent match so random D3 names don't slip through
-  if (!best || best.score < 55) return null;
   return best;
+}
+
+/** Canonical FBS short name for ranking lookup, or null if not FBS. */
+export function getFbsCanonicalName(teamName: string): string | null {
+  return matchTeam(teamName)?.entry.name ?? null;
 }
 
 export function isFbsTeam(teamName: string): boolean {

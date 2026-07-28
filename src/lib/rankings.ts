@@ -1,4 +1,5 @@
 import type { Game } from "./types";
+import { getFbsCanonicalName } from "./fbs-teams";
 
 type EspnRankEntry = {
   current: number;
@@ -12,8 +13,8 @@ type EspnRankEntry = {
 };
 
 /**
- * Fetch current AP Top 25 from ESPN's public rankings endpoint (no API key).
- * Falls back to empty map if the request fails.
+ * Fetch current AP Top 25 from ESPN (no API key).
+ * Map is keyed by our FBS canonical names (e.g. "Ohio State", "Indiana").
  */
 export async function fetchApRankMap(): Promise<Map<string, number>> {
   const map = new Map<string, number>();
@@ -31,7 +32,6 @@ export async function fetchApRankMap(): Promise<Map<string, number>> {
       ranks?: EspnRankEntry[];
     }[];
 
-    // Prefer AP Top 25
     const ap =
       rankings.find(
         (r) =>
@@ -43,78 +43,50 @@ export async function fetchApRankMap(): Promise<Map<string, number>> {
       const rank = row.current;
       if (!rank || !row.team) continue;
       const t = row.team;
-      const keys = [
-        t.location,
-        t.nickname,
-        t.name,
-        t.abbreviation,
+
+      // Resolve through the same strict FBS matcher so "Indiana" ≠ "Indiana State"
+      const candidates = [
         t.displayName,
         t.location && t.name ? `${t.location} ${t.name}` : null,
-        t.location && t.nickname ? `${t.location} ${t.nickname}` : null,
-      ];
-      for (const k of keys) {
-        if (!k) continue;
-        map.set(normalizeTeamKey(k), rank);
+        t.location,
+        t.nickname,
+      ].filter(Boolean) as string[];
+
+      let canonical: string | null = null;
+      for (const c of candidates) {
+        canonical = getFbsCanonicalName(c);
+        if (canonical) break;
       }
-      // Extra aliases for common Odds API naming
-      if (t.location === "Miami") {
-        map.set(normalizeTeamKey("Miami Florida"), rank);
-        map.set(normalizeTeamKey("Miami FL"), rank);
-        map.set(normalizeTeamKey("Miami (FL)"), rank);
+      // Fallback: location often is the school short name
+      if (!canonical && t.location) {
+        canonical = getFbsCanonicalName(t.location);
       }
-      if (t.location === "Ole Miss") {
-        map.set(normalizeTeamKey("Mississippi"), rank);
-        map.set(normalizeTeamKey("Mississippi Rebels"), rank);
+      if (!canonical && t.location) {
+        // Direct map for ESPN location strings that match our entry.name
+        canonical = t.location;
       }
-      if (t.location === "Southern California" || t.nickname === "USC") {
-        map.set(normalizeTeamKey("USC"), rank);
-        map.set(normalizeTeamKey("Southern Cal"), rank);
-      }
-      if (t.location === "Louisiana State" || t.abbreviation === "LSU") {
-        map.set(normalizeTeamKey("LSU"), rank);
-        map.set(normalizeTeamKey("Louisiana State"), rank);
+
+      if (canonical) {
+        map.set(canonical.toLowerCase(), rank);
       }
     }
   } catch {
-    // Rankings are optional — odds still work without them
+    // optional
   }
   return map;
 }
 
-function normalizeTeamKey(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/\./g, "")
-    .replace(/&/g, "and")
-    .replace(/[^a-z0-9\s]/g, " ")
-    .replace(
-      /\b(university|univ|college|the|football|team)\b/g,
-      " "
-    )
-    .replace(
-      /\b(bulldogs|tigers|bears|eagles|wildcats|crimson tide|buckeyes|wolverines|sooners|longhorns|ducks|huskies|trojans|fighting irish|gators|volunteers|aggies|rebels|hurricanes|cougars|utes|cavaliers|commodores|hoosiers|spartans|hawkeyes|nittany lions|seminoles|gamecocks|razorbacks|jayhawks|cyclones|red raiders|cowboys|mountaineers|cardinal|cardinals|blue devils|tar heels|wolfpack|orange|boilermakers|badgers|golden gophers|cornhuskers|buffaloes|beavers|cougars)\b/g,
-      " "
-    )
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-/** Look up AP rank for an odds-api team name. */
+/** Look up AP rank only for a confirmed FBS school (strict). */
 export function lookupApRank(
   teamName: string,
   rankMap: Map<string, number>
 ): number | null {
   if (!teamName || rankMap.size === 0) return null;
 
-  const key = normalizeTeamKey(teamName);
-  if (rankMap.has(key)) return rankMap.get(key)!;
+  const canonical = getFbsCanonicalName(teamName);
+  if (!canonical) return null;
 
-  // Partial contains match (e.g. "Ohio State Buckeyes" vs "ohio state")
-  for (const [k, rank] of rankMap) {
-    if (!k) continue;
-    if (key.includes(k) || k.includes(key)) return rank;
-  }
-  return null;
+  return rankMap.get(canonical.toLowerCase()) ?? null;
 }
 
 /** Attach AP ranks onto games after odds mapping. */
