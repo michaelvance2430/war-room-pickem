@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Nav from "@/components/Nav";
 import { Game, Prop } from "@/lib/types";
 import { fetchNcaafOdds } from "@/lib/odds";
+import { formatMatchupConferences } from "@/lib/fbs-teams";
 import { formatRankedTeam } from "@/lib/rankings";
 import { scoreWeek, GameResult } from "@/lib/scoring";
 import { applyWeekScores } from "@/lib/store";
@@ -103,21 +104,18 @@ export default function CommissionerPage() {
     setLoadingOdds(true);
     setOddsError(null);
     try {
-      const { games, remaining } = await fetchNcaafOdds();
+      const { games } = await fetchNcaafOdds();
       if (!games.length) {
         setAvailableGames([]);
         setSelectedIds(new Set());
         setOddsError(
-          "No NCAAF games with spreads right now (offseason, or books not posting lines yet). Try again closer to kickoff week."
+          "No NCAA FBS games with spreads right now. Books often post little in the offseason — try again when Week 1 lines are up. Only SEC / Big Ten / ACC / Big 12 / G5 / Independents are shown."
         );
         return;
       }
       setAvailableGames(games);
       setSelectedIds(new Set());
-      if (remaining != null) {
-        // Soft notice only — not an error
-        setOddsError(null);
-      }
+      setOddsError(null);
     } catch (e: unknown) {
       setOddsError(e instanceof Error ? e.message : "Failed to pull odds");
       setAvailableGames([]);
@@ -434,7 +432,7 @@ export default function CommissionerPage() {
                 <div>
                   <h2 className="font-semibold">Pull Live Odds</h2>
                   <p className="text-xs text-muted">
-                    Real NCAAF spreads from The Odds API (no mock games)
+                    Live NCAA FBS only — SEC, Big Ten, ACC, Big 12, G5, Independents
                   </p>
                 </div>
                 <button
@@ -454,7 +452,7 @@ export default function CommissionerPage() {
                   Select 5 Games ({selectedIds.size}/5)
                 </h2>
                 <p className="text-xs text-muted mb-2">
-                  {availableGames.length} live games with spreads
+                  {availableGames.length} FBS games with spreads (Power conf first)
                 </p>
                 <div className="space-y-2 max-h-96 overflow-y-auto mt-4">
                   {availableGames.map((g) => {
@@ -462,6 +460,10 @@ export default function CommissionerPage() {
                     const favLabel = formatRankedTeam(
                       g.favorite === "home" ? g.homeTeam : g.awayTeam,
                       g.favorite === "home" ? g.homeRank : g.awayRank
+                    );
+                    const confLine = formatMatchupConferences(
+                      g.awayTeam,
+                      g.homeTeam
                     );
                     return (
                       <button
@@ -480,9 +482,9 @@ export default function CommissionerPage() {
                               {formatRankedTeam(g.homeTeam, g.homeRank)}
                             </div>
                             <div className="text-xs text-muted">
+                              {confLine ? `${confLine} • ` : ""}
                               {g.startTime}
                               {g.bookmaker ? ` • ${g.bookmaker}` : ""}
-                              {(g.awayRank || g.homeRank) ? " • AP ranked" : ""}
                             </div>
                           </div>
                           <span className="text-sm text-primary shrink-0">

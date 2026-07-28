@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { mapOddsApiToGames } from "@/lib/odds";
+import { filterToFbsGames } from "@/lib/fbs-teams";
 import { applyApRanks, fetchApRankMap } from "@/lib/rankings";
 import type { OddsApiGame } from "@/lib/types";
 
@@ -51,11 +52,19 @@ export async function GET() {
     }
 
     const data = (await res.json()) as OddsApiGame[];
+    const rawCount = Array.isArray(data) ? data.length : 0;
+
+    // Keep games with a real spread market
     let games = mapOddsApiToGames(data).filter(
       (g) => g.bookmaker && Number.isFinite(g.spread)
     );
+    const withLines = games.length;
 
-    // Merge AP Top 25 ranks (best-effort; pull still works if ESPN is down)
+    // NCAA FBS only (Power 4 + G5 + independents) — drop FCS/D2/D3/noise
+    games = filterToFbsGames(games);
+    const fbsCount = games.length;
+
+    // Merge AP Top 25 ranks (best-effort)
     try {
       const rankMap = await fetchApRankMap();
       games = applyApRanks(games, rankMap);
@@ -66,8 +75,13 @@ export async function GET() {
     return NextResponse.json({
       games,
       count: games.length,
+      rawCount,
+      withLines,
+      fbsCount,
       remaining,
       used,
+      filter:
+        "NCAA FBS only (SEC, Big Ten, ACC, Big 12, Independents, Group of 5)",
     });
   } catch (e: unknown) {
     return NextResponse.json(
