@@ -28,6 +28,7 @@ import {
   loadPickSubmissionStatus,
   postMissingPicksAnnouncement,
   setLeagueActiveWeek,
+  resetSeasonInCloud,
   PickSubmissionStatus,
 } from "@/lib/cloud";
 import {
@@ -98,6 +99,10 @@ export default function CommissionerPage() {
   const [pickStatusError, setPickStatusError] = useState<string | null>(null);
   const [postingNudge, setPostingNudge] = useState(false);
   const [nudgeMessage, setNudgeMessage] = useState<string | null>(null);
+  const [resettingSeason, setResettingSeason] = useState(false);
+  const [seasonResetReport, setSeasonResetReport] = useState<string | null>(
+    null
+  );
 
   useEffect(() => {
     setAllowed(isCommissioner());
@@ -605,6 +610,81 @@ export default function CommissionerPage() {
     router.push("/join");
   }
 
+  /**
+   * Wipe picks / cards / results / scores. Keep every member.
+   * Triple confirmation so it can't fire mid-season by accident.
+   */
+  async function handleResetSeason() {
+    setSeasonResetReport(null);
+
+    const ok1 = confirm(
+      "RESET SEASON?\n\n" +
+        "This will DELETE:\n" +
+        "• All week cards & games\n" +
+        "• All player picks\n" +
+        "• All results & season scores/stats\n" +
+        "• League announcements\n\n" +
+        "This will KEEP:\n" +
+        "• Every player who joined\n" +
+        "• Divisions, roles, league code & settings\n" +
+        "• Profile photos\n\n" +
+        "Use this after testing, before the real season.\n\n" +
+        "Continue?"
+    );
+    if (!ok1) return;
+
+    const ok2 = confirm(
+      "Last chance.\n\n" +
+        "This cannot be undone.\n" +
+        "Players stay in the league with zeroed scores.\n\n" +
+        "Reset the season now?"
+    );
+    if (!ok2) return;
+
+    const typed = window.prompt(
+      'Type RESET (all caps) to confirm season reset.\n\nAnything else cancels.'
+    );
+    if (typed !== "RESET") {
+      setSeasonResetReport("Season reset cancelled — you must type RESET exactly.");
+      return;
+    }
+
+    setResettingSeason(true);
+    const result = await resetSeasonInCloud();
+    setResettingSeason(false);
+
+    if (!result.ok) {
+      setSeasonResetReport(result.error || "Season reset failed");
+      return;
+    }
+
+    // Clear UI state for a clean slate
+    setPublishedGames([]);
+    setSelectedIds(new Set());
+    setResults({});
+    setPropResult(null);
+    setCardSaved(false);
+    setResultsSaved(false);
+    setDemoScore(null);
+    setScoreReport(null);
+    setSyncReport(null);
+    setPickStatus([]);
+    setActiveWeek(0);
+    try {
+      localStorage.setItem(ACTIVE_WEEK_KEY, "0");
+    } catch {
+      /* ignore */
+    }
+    await loadWeekState(0);
+
+    const kept = result.membersKept ?? "?";
+    const picks = result.picksDeleted ?? 0;
+    const cards = result.cardsDeleted ?? 0;
+    setSeasonResetReport(
+      `Season reset complete. Kept ${kept} member(s). Removed ${cards} week card(s) and ${picks} pick sheet(s). Scores are zeroed. Ready for Week 0.`
+    );
+  }
+
   function copyCode() {
     if (!league) return;
     navigator.clipboard?.writeText(league.code);
@@ -793,9 +873,50 @@ export default function CommissionerPage() {
               </button>
             </div>
 
+            <div className="rounded-xl border border-warning/40 bg-card p-5 space-y-3">
+              <h2 className="font-semibold text-warning">Reset season</h2>
+              <p className="text-xs text-muted leading-relaxed">
+                After testing (or before kickoff of the real season): wipe all
+                cards, picks, results, and scores.{" "}
+                <span className="text-foreground font-medium">
+                  Everyone who joined stays in the league
+                </span>{" "}
+                with zeroed stats. League code, settings, divisions, and profile
+                photos are kept. Requires typing{" "}
+                <span className="font-mono text-foreground">RESET</span> to
+                confirm — hard to do by accident mid-season.
+              </p>
+              <button
+                type="button"
+                disabled={resettingSeason}
+                onClick={() => void handleResetSeason()}
+                className="px-4 py-2 rounded-lg border border-warning text-warning text-sm font-medium hover:bg-warning/10 disabled:opacity-50"
+              >
+                {resettingSeason
+                  ? "Resetting season…"
+                  : "Reset season (keep players)"}
+              </button>
+              {seasonResetReport && (
+                <p
+                  className={`text-xs leading-relaxed ${
+                    seasonResetReport.toLowerCase().includes("complete")
+                      ? "text-primary"
+                      : "text-danger"
+                  }`}
+                >
+                  {seasonResetReport}
+                </p>
+              )}
+            </div>
+
             <div className="rounded-xl border border-danger/40 bg-card p-5 space-y-3">
               <h2 className="font-semibold text-danger">Danger zone</h2>
+              <p className="text-xs text-muted">
+                Permanently deletes the whole league for everyone. Not the same
+                as reset season.
+              </p>
               <button
+                type="button"
                 onClick={handleReset}
                 className="px-4 py-2 rounded-lg border border-danger text-danger text-sm"
               >

@@ -976,3 +976,68 @@ export async function autoBalanceDivisions(): Promise<{
 
   return { ok: true };
 }
+
+export type ResetSeasonResult = {
+  ok: boolean;
+  error?: string;
+  membersKept?: number;
+  picksDeleted?: number;
+  cardsDeleted?: number;
+  resultsDeleted?: number;
+};
+
+/**
+ * Wipe season data (picks, cards, results, scores) but KEEP all members.
+ * Commissioner only. Requires reset-season.sql RPC in Supabase.
+ */
+export async function resetSeasonInCloud(): Promise<ResetSeasonResult> {
+  const session = getSession();
+  if (!session?.leagueId || !session.isCommissioner) {
+    return { ok: false, error: "Only the commissioner can reset the season" };
+  }
+
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("reset_league_season", {
+    p_league_id: session.leagueId,
+  });
+
+  if (error) {
+    const msg = error.message || "";
+    if (/function|does not exist|schema cache/i.test(msg)) {
+      return {
+        ok: false,
+        error:
+          "Reset function missing. Run supabase/reset-season.sql in the Supabase SQL Editor, then try again.",
+      };
+    }
+    return { ok: false, error: msg || "Failed to reset season" };
+  }
+
+  const row = (data || {}) as {
+    ok?: boolean;
+    membersKept?: number;
+    picksDeleted?: number;
+    cardsDeleted?: number;
+    resultsDeleted?: number;
+  };
+
+  // Clear local week caches so this device matches cloud
+  try {
+    for (let w = 0; w <= 16; w++) {
+      localStorage.removeItem(`warroom-card-week-${w}`);
+      localStorage.removeItem(`warroom-results-week-${w}`);
+      localStorage.removeItem(`warroom-picks-week-${w}`);
+    }
+    localStorage.setItem("warroom-active-week", "0");
+  } catch {
+    /* ignore */
+  }
+
+  return {
+    ok: true,
+    membersKept: row.membersKept,
+    picksDeleted: row.picksDeleted,
+    cardsDeleted: row.cardsDeleted,
+    resultsDeleted: row.resultsDeleted,
+  };
+}
