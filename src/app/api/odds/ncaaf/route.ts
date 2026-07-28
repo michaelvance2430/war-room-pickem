@@ -7,8 +7,12 @@ import type { OddsApiGame } from "@/lib/types";
  * Set ODDS_API_KEY in Vercel (Production + Preview) and restart/redeploy.
  */
 export async function GET() {
-  const apiKey =
-    process.env.ODDS_API_KEY || process.env.NEXT_PUBLIC_ODDS_API_KEY;
+  // Trim — Vercel paste often includes trailing spaces/newlines → INVALID_KEY
+  const apiKey = (
+    process.env.ODDS_API_KEY ||
+    process.env.NEXT_PUBLIC_ODDS_API_KEY ||
+    ""
+  ).trim();
 
   if (!apiKey) {
     return NextResponse.json(
