@@ -71,7 +71,9 @@ export default function ChampionshipPage() {
           <span className="font-medium text-primary">Not locked yet.</span>{" "}
           <span className="text-muted">
             Seeds update when standings change (after weeks are scored). Final
-            field locks after the regular season cut.
+            field locks after <strong className="text-foreground">Conference
+            Championship week (app week 14)</strong> is scored — that&apos;s the
+            last week that decides Championship vs Toilet Bowl.
           </span>
         </div>
 

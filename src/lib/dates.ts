@@ -88,24 +88,19 @@ export function formatKickoffLockLabel(
 }
 
 /**
- * Human label for a pick'em week.
- * Week 0 and Week 1 are separate cards — run them as two different weeks
- * if you want (e.g. Week 0 this Saturday, only Week 1 next week).
+ * Human labels for pick'em weeks — see season-calendar.ts for full scrub
+ * (Week 0 → RS → Conf Champ cut → CFP).
  */
-export function weekTitle(weekNumber: number): string {
-  if (weekNumber === 0) return "Week 0";
-  return `Week ${weekNumber}`;
-}
-
-export function weekSubtitle(weekNumber: number): string {
-  if (weekNumber === 0) {
-    return "Early openers only — its own card, picks, and scores (separate from Week 1)";
-  }
-  if (weekNumber === 1) {
-    return "Week 1 only — separate from Week 0. Pick 5 games for this week’s card";
-  }
-  return "Regular-season slate";
-}
+export {
+  weekTitle,
+  weekSubtitle,
+  weekPillHint,
+  seasonPhase,
+  FULL_SEASON_MAX_WEEK,
+  DEFAULT_CUT_LOCK_WEEK,
+  DEFAULT_SEASON_WEEKS,
+  SEASON_SCRUB_SUMMARY,
+} from "./season-calendar";
 
 /** Date span of games on a card, e.g. "Sat, Aug 29 – Sat, Sep 5". */
 export function formatCardDateRange(games: Game[]): string {

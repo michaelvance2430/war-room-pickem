@@ -54,7 +54,8 @@ body::after {
 }
 
 .hot-take-track {
-  animation: hot-take-scroll 48s linear infinite;
+  /* 75% slower than 48s → 192s per loop */
+  animation: hot-take-scroll 192s linear infinite;
 }
 
 .hot-take-track:hover {

@@ -67,7 +67,7 @@ export default function CommissionerPage() {
   const [league, setLeague] = useState<League | null>(null);
   const [leagueNameEdit, setLeagueNameEdit] = useState("");
   const [cutPercent, setCutPercent] = useState(50);
-  const [seasonWeeks, setSeasonWeeks] = useState(13);
+  const [seasonWeeks, setSeasonWeeks] = useState(18);
   /** CFB week number: 0 = openers, 1..N regular (Week 1 may span two Saturdays) */
   const [activeWeek, setActiveWeek] = useState(1);
   const [settingsSaved, setSettingsSaved] = useState(false);
@@ -120,7 +120,7 @@ export default function CommissionerPage() {
         setLeague(lg);
         setLeagueNameEdit(lg.name);
         setCutPercent(lg.settings?.cutPercent ?? 50);
-        setSeasonWeeks(lg.settings?.regularSeasonWeeks ?? 13);
+        setSeasonWeeks(lg.settings?.regularSeasonWeeks ?? 18);
       }
       let week = 1;
       try {
@@ -961,21 +961,27 @@ export default function CommissionerPage() {
                 </div>
                 <div>
                   <label className="text-xs text-muted block mb-1">
-                    Regular season weeks (default 13)
+                    Highest week # (default 18 = through CFP Final)
                   </label>
                   <input
                     type="number"
                     min={4}
-                    max={16}
+                    max={20}
                     value={seasonWeeks}
                     onChange={(e) =>
-                      setSeasonWeeks(parseInt(e.target.value) || 13)
+                      setSeasonWeeks(parseInt(e.target.value) || 18)
                     }
                     className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm"
                   />
-                  <p className="text-[11px] text-muted mt-1">
-                    Plus optional Week 0. Each week (0, 1, 2…) is its own card —
-                    run Week 0 one weekend and Week 1 the next if you want.
+                  <p className="text-[11px] text-muted mt-1 leading-relaxed">
+                    Week pills = 0 … this number. Recommended map:{" "}
+                    <span className="text-foreground">0</span> openers ·{" "}
+                    <span className="text-foreground">1–13</span> regular
+                    season · <span className="text-foreground">14 Conf
+                    Champ (CUT)</span> ·{" "}
+                    <span className="text-foreground">15–18 CFP</span> (R1 /
+                    QF / SF / Final). Raise to 18 and Save if you still only
+                    see through Week 13.
                   </p>
                 </div>
               </div>
@@ -1054,20 +1060,35 @@ export default function CommissionerPage() {
               </p>
               <div className="flex flex-wrap gap-2">
                 {Array.from({ length: seasonWeeks + 1 }, (_, i) => i).map(
-                  (w) => (
-                    <button
-                      key={w}
-                      type="button"
-                      onClick={() => changeActiveWeek(w)}
-                      className={
-                        activeWeek === w
-                          ? "px-3 py-1.5 rounded-full text-xs font-medium bg-primary text-black"
-                          : "px-3 py-1.5 rounded-full text-xs font-medium bg-card-hover border border-border text-muted hover:text-foreground"
-                      }
-                    >
-                      {weekTitle(w)}
-                    </button>
-                  )
+                  (w) => {
+                    const hint =
+                      w === 14
+                        ? " · CUT"
+                        : w === 0
+                          ? " · openers"
+                          : w >= 15
+                            ? " · CFP"
+                            : "";
+                    return (
+                      <button
+                        key={w}
+                        type="button"
+                        onClick={() => changeActiveWeek(w)}
+                        className={
+                          activeWeek === w
+                            ? w === 14
+                              ? "px-3 py-1.5 rounded-full text-xs font-medium bg-primary text-black ring-2 ring-warning/60"
+                              : "px-3 py-1.5 rounded-full text-xs font-medium bg-primary text-black"
+                            : w === 14
+                              ? "px-3 py-1.5 rounded-full text-xs font-medium bg-card-hover border border-warning/50 text-warning hover:text-warning"
+                              : "px-3 py-1.5 rounded-full text-xs font-medium bg-card-hover border border-border text-muted hover:text-foreground"
+                        }
+                      >
+                        {weekTitle(w)}
+                        {hint}
+                      </button>
+                    );
+                  }
                 )}
               </div>
             </div>

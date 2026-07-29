@@ -64,7 +64,9 @@ export const RULE_SECTIONS: RuleSection[] = [
     body: [
       "Weekly score = confidence points for correct ATS picks (+ double for a correct Best Bet) + prop points if you hit the prop.",
       "Season standings total your weekly points.",
-      "After the regular season, top players go to the Championship bracket; bottom of the cut go to the Toilet Bowl.",
+      "Week 0 (openers) is optional and independent. Real season runs Week 1 → late RS → Conference Championships.",
+      "After Conference Championship week is scored, the cut locks: top half → Championship bracket, bottom → Toilet Bowl.",
+      "CFP weeks (R1 / QF / SF / Final) advance those brackets — higher weekly score wins the matchup.",
     ],
   },
   {

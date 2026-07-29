@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/client";
 import { getSession } from "@/lib/league";
 import { Game, Prop, UserPick } from "@/lib/types";
 import { scoreWeek, GameResult } from "@/lib/scoring";
+import { weekTitle } from "@/lib/dates";
 
 export interface CloudCard {
   weekCardId: string;
@@ -576,8 +577,7 @@ export async function postMissingPicksAnnouncement(
     };
   }
 
-  const weekLabel =
-    weekNumber === 0 ? "Week 0" : `Week ${weekNumber}`;
+  const weekLabel = weekTitle(weekNumber);
   const lines = incomplete.map((r) => {
     if (!r.submitted) return `• ${r.name} — not submitted`;
     const bits = [`${r.gamePickCount} game picks`];
