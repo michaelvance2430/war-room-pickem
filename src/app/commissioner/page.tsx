@@ -42,6 +42,7 @@ import {
   fetchNcaafScores,
   buildResultsFromScores,
 } from "@/lib/scores";
+import { settlePropFromScores } from "@/lib/prop-settle";
 import {
   PROP_PRESETS,
   CUSTOM_PROP_ID,
@@ -522,7 +523,7 @@ export default function CommissionerPage() {
   /**
    * Pull final scores from The Odds API and auto-fill ATS winners
    * using the locked home spread on each card game.
-   * Prop result still needs a manual click.
+   * Also auto-settles most preset props from those finals.
    */
   async function syncFinalScores(andScore = false) {
     if (!publishedGames.length) {
@@ -548,17 +549,48 @@ export default function CommissionerPage() {
         })
         .join("\n");
 
+      let propLine = "";
+      let autoPropResult: string | null = null;
+      const propForSettle = publishedProp;
+      if (propForSettle?.question) {
+        const settled = settlePropFromScores({
+          prop: propForSettle,
+          games: publishedGames,
+          boxes: built.boxes,
+          expectedGames: publishedGames.length,
+        });
+        if (settled.status === "settled" && settled.propResult) {
+          autoPropResult = settled.propResult;
+          setPropResult(settled.propResult);
+          propLine = `\n\nProp auto-settled: ${settled.propResult}\n(${settled.reason})`;
+        } else if (settled.status === "incomplete") {
+          propLine = `\n\nProp not ready yet: ${settled.reason}`;
+        } else if (settled.status === "manual") {
+          propLine = `\n\nProp needs a manual click: ${settled.reason}`;
+        } else {
+          propLine = `\n\nProp: ${settled.reason}`;
+        }
+      } else {
+        propLine =
+          "\n\nNo published prop on file — publish the card prop first.";
+      }
+
       setSyncReport(
-        `Auto-filled ${built.filled} of ${publishedGames.length} games (last 3 days of scores).\n${lines}`
+        `Auto-filled ${built.filled} of ${publishedGames.length} games (last 3 days of scores).\n${lines}${propLine}`
       );
 
+      const mergedResults = { ...results, ...built.results };
       if (andScore && built.filled === publishedGames.length) {
-        // Keep current propResult; user may still need to set prop
         setSyncingScores(false);
-        // Defer to next tick so results state is applied
-        setTimeout(() => {
-          void handleSaveResults();
-        }, 50);
+        void handleSaveResults({
+          results: mergedResults,
+          propResult:
+            autoPropResult ??
+            (propResult &&
+            publishedProp?.options?.includes(propResult)
+              ? propResult
+              : null),
+        });
         return;
       }
     } catch (e: unknown) {
@@ -570,14 +602,23 @@ export default function CommissionerPage() {
     }
   }
 
-  async function handleSaveResults() {
+  async function handleSaveResults(override?: {
+    results?: Record<string, GameResult>;
+    propResult?: string | null;
+  }) {
     if (scoring) return;
     setScoring(true);
     setScoreReport(null);
     const keys = storageKeys(activeWeek);
+    const resultsToUse = override?.results ?? results;
+    const propResultToUse =
+      override && "propResult" in override
+        ? override.propResult ?? null
+        : propResult;
+
     localStorage.setItem(
       keys.results,
-      JSON.stringify({ results, propResult })
+      JSON.stringify({ results: resultsToUse, propResult: propResultToUse })
     );
 
     // Local demo score for this browser's picks
@@ -590,9 +631,9 @@ export default function CommissionerPage() {
           data.bestBetId || null,
           data.propChoice || null,
           publishedGames,
-          results,
+          resultsToUse,
           publishedProp || prop,
-          propResult
+          propResultToUse
         );
         setDemoScore({ totalPoints: scored.totalPoints });
         setHasPlayerPicks(true);
@@ -612,12 +653,23 @@ export default function CommissionerPage() {
       return;
     }
 
+    if (
+      !propResultToUse ||
+      !propForScoring.options?.includes(propResultToUse)
+    ) {
+      setScoring(false);
+      setScoreReport(
+        "Prop result not set (or doesn't match the published options). Sync scores again or click Yes/No manually."
+      );
+      return;
+    }
+
     const cloud = await saveResultsAndScoreWeek({
       weekNumber: activeWeek,
       games: publishedGames,
       prop: propForScoring,
-      results,
-      propResult,
+      results: resultsToUse,
+      propResult: propResultToUse,
     });
 
     setResultsSaved(true);
@@ -1477,8 +1529,9 @@ export default function CommissionerPage() {
             <div className="rounded-xl border border-border bg-card p-5 mb-6">
               <h2 className="font-semibold mb-2">Prop Result</h2>
               <p className="text-xs text-muted mb-1">
-                Locked from the published {weekTitle(activeWeek)} card (not the
-                Build Card draft)
+                Locked from the published {weekTitle(activeWeek)} card. Most
+                presets auto-fill when you Sync final scores (custom + OT are
+                manual).
               </p>
               {propRefreshing ? (
                 <p className="text-sm text-muted">Loading published prop…</p>
@@ -1506,6 +1559,11 @@ export default function CommissionerPage() {
                       </button>
                     ))}
                   </div>
+                  {propResult && (
+                    <p className="text-[11px] text-primary mt-2">
+                      Selected: {propResult}
+                    </p>
+                  )}
                 </>
               ) : (
                 <p className="text-sm text-danger">
@@ -1517,7 +1575,7 @@ export default function CommissionerPage() {
 
             <button
               disabled={!allResultsIn}
-              onClick={handleSaveResults}
+              onClick={() => void handleSaveResults()}
               className={
                 !allResultsIn
                   ? "w-full py-3 rounded-xl font-semibold mb-6 bg-border text-muted cursor-not-allowed"

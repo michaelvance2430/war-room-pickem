@@ -74,8 +74,17 @@ export function matchScoreEvent(
   return null;
 }
 
+export type FinalBoxScore = {
+  gameId: string;
+  homeScore: number;
+  awayScore: number;
+  atsWinner: "home" | "away" | "push";
+};
+
 export type AutoScoreResult = {
   results: Record<string, GameResult>;
+  /** Completed games with numeric scores (for auto prop settle) */
+  boxes: FinalBoxScore[];
   filled: number;
   pending: number;
   details: {
@@ -84,6 +93,8 @@ export type AutoScoreResult = {
     status: "final" | "live" | "not_started" | "unmatched";
     scoreLine?: string;
     winner?: "home" | "away" | "push";
+    homeScore?: number;
+    awayScore?: number;
   }[];
 };
 
@@ -96,6 +107,7 @@ export function buildResultsFromScores(
   events: OddsScoreEvent[]
 ): AutoScoreResult {
   const results: Record<string, GameResult> = {};
+  const boxes: FinalBoxScore[] = [];
   const details: AutoScoreResult["details"] = [];
   let filled = 0;
   let pending = 0;
@@ -140,6 +152,12 @@ export function buildResultsFromScores(
     const homeSpread = Number(game.spread);
     const winner = atsWinnerFromScores(homeScore, awayScore, homeSpread);
     results[game.id] = { gameId: game.id, winner };
+    boxes.push({
+      gameId: game.id,
+      homeScore,
+      awayScore,
+      atsWinner: winner,
+    });
     filled += 1;
     details.push({
       gameId: game.id,
@@ -147,10 +165,12 @@ export function buildResultsFromScores(
       status: "final",
       scoreLine: `${game.awayTeam} ${awayScore} – ${game.homeTeam} ${homeScore}`,
       winner,
+      homeScore,
+      awayScore,
     });
   }
 
-  return { results, filled, pending, details };
+  return { results, boxes, filled, pending, details };
 }
 
 /** Client fetch of our scores API. */
