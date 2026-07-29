@@ -930,8 +930,27 @@ export async function loadLeagueRoster(): Promise<LeagueRosterMember[]> {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/** True only when PostgREST cannot see the RPC (not permission / runtime errors). */
 function rpcMissing(msg: string) {
-  return /function|does not exist|schema cache/i.test(msg);
+  const m = msg.toLowerCase();
+  return (
+    m.includes("schema cache") ||
+    m.includes("could not find the function") ||
+    /function public\.\w+.*does not exist/i.test(msg) ||
+    /function \w+.*does not exist/i.test(msg)
+  );
+}
+
+function trialBotsSetupHint(raw: string) {
+  if (rpcMissing(raw)) {
+    return (
+      "Trial bots not visible to the API yet. In Supabase SQL Editor run " +
+      "supabase/trial-bots-verify.sql (grants + notify pgrst reload schema), " +
+      "wait 10s, hard-refresh the site. Raw: " +
+      raw
+    );
+  }
+  return raw;
 }
 
 /** Add up to 50 trial bots (commissioner). Requires trial-bots.sql */
@@ -948,16 +967,17 @@ export async function seedTrialBotsInCloud(
     p_count: count,
   });
   if (error) {
-    if (rpcMissing(error.message)) {
-      return {
-        ok: false,
-        error:
-          "Trial bots function missing. Run supabase/trial-bots.sql in Supabase SQL Editor, then try again.",
-      };
-    }
-    return { ok: false, error: error.message };
+    return { ok: false, error: trialBotsSetupHint(error.message || "RPC failed") };
   }
-  const row = (data || {}) as { added?: number; totalBots?: number };
+  const row = (data || {}) as {
+    ok?: boolean;
+    added?: number;
+    totalBots?: number;
+    error?: string;
+  };
+  if (row.ok === false) {
+    return { ok: false, error: row.error || "seed_trial_bots returned not ok" };
+  }
   return {
     ok: true,
     added: row.added ?? 0,
@@ -980,16 +1000,12 @@ export async function clearTrialBotsInCloud(): Promise<{
     p_league_id: session.leagueId,
   });
   if (error) {
-    if (rpcMissing(error.message)) {
-      return {
-        ok: false,
-        error:
-          "Clear-bots function missing. Run supabase/trial-bots.sql in Supabase SQL Editor.",
-      };
-    }
-    return { ok: false, error: error.message };
+    return { ok: false, error: trialBotsSetupHint(error.message || "RPC failed") };
   }
-  const row = (data || {}) as { removed?: number };
+  const row = (data || {}) as { ok?: boolean; removed?: number; error?: string };
+  if (row.ok === false) {
+    return { ok: false, error: row.error || "clear_trial_bots returned not ok" };
+  }
   return { ok: true, removed: row.removed ?? 0 };
 }
 
@@ -1007,16 +1023,13 @@ export async function seedBotPicksForWeekInCloud(
     p_week_number: weekNumber,
   });
   if (error) {
-    if (rpcMissing(error.message)) {
-      return {
-        ok: false,
-        error:
-          "Bot picks function missing. Run supabase/trial-bots.sql in Supabase SQL Editor.",
-      };
-    }
-    return { ok: false, error: error.message };
+    return { ok: false, error: trialBotsSetupHint(error.message || "RPC failed") };
   }
-  const row = (data || {}) as { ok?: boolean; botsFilled?: number; error?: string };
+  const row = (data || {}) as {
+    ok?: boolean;
+    botsFilled?: number;
+    error?: string;
+  };
   if (row.ok === false) {
     return { ok: false, error: row.error || "Failed to fill bot picks" };
   }
