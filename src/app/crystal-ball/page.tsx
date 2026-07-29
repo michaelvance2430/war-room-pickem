@@ -166,10 +166,42 @@ export default function CrystalBallPage() {
             No standings points. If you&apos;re right, you get a sarcastic
             achievement and eternal bragging rights.
           </p>
-          <p className="text-xs text-muted mt-2">
-            Locks {state.lockLabel} (Week 0 Saturday noon ET).{" "}
+        </div>
+
+        {/* Must-read lock notice */}
+        <div
+          className={`mb-6 rounded-xl border-2 px-4 py-3 ${
+            state.locked
+              ? "border-border bg-card"
+              : "border-primary bg-primary/15"
+          }`}
+        >
+          <p className="text-[10px] uppercase tracking-[0.18em] font-bold text-primary mb-1.5">
+            {state.locked ? "Locked — no changes" : "Do not skip"}
+          </p>
+          <p className="text-sm sm:text-base font-bold text-foreground leading-snug">
+            {state.locked ? (
+              <>
+                Crystal Ball is sealed as of{" "}
+                <span className="text-primary">{state.lockLabel}</span>. You
+                cannot change your national champion pick. No exceptions.
+              </>
+            ) : (
+              <>
+                Your pick locks at{" "}
+                <span className="text-primary">
+                  12:00 noon ET, Saturday, August 29, 2026
+                </span>{" "}
+                (Week 0). After that you{" "}
+                <span className="underline decoration-2">cannot change it</span>
+                . No take-backs. Make your pick before then.
+              </>
+            )}
+          </p>
+          <p className="text-xs text-muted mt-2 font-medium">
+            Deadline: {state.lockLabel}.{" "}
             <Link href="/rules" className="text-primary hover:underline">
-              Rules
+              Full rules
             </Link>
           </p>
         </div>

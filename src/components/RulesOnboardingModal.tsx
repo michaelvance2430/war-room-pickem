@@ -56,8 +56,21 @@ export default function RulesOnboardingModal() {
             Welcome to the War Room
           </h2>
           <p className="text-xs text-muted mt-1">
-            Quick rules before you pick. You only see this once.
+            Quick rules before you pick. You only see this once — scroll for
+            Crystal Ball.
           </p>
+          <div className="mt-3 rounded-lg border-2 border-primary/70 bg-primary/15 px-3 py-2.5">
+            <p className="text-[10px] uppercase tracking-[0.15em] font-bold text-primary mb-1">
+              Do not skip — Crystal Ball
+            </p>
+            <p className="text-xs sm:text-sm font-bold text-foreground leading-snug">
+              National champ pick locks at{" "}
+              <span className="text-primary">12:00 noon ET, Sat Aug 29, 2026</span>
+              . After that you{" "}
+              <span className="underline decoration-2">cannot change it</span>
+              . Zero points — but no take-backs.
+            </p>
+          </div>
         </div>
 
         <div className="px-5 py-4 overflow-y-auto flex-1 min-h-0">

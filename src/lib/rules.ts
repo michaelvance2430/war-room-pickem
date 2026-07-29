@@ -1,11 +1,21 @@
 /** Shared league rules — used by onboarding popup + Rules page. */
 
+export type RuleLine =
+  | string
+  | {
+      text: string;
+      /** Extra weight for lock deadlines / must-read lines */
+      bold?: boolean;
+    };
+
 export type RuleSection = {
   title: string;
-  body: string[];
+  body: RuleLine[];
+  /** Draw a highlighted box around this section (Crystal Ball lock, etc.) */
+  callout?: boolean;
 };
 
-export const RULES_SEEN_KEY = "warroom-rules-seen-v1";
+export const RULES_SEEN_KEY = "warroom-rules-seen-v2";
 
 export const RULES_INTRO =
   "College football pick'em against the spread. Five games each week, confidence points, one Best Bet multiplier, and a weekly prop.";
@@ -55,8 +65,8 @@ export const RULE_SECTIONS: RuleSection[] = [
     title: "6. Save your card",
     body: [
       "Hit Save Picks when everything is filled in: side + confidence on all five, one Best Bet, and a prop choice.",
-      "You can change picks and save again until the commissioner locks / scores the week (or games start).",
-      "Only you can see your picks — league mates cannot spy on your card.",
+      "Weekly game picks lock at each game’s kickoff — no exceptions. Prop locks at the first kickoff on that card.",
+      "Only you can see your weekly picks — league mates cannot spy on your card.",
     ],
   },
   {
@@ -70,13 +80,21 @@ export const RULE_SECTIONS: RuleSection[] = [
     ],
   },
   {
-    title: "Crystal Ball (preseason)",
+    title: "Crystal Ball (preseason) — READ THIS",
+    callout: true,
     body: [
       "Optional league feature — commissioner can turn it on/off under Settings.",
-      "Before Week 0 kickoff, pick who you think wins the national championship.",
-      "Crystal Ball is worth zero standings points — pure pride.",
-      "If you're right, you earn the sarcastic achievement: Village Witch / Wizard Nerd.",
-      "Picks lock at noon ET on Week 0 Saturday (Aug 29, 2026).",
+      "Before the season starts, pick who you think wins the national championship. Worth zero standings points — pure pride.",
+      {
+        bold: true,
+        text: "LOCK: Crystal Ball picks lock at 12:00 noon ET on Saturday, August 29, 2026 (Week 0). After that, you CANNOT change your pick. No exceptions. No take-backs.",
+      },
+      {
+        bold: true,
+        text: "Do it early. If you skip Crystal Ball and it locks, you are stuck without a pick for the whole season.",
+      },
+      "If you're right when the commissioner crowns the champion, you earn: Village Witch / Wizard Nerd (still zero points).",
+      "Open Crystal Ball from the nav menu while it’s still open.",
     ],
   },
   {
