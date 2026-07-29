@@ -98,7 +98,18 @@ export async function saveLeagueToCloud(opts: {
     .single();
 
   if (error || !data) {
-    return { ok: false, error: error?.message || "Failed to save" };
+    const msg = error?.message || "Failed to save";
+    if (
+      msg.includes("regular_season_weeks_check") ||
+      msg.includes("leagues_regular_season_weeks")
+    ) {
+      return {
+        ok: false,
+        error:
+          "Database still limits season weeks (max 16). Run supabase/raise-max-season-weeks.sql in Supabase → SQL Editor, then Save settings again.",
+      };
+    }
+    return { ok: false, error: msg };
   }
 
   const league = toLocalLeague(data);

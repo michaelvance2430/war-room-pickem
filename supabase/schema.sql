@@ -15,7 +15,7 @@ create table if not exists public.leagues (
   code text not null unique,
   commissioner_id uuid not null references public.profiles (id) on delete cascade,
   cut_percent int not null default 50 check (cut_percent between 10 and 75),
-  regular_season_weeks int not null default 12 check (regular_season_weeks between 4 and 16),
+  regular_season_weeks int not null default 18 check (regular_season_weeks between 4 and 24),
   games_per_week int not null default 5,
   current_week int not null default 1,
   created_at timestamptz not null default now()
