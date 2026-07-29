@@ -709,8 +709,14 @@ export default function CommissionerPage() {
       setBotReport(res.error || "Failed to clear bots");
       return;
     }
+    if ((res.removed ?? 0) === 0) {
+      setBotReport(
+        "No trial bots found to remove (0). If you still see bot names on Players, run supabase/clear-trial-bots-now.sql in Supabase SQL Editor once — that force-wipes @warroom.trial bots."
+      );
+      return;
+    }
     setBotReport(
-      `Removed ${res.removed ?? 0} trial bot(s). Real members unchanged.`
+      `Removed ${res.removed ?? 0} trial bot(s). Real members unchanged. Check Players to confirm.`
     );
     void refreshPickStatus(activeWeek);
   }

@@ -1128,7 +1128,19 @@ export async function clearTrialBotsInCloud(): Promise<{
     p_league_id: session.leagueId,
   });
   if (error) {
-    return { ok: false, error: trialBotsSetupHint(error.message || "RPC failed") };
+    const msg = error.message || "RPC failed";
+    // Most common: SQL never applied, or old broken function aborted on auth delete
+    if (
+      /function|does not exist|schema cache|permission|PGRST/i.test(msg) ||
+      /clear_trial_bots/i.test(msg)
+    ) {
+      return {
+        ok: false,
+        error:
+          "Clear bots failed in the database. Fix in 30 seconds: Supabase → SQL Editor → paste & Run file supabase/clear-trial-bots-now.sql (wipes all trial bots, keeps real players). Then refresh Players.",
+      };
+    }
+    return { ok: false, error: trialBotsSetupHint(msg) };
   }
   const row = (data || {}) as { ok?: boolean; removed?: number; error?: string };
   if (row.ok === false) {
