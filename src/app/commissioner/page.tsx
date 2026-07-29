@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Nav from "@/components/Nav";
 import { Game, Prop } from "@/lib/types";
 import { fetchNcaafOdds } from "@/lib/odds";
+import { generateDemoSlate, randomizeDemoResults } from "@/lib/demo-slate";
 import { formatMatchupConferences } from "@/lib/fbs-teams";
 import { formatRankedTeam } from "@/lib/rankings";
 import { scoreWeek, GameResult } from "@/lib/scoring";
@@ -450,10 +451,10 @@ export default function CommissionerPage() {
         const range = weekFilter || weekTitle(activeWeek);
         setOddsError(
           dryRun
-            ? "No open NCAA FBS games with spreads right now (dry run)."
+            ? "No open NCAA FBS games with spreads right now (dry run). Use Generate demo slate instead."
             : unfilteredCount && unfilteredCount > 0
-              ? `No FBS games with spreads in the ${weekTitle(activeWeek)} window (${range}). ${unfilteredCount} other FBS game(s) exist outside this week — enable Dry run or wait for books.`
-              : `No NCAA FBS games with spreads for ${weekTitle(activeWeek)} (${range}) right now. Enable Dry run to use any open games, or try again later.`
+              ? `No FBS games with spreads in the ${weekTitle(activeWeek)} window (${range}). Use Generate demo slate for a full fake season.`
+              : `No real lines for ${weekTitle(activeWeek)}. Use Generate demo slate to simulate.`
         );
         return;
       }
@@ -467,6 +468,42 @@ export default function CommissionerPage() {
     } finally {
       setLoadingOdds(false);
     }
+  }
+
+  /** Fake 5-game card for season simulation — no Odds API. */
+  function generateDemoCard() {
+    setOddsError(null);
+    setRankLabel("demo-sim");
+    const games = generateDemoSlate(activeWeek, 5);
+    setAvailableGames(games);
+    setSelectedIds(new Set(games.map((g) => g.id)));
+    setCardSaved(false);
+    setBotReport(
+      `Demo slate ready for ${weekTitle(activeWeek)} (5 fake games). Publish, then bots will pick. Enter Results → Randomize results → Score.`
+    );
+  }
+
+  function randomizeResultsForDryRun() {
+    if (resultsLocked) {
+      setScoreReport("Unlock this week before randomizing results.");
+      return;
+    }
+    if (!publishedGames.length) {
+      setScoreReport("Publish a card first.");
+      return;
+    }
+    const propOpts =
+      publishedProp?.options || prop.options || (["Yes", "No"] as [string, string]);
+    const { results: r, propResult: pr } = randomizeDemoResults(
+      publishedGames,
+      propOpts
+    );
+    setResults(r);
+    setPropResult(pr);
+    setResultsSaved(false);
+    setScoreReport(
+      `Randomized covers + prop for ${weekTitle(activeWeek)}. Hit Save Results & Score League.`
+    );
   }
 
   function toggleGame(id: string) {
@@ -1365,14 +1402,35 @@ export default function CommissionerPage() {
                     )}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => void pullOdds()}
-                  disabled={loadingOdds}
-                  className="px-4 py-2 rounded-lg bg-primary text-black text-sm font-medium disabled:opacity-50 shrink-0"
-                >
-                  {loadingOdds ? "Pulling..." : "Pull Odds"}
-                </button>
+                <div className="flex flex-wrap gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={generateDemoCard}
+                    className="px-4 py-2 rounded-lg border border-warning text-warning text-sm font-semibold hover:bg-warning/10"
+                  >
+                    Generate demo slate
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void pullOdds()}
+                    disabled={loadingOdds}
+                    className="px-4 py-2 rounded-lg bg-primary text-black text-sm font-medium disabled:opacity-50"
+                  >
+                    {loadingOdds ? "Pulling..." : "Pull Odds"}
+                  </button>
+                </div>
+              </div>
+              <div className="rounded-lg border border-warning/40 bg-warning/5 px-3 py-2.5 mb-2">
+                <p className="text-xs font-semibold text-warning mb-0.5">
+                  Full-season simulation (no real games needed)
+                </p>
+                <p className="text-[11px] text-muted leading-relaxed">
+                  <strong className="text-foreground">Generate demo slate</strong>{" "}
+                  creates 5 fake FBS matchups for this week → Publish → bots pick
+                  → Enter Results →{" "}
+                  <strong className="text-foreground">Randomize results</strong>{" "}
+                  → Score → next week. Repeat through Conf Champ / CFP.
+                </p>
               </div>
               <label className="flex items-start gap-3 cursor-pointer rounded-lg border border-border bg-background px-3 py-2.5 mb-2">
                 <input
@@ -1388,18 +1446,25 @@ export default function CommissionerPage() {
                 />
                 <span className="text-xs leading-relaxed">
                   <span className="font-semibold text-foreground">
-                    Dry run: show all open games
+                    Dry run: show all open real games
                   </span>
                   <span className="text-muted block mt-0.5">
-                    Ignore calendar windows so you can build every week card
-                    (bots + full season test) even when books only post near-term
-                    lines. Turn off for real weekly cards.
+                    Optional. Pull Odds without week date filter. Prefer{" "}
+                    <strong className="text-foreground">Generate demo slate</strong>{" "}
+                    if you just want fake games for testing.
                   </span>
                 </span>
               </label>
               {oddsError && (
                 <p className="text-sm text-danger mt-2">{oddsError}</p>
               )}
+              {availableGames.length > 0 &&
+                availableGames.every((g) => g.bookmaker === "demo-sim") && (
+                  <p className="text-xs text-warning mt-2 font-medium">
+                    Demo slate loaded ({availableGames.length} fake games,
+                    pre-selected). Hit Publish below.
+                  </p>
+                )}
             </div>
 
             {availableGames.length > 0 && (
@@ -1823,6 +1888,14 @@ export default function CommissionerPage() {
                 <div className="flex flex-col gap-2 shrink-0">
                   <button
                     type="button"
+                    onClick={randomizeResultsForDryRun}
+                    disabled={!publishedGames.length || resultsLocked}
+                    className="px-4 py-2 rounded-lg border border-warning text-warning text-sm font-semibold hover:bg-warning/10 disabled:opacity-50"
+                  >
+                    Randomize results
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => syncFinalScores(false)}
                     disabled={
                       syncingScores ||
@@ -1848,7 +1921,7 @@ export default function CommissionerPage() {
                           );
                         }
                       }}
-                      className="px-4 py-2 rounded-lg border border-warning text-warning text-sm font-medium"
+                      className="px-4 py-2 rounded-lg border border-border text-muted text-sm font-medium"
                     >
                       Unlock to re-score
                     </button>
