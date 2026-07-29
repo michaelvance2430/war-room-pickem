@@ -96,7 +96,7 @@ export default function JoinPage() {
           createdAt: league.created_at,
           settings: {
             cutPercent: league.cut_percent,
-            regularSeasonWeeks: league.regular_season_weeks,
+            regularSeasonWeeks: 18, // fixed CFB calendar (app weeks 0–18)
             gamesPerWeek: league.games_per_week,
           },
         })
@@ -154,7 +154,7 @@ export default function JoinPage() {
           createdAt: league.created_at,
           settings: {
             cutPercent: league.cut_percent,
-            regularSeasonWeeks: league.regular_season_weeks,
+            regularSeasonWeeks: 18, // fixed CFB calendar (app weeks 0–18)
             gamesPerWeek: league.games_per_week,
           },
         })
