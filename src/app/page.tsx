@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Nav from "@/components/Nav";
 import Link from "next/link";
+import HotTakeTicker from "@/components/HotTakeTicker";
+import CrownAndShame from "@/components/CrownAndShame";
 import { getSession, getLeague } from "@/lib/league";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import {
@@ -175,7 +177,7 @@ export default function Home() {
 
       <Nav />
       <main className="flex-1 max-w-6xl mx-auto w-full px-4 py-10 relative">
-        <section className="mb-12">
+        <section className="mb-8">
           <div className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-primary/80 mb-4 border border-primary/25 bg-primary/5 px-3 py-1 rounded-full">
             <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
             Situation room live
@@ -200,6 +202,14 @@ export default function Home() {
               )}
             </p>
           )}
+        </section>
+
+        <section className="mb-6">
+          <HotTakeTicker variant="warroom" />
+        </section>
+
+        <section className="mb-10">
+          <CrownAndShame />
         </section>
 
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

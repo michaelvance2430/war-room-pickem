@@ -2,12 +2,21 @@
 
 import { useState, useEffect, Fragment } from "react";
 import Nav from "@/components/Nav";
+import SwingBadge from "@/components/SwingBadge";
+import CrownAndShame from "@/components/CrownAndShame";
 import { loadLeaguePlayers } from "@/lib/cloud";
 import { getSession } from "@/lib/league";
+import { rankPlayersWithSwings } from "@/lib/fun-board";
 import { compareForSeed } from "@/lib/brackets";
 import { Division, Player } from "@/lib/types";
 
-const divisions: (Division | "Overall")[] = ["Overall", "North", "South", "East", "West"];
+const divisions: (Division | "Overall")[] = [
+  "Overall",
+  "North",
+  "South",
+  "East",
+  "West",
+];
 
 function atsPct(p: Player) {
   if (p.atsTotal === 0) return "—";
@@ -16,19 +25,28 @@ function atsPct(p: Player) {
 
 function streakDisplay(streak: number) {
   if (streak > 0) return <span className="text-primary">W{streak}</span>;
-  if (streak < 0) return <span className="text-danger">L{Math.abs(streak)}</span>;
+  if (streak < 0)
+    return <span className="text-danger">L{Math.abs(streak)}</span>;
   return <span className="text-muted">—</span>;
 }
 
 export default function StandingsPage() {
   const [players, setPlayers] = useState<Player[]>([]);
+  const [swingById, setSwingById] = useState<
+    Record<string, ReturnType<typeof rankPlayersWithSwings>[0]["swing"]>
+  >({});
   const [selfId, setSelfId] = useState<string | null>(null);
   const [active, setActive] = useState<Division | "Overall">("Overall");
 
   useEffect(() => {
     async function load() {
       setSelfId(getSession()?.playerId || null);
-      setPlayers(await loadLeaguePlayers());
+      const list = await loadLeaguePlayers();
+      setPlayers(list);
+      const ranked = rankPlayersWithSwings(list);
+      const map: Record<string, (typeof ranked)[0]["swing"]> = {};
+      for (const r of ranked) map[r.id] = r.swing;
+      setSwingById(map);
     }
     load();
   }, []);
@@ -50,9 +68,12 @@ export default function StandingsPage() {
         <div className="mb-6">
           <h1 className="text-2xl font-bold">Standings</h1>
           <p className="text-sm text-muted">
-            Live points • Bottom 50% of each division gets flushed
+            Live points • Bottom 50% of each division gets flushed • Swing labels
+            after each scored week
           </p>
         </div>
+
+        <CrownAndShame className="mb-6" />
 
         <div className="flex flex-wrap gap-2 mb-6">
           {divisions.map((d) => (
@@ -79,8 +100,13 @@ export default function StandingsPage() {
                 {active === "Overall" && (
                   <th className="text-left px-4 py-3 font-medium">Div</th>
                 )}
+                <th className="text-left px-3 py-3 font-medium hidden md:table-cell">
+                  Swing
+                </th>
                 <th className="text-right px-4 py-3 font-medium">Pts</th>
-                <th className="text-right px-4 py-3 font-medium hidden sm:table-cell">ATS%</th>
+                <th className="text-right px-4 py-3 font-medium hidden sm:table-cell">
+                  ATS%
+                </th>
                 <th className="text-right px-4 py-3 font-medium">Streak</th>
               </tr>
             </thead>
@@ -90,7 +116,7 @@ export default function StandingsPage() {
                   {idx === cutIndex && (
                     <tr className="bg-danger/10">
                       <td
-                        colSpan={active === "Overall" ? 6 : 5}
+                        colSpan={active === "Overall" ? 7 : 6}
                         className="px-4 py-1.5 text-center text-xs text-danger font-medium"
                       >
                         — Cut Line (bottom 50% → Toilet Bowl) —
@@ -104,14 +130,32 @@ export default function StandingsPage() {
                   >
                     <td className="px-4 py-3 text-muted">{idx + 1}</td>
                     <td className="px-4 py-3 font-medium">
-                      {player.name}
-                      {player.id === selfId && (
-                        <span className="ml-2 text-xs text-primary">(You)</span>
-                      )}
+                      <div className="flex flex-col gap-1 min-w-0">
+                        <span>
+                          {player.name}
+                          {player.id === selfId && (
+                            <span className="ml-2 text-xs text-primary">
+                              (You)
+                            </span>
+                          )}
+                        </span>
+                        {swingById[player.id] && (
+                          <span className="md:hidden">
+                            <SwingBadge swing={swingById[player.id]} />
+                          </span>
+                        )}
+                      </div>
                     </td>
                     {active === "Overall" && (
                       <td className="px-4 py-3 text-muted">{player.division}</td>
                     )}
+                    <td className="px-3 py-3 hidden md:table-cell">
+                      {swingById[player.id] ? (
+                        <SwingBadge swing={swingById[player.id]} />
+                      ) : (
+                        <span className="text-muted">—</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-right font-semibold">
                       {player.totalPoints}
                     </td>

@@ -2,8 +2,11 @@
 
 import { useState, useEffect } from "react";
 import Nav from "@/components/Nav";
+import SwingBadge from "@/components/SwingBadge";
+import HotTakeTicker from "@/components/HotTakeTicker";
 import { loadLeaguePlayers } from "@/lib/cloud";
 import { getSession } from "@/lib/league";
+import { powerBoardWithLabels } from "@/lib/fun-board";
 import { Player } from "@/lib/types";
 
 function computePowerScore(p: Player): number {
@@ -21,7 +24,9 @@ function computePowerScore(p: Player): number {
 }
 
 export default function PowerRankingsPage() {
-  const [ranked, setRanked] = useState<(Player & { power: number })[]>([]);
+  const [ranked, setRanked] = useState<
+    ReturnType<typeof powerBoardWithLabels>
+  >([]);
   const [selfId, setSelfId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -29,10 +34,7 @@ export default function PowerRankingsPage() {
     async function load() {
       setSelfId(getSession()?.playerId || null);
       const players = await loadLeaguePlayers();
-      const withPower = players
-        .map((p) => ({ ...p, power: computePowerScore(p) }))
-        .sort((a, b) => b.power - a.power);
-      setRanked(withPower);
+      setRanked(powerBoardWithLabels(players, computePowerScore));
       setLoading(false);
     }
     load();
@@ -43,12 +45,15 @@ export default function PowerRankingsPage() {
       <Nav />
 
       <main className="flex-1 max-w-3xl mx-auto w-full px-4 py-8">
-        <div className="mb-6">
+        <div className="mb-4">
           <h1 className="text-2xl font-bold">Power Rankings</h1>
           <p className="text-sm text-muted">
-            Who is actually playing the best right now? • Live league data
+            Who is actually playing the best right now? • Swing labels from last
+            scored week
           </p>
         </div>
+
+        <HotTakeTicker className="mb-6" />
 
         {loading && (
           <p className="text-sm text-muted py-8 text-center">Loading…</p>
@@ -70,10 +75,10 @@ export default function PowerRankingsPage() {
             return (
               <div
                 key={player.id}
-                className="rounded-xl border border-border bg-card p-4 flex items-center gap-4 hover:bg-card-hover transition"
+                className="rounded-xl border border-border bg-card p-4 flex items-center gap-3 sm:gap-4 hover:bg-card-hover transition"
               >
                 <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                  className={`w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-sm font-bold ${
                     idx < 3
                       ? "bg-primary text-black"
                       : "bg-card-hover text-muted"
@@ -83,22 +88,28 @@ export default function PowerRankingsPage() {
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium truncate">
-                    {player.name}
-                    {player.id === selfId && (
-                      <span className="ml-2 text-xs text-primary">(You)</span>
-                    )}
+                  <div className="font-medium truncate flex items-center gap-2 flex-wrap">
+                    <span>
+                      {player.name}
+                      {player.id === selfId && (
+                        <span className="ml-2 text-xs text-primary">(You)</span>
+                      )}
+                    </span>
+                    <SwingBadge swing={player.swing} />
                   </div>
-                  <div className="text-xs text-muted">
+                  <div className="text-xs text-muted mt-0.5">
                     {player.division} • Last 4: {last4Total} pts • ATS{" "}
                     {player.atsTotal
                       ? Math.round((player.atsCorrect / player.atsTotal) * 100)
                       : 0}
                     %
+                    {player.lastWeekPts != null && (
+                      <> • Last card: {player.lastWeekPts}</>
+                    )}
                   </div>
                 </div>
 
-                <div className="text-right">
+                <div className="text-right shrink-0">
                   <div className="text-sm font-semibold">
                     {player.power.toFixed(1)}
                   </div>
@@ -114,6 +125,12 @@ export default function PowerRankingsPage() {
             );
           })}
         </div>
+
+        <p className="text-[11px] text-muted mt-6 leading-relaxed">
+          Labels (ON A HEATER, DROPPED THE BALL, etc.) track movement in{" "}
+          <span className="text-foreground/80">season standings</span> after the
+          latest scored week — not pure vibes. Power score still ranks form.
+        </p>
       </main>
     </div>
   );

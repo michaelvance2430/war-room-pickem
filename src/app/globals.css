@@ -43,3 +43,27 @@ body::after {
   opacity: 0.45;
 }
 
+/* Hot take ticker — seamless horizontal scroll */
+@keyframes hot-take-scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.hot-take-track {
+  animation: hot-take-scroll 48s linear infinite;
+}
+
+.hot-take-track:hover {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hot-take-track {
+    animation: none;
+  }
+}
+
