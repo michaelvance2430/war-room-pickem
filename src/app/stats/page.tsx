@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import Nav from "@/components/Nav";
 import { loadLeaguePlayers } from "@/lib/cloud";
 import { getSession } from "@/lib/league";
+import { isSelfPlayer, selfNameClass, selfRowClass } from "@/lib/self-highlight";
+import YouBadge from "@/components/YouBadge";
 import { Player } from "@/lib/types";
 
 type StatKey =
@@ -142,19 +144,20 @@ export default function StatsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {sorted.map((p, idx) => (
+                  {sorted.map((p, idx) => {
+                    const mine = isSelfPlayer(p.id, selfId);
+                    return (
                     <tr
                       key={p.id}
-                      className="border-t border-border hover:bg-card-hover transition"
+                      className={selfRowClass(
+                        mine,
+                        "border-t border-border hover:bg-card-hover transition"
+                      )}
                     >
                       <td className="px-3 py-2.5 text-muted">{idx + 1}</td>
-                      <td className="px-3 py-2.5 font-medium">
+                      <td className={`px-3 py-2.5 ${selfNameClass(mine)}`}>
                         {p.name}
-                        {p.id === selfId && (
-                          <span className="text-primary text-xs ml-1">
-                            (You)
-                          </span>
-                        )}
+                        {mine && <YouBadge />}
                       </td>
                       <td className="px-3 py-2.5 text-right font-semibold">
                         {p.totalPoints}
@@ -191,7 +194,8 @@ export default function StatsPage() {
                         )}
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

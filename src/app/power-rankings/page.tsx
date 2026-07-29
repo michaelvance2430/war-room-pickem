@@ -7,6 +7,8 @@ import HotTakeTicker from "@/components/HotTakeTicker";
 import { loadLeaguePlayers } from "@/lib/cloud";
 import { getSession } from "@/lib/league";
 import { powerBoardWithLabels } from "@/lib/fun-board";
+import { isSelfPlayer, selfNameClass, selfRowClass } from "@/lib/self-highlight";
+import YouBadge from "@/components/YouBadge";
 import { Player } from "@/lib/types";
 
 function computePowerScore(p: Player): number {
@@ -71,11 +73,15 @@ export default function PowerRankingsPage() {
           {ranked.map((player, idx) => {
             const last4 = player.weeklyPoints.slice(-4);
             const last4Total = last4.reduce((a, b) => a + b, 0);
+            const mine = isSelfPlayer(player.id, selfId);
 
             return (
               <div
                 key={player.id}
-                className="rounded-xl border border-border bg-card p-4 flex items-center gap-3 sm:gap-4 hover:bg-card-hover transition"
+                className={selfRowClass(
+                  mine,
+                  "rounded-xl border border-border bg-card p-4 flex items-center gap-3 sm:gap-4 hover:bg-card-hover transition"
+                )}
               >
                 <div
                   className={`w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-sm font-bold ${
@@ -88,12 +94,12 @@ export default function PowerRankingsPage() {
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium truncate flex items-center gap-2 flex-wrap">
+                  <div
+                    className={`${selfNameClass(mine)} truncate flex items-center gap-2 flex-wrap`}
+                  >
                     <span>
                       {player.name}
-                      {player.id === selfId && (
-                        <span className="ml-2 text-xs text-primary">(You)</span>
-                      )}
+                      {mine && <YouBadge />}
                     </span>
                     <SwingBadge swing={player.swing} />
                   </div>

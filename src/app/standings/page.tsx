@@ -8,6 +8,8 @@ import { loadLeaguePlayers } from "@/lib/cloud";
 import { getSession } from "@/lib/league";
 import { rankPlayersWithSwings } from "@/lib/fun-board";
 import { compareForSeed } from "@/lib/brackets";
+import { isSelfPlayer, selfNameClass, selfRowClass } from "@/lib/self-highlight";
+import YouBadge from "@/components/YouBadge";
 import { Division, Player } from "@/lib/types";
 
 const divisions: (Division | "Overall")[] = [
@@ -124,20 +126,27 @@ export default function StandingsPage() {
                     </tr>
                   )}
                   <tr
-                    className={`border-t border-border hover:bg-card-hover transition ${
-                      cutIndex >= 0 && idx >= cutIndex ? "opacity-60" : ""
-                    }`}
+                    className={selfRowClass(
+                      isSelfPlayer(player.id, selfId),
+                      `border-t border-border hover:bg-card-hover transition ${
+                        cutIndex >= 0 &&
+                        idx >= cutIndex &&
+                        !isSelfPlayer(player.id, selfId)
+                          ? "opacity-60"
+                          : ""
+                      }`
+                    )}
                   >
                     <td className="px-4 py-3 text-muted">{idx + 1}</td>
                     <td className="px-4 py-3 font-medium">
                       <div className="flex flex-col gap-1 min-w-0">
-                        <span>
-                          {player.name}
-                          {player.id === selfId && (
-                            <span className="ml-2 text-xs text-primary">
-                              (You)
-                            </span>
+                        <span
+                          className={selfNameClass(
+                            isSelfPlayer(player.id, selfId)
                           )}
+                        >
+                          {player.name}
+                          {isSelfPlayer(player.id, selfId) && <YouBadge />}
                         </span>
                         {swingById[player.id] && (
                           <span className="md:hidden">

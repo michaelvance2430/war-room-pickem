@@ -4,9 +4,11 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import Nav from "@/components/Nav";
 import BracketView from "@/components/BracketView";
+import YouBadge from "@/components/YouBadge";
 import { loadLeaguePlayers } from "@/lib/cloud";
 import { getSession, getLeague } from "@/lib/league";
 import { seedToiletBowl, buildBracket, Bracket } from "@/lib/brackets";
+import { isSelfPlayer, selfNameClass, selfRowClass } from "@/lib/self-highlight";
 
 export default function ToiletBowlPage() {
   const [bracket, setBracket] = useState<Bracket | null>(null);
@@ -124,7 +126,11 @@ export default function ToiletBowlPage() {
               field
             </p>
             <div className="rounded-xl border border-toilet/30 bg-card p-4 mb-6 overflow-x-auto">
-              <BracketView bracket={bracket} accent="toilet" />
+              <BracketView
+                bracket={bracket}
+                accent="toilet"
+                selfId={selfId}
+              />
             </div>
 
             <div className="rounded-xl border border-border bg-card p-5">
@@ -132,25 +138,29 @@ export default function ToiletBowlPage() {
                 Projected seeding (worst → easiest path)
               </h2>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {bracket.players.map((p, i) => (
+                {bracket.players.map((p, i) => {
+                  const mine = isSelfPlayer(p.id, selfId);
+                  return (
                   <div
                     key={p.id}
-                    className="flex items-center gap-2 text-sm px-2 py-1.5 rounded-lg bg-card-hover"
+                    className={selfRowClass(
+                      mine,
+                      "flex items-center gap-2 text-sm px-2 py-1.5 rounded-lg bg-card-hover"
+                    )}
                   >
                     <span className="text-xs font-bold text-toilet w-5">
                       {i + 1}
                     </span>
-                    <span className="truncate">
+                    <span className={`truncate ${selfNameClass(mine, "")}`}>
                       {p.name}
-                      {p.id === selfId && (
-                        <span className="text-toilet text-xs ml-1">(You)</span>
-                      )}
+                      {mine && <YouBadge />}
                     </span>
                     <span className="text-xs text-muted ml-auto shrink-0">
                       {p.totalPoints}
                     </span>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </>
