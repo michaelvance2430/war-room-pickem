@@ -40,14 +40,19 @@ export type SeasonPhase =
   | "cfp_final"
   | "other";
 
-/** Highest week index in the full calendar (0…N inclusive). */
+/** Highest week index in the full calendar (0…N inclusive). Always 18 — not configurable. */
 export const FULL_SEASON_MAX_WEEK = 18;
 
 /** After this week is scored, Championship / Toilet fields lock from standings. */
 export const DEFAULT_CUT_LOCK_WEEK = 14;
 
-/** Default highest week number in commissioner week pills. */
-export const DEFAULT_SEASON_WEEKS = 18;
+/**
+ * Fixed season length for every league.
+ * Weeks 0–18: openers → RS → Conf Champ cut → CFP Final.
+ * Do not expose a shorter option — CFB needs the full map.
+ */
+export const SEASON_MAX_WEEK = FULL_SEASON_MAX_WEEK;
+export const DEFAULT_SEASON_WEEKS = FULL_SEASON_MAX_WEEK;
 
 export function seasonPhase(weekNumber: number): SeasonPhase {
   if (weekNumber === 0) return "week0";

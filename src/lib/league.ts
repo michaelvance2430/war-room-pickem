@@ -28,10 +28,7 @@ export interface Session {
 
 const DEFAULT_SETTINGS: LeagueSettings = {
   cutPercent: 50,
-  /**
-   * Highest app week index (0…N). Default 18 = Week 0 through CFP Final.
-   * See season-calendar.ts (Conf Champ = 14 cut lock, CFP 15–18).
-   */
+  /** Fixed: Week 0 … 18 (CFP Final). See season-calendar.ts. */
   regularSeasonWeeks: 18,
   gamesPerWeek: 5,
 };

@@ -5,6 +5,7 @@ import {
   getLeague,
   getSession,
 } from "@/lib/league";
+import { SEASON_MAX_WEEK } from "@/lib/season-calendar";
 
 const LEAGUE_KEY = "warroom-league";
 const SESSION_KEY = "warroom-session";
@@ -31,7 +32,8 @@ function toLocalLeague(row: {
     createdAt: row.created_at,
     settings: {
       cutPercent: row.cut_percent ?? 50,
-      regularSeasonWeeks: row.regular_season_weeks ?? 13,
+      // Fixed CFB calendar — never trust a short value from the DB
+      regularSeasonWeeks: SEASON_MAX_WEEK,
       gamesPerWeek: row.games_per_week ?? 5,
     },
   };
@@ -85,8 +87,8 @@ export async function saveLeagueToCloud(opts: {
   if (opts.code !== undefined) patch.code = opts.code;
   if (opts.settings?.cutPercent !== undefined)
     patch.cut_percent = opts.settings.cutPercent;
-  if (opts.settings?.regularSeasonWeeks !== undefined)
-    patch.regular_season_weeks = opts.settings.regularSeasonWeeks;
+  // Season length is fixed at SEASON_MAX_WEEK in the app — do not write
+  // regular_season_weeks (old DB check max 16 blocked saves; app ignores column).
   if (opts.settings?.gamesPerWeek !== undefined)
     patch.games_per_week = opts.settings.gamesPerWeek;
 
@@ -98,18 +100,7 @@ export async function saveLeagueToCloud(opts: {
     .single();
 
   if (error || !data) {
-    const msg = error?.message || "Failed to save";
-    if (
-      msg.includes("regular_season_weeks_check") ||
-      msg.includes("leagues_regular_season_weeks")
-    ) {
-      return {
-        ok: false,
-        error:
-          "Database still limits season weeks (max 16). Run supabase/raise-max-season-weeks.sql in Supabase → SQL Editor, then Save settings again.",
-      };
-    }
-    return { ok: false, error: msg };
+    return { ok: false, error: error?.message || "Failed to save" };
   }
 
   const league = toLocalLeague(data);

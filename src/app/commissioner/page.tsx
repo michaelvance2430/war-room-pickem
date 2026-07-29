@@ -38,6 +38,7 @@ import {
   weekTitle,
   weekSubtitle,
 } from "@/lib/dates";
+import { SEASON_MAX_WEEK } from "@/lib/season-calendar";
 import {
   fetchNcaafScores,
   buildResultsFromScores,
@@ -67,36 +68,10 @@ export default function CommissionerPage() {
   const [league, setLeague] = useState<League | null>(null);
   const [leagueNameEdit, setLeagueNameEdit] = useState("");
   const [cutPercent, setCutPercent] = useState(50);
-  const [seasonWeeks, setSeasonWeeks] = useState(18);
-  /** CFB week number: 0 = openers, 1..N regular (Week 1 may span two Saturdays) */
+  /** CFB week number: 0 = openers … 18 = CFP Final (fixed length). */
   const [activeWeek, setActiveWeek] = useState(1);
   const [settingsSaved, setSettingsSaved] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
-  const [sqlCopied, setSqlCopied] = useState(false);
-
-  const RAISE_WEEKS_SQL = `do $$
-declare r record;
-begin
-  for r in
-    select c.conname
-    from pg_constraint c
-    join pg_class t on c.conrelid = t.oid
-    join pg_namespace n on t.relnamespace = n.oid
-    where n.nspname = 'public' and t.relname = 'leagues' and c.contype = 'c'
-      and pg_get_constraintdef(c.oid) ilike '%regular_season_weeks%'
-  loop
-    execute format('alter table public.leagues drop constraint %I', r.conname);
-  end loop;
-end $$;
-
-alter table public.leagues
-  add constraint leagues_regular_season_weeks_check
-  check (regular_season_weeks between 4 and 24);
-
-select conname, pg_get_constraintdef(oid)
-from pg_constraint
-where conrelid = 'public.leagues'::regclass and contype = 'c'
-  and pg_get_constraintdef(oid) ilike '%regular_season_weeks%';`;
   const [copied, setCopied] = useState(false);
   const [availableGames, setAvailableGames] = useState<Game[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -146,7 +121,6 @@ where conrelid = 'public.leagues'::regclass and contype = 'c'
         setLeague(lg);
         setLeagueNameEdit(lg.name);
         setCutPercent(lg.settings?.cutPercent ?? 50);
-        setSeasonWeeks(lg.settings?.regularSeasonWeeks ?? 18);
       }
       let week = 1;
       try {
@@ -725,8 +699,8 @@ where conrelid = 'public.leagues'::regclass and contype = 'c'
       name: leagueNameEdit,
       settings: {
         cutPercent,
-        regularSeasonWeeks: seasonWeeks,
         gamesPerWeek: 5,
+        // Season length is fixed at SEASON_MAX_WEEK in the app (not saved to DB)
       },
     });
     if (result.ok && result.league) {
@@ -736,16 +710,6 @@ where conrelid = 'public.leagues'::regclass and contype = 'c'
       setTimeout(() => setSettingsSaved(false), 1500);
     } else {
       setSettingsError(result.error || "Failed to save settings");
-    }
-  }
-
-  async function copyRaiseWeeksSql() {
-    try {
-      await navigator.clipboard.writeText(RAISE_WEEKS_SQL);
-      setSqlCopied(true);
-      setTimeout(() => setSqlCopied(false), 2000);
-    } catch {
-      /* ignore */
     }
   }
 
@@ -983,7 +947,7 @@ where conrelid = 'public.leagues'::regclass and contype = 'c'
 
             <div className="rounded-xl border border-border bg-card p-5 space-y-4">
               <h2 className="font-semibold">Season rules</h2>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs text-muted block mb-1">
                     Cut line (% to Toilet Bowl)
@@ -997,29 +961,15 @@ where conrelid = 'public.leagues'::regclass and contype = 'c'
                     className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm"
                   />
                 </div>
-                <div>
-                  <label className="text-xs text-muted block mb-1">
-                    Highest week # (default 18 = through CFP Final)
-                  </label>
-                  <input
-                    type="number"
-                    min={4}
-                    max={20}
-                    value={seasonWeeks}
-                    onChange={(e) =>
-                      setSeasonWeeks(parseInt(e.target.value) || 18)
-                    }
-                    className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm"
-                  />
+                <div className="rounded-lg border border-border bg-background px-3 py-2">
+                  <p className="text-xs text-muted mb-1">Season length</p>
+                  <p className="text-sm font-semibold text-foreground">
+                    Always weeks 0–{SEASON_MAX_WEEK}
+                  </p>
                   <p className="text-[11px] text-muted mt-1 leading-relaxed">
-                    Week pills = 0 … this number. Recommended map:{" "}
-                    <span className="text-foreground">0</span> openers ·{" "}
-                    <span className="text-foreground">1–13</span> regular
-                    season · <span className="text-foreground">14 Conf
-                    Champ (CUT)</span> ·{" "}
-                    <span className="text-foreground">15–18 CFP</span> (R1 /
-                    QF / SF / Final). Raise to 18 and Save if you still only
-                    see through Week 13.
+                    Fixed CFB map: Week 0 openers · 1–13 regular ·{" "}
+                    <span className="text-warning">14 Conf Champ (CUT)</span> ·
+                    15–18 CFP (R1 / QF / SF / Final). Not configurable.
                   </p>
                 </div>
               </div>
@@ -1034,39 +984,7 @@ where conrelid = 'public.leagues'::regclass and contype = 'c'
                 {settingsSaved ? "Settings saved" : "Save settings"}
               </button>
               {settingsError && (
-                <div className="rounded-lg border border-danger/40 bg-danger/10 p-3 space-y-2">
-                  <p className="text-sm text-danger">{settingsError}</p>
-                  {(settingsError.includes("max 16") ||
-                    settingsError.includes("regular_season_weeks")) && (
-                    <div className="space-y-2 pt-1">
-                      <p className="text-xs text-muted leading-relaxed">
-                        One-time Supabase fix (not an app bug). Open{" "}
-                        <a
-                          href="https://supabase.com/dashboard/project/dorhjepugsjpmnuzdzck/sql/new"
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-primary underline"
-                        >
-                          SQL Editor
-                        </a>
-                        , paste the script, click <strong>Run</strong>, then
-                        Save settings again. Results should show{" "}
-                        <code className="text-foreground">between 4 and 24</code>
-                        .
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => void copyRaiseWeeksSql()}
-                        className="px-3 py-1.5 rounded-lg border border-border text-xs font-medium hover:bg-card-hover"
-                      >
-                        {sqlCopied ? "SQL copied!" : "Copy fix SQL"}
-                      </button>
-                      <pre className="text-[10px] text-muted bg-background border border-border rounded-lg p-2 overflow-x-auto max-h-32">
-                        {RAISE_WEEKS_SQL}
-                      </pre>
-                    </div>
-                  )}
-                </div>
+                <p className="text-sm text-danger">{settingsError}</p>
               )}
             </div>
 
@@ -1132,7 +1050,7 @@ where conrelid = 'public.leagues'::regclass and contype = 'c'
                 each shows its own kickoff below the matchup.
               </p>
               <div className="flex flex-wrap gap-2">
-                {Array.from({ length: seasonWeeks + 1 }, (_, i) => i).map(
+                {Array.from({ length: SEASON_MAX_WEEK + 1 }, (_, i) => i).map(
                   (w) => {
                     const hint =
                       w === 14
@@ -1426,7 +1344,7 @@ where conrelid = 'public.leagues'::regclass and contype = 'c'
               )}
 
               <div className="flex flex-wrap gap-2 mb-4">
-                {Array.from({ length: seasonWeeks + 1 }, (_, i) => i).map(
+                {Array.from({ length: SEASON_MAX_WEEK + 1 }, (_, i) => i).map(
                   (w) => (
                     <button
                       key={w}
