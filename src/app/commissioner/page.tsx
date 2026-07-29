@@ -74,10 +74,17 @@ export default function CommissionerPage() {
   const [availableGames, setAvailableGames] = useState<Game[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [publishedGames, setPublishedGames] = useState<Game[]>([]);
+  /** Draft prop on Build Card (may differ until you re-publish). */
   const [prop, setProp] = useState<Prop>(() =>
     propFromPreset(PROP_PRESETS[0], 1)
   );
   const [propPresetId, setPropPresetId] = useState(PROP_PRESETS[0].id);
+  /**
+   * Prop last published for activeWeek — Enter Results + scoring use this only.
+   * Never overwritten by Build Card dropdown clicks.
+   */
+  const [publishedProp, setPublishedProp] = useState<Prop | null>(null);
+  const [propRefreshing, setPropRefreshing] = useState(false);
   const [customQuestion, setCustomQuestion] = useState("");
   const [customOptA, setCustomOptA] = useState("Yes");
   const [customOptB, setCustomOptB] = useState("No");
@@ -128,8 +135,8 @@ export default function CommissionerPage() {
     load();
   }, []);
 
-  /** Apply published prop to UI (Build + Finalize Scores share this state). */
-  function applyLoadedProp(loaded: Prop) {
+  /** Sync Build Card draft controls from a known prop (publish / full week load). */
+  function applyDraftFromProp(loaded: Prop) {
     setProp(loaded);
     const presetId = matchPresetId(loaded);
     setPropPresetId(presetId);
@@ -140,16 +147,34 @@ export default function CommissionerPage() {
     }
   }
 
+  /** Set the frozen published prop used by Enter Results + scoring. */
+  function setPublishedPropFromCard(loaded: Prop, week: number) {
+    setPublishedProp({
+      id: loaded.id || `prop-w${week}`,
+      question: (loaded.question || "").trim(),
+      options: [
+        (loaded.options?.[0] || "Yes").trim(),
+        (loaded.options?.[1] || "No").trim(),
+      ] as [string, string],
+      points: loaded.points ?? 3,
+    });
+  }
+
+  /**
+   * Full load for a week: cloud card → local cache.
+   * Updates both draft (Build) and publishedProp (Results).
+   */
   async function loadWeekState(week: number) {
     setCardSaved(false);
     setPublishedGames([]);
+    setPublishedProp(null);
     setResults({});
     setPropResult(null);
     setResultsSaved(false);
     setDemoScore(null);
     setScoreReport(null);
     setSelectedIds(new Set());
-    // Reset prop so a previous week's selection never bleeds into this week
+    // Draft default only until we know this week's published card
     setProp(propFromPreset(PROP_PRESETS[0], week));
     setPropPresetId(PROP_PRESETS[0].id);
 
@@ -159,10 +184,10 @@ export default function CommissionerPage() {
     const cloud = await loadWeekCard(week);
     if (cloud) {
       setPublishedGames(cloud.games);
-      applyLoadedProp(cloud.prop);
+      applyDraftFromProp(cloud.prop);
+      setPublishedPropFromCard(cloud.prop, week);
       loadedProp = cloud.prop;
       setCardSaved(true);
-      // Keep local cache in sync for this week (correct key)
       try {
         localStorage.setItem(
           keys.card,
@@ -190,7 +215,8 @@ export default function CommissionerPage() {
           } else {
             if (data.games) setPublishedGames(data.games);
             if (data.prop?.question) {
-              applyLoadedProp(data.prop);
+              applyDraftFromProp(data.prop);
+              setPublishedPropFromCard(data.prop, week);
               loadedProp = data.prop;
             }
             setCardSaved(true);
@@ -206,7 +232,7 @@ export default function CommissionerPage() {
         const data = JSON.parse(resRaw);
         setResults(data.results || {});
         const savedPropResult = data.propResult || null;
-        // Drop prop result if it doesn't match either option of the loaded prop
+        // Drop prop result if it doesn't match either option of the published prop
         if (
           savedPropResult &&
           loadedProp &&
@@ -224,37 +250,62 @@ export default function CommissionerPage() {
     }
   }
 
-  /** Re-pull published prop/games from cloud when opening Finalize Scores. */
+  /**
+   * Re-pull published prop/games when opening Enter Results.
+   * Does NOT touch Build Card draft — so browsing Results never
+   * overwrites an un-published prop you're still editing.
+   */
   async function refreshPublishedProp(week: number) {
-    const cloud = await loadWeekCard(week);
-    if (cloud?.prop) {
-      setPublishedGames(cloud.games);
-      applyLoadedProp(cloud.prop);
-      setCardSaved(true);
-      try {
-        localStorage.setItem(
-          storageKeys(week).card,
-          JSON.stringify({
-            games: cloud.games,
-            prop: cloud.prop,
-            weekCardId: cloud.weekCardId,
-            weekNumber: week,
-          })
-        );
-      } catch {
-        /* ignore */
-      }
-      return;
-    }
+    setPropRefreshing(true);
     try {
-      const cardRaw = localStorage.getItem(storageKeys(week).card);
-      if (!cardRaw) return;
-      const data = JSON.parse(cardRaw);
-      if (data.weekNumber != null && Number(data.weekNumber) !== week) return;
-      if (data.games) setPublishedGames(data.games);
-      if (data.prop?.question) applyLoadedProp(data.prop);
-    } catch {
-      /* ignore */
+      const cloud = await loadWeekCard(week);
+      if (cloud?.prop?.question) {
+        setPublishedGames(cloud.games);
+        setPublishedPropFromCard(cloud.prop, week);
+        setCardSaved(true);
+        // Drop a saved prop answer if it doesn't match this card's options
+        setPropResult((prev) => {
+          const opts = cloud.prop.options || [];
+          if (prev && !opts.includes(prev)) return null;
+          return prev;
+        });
+        try {
+          localStorage.setItem(
+            storageKeys(week).card,
+            JSON.stringify({
+              games: cloud.games,
+              prop: cloud.prop,
+              weekCardId: cloud.weekCardId,
+              weekNumber: week,
+            })
+          );
+        } catch {
+          /* ignore */
+        }
+        return;
+      }
+      try {
+        const cardRaw = localStorage.getItem(storageKeys(week).card);
+        if (!cardRaw) {
+          setPublishedProp(null);
+          return;
+        }
+        const data = JSON.parse(cardRaw);
+        if (data.weekNumber != null && Number(data.weekNumber) !== week) {
+          setPublishedProp(null);
+          return;
+        }
+        if (data.games) setPublishedGames(data.games);
+        if (data.prop?.question) {
+          setPublishedPropFromCard(data.prop, week);
+        } else {
+          setPublishedProp(null);
+        }
+      } catch {
+        /* keep existing publishedProp if any */
+      }
+    } finally {
+      setPropRefreshing(false);
     }
   }
 
@@ -426,7 +477,8 @@ export default function CommissionerPage() {
     if (!result.ok) {
       alert(result.error || "Failed to publish to cloud");
       setPublishedGames(selected);
-      applyLoadedProp(propToPublish);
+      applyDraftFromProp(propToPublish);
+      setPublishedPropFromCard(propToPublish, activeWeek);
       localStorage.setItem(
         keys.card,
         JSON.stringify({
@@ -440,7 +492,8 @@ export default function CommissionerPage() {
     }
     const games = result.games || selected;
     setPublishedGames(games);
-    applyLoadedProp(propToPublish);
+    applyDraftFromProp(propToPublish);
+    setPublishedPropFromCard(propToPublish, activeWeek);
     setCardSaved(true);
     try {
       localStorage.setItem(ACTIVE_WEEK_KEY, String(activeWeek));
@@ -538,7 +591,7 @@ export default function CommissionerPage() {
           data.propChoice || null,
           publishedGames,
           results,
-          prop,
+          publishedProp || prop,
           propResult
         );
         setDemoScore({ totalPoints: scored.totalPoints });
@@ -550,10 +603,19 @@ export default function CommissionerPage() {
       setHasPlayerPicks(false);
     }
 
+    const propForScoring = publishedProp;
+    if (!propForScoring?.question) {
+      setScoring(false);
+      setScoreReport(
+        "Published prop missing for this week. Open Build Card, confirm the prop, and Publish again."
+      );
+      return;
+    }
+
     const cloud = await saveResultsAndScoreWeek({
       weekNumber: activeWeek,
       games: publishedGames,
-      prop,
+      prop: propForScoring,
       results,
       propResult,
     });
@@ -693,7 +755,11 @@ export default function CommissionerPage() {
   }
 
   const allResultsIn =
-    publishedGames.every((g) => results[g.id]?.winner) && propResult !== null;
+    publishedGames.length > 0 &&
+    !!publishedProp?.question &&
+    publishedGames.every((g) => results[g.id]?.winner) &&
+    propResult !== null &&
+    !!publishedProp.options?.includes(propResult);
 
   if (allowed === null) {
     return (
@@ -1063,7 +1129,15 @@ export default function CommissionerPage() {
                     <h3 className="font-semibold text-sm">Weekly prop</h3>
                     <p className="text-xs text-muted">
                       Pick a fun preset (or custom). Worth {prop.points} pts.
+                      Must Publish to lock this onto the card / Enter Results.
                     </p>
+                    {publishedProp?.question &&
+                      publishedProp.question !== prop.question && (
+                        <p className="text-[11px] text-warning mt-1">
+                          Draft differs from published prop. Players still see
+                          the published one until you Publish again.
+                        </p>
+                      )}
                   </div>
                   <select
                     value={propPresetId}
@@ -1403,27 +1477,42 @@ export default function CommissionerPage() {
             <div className="rounded-xl border border-border bg-card p-5 mb-6">
               <h2 className="font-semibold mb-2">Prop Result</h2>
               <p className="text-xs text-muted mb-1">
-                From the published {weekTitle(activeWeek)} card
+                Locked from the published {weekTitle(activeWeek)} card (not the
+                Build Card draft)
               </p>
-              <p className="text-sm text-foreground mb-3">{prop.question}</p>
-              <div className="grid grid-cols-2 gap-3">
-                {prop.options.map((opt) => (
-                  <button
-                    key={opt}
-                    onClick={() => {
-                      setPropResult(opt);
-                      setResultsSaved(false);
-                    }}
-                    className={
-                      propResult === opt
-                        ? "py-2.5 rounded-lg text-sm border border-primary bg-primary/10 text-primary"
-                        : "py-2.5 rounded-lg text-sm border border-border"
-                    }
-                  >
-                    {opt}
-                  </button>
-                ))}
-              </div>
+              {propRefreshing ? (
+                <p className="text-sm text-muted">Loading published prop…</p>
+              ) : publishedProp?.question ? (
+                <>
+                  <p className="text-sm text-foreground mb-3">
+                    {publishedProp.question}
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {publishedProp.options.map((opt) => (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() => {
+                          setPropResult(opt);
+                          setResultsSaved(false);
+                        }}
+                        className={
+                          propResult === opt
+                            ? "py-2.5 rounded-lg text-sm border border-primary bg-primary/10 text-primary"
+                            : "py-2.5 rounded-lg text-sm border border-border"
+                        }
+                      >
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm text-danger">
+                  No published prop for this week. Go to Build Card, pick the
+                  prop, and press Publish before entering results.
+                </p>
+              )}
             </div>
 
             <button

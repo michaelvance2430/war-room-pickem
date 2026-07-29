@@ -298,9 +298,11 @@ export async function loadWeekCard(weekNumber = 1): Promise<CloudCard | null> {
 
   if (!games?.length) return null;
 
-  const question = (card.prop_question as string) || "Prop";
-  const optionA = (card.prop_option_a as string) || "Over";
-  const optionB = (card.prop_option_b as string) || "Under";
+  const question = ((card.prop_question as string) || "").trim() || "Prop";
+  const optionA =
+    ((card.prop_option_a as string) || "").trim() || "Yes";
+  const optionB =
+    ((card.prop_option_b as string) || "").trim() || "No";
   const points = (card.prop_points as number) ?? 3;
 
   return {
@@ -309,7 +311,7 @@ export async function loadWeekCard(weekNumber = 1): Promise<CloudCard | null> {
     publishedAt: (card.published_at as string) || null,
     games: games.map(mapCardGame),
     prop: {
-      // Stable id from question text so preset matching works after reload
+      // Week-scoped id; matchPresetId resolves presets by question text
       id: `prop-w${weekNumber}`,
       question,
       options: [optionA, optionB] as [string, string],
