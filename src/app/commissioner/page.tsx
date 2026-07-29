@@ -29,6 +29,9 @@ import {
   postMissingPicksAnnouncement,
   setLeagueActiveWeek,
   resetSeasonInCloud,
+  seedTrialBotsInCloud,
+  clearTrialBotsInCloud,
+  seedBotPicksForWeekInCloud,
   PickSubmissionStatus,
 } from "@/lib/cloud";
 import {
@@ -116,6 +119,8 @@ export default function CommissionerPage() {
   const [seasonResetReport, setSeasonResetReport] = useState<string | null>(
     null
   );
+  const [botBusy, setBotBusy] = useState(false);
+  const [botReport, setBotReport] = useState<string | null>(null);
 
   useEffect(() => {
     setAllowed(isCommissioner());
@@ -529,6 +534,78 @@ export default function CommissionerPage() {
     }
     // Active week already written in publishWeekCard; double-ensure for clients
     void setLeagueActiveWeek(activeWeek);
+
+    // Trial bots auto-fill valid slips for this card (no-op if no bots / SQL missing)
+    const botFill = await seedBotPicksForWeekInCloud(activeWeek);
+    if (botFill.ok && (botFill.botsFilled || 0) > 0) {
+      setBotReport(
+        `Published ${weekTitle(activeWeek)}. ${botFill.botsFilled} trial bot(s) locked fake picks.`
+      );
+      void refreshPickStatus(activeWeek);
+    }
+  }
+
+  async function handleSeedBots() {
+    setBotReport(null);
+    setBotBusy(true);
+    const res = await seedTrialBotsInCloud(50);
+    if (!res.ok) {
+      setBotBusy(false);
+      setBotReport(res.error || "Failed to add bots");
+      return;
+    }
+    // If a card is already up for this week, fill their picks now
+    let pickNote = "";
+    if (publishedGames.length === 5) {
+      const fill = await seedBotPicksForWeekInCloud(activeWeek);
+      if (fill.ok) {
+        pickNote = ` · ${fill.botsFilled ?? 0} bot slip(s) for ${weekTitle(activeWeek)}`;
+        void refreshPickStatus(activeWeek);
+      }
+    }
+    setBotBusy(false);
+    setBotReport(
+      res.added === 0
+        ? `Trial roster full (${res.totalBots} bots).${pickNote}`
+        : `Added ${res.added} trial bots (${res.totalBots} total).${pickNote || " Publish a week card (or hit Fill bot picks) so they lock slips."}`
+    );
+  }
+
+  async function handleFillBotPicks() {
+    setBotReport(null);
+    setBotBusy(true);
+    const res = await seedBotPicksForWeekInCloud(activeWeek);
+    setBotBusy(false);
+    if (!res.ok) {
+      setBotReport(res.error || "Failed to fill bot picks");
+      return;
+    }
+    setBotReport(
+      `Filled ${res.botsFilled ?? 0} bot pick slip(s) for ${weekTitle(activeWeek)}.`
+    );
+    void refreshPickStatus(activeWeek);
+  }
+
+  async function handleClearBots() {
+    if (
+      !confirm(
+        "Remove ALL trial bots and their picks?\n\nReal players who signed up stay in the league."
+      )
+    ) {
+      return;
+    }
+    setBotReport(null);
+    setBotBusy(true);
+    const res = await clearTrialBotsInCloud();
+    setBotBusy(false);
+    if (!res.ok) {
+      setBotReport(res.error || "Failed to clear bots");
+      return;
+    }
+    setBotReport(
+      `Removed ${res.removed ?? 0} trial bot(s). Real members unchanged.`
+    );
+    void refreshPickStatus(activeWeek);
   }
 
   function setGameWinner(gameId: string, side: "home" | "away" | "push") {
@@ -1035,6 +1112,63 @@ export default function CommissionerPage() {
               </button>
               {settingsError && (
                 <p className="text-sm text-danger">{settingsError}</p>
+              )}
+            </div>
+
+            <div className="rounded-xl border border-primary/40 bg-primary/5 p-5 space-y-3">
+              <h2 className="font-semibold text-primary">Trial bots (dry run)</h2>
+              <p className="text-xs text-muted leading-relaxed">
+                Fill the league with up to{" "}
+                <strong className="text-foreground">50 fake players</strong>{" "}
+                that auto-lock picks when you publish a week. Use this to
+                simulate a full season (score weeks, standings, brackets).{" "}
+                <strong className="text-foreground">
+                  Clear bots
+                </strong>{" "}
+                removes only trial bots — real people who logged in stay.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={botBusy}
+                  onClick={() => void handleSeedBots()}
+                  className="px-4 py-2 rounded-lg bg-primary text-black text-sm font-semibold disabled:opacity-50"
+                >
+                  {botBusy ? "Working…" : "Add 50 trial bots"}
+                </button>
+                <button
+                  type="button"
+                  disabled={botBusy}
+                  onClick={() => void handleFillBotPicks()}
+                  className="px-4 py-2 rounded-lg border border-border text-sm font-medium hover:bg-card-hover disabled:opacity-50"
+                >
+                  Fill bot picks (this week)
+                </button>
+                <button
+                  type="button"
+                  disabled={botBusy}
+                  onClick={() => void handleClearBots()}
+                  className="px-4 py-2 rounded-lg border border-warning text-warning text-sm font-medium hover:bg-warning/10 disabled:opacity-50"
+                >
+                  Clear bots (keep real players)
+                </button>
+              </div>
+              <p className="text-[11px] text-muted">
+                One-time setup: run{" "}
+                <code className="text-foreground">supabase/trial-bots.sql</code>{" "}
+                in Supabase SQL Editor if buttons error about a missing function.
+              </p>
+              {botReport && (
+                <p
+                  className={`text-xs leading-relaxed ${
+                    botReport.toLowerCase().includes("fail") ||
+                    botReport.toLowerCase().includes("missing")
+                      ? "text-danger"
+                      : "text-primary"
+                  }`}
+                >
+                  {botReport}
+                </p>
               )}
             </div>
 

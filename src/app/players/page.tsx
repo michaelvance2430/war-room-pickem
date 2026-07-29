@@ -218,6 +218,11 @@ export default function PlayersPage() {
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium truncate">
                           {p.name}
+                          {p.isBot ? (
+                            <span className="ml-2 text-[10px] uppercase text-muted border border-border px-1 rounded">
+                              Trial
+                            </span>
+                          ) : null}
                           {p.userId === selfId && (
                             <span className="text-primary text-xs ml-1">(You)</span>
                           )}

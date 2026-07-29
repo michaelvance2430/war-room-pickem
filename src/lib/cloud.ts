@@ -876,6 +876,7 @@ export type LeagueRosterMember = {
   role: "commissioner" | "player";
   totalPoints: number;
   avatarUrl?: string | null;
+  isBot?: boolean;
 };
 
 /** Live league roster from Supabase memberships (not local mock players). */
@@ -883,14 +884,29 @@ export async function loadLeagueRoster(): Promise<LeagueRosterMember[]> {
   const session = getSession();
   if (!session?.leagueId) return [];
   const supabase = createClient();
-  const { data: rows, error } = await supabase
-    .from("memberships")
-    .select(
-      "id, user_id, role, division, total_points, profiles(display_name, avatar_url)"
-    )
-    .eq("league_id", session.leagueId);
+  // is_bot may be missing until trial-bots.sql is run — fall back without it
+  let rows: Record<string, unknown>[] | null = null;
+  {
+    const res = await supabase
+      .from("memberships")
+      .select(
+        "id, user_id, role, division, total_points, is_bot, profiles(display_name, avatar_url)"
+      )
+      .eq("league_id", session.leagueId);
+    if (res.error && /is_bot|schema cache|column/i.test(res.error.message)) {
+      const res2 = await supabase
+        .from("memberships")
+        .select(
+          "id, user_id, role, division, total_points, profiles(display_name, avatar_url)"
+        )
+        .eq("league_id", session.leagueId);
+      rows = (res2.data as Record<string, unknown>[] | null) || null;
+    } else if (!res.error) {
+      rows = (res.data as Record<string, unknown>[] | null) || null;
+    }
+  }
 
-  if (error || !rows) return [];
+  if (!rows) return [];
 
   return rows
     .map((m: Record<string, unknown>) => {
@@ -908,9 +924,103 @@ export async function loadLeagueRoster(): Promise<LeagueRosterMember[]> {
         role,
         totalPoints: (m.total_points as number) || 0,
         avatarUrl: profile?.avatar_url || null,
+        isBot: !!m.is_bot,
       };
     })
     .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function rpcMissing(msg: string) {
+  return /function|does not exist|schema cache/i.test(msg);
+}
+
+/** Add up to 50 trial bots (commissioner). Requires trial-bots.sql */
+export async function seedTrialBotsInCloud(
+  count = 50
+): Promise<{ ok: boolean; added?: number; totalBots?: number; error?: string }> {
+  const session = getSession();
+  if (!session?.leagueId || !session.isCommissioner) {
+    return { ok: false, error: "Commissioner only" };
+  }
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("seed_trial_bots", {
+    p_league_id: session.leagueId,
+    p_count: count,
+  });
+  if (error) {
+    if (rpcMissing(error.message)) {
+      return {
+        ok: false,
+        error:
+          "Trial bots function missing. Run supabase/trial-bots.sql in Supabase SQL Editor, then try again.",
+      };
+    }
+    return { ok: false, error: error.message };
+  }
+  const row = (data || {}) as { added?: number; totalBots?: number };
+  return {
+    ok: true,
+    added: row.added ?? 0,
+    totalBots: row.totalBots ?? 0,
+  };
+}
+
+/** Remove trial bots only — real logged-in players stay. */
+export async function clearTrialBotsInCloud(): Promise<{
+  ok: boolean;
+  removed?: number;
+  error?: string;
+}> {
+  const session = getSession();
+  if (!session?.leagueId || !session.isCommissioner) {
+    return { ok: false, error: "Commissioner only" };
+  }
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("clear_trial_bots", {
+    p_league_id: session.leagueId,
+  });
+  if (error) {
+    if (rpcMissing(error.message)) {
+      return {
+        ok: false,
+        error:
+          "Clear-bots function missing. Run supabase/trial-bots.sql in Supabase SQL Editor.",
+      };
+    }
+    return { ok: false, error: error.message };
+  }
+  const row = (data || {}) as { removed?: number };
+  return { ok: true, removed: row.removed ?? 0 };
+}
+
+/** Auto-lock valid pick slips for every bot for a published week. */
+export async function seedBotPicksForWeekInCloud(
+  weekNumber: number
+): Promise<{ ok: boolean; botsFilled?: number; error?: string }> {
+  const session = getSession();
+  if (!session?.leagueId || !session.isCommissioner) {
+    return { ok: false, error: "Commissioner only" };
+  }
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("seed_bot_picks_for_week", {
+    p_league_id: session.leagueId,
+    p_week_number: weekNumber,
+  });
+  if (error) {
+    if (rpcMissing(error.message)) {
+      return {
+        ok: false,
+        error:
+          "Bot picks function missing. Run supabase/trial-bots.sql in Supabase SQL Editor.",
+      };
+    }
+    return { ok: false, error: error.message };
+  }
+  const row = (data || {}) as { ok?: boolean; botsFilled?: number; error?: string };
+  if (row.ok === false) {
+    return { ok: false, error: row.error || "Failed to fill bot picks" };
+  }
+  return { ok: true, botsFilled: row.botsFilled ?? 0 };
 }
 
 export async function updateMemberDivision(
