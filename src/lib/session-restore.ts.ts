@@ -54,7 +54,7 @@ export function writeSessionAndLeague(
     createdAt: membership.createdAt,
     settings: {
       cutPercent: membership.cutPercent ?? 50,
-      regularSeasonWeeks: membership.regularSeasonWeeks ?? 13,
+      regularSeasonWeeks: membership.regularSeasonWeeks ?? 12,
       gamesPerWeek: membership.gamesPerWeek ?? 5,
     },
   };
@@ -71,13 +71,13 @@ export function writeSessionAndLeague(
 /** Load all leagues this user belongs to */
 export async function fetchMyMemberships(): Promise<LeagueMembership[]> {
   const supabase = createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth.user) return [];
+  const { data: sess } = await supabase.auth.getSession();
+  if (!sess.session?.user) return [];
 
-  const userId = auth.user.id;
+  const userId = sess.session.user.id;
   const metaName =
-    (auth.user.user_metadata?.display_name as string | undefined) ||
-    auth.user.email?.split("@")[0] ||
+    (sess.session.user.user_metadata?.display_name as string | undefined) ||
+    sess.session.user.email?.split("@")[0] ||
     "Player";
 
   const { data: rows, error } = await supabase
@@ -100,7 +100,7 @@ export async function fetchMyMemberships(): Promise<LeagueMembership[]> {
       commissionerId: L.commissioner_id as string,
       createdAt: (L.created_at as string) || "",
       cutPercent: (L.cut_percent as number) ?? 50,
-      regularSeasonWeeks: (L.regular_season_weeks as number) ?? 13,
+      regularSeasonWeeks: (L.regular_season_weeks as number) ?? 12,
       gamesPerWeek: (L.games_per_week as number) ?? 5,
       role: (row.role as string) || "player",
       displayName: metaName,
@@ -121,10 +121,10 @@ export type RestoreResult =
  */
 export async function restoreSessionFromCloud(): Promise<RestoreResult> {
   const supabase = createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth.user) return { status: "no_auth" };
+  const { data: sess } = await supabase.auth.getSession();
+  if (!sess.session?.user) return { status: "no_auth" };
 
-  const userId = auth.user.id;
+  const userId = sess.session.user.id;
   const memberships = await fetchMyMemberships();
   if (!memberships.length) return { status: "no_leagues" };
 
@@ -156,12 +156,12 @@ export async function restoreSessionFromCloud(): Promise<RestoreResult> {
 
 export async function switchToLeague(leagueId: string): Promise<boolean> {
   const supabase = createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth.user) return false;
+  const { data: sess } = await supabase.auth.getSession();
+  if (!sess.session?.user) return false;
   const memberships = await fetchMyMemberships();
   const m = memberships.find((x) => x.leagueId === leagueId);
   if (!m) return false;
-  writeSessionAndLeague(m, auth.user.id);
+  writeSessionAndLeague(m, sess.session.user.id);
   return true;
 }
 
@@ -180,16 +180,15 @@ export async function signOutFully() {
 
 export async function leaveLeague(leagueId: string): Promise<{ ok: boolean; error?: string }> {
   const supabase = createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth.user) return { ok: false, error: "Not signed in" };
+  const { data: sess } = await supabase.auth.getSession();
+  if (!sess.session?.user) return { ok: false, error: "Not signed in" };
 
-  // Commissioner must pass the role first so the league (and Trophy Room) stay owned
   const { data: league } = await supabase
     .from("leagues")
     .select("commissioner_id")
     .eq("id", leagueId)
     .maybeSingle();
-  if (league?.commissioner_id === auth.user.id) {
+  if (league?.commissioner_id === sess.session.user.id) {
     return {
       ok: false,
       error:
@@ -201,7 +200,7 @@ export async function leaveLeague(leagueId: string): Promise<{ ok: boolean; erro
     .from("memberships")
     .delete()
     .eq("league_id", leagueId)
-    .eq("user_id", auth.user.id);
+    .eq("user_id", sess.session.user.id);
 
   if (error) return { ok: false, error: error.message };
 
@@ -219,8 +218,8 @@ export async function leaveLeague(leagueId: string): Promise<{ ok: boolean; erro
 /** Commissioner only — deletes the league (cascades memberships, cards, etc.) */
 export async function deleteLeague(leagueId: string): Promise<{ ok: boolean; error?: string }> {
   const supabase = createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth.user) return { ok: false, error: "Not signed in" };
+  const { data: sess } = await supabase.auth.getSession();
+  if (!sess.session?.user) return { ok: false, error: "Not signed in" };
 
   const { data: league } = await supabase
     .from("leagues")
@@ -228,7 +227,7 @@ export async function deleteLeague(leagueId: string): Promise<{ ok: boolean; err
     .eq("id", leagueId)
     .maybeSingle();
 
-  if (!league || league.commissioner_id !== auth.user.id) {
+  if (!league || league.commissioner_id !== sess.session.user.id) {
     return { ok: false, error: "Only the commissioner can delete this league" };
   }
 

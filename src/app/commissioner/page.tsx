@@ -35,8 +35,11 @@ import {
   seedBotPicksForWeekInCloud,
   listScoredWeekNumbers,
   loadWeekResultsFromCloud,
+  loadLeagueRoster,
+  type LeagueRosterMember,
   PickSubmissionStatus,
 } from "@/lib/cloud";
+import { transferCommissioner } from "@/lib/trophies";
 import {
   formatKickoff,
   formatCardDateRange,
@@ -130,6 +133,10 @@ export default function CommissionerPage() {
   const [scoredWeeks, setScoredWeeks] = useState<number[]>([]);
   const [resultsLocked, setResultsLocked] = useState(false);
   const [scoredAtLabel, setScoredAtLabel] = useState<string | null>(null);
+  const [passRoster, setPassRoster] = useState<LeagueRosterMember[]>([]);
+  const [passToUserId, setPassToUserId] = useState("");
+  const [passBusy, setPassBusy] = useState(false);
+  const [passReport, setPassReport] = useState<string | null>(null);
 
   useEffect(() => {
     setAllowed(isCommissioner());
@@ -151,6 +158,17 @@ export default function CommissionerPage() {
       }
       setActiveWeek(week);
       await loadWeekState(week);
+      try {
+        const session = getSession();
+        const roster = await loadLeagueRoster();
+        setPassRoster(
+          roster.filter(
+            (m) => !m.isBot && m.userId !== session?.playerId
+          )
+        );
+      } catch {
+        /* ignore */
+      }
     }
     load();
   }, []);
@@ -928,6 +946,48 @@ export default function CommissionerPage() {
     router.push("/join");
   }
 
+  async function handlePassCommissioner() {
+    setPassReport(null);
+    if (!passToUserId) {
+      setPassReport("Pick a player to become the new commissioner.");
+      return;
+    }
+    const target = passRoster.find((m) => m.userId === passToUserId);
+    const name = target?.name || "this player";
+    if (
+      !confirm(
+        `Pass commissioner to ${name}?\n\n` +
+          "You become a regular player.\n" +
+          "They get full commissioner tools.\n" +
+          "Trophy Room stays with the league (not with you).\n\n" +
+          "This cannot be undone unless they pass it back."
+      )
+    ) {
+      return;
+    }
+    const typed = window.prompt(
+      `Type PASS to confirm transferring commissioner to ${name}.`
+    );
+    if (typed !== "PASS") {
+      setPassReport("Cancelled — type PASS exactly to confirm.");
+      return;
+    }
+    setPassBusy(true);
+    const result = await transferCommissioner(passToUserId);
+    setPassBusy(false);
+    if (!result.ok) {
+      setPassReport(result.error || "Transfer failed");
+      return;
+    }
+    setPassReport(
+      `Done. ${result.newCommissionerName || name} is now commissioner. Redirecting…`
+    );
+    setTimeout(() => {
+      router.push("/");
+      router.refresh();
+    }, 1200);
+  }
+
   /**
    * Wipe picks / cards / results / scores. Keep every member.
    * Triple confirmation so it can't fire mid-season by accident.
@@ -945,7 +1005,8 @@ export default function CommissionerPage() {
         "This will KEEP:\n" +
         "• Every player who joined\n" +
         "• Divisions, roles, league code & settings\n" +
-        "• Profile photos\n\n" +
+        "• Profile photos\n" +
+        "• Trophy Room (past champions / toilet / nerd awards)\n\n" +
         "Use this after testing, before the real season.\n\n" +
         "Continue?"
     );
@@ -1279,6 +1340,83 @@ export default function CommissionerPage() {
               )}
             </div>
 
+            <div className="rounded-xl border border-amber-400/30 bg-card p-5 space-y-3">
+              <h2 className="font-semibold text-amber-300">Trophy Room</h2>
+              <p className="text-xs text-muted leading-relaxed">
+                Engrave Championship, Toilet Bowl, and Village Nerd (Crystal
+                Ball) winners by season year. History lives on this league —
+                season reset does not wipe it, and it stays when you pass
+                commissioner.
+              </p>
+              <a
+                href="/trophy-room"
+                className="inline-block px-4 py-2 rounded-lg bg-amber-400/15 border border-amber-400/40 text-amber-200 text-sm font-medium hover:bg-amber-400/25"
+              >
+                Open Trophy Room →
+              </a>
+            </div>
+
+            <div className="rounded-xl border border-primary/30 bg-card p-5 space-y-3">
+              <h2 className="font-semibold text-primary">Pass commissioner</h2>
+              <p className="text-xs text-muted leading-relaxed">
+                Stepping down? Hand the keys to another member. They become
+                commissioner; you stay as a player.{" "}
+                <span className="text-foreground font-medium">
+                  Trophy Room travels with the league
+                </span>
+                , not with you. Requires typing{" "}
+                <span className="font-mono text-foreground">PASS</span>.
+              </p>
+              {passRoster.length === 0 ? (
+                <p className="text-xs text-muted">
+                  Need at least one other real player (not a trial bot) in the
+                  league to pass the role.
+                </p>
+              ) : (
+                <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
+                  <label className="block text-xs text-muted flex-1">
+                    New commissioner
+                    <select
+                      value={passToUserId}
+                      onChange={(e) => setPassToUserId(e.target.value)}
+                      className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                    >
+                      <option value="">— Select player —</option>
+                      {passRoster.map((m) => (
+                        <option key={m.userId} value={m.userId}>
+                          {m.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button
+                    type="button"
+                    disabled={passBusy || !passToUserId}
+                    onClick={() => void handlePassCommissioner()}
+                    className="px-4 py-2 rounded-lg border border-primary text-primary text-sm font-medium hover:bg-primary/10 disabled:opacity-50"
+                  >
+                    {passBusy ? "Passing…" : "Pass commissioner"}
+                  </button>
+                </div>
+              )}
+              {passReport && (
+                <p
+                  className={`text-xs leading-relaxed ${
+                    passReport.toLowerCase().includes("done")
+                      ? "text-primary"
+                      : "text-danger"
+                  }`}
+                >
+                  {passReport}
+                </p>
+              )}
+              <p className="text-[11px] text-muted">
+                One-time setup: run{" "}
+                <code className="text-foreground">supabase/trophy-room.sql</code>{" "}
+                in Supabase SQL Editor if pass fails.
+              </p>
+            </div>
+
             <div className="rounded-xl border border-warning/40 bg-card p-5 space-y-3">
               <h2 className="font-semibold text-warning">Reset season</h2>
               <p className="text-xs text-muted leading-relaxed">
@@ -1287,8 +1425,10 @@ export default function CommissionerPage() {
                 <span className="text-foreground font-medium">
                   Everyone who joined stays in the league
                 </span>{" "}
-                with zeroed stats. League code, settings, divisions, and profile
-                photos are kept. Requires typing{" "}
+                with zeroed stats. League code, settings, divisions, profile
+                photos, and{" "}
+                <span className="text-foreground font-medium">Trophy Room</span>{" "}
+                history are kept. Requires typing{" "}
                 <span className="font-mono text-foreground">RESET</span> to
                 confirm — hard to do by accident mid-season.
               </p>

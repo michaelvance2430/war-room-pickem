@@ -98,6 +98,14 @@ export const RULE_SECTIONS: RuleSection[] = [
     ],
   },
   {
+    title: "Trophy Room",
+    body: [
+      "After the season, the commissioner engraves winners: Championship, Toilet Bowl, and Village Nerd (Crystal Ball).",
+      "History stays with the league year after year — even if players join/leave or the commissioner is passed on.",
+      "Season reset does not wipe the Trophy Room.",
+    ],
+  },
+  {
     title: "Profile & tips",
     body: [
       "Upload a profile photo under Account so the league knows who’s who.",

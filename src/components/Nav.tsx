@@ -111,6 +111,11 @@ export default function Nav() {
     { href: "/rules", label: "Rules" },
     { href: "/championship", label: "Championship" },
     { href: "/toilet-bowl", label: "Toilet Bowl", className: "text-toilet hover:text-toilet" },
+    {
+      href: "/trophy-room",
+      label: "Trophy Room",
+      className: "text-amber-300 hover:text-amber-200",
+    },
     ...(isCommish
       ? [{ href: "/commissioner", label: "Commissioner", className: "text-primary" }]
       : []),
