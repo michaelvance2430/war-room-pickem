@@ -607,6 +607,71 @@ export async function postMissingPicksAnnouncement(
   return { ok: true, missingCount: incomplete.length };
 }
 
+/** Weeks that already have a week_results row (scored). */
+export async function listScoredWeekNumbers(): Promise<number[]> {
+  const session = getSession();
+  if (!session?.leagueId) return [];
+  try {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("week_results")
+      .select("week_number")
+      .eq("league_id", session.leagueId);
+    if (error || !data) return [];
+    return data
+      .map((r) => Number(r.week_number))
+      .filter((n) => !Number.isNaN(n))
+      .sort((a, b) => a - b);
+  } catch {
+    return [];
+  }
+}
+
+/** Load saved ATS covers + prop result for a week (if scored). */
+export async function loadWeekResultsFromCloud(
+  weekNumber: number
+): Promise<{
+  results: Record<string, GameResult>;
+  propResult: string | null;
+  scoredAt: string | null;
+} | null> {
+  const session = getSession();
+  if (!session?.leagueId) return null;
+  try {
+    const supabase = createClient();
+    const { data: wr, error } = await supabase
+      .from("week_results")
+      .select("id, prop_result, scored_at")
+      .eq("league_id", session.leagueId)
+      .eq("week_number", weekNumber)
+      .maybeSingle();
+    if (error || !wr) return null;
+
+    const { data: gr } = await supabase
+      .from("game_results")
+      .select("card_game_id, winner")
+      .eq("week_result_id", wr.id);
+
+    const results: Record<string, GameResult> = {};
+    for (const g of gr || []) {
+      const w = g.winner as "home" | "away" | "push";
+      if (w === "home" || w === "away" || w === "push") {
+        results[g.card_game_id as string] = {
+          gameId: g.card_game_id as string,
+          winner: w,
+        };
+      }
+    }
+    return {
+      results,
+      propResult: (wr.prop_result as string) || null,
+      scoredAt: (wr.scored_at as string) || null,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function saveResultsAndScoreWeek(opts: {
   weekNumber: number;
   games: Game[];

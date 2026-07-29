@@ -32,6 +32,8 @@ import {
   seedTrialBotsInCloud,
   clearTrialBotsInCloud,
   seedBotPicksForWeekInCloud,
+  listScoredWeekNumbers,
+  loadWeekResultsFromCloud,
   PickSubmissionStatus,
 } from "@/lib/cloud";
 import {
@@ -121,6 +123,10 @@ export default function CommissionerPage() {
   );
   const [botBusy, setBotBusy] = useState(false);
   const [botReport, setBotReport] = useState<string | null>(null);
+  /** Weeks already scored (locked for results entry unless unlocked). */
+  const [scoredWeeks, setScoredWeeks] = useState<number[]>([]);
+  const [resultsLocked, setResultsLocked] = useState(false);
+  const [scoredAtLabel, setScoredAtLabel] = useState<string | null>(null);
 
   useEffect(() => {
     setAllowed(isCommissioner());
@@ -175,6 +181,12 @@ export default function CommissionerPage() {
    * Full load for a week: cloud card → local cache.
    * Updates both draft (Build) and publishedProp (Results).
    */
+  async function refreshScoredWeeks() {
+    const weeks = await listScoredWeekNumbers();
+    setScoredWeeks(weeks);
+    return weeks;
+  }
+
   async function loadWeekState(week: number) {
     setCardSaved(false);
     setPublishedGames([]);
@@ -185,6 +197,8 @@ export default function CommissionerPage() {
     setDemoScore(null);
     setScoreReport(null);
     setSelectedIds(new Set());
+    setResultsLocked(false);
+    setScoredAtLabel(null);
     // Draft default only until we know this week's published card
     setProp(propFromPreset(PROP_PRESETS[0], week));
     setPropPresetId(PROP_PRESETS[0].id);
@@ -192,6 +206,7 @@ export default function CommissionerPage() {
     const keys = storageKeys(week);
     let loadedProp: Prop | null = null;
 
+    const scored = await refreshScoredWeeks();
     const cloud = await loadWeekCard(week);
     if (cloud) {
       setPublishedGames(cloud.games);
@@ -237,27 +252,59 @@ export default function CommissionerPage() {
         /* ignore */
       }
     }
-    try {
-      const resRaw = localStorage.getItem(keys.results);
-      if (resRaw) {
-        const data = JSON.parse(resRaw);
-        setResults(data.results || {});
-        const savedPropResult = data.propResult || null;
-        // Drop prop result if it doesn't match either option of the published prop
-        if (
-          savedPropResult &&
-          loadedProp &&
-          !loadedProp.options?.includes(savedPropResult)
-        ) {
-          setPropResult(null);
-          setResultsSaved(false);
-        } else {
-          setPropResult(savedPropResult);
-          setResultsSaved(true);
-        }
+    // Prefer cloud week_results (source of truth after scoring)
+    const cloudResults = await loadWeekResultsFromCloud(week);
+    if (cloudResults && Object.keys(cloudResults.results).length > 0) {
+      setResults(cloudResults.results);
+      setPropResult(cloudResults.propResult);
+      setResultsSaved(true);
+      if (scored.includes(week) || cloudResults.scoredAt) {
+        setResultsLocked(true);
+        setScoredAtLabel(
+          cloudResults.scoredAt
+            ? new Date(cloudResults.scoredAt).toLocaleString()
+            : "scored"
+        );
       }
-    } catch {
-      /* ignore */
+      try {
+        localStorage.setItem(
+          keys.results,
+          JSON.stringify({
+            results: cloudResults.results,
+            propResult: cloudResults.propResult,
+          })
+        );
+      } catch {
+        /* ignore */
+      }
+    } else {
+      try {
+        const resRaw = localStorage.getItem(keys.results);
+        if (resRaw) {
+          const data = JSON.parse(resRaw);
+          setResults(data.results || {});
+          const savedPropResult = data.propResult || null;
+          if (
+            savedPropResult &&
+            loadedProp &&
+            !loadedProp.options?.includes(savedPropResult)
+          ) {
+            setPropResult(null);
+            setResultsSaved(false);
+          } else {
+            setPropResult(savedPropResult);
+            setResultsSaved(true);
+          }
+          if (scored.includes(week)) {
+            setResultsLocked(true);
+            setScoredAtLabel("scored");
+          }
+        } else if (scored.includes(week)) {
+          setResultsLocked(true);
+        }
+      } catch {
+        /* ignore */
+      }
     }
   }
 
@@ -609,6 +656,7 @@ export default function CommissionerPage() {
   }
 
   function setGameWinner(gameId: string, side: "home" | "away" | "push") {
+    if (resultsLocked) return;
     setResults((prev) => ({ ...prev, [gameId]: { gameId, winner: side } }));
     setResultsSaved(false);
     setDemoScore(null);
@@ -701,6 +749,13 @@ export default function CommissionerPage() {
     propResult?: string | null;
   }) {
     if (scoring) return;
+    if (resultsLocked) {
+      setScoreReport(
+        "This week is locked. Click “Unlock to re-score” first (dry-run)."
+      );
+      setScoring(false);
+      return;
+    }
     setScoring(true);
     setScoreReport(null);
     const keys = storageKeys(activeWeek);
@@ -775,8 +830,16 @@ export default function CommissionerPage() {
       return;
     }
 
+    // Lock this week after a successful score pass
+    setResultsLocked(true);
+    setScoredAtLabel(new Date().toLocaleString());
+    void refreshScoredWeeks();
+
     if (cloud.scoredCount === 0) {
-      setScoreReport(cloud.error || "Saved results. No locked cloud picks to score yet.");
+      setScoreReport(
+        cloud.error ||
+          `Saved results for ${weekTitle(activeWeek)} (locked). No locked picks found yet — fill bot picks first.`
+      );
       applyWeekScores();
       return;
     }
@@ -784,7 +847,9 @@ export default function CommissionerPage() {
     const lines = (cloud.details || [])
       .map((d) => `${d.name}: ${d.points} pts`)
       .join(" · ");
-    setScoreReport(`Scored ${cloud.scoredCount} player(s). ${lines}`);
+    setScoreReport(
+      `${weekTitle(activeWeek)} scored & locked · ${cloud.scoredCount} player(s). ${lines}`
+    );
   }
 
   async function saveSettings() {
@@ -1644,11 +1709,58 @@ export default function CommissionerPage() {
 
         {tab === "results" && (
           <div>
+            {/* Week picker for scoring */}
+            <div className="rounded-xl border border-border bg-card p-5 mb-6">
+              <h2 className="font-semibold mb-1">Score which week?</h2>
+              <p className="text-xs text-muted mb-3">
+                Select a week with a published card.{" "}
+                <strong className="text-foreground">Scored weeks lock</strong>{" "}
+                so you don&apos;t overwrite them by accident. Unlock only to
+                re-score a dry run.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {Array.from({ length: SEASON_MAX_WEEK + 1 }, (_, i) => i).map(
+                  (w) => {
+                    const scored = scoredWeeks.includes(w);
+                    const selected = activeWeek === w;
+                    return (
+                      <button
+                        key={w}
+                        type="button"
+                        onClick={() => void changeActiveWeek(w)}
+                        className={
+                          selected
+                            ? scored
+                              ? "px-3 py-1.5 rounded-full text-xs font-medium bg-primary text-black ring-2 ring-ok/50"
+                              : "px-3 py-1.5 rounded-full text-xs font-medium bg-primary text-black"
+                            : scored
+                              ? "px-3 py-1.5 rounded-full text-xs font-medium bg-ok/15 border border-ok/40 text-ok"
+                              : "px-3 py-1.5 rounded-full text-xs font-medium bg-card-hover border border-border text-muted hover:text-foreground"
+                        }
+                      >
+                        {weekTitle(w)}
+                        {scored ? " ✓" : ""}
+                      </button>
+                    );
+                  }
+                )}
+              </div>
+              <p className="text-[11px] text-muted mt-3">
+                Dry-run tip: Build Card → publish week → Fill bot picks → Enter
+                Results → set covers → Score → next week.
+              </p>
+            </div>
+
             <div className="rounded-xl border border-border bg-card p-5 mb-6">
               <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
                 <div>
                   <h2 className="font-semibold mb-1">
                     Enter Results — {weekTitle(activeWeek)}
+                    {resultsLocked && (
+                      <span className="ml-2 text-xs font-bold uppercase tracking-wide text-ok border border-ok/40 px-2 py-0.5 rounded-full">
+                        Locked
+                      </span>
+                    )}
                   </h2>
                   <p className="text-xs text-muted">
                     {weekSubtitle(activeWeek)}
@@ -1656,26 +1768,64 @@ export default function CommissionerPage() {
                       ? ` · ${formatCardDateRange(publishedGames)}`
                       : ""}
                   </p>
+                  {resultsLocked && scoredAtLabel && (
+                    <p className="text-[11px] text-ok mt-1 font-medium">
+                      Scored {scoredAtLabel}. View only unless you unlock.
+                    </p>
+                  )}
                   <p className="text-[11px] text-muted mt-1">
                     Auto-sync uses The Odds API finals (last 3 days) + your
                     locked spreads for ATS. Prop still needs a manual pick.
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => syncFinalScores(false)}
-                  disabled={syncingScores || !publishedGames.length}
-                  className="px-4 py-2 rounded-lg bg-primary text-black text-sm font-medium disabled:opacity-50 shrink-0"
-                >
-                  {syncingScores ? "Syncing…" : "Sync final scores"}
-                </button>
+                <div className="flex flex-col gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => syncFinalScores(false)}
+                    disabled={
+                      syncingScores ||
+                      !publishedGames.length ||
+                      resultsLocked
+                    }
+                    className="px-4 py-2 rounded-lg bg-primary text-black text-sm font-medium disabled:opacity-50"
+                  >
+                    {syncingScores ? "Syncing…" : "Sync final scores"}
+                  </button>
+                  {resultsLocked && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (
+                          confirm(
+                            `Unlock ${weekTitle(activeWeek)} for re-scoring?\n\nUse only for dry runs.`
+                          )
+                        ) {
+                          setResultsLocked(false);
+                          setScoreReport(
+                            `${weekTitle(activeWeek)} unlocked — edit covers and score again.`
+                          );
+                        }
+                      }}
+                      className="px-4 py-2 rounded-lg border border-warning text-warning text-sm font-medium"
+                    >
+                      Unlock to re-score
+                    </button>
+                  )}
+                </div>
               </div>
               {syncReport && (
                 <pre className="text-xs text-muted whitespace-pre-wrap mb-4 rounded-lg border border-border bg-background p-3 max-h-40 overflow-y-auto">
                   {syncReport}
                 </pre>
               )}
-              <div className="space-y-4">
+              {!publishedGames.length ? (
+                <p className="text-sm text-danger py-4">
+                  No published card for {weekTitle(activeWeek)}. Go to{" "}
+                  <strong>Build Card</strong>, select this week, publish 5
+                  games, then fill bot picks.
+                </p>
+              ) : (
+              <div className={`space-y-4 ${resultsLocked ? "opacity-90" : ""}`}>
                 {publishedGames.map((game) => {
                   const res = results[game.id];
                   const kick = formatKickoff(
@@ -1689,31 +1839,37 @@ export default function CommissionerPage() {
                       <div className="text-xs text-primary mb-3">{kick.full}</div>
                       <div className="grid grid-cols-3 gap-2">
                         <button
+                          type="button"
+                          disabled={resultsLocked}
                           onClick={() => setGameWinner(game.id, "away")}
                           className={
                             res?.winner === "away"
-                              ? "py-2 rounded-lg text-sm border border-primary bg-primary/10 text-primary"
-                              : "py-2 rounded-lg text-sm border border-border"
+                              ? "py-2 rounded-lg text-sm border border-primary bg-primary/10 text-primary disabled:opacity-80"
+                              : "py-2 rounded-lg text-sm border border-border disabled:opacity-50 disabled:cursor-not-allowed"
                           }
                         >
                           {game.awayTeam}
                         </button>
                         <button
+                          type="button"
+                          disabled={resultsLocked}
                           onClick={() => setGameWinner(game.id, "push")}
                           className={
                             res?.winner === "push"
-                              ? "py-2 rounded-lg text-sm border border-primary bg-primary/10 text-primary"
-                              : "py-2 rounded-lg text-sm border border-border"
+                              ? "py-2 rounded-lg text-sm border border-primary bg-primary/10 text-primary disabled:opacity-80"
+                              : "py-2 rounded-lg text-sm border border-border disabled:opacity-50 disabled:cursor-not-allowed"
                           }
                         >
                           Push
                         </button>
                         <button
+                          type="button"
+                          disabled={resultsLocked}
                           onClick={() => setGameWinner(game.id, "home")}
                           className={
                             res?.winner === "home"
-                              ? "py-2 rounded-lg text-sm border border-primary bg-primary/10 text-primary"
-                              : "py-2 rounded-lg text-sm border border-border"
+                              ? "py-2 rounded-lg text-sm border border-primary bg-primary/10 text-primary disabled:opacity-80"
+                              : "py-2 rounded-lg text-sm border border-border disabled:opacity-50 disabled:cursor-not-allowed"
                           }
                         >
                           {game.homeTeam}
@@ -1723,6 +1879,7 @@ export default function CommissionerPage() {
                   );
                 })}
               </div>
+              )}
             </div>
 
             <div className="rounded-xl border border-border bg-card p-5 mb-6">
@@ -1744,14 +1901,16 @@ export default function CommissionerPage() {
                       <button
                         key={opt}
                         type="button"
+                        disabled={resultsLocked}
                         onClick={() => {
+                          if (resultsLocked) return;
                           setPropResult(opt);
                           setResultsSaved(false);
                         }}
                         className={
                           propResult === opt
-                            ? "py-2.5 rounded-lg text-sm border border-primary bg-primary/10 text-primary"
-                            : "py-2.5 rounded-lg text-sm border border-border"
+                            ? "py-2.5 rounded-lg text-sm border border-primary bg-primary/10 text-primary disabled:opacity-80"
+                            : "py-2.5 rounded-lg text-sm border border-border disabled:opacity-50 disabled:cursor-not-allowed"
                         }
                       >
                         {opt}
@@ -1773,15 +1932,21 @@ export default function CommissionerPage() {
             </div>
 
             <button
-              disabled={!allResultsIn}
+              disabled={!allResultsIn || resultsLocked || scoring}
               onClick={() => void handleSaveResults()}
               className={
-                !allResultsIn
+                !allResultsIn || resultsLocked || scoring
                   ? "w-full py-3 rounded-xl font-semibold mb-6 bg-border text-muted cursor-not-allowed"
                   : "w-full py-3 rounded-xl font-semibold mb-6 bg-primary text-black"
               }
             >
-              {scoring ? "Scoring…" : resultsSaved ? "Results Saved — Score Again" : "Save Results & Score League"}
+              {scoring
+                ? "Scoring…"
+                : resultsLocked
+                  ? `${weekTitle(activeWeek)} locked ✓`
+                  : resultsSaved
+                    ? "Save Results & Score League"
+                    : "Save Results & Score League"}
             </button>
 
             {scoreReport && (
