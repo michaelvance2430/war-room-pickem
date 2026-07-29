@@ -70,6 +70,15 @@ export const RULE_SECTIONS: RuleSection[] = [
     ],
   },
   {
+    title: "Crystal Ball (preseason)",
+    body: [
+      "Before Week 0 kickoff, pick who you think wins the national championship.",
+      "Crystal Ball is worth zero standings points — pure pride.",
+      "If you're right, you earn the sarcastic achievement: Village Witch / Wizard Nerd.",
+      "Picks lock at noon ET on Week 0 Saturday (Aug 29, 2026).",
+    ],
+  },
+  {
     title: "Profile & tips",
     body: [
       "Upload a profile photo under Account so the league knows who’s who.",

@@ -262,6 +262,13 @@ function matchTeam(teamName: string): Match | null {
   return best;
 }
 
+/** All FBS schools for pickers (Crystal Ball, etc.), sorted by name. */
+export function listFbsTeams(): { name: string; conference: string }[] {
+  return [...FBS_TEAMS]
+    .map((t) => ({ name: t.name, conference: t.conference }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
 /** Canonical FBS short name for ranking lookup, or null if not FBS. */
 export function getFbsCanonicalName(teamName: string): string | null {
   return matchTeam(teamName)?.entry.name ?? null;

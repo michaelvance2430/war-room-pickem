@@ -98,6 +98,7 @@ export default function Nav() {
 
   const links: NavLink[] = [
     { href: "/picks", label: "My Picks" },
+    { href: "/crystal-ball", label: "Crystal Ball" },
     { href: "/standings", label: "Standings" },
     { href: "/power-rankings", label: "Power Rankings" },
     { href: "/announcements", label: "Announcements", badge: unreadCount },
