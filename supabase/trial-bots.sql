@@ -371,3 +371,52 @@ $$;
 grant execute on function public.seed_trial_bots(uuid, int) to authenticated;
 grant execute on function public.clear_trial_bots(uuid) to authenticated;
 grant execute on function public.seed_bot_picks_for_week(uuid, int) to authenticated;
+
+-- ---------- Roster that always includes bots (bypasses embed/RLS quirks) ----------
+create or replace function public.get_league_roster(p_league_id uuid)
+returns table (
+  membership_id uuid,
+  user_id uuid,
+  display_name text,
+  division public.division,
+  role public.member_role,
+  total_points int,
+  avatar_url text,
+  is_bot boolean
+)
+language plpgsql
+security definer
+set search_path = public
+stable
+as $$
+begin
+  if auth.uid() is null then
+    raise exception 'Not authenticated';
+  end if;
+  if not exists (
+    select 1 from public.memberships m
+    where m.league_id = p_league_id and m.user_id = auth.uid()
+  ) then
+    raise exception 'Not a member of this league';
+  end if;
+
+  return query
+  select
+    m.id,
+    m.user_id,
+    coalesce(p.display_name, 'Player')::text,
+    m.division,
+    m.role,
+    coalesce(m.total_points, 0),
+    p.avatar_url::text,
+    coalesce(m.is_bot, false)
+  from public.memberships m
+  left join public.profiles p on p.id = m.user_id
+  where m.league_id = p_league_id
+  order by coalesce(m.is_bot, false), p.display_name nulls last;
+end;
+$$;
+
+grant execute on function public.get_league_roster(uuid) to authenticated;
+
+notify pgrst, 'reload schema';

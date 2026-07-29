@@ -884,7 +884,38 @@ export async function loadLeagueRoster(): Promise<LeagueRosterMember[]> {
   const session = getSession();
   if (!session?.leagueId) return [];
   const supabase = createClient();
-  // is_bot may be missing until trial-bots.sql is run — fall back without it
+
+  // Preferred: security-definer roster (includes bots reliably)
+  {
+    const { data, error } = await supabase.rpc("get_league_roster", {
+      p_league_id: session.leagueId,
+    });
+    if (!error && Array.isArray(data) && data.length) {
+      return (data as Record<string, unknown>[])
+        .map((m) => {
+          const role = m.role === "commissioner" ? "commissioner" : "player";
+          const division =
+            (m.division as LeagueRosterMember["division"]) || "North";
+          return {
+            membershipId: m.membership_id as string,
+            userId: m.user_id as string,
+            name: (m.display_name as string) || "Player",
+            division,
+            role: role as "commissioner" | "player",
+            totalPoints: (m.total_points as number) || 0,
+            avatarUrl: (m.avatar_url as string | null) || null,
+            isBot: !!m.is_bot,
+          };
+        })
+        .sort((a, b) => {
+          // Humans first, then bots; alpha within each
+          if (!!a.isBot !== !!b.isBot) return a.isBot ? 1 : -1;
+          return a.name.localeCompare(b.name);
+        });
+    }
+  }
+
+  // Fallback: direct table select
   let rows: Record<string, unknown>[] | null = null;
   {
     const res = await supabase
@@ -900,13 +931,38 @@ export async function loadLeagueRoster(): Promise<LeagueRosterMember[]> {
           "id, user_id, role, division, total_points, profiles(display_name, avatar_url)"
         )
         .eq("league_id", session.leagueId);
+      if (res2.error) {
+        console.error("loadLeagueRoster fallback failed", res2.error);
+      }
       rows = (res2.data as Record<string, unknown>[] | null) || null;
-    } else if (!res.error) {
+    } else if (res.error) {
+      console.error("loadLeagueRoster failed", res.error);
+      // Last resort without embeds
+      const res3 = await supabase
+        .from("memberships")
+        .select("id, user_id, role, division, total_points")
+        .eq("league_id", session.leagueId);
+      rows = (res3.data as Record<string, unknown>[] | null) || null;
+    } else {
       rows = (res.data as Record<string, unknown>[] | null) || null;
     }
   }
 
-  if (!rows) return [];
+  if (!rows?.length) return [];
+
+  // Resolve names if embed missing
+  const needsNames = rows.some((m) => !m.profiles);
+  let nameById = new Map<string, string>();
+  if (needsNames) {
+    const ids = rows.map((m) => m.user_id as string).filter(Boolean);
+    const { data: profs } = await supabase
+      .from("profiles")
+      .select("id, display_name")
+      .in("id", ids);
+    for (const p of profs || []) {
+      nameById.set(p.id as string, (p.display_name as string) || "Player");
+    }
+  }
 
   return rows
     .map((m: Record<string, unknown>) => {
@@ -916,10 +972,14 @@ export async function loadLeagueRoster(): Promise<LeagueRosterMember[]> {
       } | null;
       const role = m.role === "commissioner" ? "commissioner" : "player";
       const division = (m.division as LeagueRosterMember["division"]) || "North";
+      const uid = m.user_id as string;
       return {
         membershipId: m.id as string,
-        userId: m.user_id as string,
-        name: profile?.display_name || "Player",
+        userId: uid,
+        name:
+          profile?.display_name ||
+          nameById.get(uid) ||
+          "Player",
         division,
         role,
         totalPoints: (m.total_points as number) || 0,
@@ -927,7 +987,10 @@ export async function loadLeagueRoster(): Promise<LeagueRosterMember[]> {
         isBot: !!m.is_bot,
       };
     })
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .sort((a, b) => {
+      if (!!a.isBot !== !!b.isBot) return a.isBot ? 1 : -1;
+      return a.name.localeCompare(b.name);
+    });
 }
 
 /** True only when PostgREST cannot see the RPC (not permission / runtime errors). */
