@@ -54,6 +54,154 @@ export const DEFAULT_CUT_LOCK_WEEK = 14;
 export const SEASON_MAX_WEEK = FULL_SEASON_MAX_WEEK;
 export const DEFAULT_SEASON_WEEKS = FULL_SEASON_MAX_WEEK;
 
+/**
+ * 2026 CFB pick'em windows (America/New_York civil dates, inclusive).
+ *
+ * Week 0: Sat Aug 29 only (special kickoff)
+ * Week 1+: Thu–Mon college windows (Labor Day week for Week 1)
+ */
+export type WeekDateWindow = {
+  weekNumber: number;
+  /** YYYY-MM-DD start (ET calendar date) */
+  startDate: string;
+  /** YYYY-MM-DD end (ET calendar date), inclusive */
+  endDate: string;
+};
+
+/** Week 0 = Aug 29, 2026. Week 1 = Sep 3–7, then +7 days each RS week. */
+function buildRegularWindows2026(): WeekDateWindow[] {
+  const out: WeekDateWindow[] = [
+    { weekNumber: 0, startDate: "2026-08-29", endDate: "2026-08-29" },
+  ];
+  // Week 1 opens Thu Sep 3, 2026 through Mon Sep 7
+  let start = utcNoonFromYmd("2026-09-03");
+  for (let w = 1; w <= 13; w++) {
+    const end = new Date(start);
+    end.setUTCDate(end.getUTCDate() + 4); // Thu→Mon
+    out.push({
+      weekNumber: w,
+      startDate: ymdFromUtcNoon(start),
+      endDate: ymdFromUtcNoon(end),
+    });
+    start = new Date(start);
+    start.setUTCDate(start.getUTCDate() + 7);
+  }
+  // Conf Champ weekend (first weekend of Dec 2026)
+  out.push({
+    weekNumber: 14,
+    startDate: "2026-12-04",
+    endDate: "2026-12-06",
+  });
+  // CFP (approx 2026–27 windows — filter when books post)
+  out.push(
+    { weekNumber: 15, startDate: "2026-12-18", endDate: "2026-12-21" },
+    { weekNumber: 16, startDate: "2026-12-31", endDate: "2027-01-02" },
+    { weekNumber: 17, startDate: "2027-01-08", endDate: "2027-01-11" },
+    { weekNumber: 18, startDate: "2027-01-18", endDate: "2027-01-20" }
+  );
+  return out;
+}
+
+const WINDOWS_2026 = buildRegularWindows2026();
+
+function utcNoonFromYmd(ymd: string): Date {
+  const [y, m, d] = ymd.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+}
+
+function ymdFromUtcNoon(d: Date): string {
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+export function weekDateWindow(weekNumber: number): WeekDateWindow | null {
+  return WINDOWS_2026.find((w) => w.weekNumber === weekNumber) || null;
+}
+
+/** Human range e.g. "Aug 29, 2026" or "Sep 3–7, 2026" */
+export function weekDateRangeLabel(weekNumber: number): string {
+  const w = weekDateWindow(weekNumber);
+  if (!w) return "";
+  const fmt = (ymd: string) => {
+    const [y, m, d] = ymd.split("-").map(Number);
+    const dt = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+    return dt.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      timeZone: "UTC",
+    });
+  };
+  if (w.startDate === w.endDate) return fmt(w.startDate);
+  const a = fmt(w.startDate);
+  const b = fmt(w.endDate);
+  // "Sep 3, 2026" + "Sep 7, 2026" → "Sep 3–7, 2026" when same month/year
+  const [aMonthDay, aYear] = [a.replace(/,?\s*\d{4}$/, ""), a.match(/\d{4}/)?.[0]];
+  const [bMonthDay, bYear] = [b.replace(/,?\s*\d{4}$/, ""), b.match(/\d{4}/)?.[0]];
+  if (aYear === bYear && aMonthDay.split(" ")[0] === bMonthDay.split(" ")[0]) {
+    const startDay = aMonthDay.split(" ")[1];
+    const endDay = bMonthDay.split(" ")[1];
+    return `${aMonthDay.split(" ")[0]} ${startDay}–${endDay}, ${aYear}`;
+  }
+  return `${a} – ${b}`;
+}
+
+/**
+ * Inclusive ET window: startDate 00:00:00 America/New_York → endDate 23:59:59.999 ET.
+ */
+export function weekWindowMs(weekNumber: number): {
+  startMs: number;
+  endMs: number;
+} | null {
+  const w = weekDateWindow(weekNumber);
+  if (!w) return null;
+  return {
+    startMs: etStartOfDayMs(w.startDate),
+    endMs: etEndOfDayMs(w.endDate),
+  };
+}
+
+/** Midnight America/New_York on civil date YYYY-MM-DD → epoch ms. */
+function etStartOfDayMs(ymd: string): number {
+  // Prefer EDT (-04:00); if that lands on a different ET calendar day, use EST (-05:00).
+  let t = Date.parse(`${ymd}T00:00:00-04:00`);
+  if (etYmd(t) !== ymd) {
+    t = Date.parse(`${ymd}T00:00:00-05:00`);
+  }
+  return t;
+}
+
+function etEndOfDayMs(ymd: string): number {
+  // Start of next calendar day in ET, minus 1ms
+  const [y, m, d] = ymd.split("-").map(Number);
+  const next = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+  next.setUTCDate(next.getUTCDate() + 1);
+  const nextYmd = `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}-${String(next.getUTCDate()).padStart(2, "0")}`;
+  return etStartOfDayMs(nextYmd) - 1;
+}
+
+function etYmd(ms: number): string {
+  return new Date(ms).toLocaleDateString("en-CA", {
+    timeZone: "America/New_York",
+  });
+}
+
+export function filterGamesForWeek<
+  T extends { commenceTime?: string; startTime?: string },
+>(games: T[], weekNumber: number): T[] {
+  const win = weekWindowMs(weekNumber);
+  if (!win) return games;
+  return games.filter((g) => {
+    const raw = g.commenceTime || g.startTime;
+    if (!raw) return false;
+    const t = new Date(raw).getTime();
+    if (Number.isNaN(t)) return false;
+    return t >= win.startMs && t <= win.endMs;
+  });
+}
+
 export function seasonPhase(weekNumber: number): SeasonPhase {
   if (weekNumber === 0) return "week0";
   if (weekNumber >= 1 && weekNumber <= 13) return "regular";
@@ -85,29 +233,31 @@ export function weekTitle(weekNumber: number): string {
 }
 
 export function weekSubtitle(weekNumber: number): string {
+  const range = weekDateRangeLabel(weekNumber);
+  const rangeBit = range ? ` ${range}.` : "";
   switch (seasonPhase(weekNumber)) {
     case "week0":
-      return "Independent openers — own card & scores. Does not set the Championship/Toilet cut by itself.";
+      return `Special kickoff Saturday only (${range || "Aug 29, 2026"}). Separate card from Week 1.`;
     case "regular":
       if (weekNumber === 1) {
-        return "First real regular-season card (separate from Week 0). Counts toward standings.";
+        return `Opening weekend Thu–Mon.${rangeBit} Not Week 0. Counts toward standings.`;
       }
       if (weekNumber === 13) {
-        return "Late regular season — last RS Saturday(s) before conference title week.";
+        return `Late regular season.${rangeBit} Last RS window before Conf Champ.`;
       }
-      return "Regular-season slate — counts toward standings & the cut.";
+      return `Regular-season Thu–Mon window.${rangeBit} Counts toward standings & the cut.`;
     case "conf_championship":
-      return "Conference championship games. After this week is scored, top cut → Championship bracket, rest → Toilet Bowl.";
+      return `Conference championship weekend.${rangeBit} After scoring, cut locks Championship vs Toilet.`;
     case "cfp_r1":
-      return "CFP first round. Brackets locked — weekly scores advance matchups (optional pick'em card).";
+      return `CFP first round.${rangeBit} Bracket advancement week.`;
     case "cfp_qf":
-      return "CFP quarterfinals / New Year’s Six window. Bracket advancement week.";
+      return `CFP quarterfinals / NY6.${rangeBit} Bracket advancement week.`;
     case "cfp_sf":
-      return "CFP semifinals. Bracket advancement week.";
+      return `CFP semifinals.${rangeBit} Bracket advancement week.`;
     case "cfp_final":
-      return "CFP National Championship. Final bracket week.";
+      return `CFP National Championship.${rangeBit} Final bracket week.`;
     default:
-      return "Pick'em card for this week.";
+      return range ? `Pick'em card · ${range}.` : "Pick'em card for this week.";
   }
 }
 

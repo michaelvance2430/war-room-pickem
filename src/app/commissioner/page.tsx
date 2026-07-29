@@ -38,7 +38,10 @@ import {
   weekTitle,
   weekSubtitle,
 } from "@/lib/dates";
-import { SEASON_MAX_WEEK } from "@/lib/season-calendar";
+import {
+  SEASON_MAX_WEEK,
+  weekDateRangeLabel,
+} from "@/lib/season-calendar";
 import {
   fetchNcaafScores,
   buildResultsFromScores,
@@ -312,6 +315,10 @@ export default function CommissionerPage() {
 
   async function changeActiveWeek(week: number) {
     setActiveWeek(week);
+    // Don't show the previous week's odds list on the new week
+    setAvailableGames([]);
+    setSelectedIds(new Set());
+    setOddsError(null);
     try {
       localStorage.setItem(ACTIVE_WEEK_KEY, String(week));
     } catch {
@@ -373,13 +380,21 @@ export default function CommissionerPage() {
     setLoadingOdds(true);
     setOddsError(null);
     try {
-      const { games, rankLabel: pollLabel } = await fetchNcaafOdds();
+      const {
+        games,
+        rankLabel: pollLabel,
+        weekFilter,
+        unfilteredCount,
+      } = await fetchNcaafOdds(activeWeek);
       setRankLabel(pollLabel || null);
       if (!games.length) {
         setAvailableGames([]);
         setSelectedIds(new Set());
+        const range = weekFilter || weekTitle(activeWeek);
         setOddsError(
-          "No NCAA FBS games with spreads right now. Books often post little in the offseason — try again when Week 1 lines are up. Only SEC / Big Ten / ACC / Big 12 / G5 / Independents are shown."
+          unfilteredCount && unfilteredCount > 0
+            ? `No FBS games with spreads in the ${weekTitle(activeWeek)} window (${range}). ${unfilteredCount} other FBS game(s) exist outside this week — switch weeks or wait for books to post this slate.`
+            : `No NCAA FBS games with spreads for ${weekTitle(activeWeek)} (${range}) right now. Books often post little early — try again when lines are up.`
         );
         return;
       }
@@ -1091,8 +1106,11 @@ export default function CommissionerPage() {
                     Pull Live Odds — {weekTitle(activeWeek)}
                   </h2>
                   <p className="text-xs text-muted">
-                    Live NCAA FBS only — SEC, Big Ten, ACC, Big 12, G5,
-                    Independents
+                    FBS only · filtered to{" "}
+                    <span className="text-foreground font-medium">
+                      {weekDateRangeLabel(activeWeek) || weekTitle(activeWeek)}
+                    </span>{" "}
+                    (Week 0 ≠ Week 1)
                   </p>
                 </div>
                 <button

@@ -2,13 +2,19 @@ import { NextResponse } from "next/server";
 import { mapOddsApiToGames } from "@/lib/odds";
 import { filterToFbsGames } from "@/lib/fbs-teams";
 import { applyApRanks, fetchApRankSource } from "@/lib/rankings";
+import {
+  filterGamesForWeek,
+  weekDateRangeLabel,
+  weekDateWindow,
+} from "@/lib/season-calendar";
 import type { OddsApiGame } from "@/lib/types";
 
 /**
  * Server-side odds fetch so the API key is never exposed in the browser.
- * Set ODDS_API_KEY in Vercel (Production + Preview) and restart/redeploy.
+ * Optional ?week=N filters kickoffs to that pick'em week’s date window
+ * (Week 0 = Aug 29 2026; Week 1 = Sep 3–7; …).
  */
-export async function GET() {
+export async function GET(req: Request) {
   // Trim — Vercel paste often includes trailing spaces/newlines → INVALID_KEY
   const apiKey = (
     process.env.ODDS_API_KEY ||
@@ -25,6 +31,14 @@ export async function GET() {
       { status: 503 }
     );
   }
+
+  const { searchParams } = new URL(req.url);
+  const weekRaw = searchParams.get("week");
+  const weekNumber =
+    weekRaw != null && weekRaw !== ""
+      ? parseInt(weekRaw, 10)
+      : Number.NaN;
+  const filterByWeek = !Number.isNaN(weekNumber);
 
   const url = new URL(
     "https://api.the-odds-api.com/v4/sports/americanfootball_ncaaf/odds"
@@ -74,17 +88,34 @@ export async function GET() {
       // ignore ranking failures
     }
 
+    const unfilteredCount = games.length;
+    let weekLabel: string | null = null;
+    let window: { startDate: string; endDate: string } | null = null;
+    if (filterByWeek) {
+      games = filterGamesForWeek(games, weekNumber);
+      weekLabel = weekDateRangeLabel(weekNumber);
+      const w = weekDateWindow(weekNumber);
+      if (w) window = { startDate: w.startDate, endDate: w.endDate };
+    }
+
     return NextResponse.json({
       games,
       count: games.length,
       rawCount,
       withLines,
       fbsCount,
+      unfilteredCount,
       remaining,
       used,
       rankLabel,
+      week: filterByWeek ? weekNumber : null,
+      weekLabel,
+      window,
       filter:
-        "NCAA FBS only (SEC, Big Ten, ACC, Big 12, Independents, Group of 5)",
+        "NCAA FBS only (SEC, Big Ten, ACC, Big 12, Independents, Group of 5)" +
+        (filterByWeek && weekLabel
+          ? ` · kickoffs in ${weekLabel}`
+          : ""),
     });
   } catch (e: unknown) {
     return NextResponse.json(

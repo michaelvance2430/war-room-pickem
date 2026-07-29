@@ -1,4 +1,5 @@
 import { Game, OddsApiGame } from "./types";
+import { filterGamesForWeek, weekDateRangeLabel } from "./season-calendar";
 
 /**
  * Convert The Odds API response into our Game shape.
@@ -63,16 +64,22 @@ export function mapOddsApiToGames(apiGames: OddsApiGame[]): Game[] {
 
 /**
  * Fetch live NCAAF spreads via our server route (keeps API key off the client).
- * Configure ODDS_API_KEY on Vercel (or .env.local for local dev).
- * Free key: https://the-odds-api.com
+ * Pass pick'em week so results are filtered to that week's date window
+ * (Week 0 = Aug 29 2026 only; Week 1 = Sep 3–7; etc.).
  */
-export async function fetchNcaafOdds(): Promise<{
+export async function fetchNcaafOdds(weekNumber?: number): Promise<{
   games: Game[];
   remaining?: string | null;
   used?: string | null;
   rankLabel?: string;
+  weekFilter?: string | null;
+  unfilteredCount?: number;
 }> {
-  const res = await fetch("/api/odds/ncaaf", { cache: "no-store" });
+  const q =
+    weekNumber != null && Number.isFinite(weekNumber)
+      ? `?week=${encodeURIComponent(String(weekNumber))}`
+      : "";
+  const res = await fetch(`/api/odds/ncaaf${q}`, { cache: "no-store" });
   const body = await res.json().catch(() => ({}));
 
   if (!res.ok) {
@@ -82,10 +89,24 @@ export async function fetchNcaafOdds(): Promise<{
     );
   }
 
+  let games = ((body as { games?: Game[] }).games || []) as Game[];
+  const unfilteredCount =
+    (body as { unfilteredCount?: number }).unfilteredCount ?? games.length;
+
+  // Client-side belt-and-suspenders if API omitted filter
+  if (weekNumber != null && Number.isFinite(weekNumber)) {
+    games = filterGamesForWeek(games, weekNumber);
+  }
+
   return {
-    games: ((body as { games?: Game[] }).games || []) as Game[],
+    games,
     remaining: (body as { remaining?: string | null }).remaining,
     used: (body as { used?: string | null }).used,
     rankLabel: (body as { rankLabel?: string }).rankLabel,
+    weekFilter:
+      weekNumber != null
+        ? weekDateRangeLabel(weekNumber) || `week ${weekNumber}`
+        : null,
+    unfilteredCount,
   };
 }
