@@ -71,6 +71,32 @@ export default function CommissionerPage() {
   /** CFB week number: 0 = openers, 1..N regular (Week 1 may span two Saturdays) */
   const [activeWeek, setActiveWeek] = useState(1);
   const [settingsSaved, setSettingsSaved] = useState(false);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
+  const [sqlCopied, setSqlCopied] = useState(false);
+
+  const RAISE_WEEKS_SQL = `do $$
+declare r record;
+begin
+  for r in
+    select c.conname
+    from pg_constraint c
+    join pg_class t on c.conrelid = t.oid
+    join pg_namespace n on t.relnamespace = n.oid
+    where n.nspname = 'public' and t.relname = 'leagues' and c.contype = 'c'
+      and pg_get_constraintdef(c.oid) ilike '%regular_season_weeks%'
+  loop
+    execute format('alter table public.leagues drop constraint %I', r.conname);
+  end loop;
+end $$;
+
+alter table public.leagues
+  add constraint leagues_regular_season_weeks_check
+  check (regular_season_weeks between 4 and 24);
+
+select conname, pg_get_constraintdef(oid)
+from pg_constraint
+where conrelid = 'public.leagues'::regclass and contype = 'c'
+  and pg_get_constraintdef(oid) ilike '%regular_season_weeks%';`;
   const [copied, setCopied] = useState(false);
   const [availableGames, setAvailableGames] = useState<Game[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -694,6 +720,7 @@ export default function CommissionerPage() {
   }
 
   async function saveSettings() {
+    setSettingsError(null);
     const result = await saveLeagueToCloud({
       name: leagueNameEdit,
       settings: {
@@ -705,9 +732,20 @@ export default function CommissionerPage() {
     if (result.ok && result.league) {
       setLeague(result.league);
       setSettingsSaved(true);
+      setSettingsError(null);
       setTimeout(() => setSettingsSaved(false), 1500);
     } else {
-      alert(result.error || "Failed to save settings");
+      setSettingsError(result.error || "Failed to save settings");
+    }
+  }
+
+  async function copyRaiseWeeksSql() {
+    try {
+      await navigator.clipboard.writeText(RAISE_WEEKS_SQL);
+      setSqlCopied(true);
+      setTimeout(() => setSqlCopied(false), 2000);
+    } catch {
+      /* ignore */
     }
   }
 
@@ -986,7 +1024,7 @@ export default function CommissionerPage() {
                 </div>
               </div>
               <button
-                onClick={saveSettings}
+                onClick={() => void saveSettings()}
                 className={
                   settingsSaved
                     ? "w-full py-3 rounded-xl font-semibold bg-primary/20 text-primary border border-primary"
@@ -995,6 +1033,41 @@ export default function CommissionerPage() {
               >
                 {settingsSaved ? "Settings saved" : "Save settings"}
               </button>
+              {settingsError && (
+                <div className="rounded-lg border border-danger/40 bg-danger/10 p-3 space-y-2">
+                  <p className="text-sm text-danger">{settingsError}</p>
+                  {(settingsError.includes("max 16") ||
+                    settingsError.includes("regular_season_weeks")) && (
+                    <div className="space-y-2 pt-1">
+                      <p className="text-xs text-muted leading-relaxed">
+                        One-time Supabase fix (not an app bug). Open{" "}
+                        <a
+                          href="https://supabase.com/dashboard/project/dorhjepugsjpmnuzdzck/sql/new"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-primary underline"
+                        >
+                          SQL Editor
+                        </a>
+                        , paste the script, click <strong>Run</strong>, then
+                        Save settings again. Results should show{" "}
+                        <code className="text-foreground">between 4 and 24</code>
+                        .
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => void copyRaiseWeeksSql()}
+                        className="px-3 py-1.5 rounded-lg border border-border text-xs font-medium hover:bg-card-hover"
+                      >
+                        {sqlCopied ? "SQL copied!" : "Copy fix SQL"}
+                      </button>
+                      <pre className="text-[10px] text-muted bg-background border border-border rounded-lg p-2 overflow-x-auto max-h-32">
+                        {RAISE_WEEKS_SQL}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="rounded-xl border border-warning/40 bg-card p-5 space-y-3">
