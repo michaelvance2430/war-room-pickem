@@ -4,6 +4,9 @@
 -- Run once in Supabase → SQL Editor → Run
 -- ============================================================
 
+-- Needed for crypt()/gen_salt() when creating bot auth users
+create extension if not exists pgcrypto with schema extensions;
+
 alter table public.memberships
   add column if not exists is_bot boolean not null default false;
 
@@ -19,13 +22,14 @@ create or replace function public.seed_trial_bots(
 returns json
 language plpgsql
 security definer
-set search_path = public, auth
+set search_path = public, auth, extensions
 as $$
 declare
   v_uid uuid := auth.uid();
   v_existing int;
   v_need int;
   v_added int := 0;
+  v_password text;
   v_names text[] := array[
     'DJ Chaos','Couch QB','Line Shopper','Fade Master','Late Lock',
     'Sunday Scaries','Vegas Vic','Confidence King','Dog Walker','Pick Wizard',
@@ -87,6 +91,11 @@ begin
     v_user_id := gen_random_uuid();
     v_email := 'bot+' || replace(v_user_id::text, '-', '') || '@warroom.trial';
     v_div := (array['North','South','East','West'])[1 + (v_added % 4)];
+    -- pgcrypto lives in extensions schema on Supabase
+    v_password := extensions.crypt(
+      gen_random_uuid()::text,
+      extensions.gen_salt('bf')
+    );
 
     insert into auth.users (
       instance_id,
@@ -110,7 +119,7 @@ begin
       'authenticated',
       'authenticated',
       v_email,
-      crypt(gen_random_uuid()::text, gen_salt('bf')),
+      v_password,
       now(),
       '{"provider":"email","providers":["email"]}'::jsonb,
       jsonb_build_object('display_name', v_name, 'is_trial_bot', true),
