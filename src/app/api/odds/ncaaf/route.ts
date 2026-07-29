@@ -33,12 +33,16 @@ export async function GET(req: Request) {
   }
 
   const { searchParams } = new URL(req.url);
+  const dryRun =
+    searchParams.get("dryRun") === "1" ||
+    searchParams.get("dryRun") === "true";
   const weekRaw = searchParams.get("week");
   const weekNumber =
     weekRaw != null && weekRaw !== ""
       ? parseInt(weekRaw, 10)
       : Number.NaN;
-  const filterByWeek = !Number.isNaN(weekNumber);
+  // Dry run: skip calendar window so commissioner can build any week card
+  const filterByWeek = !dryRun && !Number.isNaN(weekNumber);
 
   const url = new URL(
     "https://api.the-odds-api.com/v4/sports/americanfootball_ncaaf/odds"
@@ -111,11 +115,14 @@ export async function GET(req: Request) {
       week: filterByWeek ? weekNumber : null,
       weekLabel,
       window,
+      dryRun,
       filter:
         "NCAA FBS only (SEC, Big Ten, ACC, Big 12, Independents, Group of 5)" +
-        (filterByWeek && weekLabel
-          ? ` · kickoffs in ${weekLabel}`
-          : ""),
+        (dryRun
+          ? " · DRY RUN (all open games, no week date filter)"
+          : filterByWeek && weekLabel
+            ? ` · kickoffs in ${weekLabel}`
+            : ""),
     });
   } catch (e: unknown) {
     return NextResponse.json(

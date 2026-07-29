@@ -66,19 +66,27 @@ export function mapOddsApiToGames(apiGames: OddsApiGame[]): Game[] {
  * Fetch live NCAAF spreads via our server route (keeps API key off the client).
  * Pass pick'em week so results are filtered to that week's date window
  * (Week 0 = Aug 29 2026 only; Week 1 = Sep 3–7; etc.).
+ * Pass dryRun: true to skip date filter and return all open FBS games.
  */
-export async function fetchNcaafOdds(weekNumber?: number): Promise<{
+export async function fetchNcaafOdds(
+  weekNumber?: number,
+  opts?: { dryRun?: boolean }
+): Promise<{
   games: Game[];
   remaining?: string | null;
   used?: string | null;
   rankLabel?: string;
   weekFilter?: string | null;
   unfilteredCount?: number;
+  dryRun?: boolean;
 }> {
-  const q =
-    weekNumber != null && Number.isFinite(weekNumber)
-      ? `?week=${encodeURIComponent(String(weekNumber))}`
-      : "";
+  const dryRun = !!opts?.dryRun;
+  const params = new URLSearchParams();
+  if (!dryRun && weekNumber != null && Number.isFinite(weekNumber)) {
+    params.set("week", String(weekNumber));
+  }
+  if (dryRun) params.set("dryRun", "1");
+  const q = params.toString() ? `?${params.toString()}` : "";
   const res = await fetch(`/api/odds/ncaaf${q}`, { cache: "no-store" });
   const body = await res.json().catch(() => ({}));
 
@@ -93,8 +101,12 @@ export async function fetchNcaafOdds(weekNumber?: number): Promise<{
   const unfilteredCount =
     (body as { unfilteredCount?: number }).unfilteredCount ?? games.length;
 
-  // Client-side belt-and-suspenders if API omitted filter
-  if (weekNumber != null && Number.isFinite(weekNumber)) {
+  // Client-side belt-and-suspenders if API omitted filter (never in dry run)
+  if (
+    !dryRun &&
+    weekNumber != null &&
+    Number.isFinite(weekNumber)
+  ) {
     games = filterGamesForWeek(games, weekNumber);
   }
 
@@ -103,10 +115,12 @@ export async function fetchNcaafOdds(weekNumber?: number): Promise<{
     remaining: (body as { remaining?: string | null }).remaining,
     used: (body as { used?: string | null }).used,
     rankLabel: (body as { rankLabel?: string }).rankLabel,
-    weekFilter:
-      weekNumber != null
+    weekFilter: dryRun
+      ? "DRY RUN — all open FBS"
+      : weekNumber != null
         ? weekDateRangeLabel(weekNumber) || `week ${weekNumber}`
         : null,
     unfilteredCount,
+    dryRun,
   };
 }

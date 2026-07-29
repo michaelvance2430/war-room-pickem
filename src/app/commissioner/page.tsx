@@ -123,6 +123,8 @@ export default function CommissionerPage() {
   );
   const [botBusy, setBotBusy] = useState(false);
   const [botReport, setBotReport] = useState<string | null>(null);
+  /** Skip week date filter on Pull Odds — all open FBS games for season dry-run. */
+  const [dryRunOdds, setDryRunOdds] = useState(false);
   /** Weeks already scored (locked for results entry unless unlocked). */
   const [scoredWeeks, setScoredWeeks] = useState<number[]>([]);
   const [resultsLocked, setResultsLocked] = useState(false);
@@ -439,16 +441,19 @@ export default function CommissionerPage() {
         rankLabel: pollLabel,
         weekFilter,
         unfilteredCount,
-      } = await fetchNcaafOdds(activeWeek);
+        dryRun,
+      } = await fetchNcaafOdds(activeWeek, { dryRun: dryRunOdds });
       setRankLabel(pollLabel || null);
       if (!games.length) {
         setAvailableGames([]);
         setSelectedIds(new Set());
         const range = weekFilter || weekTitle(activeWeek);
         setOddsError(
-          unfilteredCount && unfilteredCount > 0
-            ? `No FBS games with spreads in the ${weekTitle(activeWeek)} window (${range}). ${unfilteredCount} other FBS game(s) exist outside this week — switch weeks or wait for books to post this slate.`
-            : `No NCAA FBS games with spreads for ${weekTitle(activeWeek)} (${range}) right now. Books often post little early — try again when lines are up.`
+          dryRun
+            ? "No open NCAA FBS games with spreads right now (dry run)."
+            : unfilteredCount && unfilteredCount > 0
+              ? `No FBS games with spreads in the ${weekTitle(activeWeek)} window (${range}). ${unfilteredCount} other FBS game(s) exist outside this week — enable Dry run or wait for books.`
+              : `No NCAA FBS games with spreads for ${weekTitle(activeWeek)} (${range}) right now. Enable Dry run to use any open games, or try again later.`
         );
         return;
       }
@@ -1334,27 +1339,64 @@ export default function CommissionerPage() {
             </div>
 
             <div className="rounded-xl border border-border bg-card p-5 mb-6">
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-3">
                 <div>
                   <h2 className="font-semibold">
                     Pull Live Odds — {weekTitle(activeWeek)}
                   </h2>
                   <p className="text-xs text-muted">
-                    FBS only · filtered to{" "}
-                    <span className="text-foreground font-medium">
-                      {weekDateRangeLabel(activeWeek) || weekTitle(activeWeek)}
-                    </span>{" "}
-                    (Week 0 ≠ Week 1)
+                    {dryRunOdds ? (
+                      <>
+                        <span className="text-warning font-semibold">
+                          DRY RUN
+                        </span>{" "}
+                        · all open FBS games (no week date filter) · assign any
+                        5 to {weekTitle(activeWeek)} for season testing
+                      </>
+                    ) : (
+                      <>
+                        FBS only · filtered to{" "}
+                        <span className="text-foreground font-medium">
+                          {weekDateRangeLabel(activeWeek) ||
+                            weekTitle(activeWeek)}
+                        </span>{" "}
+                        (Week 0 ≠ Week 1)
+                      </>
+                    )}
                   </p>
                 </div>
                 <button
-                  onClick={pullOdds}
+                  type="button"
+                  onClick={() => void pullOdds()}
                   disabled={loadingOdds}
-                  className="px-4 py-2 rounded-lg bg-primary text-black text-sm font-medium disabled:opacity-50"
+                  className="px-4 py-2 rounded-lg bg-primary text-black text-sm font-medium disabled:opacity-50 shrink-0"
                 >
                   {loadingOdds ? "Pulling..." : "Pull Odds"}
                 </button>
               </div>
+              <label className="flex items-start gap-3 cursor-pointer rounded-lg border border-border bg-background px-3 py-2.5 mb-2">
+                <input
+                  type="checkbox"
+                  checked={dryRunOdds}
+                  onChange={(e) => {
+                    setDryRunOdds(e.target.checked);
+                    setAvailableGames([]);
+                    setSelectedIds(new Set());
+                    setOddsError(null);
+                  }}
+                  className="mt-0.5 accent-primary"
+                />
+                <span className="text-xs leading-relaxed">
+                  <span className="font-semibold text-foreground">
+                    Dry run: show all open games
+                  </span>
+                  <span className="text-muted block mt-0.5">
+                    Ignore calendar windows so you can build every week card
+                    (bots + full season test) even when books only post near-term
+                    lines. Turn off for real weekly cards.
+                  </span>
+                </span>
+              </label>
               {oddsError && (
                 <p className="text-sm text-danger mt-2">{oddsError}</p>
               )}
