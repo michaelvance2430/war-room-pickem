@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import Link from "next/link";
 import Nav from "@/components/Nav";
 import { Game, UserPick, Prop } from "@/lib/types";
 import { getSession, getLeague } from "@/lib/league";
@@ -10,7 +9,9 @@ import {
   savePicksToCloud,
   loadMyPicks,
   loadLeagueActiveWeek,
+  listPublishedWeekNumbers,
   cardRevision,
+  type CloudCard,
 } from "@/lib/cloud";
 import { createClient } from "@/lib/supabase/client";
 import { formatRankedTeam } from "@/lib/rankings";
@@ -19,6 +20,10 @@ import {
   formatCardDateRange,
   weekTitle,
   weekSubtitle,
+  isGameLocked,
+  isPropLocked,
+  openGameCount,
+  formatKickoffLockLabel,
 } from "@/lib/dates";
 
 function formatSpread(
@@ -43,7 +48,11 @@ const EMPTY_PROP: Prop = {
 const POLL_MS = 12_000;
 
 export default function PicksPage() {
-  const [weekNumber, setWeekNumber] = useState(1);
+  /** League's official pick week (commissioner-controlled). */
+  const [activeWeek, setActiveWeek] = useState(1);
+  /** Week the user is viewing (may be past = read-only). */
+  const [viewWeek, setViewWeek] = useState(1);
+  const [publishedWeeks, setPublishedWeeks] = useState<number[]>([]);
   const [games, setGames] = useState<Game[]>([]);
   const [picks, setPicks] = useState<Record<string, UserPick>>({});
   const [bestBetId, setBestBetId] = useState<string | null>(null);
@@ -58,8 +67,11 @@ export default function PicksPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [leagueName, setLeagueName] = useState("");
   const [cardNotice, setCardNotice] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const [switching, setSwitching] = useState(false);
 
   const revisionRef = useRef<string>("");
+  const viewWeekRef = useRef(1);
   const picksRef = useRef(picks);
   const bestBetRef = useRef(bestBetId);
   const propChoiceRef = useRef(propChoice);
@@ -68,65 +80,69 @@ export default function PicksPage() {
   bestBetRef.current = bestBetId;
   propChoiceRef.current = propChoice;
   savedRef.current = saved;
+  viewWeekRef.current = viewWeek;
+
+  const loadPicksIntoState = useCallback(
+    async (cloud: CloudCard, week: number) => {
+      const mine = await loadMyPicks(week);
+      if (mine) {
+        const validIds = new Set(cloud.games.map((g) => g.id));
+        const filtered: Record<string, UserPick> = {};
+        for (const [id, p] of Object.entries(mine.picks || {})) {
+          if (validIds.has(id)) filtered[id] = p;
+        }
+        picksRef.current = filtered;
+        setPicks(filtered);
+        const bb =
+          mine.bestBetId && validIds.has(mine.bestBetId)
+            ? mine.bestBetId
+            : null;
+        bestBetRef.current = bb;
+        setBestBetId(bb);
+        const propOk =
+          mine.propChoice && cloud.prop.options.includes(mine.propChoice)
+            ? mine.propChoice
+            : null;
+        propChoiceRef.current = propOk;
+        setPropChoice(propOk);
+        setSaved(
+          !!mine.lockedAt &&
+            Object.keys(filtered).length === cloud.games.length
+        );
+        const used = Object.values(filtered)
+          .map((p) => p.confidence)
+          .filter((c) => c > 0);
+        setUsedConfidence(used);
+      } else {
+        picksRef.current = {};
+        bestBetRef.current = null;
+        propChoiceRef.current = null;
+        setPicks({});
+        setBestBetId(null);
+        setPropChoice(null);
+        setSaved(false);
+        setUsedConfidence([]);
+      }
+    },
+    []
+  );
 
   const applyCard = useCallback(
     async (
-      cloud: NonNullable<Awaited<ReturnType<typeof loadWeekCard>>>,
-      opts: { isInitial: boolean }
+      cloud: CloudCard,
+      opts: { isInitial: boolean; forceReloadPicks?: boolean }
     ) => {
       const rev = cardRevision(cloud);
-      const changed =
-        !!revisionRef.current && revisionRef.current !== rev;
+      const changed = !!revisionRef.current && revisionRef.current !== rev;
 
-      setWeekNumber(cloud.weekNumber);
       setHasCard(true);
       setGames(cloud.games);
       setProp(cloud.prop);
       setLoadError(null);
 
-      if (opts.isInitial || !revisionRef.current) {
+      if (opts.isInitial || opts.forceReloadPicks || !revisionRef.current) {
         revisionRef.current = rev;
-        const mine = await loadMyPicks(cloud.weekNumber);
-        if (mine) {
-          // Keep only picks that still match current card game ids
-          const validIds = new Set(cloud.games.map((g) => g.id));
-          const filtered: Record<string, UserPick> = {};
-          for (const [id, p] of Object.entries(mine.picks || {})) {
-            if (validIds.has(id)) filtered[id] = p;
-          }
-          picksRef.current = filtered;
-          setPicks(filtered);
-          const bb =
-            mine.bestBetId && validIds.has(mine.bestBetId)
-              ? mine.bestBetId
-              : null;
-          bestBetRef.current = bb;
-          setBestBetId(bb);
-          const propOk =
-            mine.propChoice &&
-            cloud.prop.options.includes(mine.propChoice)
-              ? mine.propChoice
-              : null;
-          propChoiceRef.current = propOk;
-          setPropChoice(propOk);
-          setSaved(
-            !!mine.lockedAt &&
-              Object.keys(filtered).length === cloud.games.length
-          );
-          const used = Object.values(filtered)
-            .map((p) => p.confidence)
-            .filter((c) => c > 0);
-          setUsedConfidence(used);
-        } else {
-          picksRef.current = {};
-          bestBetRef.current = null;
-          propChoiceRef.current = null;
-          setPicks({});
-          setBestBetId(null);
-          setPropChoice(null);
-          setSaved(false);
-          setUsedConfidence([]);
-        }
+        await loadPicksIntoState(cloud, cloud.weekNumber);
         return;
       }
 
@@ -166,24 +182,39 @@ export default function PicksPage() {
       if (dropped > 0 || Object.keys(kept).length < cloud.games.length) {
         setSaved(false);
         setCardNotice(
-          "Commissioner updated this week’s games. Your card refreshed automatically — re-check picks and Save again."
+          "Commissioner updated this week’s games. Your card refreshed automatically — re-check open picks and Save again."
         );
       } else {
         setCardNotice(
-          "Commissioner updated the card (lines/prop). Review and Save if needed."
+          "Commissioner updated the card (lines/prop). Review open games and Save if needed."
         );
       }
     },
-    []
+    [loadPicksIntoState]
   );
 
-  const refreshFromCloud = useCallback(
-    async (opts: { isInitial?: boolean } = {}) => {
+  const refreshPublishedList = useCallback(async () => {
+    const weeks = await listPublishedWeekNumbers();
+    setPublishedWeeks(weeks);
+    return weeks;
+  }, []);
+
+  /**
+   * Load a specific week into the UI.
+   * Polls only refresh the week the user is currently viewing (won't yank you off Week 1).
+   */
+  const loadWeek = useCallback(
+    async (
+      week: number,
+      opts: { isInitial?: boolean; forceReloadPicks?: boolean } = {}
+    ) => {
       const session = getSession();
       const league = getLeague();
       if (!session?.leagueId) {
         if (opts.isInitial) {
-          setLoadError("No league selected. Go home and join or create a league.");
+          setLoadError(
+            "No league selected. Go home and join or create a league."
+          );
           setLoaded(true);
         }
         return null;
@@ -195,31 +226,38 @@ export default function PicksPage() {
       }
 
       try {
-        let week = await loadLeagueActiveWeek();
-        let cloud = await loadWeekCard(week);
+        const active = await loadLeagueActiveWeek();
+        setActiveWeek(active);
 
-        // Fallback: find any published week if active week has no card yet
-        if (!cloud?.games?.length) {
-          const max = league?.settings?.regularSeasonWeeks ?? 13;
-          for (let w = 0; w <= max; w++) {
-            const tryCard = await loadWeekCard(w);
-            if (tryCard?.games?.length) {
-              cloud = tryCard;
-              week = w;
-              break;
-            }
-          }
+        let target = week;
+        let cloud = await loadWeekCard(target);
+
+        // Initial only: if active has no card, land on first published week
+        if (opts.isInitial && !cloud?.games?.length) {
+          const published = await refreshPublishedList();
+          const fallback = published.includes(active)
+            ? active
+            : published[published.length - 1] ?? active;
+          target = fallback;
+          cloud = await loadWeekCard(target);
+        } else {
+          void refreshPublishedList();
         }
+
+        setViewWeek(target);
+        viewWeekRef.current = target;
 
         if (!cloud || !cloud.games.length) {
           setHasCard(false);
           setGames([]);
-          setWeekNumber(week);
           if (opts.isInitial) setLoaded(true);
           return null;
         }
 
-        await applyCard(cloud, { isInitial: !!opts.isInitial });
+        await applyCard(cloud, {
+          isInitial: !!opts.isInitial,
+          forceReloadPicks: opts.forceReloadPicks,
+        });
         return cloud;
       } catch (e: unknown) {
         if (opts.isInitial) {
@@ -232,25 +270,53 @@ export default function PicksPage() {
         if (opts.isInitial) setLoaded(true);
       }
     },
-    [applyCard]
+    [applyCard, refreshPublishedList]
   );
 
+  /** Poll / realtime: refresh current view week + active week number only. */
+  const softRefresh = useCallback(async () => {
+    const active = await loadLeagueActiveWeek();
+    setActiveWeek(active);
+    void refreshPublishedList();
+    // Only re-pull card for the week you're looking at
+    const cloud = await loadWeekCard(viewWeekRef.current);
+    if (cloud?.games?.length) {
+      await applyCard(cloud, { isInitial: false });
+    }
+  }, [applyCard, refreshPublishedList]);
+
+  async function selectWeek(week: number) {
+    if (week === viewWeek && hasCard) return;
+    setSwitching(true);
+    setSaveError(null);
+    setCardNotice(null);
+    revisionRef.current = "";
+    try {
+      await loadWeek(week, { forceReloadPicks: true });
+    } finally {
+      setSwitching(false);
+    }
+  }
+
   useEffect(() => {
-    void refreshFromCloud({ isInitial: true });
+    void (async () => {
+      const active = await loadLeagueActiveWeek();
+      setActiveWeek(active);
+      await loadWeek(active, { isInitial: true });
+    })();
 
     const poll = setInterval(() => {
-      void refreshFromCloud({ isInitial: false });
+      void softRefresh();
     }, POLL_MS);
 
     const onVisible = () => {
-      if (document.visibilityState === "visible") {
-        void refreshFromCloud({ isInitial: false });
-      }
+      if (document.visibilityState === "visible") void softRefresh();
     };
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", onVisible);
 
-    // Live push when Supabase Realtime is enabled on the project
+    const tick = window.setInterval(() => setNow(Date.now()), 30_000);
+
     let channel: ReturnType<ReturnType<typeof createClient>["channel"]> | null =
       null;
     try {
@@ -268,7 +334,7 @@ export default function PicksPage() {
               filter: `league_id=eq.${session.leagueId}`,
             },
             () => {
-              void refreshFromCloud({ isInitial: false });
+              void softRefresh();
             }
           )
           .on(
@@ -279,7 +345,7 @@ export default function PicksPage() {
               table: "card_games",
             },
             () => {
-              void refreshFromCloud({ isInitial: false });
+              void softRefresh();
             }
           )
           .on(
@@ -291,7 +357,7 @@ export default function PicksPage() {
               filter: `id=eq.${session.leagueId}`,
             },
             () => {
-              void refreshFromCloud({ isInitial: false });
+              void softRefresh();
             }
           )
           .subscribe();
@@ -302,6 +368,7 @@ export default function PicksPage() {
 
     return () => {
       clearInterval(poll);
+      window.clearInterval(tick);
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onVisible);
       if (channel) {
@@ -313,13 +380,26 @@ export default function PicksPage() {
         }
       }
     };
-  }, [refreshFromCloud]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount once
+  }, []);
+
+  // Viewing past week, or any week that isn't the league active week → full read-only
+  const isPastOrOtherWeek = viewWeek !== activeWeek;
+  const propLockedNow = isPropLocked(games, now);
+  const openCount = openGameCount(games, now);
+  const allGamesLocked = games.length > 0 && openCount === 0;
+  /** Can edit anything on this view? Only active week, and only unlocked games/prop. */
+  const weekEditable = !isPastOrOtherWeek;
+  const canEditProp = weekEditable && !propLockedNow;
+  const fullyLocked =
+    isPastOrOtherWeek || (allGamesLocked && (!prop.question || propLockedNow));
 
   const confidenceOptions = [1, 2, 3, 4, 5];
 
   function selectSide(gameId: string, side: "home" | "away") {
+    if (!weekEditable) return;
     const game = games.find((g) => g.id === gameId);
-    if (!game) return;
+    if (!game || isGameLocked(game, now)) return;
 
     setSaved(false);
     setPicks((prev) => ({
@@ -336,13 +416,15 @@ export default function PicksPage() {
   }
 
   function selectConfidence(gameId: string, conf: number) {
+    if (!weekEditable) return;
+    const game = games.find((g) => g.id === gameId);
+    if (!game || isGameLocked(game, now)) return;
     if (!picks[gameId]?.pick) return;
     const takenByOther = Object.entries(picks).some(
       ([id, p]) => id !== gameId && p.confidence === conf
     );
     if (takenByOther) return;
 
-    const game = games.find((g) => g.id === gameId);
     setSaved(false);
     setPicks((prev) => {
       const next = {
@@ -366,6 +448,15 @@ export default function PicksPage() {
   }
 
   function toggleBestBet(gameId: string) {
+    if (!weekEditable) return;
+    const game = games.find((g) => g.id === gameId);
+    if (!game || isGameLocked(game, now)) return;
+    // Can't move BB off a locked game
+    if (bestBetId && bestBetId !== gameId) {
+      const prevG = games.find((g) => g.id === bestBetId);
+      if (prevG && isGameLocked(prevG, now)) return;
+    }
+
     setSaved(false);
     if (bestBetId === gameId) {
       setBestBetId(null);
@@ -380,14 +471,13 @@ export default function PicksPage() {
         if (bestBetId && next[bestBetId]) {
           next[bestBetId] = { ...next[bestBetId], isBestBet: false };
         }
-        const game = games.find((g) => g.id === gameId);
         next[gameId] = {
           gameId,
           pick: next[gameId]?.pick ?? "home",
           confidence: next[gameId]?.confidence ?? 0,
           isBestBet: true,
-          lockedSpread: game?.spread ?? 0,
-          lockedFavorite: game?.favorite ?? "home",
+          lockedSpread: game.spread,
+          lockedFavorite: game.favorite,
         };
         return next;
       });
@@ -396,48 +486,156 @@ export default function PicksPage() {
   }
 
   async function savePicks() {
-    if (saving || !hasCard) return;
+    if (saving || !hasCard || !weekEditable) return;
     setSaving(true);
     setSaveError(null);
 
-    // Pull latest card so we never save against a stale slate
-    const latest = await refreshFromCloud({ isInitial: false });
-    const cardGames = latest?.games ?? games;
-    const cardWeek = latest?.weekNumber ?? weekNumber;
-    const currentPicks = picksRef.current;
-    const currentBest = bestBetRef.current;
-    const currentProp = propChoiceRef.current;
+    // Refresh active week card only
+    const latest = await loadWeekCard(activeWeek);
+    if (!latest?.games?.length) {
+      setSaveError("Could not load the current week card. Try again.");
+      setSaving(false);
+      return;
+    }
+    if (latest.weekNumber !== activeWeek) {
+      setSaveError("Week mismatch — refresh and try again.");
+      setSaving(false);
+      return;
+    }
+
+    const cardGames = latest.games;
+    const prevCloud = await loadMyPicks(activeWeek);
+    const prevPicks = prevCloud?.picks || {};
+    const tick = Date.now();
 
     const lockedPicks: Record<string, UserPick> = {};
     for (const g of cardGames) {
-      const p = currentPicks[g.id];
+      if (isGameLocked(g, tick)) {
+        // Hard lock: keep whatever was already saved — never overwrite with UI edits
+        if (prevPicks[g.id]) {
+          lockedPicks[g.id] = prevPicks[g.id];
+        } else if (picksRef.current[g.id]) {
+          // Edge: never saved before kickoff — allow the slip they had on screen
+          // only if it was already complete before lock; otherwise leave missing (0 pts)
+          lockedPicks[g.id] = {
+            ...picksRef.current[g.id],
+            lockedSpread: g.spread,
+            lockedFavorite: g.favorite,
+          };
+        }
+        continue;
+      }
+      const p = picksRef.current[g.id];
       if (!p) continue;
       lockedPicks[g.id] = {
         ...p,
         lockedSpread: g.spread,
         lockedFavorite: g.favorite,
-        isBestBet: currentBest === g.id,
+        isBestBet: false,
       };
     }
 
-    if (Object.keys(lockedPicks).length !== cardGames.length) {
+    // Best bet: locked game keeps previous BB if that game is locked
+    let nextBest = bestBetRef.current;
+    if (prevCloud?.bestBetId) {
+      const bbGame = cardGames.find((g) => g.id === prevCloud.bestBetId);
+      if (bbGame && isGameLocked(bbGame, tick)) {
+        nextBest = prevCloud.bestBetId;
+      }
+    }
+    if (nextBest && !lockedPicks[nextBest]) nextBest = null;
+    for (const id of Object.keys(lockedPicks)) {
+      lockedPicks[id] = {
+        ...lockedPicks[id],
+        isBestBet: id === nextBest,
+      };
+    }
+
+    let nextProp = propChoiceRef.current;
+    if (isPropLocked(cardGames, tick)) {
+      nextProp = prevCloud?.propChoice ?? nextProp;
+    }
+
+    const openGames = cardGames.filter((g) => !isGameLocked(g, tick));
+    if (openGames.length > 0) {
+      const filledOpen = openGames.filter(
+        (g) =>
+          lockedPicks[g.id]?.pick && (lockedPicks[g.id]?.confidence ?? 0) > 0
+      );
+      if (filledOpen.length !== openGames.length) {
+        setSaveError(
+          `Pick a side and confidence for every open game (${filledOpen.length}/${openGames.length}). Locked games cannot be changed.`
+        );
+        setSaving(false);
+        return;
+      }
+    }
+
+    // Full-slip rules when all games still open
+    if (openGames.length === cardGames.length) {
+      if (Object.keys(lockedPicks).length !== cardGames.length) {
+        setSaveError("Pick a side and confidence for every game.");
+        setSaving(false);
+        return;
+      }
+      const confs = cardGames
+        .map((g) => lockedPicks[g.id].confidence)
+        .sort((a, b) => a - b);
+      const expected = [1, 2, 3, 4, 5].slice(0, cardGames.length);
+      if (confs.join() !== expected.join()) {
+        setSaveError("Use each confidence 1–5 exactly once.");
+        setSaving(false);
+        return;
+      }
+      if (!nextBest) {
+        setSaveError("Mark one Best Bet.");
+        setSaving(false);
+        return;
+      }
+      if (!nextProp) {
+        setSaveError("Pick a prop option.");
+        setSaving(false);
+        return;
+      }
+    } else {
+      // Partial lock: still require BB + prop if those slots aren't locked yet
+      if (!isPropLocked(cardGames, tick) && !nextProp) {
+        setSaveError("Pick a prop option (still open until first kickoff).");
+        setSaving(false);
+        return;
+      }
+      if (!nextBest) {
+        setSaveError("Mark one Best Bet on an open game (or keep locked BB).");
+        setSaving(false);
+        return;
+      }
+    }
+
+    // Don't allow incomplete full card if nothing was ever saved and some locked empty
+    if (
+      Object.keys(lockedPicks).length !== cardGames.length &&
+      openGames.length === 0
+    ) {
       setSaveError(
-        "Pick a side and confidence for every game on the current card."
+        "All games are locked. Incomplete slips can't be filled after kickoff."
       );
       setSaving(false);
       return;
     }
-    if (!currentProp || !currentBest) {
-      setSaveError("Need a Best Bet and a prop choice.");
+
+    if (Object.keys(lockedPicks).length !== cardGames.length) {
+      setSaveError(
+        "Every game needs a pick before its kickoff. Locked games without a pick stay blank."
+      );
       setSaving(false);
       return;
     }
 
     const result = await savePicksToCloud({
-      weekNumber: cardWeek,
+      weekNumber: activeWeek,
       picks: lockedPicks,
-      bestBetId: currentBest,
-      propChoice: currentProp,
+      bestBetId: nextBest,
+      propChoice: nextProp,
     });
 
     if (!result.ok) {
@@ -447,18 +645,29 @@ export default function PicksPage() {
     }
 
     setPicks(lockedPicks);
+    setBestBetId(nextBest);
+    setPropChoice(nextProp);
     setSaved(true);
     setCardNotice(null);
     setSaving(false);
+    await applyCard(latest, { isInitial: false, forceReloadPicks: true });
   }
 
   const allGamesPicked =
     hasCard &&
+    weekEditable &&
     games.length > 0 &&
-    games.every((g) => picks[g.id]?.pick && (picks[g.id]?.confidence ?? 0) > 0) &&
-    propChoice !== null &&
-    bestBetId !== null &&
-    usedConfidence.length === games.length;
+    games.every((g) => {
+      if (isGameLocked(g, now)) return true; // locked games not required to be re-filled in UI validation for button enable — save handles
+      return picks[g.id]?.pick && (picks[g.id]?.confidence ?? 0) > 0;
+    }) &&
+    (canEditProp ? propChoice !== null : true) &&
+    bestBetId !== null;
+
+  // Weeks shown in browser: published + active (even if not published yet)
+  const weekPills = [
+    ...new Set([...publishedWeeks, activeWeek].filter((w) => w >= 0)),
+  ].sort((a, b) => a - b);
 
   if (!loaded) {
     return (
@@ -476,20 +685,98 @@ export default function PicksPage() {
       <Nav />
 
       <main className="flex-1 max-w-3xl mx-auto w-full px-4 py-8">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold">{weekTitle(weekNumber)} Picks</h1>
-          <p className="text-sm text-muted">
-            {leagueName ? `${leagueName} • ` : ""}
-            {weekSubtitle(weekNumber)}
-            {games.length
-              ? ` • ${formatCardDateRange(games) || "dates on each game"}`
-              : ""}
+        {/* Crystal-clear week banner */}
+        <div
+          className={`rounded-xl border px-4 py-3 mb-4 ${
+            weekEditable
+              ? "border-primary/50 bg-primary/10"
+              : "border-border bg-card"
+          }`}
+        >
+          <div className="flex flex-wrap items-center gap-2 mb-1">
+            <span
+              className={`text-[10px] font-bold uppercase tracking-[0.2em] ${
+                weekEditable ? "text-primary" : "text-muted"
+              }`}
+            >
+              {weekEditable ? "You are picking" : "Viewing only"}
+            </span>
+            {weekEditable ? (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-primary text-black font-semibold">
+                LIVE
+              </span>
+            ) : (
+              <span className="text-xs px-2 py-0.5 rounded-full border border-border text-muted">
+                READ-ONLY
+              </span>
+            )}
+          </div>
+          <h1 className="text-2xl font-bold">
+            {weekTitle(viewWeek)}
+            {weekEditable ? " Picks" : " — your card"}
+          </h1>
+          <p className="text-sm text-muted mt-1">
+            {leagueName ? `${leagueName} · ` : ""}
+            {weekEditable
+              ? "This is the active pick'em week. Games lock at kickoff — no exceptions."
+              : viewWeek < activeWeek
+                ? `Past week · league is on ${weekTitle(activeWeek)}. You can review but not change picks.`
+                : `Not the active week (league is on ${weekTitle(activeWeek)}). Read-only.`}
           </p>
-          <p className="text-xs text-muted mt-1">
-            Private: only you see your picks. Card updates from the commissioner
-            show up automatically.
-          </p>
+          {games.length > 0 && (
+            <p className="text-xs text-muted mt-1">
+              {formatCardDateRange(games) || weekSubtitle(viewWeek)}
+              {weekEditable && !fullyLocked && (
+                <>
+                  {" · "}
+                  {openCount} of {games.length} game
+                  {games.length === 1 ? "" : "s"} still open
+                </>
+              )}
+            </p>
+          )}
         </div>
+
+        {/* Week browser */}
+        {weekPills.length > 0 && (
+          <div className="rounded-xl border border-border bg-card p-3 mb-6">
+            <p className="text-[10px] uppercase tracking-wider text-muted mb-2 font-semibold">
+              Jump to week
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {weekPills.map((w) => {
+                const isView = w === viewWeek;
+                const isActive = w === activeWeek;
+                return (
+                  <button
+                    key={w}
+                    type="button"
+                    disabled={switching}
+                    onClick={() => void selectWeek(w)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition ${
+                      isView && isActive
+                        ? "bg-primary text-black"
+                        : isView
+                          ? "bg-card-hover border-2 border-primary text-foreground"
+                          : isActive
+                            ? "border border-primary/50 text-primary hover:bg-primary/10"
+                            : "border border-border text-muted hover:text-foreground"
+                    }`}
+                  >
+                    {weekTitle(w)}
+                    {isActive ? " · live" : ""}
+                    {!isActive && publishedWeeks.includes(w) ? "" : ""}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[11px] text-muted mt-2">
+              Past weeks are read-only so you can see how you did. Only the{" "}
+              <span className="text-primary font-medium">live</span> week accepts
+              new picks.
+            </p>
+          </div>
+        )}
 
         {loadError && (
           <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-4 py-2 text-sm text-danger">
@@ -497,7 +784,7 @@ export default function PicksPage() {
           </div>
         )}
 
-        {cardNotice && (
+        {cardNotice && weekEditable && (
           <div className="mb-4 rounded-lg border border-primary/40 bg-primary/10 px-4 py-2 text-sm text-primary flex items-start justify-between gap-3">
             <span>{cardNotice}</span>
             <button
@@ -512,32 +799,59 @@ export default function PicksPage() {
 
         {!loadError && !hasCard && (
           <div className="rounded-xl border border-border bg-card p-8 text-center">
-            <p className="font-medium mb-2">No week card published yet</p>
-            <p className="text-sm text-muted mb-4">
-              The commissioner has to publish a {weekTitle(weekNumber)} card
-              before anyone can pick. This page will pick it up automatically.
+            <p className="font-medium mb-2">
+              No card for {weekTitle(viewWeek)} yet
             </p>
-            <button
-              type="button"
-              onClick={() => void refreshFromCloud({ isInitial: false })}
-              className="text-sm text-primary hover:underline"
-            >
-              Check again
-            </button>
+            <p className="text-sm text-muted mb-4">
+              {viewWeek === activeWeek
+                ? "The commissioner has to publish this week’s card before anyone can pick."
+                : "This week was never published (or was cleared)."}
+            </p>
+            {viewWeek !== activeWeek && (
+              <button
+                type="button"
+                onClick={() => void selectWeek(activeWeek)}
+                className="text-sm text-primary hover:underline"
+              >
+                Go to live {weekTitle(activeWeek)} →
+              </button>
+            )}
           </div>
         )}
 
         {hasCard && (
           <>
+            {isPastOrOtherWeek && (
+              <div className="mb-4 rounded-lg border border-border bg-card-hover px-4 py-2 text-sm text-muted">
+                🔒 Read-only archive of {weekTitle(viewWeek)}. Switch to{" "}
+                <button
+                  type="button"
+                  className="text-primary underline font-medium"
+                  onClick={() => void selectWeek(activeWeek)}
+                >
+                  {weekTitle(activeWeek)} (live)
+                </button>{" "}
+                to make picks.
+              </div>
+            )}
+
+            {weekEditable && fullyLocked && (
+              <div className="mb-4 rounded-lg border border-border bg-card-hover px-4 py-2 text-sm text-muted">
+                🔒 All kickoffs for {weekTitle(viewWeek)} have passed. Picks are
+                locked — no exceptions.
+              </div>
+            )}
+
             {saveError && (
               <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-4 py-2 text-sm text-danger">
                 {saveError}
               </div>
             )}
-            {saved && (
+            {saved && weekEditable && !fullyLocked && (
               <div className="mb-4 rounded-lg border border-primary/40 bg-primary/10 px-4 py-2 text-sm text-primary">
-                ✓ Picks saved to the league. Edit below and Save again before
-                kickoff if you change your mind.
+                ✓ Picks saved. Open games can still be changed until{" "}
+                <strong>that game&apos;s kickoff</strong>. Locked games cannot
+                be edited.
               </div>
             )}
 
@@ -547,6 +861,8 @@ export default function PicksPage() {
                 const isBest = bestBetId === game.id;
                 const displaySpread = pick?.lockedSpread ?? game.spread;
                 const displayFavorite = pick?.lockedFavorite ?? game.favorite;
+                const locked = !weekEditable || isGameLocked(game, now);
+                const kick = formatKickoffLockLabel(game, now);
 
                 return (
                   <div
@@ -554,7 +870,9 @@ export default function PicksPage() {
                     className={`rounded-xl border bg-card p-4 transition ${
                       isBest
                         ? "border-primary/60 ring-1 ring-primary/30"
-                        : "border-border"
+                        : locked
+                          ? "border-border opacity-95"
+                          : "border-border"
                     }`}
                   >
                     <div className="mb-3">
@@ -563,25 +881,37 @@ export default function PicksPage() {
                           {formatRankedTeam(game.awayTeam, game.awayRank)} @{" "}
                           {formatRankedTeam(game.homeTeam, game.homeRank)}
                         </div>
-                        {isBest && (
-                          <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full shrink-0">
-                            BEST BET (2×)
-                          </span>
-                        )}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {locked && (
+                            <span className="text-[10px] font-bold uppercase tracking-wide text-muted border border-border px-1.5 py-0.5 rounded">
+                              Locked
+                            </span>
+                          )}
+                          {isBest && (
+                            <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                              BEST BET (2×)
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <div className="text-xs text-primary mt-1">
-                        {formatKickoff(game.commenceTime || game.startTime).full}
+                      <div
+                        className={`text-xs mt-1 ${
+                          kick.locked ? "text-muted" : "text-primary"
+                        }`}
+                      >
+                        {kick.label}
                       </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-3 mb-4">
                       <button
                         type="button"
+                        disabled={locked}
                         onClick={() => selectSide(game.id, "away")}
-                        className={`p-3 rounded-lg border text-left transition ${
+                        className={`p-3 rounded-lg border text-left transition disabled:cursor-not-allowed ${
                           pick?.pick === "away"
                             ? "border-primary bg-primary/10"
-                            : "border-border hover:border-muted"
+                            : "border-border hover:border-muted disabled:opacity-70"
                         }`}
                       >
                         <div className="text-[10px] uppercase tracking-wider text-muted mb-1">
@@ -597,11 +927,12 @@ export default function PicksPage() {
 
                       <button
                         type="button"
+                        disabled={locked}
                         onClick={() => selectSide(game.id, "home")}
-                        className={`p-3 rounded-lg border text-left transition ${
+                        className={`p-3 rounded-lg border text-left transition disabled:cursor-not-allowed ${
                           pick?.pick === "home"
                             ? "border-primary bg-primary/10"
-                            : "border-border hover:border-muted"
+                            : "border-border hover:border-muted disabled:opacity-70"
                         }`}
                       >
                         <div className="text-[10px] uppercase tracking-wider text-muted mb-1">
@@ -618,7 +949,7 @@ export default function PicksPage() {
 
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex gap-1.5 items-center">
-                        {!pick?.pick && (
+                        {!pick?.pick && !locked && (
                           <span className="text-xs text-muted mr-2">
                             Pick a team first
                           </span>
@@ -631,13 +962,15 @@ export default function PicksPage() {
                             <button
                               key={c}
                               type="button"
-                              disabled={usedElsewhere || !pick?.pick}
+                              disabled={
+                                locked || usedElsewhere || !pick?.pick
+                              }
                               onClick={() => selectConfidence(game.id, c)}
                               className={`w-8 h-8 rounded text-sm font-medium transition ${
                                 pick?.confidence === c
                                   ? "bg-primary text-black"
-                                  : usedElsewhere
-                                    ? "bg-border text-muted cursor-not-allowed"
+                                  : usedElsewhere || locked
+                                    ? "bg-border text-muted cursor-not-allowed opacity-50"
                                     : "bg-card-hover hover:bg-border"
                               }`}
                             >
@@ -648,8 +981,9 @@ export default function PicksPage() {
                       </div>
                       <button
                         type="button"
+                        disabled={locked}
                         onClick={() => toggleBestBet(game.id)}
-                        className={`text-xs px-3 py-1.5 rounded-full border transition ${
+                        className={`text-xs px-3 py-1.5 rounded-full border transition disabled:cursor-not-allowed disabled:opacity-60 ${
                           isBest
                             ? "border-primary bg-primary/20 text-primary"
                             : "border-border text-muted"
@@ -659,15 +993,14 @@ export default function PicksPage() {
                       </button>
                     </div>
 
-                    {saved && pick && (
+                    {saved && pick && weekEditable && (
                       <div className="text-xs text-muted mt-2">
-                        Last saved line for scoring snapshot:{" "}
+                        Saved line snapshot:{" "}
                         {formatSpread(
                           pick.lockedSpread,
                           pick.lockedFavorite,
                           pick.pick
-                        )}{" "}
-                        (updates when you Save again)
+                        )}
                       </div>
                     )}
                   </div>
@@ -675,9 +1008,20 @@ export default function PicksPage() {
               })}
             </div>
 
-            <div className="rounded-xl border border-border bg-card p-4 mb-8">
-              <div className="text-xs text-muted mb-1">
-                Weekly Prop • {prop.points} pts
+            <div
+              className={`rounded-xl border bg-card p-4 mb-8 ${
+                !canEditProp ? "border-border opacity-95" : "border-border"
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <div className="text-xs text-muted">
+                  Weekly Prop • {prop.points} pts
+                </div>
+                {!canEditProp && (
+                  <span className="text-[10px] font-bold uppercase tracking-wide text-muted border border-border px-1.5 py-0.5 rounded">
+                    Locked
+                  </span>
+                )}
               </div>
               <div className="font-medium mb-3">{prop.question}</div>
               <div className="grid grid-cols-2 gap-3">
@@ -685,34 +1029,62 @@ export default function PicksPage() {
                   <button
                     key={opt}
                     type="button"
+                    disabled={!canEditProp}
                     onClick={() => {
+                      if (!canEditProp) return;
                       setSaved(false);
                       setPropChoice(opt);
                     }}
-                    className={`p-3 rounded-lg border text-sm transition ${
+                    className={`p-3 rounded-lg border text-sm transition disabled:cursor-not-allowed ${
                       propChoice === opt
                         ? "border-primary bg-primary/10"
-                        : "border-border hover:border-muted"
+                        : "border-border hover:border-muted disabled:opacity-70"
                     }`}
                   >
                     {opt}
                   </button>
                 ))}
               </div>
+              {weekEditable && propLockedNow && (
+                <p className="text-[11px] text-muted mt-2">
+                  Prop locked at the first kickoff on this card.
+                </p>
+              )}
             </div>
 
-            <button
-              type="button"
-              onClick={savePicks}
-              disabled={!allGamesPicked || saving}
-              className="w-full py-3 rounded-xl bg-primary text-black font-semibold disabled:opacity-50"
-            >
-              {saving ? "Saving…" : saved ? "Update Picks" : "Save Picks"}
-            </button>
-            {!allGamesPicked && (
-              <p className="text-xs text-muted text-center mt-2">
-                Need: side + unique confidence 1–5 on every game, one Best Bet,
-                and a prop choice.
+            {weekEditable ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => void savePicks()}
+                  disabled={!allGamesPicked || saving || fullyLocked}
+                  className="w-full py-3 rounded-xl bg-primary text-black font-semibold disabled:opacity-50"
+                >
+                  {saving
+                    ? "Saving…"
+                    : fullyLocked
+                      ? "Picks locked"
+                      : saved
+                        ? "Update open picks"
+                        : "Save Picks"}
+                </button>
+                {!allGamesPicked && !fullyLocked && (
+                  <p className="text-xs text-muted text-center mt-2">
+                    Need: side + unique confidence on every open game, one Best
+                    Bet, and a prop (until first kickoff).
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="text-center text-sm text-muted py-3 rounded-xl border border-dashed border-border">
+                Archive view — no changes allowed.{" "}
+                <button
+                  type="button"
+                  className="text-primary underline"
+                  onClick={() => void selectWeek(activeWeek)}
+                >
+                  Open {weekTitle(activeWeek)} live picks
+                </button>
               </p>
             )}
           </>

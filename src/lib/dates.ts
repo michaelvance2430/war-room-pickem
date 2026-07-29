@@ -48,6 +48,46 @@ export function kickoffMs(g: Game): number {
 }
 
 /**
+ * Hard lock: once kickoff has started (now >= commence), no more changes.
+ * No exceptions — not for commissioner, not for late edits.
+ */
+export function isGameLocked(g: Game, now = Date.now()): boolean {
+  const t = kickoffMs(g);
+  if (!t) return false; // unknown kickoff stays open (shouldn't happen on live cards)
+  return now >= t;
+}
+
+/** Prop locks at the first kickoff on the card. */
+export function isPropLocked(games: Game[], now = Date.now()): boolean {
+  const times = games.map(kickoffMs).filter((t) => t > 0);
+  if (!times.length) return false;
+  return now >= Math.min(...times);
+}
+
+export function openGameCount(games: Game[], now = Date.now()): number {
+  return games.filter((g) => !isGameLocked(g, now)).length;
+}
+
+export function formatKickoffLockLabel(
+  g: Game,
+  now = Date.now()
+): { locked: boolean; label: string } {
+  const t = kickoffMs(g);
+  const full = formatKickoff(g.commenceTime || g.startTime).full;
+  if (!t) return { locked: false, label: full };
+  if (now >= t) return { locked: true, label: `LOCKED · ${full}` };
+  const mins = Math.round((t - now) / 60_000);
+  if (mins < 60) {
+    return { locked: false, label: `Locks in ${mins} min · ${full}` };
+  }
+  const hrs = Math.round(mins / 60);
+  if (hrs < 48) {
+    return { locked: false, label: `Locks in ~${hrs}h · ${full}` };
+  }
+  return { locked: false, label: full };
+}
+
+/**
  * Human label for a pick'em week.
  * Week 0 and Week 1 are separate cards — run them as two different weeks
  * if you want (e.g. Week 0 this Saturday, only Week 1 next week).

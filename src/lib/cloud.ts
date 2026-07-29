@@ -320,6 +320,27 @@ export async function loadWeekCard(weekNumber = 1): Promise<CloudCard | null> {
   };
 }
 
+/** Weeks that have a published card (for My Picks week browser). */
+export async function listPublishedWeekNumbers(): Promise<number[]> {
+  const session = getSession();
+  if (!session?.leagueId) return [];
+  try {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("week_cards")
+      .select("week_number")
+      .eq("league_id", session.leagueId)
+      .order("week_number", { ascending: true });
+    if (error || !data) return [];
+    const nums = data
+      .map((r) => Number(r.week_number))
+      .filter((n) => !Number.isNaN(n));
+    return [...new Set(nums)].sort((a, b) => a - b);
+  } catch {
+    return [];
+  }
+}
+
 export async function savePicksToCloud(opts: {
   weekNumber: number;
   picks: Record<string, UserPick>;
