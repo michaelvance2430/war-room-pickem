@@ -8,6 +8,8 @@ export interface LeagueSettings {
   cutPercent: number; // bottom X% to Toilet Bowl
   regularSeasonWeeks: number;
   gamesPerWeek: number;
+  /** Preseason national-champ Crystal Ball tab (0 pts). Default on. */
+  crystalBallEnabled: boolean;
 }
 
 export interface League {
@@ -31,6 +33,7 @@ const DEFAULT_SETTINGS: LeagueSettings = {
   /** Fixed: Week 0 … 18 (CFP Final). See season-calendar.ts. */
   regularSeasonWeeks: 18,
   gamesPerWeek: 5,
+  crystalBallEnabled: true,
 };
 
 function canUseStorage() {
@@ -52,7 +55,7 @@ export function getLeague(): League | null {
     const raw = localStorage.getItem(LEAGUE_KEY);
     if (!raw) return null;
     const league = JSON.parse(raw) as League;
-    if (!league.settings) league.settings = { ...DEFAULT_SETTINGS };
+    league.settings = { ...DEFAULT_SETTINGS, ...(league.settings || {}) };
     return league;
   } catch {
     return null;

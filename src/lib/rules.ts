@@ -72,6 +72,7 @@ export const RULE_SECTIONS: RuleSection[] = [
   {
     title: "Crystal Ball (preseason)",
     body: [
+      "Optional league feature — commissioner can turn it on/off under Settings.",
       "Before Week 0 kickoff, pick who you think wins the national championship.",
       "Crystal Ball is worth zero standings points — pure pride.",
       "If you're right, you earn the sarcastic achievement: Village Witch / Wizard Nerd.",

@@ -24,6 +24,7 @@ export default function Nav() {
   const [leagueName, setLeagueName] = useState("");
   const [unreadCount, setUnreadCount] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [crystalBallOn, setCrystalBallOn] = useState(true);
 
   useEffect(() => {
     const session = getSession();
@@ -31,6 +32,7 @@ export default function Nav() {
     setIsCommish(!!session?.isCommissioner);
     setName(session?.playerName || "You");
     setLeagueName(league?.name || "");
+    setCrystalBallOn(league?.settings?.crystalBallEnabled !== false);
 
     loadMyProfile().then((p) => {
       if (p) {
@@ -98,7 +100,9 @@ export default function Nav() {
 
   const links: NavLink[] = [
     { href: "/picks", label: "My Picks" },
-    { href: "/crystal-ball", label: "Crystal Ball" },
+    ...(crystalBallOn
+      ? [{ href: "/crystal-ball", label: "Crystal Ball" }]
+      : []),
     { href: "/standings", label: "Standings" },
     { href: "/power-rankings", label: "Power Rankings" },
     { href: "/announcements", label: "Announcements", badge: unreadCount },

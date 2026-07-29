@@ -71,6 +71,7 @@ export default function CommissionerPage() {
   const [league, setLeague] = useState<League | null>(null);
   const [leagueNameEdit, setLeagueNameEdit] = useState("");
   const [cutPercent, setCutPercent] = useState(50);
+  const [crystalBallEnabled, setCrystalBallEnabled] = useState(true);
   /** CFB week number: 0 = openers … 18 = CFP Final (fixed length). */
   const [activeWeek, setActiveWeek] = useState(1);
   const [settingsSaved, setSettingsSaved] = useState(false);
@@ -124,6 +125,7 @@ export default function CommissionerPage() {
         setLeague(lg);
         setLeagueNameEdit(lg.name);
         setCutPercent(lg.settings?.cutPercent ?? 50);
+        setCrystalBallEnabled(lg.settings?.crystalBallEnabled !== false);
       }
       let week = 1;
       try {
@@ -715,6 +717,7 @@ export default function CommissionerPage() {
       settings: {
         cutPercent,
         gamesPerWeek: 5,
+        crystalBallEnabled,
         // Season length is fixed at SEASON_MAX_WEEK in the app (not saved to DB)
       },
     });
@@ -988,6 +991,38 @@ export default function CommissionerPage() {
                   </p>
                 </div>
               </div>
+
+              <div className="rounded-xl border border-border bg-background p-4 flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-foreground">
+                    Crystal Ball
+                  </p>
+                  <p className="text-xs text-muted mt-1 leading-relaxed">
+                    Preseason tab: pick who wins the national title (0 points).
+                    Correct picks earn a sarcastic Witch/Wizard achievement.
+                    Turn off to hide the tab for everyone in this league.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={crystalBallEnabled}
+                  onClick={() => setCrystalBallEnabled((v) => !v)}
+                  className={`relative shrink-0 w-12 h-7 rounded-full transition ${
+                    crystalBallEnabled ? "bg-primary" : "bg-border"
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-black transition ${
+                      crystalBallEnabled ? "translate-x-5" : "translate-x-0"
+                    }`}
+                  />
+                </button>
+                <p className="w-full text-xs font-medium text-muted">
+                  {crystalBallEnabled ? "On — tab visible" : "Off — tab hidden"}
+                </p>
+              </div>
+
               <button
                 onClick={() => void saveSettings()}
                 className={

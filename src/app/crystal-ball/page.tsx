@@ -11,11 +11,12 @@ import {
   saveCrystalBallPick,
   type CrystalBallState,
 } from "@/lib/crystal-ball";
-import { getSession } from "@/lib/league";
+import { getLeague, getSession } from "@/lib/league";
 
 export default function CrystalBallPage() {
   const [state, setState] = useState<CrystalBallState | null>(null);
   const [loading, setLoading] = useState(true);
+  const [disabled, setDisabled] = useState(false);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -37,8 +38,14 @@ export default function CrystalBallPage() {
 
   useEffect(() => {
     const session = getSession();
+    const league = getLeague();
     setIsCommish(!!session?.isCommissioner);
     setSelfId(session?.playerId || null);
+    if (league?.settings?.crystalBallEnabled === false) {
+      setDisabled(true);
+      setLoading(false);
+      return;
+    }
     void reload();
   }, []);
 
@@ -92,6 +99,32 @@ export default function CrystalBallPage() {
       `Crowned ${crownTeam}. ${res.winners ?? 0} player(s) earned Village Witch / Wizard Nerd.`
     );
     await reload();
+  }
+
+  if (disabled) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Nav />
+        <main className="flex-1 max-w-md mx-auto px-4 py-16 text-center">
+          <h1 className="text-xl font-bold mb-2">Crystal Ball is off</h1>
+          <p className="text-sm text-muted mb-6">
+            Your commissioner disabled this feature for the league.
+          </p>
+          {isCommish ? (
+            <Link
+              href="/commissioner"
+              className="text-sm text-primary hover:underline"
+            >
+              Turn it on in Commissioner → Settings
+            </Link>
+          ) : (
+            <Link href="/picks" className="text-sm text-primary hover:underline">
+              Back to My Picks
+            </Link>
+          )}
+        </main>
+      </div>
+    );
   }
 
   if (loading || !state) {

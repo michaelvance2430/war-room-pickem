@@ -1,6 +1,10 @@
 -- Crystal Ball: preseason national champion pick (no points) + sarcastic achievements
 -- Run in Supabase → SQL Editor → Run once
 
+-- Commissioner on/off per league (default on)
+alter table public.leagues
+  add column if not exists crystal_ball_enabled boolean not null default true;
+
 create table if not exists public.crystal_ball_picks (
   league_id uuid not null references public.leagues (id) on delete cascade,
   user_id uuid not null references public.profiles (id) on delete cascade,

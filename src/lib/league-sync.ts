@@ -23,7 +23,25 @@ function toLocalLeague(row: {
   cut_percent: number;
   regular_season_weeks: number;
   games_per_week: number;
+  crystal_ball_enabled?: boolean | null;
 }): League {
+  // Prefer cloud flag; if column missing from select, keep prior local value
+  let crystalBallEnabled = true;
+  if (typeof row.crystal_ball_enabled === "boolean") {
+    crystalBallEnabled = row.crystal_ball_enabled;
+  } else if (canUseStorage()) {
+    try {
+      const prev = JSON.parse(
+        localStorage.getItem(LEAGUE_KEY) || "null"
+      ) as League | null;
+      if (typeof prev?.settings?.crystalBallEnabled === "boolean") {
+        crystalBallEnabled = prev.settings.crystalBallEnabled;
+      }
+    } catch {
+      /* default true */
+    }
+  }
+
   return {
     id: row.id,
     name: row.name,
@@ -35,6 +53,7 @@ function toLocalLeague(row: {
       // Fixed CFB calendar — never trust a short value from the DB
       regularSeasonWeeks: SEASON_MAX_WEEK,
       gamesPerWeek: row.games_per_week ?? 5,
+      crystalBallEnabled,
     },
   };
 }
@@ -91,19 +110,44 @@ export async function saveLeagueToCloud(opts: {
   // regular_season_weeks (old DB check max 16 blocked saves; app ignores column).
   if (opts.settings?.gamesPerWeek !== undefined)
     patch.games_per_week = opts.settings.gamesPerWeek;
+  if (opts.settings?.crystalBallEnabled !== undefined)
+    patch.crystal_ball_enabled = opts.settings.crystalBallEnabled;
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("leagues")
     .update(patch)
     .eq("id", session.leagueId)
     .select()
     .single();
 
+  // Column not migrated yet — save the rest without crystal_ball_enabled
+  if (
+    error &&
+    opts.settings?.crystalBallEnabled !== undefined &&
+    (error.message.includes("crystal_ball_enabled") ||
+      error.message.includes("schema cache") ||
+      error.code === "PGRST204")
+  ) {
+    delete patch.crystal_ball_enabled;
+    const retry = await supabase
+      .from("leagues")
+      .update(patch)
+      .eq("id", session.leagueId)
+      .select()
+      .single();
+    data = retry.data;
+    error = retry.error;
+  }
+
   if (error || !data) {
     return { ok: false, error: error?.message || "Failed to save" };
   }
 
   const league = toLocalLeague(data);
+  // Always stamp crystal ball from the save request (covers pre-migration DB)
+  if (opts.settings?.crystalBallEnabled !== undefined) {
+    league.settings.crystalBallEnabled = opts.settings.crystalBallEnabled;
+  }
   if (canUseStorage()) {
     localStorage.setItem(LEAGUE_KEY, JSON.stringify(league));
   }
