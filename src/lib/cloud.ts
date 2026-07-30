@@ -872,6 +872,15 @@ export async function saveResultsAndScoreWeek(opts: {
     );
   } catch {}
 
+  // Snapshot Gazette edition for the archive (survives until season reset)
+  try {
+    const { snapshotGazetteAfterScore } = await import("@/lib/gazette");
+    const players = await loadLeaguePlayers();
+    await snapshotGazetteAfterScore(players, weekNumber);
+  } catch {
+    /* best-effort */
+  }
+
   return { ok: true, scoredCount, details };
 }
 

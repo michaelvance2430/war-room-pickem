@@ -107,6 +107,7 @@ export default function Nav() {
     { href: "/standings", label: "Standings" },
     { href: "/stats", label: "Stats" },
     { href: "/announcements", label: "News", badge: unreadCount },
+    { href: "/gazette", label: "Gazette" },
     { href: "/locker-room", label: "Locker" },
     { href: "/players", label: "Players" },
     { href: "/rules", label: "Rules" },

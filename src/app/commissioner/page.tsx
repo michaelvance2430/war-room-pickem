@@ -1143,6 +1143,7 @@ export default function CommissionerPage() {
         "• Divisions, roles, league code & settings\n" +
         "• Profile photos\n" +
         "• Trophy Room (past champions / toilet / nerd awards)\n\n" +
+        "Also clears Gazette Archive headlines for this season.\n\n" +
         "Use this after testing, before the real season.\n\n" +
         "Continue?"
     );

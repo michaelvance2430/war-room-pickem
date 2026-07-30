@@ -48,6 +48,12 @@ export default function CrownAndShame({ className = "" }: Props) {
           <span className="text-toilet">🛍️ low scorer</span> for the latest
           card. Until then, the board stays empty.
         </p>
+        <Link
+          href="/gazette"
+          className="inline-block mt-3 text-xs text-primary hover:underline"
+        >
+          Gazette Archive →
+        </Link>
       </div>
     );
   }
@@ -96,11 +102,16 @@ export default function CrownAndShame({ className = "" }: Props) {
           </p>
         </div>
       </div>
-      <div className="px-4 py-2 border-t border-border bg-card/50 text-[11px] text-muted flex justify-between gap-2">
-        <span>Resets every time a week is scored</span>
-        <Link href="/standings" className="text-primary hover:underline">
-          Standings →
-        </Link>
+      <div className="px-4 py-2 border-t border-border bg-card/50 text-[11px] text-muted flex flex-wrap justify-between gap-2">
+        <span>Latest scored week · older covers in the archive</span>
+        <span className="flex gap-3">
+          <Link href="/gazette" className="text-primary hover:underline">
+            Archive →
+          </Link>
+          <Link href="/standings" className="text-primary hover:underline">
+            Standings →
+          </Link>
+        </span>
       </div>
     </div>
   );

@@ -3,6 +3,7 @@ import { weekCrownAndShame, type CrownShame } from "./fun-board";
 import { weekTitle } from "./dates";
 import { getSession } from "./league";
 import { hasSeenRules } from "./rules";
+import { createClient } from "@/lib/supabase/client";
 
 const SEEN_PREFIX = "warroom-gazette-seen-v1";
 
@@ -408,6 +409,132 @@ export function shouldOfferGazette(
   }
 
   return { show: true, edition, leagueId: session.leagueId };
+}
+
+export type ArchivedGazette = {
+  id: string;
+  weekNumber: number;
+  weekLabel: string;
+  volumeLabel: string;
+  edition: GazetteEdition;
+  createdAt: string;
+};
+
+/**
+ * Snapshot this week's paper into the archive (commissioner, after score).
+ * Upserts by league + week so re-scores refresh the edition.
+ */
+export async function archiveGazetteEdition(
+  edition: GazetteEdition
+): Promise<{ ok: boolean; error?: string }> {
+  const session = getSession();
+  if (!session?.leagueId || !session.isCommissioner) {
+    return { ok: false, error: "Commissioner only" };
+  }
+  const supabase = createClient();
+  const { error } = await supabase.from("gazette_editions").upsert(
+    {
+      league_id: session.leagueId,
+      week_number: edition.weekIndex,
+      week_label: edition.weekLabel,
+      volume_label: edition.volumeLabel,
+      payload: edition as unknown as Record<string, unknown>,
+      created_at: new Date().toISOString(),
+    },
+    { onConflict: "league_id,week_number" }
+  );
+  if (error) {
+    if (
+      /does not exist|schema cache|gazette_editions/i.test(error.message || "")
+    ) {
+      return {
+        ok: false,
+        error:
+          "Gazette archive table missing — run supabase/gazette-archive.sql once.",
+      };
+    }
+    return { ok: false, error: error.message };
+  }
+  return { ok: true };
+}
+
+/** Load all archived editions for the active league (newest week first). */
+export async function loadGazetteArchive(): Promise<{
+  ok: boolean;
+  editions?: ArchivedGazette[];
+  error?: string;
+}> {
+  const session = getSession();
+  if (!session?.leagueId) {
+    return { ok: false, error: "No league selected" };
+  }
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("gazette_editions")
+    .select("id, week_number, week_label, volume_label, payload, created_at")
+    .eq("league_id", session.leagueId)
+    .order("week_number", { ascending: false });
+
+  if (error) {
+    if (
+      /does not exist|schema cache|gazette_editions/i.test(error.message || "")
+    ) {
+      return {
+        ok: false,
+        error:
+          "Gazette archive not set up. Commissioner: run supabase/gazette-archive.sql in Supabase.",
+      };
+    }
+    return { ok: false, error: error.message };
+  }
+
+  const editions: ArchivedGazette[] = (data || []).map((row) => {
+    const r = row as Record<string, unknown>;
+    const payload = (r.payload || {}) as GazetteEdition;
+    const weekNumber = r.week_number as number;
+    return {
+      id: r.id as string,
+      weekNumber,
+      weekLabel: (r.week_label as string) || weekTitle(weekNumber),
+      volumeLabel: (r.volume_label as string) || `Vol. ${weekNumber}`,
+      edition: {
+        ...payload,
+        weekIndex: payload.weekIndex ?? weekNumber,
+        weekLabel: payload.weekLabel || (r.week_label as string) || weekTitle(weekNumber),
+        volumeLabel:
+          payload.volumeLabel ||
+          (r.volume_label as string) ||
+          `Vol. ${weekNumber}`,
+        masthead: payload.masthead || "THE WAR ROOM GAZETTE",
+      },
+      createdAt: (r.created_at as string) || new Date().toISOString(),
+    };
+  });
+
+  return { ok: true, editions };
+}
+
+/**
+ * After a week is scored: rebuild edition from fresh standings and archive it.
+ * Safe no-op if nothing to publish or table missing.
+ */
+export async function snapshotGazetteAfterScore(
+  players: Player[],
+  weekNumber?: number
+): Promise<void> {
+  try {
+    const edition = buildGazetteEdition(players);
+    if (!edition) return;
+    // Prefer explicit week when re-scoring a specific card
+    if (weekNumber != null && Number.isFinite(weekNumber)) {
+      edition.weekIndex = weekNumber;
+      edition.weekLabel = weekTitle(weekNumber);
+      edition.volumeLabel = `Vol. ${weekNumber} · ${edition.weekLabel}`;
+    }
+    await archiveGazetteEdition(edition);
+  } catch {
+    /* archive is best-effort — never block scoring */
+  }
 }
 
 export type { CrownShame };
