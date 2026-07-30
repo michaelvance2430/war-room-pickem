@@ -1268,7 +1268,7 @@ export default function CommissionerPage() {
       !confirm(
         next
           ? `Make ${m.name} a deputy commissioner?\n\nThey can build the weekly card, enter results, score weeks, and nudge picks. They cannot change settings, reset the season, or pass ownership.`
-          : `Remove deputy from ${m.name}?`
+          : `Remove deputy from ${m.name}?\n\nThey lose Ops access (card / results) immediately.`
       )
     ) {
       return;
@@ -1284,15 +1284,33 @@ export default function CommissionerPage() {
       setDeputyReport(res.error || "Failed");
       return;
     }
+    // Optimistic flip so Remove ↔ Make works even if roster RPC is stale
+    setPassRoster((prev) =>
+      prev
+        .map((x) =>
+          x.userId === m.userId ? { ...x, isDeputy: next } : x
+        )
+        .sort((a, b) => {
+          if (!!a.isDeputy !== !!b.isDeputy) return a.isDeputy ? -1 : 1;
+          return a.name.localeCompare(b.name);
+        })
+    );
     setDeputyReport(
       next
-        ? `${m.name} is now a deputy — they can run picks & results.`
+        ? `${m.name} is now a deputy — they can run picks & results. Use “Remove deputy” anytime to revoke.`
         : `${m.name} is no longer a deputy.`
     );
-    const roster = await loadLeagueRoster();
-    setPassRoster(
-      roster.filter((x) => !x.isBot && x.userId !== session?.playerId)
-    );
+    // Background refresh (best-effort)
+    void loadLeagueRoster().then((roster) => {
+      setPassRoster(
+        roster
+          .filter((x) => !x.isBot && x.userId !== session?.playerId)
+          .sort((a, b) => {
+            if (!!a.isDeputy !== !!b.isDeputy) return a.isDeputy ? -1 : 1;
+            return a.name.localeCompare(b.name);
+          })
+      );
+    });
   }
 
   return (
@@ -1763,7 +1781,9 @@ export default function CommissionerPage() {
                   {passRoster.map((m) => (
                     <li
                       key={m.userId}
-                      className="flex flex-wrap items-center justify-between gap-2 py-2.5"
+                      className={`flex flex-wrap items-center justify-between gap-2 py-2.5 ${
+                        m.isDeputy ? "bg-primary/5 -mx-2 px-2 rounded-lg" : ""
+                      }`}
                     >
                       <div className="min-w-0">
                         <span className="text-sm font-medium">{m.name}</span>
@@ -1782,7 +1802,11 @@ export default function CommissionerPage() {
                         type="button"
                         disabled={deputyBusyId === m.userId}
                         onClick={() => void toggleDeputy(m)}
-                        className="text-xs px-2.5 py-1 rounded-lg border border-primary/40 text-primary hover:bg-primary/10 disabled:opacity-50"
+                        className={
+                          m.isDeputy
+                            ? "text-xs px-2.5 py-1 rounded-lg border border-danger/50 text-danger hover:bg-danger/10 disabled:opacity-50"
+                            : "text-xs px-2.5 py-1 rounded-lg border border-primary/40 text-primary hover:bg-primary/10 disabled:opacity-50"
+                        }
                       >
                         {m.isDeputy ? "Remove deputy" : "Make deputy"}
                       </button>
@@ -1791,12 +1815,23 @@ export default function CommissionerPage() {
                 </ul>
               )}
               {deputyReport && (
-                <p className="text-xs text-primary leading-relaxed">{deputyReport}</p>
+                <p
+                  className={`text-xs leading-relaxed ${
+                    /fail|error|incomplete|not set up/i.test(deputyReport)
+                      ? "text-danger"
+                      : "text-primary"
+                  }`}
+                >
+                  {deputyReport}
+                </p>
               )}
               <p className="text-[11px] text-muted">
-                Setup once if buttons fail: run{" "}
-                <code className="text-foreground">supabase/deputy-ops.sql</code>{" "}
-                in Supabase SQL Editor.
+                Same button toggles both ways:{" "}
+                <strong className="text-foreground">Make deputy</strong> →{" "}
+                <strong className="text-foreground">Remove deputy</strong>. Setup
+                once if it fails:{" "}
+                <code className="text-foreground">supabase/staff-roles-setup.sql</code>
+                .
               </p>
             </div>
 

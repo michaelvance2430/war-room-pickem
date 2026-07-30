@@ -1104,6 +1104,32 @@ export async function setMemberModeration(opts: {
     return { ok: false, error: "Commissioner or moderator only" };
   }
   const supabase = createClient();
+  const patch: Record<string, boolean> = {};
+  if (opts.isDeputy != null) patch.is_deputy = opts.isDeputy;
+  if (opts.isModerator != null) patch.is_moderator = opts.isModerator;
+  if (opts.lockerMuted != null) patch.locker_muted = opts.lockerMuted;
+
+  // Commissioner: prefer direct update (make + remove deputy/mod/mute).
+  // Works once columns exist; avoids stale RPC signature issues.
+  if (session.isCommissioner && Object.keys(patch).length) {
+    const { error: upErr } = await supabase
+      .from("memberships")
+      .update(patch)
+      .eq("league_id", session.leagueId)
+      .eq("user_id", opts.userId);
+    if (!upErr) return { ok: true };
+    // Fall through to RPC if column missing / RLS blocks
+    if (!/column|schema cache|is_deputy|is_moderator|locker_muted/i.test(upErr.message || "")) {
+      // still try RPC below
+    } else {
+      return {
+        ok: false,
+        error:
+          `Roles incomplete (${upErr.message}). Run supabase/staff-roles-setup.sql in Supabase SQL Editor once.`,
+      };
+    }
+  }
+
   const { data, error } = await supabase.rpc("set_member_moderation", {
     p_league_id: session.leagueId,
     p_user_id: opts.userId,
@@ -1116,32 +1142,6 @@ export async function setMemberModeration(opts: {
       return { ok: false, error: "Moderation update failed" };
     }
     return { ok: true };
-  }
-
-  // Fallback: commissioner direct column update (works once columns exist,
-  // even if RPC signature is stale in PostgREST schema cache)
-  if (session.isCommissioner) {
-    const patch: Record<string, boolean> = {};
-    if (opts.isDeputy != null) patch.is_deputy = opts.isDeputy;
-    if (opts.isModerator != null) patch.is_moderator = opts.isModerator;
-    if (opts.lockerMuted != null) patch.locker_muted = opts.lockerMuted;
-    if (Object.keys(patch).length) {
-      const { error: upErr } = await supabase
-        .from("memberships")
-        .update(patch)
-        .eq("league_id", session.leagueId)
-        .eq("user_id", opts.userId);
-      if (!upErr) return { ok: true };
-      // Prefer showing the real column/permission error
-      if (!/function|does not exist|schema cache|p_is_deputy|could not find/i.test(error.message || "")) {
-        return { ok: false, error: upErr.message };
-      }
-      return {
-        ok: false,
-        error:
-          `Roles incomplete (${upErr.message}). In Supabase SQL Editor run supabase/staff-roles-setup.sql once, wait 10s, hard-refresh.`,
-      };
-    }
   }
 
   if (/function|does not exist|schema cache|p_is_deputy|could not find/i.test(error.message || "")) {
