@@ -259,17 +259,17 @@ export default function Home() {
           </Link>
 
           <Link
-            href="/power-rankings"
+            href="/stats"
             className="group rounded-xl border border-border/80 bg-black/40 backdrop-blur-sm p-6 hover:border-primary/50 hover:bg-primary/5 transition shadow-[0_0_40px_rgba(0,0,0,0.35)]"
           >
             <div className="text-xs uppercase tracking-wider text-muted mb-2">
               Pulse
             </div>
             <div className="text-lg font-semibold text-white group-hover:text-primary transition">
-              Power Rankings
+              Stats
             </div>
             <p className="text-sm text-muted mt-2">
-              Who&apos;s actually playing the best right now
+              Power rankings + season stats
             </p>
           </Link>
 

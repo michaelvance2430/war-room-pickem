@@ -105,21 +105,24 @@ export default function Nav() {
       ? [{ href: "/crystal-ball", label: "Crystal Ball" }]
       : []),
     { href: "/standings", label: "Standings" },
-    { href: "/power-rankings", label: "Power Rankings" },
-    { href: "/announcements", label: "Announcements", badge: unreadCount },
-    { href: "/locker-room", label: "Locker Room" },
     { href: "/stats", label: "Stats" },
+    { href: "/announcements", label: "News", badge: unreadCount },
+    { href: "/locker-room", label: "Locker" },
     { href: "/players", label: "Players" },
     { href: "/rules", label: "Rules" },
-    { href: "/championship", label: "Championship" },
-    { href: "/toilet-bowl", label: "Toilet Bowl", className: "text-toilet hover:text-toilet" },
+    { href: "/championship", label: "Champ" },
+    {
+      href: "/toilet-bowl",
+      label: "Toilet",
+      className: "text-toilet hover:text-toilet",
+    },
     {
       href: "/trophy-room",
-      label: "Trophy Room",
+      label: "Trophies",
       className: "text-amber-300 hover:text-amber-200",
     },
     ...(isCommish
-      ? [{ href: "/commissioner", label: "Commissioner", className: "text-primary" }]
+      ? [{ href: "/commissioner", label: "Commish", className: "text-primary" }]
       : []),
     { href: "/account", label: "Account" },
   ];
@@ -143,14 +146,17 @@ export default function Nav() {
   return (
     <>
       <header className="border-b border-border bg-card/80 backdrop-blur sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between gap-2">
-          <Link href="/" className="flex items-center gap-3 min-w-0">
+        <div className="max-w-6xl mx-auto px-3 sm:px-4 h-14 flex items-center gap-2 min-w-0">
+          <Link
+            href="/"
+            className="flex items-center gap-2 shrink-0 min-w-0 max-w-[9.5rem] sm:max-w-[11rem]"
+          >
             <div className="w-8 h-8 shrink-0 rounded bg-primary flex items-center justify-center font-bold text-black text-sm">
               WR
             </div>
-            <div className="flex flex-col min-w-0">
-              <span className="font-semibold tracking-tight leading-tight truncate">
-                War Room Pick&apos;Em
+            <div className="flex flex-col min-w-0 hidden sm:flex">
+              <span className="font-semibold tracking-tight leading-tight truncate text-sm">
+                War Room
               </span>
               {leagueName && (
                 <span className="text-[10px] text-muted leading-tight truncate">
@@ -160,19 +166,19 @@ export default function Nav() {
             </div>
           </Link>
 
-          {/* Desktop tabs */}
-          <nav className="hidden md:flex items-center gap-4 text-sm text-muted">
+          {/* Desktop tabs — scroll if needed so My Picks never gets crushed */}
+          <nav className="hidden md:flex flex-1 items-center justify-end gap-x-2.5 lg:gap-x-3 text-[13px] text-muted min-w-0 overflow-x-auto overflow-y-hidden py-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
             {links.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
-                className={`hover:text-foreground transition relative ${link.className || ""} ${
-                  linkActive(link.href) ? "text-foreground" : ""
+                className={`hover:text-foreground transition relative whitespace-nowrap shrink-0 ${link.className || ""} ${
+                  linkActive(link.href) ? "text-foreground font-medium" : ""
                 }`}
               >
                 {link.label}
                 {link.badge != null && link.badge > 0 && (
-                  <span className="absolute -top-2 -right-3 min-w-[18px] h-[18px] px-1 rounded-full bg-primary text-black text-[10px] font-bold flex items-center justify-center">
+                  <span className="absolute -top-2 -right-2.5 min-w-[16px] h-[16px] px-0.5 rounded-full bg-primary text-black text-[9px] font-bold flex items-center justify-center">
                     {link.badge > 99 ? "99+" : link.badge}
                   </span>
                 )}
