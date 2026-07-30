@@ -75,6 +75,37 @@ function storageKeys(week: number) {
   };
 }
 
+/**
+ * Week chip styles for commissioner pickers.
+ * Scored weeks: muted + diagonal strike (still clickable / view-locked).
+ */
+function weekChipClass(opts: {
+  active: boolean;
+  scored: boolean;
+  /** Conference championship / cut week accent when not scored */
+  cutHint?: boolean;
+}): string {
+  const { active, scored, cutHint } = opts;
+  const base =
+    "relative px-3 py-1.5 rounded-full text-xs font-medium transition select-none";
+
+  if (scored && active) {
+    return `${base} week-pill-passed bg-stone-500/35 text-stone-200 border border-stone-400/50 ring-2 ring-primary/50`;
+  }
+  if (scored) {
+    return `${base} week-pill-passed bg-stone-600/25 text-stone-400 border border-stone-500/40 hover:text-stone-300 hover:border-stone-400/50`;
+  }
+  if (active) {
+    return cutHint
+      ? `${base} bg-primary text-black ring-2 ring-warning/60`
+      : `${base} bg-primary text-black`;
+  }
+  if (cutHint) {
+    return `${base} bg-card-hover border border-warning/50 text-warning hover:text-warning`;
+  }
+  return `${base} bg-card-hover border border-border text-muted hover:text-foreground`;
+}
+
 export default function CommissionerPage() {
   const router = useRouter();
   const [allowed, setAllowed] = useState<boolean | null>(null);
@@ -1551,11 +1582,16 @@ export default function CommissionerPage() {
               <h2 className="font-semibold mb-1">Pick&apos;em week</h2>
               <p className="text-xs text-muted mb-3">
                 {weekSubtitle(activeWeek)}. Games on different dates are fine —
-                each shows its own kickoff below the matchup.
+                each shows its own kickoff below the matchup.{" "}
+                <span className="text-stone-400">
+                  Scored weeks look muted with a diagonal strike — still
+                  viewable, locked for edits until unlock.
+                </span>
               </p>
               <div className="flex flex-wrap gap-2">
                 {Array.from({ length: SEASON_MAX_WEEK + 1 }, (_, i) => i).map(
                   (w) => {
+                    const scored = scoredWeeks.includes(w);
                     const hint =
                       w === 14
                         ? " · CUT"
@@ -1568,19 +1604,21 @@ export default function CommissionerPage() {
                       <button
                         key={w}
                         type="button"
-                        onClick={() => changeActiveWeek(w)}
-                        className={
-                          activeWeek === w
-                            ? w === 14
-                              ? "px-3 py-1.5 rounded-full text-xs font-medium bg-primary text-black ring-2 ring-warning/60"
-                              : "px-3 py-1.5 rounded-full text-xs font-medium bg-primary text-black"
-                            : w === 14
-                              ? "px-3 py-1.5 rounded-full text-xs font-medium bg-card-hover border border-warning/50 text-warning hover:text-warning"
-                              : "px-3 py-1.5 rounded-full text-xs font-medium bg-card-hover border border-border text-muted hover:text-foreground"
+                        title={
+                          scored
+                            ? `${weekTitle(w)} — scored (view / locked)`
+                            : weekTitle(w)
                         }
+                        onClick={() => changeActiveWeek(w)}
+                        className={weekChipClass({
+                          active: activeWeek === w,
+                          scored,
+                          cutHint: w === 14,
+                        })}
                       >
                         {weekTitle(w)}
                         {hint}
+                        {scored ? " · done" : ""}
                       </button>
                     );
                   }
@@ -1917,20 +1955,28 @@ export default function CommissionerPage() {
 
               <div className="flex flex-wrap gap-2 mb-4">
                 {Array.from({ length: SEASON_MAX_WEEK + 1 }, (_, i) => i).map(
-                  (w) => (
-                    <button
-                      key={w}
-                      type="button"
-                      onClick={() => changeActiveWeek(w)}
-                      className={
-                        activeWeek === w
-                          ? "px-3 py-1 rounded-full text-xs font-medium bg-primary text-black"
-                          : "px-3 py-1 rounded-full text-xs font-medium bg-card-hover border border-border text-muted"
-                      }
-                    >
-                      {weekTitle(w)}
-                    </button>
-                  )
+                  (w) => {
+                    const scored = scoredWeeks.includes(w);
+                    return (
+                      <button
+                        key={w}
+                        type="button"
+                        title={
+                          scored
+                            ? `${weekTitle(w)} — scored (view / locked)`
+                            : weekTitle(w)
+                        }
+                        onClick={() => changeActiveWeek(w)}
+                        className={weekChipClass({
+                          active: activeWeek === w,
+                          scored,
+                        })}
+                      >
+                        {weekTitle(w)}
+                        {scored ? " · done" : ""}
+                      </button>
+                    );
+                  }
                 )}
               </div>
 
@@ -2042,32 +2088,33 @@ export default function CommissionerPage() {
                 {Array.from({ length: SEASON_MAX_WEEK + 1 }, (_, i) => i).map(
                   (w) => {
                     const scored = scoredWeeks.includes(w);
-                    const selected = activeWeek === w;
                     return (
                       <button
                         key={w}
                         type="button"
-                        onClick={() => void changeActiveWeek(w)}
-                        className={
-                          selected
-                            ? scored
-                              ? "px-3 py-1.5 rounded-full text-xs font-medium bg-primary text-black ring-2 ring-ok/50"
-                              : "px-3 py-1.5 rounded-full text-xs font-medium bg-primary text-black"
-                            : scored
-                              ? "px-3 py-1.5 rounded-full text-xs font-medium bg-ok/15 border border-ok/40 text-ok"
-                              : "px-3 py-1.5 rounded-full text-xs font-medium bg-card-hover border border-border text-muted hover:text-foreground"
+                        title={
+                          scored
+                            ? `${weekTitle(w)} — scored (view / locked)`
+                            : weekTitle(w)
                         }
+                        onClick={() => void changeActiveWeek(w)}
+                        className={weekChipClass({
+                          active: activeWeek === w,
+                          scored,
+                          cutHint: w === 14,
+                        })}
                       >
                         {weekTitle(w)}
-                        {scored ? " ✓" : ""}
+                        {scored ? " · done" : ""}
                       </button>
                     );
                   }
                 )}
               </div>
               <p className="text-[11px] text-muted mt-3">
-                Dry-run tip: Build Card → publish week → Fill bot picks → Enter
-                Results → set covers → Score → next week.
+                <span className="text-stone-400">Muted + diagonal</span> = week
+                already scored (still open to view; unlock to re-score). Dry-run:
+                publish → bot picks → results → score → next week.
               </p>
             </div>
 

@@ -68,3 +68,21 @@ body::after {
   }
 }
 
+/* Commissioner: scored / passed weeks — still clickable, visual "done" */
+.week-pill-passed {
+  position: relative;
+  overflow: hidden;
+}
+.week-pill-passed::after {
+  content: "";
+  position: absolute;
+  left: -8%;
+  right: -8%;
+  top: 50%;
+  height: 1.5px;
+  background: currentColor;
+  opacity: 0.55;
+  transform: rotate(-18deg);
+  pointer-events: none;
+}
+
