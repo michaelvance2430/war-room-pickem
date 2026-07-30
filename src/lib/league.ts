@@ -31,6 +31,8 @@ export interface Session {
   isCommissioner: boolean;
   /** Appointed by commissioner — locker mute + delete posts */
   isModerator?: boolean;
+  /** Appointed by commissioner — build cards + score weeks when you're away */
+  isDeputy?: boolean;
   leagueId: string;
 }
 
@@ -85,10 +87,20 @@ export function isCommissioner(): boolean {
   return !!session?.isCommissioner;
 }
 
-/** Commissioner or appointed moderator (troll control). */
+/** Commissioner or deputy — week ops (card, results, who's-in). */
+export function isOps(): boolean {
+  const session = getSession();
+  return !!(session?.isCommissioner || session?.isDeputy);
+}
+
+/** Commissioner, deputy, or moderator (troll control / staff nav). */
 export function isStaff(): boolean {
   const session = getSession();
-  return !!(session?.isCommissioner || session?.isModerator);
+  return !!(
+    session?.isCommissioner ||
+    session?.isDeputy ||
+    session?.isModerator
+  );
 }
 
 export function updateLeagueName(name: string): League | null {

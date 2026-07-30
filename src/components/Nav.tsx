@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { getSession, getLeague, isStaff } from "@/lib/league";
+import { getSession, getLeague, isStaff, isOps } from "@/lib/league";
 import { createClient } from "@/lib/supabase/client";
 import Avatar from "@/components/Avatar";
 import RulesOnboardingModal from "@/components/RulesOnboardingModal";
@@ -21,6 +21,7 @@ type NavLink = {
 export default function Nav() {
   const pathname = usePathname();
   const [isCommish, setIsCommish] = useState(false);
+  const [ops, setOps] = useState(false);
   const [staff, setStaff] = useState(false);
   const [name, setName] = useState("You");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -33,15 +34,18 @@ export default function Nav() {
     const session = getSession();
     const league = getLeague();
     setIsCommish(!!session?.isCommissioner);
+    setOps(isOps());
     setStaff(isStaff());
     setName(session?.playerName || "You");
     setLeagueName(league?.name || "");
     setCrystalBallOn(league?.settings?.crystalBallEnabled !== false);
 
-    // Mods appointed mid-session: refresh local flag so Mod nav appears
+    // Roles appointed mid-session: refresh local flags for nav
     void refreshStaffSessionFlags().then(() => {
+      const s = getSession();
+      setIsCommish(!!s?.isCommissioner);
+      setOps(isOps());
       setStaff(isStaff());
-      setIsCommish(!!getSession()?.isCommissioner);
     });
 
     loadMyProfile().then((p) => {
@@ -131,8 +135,14 @@ export default function Nav() {
       label: "Trophies",
       className: "text-amber-300 hover:text-amber-200",
     },
-    ...(isCommish
-      ? [{ href: "/commissioner", label: "Commish", className: "text-primary" }]
+    ...(ops
+      ? [
+          {
+            href: "/commissioner",
+            label: isCommish ? "Commish" : "Ops",
+            className: "text-primary",
+          },
+        ]
       : []),
     ...(staff
       ? [
@@ -216,6 +226,9 @@ export default function Nav() {
                 {name}
                 {isCommish && (
                   <span className="ml-1 text-xs text-primary">(Commish)</span>
+                )}
+                {!isCommish && ops && (
+                  <span className="ml-1 text-xs text-primary">(Deputy)</span>
                 )}
               </span>
             </Link>

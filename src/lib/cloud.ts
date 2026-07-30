@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
-import { getSession } from "@/lib/league";
+import { getSession, isOps } from "@/lib/league";
 import { Game, Prop, UserPick } from "@/lib/types";
 import { scoreWeek, GameResult } from "@/lib/scoring";
 import { weekTitle } from "@/lib/dates";
@@ -36,13 +36,13 @@ export function cardRevision(card: {
   ].join("::");
 }
 
-/** Commissioner sets which week everyone should see (leagues.current_week). */
+/** Ops (commissioner or deputy) set which week everyone should see. */
 export async function setLeagueActiveWeek(
   weekNumber: number
 ): Promise<{ ok: boolean; error?: string }> {
   const session = getSession();
-  if (!session?.leagueId || !session.isCommissioner) {
-    return { ok: false, error: "Commissioner session required" };
+  if (!session?.leagueId || !isOps()) {
+    return { ok: false, error: "Commissioner or deputy required" };
   }
   const supabase = createClient();
   const { error } = await supabase
@@ -140,8 +140,8 @@ export async function publishWeekCard(opts: {
   prop: Prop;
 }): Promise<{ ok: boolean; weekCardId?: string; games?: Game[]; error?: string }> {
   const session = getSession();
-  if (!session?.leagueId || !session.isCommissioner) {
-    return { ok: false, error: "Commissioner session required" };
+  if (!session?.leagueId || !isOps()) {
+    return { ok: false, error: "Commissioner or deputy required" };
   }
   if (opts.games.length !== 5) {
     return { ok: false, error: "Select exactly 5 games" };
@@ -467,7 +467,7 @@ export type PickSubmissionStatus = {
 };
 
 /**
- * Commissioner only — who has locked picks for a week.
+ * Ops only — who has locked picks for a week.
  * Does not return sides/confidence (privacy). Use for "who hasn't picked".
  */
 export async function loadPickSubmissionStatus(
@@ -475,8 +475,8 @@ export async function loadPickSubmissionStatus(
   expectedGames = 5
 ): Promise<{ ok: boolean; rows: PickSubmissionStatus[]; error?: string }> {
   const session = getSession();
-  if (!session?.leagueId || !session.isCommissioner) {
-    return { ok: false, rows: [], error: "Commissioner only" };
+  if (!session?.leagueId || !isOps()) {
+    return { ok: false, rows: [], error: "Commissioner or deputy only" };
   }
 
   const supabase = createClient();
@@ -552,7 +552,7 @@ export async function loadPickSubmissionStatus(
 }
 
 /**
- * Commissioner posts a public announcement naming who still needs picks.
+ * Ops post a public announcement naming who still needs picks.
  * Does not reveal actual picks — only names + complete/partial/missing.
  */
 export async function postMissingPicksAnnouncement(
@@ -560,8 +560,8 @@ export async function postMissingPicksAnnouncement(
   expectedGames = 5
 ): Promise<{ ok: boolean; error?: string; missingCount?: number }> {
   const session = getSession();
-  if (!session?.leagueId || !session.isCommissioner || !session.playerId) {
-    return { ok: false, error: "Commissioner session required" };
+  if (!session?.leagueId || !isOps() || !session.playerId) {
+    return { ok: false, error: "Commissioner or deputy required" };
   }
 
   const status = await loadPickSubmissionStatus(weekNumber, expectedGames);
@@ -589,7 +589,7 @@ export async function postMissingPicksAnnouncement(
 
   const title = `${weekLabel}: Still need picks`;
   const body = [
-    `Commissioner call-out — these players still need a complete ${weekLabel} card (all games + confidence + Best Bet + prop):`,
+    `League call-out — these players still need a complete ${weekLabel} card (all games + confidence + Best Bet + prop):`,
     "",
     ...lines,
     "",
@@ -681,8 +681,8 @@ export async function saveResultsAndScoreWeek(opts: {
   propResult: string | null;
 }): Promise<ScoreWeekResult> {
   const session = getSession();
-  if (!session?.leagueId || !session.isCommissioner) {
-    return { ok: false, scoredCount: 0, error: "Commissioner only" };
+  if (!session?.leagueId || !isOps()) {
+    return { ok: false, scoredCount: 0, error: "Commissioner or deputy only" };
   }
 
   const supabase = createClient();
@@ -954,6 +954,7 @@ export type LeagueRosterMember = {
   isBot?: boolean;
   isModerator?: boolean;
   lockerMuted?: boolean;
+  isDeputy?: boolean;
 };
 
 /** Live league roster from Supabase memberships (not local mock players). */
@@ -984,6 +985,7 @@ export async function loadLeagueRoster(): Promise<LeagueRosterMember[]> {
             isBot: !!m.is_bot,
             isModerator: !!m.is_moderator,
             lockerMuted: !!m.locker_muted,
+            isDeputy: !!m.is_deputy,
           };
         })
         .sort((a, b) => {
@@ -1000,7 +1002,7 @@ export async function loadLeagueRoster(): Promise<LeagueRosterMember[]> {
     const res = await supabase
       .from("memberships")
       .select(
-        "id, user_id, role, division, total_points, is_bot, is_moderator, locker_muted, profiles(display_name, avatar_url)"
+        "id, user_id, role, division, total_points, is_bot, is_moderator, locker_muted, is_deputy, profiles(display_name, avatar_url)"
       )
       .eq("league_id", session.leagueId);
     if (res.error && /is_bot|schema cache|column/i.test(res.error.message)) {
@@ -1066,6 +1068,7 @@ export async function loadLeagueRoster(): Promise<LeagueRosterMember[]> {
         isBot: !!m.is_bot,
         isModerator: !!m.is_moderator,
         lockerMuted: !!m.locker_muted,
+        isDeputy: !!m.is_deputy,
       };
     })
     .sort((a, b) => {
@@ -1074,19 +1077,31 @@ export async function loadLeagueRoster(): Promise<LeagueRosterMember[]> {
     });
 }
 
-/** Commissioner appoints/removes moderators; staff can mute for Locker Room. */
+/** Commissioner appoints mods/deputies; staff can mute for Locker Room. */
 export async function setMemberModeration(opts: {
   userId: string;
   isModerator?: boolean | null;
   lockerMuted?: boolean | null;
+  isDeputy?: boolean | null;
 }): Promise<{ ok: boolean; error?: string }> {
   const session = getSession();
   if (!session?.leagueId) return { ok: false, error: "No league" };
-  if (!session.isCommissioner && !session.isModerator) {
-    return { ok: false, error: "Commissioner or moderator only" };
+  if (opts.isDeputy != null && !session.isCommissioner) {
+    return { ok: false, error: "Only the commissioner can appoint deputies" };
   }
   if (opts.isModerator != null && !session.isCommissioner) {
     return { ok: false, error: "Only the commissioner can appoint moderators" };
+  }
+  if (
+    opts.lockerMuted != null &&
+    !session.isCommissioner &&
+    !session.isModerator
+  ) {
+    return { ok: false, error: "Commissioner or moderator only" };
+  }
+  // Need at least one permitted action path
+  if (!session.isCommissioner && !session.isModerator) {
+    return { ok: false, error: "Commissioner or moderator only" };
   }
   const supabase = createClient();
   const { data, error } = await supabase.rpc("set_member_moderation", {
@@ -1094,13 +1109,14 @@ export async function setMemberModeration(opts: {
     p_user_id: opts.userId,
     p_is_moderator: opts.isModerator ?? null,
     p_locker_muted: opts.lockerMuted ?? null,
+    p_is_deputy: opts.isDeputy ?? null,
   });
   if (error) {
-    if (/function|does not exist|schema cache/i.test(error.message || "")) {
+    if (/function|does not exist|schema cache|p_is_deputy/i.test(error.message || "")) {
       return {
         ok: false,
         error:
-          "Moderation not set up — run supabase/moderation.sql in Supabase SQL Editor once.",
+          "Roles not set up — run supabase/moderation.sql then supabase/deputy-ops.sql in Supabase SQL Editor.",
       };
     }
     return { ok: false, error: error.message };
@@ -1111,24 +1127,39 @@ export async function setMemberModeration(opts: {
   return { ok: true };
 }
 
-/** Refresh isModerator on the local session from memberships. */
+/** Refresh isModerator / isDeputy on the local session from memberships. */
 export async function refreshStaffSessionFlags(): Promise<void> {
   const session = getSession();
   if (!session?.leagueId || !session.playerId) return;
   if (session.isCommissioner) return;
   const supabase = createClient();
-  const { data } = await supabase
-    .from("memberships")
-    .select("is_moderator, locker_muted")
-    .eq("league_id", session.leagueId)
-    .eq("user_id", session.playerId)
-    .maybeSingle();
+  let data: { is_moderator?: boolean; is_deputy?: boolean } | null = null;
+  {
+    const res = await supabase
+      .from("memberships")
+      .select("is_moderator, is_deputy, locker_muted")
+      .eq("league_id", session.leagueId)
+      .eq("user_id", session.playerId)
+      .maybeSingle();
+    if (res.error && /is_deputy|column|schema/i.test(res.error.message || "")) {
+      const res2 = await supabase
+        .from("memberships")
+        .select("is_moderator, locker_muted")
+        .eq("league_id", session.leagueId)
+        .eq("user_id", session.playerId)
+        .maybeSingle();
+      data = res2.data as { is_moderator?: boolean } | null;
+    } else {
+      data = res.data as { is_moderator?: boolean; is_deputy?: boolean } | null;
+    }
+  }
   if (!data) return;
   try {
     const raw = localStorage.getItem("warroom-session");
     if (!raw) return;
     const s = JSON.parse(raw) as Record<string, unknown>;
-    s.isModerator = !!(data as { is_moderator?: boolean }).is_moderator;
+    s.isModerator = !!data.is_moderator;
+    s.isDeputy = !!data.is_deputy;
     localStorage.setItem("warroom-session", JSON.stringify(s));
   } catch {
     /* ignore */

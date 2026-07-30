@@ -17,6 +17,7 @@ export interface LeagueMembership {
   role: string;
   displayName: string;
   isModerator?: boolean;
+  isDeputy?: boolean;
 }
 
 function canUseStorage() {
@@ -45,6 +46,7 @@ export function writeSessionAndLeague(
     playerName: membership.displayName || "Player",
     isCommissioner,
     isModerator: !isCommissioner && !!membership.isModerator,
+    isDeputy: !isCommissioner && !!membership.isDeputy,
     leagueId: membership.leagueId,
   };
 
@@ -87,10 +89,10 @@ export async function fetchMyMemberships(): Promise<LeagueMembership[]> {
     const res = await supabase
       .from("memberships")
       .select(
-        "role, is_moderator, league_id, leagues(id, name, code, commissioner_id, created_at, cut_percent, regular_season_weeks, games_per_week)"
+        "role, is_moderator, is_deputy, league_id, leagues(id, name, code, commissioner_id, created_at, cut_percent, regular_season_weeks, games_per_week)"
       )
       .eq("user_id", userId);
-    if (res.error && /is_moderator|schema cache|column/i.test(res.error.message || "")) {
+    if (res.error && /is_moderator|is_deputy|schema cache|column/i.test(res.error.message || "")) {
       const res2 = await supabase
         .from("memberships")
         .select(
@@ -121,6 +123,7 @@ export async function fetchMyMemberships(): Promise<LeagueMembership[]> {
       role: (row.role as string) || "player",
       displayName: metaName,
       isModerator: !!row.is_moderator,
+      isDeputy: !!row.is_deputy,
     });
   }
   return list;

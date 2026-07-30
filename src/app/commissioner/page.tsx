@@ -12,6 +12,7 @@ import { scoreWeek, GameResult } from "@/lib/scoring";
 import { applyWeekScores } from "@/lib/store";
 import {
   isCommissioner,
+  isOps,
   getLeague,
   getSession,
   resetLeague,
@@ -37,6 +38,8 @@ import {
   listScoredWeekNumbers,
   loadWeekResultsFromCloud,
   loadLeagueRoster,
+  setMemberModeration,
+  refreshStaffSessionFlags,
   type LeagueRosterMember,
   PickSubmissionStatus,
 } from "@/lib/cloud";
@@ -115,7 +118,9 @@ function weekChipClass(opts: {
 export default function CommissionerPage() {
   const router = useRouter();
   const [allowed, setAllowed] = useState<boolean | null>(null);
-  const [tab, setTab] = useState<"card" | "results" | "settings" | "picks">("settings");
+  /** True only for league owner — settings, bots, reset, pass, deputies */
+  const [isOwner, setIsOwner] = useState(false);
+  const [tab, setTab] = useState<"card" | "results" | "settings" | "picks">("card");
   const [league, setLeague] = useState<League | null>(null);
   const [leagueNameEdit, setLeagueNameEdit] = useState("");
   const [cutPercent, setCutPercent] = useState(50);
@@ -187,10 +192,20 @@ export default function CommissionerPage() {
   const [passToUserId, setPassToUserId] = useState("");
   const [passBusy, setPassBusy] = useState(false);
   const [passReport, setPassReport] = useState<string | null>(null);
+  const [deputyBusyId, setDeputyBusyId] = useState<string | null>(null);
+  const [deputyReport, setDeputyReport] = useState<string | null>(null);
 
   useEffect(() => {
-    setAllowed(isCommissioner());
     async function load() {
+      await refreshStaffSessionFlags();
+      const owner = isCommissioner();
+      const ops = isOps();
+      setIsOwner(owner);
+      setAllowed(ops);
+      if (owner) setTab("settings");
+      else setTab("card");
+      if (!ops) return;
+
       const lg = (await syncLeagueFromCloud()) || getLeague();
       if (lg) {
         setLeague(lg);
@@ -230,7 +245,7 @@ export default function CommissionerPage() {
         /* ignore */
       }
     }
-    load();
+    void load();
   }, []);
 
   /** Sync Build Card draft controls from a known prop (publish / full week load). */
@@ -1232,9 +1247,10 @@ export default function CommissionerPage() {
         <Nav />
         <main className="flex-1 flex items-center justify-center px-4">
           <div className="max-w-md text-center rounded-xl border border-border bg-card p-6">
-            <h1 className="text-xl font-bold mb-2">Commissioner only</h1>
+            <h1 className="text-xl font-bold mb-2">Ops only</h1>
             <p className="text-sm text-muted">
-              Only the league commissioner can open these tools.
+              Only the league commissioner or an appointed deputy can open these
+              tools.
             </p>
           </div>
         </main>
@@ -1244,14 +1260,53 @@ export default function CommissionerPage() {
 
   const session = getSession();
 
+  async function toggleDeputy(m: LeagueRosterMember) {
+    if (!isOwner || m.role === "commissioner" || m.userId === session?.playerId)
+      return;
+    const next = !m.isDeputy;
+    if (
+      !confirm(
+        next
+          ? `Make ${m.name} a deputy commissioner?\n\nThey can build the weekly card, enter results, score weeks, and nudge picks. They cannot change settings, reset the season, or pass ownership.`
+          : `Remove deputy from ${m.name}?`
+      )
+    ) {
+      return;
+    }
+    setDeputyBusyId(m.userId);
+    setDeputyReport(null);
+    const res = await setMemberModeration({
+      userId: m.userId,
+      isDeputy: next,
+    });
+    setDeputyBusyId(null);
+    if (!res.ok) {
+      setDeputyReport(res.error || "Failed");
+      return;
+    }
+    setDeputyReport(
+      next
+        ? `${m.name} is now a deputy — they can run picks & results.`
+        : `${m.name} is no longer a deputy.`
+    );
+    const roster = await loadLeagueRoster();
+    setPassRoster(
+      roster.filter((x) => !x.isBot && x.userId !== session?.playerId)
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col">
       <Nav />
       <main className="flex-1 max-w-3xl mx-auto w-full px-4 py-8">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold">Commissioner Tools</h1>
+          <h1 className="text-2xl font-bold">
+            {isOwner ? "Commissioner Tools" : "Deputy Ops"}
+          </h1>
           <p className="text-sm text-muted">
-            Settings • Build card • Who&apos;s in • Results
+            {isOwner
+              ? "Settings • Build card • Who\u2019s in • Results"
+              : "Build card • Who\u2019s in • Results (settings stay with the commissioner)"}
           </p>
           {oddsCreditsRemaining != null && (
             <div
@@ -1298,16 +1353,18 @@ export default function CommissionerPage() {
         </div>
 
         <div className="flex flex-wrap gap-2 mb-6">
-          <button
-            onClick={() => setTab("settings")}
-            className={
-              tab === "settings"
-                ? "px-4 py-1.5 rounded-full text-sm font-medium bg-primary text-black"
-                : "px-4 py-1.5 rounded-full text-sm font-medium bg-card border border-border text-muted"
-            }
-          >
-            Settings
-          </button>
+          {isOwner && (
+            <button
+              onClick={() => setTab("settings")}
+              className={
+                tab === "settings"
+                  ? "px-4 py-1.5 rounded-full text-sm font-medium bg-primary text-black"
+                  : "px-4 py-1.5 rounded-full text-sm font-medium bg-card border border-border text-muted"
+              }
+            >
+              Settings
+            </button>
+          )}
           <button
             onClick={() => setTab("card")}
             className={
@@ -1347,7 +1404,7 @@ export default function CommissionerPage() {
           </button>
         </div>
 
-        {tab === "settings" && league && (
+        {tab === "settings" && isOwner && league && (
           <div className="space-y-6">
             <div className="rounded-xl border border-border bg-card p-5 space-y-4">
               <h2 className="font-semibold">League</h2>
@@ -1680,6 +1737,67 @@ export default function CommissionerPage() {
               >
                 Open Trophy Room →
               </a>
+            </div>
+
+            <div className="rounded-xl border border-primary/40 bg-card p-5 space-y-3">
+              <h2 className="font-semibold text-primary">Deputy commissioners</h2>
+              <p className="text-xs text-muted leading-relaxed">
+                When you&apos;re unavailable, a deputy can{" "}
+                <strong className="text-foreground">build the card</strong>,{" "}
+                <strong className="text-foreground">enter results</strong>,{" "}
+                <strong className="text-foreground">score the week</strong>, and{" "}
+                <strong className="text-foreground">nudge missing picks</strong>
+                . They cannot change settings, reset the season, manage bots, or
+                pass ownership. (Troll tools stay on{" "}
+                <a href="/moderation" className="text-amber-300 hover:underline">
+                  Mod
+                </a>
+                .)
+              </p>
+              {passRoster.length === 0 ? (
+                <p className="text-xs text-muted">
+                  Add another real player first, then appoint them here.
+                </p>
+              ) : (
+                <ul className="divide-y divide-border">
+                  {passRoster.map((m) => (
+                    <li
+                      key={m.userId}
+                      className="flex flex-wrap items-center justify-between gap-2 py-2.5"
+                    >
+                      <div className="min-w-0">
+                        <span className="text-sm font-medium">{m.name}</span>
+                        {m.isDeputy && (
+                          <span className="ml-1.5 text-[10px] uppercase text-primary border border-primary/40 px-1 rounded">
+                            Deputy
+                          </span>
+                        )}
+                        {m.isModerator && (
+                          <span className="ml-1.5 text-[10px] uppercase text-amber-300 border border-amber-400/40 px-1 rounded">
+                            Mod
+                          </span>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        disabled={deputyBusyId === m.userId}
+                        onClick={() => void toggleDeputy(m)}
+                        className="text-xs px-2.5 py-1 rounded-lg border border-primary/40 text-primary hover:bg-primary/10 disabled:opacity-50"
+                      >
+                        {m.isDeputy ? "Remove deputy" : "Make deputy"}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {deputyReport && (
+                <p className="text-xs text-primary leading-relaxed">{deputyReport}</p>
+              )}
+              <p className="text-[11px] text-muted">
+                Setup once if buttons fail: run{" "}
+                <code className="text-foreground">supabase/deputy-ops.sql</code>{" "}
+                in Supabase SQL Editor.
+              </p>
             </div>
 
             <div className="rounded-xl border border-primary/30 bg-card p-5 space-y-3">

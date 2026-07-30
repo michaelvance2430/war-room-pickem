@@ -428,8 +428,12 @@ export async function archiveGazetteEdition(
   edition: GazetteEdition
 ): Promise<{ ok: boolean; error?: string }> {
   const session = getSession();
-  if (!session?.leagueId || !session.isCommissioner) {
-    return { ok: false, error: "Commissioner only" };
+  // Deputies scoring a week should also archive the paper
+  if (
+    !session?.leagueId ||
+    !(session.isCommissioner || session.isDeputy)
+  ) {
+    return { ok: false, error: "Commissioner or deputy only" };
   }
   const supabase = createClient();
   const { error } = await supabase.from("gazette_editions").upsert(

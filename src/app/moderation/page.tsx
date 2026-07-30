@@ -217,6 +217,11 @@ export default function ModerationPage() {
                           Commish
                         </span>
                       )}
+                      {m.isDeputy && !isComm && (
+                        <span className="ml-1.5 text-[10px] uppercase text-primary border border-primary/40 px-1 rounded">
+                          Deputy
+                        </span>
+                      )}
                       {m.isModerator && !isComm && (
                         <span className="ml-1.5 text-[10px] uppercase text-amber-300 border border-amber-400/40 px-1 rounded">
                           Mod
