@@ -131,10 +131,10 @@ export default function JoinPage() {
         .single();
       if (findError || !league) throw new Error("Invalid league code");
 
-      // Already in league → re-enter (no capacity burn)
+      // Already in league → re-enter only (do NOT overwrite division/role)
       const { data: existingMem } = await supabase
         .from("memberships")
-        .select("id")
+        .select("id, role, division")
         .eq("league_id", league.id)
         .eq("user_id", userId)
         .maybeSingle();
@@ -148,22 +148,41 @@ export default function JoinPage() {
         if (isLeagueFull(count ?? 0)) {
           throw new Error(leagueFullMessage(count ?? MAX_LEAGUE_PLAYERS));
         }
-      }
 
-      const { error: memError } = await supabase.from("memberships").upsert(
-        {
+        // Auto-balance: put new players in the least-populated division
+        const { data: divRows } = await supabase
+          .from("memberships")
+          .select("division")
+          .eq("league_id", league.id);
+        const counts = { North: 0, South: 0, East: 0, West: 0 } as Record<
+          string,
+          number
+        >;
+        for (const r of divRows || []) {
+          const d = (r as { division?: string }).division || "North";
+          counts[d] = (counts[d] || 0) + 1;
+        }
+        let division: "North" | "South" | "East" | "West" = "North";
+        let best = Infinity;
+        for (const d of ["North", "South", "East", "West"] as const) {
+          if ((counts[d] || 0) < best) {
+            best = counts[d] || 0;
+            division = d;
+          }
+        }
+
+        const { error: memError } = await supabase.from("memberships").insert({
           league_id: league.id,
           user_id: userId,
           role: "player",
-          division: "North",
-        },
-        { onConflict: "league_id,user_id" }
-      );
-      if (memError) {
-        if (/full|max 32|check_violation/i.test(memError.message || "")) {
-          throw new Error(leagueFullMessage());
+          division,
+        });
+        if (memError) {
+          if (/full|max 32|check_violation/i.test(memError.message || "")) {
+            throw new Error(leagueFullMessage());
+          }
+          throw memError;
         }
-        throw memError;
       }
       localStorage.setItem(
         "warroom-session",

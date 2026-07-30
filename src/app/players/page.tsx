@@ -3,12 +3,13 @@
 import { useState, useEffect } from "react";
 import Nav from "@/components/Nav";
 import Avatar from "@/components/Avatar";
-import { getSession, getLeague } from "@/lib/league";
+import { getSession, getLeague, isOps, isCommissioner } from "@/lib/league";
 import {
   loadLeagueRoster,
   updateMemberDivision,
   removeLeagueMember,
   autoBalanceDivisions,
+  refreshStaffSessionFlags,
   LeagueRosterMember,
 } from "@/lib/cloud";
 import { Division } from "@/lib/types";
@@ -18,12 +19,13 @@ import {
   isLeagueFull,
   seatsRemaining,
 } from "@/lib/league-limits";
-
-const DIVISIONS: Division[] = ["North", "South", "East", "West"];
+import { DIVISIONS } from "@/lib/divisions";
 
 export default function PlayersPage() {
   const [players, setPlayers] = useState<LeagueRosterMember[]>([]);
   const [isCommish, setIsCommish] = useState(false);
+  /** Commissioner or deputy — can move people between divisions */
+  const [canManageDivs, setCanManageDivs] = useState(false);
   const [selfId, setSelfId] = useState<string | null>(null);
   const [leagueCode, setLeagueCode] = useState("");
   const [leagueName, setLeagueName] = useState("");
@@ -36,9 +38,11 @@ export default function PlayersPage() {
 
   async function reload() {
     setError(null);
+    await refreshStaffSessionFlags();
     const session = getSession();
     const league = getLeague();
-    setIsCommish(!!session?.isCommissioner);
+    setIsCommish(isCommissioner());
+    setCanManageDivs(isOps());
     setSelfId(session?.playerId || null);
     setLeagueCode(league?.code || "");
     setLeagueName(league?.name || "");
@@ -65,7 +69,7 @@ export default function PlayersPage() {
   }
 
   async function changeDivision(userId: string, division: Division) {
-    if (!isCommish || busy) return;
+    if (!canManageDivs || busy) return;
     setBusy(true);
     setError(null);
     setPlayers((prev) =>
@@ -113,10 +117,11 @@ export default function PlayersPage() {
   }
 
   async function handleAutoBalance() {
-    if (!isCommish || busy) return;
+    if (!canManageDivs || busy) return;
     if (
       !confirm(
-        "Reassign all players evenly across North / South / East / West?"
+        "Reassign all players evenly across North / South / East / West?\n\n" +
+          "This is saved to the league — it sticks when you switch leagues and come back."
       )
     ) {
       return;
@@ -266,11 +271,15 @@ export default function PlayersPage() {
           </div>
         )}
 
-        {isCommish && (
-          <div className="flex justify-end mb-4">
+        {canManageDivs && (
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+            <p className="text-xs text-muted max-w-md">
+              New joiners land in the least-full division automatically. You
+              (commish/deputy) can move anyone or rebalance the whole room.
+            </p>
             <button
               type="button"
-              onClick={handleAutoBalance}
+              onClick={() => void handleAutoBalance()}
               disabled={busy || players.length === 0}
               className="text-xs px-3 py-1.5 rounded-lg border border-border text-muted hover:text-foreground disabled:opacity-50"
             >
@@ -279,9 +288,10 @@ export default function PlayersPage() {
           </div>
         )}
 
-        {!isCommish && !loading && (
+        {!canManageDivs && !loading && (
           <p className="text-xs text-muted mb-4">
-            Only the commissioner can change divisions or remove players/bots.
+            Divisions are assigned when you join. Only the commissioner or a
+            deputy can move people — you can&apos;t change your own.
           </p>
         )}
 
@@ -337,18 +347,18 @@ export default function PlayersPage() {
                           {p.totalPoints} pts
                         </div>
                       </div>
-                      {isCommish && !p.isBot ? (
+                      {canManageDivs ? (
                         <select
                           value={p.division}
                           disabled={busy}
                           onChange={(e) =>
-                            changeDivision(
+                            void changeDivision(
                               p.userId,
                               e.target.value as Division
                             )
                           }
                           className="text-xs bg-background border border-border rounded px-1 py-0.5 max-w-[4.5rem]"
-                          title="Division"
+                          title="Change division (ops only)"
                         >
                           {DIVISIONS.map((d) => (
                             <option key={d} value={d}>
@@ -356,7 +366,11 @@ export default function PlayersPage() {
                             </option>
                           ))}
                         </select>
-                      ) : null}
+                      ) : (
+                        <span className="text-[10px] text-muted shrink-0">
+                          {p.division}
+                        </span>
+                      )}
                       {isCommish &&
                         p.role !== "commissioner" &&
                         p.userId !== selfId && (

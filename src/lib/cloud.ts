@@ -1,5 +1,11 @@
 import { createClient } from "@/lib/supabase/client";
 import { getSession, isOps } from "@/lib/league";
+import {
+  countByDivision,
+  pickLeastPopulatedDivision,
+  planAutoBalance,
+  type DivisionName,
+} from "@/lib/divisions";
 import { Game, Prop, UserPick } from "@/lib/types";
 import { scoreWeek, GameResult } from "@/lib/scoring";
 import { weekTitle } from "@/lib/dates";
@@ -1574,8 +1580,12 @@ export async function updateMemberDivision(
   division: "North" | "South" | "East" | "West"
 ): Promise<{ ok: boolean; error?: string }> {
   const session = getSession();
-  if (!session?.leagueId || !session.isCommissioner) {
-    return { ok: false, error: "Only the commissioner can change divisions" };
+  // Commissioner or deputy only — never self-service for regular players
+  if (!session?.leagueId || !isOps()) {
+    return {
+      ok: false,
+      error: "Only the commissioner or a deputy can change divisions",
+    };
   }
   const supabase = createClient();
   const { error } = await supabase
@@ -1586,6 +1596,21 @@ export async function updateMemberDivision(
 
   if (error) return { ok: false, error: error.message };
   return { ok: true };
+}
+
+/**
+ * Next division for a new join (least populated). Call before insert.
+ * Does not require ops — join path only.
+ */
+export async function nextDivisionForJoin(
+  leagueId: string
+): Promise<DivisionName> {
+  const supabase = createClient();
+  const { data } = await supabase
+    .from("memberships")
+    .select("division")
+    .eq("league_id", leagueId);
+  return pickLeastPopulatedDivision(countByDivision(data || []));
 }
 
 export async function removeLeagueMember(
@@ -1668,40 +1693,41 @@ export async function removeLeagueMember(
   return { ok: true };
 }
 
-/** Round-robin assign North/South/East/West by name. Commissioner only. */
+/** Round-robin assign North/South/East/West by name. Commissioner or deputy. */
 export async function autoBalanceDivisions(): Promise<{
   ok: boolean;
   error?: string;
+  updated?: number;
 }> {
   const session = getSession();
-  if (!session?.leagueId || !session.isCommissioner) {
-    return { ok: false, error: "Only the commissioner can auto-balance" };
+  if (!session?.leagueId || !isOps()) {
+    return {
+      ok: false,
+      error: "Only the commissioner or a deputy can auto-balance",
+    };
   }
 
   const roster = await loadLeagueRoster();
   if (!roster.length) return { ok: false, error: "No players in this league" };
 
-  const divisions: LeagueRosterMember["division"][] = [
-    "North",
-    "South",
-    "East",
-    "West",
-  ];
-  const sorted = [...roster].sort((a, b) => a.name.localeCompare(b.name));
+  const plan = planAutoBalance(
+    roster.map((m) => ({ id: m.membershipId, name: m.name }))
+  );
   const supabase = createClient();
+  let updated = 0;
 
-  for (let i = 0; i < sorted.length; i++) {
-    const member = sorted[i];
-    const division = divisions[i % 4];
-    if (member.division === division) continue;
+  for (const row of plan) {
+    const member = roster.find((m) => m.membershipId === row.id);
+    if (!member || member.division === row.division) continue;
     const { error } = await supabase
       .from("memberships")
-      .update({ division })
+      .update({ division: row.division })
       .eq("id", member.membershipId);
     if (error) return { ok: false, error: error.message };
+    updated += 1;
   }
 
-  return { ok: true };
+  return { ok: true, updated };
 }
 
 export type ResetSeasonResult = {
