@@ -1078,29 +1078,45 @@ export default function CommissionerPage() {
     );
   }
 
-  /** Sandbox: demo-publish + bot picks + randomize + score every open week → CFP Final */
+  /** Sandbox: run remaining weeks 0–18 end-to-end (or full season if none scored). */
   async function handleAutoFinishSeason() {
-    const remaining = [];
+    const remaining: number[] = [];
     for (let w = 0; w <= SEASON_MAX_WEEK; w++) {
       if (!scoredWeeks.includes(w)) remaining.push(w);
     }
     if (!remaining.length) {
-      setAutoSeasonReport("All weeks 0–18 are already scored.");
+      setAutoSeasonReport(
+        "All weeks 0–18 are already scored. Season complete — open Champ / Toilet / Trophies."
+      );
       return;
     }
+    const isFull = remaining.length === SEASON_MAX_WEEK + 1;
     if (
       !confirm(
-        `Auto-finish ${remaining.length} remaining week(s) through CFP Final?\n\n` +
-          `Weeks: ${remaining.map((w) => weekTitle(w)).join(", ")}\n\n` +
-          "For each: demo 5-game card → bot picks → random results → score.\n" +
-          "Already-scored weeks are skipped. Sandbox / dry-run only."
+        isFull
+          ? `Run ENTIRE season (Week 0 → CFP Final)?\n\n` +
+              "• Pads bots toward 16 if the roster is thin\n" +
+              "• Each week: demo card → bot picks → random results → score\n" +
+              "• ~19 weeks — leave this tab open until it finishes\n\n" +
+              "Sandbox / dry-run only."
+          : `Continue season: finish ${remaining.length} remaining week(s) through CFP Final?\n\n` +
+              `Next up: ${remaining
+                .slice(0, 6)
+                .map((w) => weekTitle(w))
+                .join(", ")}${remaining.length > 6 ? "…" : ""}\n\n` +
+              "Already-scored weeks are skipped. Leave this tab open until done."
       )
     ) {
       return;
     }
     setAutoSeasonBusy(true);
-    setAutoSeasonReport("Starting…");
+    setAutoSeasonReport(
+      isFull
+        ? "Starting full season (Week 0 → CFP Final)…"
+        : `Continuing from ${weekTitle(remaining[0])}…`
+    );
     const res = await autoFinishRemainingWeeks({
+      padRosterTo: 16,
       onProgress: (p) => {
         setAutoSeasonReport(`${p.label}: ${p.step}`);
       },
@@ -1695,14 +1711,13 @@ export default function CommissionerPage() {
 
             <div className="rounded-xl border border-warning/40 bg-warning/5 p-5 space-y-3">
               <h2 className="font-semibold text-warning">
-                Sandbox: finish remaining weeks
+                Sandbox: run entire season
               </h2>
               <p className="text-xs text-muted leading-relaxed">
-                Dry-run through{" "}
-                <strong className="text-foreground">CFP Final</strong> without
-                clicking each week. For every unscored week: demo slate → publish
-                → bot picks → randomize covers/prop → score. Already-scored weeks
-                (0–12 if you&apos;re here) are skipped.
+                Same one-click dry-run as on the{" "}
+                <strong className="text-foreground">Enter Results</strong> tab:
+                pad bots → every unscored week through CFP Final. Leave the tab
+                open until progress says done.
               </p>
               <button
                 type="button"
@@ -1711,13 +1726,13 @@ export default function CommissionerPage() {
                 className="w-full py-3 rounded-xl font-semibold bg-warning text-black disabled:opacity-50"
               >
                 {autoSeasonBusy
-                  ? "Running season…"
-                  : "Auto-finish remaining weeks → CFP Final"}
+                  ? "Season running… keep this tab open"
+                  : "Run / finish season → CFP Final"}
               </button>
               {autoSeasonReport && (
                 <p
                   className={`text-xs leading-relaxed ${
-                    /fail|error|stopped/i.test(autoSeasonReport)
+                    /fail|error|stopped|0 players/i.test(autoSeasonReport)
                       ? "text-danger"
                       : "text-primary"
                   }`}
@@ -2583,6 +2598,43 @@ export default function CommissionerPage() {
 
         {tab === "results" && (
           <div>
+            {/* Full-season dry-run — one-click for sandbox */}
+            <div className="rounded-xl border border-warning/50 bg-warning/10 p-5 mb-6 space-y-3">
+              <h2 className="font-semibold text-warning">
+                Running an entire season?
+              </h2>
+              <p className="text-xs text-muted leading-relaxed">
+                Don&apos;t click every week. This dry-runs the full map: pad bots
+                toward 16, then for each unscored week — demo card → bot picks →
+                random results → score — through{" "}
+                <strong className="text-foreground">CFP Final</strong>. Your
+                already-scored weeks (e.g. 0–12) stay put.
+              </p>
+              <button
+                type="button"
+                disabled={autoSeasonBusy}
+                onClick={() => void handleAutoFinishSeason()}
+                className="w-full py-3.5 rounded-xl font-bold bg-warning text-black text-sm disabled:opacity-50"
+              >
+                {autoSeasonBusy
+                  ? "Season running… keep this tab open"
+                  : scoredWeeks.length === 0
+                    ? "Run entire season (Week 0 → CFP Final)"
+                    : `Finish remaining weeks (${Math.max(0, SEASON_MAX_WEEK + 1 - scoredWeeks.length)} left)`}
+              </button>
+              {autoSeasonReport && (
+                <p
+                  className={`text-xs leading-relaxed font-medium ${
+                    /fail|error|stopped|0 players/i.test(autoSeasonReport)
+                      ? "text-danger"
+                      : "text-foreground"
+                  }`}
+                >
+                  {autoSeasonReport}
+                </p>
+              )}
+            </div>
+
             {/* Week picker for scoring */}
             <div className="rounded-xl border border-border bg-card p-5 mb-6">
               <h2 className="font-semibold mb-1">Score which week?</h2>

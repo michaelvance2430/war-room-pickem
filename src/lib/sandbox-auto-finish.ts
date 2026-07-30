@@ -1,6 +1,8 @@
 /**
  * Sandbox helper: publish demo card → bot picks → random results → score
  * for every week that isn't already scored, through CFP Final.
+ *
+ * Use this to run an entire CFB season dry-run without clicking each week.
  */
 
 import { generateDemoSlate, randomizeDemoResults } from "@/lib/demo-slate";
@@ -10,6 +12,8 @@ import {
   seedBotPicksForWeekInCloud,
   setLeagueActiveWeek,
   listScoredWeekNumbers,
+  loadLeagueRoster,
+  fillLeagueWithBotsToCap,
 } from "@/lib/cloud";
 import { PROP_PRESETS, propFromPreset } from "@/lib/prop-presets";
 import { SEASON_MAX_WEEK } from "@/lib/season-calendar";
@@ -33,10 +37,15 @@ export type AutoFinishResult = {
 /**
  * Finish all unscored weeks from the first gap through SEASON_MAX_WEEK (18).
  * Safe to re-run: already-scored weeks are skipped.
+ *
+ * Pads the roster with trial bots (toward 16) once at the start if the
+ * field is thin — full seasons need bodies on the board.
  */
 export async function autoFinishRemainingWeeks(opts?: {
   /** If set, only run this week and later (default: first unscored) */
   fromWeek?: number;
+  /** Grow roster toward this size before week 0 (default 16) */
+  padRosterTo?: number;
   onProgress?: (p: AutoFinishProgress) => void;
 }): Promise<AutoFinishResult> {
   if (!isOps()) {
@@ -70,8 +79,37 @@ export async function autoFinishRemainingWeeks(opts?: {
       finished: [],
       skipped: [...scored].sort((a, b) => a - b),
       errors: [],
-      message: "Every week 0–18 is already scored. Nothing to do.",
+      message: "Every week 0–18 is already scored. Season complete — check Champ / Toilet / Trophies.",
     };
+  }
+
+  // Pad bots so the season has a full field (skip if already ≥ target)
+  const padTo = opts?.padRosterTo ?? 16;
+  try {
+    const roster = await loadLeagueRoster();
+    if (roster.length < padTo) {
+      opts?.onProgress?.({
+        week: start,
+        label: "Roster",
+        step: `Padding bots toward ${padTo} (have ${roster.length})…`,
+      });
+      const pad = await fillLeagueWithBotsToCap({ targetTotal: padTo });
+      if (!pad.ok) {
+        errors.push(
+          `Bot pad warning — ${pad.error || "failed"}. Continuing with ${roster.length} players.`
+        );
+      } else if ((pad.added || 0) > 0) {
+        opts?.onProgress?.({
+          week: start,
+          label: "Roster",
+          step: `Added ${pad.added} bot(s).`,
+        });
+      }
+    }
+  } catch (e) {
+    errors.push(
+      `Bot pad warning — ${e instanceof Error ? e.message : "failed"}`
+    );
   }
 
   for (let week = start; week <= SEASON_MAX_WEEK; week++) {
@@ -87,7 +125,11 @@ export async function autoFinishRemainingWeeks(opts?: {
     }
 
     try {
-      opts?.onProgress?.({ week, label, step: "Demo slate…" });
+      opts?.onProgress?.({
+        week,
+        label,
+        step: `Week ${week} of ${SEASON_MAX_WEEK} — demo slate…`,
+      });
       const demoGames = generateDemoSlate(week, 5);
       const preset = PROP_PRESETS[week % PROP_PRESETS.length];
       const prop = propFromPreset(preset, week);
@@ -107,7 +149,6 @@ export async function autoFinishRemainingWeeks(opts?: {
       opts?.onProgress?.({ week, label, step: "Bot picks…" });
       const bots = await seedBotPicksForWeekInCloud(week);
       if (!bots.ok) {
-        // Continue — human picks may still exist; bots optional
         errors.push(
           `${label}: bot picks warning — ${bots.error || "failed"} (scoring anyway)`
         );
@@ -128,6 +169,12 @@ export async function autoFinishRemainingWeeks(opts?: {
         errors.push(`${label}: score failed — ${scoredRes.error || "unknown"}`);
         break;
       }
+      if ((scoredRes.scoredCount || 0) === 0) {
+        errors.push(
+          `${label}: scored 0 players — add trial bots (Settings) or lock picks, then re-run.`
+        );
+        // Still mark week done so we don't loop forever; standings may be empty
+      }
 
       finished.push(week);
       scored.add(week);
@@ -135,11 +182,11 @@ export async function autoFinishRemainingWeeks(opts?: {
       opts?.onProgress?.({
         week,
         label,
-        step: `Done · ${scoredRes.scoredCount} player(s)`,
+        step: `Done · ${scoredRes.scoredCount} player(s)  (${finished.length} new week(s) this run)`,
       });
 
-      // Brief yield so UI can paint progress
-      await new Promise((r) => setTimeout(r, 80));
+      // Yield so React can paint progress between weeks
+      await new Promise((r) => setTimeout(r, 120));
     } catch (e) {
       errors.push(
         `${label}: ${e instanceof Error ? e.message : "unexpected error"}`
@@ -154,6 +201,12 @@ export async function autoFinishRemainingWeeks(opts?: {
   }
 
   const hardErrors = errors.filter((e) => !/warning/i.test(e));
+  const allDone =
+    finished.length + skipped.length > 0 &&
+    [...Array(SEASON_MAX_WEEK + 1).keys()].every(
+      (w) => scored.has(w) || finished.includes(w)
+    );
+
   return {
     ok: hardErrors.length === 0,
     finished,
@@ -163,9 +216,13 @@ export async function autoFinishRemainingWeeks(opts?: {
       finished.length === 0 && hardErrors.length
         ? `Stopped early. ${hardErrors[0]}`
         : finished.length === 0
-          ? "No weeks left to finish (all scored or nothing selected)."
-          : `Finished ${finished.length} week(s): ${finished.map(weekTitle).join(", ")}.${
-              hardErrors.length ? ` Issues: ${hardErrors.join(" · ")}` : " Standings + brackets should update — check Champ / Toilet."
+          ? "No weeks left to finish — season already complete. Open Champ / Toilet / Trophies."
+          : `Season run: finished ${finished.length} week(s) (${finished.map(weekTitle).join(", ")}).${
+              hardErrors.length
+                ? ` Issues: ${hardErrors.join(" · ")}`
+                : allDone || last === SEASON_MAX_WEEK
+                  ? " Full map through CFP Final. Check Standings, Champ, Toilet, Trophies."
+                  : " More weeks may remain if something stopped early."
             }`,
   };
 }
