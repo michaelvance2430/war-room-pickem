@@ -269,7 +269,7 @@ export default function Home() {
               Stats
             </div>
             <p className="text-sm text-muted mt-2">
-              Power rankings + season stats
+              Power rankings · season table · league lore
             </p>
           </Link>
 

@@ -7,11 +7,44 @@ import HotTakeTicker from "@/components/HotTakeTicker";
 import { loadLeaguePlayers } from "@/lib/cloud";
 import { getSession } from "@/lib/league";
 import { powerBoardWithLabels } from "@/lib/fun-board";
+import { buildLeagueLoreCards, type LoreCard } from "@/lib/league-lore";
+import { loadLeagueTrophies } from "@/lib/trophies";
 import { isSelfPlayer, selfNameClass, selfRowClass } from "@/lib/self-highlight";
 import YouBadge from "@/components/YouBadge";
 import { Player } from "@/lib/types";
 
-type MainTab = "power" | "season";
+type MainTab = "power" | "season" | "lore";
+
+const LORE_TONE: Record<
+  LoreCard["tone"],
+  { border: string; glow: string; stat: string }
+> = {
+  fire: {
+    border: "border-orange-400/40",
+    glow: "shadow-[0_0_24px_rgba(251,146,60,0.12)]",
+    stat: "text-orange-300",
+  },
+  up: {
+    border: "border-primary/40",
+    glow: "shadow-[0_0_24px_rgba(34,197,94,0.1)]",
+    stat: "text-primary",
+  },
+  gold: {
+    border: "border-amber-400/40",
+    glow: "shadow-[0_0_24px_rgba(251,191,36,0.12)]",
+    stat: "text-amber-300",
+  },
+  champ: {
+    border: "border-yellow-400/35",
+    glow: "shadow-[0_0_24px_rgba(250,204,21,0.1)]",
+    stat: "text-yellow-200",
+  },
+  muted: {
+    border: "border-border",
+    glow: "",
+    stat: "text-muted",
+  },
+};
 
 type StatKey =
   | "totalPoints"
@@ -63,6 +96,7 @@ export default function StatsPage() {
   const [ranked, setRanked] = useState<
     ReturnType<typeof powerBoardWithLabels>
   >([]);
+  const [loreCards, setLoreCards] = useState<LoreCard[]>([]);
   const [selfId, setSelfId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<StatKey>("totalPoints");
   const [loading, setLoading] = useState(true);
@@ -70,9 +104,13 @@ export default function StatsPage() {
   useEffect(() => {
     async function load() {
       setSelfId(getSession()?.playerId || null);
-      const list = await loadLeaguePlayers();
+      const [list, trophies] = await Promise.all([
+        loadLeaguePlayers(),
+        loadLeagueTrophies(),
+      ]);
       setPlayers(list);
       setRanked(powerBoardWithLabels(list, computePowerScore));
+      setLoreCards(buildLeagueLoreCards(list, trophies));
       setLoading(false);
     }
     load();
@@ -118,34 +156,31 @@ export default function StatsPage() {
         <div className="mb-4">
           <h1 className="text-2xl font-bold">Stats</h1>
           <p className="text-sm text-muted">
-            Power rankings and season tracking • Live league data
+            Power rankings, season table, and league lore
           </p>
         </div>
 
-        {/* Main: Power Rankings first, then Season table */}
         <div className="flex flex-wrap gap-2 mb-6">
-          <button
-            type="button"
-            onClick={() => setMainTab("power")}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
-              mainTab === "power"
-                ? "bg-primary text-black"
-                : "bg-card border border-border text-muted hover:text-foreground"
-            }`}
-          >
-            Power Rankings
-          </button>
-          <button
-            type="button"
-            onClick={() => setMainTab("season")}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
-              mainTab === "season"
-                ? "bg-primary text-black"
-                : "bg-card border border-border text-muted hover:text-foreground"
-            }`}
-          >
-            Season stats
-          </button>
+          {(
+            [
+              { id: "power" as const, label: "Power Rankings" },
+              { id: "season" as const, label: "Season stats" },
+              { id: "lore" as const, label: "League lore" },
+            ] as const
+          ).map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setMainTab(t.id)}
+              className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
+                mainTab === t.id
+                  ? "bg-primary text-black"
+                  : "bg-card border border-border text-muted hover:text-foreground"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
         </div>
 
         {loading && (
@@ -344,6 +379,69 @@ export default function StatsPage() {
             <p className="text-xs text-muted mt-4 text-center">
               BB% = Best Bet hit rate • Perf = weeks scoring 18+ • Updates when
               results are scored
+            </p>
+          </>
+        )}
+
+        {/* —— League lore cards —— */}
+        {mainTab === "lore" && !loading && players.length > 0 && (
+          <>
+            <p className="text-xs text-muted mb-4 leading-relaxed">
+              Pride, heaters, and hardware — one glance. Empty cards stay hidden
+              until the season (or Trophy Room) has something to brag about.
+            </p>
+            {loreCards.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border bg-card/50 px-4 py-12 text-center">
+                <div className="text-3xl mb-2" aria-hidden>
+                  🏆🔥
+                </div>
+                <p className="text-sm font-medium">No lore yet</p>
+                <p className="text-xs text-muted mt-1 max-w-sm mx-auto">
+                  Score a couple weeks for streaks and jumps. Engrave a
+                  Championship in the Trophy Room for rings and a defending
+                  champ.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {loreCards.map((card) => {
+                  const tone = LORE_TONE[card.tone];
+                  const mine = isSelfPlayer(card.userId, selfId);
+                  return (
+                    <div
+                      key={card.id}
+                      className={`rounded-xl border bg-card p-4 ${tone.border} ${tone.glow} ${
+                        mine ? "ring-1 ring-inset ring-primary/30" : ""
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <div className="text-2xl" aria-hidden>
+                          {card.emoji}
+                        </div>
+                        <div
+                          className={`text-lg font-bold font-mono ${tone.stat}`}
+                        >
+                          {card.stat}
+                        </div>
+                      </div>
+                      <p className="text-[10px] uppercase tracking-[0.14em] text-muted font-semibold mb-1">
+                        {card.title}
+                      </p>
+                      <p className={selfNameClass(mine, "text-base font-bold")}>
+                        {card.name}
+                        {mine && <YouBadge />}
+                      </p>
+                      <p className="text-xs text-muted mt-1.5 leading-relaxed">
+                        {card.blurb}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <p className="text-[11px] text-muted mt-6 leading-relaxed">
+              More boards later (underdogs, SEC, heartbreak) once the data is
+              clean. Rings &amp; defending champ need Trophy Room engravings.
             </p>
           </>
         )}
