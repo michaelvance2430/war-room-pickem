@@ -7,6 +7,7 @@ import { getSession, getLeague } from "@/lib/league";
 import { createClient } from "@/lib/supabase/client";
 import Avatar from "@/components/Avatar";
 import RulesOnboardingModal from "@/components/RulesOnboardingModal";
+import GazetteModal from "@/components/GazetteModal";
 import { loadMyProfile } from "@/lib/profile";
 
 type NavLink = {
@@ -280,6 +281,8 @@ export default function Nav() {
         )}
       </header>
       <RulesOnboardingModal />
+      {/* Trial: one-shot scored-week newspaper — kill via GAZETTE_ENABLED */}
+      <GazetteModal />
     </>
   );
 }
