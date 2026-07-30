@@ -174,16 +174,29 @@ export function buildResultsFromScores(
 }
 
 /** Client fetch of our scores API. */
-export async function fetchNcaafScores(daysFrom = 3): Promise<OddsScoreEvent[]> {
+export async function fetchNcaafScores(daysFrom = 3): Promise<{
+  events: OddsScoreEvent[];
+  remaining?: string | null;
+  used?: string | null;
+  last?: string | null;
+}> {
   const res = await fetch(`/api/scores/ncaaf?daysFrom=${daysFrom}`, {
     cache: "no-store",
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(
+    const e = new Error(
       (body as { error?: string }).error || `Scores API error ${res.status}`
-    );
+    ) as Error & { remaining?: string | null; used?: string | null };
+    e.remaining = (body as { remaining?: string | null }).remaining;
+    e.used = (body as { used?: string | null }).used;
+    throw e;
   }
-  return ((body as { events?: OddsScoreEvent[] }).events ||
-    []) as OddsScoreEvent[];
+  return {
+    events: ((body as { events?: OddsScoreEvent[] }).events ||
+      []) as OddsScoreEvent[],
+    remaining: (body as { remaining?: string | null }).remaining,
+    used: (body as { used?: string | null }).used,
+    last: (body as { last?: string | null }).last,
+  };
 }

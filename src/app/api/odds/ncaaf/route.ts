@@ -56,14 +56,20 @@ export async function GET(req: Request) {
     const res = await fetch(url.toString(), { next: { revalidate: 0 } });
     const remaining = res.headers.get("x-requests-remaining");
     const used = res.headers.get("x-requests-used");
+    const last = res.headers.get("x-requests-last");
 
     if (!res.ok) {
       const body = await res.text();
+      const quota =
+        /quota|credit|usage/i.test(body) || remaining === "0"
+          ? " Odds API credits may be exhausted for this month — check the-odds-api.com account or upgrade the plan (swap ODDS_API_KEY on Vercel)."
+          : "";
       return NextResponse.json(
         {
-          error: `Odds API error ${res.status}: ${body.slice(0, 200)}`,
+          error: `Odds API error ${res.status}: ${body.slice(0, 200)}${quota}`,
           remaining,
           used,
+          last,
         },
         { status: res.status }
       );
@@ -111,6 +117,7 @@ export async function GET(req: Request) {
       unfilteredCount,
       remaining,
       used,
+      last,
       rankLabel,
       week: filterByWeek ? weekNumber : null,
       weekLabel,

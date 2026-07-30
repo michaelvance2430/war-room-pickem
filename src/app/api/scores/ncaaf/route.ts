@@ -36,10 +36,19 @@ export async function GET(req: NextRequest) {
 
   try {
     const res = await fetch(url.toString(), { next: { revalidate: 0 } });
+    const remaining = res.headers.get("x-requests-remaining");
+    const used = res.headers.get("x-requests-used");
+    const last = res.headers.get("x-requests-last");
+
     if (!res.ok) {
       const body = await res.text();
       return NextResponse.json(
-        { error: `Scores API error ${res.status}: ${body.slice(0, 200)}` },
+        {
+          error: `Scores API error ${res.status}: ${body.slice(0, 200)}`,
+          remaining,
+          used,
+          last,
+        },
         { status: res.status }
       );
     }
@@ -49,6 +58,9 @@ export async function GET(req: NextRequest) {
       events: Array.isArray(events) ? events : [],
       count: Array.isArray(events) ? events.length : 0,
       daysFrom,
+      remaining,
+      used,
+      last,
     });
   } catch (e: unknown) {
     return NextResponse.json(

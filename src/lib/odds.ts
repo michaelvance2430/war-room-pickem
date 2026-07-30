@@ -75,6 +75,7 @@ export async function fetchNcaafOdds(
   games: Game[];
   remaining?: string | null;
   used?: string | null;
+  last?: string | null;
   rankLabel?: string;
   weekFilter?: string | null;
   unfilteredCount?: number;
@@ -91,10 +92,16 @@ export async function fetchNcaafOdds(
   const body = await res.json().catch(() => ({}));
 
   if (!res.ok) {
-    throw new Error(
-      (body as { error?: string }).error ||
-        `Odds API error: ${res.status}`
-    );
+    const rem = (body as { remaining?: string | null }).remaining;
+    const err =
+      (body as { error?: string }).error || `Odds API error: ${res.status}`;
+    const e = new Error(err) as Error & {
+      remaining?: string | null;
+      used?: string | null;
+    };
+    e.remaining = rem;
+    e.used = (body as { used?: string | null }).used;
+    throw e;
   }
 
   let games = ((body as { games?: Game[] }).games || []) as Game[];
@@ -114,6 +121,7 @@ export async function fetchNcaafOdds(
     games,
     remaining: (body as { remaining?: string | null }).remaining,
     used: (body as { used?: string | null }).used,
+    last: (body as { last?: string | null }).last,
     rankLabel: (body as { rankLabel?: string }).rankLabel,
     weekFilter: dryRun
       ? "DRY RUN — all open FBS"
