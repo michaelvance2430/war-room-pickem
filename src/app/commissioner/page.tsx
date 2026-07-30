@@ -64,6 +64,12 @@ import {
   matchPresetId,
 } from "@/lib/prop-presets";
 import { MAX_LEAGUE_PLAYERS } from "@/lib/league-limits";
+import {
+  HOME_TAGLINE_MAX_CHARS,
+  HOME_TAGLINE_PRESETS,
+  DEFAULT_HOME_TAGLINE_ID,
+  resolveHomeTagline,
+} from "@/lib/home-tagline";
 
 const ACTIVE_WEEK_KEY = "warroom-active-week";
 
@@ -114,6 +120,8 @@ export default function CommissionerPage() {
   const [leagueNameEdit, setLeagueNameEdit] = useState("");
   const [cutPercent, setCutPercent] = useState(50);
   const [crystalBallEnabled, setCrystalBallEnabled] = useState(true);
+  const [homeTaglineId, setHomeTaglineId] = useState(DEFAULT_HOME_TAGLINE_ID);
+  const [homeTaglineCustom, setHomeTaglineCustom] = useState("");
   /** CFB week number: 0 = openers … 18 = CFP Final (fixed length). */
   const [activeWeek, setActiveWeek] = useState(1);
   const [settingsSaved, setSettingsSaved] = useState(false);
@@ -180,6 +188,10 @@ export default function CommissionerPage() {
         setLeagueNameEdit(lg.name);
         setCutPercent(lg.settings?.cutPercent ?? 50);
         setCrystalBallEnabled(lg.settings?.crystalBallEnabled !== false);
+        setHomeTaglineId(
+          lg.settings?.homeTaglineId || DEFAULT_HOME_TAGLINE_ID
+        );
+        setHomeTaglineCustom(lg.settings?.homeTaglineCustom || "");
       }
       let week = 1;
       try {
@@ -991,6 +1003,8 @@ export default function CommissionerPage() {
         cutPercent,
         gamesPerWeek: 5,
         crystalBallEnabled,
+        homeTaglineId,
+        homeTaglineCustom: homeTaglineCustom.slice(0, HOME_TAGLINE_MAX_CHARS),
         // Season length is fixed at SEASON_MAX_WEEK in the app (not saved to DB)
       },
     });
@@ -1337,6 +1351,63 @@ export default function CommissionerPage() {
                 <p className="w-full text-xs font-medium text-muted">
                   {crystalBallEnabled ? "On — tab visible" : "Off — tab hidden"}
                 </p>
+              </div>
+
+              <div className="rounded-xl border border-border bg-background p-4 space-y-3">
+                <div>
+                  <p className="text-sm font-semibold text-foreground">
+                    Home page tagline
+                  </p>
+                  <p className="text-xs text-muted mt-1 leading-relaxed">
+                    Line under &quot;Welcome to the War Room&quot; for everyone
+                    in this league. Change anytime and Save settings.
+                  </p>
+                </div>
+                <label className="block text-xs text-muted">
+                  Preset
+                  <select
+                    value={homeTaglineId}
+                    onChange={(e) => setHomeTaglineId(e.target.value)}
+                    className="mt-1 w-full bg-card border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                  >
+                    {HOME_TAGLINE_PRESETS.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {homeTaglineId === "custom" && (
+                  <label className="block text-xs text-muted">
+                    Your line ({HOME_TAGLINE_MAX_CHARS} characters max)
+                    <textarea
+                      value={homeTaglineCustom}
+                      onChange={(e) =>
+                        setHomeTaglineCustom(
+                          e.target.value.slice(0, HOME_TAGLINE_MAX_CHARS)
+                        )
+                      }
+                      rows={2}
+                      maxLength={HOME_TAGLINE_MAX_CHARS}
+                      placeholder="Type a home page line…"
+                      className="mt-1 w-full bg-card border border-border rounded-lg px-3 py-2 text-sm text-foreground resize-none"
+                    />
+                    <span className="text-[11px] text-muted mt-1 block">
+                      {HOME_TAGLINE_MAX_CHARS - homeTaglineCustom.length} left
+                    </span>
+                  </label>
+                )}
+                <div className="rounded-lg border border-border/80 bg-card px-3 py-2">
+                  <p className="text-[10px] uppercase tracking-wide text-muted mb-1">
+                    Preview
+                  </p>
+                  <p className="text-sm text-foreground/90 leading-relaxed">
+                    {resolveHomeTagline({
+                      homeTaglineId,
+                      homeTaglineCustom,
+                    })}
+                  </p>
+                </div>
               </div>
 
               <button

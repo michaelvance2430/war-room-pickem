@@ -24,9 +24,13 @@ function toLocalLeague(row: {
   regular_season_weeks: number;
   games_per_week: number;
   crystal_ball_enabled?: boolean | null;
+  home_tagline_id?: string | null;
+  home_tagline_custom?: string | null;
 }): League {
   // Prefer cloud flag; if column missing from select, keep prior local value
   let crystalBallEnabled = true;
+  let homeTaglineId = "good-teams";
+  let homeTaglineCustom = "";
   if (typeof row.crystal_ball_enabled === "boolean") {
     crystalBallEnabled = row.crystal_ball_enabled;
   } else if (canUseStorage()) {
@@ -37,9 +41,22 @@ function toLocalLeague(row: {
       if (typeof prev?.settings?.crystalBallEnabled === "boolean") {
         crystalBallEnabled = prev.settings.crystalBallEnabled;
       }
+      if (prev?.settings?.homeTaglineId) {
+        homeTaglineId = prev.settings.homeTaglineId;
+      }
+      if (typeof prev?.settings?.homeTaglineCustom === "string") {
+        homeTaglineCustom = prev.settings.homeTaglineCustom;
+      }
     } catch {
       /* default true */
     }
+  }
+
+  if (typeof row.home_tagline_id === "string" && row.home_tagline_id) {
+    homeTaglineId = row.home_tagline_id;
+  }
+  if (typeof row.home_tagline_custom === "string") {
+    homeTaglineCustom = row.home_tagline_custom;
   }
 
   return {
@@ -54,6 +71,8 @@ function toLocalLeague(row: {
       regularSeasonWeeks: SEASON_MAX_WEEK,
       gamesPerWeek: row.games_per_week ?? 5,
       crystalBallEnabled,
+      homeTaglineId,
+      homeTaglineCustom,
     },
   };
 }
@@ -112,6 +131,10 @@ export async function saveLeagueToCloud(opts: {
     patch.games_per_week = opts.settings.gamesPerWeek;
   if (opts.settings?.crystalBallEnabled !== undefined)
     patch.crystal_ball_enabled = opts.settings.crystalBallEnabled;
+  if (opts.settings?.homeTaglineId !== undefined)
+    patch.home_tagline_id = opts.settings.homeTaglineId;
+  if (opts.settings?.homeTaglineCustom !== undefined)
+    patch.home_tagline_custom = opts.settings.homeTaglineCustom;
 
   let { data, error } = await supabase
     .from("leagues")
@@ -120,15 +143,17 @@ export async function saveLeagueToCloud(opts: {
     .select()
     .single();
 
-  // Column not migrated yet — save the rest without crystal_ball_enabled
+  // Column not migrated yet — strip unknown columns and retry
   if (
     error &&
-    opts.settings?.crystalBallEnabled !== undefined &&
     (error.message.includes("crystal_ball_enabled") ||
+      error.message.includes("home_tagline") ||
       error.message.includes("schema cache") ||
       error.code === "PGRST204")
   ) {
     delete patch.crystal_ball_enabled;
+    delete patch.home_tagline_id;
+    delete patch.home_tagline_custom;
     const retry = await supabase
       .from("leagues")
       .update(patch)
@@ -144,9 +169,15 @@ export async function saveLeagueToCloud(opts: {
   }
 
   const league = toLocalLeague(data);
-  // Always stamp crystal ball from the save request (covers pre-migration DB)
+  // Always stamp from the save request (covers pre-migration DB)
   if (opts.settings?.crystalBallEnabled !== undefined) {
     league.settings.crystalBallEnabled = opts.settings.crystalBallEnabled;
+  }
+  if (opts.settings?.homeTaglineId !== undefined) {
+    league.settings.homeTaglineId = opts.settings.homeTaglineId;
+  }
+  if (opts.settings?.homeTaglineCustom !== undefined) {
+    league.settings.homeTaglineCustom = opts.settings.homeTaglineCustom;
   }
   if (canUseStorage()) {
     localStorage.setItem(LEAGUE_KEY, JSON.stringify(league));

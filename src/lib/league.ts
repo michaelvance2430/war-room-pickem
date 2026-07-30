@@ -10,6 +10,10 @@ export interface LeagueSettings {
   gamesPerWeek: number;
   /** Preseason national-champ Crystal Ball tab (0 pts). Default on. */
   crystalBallEnabled: boolean;
+  /** Home page tagline preset id (see home-tagline.ts). */
+  homeTaglineId: string;
+  /** Used when homeTaglineId === "custom". */
+  homeTaglineCustom: string;
 }
 
 export interface League {
@@ -34,6 +38,8 @@ const DEFAULT_SETTINGS: LeagueSettings = {
   regularSeasonWeeks: 18,
   gamesPerWeek: 5,
   crystalBallEnabled: true,
+  homeTaglineId: "good-teams",
+  homeTaglineCustom: "",
 };
 
 function canUseStorage() {

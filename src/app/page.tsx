@@ -13,12 +13,17 @@ import {
   switchToLeague,
   LeagueMembership,
 } from "@/lib/session-restore";
+import { resolveHomeTagline } from "@/lib/home-tagline";
+import { syncLeagueFromCloud } from "@/lib/league-sync";
 
 export default function Home() {
   const router = useRouter();
   const [ready, setReady] = useState(false);
   const [leagueCode, setLeagueCode] = useState<string | null>(null);
   const [leagueName, setLeagueName] = useState<string | null>(null);
+  const [homeTagline, setHomeTagline] = useState(
+    resolveHomeTagline({})
+  );
   const [isCommish, setIsCommish] = useState(false);
   const [bootError, setBootError] = useState<string | null>(null);
   const [pickList, setPickList] = useState<LeagueMembership[] | null>(null);
@@ -61,8 +66,16 @@ export default function Home() {
           league = restored.league;
         }
 
-        setLeagueCode(league.code);
-        setLeagueName(league.name);
+        // Refresh settings (tagline) from cloud when possible
+        const fresh = (await syncLeagueFromCloud()) || league;
+        setLeagueCode(fresh.code);
+        setLeagueName(fresh.name);
+        setHomeTagline(
+          resolveHomeTagline({
+            homeTaglineId: fresh.settings?.homeTaglineId,
+            homeTaglineCustom: fresh.settings?.homeTaglineCustom,
+          })
+        );
         setIsCommish(!!session.isCommissioner);
         setReady(true);
       } catch (e: unknown) {
@@ -79,14 +92,21 @@ export default function Home() {
       return;
     }
     const session = getSession();
-    const league = getLeague();
+    let league = getLeague();
     if (!session || !league) {
       setBootError("Session missing after switch");
       return;
     }
+    league = (await syncLeagueFromCloud()) || league;
     setPickList(null);
     setLeagueCode(league.code);
     setLeagueName(league.name);
+    setHomeTagline(
+      resolveHomeTagline({
+        homeTaglineId: league.settings?.homeTaglineId,
+        homeTaglineCustom: league.settings?.homeTaglineCustom,
+      })
+    );
     setIsCommish(!!session.isCommissioner);
     setReady(true);
   }
@@ -178,16 +198,11 @@ export default function Home() {
       <Nav />
       <main className="flex-1 max-w-6xl mx-auto w-full px-4 py-10 relative">
         <section className="mb-8">
-          <div className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-primary/80 mb-4 border border-primary/25 bg-primary/5 px-3 py-1 rounded-full">
-            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-            Situation room live
-          </div>
           <h1 className="text-3xl sm:text-5xl font-bold tracking-tight mb-3 text-white drop-shadow-[0_0_30px_rgba(34,197,94,0.15)]">
             Welcome to the War Room
           </h1>
           <p className="text-muted max-w-xl text-base sm:text-lg leading-relaxed">
-            Lights down. Spreads up. Confidence locked. This is where the week
-            gets decided.
+            {homeTagline}
           </p>
           {leagueName && (
             <p className="text-sm mt-5 text-muted/90">
