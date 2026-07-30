@@ -343,11 +343,435 @@ html[data-season-theme="christmas"] body::before {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .christmas-bulb {
-    animation: none;
+/* Tree + presents */
+.xmas-scene {
+  position: absolute;
+  pointer-events: none;
+  user-select: none;
+}
+.xmas-scene--left {
+  left: max(0.15rem, env(safe-area-inset-left));
+  bottom: 6%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 7.5rem;
+}
+.xmas-tree {
+  position: relative;
+  line-height: 1;
+}
+.xmas-tree-emoji {
+  font-size: 5.5rem;
+  display: block;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.5));
+  animation: xmas-tree-glow 3.5s ease-in-out infinite;
+}
+.xmas-tree-star {
+  position: absolute;
+  top: -0.15rem;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 1.1rem;
+  animation: xmas-star-pulse 1.8s ease-in-out infinite;
+  filter: drop-shadow(0 0 6px rgba(250, 204, 21, 0.9));
+}
+.xmas-ornament {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  box-shadow: 0 0 6px currentColor;
+  animation: xmas-twinkle 1.6s ease-in-out infinite;
+}
+.xmas-ornament--1 {
+  left: 28%;
+  top: 42%;
+  background: #ef4444;
+  color: #ef4444;
+  animation-delay: 0.2s;
+}
+.xmas-ornament--2 {
+  right: 26%;
+  top: 55%;
+  background: #eab308;
+  color: #eab308;
+  animation-delay: 0.7s;
+}
+.xmas-ornament--3 {
+  left: 40%;
+  top: 68%;
+  background: #38bdf8;
+  color: #38bdf8;
+  animation-delay: 1.1s;
+}
+.xmas-presents {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.15rem 0.25rem;
+  margin-top: -0.5rem;
+  max-width: 7rem;
+}
+.xmas-gift {
+  font-size: 1.35rem;
+  display: inline-block;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.4));
+  animation: halloween-bob 3s ease-in-out infinite;
+}
+.xmas-gift--a {
+  font-size: 1.55rem;
+  animation-delay: 0s;
+}
+.xmas-gift--b {
+  animation-delay: 0.4s;
+}
+.xmas-gift--c {
+  font-size: 1.15rem;
+  animation-delay: 0.8s;
+}
+.xmas-gift--d {
+  font-size: 1.4rem;
+  animation-delay: 1.1s;
+}
+
+/* Santa mid-exit — only boots + red pant leg from top-right */
+.santa-exit {
+  position: absolute;
+  top: -0.25rem;
+  right: 4%;
+  width: 4.5rem;
+  height: 7.5rem;
+  transform: rotate(18deg);
+  animation: santa-wiggle 4s ease-in-out infinite;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.45));
+}
+.santa-pants {
+  position: absolute;
+  top: 0;
+  left: 1.1rem;
+  width: 1.65rem;
+  height: 3.2rem;
+  background: linear-gradient(180deg, #b91c1c 0%, #dc2626 55%, #991b1b 100%);
+  border-radius: 0.35rem 0.35rem 0 0;
+  box-shadow: inset -4px 0 0 rgba(0, 0, 0, 0.12);
+}
+.santa-pants::before {
+  /* white fur cuff at top (off-screen-ish) */
+  content: "";
+  position: absolute;
+  top: -0.2rem;
+  left: -0.15rem;
+  right: -0.15rem;
+  height: 0.55rem;
+  background: #f5f5f4;
+  border-radius: 0.2rem;
+}
+.santa-boot {
+  position: absolute;
+  top: 2.9rem;
+  left: 0.75rem;
+  z-index: 2;
+}
+.santa-boot--back {
+  left: 1.85rem;
+  top: 2.7rem;
+  z-index: 1;
+  opacity: 0.92;
+  transform: scale(0.92);
+}
+.santa-boot-cuff {
+  width: 1.85rem;
+  height: 0.45rem;
+  background: #f5f5f4;
+  border-radius: 0.15rem;
+  margin-bottom: 0.05rem;
+}
+.santa-boot-body {
+  width: 1.7rem;
+  height: 2.1rem;
+  background: linear-gradient(180deg, #1c1917 0%, #0c0a09 100%);
+  border-radius: 0.25rem 0.25rem 0.15rem 0.9rem;
+  position: relative;
+}
+.santa-boot-toe {
+  position: absolute;
+  left: -0.15rem;
+  bottom: 0.15rem;
+  width: 1.1rem;
+  height: 0.7rem;
+  background: #0c0a09;
+  border-radius: 50% 40% 30% 60%;
+  box-shadow: 0 2px 0 #292524;
+}
+
+@keyframes xmas-tree-glow {
+  0%,
+  100% {
+    filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.5))
+      drop-shadow(0 0 4px rgba(34, 197, 94, 0.25));
+  }
+  50% {
+    filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.5))
+      drop-shadow(0 0 14px rgba(34, 197, 94, 0.55));
+  }
+}
+@keyframes xmas-star-pulse {
+  0%,
+  100% {
+    transform: translateX(-50%) scale(1);
+    opacity: 0.9;
+  }
+  50% {
+    transform: translateX(-50%) scale(1.2);
+    opacity: 1;
+  }
+}
+@keyframes santa-wiggle {
+  0%,
+  100% {
+    transform: rotate(18deg) translateY(0);
+  }
+  50% {
+    transform: rotate(22deg) translateY(4px);
+  }
+}
+
+@media (max-width: 768px) {
+  .xmas-scene--left {
+    bottom: 2%;
+    opacity: 0.65;
+    transform: scale(0.72);
+    transform-origin: bottom left;
+  }
+  .santa-exit {
+    right: 0;
+    transform: rotate(18deg) scale(0.7);
     opacity: 0.75;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .christmas-bulb,
+  .xmas-tree-emoji,
+  .xmas-tree-star,
+  .xmas-gift,
+  .xmas-ornament,
+  .santa-exit {
+    animation: none;
+    opacity: 0.85;
     filter: brightness(1.05);
+  }
+}
+
+/* --- Thanksgiving props --- */
+.tgiving-decor {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 30;
+  overflow: hidden;
+  user-select: none;
+}
+.tgiving-side {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.tgiving-side--left {
+  left: max(0.2rem, env(safe-area-inset-left));
+  bottom: 14%;
+  align-items: flex-start;
+  max-width: 9rem;
+}
+.tgiving-side--right {
+  right: max(0.2rem, env(safe-area-inset-right));
+  top: 16%;
+  align-items: flex-end;
+}
+.tgiving-cornucopia {
+  position: relative;
+  width: 8.5rem;
+  height: 5.5rem;
+}
+.tgiving-horn {
+  position: absolute;
+  left: 0;
+  bottom: 0.4rem;
+  width: 5.2rem;
+  height: 2.6rem;
+  background: linear-gradient(
+    115deg,
+    #92400e 0%,
+    #d97706 40%,
+    #b45309 70%,
+    #78350f 100%
+  );
+  border-radius: 60% 15% 40% 50%;
+  transform: rotate(-28deg);
+  box-shadow:
+    inset -6px -4px 0 rgba(0, 0, 0, 0.15),
+    0 4px 10px rgba(0, 0, 0, 0.35);
+}
+.tgiving-horn::after {
+  content: "";
+  position: absolute;
+  right: -0.35rem;
+  top: 0.35rem;
+  width: 1.4rem;
+  height: 1.6rem;
+  background: radial-gradient(circle at 30% 40%, #fbbf24, #b45309);
+  border-radius: 50%;
+  box-shadow: inset 2px 2px 0 rgba(255, 255, 255, 0.15);
+}
+.tgiving-spill {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 5rem;
+  height: 4.5rem;
+}
+.tgiving-food {
+  position: absolute;
+  font-size: 1.25rem;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.35));
+  animation: halloween-bob 3.4s ease-in-out infinite;
+}
+.tgiving-food--1 {
+  left: 0.2rem;
+  top: 0.3rem;
+  animation-delay: 0s;
+}
+.tgiving-food--2 {
+  left: 1.4rem;
+  top: 0.1rem;
+  animation-delay: 0.3s;
+}
+.tgiving-food--3 {
+  left: 0.6rem;
+  top: 1.3rem;
+  font-size: 1.4rem;
+  animation-delay: 0.5s;
+}
+.tgiving-food--4 {
+  left: 2rem;
+  top: 1.1rem;
+  animation-delay: 0.7s;
+}
+.tgiving-food--5 {
+  left: 1.1rem;
+  top: 2.3rem;
+  animation-delay: 0.2s;
+}
+.tgiving-food--6 {
+  left: 2.6rem;
+  top: 2rem;
+  animation-delay: 0.9s;
+}
+.tgiving-food--7 {
+  left: 0.3rem;
+  top: 3rem;
+  font-size: 1.1rem;
+  animation-delay: 0.4s;
+}
+.tgiving-caption {
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(251, 191, 36, 0.55);
+  font-weight: 600;
+  margin-top: 0.15rem;
+}
+.tgiving-turkey {
+  display: block;
+  line-height: 1;
+  filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.4));
+  animation: tgiving-wobble 3.6s ease-in-out infinite;
+}
+.tgiving-turkey--big {
+  font-size: 3.4rem;
+  animation-delay: 0s;
+}
+.tgiving-turkey--mid {
+  font-size: 2.4rem;
+  margin-right: 0.75rem;
+  animation-delay: 0.5s;
+  opacity: 0.92;
+}
+.tgiving-turkey--lil {
+  font-size: 1.7rem;
+  margin-right: 0.25rem;
+  animation-delay: 1s;
+  opacity: 0.85;
+}
+.tgiving-leaf {
+  font-size: 1.4rem;
+  opacity: 0.8;
+  animation: halloween-bob 4s ease-in-out infinite;
+}
+.tgiving-table {
+  position: absolute;
+  left: 50%;
+  bottom: 0.35rem;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 0.55rem;
+  font-size: 1.35rem;
+  opacity: 0.55;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.35));
+}
+.tgiving-table span {
+  animation: halloween-bob 3.5s ease-in-out infinite;
+}
+.tgiving-table span:nth-child(2) {
+  animation-delay: 0.3s;
+}
+.tgiving-table span:nth-child(3) {
+  animation-delay: 0.6s;
+}
+.tgiving-table span:nth-child(4) {
+  animation-delay: 0.9s;
+}
+.tgiving-table span:nth-child(5) {
+  animation-delay: 1.2s;
+}
+
+@keyframes tgiving-wobble {
+  0%,
+  100% {
+    transform: rotate(-4deg) translateY(0);
+  }
+  50% {
+    transform: rotate(5deg) translateY(-5px);
+  }
+}
+
+@media (max-width: 768px) {
+  .tgiving-side--left {
+    bottom: 3%;
+    transform: scale(0.72);
+    transform-origin: bottom left;
+    opacity: 0.65;
+  }
+  .tgiving-side--right {
+    top: auto;
+    bottom: 3%;
+    transform: scale(0.72);
+    transform-origin: bottom right;
+    opacity: 0.65;
+  }
+  .tgiving-table {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tgiving-food,
+  .tgiving-turkey,
+  .tgiving-leaf,
+  .tgiving-table span {
+    animation: none;
   }
 }
 
@@ -382,6 +806,292 @@ html[data-season-theme="newyear"] body::before {
     radial-gradient(1.5px 1.5px at 18% 85%, rgba(255, 255, 255, 0.4), transparent),
     radial-gradient(1.5px 1.5px at 95% 30%, rgba(255, 255, 255, 0.65), transparent);
   background-size: 100% 100%;
+}
+
+/* --- New Year: ball drop + fireworks --- */
+.ny-decor {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 30;
+  overflow: hidden;
+  user-select: none;
+}
+.ny-tower {
+  position: absolute;
+  left: max(0.4rem, env(safe-area-inset-left));
+  top: 12%;
+  width: 4.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.5));
+}
+.ny-tower-mast {
+  width: 6px;
+  height: 11rem;
+  background: linear-gradient(180deg, #94a3b8 0%, #475569 40%, #1e293b 100%);
+  border-radius: 3px;
+  position: relative;
+  box-shadow: 0 0 12px rgba(234, 179, 8, 0.25);
+}
+.ny-tower-light {
+  position: absolute;
+  left: 50%;
+  top: 15%;
+  width: 5px;
+  height: 5px;
+  margin-left: -2.5px;
+  border-radius: 50%;
+  background: #eab308;
+  box-shadow: 0 0 8px #eab308;
+  animation: ny-blink 1.2s ease-in-out infinite;
+}
+.ny-tower-light--2 {
+  top: 45%;
+  animation-delay: 0.4s;
+  background: #f472b6;
+  box-shadow: 0 0 8px #f472b6;
+}
+.ny-tower-light--3 {
+  top: 75%;
+  animation-delay: 0.8s;
+  background: #38bdf8;
+  box-shadow: 0 0 8px #38bdf8;
+}
+.ny-ball-track {
+  position: absolute;
+  top: 0.4rem;
+  left: 50%;
+  width: 2.6rem;
+  height: 10rem;
+  margin-left: -1.3rem;
+  overflow: visible;
+}
+.ny-ball {
+  position: absolute;
+  left: 50%;
+  width: 2.4rem;
+  height: 2.4rem;
+  margin-left: -1.2rem;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 32% 28%, #fef9c3 0%, #eab308 35%, #a16207 75%, #422006 100%);
+  box-shadow:
+    0 0 16px rgba(234, 179, 8, 0.75),
+    0 0 32px rgba(234, 179, 8, 0.35),
+    inset -4px -4px 8px rgba(0, 0, 0, 0.25);
+  animation: ny-ball-drop 8s ease-in-out infinite;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ny-ball-shine {
+  position: absolute;
+  top: 18%;
+  left: 22%;
+  width: 28%;
+  height: 22%;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.55);
+  filter: blur(1px);
+}
+.ny-ball-year {
+  position: relative;
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: #1c1917;
+  letter-spacing: -0.02em;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+.ny-tower-base {
+  margin-top: 0.35rem;
+  padding: 0.25rem 0.45rem;
+  border-radius: 0.35rem;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(234, 179, 8, 0.45);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.1;
+  font-size: 0.55rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: #eab308;
+}
+.ny-tower-base-sub {
+  font-size: 0.5rem;
+  color: #fcd34d;
+  letter-spacing: 0.18em;
+}
+.ny-side {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.ny-side--right {
+  right: max(0.35rem, env(safe-area-inset-right));
+  top: 18%;
+  align-items: flex-end;
+}
+.ny-emoji {
+  display: block;
+  line-height: 1;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.45));
+  animation: ny-pop 2.8s ease-in-out infinite;
+}
+.ny-emoji--xl {
+  font-size: 2.6rem;
+}
+.ny-emoji--lg {
+  font-size: 2rem;
+  animation-delay: 0.35s;
+}
+.ny-emoji--md {
+  font-size: 1.5rem;
+  animation-delay: 0.7s;
+}
+.ny-emoji--sm {
+  font-size: 1.2rem;
+  animation-delay: 1s;
+}
+.ny-burst {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  animation: ny-burst-cycle 5.5s ease-out infinite;
+}
+.ny-spark {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: hsl(var(--ny-hue, 45) 90% 60%);
+  box-shadow: 0 0 8px hsl(var(--ny-hue, 45) 90% 55%);
+  animation: ny-spark-fly 5.5s ease-out infinite;
+  transform: rotate(var(--a, 0deg)) translateY(0);
+  opacity: 0;
+}
+.ny-banner {
+  position: absolute;
+  right: max(0.5rem, env(safe-area-inset-right));
+  bottom: 8%;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(253, 224, 71, 0.55);
+  text-shadow: 0 0 12px rgba(234, 179, 8, 0.35);
+  animation: ny-banner-pulse 3s ease-in-out infinite;
+}
+
+@keyframes ny-ball-drop {
+  0%,
+  8% {
+    top: 0.2rem;
+  }
+  45%,
+  55% {
+    top: 7.2rem;
+  }
+  92%,
+  100% {
+    top: 0.2rem;
+  }
+}
+@keyframes ny-blink {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes ny-pop {
+  0%,
+  100% {
+    transform: scale(1) rotate(-3deg);
+  }
+  50% {
+    transform: scale(1.08) rotate(4deg);
+  }
+}
+@keyframes ny-burst-cycle {
+  0%,
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes ny-spark-fly {
+  0%,
+  5% {
+    opacity: 0;
+    transform: rotate(var(--a, 0deg)) translateY(0) scale(0.4);
+  }
+  12% {
+    opacity: 1;
+    transform: rotate(var(--a, 0deg)) translateY(-8px) scale(1.1);
+  }
+  45% {
+    opacity: 0.85;
+    transform: rotate(var(--a, 0deg)) translateY(-42px) scale(0.9);
+  }
+  70% {
+    opacity: 0;
+    transform: rotate(var(--a, 0deg)) translateY(-58px) scale(0.3);
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(var(--a, 0deg)) translateY(-58px) scale(0.2);
+  }
+}
+@keyframes ny-banner-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+@media (max-width: 768px) {
+  .ny-tower {
+    transform: scale(0.72);
+    transform-origin: top left;
+    opacity: 0.8;
+  }
+  .ny-side--right {
+    top: auto;
+    bottom: 6%;
+    transform: scale(0.75);
+    transform-origin: bottom right;
+    opacity: 0.7;
+  }
+  .ny-banner {
+    font-size: 0.55rem;
+    bottom: 1.5%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ny-ball,
+  .ny-tower-light,
+  .ny-emoji,
+  .ny-spark,
+  .ny-banner {
+    animation: none;
+  }
+  .ny-ball {
+    top: 4rem;
+  }
+  .ny-spark {
+    opacity: 0.6;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

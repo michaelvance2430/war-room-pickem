@@ -30,17 +30,17 @@ export const SEASON_THEME_PRESETS: SeasonThemePreset[] = [
   {
     id: "thanksgiving",
     label: "Thanksgiving 🦃",
-    blurb: "Warm amber & cranberry — turkey week.",
+    blurb: "Turkeys, cornucopia, and a harvest spread — gravy season.",
   },
   {
     id: "christmas",
     label: "Christmas 🎄",
-    blurb: "Evergreen, gold, and twinkling lights — bowl season cheer.",
+    blurb: "Twinkling lights, a tree with presents, and Santa mid-exit.",
   },
   {
     id: "newyear",
     label: "New Year ✨",
-    blurb: "Midnight navy & champagne — CFP Final energy.",
+    blurb: "Ball drop, fireworks, champagne — midnight energy.",
   },
 ];
 
