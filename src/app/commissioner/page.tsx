@@ -55,6 +55,7 @@ import {
   SEASON_MAX_WEEK,
   weekDateRangeLabel,
 } from "@/lib/season-calendar";
+import { autoFinishRemainingWeeks } from "@/lib/sandbox-auto-finish";
 import {
   fetchNcaafScores,
   buildResultsFromScores,
@@ -204,6 +205,8 @@ export default function CommissionerPage() {
   const [passReport, setPassReport] = useState<string | null>(null);
   const [deputyBusyId, setDeputyBusyId] = useState<string | null>(null);
   const [deputyReport, setDeputyReport] = useState<string | null>(null);
+  const [autoSeasonBusy, setAutoSeasonBusy] = useState(false);
+  const [autoSeasonReport, setAutoSeasonReport] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -1075,6 +1078,48 @@ export default function CommissionerPage() {
     );
   }
 
+  /** Sandbox: demo-publish + bot picks + randomize + score every open week → CFP Final */
+  async function handleAutoFinishSeason() {
+    const remaining = [];
+    for (let w = 0; w <= SEASON_MAX_WEEK; w++) {
+      if (!scoredWeeks.includes(w)) remaining.push(w);
+    }
+    if (!remaining.length) {
+      setAutoSeasonReport("All weeks 0–18 are already scored.");
+      return;
+    }
+    if (
+      !confirm(
+        `Auto-finish ${remaining.length} remaining week(s) through CFP Final?\n\n` +
+          `Weeks: ${remaining.map((w) => weekTitle(w)).join(", ")}\n\n` +
+          "For each: demo 5-game card → bot picks → random results → score.\n" +
+          "Already-scored weeks are skipped. Sandbox / dry-run only."
+      )
+    ) {
+      return;
+    }
+    setAutoSeasonBusy(true);
+    setAutoSeasonReport("Starting…");
+    const res = await autoFinishRemainingWeeks({
+      onProgress: (p) => {
+        setAutoSeasonReport(`${p.label}: ${p.step}`);
+      },
+    });
+    setAutoSeasonBusy(false);
+    setAutoSeasonReport(res.message);
+    await refreshScoredWeeks();
+    const nextWeek = res.finished[res.finished.length - 1];
+    if (nextWeek != null) {
+      setActiveWeek(nextWeek);
+      try {
+        localStorage.setItem(ACTIVE_WEEK_KEY, String(nextWeek));
+      } catch {
+        /* ignore */
+      }
+      await loadWeekState(nextWeek);
+    }
+  }
+
   async function saveSettings() {
     setSettingsError(null);
     const result = await saveLeagueToCloud({
@@ -1645,6 +1690,40 @@ export default function CommissionerPage() {
               </button>
               {settingsError && (
                 <p className="text-sm text-danger">{settingsError}</p>
+              )}
+            </div>
+
+            <div className="rounded-xl border border-warning/40 bg-warning/5 p-5 space-y-3">
+              <h2 className="font-semibold text-warning">
+                Sandbox: finish remaining weeks
+              </h2>
+              <p className="text-xs text-muted leading-relaxed">
+                Dry-run through{" "}
+                <strong className="text-foreground">CFP Final</strong> without
+                clicking each week. For every unscored week: demo slate → publish
+                → bot picks → randomize covers/prop → score. Already-scored weeks
+                (0–12 if you&apos;re here) are skipped.
+              </p>
+              <button
+                type="button"
+                disabled={autoSeasonBusy}
+                onClick={() => void handleAutoFinishSeason()}
+                className="w-full py-3 rounded-xl font-semibold bg-warning text-black disabled:opacity-50"
+              >
+                {autoSeasonBusy
+                  ? "Running season…"
+                  : "Auto-finish remaining weeks → CFP Final"}
+              </button>
+              {autoSeasonReport && (
+                <p
+                  className={`text-xs leading-relaxed ${
+                    /fail|error|stopped/i.test(autoSeasonReport)
+                      ? "text-danger"
+                      : "text-primary"
+                  }`}
+                >
+                  {autoSeasonReport}
+                </p>
               )}
             </div>
 
