@@ -69,12 +69,48 @@ export default function TrophyRoomPage() {
 
   async function onAward(e: FormEvent) {
     e.preventDefault();
-    setBusy(true);
     setFormMsg(null);
+    const name = (winnerName || "Unknown").trim();
+    if (!name) {
+      setFormMsg("Winner name is required");
+      return;
+    }
+
+    // Warn before overwriting an existing plaque for this year + trophy type
+    const existing = trophies.find(
+      (t) => t.seasonYear === year && t.trophyType === type
+    );
+    if (existing) {
+      const prev = existing.winnerName || "the current winner";
+      const trophyTitle = TROPHY_META[type].title;
+      if (prev.toLowerCase() === name.toLowerCase()) {
+        // Same person re-save (subtitle/notes only) — still confirm lightly
+        if (
+          !confirm(
+            `Update the ${year} ${trophyTitle} for ${prev}?\n\nThis keeps them as winner and refreshes subtitle/notes.`
+          )
+        ) {
+          return;
+        }
+      } else {
+        if (
+          !confirm(
+            `Replace ${prev}?\n\n` +
+              `A ${year} ${trophyTitle} is already engraved for ${prev}.\n\n` +
+              `Confirm you want to replace "${prev}" with "${name}".\n\n` +
+              `This cannot be undone except by awarding again.`
+          )
+        ) {
+          return;
+        }
+      }
+    }
+
+    setBusy(true);
     const result = await awardTrophy({
       seasonYear: year,
       trophyType: type,
-      winnerName: winnerName || "Unknown",
+      winnerName: name,
       winnerUserId: winnerUserId || null,
       subtitle: subtitle || null,
       notes: notes || null,
@@ -84,7 +120,11 @@ export default function TrophyRoomPage() {
       setFormMsg(result.error || "Failed to award");
       return;
     }
-    setFormMsg("Trophy engraved.");
+    setFormMsg(
+      existing
+        ? `Updated ${year} ${TROPHY_META[type].title}: ${name} (replaced ${existing.winnerName}).`
+        : "Trophy engraved."
+    );
     setSubtitle("");
     setNotes("");
     await reload();
@@ -257,10 +297,10 @@ export default function TrophyRoomPage() {
             <div>
               <h2 className="font-semibold text-primary">Engrave a trophy</h2>
               <p className="text-xs text-muted mt-1">
-                One of each type per season year. Re-saving the same year + type
-                overwrites the previous winner. One-time setup: run{" "}
+                One of each type per season year. If that plaque already exists,
+                you&apos;ll get a confirm popup before replacing the name. Setup:{" "}
                 <code className="text-foreground">supabase/trophy-room.sql</code>{" "}
-                in Supabase if awards fail.
+                if awards fail.
               </p>
             </div>
 
