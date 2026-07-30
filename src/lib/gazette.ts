@@ -23,8 +23,15 @@ export type GazetteEdition = {
   weekIndex: number;
   weekLabel: string;
   volumeLabel: string;
+  /** Best week card (single name — weekly multi-ties pick one, no “deadlock” copy). */
   crown: GazetteStory;
+  /** Worst week card (single name). */
   shame: GazetteStory | null;
+  /**
+   * Only when 2+ players are tied for #1 overall standings (season totalPoints).
+   * Not used for same weekly score.
+   */
+  standingsDeadlock: GazetteStory | null;
   samePerson: boolean;
   masthead: string;
 };
@@ -183,169 +190,108 @@ export function formatNameList(names: string[], maxShow = 3): string {
   return `${shown.join(", ")} +${rest} more`;
 }
 
-function lastWeekPts(p: Player): number | null {
-  if (!p.weeklyPoints?.length) return null;
-  return p.weeklyPoints[p.weeklyPoints.length - 1] ?? null;
-}
-
-/** Everyone tied for high score this week (2+). */
-function tiedForCrown(players: Player[]): { names: string[]; pts: number } | null {
-  const rows = players
-    .map((p) => ({ name: p.name, pts: lastWeekPts(p) }))
-    .filter((x): x is { name: string; pts: number } => x.pts != null);
-  if (rows.length < 2) return null;
-  const max = Math.max(...rows.map((r) => r.pts));
-  const tied = rows
-    .filter((r) => r.pts === max)
-    .map((r) => r.name)
+/**
+ * Players tied for #1 in overall season standings (totalPoints).
+ * Weekly same-score ties intentionally ignored — those happen constantly.
+ */
+export function tiedForOverallFirst(
+  players: Player[]
+): { names: string[]; pts: number } | null {
+  if (players.length < 2) return null;
+  const max = Math.max(...players.map((p) => p.totalPoints || 0));
+  // Need some season scoring on the board
+  if (max <= 0) return null;
+  const tied = players
+    .filter((p) => (p.totalPoints || 0) === max)
+    .map((p) => p.name)
     .sort((a, b) => a.localeCompare(b));
   if (tied.length < 2) return null;
   return { names: tied, pts: max };
 }
 
-/** Everyone tied for low score this week (2+), and not the whole league on one number. */
-function tiedForShame(
-  players: Player[],
-  crownPts: number
-): { names: string[]; pts: number } | null {
-  const rows = players
-    .map((p) => ({ name: p.name, pts: lastWeekPts(p) }))
-    .filter((x): x is { name: string; pts: number } => x.pts != null);
-  if (rows.length < 2) return null;
-  const min = Math.min(...rows.map((r) => r.pts));
-  // If min === max, entire field is flat — handled as solo/all-tie
-  if (min === crownPts) return null;
-  const tied = rows
-    .filter((r) => r.pts === min)
-    .map((r) => r.name)
-    .sort((a, b) => a.localeCompare(b));
-  if (tied.length < 2) return null;
-  return { names: tied, pts: min };
-}
-
 type TieHN = (label: string, pts: number, count: number) => string;
 type TieDK = (pts: number, count: number) => string;
 
-/** Deadlock at the top — WHO WILL PULL AHEAD energy (18, week-keyed). */
-export const TIE_CROWN_HEADLINES: TieHN[] = [
-  (label, pts) => `DEADLOCK AT ${pts}: ${label.toUpperCase()} — WHO WILL PULL AHEAD?`,
-  (label, pts) => `TOP OF THE TABLE TIED AT ${pts} — ${label.toUpperCase()} SHARE THE CROWN`,
-  (label, pts) => `PHOTO FINISH: ${label.toUpperCase()} KNOTTED AT ${pts}`,
-  (label, pts) => `NO SOLO KING: ${label.toUpperCase()} ALL AT ${pts}`,
-  (label, pts) => `WHO BLINKS FIRST? ${label.toUpperCase()} LOCKED AT ${pts}`,
-  (label, pts) => `SHARED THRONE: ${label.toUpperCase()} CAN'T SEPARATE (${pts})`,
-  (label, pts) => `${pts}-POINT LOGJAM — ${label.toUpperCase()} STILL UNDECIDED`,
-  (label, pts) => `TIEBREAKER WANTED: ${label.toUpperCase()} ALL POSTED ${pts}`,
-  (label, pts) => `THE RACE IS ON: ${label.toUpperCase()} DEAD EVEN AT ${pts}`,
-  (label, pts) => `CROWNS FOR EVERYONE (FOR NOW): ${label.toUpperCase()} AT ${pts}`,
-  (label, pts) => `STANDOFF AT THE SUMMIT — ${label.toUpperCase()} (${pts} PTS)`,
-  (label, pts) => `PULL AHEAD OR FALL: ${label.toUpperCase()} TIED AT ${pts}`,
-  (label, pts) => `LEVEL AT THE TOP: ${label.toUpperCase()} BOTH/ALL AT ${pts}`,
-  (label, pts) => `NEXT WEEK DECIDES — ${label.toUpperCase()} CAN'T BREAK ${pts}`,
-  (label, pts) => `CO-MVPS THIS CARD: ${label.toUpperCase()} WITH ${pts}`,
-  (label, pts) => `GRIDLOCK: ${label.toUpperCase()} MIRROR EACH OTHER AT ${pts}`,
-  (label, pts) => `WHO PULLS AHEAD? ${label.toUpperCase()} WON'T SEPARATE (${pts})`,
-  (label, pts) => `TIE GAME IN THE STANDINGS RACE: ${label.toUpperCase()} AT ${pts}`,
+/**
+ * Season standings #1 deadlock — WHO WILL PULL AHEAD (18, week-keyed).
+ * Copy talks overall points / table, not this week’s card alone.
+ */
+export const STANDINGS_TIE_HEADLINES: TieHN[] = [
+  (label, pts) =>
+    `STANDINGS DEADLOCK AT ${pts}: ${label.toUpperCase()} — WHO WILL PULL AHEAD?`,
+  (label, pts) =>
+    `NO SOLO #1: ${label.toUpperCase()} TIED ATOP THE TABLE (${pts})`,
+  (label, pts) =>
+    `PHOTO FINISH FOR FIRST: ${label.toUpperCase()} AT ${pts} OVERALL`,
+  (label, pts) =>
+    `SHARED THRONE: ${label.toUpperCase()} CAN'T SEPARATE (${pts} SEASON PTS)`,
+  (label, pts) =>
+    `WHO BLINKS FIRST? ${label.toUpperCase()} LOCKED AT ${pts} IN THE STANDINGS`,
+  (label, pts) =>
+    `TOP OF THE BOARD TIED AT ${pts} — ${label.toUpperCase()}`,
+  (label, pts) =>
+    `${pts}-POINT LOGJAM FOR #1 — ${label.toUpperCase()} STILL EVEN`,
+  (label, pts) =>
+    `TIEBREAKER WANTED: ${label.toUpperCase()} BOTH/ALL SIT AT ${pts}`,
+  (label, pts) =>
+    `THE RACE FOR FIRST IS ON: ${label.toUpperCase()} DEAD EVEN (${pts})`,
+  (label, pts) =>
+    `CO-LEADERS OF THE WAR ROOM: ${label.toUpperCase()} AT ${pts}`,
+  (label, pts) =>
+    `STANDOFF AT #1 — ${label.toUpperCase()} (${pts} OVERALL)`,
+  (label, pts) =>
+    `PULL AHEAD OR FALL: ${label.toUpperCase()} TIED FOR FIRST AT ${pts}`,
+  (label, pts) =>
+    `LEVEL AT THE SUMMIT: ${label.toUpperCase()} ALL AT ${pts}`,
+  (label, pts) =>
+    `NEXT WEEK DECIDES #1 — ${label.toUpperCase()} CAN'T BREAK ${pts}`,
+  (label, pts) =>
+    `GRIDLOCK ATOP THE STANDINGS: ${label.toUpperCase()} (${pts})`,
+  (label, pts) =>
+    `WHO PULLS AHEAD? ${label.toUpperCase()} WON'T SEPARATE (${pts} PTS)`,
+  (label, pts) =>
+    `TIE GAME FOR THE #1 SPOT: ${label.toUpperCase()} AT ${pts}`,
+  (label, pts) =>
+    `SEASON RACE FROZEN AT ${pts} — ${label.toUpperCase()} SHARE FIRST`,
 ];
 
-export const TIE_CROWN_DECKS: TieDK[] = [
+export const STANDINGS_TIE_DECKS: TieDK[] = [
   (pts, count) =>
-    `${count} players at ${pts}. Same card, same score — next week is the breakup album.`,
+    `${count} players tied for first overall at ${pts} season points. Someone has to flinch.`,
   (pts, count) =>
-    `Deadlocked at ${pts}. Someone has to flinch. The cut line is watching.`,
+    `Deadlocked atop the standings at ${pts}. The cut line is watching. So is the group chat.`,
   (pts) =>
-    `${pts} points each. Co-champions of the week until the next slate splits them.`,
+    `${pts} overall, apiece. No solo king of the table — next card is the breakup episode.`,
   (pts, count) =>
-    `${count}-way tie at the top (${pts}). Group chat just became a thriller.`,
+    `${count}-way tie for #1 (${pts} pts). Group chat just became a thriller.`,
   (pts) =>
-    `Nobody owns the crown alone at ${pts}. Fade one of them. Or don't. Chaos either way.`,
+    `Nobody owns first alone at ${pts} season points. Fade one. Or don't. Chaos either way.`,
   (pts, count) =>
-    `${count} names, one number: ${pts}. Who pulls ahead is the only plot left.`,
+    `${count} names, one number on the board: ${pts}. Who pulls ahead is the only plot left.`,
   (pts) =>
-    `Photograph finishes don't hand out rings. ${pts} even — see you next kickoff.`,
+    `Photo finishes don't hand out rings. ${pts} even in the standings — see you next kickoff.`,
   (pts, count) =>
-    `Shared glory at ${pts}. ${count} egos. One standings page. Delicious.`,
+    `Shared #1 at ${pts}. ${count} egos. One standings page. Delicious.`,
   (pts) =>
-    `They can't separate at ${pts}. Confidence pools are about to get personal.`,
+    `They can't separate at ${pts} overall. Confidence pools are about to get personal.`,
   (pts, count) =>
-    `Top shelf is crowded (${count} at ${pts}). Next week's dogs will pick a villain.`,
+    `Top of the table is crowded (${count} at ${pts}). Next week's dogs will pick a villain.`,
   (pts) =>
-    `Even at ${pts}. The War Room does not do participation trophies for long.`,
+    `Even at ${pts} season points. The War Room does not do co-champions forever.`,
   (pts, count) =>
-    `${count}-player logjam. ${pts} on the nose. Someone's Best Bet is about to snitch.`,
+    `${count}-player logjam for first. ${pts} on the nose. Someone's Best Bet is about to snitch.`,
   (pts) =>
-    `Tied for first at ${pts}. Rematch card loading. Bring popcorn.`,
+    `Tied for first overall at ${pts}. Rematch card loading. Bring popcorn.`,
   (pts, count) =>
-    `No sole survivor at the top — ${count} at ${pts}. Pull ahead or get pulled under.`,
+    `No sole #1 — ${count} at ${pts} season points. Pull ahead or get pulled under.`,
   (pts) =>
-    `${pts} apiece. The ticker can't decide who to crown. Neither can we.`,
+    `${pts} apiece atop the board. The ticker can't decide who to crown.`,
   (pts, count) =>
-    `A ${count}-horse photo at ${pts}. Place your lean. League lore starts here.`,
+    `A ${count}-horse race for first at ${pts} overall. Place your lean.`,
   (pts) =>
-    `Dead heat at ${pts}. Next slate is the tiebreaker nobody voted for.`,
+    `Dead heat for the #1 spot at ${pts}. Next slate is the tiebreaker nobody voted for.`,
   (pts, count) =>
-    `${count} players, zero separation, ${pts} points. Who will pull ahead?`,
-];
-
-/** Multi-way basement — optional shame ties. */
-export const TIE_SHAME_HEADLINES: TieHN[] = [
-  (label, pts) => `BASEMENT TRAFFIC JAM: ${label.toUpperCase()} ALL AT ${pts}`,
-  (label, pts) => `SHARED PAPER BAG: ${label.toUpperCase()} TIED AT ${pts}`,
-  (label, pts) => `NOBODY WANTS THIS TROPHY — ${label.toUpperCase()} AT ${pts}`,
-  (label, pts) => `MULTI-WAY MELTDOWN: ${label.toUpperCase()} (${pts} PTS)`,
-  (label, pts) => `WALL OF SHAME IS A GROUP PROJECT — ${label.toUpperCase()} AT ${pts}`,
-  (label, pts) => `TIED FOR LAST AT ${pts}: ${label.toUpperCase()}`,
-  (label, pts) => `TOILET SCOUTS OPEN A GROUP CHAT: ${label.toUpperCase()} (${pts})`,
-  (label, pts) => `EQUAL OPPORTUNITY DISASTER — ${label.toUpperCase()} AT ${pts}`,
-  (label, pts) => `${label.toUpperCase()} CAN'T EVEN LOSE ALONE (${pts})`,
-  (label, pts) => `BOTTOM RUNG HOLDS ${label.toUpperCase()} AT ${pts}`,
-  (label, pts) => `TIE FOR THE BAG: ${label.toUpperCase()} WITH ${pts}`,
-  (label, pts) => `COLLECTIVE SIGH: ${label.toUpperCase()} FLAT AT ${pts}`,
-  (label, pts) => `LAST PLACE IS CROWDED — ${label.toUpperCase()} (${pts})`,
-  (label, pts) => `SHARED L FOR ${label.toUpperCase()} AT ${pts}`,
-  (label, pts) => `WHO ESCAPES FIRST? ${label.toUpperCase()} STUCK AT ${pts}`,
-  (label, pts) => `BASEMENT DEADLOCK: ${label.toUpperCase()} ALL SCORED ${pts}`,
-  (label, pts) => `GROUP RATE ON SHAME: ${label.toUpperCase()} (${pts} PTS)`,
-  (label, pts) => `NO SOLO GOAT — ${label.toUpperCase()} TIED AT ${pts} FOR LAST`,
-];
-
-export const TIE_SHAME_DECKS: TieDK[] = [
-  (pts, count) =>
-    `${count} players at ${pts}. Misery loves company. The cut line loves data.`,
-  (pts) =>
-    `Tied for the floor at ${pts}. Someone has to climb. Preferably soon.`,
-  (pts, count) =>
-    `${count}-way last place at ${pts}. Brown paper bags sold in bulk this week.`,
-  (pts) =>
-    `${pts} points each. The Toilet Bowl is taking applications as a group.`,
-  (pts, count) =>
-    `${count} names, one sad number (${pts}). Escape velocity required.`,
-  (pts) =>
-    `Nobody lost alone at ${pts}. Character development is mandatory next card.`,
-  (pts, count) =>
-    `Shared basement at ${pts}. ${count} egos. One way out: better dogs.`,
-  (pts) =>
-    `${pts} on the card, times a few. The lowlight reel needs a director's cut.`,
-  (pts, count) =>
-    `${count} players discovered ${pts} together. Bonding! Horrible bonding.`,
-  (pts) =>
-    `Deadlocked at the bottom (${pts}). Next week is the jailbreak episode.`,
-  (pts, count) =>
-    `Group rate shame at ${pts}. All ${count} should re-read the rules. Or the lines.`,
-  (pts) =>
-    `${pts} apiece for last. Fade the field or hug the field — both valid.`,
-  (pts, count) =>
-    `${count}-person pile-up at ${pts}. Traffic in the basement is not a metaphor.`,
-  (pts) =>
-    `Tied for worst at ${pts}. Standings don't do soft landings.`,
-  (pts, count) =>
-    `${count} at ${pts}. The only race left is who stops the bleeding first.`,
-  (pts) =>
-    `Equal opportunity L at ${pts}. Rematch card can't come soon enough.`,
-  (pts, count) =>
-    `Basement photo finish: ${count} at ${pts}. Dignity optional.`,
-  (pts) =>
-    `${pts} points, shared last place. The Gazette refuses to pick just one victim.`,
+    `${count} players, zero separation, ${pts} season points. Who will pull ahead?`,
 ];
 
 /** Counts for tests / commissioner sanity checks. */
@@ -354,20 +300,22 @@ export const GAZETTE_COPY_COUNTS = {
   crownDecks: CROWN_DECKS.length,
   shameHeadlines: SHAME_HEADLINES.length,
   shameDecks: SHAME_DECKS.length,
-  tieCrownHeadlines: TIE_CROWN_HEADLINES.length,
-  tieCrownDecks: TIE_CROWN_DECKS.length,
-  tieShameHeadlines: TIE_SHAME_HEADLINES.length,
-  tieShameDecks: TIE_SHAME_DECKS.length,
+  standingsTieHeadlines: STANDINGS_TIE_HEADLINES.length,
+  standingsTieDecks: STANDINGS_TIE_DECKS.length,
 } as const;
 
 /**
  * Build a one-sheet edition from latest scored week, or null if nothing to show.
+ *
+ * Headlines:
+ * 1) Killer (or rough) week — single name for high/low on the card
+ * 2) Optional: overall standings #1 multi-way tie (season totalPoints)
+ * Weekly multi-way same scores do NOT get special deadlock copy.
  */
 export function buildGazetteEdition(players: Player[]): GazetteEdition | null {
   const data = weekCrownAndShame(players);
   if (!data) return null;
 
-  // Need at least 2 scores for a real "paper"
   const withPts = players.filter(
     (p) => p.weeklyPoints && p.weeklyPoints.length > 0
   );
@@ -376,115 +324,54 @@ export function buildGazetteEdition(players: Player[]): GazetteEdition | null {
   const weekIndex = data.weekIndex;
   const weekLabel = weekTitle(weekIndex);
 
-  const topTie = tiedForCrown(players);
-  const allSameScore =
-    topTie &&
-    topTie.names.length === withPts.length;
+  const cn = data.crown.player.name;
+  const cp = data.crown.pts;
+  const sn = data.shame.player.name;
+  const sp = data.shame.pts;
 
-  // Everyone put up the same number — one weird edition
-  if (allSameScore && topTie) {
-    const label = formatNameList(topTie.names);
-    return {
-      weekIndex,
-      weekLabel,
-      volumeLabel: `Vol. ${weekIndex} · Final Edition`,
-      masthead: "THE WAR ROOM GAZETTE",
-      samePerson: true,
-      crown: {
-        names: topTie.names,
-        pts: topTie.pts,
-        kind: "tie",
-        headline: byWeek(TIE_CROWN_HEADLINES, weekIndex)(
-          label,
-          topTie.pts,
-          topTie.names.length
-        ),
-        deck: `The whole league at ${topTie.pts}. Not a crown. Not a bag. A mirror. Who will pull ahead next week?`,
-      },
-      shame: null,
-    };
-  }
+  // Weekly crown — always one name (if multi-way weekly high, weekCrownAndShame already picked one)
+  const crown: GazetteStory = {
+    names: [cn],
+    pts: cp,
+    kind: "clear",
+    headline: data.samePerson
+      ? byWeek(SOLO_HEADLINES, weekIndex)(cn, cp)
+      : byWeek(CROWN_HEADLINES, weekIndex, 0)(cn, cp),
+    deck: data.samePerson
+      ? byWeek(SOLO_DECKS, weekIndex)(cp)
+      : byWeek(CROWN_DECKS, weekIndex, 0)(cp),
+  };
 
-  if (data.samePerson && !topTie) {
-    const n = data.crown.player.name;
-    const pts = data.crown.pts;
-    return {
-      weekIndex,
-      weekLabel,
-      volumeLabel: `Vol. ${weekIndex} · Final Edition`,
-      masthead: "THE WAR ROOM GAZETTE",
-      samePerson: true,
-      crown: {
-        names: [n],
-        pts,
-        kind: "clear",
-        headline: byWeek(SOLO_HEADLINES, weekIndex)(n, pts),
-        deck: byWeek(SOLO_DECKS, weekIndex)(pts),
-      },
-      shame: null,
-    };
-  }
-
-  // --- Crown story (clear winner or top tie) ---
-  let crown: GazetteStory;
-  if (topTie) {
-    const label = formatNameList(topTie.names);
-    crown = {
-      names: topTie.names,
-      pts: topTie.pts,
-      kind: "tie",
-      headline: byWeek(TIE_CROWN_HEADLINES, weekIndex)(
-        label,
-        topTie.pts,
-        topTie.names.length
-      ),
-      deck: byWeek(TIE_CROWN_DECKS, weekIndex)(topTie.pts, topTie.names.length),
-    };
-  } else {
-    const cn = data.crown.player.name;
-    const cp = data.crown.pts;
-    crown = {
-      names: [cn],
-      pts: cp,
-      kind: "clear",
-      headline: byWeek(CROWN_HEADLINES, weekIndex, 0)(cn, cp),
-      deck: byWeek(CROWN_DECKS, weekIndex, 0)(cp),
-    };
-  }
-
-  // --- Shame story ---
-  const bottomTie = tiedForShame(players, crown.pts);
   let shame: GazetteStory | null = null;
-
-  if (bottomTie) {
-    const label = formatNameList(bottomTie.names);
+  if (!data.samePerson) {
     shame = {
-      names: bottomTie.names,
-      pts: bottomTie.pts,
+      names: [sn],
+      pts: sp,
+      kind: "clear",
+      headline: byWeek(SHAME_HEADLINES, weekIndex, 0)(sn, sp),
+      deck: byWeek(SHAME_DECKS, weekIndex, 0)(sp),
+    };
+  }
+
+  // Season table only — not this week's multi-way high score
+  const overallTie = tiedForOverallFirst(players);
+  let standingsDeadlock: GazetteStory | null = null;
+  if (overallTie) {
+    const label = formatNameList(overallTie.names);
+    standingsDeadlock = {
+      names: overallTie.names,
+      pts: overallTie.pts,
       kind: "tie",
-      headline: byWeek(TIE_SHAME_HEADLINES, weekIndex)(
+      headline: byWeek(STANDINGS_TIE_HEADLINES, weekIndex)(
         label,
-        bottomTie.pts,
-        bottomTie.names.length
+        overallTie.pts,
+        overallTie.names.length
       ),
-      deck: byWeek(TIE_SHAME_DECKS, weekIndex)(
-        bottomTie.pts,
-        bottomTie.names.length
+      deck: byWeek(STANDINGS_TIE_DECKS, weekIndex)(
+        overallTie.pts,
+        overallTie.names.length
       ),
     };
-  } else if (!data.samePerson) {
-    const sn = data.shame.player.name;
-    const sp = data.shame.pts;
-    // Don't dunk the same person as sole crown if weird edge
-    if (!(crown.kind === "clear" && crown.names[0] === sn && crown.pts === sp)) {
-      shame = {
-        names: [sn],
-        pts: sp,
-        kind: "clear",
-        headline: byWeek(SHAME_HEADLINES, weekIndex, 0)(sn, sp),
-        deck: byWeek(SHAME_DECKS, weekIndex, 0)(sp),
-      };
-    }
   }
 
   return {
@@ -492,9 +379,10 @@ export function buildGazetteEdition(players: Player[]): GazetteEdition | null {
     weekLabel,
     volumeLabel: `Vol. ${weekIndex} · ${weekLabel}`,
     masthead: "THE WAR ROOM GAZETTE",
-    samePerson: false,
+    samePerson: data.samePerson,
     crown,
     shame,
+    standingsDeadlock,
   };
 }
 

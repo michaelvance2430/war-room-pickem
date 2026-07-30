@@ -134,12 +134,10 @@ export default function GazetteModal() {
         </div>
 
         <div className="px-5 py-4 space-y-4">
-          {/* A1 Crown (or top deadlock) */}
+          {/* A1 — this week's killer card (single name even if others matched weekly pts) */}
           <article>
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-800 mb-1">
-              {edition.crown.kind === "tie"
-                ? "★ Deadlock · Who pulls ahead?"
-                : "★ Top of the fold"}
+              ★ This week&apos;s card
             </p>
             <h3 className="font-serif text-xl sm:text-2xl font-black leading-tight text-stone-950">
               {edition.crown.headline}
@@ -148,17 +146,34 @@ export default function GazetteModal() {
               {edition.crown.deck}
             </p>
             <p className="text-xs text-stone-500 mt-2 font-medium">
-              {edition.crown.names.join(" · ")} · {edition.crown.pts} pts
-              {edition.crown.kind === "tie" ? " each" : ""} · {edition.weekLabel}
+              {edition.crown.names[0]} · {edition.crown.pts} pts this week ·{" "}
+              {edition.weekLabel}
             </p>
           </article>
+
+          {/* Overall #1 standings multi-way only — not weekly score ties */}
+          {edition.standingsDeadlock && (
+            <article className="border-t border-stone-400 pt-4">
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-amber-900 mb-1">
+                ★ Season standings · Who pulls ahead?
+              </p>
+              <h3 className="font-serif text-lg sm:text-xl font-black leading-snug text-stone-950">
+                {edition.standingsDeadlock.headline}
+              </h3>
+              <p className="text-sm text-stone-700 mt-1.5 leading-snug">
+                {edition.standingsDeadlock.deck}
+              </p>
+              <p className="text-xs text-stone-500 mt-2 font-medium">
+                {edition.standingsDeadlock.names.join(" · ")} ·{" "}
+                {edition.standingsDeadlock.pts} pts overall (tied for #1)
+              </p>
+            </article>
+          )}
 
           {edition.shame && (
             <article className="border-t border-stone-400 pt-4">
               <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-purple-900 mb-1">
-                {edition.shame.kind === "tie"
-                  ? "🚽 Basement traffic jam"
-                  : "🚽 Also in this edition"}
+                🚽 Also in this edition
               </p>
               <h3 className="font-serif text-lg font-bold leading-snug text-stone-900">
                 {edition.shame.headline}
@@ -167,8 +182,7 @@ export default function GazetteModal() {
                 {edition.shame.deck}
               </p>
               <p className="text-xs text-stone-500 mt-2 font-medium">
-                {edition.shame.names.join(" · ")} · {edition.shame.pts} pts
-                {edition.shame.kind === "tie" ? " each" : ""}
+                {edition.shame.names[0]} · {edition.shame.pts} pts this week
               </p>
             </article>
           )}
