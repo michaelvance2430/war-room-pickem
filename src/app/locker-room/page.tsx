@@ -31,6 +31,7 @@ export default function LockerRoomPage() {
   const [muted, setMuted] = useState(false);
   const [leagueName, setLeagueName] = useState("");
   const [cooldownLeft, setCooldownLeft] = useState(0);
+  const [weekLabel, setWeekLabel] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
   const lastPostAt = useRef(0);
   const listTopRef = useRef<HTMLDivElement>(null);
@@ -43,6 +44,7 @@ export default function LockerRoomPage() {
       return;
     }
     setMessages(res.messages || []);
+    if (res.weekLabel) setWeekLabel(res.weekLabel);
     setError(null);
   }, []);
 
@@ -101,7 +103,8 @@ export default function LockerRoomPage() {
       return;
     }
     setPosting(true);
-    const res = await postLockerMessage(body);
+    const text = body;
+    const res = await postLockerMessage(text);
     setPosting(false);
     if (!res.ok) {
       setPostError(res.error || "Failed to post");
@@ -111,6 +114,13 @@ export default function LockerRoomPage() {
     lastPostAt.current = Date.now();
     setCooldownLeft(LOCKER_COOLDOWN_SEC);
     setBody("");
+    // Show your post immediately (then reconcile with server)
+    if (res.message) {
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === res.message!.id)) return prev;
+        return [...prev, res.message!];
+      });
+    }
     await reload({ quiet: true });
   }
 
@@ -151,8 +161,16 @@ export default function LockerRoomPage() {
                 {" · "}
               </>
             ) : null}
-            Drop hot takes ({LOCKER_MAX_CHARS} char max). Keep it fun — staff can
-            delete posts and mute.
+            Drop hot takes ({LOCKER_MAX_CHARS} char max).{" "}
+            <strong className="text-foreground">This week only</strong>
+            {weekLabel ? (
+              <>
+                {" "}
+                <span className="text-foreground/80">({weekLabel})</span>
+              </>
+            ) : null}
+            — board clears every Monday ET for a fresh week. Staff can delete
+            posts and mute.
             {staff && (
               <>
                 {" "}
