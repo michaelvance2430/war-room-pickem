@@ -54,8 +54,8 @@ body::after {
 }
 
 .hot-take-track {
-  /* 75% slower than 48s → 192s per loop */
-  animation: hot-take-scroll 192s linear infinite;
+  /* One full pass of the take list. ~72s: readable, not a funeral march (was 192s). */
+  animation: hot-take-scroll 72s linear infinite;
 }
 
 .hot-take-track:hover {
