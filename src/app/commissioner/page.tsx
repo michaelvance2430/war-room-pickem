@@ -655,7 +655,7 @@ export default function CommissionerPage() {
   async function handleSeedBots() {
     setBotReport(null);
     setBotBusy(true);
-    const res = await seedTrialBotsInCloud(50);
+    const res = await seedTrialBotsInCloud(32);
     if (!res.ok) {
       setBotBusy(false);
       setBotReport(res.error || "Failed to add bots");
@@ -673,8 +673,8 @@ export default function CommissionerPage() {
     setBotBusy(false);
     setBotReport(
       res.added === 0
-        ? `Trial roster full (${res.totalBots} bots).${pickNote}`
-        : `Added ${res.added} trial bots (${res.totalBots} total).${pickNote || " Publish a week card (or hit Fill bot picks) so they lock slips."}`
+        ? `League at capacity or no seats left (32 max). Bots in league: ${res.totalBots ?? 0}.${pickNote}`
+        : `Added ${res.added} trial bots (${res.totalBots} total bots). Fills toward the 32-player league cap.${pickNote || " Publish a week card (or hit Fill bot picks) so they lock slips."}`
     );
   }
 
@@ -1292,14 +1292,13 @@ export default function CommissionerPage() {
             <div className="rounded-xl border border-primary/40 bg-primary/5 p-5 space-y-3">
               <h2 className="font-semibold text-primary">Trial bots (dry run)</h2>
               <p className="text-xs text-muted leading-relaxed">
-                Fill the league with up to{" "}
-                <strong className="text-foreground">50 fake players</strong>{" "}
-                that auto-lock picks when you publish a week. Use this to
-                simulate a full season (score weeks, standings, brackets).{" "}
-                <strong className="text-foreground">
-                  Clear bots
-                </strong>{" "}
-                removes only trial bots — real people who logged in stay.
+                Fill empty seats with fake players (league cap{" "}
+                <strong className="text-foreground">32</strong> — same as public
+                max). They auto-lock picks when you publish a week. Use this in a{" "}
+                <strong className="text-foreground">sandbox league</strong> to
+                simulate a full season.{" "}
+                <strong className="text-foreground">Clear bots</strong> removes
+                only trial bots — real people stay.
               </p>
               <div className="flex flex-wrap gap-2">
                 <button
@@ -1308,7 +1307,7 @@ export default function CommissionerPage() {
                   onClick={() => void handleSeedBots()}
                   className="px-4 py-2 rounded-lg bg-primary text-black text-sm font-semibold disabled:opacity-50"
                 >
-                  {botBusy ? "Working…" : "Add 50 trial bots"}
+                  {botBusy ? "Working…" : "Fill trial bots (up to 32)"}
                 </button>
                 <button
                   type="button"

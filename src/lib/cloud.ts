@@ -3,6 +3,7 @@ import { getSession } from "@/lib/league";
 import { Game, Prop, UserPick } from "@/lib/types";
 import { scoreWeek, GameResult } from "@/lib/scoring";
 import { weekTitle } from "@/lib/dates";
+import { MAX_LEAGUE_PLAYERS, seatsRemaining } from "@/lib/league-limits";
 
 export interface CloudCard {
   weekCardId: string;
@@ -1081,18 +1082,38 @@ function trialBotsSetupHint(raw: string) {
   return raw;
 }
 
-/** Add up to 50 trial bots (commissioner). Requires trial-bots.sql */
+/** Add trial bots up to league capacity (32). Requires trial-bots.sql. */
 export async function seedTrialBotsInCloud(
   count = 50
-): Promise<{ ok: boolean; added?: number; totalBots?: number; error?: string }> {
+): Promise<{
+  ok: boolean;
+  added?: number;
+  totalBots?: number;
+  seatsRemaining?: number;
+  error?: string;
+}> {
   const session = getSession();
   if (!session?.leagueId || !session.isCommissioner) {
     return { ok: false, error: "Commissioner only" };
   }
+  // Respect public 32-player cap (Championship + Toilet Bowl)
+  const roster = await loadLeagueRoster();
+  const seats = seatsRemaining(roster.length);
+  if (seats <= 0) {
+    return {
+      ok: true,
+      added: 0,
+      totalBots: roster.filter((m) => m.isBot).length,
+      seatsRemaining: 0,
+      error: undefined,
+    };
+  }
+  const want = Math.min(count, seats, MAX_LEAGUE_PLAYERS);
+
   const supabase = createClient();
   const { data, error } = await supabase.rpc("seed_trial_bots", {
     p_league_id: session.leagueId,
-    p_count: count,
+    p_count: want,
   });
   if (error) {
     return { ok: false, error: trialBotsSetupHint(error.message || "RPC failed") };
@@ -1110,6 +1131,7 @@ export async function seedTrialBotsInCloud(
     ok: true,
     added: row.added ?? 0,
     totalBots: row.totalBots ?? 0,
+    seatsRemaining: seats - (row.added ?? 0),
   };
 }
 

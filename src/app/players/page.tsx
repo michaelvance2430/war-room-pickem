@@ -12,6 +12,12 @@ import {
   LeagueRosterMember,
 } from "@/lib/cloud";
 import { Division } from "@/lib/types";
+import {
+  MAX_LEAGUE_PLAYERS,
+  capacityLabel,
+  isLeagueFull,
+  seatsRemaining,
+} from "@/lib/league-limits";
 
 const DIVISIONS: Division[] = ["North", "South", "East", "West"];
 
@@ -137,7 +143,7 @@ export default function PlayersPage() {
                 : (() => {
                     const bots = players.filter((p) => p.isBot).length;
                     const humans = players.length - bots;
-                    return `${players.length} total · ${humans} real · ${bots} trial bot${bots === 1 ? "" : "s"}`;
+                    return `${capacityLabel(players.length)} · ${humans} real · ${bots} trial bot${bots === 1 ? "" : "s"} · ${seatsRemaining(players.length)} open`;
                   })()}
               {leagueName ? ` • ${leagueName}` : ""}
             </p>
@@ -154,10 +160,17 @@ export default function PlayersPage() {
         <div className="rounded-xl border border-border bg-card p-5 mb-6">
           <h2 className="font-semibold mb-1">Invite players</h2>
           <p className="text-sm text-muted mb-3">
-            Friends create an account, then join with this league code. Trial
-            bots (if seeded) show a <strong className="text-foreground">Trial</strong>{" "}
-            tag and are split across divisions — scroll each column.
+            Friends create an account, then join with this league code. Cap is{" "}
+            {MAX_LEAGUE_PLAYERS} so Championship + Toilet Bowl both finish in
+            CFP weeks. Trial bots (if seeded) show a{" "}
+            <strong className="text-foreground">Trial</strong> tag.
           </p>
+          {!loading && isLeagueFull(players.length) && (
+            <p className="text-xs text-warning mb-3 border border-warning/30 rounded-lg px-3 py-2 bg-warning/10">
+              League full ({MAX_LEAGUE_PLAYERS}/{MAX_LEAGUE_PLAYERS}). New joins
+              are blocked — remove a player or start a second league.
+            </p>
+          )}
           <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
             <div className="flex-1 bg-background border border-border rounded-lg px-3 py-2 font-mono text-lg tracking-widest text-center sm:text-left">
               {leagueCode || "———"}

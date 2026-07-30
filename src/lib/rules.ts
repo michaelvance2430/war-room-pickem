@@ -106,6 +106,14 @@ export const RULE_SECTIONS: RuleSection[] = [
     ],
   },
   {
+    title: "League size",
+    body: [
+      "Leagues cap at 32 players.",
+      "Why: top half → Championship (up to 16), bottom half → Toilet Bowl (up to 16). A 16-team bracket needs 4 rounds — exactly the CFP window (weeks 15–18).",
+      "If your group is bigger, start a second league with its own code.",
+    ],
+  },
+  {
     title: "Profile & tips",
     body: [
       "Upload a profile photo under Account so the league knows who’s who.",

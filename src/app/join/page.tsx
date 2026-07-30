@@ -3,6 +3,11 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
+import {
+  MAX_LEAGUE_PLAYERS,
+  isLeagueFull,
+  leagueFullMessage,
+} from "@/lib/league-limits";
 import Link from "next/link";
 
 function generateCode(): string {
@@ -125,6 +130,26 @@ export default function JoinPage() {
         .eq("code", code.trim().toUpperCase())
         .single();
       if (findError || !league) throw new Error("Invalid league code");
+
+      // Already in league → re-enter (no capacity burn)
+      const { data: existingMem } = await supabase
+        .from("memberships")
+        .select("id")
+        .eq("league_id", league.id)
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (!existingMem) {
+        const { count, error: countErr } = await supabase
+          .from("memberships")
+          .select("id", { count: "exact", head: true })
+          .eq("league_id", league.id);
+        if (countErr) throw countErr;
+        if (isLeagueFull(count ?? 0)) {
+          throw new Error(leagueFullMessage(count ?? MAX_LEAGUE_PLAYERS));
+        }
+      }
+
       const { error: memError } = await supabase.from("memberships").upsert(
         {
           league_id: league.id,
@@ -134,7 +159,12 @@ export default function JoinPage() {
         },
         { onConflict: "league_id,user_id" }
       );
-      if (memError) throw memError;
+      if (memError) {
+        if (/full|max 32|check_violation/i.test(memError.message || "")) {
+          throw new Error(leagueFullMessage());
+        }
+        throw memError;
+      }
       localStorage.setItem(
         "warroom-session",
         JSON.stringify({
@@ -214,6 +244,10 @@ export default function JoinPage() {
             <button onClick={() => setMode("join")} className="w-full py-3 rounded-xl border border-border bg-card font-semibold">
               Join with code
             </button>
+            <p className="text-center text-[11px] text-muted pt-1">
+              Leagues cap at {MAX_LEAGUE_PLAYERS} players so Championship + Toilet
+              Bowl both finish in the CFP weeks.
+            </p>
             <Link href="/login" className="block text-center text-xs text-muted mt-4">Switch account</Link>
           </div>
         )}
@@ -221,6 +255,10 @@ export default function JoinPage() {
         {mode === "create" && (
           <div className="rounded-xl border border-border bg-card p-5 space-y-4">
             <h2 className="font-semibold">Create league</h2>
+            <p className="text-xs text-muted">
+              Up to {MAX_LEAGUE_PLAYERS} players. Top half → Championship, bottom
+              half → Toilet Bowl.
+            </p>
             <input value={leagueName} onChange={(e) => setLeagueName(e.target.value)} placeholder="League name" className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm" />
             <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Your name" className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm" />
             {error && <p className="text-sm text-danger">{error}</p>}
@@ -234,6 +272,10 @@ export default function JoinPage() {
         {mode === "join" && (
           <div className="rounded-xl border border-border bg-card p-5 space-y-4">
             <h2 className="font-semibold">Join league</h2>
+            <p className="text-xs text-muted">
+              If the league already has {MAX_LEAGUE_PLAYERS} players, you&apos;ll
+              need another code or a free seat.
+            </p>
             <input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="CODE" maxLength={6} className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm tracking-widest uppercase" />
             <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Your name" className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm" />
             {error && <p className="text-sm text-danger">{error}</p>}
