@@ -211,12 +211,49 @@ export function cfpWeekForRound(
   return CFP_BRACKET_WEEKS[idx];
 }
 
+function normalizeWeeklyPoints(raw: unknown): number[] {
+  if (Array.isArray(raw)) {
+    return raw.map((x) => {
+      const n = Number(x);
+      return Number.isFinite(n) ? n : 0;
+    });
+  }
+  // Postgres / JSON sometimes returns object map {"0":1,"1":2}
+  if (raw && typeof raw === "object") {
+    const obj = raw as Record<string, unknown>;
+    const keys = Object.keys(obj)
+      .map((k) => parseInt(k, 10))
+      .filter((k) => !Number.isNaN(k));
+    if (!keys.length) return [];
+    const max = Math.max(...keys);
+    const arr = new Array(max + 1).fill(0);
+    for (const k of keys) {
+      const n = Number(obj[String(k)]);
+      arr[k] = Number.isFinite(n) ? n : 0;
+    }
+    return arr;
+  }
+  return [];
+}
+
 function weekPoints(player: Player | null | undefined, week: number): number {
   if (!player) return 0;
-  const w = player.weeklyPoints;
-  if (!Array.isArray(w) || week < 0 || week >= w.length) return 0;
-  const n = Number(w[week]);
-  return Number.isFinite(n) ? n : 0;
+  const w = normalizeWeeklyPoints(player.weeklyPoints);
+  if (week < 0 || week >= w.length) return 0;
+  return w[week] || 0;
+}
+
+/** True if league marked week scored OR anyone has a weekly slot at that index. */
+function weekIsPlayable(
+  week: number,
+  scored: Set<number>,
+  players: Player[]
+): boolean {
+  if (scored.has(week)) return true;
+  return players.some((p) => {
+    const w = normalizeWeeklyPoints(p.weeklyPoints);
+    return w.length > week;
+  });
 }
 
 function cloneBracket(bracket: Bracket): Bracket {
@@ -233,22 +270,39 @@ function cloneBracket(bracket: Bracket): Bracket {
   };
 }
 
-function placeWinnerIntoNext(rounds: Matchup[][], match: Matchup) {
+function playerById(
+  players: Player[],
+  id: string | null | undefined
+): Player | null {
+  if (!id) return null;
+  return players.find((p) => p.id === id) || null;
+}
+
+function placeWinnerIntoNext(
+  rounds: Matchup[][],
+  match: Matchup,
+  players: Player[]
+) {
   if (!match.winnerId) return;
-  const nextRoundIdx = match.round; // round is 1-based; next array index == round number
+  // match.round is 1-based (R1 = 1) → next round array index is match.round
+  const nextRoundIdx = match.round;
   if (nextRoundIdx >= rounds.length) return;
 
-  const nextMatch = rounds[nextRoundIdx][Math.floor(match.position / 2)];
+  const nextMatch = rounds[nextRoundIdx]?.[Math.floor(match.position / 2)];
   if (!nextMatch) return;
 
+  // Prefer canonical player from roster so weeklyPoints stay attached
   const winnerPlayer =
-    match.slotA.player?.id === match.winnerId
+    playerById(players, match.winnerId) ||
+    (match.slotA.player?.id === match.winnerId
       ? match.slotA.player
-      : match.slotB.player;
+      : match.slotB.player);
   const winnerSeed =
     match.slotA.player?.id === match.winnerId
       ? match.slotA.seed
-      : match.slotB.seed;
+      : match.slotB.player?.id === match.winnerId
+        ? match.slotB.seed
+        : null;
   const slot = {
     seed: winnerSeed,
     player: winnerPlayer,
@@ -260,10 +314,11 @@ function placeWinnerIntoNext(rounds: Matchup[][], match: Matchup) {
 
 /**
  * Advance bracket slots using CFP weekly pick'em scores.
- * - Round 1 uses week 15 (or aligned), QF 16, SF 17, Final 18
+ * - Round 1 → week 15, QF → 16, SF → 17, Final → 18 (aligned for smaller fields)
  * - Higher weekly score advances; ties use season tiebreakers
- * - Only resolves a round once that week is in `scoredWeeks`
- * - Byes still auto-advance
+ * - Resolves a round if week is scored OR weekly_points exist for that week
+ * - 0–0 still advances via tiebreakers so the board never stays blank after a scored week
+ * - Byes auto-advance
  */
 export function advanceBracketFromCfpWeeks(
   bracket: Bracket,
@@ -273,8 +328,9 @@ export function advanceBracketFromCfpWeeks(
     scoredWeeks instanceof Set ? scoredWeeks : new Set(scoredWeeks);
   const out = cloneBracket(bracket);
   const totalRounds = out.rounds.length;
+  const roster = out.players;
 
-  // Clear non-R1 slots (except we re-fill from prior winners). Keep R1 as seeded.
+  // Clear non-R1 slots; re-fill from winners as we go
   for (let r = 1; r < totalRounds; r++) {
     for (const m of out.rounds[r]) {
       m.slotA = { seed: null, player: null, isBye: false };
@@ -286,12 +342,33 @@ export function advanceBracketFromCfpWeeks(
     }
   }
 
+  // Re-hydrate R1 player refs from roster (fresh weeklyPoints)
+  for (const m of out.rounds[0] || []) {
+    if (m.slotA.player) {
+      m.slotA.player =
+        playerById(roster, m.slotA.player.id) || m.slotA.player;
+    }
+    if (m.slotB.player) {
+      m.slotB.player =
+        playerById(roster, m.slotB.player.id) || m.slotB.player;
+    }
+  }
+
   for (let r = 0; r < totalRounds; r++) {
     const week = cfpWeekForRound(r, totalRounds);
-    const weekDone = scored.has(week);
+    const playable = weekIsPlayable(week, scored, roster);
 
     for (const m of out.rounds[r]) {
-      // Byes from initial build
+      // Refresh player objects if already filled from prior round
+      if (m.slotA.player) {
+        m.slotA.player =
+          playerById(roster, m.slotA.player.id) || m.slotA.player;
+      }
+      if (m.slotB.player) {
+        m.slotB.player =
+          playerById(roster, m.slotB.player.id) || m.slotB.player;
+      }
+
       if (m.slotA.isBye && m.slotB.player) {
         m.winnerId = m.slotB.player.id;
         m.advanceReason = "bye";
@@ -302,27 +379,19 @@ export function advanceBracketFromCfpWeeks(
         m.advanceReason = "bye";
         m.scoreA = null;
         m.scoreB = null;
-      } else if (m.slotA.player && m.slotB.player && weekDone) {
+      } else if (m.slotA.player && m.slotB.player && playable) {
         const scoreA = weekPoints(m.slotA.player, week);
         const scoreB = weekPoints(m.slotB.player, week);
         const scoredMatch = scoreMatchup(m, scoreA, scoreB);
         m.scoreA = scoredMatch.scoreA;
         m.scoreB = scoredMatch.scoreB;
         m.winnerId = scoredMatch.winnerId;
-        m.advanceReason = scoredMatch.advanceReason;
+        m.advanceReason = scoredMatch.advanceReason || "higher weekly score";
       }
 
       if (m.winnerId) {
-        placeWinnerIntoNext(out.rounds, m);
+        placeWinnerIntoNext(out.rounds, m, roster);
       }
-    }
-
-    // Don't score later rounds until this round's week is done
-    // (next round slots may still fill from byes / prior winners for display)
-    if (!weekDone) {
-      // Still allow bye-only placement already done; stop applying scores further
-      // but continue placing known winners so partial brackets show
-      continue;
     }
   }
 

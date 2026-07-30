@@ -59,15 +59,28 @@ export default function ChampionshipPage() {
       setBracket(advanced);
 
       const totalRounds = advanced.rounds.length;
-      const nextUnscored = [...Array(totalRounds).keys()].find(
-        (r) => !scoredWeeks.includes(cfpWeekForRound(r, totalRounds))
+      const cfpScored = scoredWeeks.filter((w) => w >= 15);
+      const qfFilled = advanced.rounds[1]?.some(
+        (m) => m.slotA.player || m.slotB.player
       );
-      if (nextUnscored == null) {
+      const nextUnscored = [...Array(totalRounds).keys()].find((r) => {
+        const w = cfpWeekForRound(r, totalRounds);
+        return !scoredWeeks.includes(w);
+      });
+      if (nextUnscored == null && qfFilled) {
         setProgressNote("All bracket rounds scored — champion is final.");
-      } else {
+      } else if (!cfpScored.length) {
+        setProgressNote(
+          "Round 1 is seeded from standings. Score CFP weeks 15–18 (or use Commish → finish remaining weeks) to fill Quarterfinals → Final. Higher weekly score advances."
+        );
+      } else if (nextUnscored != null) {
         const w = cfpWeekForRound(nextUnscored, totalRounds);
         setProgressNote(
-          `Next round advances when ${weekTitle(w)} is scored (higher weekly pts wins).`
+          `CFP weeks scored: ${cfpScored.join(", ") || "none"}. Next: score ${weekTitle(w)} to keep advancing.`
+        );
+      } else {
+        setProgressNote(
+          `CFP weeks ${cfpScored.join(", ")} scored — winners should show with weekly points.`
         );
       }
 

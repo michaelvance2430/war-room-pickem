@@ -5,6 +5,31 @@ import { scoreWeek, GameResult } from "@/lib/scoring";
 import { weekTitle } from "@/lib/dates";
 import { MAX_LEAGUE_PLAYERS, seatsRemaining } from "@/lib/league-limits";
 
+/** weekly_points from Postgres may be int[] or a JSON object map. */
+function normalizeWeeklyPointsField(raw: unknown): number[] {
+  if (Array.isArray(raw)) {
+    return raw.map((x) => {
+      const n = Number(x);
+      return Number.isFinite(n) ? n : 0;
+    });
+  }
+  if (raw && typeof raw === "object") {
+    const obj = raw as Record<string, unknown>;
+    const keys = Object.keys(obj)
+      .map((k) => parseInt(k, 10))
+      .filter((k) => !Number.isNaN(k));
+    if (!keys.length) return [];
+    const max = Math.max(...keys);
+    const arr = new Array(max + 1).fill(0);
+    for (const k of keys) {
+      const n = Number(obj[String(k)]);
+      arr[k] = Number.isFinite(n) ? n : 0;
+    }
+    return arr;
+  }
+  return [];
+}
+
 export interface CloudCard {
   weekCardId: string;
   weekNumber: number;
@@ -901,7 +926,7 @@ export async function loadLeagueStandings() {
         name: profile?.display_name || "Player",
         division: (m.division as string) || "North",
         totalPoints: (m.total_points as number) || 0,
-        weeklyPoints: (m.weekly_points as number[]) || [],
+        weeklyPoints: normalizeWeeklyPointsField(m.weekly_points),
         atsCorrect: (m.ats_correct as number) || 0,
         atsTotal: (m.ats_total as number) || 0,
         currentStreak: (m.current_streak as number) || 0,
