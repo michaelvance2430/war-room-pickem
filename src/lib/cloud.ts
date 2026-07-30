@@ -1113,7 +1113,68 @@ export async function seedTrialBotsInCloud(
   };
 }
 
-/** Remove trial bots only — real logged-in players stay. */
+/** Known trial-bot display names (from seed_trial_bots). */
+const TRIAL_BOT_NAMES = new Set(
+  [
+    "DJ Chaos",
+    "Couch QB",
+    "Line Shopper",
+    "Fade Master",
+    "Late Lock",
+    "Sunday Scaries",
+    "Vegas Vic",
+    "Confidence King",
+    "Dog Walker",
+    "Pick Wizard",
+    "Spread Sheet",
+    "Over Under",
+    "Locksmith",
+    "Parlay Pete",
+    "Unit Manager",
+    "Prime Time",
+    "Red Zone Ron",
+    "Blown Cover",
+    "Juice Box",
+    "Steam Chaser",
+    "Home Cooker",
+    "Road Warrior",
+    "Weather Guy",
+    "Injury Report",
+    "Sharp Adjacent",
+    "Public Heat",
+    "Contrarian Cat",
+    "Midweek Mike",
+    "Kickoff Kate",
+    "Prop Queen",
+    "ATS Andy",
+    "Moneyline Max",
+    "Teaser Tina",
+    "Hedge Fund",
+    "Live Bet Larry",
+    "Closing Line",
+    "Opening Line",
+    "Bad Beat Bill",
+    "Lucky Bounce",
+    "No Look Nick",
+    "Deep Dive Dana",
+    "Rivalry Rex",
+    "Division Dom",
+    "Prime Rib",
+    "Noonball",
+    "Late Window",
+    "TNF Terror",
+    "MNF Machine",
+    "Bye Week Bob",
+    "Commissioner Bot",
+  ].map((n) => n.toLowerCase())
+);
+
+/**
+ * Remove trial bots only — real logged-in players stay.
+ * 1) Tries clear_trial_bots RPC if installed
+ * 2) Always falls back to commissioner membership deletes for is_bot + known bot names
+ *    (works even when the RPC was never run / is broken)
+ */
 export async function clearTrialBotsInCloud(): Promise<{
   ok: boolean;
   removed?: number;
@@ -1124,29 +1185,74 @@ export async function clearTrialBotsInCloud(): Promise<{
     return { ok: false, error: "Commissioner only" };
   }
   const supabase = createClient();
-  const { data, error } = await supabase.rpc("clear_trial_bots", {
-    p_league_id: session.leagueId,
-  });
-  if (error) {
-    const msg = error.message || "RPC failed";
-    // Most common: SQL never applied, or old broken function aborted on auth delete
-    if (
-      /function|does not exist|schema cache|permission|PGRST/i.test(msg) ||
-      /clear_trial_bots/i.test(msg)
-    ) {
-      return {
-        ok: false,
-        error:
-          "Clear bots failed in the database. Fix in 30 seconds: Supabase → SQL Editor → paste & Run file supabase/clear-trial-bots-now.sql (wipes all trial bots, keeps real players). Then refresh Players.",
-      };
+  let removed = 0;
+  let rpcNote = "";
+
+  // Preferred path: security-definer wipe (also deletes orphan bot auth users)
+  try {
+    const { data, error } = await supabase.rpc("clear_trial_bots", {
+      p_league_id: session.leagueId,
+    });
+    if (!error && data && (data as { ok?: boolean }).ok !== false) {
+      removed = Math.max(
+        removed,
+        Number((data as { removed?: number }).removed) || 0
+      );
+    } else if (error) {
+      rpcNote = error.message || "";
     }
-    return { ok: false, error: trialBotsSetupHint(msg) };
+  } catch {
+    /* fall through to membership delete */
   }
-  const row = (data || {}) as { ok?: boolean; removed?: number; error?: string };
-  if (row.ok === false) {
-    return { ok: false, error: row.error || "clear_trial_bots returned not ok" };
+
+  // Fallback / second pass: remove anyone still on the roster who looks like a bot
+  const roster = await loadLeagueRoster();
+  const targets = roster.filter(
+    (m) =>
+      m.userId !== session.playerId &&
+      (m.isBot === true || TRIAL_BOT_NAMES.has(m.name.trim().toLowerCase()))
+  );
+
+  const failures: string[] = [];
+  for (const bot of targets) {
+    const { error } = await supabase
+      .from("memberships")
+      .delete()
+      .eq("league_id", session.leagueId)
+      .eq("user_id", bot.userId);
+    if (error) {
+      failures.push(`${bot.name}: ${error.message}`);
+    } else {
+      removed += 1;
+    }
   }
-  return { ok: true, removed: row.removed ?? 0 };
+
+  if (removed === 0 && targets.length === 0 && !rpcNote) {
+    return {
+      ok: true,
+      removed: 0,
+    };
+  }
+
+  if (removed === 0 && failures.length > 0) {
+    return {
+      ok: false,
+      error:
+        "Could not delete bot memberships (permission). Run supabase/clear-trial-bots-now.sql in Supabase SQL Editor, or run supabase/commissioner-remove-member.sql once. " +
+        failures[0],
+    };
+  }
+
+  if (removed === 0 && rpcNote && targets.length === 0) {
+    return {
+      ok: false,
+      error:
+        "No bots found via app, and database clear failed. Run supabase/clear-trial-bots-now.sql in Supabase SQL Editor (pastes wipe all @warroom.trial bots). " +
+        rpcNote,
+    };
+  }
+
+  return { ok: true, removed };
 }
 
 /** Auto-lock valid pick slips for every bot for a published week. */
