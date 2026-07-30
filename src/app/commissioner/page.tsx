@@ -1266,7 +1266,7 @@ export default function CommissionerPage() {
       return;
     }
 
-    // Clear UI state for a clean slate
+    // Clear UI state for a clean slate (including scored-week chips + sandbox banner)
     setPublishedGames([]);
     setSelectedIds(new Set());
     setResults({});
@@ -1277,6 +1277,12 @@ export default function CommissionerPage() {
     setScoreReport(null);
     setSyncReport(null);
     setPickStatus([]);
+    setScoredWeeks([]);
+    setResultsLocked(false);
+    setScoredAtLabel(null);
+    setAutoSeasonReport(null);
+    setAutoSeasonBusy(false);
+    setBotReport(null);
     setActiveWeek(0);
     try {
       localStorage.setItem(ACTIVE_WEEK_KEY, "0");
@@ -1284,12 +1290,22 @@ export default function CommissionerPage() {
       /* ignore */
     }
     await loadWeekState(0);
+    // Confirm cloud really has no scored weeks (drives sandbox "season complete" text)
+    const stillScored = await refreshScoredWeeks();
+    if (stillScored.length > 0) {
+      setSeasonResetReport(
+        `Reset ran but ${stillScored.length} scored week(s) still exist (${stillScored.join(", ")}). ` +
+          "Run supabase/reset-season.sql in Supabase SQL Editor, then reset again."
+      );
+      return;
+    }
 
     const kept = result.membersKept ?? "?";
     const picks = result.picksDeleted ?? 0;
     const cards = result.cardsDeleted ?? 0;
+    const results = result.resultsDeleted ?? 0;
     setSeasonResetReport(
-      `Season reset complete. Kept ${kept} member(s). Removed ${cards} week card(s) and ${picks} pick sheet(s). Scores are zeroed. Ready for Week 0.`
+      `Season reset complete. Kept ${kept} member(s). Removed ${cards} card(s), ${picks} pick sheet(s), ${results} scored week(s). Scores zeroed. Ready for Week 0 — re-add bots, then Run season.`
     );
   }
 

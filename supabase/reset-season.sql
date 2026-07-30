@@ -52,7 +52,7 @@ begin
   update public.memberships
   set
     total_points = 0,
-    weekly_points = '{}',
+    weekly_points = array[]::int[],
     ats_correct = 0,
     ats_total = 0,
     current_streak = 0,

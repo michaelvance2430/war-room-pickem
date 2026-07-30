@@ -1714,8 +1714,109 @@ export type ResetSeasonResult = {
 };
 
 /**
+ * Client-side wipe when RPC is missing or incomplete.
+ * Deletes results/cards/picks and zeroes membership stats.
+ */
+async function resetSeasonClientFallback(
+  leagueId: string
+): Promise<ResetSeasonResult> {
+  const supabase = createClient();
+  let picksDeleted = 0;
+  let cardsDeleted = 0;
+  let resultsDeleted = 0;
+
+  {
+    const { data, error } = await supabase
+      .from("week_results")
+      .delete()
+      .eq("league_id", leagueId)
+      .select("id");
+    if (!error) resultsDeleted = data?.length ?? 0;
+  }
+  {
+    const { data, error } = await supabase
+      .from("picks")
+      .delete()
+      .eq("league_id", leagueId)
+      .select("id");
+    if (!error) picksDeleted = data?.length ?? 0;
+  }
+  {
+    const { data, error } = await supabase
+      .from("week_cards")
+      .delete()
+      .eq("league_id", leagueId)
+      .select("id");
+    if (!error) cardsDeleted = data?.length ?? 0;
+  }
+
+  try {
+    await supabase.from("announcements").delete().eq("league_id", leagueId);
+  } catch {
+    /* optional */
+  }
+  try {
+    await supabase.from("gazette_editions").delete().eq("league_id", leagueId);
+  } catch {
+    /* optional */
+  }
+  try {
+    await supabase.from("crystal_ball_picks").delete().eq("league_id", leagueId);
+  } catch {
+    /* optional */
+  }
+  try {
+    await supabase
+      .from("crystal_ball_result")
+      .delete()
+      .eq("league_id", leagueId);
+  } catch {
+    /* optional */
+  }
+
+  const { data: members, error: memErr } = await supabase
+    .from("memberships")
+    .update({
+      total_points: 0,
+      weekly_points: [],
+      ats_correct: 0,
+      ats_total: 0,
+      current_streak: 0,
+      best_week: 0,
+      worst_week: 0,
+      perfect_weeks: 0,
+      best_bet_hits: 0,
+      best_bet_total: 0,
+      prop_hits: 0,
+      prop_total: 0,
+      weeks_played: 0,
+    })
+    .eq("league_id", leagueId)
+    .select("id");
+
+  if (memErr) {
+    return {
+      ok: false,
+      error:
+        memErr.message ||
+        "Could not zero scores. You may need commissioner RLS / reset-season.sql.",
+    };
+  }
+
+  await supabase.from("leagues").update({ current_week: 0 }).eq("id", leagueId);
+
+  return {
+    ok: true,
+    membersKept: members?.length ?? 0,
+    picksDeleted,
+    cardsDeleted,
+    resultsDeleted,
+  };
+}
+
+/**
  * Wipe season data (picks, cards, results, scores) but KEEP all members.
- * Commissioner only. Requires reset-season.sql RPC in Supabase.
+ * Commissioner only. Prefers reset_league_season RPC; falls back to direct deletes.
  */
 export async function resetSeasonInCloud(): Promise<ResetSeasonResult> {
   const session = getSession();
@@ -1724,29 +1825,72 @@ export async function resetSeasonInCloud(): Promise<ResetSeasonResult> {
   }
 
   const supabase = createClient();
+  const leagueId = session.leagueId;
+  let result: ResetSeasonResult | null = null;
+
   const { data, error } = await supabase.rpc("reset_league_season", {
-    p_league_id: session.leagueId,
+    p_league_id: leagueId,
   });
 
-  if (error) {
+  if (!error) {
+    const row = (data || {}) as {
+      ok?: boolean;
+      membersKept?: number;
+      picksDeleted?: number;
+      cardsDeleted?: number;
+      resultsDeleted?: number;
+    };
+    result = {
+      ok: true,
+      membersKept: row.membersKept,
+      picksDeleted: row.picksDeleted,
+      cardsDeleted: row.cardsDeleted,
+      resultsDeleted: row.resultsDeleted,
+    };
+  } else {
     const msg = error.message || "";
-    if (/function|does not exist|schema cache/i.test(msg)) {
+    // Always try client wipe so a stale/missing RPC can't leave week_results behind
+    result = await resetSeasonClientFallback(leagueId);
+    if (!result.ok && /function|does not exist|schema cache/i.test(msg)) {
       return {
         ok: false,
         error:
-          "Reset function missing. Run supabase/reset-season.sql in the Supabase SQL Editor, then try again.",
+          "Reset function missing and direct wipe failed. Run supabase/reset-season.sql (or gazette-archive.sql) in Supabase, then try again. " +
+          (result.error || msg),
       };
     }
-    return { ok: false, error: msg || "Failed to reset season" };
+    if (!result.ok) {
+      return { ok: false, error: result.error || msg || "Failed to reset season" };
+    }
   }
 
-  const row = (data || {}) as {
-    ok?: boolean;
-    membersKept?: number;
-    picksDeleted?: number;
-    cardsDeleted?: number;
-    resultsDeleted?: number;
-  };
+  // Belt-and-suspenders: if RPC "succeeded" but results remain, force-delete them
+  try {
+    const leftover = await listScoredWeekNumbers();
+    if (leftover.length > 0) {
+      const wipe = await resetSeasonClientFallback(leagueId);
+      if (wipe.ok) {
+        result = {
+          ...result,
+          resultsDeleted: Math.max(
+            result.resultsDeleted || 0,
+            wipe.resultsDeleted || 0
+          ),
+          picksDeleted: Math.max(
+            result.picksDeleted || 0,
+            wipe.picksDeleted || 0
+          ),
+          cardsDeleted: Math.max(
+            result.cardsDeleted || 0,
+            wipe.cardsDeleted || 0
+          ),
+          membersKept: wipe.membersKept ?? result.membersKept,
+        };
+      }
+    }
+  } catch {
+    /* ignore */
+  }
 
   // Clear local week caches so this device matches cloud
   try {
@@ -1756,7 +1900,6 @@ export async function resetSeasonInCloud(): Promise<ResetSeasonResult> {
       localStorage.removeItem(`warroom-picks-week-${w}`);
     }
     localStorage.setItem("warroom-active-week", "0");
-    // Drop gazette "seen" flags for this league so next score feels fresh
     const prefix = "warroom-gazette-seen-v1:";
     for (let i = localStorage.length - 1; i >= 0; i--) {
       const k = localStorage.key(i);
@@ -1766,11 +1909,5 @@ export async function resetSeasonInCloud(): Promise<ResetSeasonResult> {
     /* ignore */
   }
 
-  return {
-    ok: true,
-    membersKept: row.membersKept,
-    picksDeleted: row.picksDeleted,
-    cardsDeleted: row.cardsDeleted,
-    resultsDeleted: row.resultsDeleted,
-  };
+  return result;
 }
