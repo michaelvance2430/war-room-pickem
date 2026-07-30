@@ -33,6 +33,7 @@ import {
   seedTrialBotsInCloud,
   clearTrialBotsInCloud,
   seedBotPicksForWeekInCloud,
+  fillLeagueWithBotsToCap,
   listScoredWeekNumbers,
   loadWeekResultsFromCloud,
   loadLeagueRoster,
@@ -62,6 +63,7 @@ import {
   propFromPreset,
   matchPresetId,
 } from "@/lib/prop-presets";
+import { MAX_LEAGUE_PLAYERS } from "@/lib/league-limits";
 
 const ACTIVE_WEEK_KEY = "warroom-active-week";
 
@@ -652,30 +654,58 @@ export default function CommissionerPage() {
     }
   }
 
-  async function handleSeedBots() {
-    setBotReport(null);
-    setBotBusy(true);
-    const res = await seedTrialBotsInCloud(32);
-    if (!res.ok) {
-      setBotBusy(false);
-      setBotReport(res.error || "Failed to add bots");
+  /** Fill empty seats with bots up to 32 + auto-lock picks if card is live. */
+  async function handleFillLeagueWithBots() {
+    if (
+      !confirm(
+        "Fill empty seats with bots up to 32?\n\n" +
+          "• Real players stay\n" +
+          "• Bots get persona-based auto picks when a week is published\n" +
+          "• Use in sandbox or to pad a small league — remove anytime with Clear bots"
+      )
+    ) {
       return;
     }
-    // If a card is already up for this week, fill their picks now
-    let pickNote = "";
-    if (publishedGames.length === 5) {
-      const fill = await seedBotPicksForWeekInCloud(activeWeek);
-      if (fill.ok) {
-        pickNote = ` · ${fill.botsFilled ?? 0} bot slip(s) for ${weekTitle(activeWeek)}`;
-        void refreshPickStatus(activeWeek);
-      }
-    }
-    setBotBusy(false);
-    setBotReport(
-      res.added === 0
-        ? `League at capacity or no seats left (32 max). Bots in league: ${res.totalBots ?? 0}.${pickNote}`
-        : `Added ${res.added} trial bots (${res.totalBots} total bots). Fills toward the 32-player league cap.${pickNote || " Publish a week card (or hit Fill bot picks) so they lock slips."}`
+    setBotReport(null);
+    setBotBusy(true);
+    const hasCard = publishedGames.length > 0;
+    const res = await fillLeagueWithBotsToCap(
+      hasCard ? { weekNumber: activeWeek } : undefined
     );
+    setBotBusy(false);
+    if (!res.ok) {
+      setBotReport(res.error || "Failed to fill with bots");
+      return;
+    }
+    if ((res.added ?? 0) === 0 && (res.botsFilled ?? 0) === 0) {
+      setBotReport(
+        `Already at capacity or no bots needed (32 max). Bots in league: ${res.totalBots ?? 0}.`
+      );
+      return;
+    }
+    void refreshPickStatus(activeWeek);
+    const parts: string[] = [];
+    if ((res.added ?? 0) > 0) {
+      parts.push(
+        `Added ${res.added} bot(s) (${res.totalBots} bots total · filled empty seats toward 32)`
+      );
+    } else {
+      parts.push(`No new bots (${res.totalBots ?? 0} already in league)`);
+    }
+    if ((res.botsFilled ?? 0) > 0) {
+      parts.push(
+        `locked ${res.botsFilled} bot slip(s) for ${weekTitle(activeWeek)}`
+      );
+    } else if (!hasCard) {
+      parts.push(
+        "publish a week card next — bots auto-pick on publish (or use Fill bot picks)"
+      );
+    }
+    setBotReport(parts.join(" · ") + ".");
+  }
+
+  async function handleSeedBots() {
+    void handleFillLeagueWithBots();
   }
 
   async function handleFillBotPicks() {
@@ -1290,24 +1320,52 @@ export default function CommissionerPage() {
             </div>
 
             <div className="rounded-xl border border-primary/40 bg-primary/5 p-5 space-y-3">
-              <h2 className="font-semibold text-primary">Trial bots (dry run)</h2>
+              <h2 className="font-semibold text-primary">
+                Pad league with bots (to 32)
+              </h2>
               <p className="text-xs text-muted leading-relaxed">
-                Fill empty seats with fake players (league cap{" "}
-                <strong className="text-foreground">32</strong> — same as public
-                max). They auto-lock picks when you publish a week. Use this in a{" "}
-                <strong className="text-foreground">sandbox league</strong> to
-                simulate a full season.{" "}
-                <strong className="text-foreground">Clear bots</strong> removes
-                only trial bots — real people stay.
+                Optional. Fills{" "}
+                <strong className="text-foreground">empty seats only</strong> up
+                to the {MAX_LEAGUE_PLAYERS}-player cap. Real humans stay;
+                bots never block a real join until the room is full. Great for
+                sandbox testing or padding a small group so brackets feel full.
               </p>
+              <div className="rounded-lg border border-border/60 bg-background/50 px-3 py-2 text-[11px] text-muted leading-relaxed space-y-1">
+                <p className="text-foreground font-medium text-xs">
+                  How bots pick (coded guidance)
+                </p>
+                <ul className="list-disc pl-4 space-y-0.5">
+                  <li>
+                    Valid slip every week: all games, confidence 1–N, one Best
+                    Bet, one prop
+                  </li>
+                  <li>
+                    <span className="text-foreground">Chalk</span> personas
+                    (Public Heat, Locksmith…) lean favorites
+                  </li>
+                  <li>
+                    <span className="text-foreground">Dog / Fade</span> personas
+                    lean underdogs
+                  </li>
+                  <li>
+                    <span className="text-foreground">Sharp / Closing</span> mix
+                    with a slight dog lean on big spreads
+                  </li>
+                  <li>Everyone else ~58% favorite — noisy public money</li>
+                  <li>
+                    Auto-lock on <strong className="text-foreground">Publish</strong>{" "}
+                    week card (or use Fill bot picks)
+                  </li>
+                </ul>
+              </div>
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
                   disabled={botBusy}
-                  onClick={() => void handleSeedBots()}
+                  onClick={() => void handleFillLeagueWithBots()}
                   className="px-4 py-2 rounded-lg bg-primary text-black text-sm font-semibold disabled:opacity-50"
                 >
-                  {botBusy ? "Working…" : "Fill trial bots (up to 32)"}
+                  {botBusy ? "Working…" : "Fill empty seats with bots (to 32)"}
                 </button>
                 <button
                   type="button"
@@ -1327,9 +1385,13 @@ export default function CommissionerPage() {
                 </button>
               </div>
               <p className="text-[11px] text-muted">
-                One-time setup: run{" "}
-                <code className="text-foreground">supabase/trial-bots.sql</code>{" "}
-                in Supabase SQL Editor if buttons error about a missing function.
+                Setup once if buttons fail:{" "}
+                <code className="text-foreground">supabase/trial-bots.sql</code>
+                , then optional{" "}
+                <code className="text-foreground">supabase/bot-picks-smarter.sql</code>{" "}
+                for persona-based leans. Also run{" "}
+                <code className="text-foreground">supabase/league-capacity-32.sql</code>{" "}
+                so bots can&apos;t exceed 32.
               </p>
               {botReport && (
                 <p

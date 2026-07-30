@@ -1135,6 +1135,52 @@ export async function seedTrialBotsInCloud(
   };
 }
 
+/**
+ * One-click: fill empty seats with bots up to 32, then lock bot picks
+ * for the given week if a card is published.
+ */
+export async function fillLeagueWithBotsToCap(opts?: {
+  weekNumber?: number;
+}): Promise<{
+  ok: boolean;
+  added?: number;
+  totalBots?: number;
+  botsFilled?: number;
+  seatsBefore?: number;
+  error?: string;
+}> {
+  const session = getSession();
+  if (!session?.leagueId || !session.isCommissioner) {
+    return { ok: false, error: "Commissioner only" };
+  }
+  const roster = await loadLeagueRoster();
+  const seatsBefore = seatsRemaining(roster.length);
+  const seed = await seedTrialBotsInCloud(seatsBefore || MAX_LEAGUE_PLAYERS);
+  if (!seed.ok) {
+    return { ok: false, error: seed.error || "Failed to add bots" };
+  }
+
+  let botsFilled = 0;
+  if (opts?.weekNumber != null) {
+    const card = await loadWeekCard(opts.weekNumber);
+    if (card && card.games.length > 0) {
+      const fill = await seedBotPicksForWeekInCloud(opts.weekNumber);
+      if (fill.ok) botsFilled = fill.botsFilled ?? 0;
+      else if (seed.added === 0 && (seed.totalBots ?? 0) === 0) {
+        return { ok: false, error: fill.error || "No bots to fill picks" };
+      }
+    }
+  }
+
+  return {
+    ok: true,
+    added: seed.added ?? 0,
+    totalBots: seed.totalBots ?? 0,
+    botsFilled,
+    seatsBefore,
+  };
+}
+
 /** Known trial-bot display names (from seed_trial_bots). */
 const TRIAL_BOT_NAMES = new Set(
   [
