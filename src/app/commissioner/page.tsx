@@ -73,6 +73,13 @@ import {
   DEFAULT_HOME_TAGLINE_ID,
   resolveHomeTagline,
 } from "@/lib/home-tagline";
+import {
+  SEASON_THEME_PRESETS,
+  DEFAULT_SEASON_THEME_ID,
+  applySeasonTheme,
+  resolveSeasonThemeId,
+  type SeasonThemeId,
+} from "@/lib/season-theme";
 
 const ACTIVE_WEEK_KEY = "warroom-active-week";
 
@@ -127,6 +134,9 @@ export default function CommissionerPage() {
   const [crystalBallEnabled, setCrystalBallEnabled] = useState(true);
   const [homeTaglineId, setHomeTaglineId] = useState(DEFAULT_HOME_TAGLINE_ID);
   const [homeTaglineCustom, setHomeTaglineCustom] = useState("");
+  const [seasonThemeId, setSeasonThemeId] = useState<SeasonThemeId>(
+    DEFAULT_SEASON_THEME_ID
+  );
   /** CFB week number: 0 = openers … 18 = CFP Final (fixed length). */
   const [activeWeek, setActiveWeek] = useState(1);
   const [settingsSaved, setSettingsSaved] = useState(false);
@@ -216,6 +226,10 @@ export default function CommissionerPage() {
           lg.settings?.homeTaglineId || DEFAULT_HOME_TAGLINE_ID
         );
         setHomeTaglineCustom(lg.settings?.homeTaglineCustom || "");
+        setSeasonThemeId(
+          resolveSeasonThemeId(lg.settings?.seasonThemeId)
+        );
+        applySeasonTheme(lg.settings?.seasonThemeId);
       }
       let week = 1;
       try {
@@ -1071,11 +1085,13 @@ export default function CommissionerPage() {
         crystalBallEnabled,
         homeTaglineId,
         homeTaglineCustom: homeTaglineCustom.slice(0, HOME_TAGLINE_MAX_CHARS),
+        seasonThemeId,
         // Season length is fixed at SEASON_MAX_WEEK in the app (not saved to DB)
       },
     });
     if (result.ok && result.league) {
       setLeague(result.league);
+      applySeasonTheme(result.league.settings?.seasonThemeId || seasonThemeId);
       setSettingsSaved(true);
       setSettingsError(null);
       setTimeout(() => setSettingsSaved(false), 1500);
@@ -1519,6 +1535,44 @@ export default function CommissionerPage() {
                 </button>
                 <p className="w-full text-xs font-medium text-muted">
                   {crystalBallEnabled ? "On — tab visible" : "Off — tab hidden"}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-border bg-background p-4 space-y-3">
+                <div>
+                  <p className="text-sm font-semibold text-foreground">
+                    Season background
+                  </p>
+                  <p className="text-xs text-muted mt-1 leading-relaxed">
+                    Football runs through the holidays — paint the whole league
+                    for Halloween, Thanksgiving, Christmas, or New Year. Everyone
+                    sees it after you save.
+                  </p>
+                </div>
+                <label className="block text-xs text-muted">
+                  Theme
+                  <select
+                    value={seasonThemeId}
+                    onChange={(e) => {
+                      const id = resolveSeasonThemeId(e.target.value);
+                      setSeasonThemeId(id);
+                      applySeasonTheme(id);
+                    }}
+                    className="mt-1 w-full bg-card border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                  >
+                    {SEASON_THEME_PRESETS.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <p className="text-[11px] text-muted leading-relaxed">
+                  {SEASON_THEME_PRESETS.find((p) => p.id === seasonThemeId)
+                    ?.blurb || ""}{" "}
+                  Preview applies immediately; hit{" "}
+                  <strong className="text-foreground">Save settings</strong> so
+                  the rest of the league gets it.
                 </p>
               </div>
 

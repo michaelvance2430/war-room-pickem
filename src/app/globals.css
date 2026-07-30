@@ -31,8 +31,11 @@
 body {
   background: var(--background);
   color: var(--foreground);
+  min-height: 100%;
+  background-attachment: fixed;
 }
 
+/* Subtle scanline overlay (all themes) */
 body::after {
   content: "";
   position: fixed;
@@ -41,6 +44,147 @@ body::after {
   z-index: 9998;
   background: repeating-linear-gradient(to bottom, transparent 0px, transparent 2px, rgba(0,0,0,0.12) 2px, rgba(0,0,0,0.12) 3px);
   opacity: 0.45;
+}
+
+/* Optional holiday atmosphere layer */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0;
+}
+
+/* ---------- Season / holiday themes (commissioner) ---------- */
+
+html[data-season-theme="halloween"] {
+  --background: #0c0610;
+  --foreground: #f5efe8;
+  --card: #1a1020;
+  --card-hover: #251628;
+  --border: #3d2648;
+  --primary: #f97316;
+  --primary-dim: #ea580c;
+  --danger: #ef4444;
+  --warning: #fbbf24;
+  --muted: #b8a0c0;
+  --toilet: #a855f7;
+}
+html[data-season-theme="halloween"] body {
+  background:
+    radial-gradient(ellipse 90% 60% at 10% 0%, rgba(249, 115, 22, 0.22), transparent 55%),
+    radial-gradient(ellipse 70% 50% at 90% 100%, rgba(168, 85, 247, 0.18), transparent 50%),
+    radial-gradient(circle at 50% 120%, rgba(34, 0, 20, 0.9), transparent 40%),
+    var(--background);
+}
+html[data-season-theme="halloween"] body::before {
+  opacity: 1;
+  background-image:
+    radial-gradient(1.5px 1.5px at 12% 18%, rgba(249, 115, 22, 0.55), transparent),
+    radial-gradient(1.5px 1.5px at 72% 28%, rgba(251, 191, 36, 0.4), transparent),
+    radial-gradient(1.5px 1.5px at 40% 70%, rgba(168, 85, 247, 0.45), transparent),
+    radial-gradient(1.5px 1.5px at 88% 62%, rgba(249, 115, 22, 0.35), transparent),
+    radial-gradient(1.5px 1.5px at 22% 88%, rgba(251, 191, 36, 0.3), transparent);
+  background-size: 100% 100%;
+}
+
+html[data-season-theme="thanksgiving"] {
+  --background: #100a06;
+  --foreground: #faf3e8;
+  --card: #1c140e;
+  --card-hover: #261b12;
+  --border: #4a3420;
+  --primary: #d97706;
+  --primary-dim: #b45309;
+  --danger: #dc2626;
+  --warning: #f59e0b;
+  --muted: #c4a882;
+  --toilet: #a855f7;
+}
+html[data-season-theme="thanksgiving"] body {
+  background:
+    radial-gradient(ellipse 80% 55% at 50% -10%, rgba(217, 119, 6, 0.28), transparent 55%),
+    radial-gradient(ellipse 60% 45% at 0% 80%, rgba(153, 27, 27, 0.15), transparent 50%),
+    radial-gradient(ellipse 50% 40% at 100% 60%, rgba(120, 53, 15, 0.25), transparent 45%),
+    var(--background);
+}
+html[data-season-theme="thanksgiving"] body::before {
+  opacity: 1;
+  background:
+    linear-gradient(180deg, transparent 0%, rgba(120, 53, 15, 0.08) 100%);
+}
+
+html[data-season-theme="christmas"] {
+  --background: #060d0a;
+  --foreground: #f0f7f2;
+  --card: #0f1a14;
+  --card-hover: #15241c;
+  --border: #1e3d2c;
+  --primary: #22c55e;
+  --primary-dim: #16a34a;
+  --danger: #dc2626;
+  --warning: #eab308;
+  --muted: #8fad9a;
+  --toilet: #a855f7;
+}
+html[data-season-theme="christmas"] body {
+  background:
+    radial-gradient(ellipse 70% 50% at 15% 10%, rgba(220, 38, 38, 0.16), transparent 50%),
+    radial-gradient(ellipse 70% 50% at 85% 15%, rgba(34, 197, 94, 0.18), transparent 50%),
+    radial-gradient(ellipse 90% 40% at 50% 100%, rgba(234, 179, 8, 0.1), transparent 45%),
+    var(--background);
+}
+html[data-season-theme="christmas"] body::before {
+  opacity: 1;
+  background-image:
+    radial-gradient(1.5px 1.5px at 8% 12%, rgba(255, 255, 255, 0.55), transparent),
+    radial-gradient(1.5px 1.5px at 28% 40%, rgba(255, 255, 255, 0.35), transparent),
+    radial-gradient(1.5px 1.5px at 55% 18%, rgba(255, 255, 255, 0.45), transparent),
+    radial-gradient(1.5px 1.5px at 78% 55%, rgba(255, 255, 255, 0.3), transparent),
+    radial-gradient(1.5px 1.5px at 92% 22%, rgba(255, 255, 255, 0.5), transparent),
+    radial-gradient(1.5px 1.5px at 42% 78%, rgba(255, 255, 255, 0.28), transparent),
+    radial-gradient(1.5px 1.5px at 65% 88%, rgba(255, 255, 255, 0.4), transparent);
+  background-size: 100% 100%;
+}
+
+html[data-season-theme="newyear"] {
+  --background: #05060f;
+  --foreground: #f4f4ff;
+  --card: #0e1020;
+  --card-hover: #161a2e;
+  --border: #2a3050;
+  --primary: #eab308;
+  --primary-dim: #ca8a04;
+  --danger: #f43f5e;
+  --warning: #fbbf24;
+  --muted: #9ca3c7;
+  --toilet: #a855f7;
+}
+html[data-season-theme="newyear"] body {
+  background:
+    radial-gradient(ellipse 60% 45% at 50% 0%, rgba(234, 179, 8, 0.2), transparent 55%),
+    radial-gradient(ellipse 50% 40% at 0% 100%, rgba(99, 102, 241, 0.2), transparent 50%),
+    radial-gradient(ellipse 50% 40% at 100% 80%, rgba(236, 72, 153, 0.12), transparent 45%),
+    var(--background);
+}
+html[data-season-theme="newyear"] body::before {
+  opacity: 1;
+  background-image:
+    radial-gradient(1.5px 1.5px at 10% 20%, rgba(255, 255, 255, 0.7), transparent),
+    radial-gradient(1.5px 1.5px at 30% 60%, rgba(234, 179, 8, 0.6), transparent),
+    radial-gradient(1.5px 1.5px at 50% 15%, rgba(255, 255, 255, 0.5), transparent),
+    radial-gradient(1.5px 1.5px at 70% 45%, rgba(196, 181, 253, 0.55), transparent),
+    radial-gradient(1.5px 1.5px at 85% 75%, rgba(234, 179, 8, 0.45), transparent),
+    radial-gradient(1.5px 1.5px at 18% 85%, rgba(255, 255, 255, 0.4), transparent),
+    radial-gradient(1.5px 1.5px at 95% 30%, rgba(255, 255, 255, 0.65), transparent);
+  background-size: 100% 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-season-theme] body {
+    background-attachment: scroll;
+  }
 }
 
 /* Hot take ticker — seamless horizontal scroll */

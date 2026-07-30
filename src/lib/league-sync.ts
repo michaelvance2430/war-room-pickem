@@ -26,11 +26,13 @@ function toLocalLeague(row: {
   crystal_ball_enabled?: boolean | null;
   home_tagline_id?: string | null;
   home_tagline_custom?: string | null;
+  season_theme_id?: string | null;
 }): League {
   // Prefer cloud flag; if column missing from select, keep prior local value
   let crystalBallEnabled = true;
   let homeTaglineId = "good-teams";
   let homeTaglineCustom = "";
+  let seasonThemeId = "default";
   if (typeof row.crystal_ball_enabled === "boolean") {
     crystalBallEnabled = row.crystal_ball_enabled;
   } else if (canUseStorage()) {
@@ -47,6 +49,9 @@ function toLocalLeague(row: {
       if (typeof prev?.settings?.homeTaglineCustom === "string") {
         homeTaglineCustom = prev.settings.homeTaglineCustom;
       }
+      if (prev?.settings?.seasonThemeId) {
+        seasonThemeId = prev.settings.seasonThemeId;
+      }
     } catch {
       /* default true */
     }
@@ -57,6 +62,20 @@ function toLocalLeague(row: {
   }
   if (typeof row.home_tagline_custom === "string") {
     homeTaglineCustom = row.home_tagline_custom;
+  }
+  if (typeof row.season_theme_id === "string" && row.season_theme_id) {
+    seasonThemeId = row.season_theme_id;
+  } else if (canUseStorage() && !row.season_theme_id) {
+    try {
+      const prev = JSON.parse(
+        localStorage.getItem(LEAGUE_KEY) || "null"
+      ) as League | null;
+      if (prev?.settings?.seasonThemeId) {
+        seasonThemeId = prev.settings.seasonThemeId;
+      }
+    } catch {
+      /* keep default */
+    }
   }
 
   return {
@@ -73,6 +92,7 @@ function toLocalLeague(row: {
       crystalBallEnabled,
       homeTaglineId,
       homeTaglineCustom,
+      seasonThemeId,
     },
   };
 }
@@ -135,6 +155,8 @@ export async function saveLeagueToCloud(opts: {
     patch.home_tagline_id = opts.settings.homeTaglineId;
   if (opts.settings?.homeTaglineCustom !== undefined)
     patch.home_tagline_custom = opts.settings.homeTaglineCustom;
+  if (opts.settings?.seasonThemeId !== undefined)
+    patch.season_theme_id = opts.settings.seasonThemeId;
 
   let { data, error } = await supabase
     .from("leagues")
@@ -148,12 +170,14 @@ export async function saveLeagueToCloud(opts: {
     error &&
     (error.message.includes("crystal_ball_enabled") ||
       error.message.includes("home_tagline") ||
+      error.message.includes("season_theme") ||
       error.message.includes("schema cache") ||
       error.code === "PGRST204")
   ) {
     delete patch.crystal_ball_enabled;
     delete patch.home_tagline_id;
     delete patch.home_tagline_custom;
+    delete patch.season_theme_id;
     const retry = await supabase
       .from("leagues")
       .update(patch)
@@ -178,6 +202,9 @@ export async function saveLeagueToCloud(opts: {
   }
   if (opts.settings?.homeTaglineCustom !== undefined) {
     league.settings.homeTaglineCustom = opts.settings.homeTaglineCustom;
+  }
+  if (opts.settings?.seasonThemeId !== undefined) {
+    league.settings.seasonThemeId = opts.settings.seasonThemeId;
   }
   if (canUseStorage()) {
     localStorage.setItem(LEAGUE_KEY, JSON.stringify(league));

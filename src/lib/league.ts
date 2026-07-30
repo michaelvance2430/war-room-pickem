@@ -14,6 +14,8 @@ export interface LeagueSettings {
   homeTaglineId: string;
   /** Used when homeTaglineId === "custom". */
   homeTaglineCustom: string;
+  /** Holiday / season background for the whole league (see season-theme.ts). */
+  seasonThemeId: string;
 }
 
 export interface League {
@@ -44,6 +46,7 @@ const DEFAULT_SETTINGS: LeagueSettings = {
   crystalBallEnabled: true,
   homeTaglineId: "good-teams",
   homeTaglineCustom: "",
+  seasonThemeId: "default",
 };
 
 function canUseStorage() {
