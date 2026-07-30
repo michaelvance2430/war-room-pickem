@@ -316,6 +316,21 @@ export default function Home() {
             </p>
           </Link>
 
+          <Link
+            href="/locker-room"
+            className="group rounded-xl border border-orange-400/30 bg-black/40 backdrop-blur-sm p-6 hover:border-orange-300/60 hover:bg-orange-500/10 transition shadow-[0_0_40px_rgba(249,115,22,0.08)]"
+          >
+            <div className="text-xs uppercase tracking-wider text-orange-300/70 mb-2">
+              Noise
+            </div>
+            <div className="text-lg font-semibold text-orange-300">
+              Locker Room
+            </div>
+            <p className="text-sm text-muted mt-2">
+              Short takes · emojis · pure shit talk
+            </p>
+          </Link>
+
           {isCommish && (
             <Link
               href="/commissioner"

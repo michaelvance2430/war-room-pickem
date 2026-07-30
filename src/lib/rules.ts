@@ -106,6 +106,14 @@ export const RULE_SECTIONS: RuleSection[] = [
     ],
   },
   {
+    title: "Locker Room",
+    body: [
+      "Optional league chat for short trash talk (280 characters max).",
+      "Tap football emojis, post takes, delete your own. Commissioner can delete any message.",
+      "Not for official rules — use Announcements for that.",
+    ],
+  },
+  {
     title: "League size",
     body: [
       "Leagues cap at 32 players.",
