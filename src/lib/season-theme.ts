@@ -35,7 +35,7 @@ export const SEASON_THEME_PRESETS: SeasonThemePreset[] = [
   {
     id: "christmas",
     label: "Christmas 🎄",
-    blurb: "Evergreen & gold — bowl season cheer.",
+    blurb: "Evergreen, gold, and twinkling lights — bowl season cheer.",
   },
   {
     id: "newyear",
@@ -57,6 +57,8 @@ export function resolveSeasonThemeId(
   return isSeasonThemeId(raw) ? raw : DEFAULT_SEASON_THEME_ID;
 }
 
+export const SEASON_THEME_EVENT = "warroom-season-theme";
+
 /** Apply theme on <html> so CSS variables hit the whole app. */
 export function applySeasonTheme(id: string | null | undefined) {
   if (typeof document === "undefined") return;
@@ -66,5 +68,12 @@ export function applySeasonTheme(id: string | null | undefined) {
     root.removeAttribute("data-season-theme");
   } else {
     root.setAttribute("data-season-theme", theme);
+  }
+  try {
+    window.dispatchEvent(
+      new CustomEvent(SEASON_THEME_EVENT, { detail: theme })
+    );
+  } catch {
+    /* ignore */
   }
 }
