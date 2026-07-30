@@ -32,6 +32,7 @@ export default function PlayersPage() {
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [removingId, setRemovingId] = useState<string | null>(null);
 
   async function reload() {
     setError(null);
@@ -67,7 +68,6 @@ export default function PlayersPage() {
     if (!isCommish || busy) return;
     setBusy(true);
     setError(null);
-    // Optimistic UI
     setPlayers((prev) =>
       prev.map((p) => (p.userId === userId ? { ...p, division } : p))
     );
@@ -81,24 +81,44 @@ export default function PlayersPage() {
     setBusy(false);
   }
 
-  async function removePlayer(userId: string) {
+  async function removeMember(
+    member: LeagueRosterMember,
+    opts?: { fromBotList?: boolean }
+  ) {
     if (!isCommish || busy) return;
-    if (!confirm("Remove this player from the league?")) return;
+    const isBot = !!member.isBot;
+    const msg = isBot
+      ? `Remove bot "${member.name}"?\n\nFrees 1 seat so a friend can join (league cap ${MAX_LEAGUE_PLAYERS}).`
+      : `Remove "${member.name}" from the league?\n\nThey can rejoin later with the code if a seat is open.`;
+    if (!confirm(msg)) return;
+
     setBusy(true);
+    setRemovingId(member.userId);
     setError(null);
-    const result = await removeLeagueMember(userId);
+    // Optimistic
+    setPlayers((prev) => prev.filter((p) => p.userId !== member.userId));
+    const result = await removeLeagueMember(member.userId);
     if (!result.ok) {
-      setError(result.error || "Failed to remove player");
+      setError(result.error || "Failed to remove");
+      await reload();
     } else {
       flashSaved();
-      await reload();
+      if (opts?.fromBotList || isBot) {
+        // keep list in sync after seat free
+        await reload();
+      }
     }
+    setRemovingId(null);
     setBusy(false);
   }
 
   async function handleAutoBalance() {
     if (!isCommish || busy) return;
-    if (!confirm("Reassign all players evenly across North / South / East / West?")) {
+    if (
+      !confirm(
+        "Reassign all players evenly across North / South / East / West?"
+      )
+    ) {
       return;
     }
     setBusy(true);
@@ -120,13 +140,23 @@ export default function PlayersPage() {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      // ignore
+      /* ignore */
     }
   }
 
+  const bots = players.filter((p) => p.isBot);
+  const humans = players.filter((p) => !p.isBot);
+  const openSeats = seatsRemaining(players.length);
+
   const byDivision = DIVISIONS.map((d) => ({
     division: d,
-    list: players.filter((p) => p.division === d),
+    list: players
+      .filter((p) => p.division === d)
+      .sort((a, b) => {
+        // Humans first, then bots; alpha within
+        if (!!a.isBot !== !!b.isBot) return a.isBot ? 1 : -1;
+        return a.name.localeCompare(b.name);
+      }),
   }));
 
   return (
@@ -140,11 +170,7 @@ export default function PlayersPage() {
             <p className="text-sm text-muted">
               {loading
                 ? "Loading…"
-                : (() => {
-                    const bots = players.filter((p) => p.isBot).length;
-                    const humans = players.length - bots;
-                    return `${capacityLabel(players.length)} · ${humans} real · ${bots} trial bot${bots === 1 ? "" : "s"} · ${seatsRemaining(players.length)} open`;
-                  })()}
+                : `${capacityLabel(players.length)} · ${humans.length} real · ${bots.length} bot${bots.length === 1 ? "" : "s"} · ${openSeats} open`}
               {leagueName ? ` • ${leagueName}` : ""}
             </p>
           </div>
@@ -160,15 +186,15 @@ export default function PlayersPage() {
         <div className="rounded-xl border border-border bg-card p-5 mb-6">
           <h2 className="font-semibold mb-1">Invite players</h2>
           <p className="text-sm text-muted mb-3">
-            Friends create an account, then join with this league code. Cap is{" "}
-            {MAX_LEAGUE_PLAYERS} so Championship + Toilet Bowl both finish in
-            CFP weeks. Trial bots (if seeded) show a{" "}
-            <strong className="text-foreground">Trial</strong> tag.
+            Friends join with this code. Cap is {MAX_LEAGUE_PLAYERS}. If the
+            league is full of bots, remove specific bots below to free seats.
           </p>
           {!loading && isLeagueFull(players.length) && (
             <p className="text-xs text-warning mb-3 border border-warning/30 rounded-lg px-3 py-2 bg-warning/10">
-              League full ({MAX_LEAGUE_PLAYERS}/{MAX_LEAGUE_PLAYERS}). New joins
-              are blocked — remove a player or start a second league.
+              League full ({MAX_LEAGUE_PLAYERS}/{MAX_LEAGUE_PLAYERS}).
+              {bots.length > 0
+                ? " Remove a bot below to free a seat for a friend."
+                : " Remove a player or start a second league."}
             </p>
           )}
           <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
@@ -186,6 +212,60 @@ export default function PlayersPage() {
           </div>
         </div>
 
+        {/* Commissioner: kick bots one-by-one to free seats */}
+        {isCommish && !loading && bots.length > 0 && (
+          <div className="rounded-xl border border-primary/30 bg-primary/5 p-5 mb-6">
+            <div className="flex flex-wrap items-start justify-between gap-2 mb-2">
+              <div>
+                <h2 className="font-semibold text-primary">
+                  Bots — free a seat for a friend
+                </h2>
+                <p className="text-xs text-muted mt-1 max-w-xl">
+                  Tap <strong className="text-foreground">Remove bot</strong> on
+                  anyone you don&apos;t need. That opens 1 of {MAX_LEAGUE_PLAYERS}{" "}
+                  seats. Friend joins with the code. Real players are listed in
+                  divisions below — only bots appear here.
+                </p>
+              </div>
+              <span className="text-xs text-muted shrink-0">
+                {bots.length} bot{bots.length === 1 ? "" : "s"} · {openSeats} open
+              </span>
+            </div>
+            <ul className="divide-y divide-border/80 rounded-lg border border-border bg-card overflow-hidden">
+              {bots
+                .slice()
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map((b) => (
+                  <li
+                    key={b.userId}
+                    className="flex items-center gap-3 px-3 py-2.5"
+                  >
+                    <Avatar name={b.name} avatarUrl={b.avatarUrl} size="sm" />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium truncate">
+                        {b.name}
+                        <span className="ml-2 text-[10px] uppercase text-muted border border-border px-1 rounded">
+                          Bot
+                        </span>
+                      </div>
+                      <div className="text-xs text-muted">
+                        {b.division} · {b.totalPoints} pts
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void removeMember(b, { fromBotList: true })}
+                      className="shrink-0 text-xs px-3 py-1.5 rounded-lg border border-danger/50 text-danger hover:bg-danger/10 disabled:opacity-50 font-medium"
+                    >
+                      {removingId === b.userId ? "…" : "Remove bot"}
+                    </button>
+                  </li>
+                ))}
+            </ul>
+          </div>
+        )}
+
         {isCommish && (
           <div className="flex justify-end mb-4">
             <button
@@ -201,7 +281,7 @@ export default function PlayersPage() {
 
         {!isCommish && !loading && (
           <p className="text-xs text-muted mb-4">
-            Only the commissioner can change divisions or remove players.
+            Only the commissioner can change divisions or remove players/bots.
           </p>
         )}
 
@@ -225,7 +305,9 @@ export default function PlayersPage() {
                   {list.map((p) => (
                     <div
                       key={p.userId}
-                      className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-card-hover group"
+                      className={`flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-card-hover group ${
+                        p.isBot ? "opacity-90" : ""
+                      }`}
                     >
                       <Avatar
                         name={p.name}
@@ -236,27 +318,37 @@ export default function PlayersPage() {
                         <div className="text-sm font-medium truncate">
                           {p.name}
                           {p.isBot ? (
-                            <span className="ml-2 text-[10px] uppercase text-muted border border-border px-1 rounded">
-                              Trial
+                            <span className="ml-1.5 text-[10px] uppercase text-muted border border-border px-1 rounded">
+                              Bot
                             </span>
                           ) : null}
                           {p.userId === selfId && (
-                            <span className="text-primary text-xs ml-1">(You)</span>
+                            <span className="text-primary text-xs ml-1">
+                              (You)
+                            </span>
                           )}
-                          {p.role === "commissioner" && (
-                            <span className="text-primary text-xs ml-1">Commish</span>
+                          {p.role === "commissioner" && !p.isBot && (
+                            <span className="text-primary text-xs ml-1">
+                              Commish
+                            </span>
                           )}
                         </div>
-                        <div className="text-xs text-muted">{p.totalPoints} pts</div>
+                        <div className="text-xs text-muted">
+                          {p.totalPoints} pts
+                        </div>
                       </div>
-                      {isCommish ? (
+                      {isCommish && !p.isBot ? (
                         <select
                           value={p.division}
                           disabled={busy}
                           onChange={(e) =>
-                            changeDivision(p.userId, e.target.value as Division)
+                            changeDivision(
+                              p.userId,
+                              e.target.value as Division
+                            )
                           }
-                          className="text-xs bg-background border border-border rounded px-1 py-0.5 opacity-0 group-hover:opacity-100 focus:opacity-100"
+                          className="text-xs bg-background border border-border rounded px-1 py-0.5 max-w-[4.5rem]"
+                          title="Division"
                         >
                           {DIVISIONS.map((d) => (
                             <option key={d} value={d}>
@@ -271,10 +363,19 @@ export default function PlayersPage() {
                           <button
                             type="button"
                             disabled={busy}
-                            onClick={() => removePlayer(p.userId)}
-                            className="text-xs text-danger opacity-0 group-hover:opacity-100 disabled:opacity-30"
+                            onClick={() => void removeMember(p)}
+                            className={`text-xs shrink-0 disabled:opacity-30 ${
+                              p.isBot
+                                ? "px-2 py-0.5 rounded border border-danger/40 text-danger font-medium"
+                                : "text-danger opacity-70 sm:opacity-0 sm:group-hover:opacity-100"
+                            }`}
+                            title={p.isBot ? "Remove bot" : "Remove player"}
                           >
-                            ✕
+                            {p.isBot
+                              ? removingId === p.userId
+                                ? "…"
+                                : "Remove"
+                              : "✕"}
                           </button>
                         )}
                     </div>

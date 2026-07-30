@@ -1391,6 +1391,23 @@ export async function removeLeagueMember(
     return { ok: false, error: "Can't remove the commissioner" };
   }
 
+  // Drop their picks so standings don't keep ghost scores (bots or humans)
+  await supabase
+    .from("picks")
+    .delete()
+    .eq("league_id", session.leagueId)
+    .eq("user_id", userId);
+
+  try {
+    await supabase
+      .from("crystal_ball_picks")
+      .delete()
+      .eq("league_id", session.leagueId)
+      .eq("user_id", userId);
+  } catch {
+    /* table may not exist / RLS */
+  }
+
   const { error } = await supabase
     .from("memberships")
     .delete()
