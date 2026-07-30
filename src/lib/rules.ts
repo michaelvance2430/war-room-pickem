@@ -66,6 +66,10 @@ export const RULE_SECTIONS: RuleSection[] = [
     body: [
       "Hit Save Picks when everything is filled in: side + confidence on all five, one Best Bet, and a prop choice.",
       "Weekly game picks lock at each game’s kickoff — no exceptions. Prop locks at the first kickoff on that card.",
+      {
+        bold: true,
+        text: "NO LOCK, NO POINTS: If you don’t save/lock your card before kickoff, you score 0 for that week. No makeups. No partial credit. Fair is fair.",
+      },
       "Only you can see your weekly picks — league mates cannot spy on your card.",
     ],
   },
@@ -73,6 +77,7 @@ export const RULE_SECTIONS: RuleSection[] = [
     title: "Scoring & standings",
     body: [
       "Weekly score = confidence points for correct ATS picks (+ double for a correct Best Bet) + prop points if you hit the prop.",
+      "Only locked picks are scored. No locked card for the week = zero points for that week.",
       "Season standings total your weekly points.",
       "Week 0 (openers) is optional and independent. Real season runs Week 1 → late RS → Conference Championships.",
       "After Conference Championship week is scored, the cut locks: top half → Championship bracket, bottom → Toilet Bowl.",
