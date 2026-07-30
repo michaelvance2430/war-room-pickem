@@ -1560,12 +1560,18 @@ export async function resetSeasonInCloud(): Promise<ResetSeasonResult> {
 
   // Clear local week caches so this device matches cloud
   try {
-    for (let w = 0; w <= 16; w++) {
+    for (let w = 0; w <= 18; w++) {
       localStorage.removeItem(`warroom-card-week-${w}`);
       localStorage.removeItem(`warroom-results-week-${w}`);
       localStorage.removeItem(`warroom-picks-week-${w}`);
     }
     localStorage.setItem("warroom-active-week", "0");
+    // Drop gazette "seen" flags for this league so next score feels fresh
+    const prefix = "warroom-gazette-seen-v1:";
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(prefix)) localStorage.removeItem(k);
+    }
   } catch {
     /* ignore */
   }

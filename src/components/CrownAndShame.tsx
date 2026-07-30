@@ -39,13 +39,14 @@ export default function CrownAndShame({ className = "" }: Props) {
   if (!data) {
     return (
       <div
-        className={`rounded-xl border border-border bg-card/80 p-5 ${className}`}
+        className={`rounded-xl border border-dashed border-border bg-card/60 p-5 ${className}`}
       >
         <h2 className="font-semibold text-sm mb-1">Crown &amp; Wall of Shame</h2>
-        <p className="text-sm text-muted">
-          After the first week is scored, the week&apos;s{" "}
+        <p className="text-sm text-muted leading-relaxed">
+          This populates once a week is scored —{" "}
           <span className="text-primary">🐐 high scorer</span> and{" "}
-          <span className="text-toilet">🛍️ low scorer</span> land here.
+          <span className="text-toilet">🛍️ low scorer</span> for the latest
+          card. Until then, the board stays empty.
         </p>
       </div>
     );

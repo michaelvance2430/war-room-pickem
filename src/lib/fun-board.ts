@@ -147,25 +147,42 @@ export function powerBoardWithLabels(
 }
 
 /**
+ * True after at least one week has been scored this season
+ * (weeks_played > 0 or any positive weekly point entry).
+ * Fresh / post-reset leagues stay empty until the first score.
+ */
+export function leagueHasScoredWeek(players: Player[]): boolean {
+  return players.some(
+    (p) =>
+      (p.weeksPlayed || 0) > 0 ||
+      (p.weeklyPoints || []).some((n) => typeof n === "number" && n > 0)
+  );
+}
+
+/**
  * This week's Crown (high score) and Wall of Shame (low score).
  * Uses the last entry in weeklyPoints for each player.
+ * Returns null before any week is scored (including after season reset).
  */
 export function weekCrownAndShame(players: Player[]): CrownShame | null {
+  if (!players.length || !leagueHasScoredWeek(players)) return null;
+
   const withLast = players
     .map((p) => ({ player: p, pts: lastWeekPts(p) }))
     .filter((x): x is { player: Player; pts: number } => x.pts != null);
 
   if (withLast.length < 1) return null;
 
+  // All zeros / empty after a soft reset — still nothing to crown
+  if (withLast.every((r) => r.pts === 0) && players.every((p) => !(p.weeksPlayed || 0))) {
+    return null;
+  }
+
   const weekIndex = Math.max(
     ...players.map((p) => (p.weeklyPoints?.length || 0) - 1),
     0
   );
-  const weekLabel =
-    weekIndex === 0 &&
-    players.every((p) => (p.weeklyPoints?.length || 0) <= 1)
-      ? "Latest scored week"
-      : `Latest scored week`;
+  const weekLabel = "Latest scored week";
 
   let crown = withLast[0];
   let shame = withLast[0];
@@ -174,8 +191,6 @@ export function weekCrownAndShame(players: Player[]): CrownShame | null {
     if (row.pts < shame.pts) shame = row;
   }
 
-  // Prefer unique people: if ties for high, pick first alpha; already have max
-  // If everyone tied, same person ok
   return {
     weekIndex,
     weekLabel,
