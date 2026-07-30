@@ -1096,24 +1096,33 @@ export async function seedTrialBotsInCloud(
   if (!session?.leagueId || !session.isCommissioner) {
     return { ok: false, error: "Commissioner only" };
   }
-  // Respect public 32-player cap (Championship + Toilet Bowl)
+  // Respect public 32-player cap — only empty seats, never replace humans/bots
   const roster = await loadLeagueRoster();
   const seats = seatsRemaining(roster.length);
+  const existingBots = roster.filter((m) => m.isBot).length;
   if (seats <= 0) {
     return {
       ok: true,
       added: 0,
-      totalBots: roster.filter((m) => m.isBot).length,
+      totalBots: existingBots,
       seatsRemaining: 0,
       error: undefined,
     };
   }
-  const want = Math.min(count, seats, MAX_LEAGUE_PLAYERS);
+  // How many NEW bots we want (empty seats only; cap request size)
+  const wantAdd = Math.min(count, seats, MAX_LEAGUE_PLAYERS);
+  /**
+   * seed_trial_bots evolved:
+   * - Older SQL: p_count is target *total bot count* → need = p_count - existing bots
+   * - Newer SQL (league-capacity-32): p_count is max to add, also capped by empty seats
+   * Passing existingBots + wantAdd works for both (new SQL min()s with seats left).
+   */
+  const pCount = existingBots + wantAdd;
 
   const supabase = createClient();
   const { data, error } = await supabase.rpc("seed_trial_bots", {
     p_league_id: session.leagueId,
-    p_count: want,
+    p_count: pCount,
   });
   if (error) {
     return { ok: false, error: trialBotsSetupHint(error.message || "RPC failed") };
@@ -1136,8 +1145,10 @@ export async function seedTrialBotsInCloud(
 }
 
 /**
- * One-click: fill empty seats with bots up to 32, then lock bot picks
- * for the given week if a card is published.
+ * One-click: add bots only for empty seats until 32 (does not replace anyone).
+ * Then lock bot picks for the week if a card is published.
+ *
+ * Example: 31 players (friend backed out) → adds exactly 1 bot.
  */
 export async function fillLeagueWithBotsToCap(opts?: {
   weekNumber?: number;
@@ -1155,7 +1166,16 @@ export async function fillLeagueWithBotsToCap(opts?: {
   }
   const roster = await loadLeagueRoster();
   const seatsBefore = seatsRemaining(roster.length);
-  const seed = await seedTrialBotsInCloud(seatsBefore || MAX_LEAGUE_PLAYERS);
+  if (seatsBefore <= 0) {
+    return {
+      ok: true,
+      added: 0,
+      totalBots: roster.filter((m) => m.isBot).length,
+      botsFilled: 0,
+      seatsBefore: 0,
+    };
+  }
+  const seed = await seedTrialBotsInCloud(seatsBefore);
   if (!seed.ok) {
     return { ok: false, error: seed.error || "Failed to add bots" };
   }

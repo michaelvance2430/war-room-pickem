@@ -654,14 +654,15 @@ export default function CommissionerPage() {
     }
   }
 
-  /** Fill empty seats with bots up to 32 + auto-lock picks if card is live. */
+  /** Fill empty seats only (e.g. friend backed out → add 1 bot). Never replaces anyone. */
   async function handleFillLeagueWithBots() {
     if (
       !confirm(
-        "Fill empty seats with bots up to 32?\n\n" +
-          "• Real players stay\n" +
-          "• Bots get persona-based auto picks when a week is published\n" +
-          "• Use in sandbox or to pad a small league — remove anytime with Clear bots"
+        "Top up bots to 32?\n\n" +
+          "• Only fills EMPTY seats (if 1 open → adds 1 bot)\n" +
+          "• Does NOT remove or replace humans or existing bots\n" +
+          "• New bots auto-pick if this week’s card is published\n\n" +
+          "Example: remove a bot for a friend, they bail → run this again to refill."
       )
     ) {
       return;
@@ -677,28 +678,31 @@ export default function CommissionerPage() {
       setBotReport(res.error || "Failed to fill with bots");
       return;
     }
-    if ((res.added ?? 0) === 0 && (res.botsFilled ?? 0) === 0) {
+    if ((res.seatsBefore ?? 0) === 0 || (res.added ?? 0) === 0) {
       setBotReport(
-        `Already at capacity or no bots needed (32 max). Bots in league: ${res.totalBots ?? 0}.`
+        (res.seatsBefore ?? 0) === 0
+          ? `League already full (32/32). Remove a bot or player first if you need a seat. Bots: ${res.totalBots ?? 0}.`
+          : `No bots added (open seats: ${res.seatsBefore}). If that seems wrong, run supabase/trial-bots.sql + league-capacity-32.sql once. Bots: ${res.totalBots ?? 0}.`
       );
+      if ((res.botsFilled ?? 0) > 0) {
+        setBotReport((prev) =>
+          `${prev || ""} · Re-locked ${res.botsFilled} bot slip(s) for ${weekTitle(activeWeek)}.`.trim()
+        );
+      }
       return;
     }
     void refreshPickStatus(activeWeek);
-    const parts: string[] = [];
-    if ((res.added ?? 0) > 0) {
-      parts.push(
-        `Added ${res.added} bot(s) (${res.totalBots} bots total · filled empty seats toward 32)`
-      );
-    } else {
-      parts.push(`No new bots (${res.totalBots ?? 0} already in league)`);
-    }
+    const parts: string[] = [
+      `Had ${res.seatsBefore} empty seat(s) → added ${res.added} bot(s)`,
+      `${res.totalBots} bots in league now`,
+    ];
     if ((res.botsFilled ?? 0) > 0) {
       parts.push(
         `locked ${res.botsFilled} bot slip(s) for ${weekTitle(activeWeek)}`
       );
     } else if (!hasCard) {
       parts.push(
-        "publish a week card next — bots auto-pick on publish (or use Fill bot picks)"
+        "publish a week card so new bots get picks (or Fill bot picks)"
       );
     }
     setBotReport(parts.join(" · ") + ".");
@@ -1365,7 +1369,9 @@ export default function CommissionerPage() {
                   onClick={() => void handleFillLeagueWithBots()}
                   className="px-4 py-2 rounded-lg bg-primary text-black text-sm font-semibold disabled:opacity-50"
                 >
-                  {botBusy ? "Working…" : "Fill empty seats with bots (to 32)"}
+                  {botBusy
+                    ? "Working…"
+                    : "Top up bots to 32 (empty seats only)"}
                 </button>
                 <button
                   type="button"
