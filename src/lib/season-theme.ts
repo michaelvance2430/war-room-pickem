@@ -25,7 +25,7 @@ export const SEASON_THEME_PRESETS: SeasonThemePreset[] = [
   {
     id: "halloween",
     label: "Halloween 🎃",
-    blurb: "Orange & purple — spooky Saturday vibes.",
+    blurb: "Orange & purple with pumpkins and a ghost on the sides.",
   },
   {
     id: "thanksgiving",

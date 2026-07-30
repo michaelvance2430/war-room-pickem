@@ -11,6 +11,7 @@ import {
   type SeasonThemeId,
 } from "@/lib/season-theme";
 import ChristmasLights from "@/components/ChristmasLights";
+import HalloweenDecor from "@/components/HalloweenDecor";
 
 /**
  * Reads league season theme and paints holiday backgrounds for everyone.
@@ -65,5 +66,7 @@ export default function SeasonThemeApplier() {
     };
   }, []);
 
-  return theme === "christmas" ? <ChristmasLights /> : null;
+  if (theme === "christmas") return <ChristmasLights />;
+  if (theme === "halloween") return <HalloweenDecor />;
+  return null;
 }

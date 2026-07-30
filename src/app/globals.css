@@ -89,6 +89,138 @@ html[data-season-theme="halloween"] body::before {
   background-size: 100% 100%;
 }
 
+/* --- Halloween props (HalloweenDecor.tsx) --- */
+.halloween-decor {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 30;
+  overflow: hidden;
+}
+.halloween-side {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  user-select: none;
+}
+.halloween-side--left {
+  left: max(0.25rem, env(safe-area-inset-left));
+  bottom: 12%;
+  align-items: flex-start;
+}
+.halloween-side--right {
+  right: max(0.25rem, env(safe-area-inset-right));
+  top: 18%;
+  align-items: flex-end;
+}
+.halloween-prop {
+  display: block;
+  line-height: 1;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.45));
+  opacity: 0.88;
+}
+.halloween-prop--sm {
+  font-size: 1.35rem;
+}
+.halloween-prop--md {
+  font-size: 1.85rem;
+}
+.halloween-prop--lg {
+  font-size: 2.35rem;
+}
+.halloween-prop--xl {
+  font-size: 2.75rem;
+}
+.halloween-pumpkin {
+  animation: halloween-bob 3.2s ease-in-out infinite;
+}
+.halloween-ghost {
+  animation: halloween-float 4.5s ease-in-out infinite;
+  opacity: 0.9;
+}
+.halloween-bat {
+  animation: halloween-bat-flit 5s ease-in-out infinite;
+  opacity: 0.75;
+}
+
+@keyframes halloween-bob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-2deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(3deg);
+  }
+}
+@keyframes halloween-float {
+  0%,
+  100% {
+    transform: translateY(0) translateX(0) scale(1);
+    opacity: 0.85;
+  }
+  33% {
+    transform: translateY(-14px) translateX(-6px) scale(1.04);
+    opacity: 0.95;
+  }
+  66% {
+    transform: translateY(-6px) translateX(5px) scale(0.98);
+    opacity: 0.8;
+  }
+}
+@keyframes halloween-bat-flit {
+  0%,
+  100% {
+    transform: translate(0, 0) scaleX(1);
+  }
+  25% {
+    transform: translate(-10px, -12px) scaleX(-1);
+  }
+  50% {
+    transform: translate(6px, -4px) scaleX(1);
+  }
+  75% {
+    transform: translate(-4px, -16px) scaleX(-1);
+  }
+}
+
+/* Keep center column clear on phones — tucks props smaller / dimmer */
+@media (max-width: 768px) {
+  .halloween-side--left {
+    bottom: 4%;
+    opacity: 0.55;
+  }
+  .halloween-side--right {
+    top: auto;
+    bottom: 4%;
+    opacity: 0.55;
+  }
+  .halloween-prop--xl {
+    font-size: 1.75rem;
+  }
+  .halloween-prop--lg {
+    font-size: 1.4rem;
+  }
+  .halloween-prop--md {
+    font-size: 1.15rem;
+  }
+  .halloween-prop--sm {
+    font-size: 1rem;
+  }
+  /* Hide the bat on small screens so it doesn't crowd the UI */
+  .halloween-bat {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .halloween-pumpkin,
+  .halloween-ghost,
+  .halloween-bat {
+    animation: none;
+  }
+}
+
 html[data-season-theme="thanksgiving"] {
   --background: #100a06;
   --foreground: #faf3e8;
