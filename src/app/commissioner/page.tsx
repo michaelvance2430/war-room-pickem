@@ -174,6 +174,9 @@ export default function CommissionerPage() {
   );
   const [botBusy, setBotBusy] = useState(false);
   const [botReport, setBotReport] = useState<string | null>(null);
+  /** How many bots to add (not total roster). Default 6 = common “round out to ~16”. */
+  const [botAddCount, setBotAddCount] = useState(6);
+  const [rosterCount, setRosterCount] = useState<number | null>(null);
   /** Skip week date filter on Pull Odds — all open FBS games for season dry-run. */
   const [dryRunOdds, setDryRunOdds] = useState(false);
   /** Weeks already scored (locked for results entry unless unlocked). */
@@ -212,11 +215,17 @@ export default function CommissionerPage() {
       try {
         const session = getSession();
         const roster = await loadLeagueRoster();
+        setRosterCount(roster.length);
         setPassRoster(
           roster.filter(
             (m) => !m.isBot && m.userId !== session?.playerId
           )
         );
+        // Sensible default: add enough to reach ideal 16 if under; else a few
+        const open = Math.max(0, MAX_LEAGUE_PLAYERS - roster.length);
+        const toIdeal = Math.max(0, 16 - roster.length);
+        if (toIdeal > 0 && toIdeal <= open) setBotAddCount(toIdeal);
+        else if (open > 0) setBotAddCount(Math.min(6, open));
       } catch {
         /* ignore */
       }
@@ -724,15 +733,31 @@ export default function CommissionerPage() {
     }
   }
 
-  /** Fill empty seats only (e.g. friend backed out → add 1 bot). Never replaces anyone. */
-  async function handleFillLeagueWithBots() {
+  /**
+   * Add bots for empty seats only.
+   * mode: exact count | grow to target total (16 ideal / 32 max).
+   */
+  async function handleAddBots(opts: {
+    addCount?: number;
+    targetTotal?: number;
+    label: string;
+  }) {
+    const n =
+      opts.addCount != null
+        ? opts.addCount
+        : opts.targetTotal != null && rosterCount != null
+          ? Math.max(0, opts.targetTotal - rosterCount)
+          : 0;
+    if (n <= 0 && opts.targetTotal == null) {
+      setBotReport("Pick how many bots to add (1 or more).");
+      return;
+    }
     if (
       !confirm(
-        "Top up bots to 32?\n\n" +
-          "• Only fills EMPTY seats (if 1 open → adds 1 bot)\n" +
-          "• Does NOT remove or replace humans or existing bots\n" +
-          "• New bots auto-pick if this week’s card is published\n\n" +
-          "Example: remove a bot for a friend, they bail → run this again to refill."
+        `${opts.label}\n\n` +
+          "• Only fills EMPTY seats (never removes humans or existing bots)\n" +
+          "• Soft cap 32 · Ideal pad target is often 16 (clean 8+8 brackets)\n" +
+          "• New bots auto-pick if this week’s card is published"
       )
     ) {
       return;
@@ -740,46 +765,39 @@ export default function CommissionerPage() {
     setBotReport(null);
     setBotBusy(true);
     const hasCard = publishedGames.length > 0;
-    const res = await fillLeagueWithBotsToCap(
-      hasCard ? { weekNumber: activeWeek } : undefined
-    );
+    const res = await fillLeagueWithBotsToCap({
+      ...(hasCard ? { weekNumber: activeWeek } : {}),
+      ...(opts.addCount != null ? { addCount: opts.addCount } : {}),
+      ...(opts.targetTotal != null ? { targetTotal: opts.targetTotal } : {}),
+    });
     setBotBusy(false);
     if (!res.ok) {
-      setBotReport(res.error || "Failed to fill with bots");
+      setBotReport(res.error || "Failed to add bots");
       return;
     }
-    if ((res.seatsBefore ?? 0) === 0 || (res.added ?? 0) === 0) {
+    if (res.rosterAfter != null) setRosterCount(res.rosterAfter);
+    if ((res.added ?? 0) === 0) {
       setBotReport(
         (res.seatsBefore ?? 0) === 0
-          ? `League already full (32/32). Remove a bot or player first if you need a seat. Bots: ${res.totalBots ?? 0}.`
-          : `No bots added (open seats: ${res.seatsBefore}). If that seems wrong, run supabase/trial-bots.sql + league-capacity-32.sql once. Bots: ${res.totalBots ?? 0}.`
+          ? `League already full (${MAX_LEAGUE_PLAYERS}/${MAX_LEAGUE_PLAYERS}). Remove a bot on Players to free a seat.`
+          : `No bots added (already at target or no open seats). Roster: ${res.rosterBefore ?? "?"} · open: ${res.seatsBefore ?? 0}.`
       );
-      if ((res.botsFilled ?? 0) > 0) {
-        setBotReport((prev) =>
-          `${prev || ""} · Re-locked ${res.botsFilled} bot slip(s) for ${weekTitle(activeWeek)}.`.trim()
-        );
-      }
       return;
     }
     void refreshPickStatus(activeWeek);
     const parts: string[] = [
-      `Had ${res.seatsBefore} empty seat(s) → added ${res.added} bot(s)`,
-      `${res.totalBots} bots in league now`,
+      `Added ${res.added} bot(s)`,
+      `roster ${res.rosterBefore} → ${res.rosterAfter}`,
+      `${res.totalBots} bots in league`,
     ];
     if ((res.botsFilled ?? 0) > 0) {
       parts.push(
         `locked ${res.botsFilled} bot slip(s) for ${weekTitle(activeWeek)}`
       );
     } else if (!hasCard) {
-      parts.push(
-        "publish a week card so new bots get picks (or Fill bot picks)"
-      );
+      parts.push("publish a week so bots get picks (or Fill bot picks)");
     }
     setBotReport(parts.join(" · ") + ".");
-  }
-
-  async function handleSeedBots() {
-    void handleFillLeagueWithBots();
   }
 
   async function handleFillBotPicks() {
@@ -1501,60 +1519,117 @@ export default function CommissionerPage() {
             </div>
 
             <div className="rounded-xl border border-primary/40 bg-primary/5 p-5 space-y-3">
-              <h2 className="font-semibold text-primary">
-                Pad league with bots (to 32)
-              </h2>
+              <h2 className="font-semibold text-primary">Pad league with bots</h2>
               <p className="text-xs text-muted leading-relaxed">
-                Optional. Fills{" "}
-                <strong className="text-foreground">empty seats only</strong> up
-                to the {MAX_LEAGUE_PLAYERS}-player cap. Real humans stay;
-                bots never block a real join until the room is full. Great for
-                sandbox testing or padding a small group so brackets feel full.
+                Optional. Adds bots to{" "}
+                <strong className="text-foreground">empty seats only</strong>{" "}
+                (max {MAX_LEAGUE_PLAYERS}). Real humans stay. Choose a count so
+                you can round out brackets without stuffing the room to 32.
               </p>
-              <div className="rounded-lg border border-border/60 bg-background/50 px-3 py-2 text-[11px] text-muted leading-relaxed space-y-1">
-                <p className="text-foreground font-medium text-xs">
-                  How bots pick (coded guidance)
+              <div className="rounded-lg border border-border/60 bg-background/50 px-3 py-2 text-[11px] text-muted leading-relaxed">
+                <p className="text-foreground font-medium text-xs mb-1">
+                  Ideal roster sizes (dual brackets)
                 </p>
                 <ul className="list-disc pl-4 space-y-0.5">
                   <li>
-                    Valid slip every week: all games, confidence 1–N, one Best
-                    Bet, one prop
+                    <strong className="text-foreground">16 total</strong> —
+                    sweet spot (8 Champ + 8 Toilet, clean byes)
                   </li>
                   <li>
-                    <span className="text-foreground">Chalk</span> personas
-                    (Public Heat, Locksmith…) lean favorites
+                    <strong className="text-foreground">8</strong> — minimum
+                    that still feels like a league (4+4)
                   </li>
                   <li>
-                    <span className="text-foreground">Dog / Fade</span> personas
-                    lean underdogs
+                    <strong className="text-foreground">32</strong> — hard max
+                    (16+16, full CFP window)
                   </li>
-                  <li>
-                    <span className="text-foreground">Sharp / Closing</span> mix
-                    with a slight dog lean on big spreads
-                  </li>
-                  <li>Everyone else ~58% favorite — noisy public money</li>
-                  <li>
-                    Auto-lock on <strong className="text-foreground">Publish</strong>{" "}
-                    week card (or use Fill bot picks)
-                  </li>
+                  <li>12–24 is the usual friend-group range</li>
                 </ul>
+                {rosterCount != null && (
+                  <p className="mt-2 text-foreground/90">
+                    Now: <strong>{rosterCount}</strong> players ·{" "}
+                    <strong>
+                      {Math.max(0, MAX_LEAGUE_PLAYERS - rosterCount)}
+                    </strong>{" "}
+                    open
+                    {rosterCount < 16
+                      ? ` · need ${16 - rosterCount} more to hit 16`
+                      : rosterCount < 32
+                        ? " · already past ideal 16"
+                        : " · full"}
+                  </p>
+                )}
+              </div>
+              <div className="flex flex-wrap items-end gap-3">
+                <label className="block text-xs text-muted">
+                  Add this many bots
+                  <input
+                    type="number"
+                    min={1}
+                    max={MAX_LEAGUE_PLAYERS}
+                    value={botAddCount}
+                    onChange={(e) =>
+                      setBotAddCount(
+                        Math.max(
+                          1,
+                          Math.min(
+                            MAX_LEAGUE_PLAYERS,
+                            parseInt(e.target.value, 10) || 1
+                          )
+                        )
+                      )
+                    }
+                    className="mt-1 w-24 bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground font-mono"
+                  />
+                </label>
+                <button
+                  type="button"
+                  disabled={botBusy}
+                  onClick={() =>
+                    void handleAddBots({
+                      addCount: botAddCount,
+                      label: `Add ${botAddCount} bot(s)?`,
+                    })
+                  }
+                  className="px-4 py-2 rounded-lg bg-primary text-black text-sm font-semibold disabled:opacity-50"
+                >
+                  {botBusy ? "Working…" : `Add ${botAddCount} bot${botAddCount === 1 ? "" : "s"}`}
+                </button>
               </div>
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
                   disabled={botBusy}
-                  onClick={() => void handleFillLeagueWithBots()}
-                  className="px-4 py-2 rounded-lg bg-primary text-black text-sm font-semibold disabled:opacity-50"
+                  onClick={() =>
+                    void handleAddBots({
+                      targetTotal: 16,
+                      label:
+                        "Fill roster toward 16 (ideal 8+8 brackets)? Only adds what’s missing.",
+                    })
+                  }
+                  className="px-3 py-1.5 rounded-lg border border-primary/50 text-primary text-xs font-medium hover:bg-primary/10 disabled:opacity-50"
                 >
-                  {botBusy
-                    ? "Working…"
-                    : "Top up bots to 32 (empty seats only)"}
+                  Fill to 16 (ideal)
+                </button>
+                <button
+                  type="button"
+                  disabled={botBusy}
+                  onClick={() =>
+                    void handleAddBots({
+                      targetTotal: 32,
+                      label:
+                        "Fill roster to 32 (max / 16+16 brackets)? Only empty seats.",
+                    })
+                  }
+                  className="px-3 py-1.5 rounded-lg border border-border text-xs font-medium hover:bg-card-hover disabled:opacity-50"
+                >
+                  Fill to 32 (max)
                 </button>
                 <button
                   type="button"
                   disabled={botBusy}
                   onClick={() => void handleFillBotPicks()}
-                  className="px-4 py-2 rounded-lg border border-border text-sm font-medium hover:bg-card-hover disabled:opacity-50"
+                  className="px-3 py-1.5 rounded-lg border border-border text-xs font-medium hover:bg-card-hover disabled:opacity-50"
                 >
                   Fill bot picks (this week)
                 </button>
@@ -1562,9 +1637,9 @@ export default function CommissionerPage() {
                   type="button"
                   disabled={botBusy}
                   onClick={() => void handleClearBots()}
-                  className="px-4 py-2 rounded-lg border border-warning text-warning text-sm font-medium hover:bg-warning/10 disabled:opacity-50"
+                  className="px-3 py-1.5 rounded-lg border border-warning text-warning text-xs font-medium hover:bg-warning/10 disabled:opacity-50"
                 >
-                  Clear bots (keep real players)
+                  Clear bots
                 </button>
               </div>
               <p className="text-[11px] text-muted">

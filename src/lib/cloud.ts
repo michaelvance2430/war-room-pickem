@@ -1145,19 +1145,28 @@ export async function seedTrialBotsInCloud(
 }
 
 /**
- * One-click: add bots only for empty seats until 32 (does not replace anyone).
- * Then lock bot picks for the week if a card is published.
+ * Add bots for empty seats only (never replaces humans/existing bots).
  *
- * Example: 31 players (friend backed out) → adds exactly 1 bot.
+ * - addCount: how many NEW bots to try to add (capped by open seats)
+ * - targetTotal: optional "fill until league has N players" (e.g. 16 ideal, 32 max)
+ * - weekNumber: if set and a card exists, lock bot picks for that week
+ *
+ * Ideal totals for clean dual brackets: 8 (4+4), 16 (8+8), 32 (16+16).
  */
 export async function fillLeagueWithBotsToCap(opts?: {
   weekNumber?: number;
+  /** Exact number of new bots to add (preferred when set). */
+  addCount?: number;
+  /** Grow roster toward this total size (e.g. 16 or 32). */
+  targetTotal?: number;
 }): Promise<{
   ok: boolean;
   added?: number;
   totalBots?: number;
   botsFilled?: number;
   seatsBefore?: number;
+  rosterBefore?: number;
+  rosterAfter?: number;
   error?: string;
 }> {
   const session = getSession();
@@ -1165,7 +1174,8 @@ export async function fillLeagueWithBotsToCap(opts?: {
     return { ok: false, error: "Commissioner only" };
   }
   const roster = await loadLeagueRoster();
-  const seatsBefore = seatsRemaining(roster.length);
+  const rosterBefore = roster.length;
+  const seatsBefore = seatsRemaining(rosterBefore);
   if (seatsBefore <= 0) {
     return {
       ok: true,
@@ -1173,9 +1183,36 @@ export async function fillLeagueWithBotsToCap(opts?: {
       totalBots: roster.filter((m) => m.isBot).length,
       botsFilled: 0,
       seatsBefore: 0,
+      rosterBefore,
+      rosterAfter: rosterBefore,
     };
   }
-  const seed = await seedTrialBotsInCloud(seatsBefore);
+
+  let want = seatsBefore; // default: fill to 32
+  if (opts?.addCount != null && Number.isFinite(opts.addCount)) {
+    want = Math.max(0, Math.floor(opts.addCount));
+  } else if (opts?.targetTotal != null && Number.isFinite(opts.targetTotal)) {
+    const target = Math.min(
+      MAX_LEAGUE_PLAYERS,
+      Math.max(0, Math.floor(opts.targetTotal))
+    );
+    want = Math.max(0, target - rosterBefore);
+  }
+  want = Math.min(want, seatsBefore);
+
+  if (want <= 0) {
+    return {
+      ok: true,
+      added: 0,
+      totalBots: roster.filter((m) => m.isBot).length,
+      botsFilled: 0,
+      seatsBefore,
+      rosterBefore,
+      rosterAfter: rosterBefore,
+    };
+  }
+
+  const seed = await seedTrialBotsInCloud(want);
   if (!seed.ok) {
     return { ok: false, error: seed.error || "Failed to add bots" };
   }
@@ -1192,12 +1229,15 @@ export async function fillLeagueWithBotsToCap(opts?: {
     }
   }
 
+  const added = seed.added ?? 0;
   return {
     ok: true,
-    added: seed.added ?? 0,
+    added,
     totalBots: seed.totalBots ?? 0,
     botsFilled,
     seatsBefore,
+    rosterBefore,
+    rosterAfter: rosterBefore + added,
   };
 }
 
