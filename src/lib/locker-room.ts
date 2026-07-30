@@ -44,6 +44,20 @@ export type LockerMessage = {
   authorName: string;
 };
 
+export async function amILockerMuted(): Promise<boolean> {
+  const session = getSession();
+  if (!session?.leagueId || !session.playerId) return false;
+  if (session.isCommissioner) return false;
+  const supabase = createClient();
+  const { data } = await supabase
+    .from("memberships")
+    .select("locker_muted")
+    .eq("league_id", session.leagueId)
+    .eq("user_id", session.playerId)
+    .maybeSingle();
+  return !!(data as { locker_muted?: boolean } | null)?.locker_muted;
+}
+
 function mapRow(
   r: Record<string, unknown>,
   nameById: Map<string, string>
@@ -142,6 +156,13 @@ export async function postLockerMessage(body: string): Promise<{
         ok: false,
         error:
           "Locker Room isn’t set up yet. Run supabase/locker-room.sql in Supabase SQL Editor once.",
+      };
+    }
+    if (/policy|row-level|violates|muted|check/i.test(error.message || "")) {
+      return {
+        ok: false,
+        error:
+          "You can’t post right now — you may be muted by a moderator. Talk to the commissioner if that’s a mistake.",
       };
     }
     if (/check|280|length/i.test(error.message || "")) {

@@ -16,6 +16,7 @@ export interface LeagueMembership {
   gamesPerWeek: number;
   role: string;
   displayName: string;
+  isModerator?: boolean;
 }
 
 function canUseStorage() {
@@ -43,6 +44,7 @@ export function writeSessionAndLeague(
     playerId: userId,
     playerName: membership.displayName || "Player",
     isCommissioner,
+    isModerator: !isCommissioner && !!membership.isModerator,
     leagueId: membership.leagueId,
   };
 
@@ -80,14 +82,28 @@ export async function fetchMyMemberships(): Promise<LeagueMembership[]> {
     auth.user.email?.split("@")[0] ||
     "Player";
 
-  const { data: rows, error } = await supabase
-    .from("memberships")
-    .select(
-      "role, league_id, leagues(id, name, code, commissioner_id, created_at, cut_percent, regular_season_weeks, games_per_week)"
-    )
-    .eq("user_id", userId);
+  let rows: Record<string, unknown>[] | null = null;
+  {
+    const res = await supabase
+      .from("memberships")
+      .select(
+        "role, is_moderator, league_id, leagues(id, name, code, commissioner_id, created_at, cut_percent, regular_season_weeks, games_per_week)"
+      )
+      .eq("user_id", userId);
+    if (res.error && /is_moderator|schema cache|column/i.test(res.error.message || "")) {
+      const res2 = await supabase
+        .from("memberships")
+        .select(
+          "role, league_id, leagues(id, name, code, commissioner_id, created_at, cut_percent, regular_season_weeks, games_per_week)"
+        )
+        .eq("user_id", userId);
+      rows = (res2.data as Record<string, unknown>[] | null) || null;
+    } else {
+      rows = (res.data as Record<string, unknown>[] | null) || null;
+    }
+  }
 
-  if (error || !rows) return [];
+  if (!rows) return [];
 
   const list: LeagueMembership[] = [];
   for (const row of rows) {
@@ -104,6 +120,7 @@ export async function fetchMyMemberships(): Promise<LeagueMembership[]> {
       gamesPerWeek: (L.games_per_week as number) ?? 5,
       role: (row.role as string) || "player",
       displayName: metaName,
+      isModerator: !!row.is_moderator,
     });
   }
   return list;

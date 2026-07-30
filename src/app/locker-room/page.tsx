@@ -1,20 +1,23 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import Link from "next/link";
 import Nav from "@/components/Nav";
 import YouBadge from "@/components/YouBadge";
-import { getSession, getLeague, isCommissioner } from "@/lib/league";
+import { getSession, getLeague, isStaff } from "@/lib/league";
 import { isSelfPlayer, selfNameClass } from "@/lib/self-highlight";
 import {
   LOCKER_COOLDOWN_SEC,
   LOCKER_EMOJIS,
   LOCKER_MAX_CHARS,
+  amILockerMuted,
   deleteLockerMessage,
   formatLockerTime,
   loadLockerMessages,
   postLockerMessage,
   type LockerMessage,
 } from "@/lib/locker-room";
+import { refreshStaffSessionFlags } from "@/lib/cloud";
 
 export default function LockerRoomPage() {
   const [messages, setMessages] = useState<LockerMessage[]>([]);
@@ -24,7 +27,8 @@ export default function LockerRoomPage() {
   const [posting, setPosting] = useState(false);
   const [postError, setPostError] = useState<string | null>(null);
   const [selfId, setSelfId] = useState<string | null>(null);
-  const [commish, setCommish] = useState(false);
+  const [staff, setStaff] = useState(false);
+  const [muted, setMuted] = useState(false);
   const [leagueName, setLeagueName] = useState("");
   const [cooldownLeft, setCooldownLeft] = useState(0);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -45,8 +49,10 @@ export default function LockerRoomPage() {
   useEffect(() => {
     const session = getSession();
     setSelfId(session?.playerId || null);
-    setCommish(isCommissioner());
+    setStaff(isStaff());
     setLeagueName(getLeague()?.name || "");
+    void refreshStaffSessionFlags().then(() => setStaff(isStaff()));
+    void amILockerMuted().then(setMuted);
     reload().finally(() => setLoading(false));
   }, [reload]);
 
@@ -80,6 +86,12 @@ export default function LockerRoomPage() {
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setPostError(null);
+    if (muted) {
+      setPostError(
+        "You’re muted in Locker Room. Talk to the commissioner if that’s a mistake."
+      );
+      return;
+    }
     const now = Date.now();
     const wait =
       LOCKER_COOLDOWN_SEC * 1000 - (now - lastPostAt.current);
@@ -93,6 +105,7 @@ export default function LockerRoomPage() {
     setPosting(false);
     if (!res.ok) {
       setPostError(res.error || "Failed to post");
+      if (/muted/i.test(res.error || "")) setMuted(true);
       return;
     }
     lastPostAt.current = Date.now();
@@ -113,6 +126,7 @@ export default function LockerRoomPage() {
 
   const remaining = LOCKER_MAX_CHARS - body.length;
   const canPost =
+    !muted &&
     body.trim().length > 0 &&
     body.length <= LOCKER_MAX_CHARS &&
     !posting &&
@@ -137,8 +151,16 @@ export default function LockerRoomPage() {
                 {" · "}
               </>
             ) : null}
-            Drop hot takes ({LOCKER_MAX_CHARS} char max). Keep it fun — commish
-            can delete.
+            Drop hot takes ({LOCKER_MAX_CHARS} char max). Keep it fun — staff can
+            delete posts and mute.
+            {staff && (
+              <>
+                {" "}
+                <Link href="/moderation" className="text-amber-300 hover:underline">
+                  Mod tools →
+                </Link>
+              </>
+            )}
           </p>
         </div>
 
@@ -187,7 +209,7 @@ export default function LockerRoomPage() {
                   <p className="text-sm text-foreground/95 whitespace-pre-wrap break-words leading-relaxed">
                     {m.body}
                   </p>
-                  {(mine || commish) && (
+                  {(mine || staff) && (
                     <button
                       type="button"
                       onClick={() => void onDelete(m.id)}
@@ -204,54 +226,65 @@ export default function LockerRoomPage() {
         </div>
 
         {/* Composer */}
-        <form
-          onSubmit={(e) => void onSubmit(e)}
-          className="shrink-0 rounded-xl border border-border bg-card p-3 space-y-2"
-        >
-          <div className="flex flex-wrap gap-1.5">
-            {LOCKER_EMOJIS.map((em) => (
-              <button
-                key={em}
-                type="button"
-                onClick={() => insertEmoji(em)}
-                className="w-9 h-9 sm:w-8 sm:h-8 rounded-lg bg-background border border-border hover:border-primary/50 hover:bg-primary/10 text-base leading-none"
-                title="Add emoji"
+        {muted ? (
+          <div className="shrink-0 rounded-xl border border-danger/40 bg-danger/10 px-4 py-4 text-sm">
+            <p className="font-semibold text-danger mb-1">You’re muted</p>
+            <p className="text-muted text-xs leading-relaxed">
+              A moderator turned off Locker Room posting for you. You can still
+              make picks and view standings. If this is a mistake, message the
+              commissioner.
+            </p>
+          </div>
+        ) : (
+          <form
+            onSubmit={(e) => void onSubmit(e)}
+            className="shrink-0 rounded-xl border border-border bg-card p-3 space-y-2"
+          >
+            <div className="flex flex-wrap gap-1.5">
+              {LOCKER_EMOJIS.map((em) => (
+                <button
+                  key={em}
+                  type="button"
+                  onClick={() => insertEmoji(em)}
+                  className="w-9 h-9 sm:w-8 sm:h-8 rounded-lg bg-background border border-border hover:border-primary/50 hover:bg-primary/10 text-base leading-none"
+                  title="Add emoji"
+                >
+                  {em}
+                </button>
+              ))}
+            </div>
+            <textarea
+              value={body}
+              onChange={(e) =>
+                setBody(e.target.value.slice(0, LOCKER_MAX_CHARS))
+              }
+              rows={3}
+              maxLength={LOCKER_MAX_CHARS}
+              placeholder="Talk your shit… (Best Bet locks, dogs that covered, Toilet Bowl prophecy)"
+              className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground resize-none focus:outline-none focus:ring-1 focus:ring-primary/50"
+            />
+            <div className="flex items-center justify-between gap-2">
+              <span
+                className={`text-xs ${
+                  remaining < 30 ? "text-warning" : "text-muted"
+                }`}
               >
-                {em}
+                {remaining} left
+                {cooldownLeft > 0 ? ` · wait ${cooldownLeft}s` : ""}
+              </span>
+              <button
+                type="submit"
+                disabled={!canPost}
+                className="px-4 py-2 rounded-lg bg-primary text-black text-sm font-semibold disabled:opacity-40"
+              >
+                {posting ? "Sending…" : "Post"}
               </button>
-            ))}
-          </div>
-          <textarea
-            value={body}
-            onChange={(e) =>
-              setBody(e.target.value.slice(0, LOCKER_MAX_CHARS))
-            }
-            rows={3}
-            maxLength={LOCKER_MAX_CHARS}
-            placeholder="Talk your shit… (Best Bet locks, dogs that covered, Toilet Bowl prophecy)"
-            className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground resize-none focus:outline-none focus:ring-1 focus:ring-primary/50"
-          />
-          <div className="flex items-center justify-between gap-2">
-            <span
-              className={`text-xs ${
-                remaining < 30 ? "text-warning" : "text-muted"
-              }`}
-            >
-              {remaining} left
-              {cooldownLeft > 0 ? ` · wait ${cooldownLeft}s` : ""}
-            </span>
-            <button
-              type="submit"
-              disabled={!canPost}
-              className="px-4 py-2 rounded-lg bg-primary text-black text-sm font-semibold disabled:opacity-40"
-            >
-              {posting ? "Sending…" : "Post"}
-            </button>
-          </div>
-          {postError && (
-            <p className="text-xs text-danger">{postError}</p>
-          )}
-        </form>
+            </div>
+            {postError && (
+              <p className="text-xs text-danger">{postError}</p>
+            )}
+          </form>
+        )}
       </main>
     </div>
   );

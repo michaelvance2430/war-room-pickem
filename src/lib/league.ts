@@ -29,6 +29,8 @@ export interface Session {
   playerId: string;
   playerName: string;
   isCommissioner: boolean;
+  /** Appointed by commissioner — locker mute + delete posts */
+  isModerator?: boolean;
   leagueId: string;
 }
 
@@ -81,6 +83,12 @@ export function getSession(): Session | null {
 export function isCommissioner(): boolean {
   const session = getSession();
   return !!session?.isCommissioner;
+}
+
+/** Commissioner or appointed moderator (troll control). */
+export function isStaff(): boolean {
+  const session = getSession();
+  return !!(session?.isCommissioner || session?.isModerator);
 }
 
 export function updateLeagueName(name: string): League | null {

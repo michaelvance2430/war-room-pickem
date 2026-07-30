@@ -945,13 +945,15 @@ export async function loadLeaguePlayers(): Promise<
 
 export type LeagueRosterMember = {
   membershipId: string;
-  userId: string;
   name: string;
+  userId: string;
   division: "North" | "South" | "East" | "West";
   role: "commissioner" | "player";
   totalPoints: number;
   avatarUrl?: string | null;
   isBot?: boolean;
+  isModerator?: boolean;
+  lockerMuted?: boolean;
 };
 
 /** Live league roster from Supabase memberships (not local mock players). */
@@ -980,6 +982,8 @@ export async function loadLeagueRoster(): Promise<LeagueRosterMember[]> {
             totalPoints: (m.total_points as number) || 0,
             avatarUrl: (m.avatar_url as string | null) || null,
             isBot: !!m.is_bot,
+            isModerator: !!m.is_moderator,
+            lockerMuted: !!m.locker_muted,
           };
         })
         .sort((a, b) => {
@@ -996,7 +1000,7 @@ export async function loadLeagueRoster(): Promise<LeagueRosterMember[]> {
     const res = await supabase
       .from("memberships")
       .select(
-        "id, user_id, role, division, total_points, is_bot, profiles(display_name, avatar_url)"
+        "id, user_id, role, division, total_points, is_bot, is_moderator, locker_muted, profiles(display_name, avatar_url)"
       )
       .eq("league_id", session.leagueId);
     if (res.error && /is_bot|schema cache|column/i.test(res.error.message)) {
@@ -1060,12 +1064,75 @@ export async function loadLeagueRoster(): Promise<LeagueRosterMember[]> {
         totalPoints: (m.total_points as number) || 0,
         avatarUrl: profile?.avatar_url || null,
         isBot: !!m.is_bot,
+        isModerator: !!m.is_moderator,
+        lockerMuted: !!m.locker_muted,
       };
     })
     .sort((a, b) => {
       if (!!a.isBot !== !!b.isBot) return a.isBot ? 1 : -1;
       return a.name.localeCompare(b.name);
     });
+}
+
+/** Commissioner appoints/removes moderators; staff can mute for Locker Room. */
+export async function setMemberModeration(opts: {
+  userId: string;
+  isModerator?: boolean | null;
+  lockerMuted?: boolean | null;
+}): Promise<{ ok: boolean; error?: string }> {
+  const session = getSession();
+  if (!session?.leagueId) return { ok: false, error: "No league" };
+  if (!session.isCommissioner && !session.isModerator) {
+    return { ok: false, error: "Commissioner or moderator only" };
+  }
+  if (opts.isModerator != null && !session.isCommissioner) {
+    return { ok: false, error: "Only the commissioner can appoint moderators" };
+  }
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("set_member_moderation", {
+    p_league_id: session.leagueId,
+    p_user_id: opts.userId,
+    p_is_moderator: opts.isModerator ?? null,
+    p_locker_muted: opts.lockerMuted ?? null,
+  });
+  if (error) {
+    if (/function|does not exist|schema cache/i.test(error.message || "")) {
+      return {
+        ok: false,
+        error:
+          "Moderation not set up — run supabase/moderation.sql in Supabase SQL Editor once.",
+      };
+    }
+    return { ok: false, error: error.message };
+  }
+  if (data && (data as { ok?: boolean }).ok === false) {
+    return { ok: false, error: "Moderation update failed" };
+  }
+  return { ok: true };
+}
+
+/** Refresh isModerator on the local session from memberships. */
+export async function refreshStaffSessionFlags(): Promise<void> {
+  const session = getSession();
+  if (!session?.leagueId || !session.playerId) return;
+  if (session.isCommissioner) return;
+  const supabase = createClient();
+  const { data } = await supabase
+    .from("memberships")
+    .select("is_moderator, locker_muted")
+    .eq("league_id", session.leagueId)
+    .eq("user_id", session.playerId)
+    .maybeSingle();
+  if (!data) return;
+  try {
+    const raw = localStorage.getItem("warroom-session");
+    if (!raw) return;
+    const s = JSON.parse(raw) as Record<string, unknown>;
+    s.isModerator = !!(data as { is_moderator?: boolean }).is_moderator;
+    localStorage.setItem("warroom-session", JSON.stringify(s));
+  } catch {
+    /* ignore */
+  }
 }
 
 /** True only when PostgREST cannot see the RPC (not permission / runtime errors). */
@@ -1442,14 +1509,45 @@ export async function removeLeagueMember(
   userId: string
 ): Promise<{ ok: boolean; error?: string }> {
   const session = getSession();
-  if (!session?.leagueId || !session.isCommissioner) {
-    return { ok: false, error: "Only the commissioner can remove players" };
+  if (!session?.leagueId) {
+    return { ok: false, error: "No league" };
+  }
+  if (!session.isCommissioner && !session.isModerator) {
+    return { ok: false, error: "Only the commissioner or a moderator can remove players" };
   }
   if (userId === session.playerId) {
     return { ok: false, error: "Can't remove yourself (use Account to leave or delete the league)" };
   }
 
   const supabase = createClient();
+
+  // Preferred: staff RPC (bypasses pick RLS, works for mods + commish)
+  {
+    const { data, error } = await supabase.rpc("staff_remove_member", {
+      p_league_id: session.leagueId,
+      p_user_id: userId,
+    });
+    if (!error) {
+      if (data && (data as { ok?: boolean }).ok === false) {
+        return { ok: false, error: "Remove failed" };
+      }
+      return { ok: true };
+    }
+    if (!rpcMissing(error.message || "")) {
+      return { ok: false, error: error.message };
+    }
+    // fall through if SQL not deployed yet
+  }
+
+  // Fallback: commissioner-only direct deletes (legacy)
+  if (!session.isCommissioner) {
+    return {
+      ok: false,
+      error:
+        "Moderation not set up — run supabase/moderation.sql in Supabase SQL Editor once.",
+    };
+  }
+
   const { data: league } = await supabase
     .from("leagues")
     .select("commissioner_id")

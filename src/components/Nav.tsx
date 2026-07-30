@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { getSession, getLeague } from "@/lib/league";
+import { getSession, getLeague, isStaff } from "@/lib/league";
 import { createClient } from "@/lib/supabase/client";
 import Avatar from "@/components/Avatar";
 import RulesOnboardingModal from "@/components/RulesOnboardingModal";
 import GazetteModal from "@/components/GazetteModal";
 import { loadMyProfile } from "@/lib/profile";
+import { refreshStaffSessionFlags } from "@/lib/cloud";
 
 type NavLink = {
   href: string;
@@ -20,6 +21,7 @@ type NavLink = {
 export default function Nav() {
   const pathname = usePathname();
   const [isCommish, setIsCommish] = useState(false);
+  const [staff, setStaff] = useState(false);
   const [name, setName] = useState("You");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [leagueName, setLeagueName] = useState("");
@@ -31,9 +33,16 @@ export default function Nav() {
     const session = getSession();
     const league = getLeague();
     setIsCommish(!!session?.isCommissioner);
+    setStaff(isStaff());
     setName(session?.playerName || "You");
     setLeagueName(league?.name || "");
     setCrystalBallOn(league?.settings?.crystalBallEnabled !== false);
+
+    // Mods appointed mid-session: refresh local flag so Mod nav appears
+    void refreshStaffSessionFlags().then(() => {
+      setStaff(isStaff());
+      setIsCommish(!!getSession()?.isCommissioner);
+    });
 
     loadMyProfile().then((p) => {
       if (p) {
@@ -124,6 +133,15 @@ export default function Nav() {
     },
     ...(isCommish
       ? [{ href: "/commissioner", label: "Commish", className: "text-primary" }]
+      : []),
+    ...(staff
+      ? [
+          {
+            href: "/moderation",
+            label: "Mod",
+            className: "text-amber-300 hover:text-amber-200",
+          },
+        ]
       : []),
     { href: "/account", label: "Account" },
   ];
