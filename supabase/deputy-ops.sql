@@ -1,8 +1,15 @@
 -- ============================================================
 -- Deputy commissioners — run picks / results when you're away
 -- Run once in Supabase → SQL Editor → Run
--- (Safe after moderation.sql; re-runnable)
+-- (Self-contained: also adds mod/mute columns if missing)
 -- ============================================================
+
+-- Role/staff columns (moderation.sql may already have added these)
+alter table public.memberships
+  add column if not exists is_moderator boolean not null default false;
+
+alter table public.memberships
+  add column if not exists locker_muted boolean not null default false;
 
 alter table public.memberships
   add column if not exists is_deputy boolean not null default false;

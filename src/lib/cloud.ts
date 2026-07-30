@@ -1111,20 +1111,47 @@ export async function setMemberModeration(opts: {
     p_locker_muted: opts.lockerMuted ?? null,
     p_is_deputy: opts.isDeputy ?? null,
   });
-  if (error) {
-    if (/function|does not exist|schema cache|p_is_deputy/i.test(error.message || "")) {
+  if (!error) {
+    if (data && (data as { ok?: boolean }).ok === false) {
+      return { ok: false, error: "Moderation update failed" };
+    }
+    return { ok: true };
+  }
+
+  // Fallback: commissioner direct column update (works once columns exist,
+  // even if RPC signature is stale in PostgREST schema cache)
+  if (session.isCommissioner) {
+    const patch: Record<string, boolean> = {};
+    if (opts.isDeputy != null) patch.is_deputy = opts.isDeputy;
+    if (opts.isModerator != null) patch.is_moderator = opts.isModerator;
+    if (opts.lockerMuted != null) patch.locker_muted = opts.lockerMuted;
+    if (Object.keys(patch).length) {
+      const { error: upErr } = await supabase
+        .from("memberships")
+        .update(patch)
+        .eq("league_id", session.leagueId)
+        .eq("user_id", opts.userId);
+      if (!upErr) return { ok: true };
+      // Prefer showing the real column/permission error
+      if (!/function|does not exist|schema cache|p_is_deputy|could not find/i.test(error.message || "")) {
+        return { ok: false, error: upErr.message };
+      }
       return {
         ok: false,
         error:
-          "Roles not set up — run supabase/moderation.sql then supabase/deputy-ops.sql in Supabase SQL Editor.",
+          `Roles incomplete (${upErr.message}). In Supabase SQL Editor run supabase/staff-roles-setup.sql once, wait 10s, hard-refresh.`,
       };
     }
-    return { ok: false, error: error.message };
   }
-  if (data && (data as { ok?: boolean }).ok === false) {
-    return { ok: false, error: "Moderation update failed" };
+
+  if (/function|does not exist|schema cache|p_is_deputy|could not find/i.test(error.message || "")) {
+    return {
+      ok: false,
+      error:
+        `Roles not set up (${error.message}). Run supabase/staff-roles-setup.sql in Supabase SQL Editor once.`,
+    };
   }
-  return { ok: true };
+  return { ok: false, error: error.message };
 }
 
 /** Refresh isModerator / isDeputy on the local session from memberships. */
