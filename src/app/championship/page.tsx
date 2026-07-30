@@ -5,9 +5,17 @@ import Link from "next/link";
 import Nav from "@/components/Nav";
 import BracketView from "@/components/BracketView";
 import YouBadge from "@/components/YouBadge";
-import { loadLeaguePlayers } from "@/lib/cloud";
+import { loadLeaguePlayers, listScoredWeekNumbers } from "@/lib/cloud";
 import { getSession, getLeague } from "@/lib/league";
-import { seedChampionship, buildBracket, Bracket } from "@/lib/brackets";
+import {
+  seedChampionship,
+  buildBracket,
+  advanceBracketFromCfpWeeks,
+  cfpWeekForRound,
+  Bracket,
+} from "@/lib/brackets";
+import { DEFAULT_CUT_LOCK_WEEK } from "@/lib/season-calendar";
+import { weekTitle } from "@/lib/dates";
 import { isSelfPlayer, selfNameClass, selfRowClass } from "@/lib/self-highlight";
 
 export default function ChampionshipPage() {
@@ -18,6 +26,8 @@ export default function ChampionshipPage() {
   const [selfId, setSelfId] = useState<string | null>(null);
   const [cutPercent, setCutPercent] = useState(50);
   const [leagueName, setLeagueName] = useState("");
+  const [cutLocked, setCutLocked] = useState(false);
+  const [progressNote, setProgressNote] = useState("");
 
   useEffect(() => {
     async function load() {
@@ -27,8 +37,13 @@ export default function ChampionshipPage() {
       const cut = league?.settings?.cutPercent ?? 50;
       setCutPercent(cut);
 
-      const players = await loadLeaguePlayers();
+      const [players, scoredWeeks] = await Promise.all([
+        loadLeaguePlayers(),
+        listScoredWeekNumbers(),
+      ]);
       setPlayerCount(players.length);
+      const locked = scoredWeeks.includes(DEFAULT_CUT_LOCK_WEEK);
+      setCutLocked(locked);
 
       if (players.length < 2) {
         setBracket(null);
@@ -39,7 +54,23 @@ export default function ChampionshipPage() {
       // Top half by points (min 2 for a bracket; seedChampionship uses top half, min 4 when large)
       const seeded = seedChampionship(players);
       setFieldSize(seeded.length);
-      setBracket(buildBracket("championship", seeded));
+      const built = buildBracket("championship", seeded);
+      const advanced = advanceBracketFromCfpWeeks(built, scoredWeeks);
+      setBracket(advanced);
+
+      const totalRounds = advanced.rounds.length;
+      const nextUnscored = [...Array(totalRounds).keys()].find(
+        (r) => !scoredWeeks.includes(cfpWeekForRound(r, totalRounds))
+      );
+      if (nextUnscored == null) {
+        setProgressNote("All bracket rounds scored — champion is final.");
+      } else {
+        const w = cfpWeekForRound(nextUnscored, totalRounds);
+        setProgressNote(
+          `Next round advances when ${weekTitle(w)} is scored (higher weekly pts wins).`
+        );
+      }
+
       setLoading(false);
     }
     load();
@@ -58,25 +89,49 @@ export default function ChampionshipPage() {
             <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
               Top {cutPercent === 50 ? "50%" : `${100 - cutPercent}%`}
             </span>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-card border border-border text-muted">
-              Projected
+            <span
+              className={`text-xs px-2 py-0.5 rounded-full border ${
+                cutLocked
+                  ? "bg-primary/15 border-primary/40 text-primary"
+                  : "bg-card border-border text-muted"
+              }`}
+            >
+              {cutLocked ? "Field locked" : "Projected"}
             </span>
           </div>
           <p className="text-sm text-muted">
             {leagueName ? `${leagueName} • ` : ""}
-            Live standings preview • Division leaders preferred as seeds 1–4 •
-            Higher weekly score advances in the real postseason
+            Division leaders preferred as seeds 1–4 • Higher weekly score
+            advances each CFP week
           </p>
         </div>
 
-        <div className="rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-sm mb-6">
-          <span className="font-medium text-primary">Not locked yet.</span>{" "}
-          <span className="text-muted">
-            Seeds update when standings change (after weeks are scored). Final
-            field locks after <strong className="text-foreground">Conference
-            Championship week (app week 14)</strong> is scored — that&apos;s the
-            last week that decides Championship vs Toilet Bowl.
-          </span>
+        <div className="rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-sm mb-6 space-y-1">
+          {cutLocked ? (
+            <p>
+              <span className="font-medium text-primary">Cut locked</span>
+              <span className="text-muted">
+                {" "}
+                after Conference Championship (week 14). Seeds stay put; CFP
+                weeks 15–18 decide who advances.
+              </span>
+            </p>
+          ) : (
+            <p>
+              <span className="font-medium text-primary">Not locked yet.</span>
+              <span className="text-muted">
+                {" "}
+                Seeds update with standings until{" "}
+                <strong className="text-foreground">
+                  Conference Championship week (14)
+                </strong>{" "}
+                is scored.
+              </span>
+            </p>
+          )}
+          {progressNote && (
+            <p className="text-muted text-xs">{progressNote}</p>
+          )}
         </div>
 
         <div className="flex flex-wrap gap-4 text-xs text-muted mb-6">

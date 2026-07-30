@@ -194,6 +194,141 @@ export function scoreMatchup(
   };
 }
 
+/** App weeks that power bracket rounds (CFP R1 → Final). */
+export const CFP_BRACKET_WEEKS = [15, 16, 17, 18] as const;
+
+/**
+ * Which season week scores a given bracket round index.
+ * Aligns so the Final uses week 18 when the bracket has ≤ 4 rounds.
+ */
+export function cfpWeekForRound(
+  roundIndex: number,
+  totalRounds: number
+): number {
+  const n = Math.min(totalRounds, CFP_BRACKET_WEEKS.length);
+  const offset = CFP_BRACKET_WEEKS.length - n;
+  const idx = Math.min(offset + roundIndex, CFP_BRACKET_WEEKS.length - 1);
+  return CFP_BRACKET_WEEKS[idx];
+}
+
+function weekPoints(player: Player | null | undefined, week: number): number {
+  if (!player) return 0;
+  const w = player.weeklyPoints;
+  if (!Array.isArray(w) || week < 0 || week >= w.length) return 0;
+  const n = Number(w[week]);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function cloneBracket(bracket: Bracket): Bracket {
+  return {
+    type: bracket.type,
+    players: bracket.players,
+    rounds: bracket.rounds.map((round) =>
+      round.map((m) => ({
+        ...m,
+        slotA: { ...m.slotA },
+        slotB: { ...m.slotB },
+      }))
+    ),
+  };
+}
+
+function placeWinnerIntoNext(rounds: Matchup[][], match: Matchup) {
+  if (!match.winnerId) return;
+  const nextRoundIdx = match.round; // round is 1-based; next array index == round number
+  if (nextRoundIdx >= rounds.length) return;
+
+  const nextMatch = rounds[nextRoundIdx][Math.floor(match.position / 2)];
+  if (!nextMatch) return;
+
+  const winnerPlayer =
+    match.slotA.player?.id === match.winnerId
+      ? match.slotA.player
+      : match.slotB.player;
+  const winnerSeed =
+    match.slotA.player?.id === match.winnerId
+      ? match.slotA.seed
+      : match.slotB.seed;
+  const slot = {
+    seed: winnerSeed,
+    player: winnerPlayer,
+    isBye: false,
+  };
+  if (match.position % 2 === 0) nextMatch.slotA = slot;
+  else nextMatch.slotB = slot;
+}
+
+/**
+ * Advance bracket slots using CFP weekly pick'em scores.
+ * - Round 1 uses week 15 (or aligned), QF 16, SF 17, Final 18
+ * - Higher weekly score advances; ties use season tiebreakers
+ * - Only resolves a round once that week is in `scoredWeeks`
+ * - Byes still auto-advance
+ */
+export function advanceBracketFromCfpWeeks(
+  bracket: Bracket,
+  scoredWeeks: number[] | Set<number>
+): Bracket {
+  const scored =
+    scoredWeeks instanceof Set ? scoredWeeks : new Set(scoredWeeks);
+  const out = cloneBracket(bracket);
+  const totalRounds = out.rounds.length;
+
+  // Clear non-R1 slots (except we re-fill from prior winners). Keep R1 as seeded.
+  for (let r = 1; r < totalRounds; r++) {
+    for (const m of out.rounds[r]) {
+      m.slotA = { seed: null, player: null, isBye: false };
+      m.slotB = { seed: null, player: null, isBye: false };
+      m.winnerId = null;
+      m.scoreA = null;
+      m.scoreB = null;
+      m.advanceReason = null;
+    }
+  }
+
+  for (let r = 0; r < totalRounds; r++) {
+    const week = cfpWeekForRound(r, totalRounds);
+    const weekDone = scored.has(week);
+
+    for (const m of out.rounds[r]) {
+      // Byes from initial build
+      if (m.slotA.isBye && m.slotB.player) {
+        m.winnerId = m.slotB.player.id;
+        m.advanceReason = "bye";
+        m.scoreA = null;
+        m.scoreB = null;
+      } else if (m.slotB.isBye && m.slotA.player) {
+        m.winnerId = m.slotA.player.id;
+        m.advanceReason = "bye";
+        m.scoreA = null;
+        m.scoreB = null;
+      } else if (m.slotA.player && m.slotB.player && weekDone) {
+        const scoreA = weekPoints(m.slotA.player, week);
+        const scoreB = weekPoints(m.slotB.player, week);
+        const scoredMatch = scoreMatchup(m, scoreA, scoreB);
+        m.scoreA = scoredMatch.scoreA;
+        m.scoreB = scoredMatch.scoreB;
+        m.winnerId = scoredMatch.winnerId;
+        m.advanceReason = scoredMatch.advanceReason;
+      }
+
+      if (m.winnerId) {
+        placeWinnerIntoNext(out.rounds, m);
+      }
+    }
+
+    // Don't score later rounds until this round's week is done
+    // (next round slots may still fill from byes / prior winners for display)
+    if (!weekDone) {
+      // Still allow bye-only placement already done; stop applying scores further
+      // but continue placing known winners so partial brackets show
+      continue;
+    }
+  }
+
+  return out;
+}
+
 function getSeedPositions(size: number): number[] {
   if (size === 2) return [0, 1];
   if (size === 4) return [0, 3, 2, 1];

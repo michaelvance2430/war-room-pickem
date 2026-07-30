@@ -5,9 +5,17 @@ import Link from "next/link";
 import Nav from "@/components/Nav";
 import BracketView from "@/components/BracketView";
 import YouBadge from "@/components/YouBadge";
-import { loadLeaguePlayers } from "@/lib/cloud";
+import { loadLeaguePlayers, listScoredWeekNumbers } from "@/lib/cloud";
 import { getSession, getLeague } from "@/lib/league";
-import { seedToiletBowl, buildBracket, Bracket } from "@/lib/brackets";
+import {
+  seedToiletBowl,
+  buildBracket,
+  advanceBracketFromCfpWeeks,
+  cfpWeekForRound,
+  Bracket,
+} from "@/lib/brackets";
+import { DEFAULT_CUT_LOCK_WEEK } from "@/lib/season-calendar";
+import { weekTitle } from "@/lib/dates";
 import { isSelfPlayer, selfNameClass, selfRowClass } from "@/lib/self-highlight";
 
 export default function ToiletBowlPage() {
@@ -18,6 +26,8 @@ export default function ToiletBowlPage() {
   const [selfId, setSelfId] = useState<string | null>(null);
   const [cutPercent, setCutPercent] = useState(50);
   const [leagueName, setLeagueName] = useState("");
+  const [cutLocked, setCutLocked] = useState(false);
+  const [progressNote, setProgressNote] = useState("");
 
   useEffect(() => {
     async function load() {
@@ -27,8 +37,13 @@ export default function ToiletBowlPage() {
       const cut = league?.settings?.cutPercent ?? 50;
       setCutPercent(cut);
 
-      const players = await loadLeaguePlayers();
+      const [players, scoredWeeks] = await Promise.all([
+        loadLeaguePlayers(),
+        listScoredWeekNumbers(),
+      ]);
       setPlayerCount(players.length);
+      const locked = scoredWeeks.includes(DEFAULT_CUT_LOCK_WEEK);
+      setCutLocked(locked);
 
       if (players.length < 2) {
         setBracket(null);
@@ -38,7 +53,23 @@ export default function ToiletBowlPage() {
 
       const seeded = seedToiletBowl(players);
       setFieldSize(seeded.length);
-      setBracket(buildBracket("toilet", seeded));
+      const built = buildBracket("toilet", seeded);
+      const advanced = advanceBracketFromCfpWeeks(built, scoredWeeks);
+      setBracket(advanced);
+
+      const totalRounds = advanced.rounds.length;
+      const nextUnscored = [...Array(totalRounds).keys()].find(
+        (r) => !scoredWeeks.includes(cfpWeekForRound(r, totalRounds))
+      );
+      if (nextUnscored == null) {
+        setProgressNote("All bracket rounds scored — flush champion is final.");
+      } else {
+        const w = cfpWeekForRound(nextUnscored, totalRounds);
+        setProgressNote(
+          `Next round advances when ${weekTitle(w)} is scored (higher weekly pts wins).`
+        );
+      }
+
       setLoading(false);
     }
     load();
@@ -55,14 +86,20 @@ export default function ToiletBowlPage() {
             <span className="text-xs px-2 py-0.5 rounded-full bg-toilet/10 text-toilet">
               Bottom {cutPercent}%
             </span>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-card border border-border text-muted">
-              Projected
+            <span
+              className={`text-xs px-2 py-0.5 rounded-full border ${
+                cutLocked
+                  ? "bg-toilet/15 border-toilet/40 text-toilet"
+                  : "bg-card border-border text-muted"
+              }`}
+            >
+              {cutLocked ? "Field locked" : "Projected"}
             </span>
           </div>
           <p className="text-sm text-muted">
             {leagueName ? `${leagueName} • ` : ""}
-            Live standings preview • Worst record = #1 seed (easiest path) •
-            Same weekly card in the real postseason
+            Worst record = #1 seed (easiest path) • Same CFP weekly cards as
+            Championship
           </p>
         </div>
 
@@ -76,11 +113,21 @@ export default function ToiletBowlPage() {
                 done. Someone still has to win this thing.
               </span>
             </p>
-            <p className="text-muted">
-              <span className="font-medium text-toilet">Not locked yet.</span>{" "}
-              Seeds update when standings change. Field locks after the regular
-              season cut.
-            </p>
+            {cutLocked ? (
+              <p className="text-muted">
+                <span className="font-medium text-toilet">Cut locked.</span>{" "}
+                Seeds stay put after Conf Champ week 14. CFP weeks 15–18 fill
+                the board.
+              </p>
+            ) : (
+              <p className="text-muted">
+                <span className="font-medium text-toilet">Not locked yet.</span>{" "}
+                Seeds update with standings until Conf Champ week is scored.
+              </p>
+            )}
+            {progressNote && (
+              <p className="text-xs text-muted">{progressNote}</p>
+            )}
           </div>
         </div>
 
@@ -122,8 +169,8 @@ export default function ToiletBowlPage() {
         {!loading && playerCount >= 2 && bracket && (
           <>
             <p className="text-xs text-muted mb-3">
-              {playerCount} in league → {fieldSize} projected in Toilet Bowl
-              field
+              {playerCount} in league → {fieldSize}{" "}
+              {cutLocked ? "locked" : "projected"} in Toilet Bowl field
             </p>
             <div className="rounded-xl border border-toilet/30 bg-card p-4 mb-6 overflow-x-auto">
               <BracketView
@@ -135,30 +182,31 @@ export default function ToiletBowlPage() {
 
             <div className="rounded-xl border border-border bg-card p-5">
               <h2 className="font-semibold mb-3 text-sm">
-                Projected seeding (worst → easiest path)
+                {cutLocked ? "Seeding" : "Projected seeding"} (worst → easiest
+                path)
               </h2>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {bracket.players.map((p, i) => {
                   const mine = isSelfPlayer(p.id, selfId);
                   return (
-                  <div
-                    key={p.id}
-                    className={selfRowClass(
-                      mine,
-                      "flex items-center gap-2 text-sm px-2 py-1.5 rounded-lg bg-card-hover"
-                    )}
-                  >
-                    <span className="text-xs font-bold text-toilet w-5">
-                      {i + 1}
-                    </span>
-                    <span className={`truncate ${selfNameClass(mine, "")}`}>
-                      {p.name}
-                      {mine && <YouBadge />}
-                    </span>
-                    <span className="text-xs text-muted ml-auto shrink-0">
-                      {p.totalPoints}
-                    </span>
-                  </div>
+                    <div
+                      key={p.id}
+                      className={selfRowClass(
+                        mine,
+                        "flex items-center gap-2 text-sm px-2 py-1.5 rounded-lg bg-card-hover"
+                      )}
+                    >
+                      <span className="text-xs font-bold text-toilet w-5">
+                        {i + 1}
+                      </span>
+                      <span className={`truncate ${selfNameClass(mine, "")}`}>
+                        {p.name}
+                        {mine && <YouBadge />}
+                      </span>
+                      <span className="text-xs text-muted ml-auto shrink-0">
+                        {p.totalPoints}
+                      </span>
+                    </div>
                   );
                 })}
               </div>
