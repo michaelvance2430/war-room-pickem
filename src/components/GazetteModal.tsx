@@ -134,10 +134,12 @@ export default function GazetteModal() {
         </div>
 
         <div className="px-5 py-4 space-y-4">
-          {/* A1 Crown */}
+          {/* A1 Crown (or top deadlock) */}
           <article>
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-800 mb-1">
-              ★ Top of the fold
+              {edition.crown.kind === "tie"
+                ? "★ Deadlock · Who pulls ahead?"
+                : "★ Top of the fold"}
             </p>
             <h3 className="font-serif text-xl sm:text-2xl font-black leading-tight text-stone-950">
               {edition.crown.headline}
@@ -146,14 +148,17 @@ export default function GazetteModal() {
               {edition.crown.deck}
             </p>
             <p className="text-xs text-stone-500 mt-2 font-medium">
-              {edition.crown.name} · {edition.crown.pts} pts · {edition.weekLabel}
+              {edition.crown.names.join(" · ")} · {edition.crown.pts} pts
+              {edition.crown.kind === "tie" ? " each" : ""} · {edition.weekLabel}
             </p>
           </article>
 
           {edition.shame && (
             <article className="border-t border-stone-400 pt-4">
               <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-purple-900 mb-1">
-                🚽 Also in this edition
+                {edition.shame.kind === "tie"
+                  ? "🚽 Basement traffic jam"
+                  : "🚽 Also in this edition"}
               </p>
               <h3 className="font-serif text-lg font-bold leading-snug text-stone-900">
                 {edition.shame.headline}
@@ -162,7 +167,8 @@ export default function GazetteModal() {
                 {edition.shame.deck}
               </p>
               <p className="text-xs text-stone-500 mt-2 font-medium">
-                {edition.shame.name} · {edition.shame.pts} pts
+                {edition.shame.names.join(" · ")} · {edition.shame.pts} pts
+                {edition.shame.kind === "tie" ? " each" : ""}
               </p>
             </article>
           )}
