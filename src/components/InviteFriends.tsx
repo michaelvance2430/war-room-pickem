@@ -3,7 +3,7 @@
 /**
  * One-tap league invite for EVERY member — not just Commish.
  * Deep link: /join?code=XXXX — friend lands with code filled in.
- * Share copy rotates flavors (boomer / dad / group chat / chaos…).
+ * Share copy rotates multi-gen flavors (boomer → Gen X → millennial → chaos).
  */
 
 import { useState } from "react";
@@ -25,14 +25,20 @@ type Props = {
   className?: string;
 };
 
-const FLAVOR_CHIPS: { id: InviteFlavor | "random"; label: string }[] = [
-  { id: "random", label: "Surprise me" },
-  { id: "groupchat", label: "Group chat" },
-  { id: "dad", label: "Dad energy" },
-  { id: "boomer", label: "Keep it simple" },
-  { id: "xennial", label: "Tradition" },
-  { id: "chaos", label: "Chaos" },
-  { id: "warroom", label: "Classic" },
+const FLAVOR_CHIPS: {
+  id: InviteFlavor | "random";
+  label: string;
+  hint: string;
+}[] = [
+  { id: "random", label: "Surprise me", hint: "Random vibe every share" },
+  { id: "groupchat", label: "Group chat", hint: "Stop scrolling energy" },
+  { id: "boomer", label: "Boomer", hint: "Clear steps, no slang" },
+  { id: "genx", label: "Gen X", hint: "Cynical & simple" },
+  { id: "xennial", label: "Xennial", hint: "Pizza-box tradition" },
+  { id: "millennial", label: "Millennial", hint: "Group-chat soft launch" },
+  { id: "dad", label: "Dad energy", hint: "Subject line + love you" },
+  { id: "chaos", label: "Chaos", hint: "Milk-carton threat" },
+  { id: "warroom", label: "Classic", hint: "Straight product pitch" },
 ];
 
 export default function InviteFriends({
@@ -150,20 +156,32 @@ export default function InviteFriends({
     );
   }
 
+  const activeChip = FLAVOR_CHIPS.find((f) => f.id === flavor);
+  // Stable preview for a picked vibe; random only resolves on share/copy
+  const previewText =
+    flavor === "random"
+      ? null
+      : buildInviteShareText({
+          leagueName,
+          code,
+          inviterName,
+          flavor,
+        });
+
   return (
     <div
       className={`rounded-xl border border-primary/30 bg-primary/5 p-5 ${className}`}
     >
       <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-1">
-        Spread the word
+        Spread the word · everyone
       </p>
       <h2 className="font-semibold mb-1">Bring your people</h2>
       <p className="text-sm text-muted mb-3 leading-relaxed">
-        Not just the commissioner —{" "}
-        <strong className="text-foreground">anyone</strong> can invite. One
-        tap shares a link that opens the app with the code already filled
-        in. Message flips flavors so it hits dad group chats{" "}
-        <em>and</em> the chaos thread.
+        <strong className="text-foreground">Every member</strong> can invite —
+        not just the commissioner. One tap shares a deep link (code already
+        filled in) plus a message that hits boomers, Gen X, millennials, dad
+        group chats, <em>and</em> the chaos thread. Pick a vibe or hit
+        Surprise me.
       </p>
 
       <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center mb-3">
@@ -181,13 +199,19 @@ export default function InviteFriends({
       </div>
 
       <p className="text-[10px] uppercase tracking-wider text-muted font-bold mb-1.5">
-        Message vibe
+        Message vibe{" "}
+        {activeChip && (
+          <span className="normal-case tracking-normal font-medium text-foreground/70">
+            — {activeChip.hint}
+          </span>
+        )}
       </p>
       <div className="flex flex-wrap gap-1.5 mb-3">
         {FLAVOR_CHIPS.map((f) => (
           <button
             key={f.id}
             type="button"
+            title={f.hint}
             onClick={() => setFlavor(f.id)}
             className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border transition ${
               flavor === f.id
@@ -199,6 +223,23 @@ export default function InviteFriends({
           </button>
         ))}
       </div>
+
+      {previewText && (
+        <div className="mb-3 rounded-lg border border-border bg-background/80 px-3 py-2.5 max-h-40 overflow-y-auto">
+          <p className="text-[10px] uppercase tracking-wider text-muted font-bold mb-1">
+            Preview (what your buddy sees)
+          </p>
+          <pre className="text-[11px] text-foreground/90 whitespace-pre-wrap font-sans leading-relaxed">
+            {previewText}
+          </pre>
+        </div>
+      )}
+      {flavor === "random" && (
+        <p className="text-[11px] text-muted mb-3 italic">
+          Surprise me picks a random generation vibe each time you share —
+          great for blasting the whole crew.
+        </p>
+      )}
 
       <div className="flex flex-wrap gap-2">
         <button
