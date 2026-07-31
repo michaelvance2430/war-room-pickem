@@ -161,6 +161,9 @@ export {
   DEFAULT_CUT_LOCK_WEEK,
   DEFAULT_SEASON_WEEKS,
   SEASON_SCRUB_SUMMARY,
+  listSeasonWeekNumbers,
+  firstSeasonWeek,
+  NFL_SEASON_SCRUB_SUMMARY,
 } from "./season-calendar";
 
 /** Date span of games on a card, e.g. "Sat, Aug 29 – Sat, Sep 5". */

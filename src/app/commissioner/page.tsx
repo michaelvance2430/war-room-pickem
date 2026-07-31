@@ -79,6 +79,8 @@ import {
 import {
   SEASON_MAX_WEEK,
   weekDateRangeLabel,
+  listSeasonWeekNumbers,
+  firstSeasonWeek,
 } from "@/lib/season-calendar";
 import { autoFinishRemainingWeeks } from "@/lib/sandbox-auto-finish";
 import {
@@ -340,6 +342,9 @@ function CommissionerPageInner() {
       } catch {
         /* ignore */
       }
+      // NFL has no Week 0 — don't land on an empty preseason slot
+      const minW = firstSeasonWeek(lg?.sportId);
+      if (week < minW) week = minW;
       setActiveWeek(week);
       if (owner) {
         const sess = getSession();
@@ -2160,16 +2165,20 @@ function CommissionerPageInner() {
                 <div className="rounded-lg border border-border bg-background px-3 py-2">
                   <p className="text-xs text-muted mb-1">Season length</p>
                   <p className="text-sm font-semibold text-foreground">
-                    Always weeks 0–{SEASON_MAX_WEEK}
+                    {league?.sportId === "nfl"
+                      ? `Weeks 1–${SEASON_MAX_WEEK} (no Week 0)`
+                      : `Weeks 0–${SEASON_MAX_WEEK}`}
                   </p>
                   <p className="text-[11px] text-muted mt-1 leading-relaxed">
                     {league?.sportId === "nfl" ? (
                       <>
-                        Fixed NFL map: Week 0 = optional PRACTICE · Weeks 1–14
-                        regular season (Kickoff Sep 9, Wed–Tue) ·{" "}
+                        NFL: starts Week 1 (Kickoff Sep 9). Windows{" "}
+                        <strong className="text-foreground">Wed–Tue</strong>{" "}
+                        (TNF → MNF), not Mon–Sun.{" "}
                         <span className="text-warning">14 Cut</span> · 15 Wild
-                        Card · 16 Divisional · 17 Conference · 18 Super Bowl
-                        (Feb 14). Preseason does not count.
+                        Card · 16 Divisional · 17 Conference · 18 Super Bowl.
+                        No empty preseason slot — Odds API has no real lines
+                        there.
                       </>
                     ) : (
                       <>
@@ -2936,16 +2945,21 @@ function CommissionerPageInner() {
                 </span>
               </p>
               <div className="flex flex-wrap gap-2">
-                {Array.from({ length: SEASON_MAX_WEEK + 1 }, (_, i) => i).map(
+                {listSeasonWeekNumbers(league?.sportId).map(
                   (w) => {
                     const scored = scoredWeeks.includes(w);
+                    const nfl = league?.sportId === "nfl";
                     const hint =
                       w === 14
                         ? " · CUT"
                         : w === 0
                           ? " · openers"
                           : w >= 15
-                            ? " · CFP"
+                            ? nfl
+                              ? w === 18
+                                ? " · SB"
+                                : " · playoff"
+                              : " · CFP"
                             : "";
                     return (
                       <button
@@ -3578,7 +3592,7 @@ function CommissionerPageInner() {
               )}
 
               <div className="flex flex-wrap gap-2 mb-4">
-                {Array.from({ length: SEASON_MAX_WEEK + 1 }, (_, i) => i).map(
+                {listSeasonWeekNumbers(league?.sportId).map(
                   (w) => {
                     const scored = scoredWeeks.includes(w);
                     return (
@@ -3763,7 +3777,7 @@ function CommissionerPageInner() {
                     }}
                     className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground disabled:opacity-50"
                   >
-                    {Array.from({ length: SEASON_MAX_WEEK + 1 }, (_, i) => i).map(
+                    {listSeasonWeekNumbers(league?.sportId).map(
                       (w) => (
                         <option key={w} value={w}>
                           {weekTitle(w)}
@@ -3785,7 +3799,7 @@ function CommissionerPageInner() {
                     }}
                     className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground disabled:opacity-50"
                   >
-                    {Array.from({ length: SEASON_MAX_WEEK + 1 }, (_, i) => i).map(
+                    {listSeasonWeekNumbers(league?.sportId).map(
                       (w) => (
                         <option key={w} value={w}>
                           {weekTitle(w)}
@@ -3901,7 +3915,7 @@ function CommissionerPageInner() {
                 re-score a dry run.
               </p>
               <div className="flex flex-wrap gap-2">
-                {Array.from({ length: SEASON_MAX_WEEK + 1 }, (_, i) => i).map(
+                {listSeasonWeekNumbers(league?.sportId).map(
                   (w) => {
                     const scored = scoredWeeks.includes(w);
                     return (
