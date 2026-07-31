@@ -22,7 +22,9 @@ import { isSandboxMode } from "@/lib/season-mode";
 import { withCreatorFlag } from "@/lib/creator";
 import {
   computeJoinTitles,
+  isJustJoined,
   joinTitleTierLabel,
+  justJoinedBadgeLabel,
 } from "@/lib/join-titles";
 import {
   getProfileHardware,
@@ -331,6 +333,15 @@ export default function ProfilePage() {
             <div className="flex-1 min-w-0">
               <div className="flex flex-wrap items-center gap-2 mb-1">
                 <h1 className="text-2xl font-bold truncate">{player.name}</h1>
+                {!mock &&
+                  isJustJoined(player.memberSince) && (
+                    <span
+                      className="text-[10px] uppercase font-extrabold px-2 py-0.5 rounded-full border border-sky-400/50 bg-sky-400/15 text-sky-200"
+                      title="Joined this league in the last 24 hours"
+                    >
+                      {justJoinedBadgeLabel(joinTitle)}
+                    </span>
+                  )}
                 {player.isCreator && (
                   <span
                     className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border border-yellow-500 text-yellow-500"
@@ -367,6 +378,9 @@ export default function ProfilePage() {
                     >
                       {joinTitle}
                     </span>
+                    {isJustJoined(player.memberSince) ? (
+                      <span className="text-sky-300/90"> · new in the room</span>
+                    ) : null}
                   </>
                 ) : (
                   "New recruit"

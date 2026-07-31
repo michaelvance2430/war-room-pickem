@@ -117,3 +117,33 @@ export function joinTitleTierLabel(title: string): string | null {
   if (title === BOT_JOIN_TITLE) return "Bot";
   return null;
 }
+
+/** How long the “just joined” name badge stays visible. */
+export const JUST_JOINED_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * True if they joined this league seat within the last 24 hours.
+ * Uses current membership join time (not permanent first-join rank).
+ */
+export function isJustJoined(
+  joinedAt: string | null | undefined,
+  nowMs = Date.now()
+): boolean {
+  if (!joinedAt) return false;
+  const t = new Date(joinedAt).getTime();
+  if (Number.isNaN(t)) return false;
+  const age = nowMs - t;
+  return age >= 0 && age < JUST_JOINED_MS;
+}
+
+/**
+ * Pill copy next to their name while just-joined is active.
+ * Ties to join-order title: "Bottom Feeder · just joined"
+ */
+export function justJoinedBadgeLabel(
+  joinTitle: string | null | undefined
+): string {
+  const t = (joinTitle || "").trim();
+  if (!t || t === BOT_JOIN_TITLE) return "Just joined";
+  return `${t} · just joined`;
+}

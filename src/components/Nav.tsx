@@ -21,6 +21,7 @@ import GuestDemoChrome from "@/components/GuestDemoChrome";
 import GuestOnboarding from "@/components/GuestOnboarding";
 import PlayerWalkthrough from "@/components/PlayerWalkthrough";
 import RingCeremonyModal from "@/components/RingCeremonyModal";
+import JoinBadgeHydrator from "@/components/JoinBadgeHydrator";
 import { loadMyProfile } from "@/lib/profile";
 import { isGuestMode } from "@/lib/guest-mode";
 import { refreshStaffSessionFlags } from "@/lib/cloud";
@@ -604,6 +605,7 @@ export default function Nav() {
       {!isGuestMode() && <SeasonCountdownTicker />}
       {!isGuestMode() && <SeasonOpenWelcome />}
       {!isGuestMode() && <RingCeremonyModal />}
+      {!isGuestMode() && <JoinBadgeHydrator />}
       {!isGuestMode() && <RulesOnboardingModal />}
       <GazetteModal />
       <BadgeUnlockModal />
