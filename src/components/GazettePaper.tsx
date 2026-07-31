@@ -275,10 +275,14 @@ export default function GazettePaper({
 
         {edition.chaosDetonation && (
           <StoryBlock
-            kicker="💥 Chaos desk · Detonation report"
+            kicker="💥 Chaos desk · They locked pure random"
             kickerClass="text-orange-900"
             story={edition.chaosDetonation}
-            footer={`${edition.chaosDetonation.names.join(" · ")} · Chaos Mode · top ${edition.chaosDetonation.pts} pts`}
+            footer={`${edition.chaosDetonation.names.join(" · ")} · Chaos Mode confirmed at lock${
+              edition.chaosDetonation.pts
+                ? ` · finished at ${edition.chaosDetonation.pts} pts`
+                : ""
+            }`}
             avatar="☢️"
             avatarClass="border-orange-800 bg-orange-100"
           />

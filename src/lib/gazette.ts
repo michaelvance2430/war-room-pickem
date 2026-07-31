@@ -50,8 +50,8 @@ export type GazetteEdition = {
   /** Biggest standings mover this week (climb or freefall). */
   swing: GazetteStory | null;
   /**
-   * Chaos Mode went nuclear — one headline (multi-name if several detonated).
-   * All sports. Sarcastic “gone postal” energy.
+   * Someone confirmed Chaos lock this week — one headline (multi-name if several).
+   * Trigger is lock-in, not final score. All sports.
    */
   chaosDetonation: GazetteStory | null;
   samePerson: boolean;
@@ -385,47 +385,47 @@ const SOLO_DECKS: DK[] = [
 
 /** Format "A & B" or "A, B & C" or "A, B, C +2 more" */
 /**
- * Chaos went nuclear — one story, multi-name OK (better than multiple papers).
- * All sports. Trigger: Chaos Mode week + big doubled total (same bar as chaosExtremeLabel).
+ * Chaos lock-in headlines — fires because they *confirmed Chaos*, not the final score.
+ * One story for the week; multi-name if several people went postal.
+ * All sports.
  */
-const CHAOS_NUKE_HEADLINES: ((label: string, pts: number) => string)[] = [
-  (label, pts) => `${label.toUpperCase()} HAS GONE POSTAL (${pts} PTS)`,
-  (label, pts) => `${label.toUpperCase()} HAS GONE NUCLEAR — ${pts} ON THE CARD`,
-  (label, pts) => `CHAOS DETONATION: ${label.toUpperCase()} STACKS ${pts}`,
-  (label, pts) => `${label.toUpperCase()} WENT THERMONUCLEAR (${pts})`,
-  (label, pts) => `BREAKING: ${label.toUpperCase()} BLEW THE DOORS OFF — ${pts}`,
-  (label, pts) => `${label.toUpperCase()} WENT FULL SEND. THE CITY IS GONE. (${pts})`,
-  (label, pts) => `EXTRA! ${label.toUpperCase()} DETONATED THE SLATE (${pts} PTS)`,
-  (label, pts) => `${label.toUpperCase()} HAS LEFT THE CHAT (AND THE LEAGUE'S DIGNITY) — ${pts}`,
+const CHAOS_LOCK_HEADLINES: ((label: string) => string)[] = [
+  (label) => `${label.toUpperCase()} HAS GONE POSTAL`,
+  (label) => `${label.toUpperCase()} HAS GONE NUCLEAR`,
+  (label) => `${label.toUpperCase()} JUST HIT THE BIG RED BUTTON`,
+  (label) => `BREAKING: ${label.toUpperCase()} WENT FULL CHAOS`,
+  (label) => `${label.toUpperCase()} HAS LEFT THE BUILDING (CHAOS MODE)`,
+  (label) => `${label.toUpperCase()} CHOSE VIOLENCE — CHAOS LOCKED`,
+  (label) => `EXTRA! ${label.toUpperCase()} DETONATED THEIR OWN CARD`,
+  (label) => `${label.toUpperCase()} WENT THERMONUCLEAR ON PURPOSE`,
 ];
 
-const CHAOS_NUKE_MULTI_HEADLINES: ((label: string, pts: number) => string)[] = [
-  (label, pts) =>
-    `MASS DETONATION: ${label.toUpperCase()} HAVE GONE POSTAL (TOP ${pts})`,
-  (label, pts) =>
-    `MULTIPLE NUKES: ${label.toUpperCase()} — CHAOS WEEK ENDS AT ${pts}`,
-  (label, pts) =>
-    `THE CHAOS DESK REPORTS A GROUP MELTDOWN OF SUCCESS: ${label.toUpperCase()} (${pts})`,
-  (label, pts) =>
-    `${label.toUpperCase()} ALL WENT NUCLEAR. EVACUATE THE STANDINGS. (${pts})`,
+const CHAOS_LOCK_MULTI_HEADLINES: ((label: string) => string)[] = [
+  (label) => `MASS CHAOS: ${label.toUpperCase()} HAVE GONE POSTAL`,
+  (label) => `MULTIPLE NUKES ARMED: ${label.toUpperCase()}`,
+  (label) => `THE CHAOS DESK: ${label.toUpperCase()} ALL HIT THE BIG RED BUTTON`,
+  (label) => `${label.toUpperCase()} WENT NUCLEAR. EVACUATE THE LOCKER ROOM.`,
 ];
 
-const CHAOS_NUKE_DECKS: ((pts: number, count: number) => string)[] = [
-  (pts, count) =>
+const CHAOS_LOCK_DECKS: ((count: number, pts: number) => string)[] = [
+  (count, pts) =>
     count > 1
-      ? `${count} Chaos cards cooked. Highest total ${pts}. The robots did that on purpose.`
-      : `Chaos Mode, doubled damage, ${pts} on the ledger. Someone check the smoke alarms.`,
-  (pts, count) =>
+      ? `${count} humans locked pure random this week. Finals later. Dignity already spent.`
+      : `Confirmed Chaos lock. Pure random. 2× the week if it hits. Final score ${pts} — the paper does not care how you feel.`,
+  (count, pts) =>
     count > 1
-      ? `Group detonation. Peak ${pts}. Paper bags sold separately.`
-      : `${pts} after the 2×. Gone postal. The room is still under the desk.`,
-  (pts) =>
-    `Pure random. Pure violence. ${pts} points. Do not try this at home (they will).`,
+      ? `Group detonation at lock. Scores came later (${pts} peak). The robots are laughing.`
+      : `They pressed Chaos and meant it. ${pts} pts when the smoke cleared. No take-backs.`,
+  (count) =>
+    count > 1
+      ? `Several big red buttons. One paper. Zero chill.`
+      : `Gone postal at the lock screen. The room saw the flames. History will roast them either way.`,
 ];
 
 /**
- * Who Chaos'd this week and went nuclear (high doubled total).
- * Cloud is_chaos preferred; local chaos week list is fallback.
+ * Who confirmed Chaos lock this week (is_chaos on the pick).
+ * Cloud preferred; local chaos-week list is fallback.
+ * Score is for the deck only — trigger is the lock, not a nuke threshold.
  */
 async function buildChaosDetonationStory(
   weekIndex: number,
@@ -437,7 +437,6 @@ async function buildChaosDetonationStory(
     players.map((p) => {
       const w = p.weeklyPoints || [];
       const last = w.length ? w[w.length - 1] : null;
-      // Prefer the scored week index if aligned
       const atWeek =
         w.length > weekIndex && weekIndex >= 0 ? w[weekIndex] : last;
       return [p.id, atWeek ?? last ?? 0] as const;
@@ -447,16 +446,20 @@ async function buildChaosDetonationStory(
   type Hit = { name: string; pts: number };
   const hits: Hit[] = [];
 
-  // Cloud picks
+  // Cloud: anyone who locked is_chaos for this week
   try {
     const session = getSession();
     if (session?.leagueId && typeof window !== "undefined") {
       const supabase = createClient();
-      let rows: { user_id: string; total_points: number | null; is_chaos?: boolean }[] =
-        [];
+      let rows: {
+        user_id: string;
+        total_points: number | null;
+        is_chaos?: boolean;
+        locked_at?: string | null;
+      }[] = [];
       const res = await supabase
         .from("picks")
-        .select("user_id, total_points, is_chaos")
+        .select("user_id, total_points, is_chaos, locked_at")
         .eq("league_id", session.leagueId)
         .eq("week_number", weekIndex);
       if (res.error && /is_chaos|column/i.test(res.error.message || "")) {
@@ -466,9 +469,11 @@ async function buildChaosDetonationStory(
       }
       for (const r of rows) {
         if (!r.is_chaos) continue;
-        const pts = Number(r.total_points ?? 0);
-        const { chaosExtremeLabel } = await import("./chaos-mode");
-        if (chaosExtremeLabel(pts, true).kind !== "nuke") continue;
+        // Prefer locked chaos cards
+        if (r.locked_at === null || r.locked_at === undefined) {
+          // still count if is_chaos set (some paths lock without timestamp edge cases)
+        }
+        const pts = Number(r.total_points ?? ptsById.get(r.user_id) ?? 0);
         const name = nameById.get(r.user_id) || "Someone";
         hits.push({ name, pts });
       }
@@ -477,18 +482,14 @@ async function buildChaosDetonationStory(
     /* fall through */
   }
 
-  // Local fallback — anyone marked chaos that week with nuke totals
+  // Local fallback — marked chaos for this week at lock
   if (!hits.length) {
     try {
-      const { isWeekChaosForUser, chaosExtremeLabel } = await import(
-        "./chaos-mode"
-      );
+      const { isWeekChaosForUser } = await import("./chaos-mode");
       for (const p of players) {
         if (p.isMock) continue;
         if (!isWeekChaosForUser(weekIndex, leagueId, p.id)) continue;
-        const pts = ptsById.get(p.id) ?? 0;
-        if (chaosExtremeLabel(pts, true).kind !== "nuke") continue;
-        hits.push({ name: p.name, pts });
+        hits.push({ name: p.name, pts: ptsById.get(p.id) ?? 0 });
       }
     } catch {
       /* ignore */
@@ -498,7 +499,6 @@ async function buildChaosDetonationStory(
   if (!hits.length) return null;
 
   hits.sort((a, b) => b.pts - a.pts || a.name.localeCompare(b.name));
-  // Dedupe by name
   const seen = new Set<string>();
   const unique = hits.filter((h) => {
     const k = h.name.toLowerCase();
@@ -512,9 +512,9 @@ async function buildChaosDetonationStory(
   const label = formatNameList(names);
   const multi = names.length > 1;
   const hn = multi
-    ? byWeek(CHAOS_NUKE_MULTI_HEADLINES, weekIndex)(label, topPts)
-    : byWeek(CHAOS_NUKE_HEADLINES, weekIndex)(label, topPts);
-  const deck = byWeek(CHAOS_NUKE_DECKS, weekIndex)(topPts, names.length);
+    ? byWeek(CHAOS_LOCK_MULTI_HEADLINES, weekIndex)(label)
+    : byWeek(CHAOS_LOCK_HEADLINES, weekIndex)(label);
+  const deck = byWeek(CHAOS_LOCK_DECKS, weekIndex)(names.length, topPts);
 
   return {
     names,
