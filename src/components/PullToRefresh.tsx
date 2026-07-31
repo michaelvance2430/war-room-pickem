@@ -2,16 +2,21 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
-const THRESHOLD = 78;
+const THRESHOLD = 72;
 const MAX_PULL = 120;
 /** Ignore tiny finger jitter so taps on links still fire. */
-const ARM_PX = 18;
-/** Must hold past threshold this long before refresh starts. */
+const ARM_PX = 16;
+/** Hold past threshold this long, then release to refresh. */
 const HOLD_MS = 500;
 
+type Phase = "idle" | "pulling" | "holding" | "ready" | "refreshing";
+
 /**
- * Mobile: pull down at top of page, then hold ~0.5s → full reload.
- * Release early cancels. Doesn't arm on link/button taps.
+ * Mobile pull-to-refresh:
+ * 1) Pull down from top
+ * 2) Popup: Hold + countdown
+ * 3) When countdown hits 0 → "Release to refresh"
+ * 4) Release → reload (early release cancels)
  */
 export default function PullToRefresh({ children }: { children: ReactNode }) {
   const startY = useRef(0);
@@ -19,64 +24,76 @@ export default function PullToRefresh({ children }: { children: ReactNode }) {
   const armed = useRef(false);
   const pulling = useRef(false);
   const offsetRef = useRef(0);
-  const refreshingRef = useRef(false);
+  const phaseRef = useRef<Phase>("idle");
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const tickTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const holdStartedAt = useRef<number | null>(null);
-  const [offset, setOffset] = useState(0);
-  const [refreshing, setRefreshing] = useState(false);
-  const [holding, setHolding] = useState(false);
-  const [holdProgress, setHoldProgress] = useState(0);
 
-  const clearHold = useCallback(() => {
+  const [offset, setOffset] = useState(0);
+  const [phase, setPhase] = useState<Phase>("idle");
+  const [secondsLeft, setSecondsLeft] = useState(HOLD_MS / 1000);
+
+  const setPhaseBoth = useCallback((p: Phase) => {
+    phaseRef.current = p;
+    setPhase(p);
+  }, []);
+
+  const clearHoldTimers = useCallback(() => {
     if (holdTimer.current) {
       clearTimeout(holdTimer.current);
       holdTimer.current = null;
     }
-    if (progressTimer.current) {
-      clearInterval(progressTimer.current);
-      progressTimer.current = null;
+    if (tickTimer.current) {
+      clearInterval(tickTimer.current);
+      tickTimer.current = null;
     }
     holdStartedAt.current = null;
-    setHolding(false);
-    setHoldProgress(0);
   }, []);
 
+  const cancelGesture = useCallback(() => {
+    armed.current = false;
+    pulling.current = false;
+    clearHoldTimers();
+    offsetRef.current = 0;
+    setOffset(0);
+    setSecondsLeft(HOLD_MS / 1000);
+    if (phaseRef.current !== "refreshing") {
+      setPhaseBoth("idle");
+    }
+  }, [clearHoldTimers, setPhaseBoth]);
+
   const doRefresh = useCallback(() => {
-    clearHold();
-    refreshingRef.current = true;
-    setRefreshing(true);
-    offsetRef.current = THRESHOLD;
-    setOffset(THRESHOLD);
+    clearHoldTimers();
+    setPhaseBoth("refreshing");
     window.location.reload();
-  }, [clearHold]);
+  }, [clearHoldTimers, setPhaseBoth]);
 
-  const startHold = useCallback(() => {
-    if (holdTimer.current || refreshingRef.current) return;
+  const startHoldCountdown = useCallback(() => {
+    if (holdTimer.current || phaseRef.current === "refreshing") return;
     holdStartedAt.current = Date.now();
-    setHolding(true);
-    setHoldProgress(0);
+    setPhaseBoth("holding");
+    setSecondsLeft(HOLD_MS / 1000);
 
-    progressTimer.current = setInterval(() => {
+    tickTimer.current = setInterval(() => {
       if (!holdStartedAt.current) return;
-      const p = Math.min(1, (Date.now() - holdStartedAt.current) / HOLD_MS);
-      setHoldProgress(p);
-    }, 40);
+      const elapsed = Date.now() - holdStartedAt.current;
+      const left = Math.max(0, (HOLD_MS - elapsed) / 1000);
+      setSecondsLeft(left);
+    }, 30);
 
     holdTimer.current = setTimeout(() => {
       holdTimer.current = null;
-      if (progressTimer.current) {
-        clearInterval(progressTimer.current);
-        progressTimer.current = null;
+      if (tickTimer.current) {
+        clearInterval(tickTimer.current);
+        tickTimer.current = null;
       }
-      if (offsetRef.current >= THRESHOLD && !refreshingRef.current) {
-        doRefresh();
-      } else {
-        setHolding(false);
-        setHoldProgress(0);
+      // Still past threshold? → ready for release
+      if (offsetRef.current >= THRESHOLD && phaseRef.current === "holding") {
+        setSecondsLeft(0);
+        setPhaseBoth("ready");
       }
     }, HOLD_MS);
-  }, [doRefresh]);
+  }, [setPhaseBoth]);
 
   useEffect(() => {
     function setPull(n: number) {
@@ -84,15 +101,8 @@ export default function PullToRefresh({ children }: { children: ReactNode }) {
       setOffset(n);
     }
 
-    function reset() {
-      armed.current = false;
-      pulling.current = false;
-      clearHold();
-      setPull(0);
-    }
-
     function onTouchStart(e: TouchEvent) {
-      if (refreshingRef.current) return;
+      if (phaseRef.current === "refreshing") return;
       if (window.scrollY > 1) return;
       const t = e.touches[0];
       if (!t) return;
@@ -108,13 +118,15 @@ export default function PullToRefresh({ children }: { children: ReactNode }) {
       startX.current = t.clientX;
       armed.current = true;
       pulling.current = false;
-      clearHold();
+      clearHoldTimers();
+      setSecondsLeft(HOLD_MS / 1000);
+      setPhaseBoth("idle");
     }
 
     function onTouchMove(e: TouchEvent) {
-      if (!armed.current || refreshingRef.current) return;
+      if (!armed.current || phaseRef.current === "refreshing") return;
       if (window.scrollY > 1) {
-        reset();
+        cancelGesture();
         return;
       }
       const t = e.touches[0];
@@ -126,15 +138,16 @@ export default function PullToRefresh({ children }: { children: ReactNode }) {
         if (dy < ARM_PX) return;
         if (dx > dy * 0.7) {
           armed.current = false;
-          clearHold();
           return;
         }
         pulling.current = true;
+        setPhaseBoth("pulling");
       }
 
       if (dy <= 0) {
         setPull(0);
-        clearHold();
+        clearHoldTimers();
+        setPhaseBoth("pulling");
         return;
       }
 
@@ -142,13 +155,23 @@ export default function PullToRefresh({ children }: { children: ReactNode }) {
       setPull(damped);
 
       if (damped >= THRESHOLD) {
-        // Past threshold — start hold clock (once)
-        if (!holdTimer.current && !holdStartedAt.current) {
-          startHold();
+        if (
+          phaseRef.current === "pulling" ||
+          phaseRef.current === "idle"
+        ) {
+          startHoldCountdown();
         }
+        // If already ready and still holding, stay ready
       } else {
-        // Dropped below threshold — cancel hold
-        clearHold();
+        // Dropped below threshold — cancel countdown / ready
+        if (
+          phaseRef.current === "holding" ||
+          phaseRef.current === "ready"
+        ) {
+          clearHoldTimers();
+          setSecondsLeft(HOLD_MS / 1000);
+          setPhaseBoth("pulling");
+        }
       }
 
       if (damped > 4 && e.cancelable) {
@@ -158,12 +181,19 @@ export default function PullToRefresh({ children }: { children: ReactNode }) {
 
     function onTouchEnd() {
       if (!armed.current && !pulling.current) return;
-      // Release before 0.5s = cancel (never refresh on release alone)
+      const wasReady = phaseRef.current === "ready";
       armed.current = false;
       pulling.current = false;
-      if (!refreshingRef.current) {
-        clearHold();
-        setPull(0);
+
+      if (wasReady) {
+        // Countdown finished and they released → refresh
+        doRefresh();
+        return;
+      }
+
+      // Released early during hold/pull → cancel
+      if (phaseRef.current !== "refreshing") {
+        cancelGesture();
       }
     }
 
@@ -173,55 +203,106 @@ export default function PullToRefresh({ children }: { children: ReactNode }) {
     document.addEventListener("touchcancel", onTouchEnd, { passive: true });
 
     return () => {
-      clearHold();
+      clearHoldTimers();
       document.removeEventListener("touchstart", onTouchStart);
       document.removeEventListener("touchmove", onTouchMove);
       document.removeEventListener("touchend", onTouchEnd);
       document.removeEventListener("touchcancel", onTouchEnd);
     };
-  }, [clearHold, startHold]);
+  }, [
+    cancelGesture,
+    clearHoldTimers,
+    doRefresh,
+    setPhaseBoth,
+    startHoldCountdown,
+  ]);
 
-  let label = "Pull to refresh";
-  if (refreshing) {
-    label = "Refreshing…";
-  } else if (holding) {
-    label = "Hold to refresh…";
-  } else if (offset >= THRESHOLD) {
-    label = "Hold to refresh…";
-  } else if (offset > 20) {
-    label = "Keep pulling…";
-  }
+  const showPopup =
+    phase === "holding" || phase === "ready" || phase === "refreshing";
+  const showPill = (phase === "pulling" && offset > 12) || showPopup;
 
-  const show = offset > 6 || refreshing || holding;
+  const displaySec = Math.max(0, secondsLeft).toFixed(1);
+  const holdProgress =
+    phase === "holding"
+      ? Math.min(1, 1 - secondsLeft / (HOLD_MS / 1000))
+      : phase === "ready" || phase === "refreshing"
+        ? 1
+        : 0;
 
   return (
     <>
-      <div
-        className="fixed left-0 right-0 z-[70] flex justify-center pointer-events-none transition-opacity"
-        style={{
-          top: Math.max(8, offset - 28),
-          opacity: show ? 1 : 0,
-        }}
-        aria-hidden
-      >
+      {/* Light top pill while pulling before threshold popup */}
+      {showPill && !showPopup && (
         <div
-          className={`relative overflow-hidden rounded-full border px-3 py-1.5 text-[11px] font-bold shadow-lg backdrop-blur-md ${
-            refreshing || holding
-              ? "border-primary/60 bg-primary text-black"
-              : offset >= THRESHOLD
-                ? "border-primary/50 bg-primary/20 text-primary"
-                : "border-border bg-card/90 text-muted"
-          }`}
+          className="fixed left-0 right-0 z-[70] flex justify-center pointer-events-none"
+          style={{ top: Math.max(10, offset * 0.35) }}
+          aria-hidden
         >
-          {holding && !refreshing && (
-            <span
-              className="absolute inset-0 bg-black/15 origin-left"
-              style={{ transform: `scaleX(${holdProgress})` }}
-            />
-          )}
-          <span className="relative z-10">{label}</span>
+          <div className="rounded-full border border-border bg-card/95 px-3 py-1.5 text-[11px] font-bold text-muted shadow-lg backdrop-blur-md">
+            Keep pulling…
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Full popup once past threshold */}
+      {showPopup && (
+        <div
+          className="fixed inset-0 z-[80] flex items-start justify-center pt-[18vh] px-4 pointer-events-none"
+          role="status"
+          aria-live="polite"
+        >
+          <div
+            className={`w-full max-w-xs rounded-2xl border-2 px-5 py-5 shadow-[0_12px_48px_rgba(0,0,0,0.55)] backdrop-blur-md text-center ${
+              phase === "ready" || phase === "refreshing"
+                ? "border-primary bg-primary text-black"
+                : "border-primary/50 bg-card/95 text-foreground"
+            }`}
+          >
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-80 mb-2">
+              Refresh
+            </p>
+
+            {phase === "holding" && (
+              <>
+                <p className="text-xl font-extrabold mb-1">Hold…</p>
+                <p className="text-4xl font-black tabular-nums tracking-tight mb-2">
+                  {displaySec}
+                  <span className="text-lg font-bold opacity-70">s</span>
+                </p>
+                <p className="text-xs opacity-80 mb-3">
+                  Keep holding — then release to refresh
+                </p>
+                <div className="h-2 rounded-full bg-black/15 overflow-hidden">
+                  <div
+                    className="h-full bg-primary rounded-full transition-[width] duration-75"
+                    style={{ width: `${holdProgress * 100}%` }}
+                  />
+                </div>
+              </>
+            )}
+
+            {phase === "ready" && (
+              <>
+                <p className="text-2xl font-extrabold mb-1">Release</p>
+                <p className="text-sm font-semibold opacity-90">
+                  to refresh the app
+                </p>
+                <p className="text-[11px] mt-2 opacity-70">
+                  Let go now · lift finger early cancels
+                </p>
+              </>
+            )}
+
+            {phase === "refreshing" && (
+              <>
+                <p className="text-xl font-extrabold mb-1">Refreshing…</p>
+                <p className="text-sm opacity-80">Hang tight</p>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       <div
         style={{
           transform: offset > 0 ? `translateY(${offset * 0.35}px)` : undefined,
