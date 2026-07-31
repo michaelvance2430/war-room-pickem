@@ -49,6 +49,11 @@ export type GazetteEdition = {
   crystalBallMiss: GazetteStory | null;
   /** Biggest standings mover this week (climb or freefall). */
   swing: GazetteStory | null;
+  /**
+   * Chaos Mode went nuclear — one headline (multi-name if several detonated).
+   * All sports. Sarcastic “gone postal” energy.
+   */
+  chaosDetonation: GazetteStory | null;
   samePerson: boolean;
   masthead: string;
   /** Under the masthead — one-line sizzle */
@@ -379,6 +384,147 @@ const SOLO_DECKS: DK[] = [
 ];
 
 /** Format "A & B" or "A, B & C" or "A, B, C +2 more" */
+/**
+ * Chaos went nuclear — one story, multi-name OK (better than multiple papers).
+ * All sports. Trigger: Chaos Mode week + big doubled total (same bar as chaosExtremeLabel).
+ */
+const CHAOS_NUKE_HEADLINES: ((label: string, pts: number) => string)[] = [
+  (label, pts) => `${label.toUpperCase()} HAS GONE POSTAL (${pts} PTS)`,
+  (label, pts) => `${label.toUpperCase()} HAS GONE NUCLEAR — ${pts} ON THE CARD`,
+  (label, pts) => `CHAOS DETONATION: ${label.toUpperCase()} STACKS ${pts}`,
+  (label, pts) => `${label.toUpperCase()} WENT THERMONUCLEAR (${pts})`,
+  (label, pts) => `BREAKING: ${label.toUpperCase()} BLEW THE DOORS OFF — ${pts}`,
+  (label, pts) => `${label.toUpperCase()} WENT FULL SEND. THE CITY IS GONE. (${pts})`,
+  (label, pts) => `EXTRA! ${label.toUpperCase()} DETONATED THE SLATE (${pts} PTS)`,
+  (label, pts) => `${label.toUpperCase()} HAS LEFT THE CHAT (AND THE LEAGUE'S DIGNITY) — ${pts}`,
+];
+
+const CHAOS_NUKE_MULTI_HEADLINES: ((label: string, pts: number) => string)[] = [
+  (label, pts) =>
+    `MASS DETONATION: ${label.toUpperCase()} HAVE GONE POSTAL (TOP ${pts})`,
+  (label, pts) =>
+    `MULTIPLE NUKES: ${label.toUpperCase()} — CHAOS WEEK ENDS AT ${pts}`,
+  (label, pts) =>
+    `THE CHAOS DESK REPORTS A GROUP MELTDOWN OF SUCCESS: ${label.toUpperCase()} (${pts})`,
+  (label, pts) =>
+    `${label.toUpperCase()} ALL WENT NUCLEAR. EVACUATE THE STANDINGS. (${pts})`,
+];
+
+const CHAOS_NUKE_DECKS: ((pts: number, count: number) => string)[] = [
+  (pts, count) =>
+    count > 1
+      ? `${count} Chaos cards cooked. Highest total ${pts}. The robots did that on purpose.`
+      : `Chaos Mode, doubled damage, ${pts} on the ledger. Someone check the smoke alarms.`,
+  (pts, count) =>
+    count > 1
+      ? `Group detonation. Peak ${pts}. Paper bags sold separately.`
+      : `${pts} after the 2×. Gone postal. The room is still under the desk.`,
+  (pts) =>
+    `Pure random. Pure violence. ${pts} points. Do not try this at home (they will).`,
+];
+
+/**
+ * Who Chaos'd this week and went nuclear (high doubled total).
+ * Cloud is_chaos preferred; local chaos week list is fallback.
+ */
+async function buildChaosDetonationStory(
+  weekIndex: number,
+  players: Player[]
+): Promise<GazetteStory | null> {
+  const leagueId = getLeague()?.id;
+  const nameById = new Map(players.map((p) => [p.id, p.name]));
+  const ptsById = new Map(
+    players.map((p) => {
+      const w = p.weeklyPoints || [];
+      const last = w.length ? w[w.length - 1] : null;
+      // Prefer the scored week index if aligned
+      const atWeek =
+        w.length > weekIndex && weekIndex >= 0 ? w[weekIndex] : last;
+      return [p.id, atWeek ?? last ?? 0] as const;
+    })
+  );
+
+  type Hit = { name: string; pts: number };
+  const hits: Hit[] = [];
+
+  // Cloud picks
+  try {
+    const session = getSession();
+    if (session?.leagueId && typeof window !== "undefined") {
+      const supabase = createClient();
+      let rows: { user_id: string; total_points: number | null; is_chaos?: boolean }[] =
+        [];
+      const res = await supabase
+        .from("picks")
+        .select("user_id, total_points, is_chaos")
+        .eq("league_id", session.leagueId)
+        .eq("week_number", weekIndex);
+      if (res.error && /is_chaos|column/i.test(res.error.message || "")) {
+        rows = [];
+      } else if (!res.error && res.data) {
+        rows = res.data as typeof rows;
+      }
+      for (const r of rows) {
+        if (!r.is_chaos) continue;
+        const pts = Number(r.total_points ?? 0);
+        const { chaosExtremeLabel } = await import("./chaos-mode");
+        if (chaosExtremeLabel(pts, true).kind !== "nuke") continue;
+        const name = nameById.get(r.user_id) || "Someone";
+        hits.push({ name, pts });
+      }
+    }
+  } catch {
+    /* fall through */
+  }
+
+  // Local fallback — anyone marked chaos that week with nuke totals
+  if (!hits.length) {
+    try {
+      const { isWeekChaosForUser, chaosExtremeLabel } = await import(
+        "./chaos-mode"
+      );
+      for (const p of players) {
+        if (p.isMock) continue;
+        if (!isWeekChaosForUser(weekIndex, leagueId, p.id)) continue;
+        const pts = ptsById.get(p.id) ?? 0;
+        if (chaosExtremeLabel(pts, true).kind !== "nuke") continue;
+        hits.push({ name: p.name, pts });
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  if (!hits.length) return null;
+
+  hits.sort((a, b) => b.pts - a.pts || a.name.localeCompare(b.name));
+  // Dedupe by name
+  const seen = new Set<string>();
+  const unique = hits.filter((h) => {
+    const k = h.name.toLowerCase();
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+
+  const names = unique.map((h) => h.name);
+  const topPts = unique[0].pts;
+  const label = formatNameList(names);
+  const multi = names.length > 1;
+  const hn = multi
+    ? byWeek(CHAOS_NUKE_MULTI_HEADLINES, weekIndex)(label, topPts)
+    : byWeek(CHAOS_NUKE_HEADLINES, weekIndex)(label, topPts);
+  const deck = byWeek(CHAOS_NUKE_DECKS, weekIndex)(topPts, names.length);
+
+  return {
+    names,
+    pts: topPts,
+    kind: multi ? "tie" : "clear",
+    headline: hn,
+    deck,
+  };
+}
+
 export function formatNameList(names: string[], maxShow = 3): string {
   const clean = names.map((n) => n.trim()).filter(Boolean);
   if (clean.length === 0) return "THE FIELD";
@@ -737,6 +883,14 @@ export async function buildGazetteEdition(
     }
   }
 
+  // Chaos went postal / nuclear — one headline, multi-name if several nuked
+  let chaosDetonation: GazetteStory | null = null;
+  try {
+    chaosDetonation = await buildChaosDetonationStory(weekIndex, players);
+  } catch {
+    chaosDetonation = null;
+  }
+
   // Biggest climber / freefall for the paper's "Movers" box
   let swing: GazetteStory | null = null;
   try {
@@ -953,6 +1107,7 @@ export async function buildGazetteEdition(
       noLock: nflNoLock,
       crystalBallMiss: null, // no Crystal Ball in NFL packs by default
       swing: nflSwing,
+      chaosDetonation,
       sportId: "nfl",
       stampLine: "Extra · Extra",
       eventLine: "Pro football · primetime desk · not college",
@@ -1028,6 +1183,7 @@ export async function buildGazetteEdition(
       noLock,
       crystalBallMiss,
       swing,
+      chaosDetonation,
       sportId: "soccer_wwc",
       stampLine: "EXTRA!",
       eventLine: "FIFA Women's World Cup Brazil 2027™ · War Room desk",
@@ -1090,6 +1246,7 @@ export async function buildGazetteEdition(
     noLock,
     crystalBallMiss,
     swing,
+    chaosDetonation,
     sportId: "cfb",
     stampLine: "Extra · Extra",
     eventLine: undefined,
@@ -1114,6 +1271,13 @@ export function formatGazetteShareText(edition: GazetteEdition): string {
   }
   if (edition.swing) {
     lines.push(`📈 ${edition.swing.headline}`, edition.swing.deck, "");
+  }
+  if (edition.chaosDetonation) {
+    lines.push(
+      `💥 ${edition.chaosDetonation.headline}`,
+      edition.chaosDetonation.deck,
+      ""
+    );
   }
   if (edition.noLock) {
     lines.push(`🥛 ${edition.noLock.headline}`, edition.noLock.deck, "");

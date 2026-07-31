@@ -51,6 +51,7 @@ export function normalizeEdition(raw: GazetteEdition): GazetteEdition {
     },
     sideStories: Array.isArray(raw.sideStories) ? raw.sideStories : [],
     swing: raw.swing ?? null,
+    chaosDetonation: raw.chaosDetonation ?? null,
     crystalBallMiss: raw.crystalBallMiss ?? null,
     standingsDeadlock: raw.standingsDeadlock ?? null,
     noLock: raw.noLock ?? null,
@@ -269,6 +270,17 @@ export default function GazettePaper({
             footer={`${edition.swing.names[0]} · ${edition.swing.pts} this week`}
             avatar="🚀"
             avatarClass="border-teal-800 bg-teal-100"
+          />
+        )}
+
+        {edition.chaosDetonation && (
+          <StoryBlock
+            kicker="💥 Chaos desk · Detonation report"
+            kickerClass="text-orange-900"
+            story={edition.chaosDetonation}
+            footer={`${edition.chaosDetonation.names.join(" · ")} · Chaos Mode · top ${edition.chaosDetonation.pts} pts`}
+            avatar="☢️"
+            avatarClass="border-orange-800 bg-orange-100"
           />
         )}
 
