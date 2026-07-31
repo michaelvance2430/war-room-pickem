@@ -455,6 +455,28 @@ export async function savePicksToCloud(opts: {
     return { ok: false, error: "Not signed into a league" };
   }
 
+  // Guest demo: save picks locally so the player tutorial can complete
+  try {
+    const { isGuestMode } = await import("./guest-mode");
+    if (isGuestMode()) {
+      const pickList = Object.values(opts.picks);
+      if (!pickList.length) return { ok: false, error: "No picks to save" };
+      const payload = {
+        picks: opts.picks,
+        bestBetId: opts.bestBetId,
+        propChoice: opts.propChoice,
+        lockedAt: new Date().toISOString(),
+      };
+      localStorage.setItem(
+        `warroom-picks-week-${opts.weekNumber}`,
+        JSON.stringify(payload)
+      );
+      return { ok: true, firstFinal: "ignored" };
+    }
+  } catch {
+    /* fall through to cloud */
+  }
+
   const supabase = createClient();
   const { data: auth } = await supabase.auth.getUser();
   const uid = auth.user?.id || session.playerId;
@@ -620,6 +642,30 @@ export async function savePicksToCloud(opts: {
 export async function loadMyPicks(weekNumber = 1) {
   const session = getSession();
   if (!session?.leagueId) return null;
+
+  try {
+    const { isGuestMode } = await import("./guest-mode");
+    if (isGuestMode()) {
+      const raw = localStorage.getItem(`warroom-picks-week-${weekNumber}`);
+      if (!raw) return null;
+      const data = JSON.parse(raw) as {
+        picks?: Record<string, UserPick>;
+        bestBetId?: string | null;
+        propChoice?: string | null;
+        lockedAt?: string | null;
+      };
+      if (!data.picks || !Object.keys(data.picks).length) return null;
+      return {
+        picks: data.picks,
+        bestBetId: data.bestBetId ?? null,
+        propChoice: data.propChoice ?? null,
+        lockedAt: data.lockedAt ?? null,
+      };
+    }
+  } catch {
+    /* fall through */
+  }
+
   const supabase = createClient();
   const { data: auth } = await supabase.auth.getUser();
   const uid = auth.user?.id || session.playerId;
