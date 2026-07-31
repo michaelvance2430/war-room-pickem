@@ -30,6 +30,11 @@ export const NFL_CROWN_HEADLINES: HN[] = [
   (n, pts) => `PLAYOFF AURA IN WEEK CLOTHES: ${n.toUpperCase()} — ${pts}`,
   (n, pts) => `${n.toUpperCase()} JUST DROPPED A PRIMETIME MASTERCLASS (${pts})`,
   (n, pts) => `THE BOARD SALUTES ${n.toUpperCase()} — ${pts} ON THE CARD`,
+  // WTF / surreal desk
+  (n, pts) =>
+    `LOCAL MAN DISCOVERS SPREADS ARE FAKE; ${n.toUpperCase()} POSTS ${pts} ANYWAY`,
+  (n, pts) =>
+    `NFL FINES ${n.toUpperCase()} FOR EXCESSIVE DOMINANCE (${pts} PTS) — APPEAL PENDING`,
 ];
 
 export const NFL_CROWN_DECKS: DK[] = [
@@ -51,6 +56,10 @@ export const NFL_CROWN_DECKS: DK[] = [
     `${pts} pts — the kind of Sunday that makes rivalries personal.`,
   (pts) =>
     `Toilet Bowl scouts looked away. ${pts} is the wrong end of the film.`,
+  (pts) =>
+    `${pts}. Scientists at the league office have opened a small, worried folder.`,
+  (pts) =>
+    `Broadcast cut to commercial mid-celebration. Still ${pts}. Math is undefeated.`,
 ];
 
 export const NFL_SHAME_HEADLINES: HN[] = [
@@ -81,6 +90,11 @@ export const NFL_SHAME_HEADLINES: HN[] = [
     `${n.toUpperCase()} CALLED A TIMEOUT TOO LATE — ${pts} PTS`,
   (n, pts) =>
     `SUNDAY NIGHTMARE: ${n.toUpperCase()} WITH A CRISP ${pts}`,
+  // WTF / surreal desk
+  (n, pts) =>
+    `${n.toUpperCase()} LEGALLY CHANGED NAME TO "ALMOST COVERED" AFTER ${pts}`,
+  (n, pts) =>
+    `BREAKING: ${n.toUpperCase()}'S CARD WAS HAUNTED — ONLY EXPLANATION FOR ${pts}`,
 ];
 
 export const NFL_SHAME_DECKS: DK[] = [
@@ -105,6 +119,10 @@ export const NFL_SHAME_DECKS: DK[] = [
   (pts) => `${pts} points and a dream. The dream got sacked.`,
   (pts) =>
     `If this card were a two-minute drill, the clock hit zero at ${pts}.`,
+  (pts) =>
+    `${pts}. At one point the referees reviewed the card for a personal foul on reality.`,
+  (pts) =>
+    `We checked for a glitch. There was no glitch. Just ${pts} and a long silence.`,
 ];
 
 export const NFL_EDITION_TAGLINES: string[] = [
@@ -156,6 +174,14 @@ export const NFL_PULL_QUOTES: ((ctx: {
     text: `"Next man up."`,
     by: "The cut line, staring at the Toilet Bowl",
   }),
+  (c) => ({
+    text: `"I saw the matrix. It was just spreads with better lighting."`,
+    by: c.crown || "Someone who cashed the late window",
+  }),
+  (c) => ({
+    text: `"The dog spoke to me. I should not have listened."`,
+    by: c.shame || "Best Bet, currently on IR",
+  }),
 ];
 
 export const NFL_CLASSIFIEDS: ((ctx: {
@@ -174,6 +200,10 @@ export const NFL_CLASSIFIEDS: ((ctx: {
     `NOTICE: film room reviewed ${c.crown}'s week. Decision stands. (${c.pts} pts.)`,
   (c) =>
     `HELP WANTED: someone to explain how ${c.shame || "half the room"} scored that. Experience with self-owns preferred.`,
+  (c) =>
+    `REWARD: one (1) free conscience if you can prove ${c.crown} used legal means for ${c.pts} pts. No psychics.`,
+  (c) =>
+    `MISSING: the plot. Last seen leaving ${c.league} after the late window. If found, do not approach ${c.shame || "the cut line"}.`,
 ];
 
 export type NflSideCtx = {
@@ -208,6 +238,22 @@ export const NFL_SIDE_STORIES: ((ctx: NflSideCtx) => {
     kicker: "Cut line watch",
     headline: "TOILET BOWL SCOUTS LOVE A SLOW START",
     body: `Bottom half still has a path. It's just uglier. ${ctx.pts} at the top doesn't care about your feelings.`,
+  }),
+  // Super out-there / WTF desk — pure absurdist Sunday energy
+  (ctx) => ({
+    kicker: "Unconfirmed · very loud",
+    headline: `SKYWRITER HIRED TO APOLOGIZE FOR ${ctx.crown.toUpperCase()}'S CARD`,
+    body: `A plane over the metro allegedly dragged a banner reading “SORRY ABOUT THE ${ctx.pts}.” FAA has no comment. ${ctx.league} group chat has 400. ${ctx.shame ? `${ctx.shame} tried to book a counter-flight.` : "No counter-flight available."}`,
+  }),
+  (ctx) => ({
+    kicker: "Science desk",
+    headline: "PHYSICISTS BAFFLED BY SPREAD THAT SHOULD NOT EXIST",
+    body: `${ctx.weekLabel} produced a result so wrong it briefly reverse-engineered confidence. Lab notes just say “${ctx.crown}: ${ctx.pts}” and then a coffee ring. Peer review is the Locker Room.`,
+  }),
+  (ctx) => ({
+    kicker: "Crime blotter",
+    headline: "BEST BET STOLEN; SUSPECT DESCRIBED AS “FULL OF HOPE”",
+    body: `Witnesses saw someone double-or-nothing their dignity near the red zone. Recovered items: zero covers, one monologue. ${ctx.shame ? `${ctx.shame} remains a person of interest.` : "Investigation ongoing."}`,
   }),
 ];
 
@@ -283,6 +329,9 @@ export const NFL_LOCK_ROASTS = [
   "Future you on Monday morning is watching. Don't be a zero with opinions.",
   "This is your coordinator. He wants the card in before the two-minute warning of life.",
   "Hydrate. Lock. Then Locker Room. In that order, champ.",
+  // WTF lock nudges
+  "Your unpicked card is currently astral projecting. Ground it. Hit Save.",
+  "A raccoon in a headset just asked if you're locking. Don't make the raccoon wait.",
 ];
 
 export const NFL_LATE_LOCK_ROASTS = [
@@ -319,6 +368,15 @@ export function buildNflHotTakes(players: Player[]): string[] {
   );
   takes.push(
     "Hot take: “Any given Sunday” is not an excuse for a three-and-out card."
+  );
+  takes.push(
+    "Hot take: if your card needs a skywriter apology, you might be cooking too hard."
+  );
+  takes.push(
+    "Hot take: the dog that “spoke to you” was just the line. Lines lie. Often."
+  );
+  takes.push(
+    "Hot take: we ran the tape backward and your zero still happened. Haunted."
   );
 
   const top = sorted[0];
