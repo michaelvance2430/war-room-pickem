@@ -79,8 +79,9 @@ export default function PicksHowToModal() {
 
           <div className="rounded-lg border-2 border-danger/50 bg-danger/10 px-3 py-2.5">
             <p className="text-xs font-bold text-danger leading-snug">
-              No lock, no points. Save before kickoff or you score zero that
-              week. Fair is fair.
+              No lock, no points. Lock a full card before the first kickoff on
+              the slate — after that you cannot lock. Same-day games freeze at
+              that day&apos;s first kickoff. Fair is fair.
             </p>
           </div>
         </div>

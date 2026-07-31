@@ -47,44 +47,109 @@ export function kickoffMs(g: Game): number {
   return Number.isNaN(t) ? 0 : t;
 }
 
+/** ET calendar day key (YYYY-MM-DD) for a timestamp. */
+export function etDayKeyFromMs(ms: number): string {
+  return new Date(ms).toLocaleDateString("en-CA", { timeZone: ET });
+}
+
+/** Earliest kickoff on the whole card (ms), or 0. */
+export function firstKickoffOnCardMs(games: Game[]): number {
+  const times = games.map(kickoffMs).filter((t) => t > 0);
+  return times.length ? Math.min(...times) : 0;
+}
+
 /**
- * Hard lock: once kickoff has started (now >= commence), no more changes.
- * No exceptions — not for commissioner, not for late edits.
+ * First kickoff that ET calendar day among games on the card.
+ * e.g. first Saturday game freezes all Saturday games.
  */
-export function isGameLocked(g: Game, now = Date.now()): boolean {
+export function firstKickoffOfEtDayMs(game: Game, allGames: Game[]): number {
+  const t = kickoffMs(game);
+  if (!t) return 0;
+  const day = etDayKeyFromMs(t);
+  const sameDay = allGames
+    .map(kickoffMs)
+    .filter((ms) => ms > 0 && etDayKeyFromMs(ms) === day);
+  return sameDay.length ? Math.min(...sameDay) : 0;
+}
+
+/**
+ * Hard lock for a game: once the **first kickoff that ET day** has started,
+ * no more changes to any game on that day.
+ * Pass `allGames` (the full card) so same-day slate freezes together.
+ */
+export function isGameLocked(
+  g: Game,
+  now = Date.now(),
+  allGames?: Game[]
+): boolean {
+  const slate = allGames?.length ? allGames : [g];
+  const dayFirst = firstKickoffOfEtDayMs(g, slate);
+  if (dayFirst) return now >= dayFirst;
   const t = kickoffMs(g);
-  if (!t) return false; // unknown kickoff stays open (shouldn't happen on live cards)
+  if (!t) return false;
+  return now >= t;
+}
+
+/**
+ * True once the first kickoff on the card has started.
+ * After this, you cannot lock a card if you never locked before.
+ */
+export function isCardLockDeadlinePassed(
+  games: Game[],
+  now = Date.now()
+): boolean {
+  const t = firstKickoffOnCardMs(games);
+  if (!t) return false;
   return now >= t;
 }
 
 /** Prop locks at the first kickoff on the card. */
 export function isPropLocked(games: Game[], now = Date.now()): boolean {
-  const times = games.map(kickoffMs).filter((t) => t > 0);
-  if (!times.length) return false;
-  return now >= Math.min(...times);
+  return isCardLockDeadlinePassed(games, now);
 }
 
 export function openGameCount(games: Game[], now = Date.now()): number {
-  return games.filter((g) => !isGameLocked(g, now)).length;
+  return games.filter((g) => !isGameLocked(g, now, games)).length;
 }
 
 export function formatKickoffLockLabel(
   g: Game,
-  now = Date.now()
+  now = Date.now(),
+  allGames?: Game[]
 ): { locked: boolean; label: string } {
-  const t = kickoffMs(g);
+  const slate = allGames?.length ? allGames : [g];
+  const dayFirst = firstKickoffOfEtDayMs(g, slate);
   const full = formatKickoff(g.commenceTime || g.startTime).full;
-  if (!t) return { locked: false, label: full };
-  if (now >= t) return { locked: true, label: `LOCKED · ${full}` };
-  const mins = Math.round((t - now) / 60_000);
+  const lockAt = dayFirst || kickoffMs(g);
+  if (!lockAt) return { locked: false, label: full };
+  if (now >= lockAt) {
+    return {
+      locked: true,
+      label: `LOCKED · first kickoff of the day · ${full}`,
+    };
+  }
+  const mins = Math.round((lockAt - now) / 60_000);
   if (mins < 60) {
-    return { locked: false, label: `Locks in ${mins} min · ${full}` };
+    return {
+      locked: false,
+      label: `Day locks in ${mins} min · ${full}`,
+    };
   }
   const hrs = Math.round(mins / 60);
   if (hrs < 48) {
-    return { locked: false, label: `Locks in ~${hrs}h · ${full}` };
+    return {
+      locked: false,
+      label: `Day locks in ~${hrs}h · ${full}`,
+    };
   }
   return { locked: false, label: full };
+}
+
+/** Human label for the card-wide lock deadline (first kickoff). */
+export function formatCardLockDeadline(games: Game[]): string {
+  const t = firstKickoffOnCardMs(games);
+  if (!t) return "first kickoff";
+  return formatKickoff(new Date(t).toISOString()).full;
 }
 
 /**

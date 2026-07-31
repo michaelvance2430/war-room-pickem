@@ -65,10 +65,14 @@ export const RULE_SECTIONS: RuleSection[] = [
     title: "6. Save your card",
     body: [
       "Hit Save Picks when everything is filled in: side + confidence on all five, one Best Bet, and a prop choice.",
-      "Weekly game picks lock at each game’s kickoff — no exceptions. Prop locks at the first kickoff on that card.",
       {
         bold: true,
-        text: "NO LOCK, NO POINTS: If you don’t save/lock your card before kickoff, you score 0 for that week. No makeups. No partial credit. Fair is fair.",
+        text: "LOCK DEADLINE: You must lock a full card before the first kickoff on that week’s slate. After first kickoff, if you never locked, you cannot lock — you score 0 for the week.",
+      },
+      "Games on the same calendar day (ET) freeze together at that day’s first kickoff — no more edits to that day’s games.",
+      {
+        bold: true,
+        text: "NO LOCK, NO POINTS: Miss the first-kickoff deadline and you get nothing. No makeups. No partial credit. Fair is fair. Gazette may put you on the milk carton.",
       },
       "Only you can see your weekly picks — league mates cannot spy on your card.",
     ],
