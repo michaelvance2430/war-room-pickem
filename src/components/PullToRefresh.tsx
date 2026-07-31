@@ -6,10 +6,12 @@ const THRESHOLD = 78;
 const MAX_PULL = 120;
 /** Ignore tiny finger jitter so taps on links still fire. */
 const ARM_PX = 18;
+/** Must hold past threshold this long before refresh starts. */
+const HOLD_MS = 500;
 
 /**
- * Mobile pull-down at top of page → full reload.
- * Careful not to steal taps on checklist links / buttons.
+ * Mobile: pull down at top of page, then hold ~0.5s → full reload.
+ * Release early cancels. Doesn't arm on link/button taps.
  */
 export default function PullToRefresh({ children }: { children: ReactNode }) {
   const startY = useRef(0);
@@ -18,38 +20,82 @@ export default function PullToRefresh({ children }: { children: ReactNode }) {
   const pulling = useRef(false);
   const offsetRef = useRef(0);
   const refreshingRef = useRef(false);
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const holdStartedAt = useRef<number | null>(null);
   const [offset, setOffset] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
-  const [hint, setHint] = useState(false);
+  const [holding, setHolding] = useState(false);
+  const [holdProgress, setHoldProgress] = useState(0);
+
+  const clearHold = useCallback(() => {
+    if (holdTimer.current) {
+      clearTimeout(holdTimer.current);
+      holdTimer.current = null;
+    }
+    if (progressTimer.current) {
+      clearInterval(progressTimer.current);
+      progressTimer.current = null;
+    }
+    holdStartedAt.current = null;
+    setHolding(false);
+    setHoldProgress(0);
+  }, []);
 
   const doRefresh = useCallback(() => {
+    clearHold();
     refreshingRef.current = true;
     setRefreshing(true);
     offsetRef.current = THRESHOLD;
     setOffset(THRESHOLD);
     window.location.reload();
-  }, []);
+  }, [clearHold]);
+
+  const startHold = useCallback(() => {
+    if (holdTimer.current || refreshingRef.current) return;
+    holdStartedAt.current = Date.now();
+    setHolding(true);
+    setHoldProgress(0);
+
+    progressTimer.current = setInterval(() => {
+      if (!holdStartedAt.current) return;
+      const p = Math.min(1, (Date.now() - holdStartedAt.current) / HOLD_MS);
+      setHoldProgress(p);
+    }, 40);
+
+    holdTimer.current = setTimeout(() => {
+      holdTimer.current = null;
+      if (progressTimer.current) {
+        clearInterval(progressTimer.current);
+        progressTimer.current = null;
+      }
+      if (offsetRef.current >= THRESHOLD && !refreshingRef.current) {
+        doRefresh();
+      } else {
+        setHolding(false);
+        setHoldProgress(0);
+      }
+    }, HOLD_MS);
+  }, [doRefresh]);
 
   useEffect(() => {
     function setPull(n: number) {
       offsetRef.current = n;
       setOffset(n);
-      setHint(n >= THRESHOLD * 0.55);
     }
 
     function reset() {
       armed.current = false;
       pulling.current = false;
+      clearHold();
       setPull(0);
     }
 
     function onTouchStart(e: TouchEvent) {
       if (refreshingRef.current) return;
-      // Only candidate when truly at top
       if (window.scrollY > 1) return;
       const t = e.touches[0];
       if (!t) return;
-      // Don't start a pull when the finger lands on a real control
       const target = e.target as HTMLElement | null;
       if (
         target?.closest?.(
@@ -62,6 +108,7 @@ export default function PullToRefresh({ children }: { children: ReactNode }) {
       startX.current = t.clientX;
       armed.current = true;
       pulling.current = false;
+      clearHold();
     }
 
     function onTouchMove(e: TouchEvent) {
@@ -75,12 +122,11 @@ export default function PullToRefresh({ children }: { children: ReactNode }) {
       const dy = t.clientY - startY.current;
       const dx = Math.abs(t.clientX - startX.current);
 
-      // Horizontal or upward = not a pull-to-refresh gesture
       if (!pulling.current) {
         if (dy < ARM_PX) return;
         if (dx > dy * 0.7) {
-          // side swipe / scroll intention
           armed.current = false;
+          clearHold();
           return;
         }
         pulling.current = true;
@@ -88,12 +134,23 @@ export default function PullToRefresh({ children }: { children: ReactNode }) {
 
       if (dy <= 0) {
         setPull(0);
+        clearHold();
         return;
       }
 
       const damped = Math.min(MAX_PULL, (dy - ARM_PX) * 0.5);
       setPull(damped);
-      // Only block native scroll once we've committed to a pull
+
+      if (damped >= THRESHOLD) {
+        // Past threshold — start hold clock (once)
+        if (!holdTimer.current && !holdStartedAt.current) {
+          startHold();
+        }
+      } else {
+        // Dropped below threshold — cancel hold
+        clearHold();
+      }
+
       if (damped > 4 && e.cancelable) {
         e.preventDefault();
       }
@@ -101,15 +158,11 @@ export default function PullToRefresh({ children }: { children: ReactNode }) {
 
     function onTouchEnd() {
       if (!armed.current && !pulling.current) return;
-      const shouldRefresh =
-        pulling.current &&
-        offsetRef.current >= THRESHOLD &&
-        !refreshingRef.current;
+      // Release before 0.5s = cancel (never refresh on release alone)
       armed.current = false;
       pulling.current = false;
-      if (shouldRefresh) {
-        doRefresh();
-      } else {
+      if (!refreshingRef.current) {
+        clearHold();
         setPull(0);
       }
     }
@@ -120,12 +173,26 @@ export default function PullToRefresh({ children }: { children: ReactNode }) {
     document.addEventListener("touchcancel", onTouchEnd, { passive: true });
 
     return () => {
+      clearHold();
       document.removeEventListener("touchstart", onTouchStart);
       document.removeEventListener("touchmove", onTouchMove);
       document.removeEventListener("touchend", onTouchEnd);
       document.removeEventListener("touchcancel", onTouchEnd);
     };
-  }, [doRefresh]);
+  }, [clearHold, startHold]);
+
+  let label = "Pull to refresh";
+  if (refreshing) {
+    label = "Refreshing…";
+  } else if (holding) {
+    label = "Hold to refresh…";
+  } else if (offset >= THRESHOLD) {
+    label = "Hold to refresh…";
+  } else if (offset > 20) {
+    label = "Keep pulling…";
+  }
+
+  const show = offset > 6 || refreshing || holding;
 
   return (
     <>
@@ -133,24 +200,26 @@ export default function PullToRefresh({ children }: { children: ReactNode }) {
         className="fixed left-0 right-0 z-[70] flex justify-center pointer-events-none transition-opacity"
         style={{
           top: Math.max(8, offset - 28),
-          opacity: offset > 6 || refreshing ? 1 : 0,
+          opacity: show ? 1 : 0,
         }}
         aria-hidden
       >
         <div
-          className={`rounded-full border px-3 py-1.5 text-[11px] font-bold shadow-lg backdrop-blur-md ${
-            refreshing || offset >= THRESHOLD
+          className={`relative overflow-hidden rounded-full border px-3 py-1.5 text-[11px] font-bold shadow-lg backdrop-blur-md ${
+            refreshing || holding
               ? "border-primary/60 bg-primary text-black"
-              : "border-border bg-card/90 text-muted"
+              : offset >= THRESHOLD
+                ? "border-primary/50 bg-primary/20 text-primary"
+                : "border-border bg-card/90 text-muted"
           }`}
         >
-          {refreshing
-            ? "Refreshing…"
-            : offset >= THRESHOLD
-              ? "Release to refresh"
-              : hint
-                ? "Keep pulling…"
-                : "Pull to refresh"}
+          {holding && !refreshing && (
+            <span
+              className="absolute inset-0 bg-black/15 origin-left"
+              style={{ transform: `scaleX(${holdProgress})` }}
+            />
+          )}
+          <span className="relative z-10">{label}</span>
         </div>
       </div>
       <div
