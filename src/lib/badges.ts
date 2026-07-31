@@ -1,6 +1,12 @@
 import { BadgeDef, BadgeStatus, BadgeTier, Player } from "./types";
 import { isAppCreator, withCreatorFlag } from "./creator";
 import {
+  getBestCommishWeeks,
+  IRON_COMMISH_BADGE_ID,
+  IRON_COMMISH_TARGET,
+  syncCommissionerTenureFromSession,
+} from "./commish-tenure";
+import {
   getPermanentBadgeIds,
   grantPermanentBadgeId,
   mergePermanentBadges,
@@ -11,6 +17,9 @@ export const CHEEVO_KING_ID = "cheevo_king";
 
 /** Legendary creator badge — follows the app owner across every league */
 export const CREATOR_BADGE_ID = "the_commissioner";
+
+/** Legendary: ran a league as commissioner 14+ of 18 weeks */
+export { IRON_COMMISH_BADGE_ID };
 
 export function hasPermanentBadge(player: Player, badgeId: string): boolean {
   if (player.permanentBadgeIds?.includes(badgeId)) return true;
@@ -104,6 +113,17 @@ export const BADGE_CATALOG: BadgeDef[] = [
     tier: "legendary",
     points: 150,
     icon: "🎯",
+  },
+  {
+    id: "elite_commish",
+    name: "Elite Commish",
+    description:
+      "Ran a league with the gavel — 14 of 18 weeks minimum. Real work. Not the game-creator crown.",
+    howToEarn:
+      "Serve as league commissioner for at least 14 of the 18 season weeks in one league season. Pass the role and the clock stops; keep showing up and the gavel remembers.",
+    tier: "legendary",
+    points: 150,
+    icon: "⚖️",
   },
 
   // —— Epic ——
@@ -366,6 +386,15 @@ function evaluateBadge(badgeId: string, player: Player): EvalResult {
       // creator NEVER earns this — they just get the Commish tools.
       return { earned: isAppCreator(player.id) };
 
+    case "elite_commish": {
+      // League commissioner tenure (14/18 weeks). Permanent once earned.
+      if (hasPermanentBadge(player, IRON_COMMISH_BADGE_ID)) {
+        return { earned: true };
+      }
+      const weeksAsCommish = getBestCommishWeeks(player.id);
+      return progress(weeksAsCommish, IRON_COMMISH_TARGET);
+    }
+
     case "war_room_legend":
       // Manual / season-end award for now
       return { earned: false };
@@ -465,10 +494,20 @@ function sortBadges(statuses: BadgeStatus[]): BadgeStatus[] {
  * Creator badge is always listed (gold if creator, grey locked otherwise).
  */
 export function getPlayerBadges(player: Player): BadgeStatus[] {
+  // Credit active week if YOU are the league commissioner (tenure tracker)
+  try {
+    syncCommissionerTenureFromSession();
+  } catch {
+    /* ignore */
+  }
   const p = withPermanentBadges(player);
   // Ensure creator always has the legendary permanently recorded for this id
   if (isAppCreator(p.id)) {
     grantPermanentBadgeId(p.id, CREATOR_BADGE_ID);
+  }
+  // Elite Commish sticks forever once 14/18 is hit
+  if (getBestCommishWeeks(p.id) >= IRON_COMMISH_TARGET) {
+    grantPermanentBadgeId(p.id, IRON_COMMISH_BADGE_ID);
   }
   const statuses: BadgeStatus[] = BADGE_CATALOG.map((def) => {
     try {

@@ -45,6 +45,7 @@ import {
   PickSubmissionStatus,
 } from "@/lib/cloud";
 import { transferCommissioner } from "@/lib/trophies";
+import { recordCommissionerWeek } from "@/lib/commish-tenure";
 import {
   formatKickoff,
   formatCardDateRange,
@@ -244,6 +245,16 @@ export default function CommissionerPage() {
         /* ignore */
       }
       setActiveWeek(week);
+      if (owner) {
+        const sess = getSession();
+        if (sess?.playerId && sess.leagueId) {
+          recordCommissionerWeek({
+            userId: sess.playerId,
+            leagueId: sess.leagueId,
+            weekNumber: week,
+          });
+        }
+      }
       await loadWeekState(week);
       try {
         const session = getSession();
@@ -494,6 +505,15 @@ export default function CommissionerPage() {
     }
     // Push active week to cloud so every player's My Picks follows it
     void setLeagueActiveWeek(week);
+    // Elite Commish progress — only the actual commissioner (not deputies)
+    const sess = getSession();
+    if (sess?.isCommissioner && sess.playerId && sess.leagueId) {
+      recordCommissionerWeek({
+        userId: sess.playerId,
+        leagueId: sess.leagueId,
+        weekNumber: week,
+      });
+    }
     await loadWeekState(week);
     if (tab === "picks") await refreshPickStatus(week);
   }

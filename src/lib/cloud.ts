@@ -86,6 +86,19 @@ export async function setLeagueActiveWeek(
   } catch {
     /* ignore */
   }
+  // Tenure for Elite Commish — true commissioner only (not deputies)
+  if (session.isCommissioner && session.playerId) {
+    try {
+      const { recordCommissionerWeek } = await import("./commish-tenure");
+      recordCommissionerWeek({
+        userId: session.playerId,
+        leagueId: session.leagueId,
+        weekNumber,
+      });
+    } catch {
+      /* ignore */
+    }
+  }
   return { ok: true };
 }
 
