@@ -225,11 +225,21 @@ export default function Nav() {
   }
 
   function NavItem({ link }: { link: NavLink }) {
+    const isHome = link.href === "/";
+    const active = linkActive(link.href);
     return (
       <Link
         href={link.href}
-        className={`hover:text-foreground transition relative whitespace-nowrap shrink-0 ${link.className || ""} ${
-          linkActive(link.href) ? "text-foreground font-medium" : ""
+        className={`transition relative whitespace-nowrap shrink-0 ${
+          isHome
+            ? `text-[15px] sm:text-base font-extrabold tracking-tight ${
+                active
+                  ? "text-primary"
+                  : "text-primary/90 hover:text-primary"
+              }`
+            : `hover:text-foreground ${link.className || ""} ${
+                active ? "text-foreground font-medium" : ""
+              }`
         }`}
       >
         {link.label}
@@ -256,7 +266,13 @@ export default function Nav() {
               WR
             </div>
             <div className="flex flex-col min-w-0">
-              <span className="font-semibold tracking-tight leading-tight truncate text-sm">
+              <span
+                className={`tracking-tight leading-tight truncate ${
+                  pathname === "/"
+                    ? "font-bold text-sm text-foreground"
+                    : "font-extrabold text-[15px] sm:text-base text-primary"
+                }`}
+              >
                 {pathname === "/" ? "War Room" : "← Home"}
               </span>
               {leagueName && (
@@ -405,18 +421,29 @@ export default function Nav() {
               <ul className="pb-1">
                 {primaryLinks.map((link) => {
                   const active = linkActive(link.href);
+                  const isHome = link.href === "/";
                   return (
                     <li key={link.href}>
                       <Link
                         href={link.href}
                         onClick={() => setMenuOpen(false)}
-                        className={`flex items-center justify-between gap-3 px-4 py-3 text-base transition ${
-                          active
-                            ? "bg-card-hover text-foreground"
-                            : "text-muted hover:bg-card-hover hover:text-foreground"
-                        } ${link.className || ""}`}
+                        className={`flex items-center justify-between gap-3 px-4 py-3 transition ${
+                          isHome
+                            ? `text-lg font-extrabold ${
+                                active
+                                  ? "bg-primary/15 text-primary"
+                                  : "text-primary hover:bg-primary/10"
+                              }`
+                            : `text-base ${
+                                active
+                                  ? "bg-card-hover text-foreground"
+                                  : "text-muted hover:bg-card-hover hover:text-foreground"
+                              } ${link.className || ""}`
+                        }`}
                       >
-                        <span className="font-medium">{link.label}</span>
+                        <span className={isHome ? "font-extrabold" : "font-medium"}>
+                          {link.label}
+                        </span>
                         {link.badge != null && link.badge > 0 && (
                           <UnreadBadge count={link.badge} />
                         )}
