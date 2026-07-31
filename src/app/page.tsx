@@ -69,6 +69,7 @@ export default function Home() {
             resolveHomeTagline({
               homeTaglineId: league.settings?.homeTaglineId,
               homeTaglineCustom: league.settings?.homeTaglineCustom,
+              sportId: league.sportId || "cfb",
             })
           );
           setIsCommish(isCommissioner());
@@ -123,6 +124,7 @@ export default function Home() {
           resolveHomeTagline({
             homeTaglineId: fresh.settings?.homeTaglineId,
             homeTaglineCustom: fresh.settings?.homeTaglineCustom,
+            sportId: fresh.sportId || "cfb",
           })
         );
         setIsCommish(isCommissioner());
@@ -200,6 +202,7 @@ export default function Home() {
       resolveHomeTagline({
         homeTaglineId: league.settings?.homeTaglineId,
         homeTaglineCustom: league.settings?.homeTaglineCustom,
+        sportId: league.sportId || "cfb",
       })
     );
     setIsCommish(isCommissioner());

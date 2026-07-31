@@ -104,7 +104,7 @@ function chromeForPack(pack: SportPack): SportHomeChrome {
       pack,
       welcomeTitle: "Welcome to the War Room",
       defaultTagline:
-        "Sundays. Primetime. Same clubhouse — navy, crimson, and no mercy.",
+        "Sundays. Spreads. No campus. Just the room and the late window.",
       sportBadge: "PRO FOOTBALL · SUNDAY",
       periodWord: "Week",
       periodProgressHint: "Season weeks — lock before first kickoff",

@@ -1,6 +1,7 @@
 import type { Player } from "./types";
 import { isAppCreator } from "./creator";
 import { getLeague } from "./league";
+import { buildNflHotTakes } from "./sports/nfl-voice";
 
 /** Humorous rank-movement label from standings rank change (positive = climbed). */
 export type SwingLabel = {
@@ -243,6 +244,30 @@ export function weekCrownAndShame(players: Player[]): CrownShame | null {
 
 /** Build scrolling hot takes from live league stats. */
 export function buildHotTakes(players: Player[]): string[] {
+  // NFL ticker has its own heartbeat — dual-sport players shouldn't hear CFB jokes twice
+  if (getLeague()?.sportId === "nfl") {
+    const nflTakes = buildNflHotTakes(players);
+    const crownShame = weekCrownAndShame(players);
+    if (crownShame && !crownShame.samePerson) {
+      nflTakes.unshift(
+        `👑 Late window: ${crownShame.crown.player.name} stacked ${crownShame.crown.pts}. Film don't lie.`,
+        `📉 Three-and-out: ${crownShame.shame.player.name} at ${crownShame.shame.pts}. Red-zone dignity: missing.`
+      );
+    } else if (crownShame?.samePerson) {
+      nflTakes.unshift(
+        `${crownShame.crown.player.name} is both the highlight and the lowlight package at ${crownShame.crown.pts}. Lonely at the top (and bottom).`
+      );
+    }
+    const seen = new Set<string>();
+    return nflTakes
+      .filter((t) => {
+        if (seen.has(t)) return false;
+        seen.add(t);
+        return true;
+      })
+      .slice(0, 24);
+  }
+
   if (!players.length) {
     return [
       "War Room is quiet… too quiet. Invite the chaos.",
@@ -254,7 +279,7 @@ export function buildHotTakes(players: Player[]): string[] {
   const ranked = rankPlayersWithSwings(players);
   const crownShame = weekCrownAndShame(players);
 
-  // Generic always-on
+  // Generic always-on (CFB / default)
   takes.push("Hot takes are free. Points are not.");
   takes.push("Best Bet bravely or Best Bet fraudulently — history will decide.");
 

@@ -187,14 +187,14 @@ export function gazetteAnticipationCopy(): {
   if (isNflLeague()) {
     if (day === 0 || day === 1) {
       return {
-        title: "Sunday paper almost ready",
-        body: "When the host scores this week, the primetime Gazette drops — crowns, shame, Best Bet blood. Keep it tight.",
+        title: "Primetime paper almost on the stands",
+        body: "When the host scores this week, the Sunday desk drops — late-window crowns, three-and-outs, Best Bet blood. No campus filler.",
         ritualHint: ritualEditionNameNfl(),
       };
     }
     return {
       title: "Save room for the Sunday paper",
-      body: "After scores post: one good Extra. Who won the week, who ate it, movers. Not a magazine.",
+      body: "After scores post: one tight Extra. Who owned the late window, who three-and-out'd, who moved. Film room energy. Not a magazine.",
       ritualHint: "Sunday Extra",
     };
   }
@@ -813,8 +813,26 @@ export async function buildGazetteEdition(
     pts: cp,
   };
 
-  // --- NFL Sunday paper (same engine, primetime voice — keep slim) ---
+  // --- NFL Sunday paper — own headlines & sass (not CFB recycled) ---
   if (nfl) {
+    const {
+      NFL_CROWN_HEADLINES,
+      NFL_CROWN_DECKS,
+      NFL_SHAME_HEADLINES,
+      NFL_SHAME_DECKS,
+      NFL_EDITION_TAGLINES,
+      NFL_WEATHER_BOXES,
+      NFL_CLASSIFIEDS,
+      NFL_PULL_QUOTES,
+      NFL_SIDE_STORIES,
+      NFL_NO_LOCK_HEADLINES,
+      NFL_NO_LOCK_DECKS,
+      NFL_SWING_UP_HEADLINES,
+      NFL_SWING_UP_DECKS,
+      NFL_SWING_DOWN_HEADLINES,
+      NFL_SWING_DOWN_DECKS,
+    } = await import("./sports/nfl-voice");
+
     const tagline = byWeek(NFL_EDITION_TAGLINES, weekIndex);
     const weather = byWeek(NFL_WEATHER_BOXES, weekIndex, 1);
     const classifieds =
@@ -823,6 +841,7 @@ export async function buildGazetteEdition(
         : [
             byWeek(NFL_CLASSIFIEDS, weekIndex, 0),
             byWeek(NFL_CLASSIFIEDS, weekIndex, 1),
+            byWeek(NFL_CLASSIFIEDS, weekIndex, 2),
           ].map((fn) => fn(classifiedCtx));
     const pullQuote = byWeek(NFL_PULL_QUOTES, weekIndex, 1)({
       crown: cn,
@@ -838,11 +857,82 @@ export async function buildGazetteEdition(
     };
     const sideStories: GazetteSideStory[] =
       flavor === "slim"
-        ? []
-        : [byWeek(NFL_SIDE_STORIES, weekIndex, 0)(sideCtx)];
+        ? [byWeek(NFL_SIDE_STORIES, weekIndex, 0)(sideCtx)]
+        : [
+            byWeek(NFL_SIDE_STORIES, weekIndex, 0)(sideCtx),
+            byWeek(NFL_SIDE_STORIES, weekIndex, 1)(sideCtx),
+          ];
+
+    const nflCrown: GazetteStory = {
+      ...crown,
+      headline: data.samePerson
+        ? byWeek(NFL_CROWN_HEADLINES, weekIndex)(cn, cp)
+        : byWeek(NFL_CROWN_HEADLINES, weekIndex, 0)(cn, cp),
+      deck: byWeek(NFL_CROWN_DECKS, weekIndex, 0)(cp),
+    };
+    let nflShame: GazetteStory | null = shame;
+    if (shame && !data.samePerson) {
+      nflShame = {
+        ...shame,
+        headline: byWeek(NFL_SHAME_HEADLINES, weekIndex, 0)(sn, sp),
+        deck: byWeek(NFL_SHAME_DECKS, weekIndex, 0)(sp),
+      };
+    }
+
+    // Ghosts / movers — re-voice so dual-sport rooms don't hear campus copy twice
+    let nflNoLock: GazetteStory | null = noLock;
+    if (noLock) {
+      const label = formatNameList(noLock.names);
+      nflNoLock = {
+        ...noLock,
+        headline: byWeek(NFL_NO_LOCK_HEADLINES, weekIndex, 3)(label),
+        deck: byWeek(NFL_NO_LOCK_DECKS, weekIndex, 3)(noLock.names.length),
+      };
+    }
+
+    let nflSwing: GazetteStory | null = swing;
+    if (swing) {
+      try {
+        const ranked = rankPlayersWithSwings(players).filter((p) => !p.isMock);
+        const star = ranked.find(
+          (p) => p.name.toLowerCase() === (swing!.names[0] || "").toLowerCase()
+        );
+        if (star) {
+          const up = star.swing.delta > 0;
+          const d = Math.abs(star.swing.delta);
+          nflSwing = {
+            ...swing,
+            headline: up
+              ? byWeek(NFL_SWING_UP_HEADLINES, weekIndex)(
+                  star.name,
+                  d,
+                  star.swing.text
+                )
+              : byWeek(NFL_SWING_DOWN_HEADLINES, weekIndex)(
+                  star.name,
+                  d,
+                  star.swing.text
+                ),
+            deck: up
+              ? byWeek(NFL_SWING_UP_DECKS, weekIndex)(
+                  d,
+                  star.rank,
+                  star.swing.text
+                )
+              : byWeek(NFL_SWING_DOWN_DECKS, weekIndex)(
+                  d,
+                  star.rank,
+                  star.swing.text
+                ),
+          };
+        }
+      } catch {
+        /* keep CFB-built swing as last resort */
+      }
+    }
 
     const ritualName = ritualEditionNameNfl();
-    const printedLine = `${ritualName.toUpperCase()} · ${weekLabel.toUpperCase()} · ${year} · ${leagueName.toUpperCase()} · PRIMETIME DESK`;
+    const printedLine = `${ritualName.toUpperCase()} · ${weekLabel.toUpperCase()} · ${year} · ${leagueName.toUpperCase()} · PRIMETIME DESK · NOT CAMPUS`;
 
     return {
       weekIndex,
@@ -857,15 +947,15 @@ export async function buildGazetteEdition(
       pullQuote,
       sideStories,
       samePerson: data.samePerson,
-      crown,
-      shame,
+      crown: nflCrown,
+      shame: nflShame,
       standingsDeadlock,
-      noLock,
+      noLock: nflNoLock,
       crystalBallMiss: null, // no Crystal Ball in NFL packs by default
-      swing,
+      swing: nflSwing,
       sportId: "nfl",
       stampLine: "Extra · Extra",
-      eventLine: "Pro football · same room · louder Sundays",
+      eventLine: "Pro football · primetime desk · not college",
     };
   }
 
@@ -1069,71 +1159,7 @@ const EDITION_TAGLINES: string[] = [
   "Official publication of the cut line",
 ];
 
-// ——— NFL Sunday paper banks (primetime, not college) ———
-
-const NFL_EDITION_TAGLINES: string[] = [
-  "All the news that fits between kickoffs",
-  "Printed after the late window · feelings included",
-  "Primetime ink · Toilet Bowl footnotes",
-  "If you're reading this, you locked. Probably.",
-  "Special Sunday edition: somebody covered",
-  "Not responsible for red-zone decisions",
-  "Free with every scored week · tips optional",
-  "We report. You cope. Then Monday.",
-];
-
-const NFL_WEATHER_BOXES: { kicker: string; body: string }[] = [
-  {
-    kicker: "Sunday forecast",
-    body: "High: confidence. Low: dignity. Wind from the red zone. Pack layers.",
-  },
-  {
-    kicker: "Primetime conditions",
-    body: "Scattered Best Bets. Late windows. 90% chance someone says “script.”",
-  },
-];
-
-const NFL_PULL_QUOTES: ((ctx: {
-  crown: string;
-  shame: string;
-  pts: number;
-}) => { text: string; by: string })[] = [
-  (c) => ({
-    text: `"Trust the process."`,
-    by: `${c.crown}, process currently winning`,
-  }),
-  (c) => ({
-    text: `"Any given Sunday."`,
-    by: c.shame || "The bottom of the board",
-  }),
-];
-
-const NFL_CLASSIFIEDS: ((ctx: {
-  crown: string;
-  shame: string;
-  league: string;
-  pts: number;
-}) => string)[] = [
-  (c) =>
-    `WANTED: one clean Sunday. Last seen near ${c.crown}'s card. Reward: silence in the group chat.`,
-  (c) =>
-    `LOST: red-zone dignity. Return to ${c.shame || "the cut line"}. No questions.`,
-  (c) =>
-    `NOTICE: ${c.league} film room open. ${c.pts} pts still leading the conversation.`,
-];
-
-const NFL_SIDE_STORIES: ((ctx: SideStoryCtx) => GazetteSideStory)[] = [
-  (ctx) => ({
-    kicker: "Primetime desk",
-    headline: "LATE WINDOW DECIDES EVERYTHING (AS USUAL)",
-    body: `${ctx.crown} cashed ${ctx.pts}. The rest of ${ctx.league} is still arguing about one possession. Classic.`,
-  }),
-  (ctx) => ({
-    kicker: "Also true",
-    headline: "BEST BETS: LOVED OR HATED, NEVER IGNORED",
-    body: `Someone doubled down. Someone ate it. ${ctx.shame ? `${ctx.shame} knows which.` : "Check the board."}`,
-  }),
-];
+// NFL Sunday paper banks live in ./sports/nfl-voice (not duplicated here).
 
 // ——— FIFA WWC Brazil 2027™ paper banks (ESPN-event energy) ———
 

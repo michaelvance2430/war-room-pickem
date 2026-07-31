@@ -1,7 +1,14 @@
 /**
  * Sarcastic home nudge when you still haven't locked picks.
  * Light shit-talk — meds / adulting energy, not cruelty.
+ * CFB vs NFL banks stay separate so dual-sport players don't hear the same bit twice.
  */
+
+import { getLeague } from "./league";
+import {
+  NFL_LATE_LOCK_ROASTS,
+  NFL_LOCK_ROASTS,
+} from "./sports/nfl-voice";
 
 const ROASTS = [
   "Reminder from the War Room: take your meds and lock your picks. In that order.",
@@ -22,16 +29,25 @@ const LATE_ROASTS = [
   "Too late. The meds didn't take. Zero points. Don't ghost the next card.",
 ];
 
-export function pickLockRoast(seed?: string): string {
+function hashPick(seed?: string): number {
   let h = 0;
   const s = seed || String(Date.now());
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h;
+}
+
+export function pickLockRoast(seed?: string): string {
+  const h = hashPick(seed);
+  if (getLeague()?.sportId === "nfl") {
+    return NFL_LOCK_ROASTS[h % NFL_LOCK_ROASTS.length];
+  }
   return ROASTS[h % ROASTS.length];
 }
 
 export function pickLateLockRoast(seed?: string): string {
-  let h = 0;
-  const s = seed || String(Date.now());
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  const h = hashPick(seed);
+  if (getLeague()?.sportId === "nfl") {
+    return NFL_LATE_LOCK_ROASTS[h % NFL_LATE_LOCK_ROASTS.length];
+  }
   return LATE_ROASTS[h % LATE_ROASTS.length];
 }

@@ -126,8 +126,8 @@ export default function HomeSportHeader({
       )}
       {isNfl && (
         <p className="mt-2 text-xs sm:text-sm max-w-xl leading-relaxed text-white/80">
-          Same picks loop as college — different skin. Holidays still available
-          in settings; this navy/crimson look is the NFL default.
+          Primetime desk. Late windows. No campus filler. Holidays still live
+          in settings — navy, crimson, and Sunday are the default pulse.
         </p>
       )}
 

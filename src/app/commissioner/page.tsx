@@ -100,8 +100,8 @@ import {
 import { MAX_LEAGUE_PLAYERS } from "@/lib/league-limits";
 import {
   HOME_TAGLINE_MAX_CHARS,
-  HOME_TAGLINE_PRESETS,
   DEFAULT_HOME_TAGLINE_ID,
+  homeTaglinePresetsForSport,
   resolveHomeTagline,
 } from "@/lib/home-tagline";
 import {
@@ -2196,7 +2196,7 @@ function CommissionerPageInner() {
                     onChange={(e) => setHomeTaglineId(e.target.value)}
                     className="mt-1 w-full bg-card border border-border rounded-lg px-3 py-2 text-sm text-foreground"
                   >
-                    {HOME_TAGLINE_PRESETS.map((p) => (
+                    {homeTaglinePresetsForSport(league?.sportId).map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.label}
                       </option>
@@ -2231,6 +2231,7 @@ function CommissionerPageInner() {
                     {resolveHomeTagline({
                       homeTaglineId,
                       homeTaglineCustom,
+                      sportId: league?.sportId,
                     })}
                   </p>
                 </div>
