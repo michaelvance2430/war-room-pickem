@@ -8,7 +8,8 @@ import {
   markBadgesCelebrated,
 } from "@/lib/badge-celebration";
 import { hasSeenRules } from "@/lib/rules";
-import { TIER_LABEL } from "@/lib/badges";
+import { isStackableBadge, TIER_LABEL } from "@/lib/badges";
+import { stackCelebrationKey } from "@/lib/badge-stacks";
 import type { BadgeStatus, BadgeTier } from "@/lib/types";
 import { getSession } from "@/lib/league";
 
@@ -68,7 +69,15 @@ export default function BadgeUnlockModal() {
   function advance() {
     const session = getSession();
     if (session?.playerId && current) {
-      markBadgesCelebrated(session.playerId, [current.def.id]);
+      const id = current.def.id;
+      if (isStackableBadge(id) && current.earnCount) {
+        markBadgesCelebrated(session.playerId, [
+          id,
+          stackCelebrationKey(id, current.earnCount),
+        ]);
+      } else {
+        markBadgesCelebrated(session.playerId, [id]);
+      }
     }
     setQueue((q) => q.slice(1));
   }
@@ -146,6 +155,9 @@ export default function BadgeUnlockModal() {
             style={{ color: hex }}
           >
             +{current.def.points} achievement pts
+            {current.def.stackable && current.earnCount
+              ? ` · lifetime ×${current.earnCount}`
+              : ""}
           </p>
           {(current.earnedSeasonYear != null ||
             current.earnedWeek != null) && (

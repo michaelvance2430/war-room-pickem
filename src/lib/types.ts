@@ -41,6 +41,12 @@ export interface BadgeDef {
   lockedLabel?: string;
   creatorOnly?: boolean;
   icon: string;
+  /**
+   * Can be earned more than once (weekly last, perfect week, etc.).
+   * Stack count shows on Status; re-earn can celebrate again.
+   * Career points still bank once unless noted otherwise.
+   */
+  stackable?: boolean;
 }
 
 export interface BadgeStatus {
@@ -52,6 +58,8 @@ export interface BadgeStatus {
   earnedSeasonYear?: number | null;
   /** League week when first earned (0–18), if known */
   earnedWeek?: number | null;
+  /** Lifetime times earned (stackable cheevos) */
+  earnCount?: number | null;
   progress?: { current: number; target: number } | null;
 }
 

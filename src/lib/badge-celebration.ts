@@ -1,25 +1,35 @@
 /**
  * Track which badges we've already celebrated for a user.
  *
- * Bump CELEBRATION_EPOCH to force every client to re-see unlocks
- * (new storage key → empty celebrated list → all current earned fire one-by-one).
+ * Anti-glitch: never re-pop badges already owned (career bank, permanent,
+ * earn meta, or prior celebration epochs). Stackable badges celebrate per
+ * stack height (`badgeId#3`) only when count increases.
  */
 
 import {
   getPlayerBadges,
   withPermanentBadges,
   syncLeagueCheevoKing,
+  isStackableBadge,
 } from "./badges";
-import { bankCareerCheevos } from "./career-cheevo";
+import {
+  bankCareerCheevos,
+  getCareerBadgeIds,
+} from "./career-cheevo";
+import { getPermanentBadgeIds } from "./permanent-badges";
+import { getBadgeEarnMeta } from "./badge-earn-meta";
+import {
+  getBadgeStackCount,
+  stackCelebrationKey,
+} from "./badge-stacks";
 import type { BadgeStatus, BadgeTier, Player } from "./types";
 import { getSession } from "./league";
 
 /**
- * Bump this number to reset achievement notifications for everyone.
- * Next login: each earned badge that isn't in the new key is celebrated
- * one at a time (after Gazette).
+ * Bump only when you intentionally want a global re-show.
+ * Prefer backfill over epoch bumps so logins don't re-fire owned cheevos.
  */
-export const CELEBRATION_EPOCH = 2;
+export const CELEBRATION_EPOCH = 3;
 
 const STORAGE_PREFIX = `warroom-badges-celebrated-e${CELEBRATION_EPOCH}:`;
 
@@ -62,6 +72,69 @@ export function markBadgesCelebrated(userId: string, badgeIds: string[]) {
   writeCelebratedIds(userId, [...prev, ...badgeIds]);
 }
 
+/**
+ * Pull celebrated ids from older epochs so an epoch bump doesn't re-pop everything.
+ */
+function migrateFromPriorEpochs(userId: string): string[] {
+  if (typeof window === "undefined" || !userId) return [];
+  const found: string[] = [];
+  for (let e = 1; e < CELEBRATION_EPOCH; e++) {
+    try {
+      const raw = localStorage.getItem(
+        `warroom-badges-celebrated-e${e}:${userId}`
+      );
+      if (!raw) continue;
+      const parsed = JSON.parse(raw) as string[];
+      if (Array.isArray(parsed)) found.push(...parsed);
+    } catch {
+      /* ignore */
+    }
+  }
+  return found;
+}
+
+/**
+ * Seed celebrated list from everything the player already owns so
+ * logout/login never re-fires Creator / Legend / banked cheevos.
+ */
+export function backfillCelebratedFromOwned(
+  playerId: string,
+  earned: BadgeStatus[]
+): void {
+  if (!playerId) return;
+  const known = new Set([
+    ...readCelebratedIds(playerId),
+    ...migrateFromPriorEpochs(playerId),
+  ]);
+  const career = getCareerBadgeIds(playerId);
+  const permanent = getPermanentBadgeIds(playerId);
+
+  for (const id of career) known.add(id);
+  for (const id of permanent) known.add(id);
+
+  for (const b of earned) {
+    if (!b.earned) continue;
+    const id = b.def.id;
+    // Already owned signals → mark celebrated, no popup
+    if (
+      career.includes(id) ||
+      permanent.includes(id) ||
+      getBadgeEarnMeta(playerId, id) ||
+      b.earnedAt
+    ) {
+      known.add(id);
+      if (isStackableBadge(id)) {
+        const count = getBadgeStackCount(playerId, id) || 1;
+        for (let c = 1; c <= count; c++) {
+          known.add(stackCelebrationKey(id, c));
+        }
+      }
+    }
+  }
+
+  writeCelebratedIds(playerId, [...known]);
+}
+
 const TIER_ORDER: BadgeTier[] = ["legendary", "epic", "rare", "common"];
 
 /** Sort flashiest first for the one-at-a-time queue. */
@@ -75,16 +148,35 @@ export function sortBadgesForCelebration(badges: BadgeStatus[]): BadgeStatus[] {
 
 /**
  * Badges earned that we haven't celebrated yet.
- * Missing storage key = none celebrated → return all currently earned
- * (used for epoch resets so everyone sees the popup next login).
+ * Stackables: only when stack height is new (`id#N`).
+ * One-shots: only if never owned/celebrated.
  */
 export function getUncelebratedBadges(player: Player): BadgeStatus[] {
   const p = withPermanentBadges(player);
   const earned = getPlayerBadges(p).filter((b) => b.earned);
-  const known = new Set(readCelebratedIds(player.id));
-  return sortBadgesForCelebration(
-    earned.filter((b) => !known.has(b.def.id))
-  );
+  backfillCelebratedFromOwned(p.id, earned);
+  const known = new Set(readCelebratedIds(p.id));
+
+  const fresh: BadgeStatus[] = [];
+  for (const b of earned) {
+    const id = b.def.id;
+    if (isStackableBadge(id)) {
+      const count = Math.max(1, b.earnCount || getBadgeStackCount(p.id, id) || 1);
+      const key = stackCelebrationKey(id, count);
+      if (!known.has(key)) {
+        // Don't re-pop stack #1 if plain id was celebrated historically
+        if (count === 1 && known.has(id)) {
+          markBadgesCelebrated(p.id, [key]);
+          continue;
+        }
+        fresh.push(b);
+      }
+    } else if (!known.has(id)) {
+      fresh.push(b);
+    }
+  }
+
+  return sortBadgesForCelebration(fresh);
 }
 
 /** Load me from league list + cheevo sync, then find new unlocks. */
@@ -102,9 +194,9 @@ export async function findNewBadgeUnlocksForSession(): Promise<{
     const me = players.find((p) => p.id === session.playerId);
     if (!me) return null;
     const tagged = withPermanentBadges(me);
-    const newBadges = getUncelebratedBadges(tagged);
-    // Bank career points whenever we detect earned badges
+    // Bank first, then backfill celebrated from bank — kills login re-fires
     bankCareerCheevos(tagged.id, getPlayerBadges(tagged));
+    const newBadges = getUncelebratedBadges(tagged);
     return { player: tagged, newBadges };
   } catch {
     return null;

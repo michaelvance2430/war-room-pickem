@@ -20,9 +20,35 @@ import { applyLegacyBadgeGrants, WAR_ROOM_LEGEND_ID } from "./legacy-badge-grant
 import { hasEngagement } from "./engagement";
 import { getBadgeEarnMeta, stampBadgeEarn } from "./badge-earn-meta";
 import { isSandboxMode, isSandboxProtectedBadge } from "./season-mode";
+import { getBadgeStack, getBadgeStackCount } from "./badge-stacks";
+import {
+  CAREER_CELLAR_ID,
+  BOTTOM_BARREL_ID,
+  careerLastPlaceLeader,
+  ensureBarrelStackFromCareer,
+  getCareerLastPlaceCount,
+  syncCareerLastPlacesFromLeague,
+  syncStackableWeekCheevosFromLeague,
+} from "./last-place-career";
 
 /** Permanent rare: most achievement points in the league */
 export const CHEEVO_KING_ID = "cheevo_king";
+
+/** Stackable badge ids (also def.stackable on catalog). */
+const STACKABLE_IDS = new Set<string>([
+  "bottom_of_the_barrel",
+  "perfect_saturday",
+  "max_card",
+  "war_room_general",
+  "four_green_friday",
+  "sweep_adjacent",
+  "first_final",
+]);
+
+export function isStackableBadge(badgeId: string): boolean {
+  if (STACKABLE_IDS.has(badgeId)) return true;
+  return !!getBadgeDef(badgeId)?.stackable;
+}
 
 /** Legendary creator badge — follows the app owner across every league */
 export const CREATOR_BADGE_ID = "the_commissioner";
@@ -109,6 +135,17 @@ export const BADGE_CATALOG: BadgeDef[] = [
     icon: "🏆",
   },
   {
+    id: CAREER_CELLAR_ID,
+    name: "Sad Little Brains Forever",
+    description:
+      "Career king of sole last-place weeks. Not a bit. A lifestyle. The group chat's favorite tragedy.",
+    howToEarn:
+      "Hold the league record for sole last-place weeks all-time (min 3, no ties for the record). Lifetime. Sticky. Deeply unserious.",
+    tier: "legendary",
+    points: 200,
+    icon: "🧠",
+  },
+  {
     id: "immortal_streak",
     name: "Immortal Streak",
     description: "Thirty straight correct. Unholy.",
@@ -142,11 +179,12 @@ export const BADGE_CATALOG: BadgeDef[] = [
   {
     id: "war_room_general",
     name: "War Room General",
-    description: "Your league, your week, your throne.",
-    howToEarn: "Finish #1 in your league for a week.",
+    description: "Your league, your week, your throne. Stacks each week you own it.",
+    howToEarn: "Finish #1 in your league for a week. Can earn every week you top the board.",
     tier: "epic",
     points: 50,
     icon: "⭐",
+    stackable: true,
   },
   {
     id: "sniper",
@@ -160,20 +198,22 @@ export const BADGE_CATALOG: BadgeDef[] = [
   {
     id: "max_card",
     name: "Max Card",
-    description: "Confidence stacked. Everything hit.",
-    howToEarn: "Score 18+ points in a single week (perfect card territory).",
+    description: "Confidence stacked. Everything hit. Stacks each perfect-territory week.",
+    howToEarn: "Score 18+ points in a single week (perfect card territory). Multi-earn.",
     tier: "epic",
     points: 50,
     icon: "💎",
+    stackable: true,
   },
   {
     id: "perfect_saturday",
     name: "Perfect Saturday",
-    description: "Every pick. One Saturday. No misses.",
-    howToEarn: "Post a perfect week (18+ pts) at least once.",
+    description: "Every pick. One Saturday. No misses. Stacks each clean sheet.",
+    howToEarn: "Post a perfect week (18+ pts). Can earn more than once.",
     tier: "epic",
     points: 50,
     icon: "✨",
+    stackable: true,
   },
   {
     id: "seasoned_vet",
@@ -602,12 +642,13 @@ export const BADGE_CATALOG: BadgeDef[] = [
     id: "bottom_of_the_barrel",
     name: "Bottom of the Barrel",
     description:
-      "Dead last for a week. Alone. No ties. Pure basement energy.",
+      "Dead last for a week. Alone. No ties. Pure basement energy. Stacks every time you do it again.",
     howToEarn:
-      "Finish sole last in weekly points among players who scored that week — no ties for last.",
+      "Finish sole last in weekly points among players who scored that week — no ties for last. Can earn every week you solo the basement.",
     tier: "rare",
     points: 25,
     icon: "🛢️",
+    stackable: true,
   },
   {
     id: "streak_starter",
@@ -1201,8 +1242,29 @@ function evaluateBadge(
         earned: n >= 2 && rank > 0 && rank <= Math.ceil(n / 2),
       };
 
-    case "bottom_of_the_barrel":
-      return progress(hadSoleLastPlaceWeek(player, league) ? 1 : 0, 1);
+    case "bottom_of_the_barrel": {
+      const careerN = getCareerLastPlaceCount(player.id);
+      const n = Math.max(
+        careerN,
+        hadSoleLastPlaceWeek(player, league) ? 1 : 0,
+        getBadgeStackCount(player.id, BOTTOM_BARREL_ID)
+      );
+      return progress(n >= 1 ? n : 0, 1);
+    }
+
+    case "sad_little_brains": {
+      const leader = careerLastPlaceLeader(league);
+      if (!leader || leader.playerId !== player.id) {
+        return {
+          earned: false,
+          progress: {
+            current: getCareerLastPlaceCount(player.id),
+            target: 3,
+          },
+        };
+      }
+      return { earned: true };
+    }
 
     case "silence_the_room": {
       if (n < 2 || bestWeek <= 0) return { earned: false };
@@ -1376,6 +1438,15 @@ export function getPlayerBadges(
     leaguePeers && leaguePeers.length
       ? leaguePeers.map((x) => withPermanentBadges(x))
       : [p];
+  // Career last-place weeks + stackable week cheevos (before evaluate)
+  try {
+    syncCareerLastPlacesFromLeague(peers);
+    ensureBarrelStackFromCareer(p.id);
+    syncStackableWeekCheevosFromLeague(peers);
+  } catch {
+    /* ignore */
+  }
+
   const sandbox = isSandboxMode();
   const statuses: BadgeStatus[] = BADGE_CATALOG.map((def) => {
     try {
@@ -1393,6 +1464,7 @@ export function getPlayerBadges(
           earnedAt: null,
           earnedSeasonYear: null,
           earnedWeek: null,
+          earnCount: null,
           // Keep progress so hosts can still see the path; never "Earned"
           progress:
             result.progress ??
@@ -1403,6 +1475,23 @@ export function getPlayerBadges(
       let earnedSeasonYear: number | null = null;
       let earnedWeek: number | null = null;
       let earnedAt: string | null = null;
+      let earnCount: number | null = null;
+
+      if (isStackableBadge(def.id) || def.stackable) {
+        const stack = getBadgeStack(p.id, def.id);
+        earnCount =
+          stack.count ||
+          (def.id === BOTTOM_BARREL_ID
+            ? getCareerLastPlaceCount(p.id)
+            : 0) ||
+          (earned ? 1 : 0);
+        if (earnCount > 0) earned = true;
+        if (stack.lastSeasonYear != null) {
+          earnedSeasonYear = stack.lastSeasonYear;
+          earnedWeek = stack.lastWeek;
+        }
+      }
+
       if (earned) {
         try {
           // Stamp season year + week the first time we see this cheevo earned
@@ -1410,8 +1499,8 @@ export function getPlayerBadges(
           const meta =
             getBadgeEarnMeta(p.id, def.id) || stampBadgeEarn(p.id, def.id);
           if (meta) {
-            earnedSeasonYear = meta.seasonYear;
-            earnedWeek = meta.week;
+            earnedSeasonYear = earnedSeasonYear ?? meta.seasonYear;
+            earnedWeek = earnedWeek ?? meta.week;
             earnedAt = meta.at;
           }
         } catch {
@@ -1424,7 +1513,12 @@ export function getPlayerBadges(
         earnedAt,
         earnedSeasonYear,
         earnedWeek,
-        progress: earned ? null : result.progress ?? null,
+        earnCount,
+        progress: earned
+          ? isStackableBadge(def.id) && earnCount && earnCount > 0
+            ? { current: earnCount, target: earnCount }
+            : null
+          : result.progress ?? null,
       };
     } catch {
       const perm = hasPermanentBadge(p, def.id);
@@ -1436,6 +1530,7 @@ export function getPlayerBadges(
         earnedAt: null,
         earnedSeasonYear: null,
         earnedWeek: null,
+        earnCount: null,
         progress: null,
       };
     }

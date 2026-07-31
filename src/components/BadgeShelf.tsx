@@ -238,11 +238,28 @@ function BadgeDetailModal({
             </div>
             {earned ? (
               <div className="font-medium" style={{ color: hex }}>
-                {status.earnedSeasonYear != null
-                  ? status.earnedWeek != null && status.earnedWeek >= 0
-                    ? `Earned · ${status.earnedSeasonYear} · Week ${status.earnedWeek}`
-                    : `Earned · ${status.earnedSeasonYear}`
-                  : "Earned"}
+                {(() => {
+                  const stack =
+                    status.def.stackable &&
+                    status.earnCount != null &&
+                    status.earnCount > 1
+                      ? ` ×${status.earnCount}`
+                      : status.def.stackable &&
+                          status.earnCount != null &&
+                          status.earnCount === 1
+                        ? " ×1"
+                        : "";
+                  const when =
+                    status.earnedSeasonYear != null
+                      ? status.earnedWeek != null && status.earnedWeek >= 0
+                        ? ` · ${status.earnedSeasonYear} · Week ${status.earnedWeek}`
+                        : ` · ${status.earnedSeasonYear}`
+                      : "";
+                  if (status.def.stackable && status.earnCount) {
+                    return `Earned${stack}${when ? ` · last${when}` : ""}`;
+                  }
+                  return `Earned${when}`;
+                })()}
               </div>
             ) : lockedText ? (
               <div className="font-medium text-warning">{lockedText}</div>

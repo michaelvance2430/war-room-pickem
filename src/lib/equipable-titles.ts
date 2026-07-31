@@ -45,6 +45,12 @@ export const EQUIPABLE_TITLE_CATALOG: EquipableTitleDef[] = [
     blurb: "Hardware. History. The board remembers.",
   },
   {
+    badgeId: "sad_little_brains",
+    title: "Sad Little Brain",
+    vibe: "roast",
+    blurb: "Career last-place champion. Wear it. Own it.",
+  },
+  {
     badgeId: "championship_ring",
     title: "Ring Bearer",
     vibe: "brag",
@@ -246,7 +252,7 @@ export const EQUIPABLE_TITLE_CATALOG: EquipableTitleDef[] = [
     badgeId: "bottom_of_the_barrel",
     title: "Bottom of the Barrel",
     vibe: "roast",
-    blurb: "Sole last for a week. No ties. Pure basement.",
+    blurb: "Sole last for a week. Stacks every time you solo the basement.",
   },
   {
     badgeId: "chalk_eater",
