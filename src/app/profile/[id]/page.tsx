@@ -48,10 +48,47 @@ export default function ProfilePage() {
   const [showAvatarForm, setShowAvatarForm] = useState(false);
 
   useEffect(() => {
-    const found = findPlayer(id);
-    setPlayer(found);
-    setAvatarInput(found?.avatarUrl || "");
-    setReady(true);
+    let cancelled = false;
+
+    async function load() {
+      // 1) Local/mock roster
+      let found = findPlayer(id);
+
+      // 2) Live league standings (Supabase) — real multiplayer ids
+      if (!found) {
+        try {
+          const { loadLeaguePlayers } = await import("@/lib/cloud");
+          const league = await loadLeaguePlayers();
+          found = league.find((p) => p.id === id) ?? null;
+          if (found) {
+            // Pull avatar from roster when available
+            try {
+              const { loadLeagueRoster } = await import("@/lib/cloud");
+              const roster = await loadLeagueRoster();
+              const row = roster.find((m) => m.userId === id);
+              if (row?.avatarUrl) {
+                found = { ...found, avatarUrl: row.avatarUrl };
+              }
+            } catch {
+              /* optional */
+            }
+          }
+        } catch {
+          /* offline / no session */
+        }
+      }
+
+      if (cancelled) return;
+      setPlayer(found);
+      setAvatarInput(found?.avatarUrl || "");
+      setReady(true);
+    }
+
+    setReady(false);
+    load();
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   const badges = useMemo(

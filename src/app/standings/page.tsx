@@ -10,6 +10,7 @@ import { rankPlayersWithSwings } from "@/lib/fun-board";
 import { compareForSeed } from "@/lib/brackets";
 import { isSelfPlayer, selfNameClass, selfRowClass } from "@/lib/self-highlight";
 import YouBadge from "@/components/YouBadge";
+import PlayerLink from "@/components/PlayerLink";
 import { Division, Player } from "@/lib/types";
 
 const divisions: (Division | "Overall")[] = [
@@ -145,7 +146,7 @@ export default function StandingsPage() {
                             isSelfPlayer(player.id, selfId)
                           )}
                         >
-                          {player.name}
+                          <PlayerLink id={player.id} name={player.name} />
                           {isSelfPlayer(player.id, selfId) && <YouBadge />}
                         </span>
                         {swingById[player.id] && (
