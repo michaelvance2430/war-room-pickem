@@ -4,6 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import Nav from "@/components/Nav";
 import YouBadge from "@/components/YouBadge";
+import PlayerLink from "@/components/PlayerLink";
 import { getSession, getLeague, isCommissioner } from "@/lib/league";
 import { loadLeagueRoster, type LeagueRosterMember } from "@/lib/cloud";
 import {
@@ -259,7 +260,10 @@ export default function TrophyRoomPage() {
                       <div
                         className={`text-lg mt-1 ${selfNameClass(mine, "font-bold")}`}
                       >
-                        {item.winnerName}
+                        <PlayerLink
+                          id={item.winnerUserId}
+                          name={item.winnerName}
+                        />
                         {mine && <YouBadge />}
                       </div>
                       {item.subtitle && (

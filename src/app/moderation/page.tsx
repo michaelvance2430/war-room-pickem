@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Nav from "@/components/Nav";
 import Avatar from "@/components/Avatar";
+import PlayerLink from "@/components/PlayerLink";
 import {
   loadLeagueRoster,
   removeLeagueMember,
@@ -211,7 +212,7 @@ export default function ModerationPage() {
                   <Avatar name={m.name} avatarUrl={m.avatarUrl} size="sm" />
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium truncate">
-                      {m.name}
+                      <PlayerLink id={m.userId} name={m.name} />
                       {isComm && (
                         <span className="ml-1.5 text-[10px] text-primary">
                           Commish

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Nav from "@/components/Nav";
+import PlayerLink from "@/components/PlayerLink";
 import {
   crystalBallLockLabel,
   crystalBallTeams,
@@ -330,7 +331,7 @@ export default function CrystalBallPage() {
                     }`}
                   >
                     <span className="font-medium">
-                      {p.displayName}
+                      <PlayerLink id={p.userId} name={p.displayName} />
                       {p.userId === selfId && (
                         <span className="text-xs text-muted ml-1">(you)</span>
                       )}

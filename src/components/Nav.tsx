@@ -24,6 +24,7 @@ export default function Nav() {
   const [ops, setOps] = useState(false);
   const [staff, setStaff] = useState(false);
   const [name, setName] = useState("You");
+  const [playerId, setPlayerId] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [leagueName, setLeagueName] = useState("");
   const [unreadCount, setUnreadCount] = useState(0);
@@ -37,6 +38,7 @@ export default function Nav() {
     setOps(isOps());
     setStaff(isStaff());
     setName(session?.playerName || "You");
+    setPlayerId(session?.playerId || null);
     setLeagueName(league?.name || "");
     setCrystalBallOn(league?.settings?.crystalBallEnabled !== false);
 
@@ -218,8 +220,9 @@ export default function Nav() {
           {/* Profile + hamburger (mobile) */}
           <div className="flex items-center gap-1 sm:gap-2 shrink-0">
             <Link
-              href="/account"
+              href={playerId ? `/profile/${playerId}` : "/account"}
               className="flex items-center gap-2 text-sm text-muted hover:text-foreground"
+              title="Your profile & badges"
             >
               <Avatar name={name} avatarUrl={avatarUrl} size="sm" />
               <span className="hidden sm:inline">

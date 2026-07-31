@@ -11,6 +11,7 @@ import { buildLeagueLoreCards, type LoreCard } from "@/lib/league-lore";
 import { loadLeagueTrophies } from "@/lib/trophies";
 import { isSelfPlayer, selfNameClass, selfRowClass } from "@/lib/self-highlight";
 import YouBadge from "@/components/YouBadge";
+import PlayerLink from "@/components/PlayerLink";
 import { Player } from "@/lib/types";
 
 type MainTab = "power" | "season" | "lore";
@@ -232,7 +233,7 @@ export default function StatsPage() {
                         className={`${selfNameClass(mine)} truncate flex items-center gap-2 flex-wrap`}
                       >
                         <span>
-                          {player.name}
+                          <PlayerLink id={player.id} name={player.name} />
                           {mine && <YouBadge />}
                         </span>
                         <SwingBadge swing={player.swing} />
@@ -332,7 +333,7 @@ export default function StatsPage() {
                           <td
                             className={`px-3 py-2.5 ${selfNameClass(mine)}`}
                           >
-                            {p.name}
+                            <PlayerLink id={p.id} name={p.name} />
                             {mine && <YouBadge />}
                           </td>
                           <td className="px-3 py-2.5 text-right font-semibold">
@@ -428,7 +429,7 @@ export default function StatsPage() {
                         {card.title}
                       </p>
                       <p className={selfNameClass(mine, "text-base font-bold")}>
-                        {card.name}
+                        <PlayerLink id={card.userId} name={card.name} />
                         {mine && <YouBadge />}
                       </p>
                       <p className="text-xs text-muted mt-1.5 leading-relaxed">

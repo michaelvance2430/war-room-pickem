@@ -5,6 +5,7 @@ import Link from "next/link";
 import Nav from "@/components/Nav";
 import BracketView from "@/components/BracketView";
 import YouBadge from "@/components/YouBadge";
+import PlayerLink from "@/components/PlayerLink";
 import { loadLeaguePlayers, listScoredWeekNumbers } from "@/lib/cloud";
 import { getSession, getLeague } from "@/lib/league";
 import {
@@ -199,8 +200,8 @@ export default function ToiletBowlPage() {
                       <span className="text-xs font-bold text-toilet w-5">
                         {i + 1}
                       </span>
-                      <span className={`truncate ${selfNameClass(mine, "")}`}>
-                        {p.name}
+                      <span className={`truncate min-w-0 ${selfNameClass(mine, "")}`}>
+                        <PlayerLink id={p.id} name={p.name} />
                         {mine && <YouBadge />}
                       </span>
                       <span className="text-xs text-muted ml-auto shrink-0">

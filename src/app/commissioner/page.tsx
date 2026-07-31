@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Nav from "@/components/Nav";
+import PlayerLink from "@/components/PlayerLink";
 import { Game, Prop } from "@/lib/types";
 import { fetchNcaafOdds } from "@/lib/odds";
 import { generateDemoSlate, randomizeDemoResults } from "@/lib/demo-slate";
@@ -1950,7 +1951,9 @@ export default function CommissionerPage() {
                       }`}
                     >
                       <div className="min-w-0">
-                        <span className="text-sm font-medium">{m.name}</span>
+                        <span className="text-sm font-medium">
+                          <PlayerLink id={m.userId} name={m.name} />
+                        </span>
                         {m.isDeputy && (
                           <span className="ml-1.5 text-[10px] uppercase text-primary border border-primary/40 px-1 rounded">
                             Deputy
@@ -2575,7 +2578,7 @@ export default function CommissionerPage() {
                     >
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium truncate">
-                          {r.name}
+                          <PlayerLink id={r.userId} name={r.name} />
                           {r.role === "commissioner" && (
                             <span className="text-primary text-xs ml-1">
                               Commish

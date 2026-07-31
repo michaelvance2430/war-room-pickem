@@ -3,6 +3,7 @@
 import { Bracket, Matchup, roundLabel } from "@/lib/brackets";
 import { isSelfPlayer, selfNameClass } from "@/lib/self-highlight";
 import YouBadge from "@/components/YouBadge";
+import PlayerLink from "@/components/PlayerLink";
 
 interface Props {
   bracket: Bracket;
@@ -72,12 +73,16 @@ function Slot({
         </span>
       )}
       <span
-        className={`flex-1 truncate ${selfNameClass(
+        className={`flex-1 min-w-0 truncate ${selfNameClass(
           mine,
           isWinner && !mine ? "font-medium text-foreground" : "font-medium"
         )}`}
       >
-        {name ?? "TBD"}
+        <PlayerLink
+          id={playerId}
+          name={name}
+          className="truncate max-w-full"
+        />
         {mine && <YouBadge />}
       </span>
       {score !== null && (

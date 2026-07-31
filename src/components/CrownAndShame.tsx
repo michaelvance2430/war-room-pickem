@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import PlayerLink from "@/components/PlayerLink";
 import { loadLeaguePlayers } from "@/lib/cloud";
 import { weekCrownAndShame, type CrownShame } from "@/lib/fun-board";
 
@@ -74,7 +75,10 @@ export default function CrownAndShame({ className = "" }: Props) {
             🐐 This week&apos;s crown
           </div>
           <div className="text-lg font-bold text-foreground truncate">
-            {data.crown.player.name}
+            <PlayerLink
+              id={data.crown.player.id}
+              name={data.crown.player.name}
+            />
           </div>
           <div className="text-sm text-primary font-semibold mt-0.5">
             {data.crown.pts} pts
@@ -90,7 +94,10 @@ export default function CrownAndShame({ className = "" }: Props) {
             🛍️ Wall of shame
           </div>
           <div className="text-lg font-bold text-foreground truncate">
-            {data.shame.player.name}
+            <PlayerLink
+              id={data.shame.player.id}
+              name={data.shame.player.name}
+            />
           </div>
           <div className="text-sm text-toilet font-semibold mt-0.5">
             {data.shame.pts} pts

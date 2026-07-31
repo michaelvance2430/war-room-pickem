@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Nav from "@/components/Nav";
 import Avatar from "@/components/Avatar";
+import PlayerLink from "@/components/PlayerLink";
 import { getSession, getLeague, isOps, isCommissioner } from "@/lib/league";
 import {
   loadLeagueRoster,
@@ -248,7 +249,7 @@ export default function PlayersPage() {
                     <Avatar name={b.name} avatarUrl={b.avatarUrl} size="sm" />
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium truncate">
-                        {b.name}
+                        <PlayerLink id={b.userId} name={b.name} />
                         <span className="ml-2 text-[10px] uppercase text-muted border border-border px-1 rounded">
                           Bot
                         </span>
@@ -326,7 +327,7 @@ export default function PlayersPage() {
                       />
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium truncate">
-                          {p.name}
+                          <PlayerLink id={p.userId} name={p.name} />
                           {p.isBot ? (
                             <span className="ml-1.5 text-[10px] uppercase text-muted border border-border px-1 rounded">
                               Bot

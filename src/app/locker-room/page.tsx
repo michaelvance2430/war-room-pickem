@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import Link from "next/link";
 import Nav from "@/components/Nav";
 import YouBadge from "@/components/YouBadge";
+import PlayerLink from "@/components/PlayerLink";
 import { getSession, getLeague, isStaff } from "@/lib/league";
 import { isSelfPlayer, selfNameClass } from "@/lib/self-highlight";
 import {
@@ -217,7 +218,7 @@ export default function LockerRoomPage() {
                 >
                   <div className="flex items-baseline justify-between gap-2 mb-0.5">
                     <span className={selfNameClass(mine, "text-sm font-semibold")}>
-                      {m.authorName}
+                      <PlayerLink id={m.userId} name={m.authorName} />
                       {mine && <YouBadge />}
                     </span>
                     <span className="text-[11px] text-muted shrink-0">
