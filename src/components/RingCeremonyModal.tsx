@@ -3,20 +3,33 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { getLeague, getSession } from "@/lib/league";
+import {
+  loadLeagueActiveWeek,
+  listScoredWeekNumbers,
+} from "@/lib/cloud";
 import { loadLeagueTrophies } from "@/lib/trophies";
 import { getDefendingChampion } from "@/lib/player-history";
 import { isSeasonOpen } from "@/lib/season-countdown";
 
-const SEEN_KEY = "warroom-ring-ceremony-seen-v1";
+/**
+ * Opening Day / ring ceremony.
+ * Only once per player · league · season year, and only while the
+ * first week of the live season is open (active week 0 or 1, season doors open).
+ * Does not re-fire midseason or on every login after dismissal.
+ */
+const SEEN_KEY = "warroom-ring-ceremony-seen-v2";
 
-function storageKey(leagueId: string, year: number) {
-  return `${SEEN_KEY}:${leagueId || "default"}:${year}`;
+/** League active week counts as "opening week" */
+const OPENING_WEEKS = new Set([0, 1]);
+
+function storageKey(
+  leagueId: string,
+  playerId: string,
+  champYear: number
+) {
+  return `${SEEN_KEY}:${leagueId || "default"}:${playerId}:${champYear}`;
 }
 
-/**
- * Opening Day / ring ceremony — shows defending champ once per league+year.
- * Light ritual; full animation can layer later.
- */
 export default function RingCeremonyModal() {
   const [open, setOpen] = useState(false);
   const [champ, setChamp] = useState<{
@@ -30,23 +43,36 @@ export default function RingCeremonyModal() {
     let cancelled = false;
     async function run() {
       try {
+        // Real season only — no preseason sandbox spam
+        if (!isSeasonOpen()) return;
+
         const league = getLeague();
         const session = getSession();
         if (!session?.playerId || !league?.id) return;
+
+        // First week open only (Week 0 openers or Week 1)
+        const activeWeek = await loadLeagueActiveWeek();
+        if (!OPENING_WEEKS.has(activeWeek)) return;
+
+        // If the room has already scored past opening, skip even if active week lag
+        try {
+          const scored = await listScoredWeekNumbers();
+          const pastOpening = scored.some((w) => w >= 2);
+          if (pastOpening) return;
+        } catch {
+          /* ignore scored check */
+        }
 
         const trophies = await loadLeagueTrophies();
         const d = getDefendingChampion(trophies);
         if (!d || cancelled) return;
 
-        // Only show once the calendar says season is open, OR always in sandbox
-        // as a "practice ring" if champ exists — prefer real open.
-        // Show whenever we have a defending champ and user hasn't dismissed this year plaque.
-        const key = storageKey(league.id, d.year);
+        const key = storageKey(league.id, session.playerId, d.year);
         if (localStorage.getItem(key) === "1") return;
 
-        // Delay slightly so Home paints first
-        await new Promise((r) => setTimeout(r, 600));
+        await new Promise((r) => setTimeout(r, 700));
         if (cancelled) return;
+
         setChamp(d);
         setLeagueName(league.name || "War Room");
         setOpen(true);
@@ -63,8 +89,12 @@ export default function RingCeremonyModal() {
   function dismiss() {
     try {
       const league = getLeague();
-      if (league?.id && champ) {
-        localStorage.setItem(storageKey(league.id, champ.year), "1");
+      const session = getSession();
+      if (league?.id && session?.playerId && champ) {
+        localStorage.setItem(
+          storageKey(league.id, session.playerId, champ.year),
+          "1"
+        );
       }
     } catch {
       /* ignore */
@@ -73,8 +103,6 @@ export default function RingCeremonyModal() {
   }
 
   if (!open || !champ) return null;
-
-  const seasonLive = isSeasonOpen();
 
   return (
     <div
@@ -89,7 +117,7 @@ export default function RingCeremonyModal() {
         onClick={(e) => e.stopPropagation()}
       >
         <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-amber-300 text-center">
-          {seasonLive ? "Opening day" : "Ring ceremony · preview"}
+          Opening day
         </p>
         <div className="text-center">
           <div className="text-5xl mb-2" aria-hidden>
@@ -122,8 +150,7 @@ export default function RingCeremonyModal() {
             </p>
           )}
           <p className="text-xs text-muted mt-2 leading-relaxed">
-            The ring is theirs until someone takes it. Crystal Ball is free
-            pride. The board is watching.
+            First week is live. The ring is theirs until someone takes it.
           </p>
         </div>
 
