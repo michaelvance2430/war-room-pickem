@@ -9,6 +9,7 @@ import {
   shouldOfferGazette,
   type GazetteEdition,
 } from "@/lib/gazette";
+import { notifyGazetteDone } from "@/lib/badge-celebration";
 import { hasSeenRules } from "@/lib/rules";
 
 /**
@@ -36,12 +37,16 @@ export default function GazetteModal() {
         const players = await loadLeaguePlayers();
         if (cancelled) return;
         const offer = shouldOfferGazette(players);
-        if (!offer.show) return;
+        if (!offer.show) {
+          // No paper this week → free the queue for badge celebrations
+          notifyGazetteDone();
+          return;
+        }
         setEdition(offer.edition);
         setLeagueId(offer.leagueId);
         setOpen(true);
       } catch {
-        /* ignore */
+        notifyGazetteDone();
       }
     }
 
@@ -80,9 +85,11 @@ export default function GazetteModal() {
             setEdition(offer.edition);
             setLeagueId(offer.leagueId);
             setOpen(true);
+          } else {
+            notifyGazetteDone();
           }
         } catch {
-          /* ignore */
+          notifyGazetteDone();
         }
       })();
     }, 1500);
@@ -98,6 +105,8 @@ export default function GazetteModal() {
       markGazetteSeen(leagueId, edition.weekIndex);
     }
     setOpen(false);
+    // Next in the login queue: achievement unlocks
+    notifyGazetteDone();
   }
 
   if (!open || !edition) return null;

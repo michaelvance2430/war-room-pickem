@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import Avatar from "@/components/Avatar";
 import RulesOnboardingModal from "@/components/RulesOnboardingModal";
 import GazetteModal from "@/components/GazetteModal";
+import BadgeUnlockModal from "@/components/BadgeUnlockModal";
 import { loadMyProfile } from "@/lib/profile";
 import { refreshStaffSessionFlags } from "@/lib/cloud";
 
@@ -324,6 +325,8 @@ export default function Nav() {
       <RulesOnboardingModal />
       {/* Trial: one-shot scored-week newspaper — kill via GAZETTE_ENABLED */}
       <GazetteModal />
+      {/* After Gazette: celebrate newly earned badges */}
+      <BadgeUnlockModal />
     </>
   );
 }
