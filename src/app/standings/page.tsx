@@ -47,7 +47,16 @@ export default function StandingsPage() {
 
   useEffect(() => {
     async function load() {
-      setSelfId(getSession()?.playerId || null);
+      const sid = getSession()?.playerId || null;
+      setSelfId(sid);
+      if (sid) {
+        try {
+          const { markEngagement } = await import("@/lib/engagement");
+          markEngagement(sid, "opened_standings");
+        } catch {
+          /* ignore */
+        }
+      }
       const list = await loadLeaguePlayers();
       setPlayers(list);
       const ranked = rankPlayersWithSwings(list);

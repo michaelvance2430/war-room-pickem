@@ -1,10 +1,18 @@
 "use client";
 
+import { useEffect } from "react";
 import Nav from "@/components/Nav";
 import RulesContent from "@/components/RulesContent";
 import Link from "next/link";
+import { getSession } from "@/lib/league";
+import { markEngagement } from "@/lib/engagement";
 
 export default function RulesPage() {
+  useEffect(() => {
+    const id = getSession()?.playerId;
+    if (id) markEngagement(id, "opened_rules");
+  }, []);
+
   return (
     <div className="min-h-screen flex flex-col">
       <Nav />

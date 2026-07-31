@@ -141,6 +141,28 @@ export async function awardTrophy(opts: {
     }
     return { ok: false, error: error.message };
   }
+
+  // Permanent badge grants for trophy hardware
+  try {
+    const { grantPermanentBadgeId } = await import("./permanent-badges");
+    const uid = opts.winnerUserId;
+    if (uid) {
+      if (opts.trophyType === "championship") {
+        grantPermanentBadgeId(uid, "championship_ring");
+        grantPermanentBadgeId(uid, "war_room_legend");
+      }
+      if (opts.trophyType === "toilet_bowl") {
+        grantPermanentBadgeId(uid, "toilet_crown");
+      }
+      if (opts.trophyType === "crystal_ball") {
+        grantPermanentBadgeId(uid, "national_nightmare");
+        grantPermanentBadgeId(uid, "war_room_legend");
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+
   return { ok: true };
 }
 

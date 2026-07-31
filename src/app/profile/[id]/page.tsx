@@ -60,6 +60,7 @@ export default function ProfilePage() {
   /** Join-order flex title (e.g. Day-One Demon, Bottom Feeder) */
   const [joinTitle, setJoinTitle] = useState<string | null>(null);
   const [leagueTrophies, setLeagueTrophies] = useState<LeagueTrophy[]>([]);
+  const [leaguePeers, setLeaguePeers] = useState<Player[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -145,10 +146,22 @@ export default function ProfilePage() {
             /* ignore */
           }
           found = withPermanentBadges(withCreatorFlag(found));
+          // Profile peeker — viewing someone else
+          try {
+            const { getSession } = await import("@/lib/league");
+            const me = getSession()?.playerId;
+            if (me && me !== found.id) {
+              const { markEngagement } = await import("@/lib/engagement");
+              markEngagement(me, "opened_other_profile");
+            }
+          } catch {
+            /* ignore */
+          }
         }
 
         if (cancelled) return;
         setPlayer(found);
+        setLeaguePeers(leagueForSync.length ? leagueForSync : found ? [found] : []);
         setJoinTitle(title);
         setLeagueTrophies(trophies);
       } catch (e) {
@@ -174,11 +187,14 @@ export default function ProfilePage() {
       // Scrub sim career before badge/career paint (accurate shelf numbers)
       nukeAccumulatedSandboxCareersOnce([player.id]);
       applyLegacyBadgeGrants({ id: player.id, name: player.name });
-      return getPlayerBadges(player);
+      return getPlayerBadges(
+        player,
+        leaguePeers.length ? leaguePeers : undefined
+      );
     } catch {
       return [];
     }
-  }, [player]);
+  }, [player, leaguePeers]);
 
   const { seasonPoints, careerPoints } = useMemo(() => {
     if (!player) return { seasonPoints: 0, careerPoints: 0 };

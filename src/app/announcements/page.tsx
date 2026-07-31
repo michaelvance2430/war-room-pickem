@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Nav from "@/components/Nav";
 import { getSession, getLeague } from "@/lib/league";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
+import { markEngagement } from "@/lib/engagement";
 
 type Announcement = {
   id: string;
@@ -126,6 +127,8 @@ export default function AnnouncementsPage() {
 
   useEffect(() => {
     loadAll();
+    const id = getSession()?.playerId;
+    if (id) markEngagement(id, "opened_announcements");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 

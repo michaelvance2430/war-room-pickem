@@ -89,6 +89,11 @@ export default function LockerRoomPage() {
           .map((m) => ({ userId: m.userId, name: m.name }))
       );
     });
+    if (session?.playerId) {
+      void import("@/lib/engagement").then((m) =>
+        m.markEngagement(session.playerId!, "opened_locker")
+      );
+    }
   }, [reload]);
 
   useEffect(() => {
@@ -198,6 +203,11 @@ export default function LockerRoomPage() {
     setCooldownLeft(LOCKER_COOLDOWN_SEC);
     setBody("");
     setMentionOpen(false);
+    if (selfId) {
+      void import("@/lib/engagement").then((m) =>
+        m.markEngagement(selfId, "posted_locker")
+      );
+    }
     if (res.message) {
       setMessages((prev) => {
         if (prev.some((m) => m.id === res.message!.id)) return prev;

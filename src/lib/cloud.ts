@@ -471,6 +471,15 @@ export async function savePicksToCloud(opts: {
         `warroom-picks-week-${opts.weekNumber}`,
         JSON.stringify(payload)
       );
+      try {
+        const { markEngagement } = await import("./engagement");
+        const hour = new Date().getHours();
+        if (hour >= 22 || hour < 5) {
+          markEngagement(session.playerId, "locked_after_22");
+        }
+      } catch {
+        /* ignore */
+      }
       return { ok: true, firstFinal: "ignored" };
     }
   } catch {
@@ -634,6 +643,16 @@ export async function savePicksToCloud(opts: {
     }
   } catch {
     firstFinal = "ignored";
+  }
+
+  try {
+    const { markEngagement } = await import("./engagement");
+    const hour = new Date().getHours();
+    if (hour >= 22 || hour < 5) {
+      markEngagement(uid, "locked_after_22");
+    }
+  } catch {
+    /* ignore */
   }
 
   return { ok: true, firstFinal, firstFinalPointsDelta };
@@ -1125,6 +1144,15 @@ export async function saveResultsAndScoreWeek(opts: {
     const gamesCount = opts.games.length;
     const bestBetHit = weekScore.gameScores.some((g) => g.isBestBet && g.correct);
     const hadBestBet = weekScore.gameScores.some((g) => g.isBestBet);
+    const hadPush = weekScore.gameScores.some((g) => g.pushed);
+    if (hadPush) {
+      try {
+        const { markEngagement } = await import("./engagement");
+        markEngagement(pickRow.user_id as string, "push_recorded");
+      } catch {
+        /* ignore */
+      }
+    }
 
     let weekly: number[] = Array.isArray(membership.weekly_points)
       ? [...membership.weekly_points]

@@ -291,7 +291,15 @@ export async function saveCrystalBallPick(
       },
       { onConflict: "league_id,user_id" }
     );
-    if (!error) return { ok: true, cloud: true };
+    if (!error) {
+      try {
+        const { markEngagement } = await import("./engagement");
+        markEngagement(session.playerId, "crystal_ball_picked");
+      } catch {
+        /* ignore */
+      }
+      return { ok: true, cloud: true };
+    }
     // table missing or RLS — local
   } catch {
     /* local */
@@ -304,6 +312,12 @@ export async function saveCrystalBallPick(
     name: session.playerName || "You",
   };
   writeLocal(session.leagueId, local);
+  try {
+    const { markEngagement } = await import("./engagement");
+    markEngagement(session.playerId, "crystal_ball_picked");
+  } catch {
+    /* ignore */
+  }
   return { ok: true, cloud: false };
 }
 
@@ -392,6 +406,12 @@ export async function crownNationalChampion(
           },
           { onConflict: "league_id,user_id,code" }
         );
+        try {
+          const { grantPermanentBadgeId } = await import("./permanent-badges");
+          grantPermanentBadgeId(w.userId, "national_nightmare");
+        } catch {
+          /* ignore */
+        }
       }
       return { ok: true, winners: winners.length };
     }
@@ -414,6 +434,12 @@ export async function crownNationalChampion(
         flavor: ach.flavor,
         earnedAt: new Date().toISOString(),
       });
+    }
+    try {
+      const { grantPermanentBadgeId } = await import("./permanent-badges");
+      grantPermanentBadgeId(w.userId, "national_nightmare");
+    } catch {
+      /* ignore */
     }
   }
   writeLocal(session.leagueId, local);
