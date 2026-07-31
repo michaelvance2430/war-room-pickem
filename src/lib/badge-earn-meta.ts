@@ -4,6 +4,7 @@
  */
 
 import { defaultSeasonYear } from "./trophies";
+import { isSandboxMode, isSandboxProtectedBadge } from "./season-mode";
 
 const KEY = "warroom-badge-earn-meta-v1";
 
@@ -71,6 +72,7 @@ export function getBadgeEarnMeta(
 
 /**
  * Stamp first earn. Does not overwrite an existing stamp.
+ * No-op in sandbox for non-protected badges (trial cheevos never stick).
  * Returns the meta (existing or new).
  */
 export function stampBadgeEarn(
@@ -79,6 +81,10 @@ export function stampBadgeEarn(
   opts?: { seasonYear?: number; week?: number | null }
 ): BadgeEarnMeta | null {
   if (!playerId || !badgeId || !canUse()) return null;
+  // Practice season: never stamp fake unlocks
+  if (isSandboxMode() && !isSandboxProtectedBadge(badgeId)) {
+    return null;
+  }
   const existing = getBadgeEarnMeta(playerId, badgeId);
   if (existing) return existing;
 
@@ -98,6 +104,30 @@ export function stampBadgeEarn(
   all[playerId][badgeId] = meta;
   writeAll(all);
   return meta;
+}
+
+/** Drop trial-run earn stamps (keep creator / prior-season protected only). */
+export function clearSandboxBadgeEarnMeta(playerId?: string): number {
+  if (!canUse()) return 0;
+  const all = readAll();
+  let removed = 0;
+  const ids = playerId ? [playerId] : Object.keys(all);
+  for (const pid of ids) {
+    const row = all[pid];
+    if (!row) continue;
+    const next: Record<string, BadgeEarnMeta> = {};
+    for (const [bid, meta] of Object.entries(row)) {
+      if (isSandboxProtectedBadge(bid)) {
+        next[bid] = meta;
+      } else {
+        removed += 1;
+      }
+    }
+    if (Object.keys(next).length) all[pid] = next;
+    else delete all[pid];
+  }
+  writeAll(all);
+  return removed;
 }
 
 /** Status line: "Earned · 2026 · Week 3" */

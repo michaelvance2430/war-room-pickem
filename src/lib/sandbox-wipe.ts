@@ -20,10 +20,11 @@ import {
 import { clearFirstFinalForLeague } from "./first-final";
 import { clearCommishTenureForLeague } from "./commish-tenure";
 import { wipeLeagueTrophiesForSandbox } from "./trophies";
+import { clearSandboxBadgeEarnMeta } from "./badge-earn-meta";
 import { getSession } from "./league";
 
 /** Bump to force another one-time full scrub on every browser. */
-const NUKE_FLAG = "warroom-sandbox-career-nuke-v3";
+const NUKE_FLAG = "warroom-sandbox-career-nuke-v4";
 
 export type SandboxWipeReport = {
   mode: string;
@@ -77,6 +78,7 @@ export function scrubSandboxProgressOnThisDevice(playerIds?: string[]): number {
   for (const id of ids) {
     const a = stripSandboxPermanentBadges(id);
     const b = stripSandboxCareerCheevos(id);
+    clearSandboxBadgeEarnMeta(id);
     if (a.length || b.length) n += 1;
   }
 

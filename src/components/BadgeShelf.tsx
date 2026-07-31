@@ -246,6 +246,15 @@ function BadgeDetailModal({
               </div>
             ) : lockedText ? (
               <div className="font-medium text-warning">{lockedText}</div>
+            ) : progress &&
+              progress.target > 0 &&
+              progress.current >= progress.target ? (
+              <div className="font-medium text-muted">
+                Practice only
+                <span className="block text-[11px] font-normal text-muted/90 mt-0.5">
+                  Trial runs don&apos;t list as earned until the season opens
+                </span>
+              </div>
             ) : (
               <div className="font-medium text-muted">Locked</div>
             )}

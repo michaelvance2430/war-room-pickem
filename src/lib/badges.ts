@@ -19,6 +19,7 @@ import {
 import { applyLegacyBadgeGrants, WAR_ROOM_LEGEND_ID } from "./legacy-badge-grants";
 import { hasEngagement } from "./engagement";
 import { getBadgeEarnMeta, stampBadgeEarn } from "./badge-earn-meta";
+import { isSandboxMode, isSandboxProtectedBadge } from "./season-mode";
 
 /** Permanent rare: most achievement points in the league */
 export const CHEEVO_KING_ID = "cheevo_king";
@@ -1375,17 +1376,37 @@ export function getPlayerBadges(
     leaguePeers && leaguePeers.length
       ? leaguePeers.map((x) => withPermanentBadges(x))
       : [p];
+  const sandbox = isSandboxMode();
   const statuses: BadgeStatus[] = BADGE_CATALOG.map((def) => {
     try {
       const result = evaluateBadge(def.id, p, peers);
       const permanent = hasPermanentBadge(p, def.id);
-      const earned = result.earned || permanent;
+      let earned = result.earned || permanent;
+
+      // Trial / preseason dry-run: fake week scores must NOT list as Earned.
+      // Only true prior-season / creator hardware shows earned (protected ids).
+      if (sandbox && !isSandboxProtectedBadge(def.id)) {
+        earned = false;
+        return {
+          def,
+          earned: false,
+          earnedAt: null,
+          earnedSeasonYear: null,
+          earnedWeek: null,
+          // Keep progress so hosts can still see the path; never "Earned"
+          progress:
+            result.progress ??
+            (result.earned ? { current: 1, target: 1 } : null),
+        };
+      }
+
       let earnedSeasonYear: number | null = null;
       let earnedWeek: number | null = null;
       let earnedAt: string | null = null;
       if (earned) {
         try {
           // Stamp season year + week the first time we see this cheevo earned
+          // (real season only — sandbox already returned above)
           const meta =
             getBadgeEarnMeta(p.id, def.id) || stampBadgeEarn(p.id, def.id);
           if (meta) {
@@ -1406,9 +1427,12 @@ export function getPlayerBadges(
         progress: earned ? null : result.progress ?? null,
       };
     } catch {
+      const perm = hasPermanentBadge(p, def.id);
+      const show =
+        perm && (!sandbox || isSandboxProtectedBadge(def.id));
       return {
         def,
-        earned: hasPermanentBadge(p, def.id),
+        earned: show,
         earnedAt: null,
         earnedSeasonYear: null,
         earnedWeek: null,
