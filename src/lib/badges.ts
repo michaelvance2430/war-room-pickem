@@ -1,17 +1,37 @@
 import { BadgeDef, BadgeStatus, BadgeTier, Player } from "./types";
+import {
+  getPermanentBadgeIds,
+  grantPermanentBadgeId,
+  mergePermanentBadges,
+} from "./permanent-badges";
 
 /** Permanent rare: most achievement points in the league */
 export const CHEEVO_KING_ID = "cheevo_king";
 
 export function hasPermanentBadge(player: Player, badgeId: string): boolean {
-  return !!player.permanentBadgeIds?.includes(badgeId);
+  if (player.permanentBadgeIds?.includes(badgeId)) return true;
+  return getPermanentBadgeIds(player.id).includes(badgeId);
 }
 
 function grantPermanentBadge(player: Player, badgeId: string): Player {
-  if (hasPermanentBadge(player, badgeId)) return player;
+  grantPermanentBadgeId(player.id, badgeId);
+  if (hasPermanentBadge(player, badgeId) && player.permanentBadgeIds?.includes(badgeId)) {
+    return player;
+  }
   return {
     ...player,
-    permanentBadgeIds: [...(player.permanentBadgeIds || []), badgeId],
+    permanentBadgeIds: mergePermanentBadges(player.id, [
+      ...(player.permanentBadgeIds || []),
+      badgeId,
+    ]),
+  };
+}
+
+/** Attach permanent grants from local storage onto a player (live UUIDs). */
+export function withPermanentBadges(player: Player): Player {
+  return {
+    ...player,
+    permanentBadgeIds: mergePermanentBadges(player.id, player.permanentBadgeIds),
   };
 }
 
@@ -437,16 +457,26 @@ function sortBadges(statuses: BadgeStatus[]): BadgeStatus[] {
  * Creator badge is always listed (gold if creator, grey locked otherwise).
  */
 export function getPlayerBadges(player: Player): BadgeStatus[] {
+  const p = withPermanentBadges(player);
   const statuses: BadgeStatus[] = BADGE_CATALOG.map((def) => {
-    const result = evaluateBadge(def.id, player);
-    const permanent = hasPermanentBadge(player, def.id);
-    const earned = result.earned || permanent;
-    return {
-      def,
-      earned,
-      earnedAt: earned ? player.memberSince ?? null : null,
-      progress: earned ? null : result.progress ?? null,
-    };
+    try {
+      const result = evaluateBadge(def.id, p);
+      const permanent = hasPermanentBadge(p, def.id);
+      const earned = result.earned || permanent;
+      return {
+        def,
+        earned,
+        earnedAt: earned ? p.memberSince ?? null : null,
+        progress: earned ? null : result.progress ?? null,
+      };
+    } catch {
+      return {
+        def,
+        earned: hasPermanentBadge(p, def.id),
+        earnedAt: null,
+        progress: null,
+      };
+    }
   });
   return sortBadges(statuses);
 }

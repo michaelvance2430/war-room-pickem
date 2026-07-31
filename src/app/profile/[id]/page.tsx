@@ -11,13 +11,15 @@ import {
   getAchievementPoints,
   getPlayerBadges,
   memberDuration,
+  syncLeagueCheevoKing,
+  withPermanentBadges,
 } from "@/lib/badges";
 import {
   isMockPlayer,
   mockRoastFor,
   mockRoastLabel,
 } from "@/lib/mock-roasts";
-import { findPlayer, loadPlayers, savePlayers } from "@/lib/store";
+import { findPlayer } from "@/lib/store";
 import { Player } from "@/lib/types";
 
 function initials(name: string) {
@@ -32,10 +34,7 @@ function initials(name: string) {
 }
 
 /**
- * Profile page — keep it dumb:
- * 1) read id from URL
- * 2) findPlayer(id)
- * 3) render
+ * Profile: load player (cloud first on live), always show full badge shelves.
  */
 export default function ProfilePage() {
   const params = useParams();
@@ -44,44 +43,69 @@ export default function ProfilePage() {
   const [player, setPlayer] = useState<Player | null>(null);
   const [ready, setReady] = useState(false);
   const [lightbox, setLightbox] = useState(false);
-  const [avatarInput, setAvatarInput] = useState("");
-  const [showAvatarForm, setShowAvatarForm] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
-      // 1) Local/mock roster
-      let found = findPlayer(id);
+      setLoadError(null);
+      try {
+        let found: Player | null = null;
+        let leagueForSync: Player[] = [];
 
-      // 2) Live league standings (Supabase) — real multiplayer ids
-      if (!found) {
+        // Live league first (real multiplayer)
         try {
-          const { loadLeaguePlayers } = await import("@/lib/cloud");
-          const league = await loadLeaguePlayers();
-          found = league.find((p) => p.id === id) ?? null;
+          const { loadLeaguePlayers, loadLeagueRoster } = await import(
+            "@/lib/cloud"
+          );
+          leagueForSync = await loadLeaguePlayers();
+          found = leagueForSync.find((p) => p.id === id) ?? null;
           if (found) {
-            // Pull avatar from roster when available
             try {
-              const { loadLeagueRoster } = await import("@/lib/cloud");
               const roster = await loadLeagueRoster();
               const row = roster.find((m) => m.userId === id);
-              if (row?.avatarUrl) {
-                found = { ...found, avatarUrl: row.avatarUrl };
+              if (row) {
+                found = {
+                  ...found,
+                  avatarUrl: row.avatarUrl ?? found.avatarUrl,
+                  name: row.name || found.name,
+                };
               }
             } catch {
               /* optional */
             }
           }
-        } catch {
-          /* offline / no session */
-        }
-      }
 
-      if (cancelled) return;
-      setPlayer(found);
-      setAvatarInput(found?.avatarUrl || "");
-      setReady(true);
+          // Crown Cheevo King among live league (permanent storage by user id)
+          if (leagueForSync.length) {
+            syncLeagueCheevoKing(
+              leagueForSync.map((p) => withPermanentBadges(p))
+            );
+          }
+        } catch {
+          /* no session / offline */
+        }
+
+        // Local/mock fallback
+        if (!found) {
+          found = findPlayer(id);
+        }
+
+        if (found) {
+          found = withPermanentBadges(found);
+        }
+
+        if (cancelled) return;
+        setPlayer(found);
+      } catch (e) {
+        if (!cancelled) {
+          setLoadError(e instanceof Error ? e.message : "Failed to load");
+          setPlayer(null);
+        }
+      } finally {
+        if (!cancelled) setReady(true);
+      }
     }
 
     setReady(false);
@@ -91,25 +115,23 @@ export default function ProfilePage() {
     };
   }, [id]);
 
-  const badges = useMemo(
-    () => (player ? getPlayerBadges(player) : []),
-    [player]
-  );
-  const points = useMemo(
-    () => (player ? getAchievementPoints(player) : 0),
-    [player]
-  );
+  const badges = useMemo(() => {
+    if (!player) return [];
+    try {
+      return getPlayerBadges(player);
+    } catch {
+      return [];
+    }
+  }, [player]);
 
-  function saveAvatar() {
-    if (!player || player.isMock) return;
-    const url = avatarInput.trim() || null;
-    const next = loadPlayers().map((p) =>
-      p.id === player.id ? { ...p, avatarUrl: url } : p
-    );
-    savePlayers(next);
-    setPlayer({ ...player, avatarUrl: url });
-    setShowAvatarForm(false);
-  }
+  const points = useMemo(() => {
+    if (!player) return 0;
+    try {
+      return getAchievementPoints(player);
+    } catch {
+      return 0;
+    }
+  }, [player]);
 
   if (!ready) {
     return (
@@ -125,7 +147,15 @@ export default function ProfilePage() {
         <Nav />
         <main className="flex-1 max-w-lg mx-auto px-4 py-16 text-center">
           <h1 className="text-xl font-bold mb-2">Player not found</h1>
-          <p className="text-sm text-muted mb-4">id: {id || "(empty)"}</p>
+          <p className="text-sm text-muted mb-2">
+            Open a profile from Standings (click a name).
+          </p>
+          {id && (
+            <p className="text-xs text-muted mb-2 font-mono break-all">id: {id}</p>
+          )}
+          {loadError && (
+            <p className="text-xs text-danger mb-4">{loadError}</p>
+          )}
           <Link href="/standings" className="text-primary text-sm hover:underline">
             ← Standings
           </Link>
@@ -138,6 +168,7 @@ export default function ProfilePage() {
   const roast = mockRoastFor(player);
   const roastNum = mockRoastLabel(player);
   const ini = initials(player.name);
+  const earnedCount = badges.filter((b) => b.earned).length;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -199,7 +230,7 @@ export default function ProfilePage() {
               <div className="flex flex-wrap items-center gap-2 mb-1">
                 <h1 className="text-2xl font-bold truncate">{player.name}</h1>
                 {player.isCreator && (
-                  <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border border-badge-legendary text-badge-legendary">
+                  <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border border-yellow-500 text-yellow-500">
                     Creator
                   </span>
                 )}
@@ -224,54 +255,10 @@ export default function ProfilePage() {
                 <Chip label="Achievement pts" value={String(points)} accent />
                 <Chip label="Season pts" value={String(player.totalPoints)} />
                 <Chip
-                  label="Gold badges"
-                  value={String(
-                    badges.filter(
-                      (b) => b.earned && b.def.tier === "legendary"
-                    ).length
-                  )}
+                  label="Badges earned"
+                  value={`${earnedCount}/${badges.length || "?"}`}
                 />
               </div>
-
-              {!mock && (
-                <div className="mt-4">
-                  {!showAvatarForm ? (
-                    <button
-                      type="button"
-                      onClick={() => setShowAvatarForm(true)}
-                      className="text-xs text-primary hover:underline"
-                    >
-                      {player.avatarUrl
-                        ? "Change profile photo"
-                        : "Add profile photo"}
-                    </button>
-                  ) : (
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      <input
-                        type="url"
-                        value={avatarInput}
-                        onChange={(e) => setAvatarInput(e.target.value)}
-                        placeholder="Paste image URL"
-                        className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-sm"
-                      />
-                      <button
-                        type="button"
-                        onClick={saveAvatar}
-                        className="px-3 py-2 rounded-lg bg-primary text-black text-sm font-medium"
-                      >
-                        Save
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowAvatarForm(false)}
-                        className="px-3 py-2 rounded-lg border border-border text-sm text-muted"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           </div>
         </section>
@@ -305,8 +292,18 @@ export default function ProfilePage() {
           </div>
         </section>
 
-        <div className="rounded-2xl border border-border bg-card p-5 sm:p-6">
-          <BadgeShelf badges={badges} />
+        {/* Badges — always mount when we have a player */}
+        <div className="rounded-2xl border border-border bg-card p-5 sm:p-6 mb-6">
+          {badges.length > 0 ? (
+            <BadgeShelf badges={badges} />
+          ) : (
+            <div>
+              <h2 className="font-semibold text-lg mb-2">Badge shelves</h2>
+              <p className="text-sm text-muted">
+                Could not load badges. Try a hard refresh.
+              </p>
+            </div>
+          )}
         </div>
       </main>
 

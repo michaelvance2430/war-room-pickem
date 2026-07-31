@@ -177,6 +177,14 @@ export default function AccountPage() {
             <Avatar name={name || "You"} avatarUrl={avatarUrl} size="lg" />
             <div className="flex-1 min-w-0 space-y-2">
               <p className="text-sm font-medium truncate">{name || "Player"}</p>
+              {userId && (
+                <Link
+                  href={`/profile/${userId}`}
+                  className="inline-block text-xs text-primary hover:underline font-medium"
+                >
+                  View your badges &amp; public profile →
+                </Link>
+              )}
               <p className="text-xs text-muted">
                 Any player can upload. JPG or PNG works best (max 2 MB after
                 resize). On iPhone, avoid HEIC — use &quot;Most Compatible&quot;
