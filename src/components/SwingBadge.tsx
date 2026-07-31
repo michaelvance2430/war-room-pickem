@@ -27,13 +27,17 @@ export default function SwingBadge({
         swing.tone
       )} ${className}`}
       title={
-        swing.key === "preseason"
-          ? "No weeks scored yet"
-          : swing.delta > 0
-            ? `Climbed ${swing.delta} spot(s) after last week`
-            : swing.delta < 0
-              ? `Fell ${Math.abs(swing.delta)} spot(s) after last week`
-              : "No standings move"
+        swing.key === "architect"
+          ? "Built the War Room — permanent flex"
+          : swing.key === "gavel"
+            ? "League commissioner — runs this room"
+            : swing.key === "preseason"
+              ? "No weeks scored yet"
+              : swing.delta > 0
+                ? `Climbed ${swing.delta} spot(s) after last week`
+                : swing.delta < 0
+                  ? `Fell ${Math.abs(swing.delta)} spot(s) after last week`
+                  : "No standings move"
       }
     >
       {swing.text}

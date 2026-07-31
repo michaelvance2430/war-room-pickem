@@ -1,4 +1,6 @@
 import type { Player } from "./types";
+import { isAppCreator } from "./creator";
+import { getLeague } from "./league";
 
 /** Humorous rank-movement label from standings rank change (positive = climbed). */
 export type SwingLabel = {
@@ -53,12 +55,41 @@ function rankByPoints(players: Player[], getPts: (p: Player) => number): Map<str
  * Swing labels from standings movement after the most recent scored week.
  * Climbed ranks → positive delta.
  */
+/** Preseason status under a name — special flex for the people who run the room. */
+export function preseasonSwingForPlayer(player: Player): SwingLabel {
+  // Game creator — permanent flex
+  if (isAppCreator(player.id) || player.isCreator) {
+    return {
+      key: "architect",
+      text: "THE ARCHITECT",
+      tone: "hero",
+      delta: 0,
+    };
+  }
+  // League commissioner (not the same as game creator)
+  try {
+    const league = getLeague();
+    if (league?.commissionerId && league.commissionerId === player.id) {
+      return {
+        key: "gavel",
+        text: "RUNS THE ROOM",
+        tone: "hero",
+        delta: 0,
+      };
+    }
+  } catch {
+    /* ignore */
+  }
+  return { key: "preseason", text: "WAITING", tone: "flat", delta: 0 };
+}
+
 export function swingLabelFromDelta(
   delta: number | null,
-  opts?: { preseason?: boolean }
+  opts?: { preseason?: boolean; player?: Player }
 ): SwingLabel {
   // No scored weeks yet — don't fake "MID AS HELL" for everyone
   if (opts?.preseason || delta === null) {
+    if (opts?.player) return preseasonSwingForPlayer(opts.player);
     return { key: "preseason", text: "WAITING", tone: "flat", delta: 0 };
   }
   if (delta === 0) {
@@ -133,7 +164,7 @@ export function rankPlayersWithSwings(players: Player[]): RankedPlayer[] {
         ...p,
         rank,
         prevRank,
-        swing: swingLabelFromDelta(delta, { preseason }),
+        swing: swingLabelFromDelta(delta, { preseason, player: p }),
         lastWeekPts: lastWeekPts(p),
       };
     });
