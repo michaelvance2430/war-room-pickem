@@ -1,39 +1,44 @@
 /**
  * Prior-season / manual trophy → permanent badges + career cheevo bank.
  * Matched by display name (same approach as profile hardware).
+ *
+ * Correct winners (2025 hardware):
+ *  - Kahmann → Championship → War Room Legend
+ *  - Bill ball Ben → Village Nerd → War Room Legend
  */
 
-import { grantPermanentBadgeId, getPermanentBadgeIds } from "./permanent-badges";
-import { bankCareerBadgeId } from "./career-cheevo";
+import {
+  grantPermanentBadgeId,
+  getPermanentBadgeIds,
+  revokePermanentBadgeId,
+} from "./permanent-badges";
+import { bankCareerBadgeId, unbankCareerBadgeId } from "./career-cheevo";
 import { getBadgeDef } from "./badges";
 
 export const WAR_ROOM_LEGEND_ID = "war_room_legend";
 
 type LegacyBadgeGrant = {
-  /** Match against player display name */
   pattern: RegExp;
   badgeId: string;
-  /** Human note for debugging */
   reason: string;
 };
 
-/**
- * Andy (Andrew Visconti) + Bill ball Ben — trophy winners → War Room Legend.
- */
+/** Trophy winners who get War Room Legend + career points */
 export const LEGACY_BADGE_GRANTS: LegacyBadgeGrant[] = [
   {
-    // Andy / Andrew Visconti (avoid bare "and" matching)
-    pattern: /\bandy\b|\bandrew\s+visconti\b|\bvisconti\b/i,
+    pattern: /\bkahmann\b/i,
     badgeId: WAR_ROOM_LEGEND_ID,
-    reason: "Trophy winner — War Room Legend",
+    reason: "2025 Championship — War Room Legend",
   },
   {
-    // Bill ball Ben / Ben (prefer full phrase first)
     pattern: /\bbill\s*ball\s*ben\b|\bbillballben\b/i,
     badgeId: WAR_ROOM_LEGEND_ID,
-    reason: "Trophy winner — War Room Legend",
+    reason: "2025 Village Nerd — War Room Legend",
   },
 ];
+
+/** Mistakenly granted earlier — strip if present */
+const MISTAKEN_LEGEND_PATTERN = /\bandy\b|\bandrew\s+visconti\b|\bvisconti\b/i;
 
 /**
  * Grant permanent badges for legacy winners and bank career points once.
@@ -46,20 +51,30 @@ export function applyLegacyBadgeGrants(player: {
   if (!player?.id || !player?.name) return [];
   const newly: string[] = [];
   const known = new Set(getPermanentBadgeIds(player.id));
+  const pts = getBadgeDef(WAR_ROOM_LEGEND_ID)?.points ?? 200;
+
+  // Undo mistaken Andy / Andrew Visconti grant (if any)
+  if (
+    MISTAKEN_LEGEND_PATTERN.test(player.name) &&
+    !LEGACY_BADGE_GRANTS.some((g) => g.pattern.test(player.name))
+  ) {
+    if (known.has(WAR_ROOM_LEGEND_ID)) {
+      revokePermanentBadgeId(player.id, WAR_ROOM_LEGEND_ID);
+      unbankCareerBadgeId(player.id, WAR_ROOM_LEGEND_ID, pts);
+      known.delete(WAR_ROOM_LEGEND_ID);
+    }
+  }
 
   for (const g of LEGACY_BADGE_GRANTS) {
     if (!g.pattern.test(player.name)) continue;
     if (known.has(g.badgeId)) {
-      // Still ensure career bank (in case permanent existed without career)
-      const def = getBadgeDef(g.badgeId);
-      bankCareerBadgeId(player.id, g.badgeId, def?.points ?? 200);
+      bankCareerBadgeId(player.id, g.badgeId, pts);
       continue;
     }
     const granted = grantPermanentBadgeId(player.id, g.badgeId);
     if (granted) newly.push(g.badgeId);
     known.add(g.badgeId);
-    const def = getBadgeDef(g.badgeId);
-    bankCareerBadgeId(player.id, g.badgeId, def?.points ?? 200);
+    bankCareerBadgeId(player.id, g.badgeId, pts);
   }
 
   return newly;
