@@ -105,12 +105,12 @@ export default function Home() {
         } catch {
           /* ignore */
         }
-        // Sandbox: strip already-banked sim cheevos so fake weeks don't stick
+        // Sandbox: one-time nuke of sim career banks from dry-run seasons
         try {
-          const { scrubSandboxProgressOnThisDevice } = await import(
+          const { nukeAccumulatedSandboxCareersOnce } = await import(
             "@/lib/sandbox-wipe"
           );
-          scrubSandboxProgressOnThisDevice();
+          nukeAccumulatedSandboxCareersOnce();
         } catch {
           /* ignore */
         }

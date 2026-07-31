@@ -28,6 +28,7 @@ import {
   countUnseenLockerPosts,
 } from "@/lib/room-unseen";
 import { sanitizeLegacyLegendsOnBoot } from "@/lib/legacy-badge-grants";
+import { nukeAccumulatedSandboxCareersOnce } from "@/lib/sandbox-wipe";
 
 type NavLink = {
   href: string;
@@ -113,6 +114,14 @@ export default function Nav() {
         playerId: session.playerId,
         playerName: session.playerName,
       });
+    }
+    // One-time scrub of sim career points for everyone banked on this browser
+    try {
+      nukeAccumulatedSandboxCareersOnce(
+        session?.playerId ? [session.playerId] : undefined
+      );
+    } catch {
+      /* ignore */
     }
 
     async function loadUnread() {
