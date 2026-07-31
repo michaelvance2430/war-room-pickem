@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { TIER_LABEL, TIER_ORDER } from "@/lib/badges";
+import { getBadgeRewards } from "@/lib/badge-rewards";
 import { BadgeStatus, BadgeTier } from "@/lib/types";
 
 /** Hex colors so shelves always show even if Tailwind theme tokens miss */
@@ -22,12 +23,13 @@ function BadgeTile({
   hex: string;
 }) {
   const { def, earned } = status;
+  const rewards = getBadgeRewards(def);
 
   return (
     <button
       type="button"
       onClick={() => onSelect(status)}
-      title={def.name}
+      title={`${def.name} — ${rewards.line}`}
       className="relative flex flex-col items-center gap-1 w-[4.5rem] sm:w-20 shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-lg transition hover:-translate-y-0.5"
     >
       <div
@@ -40,6 +42,18 @@ function BadgeTile({
         }}
       >
         <span aria-hidden>{def.icon}</span>
+        {(rewards.title || rewards.border) && (
+          <span
+            className="absolute -top-0.5 -right-0.5 min-w-[14px] h-3.5 px-0.5 rounded-full bg-amber-400 text-black text-[8px] font-black flex items-center justify-center"
+            title={rewards.line}
+          >
+            {rewards.title && rewards.border
+              ? "★"
+              : rewards.title
+                ? "T"
+                : "B"}
+          </span>
+        )}
       </div>
       <span
         className={`text-[10px] font-medium text-center leading-tight line-clamp-2 w-full px-0.5 ${
@@ -47,6 +61,9 @@ function BadgeTile({
         }`}
       >
         {def.name}
+      </span>
+      <span className="text-[9px] text-muted text-center leading-none">
+        {rewards.line.replace(" · ", "·")}
       </span>
     </button>
   );
@@ -119,6 +136,7 @@ function BadgeDetailModal({
 }) {
   const { def, earned, progress } = status;
   const hex = TIER_HEX[def.tier];
+  const rewards = getBadgeRewards(def);
   const isCreatorLocked = !!(def.creatorOnly && !earned);
   const lockedText = isCreatorLocked
     ? def.lockedLabel || "Hard locked — peasants don't get this one"
@@ -162,6 +180,58 @@ function BadgeDetailModal({
         </div>
 
         <div className="mt-4 space-y-3 text-sm">
+          {/* Rewards chase panel */}
+          <div className="rounded-lg border border-amber-400/35 bg-amber-400/10 px-3 py-2.5">
+            <div className="text-[10px] uppercase tracking-wider text-amber-300 font-bold mb-1.5">
+              Rewards if you earn this
+            </div>
+            <ul className="space-y-1 text-sm">
+              <li className="flex justify-between gap-2">
+                <span className="text-muted">Points</span>
+                <span className="font-semibold" style={{ color: hex }}>
+                  +{rewards.points}
+                  {def.creatorOnly ? (
+                    <span className="text-muted font-normal text-xs">
+                      {" "}
+                      · career only
+                    </span>
+                  ) : null}
+                </span>
+              </li>
+              <li className="flex justify-between gap-2">
+                <span className="text-muted">Name title</span>
+                <span
+                  className={
+                    rewards.title
+                      ? "font-semibold text-amber-200 text-right"
+                      : "text-muted text-right"
+                  }
+                >
+                  {rewards.title
+                    ? `“${rewards.title}”`
+                    : "— none"}
+                </span>
+              </li>
+              <li className="flex justify-between gap-2">
+                <span className="text-muted">Profile border</span>
+                <span
+                  className={
+                    rewards.border
+                      ? "font-semibold text-sky-200 text-right"
+                      : "text-muted text-right"
+                  }
+                >
+                  {rewards.border || "— none"}
+                </span>
+              </li>
+            </ul>
+            {(rewards.title || rewards.border) && (
+              <p className="text-[10px] text-muted mt-2 leading-relaxed">
+                Equip on Account after you earn it. Never sold — chase it.
+              </p>
+            )}
+          </div>
+
           <div className="rounded-lg bg-background border border-border px-3 py-2">
             <div className="text-[10px] uppercase tracking-wider text-muted mb-0.5">
               Status
@@ -216,20 +286,6 @@ function BadgeDetailModal({
                 </div>
               </div>
             )}
-          </div>
-
-          <div className="flex items-center justify-between text-xs text-muted px-1">
-            <span>
-              {def.creatorOnly
-                ? "Career points only"
-                : "Achievement points"}
-            </span>
-            <span className="font-semibold" style={{ color: hex }}>
-              +{def.points}
-              {def.creatorOnly ? (
-                <span className="text-muted font-normal"> · not season</span>
-              ) : null}
-            </span>
           </div>
         </div>
 
