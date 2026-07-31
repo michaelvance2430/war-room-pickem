@@ -5,6 +5,7 @@
 import type { Game } from "./types";
 import type { GameResult } from "./scoring";
 import { listFbsTeams } from "./fbs-teams";
+import { listNflTeamNames } from "./nfl-teams";
 import { weekDateWindow } from "./season-calendar";
 
 function mulberry(seed: number) {
@@ -19,10 +20,19 @@ function mulberry(seed: number) {
 /**
  * Deterministic 5-game demo card for a pick'em week.
  * Teams/spreads/kickoffs change by weekNumber so each week looks different.
+ * `sport`: "nfl" uses pro team names; default CFB FBS.
  */
-export function generateDemoSlate(weekNumber: number, count = 5): Game[] {
-  const names = listFbsTeams().map((t) => t.name);
-  const rand = mulberry(10007 + weekNumber * 9973);
+export function generateDemoSlate(
+  weekNumber: number,
+  count = 5,
+  sport: "cfb" | "nfl" = "cfb"
+): Game[] {
+  const names =
+    sport === "nfl"
+      ? listNflTeamNames()
+      : listFbsTeams().map((t) => t.name);
+  const seedBoost = sport === "nfl" ? 33331 : 0;
+  const rand = mulberry(10007 + weekNumber * 9973 + seedBoost);
   const used = new Set<string>();
   const win = weekDateWindow(weekNumber);
   const baseDay = win?.startDate || "2026-09-01";
@@ -61,16 +71,17 @@ export function generateDemoSlate(weekNumber: number, count = 5): Game[] {
       timeZone: "America/New_York",
     });
 
+    const prefix = sport === "nfl" ? "demo-nfl" : "demo";
     games.push({
-      id: `demo-w${weekNumber}-g${i}`,
-      oddsEventId: `demo-w${weekNumber}-g${i}`,
+      id: `${prefix}-w${weekNumber}-g${i}`,
+      oddsEventId: `${prefix}-w${weekNumber}-g${i}`,
       awayTeam: away,
       homeTeam: home,
       spread,
       favorite,
       startTime,
       commenceTime: kick,
-      bookmaker: "demo-sim",
+      bookmaker: sport === "nfl" ? "demo-nfl-sim" : "demo-sim",
     });
   }
   return games;

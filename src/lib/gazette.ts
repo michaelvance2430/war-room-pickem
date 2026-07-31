@@ -136,9 +136,28 @@ export function ritualEditionNameWwc(when: Date = new Date()): string {
   return "World Cup Late Edition";
 }
 
+/** NFL primetime paper ritual names */
+export function ritualEditionNameNfl(when: Date = new Date()): string {
+  const day = when.getDay();
+  if (day === 0) return "Sunday Night Extra";
+  if (day === 1) return "Monday Morning Film";
+  if (day === 2) return "Tuesday Tape Review";
+  if (day === 4) return "Thursday Night Hangover";
+  if (day === 6) return "Saturday Primetime Desk";
+  return "War Room Late Edition";
+}
+
 function isWwcLeague(): boolean {
   try {
     return (getLeague()?.sportId || "cfb") === "soccer_wwc";
+  } catch {
+    return false;
+  }
+}
+
+function isNflLeague(): boolean {
+  try {
+    return (getLeague()?.sportId || "cfb") === "nfl";
   } catch {
     return false;
   }
@@ -163,6 +182,20 @@ export function gazetteAnticipationCopy(): {
       title: "Save room for the World Cup paper",
       body: "After scores post: EXTRA! Crowns, shame, and group-stage nonsense. The weekly appointment, Brazil 2027 edition.",
       ritualHint: "World Cup Extra",
+    };
+  }
+  if (isNflLeague()) {
+    if (day === 0 || day === 1) {
+      return {
+        title: "Sunday paper almost ready",
+        body: "When the host scores this week, the primetime Gazette drops — crowns, shame, Best Bet blood. Keep it tight.",
+        ritualHint: ritualEditionNameNfl(),
+      };
+    }
+    return {
+      title: "Save room for the Sunday paper",
+      body: "After scores post: one good Extra. Who won the week, who ate it, movers. Not a magazine.",
+      ritualHint: "Sunday Extra",
     };
   }
   if (day === 0 || day === 1) {
@@ -757,6 +790,7 @@ export async function buildGazetteEdition(
   const year = defaultSeasonYear();
   const sportId = getLeague()?.sportId || "cfb";
   const wwc = sportId === "soccer_wwc";
+  const nfl = sportId === "nfl";
 
   // Early weeks: one tight page (want next issue, not homework)
   // WWC: still keep a tight paper early; full desk from matchday 2
@@ -778,6 +812,62 @@ export async function buildGazetteEdition(
     league: leagueName,
     pts: cp,
   };
+
+  // --- NFL Sunday paper (same engine, primetime voice — keep slim) ---
+  if (nfl) {
+    const tagline = byWeek(NFL_EDITION_TAGLINES, weekIndex);
+    const weather = byWeek(NFL_WEATHER_BOXES, weekIndex, 1);
+    const classifieds =
+      flavor === "slim"
+        ? [byWeek(NFL_CLASSIFIEDS, weekIndex, 0)(classifiedCtx)]
+        : [
+            byWeek(NFL_CLASSIFIEDS, weekIndex, 0),
+            byWeek(NFL_CLASSIFIEDS, weekIndex, 1),
+          ].map((fn) => fn(classifiedCtx));
+    const pullQuote = byWeek(NFL_PULL_QUOTES, weekIndex, 1)({
+      crown: cn,
+      shame: sn,
+      pts: cp,
+    });
+    const sideCtx: SideStoryCtx = {
+      crown: cn,
+      shame: sn,
+      league: leagueName,
+      pts: cp,
+      weekLabel,
+    };
+    const sideStories: GazetteSideStory[] =
+      flavor === "slim"
+        ? []
+        : [byWeek(NFL_SIDE_STORIES, weekIndex, 0)(sideCtx)];
+
+    const ritualName = ritualEditionNameNfl();
+    const printedLine = `${ritualName.toUpperCase()} · ${weekLabel.toUpperCase()} · ${year} · ${leagueName.toUpperCase()} · PRIMETIME DESK`;
+
+    return {
+      weekIndex,
+      weekLabel,
+      volumeLabel: `Sunday Edition · Vol. ${weekIndex + 1} · ${weekLabel} · ${year}`,
+      masthead: "THE WAR ROOM · SUNDAY",
+      ritualName,
+      tagline,
+      printedLine,
+      weather,
+      classifieds,
+      pullQuote,
+      sideStories,
+      samePerson: data.samePerson,
+      crown,
+      shame,
+      standingsDeadlock,
+      noLock,
+      crystalBallMiss: null, // no Crystal Ball in NFL packs by default
+      swing,
+      sportId: "nfl",
+      stampLine: "Extra · Extra",
+      eventLine: "Pro football · same room · louder Sundays",
+    };
+  }
 
   // --- World Cup Edition voice (same engine, different newspaper) ---
   if (wwc) {
@@ -977,6 +1067,72 @@ const EDITION_TAGLINES: string[] = [
   "Subscription: one lock per week, forever",
   "We report. You cope.",
   "Official publication of the cut line",
+];
+
+// ——— NFL Sunday paper banks (primetime, not college) ———
+
+const NFL_EDITION_TAGLINES: string[] = [
+  "All the news that fits between kickoffs",
+  "Printed after the late window · feelings included",
+  "Primetime ink · Toilet Bowl footnotes",
+  "If you're reading this, you locked. Probably.",
+  "Special Sunday edition: somebody covered",
+  "Not responsible for red-zone decisions",
+  "Free with every scored week · tips optional",
+  "We report. You cope. Then Monday.",
+];
+
+const NFL_WEATHER_BOXES: { kicker: string; body: string }[] = [
+  {
+    kicker: "Sunday forecast",
+    body: "High: confidence. Low: dignity. Wind from the red zone. Pack layers.",
+  },
+  {
+    kicker: "Primetime conditions",
+    body: "Scattered Best Bets. Late windows. 90% chance someone says “script.”",
+  },
+];
+
+const NFL_PULL_QUOTES: ((ctx: {
+  crown: string;
+  shame: string;
+  pts: number;
+}) => { text: string; by: string })[] = [
+  (c) => ({
+    text: `"Trust the process."`,
+    by: `${c.crown}, process currently winning`,
+  }),
+  (c) => ({
+    text: `"Any given Sunday."`,
+    by: c.shame || "The bottom of the board",
+  }),
+];
+
+const NFL_CLASSIFIEDS: ((ctx: {
+  crown: string;
+  shame: string;
+  league: string;
+  pts: number;
+}) => string)[] = [
+  (c) =>
+    `WANTED: one clean Sunday. Last seen near ${c.crown}'s card. Reward: silence in the group chat.`,
+  (c) =>
+    `LOST: red-zone dignity. Return to ${c.shame || "the cut line"}. No questions.`,
+  (c) =>
+    `NOTICE: ${c.league} film room open. ${c.pts} pts still leading the conversation.`,
+];
+
+const NFL_SIDE_STORIES: ((ctx: SideStoryCtx) => GazetteSideStory)[] = [
+  (ctx) => ({
+    kicker: "Primetime desk",
+    headline: "LATE WINDOW DECIDES EVERYTHING (AS USUAL)",
+    body: `${ctx.crown} cashed ${ctx.pts}. The rest of ${ctx.league} is still arguing about one possession. Classic.`,
+  }),
+  (ctx) => ({
+    kicker: "Also true",
+    headline: "BEST BETS: LOVED OR HATED, NEVER IGNORED",
+    body: `Someone doubled down. Someone ate it. ${ctx.shame ? `${ctx.shame} knows which.` : "Check the board."}`,
+  }),
 ];
 
 // ——— FIFA WWC Brazil 2027™ paper banks (ESPN-event energy) ———

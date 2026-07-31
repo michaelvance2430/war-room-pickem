@@ -118,10 +118,12 @@ function JoinPageInner() {
         commissioner_id: userId,
       };
       // Include sport when column exists (run supabase/sport-id.sql on dev DB)
+      // Crystal Ball is CFB pride pick — default off for NFL
       const withSport = {
         ...baseRow,
         sport_id: sportId,
         sport_settings: {},
+        crystal_ball_enabled: sportId === "cfb",
       };
 
       let league: Record<string, unknown> | null = null;
@@ -196,13 +198,25 @@ function JoinPageInner() {
             regularSeasonWeeks: pack.defaultSeasonWeeks,
             gamesPerWeek:
               (league.games_per_week as number) ?? pack.defaultGamesPerWeek,
-            crystalBallEnabled: true,
+            // Crystal Ball = CFB national champ pride pick; off for NFL by default
+            crystalBallEnabled: createdSportId === "cfb",
             homeTaglineId: "good-teams",
             homeTaglineCustom: "",
             seasonThemeId: "default",
           },
         })
       );
+      // Persist CB default to cloud when column exists
+      try {
+        if (createdSportId === "nfl") {
+          const { saveLeagueToCloud } = await import("@/lib/league-sync");
+          await saveLeagueToCloud({
+            settings: { crystalBallEnabled: false },
+          });
+        }
+      } catch {
+        /* optional */
+      }
       try {
         const { applySportTheme } = await import("@/lib/sports/sport-theme");
         applySportTheme(createdSportId);

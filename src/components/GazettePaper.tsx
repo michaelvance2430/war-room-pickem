@@ -103,7 +103,7 @@ export default function GazettePaper({
           : "rounded-sm border-2 border-stone-600 shadow-lg"
       } ${className}`}
     >
-      {/* EXTRA stamp strip — classic red vs Brazil World Cup bar */}
+      {/* EXTRA stamp strip — CFB red · NFL navy/crimson · WWC Brazil */}
       {edition.sportId === "soccer_wwc" ? (
         <div
           className="relative px-3 py-1.5 flex items-center justify-between gap-2 text-white"
@@ -120,6 +120,24 @@ export default function GazettePaper({
           </span>
           <span className="text-[10px] font-bold uppercase tracking-wider opacity-95">
             {edition.ritualName || "World Cup Extra"}
+          </span>
+        </div>
+      ) : edition.sportId === "nfl" ? (
+        <div
+          className="relative px-3 py-1.5 flex items-center justify-between gap-2 text-white"
+          style={{
+            background:
+              "linear-gradient(90deg, #0B1426 0%, #C1121F 55%, #0B1426 100%)",
+          }}
+        >
+          <span
+            className="text-[11px] font-black uppercase tracking-[0.25em]"
+            style={{ color: "#C5CCD3" }}
+          >
+            {edition.stampLine || "Extra · Extra"}
+          </span>
+          <span className="text-[10px] font-bold uppercase tracking-wider opacity-95">
+            {edition.ritualName || "Sunday Night Extra"}
           </span>
         </div>
       ) : (

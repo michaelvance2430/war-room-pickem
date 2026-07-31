@@ -62,13 +62,16 @@ export function mapOddsApiToGames(apiGames: OddsApiGame[]): Game[] {
   });
 }
 
+export type FootballOddsSport = "cfb" | "nfl";
+
 /**
- * Fetch live NCAAF spreads via our server route (keeps API key off the client).
- * Pass pick'em week so results are filtered to that week's date window
- * (Week 0 = Aug 29 2026 only; Week 1 = Sep 3–7; etc.).
- * Pass dryRun: true to skip date filter and return all open FBS games.
+ * Fetch live football spreads via our server route (keeps API key off the client).
+ * `cfb` → NCAAF FBS · `nfl` → NFL
+ * Pass pick'em week so results are filtered to that week's date window.
+ * Pass dryRun: true to skip date filter and return all open games.
  */
-export async function fetchNcaafOdds(
+export async function fetchFootballOdds(
+  sport: FootballOddsSport,
   weekNumber?: number,
   opts?: { dryRun?: boolean }
 ): Promise<{
@@ -80,6 +83,7 @@ export async function fetchNcaafOdds(
   weekFilter?: string | null;
   unfilteredCount?: number;
   dryRun?: boolean;
+  sport: FootballOddsSport;
 }> {
   const dryRun = !!opts?.dryRun;
   const params = new URLSearchParams();
@@ -88,7 +92,8 @@ export async function fetchNcaafOdds(
   }
   if (dryRun) params.set("dryRun", "1");
   const q = params.toString() ? `?${params.toString()}` : "";
-  const res = await fetch(`/api/odds/ncaaf${q}`, { cache: "no-store" });
+  const path = sport === "nfl" ? "/api/odds/nfl" : "/api/odds/ncaaf";
+  const res = await fetch(`${path}${q}`, { cache: "no-store" });
   const body = await res.json().catch(() => ({}));
 
   if (!res.ok) {
@@ -118,17 +123,53 @@ export async function fetchNcaafOdds(
   }
 
   return {
+    sport,
     games,
     remaining: (body as { remaining?: string | null }).remaining,
     used: (body as { used?: string | null }).used,
     last: (body as { last?: string | null }).last,
     rankLabel: (body as { rankLabel?: string }).rankLabel,
-    weekFilter: dryRun
-      ? "DRY RUN — all open FBS"
-      : weekNumber != null
-        ? weekDateRangeLabel(weekNumber) || `week ${weekNumber}`
-        : null,
+    weekFilter:
+      (body as { weekLabel?: string | null }).weekLabel ||
+      (weekNumber != null && !dryRun
+        ? weekDateRangeLabel(weekNumber)
+        : null),
     unfilteredCount,
     dryRun,
   };
+}
+
+/** @deprecated prefer fetchFootballOdds("cfb", …) */
+export async function fetchNcaafOdds(
+  weekNumber?: number,
+  opts?: { dryRun?: boolean }
+): Promise<{
+  games: Game[];
+  remaining?: string | null;
+  used?: string | null;
+  last?: string | null;
+  rankLabel?: string;
+  weekFilter?: string | null;
+  unfilteredCount?: number;
+  dryRun?: boolean;
+}> {
+  const r = await fetchFootballOdds("cfb", weekNumber, opts);
+  return {
+    games: r.games,
+    remaining: r.remaining,
+    used: r.used,
+    last: r.last,
+    rankLabel: r.rankLabel,
+    weekFilter: r.weekFilter,
+    unfilteredCount: r.unfilteredCount,
+    dryRun: r.dryRun,
+  };
+}
+
+/** NFL spreads */
+export async function fetchNflOdds(
+  weekNumber?: number,
+  opts?: { dryRun?: boolean }
+) {
+  return fetchFootballOdds("nfl", weekNumber, opts);
 }

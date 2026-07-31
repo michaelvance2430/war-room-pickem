@@ -165,7 +165,11 @@ export async function autoFinishRemainingWeeks(opts?: {
         label,
         step: `Week ${week} of ${end} (range ${start}–${end}) — demo slate…`,
       });
-      const demoGames = generateDemoSlate(week, 5);
+      const sport =
+        (await import("./league")).getLeague()?.sportId === "nfl"
+          ? "nfl"
+          : "cfb";
+      const demoGames = generateDemoSlate(week, 5, sport);
       const preset = PROP_PRESETS[week % PROP_PRESETS.length];
       const prop = propFromPreset(preset, week);
 

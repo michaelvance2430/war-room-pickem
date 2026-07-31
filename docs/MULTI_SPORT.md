@@ -31,7 +31,7 @@
 | Sport | Status |
 |-------|--------|
 | **CFB** | Live — green War Room default |
-| **NFL** | Live — navy/crimson default (holidays still available) |
+| **NFL** | Live — navy/crimson default · odds/scores API · NFL demo slate · Sunday Gazette · CB off by default |
 | **WWC Brazil 2027** | Coming soon (theme + passport parked) |
 | Others | Coming soon |
 

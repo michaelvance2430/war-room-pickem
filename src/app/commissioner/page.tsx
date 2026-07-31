@@ -14,7 +14,7 @@ import {
   buildInviteShareText,
 } from "@/lib/commish-onboarding";
 import { Game, Prop } from "@/lib/types";
-import { fetchNcaafOdds } from "@/lib/odds";
+import { fetchFootballOdds } from "@/lib/odds";
 import { generateDemoSlate, randomizeDemoResults } from "@/lib/demo-slate";
 import { formatMatchupConferences } from "@/lib/fbs-teams";
 import {
@@ -87,7 +87,7 @@ import {
 import { SEASON_OPEN_LABEL } from "@/lib/season-countdown";
 import { advanceLeagueAfterScore } from "@/lib/active-week";
 import {
-  fetchNcaafScores,
+  fetchFootballScores,
   buildResultsFromScores,
 } from "@/lib/scores";
 import { settlePropFromScores } from "@/lib/prop-settle";
@@ -648,9 +648,14 @@ function CommissionerPageInner() {
     if (q.last != null) setOddsCreditsLast(q.last);
   }
 
+  function leagueFootballSport(): "cfb" | "nfl" {
+    return getLeague()?.sportId === "nfl" ? "nfl" : "cfb";
+  }
+
   async function pullOdds() {
     setLoadingOdds(true);
     setOddsError(null);
+    const sport = leagueFootballSport();
     try {
       const {
         games,
@@ -661,19 +666,20 @@ function CommissionerPageInner() {
         remaining,
         used,
         last,
-      } = await fetchNcaafOdds(activeWeek, { dryRun: dryRunOdds });
+      } = await fetchFootballOdds(sport, activeWeek, { dryRun: dryRunOdds });
       applyOddsQuota({ remaining, used, last });
       setRankLabel(pollLabel || null);
       if (!games.length) {
         setAvailableGames([]);
         setSelectedIds(new Set());
         const range = weekFilter || weekTitle(activeWeek);
+        const label = sport === "nfl" ? "NFL" : "NCAA FBS";
         setOddsError(
           dryRun
-            ? "No open NCAA FBS games with spreads right now (dry run). Use Generate demo slate instead."
+            ? `No open ${label} games with spreads right now (dry run). Use Generate demo slate instead.`
             : unfilteredCount && unfilteredCount > 0
-              ? `No FBS games with spreads in the ${weekTitle(activeWeek)} window (${range}). Use Generate demo slate for a full fake season.`
-              : `No real lines for ${weekTitle(activeWeek)}. Use Generate demo slate to simulate.`
+              ? `No ${label} games with spreads in the ${weekTitle(activeWeek)} window (${range}). Use Generate demo slate for a full fake season.`
+              : `No real ${label} lines for ${weekTitle(activeWeek)}. Use Generate demo slate to simulate.`
         );
         return;
       }
@@ -707,13 +713,14 @@ function CommissionerPageInner() {
   function generateDemoCard() {
     if (!requirePreseasonTools()) return;
     setOddsError(null);
-    setRankLabel("demo-sim");
-    const games = generateDemoSlate(activeWeek, 5);
+    const sport = leagueFootballSport();
+    setRankLabel(sport === "nfl" ? "demo-nfl-sim" : "demo-sim");
+    const games = generateDemoSlate(activeWeek, 5, sport);
     setAvailableGames(games);
     setSelectedIds(new Set(games.map((g) => g.id)));
     setCardSaved(false);
     setBotReport(
-      `Demo slate ready for ${weekTitle(activeWeek)} (5 fake games). Or use “Publish demo week” for one tap.`
+      `Demo slate ready for ${weekTitle(activeWeek)} (5 fake ${sport === "nfl" ? "NFL" : "CFB"} games). Or use “Publish demo week” for one tap.`
     );
   }
 
@@ -727,9 +734,10 @@ function CommissionerPageInner() {
     setDemoBusy(true);
     setOddsError(null);
     setBotReport(null);
-    setRankLabel("demo-sim");
+    const sport = leagueFootballSport();
+    setRankLabel(sport === "nfl" ? "demo-nfl-sim" : "demo-sim");
 
-    const games = generateDemoSlate(activeWeek, 5);
+    const games = generateDemoSlate(activeWeek, 5, sport);
     setAvailableGames(games);
     setSelectedIds(new Set(games.map((g) => g.id)));
     setCardSaved(false);
@@ -1182,7 +1190,7 @@ function CommissionerPageInner() {
     setSyncingScores(true);
     setSyncReport(null);
     try {
-      const scoreRes = await fetchNcaafScores(3);
+      const scoreRes = await fetchFootballScores(leagueFootballSport(), 3);
       applyOddsQuota({
         remaining: scoreRes.remaining,
         used: scoreRes.used,
