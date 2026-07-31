@@ -24,6 +24,18 @@ export const SANDBOX_PROTECTED_BADGE_IDS = new Set([
  * After SEASON_OPEN_AT_MS, resets keep career cheevos.
  */
 export function isSandboxMode(now = Date.now()): boolean {
+  // Guest demo is always sandbox (no career bank from the tour)
+  try {
+    if (typeof window !== "undefined") {
+      const raw = localStorage.getItem("warroom-guest-mode-v1");
+      if (raw) {
+        const g = JSON.parse(raw) as { active?: boolean };
+        if (g?.active) return true;
+      }
+    }
+  } catch {
+    /* ignore */
+  }
   if (Number.isNaN(SEASON_OPEN_AT_MS)) return true;
   return now < SEASON_OPEN_AT_MS;
 }

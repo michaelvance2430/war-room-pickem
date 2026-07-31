@@ -104,6 +104,16 @@ export async function setLeagueActiveWeek(
 
 /** Active pick'em week for the league (cloud first, then localStorage). */
 export async function loadLeagueActiveWeek(): Promise<number> {
+  try {
+    const { isGuestMode } = await import("./guest-mode");
+    if (isGuestMode()) {
+      const saved = localStorage.getItem("warroom-active-week");
+      const n = saved != null ? parseInt(saved, 10) : 9;
+      return Number.isNaN(n) ? 9 : n;
+    }
+  } catch {
+    /* ignore */
+  }
   const session = getSession();
   let week = 1;
   try {
@@ -326,6 +336,35 @@ export async function loadWeekCard(weekNumber = 1): Promise<CloudCard | null> {
   const session = getSession();
   if (!session?.leagueId) return null;
 
+  // Guest demo: local cards only
+  try {
+    const { isGuestMode } = await import("./guest-mode");
+    if (isGuestMode()) {
+      const raw = localStorage.getItem(`warroom-card-week-${weekNumber}`);
+      if (!raw) return null;
+      const data = JSON.parse(raw) as {
+        games?: Game[];
+        prop?: Prop;
+        weekNumber?: number;
+      };
+      if (!data.games?.length) return null;
+      return {
+        weekCardId: `guest-card-w${weekNumber}`,
+        weekNumber,
+        publishedAt: new Date().toISOString(),
+        games: data.games,
+        prop: data.prop || {
+          id: `prop-w${weekNumber}`,
+          question: "Demo prop",
+          options: ["Yes", "No"],
+          points: 3,
+        },
+      };
+    }
+  } catch {
+    /* fall through to cloud */
+  }
+
   const supabase = createClient();
   const { data: card, error } = await supabase
     .from("week_cards")
@@ -368,6 +407,17 @@ export async function loadWeekCard(weekNumber = 1): Promise<CloudCard | null> {
 
 /** Weeks that have a published card (for My Picks week browser). */
 export async function listPublishedWeekNumbers(): Promise<number[]> {
+  try {
+    const { isGuestMode } = await import("./guest-mode");
+    if (isGuestMode()) {
+      const { GUEST_SCORED_WEEKS, GUEST_ACTIVE_WEEK } = await import(
+        "./guest-demo-seed"
+      );
+      return [...GUEST_SCORED_WEEKS, GUEST_ACTIVE_WEEK];
+    }
+  } catch {
+    /* ignore */
+  }
   const session = getSession();
   if (!session?.leagueId) return [];
   try {
@@ -838,6 +888,15 @@ export async function postMissingPicksAnnouncement(
 
 /** Weeks that already have a week_results row (scored). */
 export async function listScoredWeekNumbers(): Promise<number[]> {
+  try {
+    const { isGuestMode } = await import("./guest-mode");
+    if (isGuestMode()) {
+      const { getGuestScoredWeeks } = await import("./guest-demo-seed");
+      return getGuestScoredWeeks();
+    }
+  } catch {
+    /* ignore */
+  }
   const session = getSession();
   if (!session?.leagueId) return [];
   try {
@@ -1150,6 +1209,15 @@ export async function loadLeagueStandings() {
 export async function loadLeaguePlayers(): Promise<
   import("./types").Player[]
 > {
+  try {
+    const { isGuestMode } = await import("./guest-mode");
+    if (isGuestMode()) {
+      const { loadPlayers } = await import("./store");
+      return loadPlayers();
+    }
+  } catch {
+    /* fall through */
+  }
   const cloud = await loadLeagueStandings();
   return cloud.map((c) => ({
     id: c.userId,

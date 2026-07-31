@@ -45,6 +45,29 @@ export default function Home() {
   useEffect(() => {
     async function boot() {
       try {
+        // Guest demo — local world, no Supabase account
+        const { isGuestMode } = await import("@/lib/guest-mode");
+        if (isGuestMode()) {
+          const session = getSession();
+          const league = getLeague();
+          if (!session || !league) {
+            router.replace("/login");
+            return;
+          }
+          setLeagueCode(league.code);
+          setLeagueName(league.name);
+          setHomeTagline(
+            resolveHomeTagline({
+              homeTaglineId: league.settings?.homeTaglineId,
+              homeTaglineCustom: league.settings?.homeTaglineCustom,
+            })
+          );
+          setIsCommish(isCommissioner());
+          setActuallyCommish(isActuallyCommissioner());
+          setReady(true);
+          return;
+        }
+
         if (!hasSupabaseConfig()) {
           setBootError("Supabase keys missing on this deployment.");
           return;

@@ -17,7 +17,10 @@ import GazetteModal from "@/components/GazetteModal";
 import BadgeUnlockModal from "@/components/BadgeUnlockModal";
 import SeasonCountdownTicker from "@/components/SeasonCountdownTicker";
 import SeasonOpenWelcome from "@/components/SeasonOpenWelcome";
+import GuestDemoChrome from "@/components/GuestDemoChrome";
+import GuestOnboarding from "@/components/GuestOnboarding";
 import { loadMyProfile } from "@/lib/profile";
+import { isGuestMode } from "@/lib/guest-mode";
 import { refreshStaffSessionFlags } from "@/lib/cloud";
 import {
   isViewAsPlayer,
@@ -570,10 +573,13 @@ export default function Nav() {
           Exit → Home
         </button>
       )}
+      {/* Guest demo: sticky DEMO bar + welcome / role / tutorial */}
+      <GuestDemoChrome />
+      <GuestOnboarding />
       {/* Until Aug 23 00:01 ET: countdown. After: ticker gone; one-time welcome splash */}
-      <SeasonCountdownTicker />
-      <SeasonOpenWelcome />
-      <RulesOnboardingModal />
+      {!isGuestMode() && <SeasonCountdownTicker />}
+      {!isGuestMode() && <SeasonOpenWelcome />}
+      {!isGuestMode() && <RulesOnboardingModal />}
       <GazetteModal />
       <BadgeUnlockModal />
     </>

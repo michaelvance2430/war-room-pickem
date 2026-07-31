@@ -3,6 +3,7 @@
 import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
+import { enterGuestDemo } from "@/lib/guest-mode";
 import Link from "next/link";
 
 export default function LoginPage() {
@@ -16,6 +17,7 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [guestLoading, setGuestLoading] = useState(false);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -78,6 +80,39 @@ export default function LoginPage() {
           <h1 className="text-2xl font-bold">War Room Pick&apos;Em</h1>
           <p className="text-sm text-muted mt-1">
             {mode === "login" ? "Log in to continue" : "Create an account"}
+          </p>
+        </div>
+
+        {/* Guest demo — primary invite path for “just show me” */}
+        <div className="rounded-xl border-2 border-primary/50 bg-primary/10 p-4 mb-4 space-y-3">
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
+            Try before you host
+          </p>
+          <p className="text-sm text-foreground leading-relaxed">
+            Jump into a <strong>simulated season through Week 9</strong> —
+            bots, standings, and the full room. No account required.
+          </p>
+          <button
+            type="button"
+            disabled={guestLoading || loading}
+            onClick={() => {
+              setError(null);
+              setGuestLoading(true);
+              const res = enterGuestDemo();
+              setGuestLoading(false);
+              if (!res.ok) {
+                setError(res.error || "Could not start guest demo");
+                return;
+              }
+              router.push("/");
+              router.refresh();
+            }}
+            className="w-full py-3.5 rounded-xl bg-primary text-black font-extrabold text-base disabled:opacity-50"
+          >
+            {guestLoading ? "Loading demo…" : "Join as Guest →"}
+          </button>
+          <p className="text-[11px] text-muted text-center">
+            Or create an account for your real friend league below
           </p>
         </div>
 
