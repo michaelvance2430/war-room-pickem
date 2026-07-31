@@ -231,6 +231,9 @@ function CommissionerPageInner() {
   const [deputyReport, setDeputyReport] = useState<string | null>(null);
   const [autoSeasonBusy, setAutoSeasonBusy] = useState(false);
   const [autoSeasonReport, setAutoSeasonReport] = useState<string | null>(null);
+  /** Inclusive range for sandbox auto-score (one week … full season) */
+  const [autoFromWeek, setAutoFromWeek] = useState(0);
+  const [autoToWeek, setAutoToWeek] = useState(SEASON_MAX_WEEK);
 
   useEffect(() => {
     async function load() {
@@ -1185,45 +1188,73 @@ function CommissionerPageInner() {
     );
   }
 
-  /** Sandbox: run remaining weeks 0–18 end-to-end (or full season if none scored). */
-  async function handleAutoFinishSeason() {
-    const remaining: number[] = [];
-    for (let w = 0; w <= SEASON_MAX_WEEK; w++) {
-      if (!scoredWeeks.includes(w)) remaining.push(w);
+  /**
+   * Sandbox auto-run: demo card → bots → random results → score
+   * for a chosen inclusive week range (one week up to full 0–18).
+   */
+  async function handleAutoFinishRange(opts?: {
+    from?: number;
+    to?: number;
+    skipConfirm?: boolean;
+  }) {
+    let from = opts?.from ?? autoFromWeek;
+    let to = opts?.to ?? autoToWeek;
+    from = Math.max(0, Math.min(SEASON_MAX_WEEK, from));
+    to = Math.max(0, Math.min(SEASON_MAX_WEEK, to));
+    if (to < from) {
+      setAutoSeasonReport("End week must be ≥ start week.");
+      return;
     }
-    if (!remaining.length) {
+
+    const inRange: number[] = [];
+    for (let w = from; w <= to; w++) {
+      if (!scoredWeeks.includes(w)) inRange.push(w);
+    }
+    if (!inRange.length) {
       setAutoSeasonReport(
-        "All weeks 0–18 are already scored. Season complete — open Champ / Toilet / Trophies."
+        from === to
+          ? `${weekTitle(from)} is already scored.`
+          : `Nothing left to run in ${weekTitle(from)} → ${weekTitle(to)} (all scored).`
       );
       return;
     }
-    const isFull = remaining.length === SEASON_MAX_WEEK + 1;
+
+    const one = from === to;
+    const full = from === 0 && to === SEASON_MAX_WEEK;
     if (
+      !opts?.skipConfirm &&
       !confirm(
-        isFull
-          ? `Run ENTIRE season (Week 0 → CFP Final)?\n\n` +
-              "• Pads bots toward 16 if the roster is thin\n" +
-              "• Each week: demo card → bot picks → random results → score\n" +
-              "• ~19 weeks — leave this tab open until it finishes\n\n" +
+        one
+          ? `Auto-score ${weekTitle(from)} only?\n\n` +
+              "Demo card → bot picks → random results → score.\n" +
+              "Sandbox / dry-run."
+          : full
+            ? `Run ENTIRE season (Week 0 → CFP Final)?\n\n` +
+              `• ${inRange.length} unscored week(s)\n` +
+              "• Pads bots toward 16 if thin\n" +
+              "• Demo card → bots → random results → score each week\n" +
+              "• Leave this tab open until finished\n\n" +
               "Sandbox / dry-run only."
-          : `Continue season: finish ${remaining.length} remaining week(s) through CFP Final?\n\n` +
-              `Next up: ${remaining
-                .slice(0, 6)
-                .map((w) => weekTitle(w))
-                .join(", ")}${remaining.length > 6 ? "…" : ""}\n\n` +
-              "Already-scored weeks are skipped. Leave this tab open until done."
+            : `Auto-score ${weekTitle(from)} → ${weekTitle(to)}?\n\n` +
+              `• ${inRange.length} unscored week(s) in range\n` +
+              "• Already-scored weeks skipped\n" +
+              "• Leave this tab open until done\n\n" +
+              "Sandbox / dry-run."
       )
     ) {
       return;
     }
+
     setAutoSeasonBusy(true);
     setAutoSeasonReport(
-      isFull
-        ? "Starting full season (Week 0 → CFP Final)…"
-        : `Continuing from ${weekTitle(remaining[0])}…`
+      one
+        ? `Running ${weekTitle(from)}…`
+        : `Running ${weekTitle(from)} → ${weekTitle(to)}…`
     );
     const res = await autoFinishRemainingWeeks({
-      padRosterTo: 16,
+      fromWeek: from,
+      toWeek: to,
+      padRosterTo: one ? 0 : 16,
       onProgress: (p) => {
         setAutoSeasonReport(`${p.label}: ${p.step}`);
       },
@@ -1241,6 +1272,28 @@ function CommissionerPageInner() {
       }
       await loadWeekState(nextWeek);
     }
+  }
+
+  /** Back-compat: full remaining season */
+  async function handleAutoFinishSeason() {
+    const firstUnscored = (() => {
+      for (let w = 0; w <= SEASON_MAX_WEEK; w++) {
+        if (!scoredWeeks.includes(w)) return w;
+      }
+      return null;
+    })();
+    if (firstUnscored == null) {
+      setAutoSeasonReport(
+        "All weeks 0–18 are already scored. Season complete — open Champ / Toilet / Trophies."
+      );
+      return;
+    }
+    setAutoFromWeek(firstUnscored);
+    setAutoToWeek(SEASON_MAX_WEEK);
+    await handleAutoFinishRange({
+      from: firstUnscored,
+      to: SEASON_MAX_WEEK,
+    });
   }
 
   async function saveSettings() {
@@ -1962,13 +2015,12 @@ function CommissionerPageInner() {
             <>
             <div className="rounded-xl border border-warning/40 bg-warning/5 p-5 space-y-3">
               <h2 className="font-semibold text-warning">
-                Sandbox: run entire season
+                Sandbox: auto-score range
               </h2>
               <p className="text-xs text-muted leading-relaxed">
-                Same one-click dry-run as on the{" "}
-                <strong className="text-foreground">Enter Results</strong> tab:
-                pad bots → every unscored week through CFP Final. Leave the tab
-                open until progress says done.
+                Full control (one week → full season) lives on{" "}
+                <strong className="text-foreground">Enter Results</strong>.
+                Shortcut here: finish everything left through CFP Final.
               </p>
               <button
                 type="button"
@@ -1978,7 +2030,15 @@ function CommissionerPageInner() {
               >
                 {autoSeasonBusy
                   ? "Season running… keep this tab open"
-                  : "Run / finish season → CFP Final"}
+                  : "Finish remaining → CFP Final"}
+              </button>
+              <button
+                type="button"
+                disabled={autoSeasonBusy}
+                onClick={() => setTab("results")}
+                className="w-full py-2 rounded-xl border border-border text-sm text-muted hover:text-foreground"
+              >
+                Open range picker on Enter Results →
               </button>
               {autoSeasonReport && (
                 <p
@@ -3000,30 +3060,136 @@ function CommissionerPageInner() {
                 </p>
               </div>
             )}
-            {/* Full-season dry-run — hide until first scored week */}
-            {!firstTime && (
+            {/* Sandbox auto-score: one week … full season */}
             <div className="rounded-xl border border-warning/50 bg-warning/10 p-5 mb-6 space-y-3">
               <h2 className="font-semibold text-warning">
-                Running an entire season?
+                Auto-score weeks (sandbox)
               </h2>
               <p className="text-xs text-muted leading-relaxed">
-                Don&apos;t click every week. This dry-runs the full map: pad bots
-                toward 16, then for each unscored week — demo card → bot picks →
-                random results → score — through{" "}
-                <strong className="text-foreground">CFP Final</strong>. Your
-                already-scored weeks (e.g. 0–12) stay put.
+                Pick a range. Each unscored week gets: demo card → bot picks →
+                random results → score. Already-scored weeks are skipped. Leave
+                this tab open while it runs.
               </p>
+
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block text-xs text-muted">
+                  From
+                  <select
+                    value={autoFromWeek}
+                    disabled={autoSeasonBusy}
+                    onChange={(e) => {
+                      const v = parseInt(e.target.value, 10);
+                      setAutoFromWeek(v);
+                      if (v > autoToWeek) setAutoToWeek(v);
+                    }}
+                    className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                  >
+                    {Array.from({ length: SEASON_MAX_WEEK + 1 }, (_, i) => i).map(
+                      (w) => (
+                        <option key={w} value={w}>
+                          {weekTitle(w)}
+                          {scoredWeeks.includes(w) ? " · scored" : ""}
+                        </option>
+                      )
+                    )}
+                  </select>
+                </label>
+                <label className="block text-xs text-muted">
+                  Through
+                  <select
+                    value={autoToWeek}
+                    disabled={autoSeasonBusy}
+                    onChange={(e) => {
+                      const v = parseInt(e.target.value, 10);
+                      setAutoToWeek(v);
+                      if (v < autoFromWeek) setAutoFromWeek(v);
+                    }}
+                    className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                  >
+                    {Array.from({ length: SEASON_MAX_WEEK + 1 }, (_, i) => i).map(
+                      (w) => (
+                        <option key={w} value={w}>
+                          {weekTitle(w)}
+                          {scoredWeeks.includes(w) ? " · scored" : ""}
+                        </option>
+                      )
+                    )}
+                  </select>
+                </label>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={autoSeasonBusy}
+                  onClick={() => {
+                    setAutoFromWeek(activeWeek);
+                    setAutoToWeek(activeWeek);
+                  }}
+                  className="px-3 py-1.5 rounded-lg border border-border text-xs font-medium hover:bg-card-hover disabled:opacity-50"
+                >
+                  This week only
+                </button>
+                <button
+                  type="button"
+                  disabled={autoSeasonBusy}
+                  onClick={() => {
+                    const start =
+                      scoredWeeks.length === 0
+                        ? 0
+                        : Math.min(
+                            SEASON_MAX_WEEK,
+                            Math.max(...scoredWeeks) + 1
+                          );
+                    setAutoFromWeek(start);
+                    setAutoToWeek(Math.min(SEASON_MAX_WEEK, start));
+                  }}
+                  className="px-3 py-1.5 rounded-lg border border-border text-xs font-medium hover:bg-card-hover disabled:opacity-50"
+                >
+                  Next unscored
+                </button>
+                <button
+                  type="button"
+                  disabled={autoSeasonBusy}
+                  onClick={() => {
+                    const start =
+                      scoredWeeks.length === 0
+                        ? 0
+                        : Math.min(
+                            SEASON_MAX_WEEK,
+                            Math.max(...scoredWeeks) + 1
+                          );
+                    setAutoFromWeek(start);
+                    setAutoToWeek(SEASON_MAX_WEEK);
+                  }}
+                  className="px-3 py-1.5 rounded-lg border border-border text-xs font-medium hover:bg-card-hover disabled:opacity-50"
+                >
+                  Rest of season
+                </button>
+                <button
+                  type="button"
+                  disabled={autoSeasonBusy}
+                  onClick={() => {
+                    setAutoFromWeek(0);
+                    setAutoToWeek(SEASON_MAX_WEEK);
+                  }}
+                  className="px-3 py-1.5 rounded-lg border border-warning/50 text-warning text-xs font-medium hover:bg-warning/10 disabled:opacity-50"
+                >
+                  Full 0 → Final
+                </button>
+              </div>
+
               <button
                 type="button"
                 disabled={autoSeasonBusy}
-                onClick={() => void handleAutoFinishSeason()}
+                onClick={() => void handleAutoFinishRange()}
                 className="w-full py-3.5 rounded-xl font-bold bg-warning text-black text-sm disabled:opacity-50"
               >
                 {autoSeasonBusy
-                  ? "Season running… keep this tab open"
-                  : scoredWeeks.length === 0
-                    ? "Run entire season (Week 0 → CFP Final)"
-                    : `Finish remaining weeks (${Math.max(0, SEASON_MAX_WEEK + 1 - scoredWeeks.length)} left)`}
+                  ? "Running… keep this tab open"
+                  : autoFromWeek === autoToWeek
+                    ? `Auto-score ${weekTitle(autoFromWeek)} only`
+                    : `Auto-score ${weekTitle(autoFromWeek)} → ${weekTitle(autoToWeek)}`}
               </button>
               {autoSeasonReport && (
                 <p
@@ -3037,7 +3203,6 @@ function CommissionerPageInner() {
                 </p>
               )}
             </div>
-            )}
 
             {/* Week picker for scoring */}
             <div className="rounded-xl border border-border bg-card p-5 mb-6">

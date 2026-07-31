@@ -35,16 +35,20 @@ export type AutoFinishResult = {
 };
 
 /**
- * Finish all unscored weeks from the first gap through SEASON_MAX_WEEK (18).
+ * Finish unscored weeks in a range.
+ * - Default: first unscored → CFP Final (18)
+ * - fromWeek / toWeek: run only that inclusive range (one week = same both)
  * Safe to re-run: already-scored weeks are skipped.
  *
  * Pads the roster with trial bots (toward 16) once at the start if the
  * field is thin — full seasons need bodies on the board.
  */
 export async function autoFinishRemainingWeeks(opts?: {
-  /** If set, only run this week and later (default: first unscored) */
+  /** Inclusive start (default: first unscored) */
   fromWeek?: number;
-  /** Grow roster toward this size before week 0 (default 16) */
+  /** Inclusive end (default: SEASON_MAX_WEEK). One week: set fromWeek === toWeek. */
+  toWeek?: number;
+  /** Grow roster toward this size before the run (default 16; set 0 to skip pad) */
   padRosterTo?: number;
   onProgress?: (p: AutoFinishProgress) => void;
 }): Promise<AutoFinishResult> {
@@ -65,13 +69,18 @@ export async function autoFinishRemainingWeeks(opts?: {
 
   const start =
     opts?.fromWeek != null
-      ? opts.fromWeek
+      ? Math.max(0, Math.min(SEASON_MAX_WEEK, opts.fromWeek))
       : (() => {
           for (let w = 0; w <= SEASON_MAX_WEEK; w++) {
             if (!scored.has(w)) return w;
           }
           return SEASON_MAX_WEEK + 1;
         })();
+
+  const end =
+    opts?.toWeek != null
+      ? Math.max(0, Math.min(SEASON_MAX_WEEK, opts.toWeek))
+      : SEASON_MAX_WEEK;
 
   if (start > SEASON_MAX_WEEK) {
     return {
@@ -83,8 +92,19 @@ export async function autoFinishRemainingWeeks(opts?: {
     };
   }
 
-  // Pad bots so the season has a full field (skip if already ≥ target)
+  if (end < start) {
+    return {
+      ok: false,
+      finished: [],
+      skipped: [],
+      errors: ["End week must be ≥ start week"],
+      message: "Pick a range that goes forward (from ≤ to).",
+    };
+  }
+
+  // Pad bots so the season has a full field (skip if already ≥ target or pad disabled)
   const padTo = opts?.padRosterTo ?? 16;
+  if (padTo > 0) {
   try {
     const roster = await loadLeagueRoster();
     if (roster.length < padTo) {
@@ -111,8 +131,9 @@ export async function autoFinishRemainingWeeks(opts?: {
       `Bot pad warning — ${e instanceof Error ? e.message : "failed"}`
     );
   }
+  }
 
-  for (let week = start; week <= SEASON_MAX_WEEK; week++) {
+  for (let week = start; week <= end; week++) {
     const label = weekTitle(week);
     if (scored.has(week)) {
       skipped.push(week);
@@ -128,7 +149,7 @@ export async function autoFinishRemainingWeeks(opts?: {
       opts?.onProgress?.({
         week,
         label,
-        step: `Week ${week} of ${SEASON_MAX_WEEK} — demo slate…`,
+        step: `Week ${week} of ${end} (range ${start}–${end}) — demo slate…`,
       });
       const demoGames = generateDemoSlate(week, 5);
       const preset = PROP_PRESETS[week % PROP_PRESETS.length];
@@ -201,11 +222,10 @@ export async function autoFinishRemainingWeeks(opts?: {
   }
 
   const hardErrors = errors.filter((e) => !/warning/i.test(e));
-  const allDone =
-    finished.length + skipped.length > 0 &&
-    [...Array(SEASON_MAX_WEEK + 1).keys()].every(
-      (w) => scored.has(w) || finished.includes(w)
-    );
+  const rangeComplete =
+    finished.length +
+      skipped.filter((w) => w >= start && w <= end).length >=
+    end - start + 1;
 
   return {
     ok: hardErrors.length === 0,
@@ -216,13 +236,17 @@ export async function autoFinishRemainingWeeks(opts?: {
       finished.length === 0 && hardErrors.length
         ? `Stopped early. ${hardErrors[0]}`
         : finished.length === 0
-          ? "No weeks left to finish — season already complete. Open Champ / Toilet / Trophies."
-          : `Season run: finished ${finished.length} week(s) (${finished.map(weekTitle).join(", ")}).${
+          ? start === end
+            ? `${weekTitle(start)} was already scored (or nothing to run).`
+            : `No unscored weeks in ${weekTitle(start)} → ${weekTitle(end)}. Already done or empty range.`
+          : `Auto-run: finished ${finished.length} week(s) (${finished.map(weekTitle).join(", ")}).${
               hardErrors.length
                 ? ` Issues: ${hardErrors.join(" · ")}`
-                : allDone || last === SEASON_MAX_WEEK
-                  ? " Full map through CFP Final. Check Standings, Champ, Toilet, Trophies."
-                  : " More weeks may remain if something stopped early."
+                : rangeComplete
+                  ? start === end
+                    ? ` ${weekTitle(start)} complete.`
+                    : ` Range ${weekTitle(start)} → ${weekTitle(end)} complete.`
+                  : " Stopped before the full range finished."
             }`,
   };
 }
