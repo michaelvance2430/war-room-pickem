@@ -94,7 +94,7 @@ export default function CommishWeekChecklist({
             label: "2. Build & publish the card",
             detail: hasCard
               ? `${weekTitle(w)} is live (${card!.games!.length} games)`
-              : `First time? Use the First card wizard (demo slate → publish)`,
+              : `First time? Publish demo week (one tap) on Build Card`,
             why: "No card = friends can’t pick.",
             done: hasCard,
             actionTab: "card",

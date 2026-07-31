@@ -71,7 +71,7 @@ export default function GuestOnboarding() {
   const commishSteps = [
     {
       title: "1 · Build the card",
-      body: "Commish tools → Build Card. Pull odds or Generate demo slate, pick 5 games, set the weekly prop.",
+      body: "Commish tools → Build Card. One tap: Publish demo week (or pull real odds and pick 5).",
       href: "/commissioner?tab=card&first=1",
       cta: "Open Build Card",
     },

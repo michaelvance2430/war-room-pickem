@@ -214,6 +214,8 @@ function CommissionerPageInner() {
   );
   const [botBusy, setBotBusy] = useState(false);
   const [botReport, setBotReport] = useState<string | null>(null);
+  /** One-tap demo publish busy flag (generate + publish + bots). */
+  const [demoBusy, setDemoBusy] = useState(false);
   /** How many bots to add (not total roster). Default 6 = common “round out to ~16”. */
   const [botAddCount, setBotAddCount] = useState(6);
   const [rosterCount, setRosterCount] = useState<number | null>(null);
@@ -687,8 +689,130 @@ function CommissionerPageInner() {
     setSelectedIds(new Set(games.map((g) => g.id)));
     setCardSaved(false);
     setBotReport(
-      `Demo slate ready for ${weekTitle(activeWeek)} (5 fake games). Publish, then bots will pick. Enter Results → Randomize results → Score.`
+      `Demo slate ready for ${weekTitle(activeWeek)} (5 fake games). Or use “Publish demo week” for one tap.`
     );
+  }
+
+  /**
+   * One tap: demo slate → default/current prop → publish → bot picks.
+   * Skips Generate + Publish as separate clicks.
+   */
+  async function publishDemoWeek() {
+    if (demoBusy) return;
+    setDemoBusy(true);
+    setOddsError(null);
+    setBotReport(null);
+    setRankLabel("demo-sim");
+
+    const games = generateDemoSlate(activeWeek, 5);
+    setAvailableGames(games);
+    setSelectedIds(new Set(games.map((g) => g.id)));
+    setCardSaved(false);
+
+    // Prefer the draft prop on the form; fall back to a rotating preset.
+    let propToPublish = prop;
+    if (propPresetId === CUSTOM_PROP_ID) {
+      if (!customQuestion.trim()) {
+        propToPublish = propFromPreset(
+          PROP_PRESETS[activeWeek % PROP_PRESETS.length],
+          activeWeek
+        );
+      } else {
+        propToPublish = {
+          id: `prop-custom-w${activeWeek}`,
+          question: customQuestion.trim(),
+          options: [
+            customOptA.trim() || "Yes",
+            customOptB.trim() || "No",
+          ] as [string, string],
+          points: 3,
+        };
+      }
+    } else {
+      const preset = PROP_PRESETS.find((p) => p.id === propPresetId);
+      propToPublish = preset
+        ? propFromPreset(preset, activeWeek)
+        : propFromPreset(
+            PROP_PRESETS[activeWeek % PROP_PRESETS.length],
+            activeWeek
+          );
+    }
+    applyDraftFromProp(propToPublish);
+
+    games.sort((a, b) => {
+      const ta = new Date(a.commenceTime || a.startTime || 0).getTime();
+      const tb = new Date(b.commenceTime || b.startTime || 0).getTime();
+      return (Number.isNaN(ta) ? 0 : ta) - (Number.isNaN(tb) ? 0 : tb);
+    });
+
+    const result = await publishWeekCard({
+      weekNumber: activeWeek,
+      games,
+      prop: propToPublish,
+    });
+    const keys = storageKeys(activeWeek);
+    if (!result.ok) {
+      setPublishedGames(games);
+      setPublishedPropFromCard(propToPublish, activeWeek);
+      localStorage.setItem(
+        keys.card,
+        JSON.stringify({
+          games,
+          prop: propToPublish,
+          weekNumber: activeWeek,
+        })
+      );
+      setCardSaved(true);
+      setDemoBusy(false);
+      setBotReport(
+        result.error ||
+          `Published ${weekTitle(activeWeek)} demo locally (cloud failed).`
+      );
+      return;
+    }
+
+    const published = result.games || games;
+    setPublishedGames(published);
+    setPublishedPropFromCard(propToPublish, activeWeek);
+    setCardSaved(true);
+    setShowFirstWizard(false);
+    try {
+      const lid = getSession()?.leagueId || getLeague()?.id;
+      if (lid) {
+        markFirstCardPublished(lid);
+        markPracticeWeekDone(lid);
+      }
+    } catch {
+      /* ignore */
+    }
+    try {
+      localStorage.setItem(ACTIVE_WEEK_KEY, String(activeWeek));
+      localStorage.setItem(
+        keys.card,
+        JSON.stringify({
+          games: published,
+          prop: propToPublish,
+          weekCardId: result.weekCardId,
+          weekNumber: activeWeek,
+        })
+      );
+    } catch {
+      /* ignore */
+    }
+    void setLeagueActiveWeek(activeWeek);
+
+    const botFill = await seedBotPicksForWeekInCloud(activeWeek);
+    setDemoBusy(false);
+    if (botFill.ok && (botFill.botsFilled || 0) > 0) {
+      setBotReport(
+        `Demo week published · ${botFill.botsFilled} bot(s) locked picks. Enter Results → Randomize & score.`
+      );
+      void refreshPickStatus(activeWeek);
+    } else {
+      setBotReport(
+        `Demo week published for ${weekTitle(activeWeek)}. Bots will pick if seats exist — then Randomize & score.`
+      );
+    }
   }
 
   function randomizeResultsForDryRun() {
@@ -710,8 +834,40 @@ function CommissionerPageInner() {
     setPropResult(pr);
     setResultsSaved(false);
     setScoreReport(
-      `Randomized covers + prop for ${weekTitle(activeWeek)}. Hit Save Results & Score League.`
+      `Randomized covers + prop for ${weekTitle(activeWeek)}. Or use “Randomize & score” for one tap.`
     );
+  }
+
+  /**
+   * One tap: random covers + prop → save & score league.
+   * Skips Randomize + Save as separate clicks.
+   */
+  async function randomizeAndScoreWeek() {
+    if (resultsLocked) {
+      setScoreReport("Unlock this week before scoring.");
+      return;
+    }
+    if (!publishedGames.length) {
+      setScoreReport("Publish a card first (Build Card → Publish demo week).");
+      return;
+    }
+    if (!publishedProp?.question) {
+      setScoreReport(
+        "Published prop missing. Re-publish the card, then try again."
+      );
+      return;
+    }
+    const propOpts =
+      publishedProp.options || (["Yes", "No"] as [string, string]);
+    const { results: r, propResult: pr } = randomizeDemoResults(
+      publishedGames,
+      propOpts
+    );
+    setResults(r);
+    setPropResult(pr);
+    setResultsSaved(false);
+    setScoreReport(`Randomized ${weekTitle(activeWeek)} — scoring…`);
+    await handleSaveResults({ results: r, propResult: pr });
   }
 
   function toggleGame(id: string) {
@@ -2423,6 +2579,9 @@ function CommissionerPageInner() {
                   weekLabel={weekTitle(activeWeek)}
                   hasDraftGames={selectedIds.size > 0}
                   hasProp={!!(prop?.question?.trim())}
+                  busy={demoBusy}
+                  cardPublished={cardSaved && publishedGames.length > 0}
+                  onDemoPublish={() => void publishDemoWeek()}
                   onDemo={() => {
                     generateDemoCard();
                     try {
@@ -2514,8 +2673,18 @@ function CommissionerPageInner() {
                 <div className="flex flex-wrap gap-2 shrink-0">
                   <button
                     type="button"
+                    onClick={() => void publishDemoWeek()}
+                    disabled={demoBusy}
+                    className="px-4 py-2 rounded-lg bg-warning text-black text-sm font-bold hover:bg-warning/90 disabled:opacity-50"
+                    title="One tap: fake 5 games + prop + publish + bots pick"
+                  >
+                    {demoBusy ? "Publishing demo…" : "Publish demo week"}
+                  </button>
+                  <button
+                    type="button"
                     onClick={generateDemoCard}
                     className="px-4 py-2 rounded-lg border border-warning text-warning text-sm font-semibold hover:bg-warning/10"
+                    title="Load fake games only — then edit / Publish manually"
                   >
                     Generate demo slate
                   </button>
@@ -2531,14 +2700,17 @@ function CommissionerPageInner() {
               </div>
               <div className="rounded-lg border border-warning/40 bg-warning/5 px-3 py-2.5 mb-2">
                 <p className="text-xs font-semibold text-warning mb-0.5">
-                  Full-season simulation (no real games needed)
+                  Sandbox — minimal clicks
                 </p>
                 <p className="text-[11px] text-muted leading-relaxed">
-                  <strong className="text-foreground">Generate demo slate</strong>{" "}
-                  creates 5 fake FBS matchups for this week → Publish → bots pick
-                  → Enter Results →{" "}
-                  <strong className="text-foreground">Randomize results</strong>{" "}
-                  → Score → next week. Repeat through Conf Champ / CFP.
+                  <strong className="text-foreground">Publish demo week</strong>{" "}
+                  = one tap (5 fake games + prop + bots). Then Enter Results →{" "}
+                  <strong className="text-foreground">Randomize &amp; score</strong>
+                  . Need many weeks? Use Auto-score range under Results.{" "}
+                  <span className="text-muted">
+                    Generate demo slate still loads games only if you want to
+                    edit first.
+                  </span>
                 </p>
               </div>
               <label className="flex items-start gap-3 cursor-pointer rounded-lg border border-border bg-background px-3 py-2.5 mb-2">
@@ -3277,9 +3449,25 @@ function CommissionerPageInner() {
                 <div className="flex flex-col gap-2 shrink-0">
                   <button
                     type="button"
+                    onClick={() => void randomizeAndScoreWeek()}
+                    disabled={
+                      !publishedGames.length || resultsLocked || scoring
+                    }
+                    className="px-4 py-2 rounded-lg bg-warning text-black text-sm font-bold hover:bg-warning/90 disabled:opacity-50"
+                    title="One tap: random covers + prop + score the league"
+                  >
+                    {scoring
+                      ? "Scoring…"
+                      : resultsLocked
+                        ? "Week scored ✓"
+                        : "Randomize & score"}
+                  </button>
+                  <button
+                    type="button"
                     onClick={randomizeResultsForDryRun}
                     disabled={!publishedGames.length || resultsLocked}
                     className="px-4 py-2 rounded-lg border border-warning text-warning text-sm font-semibold hover:bg-warning/10 disabled:opacity-50"
+                    title="Fill random covers only — then Save & Score yourself"
                   >
                     Randomize results
                   </button>
