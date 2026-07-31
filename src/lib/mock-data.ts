@@ -26,7 +26,8 @@ function p(
   weeklyPoints: number[],
   atsCorrect: number,
   atsTotal: number,
-  currentStreak: number
+  currentStreak: number,
+  extras?: Partial<Player>
 ): Player {
   const bestWeek = weeklyPoints.length ? Math.max(...weeklyPoints) : 0;
   const worstWeek = weeklyPoints.length ? Math.min(...weeklyPoints) : 0;
@@ -47,11 +48,20 @@ function p(
     propHits: Math.floor(weeklyPoints.length * 0.5),
     propTotal: weeklyPoints.length,
     weeksPlayed: weeklyPoints.length,
+    memberSince: "2025-08-01T12:00:00.000Z",
+    avatarUrl: null,
+    isCreator: false,
+    isMock: true,
+    ...extras,
   };
 }
 
 export const mockPlayers: Player[] = [
-  p("1", "Commissioner", "North", 48, [12, 9, 14, 13], 14, 20, 3),
+  p("1", "Commissioner", "North", 48, [12, 9, 14, 13], 14, 20, 3, {
+    isCreator: true,
+    isMock: false, // real creator seat when you play; still demo stats until you replace
+    memberSince: "2025-06-01T12:00:00.000Z",
+  }),
   p("2", "BigDawg22", "North", 44, [11, 10, 8, 15], 13, 20, 2),
   p("3", "SpreadSlayer", "North", 39, [8, 12, 9, 10], 11, 20, -1),
   p("4", "NorthStar", "North", 31, [7, 6, 9, 9], 9, 20, 1),
@@ -72,3 +82,8 @@ export const mockPlayers: Player[] = [
   p("19", "UnderdogU", "West", 29, [7, 6, 8, 8], 9, 20, -1),
   p("20", "LastPlaceLarry", "West", 16, [2, 3, 5, 6], 5, 20, -2),
 ];
+
+/** Known demo NPC ids (everything in mockPlayers except a real creator seat). */
+export const MOCK_NPC_IDS = new Set(
+  mockPlayers.filter((p) => p.isMock).map((p) => p.id)
+);

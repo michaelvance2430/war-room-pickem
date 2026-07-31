@@ -1,5 +1,7 @@
 export type Division = "North" | "South" | "East" | "West";
 
+export type BadgeTier = "common" | "rare" | "epic" | "legendary";
+
 export interface Player {
   id: string;
   name: string;
@@ -18,6 +20,34 @@ export interface Player {
   propHits: number;
   propTotal: number;
   weeksPlayed: number;
+  /** Profile extras */
+  avatarUrl?: string | null;
+  memberSince?: string; // ISO date
+  /** App creator — permanent Legendary badge */
+  isCreator?: boolean;
+  /** Demo/NPC filler */
+  isMock?: boolean;
+  /** Permanent badges (e.g. Cheevo King) — never revoked */
+  permanentBadgeIds?: string[];
+}
+
+export interface BadgeDef {
+  id: string;
+  name: string;
+  description: string;
+  howToEarn: string;
+  tier: BadgeTier;
+  points: number;
+  lockedLabel?: string;
+  creatorOnly?: boolean;
+  icon: string;
+}
+
+export interface BadgeStatus {
+  def: BadgeDef;
+  earned: boolean;
+  earnedAt?: string | null;
+  progress?: { current: number; target: number } | null;
 }
 
 export interface Game {

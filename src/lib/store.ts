@@ -1,4 +1,5 @@
 import { Player, Game, Prop, UserPick } from "./types";
+import { syncLeagueCheevoKing } from "./badges";
 import { scoreWeek, GameResult } from "./scoring";
 import { mockPlayers } from "./mock-data";
 
@@ -11,41 +12,94 @@ function canUseStorage() {
   return typeof window !== "undefined" && typeof localStorage !== "undefined";
 }
 
+function withDefaults(p: Player): Player {
+  return {
+    ...p,
+    bestWeek: p.bestWeek ?? 0,
+    worstWeek: p.worstWeek ?? 0,
+    perfectWeeks: p.perfectWeeks ?? 0,
+    bestBetHits: p.bestBetHits ?? 0,
+    bestBetTotal: p.bestBetTotal ?? 0,
+    propHits: p.propHits ?? 0,
+    propTotal: p.propTotal ?? 0,
+    weeksPlayed: p.weeksPlayed ?? p.weeklyPoints?.length ?? 0,
+    avatarUrl: p.avatarUrl ?? null,
+    memberSince: p.memberSince ?? "2025-08-01T12:00:00.000Z",
+    isCreator: p.id === "1" || !!p.isCreator,
+    // NPC if marked, or still matches a demo catalog entry (not you)
+    isMock:
+      p.id === "1" || p.isCreator
+        ? false
+        : p.isMock === true ||
+          mockPlayers.some((m) => m.id === p.id && m.name === p.name && m.isMock),
+    permanentBadgeIds: p.permanentBadgeIds ?? [],
+  };
+}
+
+/** Always returns a roster. Defaults to mock players. */
 export function loadPlayers(): Player[] {
-  if (!canUseStorage()) return mockPlayers;
+  if (!canUseStorage()) return mockPlayers.map(withDefaults);
+
   try {
     const raw = localStorage.getItem(PLAYERS_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as Player[];
-      // migrate older records missing new fields
-      return parsed.map((p) => ({
-        bestWeek: 0,
-        worstWeek: 0,
-        perfectWeeks: 0,
-        bestBetHits: 0,
-        bestBetTotal: 0,
-        propHits: 0,
-        propTotal: 0,
-        weeksPlayed: p.weeklyPoints?.length ?? 0,
-        ...p,
-      }));
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed.map(withDefaults);
+      }
     }
-  } catch {}
+  } catch {
+    /* use mocks */
+  }
+
   try {
     localStorage.setItem(PLAYERS_KEY, JSON.stringify(mockPlayers));
-  } catch {}
-  return mockPlayers;
+  } catch {
+    /* ignore */
+  }
+  return mockPlayers.map(withDefaults);
+}
+
+/**
+ * Load roster, crown Cheevo King(s), save if anyone newly earned it.
+ * Use when opening profiles / standings so the rare badge stays in sync.
+ */
+export function loadPlayersAndSyncCheevos(): Player[] {
+  const players = loadPlayers();
+  const synced = syncLeagueCheevoKing(players);
+  if (synced !== players) {
+    savePlayers(synced);
+  }
+  return synced;
 }
 
 export function savePlayers(players: Player[]) {
   if (!canUseStorage()) return;
   try {
     localStorage.setItem(PLAYERS_KEY, JSON.stringify(players));
-  } catch {}
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Simple: look up by id in roster (after cheevo sync), then mock catalog. */
+export function findPlayer(id: string | null | undefined): Player | null {
+  if (!id) return null;
+  const key = String(id);
+
+  const fromRoster = loadPlayersAndSyncCheevos().find((p) => p.id === key);
+  if (fromRoster) return fromRoster;
+
+  const fromMocks = mockPlayers.find((p) => p.id === key);
+  return fromMocks ? withDefaults(fromMocks) : null;
+}
+
+export function playerProfilePath(playerId: string): string {
+  return `/profile/${playerId}`;
 }
 
 export function applyWeekScores(): Player[] {
-  if (!canUseStorage()) return mockPlayers;
+  if (!canUseStorage()) return mockPlayers.map(withDefaults);
 
   const players = loadPlayers();
 
@@ -142,9 +196,11 @@ export function applyWeekScores(): Player[] {
 }
 
 export function resetPlayers() {
-  if (!canUseStorage()) return mockPlayers;
+  if (!canUseStorage()) return mockPlayers.map(withDefaults);
   try {
     localStorage.removeItem(PLAYERS_KEY);
-  } catch {}
+  } catch {
+    /* ignore */
+  }
   return loadPlayers();
 }
