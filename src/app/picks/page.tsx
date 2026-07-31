@@ -41,9 +41,11 @@ import {
 } from "@/lib/dates";
 import {
   CHAOS_USES_PER_SEASON,
+  forceEquipChaosTitle,
   generateChaosCard,
   getChaosUsesRemaining,
   isWeekChaosForUser,
+  spendChaosUse,
 } from "@/lib/chaos-mode";
 
 function formatSpread(
@@ -504,11 +506,8 @@ export default function PicksPage() {
 
   function selectSide(gameId: string, side: "home" | "away") {
     if (!weekEditable || cardFrozen) return;
-    if (chaosArmed && !chaosLockedWeek) {
-      // Editing after robots filled voids Chaos before lock
-      setChaosArmed(false);
-    }
-    if (chaosLockedWeek) return;
+    // Chaos committed = no human control (no undo)
+    if (chaosArmed || chaosLockedWeek) return;
     const game = games.find((g) => g.id === gameId);
     if (!game || isGameLocked(game, now, games)) return;
 
@@ -527,8 +526,7 @@ export default function PicksPage() {
   }
 
   function selectConfidence(gameId: string, conf: number) {
-    if (!weekEditable || cardFrozen || chaosLockedWeek) return;
-    if (chaosArmed) setChaosArmed(false);
+    if (!weekEditable || cardFrozen || chaosArmed || chaosLockedWeek) return;
     const game = games.find((g) => g.id === gameId);
     if (!game || isGameLocked(game, now, games)) return;
     if (!picks[gameId]?.pick) return;
@@ -560,8 +558,7 @@ export default function PicksPage() {
   }
 
   function toggleBestBet(gameId: string) {
-    if (!weekEditable || cardFrozen || chaosLockedWeek) return;
-    if (chaosArmed) setChaosArmed(false);
+    if (!weekEditable || cardFrozen || chaosArmed || chaosLockedWeek) return;
     const game = games.find((g) => g.id === gameId);
     if (!game || isGameLocked(game, now, games)) return;
     // Can't move BB off a locked game
@@ -836,12 +833,12 @@ export default function PicksPage() {
             </p>
             {(chaosArmed || chaosLockedWeek) && (
               <p className="text-xs font-bold text-orange-300 mt-2">
-                {chaosLockedWeek
-                  ? "🔥 Chaos locked — card frozen to the robots. No edits. Flames are live."
-                  : "🔥 Robots filled your card. Save/lock to spend a charge & light the flames. Edit now = cancel Chaos (no charge yet)."}
+                🔥 Chaos is live — no undo. Card frozen to the robots. Title
+                locked as Chaos Agent. Hit Save/lock so the room sees it.
               </p>
             )}
             {weekEditable &&
+              !chaosArmed &&
               !chaosLockedWeek &&
               chaosRemaining > 0 &&
               !fullyLocked && (
@@ -869,30 +866,41 @@ export default function PicksPage() {
               aria-label="Close"
               onClick={() => setChaosConfirm(false)}
             />
-            <div className="relative w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl border-2 border-orange-500/60 bg-card p-5 space-y-3">
+            <div className="relative w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl border-2 border-orange-500/60 bg-card p-5 space-y-3 max-h-[90vh] overflow-y-auto">
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-orange-300">
-                Chaos Mode
+                Chaos Mode · no take-backs
               </p>
-              <h2 className="text-xl font-black">Let the robots cook?</h2>
+              <h2 className="text-xl font-black">Are you sure?</h2>
+              <p className="text-sm text-orange-200/90 font-semibold leading-snug">
+                Once you go Chaos, it is out of your hands. No undo. No edits.
+                The room will see the flames.
+              </p>
               <ul className="text-sm text-muted space-y-1.5 list-disc pl-4">
-                <li>Pure random — coin flips, no favorites, no AI edge</li>
-                <li>Legal card: sides + confidence 1–5 + Best Bet + prop</li>
+                <li>Pure random — coin flips only (no AI edge)</li>
+                <li>Legal card filled for you — you cannot change it</li>
+                <li>
+                  Title forced to{" "}
+                  <strong className="text-orange-200">Chaos Agent</strong> —
+                  you can&apos;t pick or swap it off this week
+                </li>
                 <li>
                   <strong className="text-foreground">2× week points</strong>{" "}
-                  when scored (if anything hits)
+                  when scored · uses{" "}
+                  <strong className="text-foreground">1 of 2</strong> season
+                  charges now
                 </li>
-                <li>
-                  Uses <strong className="text-foreground">1 of 2</strong> Chaos
-                  charges this season when you lock
-                </li>
-                <li>
-                  After lock: no edits · 🔥 CHAOS on your name so dad&apos;s
-                  week is public
-                </li>
+                <li>🔥 CHAOS on your name everywhere until the week is done</li>
               </ul>
               <button
                 type="button"
                 onClick={() => {
+                  const spent = spendChaosUse(activeWeek);
+                  if (!spent.ok) {
+                    setSaveError(spent.error || "No Chaos left");
+                    setChaosConfirm(false);
+                    return;
+                  }
+                  void forceEquipChaosTitle();
                   const filled = generateChaosCard({ games, prop });
                   setPicks(filled.picks);
                   setBestBetId(filled.bestBetId);
@@ -902,19 +910,21 @@ export default function PicksPage() {
                     .filter((c) => c > 0);
                   setUsedConfidence(used);
                   setChaosArmed(true);
+                  setChaosLockedWeek(true);
+                  setChaosRemaining(spent.remaining);
                   setSaved(false);
                   setChaosConfirm(false);
                 }}
                 className="w-full py-3.5 min-h-[52px] rounded-xl bg-orange-600 text-white font-extrabold"
               >
-                Fill my card with chaos
+                Yes — go Chaos, no undo
               </button>
               <button
                 type="button"
                 onClick={() => setChaosConfirm(false)}
                 className="w-full py-3 min-h-[48px] rounded-xl border border-border text-muted font-semibold"
               >
-                Never mind — I&apos;ll think
+                Cancel — keep control
               </button>
             </div>
           </div>
@@ -1428,9 +1438,9 @@ export default function PicksPage() {
                   <button
                     key={opt}
                     type="button"
-                    disabled={!canEditProp}
+                    disabled={!canEditProp || chaosArmed || chaosLockedWeek}
                     onClick={() => {
-                      if (!canEditProp) return;
+                      if (!canEditProp || chaosArmed || chaosLockedWeek) return;
                       setSaved(false);
                       setPropChoice(opt);
                     }}

@@ -110,15 +110,57 @@ export function hydrateEquippedTitles(
   notify();
 }
 
+/**
+ * Force equip (Chaos Mode) — bypasses Chaos title lock checks.
+ * Used when the app takes control of the nameplate.
+ */
+export async function setMyEquippedTitleForced(
+  badgeId: string | null
+): Promise<{ ok: boolean; error?: string; label?: string | null }> {
+  return setMyEquippedTitle(badgeId, { force: true });
+}
+
 /** Equip or clear title for the signed-in user. */
 export async function setMyEquippedTitle(
-  badgeId: string | null
+  badgeId: string | null,
+  opts?: { force?: boolean }
 ): Promise<{ ok: boolean; error?: string; label?: string | null }> {
   const session = getSession();
   const userId = session?.playerId;
   if (!userId) return { ok: false, error: "Not signed in" };
 
-  if (badgeId && !isEquipableTitleBadgeId(badgeId) && badgeId !== "the_commissioner") {
+  // Chaos week: nameplate is out of your hands
+  if (!opts?.force) {
+    try {
+      const { isChaosTitleLocked, CHAOS_TITLE_BADGE_ID } = await import(
+        "./chaos-mode"
+      );
+      if (isChaosTitleLocked(userId)) {
+        return {
+          ok: false,
+          error:
+            "Chaos Mode owns your title this week — Chaos Agent stays on. No swaps until the week is done.",
+        };
+      }
+      // Chaos Agent is never a free Account pick
+      if (badgeId === CHAOS_TITLE_BADGE_ID) {
+        return {
+          ok: false,
+          error:
+            "Chaos Agent isn’t choosable. It only equips when you go Chaos — and it sticks until the week ends.",
+        };
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  if (
+    badgeId &&
+    !isEquipableTitleBadgeId(badgeId) &&
+    badgeId !== "the_commissioner" &&
+    badgeId !== "let_them_cook"
+  ) {
     return { ok: false, error: "That achievement doesn’t come with a nameplate title." };
   }
   const label = badgeId ? titleLabelForBadgeId(badgeId) : null;

@@ -40,6 +40,7 @@ import {
   setMyEquippedTitle,
   syncMyEquippedTitleFromCloud,
 } from "@/lib/equipped-title-store";
+import { isChaosTitleLocked } from "@/lib/chaos-mode";
 import {
   PROFILE_BORDER_CATALOG,
   isBorderUnlocked,
@@ -77,6 +78,7 @@ export default function AccountPage() {
   );
   const [equippedBorderId, setEquippedBorderId] = useState<string>("plain");
   const [borderBusy, setBorderBusy] = useState(false);
+  const [chaosTitleLock, setChaosTitleLock] = useState(false);
 
   async function reload() {
     const session = getSession();
@@ -84,6 +86,7 @@ export default function AccountPage() {
     setUserId(session?.playerId || null);
     setPlayerView(isViewAsPlayer());
     setActiveId(league?.id || session?.leagueId || null);
+    setChaosTitleLock(isChaosTitleLocked(session?.playerId, league?.id));
     const profile = await loadMyProfile();
     if (profile) {
       setName(profile.displayName);
@@ -372,9 +375,16 @@ export default function AccountPage() {
             <div className="space-y-3">
               <label className="block text-xs text-muted">
                 Active title
+                {chaosTitleLock && (
+                  <p className="mt-1 text-xs text-orange-300 font-semibold">
+                    🔥 Chaos Agent is forced this week — you can&apos;t change
+                    titles until Chaos ends. You didn&apos;t pick it; the robots
+                    did.
+                  </p>
+                )}
                 <select
                   value={equippedBadgeId || ""}
-                  disabled={titleBusy}
+                  disabled={titleBusy || chaosTitleLock}
                   onChange={async (e) => {
                     const v = e.target.value || null;
                     setTitleBusy(true);

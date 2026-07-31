@@ -24,6 +24,11 @@ export type EquipableTitleDef = {
   vibe: TitleVibe;
   /** One-line tease in Account picker */
   blurb: string;
+  /**
+   * Not choosable in Account — only forced by the app (e.g. Chaos Mode).
+   * Still shows on the nameplate when auto-equipped.
+   */
+  forceOnly?: boolean;
 };
 
 /**
@@ -54,7 +59,9 @@ export const EQUIPABLE_TITLE_CATALOG: EquipableTitleDef[] = [
     badgeId: "let_them_cook",
     title: "Chaos Agent",
     vibe: "chaos",
-    blurb: "Locked a robot card. Dad went Chaos. The room knows.",
+    blurb:
+      "Forced on when you go Chaos — you don’t pick it, you can’t swap it off until the week is done.",
+    forceOnly: true,
   },
   {
     badgeId: "championship_ring",
@@ -402,6 +409,8 @@ export function listEquipableTitlesFromBadges(
 
   for (const t of EQUIPABLE_TITLE_CATALOG) {
     if (!earned.has(t.badgeId)) continue;
+    // Chaos Agent etc. — never a free pick in Account
+    if (t.forceOnly) continue;
     const def = getBadgeDef(t.badgeId);
     out.push({
       badgeId: t.badgeId,

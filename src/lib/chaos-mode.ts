@@ -9,10 +9,14 @@ import { defaultSeasonYear } from "./trophies";
 
 export const CHAOS_USES_PER_SEASON = 2;
 export const CHAOS_BADGE_ID = "let_them_cook";
+/** Forced nameplate while Chaos is live — not choosable in Account */
+export const CHAOS_TITLE_BADGE_ID = "let_them_cook";
 
 const USES_KEY = "warroom-chaos-uses-v1";
 const WEEKS_KEY = "warroom-chaos-weeks-v1"; // leagueId → { userId: weekNumbers[] }
 const ACTIVE_KEY = "warroom-chaos-active-v1"; // leagueId → { userId: weekNumber } live flames
+/** Saved title before Chaos forced Chaos Agent on */
+const TITLE_BACKUP_KEY = "warroom-chaos-title-backup-v1";
 
 export type ChaosUsesState = {
   seasonYear: number;
@@ -100,6 +104,7 @@ export function spendChaosUse(
   }
   if (row.weekNumbers.includes(weekNumber)) {
     markChaosActive(lid, uid, weekNumber);
+    void forceEquipChaosTitle(uid);
     return {
       ok: true,
       remaining: Math.max(0, CHAOS_USES_PER_SEASON - row.used),
@@ -121,6 +126,7 @@ export function spendChaosUse(
   writeUsesStore(store);
   markChaosActive(lid, uid, weekNumber);
   rememberChaosWeek(lid, uid, weekNumber);
+  void forceEquipChaosTitle(uid);
   return {
     ok: true,
     remaining: Math.max(0, CHAOS_USES_PER_SEASON - row.used),
@@ -176,6 +182,87 @@ export function markChaosActive(
   } catch {
     /* ignore */
   }
+}
+
+/** True while this user is mid-Chaos week — title locked to Chaos Agent. */
+export function isChaosTitleLocked(
+  userId?: string | null,
+  leagueId?: string | null
+): boolean {
+  const uid = userId || getSession()?.playerId;
+  const lid = leagueId || getLeague()?.id;
+  if (!uid || !lid) return false;
+  const m = readActive();
+  return m[lid]?.[uid] != null;
+}
+
+/**
+ * Force-equip Chaos Agent. Backs up previous title for restore after week ends.
+ * No undo — title stays until chaos week is cleared.
+ */
+export async function forceEquipChaosTitle(
+  userId?: string | null
+): Promise<void> {
+  const uid = userId || getSession()?.playerId;
+  if (!uid || !canUse()) return;
+  try {
+    const {
+      getLocalEquippedBadgeId,
+      setMyEquippedTitleForced,
+    } = await import("./equipped-title-store");
+    const prev = getLocalEquippedBadgeId(uid);
+    // Don't backup Chaos as previous
+    if (prev && prev !== CHAOS_TITLE_BADGE_ID) {
+      const raw = localStorage.getItem(TITLE_BACKUP_KEY);
+      const map = raw
+        ? (JSON.parse(raw) as Record<string, string | null>)
+        : {};
+      if (map[uid] === undefined) {
+        map[uid] = prev;
+        localStorage.setItem(TITLE_BACKUP_KEY, JSON.stringify(map));
+      }
+    }
+    await setMyEquippedTitleForced(CHAOS_TITLE_BADGE_ID);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** After Chaos week ends — restore prior title if we forced Chaos Agent. */
+export async function releaseChaosTitleIfNeeded(
+  userId: string,
+  leagueId: string,
+  liveWeek: number
+): Promise<void> {
+  if (!canUse()) return;
+  const m = readActive();
+  const chaosWeek = m[leagueId]?.[userId];
+  // Still on that chaos week
+  if (chaosWeek != null && chaosWeek === liveWeek) return;
+
+  try {
+    const {
+      getLocalEquippedBadgeId,
+      setMyEquippedTitleForced,
+    } = await import("./equipped-title-store");
+    const cur = getLocalEquippedBadgeId(userId);
+    if (cur !== CHAOS_TITLE_BADGE_ID) return;
+
+    const raw = localStorage.getItem(TITLE_BACKUP_KEY);
+    const map = raw
+      ? (JSON.parse(raw) as Record<string, string | null>)
+      : {};
+    const prev = map[uidKey(map, userId)];
+    delete map[userId];
+    localStorage.setItem(TITLE_BACKUP_KEY, JSON.stringify(map));
+    await setMyEquippedTitleForced(prev ?? null);
+  } catch {
+    /* ignore */
+  }
+}
+
+function uidKey(map: Record<string, string | null>, userId: string) {
+  return userId in map ? userId : userId;
 }
 
 export function clearChaosActiveIfWeek(
