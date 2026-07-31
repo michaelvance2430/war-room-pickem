@@ -233,6 +233,22 @@ export default function GazettePaper({
           </p>
         </article>
 
+        {/* Chaos lock-in — high on the page; Monday Morning Edition energy */}
+        {edition.chaosDetonation && (
+          <StoryBlock
+            kicker="💥 First thing · Chaos desk"
+            kickerClass="text-orange-900"
+            story={edition.chaosDetonation}
+            footer={`${edition.chaosDetonation.names.join(" · ")} · locked Chaos this week${
+              edition.chaosDetonation.pts
+                ? ` · finished at ${edition.chaosDetonation.pts} pts`
+                : ""
+            }`}
+            avatar="☢️"
+            avatarClass="border-orange-800 bg-orange-100"
+          />
+        )}
+
         {/* Pull quote */}
         <blockquote className="border-l-4 border-stone-900 pl-3 py-1 my-1">
           <p className="font-serif text-base sm:text-lg italic text-stone-900 leading-snug">
@@ -270,21 +286,6 @@ export default function GazettePaper({
             footer={`${edition.swing.names[0]} · ${edition.swing.pts} this week`}
             avatar="🚀"
             avatarClass="border-teal-800 bg-teal-100"
-          />
-        )}
-
-        {edition.chaosDetonation && (
-          <StoryBlock
-            kicker="💥 Chaos desk · They locked pure random"
-            kickerClass="text-orange-900"
-            story={edition.chaosDetonation}
-            footer={`${edition.chaosDetonation.names.join(" · ")} · Chaos Mode confirmed at lock${
-              edition.chaosDetonation.pts
-                ? ` · finished at ${edition.chaosDetonation.pts} pts`
-                : ""
-            }`}
-            avatar="☢️"
-            avatarClass="border-orange-800 bg-orange-100"
           />
         )}
 

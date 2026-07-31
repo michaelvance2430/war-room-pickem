@@ -1266,18 +1266,19 @@ export function formatGazetteShareText(edition: GazetteEdition): string {
     edition.crown.deck,
     "",
   ];
-  if (edition.shame) {
-    lines.push(`🚽 ${edition.shame.headline}`, edition.shame.deck, "");
-  }
-  if (edition.swing) {
-    lines.push(`📈 ${edition.swing.headline}`, edition.swing.deck, "");
-  }
+  // Chaos lock-in sits high — Monday-morning “first thing” energy in the chat paste too
   if (edition.chaosDetonation) {
     lines.push(
       `💥 ${edition.chaosDetonation.headline}`,
       edition.chaosDetonation.deck,
       ""
     );
+  }
+  if (edition.shame) {
+    lines.push(`🚽 ${edition.shame.headline}`, edition.shame.deck, "");
+  }
+  if (edition.swing) {
+    lines.push(`📈 ${edition.swing.headline}`, edition.swing.deck, "");
   }
   if (edition.noLock) {
     lines.push(`🥛 ${edition.noLock.headline}`, edition.noLock.deck, "");
