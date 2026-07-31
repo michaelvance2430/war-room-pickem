@@ -7,7 +7,13 @@ import Link from "next/link";
 import HotTakeTicker from "@/components/HotTakeTicker";
 import CrownAndShame from "@/components/CrownAndShame";
 import HomeWeekHero from "@/components/HomeWeekHero";
-import { getSession, getLeague, isCommissioner } from "@/lib/league";
+import {
+  getSession,
+  getLeague,
+  isCommissioner,
+  isActuallyCommissioner,
+} from "@/lib/league";
+import { setViewAsPlayer } from "@/lib/view-as-player";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import {
   restoreSessionFromCloud,
@@ -26,6 +32,7 @@ export default function Home() {
     resolveHomeTagline({})
   );
   const [isCommish, setIsCommish] = useState(false);
+  const [actuallyCommish, setActuallyCommish] = useState(false);
   const [bootError, setBootError] = useState<string | null>(null);
   const [pickList, setPickList] = useState<LeagueMembership[] | null>(null);
   const [codeCopied, setCodeCopied] = useState(false);
@@ -79,6 +86,7 @@ export default function Home() {
           })
         );
         setIsCommish(isCommissioner());
+        setActuallyCommish(isActuallyCommissioner());
         setReady(true);
       } catch (e: unknown) {
         setBootError(e instanceof Error ? e.message : "Failed to start");
@@ -87,6 +95,7 @@ export default function Home() {
     boot();
     function onPreview() {
       setIsCommish(isCommissioner());
+      setActuallyCommish(isActuallyCommissioner());
     }
     window.addEventListener("warroom-view-as-player", onPreview);
     return () => window.removeEventListener("warroom-view-as-player", onPreview);
@@ -115,6 +124,7 @@ export default function Home() {
       })
     );
     setIsCommish(isCommissioner());
+    setActuallyCommish(isActuallyCommissioner());
     setReady(true);
   }
 
@@ -240,6 +250,26 @@ export default function Home() {
             </div>
           )}
         </section>
+
+        {actuallyCommish && isCommish && (
+          <div className="mb-6 rounded-xl border-2 border-warning/50 bg-warning/10 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <p className="text-sm text-foreground">
+              <span className="font-bold text-warning">Commish tip:</span> Want
+              to see what your players see?
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setViewAsPlayer(true);
+                setIsCommish(false);
+                window.location.href = "/";
+              }}
+              className="shrink-0 px-4 py-2 rounded-lg bg-warning text-black text-sm font-bold"
+            >
+              Enter player view →
+            </button>
+          </div>
+        )}
 
         {/* One job: pick / wait / score path — strengths stay below */}
         <HomeWeekHero />

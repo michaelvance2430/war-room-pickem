@@ -47,6 +47,7 @@ import {
 import { transferCommissioner } from "@/lib/trophies";
 import { recordCommissionerWeek } from "@/lib/commish-tenure";
 import CommishWeekChecklist from "@/components/CommishWeekChecklist";
+import { setViewAsPlayer } from "@/lib/view-as-player";
 import {
   formatKickoff,
   formatCardDateRange,
@@ -1450,6 +1451,24 @@ export default function CommissionerPage() {
               ? "Settings • Build card • Who\u2019s in • Results"
               : "Build card • Who\u2019s in • Results (settings stay with the commissioner)"}
           </p>
+          <div className="mt-3 rounded-xl border-2 border-warning bg-warning/15 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div>
+              <p className="text-sm font-bold text-warning">View as player</p>
+              <p className="text-xs text-muted">
+                Hide Commish tools and see the app like your league mates.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setViewAsPlayer(true);
+                router.push("/");
+              }}
+              className="shrink-0 px-4 py-2 rounded-lg bg-warning text-black text-sm font-bold"
+            >
+              Enter player view →
+            </button>
+          </div>
           {oddsCreditsRemaining != null && (
             <div
               className={`mt-3 rounded-xl border px-4 py-3 text-sm ${

@@ -47,7 +47,6 @@ export default function AccountPage() {
     const league = getLeague();
     setUserId(session?.playerId || null);
     setPlayerView(isViewAsPlayer());
-    setCanPreviewPlayer(isActuallyCommissioner() || isActuallyOps());
     setActiveId(league?.id || session?.leagueId || null);
     const profile = await loadMyProfile();
     if (profile) {
@@ -58,6 +57,18 @@ export default function AccountPage() {
     }
     const list = await fetchMyMemberships();
     setMemberships(list);
+    // Any path that means "you run a league" → can preview player UI
+    const runsALeague =
+      isActuallyCommissioner() ||
+      isActuallyOps() ||
+      !!session?.isCommissioner ||
+      !!session?.isDeputy ||
+      list.some(
+        (m) =>
+          m.role === "commissioner" ||
+          m.commissionerId === session?.playerId
+      );
+    setCanPreviewPlayer(runsALeague);
     setLoading(false);
   }
 
@@ -172,7 +183,7 @@ export default function AccountPage() {
       <Nav />
       <main className="flex-1 max-w-lg mx-auto w-full px-4 py-8">
         <h1 className="text-2xl font-bold mb-1">Account</h1>
-        <p className="text-sm text-muted mb-6">
+        <p className="text-sm text-muted mb-4">
           {name ? `Signed in as ${name}` : "Manage profile, leagues, and sign out"}
         </p>
 
@@ -180,6 +191,48 @@ export default function AccountPage() {
           <div className="mb-4 text-sm text-primary border border-primary/40 rounded-lg px-3 py-2">
             {message}
           </div>
+        )}
+
+        {/* Always first so it’s impossible to miss */}
+        {canPreviewPlayer && (
+          <section className="rounded-xl border-2 border-warning bg-warning/15 p-5 mb-6 shadow-[0_0_24px_rgba(234,179,8,0.12)]">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-warning mb-1">
+              Commish only
+            </p>
+            <h2 className="text-lg font-bold mb-1 text-warning">
+              View as player
+            </h2>
+            <p className="text-sm text-foreground/90 mb-3 leading-relaxed">
+              See the app like your 20 friends: no Commish button, no ops tools.
+              Your real powers stay on — this only changes the UI.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                const next = !playerView;
+                setViewAsPlayer(next);
+                setPlayerView(next);
+                setMessage(
+                  next
+                    ? "Player view ON — go to Home. Yellow bar exits anytime."
+                    : "Player view OFF — Commish is back."
+                );
+                if (next) {
+                  router.push("/");
+                  router.refresh();
+                } else {
+                  router.refresh();
+                }
+              }}
+              className={`w-full sm:w-auto text-base px-5 py-3 rounded-xl font-bold ${
+                playerView
+                  ? "bg-warning text-black"
+                  : "bg-warning text-black hover:opacity-90"
+              }`}
+            >
+              {playerView ? "Exit player view" : "Enter player view →"}
+            </button>
+          </section>
         )}
 
         <section className="rounded-xl border border-border bg-card p-5 mb-6">
@@ -272,39 +325,6 @@ export default function AccountPage() {
             </div>
           </div>
         </section>
-
-        {canPreviewPlayer && (
-          <section className="rounded-xl border border-warning/40 bg-warning/10 p-5 mb-6">
-            <h2 className="font-semibold mb-1 text-warning">View as player</h2>
-            <p className="text-xs text-muted mb-3 leading-relaxed">
-              See the app like a regular league member: no Commish nav, no ops
-              checklist, no invite-code flex. Your real commissioner powers stay
-              intact — this only changes what you see. Exit anytime from the
-              yellow bar or here.
-            </p>
-            <button
-              type="button"
-              onClick={() => {
-                const next = !playerView;
-                setViewAsPlayer(next);
-                setPlayerView(next);
-                setMessage(
-                  next
-                    ? "Player view ON — open Home to see the player experience"
-                    : "Player view OFF — Commish tools are back"
-                );
-                router.refresh();
-              }}
-              className={`text-sm px-4 py-2 rounded-lg font-semibold ${
-                playerView
-                  ? "bg-warning text-black"
-                  : "border border-warning/50 text-warning hover:bg-warning/15"
-              }`}
-            >
-              {playerView ? "Exit player view" : "Enter player view"}
-            </button>
-          </section>
-        )}
 
         <section className="rounded-xl border border-border bg-card p-5 mb-6">
           <h2 className="font-semibold mb-3">Your leagues</h2>
