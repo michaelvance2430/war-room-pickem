@@ -28,9 +28,10 @@
 
 ## Next phases
 
-2. CFB fully behind pack interface (calendar/scoring/copy entry points)  
-3. Second live pack (NFL or Women’s World Cup event)  
-4. Profile hardware tagged by `sport_id`  
+2. **WWC home shell (in progress on `dev`)** — sport badge, atmosphere, copy; create league as `soccer_wwc`  
+3. CFB fully behind pack interface (calendar/scoring/copy entry points)  
+4. WWC matchday card markets (1X2 / ML) + tournament calendar  
+5. Profile hardware tagged by `sport_id`  
 
 ## Rule of thumb
 

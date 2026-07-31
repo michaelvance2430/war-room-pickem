@@ -29,6 +29,9 @@ import {
 } from "@/lib/session-restore";
 import { resolveHomeTagline } from "@/lib/home-tagline";
 import { syncLeagueFromCloud } from "@/lib/league-sync";
+import { resolveHomeChrome } from "@/lib/sports/home-chrome";
+import HomeSportAtmosphere from "@/components/HomeSportAtmosphere";
+import HomeSportHeader from "@/components/HomeSportHeader";
 
 export default function Home() {
   const router = useRouter();
@@ -38,6 +41,7 @@ export default function Home() {
   const [homeTagline, setHomeTagline] = useState(
     resolveHomeTagline({})
   );
+  const [sportId, setSportId] = useState<string>("cfb");
   const [isCommish, setIsCommish] = useState(false);
   const [actuallyCommish, setActuallyCommish] = useState(false);
   const [bootError, setBootError] = useState<string | null>(null);
@@ -60,6 +64,7 @@ export default function Home() {
           }
           setLeagueCode(league.code);
           setLeagueName(league.name);
+          setSportId(league.sportId || "cfb");
           setHomeTagline(
             resolveHomeTagline({
               homeTaglineId: league.settings?.homeTaglineId,
@@ -113,6 +118,7 @@ export default function Home() {
         const fresh = (await syncLeagueFromCloud()) || league;
         setLeagueCode(fresh.code);
         setLeagueName(fresh.name);
+        setSportId(fresh.sportId || "cfb");
         setHomeTagline(
           resolveHomeTagline({
             homeTaglineId: fresh.settings?.homeTaglineId,
@@ -189,6 +195,7 @@ export default function Home() {
     setPickList(null);
     setLeagueCode(league.code);
     setLeagueName(league.name);
+    setSportId(league.sportId || "cfb");
     setHomeTagline(
       resolveHomeTagline({
         homeTaglineId: league.settings?.homeTaglineId,
@@ -206,6 +213,8 @@ export default function Home() {
     }
     setReady(true);
   }
+
+  const homeChrome = resolveHomeChrome(sportId);
 
   if (bootError) {
     return (
@@ -259,77 +268,29 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex flex-col relative overflow-x-hidden crt-frame scan-sweep home-war-room">
-      {/* War room atmosphere layers (always stay — season themes overlay on top via SeasonThemeApplier) */}
-      <div
-        className="home-war-base pointer-events-none absolute inset-0 -z-10"
-        style={{
-          background:
-            "radial-gradient(ellipse 80% 60% at 50% 0%, rgba(34, 197, 94, 0.12), transparent 55%), radial-gradient(ellipse 70% 50% at 100% 100%, rgba(120, 40, 40, 0.18), transparent 50%), radial-gradient(ellipse 50% 40% at 0% 80%, rgba(20, 40, 30, 0.5), transparent 45%), #050805",
-        }}
-      />
-      <div
-        className="home-war-base pointer-events-none absolute inset-0 -z-10 opacity-[0.35]"
-        style={{
-          backgroundImage:
-            "linear-gradient(rgba(34,197,94,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(34,197,94,0.04) 1px, transparent 1px)",
-          backgroundSize: "48px 48px",
-        }}
-      />
-      <div
-        className="home-war-base pointer-events-none absolute inset-0 -z-10"
-        style={{
-          background:
-            "radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.75) 100%)",
-        }}
-      />
-      {/* faint scanline */}
-      <div
-        className="home-war-base pointer-events-none absolute inset-0 -z-10 opacity-[0.07]"
-        style={{
-          backgroundImage:
-            "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.35) 3px)",
-        }}
-      />
+      <HomeSportAtmosphere atmosphere={homeChrome.atmosphere} />
 
       <Nav />
       {/* Phone-first: less chrome padding, job-first stack (most users are on phones) */}
       <main className="flex-1 max-w-6xl mx-auto w-full px-3 sm:px-4 py-5 sm:py-10 relative z-10">
-        <section className="mb-4 sm:mb-6">
-          <h1 className="text-2xl sm:text-5xl font-bold tracking-tight mb-1.5 sm:mb-3 text-white drop-shadow-[0_0_30px_rgba(34,197,94,0.15)]">
-            Welcome to the War Room
-          </h1>
-          <p className="text-muted max-w-xl text-sm sm:text-lg leading-relaxed">
-            {homeTagline}
-          </p>
-          {leagueName && (
-            <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-muted/90">
-              <span className="text-foreground/90 font-medium">{leagueName}</span>
-              {isCommish && leagueCode && (
-                <>
-                  <span className="text-border">|</span>
-                  <span className="font-mono text-primary tracking-[0.2em] text-base font-bold">
-                    {leagueCode}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      try {
-                        await navigator.clipboard.writeText(leagueCode);
-                        setCodeCopied(true);
-                        setTimeout(() => setCodeCopied(false), 2000);
-                      } catch {
-                        /* ignore */
-                      }
-                    }}
-                    className="text-xs px-3 py-2 min-h-[40px] rounded-md border border-primary/40 text-primary hover:bg-primary/10 font-semibold touch-manipulation"
-                  >
-                    {codeCopied ? "Copied!" : "Copy invite code"}
-                  </button>
-                </>
-              )}
-            </div>
-          )}
-        </section>
+        <HomeSportHeader
+          chrome={homeChrome}
+          tagline={homeTagline}
+          leagueName={leagueName}
+          leagueCode={leagueCode}
+          isCommish={isCommish}
+          codeCopied={codeCopied}
+          onCopyCode={async () => {
+            if (!leagueCode) return;
+            try {
+              await navigator.clipboard.writeText(leagueCode);
+              setCodeCopied(true);
+              setTimeout(() => setCodeCopied(false), 2000);
+            } catch {
+              /* ignore */
+            }
+          }}
+        />
 
         {/* Host first-hour spine (invite → publish → score) before anything else */}
         <CommishSetupBanner />
@@ -443,16 +404,32 @@ export default function Home() {
           {!firstWeekChrome && (
             <Link
               href="/championship"
-              className="group rounded-xl border border-primary/30 bg-black/40 backdrop-blur-sm p-6 hover:border-primary hover:bg-primary/10 transition shadow-[0_0_40px_rgba(34,197,94,0.08)]"
+              className={`group rounded-xl border bg-black/40 backdrop-blur-sm p-6 transition ${
+                homeChrome.sportId === "soccer_wwc"
+                  ? "border-pink-400/35 hover:border-pink-300/60 hover:bg-pink-500/10 shadow-[0_0_40px_rgba(236,72,153,0.1)]"
+                  : "border-primary/30 hover:border-primary hover:bg-primary/10 shadow-[0_0_40px_rgba(34,197,94,0.08)]"
+              }`}
             >
-              <div className="text-xs uppercase tracking-wider text-primary/70 mb-2">
+              <div
+                className={`text-xs uppercase tracking-wider mb-2 ${
+                  homeChrome.sportId === "soccer_wwc"
+                    ? "text-pink-300/80"
+                    : "text-primary/70"
+                }`}
+              >
                 Postseason
               </div>
-              <div className="text-lg font-semibold text-primary">
-                Championship Bracket
+              <div
+                className={`text-lg font-semibold ${
+                  homeChrome.sportId === "soccer_wwc"
+                    ? "text-pink-200"
+                    : "text-primary"
+                }`}
+              >
+                {homeChrome.primaryPathLabel}
               </div>
               <p className="text-sm text-muted mt-2">
-                Top half. One path. No excuses.
+                {homeChrome.primaryPathBlurb}
               </p>
             </Link>
           )}
@@ -466,10 +443,10 @@ export default function Home() {
                 Bottom half
               </div>
               <div className="text-lg font-semibold text-purple-300">
-                Toilet Bowl
+                {homeChrome.shamePathLabel}
               </div>
               <p className="text-sm text-muted mt-2">
-                Shame bracket. Still matters.
+                {homeChrome.shamePathBlurb}
               </p>
             </Link>
           )}
