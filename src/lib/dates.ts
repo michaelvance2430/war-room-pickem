@@ -67,7 +67,7 @@ export function isCardLockDeadlinePassed(
 }
 
 /**
- * Hard lock: once the **first kickoff on the card** has started,
+ * Hard lock for *editing*: once the **first kickoff on the card** has started,
  * every game is frozen. No late locks, no mid-slate edits.
  * Pass `allGames` (the full card) so the deadline is card-wide.
  */
@@ -79,6 +79,21 @@ export function isGameLocked(
   if (allGames?.length) {
     return isCardLockDeadlinePassed(allGames, now);
   }
+  const t = kickoffMs(g);
+  if (!t) return false;
+  return now >= t;
+}
+
+/**
+ * Board reveal for one matchup: like fantasy football — you don't see who
+ * they took until *that game* has kicked off (or the week is already scored).
+ */
+export function isGamePickRevealed(
+  g: Game,
+  now = Date.now(),
+  opts?: { weekScored?: boolean }
+): boolean {
+  if (opts?.weekScored) return true;
   const t = kickoffMs(g);
   if (!t) return false;
   return now >= t;

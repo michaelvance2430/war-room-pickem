@@ -2,8 +2,9 @@
 
 /**
  * The Board — fantasy-football style league pick reveal.
- * Opens at first kickoff (card locks). Secret until then.
- * Views: By game (who took whom) · Full cards (matrix)
+ * Card freezes at first kickoff; each game's picks reveal only when *that*
+ * game starts (like not knowing someone's QB until their kickoff).
+ * Views: By game · Full cards
  */
 
 import { useCallback, useEffect, useMemo, useState, Suspense } from "react";
@@ -27,6 +28,7 @@ import {
   formatKickoff,
   isCardLockDeadlinePassed,
   firstKickoffOnCardMs,
+  isGamePickRevealed,
 } from "@/lib/dates";
 import { getSession } from "@/lib/league";
 import { formatRankedTeam } from "@/lib/rankings";
@@ -151,8 +153,11 @@ function BoardInner() {
           </p>
           <h1 className="text-2xl font-black mt-1">The Board</h1>
           <p className="text-sm text-muted mt-2 leading-relaxed">
-            Like fantasy football: once the first game kicks off, you can see
-            what everyone locked — sides, confidence, Best Bets, prop.
+            Like fantasy football: you don&apos;t see who they took until{" "}
+            <strong className="text-foreground font-medium">
+              that game kicks off
+            </strong>
+            . Earlier games on the card stay hidden until their own kickoff.
           </p>
         </div>
 
@@ -170,13 +175,12 @@ function BoardInner() {
                 <p className="text-sm font-bold text-primary">
                   {scored
                     ? `${weekTitle(week)} scored · full reveal`
-                    : `${weekTitle(week)} is live · picks are open`}
+                    : `${weekTitle(week)} live · progressive reveal`}
                 </p>
                 <p className="text-xs text-muted mt-1">
-                  {lockedCount} of {slips.length} locked a card
-                  {scored
-                    ? " · results shown in green / red"
-                    : " · results appear when the commissioner scores"}
+                  {lockedCount} of {slips.length} locked · each matchup unlocks
+                  at its own kickoff (not the whole card at once)
+                  {scored ? " · scored weeks show green/red" : ""}
                 </p>
               </>
             ) : (
@@ -185,7 +189,7 @@ function BoardInner() {
                   Picks still secret
                 </p>
                 <p className="text-xs text-muted mt-1">
-                  The Board opens at first kickoff
+                  Cards freeze at first kickoff
                   {firstKick
                     ? ` (${new Date(firstKick).toLocaleString(undefined, {
                         weekday: "short",
@@ -195,7 +199,7 @@ function BoardInner() {
                         minute: "2-digit",
                       })})`
                     : ""}
-                  . Same moment cards freeze.
+                  . Then each game reveals when it starts — like fantasy.
                 </p>
               </>
             )}
@@ -347,17 +351,25 @@ function ByGameView({
   selfId: string | null;
   scored: boolean;
 }) {
+  const now = Date.now();
+  // Prop locks with first kickoff on the card — reveal then
+  const propRevealed =
+    scored || isCardLockDeadlinePassed(games, now);
+
   return (
     <div className="space-y-5">
       {games.map((g, i) => {
         const res = results[g.id];
-        const awayPicks = slips.filter(
-          (s) => s.picks[g.id]?.pick === "away"
-        );
-        const homePicks = slips.filter(
-          (s) => s.picks[g.id]?.pick === "home"
-        );
-        const noPick = slips.filter((s) => !s.picks[g.id]);
+        const revealed = isGamePickRevealed(g, now, { weekScored: scored });
+        const awayPicks = revealed
+          ? slips.filter((s) => s.picks[g.id]?.pick === "away")
+          : [];
+        const homePicks = revealed
+          ? slips.filter((s) => s.picks[g.id]?.pick === "home")
+          : [];
+        const noPick = revealed
+          ? slips.filter((s) => s.lockedAt && !s.picks[g.id])
+          : [];
         const kick = formatKickoff(g.commenceTime || g.startTime);
 
         return (
@@ -370,13 +382,15 @@ function ByGameView({
                 <div>
                   <p className="text-[10px] uppercase tracking-wider text-muted font-bold">
                     Game {i + 1}
-                    {res?.winner
-                      ? res.winner === "push"
-                        ? " · Push"
-                        : res.winner === "away"
-                          ? " · Away covers"
-                          : " · Home covers"
-                      : ""}
+                    {!revealed
+                      ? " · locked until kickoff"
+                      : res?.winner
+                        ? res.winner === "push"
+                          ? " · Push"
+                          : res.winner === "away"
+                            ? " · Away covers"
+                            : " · Home covers"
+                        : " · picks open"}
                   </p>
                   <h2 className="font-bold text-base mt-0.5">
                     {formatRankedTeam(g.awayTeam, g.awayRank)} @{" "}
@@ -395,38 +409,57 @@ function ByGameView({
                     )}
                   </p>
                 </div>
-                <div className="text-[11px] text-muted tabular-nums">
-                  {awayPicks.length} away · {homePicks.length} home
-                </div>
+                {revealed ? (
+                  <div className="text-[11px] text-muted tabular-nums">
+                    {awayPicks.length} away · {homePicks.length} home
+                  </div>
+                ) : (
+                  <span className="text-[10px] font-bold uppercase tracking-wide text-muted border border-border px-2 py-1 rounded-full">
+                    🔒 Hidden
+                  </span>
+                )}
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-border">
-              <PickSide
-                label={shortTeam(g.awayTeam, g.awayRank)}
-                side="Away"
-                list={awayPicks}
-                gameId={g.id}
-                winner={res?.winner}
-                selfId={selfId}
-                scored={scored}
-              />
-              <PickSide
-                label={shortTeam(g.homeTeam, g.homeRank)}
-                side="Home"
-                list={homePicks}
-                gameId={g.id}
-                winner={res?.winner}
-                selfId={selfId}
-                scored={scored}
-              />
-            </div>
-
-            {noPick.length > 0 && (
-              <p className="px-4 py-2 text-[11px] text-muted border-t border-border">
-                No pick:{" "}
-                {noPick.map((s) => s.name).join(", ")}
-              </p>
+            {!revealed ? (
+              <div className="px-4 py-8 text-center">
+                <p className="text-sm font-semibold text-foreground">
+                  Like fantasy — lineup hidden
+                </p>
+                <p className="text-xs text-muted mt-1 max-w-sm mx-auto leading-relaxed">
+                  You don&apos;t see who they took until this game starts.
+                  Come back after{" "}
+                  {kick.full || "kickoff"}.
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-border">
+                  <PickSide
+                    label={shortTeam(g.awayTeam, g.awayRank)}
+                    side="Away"
+                    list={awayPicks}
+                    gameId={g.id}
+                    winner={res?.winner}
+                    selfId={selfId}
+                    scored={scored}
+                  />
+                  <PickSide
+                    label={shortTeam(g.homeTeam, g.homeRank)}
+                    side="Home"
+                    list={homePicks}
+                    gameId={g.id}
+                    winner={res?.winner}
+                    selfId={selfId}
+                    scored={scored}
+                  />
+                </div>
+                {noPick.length > 0 && (
+                  <p className="px-4 py-2 text-[11px] text-muted border-t border-border">
+                    No pick: {noPick.map((s) => s.name).join(", ")}
+                  </p>
+                )}
+              </>
             )}
           </section>
         );
@@ -436,36 +469,44 @@ function ByGameView({
         <section className="rounded-xl border border-border bg-card p-4">
           <p className="text-[10px] uppercase tracking-wider text-muted font-bold">
             Prop
+            {!propRevealed ? " · locks with first kickoff" : ""}
           </p>
           <p className="text-sm font-medium mt-1">{prop.question}</p>
           {propResult && (
             <p className="text-xs text-primary mt-1">Result: {propResult}</p>
           )}
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            {prop.options.map((opt) => {
-              const who = slips.filter((s) => s.propChoice === opt);
-              const hit = propResult === opt;
-              return (
-                <div
-                  key={opt}
-                  className={`rounded-lg border px-3 py-2 ${
-                    propResult
-                      ? hit
-                        ? "border-primary/40 bg-primary/10"
+          {!propRevealed ? (
+            <p className="text-xs text-muted mt-3">
+              🔒 Prop picks stay hidden until the first game on the card kicks
+              off.
+            </p>
+          ) : (
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              {prop.options.map((opt) => {
+                const who = slips.filter((s) => s.propChoice === opt);
+                const hit = propResult === opt;
+                return (
+                  <div
+                    key={opt}
+                    className={`rounded-lg border px-3 py-2 ${
+                      propResult
+                        ? hit
+                          ? "border-primary/40 bg-primary/10"
+                          : "border-border"
                         : "border-border"
-                      : "border-border"
-                  }`}
-                >
-                  <p className="text-xs font-bold">{opt}</p>
-                  <p className="text-[11px] text-muted mt-1">
-                    {who.length
-                      ? who.map((s) => s.name).join(", ")
-                      : "—"}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
+                    }`}
+                  >
+                    <p className="text-xs font-bold">{opt}</p>
+                    <p className="text-[11px] text-muted mt-1">
+                      {who.length
+                        ? who.map((s) => s.name).join(", ")
+                        : "—"}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </section>
       )}
     </div>
@@ -566,6 +607,10 @@ function FullCardsView({
   selfId: string | null;
   scored: boolean;
 }) {
+  const now = Date.now();
+  const propRevealed =
+    scored || isCardLockDeadlinePassed(games, now);
+
   return (
     <div className="space-y-4">
       {slips.map((s) => {
@@ -583,14 +628,13 @@ function FullCardsView({
             : null;
         const pts =
           s.totalPoints != null ? s.totalPoints : scoredSlip?.totalPoints;
+        const isSelf = s.userId === selfId;
 
         return (
           <section
             key={s.userId}
             className={`rounded-xl border bg-card p-4 ${
-              s.userId === selfId
-                ? "border-primary/40 bg-primary/5"
-                : "border-border"
+              isSelf ? "border-primary/40 bg-primary/5" : "border-border"
             }`}
           >
             <div className="flex items-center justify-between gap-2 mb-3">
@@ -602,7 +646,7 @@ function FullCardsView({
                   </span>
                 )}
               </div>
-              {pts != null && (
+              {pts != null && scored && (
                 <span className="text-lg font-black tabular-nums text-primary">
                   {pts}
                 </span>
@@ -610,11 +654,22 @@ function FullCardsView({
             </div>
             <ul className="space-y-1.5 text-sm">
               {games.map((g) => {
+                const revealed =
+                  isSelf ||
+                  isGamePickRevealed(g, now, { weekScored: scored });
                 const pk = s.picks[g.id];
                 const res = results[g.id];
                 const gs = scoredSlip?.gameScores.find(
                   (x) => x.gameId === g.id
                 );
+                if (!revealed) {
+                  return (
+                    <li key={g.id} className="text-muted text-xs">
+                      {shortTeam(g.awayTeam)} @ {shortTeam(g.homeTeam)} —{" "}
+                      <span className="font-semibold">🔒 until kickoff</span>
+                    </li>
+                  );
+                }
                 if (!pk) {
                   return (
                     <li key={g.id} className="text-muted text-xs">
@@ -651,20 +706,26 @@ function FullCardsView({
                 );
               })}
             </ul>
-            {s.propChoice && (
+            {propRevealed || isSelf ? (
+              s.propChoice ? (
+                <p className="text-xs mt-2 text-muted">
+                  Prop:{" "}
+                  <span
+                    className={
+                      propResult
+                        ? s.propChoice === propResult
+                          ? "text-primary font-semibold"
+                          : "text-danger/80"
+                        : "text-foreground"
+                    }
+                  >
+                    {s.propChoice}
+                  </span>
+                </p>
+              ) : null
+            ) : (
               <p className="text-xs mt-2 text-muted">
-                Prop:{" "}
-                <span
-                  className={
-                    propResult
-                      ? s.propChoice === propResult
-                        ? "text-primary font-semibold"
-                        : "text-danger/80"
-                      : "text-foreground"
-                  }
-                >
-                  {s.propChoice}
-                </span>
+                Prop: 🔒 until first kickoff
               </p>
             )}
           </section>
