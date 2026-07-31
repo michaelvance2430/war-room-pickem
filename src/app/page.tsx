@@ -7,6 +7,7 @@ import Link from "next/link";
 import HotTakeTicker from "@/components/HotTakeTicker";
 import CrownAndShame from "@/components/CrownAndShame";
 import HomeWeekHero from "@/components/HomeWeekHero";
+import PlayerWeekChecklist from "@/components/PlayerWeekChecklist";
 import {
   getSession,
   getLeague,
@@ -273,6 +274,9 @@ export default function Home() {
 
         {/* One job: pick / wait / score path — strengths stay below */}
         <HomeWeekHero />
+
+        {/* Every member — not just Commish */}
+        <PlayerWeekChecklist />
 
         <section className="mb-6">
           <HotTakeTicker variant="warroom" />
