@@ -7,6 +7,11 @@ import {
   syncCommissionerTenureFromSession,
 } from "./commish-tenure";
 import {
+  FIRST_FINAL_BADGE_ID,
+  firstFinalEarned,
+  countCleanFirstFinalWeeks,
+} from "./first-final";
+import {
   getPermanentBadgeIds,
   grantPermanentBadgeId,
   mergePermanentBadges,
@@ -183,6 +188,17 @@ export const BADGE_CATALOG: BadgeDef[] = [
   },
 
   // —— Rare ——
+  {
+    id: "first_and_final",
+    name: "First & Final",
+    description:
+      "Locked the full card before every other human that week — then never touched the slip. Edit once and it's gone.",
+    howToEarn:
+      "Be the first real player in your league to fully lock a week (sides, confidence, Best Bet, prop). Change any pick after that and you forfeit the badge for that week.",
+    tier: "rare",
+    points: 25,
+    icon: "🔒",
+  },
   {
     id: "hot_hand",
     name: "Hot Hand",
@@ -421,6 +437,12 @@ function evaluateBadge(badgeId: string, player: Player): EvalResult {
 
     case "villain_arc":
       return { earned: false };
+
+    case "first_and_final": {
+      if (firstFinalEarned(player.id)) return { earned: true };
+      // Progress = clean first-lock weeks (need 1 to unlock)
+      return progress(countCleanFirstFinalWeeks(player.id), 1);
+    }
 
     case "hot_hand":
       return progress(streak, 5);

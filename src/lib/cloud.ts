@@ -392,7 +392,12 @@ export async function savePicksToCloud(opts: {
   picks: Record<string, UserPick>;
   bestBetId: string | null;
   propChoice: string | null;
-}): Promise<{ ok: boolean; error?: string }> {
+}): Promise<{
+  ok: boolean;
+  error?: string;
+  /** First & Final rare badge outcome for this save */
+  firstFinal?: "earned" | "held" | "forfeit" | "not_first" | "ignored";
+}> {
   const session = getSession();
   if (!session?.leagueId || !session.playerId) {
     return { ok: false, error: "Not signed into a league" };
@@ -407,21 +412,22 @@ export async function savePicksToCloud(opts: {
 
   const { data: existing } = await supabase
     .from("picks")
-    .select("id")
+    .select("id, locked_at")
     .eq("league_id", leagueId)
     .eq("user_id", uid)
     .eq("week_number", opts.weekNumber)
     .maybeSingle();
 
+  const isFirstSave = !existing?.id;
   let pickId: string;
   if (existing?.id) {
     pickId = existing.id;
+    // Keep original locked_at — re-save is an edit, not a new first-lock time
     const { error } = await supabase
       .from("picks")
       .update({
         prop_choice: opts.propChoice,
         best_bet_game_id: opts.bestBetId,
-        locked_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
       .eq("id", pickId);
@@ -456,7 +462,81 @@ export async function savePicksToCloud(opts: {
     }))
   );
   if (pgError) return { ok: false, error: pgError.message };
-  return { ok: true };
+
+  // —— First & Final rare: first human lock + never change the slip ——
+  let firstFinal: "earned" | "held" | "forfeit" | "not_first" | "ignored" =
+    "ignored";
+  try {
+    const {
+      onPicksSavedForFirstFinal,
+      slipFingerprint,
+    } = await import("./first-final");
+    const hash = slipFingerprint(opts.picks, opts.bestBetId, opts.propChoice);
+    let wasFirstInLeague = false;
+
+    if (isFirstSave) {
+      // Try claim table (first insert wins). Requires supabase/first-lock-badge.sql
+      const { data: claimRow, error: claimErr } = await supabase
+        .from("first_lock_claims")
+        .insert({
+          league_id: leagueId,
+          week_number: opts.weekNumber,
+          user_id: uid,
+          slip_hash: hash,
+          dirty: false,
+        })
+        .select("user_id")
+        .maybeSingle();
+
+      if (!claimErr && claimRow?.user_id === uid) {
+        wasFirstInLeague = true;
+      } else if (claimErr) {
+        // PK conflict = someone else already first, or table missing
+        const { data: existingClaim } = await supabase
+          .from("first_lock_claims")
+          .select("user_id, dirty, slip_hash")
+          .eq("league_id", leagueId)
+          .eq("week_number", opts.weekNumber)
+          .maybeSingle();
+        wasFirstInLeague = existingClaim?.user_id === uid;
+      }
+    } else {
+      // Re-save: if we own the claim, mark dirty when slip hash changes
+      const { data: existingClaim } = await supabase
+        .from("first_lock_claims")
+        .select("user_id, dirty, slip_hash")
+        .eq("league_id", leagueId)
+        .eq("week_number", opts.weekNumber)
+        .maybeSingle();
+      if (existingClaim?.user_id === uid) {
+        wasFirstInLeague = true;
+        if (existingClaim.slip_hash !== hash && !existingClaim.dirty) {
+          await supabase
+            .from("first_lock_claims")
+            .update({ dirty: true, slip_hash: hash })
+            .eq("league_id", leagueId)
+            .eq("week_number", opts.weekNumber)
+            .eq("user_id", uid);
+        }
+      }
+    }
+
+    const result = onPicksSavedForFirstFinal({
+      userId: uid,
+      leagueId,
+      weekNumber: opts.weekNumber,
+      isFirstSave,
+      wasFirstInLeague,
+      picks: opts.picks,
+      bestBetId: opts.bestBetId,
+      propChoice: opts.propChoice,
+    });
+    firstFinal = result.status;
+  } catch {
+    firstFinal = "ignored";
+  }
+
+  return { ok: true, firstFinal };
 }
 
 export async function loadMyPicks(weekNumber = 1) {

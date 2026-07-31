@@ -58,3 +58,17 @@ export function grantPermanentBadgeId(
   writeAll(map);
   return true;
 }
+
+/** Remove a permanent grant (e.g. First & Final after editing picks). */
+export function revokePermanentBadgeId(
+  playerId: string,
+  badgeId: string
+): boolean {
+  if (!playerId || !badgeId) return false;
+  const map = readAll();
+  const list = map[playerId] || [];
+  if (!list.includes(badgeId)) return false;
+  map[playerId] = list.filter((id) => id !== badgeId);
+  writeAll(map);
+  return true;
+}

@@ -606,7 +606,18 @@ export default function PicksPage() {
     setBestBetId(nextBest);
     setPropChoice(nextProp);
     setSaved(true);
-    setCardNotice(null);
+    // First & Final rare: toast outcome without blocking
+    if (result.firstFinal === "earned") {
+      setCardNotice(
+        `🔒 First & Final — you locked Week ${activeWeek} before everyone else. Don't touch the slip or you lose it.`
+      );
+    } else if (result.firstFinal === "forfeit") {
+      setCardNotice(
+        `First & Final voided for Week ${activeWeek} — you changed picks after locking first.`
+      );
+    } else {
+      setCardNotice(null);
+    }
     setSaving(false);
     await applyCard(latest, { isInitial: false, forceReloadPicks: true });
   }
