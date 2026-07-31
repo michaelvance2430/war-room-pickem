@@ -2121,11 +2121,11 @@ function CommissionerPageInner() {
                   <p className="text-[11px] text-muted mt-1 leading-relaxed">
                     {league?.sportId === "nfl" ? (
                       <>
-                        Fixed NFL map: Week 0 = optional preseason PRACTICE
-                        only · Weeks 1–18 = real regular season (Kickoff Sep 9)
-                        · <span className="text-warning">14 Cut</span> · 15–18
-                        late RS + brackets. Windows Wed–Tue. Preseason does not
-                        count as the season.
+                        Fixed NFL map: Week 0 = optional PRACTICE · Weeks 1–14
+                        regular season (Kickoff Sep 9, Wed–Tue) ·{" "}
+                        <span className="text-warning">14 Cut</span> · 15 Wild
+                        Card · 16 Divisional · 17 Conference · 18 Super Bowl
+                        (Feb 14). Preseason does not count.
                       </>
                     ) : (
                       <>

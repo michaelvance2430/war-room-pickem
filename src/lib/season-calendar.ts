@@ -105,30 +105,31 @@ function buildRegularWindows2026(): WeekDateWindow[] {
 const WINDOWS_2026 = buildRegularWindows2026();
 
 /**
- * 2026 NFL pick'em windows (America/New_York civil dates, inclusive).
+ * 2026–27 NFL pick'em windows (America/New_York civil dates, inclusive).
  *
- * LOCKED product map (KISS):
- * - Week 0 = optional PRACTICE only (last preseason weekend). Does not drive cut.
- * - Weeks 1–18 = real 2026 regular season (18-week slate).
- * - Cut still locks after week 14 (same engine as CFB).
- * - Weeks 15–18 = late RS cards that also advance brackets (Wild Card… labels).
+ * LOCKED product map (same engine as CFB: 0–18 slots, cut after 14):
+ * - Week 0 = optional PRACTICE (last preseason weekend). Not the season.
+ * - Weeks 1–14 = regular season (Wed→Tue windows from Kickoff Sep 9).
+ * - Cut locks after week 14 is scored → Championship / Toilet brackets.
+ * - Weeks 15–18 = PLAYOFFS: Wild Card → Divisional → Conference → Super Bowl.
  *
- * NFL “week” for filtering = Wed→Tue (covers Wed/Thu kickoff through MNF).
- * Real 2026 Kickoff: Wed Sep 9 (Seattle hosts). Preseason does NOT count as the season.
+ * Preseason does NOT count. Full NFL has 18 RS weeks in real life; we bank
+ * 14 RS pick'em weeks then run the postseason slate (mirrors CFB + CFP).
  *
- * Sources: NFL.com / ESPN 2026 schedule (HOF Aug 6; Pre W1 Aug 13–15; Pre W2 Aug 20–23;
- * Pre W3 Aug 27–29; RS Week 1 Sep 9–15 … Week 18 early Jan 2027).
+ * Sources: NFL.com / Wikipedia 2026 season — Kickoff Sep 9 2026;
+ * Wild Card Jan 16–18 2027; Divisional Jan 23–24; Conference Jan 31;
+ * Super Bowl LXI Feb 14 2027 (SoFi).
  */
 function buildNflWindows2026(): WeekDateWindow[] {
   const out: WeekDateWindow[] = [
-    // Optional practice card — Preseason Week 3 only (not the real season)
+    // Optional practice — Preseason Week 3 only
     { weekNumber: 0, startDate: "2026-08-27", endDate: "2026-08-29" },
   ];
-  // Week 1: Wed Sep 9 → Tue Sep 15, 2026 (Kickoff weekend)
+  // Regular season Weeks 1–14 (Wed→Tue from Kickoff weekend)
   let start = utcNoonFromYmd("2026-09-09");
-  for (let w = 1; w <= 18; w++) {
+  for (let w = 1; w <= 14; w++) {
     const end = new Date(start);
-    end.setUTCDate(end.getUTCDate() + 6); // Wed→Tue (7 civil days)
+    end.setUTCDate(end.getUTCDate() + 6); // Wed→Tue
     out.push({
       weekNumber: w,
       startDate: ymdFromUtcNoon(start),
@@ -137,6 +138,13 @@ function buildNflWindows2026(): WeekDateWindow[] {
     start = new Date(start);
     start.setUTCDate(start.getUTCDate() + 7);
   }
+  // Postseason (pull odds for these windows when books post)
+  out.push(
+    { weekNumber: 15, startDate: "2027-01-16", endDate: "2027-01-18" }, // Wild Card
+    { weekNumber: 16, startDate: "2027-01-23", endDate: "2027-01-24" }, // Divisional
+    { weekNumber: 17, startDate: "2027-01-31", endDate: "2027-02-01" }, // Conference
+    { weekNumber: 18, startDate: "2027-02-14", endDate: "2027-02-14" } // Super Bowl LXI
+  );
   return out;
 }
 
@@ -289,13 +297,13 @@ export function weekTitle(
       case "conf_championship":
         return "Week 14 · Cut";
       case "cfp_r1":
-        return "Week 15 · Bracket";
+        return "Wild Card";
       case "cfp_qf":
-        return "Week 16 · Bracket";
+        return "Divisional";
       case "cfp_sf":
-        return "Week 17 · Bracket";
+        return "Conference";
       case "cfp_final":
-        return "Week 18 · Final RS";
+        return "Super Bowl";
       default:
         return `Week ${weekNumber}`;
     }
@@ -328,23 +336,25 @@ export function weekSubtitle(
   if (sport === "nfl") {
     switch (seasonPhase(weekNumber)) {
       case "week0":
-        return `Optional PRACTICE card — last preseason weekend only (${range || "Aug 27–29"}). Does not count toward the cut. Skip if you want pure regular season.`;
+        return `Optional PRACTICE — last preseason weekend (${range || "Aug 27–29"}). Does not count toward the cut.`;
       case "regular":
         if (weekNumber === 1) {
-          return `Kickoff weekend (Wed–Tue).${rangeBit} Real season starts here. Counts toward standings.`;
+          return `Kickoff weekend (Wed–Tue).${rangeBit} Real season. Counts toward standings.`;
         }
         if (weekNumber === 13) {
-          return `Late regular season.${rangeBit} Cut week is next.`;
+          return `Regular season.${rangeBit} Cut week is next.`;
         }
         return `Regular-season Wed–Tue window.${rangeBit} Counts toward standings & the cut.`;
       case "conf_championship":
-        return `Week 14 · cut locks after this is scored.${rangeBit} Championship vs Toilet.`;
+        return `Last regular-season pick'em week before playoffs.${rangeBit} After scoring, cut locks Championship vs Toilet.`;
       case "cfp_r1":
+        return `Wild Card weekend.${rangeBit} Playoff card — higher weekly score advances the bracket.`;
       case "cfp_qf":
+        return `Divisional round.${rangeBit} Playoff card — bracket advancement.`;
       case "cfp_sf":
-        return `Late regular season + bracket advancement.${rangeBit} Higher weekly score advances.`;
+        return `Conference championships.${rangeBit} Playoff card — bracket advancement.`;
       case "cfp_final":
-        return `Final regular-season week + last bracket card.${rangeBit} (True Super Bowl is after Week 18 — host can run a special card if books post it.)`;
+        return `Super Bowl LXI.${rangeBit} Final card of the year. Lift the trophy energy.`;
       default:
         return range
           ? `Pick'em card · ${range}.`
@@ -413,13 +423,15 @@ export const SEASON_SCRUB_SUMMARY = {
 /** NFL-facing season map copy for commissioner settings */
 export const NFL_SEASON_SCRUB_SUMMARY = {
   week0:
-    "Optional PRACTICE only (Preseason W3 Aug 27–29). Skip for pure regular season.",
-  regularSeason: "18 NFL regular-season weeks (Week 1 Kickoff Sep 9 → Week 18)",
+    "Optional PRACTICE only (Preseason W3 Aug 27–29). Skip for pure RS.",
+  regularSeason: "14 regular-season pick'em weeks (Kickoff Sep 9 → Week 14 cut)",
   cutWeek: "Week 14 — locks Championship vs Toilet cut",
-  lateBracket: "Weeks 15–18 late RS cards also advance brackets",
-  weekShape: "Wed–Tue civil windows (Thu–Mon games + MNF)",
+  playoffs:
+    "Weeks 15–18: Wild Card · Divisional · Conference · Super Bowl LXI (Feb 14)",
+  weekShape: "RS = Wed–Tue windows; playoff weeks = real postseason dates",
   totalCardsMax: 19,
   cutLocksAfterWeek: DEFAULT_CUT_LOCK_WEEK,
   firstKickoff: "2026-09-09 (Kickoff Game)",
+  superBowl: "2027-02-14 Super Bowl LXI",
   preseasonCounts: false,
 };
