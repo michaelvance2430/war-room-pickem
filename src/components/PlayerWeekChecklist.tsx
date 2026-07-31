@@ -15,7 +15,8 @@ import {
   isCardLockDeadlinePassed,
   weekTitle,
 } from "@/lib/dates";
-import { createClient } from "@/lib/supabase/client";
+import { loadCrystalBall } from "@/lib/crystal-ball";
+import { hasEngagement } from "@/lib/engagement";
 
 type Step = {
   id: string;
@@ -71,24 +72,27 @@ export default function PlayerWeekChecklist() {
         const hasPhoto = !!(profile?.avatarUrl);
 
         let crystalDone = false;
+        let crystalTeam: string | null = null;
+        let crystalLocked = false;
+        let crystalLockLabel = "";
         let crystalOn = true;
         try {
           const league = (
             await import("@/lib/league")
           ).getLeague();
           crystalOn = league?.settings?.crystalBallEnabled !== false;
-          if (crystalOn && session.leagueId) {
-            const supabase = createClient();
-            const { data } = await supabase
-              .from("crystal_ball_picks")
-              .select("user_id")
-              .eq("league_id", session.leagueId)
-              .eq("user_id", session.playerId)
-              .maybeSingle();
-            crystalDone = !!data;
+          if (crystalOn) {
+            // Same source as Crystal Ball page (cloud + localStorage fallback)
+            const cb = await loadCrystalBall();
+            crystalTeam = cb.myTeam;
+            crystalDone =
+              !!cb.myTeam ||
+              hasEngagement(session.playerId, "crystal_ball_picked");
+            crystalLocked = cb.locked;
+            crystalLockLabel = cb.lockLabel;
           }
         } catch {
-          /* table may not exist / offline */
+          /* offline */
         }
 
         let scored: number[] = [];
@@ -116,11 +120,17 @@ export default function PlayerWeekChecklist() {
                   id: "crystal",
                   label: "2. Crystal Ball (national champ)",
                   detail: crystalDone
-                    ? "Pick is in — zero points, infinite pride"
-                    : "Do it early — locks noon ET Sat Aug 29, 2026, or when Week 0 freezes/scores. No take-backs.",
+                    ? crystalLocked
+                      ? `Locked in${crystalTeam ? `: ${crystalTeam}` : ""} — no more changes`
+                      : `Pick is in${crystalTeam ? `: ${crystalTeam}` : ""} · green ✓ — you can still change until ${crystalLockLabel || "lock"}`
+                    : `Do it early — free pride pick. Locks ${crystalLockLabel || "when Week 0 freezes"}.`,
                   done: crystalDone,
                   href: "/crystal-ball",
-                  hrefLabel: "Crystal Ball",
+                  hrefLabel: crystalDone
+                    ? crystalLocked
+                      ? "View Crystal Ball"
+                      : "Change pick (still open)"
+                    : "Crystal Ball",
                 } as Step,
               ]
             : []),
@@ -187,8 +197,16 @@ export default function PlayerWeekChecklist() {
       }
     }
     void load();
+    function onVis() {
+      if (document.visibilityState === "visible") void load();
+    }
+    document.addEventListener("visibilitychange", onVis);
+    // Refresh when returning from Crystal Ball / Picks
+    window.addEventListener("focus", onVis);
     return () => {
       cancelled = true;
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("focus", onVis);
     };
   }, []);
 
@@ -271,10 +289,14 @@ export default function PlayerWeekChecklist() {
                 <p className="text-xs text-muted mt-0.5 leading-relaxed">
                   {s.detail}
                 </p>
-                {!s.done && s.href && (
+                {s.href && (
                   <Link
                     href={s.href}
-                    className="inline-flex items-center mt-2 min-h-[44px] px-3 py-2 rounded-lg border border-primary/40 bg-primary/10 text-sm font-bold text-primary active:bg-primary/20"
+                    className={`inline-flex items-center mt-2 min-h-[44px] px-3 py-2 rounded-lg border text-sm font-bold active:opacity-90 ${
+                      s.done
+                        ? "border-primary/50 bg-primary/15 text-primary"
+                        : "border-primary/40 bg-primary/10 text-primary"
+                    }`}
                   >
                     {s.hrefLabel || "Go there"} →
                   </Link>
