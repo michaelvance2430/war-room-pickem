@@ -2566,6 +2566,11 @@ function CommissionerPageInner() {
                               <div className="flex justify-between items-start gap-2">
                                 <div className="min-w-0">
                                   <div className="flex items-center gap-2 flex-wrap">
+                                    {selected && (
+                                      <span className="text-[10px] font-extrabold uppercase tracking-wide text-black bg-primary px-1.5 py-0.5 rounded shrink-0">
+                                        ✓ On card
+                                      </span>
+                                    )}
                                     <div
                                       className={`font-medium truncate ${
                                         rankTier === "legendary"
@@ -2595,7 +2600,7 @@ function CommissionerPageInner() {
                                       : ""}
                                   </div>
                                 </div>
-                                <span className="text-sm text-primary shrink-0">
+                                <span className="text-sm text-primary shrink-0 font-semibold">
                                   {favLabel}{" "}
                                   {g.spread < 0
                                     ? g.spread

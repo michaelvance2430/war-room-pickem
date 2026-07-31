@@ -265,14 +265,19 @@ export function rankedMatchupShellClass(
 ): string {
   if (!tier) {
     if (opts?.bestBet) return "border-primary/60 ring-1 ring-primary/30";
-    if (opts?.selected) return "border-primary bg-primary/10";
+    if (opts?.selected)
+      return "border-primary border-2 bg-primary/15 ring-2 ring-primary/40";
     return "border-border";
   }
   if (tier === "legendary") {
     // Gold / legendary badge energy
     const base =
       "border-amber-400/70 bg-gradient-to-br from-amber-400/20 via-amber-500/10 to-yellow-600/5 ring-1 ring-amber-400/45 shadow-[0_0_28px_rgba(234,179,8,0.18)]";
-    if (opts?.selected || opts?.bestBet) {
+    if (opts?.selected) {
+      // Green “on the card” signal on top of gold heat
+      return `${base} border-2 border-primary ring-2 ring-primary/70 shadow-[0_0_0_2px_rgba(34,197,94,0.45),0_0_28px_rgba(234,179,8,0.2)] brightness-110`;
+    }
+    if (opts?.bestBet) {
       return `${base} ring-2 ring-amber-300/70`;
     }
     return base;
@@ -280,7 +285,11 @@ export function rankedMatchupShellClass(
   // Both top 25 (11–25 band / mixed top-10 + 11–25)
   const base =
     "border-violet-400/55 bg-gradient-to-br from-violet-500/15 via-violet-500/8 to-fuchsia-500/5 ring-1 ring-violet-400/30";
-  if (opts?.selected || opts?.bestBet) {
+  if (opts?.selected) {
+    // Violet heat stays; primary green outline = clearly selected
+    return `${base} border-2 border-primary ring-2 ring-primary/70 shadow-[0_0_0_2px_rgba(34,197,94,0.5),0_0_20px_rgba(34,197,94,0.25)] brightness-110`;
+  }
+  if (opts?.bestBet) {
     return `${base} ring-2 ring-violet-300/50`;
   }
   return base;
