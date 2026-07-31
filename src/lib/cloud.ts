@@ -397,6 +397,8 @@ export async function savePicksToCloud(opts: {
   error?: string;
   /** First & Final rare badge outcome for this save */
   firstFinal?: "earned" | "held" | "forfeit" | "not_first" | "ignored";
+  /** Career/season pts added (+) or removed (−) for First & Final */
+  firstFinalPointsDelta?: number;
 }> {
   const session = getSession();
   if (!session?.leagueId || !session.playerId) {
@@ -466,6 +468,7 @@ export async function savePicksToCloud(opts: {
   // —— First & Final rare: first human lock + never change the slip ——
   let firstFinal: "earned" | "held" | "forfeit" | "not_first" | "ignored" =
     "ignored";
+  let firstFinalPointsDelta = 0;
   try {
     const {
       onPicksSavedForFirstFinal,
@@ -532,11 +535,36 @@ export async function savePicksToCloud(opts: {
       propChoice: opts.propChoice,
     });
     firstFinal = result.status;
+
+    // Career points: bank on earn, unbank only when badge fully lost
+    // Season pts follow live badge eval (earned → +25, lost → 0 for this badge)
+    try {
+      const { bankCareerBadgeId, unbankCareerBadgeId } = await import(
+        "./career-cheevo"
+      );
+      const {
+        FIRST_FINAL_BADGE_ID,
+        firstFinalEarned,
+      } = await import("./first-final");
+      const PTS = 25;
+
+      if (result.status === "earned") {
+        const banked = bankCareerBadgeId(uid, FIRST_FINAL_BADGE_ID, PTS);
+        firstFinalPointsDelta = banked.banked ? PTS : 0;
+      } else if (result.status === "forfeit") {
+        if (!firstFinalEarned(uid)) {
+          const un = unbankCareerBadgeId(uid, FIRST_FINAL_BADGE_ID, PTS);
+          firstFinalPointsDelta = un.removed ? -PTS : 0;
+        }
+      }
+    } catch {
+      /* career bank optional */
+    }
   } catch {
     firstFinal = "ignored";
   }
 
-  return { ok: true, firstFinal };
+  return { ok: true, firstFinal, firstFinalPointsDelta };
 }
 
 export async function loadMyPicks(weekNumber = 1) {

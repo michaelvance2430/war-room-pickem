@@ -85,6 +85,55 @@ export function bankCareerCheevos(
   return { points: row.points, newlyBanked };
 }
 
+/** Bank a single badge id into career (e.g. First & Final on earn). */
+export function bankCareerBadgeId(
+  playerId: string,
+  badgeId: string,
+  points?: number
+): { banked: boolean; careerPoints: number } {
+  if (!playerId || !badgeId) return { banked: false, careerPoints: 0 };
+  const map = readAll();
+  const row: CareerRow = map[playerId] || { badgeIds: [], points: 0 };
+  if (row.badgeIds.includes(badgeId)) {
+    return { banked: false, careerPoints: row.points };
+  }
+  const pts = points ?? getBadgeDef(badgeId)?.points ?? 0;
+  row.badgeIds.push(badgeId);
+  row.points += pts;
+  map[playerId] = row;
+  writeAll(map);
+  return { banked: true, careerPoints: row.points };
+}
+
+/**
+ * Remove a badge from career bank (e.g. First & Final forfeit with no
+ * remaining clean weeks). Season totals drop automatically via live badge eval.
+ */
+export function unbankCareerBadgeId(
+  playerId: string,
+  badgeId: string,
+  points?: number
+): { removed: boolean; pointsRemoved: number; careerPoints: number } {
+  if (!playerId || !badgeId) {
+    return { removed: false, pointsRemoved: 0, careerPoints: 0 };
+  }
+  const map = readAll();
+  const row = map[playerId];
+  if (!row?.badgeIds?.includes(badgeId)) {
+    return {
+      removed: false,
+      pointsRemoved: 0,
+      careerPoints: row?.points ?? 0,
+    };
+  }
+  const pts = points ?? getBadgeDef(badgeId)?.points ?? 0;
+  row.badgeIds = row.badgeIds.filter((id) => id !== badgeId);
+  row.points = Math.max(0, row.points - pts);
+  map[playerId] = row;
+  writeAll(map);
+  return { removed: true, pointsRemoved: pts, careerPoints: row.points };
+}
+
 /**
  * Season total from live badge list (may drop after season reset).
  * Creator-only legendaries (The Commissioner) are career-only — not season race.

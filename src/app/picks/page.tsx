@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import Nav from "@/components/Nav";
 import PicksHowToModal from "@/components/PicksHowToModal";
+import FirstFinalModal from "@/components/FirstFinalModal";
 import { Game, UserPick, Prop } from "@/lib/types";
 import { getSession, getLeague } from "@/lib/league";
 import {
@@ -72,6 +73,11 @@ export default function PicksPage() {
   const [cardNotice, setCardNotice] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [switching, setSwitching] = useState(false);
+  const [firstFinalModal, setFirstFinalModal] = useState<{
+    mode: "earned" | "forfeit";
+    weekNumber: number;
+    pointsRemoved?: number;
+  } | null>(null);
 
   const revisionRef = useRef<string>("");
   const viewWeekRef = useRef(1);
@@ -606,14 +612,26 @@ export default function PicksPage() {
     setBestBetId(nextBest);
     setPropChoice(nextProp);
     setSaved(true);
-    // First & Final rare: toast outcome without blocking
+
+    // First & Final: full popup (earn warning / forfeit point loss)
     if (result.firstFinal === "earned") {
+      setFirstFinalModal({ mode: "earned", weekNumber: activeWeek });
       setCardNotice(
-        `🔒 First & Final — you locked Week ${activeWeek} before everyone else. Don't touch the slip or you lose it.`
+        `🔒 First & Final active for Week ${activeWeek} — change any pick and you lose +25 season & career.`
       );
     } else if (result.firstFinal === "forfeit") {
+      const removed = Math.abs(result.firstFinalPointsDelta ?? 25);
+      setFirstFinalModal({
+        mode: "forfeit",
+        weekNumber: activeWeek,
+        pointsRemoved: result.firstFinalPointsDelta
+          ? Math.abs(result.firstFinalPointsDelta)
+          : 0,
+      });
       setCardNotice(
-        `First & Final voided for Week ${activeWeek} — you changed picks after locking first.`
+        (result.firstFinalPointsDelta ?? 0) < 0
+          ? `First & Final voided — −${removed} season & career cheevo pts.`
+          : `Week ${activeWeek} first-lock voided (you still have another clean week).`
       );
     } else {
       setCardNotice(null);
@@ -654,6 +672,14 @@ export default function PicksPage() {
     <div className="min-h-screen flex flex-col">
       <Nav />
       <PicksHowToModal />
+      {firstFinalModal && (
+        <FirstFinalModal
+          mode={firstFinalModal.mode}
+          weekNumber={firstFinalModal.weekNumber}
+          pointsRemoved={firstFinalModal.pointsRemoved}
+          onClose={() => setFirstFinalModal(null)}
+        />
+      )}
 
       <main className="flex-1 max-w-3xl mx-auto w-full px-4 py-8">
         {/* Crystal-clear week banner */}
