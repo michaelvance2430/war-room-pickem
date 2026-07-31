@@ -2128,13 +2128,16 @@ function CommissionerPageInner() {
               <div className="rounded-xl border border-border bg-background p-4 space-y-3">
                 <div>
                   <p className="text-sm font-semibold text-foreground">
-                    Season background
+                    Holiday / season background
                   </p>
                   <p className="text-xs text-muted mt-1 leading-relaxed">
-                    Football runs through the holidays — overlay Halloween,
-                    Thanksgiving, Christmas, or New Year on the War Room layout
-                    (Home stays the same structure; theme washes + props sit on
-                    top). Everyone sees it after you save.
+                    Every sport pack includes this.{" "}
+                    <strong className="text-foreground">Sport default</strong>{" "}
+                    = this league&apos;s pack look (CFB green, NFL primetime,
+                    etc.). Holidays (Halloween, Thanksgiving, Christmas, New
+                    Year…) wash <strong className="text-foreground">every
+                    page</strong> for the whole room — same picker for CFB, NFL,
+                    and future packs. We can add more seasons anytime.
                   </p>
                 </div>
                 <label className="block text-xs text-muted">

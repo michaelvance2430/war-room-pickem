@@ -35,7 +35,18 @@
 | **WWC Brazil 2027** | Coming soon (theme + passport parked) |
 | Others | Coming soon |
 
-**Sport default ≠ holiday:** `data-sport` sets pack skin; Commish `seasonThemeId` (Halloween, etc.) still paints every page via `data-season-theme` and **overrides** pack colors when not “Sport default”.
+### Permanent rule: holidays on every sport
+
+Every pack (CFB, NFL, WWC, future) **always** gets commissioner holiday backgrounds:
+
+| Layer | What |
+|-------|------|
+| **Sport default** | Pack skin only (`data-sport`) — CFB green, NFL navy/crimson, … |
+| **Holiday** | Shared catalog in `season-theme.ts` — Halloween, Thanksgiving, Christmas, New Year, **+ more later** |
+| **Scope** | Whole app / every page for the league |
+| **Override** | Holiday wins over sport default when selected |
+
+Do not ship a sport without this picker working. Add new seasons in `SEASON_THEME_PRESETS` + CSS (+ optional decor component).
 
 ## Next phases
 

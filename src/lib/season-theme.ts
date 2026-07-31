@@ -1,4 +1,13 @@
-/** League-wide holiday / season backgrounds (commissioner sets for everyone). */
+/**
+ * League-wide holiday / season backgrounds (commissioner sets for everyone).
+ *
+ * PRODUCT RULE — every sport pack always has this:
+ * - Sport pack owns the DEFAULT skin (CFB green, NFL primetime, WWC Brazil, …)
+ * - Commissioner can always pick a holiday overlay for the whole room
+ * - Holidays apply app-wide (every page), all sports — add more seasons anytime
+ *
+ * Tech: `data-sport` = pack default · `data-season-theme` = holiday (overrides when not default)
+ */
 
 export type SeasonThemeId =
   | "default"
@@ -16,36 +25,40 @@ export type SeasonThemePreset = {
 
 export const DEFAULT_SEASON_THEME_ID: SeasonThemeId = "default";
 
+/**
+ * Shared holiday catalog — available to CFB, NFL, WWC, and every future pack.
+ * Append new seasons here (e.g. easter, july4); CSS + optional decor components follow.
+ */
 export const SEASON_THEME_PRESETS: SeasonThemePreset[] = [
   {
     id: "default",
     label: "Sport default",
     blurb:
-      "Pack skin: CFB green room · NFL navy/crimson primetime · (others when live). No holiday overlay.",
+      "This league’s pack skin only (CFB green · NFL navy/crimson · etc.). No holiday overlay.",
   },
   {
     id: "halloween",
     label: "Halloween 🎃",
     blurb:
-      "Orange & purple wash over the War Room + pumpkins & ghost on the sides.",
+      "Orange & purple wash on every page + props. Works for every sport.",
   },
   {
     id: "thanksgiving",
     label: "Thanksgiving 🦃",
     blurb:
-      "Harvest wash over the War Room + turkeys & cornucopia on the edges.",
+      "Harvest wash on every page + props. Works for every sport.",
   },
   {
     id: "christmas",
     label: "Christmas 🎄",
     blurb:
-      "Red/green wash over the War Room + lights under the nav, tree & Santa.",
+      "Red/green wash on every page + lights/props. Works for every sport.",
   },
   {
     id: "newyear",
     label: "New Year ✨",
     blurb:
-      "Sparkle wash over the War Room + ball drop & fireworks energy.",
+      "Sparkle wash on every page + NY props. Works for every sport.",
   },
 ];
 

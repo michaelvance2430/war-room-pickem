@@ -128,4 +128,17 @@ If you hear “don’t add that” it often means: **don’t require it on day 1
 
 ---
 
+## Sport packs + holiday backgrounds (always)
+
+Every sport has:
+
+1. **Its own default skin** (not college green for everyone)  
+2. **Commissioner holiday / season backgrounds** shared across packs  
+
+Holidays are Layer-2 fun (discoverable, optional) that still paint the whole room when the host turns them on. New seasons (Easter, July 4, etc.) get added to the shared catalog over time — never “NFL-only Christmas.”
+
+See `src/lib/season-theme.ts` and `docs/MULTI_SPORT.md`.
+
+---
+
 *Locked as product law. Prefer this document when feature ambition and onboarding clarity fight.*
