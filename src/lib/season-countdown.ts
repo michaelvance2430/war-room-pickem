@@ -10,12 +10,12 @@ export const CFB_SEASON_OPEN_AT_MS = Date.parse("2026-08-23T04:01:00.000Z");
 export const CFB_SEASON_OPEN_LABEL = "Sun Aug 23 · 12:01 AM ET";
 
 /**
- * NFL Kickoff Game 2026 — Wed Sep 9 evening ET.
+ * NFL Kickoff 2026 — Thu Sep 10 evening ET (TNF season opener).
  * Doors open at kickoff so the countdown mirrors the first real game.
- * (8:20 PM EDT ≈ 00:20 UTC Sep 10)
+ * 8:20 PM EDT = 00:20 UTC Sep 11.
  */
-export const NFL_SEASON_OPEN_AT_MS = Date.parse("2026-09-10T00:20:00.000Z");
-export const NFL_SEASON_OPEN_LABEL = "Wed Sep 9 · Kickoff · ~8:20 PM ET";
+export const NFL_SEASON_OPEN_AT_MS = Date.parse("2026-09-11T00:20:00.000Z");
+export const NFL_SEASON_OPEN_LABEL = "Thu Sep 10 · Kickoff · ~8:20 PM ET";
 
 /** @deprecated use getSeasonOpenAtMs — kept for any stray imports */
 export const SEASON_OPEN_AT_MS = CFB_SEASON_OPEN_AT_MS;

@@ -2172,13 +2172,10 @@ function CommissionerPageInner() {
                   <p className="text-[11px] text-muted mt-1 leading-relaxed">
                     {league?.sportId === "nfl" ? (
                       <>
-                        NFL: starts Week 1 (Kickoff Sep 9). Windows{" "}
-                        <strong className="text-foreground">Wed–Tue</strong>{" "}
-                        (TNF → MNF), not Mon–Sun.{" "}
+                        NFL: official Week 1–14 (Thu–Mon, Kickoff Sep 10–14) ·{" "}
                         <span className="text-warning">14 Cut</span> · 15 Wild
                         Card · 16 Divisional · 17 Conference · 18 Super Bowl.
-                        No empty preseason slot — Odds API has no real lines
-                        there.
+                        No Week 0.
                       </>
                     ) : (
                       <>

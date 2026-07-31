@@ -107,25 +107,29 @@ const WINDOWS_2026 = buildRegularWindows2026();
 /**
  * 2026–27 NFL pick'em windows (America/New_York civil dates, inclusive).
  *
- * NO Week 0 — The Odds API rarely posts usable preseason spreads, so empty
- * pulls on "practice week" just confuse hosts. Season starts at Week 1.
+ * NO Week 0 — season starts at official NFL Week 1.
  *
- * - Weeks 1–14 = regular season (Wed→Tue from Kickoff Sep 9).
- * - Cut after week 14 → Championship / Toilet.
- * - Weeks 15–18 = PLAYOFFS: Wild Card → Divisional → Conference → Super Bowl.
+ * Regular season shape (fan-recognizable):
+ *   Week 1  Thu Sep 10 – Mon Sep 14, 2026
+ *   Week 2  Thu Sep 17 – Mon Sep 21
+ *   Week 3  Thu Sep 24 – Mon Sep 28
+ *   … through Week 14 (cut), then playoffs on 15–18.
  *
- * Week shape: Wed→Tue (not Mon–Sun). Matches NFL slate: TNF / Sunday / MNF.
- * (Fantasy “Tue–Mon” is similar; we use Wed open so Kickoff Wed is Week 1.)
+ * Week shape: **Thursday → Monday** (TNF kickoff through MNF).
+ * Not Mon–Sun. Official NFL week numbers match the league (1, 2, 3…).
  *
- * Sources: NFL.com / Wikipedia 2026 — Kickoff Sep 9 2026; SB LXI Feb 14 2027.
+ * Playoffs (app weeks 15–18) use real postseason dates, not RS weeks 15–18
+ * (same engine as CFB: cut after 14, then postseason cards).
+ *
+ * Super Bowl LXI: Feb 14, 2027 (SoFi).
  */
 function buildNflWindows2026(): WeekDateWindow[] {
   const out: WeekDateWindow[] = [];
-  // Regular season Weeks 1–14 (Wed→Tue from Kickoff weekend)
-  let start = utcNoonFromYmd("2026-09-09");
+  // Regular season Weeks 1–14: Thu → Mon
+  let start = utcNoonFromYmd("2026-09-10");
   for (let w = 1; w <= 14; w++) {
     const end = new Date(start);
-    end.setUTCDate(end.getUTCDate() + 6); // Wed→Tue inclusive
+    end.setUTCDate(end.getUTCDate() + 4); // Thu→Mon inclusive
     out.push({
       weekNumber: w,
       startDate: ymdFromUtcNoon(start),
@@ -355,12 +359,12 @@ export function weekSubtitle(
         return `Optional PRACTICE — last preseason weekend (${range || "Aug 27–29"}). Does not count toward the cut.`;
       case "regular":
         if (weekNumber === 1) {
-          return `Kickoff weekend (Wed–Tue).${rangeBit} Real season. Counts toward standings.`;
+          return `Kickoff week (Thu–Mon).${rangeBit} Official NFL Week 1. Counts toward standings.`;
         }
         if (weekNumber === 13) {
           return `Regular season.${rangeBit} Cut week is next.`;
         }
-        return `Regular-season Wed–Tue window.${rangeBit} Counts toward standings & the cut.`;
+        return `Regular season (Thu–Mon).${rangeBit} Official NFL week. Counts toward standings & the cut.`;
       case "conf_championship":
         return `Last regular-season pick'em week before playoffs.${rangeBit} After scoring, cut locks Championship vs Toilet.`;
       case "cfp_r1":
@@ -444,10 +448,11 @@ export const NFL_SEASON_SCRUB_SUMMARY = {
   playoffs:
     "Weeks 15–18: Wild Card · Divisional · Conference · Super Bowl LXI (Feb 14)",
   weekShape:
-    "Wed→Tue (TNF through MNF). Not Mon–Sun. Odds pull uses these windows.",
+    "Thu→Mon (TNF through MNF). Official NFL week numbers. Not Mon–Sun.",
   totalCardsMax: 18, // weeks 1–18
   cutLocksAfterWeek: DEFAULT_CUT_LOCK_WEEK,
-  firstKickoff: "2026-09-09 (Kickoff Game)",
+  firstKickoff: "2026-09-10 ~8:20 PM ET (Kickoff)",
+  week1: "2026-09-10 – 2026-09-14",
   superBowl: "2027-02-14 Super Bowl LXI",
   preseasonCounts: false,
 };

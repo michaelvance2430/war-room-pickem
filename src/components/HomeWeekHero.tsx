@@ -12,6 +12,7 @@ import {
   formatCardLockDeadline,
   isCardLockDeadlinePassed,
   weekTitle,
+  weekDateRangeLabel,
 } from "@/lib/dates";
 import {
   resolvePlayerActiveWeek,
@@ -220,6 +221,30 @@ export default function HomeWeekHero() {
             {progress}
           </span>
         </div>
+
+        {/* NFL: fan-familiar week chrome (sport · week · dates · lock) */}
+        {isNfl && (
+          <div className="mb-3 rounded-xl border border-primary/25 bg-black/40 px-3 py-2.5">
+            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-primary">
+              🏈 NFL
+            </p>
+            <p className="text-lg sm:text-xl font-bold text-white leading-tight mt-0.5">
+              {weekLabel}
+            </p>
+            <p className="text-sm text-muted mt-0.5">
+              {weekDateRangeLabel(state.week, "nfl") || "Dates TBD"}
+            </p>
+            <p className="text-sm text-foreground/90 mt-1.5 font-medium">
+              Lock:{" "}
+              {state.lockLabel
+                ? state.lockLabel
+                : state.week === 1
+                  ? "Thursday · 8:20 PM ET"
+                  : "First kickoff on the card"}
+            </p>
+          </div>
+        )}
+
         <h2 className="text-xl sm:text-3xl font-bold text-white mb-2 leading-tight">
           {title}
         </h2>

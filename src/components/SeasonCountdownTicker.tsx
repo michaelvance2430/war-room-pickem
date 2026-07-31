@@ -48,7 +48,7 @@ export default function SeasonCountdownTicker() {
 
   const clock = formatCountdownCompact(parts);
   const shortLabel =
-    sportId === "nfl" ? "Sep 9 · Kickoff" : "Aug 23 · 12:01 AM ET";
+    sportId === "nfl" ? "Sep 10 · Kickoff" : "Aug 23 · 12:01 AM ET";
 
   return (
     <div
