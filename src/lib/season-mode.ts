@@ -12,7 +12,10 @@
  *  - Demo / trial-bot / auto-score training tools lock
  */
 
-import { SEASON_OPEN_AT_MS, SEASON_OPEN_LABEL } from "./season-countdown";
+import {
+  getSeasonOpenAtMs,
+  getSeasonOpenLabel,
+} from "./season-countdown";
 
 /** Badges that survive sandbox wipe (true prior-season / app creator). */
 export const SANDBOX_PROTECTED_BADGE_IDS = new Set([
@@ -20,9 +23,19 @@ export const SANDBOX_PROTECTED_BADGE_IDS = new Set([
   "war_room_legend", // Kahmann / Bill ball Ben prior-season
 ]);
 
+function currentSportId(): string | null {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getLeague } = require("./league") as typeof import("./league");
+    return getLeague()?.sportId || "cfb";
+  } catch {
+    return "cfb";
+  }
+}
+
 /**
  * True while friends are still dry-running before the real 2026-27 open.
- * After SEASON_OPEN_AT_MS, resets keep career cheevos.
+ * CFB doors Aug 23 · NFL Kickoff Sep 9. After open, resets keep career cheevos.
  */
 export function isSandboxMode(now = Date.now()): boolean {
   // Guest demo is always sandbox (no career bank from the tour)
@@ -37,8 +50,9 @@ export function isSandboxMode(now = Date.now()): boolean {
   } catch {
     /* ignore */
   }
-  if (Number.isNaN(SEASON_OPEN_AT_MS)) return true;
-  return now < SEASON_OPEN_AT_MS;
+  const openAt = getSeasonOpenAtMs(currentSportId());
+  if (Number.isNaN(openAt)) return true;
+  return now < openAt;
 }
 
 export function isRealSeasonLive(now = Date.now()): boolean {
@@ -56,11 +70,12 @@ export function isPreseasonCommishToolsAllowed(now = Date.now()): boolean {
 export const PRESEASON_COMMISH_TOOLS_TITLE = "Pre-season practice tools";
 
 export function preseasonCommishToolsBody(): string {
+  const label = getSeasonOpenLabel(currentSportId());
   return (
     "Demo weeks, trial bots, and auto-score runs are for pre-season only — " +
     "so you can learn the commissioner role without burning real lines or " +
     "messing up the live board.\n\n" +
-    `Once the season is open (${SEASON_OPEN_LABEL}), the league runs on live odds, ` +
+    `Once the season is open (${label}), the league runs on live odds, ` +
     "real player picks, and real scores only.\n\n" +
     "You can still clear leftover trial bots if any remain."
   );

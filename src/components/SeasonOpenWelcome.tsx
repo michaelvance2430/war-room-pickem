@@ -8,6 +8,7 @@ import {
   isSeasonOpen,
   markSeasonOpenWelcomeSeen,
   SEASON_DISPLAY_YEAR,
+  getSeasonOpenLabel,
 } from "@/lib/season-countdown";
 
 /**
@@ -20,15 +21,16 @@ export default function SeasonOpenWelcome() {
   const [isNfl, setIsNfl] = useState(false);
 
   useEffect(() => {
-    if (!isSeasonOpen()) return;
+    const league = getLeague();
+    const sid = league?.sportId || "cfb";
+    if (!isSeasonOpen(Date.now(), sid)) return;
     const session = getSession();
     if (!session?.playerId || !session.leagueId) return;
     if (hasSeenSeasonOpenWelcome(session.leagueId)) return;
 
-    const league = getLeague();
     const name = league?.name?.trim() || "the War Room";
     setLeagueName(name);
-    setIsNfl(league?.sportId === "nfl");
+    setIsNfl(sid === "nfl");
 
     // Let the page paint, then hit them with the splash
     const t = window.setTimeout(() => setOpen(true), 500);

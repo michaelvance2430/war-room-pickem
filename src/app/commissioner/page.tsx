@@ -85,7 +85,7 @@ import {
   PRESEASON_COMMISH_TOOLS_TITLE,
   preseasonCommishToolsBody,
 } from "@/lib/season-mode";
-import { SEASON_OPEN_LABEL } from "@/lib/season-countdown";
+import { getSeasonOpenLabel } from "@/lib/season-countdown";
 import { advanceLeagueAfterScore } from "@/lib/active-week";
 import {
   fetchFootballScores,
@@ -2121,10 +2121,11 @@ function CommissionerPageInner() {
                   <p className="text-[11px] text-muted mt-1 leading-relaxed">
                     {league?.sportId === "nfl" ? (
                       <>
-                        Fixed NFL map: Week 0 optional · 1–13 regular ·{" "}
-                        <span className="text-warning">14 Cut week</span> ·
-                        15–18 playoffs (Wild Card / Divisional / Conference /
-                        Super Bowl). Not configurable.
+                        Fixed NFL map: Week 0 = optional preseason PRACTICE
+                        only · Weeks 1–18 = real regular season (Kickoff Sep 9)
+                        · <span className="text-warning">14 Cut</span> · 15–18
+                        late RS + brackets. Windows Wed–Tue. Preseason does not
+                        count as the season.
                       </>
                     ) : (
                       <>
@@ -2402,7 +2403,7 @@ function CommissionerPageInner() {
                 ) : (
                   <>
                     Practice auto-run locked after season open (
-                    {SEASON_OPEN_LABEL}). Tap below for why.
+                    {getSeasonOpenLabel(league?.sportId)}). Tap below for why.
                   </>
                 )}
               </p>
@@ -2472,7 +2473,7 @@ function CommissionerPageInner() {
                 ) : (
                   <>
                     Trial bots are a pre-season practice tool (learn the
-                    Commish role before {SEASON_OPEN_LABEL}). Add / fill locked
+                    Commish role before {getSeasonOpenLabel(league?.sportId)}). Add / fill locked
                     now — Clear bots still works if leftovers remain.
                   </>
                 )}
@@ -3002,7 +3003,7 @@ function CommissionerPageInner() {
                 >
                   {preseasonToolsOk
                     ? "Pre-season practice — minimal clicks"
-                    : `Pre-season tools locked · season open ${SEASON_OPEN_LABEL}`}
+                    : `Pre-season tools locked · season open ${getSeasonOpenLabel(league?.sportId)}`}
                 </p>
                 <p className="text-[11px] text-muted leading-relaxed">
                   {preseasonToolsOk ? (
@@ -3685,7 +3686,7 @@ function CommissionerPageInner() {
                   </>
                 ) : (
                   <>
-                    Locked after season open ({SEASON_OPEN_LABEL}). This was a
+                    Locked after season open ({getSeasonOpenLabel(league?.sportId)}). This was a
                     pre-season trainer for the Commish role — not for live
                     weeks. Tap Run below for the full note.
                   </>
