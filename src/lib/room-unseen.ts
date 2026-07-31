@@ -1,6 +1,9 @@
 /**
  * Unseen activity for Home / nav: announcements (cloud reads) +
  * locker posts (per-device last-seen watermark).
+ *
+ * Locker: walking into /locker-room clears the badge automatically —
+ * no extra tap. Watermark = max(now, newest message on screen).
  */
 
 import { createClient } from "@/lib/supabase/client";
@@ -8,6 +11,9 @@ import { getSession, getLeague } from "@/lib/league";
 import { getLockerWeekBounds } from "@/lib/locker-room";
 
 const LOCKER_SEEN_KEY = "warroom-locker-seen-v1";
+
+/** Fired after markLockerSeen so Nav / Home can drop badges without a full reload. */
+export const EVENT_LOCKER_SEEN = "warroom-locker-seen";
 
 type LockerSeenStore = Record<string, string>; // `${leagueId}:${userId}` → ISO timestamp
 
@@ -40,6 +46,15 @@ function writeLockerSeen(store: LockerSeenStore) {
   }
 }
 
+function emitLockerSeen() {
+  if (typeof window === "undefined") return;
+  try {
+    window.dispatchEvent(new CustomEvent(EVENT_LOCKER_SEEN));
+  } catch {
+    /* ignore */
+  }
+}
+
 export function getLockerLastSeenIso(
   leagueId: string,
   userId: string
@@ -48,26 +63,65 @@ export function getLockerLastSeenIso(
   return readLockerSeen()[lockerKey(leagueId, userId)] || null;
 }
 
-/** Call when the user opens Locker Room (or after they post). */
+/**
+ * Call when the user opens Locker Room (or after they post).
+ * Uses the later of `atIso` and now so clock skew / sort mistakes can't leave
+ * a sticky "1 unread".
+ */
 export function markLockerSeen(opts?: {
   leagueId?: string;
   userId?: string;
-  /** Default: now. Pass latest message createdAt to avoid race with poll. */
+  /** Newest message createdAt if known */
   atIso?: string;
+  /** Skip browser event (batch) */
+  silent?: boolean;
 }) {
   const session = getSession();
   const league = getLeague();
   const leagueId = opts?.leagueId || league?.id || session?.leagueId || "";
   const userId = opts?.userId || session?.playerId || "";
   if (!leagueId || !userId) return;
-  const at = opts?.atIso || new Date().toISOString();
+
+  const nowMs = Date.now();
+  let atMs = nowMs;
+  if (opts?.atIso) {
+    const t = new Date(opts.atIso).getTime();
+    if (!Number.isNaN(t)) atMs = Math.max(atMs, t);
+  }
+  // Small pad so equality / ms rounding never leaves the newest post "after" watermark
+  const at = new Date(atMs + 500).toISOString();
+
   const all = readLockerSeen();
   const key = lockerKey(leagueId, userId);
   const prev = all[key];
   // Never move watermark backward
-  if (prev && new Date(prev).getTime() >= new Date(at).getTime()) return;
+  if (prev && new Date(prev).getTime() >= new Date(at).getTime()) {
+    if (!opts?.silent) emitLockerSeen();
+    return;
+  }
   all[key] = at;
   writeLockerSeen(all);
+  if (!opts?.silent) emitLockerSeen();
+}
+
+/**
+ * Mark fully caught up from a loaded thread (oldest→newest or any order).
+ * Prefer this over passing list[0].
+ */
+export function markLockerCaughtUp(
+  messages: { createdAt?: string | null }[]
+) {
+  let newest: string | undefined;
+  let newestMs = 0;
+  for (const m of messages) {
+    if (!m.createdAt) continue;
+    const t = new Date(m.createdAt).getTime();
+    if (!Number.isNaN(t) && t >= newestMs) {
+      newestMs = t;
+      newest = m.createdAt;
+    }
+  }
+  markLockerSeen({ atIso: newest });
 }
 
 export async function countUnreadAnnouncements(): Promise<number> {

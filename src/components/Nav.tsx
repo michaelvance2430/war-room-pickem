@@ -31,6 +31,7 @@ import {
 import {
   countUnreadAnnouncements,
   countUnseenLockerPosts,
+  EVENT_LOCKER_SEEN,
 } from "@/lib/room-unseen";
 import { sanitizeLegacyLegendsOnBoot } from "@/lib/legacy-badge-grants";
 import { nukeAccumulatedSandboxCareersOnce } from "@/lib/sandbox-wipe";
@@ -148,16 +149,30 @@ export default function Nav() {
     function onVis() {
       if (document.visibilityState === "visible") void loadUnread();
     }
+    function onLockerSeen() {
+      // Instant clear — walking into locker marks seen without extra taps
+      setLockerUnseen(0);
+    }
     document.addEventListener("visibilitychange", onVis);
+    window.addEventListener(EVENT_LOCKER_SEEN, onLockerSeen);
     return () => {
       window.removeEventListener("warroom-view-as-player", onPreview);
       document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener(EVENT_LOCKER_SEEN, onLockerSeen);
     };
   }, []);
 
   useEffect(() => {
     setMenuOpen(false);
     setMoreOpen(false);
+    // On locker route: badge off immediately (mark runs on the page too)
+    if (pathname === "/locker-room" || pathname.startsWith("/locker-room/")) {
+      setLockerUnseen(0);
+    } else {
+      // Leaving locker / navigating elsewhere — refresh counts
+      void countUnseenLockerPosts().then(setLockerUnseen).catch(() => {});
+      void countUnreadAnnouncements().then(setUnreadCount).catch(() => {});
+    }
   }, [pathname]);
 
   useEffect(() => {

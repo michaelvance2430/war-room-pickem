@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import {
   countUnreadAnnouncements,
   countUnseenLockerPosts,
+  EVENT_LOCKER_SEEN,
 } from "@/lib/room-unseen";
 
 /** Small count pill for Home tiles. */
@@ -16,15 +17,26 @@ export default function HomeTileUnseen({
 
   useEffect(() => {
     let cancelled = false;
-    void (async () => {
+    async function load() {
       const count =
         kind === "announcements"
           ? await countUnreadAnnouncements()
           : await countUnseenLockerPosts();
       if (!cancelled) setN(count);
-    })();
+    }
+    void load();
+    function onLockerSeen() {
+      if (kind === "locker") setN(0);
+    }
+    function onVis() {
+      if (document.visibilityState === "visible") void load();
+    }
+    window.addEventListener(EVENT_LOCKER_SEEN, onLockerSeen);
+    document.addEventListener("visibilitychange", onVis);
     return () => {
       cancelled = true;
+      window.removeEventListener(EVENT_LOCKER_SEEN, onLockerSeen);
+      document.removeEventListener("visibilitychange", onVis);
     };
   }, [kind]);
 

@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { loadRoomUnseen } from "@/lib/room-unseen";
+import { EVENT_LOCKER_SEEN, loadRoomUnseen } from "@/lib/room-unseen";
 
 /**
  * Home: how many unseen announcements + locker posts.
- * Each count is a link to that page.
+ * Each count is a link to that page. Locker clears on walk-in (no extra taps).
  */
 export default function HomeUnseenPulse() {
   const [announcements, setAnnouncements] = useState<number | null>(null);
@@ -28,14 +28,18 @@ export default function HomeUnseenPulse() {
       }
     }
     void load();
-    // Refresh when returning to the tab (e.g. after reading news)
     function onVis() {
       if (document.visibilityState === "visible") void load();
     }
+    function onLockerSeen() {
+      setLocker(0);
+    }
     document.addEventListener("visibilitychange", onVis);
+    window.addEventListener(EVENT_LOCKER_SEEN, onLockerSeen);
     return () => {
       cancelled = true;
       document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener(EVENT_LOCKER_SEEN, onLockerSeen);
     };
   }, []);
 
@@ -120,8 +124,8 @@ export default function HomeUnseenPulse() {
       </div>
 
       <p className="px-4 pb-3 text-[10px] text-muted leading-relaxed">
-        Tap a number to open that board. News clears when you open it; Locker
-        clears when you walk in.
+        Open the board to catch up — counts clear when you walk in. No extra
+        taps.
       </p>
     </section>
   );

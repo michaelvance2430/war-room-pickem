@@ -25,7 +25,7 @@ import {
   postLockerMessage,
   type LockerMessage,
 } from "@/lib/locker-room";
-import { markLockerSeen } from "@/lib/room-unseen";
+import { markLockerCaughtUp, markLockerSeen } from "@/lib/room-unseen";
 import { loadLeagueRoster } from "@/lib/cloud";
 import { refreshStaffSessionFlags } from "@/lib/cloud";
 import {
@@ -64,14 +64,16 @@ export default function LockerRoomPage() {
     const res = await loadLockerMessages(100);
     if (!res.ok) {
       if (!opts?.quiet) setError(res.error || "Could not load");
+      // Still clear badge — they opened the room
+      markLockerSeen();
       return;
     }
     const list = res.messages || [];
     setMessages(list);
     if (res.weekLabel) setWeekLabel(res.weekLabel);
     setError(null);
-    const newest = list[0]?.createdAt;
-    markLockerSeen({ atIso: newest });
+    // Thread is oldest→newest; catch up on max createdAt (not list[0])
+    markLockerCaughtUp(list);
   }, []);
 
   useEffect(() => {
@@ -79,6 +81,8 @@ export default function LockerRoomPage() {
     setSelfId(session?.playerId || null);
     setStaff(isStaff());
     setLeagueName(getLeague()?.name || "");
+    // Immediate clear on walk-in — don't wait for network or extra taps
+    markLockerSeen();
     void refreshStaffSessionFlags().then(() => setStaff(isStaff()));
     void amILockerMuted().then(setMuted);
     reload().finally(() => setLoading(false));
