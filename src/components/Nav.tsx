@@ -63,7 +63,8 @@ export default function Nav() {
     refreshRoles();
     setMenuOpen(false);
     setMoreOpen(false);
-    // Stay on this page — Commish chrome comes back without a full trip to /commissioner
+    // Leave current page → Home as commissioner (invite code, hero, tiles)
+    window.location.href = "/";
   }
 
   useEffect(() => {
@@ -448,7 +449,7 @@ export default function Nav() {
                     onClick={exitPlayerView}
                     className="w-full py-3 rounded-xl bg-warning text-black text-sm font-extrabold uppercase tracking-wide"
                   >
-                    Exit player view
+                    Exit → Home (Commish)
                   </button>
                 </div>
               )}
@@ -523,14 +524,14 @@ export default function Nav() {
         <div className="sticky top-14 z-[45] border-b-2 border-warning bg-warning text-black">
           <div className="max-w-6xl mx-auto px-3 sm:px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs sm:text-sm font-bold">
-              PLAYER VIEW — no Commish tools. Exit anytime (stays on this page).
+              PLAYER VIEW — Exit returns you to Home as Commish.
             </p>
             <button
               type="button"
               onClick={exitPlayerView}
               className="shrink-0 px-4 py-2 rounded-lg bg-black text-warning text-xs sm:text-sm font-extrabold uppercase tracking-wide hover:bg-black/90"
             >
-              Exit player view
+              Exit → Home
             </button>
           </div>
         </div>
@@ -542,7 +543,7 @@ export default function Nav() {
           onClick={exitPlayerView}
           className="fixed bottom-5 right-4 z-[60] px-4 py-3 rounded-full bg-warning text-black text-xs sm:text-sm font-extrabold uppercase tracking-wide shadow-[0_4px_24px_rgba(0,0,0,0.45)] border-2 border-black/20 hover:scale-[1.03] active:scale-[0.98] transition"
         >
-          Exit player view
+          Exit → Home
         </button>
       )}
       {/* Until Aug 23 00:01 ET: countdown. After: ticker gone; one-time welcome splash */}
