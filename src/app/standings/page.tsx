@@ -34,6 +34,8 @@ function streakDisplay(streak: number) {
   return <span className="text-muted">—</span>;
 }
 
+const TIP_KEY = "warroom-tip-tap-names-v1";
+
 export default function StandingsPage() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [swingById, setSwingById] = useState<
@@ -41,6 +43,7 @@ export default function StandingsPage() {
   >({});
   const [selfId, setSelfId] = useState<string | null>(null);
   const [active, setActive] = useState<Division | "Overall">("Overall");
+  const [showNameTip, setShowNameTip] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -53,6 +56,11 @@ export default function StandingsPage() {
       setSwingById(map);
     }
     load();
+    try {
+      if (localStorage.getItem(TIP_KEY) !== "1") setShowNameTip(true);
+    } catch {
+      setShowNameTip(true);
+    }
   }, []);
 
   const filtered =
@@ -80,6 +88,34 @@ export default function StandingsPage() {
               ? "No weeks scored yet — everyone is tied at zero until the first card is locked and scored."
               : "Live points · Bottom 50% of each division gets flushed · Swing labels after each scored week"}
           </p>
+          <p className="text-xs text-primary/90 mt-1.5 font-medium">
+            Tap a green name → open their profile (badges &amp; trophies).
+          </p>
+          {showNameTip && (
+            <div className="mt-3 rounded-xl border border-primary/40 bg-primary/10 px-3 py-2.5 flex items-start justify-between gap-2">
+              <p className="text-xs text-foreground leading-relaxed">
+                <strong className="text-primary">Tip:</strong> Names in{" "}
+                <span className="font-semibold text-primary underline decoration-2">
+                  green
+                </span>{" "}
+                are links. Tap anyone to roast their trophy case.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowNameTip(false);
+                  try {
+                    localStorage.setItem(TIP_KEY, "1");
+                  } catch {
+                    /* ignore */
+                  }
+                }}
+                className="shrink-0 text-[11px] text-muted hover:text-foreground px-1"
+              >
+                Got it
+              </button>
+            </div>
+          )}
         </div>
 
         {preseason && (

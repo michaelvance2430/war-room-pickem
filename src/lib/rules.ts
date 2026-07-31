@@ -18,7 +18,7 @@ export type RuleSection = {
 export const RULES_SEEN_KEY = "warroom-rules-seen-v2";
 
 export const RULES_INTRO =
-  "College football pick'em against the spread. Five games each week, confidence points, one Best Bet multiplier, and a weekly prop.";
+  "College football pick'em against the spread. Five games each week, confidence points, one Best Bet multiplier, and a weekly prop. Tap any green player name to open their profile.";
 
 export const RULE_SECTIONS: RuleSection[] = [
   {

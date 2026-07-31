@@ -57,8 +57,12 @@ export default function RulesOnboardingModal() {
       d: "Season points rank you. Bottom half of each division heads toward the Toilet Bowl.",
     },
     {
+      t: "Tap a name",
+      d: "Green underlined names open that player’s profile — badges, trophies, the whole flex. Tap anyone.",
+    },
+    {
       t: "The room",
-      d: "Gazette, Locker, profiles, trophies — drama after you lock. Flavor is free; picks are not.",
+      d: "Gazette, Locker, trophies — drama after you lock. Flavor is free; picks are not.",
     },
   ];
 
