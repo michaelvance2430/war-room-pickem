@@ -9,9 +9,10 @@
  * Real season (after open):
  *  - Career cheevos + permanent badges stick forever
  *  - Season reset zeros scores/cards but keeps career hardware
+ *  - Demo / trial-bot / auto-score training tools lock
  */
 
-import { SEASON_OPEN_AT_MS } from "./season-countdown";
+import { SEASON_OPEN_AT_MS, SEASON_OPEN_LABEL } from "./season-countdown";
 
 /** Badges that survive sandbox wipe (true prior-season / app creator). */
 export const SANDBOX_PROTECTED_BADGE_IDS = new Set([
@@ -42,6 +43,27 @@ export function isSandboxMode(now = Date.now()): boolean {
 
 export function isRealSeasonLive(now = Date.now()): boolean {
   return !isSandboxMode(now);
+}
+
+/**
+ * Demo slate, trial bots, randomize+score, auto-score range —
+ * practice toolkit for learning the Commish role before doors open.
+ */
+export function isPreseasonCommishToolsAllowed(now = Date.now()): boolean {
+  return isSandboxMode(now);
+}
+
+export const PRESEASON_COMMISH_TOOLS_TITLE = "Pre-season practice tools";
+
+export function preseasonCommishToolsBody(): string {
+  return (
+    "Demo weeks, trial bots, and auto-score runs are for pre-season only — " +
+    "so you can learn the commissioner role without burning real lines or " +
+    "messing up the live board.\n\n" +
+    `Once the season is open (${SEASON_OPEN_LABEL}), the league runs on live odds, ` +
+    "real player picks, and real scores only.\n\n" +
+    "You can still clear leftover trial bots if any remain."
+  );
 }
 
 export function seasonModeLabel(now = Date.now()): string {

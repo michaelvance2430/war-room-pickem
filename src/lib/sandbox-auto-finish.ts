@@ -19,6 +19,10 @@ import { PROP_PRESETS, propFromPreset } from "@/lib/prop-presets";
 import { SEASON_MAX_WEEK } from "@/lib/season-calendar";
 import { weekTitle } from "@/lib/dates";
 import { isOps } from "@/lib/league";
+import {
+  isPreseasonCommishToolsAllowed,
+  preseasonCommishToolsBody,
+} from "@/lib/season-mode";
 
 export type AutoFinishProgress = {
   week: number;
@@ -59,6 +63,16 @@ export async function autoFinishRemainingWeeks(opts?: {
       skipped: [],
       errors: ["Commissioner or deputy only"],
       message: "Ops only",
+    };
+  }
+
+  if (!isPreseasonCommishToolsAllowed()) {
+    return {
+      ok: false,
+      finished: [],
+      skipped: [],
+      errors: ["Pre-season only"],
+      message: preseasonCommishToolsBody().replace(/\n+/g, " "),
     };
   }
 

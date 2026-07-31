@@ -1714,6 +1714,19 @@ export async function seedTrialBotsInCloud(
   if (!session?.leagueId || !session.isCommissioner) {
     return { ok: false, error: "Commissioner only" };
   }
+  // Live season: no new trial bots (pre-season practice only)
+  try {
+    const { isPreseasonCommishToolsAllowed, preseasonCommishToolsBody } =
+      await import("./season-mode");
+    if (!isPreseasonCommishToolsAllowed()) {
+      return {
+        ok: false,
+        error: preseasonCommishToolsBody().replace(/\n+/g, " "),
+      };
+    }
+  } catch {
+    /* if import fails, fall through */
+  }
   // Respect public 32-player cap — only empty seats, never replace humans/bots
   const roster = await loadLeagueRoster();
   const seats = seatsRemaining(roster.length);
@@ -1790,6 +1803,18 @@ export async function fillLeagueWithBotsToCap(opts?: {
   const session = getSession();
   if (!session?.leagueId || !session.isCommissioner) {
     return { ok: false, error: "Commissioner only" };
+  }
+  try {
+    const { isPreseasonCommishToolsAllowed, preseasonCommishToolsBody } =
+      await import("./season-mode");
+    if (!isPreseasonCommishToolsAllowed()) {
+      return {
+        ok: false,
+        error: preseasonCommishToolsBody().replace(/\n+/g, " "),
+      };
+    }
+  } catch {
+    /* fall through */
   }
   const roster = await loadLeagueRoster();
   const rosterBefore = roster.length;

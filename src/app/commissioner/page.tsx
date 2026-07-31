@@ -75,6 +75,12 @@ import {
   weekDateRangeLabel,
 } from "@/lib/season-calendar";
 import { autoFinishRemainingWeeks } from "@/lib/sandbox-auto-finish";
+import {
+  isPreseasonCommishToolsAllowed,
+  PRESEASON_COMMISH_TOOLS_TITLE,
+  preseasonCommishToolsBody,
+} from "@/lib/season-mode";
+import { SEASON_OPEN_LABEL } from "@/lib/season-countdown";
 import { advanceLeagueAfterScore } from "@/lib/active-week";
 import {
   fetchNcaafScores,
@@ -216,6 +222,9 @@ function CommissionerPageInner() {
   const [botReport, setBotReport] = useState<string | null>(null);
   /** One-tap demo publish busy flag (generate + publish + bots). */
   const [demoBusy, setDemoBusy] = useState(false);
+  /** Real season: explain why demo/bot/auto-score tools are locked. */
+  const [preseasonToolsPopup, setPreseasonToolsPopup] = useState(false);
+  const preseasonToolsOk = isPreseasonCommishToolsAllowed();
   /** How many bots to add (not total roster). Default 6 = common “round out to ~16”. */
   const [botAddCount, setBotAddCount] = useState(6);
   const [rosterCount, setRosterCount] = useState<number | null>(null);
@@ -680,8 +689,16 @@ function CommissionerPageInner() {
     }
   }
 
+  /** Show locked-tool popup when real season has started; returns true if pre-season tools may run. */
+  function requirePreseasonTools(): boolean {
+    if (isPreseasonCommishToolsAllowed()) return true;
+    setPreseasonToolsPopup(true);
+    return false;
+  }
+
   /** Fake 5-game card for season simulation — no Odds API. */
   function generateDemoCard() {
+    if (!requirePreseasonTools()) return;
     setOddsError(null);
     setRankLabel("demo-sim");
     const games = generateDemoSlate(activeWeek, 5);
@@ -698,6 +715,7 @@ function CommissionerPageInner() {
    * Skips Generate + Publish as separate clicks.
    */
   async function publishDemoWeek() {
+    if (!requirePreseasonTools()) return;
     if (demoBusy) return;
     setDemoBusy(true);
     setOddsError(null);
@@ -816,6 +834,7 @@ function CommissionerPageInner() {
   }
 
   function randomizeResultsForDryRun() {
+    if (!requirePreseasonTools()) return;
     if (resultsLocked) {
       setScoreReport("Unlock this week before randomizing results.");
       return;
@@ -843,6 +862,7 @@ function CommissionerPageInner() {
    * Skips Randomize + Save as separate clicks.
    */
   async function randomizeAndScoreWeek() {
+    if (!requirePreseasonTools()) return;
     if (resultsLocked) {
       setScoreReport("Unlock this week before scoring.");
       return;
@@ -1014,6 +1034,7 @@ function CommissionerPageInner() {
     targetTotal?: number;
     label: string;
   }) {
+    if (!requirePreseasonTools()) return;
     const n =
       opts.addCount != null
         ? opts.addCount
@@ -1073,6 +1094,7 @@ function CommissionerPageInner() {
   }
 
   async function handleFillBotPicks() {
+    if (!requirePreseasonTools()) return;
     setBotReport(null);
     setBotBusy(true);
     const res = await seedBotPicksForWeekInCloud(activeWeek);
@@ -1353,6 +1375,7 @@ function CommissionerPageInner() {
     to?: number;
     skipConfirm?: boolean;
   }) {
+    if (!requirePreseasonTools()) return;
     let from = opts?.from ?? autoFromWeek;
     let to = opts?.to ?? autoToWeek;
     from = Math.max(0, Math.min(SEASON_MAX_WEEK, from));
@@ -1767,6 +1790,44 @@ function CommissionerPageInner() {
   return (
     <div className="min-h-screen flex flex-col">
       <Nav />
+      {preseasonToolsPopup && (
+        <div
+          className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-4 bg-black/70"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="preseason-tools-title"
+          onClick={() => setPreseasonToolsPopup(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-warning/40 bg-card p-5 shadow-xl space-y-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-warning">
+              Real season live
+            </p>
+            <h2
+              id="preseason-tools-title"
+              className="text-lg font-bold text-foreground"
+            >
+              {PRESEASON_COMMISH_TOOLS_TITLE}
+            </h2>
+            <p className="text-sm text-muted leading-relaxed whitespace-pre-line">
+              {preseasonCommishToolsBody()}
+            </p>
+            <p className="text-xs text-muted leading-relaxed">
+              Live path: Pull Odds → publish → friends pick → Sync final scores
+              → Save &amp; Score.
+            </p>
+            <button
+              type="button"
+              onClick={() => setPreseasonToolsPopup(false)}
+              className="w-full py-3 rounded-xl font-bold bg-primary text-black min-h-[48px]"
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
       <main className="flex-1 max-w-3xl mx-auto w-full px-4 py-8">
         <div className="mb-6">
           <h1 className="text-2xl font-bold">
@@ -2169,24 +2230,52 @@ function CommissionerPageInner() {
 
             {(advancedOpen || !firstTime) && (
             <>
-            <div className="rounded-xl border border-warning/40 bg-warning/5 p-5 space-y-3">
-              <h2 className="font-semibold text-warning">
+            <div
+              className={`rounded-xl border p-5 space-y-3 ${
+                preseasonToolsOk
+                  ? "border-warning/40 bg-warning/5"
+                  : "border-border bg-card opacity-90"
+              }`}
+            >
+              <h2
+                className={`font-semibold ${
+                  preseasonToolsOk ? "text-warning" : "text-muted"
+                }`}
+              >
                 Sandbox: auto-score range
+                {!preseasonToolsOk && (
+                  <span className="ml-2 text-[10px] font-bold uppercase tracking-wide text-muted border border-border px-1.5 py-0.5 rounded">
+                    Pre-season only
+                  </span>
+                )}
               </h2>
               <p className="text-xs text-muted leading-relaxed">
-                Full control (one week → full season) lives on{" "}
-                <strong className="text-foreground">Enter Results</strong>.
-                Shortcut here: finish everything left through CFP Final.
+                {preseasonToolsOk ? (
+                  <>
+                    Full control (one week → full season) lives on{" "}
+                    <strong className="text-foreground">Enter Results</strong>.
+                    Shortcut here: finish everything left through CFP Final.
+                  </>
+                ) : (
+                  <>
+                    Practice auto-run locked after season open (
+                    {SEASON_OPEN_LABEL}). Tap below for why.
+                  </>
+                )}
               </p>
               <button
                 type="button"
                 disabled={autoSeasonBusy}
                 onClick={() => void handleAutoFinishSeason()}
-                className="w-full py-3 rounded-xl font-semibold bg-warning text-black disabled:opacity-50"
+                className={`w-full py-3 rounded-xl font-semibold bg-warning text-black disabled:opacity-50 ${
+                  !preseasonToolsOk ? "opacity-45" : ""
+                }`}
               >
                 {autoSeasonBusy
                   ? "Season running… keep this tab open"
-                  : "Finish remaining → CFP Final"}
+                  : preseasonToolsOk
+                    ? "Finish remaining → CFP Final"
+                    : "Finish remaining (locked)"}
               </button>
               <button
                 type="button"
@@ -2209,13 +2298,41 @@ function CommissionerPageInner() {
               )}
             </div>
 
-            <div className="rounded-xl border border-primary/40 bg-primary/5 p-5 space-y-3">
-              <h2 className="font-semibold text-primary">Pad league with bots</h2>
+            <div
+              className={`rounded-xl border p-5 space-y-3 ${
+                preseasonToolsOk
+                  ? "border-primary/40 bg-primary/5"
+                  : "border-border bg-card"
+              }`}
+            >
+              <h2
+                className={`font-semibold ${
+                  preseasonToolsOk ? "text-primary" : "text-muted"
+                }`}
+              >
+                Pad league with bots
+                {!preseasonToolsOk && (
+                  <span className="ml-2 text-[10px] font-bold uppercase tracking-wide text-muted border border-border px-1.5 py-0.5 rounded">
+                    Pre-season only
+                  </span>
+                )}
+              </h2>
               <p className="text-xs text-muted leading-relaxed">
-                Optional. Adds bots to{" "}
-                <strong className="text-foreground">empty seats only</strong>{" "}
-                (max {MAX_LEAGUE_PLAYERS}). Real humans stay. Choose a count so
-                you can round out brackets without stuffing the room to 32.
+                {preseasonToolsOk ? (
+                  <>
+                    Optional. Adds bots to{" "}
+                    <strong className="text-foreground">empty seats only</strong>{" "}
+                    (max {MAX_LEAGUE_PLAYERS}). Real humans stay. Choose a count
+                    so you can round out brackets without stuffing the room to
+                    32.
+                  </>
+                ) : (
+                  <>
+                    Trial bots are a pre-season practice tool (learn the
+                    Commish role before {SEASON_OPEN_LABEL}). Add / fill locked
+                    now — Clear bots still works if leftovers remain.
+                  </>
+                )}
               </p>
               <div className="rounded-lg border border-border/60 bg-background/50 px-3 py-2 text-[11px] text-muted leading-relaxed">
                 <p className="text-foreground font-medium text-xs mb-1">
@@ -2282,9 +2399,15 @@ function CommissionerPageInner() {
                       label: `Add ${botAddCount} bot(s)?`,
                     })
                   }
-                  className="px-4 py-2 rounded-lg bg-primary text-black text-sm font-semibold disabled:opacity-50"
+                  className={`px-4 py-2 rounded-lg bg-primary text-black text-sm font-semibold disabled:opacity-50 ${
+                    !preseasonToolsOk ? "opacity-45" : ""
+                  }`}
                 >
-                  {botBusy ? "Working…" : `Add ${botAddCount} bot${botAddCount === 1 ? "" : "s"}`}
+                  {botBusy
+                    ? "Working…"
+                    : preseasonToolsOk
+                      ? `Add ${botAddCount} bot${botAddCount === 1 ? "" : "s"}`
+                      : "Add bots (locked)"}
                 </button>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -2298,7 +2421,9 @@ function CommissionerPageInner() {
                         "Fill roster toward 16 (ideal 8+8 brackets)? Only adds what’s missing.",
                     })
                   }
-                  className="px-3 py-1.5 rounded-lg border border-primary/50 text-primary text-xs font-medium hover:bg-primary/10 disabled:opacity-50"
+                  className={`px-3 py-1.5 rounded-lg border border-primary/50 text-primary text-xs font-medium hover:bg-primary/10 disabled:opacity-50 ${
+                    !preseasonToolsOk ? "opacity-45" : ""
+                  }`}
                 >
                   Fill to 16 (ideal)
                 </button>
@@ -2312,7 +2437,9 @@ function CommissionerPageInner() {
                         "Fill roster to 32 (max / 16+16 brackets)? Only empty seats.",
                     })
                   }
-                  className="px-3 py-1.5 rounded-lg border border-border text-xs font-medium hover:bg-card-hover disabled:opacity-50"
+                  className={`px-3 py-1.5 rounded-lg border border-border text-xs font-medium hover:bg-card-hover disabled:opacity-50 ${
+                    !preseasonToolsOk ? "opacity-45" : ""
+                  }`}
                 >
                   Fill to 32 (max)
                 </button>
@@ -2320,7 +2447,9 @@ function CommissionerPageInner() {
                   type="button"
                   disabled={botBusy}
                   onClick={() => void handleFillBotPicks()}
-                  className="px-3 py-1.5 rounded-lg border border-border text-xs font-medium hover:bg-card-hover disabled:opacity-50"
+                  className={`px-3 py-1.5 rounded-lg border border-border text-xs font-medium hover:bg-card-hover disabled:opacity-50 ${
+                    !preseasonToolsOk ? "opacity-45" : ""
+                  }`}
                 >
                   Fill bot picks (this week)
                 </button>
@@ -2675,16 +2804,34 @@ function CommissionerPageInner() {
                     type="button"
                     onClick={() => void publishDemoWeek()}
                     disabled={demoBusy}
-                    className="px-4 py-2 rounded-lg bg-warning text-black text-sm font-bold hover:bg-warning/90 disabled:opacity-50"
-                    title="One tap: fake 5 games + prop + publish + bots pick"
+                    aria-disabled={!preseasonToolsOk}
+                    className={`px-4 py-2 rounded-lg bg-warning text-black text-sm font-bold hover:bg-warning/90 disabled:opacity-50 ${
+                      !preseasonToolsOk ? "opacity-45" : ""
+                    }`}
+                    title={
+                      preseasonToolsOk
+                        ? "One tap: fake 5 games + prop + publish + bots pick"
+                        : "Pre-season practice only — tap for why"
+                    }
                   >
-                    {demoBusy ? "Publishing demo…" : "Publish demo week"}
+                    {demoBusy
+                      ? "Publishing demo…"
+                      : preseasonToolsOk
+                        ? "Publish demo week"
+                        : "Publish demo week (locked)"}
                   </button>
                   <button
                     type="button"
                     onClick={generateDemoCard}
-                    className="px-4 py-2 rounded-lg border border-warning text-warning text-sm font-semibold hover:bg-warning/10"
-                    title="Load fake games only — then edit / Publish manually"
+                    aria-disabled={!preseasonToolsOk}
+                    className={`px-4 py-2 rounded-lg border border-warning text-warning text-sm font-semibold hover:bg-warning/10 ${
+                      !preseasonToolsOk ? "opacity-45" : ""
+                    }`}
+                    title={
+                      preseasonToolsOk
+                        ? "Load fake games only — then edit / Publish manually"
+                        : "Pre-season practice only — tap for why"
+                    }
                   >
                     Generate demo slate
                   </button>
@@ -2698,19 +2845,43 @@ function CommissionerPageInner() {
                   </button>
                 </div>
               </div>
-              <div className="rounded-lg border border-warning/40 bg-warning/5 px-3 py-2.5 mb-2">
-                <p className="text-xs font-semibold text-warning mb-0.5">
-                  Sandbox — minimal clicks
+              <div
+                className={`rounded-lg border px-3 py-2.5 mb-2 ${
+                  preseasonToolsOk
+                    ? "border-warning/40 bg-warning/5"
+                    : "border-border bg-background/60"
+                }`}
+              >
+                <p
+                  className={`text-xs font-semibold mb-0.5 ${
+                    preseasonToolsOk ? "text-warning" : "text-muted"
+                  }`}
+                >
+                  {preseasonToolsOk
+                    ? "Pre-season practice — minimal clicks"
+                    : `Pre-season tools locked · season open ${SEASON_OPEN_LABEL}`}
                 </p>
                 <p className="text-[11px] text-muted leading-relaxed">
-                  <strong className="text-foreground">Publish demo week</strong>{" "}
-                  = one tap (5 fake games + prop + bots). Then Enter Results →{" "}
-                  <strong className="text-foreground">Randomize &amp; score</strong>
-                  . Need many weeks? Use Auto-score range under Results.{" "}
-                  <span className="text-muted">
-                    Generate demo slate still loads games only if you want to
-                    edit first.
-                  </span>
+                  {preseasonToolsOk ? (
+                    <>
+                      <strong className="text-foreground">
+                        Publish demo week
+                      </strong>{" "}
+                      = one tap (5 fake games + prop + bots). Then Enter Results
+                      →{" "}
+                      <strong className="text-foreground">
+                        Randomize &amp; score
+                      </strong>
+                      . Need many weeks? Use Auto-score range under Results.
+                    </>
+                  ) : (
+                    <>
+                      Demo weeks, trial bots, and auto-score were for learning
+                      the Commish role before doors opened. Tap a locked button
+                      for the full note. Live path: Pull Odds → publish → Sync
+                      final scores.
+                    </>
+                  )}
                 </p>
               </div>
               <label className="flex items-start gap-3 cursor-pointer rounded-lg border border-border bg-background px-3 py-2.5 mb-2">
@@ -3232,15 +3403,40 @@ function CommissionerPageInner() {
                 </p>
               </div>
             )}
-            {/* Sandbox auto-score: one week … full season */}
-            <div className="rounded-xl border border-warning/50 bg-warning/10 p-5 mb-6 space-y-3">
-              <h2 className="font-semibold text-warning">
+            {/* Sandbox auto-score: one week … full season (pre-season only) */}
+            <div
+              className={`rounded-xl border p-5 mb-6 space-y-3 ${
+                preseasonToolsOk
+                  ? "border-warning/50 bg-warning/10"
+                  : "border-border bg-card"
+              }`}
+            >
+              <h2
+                className={`font-semibold ${
+                  preseasonToolsOk ? "text-warning" : "text-muted"
+                }`}
+              >
                 Auto-score weeks (sandbox)
+                {!preseasonToolsOk && (
+                  <span className="ml-2 text-[10px] font-bold uppercase tracking-wide text-muted border border-border px-1.5 py-0.5 rounded">
+                    Pre-season only
+                  </span>
+                )}
               </h2>
               <p className="text-xs text-muted leading-relaxed">
-                Pick a range. Each unscored week gets: demo card → bot picks →
-                random results → score. Already-scored weeks are skipped. Leave
-                this tab open while it runs.
+                {preseasonToolsOk ? (
+                  <>
+                    Pick a range. Each unscored week gets: demo card → bot picks
+                    → random results → score. Already-scored weeks are skipped.
+                    Leave this tab open while it runs.
+                  </>
+                ) : (
+                  <>
+                    Locked after season open ({SEASON_OPEN_LABEL}). This was a
+                    pre-season trainer for the Commish role — not for live
+                    weeks. Tap Run below for the full note.
+                  </>
+                )}
               </p>
 
               <div className="grid grid-cols-2 gap-3">
@@ -3248,13 +3444,13 @@ function CommissionerPageInner() {
                   From
                   <select
                     value={autoFromWeek}
-                    disabled={autoSeasonBusy}
+                    disabled={autoSeasonBusy || !preseasonToolsOk}
                     onChange={(e) => {
                       const v = parseInt(e.target.value, 10);
                       setAutoFromWeek(v);
                       if (v > autoToWeek) setAutoToWeek(v);
                     }}
-                    className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                    className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground disabled:opacity-50"
                   >
                     {Array.from({ length: SEASON_MAX_WEEK + 1 }, (_, i) => i).map(
                       (w) => (
@@ -3270,13 +3466,13 @@ function CommissionerPageInner() {
                   Through
                   <select
                     value={autoToWeek}
-                    disabled={autoSeasonBusy}
+                    disabled={autoSeasonBusy || !preseasonToolsOk}
                     onChange={(e) => {
                       const v = parseInt(e.target.value, 10);
                       setAutoToWeek(v);
                       if (v < autoFromWeek) setAutoFromWeek(v);
                     }}
-                    className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                    className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground disabled:opacity-50"
                   >
                     {Array.from({ length: SEASON_MAX_WEEK + 1 }, (_, i) => i).map(
                       (w) => (
@@ -3293,8 +3489,9 @@ function CommissionerPageInner() {
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
-                  disabled={autoSeasonBusy}
+                  disabled={autoSeasonBusy || !preseasonToolsOk}
                   onClick={() => {
+                    if (!requirePreseasonTools()) return;
                     setAutoFromWeek(activeWeek);
                     setAutoToWeek(activeWeek);
                   }}
@@ -3304,8 +3501,9 @@ function CommissionerPageInner() {
                 </button>
                 <button
                   type="button"
-                  disabled={autoSeasonBusy}
+                  disabled={autoSeasonBusy || !preseasonToolsOk}
                   onClick={() => {
+                    if (!requirePreseasonTools()) return;
                     const start =
                       scoredWeeks.length === 0
                         ? 0
@@ -3322,8 +3520,9 @@ function CommissionerPageInner() {
                 </button>
                 <button
                   type="button"
-                  disabled={autoSeasonBusy}
+                  disabled={autoSeasonBusy || !preseasonToolsOk}
                   onClick={() => {
+                    if (!requirePreseasonTools()) return;
                     const start =
                       scoredWeeks.length === 0
                         ? 0
@@ -3340,8 +3539,9 @@ function CommissionerPageInner() {
                 </button>
                 <button
                   type="button"
-                  disabled={autoSeasonBusy}
+                  disabled={autoSeasonBusy || !preseasonToolsOk}
                   onClick={() => {
+                    if (!requirePreseasonTools()) return;
                     setAutoFromWeek(0);
                     setAutoToWeek(SEASON_MAX_WEEK);
                   }}
@@ -3355,13 +3555,17 @@ function CommissionerPageInner() {
                 type="button"
                 disabled={autoSeasonBusy}
                 onClick={() => void handleAutoFinishRange()}
-                className="w-full py-3.5 rounded-xl font-bold bg-warning text-black text-sm disabled:opacity-50"
+                className={`w-full py-3.5 rounded-xl font-bold bg-warning text-black text-sm disabled:opacity-50 ${
+                  !preseasonToolsOk ? "opacity-45" : ""
+                }`}
               >
                 {autoSeasonBusy
                   ? "Running… keep this tab open"
-                  : autoFromWeek === autoToWeek
-                    ? `Auto-score ${weekTitle(autoFromWeek)} only`
-                    : `Auto-score ${weekTitle(autoFromWeek)} → ${weekTitle(autoToWeek)}`}
+                  : !preseasonToolsOk
+                    ? "Auto-score (locked) — tap for why"
+                    : autoFromWeek === autoToWeek
+                      ? `Auto-score ${weekTitle(autoFromWeek)} only`
+                      : `Auto-score ${weekTitle(autoFromWeek)} → ${weekTitle(autoToWeek)}`}
               </button>
               {autoSeasonReport && (
                 <p
@@ -3451,23 +3655,41 @@ function CommissionerPageInner() {
                     type="button"
                     onClick={() => void randomizeAndScoreWeek()}
                     disabled={
-                      !publishedGames.length || resultsLocked || scoring
+                      preseasonToolsOk &&
+                      (!publishedGames.length || resultsLocked || scoring)
                     }
-                    className="px-4 py-2 rounded-lg bg-warning text-black text-sm font-bold hover:bg-warning/90 disabled:opacity-50"
-                    title="One tap: random covers + prop + score the league"
+                    className={`px-4 py-2 rounded-lg bg-warning text-black text-sm font-bold hover:bg-warning/90 disabled:opacity-50 ${
+                      !preseasonToolsOk ? "opacity-45" : ""
+                    }`}
+                    title={
+                      preseasonToolsOk
+                        ? "One tap: random covers + prop + score the league"
+                        : "Pre-season practice only — tap for why"
+                    }
                   >
                     {scoring
                       ? "Scoring…"
-                      : resultsLocked
-                        ? "Week scored ✓"
-                        : "Randomize & score"}
+                      : !preseasonToolsOk
+                        ? "Randomize & score (locked)"
+                        : resultsLocked
+                          ? "Week scored ✓"
+                          : "Randomize & score"}
                   </button>
                   <button
                     type="button"
                     onClick={randomizeResultsForDryRun}
-                    disabled={!publishedGames.length || resultsLocked}
-                    className="px-4 py-2 rounded-lg border border-warning text-warning text-sm font-semibold hover:bg-warning/10 disabled:opacity-50"
-                    title="Fill random covers only — then Save & Score yourself"
+                    disabled={
+                      preseasonToolsOk &&
+                      (!publishedGames.length || resultsLocked)
+                    }
+                    className={`px-4 py-2 rounded-lg border border-warning text-warning text-sm font-semibold hover:bg-warning/10 disabled:opacity-50 ${
+                      !preseasonToolsOk ? "opacity-45" : ""
+                    }`}
+                    title={
+                      preseasonToolsOk
+                        ? "Fill random covers only — then Save & Score yourself"
+                        : "Pre-season practice only — tap for why"
+                    }
                   >
                     Randomize results
                   </button>
