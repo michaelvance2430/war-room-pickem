@@ -6,6 +6,7 @@ import Nav from "@/components/Nav";
 import Link from "next/link";
 import HotTakeTicker from "@/components/HotTakeTicker";
 import CrownAndShame from "@/components/CrownAndShame";
+import HomeWeekHero from "@/components/HomeWeekHero";
 import { getSession, getLeague } from "@/lib/league";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import {
@@ -197,7 +198,7 @@ export default function Home() {
 
       <Nav />
       <main className="flex-1 max-w-6xl mx-auto w-full px-4 py-10 relative">
-        <section className="mb-8">
+        <section className="mb-6">
           <h1 className="text-3xl sm:text-5xl font-bold tracking-tight mb-3 text-white drop-shadow-[0_0_30px_rgba(34,197,94,0.15)]">
             Welcome to the War Room
           </h1>
@@ -205,7 +206,7 @@ export default function Home() {
             {homeTagline}
           </p>
           {leagueName && (
-            <p className="text-sm mt-5 text-muted/90">
+            <p className="text-sm mt-4 text-muted/90">
               <span className="text-foreground/90 font-medium">{leagueName}</span>
               {isCommish && leagueCode && (
                 <>
@@ -213,11 +214,17 @@ export default function Home() {
                   <span className="font-mono text-primary tracking-[0.2em]">
                     {leagueCode}
                   </span>
+                  <span className="text-muted text-xs ml-2">
+                    (invite code — share it)
+                  </span>
                 </>
               )}
             </p>
           )}
         </section>
+
+        {/* One job: pick / wait / score path — strengths stay below */}
+        <HomeWeekHero />
 
         <section className="mb-6">
           <HotTakeTicker variant="warroom" />
@@ -227,22 +234,10 @@ export default function Home() {
           <CrownAndShame />
         </section>
 
+        <p className="text-[10px] uppercase tracking-[0.18em] text-muted mb-3 font-semibold">
+          The rest of the room
+        </p>
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <Link
-            href="/picks"
-            className="group rounded-xl border border-border/80 bg-black/40 backdrop-blur-sm p-6 hover:border-primary/50 hover:bg-primary/5 transition shadow-[0_0_40px_rgba(0,0,0,0.35)]"
-          >
-            <div className="text-xs uppercase tracking-wider text-muted mb-2">
-              This week
-            </div>
-            <div className="text-lg font-semibold text-white group-hover:text-primary transition">
-              Make your picks
-            </div>
-            <p className="text-sm text-muted mt-2">
-              ATS · confidence · Best Bet · prop
-            </p>
-          </Link>
-
           <Link
             href="/standings"
             className="group rounded-xl border border-border/80 bg-black/40 backdrop-blur-sm p-6 hover:border-primary/50 hover:bg-primary/5 transition shadow-[0_0_40px_rgba(0,0,0,0.35)]"

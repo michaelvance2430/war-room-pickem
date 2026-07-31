@@ -63,6 +63,10 @@ export default function StandingsPage() {
           .sort(compareForSeed);
 
   const cutIndex = active !== "Overall" ? Math.floor(filtered.length / 2) : -1;
+  const anyScored = players.some(
+    (p) => p.totalPoints > 0 || (p.weeklyPoints?.length || 0) > 0
+  );
+  const preseason = players.length > 0 && !anyScored;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -72,12 +76,39 @@ export default function StandingsPage() {
         <div className="mb-6">
           <h1 className="text-2xl font-bold">Standings</h1>
           <p className="text-sm text-muted">
-            Live points • Bottom 50% of each division gets flushed • Swing labels
-            after each scored week
+            {preseason
+              ? "No weeks scored yet — everyone is tied at zero until the first card is locked and scored."
+              : "Live points · Bottom 50% of each division gets flushed · Swing labels after each scored week"}
           </p>
         </div>
 
-        <CrownAndShame className="mb-6" />
+        {preseason && (
+          <div className="mb-6 rounded-xl border border-primary/30 bg-primary/10 px-4 py-3">
+            <p className="text-xs font-bold uppercase tracking-wider text-primary mb-1">
+              Preseason board
+            </p>
+            <p className="text-sm text-foreground leading-relaxed">
+              This isn&apos;t broken — the season hasn&apos;t posted points yet.
+              Names, divisions, and hardware flair are live. Points and swing
+              labels light up after the commissioner scores week one.{" "}
+              <span className="text-muted">
+                Go lock picks when the card is published.
+              </span>
+            </p>
+          </div>
+        )}
+
+        {!preseason && <CrownAndShame className="mb-6" />}
+
+        {players.length === 0 && (
+          <div className="mb-6 rounded-xl border border-dashed border-border bg-card/50 px-4 py-8 text-center">
+            <p className="font-medium mb-1">Nobody on the board yet</p>
+            <p className="text-sm text-muted">
+              Share the league invite code. When friends join, they show up
+              here.
+            </p>
+          </div>
+        )}
 
         <div className="flex flex-wrap gap-2 mb-6">
           {divisions.map((d) => (

@@ -53,8 +53,15 @@ function rankByPoints(players: Player[], getPts: (p: Player) => number): Map<str
  * Swing labels from standings movement after the most recent scored week.
  * Climbed ranks → positive delta.
  */
-export function swingLabelFromDelta(delta: number | null): SwingLabel {
-  if (delta == null || delta === 0) {
+export function swingLabelFromDelta(
+  delta: number | null,
+  opts?: { preseason?: boolean }
+): SwingLabel {
+  // No scored weeks yet — don't fake "MID AS HELL" for everyone
+  if (opts?.preseason || delta === null) {
+    return { key: "preseason", text: "WAITING", tone: "flat", delta: 0 };
+  }
+  if (delta === 0) {
     return { key: "mid", text: "MID AS HELL", tone: "flat", delta: 0 };
   }
   if (delta >= 5) {
@@ -100,7 +107,10 @@ export function rankPlayersWithSwings(players: Player[]): RankedPlayer[] {
         0
       );
       let delta: number | null = null;
-      if (prevRank != null && weeksPlayed >= 2) {
+      const preseason = weeksPlayed === 0;
+      if (preseason) {
+        delta = null;
+      } else if (prevRank != null && weeksPlayed >= 2) {
         delta = prevRank - rank; // climbed = prev was worse (higher number)
       } else if (weeksPlayed === 1) {
         // First scored week: use last week pts vs field average for flavor labels
@@ -123,7 +133,7 @@ export function rankPlayersWithSwings(players: Player[]): RankedPlayer[] {
         ...p,
         rank,
         prevRank,
-        swing: swingLabelFromDelta(delta),
+        swing: swingLabelFromDelta(delta, { preseason }),
         lastWeekPts: lastWeekPts(p),
       };
     });

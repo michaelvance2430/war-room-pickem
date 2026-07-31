@@ -46,6 +46,7 @@ import {
 } from "@/lib/cloud";
 import { transferCommissioner } from "@/lib/trophies";
 import { recordCommissionerWeek } from "@/lib/commish-tenure";
+import CommishWeekChecklist from "@/components/CommishWeekChecklist";
 import {
   formatKickoff,
   formatCardDateRange,
@@ -1483,6 +1484,14 @@ export default function CommissionerPage() {
             </p>
           )}
         </div>
+
+        <CommishWeekChecklist
+          onGoTab={(t) => {
+            setTab(t);
+            if (t === "picks") void refreshPickStatus();
+            if (t === "results") void refreshPublishedProp(activeWeek);
+          }}
+        />
 
         <div className="flex flex-wrap gap-2 mb-6">
           {isOwner && (

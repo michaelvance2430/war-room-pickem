@@ -27,11 +27,13 @@ export default function SwingBadge({
         swing.tone
       )} ${className}`}
       title={
-        swing.delta > 0
-          ? `Climbed ${swing.delta} spot(s) after last week`
-          : swing.delta < 0
-            ? `Fell ${Math.abs(swing.delta)} spot(s) after last week`
-            : "No standings move"
+        swing.key === "preseason"
+          ? "No weeks scored yet"
+          : swing.delta > 0
+            ? `Climbed ${swing.delta} spot(s) after last week`
+            : swing.delta < 0
+              ? `Fell ${Math.abs(swing.delta)} spot(s) after last week`
+              : "No standings move"
       }
     >
       {swing.text}

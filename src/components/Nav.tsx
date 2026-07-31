@@ -19,6 +19,10 @@ type NavLink = {
   badge?: number;
 };
 
+/**
+ * Slim primary nav = what you need every week.
+ * Everything else lives under More (flavor intact, less overwhelm).
+ */
 export default function Nav() {
   const pathname = usePathname();
   const [isCommish, setIsCommish] = useState(false);
@@ -30,6 +34,7 @@ export default function Nav() {
   const [leagueName, setLeagueName] = useState("");
   const [unreadCount, setUnreadCount] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [crystalBallOn, setCrystalBallOn] = useState(true);
 
   useEffect(() => {
@@ -43,7 +48,6 @@ export default function Nav() {
     setLeagueName(league?.name || "");
     setCrystalBallOn(league?.settings?.crystalBallEnabled !== false);
 
-    // Roles appointed mid-session: refresh local flags for nav
     void refreshStaffSessionFlags().then(() => {
       const s = getSession();
       setIsCommish(!!s?.isCommissioner);
@@ -90,12 +94,11 @@ export default function Nav() {
     loadUnread();
   }, []);
 
-  // Close mobile menu on route change
   useEffect(() => {
     setMenuOpen(false);
+    setMoreOpen(false);
   }, [pathname]);
 
-  // Lock body scroll while menu is open
   useEffect(() => {
     if (!menuOpen) return;
     const prev = document.body.style.overflow;
@@ -105,26 +108,42 @@ export default function Nav() {
     };
   }, [menuOpen]);
 
-  // Close on Escape
   useEffect(() => {
-    if (!menuOpen) return;
+    if (!menuOpen && !moreOpen) return;
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setMenuOpen(false);
+      if (e.key === "Escape") {
+        setMenuOpen(false);
+        setMoreOpen(false);
+      }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [menuOpen]);
+  }, [menuOpen, moreOpen]);
 
-  const links: NavLink[] = [
+  // Primary: weekly habit loop
+  const primaryLinks: NavLink[] = [
     { href: "/picks", label: "My Picks" },
+    { href: "/standings", label: "Standings" },
+    { href: "/locker-room", label: "Locker" },
+    { href: "/gazette", label: "Gazette" },
+    ...(ops
+      ? [
+          {
+            href: "/commissioner",
+            label: isCommish ? "Commish" : "Ops",
+            className: "text-primary",
+          } as NavLink,
+        ]
+      : []),
+  ];
+
+  // More: flavor + depth (still all there)
+  const moreLinks: NavLink[] = [
     ...(crystalBallOn
       ? [{ href: "/crystal-ball", label: "Crystal Ball" }]
       : []),
-    { href: "/standings", label: "Standings" },
     { href: "/stats", label: "Stats" },
     { href: "/announcements", label: "News", badge: unreadCount },
-    { href: "/gazette", label: "Gazette" },
-    { href: "/locker-room", label: "Locker" },
     { href: "/players", label: "Players" },
     { href: "/rules", label: "Rules" },
     { href: "/championship", label: "Champ" },
@@ -138,33 +157,37 @@ export default function Nav() {
       label: "Trophies",
       className: "text-amber-300 hover:text-amber-200",
     },
-    ...(ops
-      ? [
-          {
-            href: "/commissioner",
-            label: isCommish ? "Commish" : "Ops",
-            className: "text-primary",
-          },
-        ]
-      : []),
     ...(staff
       ? [
           {
             href: "/moderation",
             label: "Mod",
             className: "text-amber-300 hover:text-amber-200",
-          },
+          } as NavLink,
         ]
       : []),
     { href: "/account", label: "Account" },
   ];
+
+  const allMobileLinks = [...primaryLinks, ...moreLinks];
+
+  const moreActive = moreLinks.some(
+    (l) => pathname === l.href || pathname.startsWith(l.href + "/")
+  );
+  const moreBadge = moreLinks.reduce((n, l) => n + (l.badge || 0), 0);
 
   function linkActive(href: string) {
     if (href === "/") return pathname === "/";
     return pathname === href || pathname.startsWith(href + "/");
   }
 
-  function UnreadBadge({ count, className = "" }: { count: number; className?: string }) {
+  function UnreadBadge({
+    count,
+    className = "",
+  }: {
+    count: number;
+    className?: string;
+  }) {
     if (count <= 0) return null;
     return (
       <span
@@ -172,6 +195,24 @@ export default function Nav() {
       >
         {count > 99 ? "99+" : count}
       </span>
+    );
+  }
+
+  function NavItem({ link }: { link: NavLink }) {
+    return (
+      <Link
+        href={link.href}
+        className={`hover:text-foreground transition relative whitespace-nowrap shrink-0 ${link.className || ""} ${
+          linkActive(link.href) ? "text-foreground font-medium" : ""
+        }`}
+      >
+        {link.label}
+        {link.badge != null && link.badge > 0 && (
+          <span className="absolute -top-2 -right-2.5 min-w-[16px] h-[16px] px-0.5 rounded-full bg-primary text-black text-[9px] font-bold flex items-center justify-center">
+            {link.badge > 99 ? "99+" : link.badge}
+          </span>
+        )}
+      </Link>
     );
   }
 
@@ -198,28 +239,63 @@ export default function Nav() {
             </div>
           </Link>
 
-          {/* Desktop tabs — scroll if needed so My Picks never gets crushed */}
-          <nav className="hidden md:flex flex-1 items-center justify-end gap-x-2.5 lg:gap-x-3 text-[13px] text-muted min-w-0 overflow-x-auto overflow-y-hidden py-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-            {links.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={`hover:text-foreground transition relative whitespace-nowrap shrink-0 ${link.className || ""} ${
-                  linkActive(link.href) ? "text-foreground font-medium" : ""
+          {/* Desktop: primary + More */}
+          <nav className="hidden md:flex flex-1 items-center justify-end gap-x-3 text-[13px] text-muted min-w-0">
+            {primaryLinks.map((link) => (
+              <NavItem key={link.href} link={link} />
+            ))}
+
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setMoreOpen((o) => !o)}
+                className={`hover:text-foreground transition whitespace-nowrap ${
+                  moreActive || moreOpen ? "text-foreground font-medium" : ""
                 }`}
+                aria-expanded={moreOpen}
+                aria-haspopup="true"
               >
-                {link.label}
-                {link.badge != null && link.badge > 0 && (
-                  <span className="absolute -top-2 -right-2.5 min-w-[16px] h-[16px] px-0.5 rounded-full bg-primary text-black text-[9px] font-bold flex items-center justify-center">
-                    {link.badge > 99 ? "99+" : link.badge}
+                More
+                {moreBadge > 0 && (
+                  <span className="ml-1 inline-flex min-w-[16px] h-[16px] px-0.5 rounded-full bg-primary text-black text-[9px] font-bold items-center justify-center align-middle">
+                    {moreBadge > 99 ? "99+" : moreBadge}
                   </span>
                 )}
-              </Link>
-            ))}
+                <span className="ml-0.5 text-[10px] opacity-70">▾</span>
+              </button>
+              {moreOpen && (
+                <>
+                  <button
+                    type="button"
+                    className="fixed inset-0 z-40 cursor-default"
+                    aria-label="Close more menu"
+                    onClick={() => setMoreOpen(false)}
+                  />
+                  <div className="absolute right-0 top-full mt-2 z-50 w-48 rounded-xl border border-border bg-card shadow-xl py-1">
+                    {moreLinks.map((link) => (
+                      <Link
+                        key={link.href}
+                        href={link.href}
+                        onClick={() => setMoreOpen(false)}
+                        className={`flex items-center justify-between px-3 py-2 text-sm hover:bg-card-hover transition ${
+                          linkActive(link.href)
+                            ? "text-foreground font-medium"
+                            : "text-muted"
+                        } ${link.className || ""}`}
+                      >
+                        <span>{link.label}</span>
+                        {link.badge != null && link.badge > 0 && (
+                          <UnreadBadge count={link.badge} />
+                        )}
+                      </Link>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           </nav>
 
-          {/* Profile + hamburger (mobile) */}
-          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+          <div className="flex items-center gap-1 sm:gap-2 shrink-0 ml-auto md:ml-2">
             <Link
               href={playerId ? `/profile/${playerId}` : "/account"}
               className="flex items-center gap-2 text-sm text-muted hover:text-foreground"
@@ -246,7 +322,6 @@ export default function Nav() {
               onClick={() => setMenuOpen((open) => !open)}
             >
               {menuOpen ? (
-                // X icon
                 <svg
                   width="22"
                   height="22"
@@ -260,7 +335,6 @@ export default function Nav() {
                   <path d="M18 6L6 18M6 6l12 12" />
                 </svg>
               ) : (
-                // Hamburger — 3 horizontal lines
                 <svg
                   width="22"
                   height="22"
@@ -283,7 +357,6 @@ export default function Nav() {
           </div>
         </div>
 
-        {/* Mobile menu panel */}
         {menuOpen && (
           <>
             <div
@@ -295,8 +368,11 @@ export default function Nav() {
               id="mobile-nav-menu"
               className="md:hidden absolute left-0 right-0 top-full z-50 border-b border-border bg-card shadow-xl max-h-[calc(100dvh-3.5rem)] overflow-y-auto"
             >
-              <ul className="py-2">
-                {links.map((link) => {
+              <p className="px-4 pt-3 pb-1 text-[10px] uppercase tracking-wider text-muted font-semibold">
+                This week
+              </p>
+              <ul className="pb-1">
+                {primaryLinks.map((link) => {
                   const active = linkActive(link.href);
                   return (
                     <li key={link.href}>
@@ -318,14 +394,38 @@ export default function Nav() {
                   );
                 })}
               </ul>
+              <p className="px-4 pt-2 pb-1 text-[10px] uppercase tracking-wider text-muted font-semibold border-t border-border">
+                More of the room
+              </p>
+              <ul className="py-1 pb-2">
+                {moreLinks.map((link) => {
+                  const active = linkActive(link.href);
+                  return (
+                    <li key={link.href}>
+                      <Link
+                        href={link.href}
+                        onClick={() => setMenuOpen(false)}
+                        className={`flex items-center justify-between gap-3 px-4 py-2.5 text-sm transition ${
+                          active
+                            ? "bg-card-hover text-foreground"
+                            : "text-muted hover:bg-card-hover hover:text-foreground"
+                        } ${link.className || ""}`}
+                      >
+                        <span className="font-medium">{link.label}</span>
+                        {link.badge != null && link.badge > 0 && (
+                          <UnreadBadge count={link.badge} />
+                        )}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
             </nav>
           </>
         )}
       </header>
       <RulesOnboardingModal />
-      {/* Trial: one-shot scored-week newspaper — kill via GAZETTE_ENABLED */}
       <GazetteModal />
-      {/* After Gazette: celebrate newly earned badges */}
       <BadgeUnlockModal />
     </>
   );
