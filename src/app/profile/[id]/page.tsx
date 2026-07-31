@@ -231,8 +231,11 @@ export default function ProfilePage() {
               <div className="flex flex-wrap items-center gap-2 mb-1">
                 <h1 className="text-2xl font-bold truncate">{player.name}</h1>
                 {player.isCreator && (
-                  <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border border-yellow-500 text-yellow-500">
-                    Creator
+                  <span
+                    className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border border-yellow-500 text-yellow-500"
+                    title="Built the app — not the same as league commissioner"
+                  >
+                    Game creator
                   </span>
                 )}
                 {mock && (

@@ -69,9 +69,9 @@ export const BADGE_CATALOG: BadgeDef[] = [
     id: "the_commissioner",
     name: "The Commissioner",
     description:
-      "Created the War Room. Writes the rules. Still might fade your lock. Career points only — does not pad season cheevos or Cheevo King.",
+      "Built War Room Pick'Em — the game. Not your league commish role. Career points only; never pads season cheevos or Cheevo King.",
     howToEarn:
-      "You can't. Only the person who built this app gets the crown. Peasants stay grey — go earn something you can actually unlock.",
+      "You can't. Starting a league makes you commissioner of that league — cute. This crown is for the person who built the app. Peasants stay grey.",
     lockedLabel: "Hard locked — peasants don't get this one",
     tier: "legendary",
     points: 250,
@@ -362,13 +362,9 @@ function evaluateBadge(badgeId: string, player: Player): EvalResult {
 
   switch (badgeId) {
     case "the_commissioner":
-      // App creator — every league, not "commissioner of this league"
-      return {
-        earned:
-          isAppCreator(player.id) ||
-          !!player.isCreator ||
-          hasPermanentBadge(player, CREATOR_BADGE_ID),
-      };
+      // GAME creator only (fixed user ids). League commissioner / league
+      // creator NEVER earns this — they just get the Commish tools.
+      return { earned: isAppCreator(player.id) };
 
     case "war_room_legend":
       // Manual / season-end award for now
