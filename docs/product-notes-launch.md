@@ -83,6 +83,14 @@ This is non-negotiable product DNA across every sport pack.
 
 ---
 
+## Locker reactions (dev)
+
+- React on messages with emoji (😂 🔥 😭 😤 💀 🤬 👏 👀 🤡 🫡) without a full reply.
+- SQL: `supabase/locker-reactions.sql`
+- Toggle on/off; muted users can’t react.
+
+---
+
 ## Out of scope until explicitly pulled in
 
 - Multi-sport packs (see `docs/MULTI_SPORT.md`)  
