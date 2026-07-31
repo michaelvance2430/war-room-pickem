@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { loadLeaguePlayers } from "@/lib/cloud";
 import {
   GAZETTE_ENABLED,
@@ -11,10 +10,11 @@ import {
 } from "@/lib/gazette";
 import { notifyGazetteDone } from "@/lib/badge-celebration";
 import { hasSeenRules } from "@/lib/rules";
+import GazettePaper from "@/components/GazettePaper";
 
 /**
  * One-shot "newspaper cover" after a week is scored.
- * Trial feature — disable via GAZETTE_ENABLED or remove this component.
+ * Big, shareable, phone-first — then badge unlocks can fire.
  */
 export default function GazetteModal() {
   const [edition, setEdition] = useState<GazetteEdition | null>(null);
@@ -27,18 +27,13 @@ export default function GazetteModal() {
     let cancelled = false;
 
     async function tryShow() {
-      // Wait for rules modal to be done (or never needed)
-      if (!hasSeenRules()) {
-        // Re-check after rules might be dismissed
-        return;
-      }
+      if (!hasSeenRules()) return;
 
       try {
         const players = await loadLeaguePlayers();
         if (cancelled) return;
         const offer = await shouldOfferGazette(players);
         if (!offer.show) {
-          // No paper this week → free the queue for badge celebrations
           notifyGazetteDone();
           return;
         }
@@ -50,12 +45,10 @@ export default function GazetteModal() {
       }
     }
 
-    // Delay so rules paints first if needed; also re-try so post-rules works
     const t1 = setTimeout(() => void tryShow(), 700);
     const t2 = setTimeout(() => void tryShow(), 2500);
     const t3 = setTimeout(() => void tryShow(), 5000);
 
-    // When rules marked seen in another tab/component, try again
     function onStorage(e: StorageEvent) {
       if (e.key?.includes("warroom-rules") || e.key?.includes("gazette")) {
         void tryShow();
@@ -72,7 +65,6 @@ export default function GazetteModal() {
     };
   }, []);
 
-  // Poll briefly until rules seen (same session dismiss)
   useEffect(() => {
     if (!GAZETTE_ENABLED || open) return;
     const id = setInterval(() => {
@@ -105,7 +97,6 @@ export default function GazetteModal() {
       markGazetteSeen(leagueId, edition.weekIndex);
     }
     setOpen(false);
-    // Next in the login queue: achievement unlocks
     notifyGazetteDone();
   }
 
@@ -120,138 +111,20 @@ export default function GazetteModal() {
     >
       <button
         type="button"
-        className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/85 backdrop-blur-sm"
         aria-label="Close gazette"
         onClick={dismiss}
       />
 
-      <div className="relative w-full sm:max-w-md max-h-[92vh] overflow-y-auto rounded-t-2xl sm:rounded-sm border-2 border-stone-600 bg-[#f4f0e6] text-stone-900 shadow-2xl">
-        {/* Masthead */}
-        <div className="border-b-4 border-double border-stone-900 px-5 pt-5 pb-3 text-center">
-          <p className="text-[10px] uppercase tracking-[0.35em] text-stone-600 mb-1">
-            Extra · Extra
-          </p>
-          <h2
-            id="gazette-title"
-            className="font-serif text-2xl sm:text-3xl font-black tracking-tight text-stone-950"
-          >
-            {edition.masthead}
-          </h2>
-          <p className="text-[11px] uppercase tracking-widest text-stone-600 mt-2 border-t border-b border-stone-400 py-1">
-            {edition.volumeLabel}
-          </p>
-        </div>
-
-        <div className="px-5 py-4 space-y-4">
-          {/* A1 — this week's killer card (single name even if others matched weekly pts) */}
-          <article>
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-800 mb-1">
-              ★ This week&apos;s card
-            </p>
-            <h3 className="font-serif text-xl sm:text-2xl font-black leading-tight text-stone-950">
-              {edition.crown.headline}
-            </h3>
-            <p className="text-sm text-stone-700 mt-2 leading-snug">
-              {edition.crown.deck}
-            </p>
-            <p className="text-xs text-stone-500 mt-2 font-medium">
-              {edition.crown.names[0]} · {edition.crown.pts} pts this week ·{" "}
-              {edition.weekLabel}
-            </p>
-          </article>
-
-          {/* Overall #1 standings multi-way only — not weekly score ties */}
-          {edition.standingsDeadlock && (
-            <article className="border-t border-stone-400 pt-4">
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-amber-900 mb-1">
-                ★ Season standings · Who pulls ahead?
-              </p>
-              <h3 className="font-serif text-lg sm:text-xl font-black leading-snug text-stone-950">
-                {edition.standingsDeadlock.headline}
-              </h3>
-              <p className="text-sm text-stone-700 mt-1.5 leading-snug">
-                {edition.standingsDeadlock.deck}
-              </p>
-              <p className="text-xs text-stone-500 mt-2 font-medium">
-                {edition.standingsDeadlock.names.join(" · ")} ·{" "}
-                {edition.standingsDeadlock.pts} pts overall (tied for #1)
-              </p>
-            </article>
-          )}
-
-          {edition.shame && (
-            <article className="border-t border-stone-400 pt-4">
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-purple-900 mb-1">
-                🚽 Also in this edition
-              </p>
-              <h3 className="font-serif text-lg font-bold leading-snug text-stone-900">
-                {edition.shame.headline}
-              </h3>
-              <p className="text-sm text-stone-700 mt-1.5 leading-snug">
-                {edition.shame.deck}
-              </p>
-              <p className="text-xs text-stone-500 mt-2 font-medium">
-                {edition.shame.names[0]} · {edition.shame.pts} pts this week
-              </p>
-            </article>
-          )}
-
-          {edition.noLock && (
-            <article className="border-t-2 border-dashed border-stone-500 pt-4 bg-amber-50/80 -mx-2 px-2 py-3 rounded">
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-amber-900 mb-1">
-                🥛 Missing persons · No lock
-              </p>
-              <h3 className="font-serif text-lg sm:text-xl font-black leading-snug text-stone-950">
-                {edition.noLock.headline}
-              </h3>
-              <p className="text-sm text-stone-700 mt-1.5 leading-snug">
-                {edition.noLock.deck}
-              </p>
-              <p className="text-xs text-stone-600 mt-2 font-medium">
-                {edition.noLock.names.join(" · ")} · 0 pts · never locked
-              </p>
-            </article>
-          )}
-
-          {edition.crystalBallMiss && (
-            <article className="border-t-2 border-dashed border-indigo-400 pt-4 bg-indigo-50/90 -mx-2 px-2 py-3 rounded">
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-indigo-900 mb-1">
-                🔮 Crystal Ball · No pick
-              </p>
-              <h3 className="font-serif text-lg sm:text-xl font-black leading-snug text-stone-950">
-                {edition.crystalBallMiss.headline}
-              </h3>
-              <p className="text-sm text-stone-700 mt-1.5 leading-snug">
-                {edition.crystalBallMiss.deck}
-              </p>
-              <p className="text-xs text-stone-600 mt-2 font-medium">
-                {edition.crystalBallMiss.names.join(" · ")} · blank orb · no
-                Witch/Wizard shot
-              </p>
-            </article>
-          )}
-
-          <p className="text-[10px] text-stone-500 text-center italic pt-1">
-            You only see this once per scored week. Rules live under Rules anytime.
-          </p>
-        </div>
-
-        <div className="px-5 pb-5 flex flex-col sm:flex-row gap-2">
-          <button
-            type="button"
-            onClick={dismiss}
-            className="flex-1 py-2.5 rounded-lg bg-stone-900 text-[#f4f0e6] text-sm font-semibold hover:bg-stone-800"
-          >
-            Got it
-          </button>
-          <Link
-            href="/standings"
-            onClick={dismiss}
-            className="flex-1 py-2.5 rounded-lg border-2 border-stone-900 text-stone-900 text-sm font-semibold text-center hover:bg-stone-200"
-          >
-            See standings
-          </Link>
-        </div>
+      <div className="relative w-full sm:max-w-lg max-h-[94vh] overflow-y-auto overscroll-contain">
+        <span id="gazette-title" className="sr-only">
+          {edition.masthead}
+        </span>
+        <GazettePaper
+          edition={edition}
+          variant="modal"
+          onDismiss={dismiss}
+        />
       </div>
     </div>
   );

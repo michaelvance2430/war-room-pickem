@@ -1,9 +1,13 @@
 import type { Player } from "./types";
-import { weekCrownAndShame, type CrownShame } from "./fun-board";
+import {
+  rankPlayersWithSwings,
+  weekCrownAndShame,
+} from "./fun-board";
 import { weekTitle } from "./dates";
-import { getSession } from "./league";
+import { getSession, getLeague } from "./league";
 import { hasSeenRules } from "./rules";
 import { createClient } from "@/lib/supabase/client";
+import { defaultSeasonYear } from "./trophies";
 
 const SEEN_PREFIX = "warroom-gazette-seen-v1";
 
@@ -43,8 +47,20 @@ export type GazetteEdition = {
    * Mild shit-talk — forgot the national champ pick.
    */
   crystalBallMiss: GazetteStory | null;
+  /** Biggest standings mover this week (climb or freefall). */
+  swing: GazetteStory | null;
   samePerson: boolean;
   masthead: string;
+  /** Under the masthead — one-line sizzle */
+  tagline: string;
+  /** “Printed” date line for newspaper feel */
+  printedLine: string;
+  /** Fake weather / league forecast box */
+  weather: { kicker: string; body: string };
+  /** Classified ads — short roasts */
+  classifieds: string[];
+  /** Pull quote for layout drama */
+  pullQuote: { text: string; by: string };
 };
 
 function storageKey(leagueId: string, weekIndex: number): string {
@@ -545,19 +561,285 @@ export async function buildGazetteEdition(
     }
   }
 
+  // Biggest climber / freefall for the paper's "Movers" box
+  let swing: GazetteStory | null = null;
+  try {
+    const ranked = rankPlayersWithSwings(players).filter((p) => !p.isMock);
+    const movers = ranked.filter(
+      (p) =>
+        p.swing.tone === "hero" ||
+        p.swing.tone === "up" ||
+        p.swing.tone === "shame" ||
+        p.swing.tone === "down"
+    );
+    if (movers.length) {
+      movers.sort(
+        (a, b) => Math.abs(b.swing.delta) - Math.abs(a.swing.delta)
+      );
+      const star = movers[0];
+      const up = star.swing.delta > 0;
+      swing = {
+        names: [star.name],
+        pts: star.lastWeekPts ?? star.totalPoints,
+        kind: "clear",
+        headline: up
+          ? byWeek(SWING_UP_HEADLINES, weekIndex)(
+              star.name,
+              star.swing.delta,
+              star.swing.text
+            )
+          : byWeek(SWING_DOWN_HEADLINES, weekIndex)(
+              star.name,
+              Math.abs(star.swing.delta),
+              star.swing.text
+            ),
+        deck: up
+          ? byWeek(SWING_UP_DECKS, weekIndex)(
+              star.swing.delta,
+              star.rank,
+              star.swing.text
+            )
+          : byWeek(SWING_DOWN_DECKS, weekIndex)(
+              Math.abs(star.swing.delta),
+              star.rank,
+              star.swing.text
+            ),
+      };
+    }
+  } catch {
+    swing = null;
+  }
+
+  const leagueName = getLeague()?.name || "War Room";
+  const year = defaultSeasonYear();
+  const tagline = byWeek(EDITION_TAGLINES, weekIndex);
+  const weather = byWeek(WEATHER_BOXES, weekIndex, 2);
+  const classifieds = [
+    byWeek(CLASSIFIEDS_A, weekIndex, 0),
+    byWeek(CLASSIFIEDS_B, weekIndex, 1),
+    byWeek(CLASSIFIEDS_C, weekIndex, 2),
+  ].map((fn) =>
+    fn({
+      crown: cn,
+      shame: sn,
+      league: leagueName,
+      pts: cp,
+    })
+  );
+  const pullQuote = byWeek(PULL_QUOTES, weekIndex, 4)({
+    crown: cn,
+    shame: sn,
+    pts: cp,
+  });
+
+  const printedLine = `${weekLabel.toUpperCase()} EDITION · ${year} SEASON · ${leagueName.toUpperCase()} · NOT FIT FOR FRAMING (BUT YOU WILL)`;
+
   return {
     weekIndex,
     weekLabel,
-    volumeLabel: `Vol. ${weekIndex} · ${weekLabel}`,
+    volumeLabel: `Vol. ${weekIndex + 1} · ${weekLabel} · ${year}`,
     masthead: "THE WAR ROOM GAZETTE",
+    tagline,
+    printedLine,
+    weather,
+    classifieds,
+    pullQuote,
     samePerson: data.samePerson,
     crown,
     shame,
     standingsDeadlock,
     noLock,
     crystalBallMiss,
+    swing,
   };
 }
+
+/** One-tap share / paste into the group chat. */
+export function formatGazetteShareText(edition: GazetteEdition): string {
+  const lines = [
+    `📰 ${edition.masthead}`,
+    edition.volumeLabel,
+    edition.tagline,
+    "",
+    `★ ${edition.crown.headline}`,
+    edition.crown.deck,
+    "",
+  ];
+  if (edition.shame) {
+    lines.push(`🚽 ${edition.shame.headline}`, edition.shame.deck, "");
+  }
+  if (edition.swing) {
+    lines.push(`📈 ${edition.swing.headline}`, edition.swing.deck, "");
+  }
+  if (edition.noLock) {
+    lines.push(`🥛 ${edition.noLock.headline}`, edition.noLock.deck, "");
+  }
+  if (edition.standingsDeadlock) {
+    lines.push(
+      `⚖️ ${edition.standingsDeadlock.headline}`,
+      edition.standingsDeadlock.deck,
+      ""
+    );
+  }
+  lines.push(`— ${edition.pullQuote.text}`, `   — ${edition.pullQuote.by}`);
+  lines.push("", "War Room Pick'Em · don't ghost next week");
+  return lines.filter((l) => l != null).join("\n");
+}
+
+// ——— Extra flavor banks (week-keyed) ———
+
+const EDITION_TAGLINES: string[] = [
+  "All the news that's fit to roast",
+  "Printed in ink, sealed in shame",
+  "If you're reading this, you locked. Probably.",
+  "Special late edition: feelings were hurt",
+  "Confidence died so this paper could live",
+  "Not responsible for group-chat violence",
+  "Free with every scored week · tips optional",
+  "Est. whenever you started caring too much",
+  "The only paper that covers the spread",
+  "Breaking: somebody was right. Most of you weren't.",
+  "Hold for applause · then hold for the Toilet Bowl",
+  "Weather inside: 100% chance of trash talk",
+  "Your name may appear. Lawyer up or lean in.",
+  "Brought to you by Best Bets and bad ideas",
+  "Extra! Extra! Read all about… yourself",
+  "Subscription: one lock per week, forever",
+  "We report. You cope.",
+  "Official publication of the cut line",
+];
+
+const WEATHER_BOXES: { kicker: string; body: string }[] = [
+  {
+    kicker: "War Room weather",
+    body: "High: confidence. Low: dignity. Wind: from the Toilet Bowl. Pack a paper bag.",
+  },
+  {
+    kicker: "Forecast",
+    body: "Scattered Best Bets, late shame, 80% chance someone says “I almost had it.”",
+  },
+  {
+    kicker: "Conditions",
+    body: "Fog of spreads. Brief sun if you hit the prop. Overnight: group chat storms.",
+  },
+  {
+    kicker: "Advisory",
+    body: "Heat advisory for the crown. Freeze warning for anyone who didn't lock.",
+  },
+  {
+    kicker: "Local radar",
+    body: "Storm cells forming over the cut line. Seek shelter in better dogs.",
+  },
+  {
+    kicker: "Extended outlook",
+    body: "Next week: more football, more opinions, same people who “know ball.”",
+  },
+];
+
+type ClassCtx = { crown: string; shame: string; league: string; pts: number };
+
+const CLASSIFIEDS_A: ((c: ClassCtx) => string)[] = [
+  (c) =>
+    `FOR SALE: One (1) strategy. Barely used by ${c.shame}. Make offer in Locker.`,
+  (c) =>
+    `WANTED: Dignity. Last seen near ${c.shame}'s card. Reward: nothing, but respect.`,
+  (c) =>
+    `LOST: A lock button. If found, return to ${c.shame} before next kickoff.`,
+  (c) =>
+    `HELP WANTED: Underdog. Must cover. Apply to everyone who faded ${c.crown}.`,
+];
+
+const CLASSIFIEDS_B: ((c: ClassCtx) => string)[] = [
+  (c) =>
+    `PERSONALS: ${c.crown} seeks worthy rival. Must survive ${c.pts}-pt weeks.`,
+  (c) =>
+    `SERVICES: Confidence assigned randomly. Results may vary (${c.shame} can confirm).`,
+  (c) =>
+    `NOTICE: ${c.league} reminds all members that “almost” is not a score.`,
+  (c) =>
+    `YARD SALE: Old excuses. Free to ${c.shame}. Bring your own alibi.`,
+];
+
+const CLASSIFIEDS_C: ((c: ClassCtx) => string)[] = [
+  (c) =>
+    `LEGAL: Spreads are not financial advice. Neither is listening to ${c.shame}.`,
+  (c) =>
+    `EVENTS: Mandatory coping session after ${c.crown}'s ${c.pts}. BYO snacks.`,
+  (c) =>
+    `REAL ESTATE: One open seat in the Toilet Bowl. Tour with ${c.shame}.`,
+  (c) =>
+    `PETS: Found — one lucky dog. Owner: ${c.crown}. Collar says “I told you so.”`,
+];
+
+const PULL_QUOTES: ((c: {
+  crown: string;
+  shame: string;
+  pts: number;
+}) => { text: string; by: string })[] = [
+  (c) => ({
+    text: `"I knew it the whole time."`,
+    by: `${c.crown}, probably lying a little`,
+  }),
+  (c) => ({
+    text: `"The process is fine."`,
+    by: `${c.shame}, after ${c.pts > 0 ? "a long week" : "zero"}`,
+  }),
+  (c) => ({
+    text: `"It's a marathon."`,
+    by: `Someone who just lost a sprint to ${c.crown}`,
+  }),
+  (c) => ({
+    text: `"Trust the card."`,
+    by: `Ancient War Room proverb (contested)`,
+  }),
+  (c) => ({
+    text: `"We're still early."`,
+    by: `The cut line, sharpening its knife`,
+  }),
+  (c) => ({
+    text: `"No notes."`,
+    by: `${c.crown}, with ${c.pts} notes`,
+  }),
+];
+
+type SwingHN = (name: string, spots: number, label: string) => string;
+type SwingDK = (spots: number, rank: number, label: string) => string;
+
+const SWING_UP_HEADLINES: SwingHN[] = [
+  (n, s, lab) =>
+    `${n.toUpperCase()} ${lab} — UP ${s} SPOT${s === 1 ? "" : "S"} IN THE TABLE`,
+  (n, s) =>
+    `MOVERS: ${n.toUpperCase()} CLIMBS ${s} — STANDINGS JUST GOT LOUDER`,
+  (n, s, lab) =>
+    `${n.toUpperCase()} GOES ${lab} (+${s}) — CHASE PACK NERVOUS`,
+];
+
+const SWING_UP_DECKS: SwingDK[] = [
+  (s, rank, lab) =>
+    `${lab}. Climbed ${s} spot${s === 1 ? "" : "s"} to #${rank}. Elevators exist; this was a rocket.`,
+  (s, rank) =>
+    `+${s} in the rankings, now sitting ${rank === 1 ? "alone at the top" : `at #${rank}`}. Momentum is a drug.`,
+  (s, rank) =>
+    `Jumped ${s}. Current rank: #${rank}. The people below are “happy for them.”`,
+];
+
+const SWING_DOWN_HEADLINES: SwingHN[] = [
+  (n, s, lab) =>
+    `${n.toUpperCase()} ${lab} — DOWN ${s} IN THE STANDINGS`,
+  (n, s) =>
+    `TRAPDOOR OPENS: ${n.toUpperCase()} FALLS ${s} SPOT${s === 1 ? "" : "S"}`,
+  (n, s, lab) =>
+    `MOVERS (THE BAD KIND): ${n.toUpperCase()} ${lab} (−${s})`,
+];
+
+const SWING_DOWN_DECKS: SwingDK[] = [
+  (s, rank, lab) =>
+    `${lab}. Dropped ${s} to #${rank}. Gravity remains undefeated.`,
+  (s, rank) =>
+    `−${s} on the board. Now #${rank}. Bring a helmet next week.`,
+  (s, rank) =>
+    `Fell ${s} spots (now #${rank}). The cut line sent a “thinking of you” card.`,
+];
 
 /**
  * Should we show the gazette now?
@@ -715,4 +997,4 @@ export async function snapshotGazetteAfterScore(
   }
 }
 
-export type { CrownShame };
+export type { CrownShame } from "./fun-board";
