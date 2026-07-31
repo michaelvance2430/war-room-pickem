@@ -1,9 +1,12 @@
 /**
  * Prior-season trophy → permanent War Room Legend + career cheevo bank.
  *
- * 2025 winners:
- *  - Andy / Andrew Visconti → Championship → War Room Legend (+200 career)
- *  - Bill ball Ben → Village Nerd → War Room Legend (+200 career)
+ * Confirmed:
+ *  - Bill ball Ben → Village Nerd (Crystal Ball) → War Room Legend (+200 career)
+ *
+ * NOT a legend (revoked if present):
+ *  - Andrew Visconti / Andy — no engraved trophy; remove mistaken grant
+ *  - Kahmann — earlier mistaken champ grant
  */
 
 import {
@@ -24,23 +27,21 @@ type LegacyBadgeGrant = {
 
 export const LEGACY_BADGE_GRANTS: LegacyBadgeGrant[] = [
   {
-    pattern: /\bandy\b|\bandrew\s+visconti\b|\bvisconti\b/i,
-    badgeId: WAR_ROOM_LEGEND_ID,
-    reason: "2025 Championship — War Room Legend",
-  },
-  {
     pattern: /\bbill\s*ball\s*ben\b|\bbillballben\b/i,
     badgeId: WAR_ROOM_LEGEND_ID,
     reason: "2025 Village Nerd — War Room Legend",
   },
 ];
 
-/** Wrongly granted when we thought Kahmann was champ */
-const MISTAKEN_LEGEND_PATTERN = /\bkahmann\b/i;
+/** Names that should never hold a seeded War Room Legend */
+const REVOKE_LEGEND_PATTERNS: RegExp[] = [
+  /\bkahmann\b/i,
+  /\bandy\b|\bandrew\s+visconti\b|\bvisconti\b/i,
+];
 
 /**
  * Grant permanent badges for legacy winners and bank career points once.
- * Safe to call on every profile load.
+ * Safe to call on every profile load. Also strips mistaken legends.
  */
 export function applyLegacyBadgeGrants(player: {
   id: string;
@@ -51,10 +52,13 @@ export function applyLegacyBadgeGrants(player: {
   const known = new Set(getPermanentBadgeIds(player.id));
   const pts = getBadgeDef(WAR_ROOM_LEGEND_ID)?.points ?? 200;
 
-  // Strip mistaken Kahmann legend if present
+  // Strip mistaken legends (Andy/Visconti, Kahmann, etc.)
+  const isConfirmedLegend = LEGACY_BADGE_GRANTS.some((g) =>
+    g.pattern.test(player.name)
+  );
   if (
-    MISTAKEN_LEGEND_PATTERN.test(player.name) &&
-    !LEGACY_BADGE_GRANTS.some((g) => g.pattern.test(player.name))
+    !isConfirmedLegend &&
+    REVOKE_LEGEND_PATTERNS.some((p) => p.test(player.name))
   ) {
     if (known.has(WAR_ROOM_LEGEND_ID)) {
       revokePermanentBadgeId(player.id, WAR_ROOM_LEGEND_ID);

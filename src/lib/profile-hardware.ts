@@ -59,17 +59,11 @@ function namesMatch(a: string, b: string) {
  * Matched by display name so it shows even before engraver links a user id.
  * Last CFB season relative to mid-2026 = 2025.
  */
+/**
+ * Only seed hardware we can confirm. Andrew Visconti / Andy is NOT a champ —
+ * no empty trophy case, no Legend badge.
+ */
 export const LEGACY_PROFILE_HARDWARE: Omit<ProfileTrophy, "source">[] = [
-  {
-    id: "legacy-andy-championship-2025",
-    kind: "championship",
-    seasonYear: 2025,
-    title: "Championship",
-    subtitle: "War Room Champion",
-    notes: "Last season's big one. The board still remembers.",
-    // Standings: Andrew Visconti / Andy
-    winnerName: "Andrew Visconti",
-  },
   {
     id: "legacy-bill-ball-ben-nerd-2025",
     kind: "crystal_ball",
@@ -84,10 +78,6 @@ export const LEGACY_PROFILE_HARDWARE: Omit<ProfileTrophy, "source">[] = [
 
 /** Also match these name aliases → legacy id */
 const LEGACY_NAME_ALIASES: { pattern: RegExp; legacyId: string }[] = [
-  {
-    pattern: /\bandy\b|\bandrew\s+visconti\b|\bvisconti\b/i,
-    legacyId: "legacy-andy-championship-2025",
-  },
   {
     pattern: /\bbill\s*ball\s*ben\b|\bbillballben\b/i,
     legacyId: "legacy-bill-ball-ben-nerd-2025",
