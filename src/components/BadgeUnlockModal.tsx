@@ -147,6 +147,16 @@ export default function BadgeUnlockModal() {
           >
             +{current.def.points} achievement pts
           </p>
+          {(current.earnedSeasonYear != null ||
+            current.earnedWeek != null) && (
+            <p className="text-xs text-muted mt-2 font-medium">
+              {current.earnedSeasonYear != null && current.earnedWeek != null
+                ? `${current.earnedSeasonYear} · Week ${current.earnedWeek}`
+                : current.earnedSeasonYear != null
+                  ? `${current.earnedSeasonYear}`
+                  : `Week ${current.earnedWeek}`}
+            </p>
+          )}
         </div>
 
         <div className="px-5 py-4 border-t border-border flex flex-col sm:flex-row gap-2">

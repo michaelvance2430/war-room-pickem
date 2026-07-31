@@ -46,7 +46,12 @@ export interface BadgeDef {
 export interface BadgeStatus {
   def: BadgeDef;
   earned: boolean;
+  /** ISO first-seen stamp (optional) */
   earnedAt?: string | null;
+  /** CFB season year when first earned (e.g. 2026) */
+  earnedSeasonYear?: number | null;
+  /** League week when first earned (0–18), if known */
+  earnedWeek?: number | null;
   progress?: { current: number; target: number } | null;
 }
 

@@ -238,7 +238,11 @@ function BadgeDetailModal({
             </div>
             {earned ? (
               <div className="font-medium" style={{ color: hex }}>
-                Earned
+                {status.earnedSeasonYear != null
+                  ? status.earnedWeek != null && status.earnedWeek >= 0
+                    ? `Earned · ${status.earnedSeasonYear} · Week ${status.earnedWeek}`
+                    : `Earned · ${status.earnedSeasonYear}`
+                  : "Earned"}
               </div>
             ) : lockedText ? (
               <div className="font-medium text-warning">{lockedText}</div>

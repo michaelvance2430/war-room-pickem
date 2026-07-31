@@ -18,6 +18,7 @@ import {
 } from "./permanent-badges";
 import { applyLegacyBadgeGrants, WAR_ROOM_LEGEND_ID } from "./legacy-badge-grants";
 import { hasEngagement } from "./engagement";
+import { getBadgeEarnMeta, stampBadgeEarn } from "./badge-earn-meta";
 
 /** Permanent rare: most achievement points in the league */
 export const CHEEVO_KING_ID = "cheevo_king";
@@ -1379,10 +1380,29 @@ export function getPlayerBadges(
       const result = evaluateBadge(def.id, p, peers);
       const permanent = hasPermanentBadge(p, def.id);
       const earned = result.earned || permanent;
+      let earnedSeasonYear: number | null = null;
+      let earnedWeek: number | null = null;
+      let earnedAt: string | null = null;
+      if (earned) {
+        try {
+          // Stamp season year + week the first time we see this cheevo earned
+          const meta =
+            getBadgeEarnMeta(p.id, def.id) || stampBadgeEarn(p.id, def.id);
+          if (meta) {
+            earnedSeasonYear = meta.seasonYear;
+            earnedWeek = meta.week;
+            earnedAt = meta.at;
+          }
+        } catch {
+          /* ignore stamp failures */
+        }
+      }
       return {
         def,
         earned,
-        earnedAt: earned ? p.memberSince ?? null : null,
+        earnedAt,
+        earnedSeasonYear,
+        earnedWeek,
         progress: earned ? null : result.progress ?? null,
       };
     } catch {
@@ -1390,6 +1410,8 @@ export function getPlayerBadges(
         def,
         earned: hasPermanentBadge(p, def.id),
         earnedAt: null,
+        earnedSeasonYear: null,
+        earnedWeek: null,
         progress: null,
       };
     }
