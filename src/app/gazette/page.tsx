@@ -83,6 +83,22 @@ function EditionCard({
             </p>
           </div>
         )}
+        {edition.noLock && (
+          <div className="border-t-2 border-dashed border-stone-500 pt-3 mt-1">
+            <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-amber-900 mb-1">
+              🥛 Missing persons · No lock
+            </p>
+            <h3 className="font-serif text-base font-black leading-snug">
+              {edition.noLock.headline}
+            </h3>
+            <p className="text-sm text-stone-700 mt-1 leading-snug">
+              {edition.noLock.deck}
+            </p>
+            <p className="text-xs text-stone-600 mt-1.5 font-medium">
+              {edition.noLock.names?.join(" · ")} · 0 pts · never locked
+            </p>
+          </div>
+        )}
       </div>
     </article>
   );

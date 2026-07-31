@@ -36,7 +36,7 @@ export default function GazetteModal() {
       try {
         const players = await loadLeaguePlayers();
         if (cancelled) return;
-        const offer = shouldOfferGazette(players);
+        const offer = await shouldOfferGazette(players);
         if (!offer.show) {
           // No paper this week → free the queue for badge celebrations
           notifyGazetteDone();
@@ -80,7 +80,7 @@ export default function GazetteModal() {
       void (async () => {
         try {
           const players = await loadLeaguePlayers();
-          const offer = shouldOfferGazette(players);
+          const offer = await shouldOfferGazette(players);
           if (offer.show) {
             setEdition(offer.edition);
             setLeagueId(offer.leagueId);
@@ -192,6 +192,23 @@ export default function GazetteModal() {
               </p>
               <p className="text-xs text-stone-500 mt-2 font-medium">
                 {edition.shame.names[0]} · {edition.shame.pts} pts this week
+              </p>
+            </article>
+          )}
+
+          {edition.noLock && (
+            <article className="border-t-2 border-dashed border-stone-500 pt-4 bg-amber-50/80 -mx-2 px-2 py-3 rounded">
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-amber-900 mb-1">
+                🥛 Missing persons · No lock
+              </p>
+              <h3 className="font-serif text-lg sm:text-xl font-black leading-snug text-stone-950">
+                {edition.noLock.headline}
+              </h3>
+              <p className="text-sm text-stone-700 mt-1.5 leading-snug">
+                {edition.noLock.deck}
+              </p>
+              <p className="text-xs text-stone-600 mt-2 font-medium">
+                {edition.noLock.names.join(" · ")} · 0 pts · never locked
               </p>
             </article>
           )}

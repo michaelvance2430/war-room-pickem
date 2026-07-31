@@ -33,6 +33,11 @@ export type GazetteEdition = {
    * Not used for same weekly score.
    */
   standingsDeadlock: GazetteStory | null;
+  /**
+   * Players who never locked a full card (0 by ghosting).
+   * Milk-carton missing-person energy.
+   */
+  noLock: GazetteStory | null;
   samePerson: boolean;
   masthead: string;
 };
@@ -295,6 +300,79 @@ export const STANDINGS_TIE_DECKS: TieDK[] = [
     `${count} players, zero separation, ${pts} season points. Who will pull ahead?`,
 ];
 
+/** Forgot to lock — milk carton / missing-person energy (rotates by week). */
+export const NO_LOCK_HEADLINES: ((names: string) => string)[] = [
+  (n) => `MISSING: HAVE YOU SEEN ${n.toUpperCase()}? CHECK THE MILK CARTON`,
+  (n) => `ALERT: ${n.toUpperCase()} NEVER LOCKED — SIDE OF A GALLON ENERGY`,
+  (n) => `WAR ROOM AMBER ALERT: ${n.toUpperCase()} GHOSTED THE CARD`,
+  (n) => `SOMEONE CHECK THE DAIRY AISLE FOR ${n.toUpperCase()}`,
+  (n) => `${n.toUpperCase()} WENT 0 THE COWARDLY WAY — NO LOCK, NO DIGNITY`,
+  (n) => `BREAKING: ${n.toUpperCase()} LEFT THE PICKS ON READ`,
+  (n) => `HAVE YOU SEEN THIS PLAYER? ${n.toUpperCase()} LAST SPOTTED PRE-KICKOFF`,
+  (n) => `MILK CARTON MONDAY: ${n.toUpperCase()} DID NOT SAVE`,
+  (n) => `${n.toUpperCase()} — IF FOUND, PLEASE RETURN TO MY PICKS`,
+  (n) => `KICKOFF CAME. ${n.toUpperCase()} DID NOT. ZERO POINTS. ZERO EXCUSES.`,
+  (n) => `THE CARD WAS OPEN. ${n.toUpperCase()} WAS… ELSEWHERE`,
+  (n) => `MISSING PERSON REPORT: ${n.toUpperCase()} (SUSPECTED: NETFLIX)`,
+  (n) => `${n.toUpperCase()} TREATED “LOCK BEFORE KICKOFF” LIKE A SUGGESTION`,
+  (n) => `LOST & FOUND: ONE (1) BRAIN CELL, LAST HELD BY ${n.toUpperCase()}`,
+  (n) => `HEY — SOMEONE CHECK THE MILK CARTON FOR ${n.toUpperCase()}!`,
+  (n) => `${n.toUpperCase()} DISCOVERED A NEW STRATEGY: NOT PLAYING`,
+  (n) => `NO LOCK, NO POINTS, NO MERCY: ${n.toUpperCase()} ON THE CARTON`,
+  (n) => `THE SPREAD DIDN'T BEAT ${n.toUpperCase()}. THE CLOCK DID.`,
+];
+
+export const NO_LOCK_DECKS: ((count: number) => string)[] = [
+  (c) =>
+    c === 1
+      ? "Forgot to lock. Scored a crisp 0. The milk is cold and so is the reception."
+      : `${c} players ghosted the card. Group milk carton. No makeups. Fair is fair.`,
+  (c) =>
+    c === 1
+      ? "Kickoff hit. Card still draft. Zero points. Dignity also zero."
+      : `${c} no-shows on lock. The War Room does not do participation trophies.`,
+  () =>
+    "If you don't lock before kickoff, you score nothing. This is not a drill. This is a roast.",
+  (c) =>
+    c === 1
+      ? "Last seen: scrolling. Not seen: Save Picks. Case closed at 0."
+      : `${c} names on the carton. Check My Picks next week like it matters — because it does.`,
+  () =>
+    "No lock, no points. The rules are mean. The group chat will be meaner.",
+  (c) =>
+    c === 1
+      ? "They'll say the dog ate the homework. The dog locked before them."
+      : `A ${c}-person missing-persons lineup. Side of 2%. Extra sarcasm.`,
+  () =>
+    "Pro tip for next week: the big green button that says Save. Revolutionary.",
+  (c) =>
+    c === 1
+      ? "Amber Alert for a locked card. Spoiler: it never arrived."
+      : `${c} players chose chaos by choosing nothing. The ledger recorded it as 0.`,
+];
+
+/** Score fallback: 0 on the week while someone else scored > 0. */
+export function inferNoLockNamesFromScores(
+  players: Player[],
+  weekIndex: number
+): string[] {
+  const rows = players
+    .filter((p) => !p.isMock)
+    .map((p) => ({
+      name: p.name,
+      pts: p.weeklyPoints?.[weekIndex],
+    }))
+    .filter((r): r is { name: string; pts: number } => typeof r.pts === "number");
+
+  if (rows.length < 2) return [];
+  const max = Math.max(...rows.map((r) => r.pts));
+  if (max <= 0) return [];
+  return rows
+    .filter((r) => r.pts === 0)
+    .map((r) => r.name)
+    .sort((a, b) => a.localeCompare(b));
+}
+
 /** Counts for tests / commissioner sanity checks. */
 export const GAZETTE_COPY_COUNTS = {
   crownHeadlines: CROWN_HEADLINES.length,
@@ -303,6 +381,8 @@ export const GAZETTE_COPY_COUNTS = {
   shameDecks: SHAME_DECKS.length,
   standingsTieHeadlines: STANDINGS_TIE_HEADLINES.length,
   standingsTieDecks: STANDINGS_TIE_DECKS.length,
+  noLockHeadlines: NO_LOCK_HEADLINES.length,
+  noLockDecks: NO_LOCK_DECKS.length,
 } as const;
 
 /**
@@ -311,9 +391,12 @@ export const GAZETTE_COPY_COUNTS = {
  * Headlines:
  * 1) Killer (or rough) week — single name for high/low on the card
  * 2) Optional: overall standings #1 multi-way tie (season totalPoints)
+ * 3) Optional: forgot-to-lock milk carton story
  * Weekly multi-way same scores do NOT get special deadlock copy.
  */
-export function buildGazetteEdition(players: Player[]): GazetteEdition | null {
+export async function buildGazetteEdition(
+  players: Player[]
+): Promise<GazetteEdition | null> {
   const data = weekCrownAndShame(players);
   if (!data) return null;
 
@@ -375,6 +458,40 @@ export function buildGazetteEdition(players: Player[]): GazetteEdition | null {
     };
   }
 
+  // Forgot to lock → milk carton story
+  let noLock: GazetteStory | null = null;
+  let ghostNames: string[] = [];
+  try {
+    const { loadWeekNoLockNames } = await import("./cloud");
+    ghostNames = await loadWeekNoLockNames(weekIndex);
+  } catch {
+    ghostNames = [];
+  }
+  if (!ghostNames.length) {
+    ghostNames = inferNoLockNamesFromScores(players, weekIndex);
+  }
+  if (ghostNames.length) {
+    const label = formatNameList(ghostNames);
+    noLock = {
+      names: ghostNames,
+      pts: 0,
+      kind: ghostNames.length > 1 ? "tie" : "clear",
+      headline: byWeek(NO_LOCK_HEADLINES, weekIndex, 3)(label),
+      deck: byWeek(NO_LOCK_DECKS, weekIndex, 3)(ghostNames.length),
+    };
+    // If the "shame" player is only on the carton for ghosting, prefer milk carton copy
+    // and still keep shame for legit low scores who did lock.
+    if (
+      shame &&
+      ghostNames.some(
+        (g) => g.toLowerCase() === (shame!.names[0] || "").toLowerCase()
+      ) &&
+      shame.pts === 0
+    ) {
+      shame = null;
+    }
+  }
+
   return {
     weekIndex,
     weekLabel,
@@ -384,6 +501,7 @@ export function buildGazetteEdition(players: Player[]): GazetteEdition | null {
     crown,
     shame,
     standingsDeadlock,
+    noLock,
   };
 }
 
@@ -391,9 +509,11 @@ export function buildGazetteEdition(players: Player[]): GazetteEdition | null {
  * Should we show the gazette now?
  * Guardrails: feature on, rules already seen, league session, not seen this week.
  */
-export function shouldOfferGazette(
+export async function shouldOfferGazette(
   players: Player[]
-): { show: true; edition: GazetteEdition; leagueId: string } | { show: false } {
+): Promise<
+  { show: true; edition: GazetteEdition; leagueId: string } | { show: false }
+> {
   if (!GAZETTE_ENABLED) return { show: false };
   if (typeof window === "undefined") return { show: false };
   if (!hasSeenRules()) return { show: false }; // rules first, always
@@ -401,7 +521,7 @@ export function shouldOfferGazette(
   const session = getSession();
   if (!session?.leagueId || !session.playerId) return { show: false };
 
-  const edition = buildGazetteEdition(players);
+  const edition = await buildGazetteEdition(players);
   if (!edition) return { show: false };
 
   if (hasSeenGazette(session.leagueId, edition.weekIndex)) {
@@ -527,7 +647,7 @@ export async function snapshotGazetteAfterScore(
   weekNumber?: number
 ): Promise<void> {
   try {
-    const edition = buildGazetteEdition(players);
+    const edition = await buildGazetteEdition(players);
     if (!edition) return;
     // Prefer explicit week when re-scoring a specific card
     if (weekNumber != null && Number.isFinite(weekNumber)) {

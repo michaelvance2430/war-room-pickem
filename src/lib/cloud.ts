@@ -583,6 +583,82 @@ export async function loadPickSubmissionStatus(
 }
 
 /**
+ * Who failed to lock a card for a scored week (Gazette "milk carton" roast).
+ * Any league member can call this — returns names only, no sides/confidence.
+ * Falls back to empty if RLS blocks pick rows.
+ */
+export async function loadWeekNoLockNames(
+  weekNumber: number,
+  expectedGames = 5
+): Promise<string[]> {
+  const session = getSession();
+  if (!session?.leagueId) return [];
+
+  try {
+    const supabase = createClient();
+    const leagueId = session.leagueId;
+
+    const { data: members, error: memErr } = await supabase
+      .from("memberships")
+      .select("user_id, is_bot, profiles(display_name)")
+      .eq("league_id", leagueId);
+
+    if (memErr || !members?.length) return [];
+
+    const { data: pickRows, error: pickErr } = await supabase
+      .from("picks")
+      .select("id, user_id, prop_choice, best_bet_game_id, locked_at")
+      .eq("league_id", leagueId)
+      .eq("week_number", weekNumber);
+
+    // Can't see others' picks → caller may use score-based fallback
+    if (pickErr) return [];
+
+    const pickByUser = new Map(
+      (pickRows || []).map((p) => [p.user_id as string, p])
+    );
+    const pickIds = (pickRows || []).map((p) => p.id as string);
+    const countByPickId = new Map<string, number>();
+    if (pickIds.length) {
+      const { data: pgs } = await supabase
+        .from("pick_games")
+        .select("pick_id")
+        .in("pick_id", pickIds);
+      for (const row of pgs || []) {
+        const id = row.pick_id as string;
+        countByPickId.set(id, (countByPickId.get(id) || 0) + 1);
+      }
+    }
+
+    const ghosts: string[] = [];
+    for (const m of members) {
+      if (m.is_bot) continue;
+      const userId = m.user_id as string;
+      const profile = m.profiles as { display_name?: string } | null;
+      const name = profile?.display_name || "Player";
+      const pick = pickByUser.get(userId);
+      const gamePickCount = pick
+        ? countByPickId.get(pick.id as string) || 0
+        : 0;
+      const locked = !!(pick?.locked_at);
+      const complete =
+        !!pick &&
+        locked &&
+        gamePickCount >= expectedGames &&
+        !!pick.prop_choice &&
+        !!pick.best_bet_game_id;
+
+      // Never locked a full card = milk carton material
+      if (!complete) ghosts.push(name);
+    }
+
+    return ghosts.sort((a, b) => a.localeCompare(b));
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Ops post a public announcement naming who still needs picks.
  * Does not reveal actual picks — only names + complete/partial/missing.
  */
