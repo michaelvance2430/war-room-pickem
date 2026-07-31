@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { TIER_LABEL, TIER_ORDER } from "@/lib/badges";
 import { getBadgeRewards } from "@/lib/badge-rewards";
 import { BadgeStatus, BadgeTier } from "@/lib/types";
@@ -329,6 +329,13 @@ interface BadgeShelfProps {
 export default function BadgeShelf({ badges }: BadgeShelfProps) {
   const [selected, setSelected] = useState<BadgeStatus | null>(null);
   const earnedCount = badges.filter((b) => b.earned).length;
+  const [firstWeek, setFirstWeek] = useState(false);
+
+  useEffect(() => {
+    void import("@/lib/first-week").then((fw) => {
+      setFirstWeek(fw.isFirstWeekChrome());
+    });
+  }, []);
 
   const byTier = TIER_ORDER.map((tier) => ({
     tier,
@@ -357,6 +364,12 @@ export default function BadgeShelf({ badges }: BadgeShelfProps) {
           {earnedCount} earned · {badges.length - earnedCount} locked · each
           tier on its own shelf · tap for details
         </p>
+        {firstWeek && (
+          <p className="text-xs text-primary/90 mt-1.5 leading-relaxed">
+            Cheevos light up as the season plays out — lock your first card,
+            then the flex starts popping.
+          </p>
+        )}
       </div>
 
       <div className="space-y-1">

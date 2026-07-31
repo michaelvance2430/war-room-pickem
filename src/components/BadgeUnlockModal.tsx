@@ -36,6 +36,20 @@ export default function BadgeUnlockModal() {
     if (!hasSeenRules()) return;
     if (!getSession()?.playerId) return;
 
+    // After first lock / scores only — don't compete with "make picks"
+    try {
+      const { canShowBadgeCelebrations, syncFirstWeekFromCloud } = await import(
+        "@/lib/first-week"
+      );
+      await syncFirstWeekFromCloud(getSession()?.playerId);
+      if (!canShowBadgeCelebrations(getSession()?.playerId)) {
+        // Stay unchecked so we re-try after they lock
+        return;
+      }
+    } catch {
+      /* proceed best-effort */
+    }
+
     const result = await findNewBadgeUnlocksForSession();
     if (!result || result.newBadges.length === 0) {
       setChecked(true);
@@ -50,11 +64,18 @@ export default function BadgeUnlockModal() {
     function onGazetteDone() {
       void tryCelebrate();
     }
+    function onFirstWeek() {
+      void tryCelebrate();
+    }
     window.addEventListener(EVENT_GAZETTE_DONE, onGazetteDone);
-    return () => window.removeEventListener(EVENT_GAZETTE_DONE, onGazetteDone);
+    window.addEventListener("warroom-first-week-progress", onFirstWeek);
+    return () => {
+      window.removeEventListener(EVENT_GAZETTE_DONE, onGazetteDone);
+      window.removeEventListener("warroom-first-week-progress", onFirstWeek);
+    };
   }, [tryCelebrate]);
 
-  // Fallback if gazette never fires
+  // Fallback if gazette never fires (only after core loop unlock)
   useEffect(() => {
     if (checked) return;
     const timers = [3000, 6000, 10000].map((ms) =>

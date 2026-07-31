@@ -151,11 +151,15 @@ export function sortBadgesForCelebration(badges: BadgeStatus[]): BadgeStatus[] {
  * Stackables: only when stack height is new (`id#N`).
  * One-shots: only if never owned/celebrated.
  */
-export function getUncelebratedBadges(player: Player): BadgeStatus[] {
+export function getUncelebratedBadges(
+  player: Player,
+  opts?: { allowStackMultiples?: boolean }
+): BadgeStatus[] {
   const p = withPermanentBadges(player);
   const earned = getPlayerBadges(p).filter((b) => b.earned);
   backfillCelebratedFromOwned(p.id, earned);
   const known = new Set(readCelebratedIds(p.id));
+  const allowStackMultiples = opts?.allowStackMultiples !== false;
 
   const fresh: BadgeStatus[] = [];
   for (const b of earned) {
@@ -167,6 +171,10 @@ export function getUncelebratedBadges(player: Player): BadgeStatus[] {
         // Don't re-pop stack #1 if plain id was celebrated historically
         if (count === 1 && known.has(id)) {
           markBadgesCelebrated(p.id, [key]);
+          continue;
+        }
+        // Multi-earn fanfare is mid-season energy — hold ×2+ until unlocked
+        if (count > 1 && !allowStackMultiples) {
           continue;
         }
         fresh.push(b);
@@ -188,7 +196,18 @@ export async function findNewBadgeUnlocksForSession(): Promise<{
   if (!session?.playerId) return null;
 
   try {
-    const { loadLeaguePlayers } = await import("./cloud");
+    const {
+      canShowBadgeCelebrations,
+      canCelebrateStackMultiples,
+      syncFirstWeekFromCloud,
+    } = await import("./first-week");
+    // First week: earn quietly — no popup stack until first lock / scores
+    await syncFirstWeekFromCloud(session.playerId);
+    if (!canShowBadgeCelebrations(session.playerId)) {
+      return null;
+    }
+
+    const { loadLeaguePlayers, loadLeagueActiveWeek } = await import("./cloud");
     let players = await loadLeaguePlayers();
     players = syncLeagueCheevoKing(players.map((p) => withPermanentBadges(p)));
     const me = players.find((p) => p.id === session.playerId);
@@ -196,7 +215,18 @@ export async function findNewBadgeUnlocksForSession(): Promise<{
     const tagged = withPermanentBadges(me);
     // Bank first, then backfill celebrated from bank — kills login re-fires
     bankCareerCheevos(tagged.id, getPlayerBadges(tagged));
-    const newBadges = getUncelebratedBadges(tagged);
+    let activeWeek = 0;
+    try {
+      activeWeek = await loadLeagueActiveWeek();
+    } catch {
+      activeWeek = 0;
+    }
+    const newBadges = getUncelebratedBadges(tagged, {
+      allowStackMultiples: canCelebrateStackMultiples(
+        session.playerId,
+        activeWeek
+      ),
+    });
     return { player: tagged, newBadges };
   } catch {
     return null;

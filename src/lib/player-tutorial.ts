@@ -1,6 +1,7 @@
 /**
- * Real-account first-login “walk the dog” — Crystal Ball + My Picks.
- * Guest demo uses guest-mode tutorials (no Crystal Ball on week 9).
+ * Real-account first-login “walk the dog”.
+ * Default = picks-only (Crystal Ball is optional power, not onboarding).
+ * Guest demo uses guest-mode tutorials.
  */
 
 const KEY = "warroom-player-tutorial-v1";
@@ -14,6 +15,9 @@ export type PlayerTutorialStep =
   | "save_picks"
   | "done";
 
+/** picks = first-week path; full = Crystal Ball + picks (Account re-run). */
+export type PlayerTutorialMode = "picks" | "full";
+
 export type PlayerTutorialState = {
   /** User has finished (or skipped) the walkthrough */
   completed: boolean;
@@ -22,6 +26,8 @@ export type PlayerTutorialState = {
   step: PlayerTutorialStep;
   /** Which auth user this is for (re-run is per browser still fine) */
   userId?: string;
+  /** Default picks-only for new players */
+  mode?: PlayerTutorialMode;
 };
 
 const ORDER: PlayerTutorialStep[] = [
@@ -34,10 +40,18 @@ const ORDER: PlayerTutorialStep[] = [
   "done",
 ];
 
+const PICKS_ORDER: PlayerTutorialStep[] = [
+  "open_picks",
+  "fill_picks",
+  "save_picks",
+  "done",
+];
+
 const DEFAULT: PlayerTutorialState = {
   completed: false,
   active: false,
-  step: "open_crystal",
+  step: "open_picks",
+  mode: "picks",
 };
 
 function canUse() {
@@ -80,23 +94,38 @@ export function needsPlayerTutorial(): boolean {
 
 /**
  * First login after rules — or Account re-run.
- * Prefer picks-first when crystal ball is off or card just went live.
+ * Default mode is picks-only (Crystal Ball is optional / Account full re-run).
  */
 export function startPlayerTutorial(
   userId?: string,
-  opts?: { startAt?: PlayerTutorialStep }
+  opts?: { startAt?: PlayerTutorialStep; mode?: PlayerTutorialMode }
 ) {
+  const mode: PlayerTutorialMode =
+    opts?.mode ??
+    (opts?.startAt === "open_crystal" ||
+    opts?.startAt === "search_team" ||
+    opts?.startAt === "lock_crystal"
+      ? "full"
+      : "picks");
+  const startAt =
+    opts?.startAt || (mode === "full" ? "open_crystal" : "open_picks");
   write({
     completed: false,
     active: true,
-    step: opts?.startAt || "open_crystal",
+    step: startAt,
     userId,
+    mode,
   });
 }
 
-/** Picks-only coach (skip crystal) — used when CB is off or user wants simple path. */
+/** Picks-only coach — default first-week path. */
 export function startPicksOnlyTutorial(userId?: string) {
-  startPlayerTutorial(userId, { startAt: "open_picks" });
+  startPlayerTutorial(userId, { mode: "picks", startAt: "open_picks" });
+}
+
+/** Full coach including Crystal Ball (Account re-run). */
+export function startFullPlayerTutorial(userId?: string) {
+  startPlayerTutorial(userId, { mode: "full", startAt: "open_crystal" });
 }
 
 export function completePlayerTutorial() {
@@ -126,6 +155,8 @@ export function setPlayerTutorialStep(step: PlayerTutorialStep) {
 export function advancePlayerTutorialTo(step: PlayerTutorialStep) {
   const s = getPlayerTutorialState();
   if (!s.active || s.completed) return;
+  // Always use full ORDER for index comparison so crystal→picks still works
+  // if someone upgrades mid-run; picks-only never lands on crystal steps.
   const cur = ORDER.indexOf(s.step);
   const next = ORDER.indexOf(step);
   if (next < 0) return;
@@ -134,12 +165,20 @@ export function advancePlayerTutorialTo(step: PlayerTutorialStep) {
 }
 
 /** Explicit back — one step only. */
+function orderForMode(mode?: PlayerTutorialMode): PlayerTutorialStep[] {
+  return mode === "full" ? ORDER : PICKS_ORDER;
+}
+
 export function goBackPlayerTutorial(): PlayerTutorialStep | null {
   const s = getPlayerTutorialState();
   if (!s.active || s.completed) return null;
-  const cur = ORDER.indexOf(s.step);
-  if (cur <= 0) return null;
-  const prev = ORDER[cur - 1];
+  const order = orderForMode(s.mode);
+  const cur = order.indexOf(s.step);
+  // If step isn't in picks order (stale full step), fall back to full order
+  const list = cur >= 0 ? order : ORDER;
+  const idx = list.indexOf(s.step);
+  if (idx <= 0) return null;
+  const prev = list[idx - 1];
   // Force step (bypass forward-only guard)
   write({
     ...s,
@@ -178,12 +217,18 @@ export function skipPlayerTutorial() {
 }
 
 export function playerTutorialStepIndex(step: PlayerTutorialStep): number {
+  const s = getPlayerTutorialState();
+  const order = orderForMode(s.mode);
+  const i = order.indexOf(step);
+  if (i >= 0) return i;
   return ORDER.indexOf(step);
 }
 
 export function playerTutorialStepCount(): number {
+  const s = getPlayerTutorialState();
+  const order = orderForMode(s.mode ?? "picks");
   // Exclude "done"
-  return ORDER.length - 1;
+  return order.length - 1;
 }
 
 export type CoachCopy = {
@@ -196,6 +241,9 @@ export type CoachCopy = {
 };
 
 export function coachCopyForStep(step: PlayerTutorialStep): CoachCopy {
+  const mode = getPlayerTutorialState().mode ?? "picks";
+  const picksOnly = mode !== "full";
+
   switch (step) {
     case "open_crystal":
       return {
@@ -220,31 +268,55 @@ export function coachCopyForStep(step: PlayerTutorialStep): CoachCopy {
         ctaHref: "/crystal-ball",
       };
     case "open_picks":
-      return {
-        title: "Step 4 of 6 · Open My Picks",
-        body: "Crystal Ball’s done for now. Open My Picks — that’s where you lock this week’s card.",
-        ctaLabel: "Open My Picks →",
-        ctaHref: "/picks",
-      };
+      return picksOnly
+        ? {
+            title: "Step 1 of 3 · Open My Picks",
+            body: "This is the job every week. Open My Picks and lock this week’s card before first kickoff.",
+            ctaLabel: "Open My Picks →",
+            ctaHref: "/picks",
+          }
+        : {
+            title: "Step 4 of 6 · Open My Picks",
+            body: "Crystal Ball’s done for now. Open My Picks — that’s where you lock this week’s card.",
+            ctaLabel: "Open My Picks →",
+            ctaHref: "/picks",
+          };
     case "fill_picks":
-      return {
-        title: "Step 5 of 6 · Fill the card",
-        body: "For every game: pick a side, set confidence 1–5 (each number once), set one Best Bet (2×), and answer the prop.",
-        ctaLabel: "Open My Picks",
-        ctaHref: "/picks",
-        allowManualNext: true,
-      };
+      return picksOnly
+        ? {
+            title: "Step 2 of 3 · Fill the card",
+            body: "For every game: pick a side, set confidence 1–5 (each number once), set one Best Bet (2×), and answer the prop.",
+            ctaLabel: "Open My Picks",
+            ctaHref: "/picks",
+            allowManualNext: true,
+          }
+        : {
+            title: "Step 5 of 6 · Fill the card",
+            body: "For every game: pick a side, set confidence 1–5 (each number once), set one Best Bet (2×), and answer the prop.",
+            ctaLabel: "Open My Picks",
+            ctaHref: "/picks",
+            allowManualNext: true,
+          };
     case "save_picks":
-      return {
-        title: "Step 6 of 6 · Save Picks",
-        body: "Hit the big Save Picks button. After first kickoff the whole card freezes — so save before Saturday.",
-        ctaLabel: "Open My Picks",
-        ctaHref: "/picks",
-      };
+      return picksOnly
+        ? {
+            title: "Step 3 of 3 · Save Picks",
+            body: "Hit the big Save Picks button. After first kickoff the whole card freezes — so save before Saturday. That’s the whole weekly job.",
+            ctaLabel: "Open My Picks",
+            ctaHref: "/picks",
+          }
+        : {
+            title: "Step 6 of 6 · Save Picks",
+            body: "Hit the big Save Picks button. After first kickoff the whole card freezes — so save before Saturday.",
+            ctaLabel: "Open My Picks",
+            ctaHref: "/picks",
+          };
     default:
       return {
         title: "You’re set",
-        body: "Tutorial complete. Replay anytime from Account.",
+        body: picksOnly
+          ? "Tutorial complete. Crystal Ball and more flavor live under More when you’re ready. Replay anytime from Account."
+          : "Tutorial complete. Replay anytime from Account.",
         ctaLabel: "Home",
         ctaHref: "/",
       };

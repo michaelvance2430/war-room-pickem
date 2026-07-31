@@ -27,7 +27,10 @@ import {
 import { isAppCreator, withCreatorFlag } from "@/lib/creator";
 import { isViewAsPlayer, setViewAsPlayer } from "@/lib/view-as-player";
 import FeedbackForm from "@/components/FeedbackForm";
-import { startPlayerTutorial } from "@/lib/player-tutorial";
+import {
+  startFullPlayerTutorial,
+  startPicksOnlyTutorial,
+} from "@/lib/player-tutorial";
 import { isGuestMode } from "@/lib/guest-mode";
 import { getPlayerBadges, withPermanentBadges } from "@/lib/badges";
 import {
@@ -326,28 +329,49 @@ export default function AccountPage() {
           </p>
           <h2 className="font-semibold mb-1">Player tutorial</h2>
           <p className="text-xs text-muted mb-3 leading-relaxed">
-            Walk the dog again: Crystal Ball → search a school → lock pick → My
-            Picks → fill the card → Save. One step at a time.
+            Default path is My Picks only (the weekly job). Crystal Ball is
+            optional power — full walkthrough includes it.
           </p>
-          <button
-            type="button"
-            onClick={() => {
-              if (isGuestMode()) {
+          <div className="flex flex-col sm:flex-row gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                if (isGuestMode()) {
+                  setMessage(
+                    "Guest demo uses the onboarding popup — Exit demo first for the real walkthrough."
+                  );
+                  return;
+                }
+                startPicksOnlyTutorial(userId || undefined);
                 setMessage(
-                  "Guest demo uses the onboarding popup — Exit demo first for the full Crystal Ball walkthrough."
+                  "Picks tutorial restarted — follow the coach bar at the bottom."
                 );
-                return;
-              }
-              startPlayerTutorial(userId || undefined);
-              setMessage(
-                "Tutorial restarted — follow the coach bar at the bottom."
-              );
-              router.push("/crystal-ball");
-            }}
-            className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-primary text-black text-sm font-bold"
-          >
-            Run player tutorial again →
-          </button>
+                router.push("/picks");
+              }}
+              className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-primary text-black text-sm font-bold"
+            >
+              Run picks tutorial →
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (isGuestMode()) {
+                  setMessage(
+                    "Guest demo uses the onboarding popup — Exit demo first for the full Crystal Ball walkthrough."
+                  );
+                  return;
+                }
+                startFullPlayerTutorial(userId || undefined);
+                setMessage(
+                  "Full tutorial (Crystal Ball + picks) — follow the coach bar."
+                );
+                router.push("/crystal-ball");
+              }}
+              className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-border text-sm font-semibold text-foreground hover:bg-card-hover"
+            >
+              Full walkthrough (+ Crystal Ball)
+            </button>
+          </div>
         </section>
 
         <section className="rounded-xl border border-amber-400/35 bg-amber-400/10 p-5 mb-6">

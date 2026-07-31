@@ -2,7 +2,8 @@
 
 /**
  * Sticky coach for real-account first login.
- * Walks Crystal Ball → My Picks → Save. Guest uses GuestOnboarding instead.
+ * Default: My Picks only (Crystal Ball optional via Account full re-run).
+ * Guest uses GuestOnboarding instead.
  */
 
 import { useEffect, useState } from "react";
@@ -22,17 +23,24 @@ import {
   needsPlayerTutorial,
   playerTutorialStepIndex,
   skipPlayerTutorial,
-  startPlayerTutorial,
+  startPicksOnlyTutorial,
   type PlayerTutorialStep,
 } from "@/lib/player-tutorial";
 import { hasSeenRules } from "@/lib/rules";
 import { loadCrystalBall } from "@/lib/crystal-ball";
 import { leagueHasLiveCard } from "@/lib/first-session";
 
-const ORDER: PlayerTutorialStep[] = [
+const FULL_ORDER: PlayerTutorialStep[] = [
   "open_crystal",
   "search_team",
   "lock_crystal",
+  "open_picks",
+  "fill_picks",
+  "save_picks",
+  "done",
+];
+
+const PICKS_ORDER: PlayerTutorialStep[] = [
   "open_picks",
   "fill_picks",
   "save_picks",
@@ -43,7 +51,7 @@ export default function PlayerWalkthrough() {
   const pathname = usePathname();
   const router = useRouter();
   const [active, setActive] = useState(false);
-  const [step, setStep] = useState<PlayerTutorialStep>("open_crystal");
+  const [step, setStep] = useState<PlayerTutorialStep>("open_picks");
 
   function syncFromStorage() {
     if (isGuestMode()) {
@@ -64,14 +72,14 @@ export default function PlayerWalkthrough() {
       if (isGuestMode()) return;
       if (!getSession()?.playerId) return;
       if (!hasSeenRules()) return;
-      // KISS: no Crystal Ball walkthrough until there's a live card to pick
+      // KISS: no coach until there's a live card to pick
       if (!(await leagueHasLiveCard())) {
         syncFromStorage();
         return;
       }
       if (needsPlayerTutorial() && !isPlayerTutorialActive()) {
-        // Start at picks if crystal already done / keep simple path
-        startPlayerTutorial(getSession()?.playerId || undefined);
+        // First week: picks only — Crystal Ball is optional power
+        startPicksOnlyTutorial(getSession()?.playerId || undefined);
       }
       syncFromStorage();
     }
@@ -200,8 +208,10 @@ export default function PlayerWalkthrough() {
 
   function manualNext() {
     clearTutorialHold();
-    const i = ORDER.indexOf(step);
-    const next = ORDER[i + 1] || "done";
+    const mode = getPlayerTutorialState().mode ?? "picks";
+    const order = mode === "full" ? FULL_ORDER : PICKS_ORDER;
+    const i = order.indexOf(step);
+    const next = order[i + 1] || "done";
     if (next === "done") {
       completePlayerTutorial();
     } else {

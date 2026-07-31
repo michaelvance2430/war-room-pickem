@@ -43,6 +43,8 @@ export default function Home() {
   const [bootError, setBootError] = useState<string | null>(null);
   const [pickList, setPickList] = useState<LeagueMembership[] | null>(null);
   const [codeCopied, setCodeCopied] = useState(false);
+  /** Demote museum/lore/brackets until first lock or first scores */
+  const [firstWeekChrome, setFirstWeekChrome] = useState(true);
 
   useEffect(() => {
     async function boot() {
@@ -66,6 +68,8 @@ export default function Home() {
           );
           setIsCommish(isCommissioner());
           setActuallyCommish(isActuallyCommissioner());
+          // Guest demo: show the full room (sandbox playground)
+          setFirstWeekChrome(false);
           setReady(true);
           return;
         }
@@ -139,6 +143,13 @@ export default function Home() {
         } catch {
           /* ignore */
         }
+        try {
+          const fw = await import("@/lib/first-week");
+          await fw.syncFirstWeekFromCloud(getSession()?.playerId);
+          setFirstWeekChrome(fw.isFirstWeekChrome(getSession()?.playerId));
+        } catch {
+          setFirstWeekChrome(false);
+        }
         setReady(true);
       } catch (e: unknown) {
         setBootError(e instanceof Error ? e.message : "Failed to start");
@@ -149,8 +160,17 @@ export default function Home() {
       setIsCommish(isCommissioner());
       setActuallyCommish(isActuallyCommissioner());
     }
+    function onFirstWeek() {
+      void import("@/lib/first-week").then((fw) => {
+        setFirstWeekChrome(fw.isFirstWeekChrome(getSession()?.playerId));
+      });
+    }
     window.addEventListener("warroom-view-as-player", onPreview);
-    return () => window.removeEventListener("warroom-view-as-player", onPreview);
+    window.addEventListener("warroom-first-week-progress", onFirstWeek);
+    return () => {
+      window.removeEventListener("warroom-view-as-player", onPreview);
+      window.removeEventListener("warroom-first-week-progress", onFirstWeek);
+    };
   }, [router]);
 
   async function chooseLeague(leagueId: string) {
@@ -177,6 +197,13 @@ export default function Home() {
     );
     setIsCommish(isCommissioner());
     setActuallyCommish(isActuallyCommissioner());
+    try {
+      const fw = await import("@/lib/first-week");
+      await fw.syncFirstWeekFromCloud(getSession()?.playerId);
+      setFirstWeekChrome(fw.isFirstWeekChrome(getSession()?.playerId));
+    } catch {
+      setFirstWeekChrome(false);
+    }
     setReady(true);
   }
 
@@ -356,8 +383,15 @@ export default function Home() {
         </section>
 
         <p className="text-[10px] uppercase tracking-[0.18em] text-muted mb-3 font-semibold">
-          The rest of the room
+          {firstWeekChrome ? "This week’s job" : "The rest of the room"}
         </p>
+        {firstWeekChrome && (
+          <p className="text-xs text-muted mb-3 leading-relaxed max-w-xl">
+            Lock your picks first. Stats, brackets, trophy room, and lore open
+            up once you&apos;ve played a week — they&apos;re destinations, not
+            homework on day one.
+          </p>
+        )}
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           <Link
             href="/standings"
@@ -371,21 +405,6 @@ export default function Home() {
             </div>
             <p className="text-sm text-muted mt-2">
               Divisions · cut line · season points
-            </p>
-          </Link>
-
-          <Link
-            href="/stats"
-            className="group rounded-xl border border-border/80 bg-black/40 backdrop-blur-sm p-6 hover:border-primary/50 hover:bg-primary/5 transition shadow-[0_0_40px_rgba(0,0,0,0.35)]"
-          >
-            <div className="text-xs uppercase tracking-wider text-muted mb-2">
-              Pulse
-            </div>
-            <div className="text-lg font-semibold text-white group-hover:text-primary transition">
-              Stats
-            </div>
-            <p className="text-sm text-muted mt-2">
-              Power rankings · season table · league lore
             </p>
           </Link>
 
@@ -404,48 +423,73 @@ export default function Home() {
             </p>
           </Link>
 
-          <Link
-            href="/championship"
-            className="group rounded-xl border border-primary/30 bg-black/40 backdrop-blur-sm p-6 hover:border-primary hover:bg-primary/10 transition shadow-[0_0_40px_rgba(34,197,94,0.08)]"
-          >
-            <div className="text-xs uppercase tracking-wider text-primary/70 mb-2">
-              Postseason
-            </div>
-            <div className="text-lg font-semibold text-primary">
-              Championship Bracket
-            </div>
-            <p className="text-sm text-muted mt-2">Top half. One path. No excuses.</p>
-          </Link>
+          {!firstWeekChrome && (
+            <Link
+              href="/stats"
+              className="group rounded-xl border border-border/80 bg-black/40 backdrop-blur-sm p-6 hover:border-primary/50 hover:bg-primary/5 transition shadow-[0_0_40px_rgba(0,0,0,0.35)]"
+            >
+              <div className="text-xs uppercase tracking-wider text-muted mb-2">
+                Pulse
+              </div>
+              <div className="text-lg font-semibold text-white group-hover:text-primary transition">
+                Stats
+              </div>
+              <p className="text-sm text-muted mt-2">
+                Power rankings · season table · league lore
+              </p>
+            </Link>
+          )}
 
-          <Link
-            href="/toilet-bowl"
-            className="group rounded-xl border border-purple-500/30 bg-black/40 backdrop-blur-sm p-6 hover:border-purple-400/60 hover:bg-purple-500/10 transition shadow-[0_0_40px_rgba(0,0,0,0.35)]"
-          >
-            <div className="text-xs uppercase tracking-wider text-purple-300/70 mb-2">
-              Bottom half
-            </div>
-            <div className="text-lg font-semibold text-purple-300">
-              Toilet Bowl
-            </div>
-            <p className="text-sm text-muted mt-2">
-              Shame bracket. Still matters.
-            </p>
-          </Link>
+          {!firstWeekChrome && (
+            <Link
+              href="/championship"
+              className="group rounded-xl border border-primary/30 bg-black/40 backdrop-blur-sm p-6 hover:border-primary hover:bg-primary/10 transition shadow-[0_0_40px_rgba(34,197,94,0.08)]"
+            >
+              <div className="text-xs uppercase tracking-wider text-primary/70 mb-2">
+                Postseason
+              </div>
+              <div className="text-lg font-semibold text-primary">
+                Championship Bracket
+              </div>
+              <p className="text-sm text-muted mt-2">
+                Top half. One path. No excuses.
+              </p>
+            </Link>
+          )}
 
-          <Link
-            href="/trophy-room"
-            className="group rounded-xl border border-amber-400/30 bg-black/40 backdrop-blur-sm p-6 hover:border-amber-300/60 hover:bg-amber-400/10 transition shadow-[0_0_40px_rgba(251,191,36,0.08)]"
-          >
-            <div className="text-xs uppercase tracking-wider text-amber-300/70 mb-2">
-              Legacy
-            </div>
-            <div className="text-lg font-semibold text-amber-300">
-              Trophy Room
-            </div>
-            <p className="text-sm text-muted mt-2">
-              Champs · Toilet · Village Nerd — year after year
-            </p>
-          </Link>
+          {!firstWeekChrome && (
+            <Link
+              href="/toilet-bowl"
+              className="group rounded-xl border border-purple-500/30 bg-black/40 backdrop-blur-sm p-6 hover:border-purple-400/60 hover:bg-purple-500/10 transition shadow-[0_0_40px_rgba(0,0,0,0.35)]"
+            >
+              <div className="text-xs uppercase tracking-wider text-purple-300/70 mb-2">
+                Bottom half
+              </div>
+              <div className="text-lg font-semibold text-purple-300">
+                Toilet Bowl
+              </div>
+              <p className="text-sm text-muted mt-2">
+                Shame bracket. Still matters.
+              </p>
+            </Link>
+          )}
+
+          {!firstWeekChrome && (
+            <Link
+              href="/trophy-room"
+              className="group rounded-xl border border-amber-400/30 bg-black/40 backdrop-blur-sm p-6 hover:border-amber-300/60 hover:bg-amber-400/10 transition shadow-[0_0_40px_rgba(251,191,36,0.08)]"
+            >
+              <div className="text-xs uppercase tracking-wider text-amber-300/70 mb-2">
+                Legacy
+              </div>
+              <div className="text-lg font-semibold text-amber-300">
+                Trophy Room
+              </div>
+              <p className="text-sm text-muted mt-2">
+                Champs · Toilet · Village Nerd — year after year
+              </p>
+            </Link>
+          )}
 
           <Link
             href="/announcements"
@@ -498,7 +542,9 @@ export default function Home() {
 
           <Link
             href="/account"
-            className="group rounded-xl border border-sky-400/35 bg-sky-500/10 backdrop-blur-sm p-6 hover:border-sky-300/60 hover:bg-sky-500/15 transition shadow-[0_0_40px_rgba(56,189,248,0.08)] sm:col-span-2 lg:col-span-3"
+            className={`group rounded-xl border border-sky-400/35 bg-sky-500/10 backdrop-blur-sm p-6 hover:border-sky-300/60 hover:bg-sky-500/15 transition shadow-[0_0_40px_rgba(56,189,248,0.08)] ${
+              firstWeekChrome ? "" : "sm:col-span-2 lg:col-span-3"
+            }`}
           >
             <div className="text-xs uppercase tracking-wider text-sky-300/80 mb-2">
               You

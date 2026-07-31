@@ -164,6 +164,13 @@ export async function getGazetteUnreadState(): Promise<{
   try {
     const res = await loadGazetteArchive();
     if (!res.ok || !res.editions?.length) return empty;
+    // Paper exists → season is alive (unlock deep home tiles / cheevo pops)
+    try {
+      const { markSeasonComeAlive } = await import("./first-week");
+      markSeasonComeAlive(session.playerId);
+    } catch {
+      /* ignore */
+    }
     const latest = res.editions[0];
     const week = latest.weekNumber;
     const unread = !hasSeenGazette(session.leagueId, week);
@@ -712,25 +719,41 @@ export async function buildGazetteEdition(
   const year = defaultSeasonYear();
   const tagline = byWeek(EDITION_TAGLINES, weekIndex);
   const weather = byWeek(WEATHER_BOXES, weekIndex, 2);
-  const classifieds = [
-    byWeek(CLASSIFIEDS_A, weekIndex, 0),
-    byWeek(CLASSIFIEDS_B, weekIndex, 1),
-    byWeek(CLASSIFIEDS_C, weekIndex, 2),
-  ].map((fn) =>
-    fn({
-      crown: cn,
-      shame: sn,
-      league: leagueName,
-      pts: cp,
-    })
-  );
+
+  // Early weeks: one tight page (want next issue, not homework)
+  let flavor: "slim" | "full" = "full";
+  try {
+    const { gazetteFlavorLevel, markSeasonComeAlive } = await import(
+      "./first-week"
+    );
+    flavor = gazetteFlavorLevel(weekIndex);
+    // Scored week exists → unlock personality layer for the room
+    markSeasonComeAlive();
+  } catch {
+    flavor = weekIndex <= 1 ? "slim" : "full";
+  }
+
+  const classifiedCtx = {
+    crown: cn,
+    shame: sn,
+    league: leagueName,
+    pts: cp,
+  };
+  const classifieds =
+    flavor === "slim"
+      ? [byWeek(CLASSIFIEDS_A, weekIndex, 0)(classifiedCtx)]
+      : [
+          byWeek(CLASSIFIEDS_A, weekIndex, 0),
+          byWeek(CLASSIFIEDS_B, weekIndex, 1),
+          byWeek(CLASSIFIEDS_C, weekIndex, 2),
+        ].map((fn) => fn(classifiedCtx));
   const pullQuote = byWeek(PULL_QUOTES, weekIndex, 4)({
     crown: cn,
     shame: sn,
     pts: cp,
   });
 
-  // Sub-stories: one name-tied roast + one pure non-football absurdity
+  // Sub-stories: full paper only (week 2+). Slim editions skip the joke pile.
   const sideCtx: SideStoryCtx = {
     crown: cn,
     shame: sn,
@@ -738,10 +761,13 @@ export async function buildGazetteEdition(
     pts: cp,
     weekLabel,
   };
-  const sideStories: GazetteSideStory[] = [
-    byWeek(SIDE_STORIES_NAMED, weekIndex, 0)(sideCtx),
-    byWeek(SIDE_STORIES_ABSURD, weekIndex, 1)(sideCtx),
-  ];
+  const sideStories: GazetteSideStory[] =
+    flavor === "slim"
+      ? []
+      : [
+          byWeek(SIDE_STORIES_NAMED, weekIndex, 0)(sideCtx),
+          byWeek(SIDE_STORIES_ABSURD, weekIndex, 1)(sideCtx),
+        ];
 
   const ritualName = ritualEditionName();
   const printedLine = `${ritualName.toUpperCase()} · ${weekLabel.toUpperCase()} · ${year} SEASON · ${leagueName.toUpperCase()} · NOT FIT FOR FRAMING (BUT YOU WILL)`;

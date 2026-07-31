@@ -34,7 +34,8 @@ export default function RulesOnboardingModal() {
             if (!(await leagueHasLiveCard())) return;
             const m = await import("@/lib/player-tutorial");
             if (m.needsPlayerTutorial()) {
-              m.startPlayerTutorial(getSession()?.playerId || undefined);
+              // First week: picks path only — Crystal Ball is optional
+              m.startPicksOnlyTutorial(getSession()?.playerId || undefined);
             }
           })();
         }
@@ -57,15 +58,11 @@ export default function RulesOnboardingModal() {
     },
     {
       t: "Standings",
-      d: "Season points rank you. Bottom half of each division heads toward the Toilet Bowl.",
-    },
-    {
-      t: "Tap a name",
-      d: "Green underlined names open that player’s profile — badges, trophies, the whole flex. Tap anyone.",
+      d: "Season points rank you. That’s the board that matters every week.",
     },
     {
       t: "The room",
-      d: "Sunday/Monday Gazette is the weekly paper (look forward to it). Locker + trophies for the rest. Flavor is free; picks are not.",
+      d: "Sunday/Monday Gazette is the weekly paper. Badges, titles, and lore light up as you play — not on day one.",
     },
   ];
 
@@ -121,16 +118,10 @@ export default function RulesOnboardingModal() {
             </div>
           ))}
 
-          <div className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2.5">
-            <p className="text-[10px] uppercase tracking-[0.15em] font-bold text-warning mb-1">
-              Crystal Ball
-            </p>
-            <p className="text-xs text-foreground leading-snug">
-              National champ pick (0 standings pts). Locks{" "}
-              <span className="font-semibold">noon ET Sat Aug 29, 2026</span> —
-              no take-backs. Do it early under More → Crystal Ball.
-            </p>
-          </div>
+          <p className="text-[11px] text-muted leading-relaxed px-0.5">
+            Optional later: Crystal Ball (national champ flex, 0 standings pts)
+            lives under More when you’re ready — not required for week one.
+          </p>
         </div>
 
         <div className="px-5 py-4 border-t border-border shrink-0 flex flex-col sm:flex-row gap-2">

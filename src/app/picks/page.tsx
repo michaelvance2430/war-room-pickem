@@ -148,6 +148,11 @@ export default function PicksPage() {
           !!mine.lockedAt &&
             Object.keys(filtered).length === cloud.games.length
         );
+        if (mine.lockedAt) {
+          void import("@/lib/first-week").then((m) =>
+            m.markHasLockedPicksOnce(getSession()?.playerId)
+          );
+        }
         const used = Object.values(filtered)
           .map((p) => p.confidence)
           .filter((c) => c > 0);
@@ -715,6 +720,13 @@ export default function PicksPage() {
     } catch {
       /* ignore */
     }
+    // First-week unlock: cheevo popups + deep home tiles after first lock
+    try {
+      const { markHasLockedPicksOnce } = await import("@/lib/first-week");
+      markHasLockedPicksOnce(getSession()?.playerId);
+    } catch {
+      /* ignore */
+    }
 
     // First & Final: full popup (earn warning / forfeit point loss)
     if (result.firstFinal === "earned") {
@@ -814,8 +826,14 @@ export default function PicksPage() {
       )}
 
       <main className="flex-1 max-w-3xl mx-auto w-full px-3 sm:px-4 py-5 sm:py-8 phone-picks-main">
-        {/* Chaos Mode — robots cook; room sees flames */}
-        {weekEditable && hasCard && !cardFrozen && !missedLockWindow && (
+        {/* Chaos Mode — mid-season spice (week 2+); not a first-week teach */}
+        {weekEditable &&
+          hasCard &&
+          !cardFrozen &&
+          !missedLockWindow &&
+          (chaosArmed ||
+            chaosLockedWeek ||
+            activeWeek >= 2) && (
           <div className="rounded-xl border-2 border-orange-500/50 bg-gradient-to-br from-orange-950/50 via-red-950/30 to-black/40 px-4 py-3 mb-4">
             <p className="text-[10px] font-black uppercase tracking-[0.18em] text-orange-300 mb-1">
               🤖 Chaos Mode · pure RNG

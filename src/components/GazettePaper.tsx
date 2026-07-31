@@ -33,22 +33,15 @@ export function normalizeEdition(raw: GazetteEdition): GazetteEdition {
       kicker: "War Room weather",
       body: "High confidence. Low dignity. Pack a paper bag.",
     },
-    classifieds: raw.classifieds?.length
+    // Empty arrays are intentional (slim early editions) — don't invent filler
+    classifieds: Array.isArray(raw.classifieds)
       ? raw.classifieds
       : ["Classifieds ran long. See Locker Room."],
     pullQuote: raw.pullQuote || {
       text: `"Trust the process."`,
       by: "Someone mid-process",
     },
-    sideStories: raw.sideStories?.length
-      ? raw.sideStories
-      : [
-          {
-            kicker: "Odd news",
-            headline: "SIDEBAR MISSING FROM ARCHIVE",
-            body: "This old edition predated our fake-news desk. Re-score the week for full absurdity.",
-          },
-        ],
+    sideStories: Array.isArray(raw.sideStories) ? raw.sideStories : [],
     swing: raw.swing ?? null,
     crystalBallMiss: raw.crystalBallMiss ?? null,
     standingsDeadlock: raw.standingsDeadlock ?? null,
@@ -268,25 +261,27 @@ export default function GazettePaper({
           </div>
         )}
 
-        {/* Classifieds */}
-        <div className="border-t-2 border-stone-900 pt-3">
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-stone-800 mb-2 text-center">
-            Classifieds
-          </p>
-          <ul className="space-y-2">
-            {edition.classifieds.map((line, i) => (
-              <li
-                key={i}
-                className="text-[12px] sm:text-[13px] text-stone-800 leading-snug border-b border-stone-300 pb-2 last:border-0"
-              >
-                <span className="font-bold text-stone-500 mr-1.5">
-                  {String.fromCharCode(65 + i)}.
-                </span>
-                {line}
-              </li>
-            ))}
-          </ul>
-        </div>
+        {/* Classifieds — skip section if empty (slim editions) */}
+        {edition.classifieds.length > 0 && (
+          <div className="border-t-2 border-stone-900 pt-3">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-stone-800 mb-2 text-center">
+              Classifieds
+            </p>
+            <ul className="space-y-2">
+              {edition.classifieds.map((line, i) => (
+                <li
+                  key={i}
+                  className="text-[12px] sm:text-[13px] text-stone-800 leading-snug border-b border-stone-300 pb-2 last:border-0"
+                >
+                  <span className="font-bold text-stone-500 mr-1.5">
+                    {String.fromCharCode(65 + i)}.
+                  </span>
+                  {line}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <p className="text-[10px] text-stone-500 text-center italic">
           {variant === "modal"
