@@ -235,18 +235,27 @@ export default function GazettePaper({
 
         {/* Chaos lock-in — high on the page; Monday Morning Edition energy */}
         {edition.chaosDetonation && (
-          <StoryBlock
-            kicker="💥 First thing · Chaos desk"
-            kickerClass="text-orange-900"
-            story={edition.chaosDetonation}
-            footer={`${edition.chaosDetonation.names.join(" · ")} · locked Chaos this week${
-              edition.chaosDetonation.pts
-                ? ` · finished at ${edition.chaosDetonation.pts} pts`
-                : ""
-            }`}
-            avatar="☢️"
-            avatarClass="border-orange-800 bg-orange-100"
-          />
+          <div className="space-y-1.5">
+            <StoryBlock
+              kicker="💥 First thing · Chaos desk"
+              kickerClass="text-orange-900"
+              story={edition.chaosDetonation}
+              footer={`${edition.chaosDetonation.names.join(" · ")} · locked Chaos this week${
+                edition.chaosDetonation.pts
+                  ? ` · finished at ${edition.chaosDetonation.pts} pts`
+                  : ""
+              }`}
+              avatar="☢️"
+              avatarClass="border-orange-800 bg-orange-100"
+            />
+            <p className="text-[11px] text-stone-600 leading-snug px-0.5">
+              New here?{" "}
+              <span className="font-semibold text-stone-800">
+                Chaos = random card · 2× week · limited uses · no undo.
+              </span>{" "}
+              That&apos;s why the paper is yelling.
+            </p>
+          </div>
         )}
 
         {/* Pull quote */}

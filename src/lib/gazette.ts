@@ -407,19 +407,23 @@ const CHAOS_LOCK_MULTI_HEADLINES: ((label: string) => string)[] = [
   (label) => `${label.toUpperCase()} WENT NUCLEAR. EVACUATE THE LOCKER ROOM.`,
 ];
 
+/** Always explain Chaos once — half the room will ask “wtf is that?” */
+const CHAOS_WHAT_IS =
+  "Chaos Mode = one pure-random card, 2× the week points, limited uses. No take-backs. Flames on the name.";
+
 const CHAOS_LOCK_DECKS: ((count: number, pts: number) => string)[] = [
   (count, pts) =>
     count > 1
-      ? `${count} humans locked pure random this week. Finals later. Dignity already spent.`
-      : `Confirmed Chaos lock. Pure random. 2× the week if it hits. Final score ${pts} — the paper does not care how you feel.`,
+      ? `${count} humans locked pure random this week. Peak ${pts}. ${CHAOS_WHAT_IS}`
+      : `Confirmed Chaos lock. Finished at ${pts}. ${CHAOS_WHAT_IS}`,
   (count, pts) =>
     count > 1
-      ? `Group detonation at lock. Scores came later (${pts} peak). The robots are laughing.`
-      : `They pressed Chaos and meant it. ${pts} pts when the smoke cleared. No take-backs.`,
+      ? `Group detonation at lock (${pts} peak). ${CHAOS_WHAT_IS}`
+      : `They pressed the big red button. ${pts} pts when the smoke cleared. ${CHAOS_WHAT_IS}`,
   (count) =>
     count > 1
-      ? `Several big red buttons. One paper. Zero chill.`
-      : `Gone postal at the lock screen. The room saw the flames. History will roast them either way.`,
+      ? `Several big red buttons. One paper. Zero chill. ${CHAOS_WHAT_IS}`
+      : `Gone postal at the lock screen. The room saw the flames. ${CHAOS_WHAT_IS}`,
 ];
 
 /**
