@@ -1679,9 +1679,10 @@ export default function CommissionerPage() {
                     Season background
                   </p>
                   <p className="text-xs text-muted mt-1 leading-relaxed">
-                    Football runs through the holidays — paint the whole league
-                    for Halloween, Thanksgiving, Christmas, or New Year. Everyone
-                    sees it after you save.
+                    Football runs through the holidays — overlay Halloween,
+                    Thanksgiving, Christmas, or New Year on the War Room layout
+                    (Home stays the same structure; theme washes + props sit on
+                    top). Everyone sees it after you save.
                   </p>
                 </div>
                 <label className="block text-xs text-muted">

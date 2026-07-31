@@ -180,17 +180,17 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col relative overflow-hidden crt-frame scan-sweep">
-      {/* War room atmosphere layers */}
+    <div className="min-h-screen flex flex-col relative overflow-hidden crt-frame scan-sweep home-war-room">
+      {/* War room atmosphere layers (always stay — season themes overlay on top via SeasonThemeApplier) */}
       <div
-        className="pointer-events-none absolute inset-0 -z-10"
+        className="home-war-base pointer-events-none absolute inset-0 -z-10"
         style={{
           background:
             "radial-gradient(ellipse 80% 60% at 50% 0%, rgba(34, 197, 94, 0.12), transparent 55%), radial-gradient(ellipse 70% 50% at 100% 100%, rgba(120, 40, 40, 0.18), transparent 50%), radial-gradient(ellipse 50% 40% at 0% 80%, rgba(20, 40, 30, 0.5), transparent 45%), #050805",
         }}
       />
       <div
-        className="pointer-events-none absolute inset-0 -z-10 opacity-[0.35]"
+        className="home-war-base pointer-events-none absolute inset-0 -z-10 opacity-[0.35]"
         style={{
           backgroundImage:
             "linear-gradient(rgba(34,197,94,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(34,197,94,0.04) 1px, transparent 1px)",
@@ -198,7 +198,7 @@ export default function Home() {
         }}
       />
       <div
-        className="pointer-events-none absolute inset-0 -z-10"
+        className="home-war-base pointer-events-none absolute inset-0 -z-10"
         style={{
           background:
             "radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.75) 100%)",
@@ -206,7 +206,7 @@ export default function Home() {
       />
       {/* faint scanline */}
       <div
-        className="pointer-events-none absolute inset-0 -z-10 opacity-[0.07]"
+        className="home-war-base pointer-events-none absolute inset-0 -z-10 opacity-[0.07]"
         style={{
           backgroundImage:
             "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.35) 3px)",
@@ -214,7 +214,7 @@ export default function Home() {
       />
 
       <Nav />
-      <main className="flex-1 max-w-6xl mx-auto w-full px-4 py-10 relative">
+      <main className="flex-1 max-w-6xl mx-auto w-full px-4 py-10 relative z-10">
         <section className="mb-6">
           <h1 className="text-3xl sm:text-5xl font-bold tracking-tight mb-3 text-white drop-shadow-[0_0_30px_rgba(34,197,94,0.15)]">
             Welcome to the War Room

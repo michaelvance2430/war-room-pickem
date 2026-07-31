@@ -25,22 +25,26 @@ export const SEASON_THEME_PRESETS: SeasonThemePreset[] = [
   {
     id: "halloween",
     label: "Halloween 🎃",
-    blurb: "Orange & purple with pumpkins and a ghost on the sides.",
+    blurb:
+      "Orange & purple wash over the War Room + pumpkins & ghost on the sides.",
   },
   {
     id: "thanksgiving",
     label: "Thanksgiving 🦃",
-    blurb: "Turkeys, cornucopia, and a harvest spread — gravy season.",
+    blurb:
+      "Harvest wash over the War Room + turkeys & cornucopia on the edges.",
   },
   {
     id: "christmas",
     label: "Christmas 🎄",
-    blurb: "Twinkling lights, a tree with presents, and Santa mid-exit.",
+    blurb:
+      "Red/green wash over the War Room + lights under the nav, tree & Santa.",
   },
   {
     id: "newyear",
     label: "New Year ✨",
-    blurb: "Ball drop, fireworks, champagne — midnight energy.",
+    blurb:
+      "Sparkle wash over the War Room + ball drop & fireworks energy.",
   },
 ];
 

@@ -68,9 +68,21 @@ export default function SeasonThemeApplier() {
     };
   }, []);
 
-  if (theme === "christmas") return <ChristmasLights />;
-  if (theme === "halloween") return <HalloweenDecor />;
-  if (theme === "thanksgiving") return <ThanksgivingDecor />;
-  if (theme === "newyear") return <NewYearDecor />;
-  return null;
+  if (theme === "default") return null;
+
+  // Color wash overlays the War Room base (especially Home) — layout unchanged.
+  // Decor sits above the wash, under sticky nav; never steals clicks.
+  return (
+    <>
+      <div
+        className="season-theme-overlay"
+        data-theme={theme}
+        aria-hidden
+      />
+      {theme === "christmas" && <ChristmasLights />}
+      {theme === "halloween" && <HalloweenDecor />}
+      {theme === "thanksgiving" && <ThanksgivingDecor />}
+      {theme === "newyear" && <NewYearDecor />}
+    </>
+  );
 }
