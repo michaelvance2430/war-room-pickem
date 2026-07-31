@@ -404,27 +404,27 @@ export default function Home() {
           {!firstWeekChrome && (
             <Link
               href="/championship"
-              className={`group rounded-xl border bg-black/40 backdrop-blur-sm p-6 transition ${
+              className={
                 homeChrome.sportId === "soccer_wwc"
-                  ? "border-pink-400/35 hover:border-pink-300/60 hover:bg-pink-500/10 shadow-[0_0_40px_rgba(236,72,153,0.1)]"
-                  : "border-primary/30 hover:border-primary hover:bg-primary/10 shadow-[0_0_40px_rgba(34,197,94,0.08)]"
-              }`}
+                  ? "group rounded-xl border bg-black/40 backdrop-blur-sm p-6 transition border-[#009C3B]/50 hover:border-[#FFDF00]/70 hover:bg-[#009C3B]/10 shadow-[0_0_40px_rgba(0,156,59,0.15)]"
+                  : "group rounded-xl border bg-black/40 backdrop-blur-sm p-6 transition border-primary/30 hover:border-primary hover:bg-primary/10 shadow-[0_0_40px_rgba(34,197,94,0.08)]"
+              }
             >
               <div
-                className={`text-xs uppercase tracking-wider mb-2 ${
+                className={
                   homeChrome.sportId === "soccer_wwc"
-                    ? "text-pink-300/80"
-                    : "text-primary/70"
-                }`}
+                    ? "text-xs uppercase tracking-wider mb-2 text-[#FFDF00]/90"
+                    : "text-xs uppercase tracking-wider mb-2 text-primary/70"
+                }
               >
                 Postseason
               </div>
               <div
-                className={`text-lg font-semibold ${
+                className={
                   homeChrome.sportId === "soccer_wwc"
-                    ? "text-pink-200"
-                    : "text-primary"
-                }`}
+                    ? "text-lg font-semibold text-white"
+                    : "text-lg font-semibold text-primary"
+                }
               >
                 {homeChrome.primaryPathLabel}
               </div>

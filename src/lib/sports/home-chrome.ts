@@ -45,16 +45,29 @@ const CFB_ATMO: SportAtmosphere = {
   accentHex: "#22c55e",
 };
 
+/** FIFA WWC Brazil 2027™ — Brazilian flag palette (green / gold / blue / white) */
+export const WWC_BRAZIL_COLORS = {
+  emerald: "#009C3B",
+  gold: "#FFDF00",
+  royal: "#002776",
+  white: "#FFFFFF",
+} as const;
+
 const WWC_ATMO: SportAtmosphere = {
   baseGradient:
-    "radial-gradient(ellipse 80% 55% at 50% -10%, rgba(236, 72, 153, 0.22), transparent 50%), radial-gradient(ellipse 60% 50% at 100% 80%, rgba(56, 189, 248, 0.14), transparent 55%), radial-gradient(ellipse 50% 40% at 0% 70%, rgba(167, 139, 250, 0.16), transparent 50%), #07050c",
-  gridLine: "rgba(244,114,182,0.06)",
+    // Emerald top · gold heat · deep royal corners · dark pitch
+    `radial-gradient(ellipse 85% 55% at 50% -8%, rgba(0, 156, 59, 0.28), transparent 52%),
+     radial-gradient(ellipse 55% 45% at 95% 75%, rgba(255, 223, 0, 0.12), transparent 55%),
+     radial-gradient(ellipse 50% 50% at 5% 80%, rgba(0, 39, 118, 0.35), transparent 50%),
+     radial-gradient(ellipse 40% 30% at 70% 20%, rgba(255, 255, 255, 0.04), transparent 45%),
+     #04080a`,
+  gridLine: "rgba(0, 156, 59, 0.07)",
   vignette:
-    "radial-gradient(ellipse at center, transparent 35%, rgba(0,0,0,0.8) 100%)",
+    "radial-gradient(ellipse at center, transparent 32%, rgba(0, 20, 40, 0.85) 100%)",
   scanline:
-    "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.3) 3px)",
-  titleGlow: "drop-shadow-[0_0_34px_rgba(236,72,153,0.28)]",
-  accentHex: "#f472b6",
+    "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.32) 3px)",
+  titleGlow: "drop-shadow-[0_0_32px_rgba(0,156,59,0.35)] drop-shadow-[0_0_18px_rgba(255,223,0,0.12)]",
+  accentHex: WWC_BRAZIL_COLORS.emerald,
 };
 
 function chromeForPack(pack: SportPack): SportHomeChrome {
@@ -66,7 +79,7 @@ function chromeForPack(pack: SportPack): SportHomeChrome {
       pack,
       welcomeTitle: "Welcome to the War Room",
       defaultTagline:
-        "Same clubhouse. Global stage. Lock the card, roast the room, chase the Cup.",
+        "Brazil 2027. Same clubhouse. Global stage. Lock the card, roast the room, chase the Cup.",
       sportBadge: "FIFA WOMEN'S WORLD CUP BRAZIL 2027™",
       periodWord: "Matchday",
       periodProgressHint: "Tournament matchdays — short, loud, zero chill",
