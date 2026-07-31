@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
+import { useMemo, useState } from "react";
 import { getSession, getLeague } from "@/lib/league";
 
 /** Personal inbox until a business address exists. */
@@ -27,11 +27,19 @@ function kindLabel(kind: string) {
   return "Feedback";
 }
 
-function buildMailto(opts: {
+type Draft = {
+  subject: string;
+  body: string;
+  mailto: string;
+  gmail: string;
+  outlook: string;
+};
+
+function buildDraft(opts: {
   kind: string;
   message: string;
   contactEmail: string;
-}): { subject: string; body: string; href: string } {
+}): Draft {
   const session = getSession();
   const league = getLeague();
   const name = (session?.playerName || "Player").trim().slice(0, 80);
@@ -41,7 +49,7 @@ function buildMailto(opts: {
   const label = kindLabel(opts.kind);
 
   const subject = `[War Room] ${label} from ${name}`;
-  // Keep body short — some mail clients silently ignore long mailto: URLs
+  // Cap length — Gmail/Outlook URL compose has limits
   const body = [
     `Type: ${label}`,
     `From: ${name}`,
@@ -49,47 +57,42 @@ function buildMailto(opts: {
     leagueName ? `League: ${leagueName}` : null,
     userId ? `User ID: ${userId}` : null,
     "",
-    opts.message.trim().slice(0, 1200),
+    opts.message.trim().slice(0, 900),
   ]
     .filter(Boolean)
     .join("\n");
 
-  const href = `mailto:${FEEDBACK_TO_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  return { subject, body, href };
+  const to = FEEDBACK_TO_EMAIL;
+  const mailto = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+  // Works in the browser — no OS mail client required
+  const gmail =
+    `https://mail.google.com/mail/?view=cm&fs=1&tf=1` +
+    `&to=${encodeURIComponent(to)}` +
+    `&su=${encodeURIComponent(subject)}` +
+    `&body=${encodeURIComponent(body)}`;
+
+  const outlook =
+    `https://outlook.live.com/mail/0/deeplink/compose` +
+    `?to=${encodeURIComponent(to)}` +
+    `&subject=${encodeURIComponent(subject)}` +
+    `&body=${encodeURIComponent(body)}`;
+
+  return { subject, body, mailto, gmail, outlook };
 }
 
-/**
- * Opens the OS mail client (Apple Mail, Gmail, Outlook, Android mail).
- * Anchor click is far more reliable than window.location in Next.js / phones.
- */
-function openMailClient(href: string): boolean {
-  if (typeof window === "undefined" || !href) return false;
-
-  try {
-    const a = document.createElement("a");
-    a.href = href;
-    a.setAttribute("aria-hidden", "true");
-    // Don't use target=_blank — breaks mailto on some desktop Outlook setups
-    a.style.display = "none";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    return true;
-  } catch {
-    /* fall through */
-  }
-
-  try {
-    window.location.assign(href);
-    return true;
-  } catch {
-    return false;
+function openInNewTab(url: string) {
+  const w = window.open(url, "_blank", "noopener,noreferrer");
+  if (!w) {
+    // Popup blocked — same-tab fallback
+    window.location.href = url;
   }
 }
 
 /**
- * Account → Feedback.
- * Opens Apple Mail / Gmail / Outlook / Android mail with a draft to Mike.
+ * Account → Feedback for Mike.
+ * Primary path = Gmail/Outlook *web* compose (always does something in browser).
+ * mailto is optional extras for devices where it works.
  */
 export default function FeedbackForm() {
   const [kind, setKind] = useState<string>("recommendation");
@@ -100,59 +103,71 @@ export default function FeedbackForm() {
 
   const canSend = message.trim().length >= 5;
 
-  const mailto = useMemo(
+  const draft = useMemo(
     () =>
-      buildMailto({
+      buildDraft({
         kind,
-        message: message || "(write your note above)",
+        message: canSend ? message : " ",
         contactEmail,
       }),
-    [kind, message, contactEmail]
+    [kind, message, contactEmail, canSend]
   );
 
-  function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    setStatus(null);
+  function sendVia(channel: "gmail" | "outlook" | "mailto") {
     setError(null);
-
     if (!canSend) {
-      setError("Message needs at least a few words.");
+      setError("Write a message first (at least a few words).");
       return;
     }
-
-    const { href } = buildMailto({ kind, message, contactEmail });
-    const ok = openMailClient(href);
-
-    if (ok) {
+    const d = buildDraft({ kind, message, contactEmail });
+    if (channel === "gmail") {
+      openInNewTab(d.gmail);
       setStatus(
-        "If your mail app opened, hit Send. If nothing opened, use the blue email link below — or copy the address."
+        "Gmail should open in a new tab with Mike as To and your note filled in. Hit Send there."
       );
-    } else {
-      setError(
-        `Could not open mail. Write to ${FEEDBACK_TO_EMAIL} and paste your note.`
+      return;
+    }
+    if (channel === "outlook") {
+      openInNewTab(d.outlook);
+      setStatus(
+        "Outlook on the web should open with a draft. Hit Send there."
       );
+      return;
+    }
+    // mailto — OS app
+    try {
+      window.location.href = d.mailto;
+      setStatus(
+        "Tried to open your mail app. If nothing happened, use Gmail or Outlook buttons instead."
+      );
+    } catch {
+      setError("Mail app blocked. Use Open in Gmail below.");
     }
   }
 
   async function copyEmail() {
     try {
       await navigator.clipboard.writeText(FEEDBACK_TO_EMAIL);
-      setStatus("Email address copied.");
+      setStatus("Copied: " + FEEDBACK_TO_EMAIL);
       setError(null);
     } catch {
-      setError(`Copy failed — type this: ${FEEDBACK_TO_EMAIL}`);
+      setError(`Type this: ${FEEDBACK_TO_EMAIL}`);
     }
   }
 
-  async function copyFullDraft() {
-    const { subject, body } = buildMailto({ kind, message, contactEmail });
-    const full = `To: ${FEEDBACK_TO_EMAIL}\nSubject: ${subject}\n\n${body}`;
+  async function copyDraft() {
+    if (!canSend) {
+      setError("Write a message first.");
+      return;
+    }
+    const d = buildDraft({ kind, message, contactEmail });
+    const full = `To: ${FEEDBACK_TO_EMAIL}\nSubject: ${d.subject}\n\n${d.body}`;
     try {
       await navigator.clipboard.writeText(full);
-      setStatus("Full draft copied — paste into Outlook, Gmail, or any mail app.");
+      setStatus("Draft copied. Paste into any email app and send.");
       setError(null);
     } catch {
-      setError("Could not copy. Select and copy manually from the fields above.");
+      setError("Copy failed — select your message and copy manually.");
     }
   }
 
@@ -163,12 +178,12 @@ export default function FeedbackForm() {
     >
       <h2 className="font-semibold mb-1 text-sky-200">Feedback for Mike</h2>
       <p className="text-xs text-muted mb-4 leading-relaxed">
-        Bug, idea, or general take. This opens your mail app (Outlook, Apple
-        Mail, Gmail, etc.) with Mike already in the To field — then you hit
-        Send.
+        Bug, idea, or take. Opens a draft <strong className="text-foreground">to{" "}
+        {FEEDBACK_TO_EMAIL}</strong>. Gmail is the reliable path on phone and
+        computer.
       </p>
 
-      <form onSubmit={onSubmit} className="space-y-3">
+      <div className="space-y-3">
         <div className="flex flex-wrap gap-2">
           {KINDS.map((k) => (
             <button
@@ -192,7 +207,6 @@ export default function FeedbackForm() {
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            required
             minLength={5}
             maxLength={4000}
             rows={4}
@@ -212,59 +226,60 @@ export default function FeedbackForm() {
           />
         </label>
 
-        {/* Real <a href="mailto:"> — most reliable on phone + desktop */}
-        {canSend ? (
-          <a
-            href={mailto.href}
-            onClick={() => {
-              setStatus(
-                "Mail app should open with Mike as To. Hit Send when ready."
-              );
-              setError(null);
-            }}
-            className="flex items-center justify-center w-full py-3 min-h-[48px] rounded-lg bg-sky-400 text-black text-sm font-bold hover:opacity-90 transition touch-manipulation"
-          >
-            Open mail to Mike
-          </a>
-        ) : (
-          <button
-            type="button"
-            disabled
-            className="w-full py-3 min-h-[48px] rounded-lg bg-sky-400/40 text-black/60 text-sm font-bold cursor-not-allowed"
-          >
-            Write a message first (5+ characters)
-          </button>
-        )}
-
-        {/* Hidden submit still works for Enter key */}
-        <button type="submit" className="sr-only" tabIndex={-1}>
-          Submit
+        {/* Primary: Gmail web — always does something in the browser */}
+        <button
+          type="button"
+          disabled={!canSend}
+          onClick={() => sendVia("gmail")}
+          className="w-full py-3.5 min-h-[52px] rounded-xl bg-sky-400 text-black text-sm font-extrabold disabled:opacity-40 touch-manipulation active:scale-[0.99]"
+        >
+          Open in Gmail → send to Mike
         </button>
 
-        <div className="flex flex-col sm:flex-row gap-2">
-          <a
-            href={`mailto:${FEEDBACK_TO_EMAIL}`}
-            className="flex-1 text-center text-xs py-2.5 rounded-lg border border-sky-400/50 text-sky-200 font-semibold hover:bg-sky-400/10"
-          >
-            {FEEDBACK_TO_EMAIL}
-          </a>
+        <button
+          type="button"
+          disabled={!canSend}
+          onClick={() => sendVia("outlook")}
+          className="w-full py-3 min-h-[48px] rounded-xl border-2 border-sky-400/60 text-sky-100 text-sm font-bold disabled:opacity-40 touch-manipulation"
+        >
+          Open in Outlook on the web
+        </button>
+
+        <button
+          type="button"
+          disabled={!canSend}
+          onClick={() => sendVia("mailto")}
+          className="w-full py-2.5 rounded-lg border border-border text-sm text-muted hover:text-foreground disabled:opacity-40"
+        >
+          Try phone / desktop mail app
+        </button>
+
+        <div className="flex flex-col sm:flex-row gap-2 pt-1">
           <button
             type="button"
             onClick={() => void copyEmail()}
             className="flex-1 text-xs py-2.5 rounded-lg border border-border text-muted hover:text-foreground"
           >
-            Copy email address
+            Copy Mike&apos;s email
+          </button>
+          <button
+            type="button"
+            disabled={!canSend}
+            onClick={() => void copyDraft()}
+            className="flex-1 text-xs py-2.5 rounded-lg border border-border text-muted hover:text-foreground disabled:opacity-40"
+          >
+            Copy full draft
           </button>
         </div>
 
-        {canSend && (
-          <button
-            type="button"
-            onClick={() => void copyFullDraft()}
-            className="w-full text-xs py-2 rounded-lg border border-border text-muted hover:text-foreground"
-          >
-            Copy full draft (if mail app won’t open)
-          </button>
+        <p className="text-[11px] text-muted text-center break-all">
+          {FEEDBACK_TO_EMAIL}
+        </p>
+
+        {!canSend && (
+          <p className="text-xs text-amber-200/90 text-center">
+            Type a message above (5+ characters), then the buttons unlock.
+          </p>
         )}
 
         {status && (
@@ -277,7 +292,7 @@ export default function FeedbackForm() {
             {error}
           </p>
         )}
-      </form>
+      </div>
     </section>
   );
 }
