@@ -15,6 +15,7 @@ import {
   takePendingJoinCode,
 } from "@/lib/commish-onboarding";
 import InviteFriends from "@/components/InviteFriends";
+import OwnershipNotice from "@/components/OwnershipNotice";
 
 function generateCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -402,6 +403,7 @@ function JoinPageInner() {
               Bowl both finish in the CFP weeks.
             </p>
             <Link href="/login" className="block text-center text-xs text-muted mt-4">Switch account</Link>
+            <OwnershipNotice className="mt-6" />
           </div>
         )}
 
