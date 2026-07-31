@@ -898,7 +898,10 @@ export async function buildGazetteEdition(
   // Biggest climber / freefall for the paper's "Movers" box
   let swing: GazetteStory | null = null;
   try {
-    const ranked = rankPlayersWithSwings(players).filter((p) => !p.isMock);
+    const ranked = rankPlayersWithSwings(
+      players,
+      getLeague()?.sportId
+    ).filter((p) => !p.isMock);
     const movers = ranked.filter(
       (p) =>
         p.swing.tone === "hero" ||
@@ -1051,7 +1054,10 @@ export async function buildGazetteEdition(
     let nflSwing: GazetteStory | null = swing;
     if (swing) {
       try {
-        const ranked = rankPlayersWithSwings(players).filter((p) => !p.isMock);
+        const ranked = rankPlayersWithSwings(
+      players,
+      getLeague()?.sportId
+    ).filter((p) => !p.isMock);
         const star = ranked.find(
           (p) => p.name.toLowerCase() === (swing!.names[0] || "").toLowerCase()
         );

@@ -5,7 +5,7 @@ import Nav from "@/components/Nav";
 import SwingBadge from "@/components/SwingBadge";
 import CrownAndShame from "@/components/CrownAndShame";
 import { loadLeaguePlayers } from "@/lib/cloud";
-import { getSession } from "@/lib/league";
+import { getSession, getLeague } from "@/lib/league";
 import { rankPlayersWithSwings } from "@/lib/fun-board";
 import { compareForSeed } from "@/lib/brackets";
 import { isSelfPlayer, selfNameClass, selfRowClass } from "@/lib/self-highlight";
@@ -59,7 +59,7 @@ export default function StandingsPage() {
       }
       const list = await loadLeaguePlayers();
       setPlayers(list);
-      const ranked = rankPlayersWithSwings(list);
+      const ranked = rankPlayersWithSwings(list, getLeague()?.sportId);
       const map: Record<string, (typeof ranked)[0]["swing"]> = {};
       for (const r of ranked) map[r.id] = r.swing;
       setSwingById(map);

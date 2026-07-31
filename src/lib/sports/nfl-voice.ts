@@ -479,6 +479,38 @@ export function buildNflHotTakes(players: Player[]): string[] {
   return unique.slice(0, 24);
 }
 
+/** Ticker chrome label */
+export const NFL_TICKER_LABEL = "Primetime wire";
+
+/** Standings swing badges — pro lexicon (not campus) */
+export function nflSwingText(
+  key:
+    | "mid"
+    | "rocket"
+    | "heater"
+    | "climb"
+    | "trapdoor"
+    | "dropped"
+    | "slip"
+): string {
+  switch (key) {
+    case "mid":
+      return "STUCK IN TRAFFIC";
+    case "rocket":
+      return "PRIMETIME LIFT";
+    case "heater":
+      return "SCRIPTING WINS";
+    case "climb":
+      return "MOVING UP";
+    case "trapdoor":
+      return "BLOWN COVERAGE";
+    case "dropped":
+      return "THREE-AND-OUT";
+    case "slip":
+      return "LOSING GROUND";
+  }
+}
+
 export const NFL_HOME_TAGLINE_DEFAULT =
   "Sundays. Spreads. No campus. Just the room and the late window.";
 
