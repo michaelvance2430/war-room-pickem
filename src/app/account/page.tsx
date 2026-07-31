@@ -23,6 +23,7 @@ import {
   loadMyProfile,
   uploadMyAvatar,
   removeMyAvatar,
+  updateMyDisplayName,
 } from "@/lib/profile";
 import { isAppCreator, withCreatorFlag } from "@/lib/creator";
 import { isViewAsPlayer, setViewAsPlayer } from "@/lib/view-as-player";
@@ -63,6 +64,8 @@ export default function AccountPage() {
   const [memberships, setMemberships] = useState<LeagueMembership[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [name, setName] = useState("");
+  const [nameDraft, setNameDraft] = useState("");
+  const [nameBusy, setNameBusy] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -93,9 +96,12 @@ export default function AccountPage() {
     const profile = await loadMyProfile();
     if (profile) {
       setName(profile.displayName);
+      setNameDraft(profile.displayName);
       setAvatarUrl(profile.avatarUrl);
     } else {
-      setName(session?.playerName || "");
+      const n = session?.playerName || "";
+      setName(n);
+      setNameDraft(n);
     }
     const list = await fetchMyMemberships();
     setMemberships(list);
@@ -192,6 +198,31 @@ export default function AccountPage() {
     }
     setAvatarUrl(null);
     setMessage("Profile photo removed");
+  }
+
+  async function onSaveName() {
+    if (isGuestMode()) {
+      setMessage("Exit guest demo to change a real display name.");
+      return;
+    }
+    const next = nameDraft.trim().replace(/\s+/g, " ");
+    if (!next || next === name.trim()) {
+      setMessage(next === name.trim() ? "That’s already your name." : "Enter a name.");
+      return;
+    }
+    setNameBusy(true);
+    setMessage(null);
+    const res = await updateMyDisplayName(next);
+    setNameBusy(false);
+    if (!res.ok) {
+      setMessage(res.error || "Could not save name");
+      return;
+    }
+    setName(res.displayName || next);
+    setNameDraft(res.displayName || next);
+    setMessage(
+      `Name updated to ${res.displayName || next}. The room will see it on the board.`
+    );
   }
 
   async function onSwitch(leagueId: string) {
@@ -565,6 +596,40 @@ export default function AccountPage() {
               );
             })}
           </div>
+        </section>
+
+        <section className="rounded-xl border border-border bg-card p-5 mb-6">
+          <h2 className="font-semibold mb-1">Display name</h2>
+          <p className="text-xs text-muted mb-3 leading-relaxed">
+            What the room sees on standings, picks, and the Gazette. Change it
+            anytime.
+          </p>
+          <label className="block text-xs text-muted mb-3">
+            Your name
+            <input
+              type="text"
+              value={nameDraft}
+              onChange={(e) => setNameDraft(e.target.value)}
+              maxLength={40}
+              autoComplete="nickname"
+              placeholder="e.g. Mike V"
+              disabled={nameBusy || isGuestMode()}
+              className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground font-medium disabled:opacity-50"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={() => void onSaveName()}
+            disabled={
+              nameBusy ||
+              isGuestMode() ||
+              nameDraft.trim().replace(/\s+/g, " ") === name.trim() ||
+              !nameDraft.trim()
+            }
+            className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-primary text-black text-sm font-bold disabled:opacity-40"
+          >
+            {nameBusy ? "Saving…" : "Save name"}
+          </button>
         </section>
 
         <section className="rounded-xl border border-border bg-card p-5 mb-6">

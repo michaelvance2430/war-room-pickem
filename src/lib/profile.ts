@@ -10,6 +10,113 @@ export type Profile = {
   avatarUrl: string | null;
 };
 
+export const EVENT_PROFILE_UPDATED = "warroom-profile-updated";
+
+function notifyProfileUpdated(detail?: { displayName?: string }) {
+  if (typeof window === "undefined") return;
+  try {
+    window.dispatchEvent(
+      new CustomEvent(EVENT_PROFILE_UPDATED, { detail: detail || {} })
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Patch local session name so Nav / home update immediately. */
+function patchSessionPlayerName(displayName: string) {
+  if (typeof window === "undefined" || typeof localStorage === "undefined")
+    return;
+  try {
+    const raw = localStorage.getItem("warroom-session");
+    if (!raw) return;
+    const session = JSON.parse(raw) as { playerName?: string };
+    session.playerName = displayName;
+    localStorage.setItem("warroom-session", JSON.stringify(session));
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * Change display name (what the room sees on the board, Gazette, etc.).
+ * Updates profiles + auth metadata + local session.
+ */
+export async function updateMyDisplayName(
+  raw: string
+): Promise<{ ok: boolean; displayName?: string; error?: string }> {
+  const name = raw.trim().replace(/\s+/g, " ");
+  if (!name) return { ok: false, error: "Enter a name." };
+  if (name.length < 2) {
+    return { ok: false, error: "Name needs at least 2 characters." };
+  }
+  if (name.length > 40) {
+    return { ok: false, error: "Keep it under 40 characters." };
+  }
+
+  try {
+    const supabase = createClient();
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth.user) {
+      return { ok: false, error: "Not signed in — log in and try again." };
+    }
+    const userId = auth.user.id;
+
+    const { data: existing } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (existing?.id) {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ display_name: name })
+        .eq("id", userId);
+      if (error) {
+        const msg = error.message || "";
+        if (/row-level security|violates|policy/i.test(msg)) {
+          return {
+            ok: false,
+            error:
+              "Could not update name (permissions). Ask Mike if this keeps happening.",
+          };
+        }
+        return { ok: false, error: msg || "Could not save name." };
+      }
+    } else {
+      const { error } = await supabase.from("profiles").insert({
+        id: userId,
+        display_name: name,
+      });
+      if (error) {
+        return {
+          ok: false,
+          error: error.message || "Could not create profile name.",
+        };
+      }
+    }
+
+    // Keep signup metadata in sync (session restore fallback)
+    try {
+      await supabase.auth.updateUser({
+        data: { display_name: name },
+      });
+    } catch {
+      /* non-fatal */
+    }
+
+    patchSessionPlayerName(name);
+    notifyProfileUpdated({ displayName: name });
+    return { ok: true, displayName: name };
+  } catch (e: unknown) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "Could not save name",
+    };
+  }
+}
+
 /** Load current user's profile row. */
 export async function loadMyProfile(): Promise<Profile | null> {
   const supabase = createClient();

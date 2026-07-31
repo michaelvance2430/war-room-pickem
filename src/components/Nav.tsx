@@ -121,6 +121,20 @@ export default function Nav() {
         });
       }
     });
+
+    function onProfileUpdated(e: Event) {
+      const detail = (e as CustomEvent<{ displayName?: string }>).detail;
+      if (detail?.displayName) setName(detail.displayName);
+      else {
+        void loadMyProfile().then((p) => {
+          if (p) {
+            setName(p.displayName);
+            setAvatarUrl(p.avatarUrl);
+          }
+        });
+      }
+    }
+    window.addEventListener("warroom-profile-updated", onProfileUpdated);
     // Immediate pass from session (before profile returns)
     if (session?.playerId) {
       sanitizeLegacyLegendsOnBoot({
@@ -181,6 +195,7 @@ export default function Nav() {
       document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener(EVENT_LOCKER_SEEN, onLockerSeen);
       window.removeEventListener("warroom-gazette-seen", onGazetteSeen);
+      window.removeEventListener("warroom-profile-updated", onProfileUpdated);
     };
   }, []);
 
