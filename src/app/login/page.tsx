@@ -25,7 +25,6 @@ function LoginPageInner() {
   const [loading, setLoading] = useState(false);
   const [guestLoading, setGuestLoading] = useState(false);
   const [inviteHint, setInviteHint] = useState<string | null>(null);
-  const [showGuest, setShowGuest] = useState(false);
 
   // Preserve deep-link invite through login/signup
   useEffect(() => {
@@ -135,6 +134,57 @@ function LoginPageInner() {
             </p>
           )}
         </div>
+
+        {/* Four doors in — host, code, open lobby, demo */}
+        {!inviteHint && (
+          <div className="mb-5 grid grid-cols-1 gap-2">
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary text-center mb-1">
+              How do you want in?
+            </p>
+            <Link
+              href="/join?mode=create"
+              className="w-full py-3.5 min-h-[52px] rounded-xl bg-primary text-black text-sm font-extrabold touch-manipulation flex items-center justify-center"
+            >
+              Commissioner — create league
+            </Link>
+            <Link
+              href="/join?mode=join"
+              className="w-full py-3.5 min-h-[52px] rounded-xl border border-border bg-card text-sm font-bold touch-manipulation flex items-center justify-center"
+            >
+              Join with code
+            </Link>
+            <Link
+              href="/open-room"
+              className="w-full py-3.5 min-h-[52px] rounded-xl border-2 border-primary/40 bg-primary/10 text-sm font-bold touch-manipulation flex items-center justify-center"
+            >
+              Join open room
+            </Link>
+            <button
+              type="button"
+              disabled={guestLoading || loading}
+              onClick={() => {
+                setError(null);
+                setGuestLoading(true);
+                const res = enterGuestDemo();
+                setGuestLoading(false);
+                if (!res.ok) {
+                  setError(res.error || "Could not start guest demo");
+                  return;
+                }
+                router.push("/");
+                router.refresh();
+              }}
+              className="w-full py-3.5 min-h-[52px] rounded-xl border border-border text-sm font-medium text-muted touch-manipulation disabled:opacity-50"
+            >
+              {guestLoading ? "Loading demo…" : "Guest demo (bots, no account)"}
+            </button>
+            <p className="text-[11px] text-muted text-center leading-relaxed px-1">
+              Open lobby fills one room at a time. Full rooms get a friendly
+              “no seats” bounce — not a lecture. Log in below if you need an
+              account first.
+            </p>
+          </div>
+        )}
 
         {/* Auth form FIRST when invited; always big phone fields */}
         <form
@@ -249,47 +299,6 @@ function LoginPageInner() {
               : "Already have an account? Log in"}
           </button>
         </form>
-
-        {/* Guest: secondary — especially hidden when you have a real invite */}
-        {!inviteHint && (
-          <div className="mt-5">
-            {!showGuest ? (
-              <button
-                type="button"
-                onClick={() => setShowGuest(true)}
-                className="w-full py-3 min-h-[48px] rounded-xl border border-border text-sm text-muted font-medium touch-manipulation"
-              >
-                Just looking? Try a free demo
-              </button>
-            ) : (
-              <div className="rounded-xl border border-border bg-card/80 p-4 space-y-3">
-                <p className="text-sm text-muted leading-relaxed">
-                  Simulated season with bots — <strong className="text-foreground">not</strong> your
-                  friends&apos; league. No account needed.
-                </p>
-                <button
-                  type="button"
-                  disabled={guestLoading || loading}
-                  onClick={() => {
-                    setError(null);
-                    setGuestLoading(true);
-                    const res = enterGuestDemo();
-                    setGuestLoading(false);
-                    if (!res.ok) {
-                      setError(res.error || "Could not start guest demo");
-                      return;
-                    }
-                    router.push("/");
-                    router.refresh();
-                  }}
-                  className="w-full py-3.5 min-h-[52px] rounded-xl border border-primary/40 text-primary font-bold disabled:opacity-50 touch-manipulation"
-                >
-                  {guestLoading ? "Loading demo…" : "Open guest demo"}
-                </button>
-              </div>
-            )}
-          </div>
-        )}
 
         {inviteHint && (
           <p className="text-center text-[11px] text-muted mt-4 leading-relaxed">

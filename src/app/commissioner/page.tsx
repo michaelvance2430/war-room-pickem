@@ -167,6 +167,10 @@ function CommissionerPageInner() {
   const [leagueNameEdit, setLeagueNameEdit] = useState("");
   const [cutPercent, setCutPercent] = useState(50);
   const [crystalBallEnabled, setCrystalBallEnabled] = useState(true);
+  /** List league in Join open room lobby */
+  const [isOpenRoom, setIsOpenRoom] = useState(false);
+  const [openRoomBusy, setOpenRoomBusy] = useState(false);
+  const [openRoomNote, setOpenRoomNote] = useState<string | null>(null);
   const [homeTaglineId, setHomeTaglineId] = useState(DEFAULT_HOME_TAGLINE_ID);
   const [homeTaglineCustom, setHomeTaglineCustom] = useState("");
   const [seasonThemeId, setSeasonThemeId] = useState<SeasonThemeId>(
@@ -300,6 +304,23 @@ function CommissionerPageInner() {
         setLeagueNameEdit(lg.name);
         setCutPercent(lg.settings?.cutPercent ?? 50);
         setCrystalBallEnabled(lg.settings?.crystalBallEnabled !== false);
+        // Open-room listing (cloud column; optional until SQL runs)
+        try {
+          const { createClient, hasSupabaseConfig } = await import(
+            "@/lib/supabase/client"
+          );
+          if (hasSupabaseConfig() && lg.id) {
+            const sb = createClient();
+            const { data: row } = await sb
+              .from("leagues")
+              .select("is_open")
+              .eq("id", lg.id)
+              .maybeSingle();
+            setIsOpenRoom(!!(row as { is_open?: boolean } | null)?.is_open);
+          }
+        } catch {
+          setIsOpenRoom(false);
+        }
         setHomeTaglineId(
           lg.settings?.homeTaglineId || DEFAULT_HOME_TAGLINE_ID
         );
@@ -2141,6 +2162,77 @@ function CommissionerPageInner() {
                 </button>
                 <p className="w-full text-xs font-medium text-muted">
                   {crystalBallEnabled ? "On — tab visible" : "Off — tab hidden"}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-border bg-background p-4 flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-foreground">
+                    Open room listing
+                  </p>
+                  <p className="text-xs text-muted mt-1 leading-relaxed">
+                    When on, people using{" "}
+                    <strong className="text-foreground">Join open room</strong>{" "}
+                    can land here. We fill this room first (fast team build),
+                    then the next open league. Auto-unlists when full. Run{" "}
+                    <span className="font-mono text-[10px]">
+                      supabase/open-rooms.sql
+                    </span>{" "}
+                    once if the toggle errors.
+                  </p>
+                  {openRoomNote && (
+                    <p className="text-xs text-primary mt-2">{openRoomNote}</p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={isOpenRoom}
+                  disabled={openRoomBusy}
+                  onClick={() => {
+                    void (async () => {
+                      if (!league?.id) return;
+                      setOpenRoomBusy(true);
+                      setOpenRoomNote(null);
+                      const next = !isOpenRoom;
+                      try {
+                        const { setLeagueOpenListing } = await import(
+                          "@/lib/open-room"
+                        );
+                        const res = await setLeagueOpenListing(league.id, next);
+                        if (!res.ok) {
+                          setOpenRoomNote(res.error || "Could not update");
+                          return;
+                        }
+                        setIsOpenRoom(next);
+                        setOpenRoomNote(
+                          next
+                            ? "Listed — open lobby can find you"
+                            : "Unlisted from open lobby"
+                        );
+                      } catch (e: unknown) {
+                        setOpenRoomNote(
+                          e instanceof Error ? e.message : "Could not update"
+                        );
+                      } finally {
+                        setOpenRoomBusy(false);
+                      }
+                    })();
+                  }}
+                  className={`relative shrink-0 w-12 h-7 rounded-full transition ${
+                    isOpenRoom ? "bg-primary" : "bg-border"
+                  } disabled:opacity-50`}
+                >
+                  <span
+                    className={`absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-black transition ${
+                      isOpenRoom ? "translate-x-5" : "translate-x-0"
+                    }`}
+                  />
+                </button>
+                <p className="w-full text-xs font-medium text-muted">
+                  {isOpenRoom
+                    ? "On — open lobby can seat people here"
+                    : "Off — code invite only"}
                 </p>
               </div>
 

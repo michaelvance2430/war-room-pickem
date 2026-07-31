@@ -41,6 +41,8 @@ function JoinPageInner() {
   const [leagueName, setLeagueName] = useState("War Room");
   /** Multi-sport: only CFB is live in Phase 1 */
   const [sportId, setSportId] = useState<SportId>(DEFAULT_SPORT_ID);
+  /** List new league in open-room lobby for strangers to fill seats */
+  const [listAsOpen, setListAsOpen] = useState(false);
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -59,6 +61,14 @@ function JoinPageInner() {
       setDeepLinkCode(c);
       setMode("join");
       stashPendingJoinCode(c); // keep if we bounce to login
+      return;
+    }
+    const m = (searchParams.get("mode") || "").toLowerCase();
+    if (m === "create") setMode("create");
+    if (m === "join") setMode("join");
+    if (searchParams.get("open") === "1") {
+      setMode("create");
+      setListAsOpen(true);
     }
   }, [searchParams]);
 
@@ -119,12 +129,16 @@ function JoinPageInner() {
       };
       // Include sport when column exists (run supabase/sport-id.sql on dev DB)
       // Crystal Ball is CFB pride pick — default off for NFL
-      const withSport = {
+      const withSport: Record<string, unknown> = {
         ...baseRow,
         sport_id: sportId,
         sport_settings: {},
         crystal_ball_enabled: sportId === "cfb",
       };
+      if (listAsOpen) {
+        withSport.is_open = true;
+        withSport.open_listed_at = new Date().toISOString();
+      }
 
       let league: Record<string, unknown> | null = null;
       let leagueError: { message?: string } | null = null;
@@ -139,20 +153,35 @@ function JoinPageInner() {
         leagueError = res.error;
       }
 
-      // Column missing — retry without sport fields (prod freeze / pre-migration)
+      // Column missing — strip open-room and/or sport fields and retry
       if (
         leagueError &&
-        /sport_id|sport_settings|column|schema cache|PGRST/i.test(
+        /is_open|open_listed|sport_id|sport_settings|column|schema cache|PGRST/i.test(
           leagueError.message || ""
         )
       ) {
-        const res = await supabase
-          .from("leagues")
-          .insert(baseRow)
-          .select()
-          .single();
+        const stripped = { ...withSport };
+        delete stripped.is_open;
+        delete stripped.open_listed_at;
+        let res = await supabase.from("leagues").insert(stripped).select().single();
+        if (
+          res.error &&
+          /sport_id|sport_settings|column|schema cache|PGRST/i.test(
+            res.error.message || ""
+          )
+        ) {
+          res = await supabase.from("leagues").insert(baseRow).select().single();
+        }
         league = res.data as Record<string, unknown> | null;
         leagueError = res.error;
+        if (listAsOpen && league?.id && !leagueError) {
+          try {
+            const { setLeagueOpenListing } = await import("@/lib/open-room");
+            await setLeagueOpenListing(league.id as string, true);
+          } catch {
+            /* SQL not run yet */
+          }
+        }
       }
 
       if (leagueError || !league) {
@@ -477,7 +506,7 @@ function JoinPageInner() {
               onClick={() => setMode("create")}
               className="w-full py-4 min-h-[56px] rounded-xl bg-primary text-black text-base font-extrabold touch-manipulation"
             >
-              Create league (you&apos;re host)
+              Commissioner — create league
             </button>
             <button
               type="button"
@@ -486,9 +515,15 @@ function JoinPageInner() {
             >
               Join with code
             </button>
-            <p className="text-center text-[11px] text-muted pt-1">
-              Leagues cap at {MAX_LEAGUE_PLAYERS} players so Championship + Toilet
-              Bowl both finish in the playoff weeks.
+            <Link
+              href="/open-room"
+              className="w-full py-4 min-h-[56px] rounded-xl border-2 border-primary/40 bg-primary/10 text-base font-bold touch-manipulation flex items-center justify-center text-foreground"
+            >
+              Join open room
+            </Link>
+            <p className="text-center text-[11px] text-muted pt-1 leading-relaxed">
+              Open lobby fills one room at a time (max {MAX_LEAGUE_PLAYERS}).
+              Full rooms get a friendly “no seats” message — not a scolding.
             </p>
             <Link href="/login" className="block text-center text-xs text-muted mt-4">Switch account</Link>
             <OwnershipNotice className="mt-6" />
@@ -608,6 +643,24 @@ function JoinPageInner() {
               placeholder="Your name"
               className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm"
             />
+            <label className="flex items-start gap-3 rounded-xl border border-border bg-background/50 px-3 py-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={listAsOpen}
+                onChange={(e) => setListAsOpen(e.target.checked)}
+                className="mt-1 w-5 h-5 rounded border-border shrink-0"
+              />
+              <span>
+                <span className="text-sm font-semibold text-foreground block">
+                  List as open room
+                </span>
+                <span className="text-xs text-muted leading-relaxed">
+                  Strangers can find you in the open lobby. We fill this room
+                  first before seating people elsewhere. Turn off anytime in
+                  Settings.
+                </span>
+              </span>
+            </label>
             {error && <p className="text-sm text-danger">{error}</p>}
             <button
               onClick={() => void handleCreate()}

@@ -15,8 +15,22 @@ export function isLeagueFull(memberCount: number): boolean {
   return memberCount >= MAX_LEAGUE_PLAYERS;
 }
 
+/**
+ * Friendly “no seats” copy — playful, never mean.
+ * Used when join-by-code or open-room hit capacity.
+ */
 export function leagueFullMessage(memberCount = MAX_LEAGUE_PLAYERS): string {
-  return `This league is full (${memberCount}/${MAX_LEAGUE_PLAYERS}). Championship + Toilet Bowl are built for ${MAX_LEAGUE_PLAYERS} max so both brackets finish in the CFP weeks. Ask the commissioner to open a second league or free a seat.`;
+  return (
+    `This room is full (${memberCount}/${MAX_LEAGUE_PLAYERS}) — every seat’s taken, ` +
+    `including the good ones by the snacks. ` +
+    `We cap at ${MAX_LEAGUE_PLAYERS} so Championship + Toilet Bowl both finish clean. ` +
+    `Ask the host for a second league code, free a seat, or hop into another open room.`
+  );
+}
+
+/** Short toast for open-lobby when a listed room filled mid-claim */
+export function leagueJustFilledMessage(): string {
+  return "That room just filled up — no hard feelings. Finding the next open seat…";
 }
 
 export function capacityLabel(memberCount: number): string {
