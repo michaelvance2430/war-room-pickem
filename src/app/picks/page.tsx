@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import Nav from "@/components/Nav";
+import PicksHowToModal from "@/components/PicksHowToModal";
 import { Game, UserPick, Prop } from "@/lib/types";
 import { getSession, getLeague } from "@/lib/league";
 import {
@@ -673,6 +674,7 @@ export default function PicksPage() {
     return (
       <div className="min-h-screen flex flex-col">
         <Nav />
+        <PicksHowToModal />
         <main className="flex-1 flex items-center justify-center text-muted">
           Loading…
         </main>
@@ -683,6 +685,7 @@ export default function PicksPage() {
   return (
     <div className="min-h-screen flex flex-col">
       <Nav />
+      <PicksHowToModal />
 
       <main className="flex-1 max-w-3xl mx-auto w-full px-4 py-8">
         {/* Crystal-clear week banner */}
