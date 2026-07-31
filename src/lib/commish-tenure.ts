@@ -66,6 +66,39 @@ export function getBestCommishWeeks(userId: string): number {
 }
 
 /**
+ * How many distinct league-seasons this user ran as commissioner for ≥14 weeks.
+ * Each run key is `${leagueId}:${seasonYear}`. Scales the commissioner ladder.
+ */
+export function getQualifyingCommishSeasons(userId: string): number {
+  if (!userId) return 0;
+  const row = readAll()[userId];
+  if (!row?.runs) return 0;
+  let n = 0;
+  for (const weeks of Object.values(row.runs)) {
+    if ((weeks?.length || 0) >= IRON_COMMISH_TARGET) n += 1;
+  }
+  return n;
+}
+
+/** All run snapshots for profile UI */
+export function listCommishRuns(userId: string): {
+  runKey: string;
+  weekCount: number;
+  qualifies: boolean;
+}[] {
+  if (!userId) return [];
+  const row = readAll()[userId];
+  if (!row?.runs) return [];
+  return Object.entries(row.runs)
+    .map(([runKey, weeks]) => ({
+      runKey,
+      weekCount: weeks?.length || 0,
+      qualifies: (weeks?.length || 0) >= IRON_COMMISH_TARGET,
+    }))
+    .sort((a, b) => b.weekCount - a.weekCount);
+}
+
+/**
  * Credit one week as commissioner for this league/season.
  * Returns best week count across all runs for this user.
  */
@@ -98,6 +131,13 @@ export function recordCommissionerWeek(opts: {
   if (best >= IRON_COMMISH_TARGET) {
     // grantPermanentBadgeId is a no-op in sandbox for non-protected badges
     grantPermanentBadgeId(userId, IRON_COMMISH_BADGE_ID);
+  }
+  try {
+    // Scale ladder: 1 → 10 qualifying seasons (Assistant to the Regional Manager)
+    const { syncCommishLadderGrants } = require("./commish-ladder") as typeof import("./commish-ladder");
+    syncCommishLadderGrants(userId);
+  } catch {
+    /* ignore */
   }
   return best;
 }

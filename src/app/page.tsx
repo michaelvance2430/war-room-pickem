@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Nav from "@/components/Nav";
 import Link from "next/link";
 import HotTakeTicker from "@/components/HotTakeTicker";
+import SportPoolPollBanner from "@/components/SportPoolPollBanner";
 import CrownAndShame from "@/components/CrownAndShame";
 import HomeWeekHero from "@/components/HomeWeekHero";
 import PlayerWeekChecklist from "@/components/PlayerWeekChecklist";
@@ -297,6 +298,9 @@ export default function Home() {
 
         {/* Host first-hour spine (invite → publish → score) before anything else */}
         <CommishSetupBanner />
+
+        {/* Cross-sport pool: “want NFL/CFB in a new room?” */}
+        <SportPoolPollBanner />
 
         {/* Weekly paper ritual — unread splash or Sunday/Monday tease */}
         <HomeGazetteSpotlight />

@@ -9,6 +9,7 @@ import BadgeShelf from "@/components/BadgeShelf";
 import WwcPassportShelf from "@/components/WwcPassportShelf";
 import ProfileTrophyCase from "@/components/ProfileTrophyCase";
 import FootballResume from "@/components/FootballResume";
+import CommishCareerCard from "@/components/CommishCareerCard";
 import Avatar from "@/components/Avatar";
 import {
   formatMemberSince,
@@ -325,6 +326,12 @@ export default function ProfilePage() {
               )}
             </div>
             <p className="text-sm">{roast}</p>
+          </div>
+        )}
+
+        {!mock && (
+          <div className="mb-6">
+            <CommishCareerCard userId={player.id} />
           </div>
         )}
 

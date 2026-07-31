@@ -87,6 +87,43 @@ export const EQUIPABLE_TITLE_CATALOG: EquipableTitleDef[] = [
     vibe: "brag",
     blurb: "Actually ran the league. Real work.",
   },
+  // —— Commissioner career ladder (14+/18 seasons stacked) ——
+  {
+    badgeId: "commish_ladder_1",
+    title: "First Gavel",
+    vibe: "brag",
+    blurb: "One qualifying season as commissioner.",
+  },
+  {
+    badgeId: "commish_ladder_2",
+    title: "Double Host",
+    vibe: "brag",
+    blurb: "Two full-ish seasons with the gavel.",
+  },
+  {
+    badgeId: "commish_ladder_3",
+    title: "Season Architect",
+    vibe: "brag",
+    blurb: "Three qualifying seasons. Trust earned.",
+  },
+  {
+    badgeId: "commish_ladder_5",
+    title: "Multi-Room Operator",
+    vibe: "brag",
+    blurb: "Five seasons. Cross-sport welcome.",
+  },
+  {
+    badgeId: "commish_ladder_7",
+    title: "Regional Manager",
+    vibe: "brag",
+    blurb: "Seven seasons. The region reports to you.",
+  },
+  {
+    badgeId: "commish_ladder_10",
+    title: "Assistant to the Regional Manager",
+    vibe: "brag",
+    blurb: "Ten qualifying seasons. Peak commissioner. Respect the stapler.",
+  },
 
   // —— Lethal form (brag) ——
   {

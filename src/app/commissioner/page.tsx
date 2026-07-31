@@ -66,6 +66,7 @@ import {
 import { transferCommissioner } from "@/lib/trophies";
 import { recordCommissionerWeek } from "@/lib/commish-tenure";
 import CommishWeekChecklist from "@/components/CommishWeekChecklist";
+import SportPoolCommishPanel from "@/components/SportPoolCommishPanel";
 import { setViewAsPlayer } from "@/lib/view-as-player";
 import {
   formatKickoff,
@@ -2041,6 +2042,8 @@ function CommissionerPageInner() {
 
         {tab === "settings" && isOwner && league && (
           <div className="space-y-6">
+            <SportPoolCommishPanel />
+
             <div className="rounded-xl border border-border bg-card p-5 space-y-4">
               <h2 className="font-semibold">League</h2>
               <div>
