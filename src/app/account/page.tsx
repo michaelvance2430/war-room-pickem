@@ -28,6 +28,7 @@ import {
 import { isAppCreator, withCreatorFlag } from "@/lib/creator";
 import { isViewAsPlayer, setViewAsPlayer } from "@/lib/view-as-player";
 import FeedbackForm from "@/components/FeedbackForm";
+import OwnershipNotice from "@/components/OwnershipNotice";
 import {
   startFullPlayerTutorial,
   startPicksOnlyTutorial,
@@ -825,6 +826,8 @@ export default function AccountPage() {
             Sign out / switch account
           </button>
         </section>
+
+        <OwnershipNotice variant="full" className="mt-8 mb-4 px-2" />
       </main>
     </div>
   );

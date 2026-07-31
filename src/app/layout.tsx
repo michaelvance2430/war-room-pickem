@@ -18,8 +18,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "War Room Pick'Em",
   description:
-    "College Football Pick'Em with divisions, confidence, Best Bets, props, and dual brackets. Championship + Toilet Bowl.",
+    "College Football Pick'Em with divisions, confidence, Best Bets, props, and dual brackets. Championship + Toilet Bowl. © Mike Vance. Owned by Mike Vance.",
   applicationName: "War Room Pick'Em",
+  authors: [{ name: "Mike Vance" }],
+  creator: "Mike Vance",
+  publisher: "Mike Vance",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -36,6 +39,9 @@ export const metadata: Metadata = {
     apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
   },
   manifest: "/manifest.webmanifest",
+  other: {
+    "copyright": "© 2026 Mike Vance. War Room Pick'Em. All rights reserved. Owned by Mike Vance.",
+  },
 };
 
 /** Phone-first: full width, notch safe areas, dark status chrome */

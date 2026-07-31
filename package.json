@@ -2,6 +2,9 @@
   "name": "war-room-pickem",
   "version": "0.1.0",
   "private": true,
+  "author": "Mike Vance <michaelvance2430@gmail.com>",
+  "license": "UNLICENSED",
+  "description": "War Room Pick'Em — owned by Mike Vance. All rights reserved.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

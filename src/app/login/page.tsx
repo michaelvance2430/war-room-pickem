@@ -9,6 +9,7 @@ import {
   peekPendingJoinCode,
   stashPendingJoinCode,
 } from "@/lib/commish-onboarding";
+import OwnershipNotice from "@/components/OwnershipNotice";
 
 function LoginPageInner() {
   const router = useRouter();
@@ -302,6 +303,8 @@ function LoginPageInner() {
             Back
           </Link>
         </p>
+
+        <OwnershipNotice variant="full" className="mt-8 px-2" />
       </div>
     </div>
   );

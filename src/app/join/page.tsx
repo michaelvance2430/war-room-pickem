@@ -21,6 +21,7 @@ import {
   listSportPickerOptions,
 } from "@/lib/sports/registry";
 import { DEFAULT_SPORT_ID, type SportId } from "@/lib/sports/types";
+import OwnershipNotice from "@/components/OwnershipNotice";
 
 function generateCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -460,6 +461,7 @@ function JoinPageInner() {
               Bowl both finish in the CFP weeks.
             </p>
             <Link href="/login" className="block text-center text-xs text-muted mt-4">Switch account</Link>
+            <OwnershipNotice className="mt-6" />
           </div>
         )}
 
