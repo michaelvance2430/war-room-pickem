@@ -22,16 +22,24 @@ type Props = {
 
 /** Backfill older archived payloads missing new fields. */
 export function normalizeEdition(raw: GazetteEdition): GazetteEdition {
+  const wwc = raw.sportId === "soccer_wwc";
   return {
     ...raw,
-    ritualName: raw.ritualName || "War Room Edition",
-    tagline: raw.tagline || "All the news that's fit to roast",
+    ritualName:
+      raw.ritualName || (wwc ? "World Cup Extra" : "War Room Edition"),
+    tagline:
+      raw.tagline ||
+      (wwc
+        ? "WORLD CUP EDITION · all the news that fits the pitch"
+        : "All the news that's fit to roast"),
     printedLine:
       raw.printedLine ||
       `${raw.ritualName || "Edition"} · ${raw.weekLabel || "Week"} · War Room`,
     weather: raw.weather || {
-      kicker: "War Room weather",
-      body: "High confidence. Low dignity. Pack a paper bag.",
+      kicker: wwc ? "Brasil forecast" : "War Room weather",
+      body: wwc
+        ? "High: emerald heat. Low: royal-blue despair."
+        : "High confidence. Low dignity. Pack a paper bag.",
     },
     // Empty arrays are intentional (slim early editions) — don't invent filler
     classifieds: Array.isArray(raw.classifieds)
@@ -47,6 +55,9 @@ export function normalizeEdition(raw: GazetteEdition): GazetteEdition {
     standingsDeadlock: raw.standingsDeadlock ?? null,
     noLock: raw.noLock ?? null,
     shame: raw.shame ?? null,
+    sportId: raw.sportId,
+    stampLine: raw.stampLine || (wwc ? "EXTRA!" : "Extra · Extra"),
+    eventLine: raw.eventLine,
   };
 }
 
@@ -92,27 +103,79 @@ export default function GazettePaper({
           : "rounded-sm border-2 border-stone-600 shadow-lg"
       } ${className}`}
     >
-      {/* EXTRA stamp strip */}
-      <div className="relative bg-red-700 text-[#f4f0e6] px-3 py-1.5 flex items-center justify-between gap-2">
-        <span className="text-[11px] font-black uppercase tracking-[0.25em]">
-          Extra · Extra
-        </span>
-        <span className="text-[10px] font-bold uppercase tracking-wider opacity-90">
-          {edition.ritualName || "Read all about it"}
-        </span>
-      </div>
+      {/* EXTRA stamp strip — classic red vs Brazil World Cup bar */}
+      {edition.sportId === "soccer_wwc" ? (
+        <div
+          className="relative px-3 py-1.5 flex items-center justify-between gap-2 text-white"
+          style={{
+            background:
+              "linear-gradient(90deg, #009C3B 0%, #002776 55%, #009C3B 100%)",
+          }}
+        >
+          <span
+            className="text-[12px] font-black uppercase tracking-[0.28em]"
+            style={{ color: "#FFDF00" }}
+          >
+            {edition.stampLine || "EXTRA!"}
+          </span>
+          <span className="text-[10px] font-bold uppercase tracking-wider opacity-95">
+            {edition.ritualName || "World Cup Extra"}
+          </span>
+        </div>
+      ) : (
+        <div className="relative bg-red-700 text-[#f4f0e6] px-3 py-1.5 flex items-center justify-between gap-2">
+          <span className="text-[11px] font-black uppercase tracking-[0.25em]">
+            {edition.stampLine || "Extra · Extra"}
+          </span>
+          <span className="text-[10px] font-bold uppercase tracking-wider opacity-90">
+            {edition.ritualName || "Read all about it"}
+          </span>
+        </div>
+      )}
 
       {/* Masthead */}
-      <div className="border-b-4 border-double border-stone-900 px-4 pt-4 pb-3 text-center">
-        <p className="text-[10px] font-black uppercase tracking-[0.28em] text-red-800 mb-1">
+      <div
+        className={`border-b-4 border-double px-4 pt-4 pb-3 text-center ${
+          edition.sportId === "soccer_wwc"
+            ? "border-[#002776] bg-gradient-to-b from-[#009C3B]/10 to-transparent"
+            : "border-stone-900"
+        }`}
+      >
+        <p
+          className={`text-[10px] font-black uppercase tracking-[0.28em] mb-1 ${
+            edition.sportId === "soccer_wwc" ? "text-[#009C3B]" : "text-red-800"
+          }`}
+        >
           {edition.ritualName}
         </p>
+        {edition.eventLine && (
+          <p
+            className="text-[10px] font-black uppercase tracking-[0.16em] mb-1"
+            style={{ color: "#002776" }}
+          >
+            {edition.eventLine}
+          </p>
+        )}
         <p className="text-[10px] uppercase tracking-[0.2em] text-stone-500 mb-1 leading-snug px-1">
           {edition.printedLine}
         </p>
-        <h2 className="font-serif text-2xl sm:text-3xl font-black tracking-tight text-stone-950 leading-none">
+        <h2
+          className={`font-serif text-2xl sm:text-3xl font-black tracking-tight leading-none ${
+            edition.sportId === "soccer_wwc"
+              ? "text-[#002776]"
+              : "text-stone-950"
+          }`}
+        >
           {edition.masthead || "THE WAR ROOM GAZETTE"}
         </h2>
+        {edition.sportId === "soccer_wwc" && (
+          <p
+            className="text-[11px] font-extrabold uppercase tracking-[0.2em] mt-2"
+            style={{ color: "#009C3B" }}
+          >
+            Women&apos;s World Cup · Brazil 2027
+          </p>
+        )}
         <p className="text-[11px] italic text-stone-600 mt-2">
           {edition.tagline}
         </p>

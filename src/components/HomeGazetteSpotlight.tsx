@@ -22,6 +22,7 @@ import {
 } from "@/lib/cloud";
 import { isCardLockDeadlinePassed } from "@/lib/dates";
 import { isGuestMode } from "@/lib/guest-mode";
+import { getLeague } from "@/lib/league";
 
 type Mode =
   | { kind: "unread"; ritualName: string; weekLabel: string | null }
@@ -99,6 +100,58 @@ export default function HomeGazetteSpotlight() {
   if (mode.kind === "loading" || mode.kind === "quiet") return null;
 
   if (mode.kind === "unread") {
+    const wwc = getLeague()?.sportId === "soccer_wwc";
+    if (wwc) {
+      return (
+        <section className="mb-5 rounded-2xl border-2 border-[#FFDF00]/50 bg-gradient-to-br from-[#002776]/90 via-black/80 to-[#009C3B]/40 overflow-hidden shadow-[0_0_40px_rgba(0,156,59,0.25)]">
+          <div
+            className="px-4 py-1.5 flex items-center justify-between gap-2 text-white"
+            style={{
+              background:
+                "linear-gradient(90deg, #009C3B 0%, #002776 50%, #009C3B 100%)",
+            }}
+          >
+            <span
+              className="text-[12px] font-black uppercase tracking-[0.28em]"
+              style={{ color: "#FFDF00" }}
+            >
+              EXTRA!
+            </span>
+            <span className="text-[10px] font-bold uppercase tracking-wide">
+              World Cup paper is out
+            </span>
+          </div>
+          <div className="p-4 sm:p-5">
+            <p
+              className="text-[10px] font-bold uppercase tracking-[0.18em] mb-1"
+              style={{ color: "#FFDF00" }}
+            >
+              WORLD CUP EDITION
+            </p>
+            <h2 className="text-xl sm:text-2xl font-black text-white leading-tight">
+              {mode.ritualName}
+              {mode.weekLabel ? (
+                <span className="text-white/70 font-bold text-base sm:text-lg">
+                  {" "}
+                  · {mode.weekLabel}
+                </span>
+              ) : null}
+            </h2>
+            <p className="text-sm text-stone-200 mt-2 leading-relaxed">
+              Survivors. Collapses. Chaos in the group. ESPN energy, War Room
+              sass — Brazil 2027 on the masthead.
+            </p>
+            <Link
+              href="/gazette"
+              className="mt-4 flex items-center justify-center w-full py-3.5 min-h-[52px] rounded-xl text-base font-extrabold touch-manipulation active:scale-[0.99] shadow-lg text-white"
+              style={{ backgroundColor: "#009C3B" }}
+            >
+              Read WORLD CUP EDITION →
+            </Link>
+          </div>
+        </section>
+      );
+    }
     return (
       <section className="mb-5 rounded-2xl border-2 border-red-600/70 bg-gradient-to-br from-red-950/80 via-black/70 to-stone-900 overflow-hidden shadow-[0_0_40px_rgba(185,28,28,0.25)]">
         <div className="bg-red-700 text-[#f4f0e6] px-4 py-1.5 flex items-center justify-between gap-2">

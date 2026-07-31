@@ -35,7 +35,7 @@ export default function HomeSportHeader({
   return (
     <section className="mb-4 sm:mb-6">
       {isWwc ? (
-        <div className="flex items-start gap-3 sm:gap-4 mb-4">
+        <div className="flex items-start gap-3 sm:gap-5 mb-5">
           <div
             className="shrink-0 rounded-2xl p-1.5 sm:p-2 border"
             style={{
@@ -44,24 +44,24 @@ export default function HomeSportHeader({
               boxShadow: `0 0 28px ${emerald}44, 0 0 12px ${gold}33`,
             }}
           >
-            <WwcTrophyLogo size={72} />
+            <WwcTrophyLogo size={80} />
           </div>
-          <div className="min-w-0 pt-0.5">
-            <span
-              className="inline-flex items-center text-[10px] font-black uppercase tracking-[0.12em] sm:tracking-[0.14em] px-2.5 py-1 rounded-full border max-w-full leading-snug"
-              style={{
-                borderColor: `${gold}aa`,
-                background: `linear-gradient(135deg, ${emerald}44 0%, ${royal}cc 50%, ${emerald}33 100%)`,
-                color: white,
-              }}
-            >
-              {chrome.sportBadge}
-            </span>
+          {/* ESPN-style special-event stack under the mark */}
+          <div className="min-w-0 pt-1">
+            <p className="text-xl sm:text-3xl font-black text-white tracking-tight leading-none">
+              War Room
+            </p>
+            <p className="mt-1.5 text-base sm:text-xl font-bold text-white/95 leading-tight">
+              Women&apos;s World Cup
+            </p>
             <p
-              className="mt-1.5 text-[10px] font-bold uppercase tracking-wide"
+              className="mt-0.5 text-base sm:text-xl font-extrabold leading-tight"
               style={{ color: gold }}
             >
-              Brasil 2027 · event pack
+              Brazil 2027
+            </p>
+            <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.16em] text-white/55">
+              Special event presentation
             </p>
           </div>
         </div>
@@ -74,19 +74,21 @@ export default function HomeSportHeader({
         </div>
       )}
 
-      <h1
-        className={`text-2xl sm:text-5xl font-bold tracking-tight mb-1.5 sm:mb-3 text-white ${chrome.atmosphere.titleGlow}`}
-      >
-        {chrome.welcomeTitle}
-      </h1>
+      {!isWwc && (
+        <h1
+          className={`text-2xl sm:text-5xl font-bold tracking-tight mb-1.5 sm:mb-3 text-white ${chrome.atmosphere.titleGlow}`}
+        >
+          {chrome.welcomeTitle}
+        </h1>
+      )}
       <p className="text-muted max-w-xl text-sm sm:text-lg leading-relaxed">
         {tagline || chrome.defaultTagline}
       </p>
 
       {isWwc && (
         <p className="mt-2 text-xs sm:text-sm max-w-xl leading-relaxed text-white/80">
-          Short tournament. Loud Gazette. Same sarcastic room — pitch in emerald,
-          gold, and royal blue. Lock the card, talk trash, chase the Cup.
+          Same War Room ops. World Cup paper. Lock the card, talk trash, chase
+          the Cup — emerald, gold, and royal blue.
         </p>
       )}
 

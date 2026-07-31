@@ -399,28 +399,40 @@ export default function Nav() {
             aria-label="Home"
           >
             <BrandMark size={32} className="shrink-0" />
-            <div className="flex flex-col min-w-0">
-              <span
-                className={`tracking-tight leading-tight truncate ${
-                  pathname === "/"
-                    ? "font-bold text-sm text-foreground"
-                    : "font-extrabold text-[15px] sm:text-base text-primary"
-                }`}
-              >
-                {pathname === "/" ? "War Room" : "← Home"}
-              </span>
-              {leagueName && (
-                <span className="text-[10px] text-muted leading-tight truncate hidden sm:block">
-                  {leagueName}
-                </span>
-              )}
-              {sportIsWwc && pathname === "/" && (
-                <span
-                  className="text-[9px] font-bold uppercase tracking-wide truncate"
-                  style={{ color: "#FFDF00" }}
-                >
-                  Brazil 2027™
-                </span>
+            <div className="flex flex-col min-w-0 justify-center">
+              {sportIsWwc ? (
+                <>
+                  <span className="font-bold text-sm text-foreground tracking-tight leading-tight truncate">
+                    {pathname === "/" ? "War Room" : "← Home"}
+                  </span>
+                  {/* ESPN-style event stack */}
+                  <span className="text-[10px] font-semibold text-white/90 leading-tight truncate">
+                    Women&apos;s World Cup
+                  </span>
+                  <span
+                    className="text-[10px] font-bold leading-tight truncate"
+                    style={{ color: "#FFDF00" }}
+                  >
+                    Brazil 2027
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span
+                    className={`tracking-tight leading-tight truncate ${
+                      pathname === "/"
+                        ? "font-bold text-sm text-foreground"
+                        : "font-extrabold text-[15px] sm:text-base text-primary"
+                    }`}
+                  >
+                    {pathname === "/" ? "War Room" : "← Home"}
+                  </span>
+                  {leagueName && (
+                    <span className="text-[10px] text-muted leading-tight truncate hidden sm:block">
+                      {leagueName}
+                    </span>
+                  )}
+                </>
               )}
             </div>
           </Link>
