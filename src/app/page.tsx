@@ -6,6 +6,7 @@ import Nav from "@/components/Nav";
 import Link from "next/link";
 import HotTakeTicker from "@/components/HotTakeTicker";
 import SportPoolPollBanner from "@/components/SportPoolPollBanner";
+import BetaLeagueBanner from "@/components/BetaLeagueBanner";
 import CrownAndShame from "@/components/CrownAndShame";
 import HomeWeekHero from "@/components/HomeWeekHero";
 import PlayerWeekChecklist from "@/components/PlayerWeekChecklist";
@@ -277,6 +278,9 @@ export default function Home() {
       <Nav />
       {/* Phone-first: less chrome padding, job-first stack (most users are on phones) */}
       <main className="flex-1 max-w-6xl mx-auto w-full px-3 sm:px-4 py-5 sm:py-10 relative z-10">
+        {/* All sports — testers are builders; bugs are part of the game */}
+        <BetaLeagueBanner />
+
         <HomeSportHeader
           chrome={homeChrome}
           tagline={homeTagline}
