@@ -10,7 +10,8 @@
 
 /** Optional hardcodes if you don't want env (still prefer env on Vercel). */
 const HARDCODED_CREATOR_IDS: string[] = [
-  // e.g. "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  // Mike V. — app creator (The Commissioner legendary)
+  "09544d2b-6eca-4131-a321-c000586c9029",
 ];
 
 function envCreatorIds(): string[] {
