@@ -61,7 +61,7 @@ export function preseasonSwingForPlayer(player: Player): SwingLabel {
   if (isAppCreator(player.id) || player.isCreator) {
     return {
       key: "architect",
-      text: "THE ARCHITECT",
+      text: "THE CREATOR",
       tone: "hero",
       delta: 0,
     };

@@ -127,8 +127,8 @@ export function derivePlayerTitles(
   if (isCommissioner) {
     titles.push({
       id: "commissioner",
-      label: "The Commissioner",
-      blurb: "Runs the room. Blame optional.",
+      label: "Runs the Room",
+      blurb: "League host. Blame optional. Not the app Creator.",
     });
   }
   if (champs.length >= 2) {

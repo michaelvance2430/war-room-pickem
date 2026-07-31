@@ -356,7 +356,7 @@ export default function ProfilePage() {
                     className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border border-yellow-500 text-yellow-500"
                     title="Built the app — not the same as league commissioner"
                   >
-                    Game creator
+                    The Creator
                   </span>
                 )}
                 {mock && (

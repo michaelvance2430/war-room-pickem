@@ -1,5 +1,5 @@
 /**
- * GAME creator identity — Legendary "The Commissioner" badge.
+ * GAME creator identity — Legendary "The Creator" badge / nameplate title.
  *
  * This is NOT league commissioner / who started a league.
  * Friends who create their own league stay grey on this badge.
@@ -11,7 +11,7 @@
 
 /** Optional hardcodes if you don't want env (still prefer env on Vercel). */
 const HARDCODED_CREATOR_IDS: string[] = [
-  // Mike V. — app creator (The Commissioner legendary)
+  // Mike V. — app creator (The Creator legendary)
   "09544d2b-6eca-4131-a321-c000586c9029",
 ];
 

@@ -411,8 +411,10 @@ export default function AccountPage() {
               )}
               {userId && isAppCreator(userId) && (
                 <p className="text-xs text-yellow-500 font-medium">
-                  👑 The Commissioner legendary is active — gold on your profile
-                  in every league. Everyone else stays grey.
+                  👑 The Creator legendary is active — gold on your profile, and
+                  your nameplate defaults to{" "}
+                  <span className="font-black uppercase">The Creator</span>{" "}
+                  {name || "Mike V."}. Peasants stay grey.
                 </p>
               )}
               {userId && !isAppCreator(userId) && (

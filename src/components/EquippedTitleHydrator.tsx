@@ -2,16 +2,21 @@
 
 /**
  * Loads equipped titles for league roster so PlayerLink can show them.
+ * App creator (Mike V.) defaults to "The Creator" if no title equipped yet.
  */
 
 import { useEffect } from "react";
 import { getLeague, getSession } from "@/lib/league";
 import { loadLeagueRoster } from "@/lib/cloud";
 import {
+  getLocalEquippedBadgeId,
   hydrateEquippedTitles,
+  setMyEquippedTitle,
   syncMyEquippedTitleFromCloud,
 } from "@/lib/equipped-title-store";
 import { titleLabelForBadgeId } from "@/lib/equipable-titles";
+import { isAppCreator } from "@/lib/creator";
+import { CREATOR_BADGE_ID } from "@/lib/badges";
 
 export default function EquippedTitleHydrator() {
   useEffect(() => {
@@ -23,6 +28,15 @@ export default function EquippedTitleHydrator() {
       if (!session?.playerId) return;
 
       await syncMyEquippedTitleFromCloud();
+      if (cancelled) return;
+
+      // Default nameplate for the person who built the app
+      if (isAppCreator(session.playerId)) {
+        const current = getLocalEquippedBadgeId(session.playerId);
+        if (!current) {
+          await setMyEquippedTitle(CREATOR_BADGE_ID);
+        }
+      }
       if (cancelled) return;
 
       if (!league?.id && !session.leagueId) return;

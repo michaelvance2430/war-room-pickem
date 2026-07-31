@@ -153,7 +153,7 @@ export function unbankCareerBadgeId(
 
 /**
  * Season total from live badge list (may drop after season reset).
- * Creator-only legendaries (The Commissioner) are career-only — not season race.
+ * Creator-only legendaries (The Creator) are career-only — not season race.
  */
 export function seasonCheevoFromBadges(earnedOrAll: BadgeStatus[]): number {
   return earnedOrAll

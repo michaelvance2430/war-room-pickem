@@ -10,7 +10,7 @@ const EQUIPABLE_TIERS: BadgeTier[] = ["rare", "epic", "legendary"];
 
 export function isEquipableTitleBadge(def: BadgeDef | null | undefined): boolean {
   if (!def) return false;
-  if (def.creatorOnly && def.id === "the_commissioner") return true;
+  if (def.creatorOnly) return true;
   return EQUIPABLE_TIERS.includes(def.tier);
 }
 
