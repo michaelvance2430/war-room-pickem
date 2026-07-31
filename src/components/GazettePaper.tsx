@@ -24,10 +24,11 @@ type Props = {
 export function normalizeEdition(raw: GazetteEdition): GazetteEdition {
   return {
     ...raw,
+    ritualName: raw.ritualName || "War Room Edition",
     tagline: raw.tagline || "All the news that's fit to roast",
     printedLine:
       raw.printedLine ||
-      `${raw.weekLabel || "Week"} edition · War Room`,
+      `${raw.ritualName || "Edition"} · ${raw.weekLabel || "Week"} · War Room`,
     weather: raw.weather || {
       kicker: "War Room weather",
       body: "High confidence. Low dignity. Pack a paper bag.",
@@ -104,13 +105,16 @@ export default function GazettePaper({
           Extra · Extra
         </span>
         <span className="text-[10px] font-bold uppercase tracking-wider opacity-90">
-          Read all about it
+          {edition.ritualName || "Read all about it"}
         </span>
       </div>
 
       {/* Masthead */}
       <div className="border-b-4 border-double border-stone-900 px-4 pt-4 pb-3 text-center">
-        <p className="text-[10px] uppercase tracking-[0.35em] text-stone-500 mb-1">
+        <p className="text-[10px] font-black uppercase tracking-[0.28em] text-red-800 mb-1">
+          {edition.ritualName}
+        </p>
+        <p className="text-[10px] uppercase tracking-[0.2em] text-stone-500 mb-1 leading-snug px-1">
           {edition.printedLine}
         </p>
         <h2 className="font-serif text-2xl sm:text-3xl font-black tracking-tight text-stone-950 leading-none">

@@ -11,6 +11,7 @@ import PlayerWeekChecklist from "@/components/PlayerWeekChecklist";
 import CommishSetupBanner from "@/components/CommishSetupBanner";
 import InviteFriends from "@/components/InviteFriends";
 import HomeUnseenPulse from "@/components/HomeUnseenPulse";
+import HomeGazetteSpotlight from "@/components/HomeGazetteSpotlight";
 import HomeTileUnseen from "@/components/HomeTileUnseen";
 import LockPicksRoast from "@/components/LockPicksRoast";
 import {
@@ -305,6 +306,9 @@ export default function Home() {
 
         {/* Host first-hour spine (invite → publish → score) before anything else */}
         <CommishSetupBanner />
+
+        {/* Weekly paper ritual — unread splash or Sunday/Monday tease */}
+        <HomeGazetteSpotlight />
 
         {/* One job first — make picks (or wait calmly) */}
         <HomeWeekHero />

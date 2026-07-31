@@ -64,6 +64,7 @@ export default function Nav() {
   const [leagueName, setLeagueName] = useState("");
   const [unreadCount, setUnreadCount] = useState(0);
   const [lockerUnseen, setLockerUnseen] = useState(0);
+  const [gazetteUnseen, setGazetteUnseen] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [crystalBallOn, setCrystalBallOn] = useState(true);
@@ -139,15 +140,18 @@ export default function Nav() {
     async function loadUnread() {
       if (!session?.playerId || !league?.id) return;
       try {
-        const [ann, lock] = await Promise.all([
+        const [ann, lock, gaz] = await Promise.all([
           countUnreadAnnouncements(),
           countUnseenLockerPosts(),
+          import("@/lib/gazette").then((m) => m.getGazetteUnreadState()),
         ]);
         setUnreadCount(ann);
         setLockerUnseen(lock);
+        setGazetteUnseen(gaz.unread ? 1 : 0);
       } catch {
         setUnreadCount(0);
         setLockerUnseen(0);
+        setGazetteUnseen(0);
       }
     }
 
@@ -162,6 +166,10 @@ export default function Nav() {
         if (!isGuestMode()) void touchLastSeen();
       }
     }
+    function onGazetteSeen() {
+      setGazetteUnseen(0);
+    }
+    window.addEventListener("warroom-gazette-seen", onGazetteSeen);
     function onLockerSeen() {
       // Instant clear — walking into locker marks seen without extra taps
       setLockerUnseen(0);
@@ -172,6 +180,7 @@ export default function Nav() {
       window.removeEventListener("warroom-view-as-player", onPreview);
       document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener(EVENT_LOCKER_SEEN, onLockerSeen);
+      window.removeEventListener("warroom-gazette-seen", onGazetteSeen);
     };
   }, []);
 
@@ -181,10 +190,16 @@ export default function Nav() {
     // On locker route: badge off immediately (mark runs on the page too)
     if (pathname === "/locker-room" || pathname.startsWith("/locker-room/")) {
       setLockerUnseen(0);
+    } else if (pathname === "/gazette" || pathname.startsWith("/gazette/")) {
+      setGazetteUnseen(0);
     } else {
       // Leaving locker / navigating elsewhere — refresh counts
       void countUnseenLockerPosts().then(setLockerUnseen).catch(() => {});
       void countUnreadAnnouncements().then(setUnreadCount).catch(() => {});
+      void import("@/lib/gazette")
+        .then((m) => m.getGazetteUnreadState())
+        .then((g) => setGazetteUnseen(g.unread ? 1 : 0))
+        .catch(() => {});
     }
   }, [pathname]);
 
@@ -216,7 +231,7 @@ export default function Nav() {
     { href: "/board", label: "The Board" },
     { href: "/standings", label: "Standings" },
     { href: "/locker-room", label: "Locker", badge: lockerUnseen },
-    { href: "/gazette", label: "Gazette" },
+    { href: "/gazette", label: "Gazette", badge: gazetteUnseen },
     ...(ops
       ? [
           {

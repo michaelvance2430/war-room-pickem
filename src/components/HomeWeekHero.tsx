@@ -164,14 +164,16 @@ export default function HomeWeekHero() {
       ? `${weekLabel} is frozen`
       : `You’re locked for ${weekLabel}`;
     body = state.frozen
-      ? "First kickoff hit. Sit tight for scores — then check the Gazette."
+      ? "First kickoff hit. Sit tight for scores — then the Sunday / Monday Gazette drops. That’s the paper the room waits for."
       : `You’re locked before first kickoff${state.lockLabel ? ` (${state.lockLabel})` : ""}. Change nothing if you want First & Final.`;
-    primaryHref = "/standings";
-    primaryLabel = "Standings";
-    primaryClass =
-      "border border-primary/50 text-primary hover:bg-primary/10 bg-transparent";
-    secondaryHref = "/gazette";
-    secondaryLabel = "Gazette";
+    // After freeze: Gazette is the appointment; standings still one tap away
+    primaryHref = state.frozen ? "/gazette" : "/standings";
+    primaryLabel = state.frozen ? "Gazette · the weekly paper" : "Standings";
+    primaryClass = state.frozen
+      ? "bg-red-700 text-white hover:bg-red-600 shadow-[0_0_24px_rgba(185,28,28,0.35)]"
+      : "border border-primary/50 text-primary hover:bg-primary/10 bg-transparent";
+    secondaryHref = state.frozen ? "/standings" : "/gazette";
+    secondaryLabel = state.frozen ? "Standings" : "Gazette";
   } else if (state.frozen) {
     eyebrow = "Too late";
     title = `${weekLabel} already kicked off`;

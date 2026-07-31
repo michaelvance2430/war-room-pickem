@@ -65,7 +65,7 @@ export default function RulesOnboardingModal() {
     },
     {
       t: "The room",
-      d: "Gazette, Locker, trophies — drama after you lock. Flavor is free; picks are not.",
+      d: "Sunday/Monday Gazette is the weekly paper (look forward to it). Locker + trophies for the rest. Flavor is free; picks are not.",
     },
   ];
 

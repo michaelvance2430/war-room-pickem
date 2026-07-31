@@ -66,6 +66,11 @@ export type GazetteEdition = {
    * One may name-drop the crown/shame; others are pure absurdity.
    */
   sideStories: GazetteSideStory[];
+  /**
+   * Ritual brand for the drop — “Sunday Paper”, “Monday Morning Edition”, etc.
+   * This is the weekly appointment product.
+   */
+  ritualName: string;
 };
 
 /** Sidebar / “also in this paper” bit */
@@ -94,6 +99,87 @@ export function markGazetteSeen(leagueId: string, weekIndex: number): void {
     localStorage.setItem(storageKey(leagueId, weekIndex), "1");
   } catch {
     /* ignore */
+  }
+  try {
+    window.dispatchEvent(new CustomEvent("warroom-gazette-seen"));
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * Sunday / Monday ritual naming — what people look forward to.
+ * Scored weekend → Sunday Paper; Monday → Monday Morning Edition; else special.
+ */
+export function ritualEditionName(when: Date = new Date()): string {
+  const day = when.getDay(); // 0 = Sun
+  if (day === 0) return "Sunday Paper";
+  if (day === 1) return "Monday Morning Edition";
+  if (day === 2) return "Tuesday Hangover Edition";
+  if (day === 6) return "Saturday Night Extra";
+  return "War Room Late Edition";
+}
+
+/** Short tease while waiting on Commish to score. */
+export function gazetteAnticipationCopy(): {
+  title: string;
+  body: string;
+  ritualHint: string;
+} {
+  const day = new Date().getDay();
+  if (day === 0 || day === 1) {
+    return {
+      title: "The paper is almost here",
+      body: "When the host scores this week, the Sunday / Monday Gazette drops — crowns, shame, fake news, the works.",
+      ritualHint: ritualEditionName(),
+    };
+  }
+  return {
+    title: "Save room for the Gazette",
+    body: "After scores post, the room gets a full paper. It’s the weekly appointment — don’t miss the splash.",
+    ritualHint: "Weekly paper",
+  };
+}
+
+export const EVENT_GAZETTE_SEEN = "warroom-gazette-seen";
+
+/**
+ * Home / nav: is there a filed edition this player hasn’t opened?
+ */
+export async function getGazetteUnreadState(): Promise<{
+  unread: boolean;
+  weekNumber: number | null;
+  ritualName: string | null;
+  weekLabel: string | null;
+}> {
+  const empty = {
+    unread: false,
+    weekNumber: null as number | null,
+    ritualName: null as string | null,
+    weekLabel: null as string | null,
+  };
+  if (!GAZETTE_ENABLED) return empty;
+  const session = getSession();
+  if (!session?.leagueId) return empty;
+  try {
+    const res = await loadGazetteArchive();
+    if (!res.ok || !res.editions?.length) return empty;
+    const latest = res.editions[0];
+    const week = latest.weekNumber;
+    const unread = !hasSeenGazette(session.leagueId, week);
+    const ritual =
+      latest.edition?.ritualName ||
+      ritualEditionName(
+        latest.createdAt ? new Date(latest.createdAt) : new Date()
+      );
+    return {
+      unread,
+      weekNumber: week,
+      ritualName: ritual,
+      weekLabel: latest.weekLabel || latest.edition?.weekLabel || null,
+    };
+  } catch {
+    return empty;
   }
 }
 
@@ -657,13 +743,15 @@ export async function buildGazetteEdition(
     byWeek(SIDE_STORIES_ABSURD, weekIndex, 1)(sideCtx),
   ];
 
-  const printedLine = `${weekLabel.toUpperCase()} EDITION · ${year} SEASON · ${leagueName.toUpperCase()} · NOT FIT FOR FRAMING (BUT YOU WILL)`;
+  const ritualName = ritualEditionName();
+  const printedLine = `${ritualName.toUpperCase()} · ${weekLabel.toUpperCase()} · ${year} SEASON · ${leagueName.toUpperCase()} · NOT FIT FOR FRAMING (BUT YOU WILL)`;
 
   return {
     weekIndex,
     weekLabel,
-    volumeLabel: `Vol. ${weekIndex + 1} · ${weekLabel} · ${year}`,
+    volumeLabel: `${ritualName} · Vol. ${weekIndex + 1} · ${weekLabel} · ${year}`,
     masthead: "THE WAR ROOM GAZETTE",
+    ritualName,
     tagline,
     printedLine,
     weather,
@@ -684,7 +772,9 @@ export async function buildGazetteEdition(
 export function formatGazetteShareText(edition: GazetteEdition): string {
   const lines = [
     `📰 ${edition.masthead}`,
-    edition.volumeLabel,
+    edition.ritualName
+      ? `${edition.ritualName} · ${edition.volumeLabel}`
+      : edition.volumeLabel,
     edition.tagline,
     "",
     `★ ${edition.crown.headline}`,
