@@ -56,7 +56,9 @@ SlateClub is dead. The future is **War Room** — first **FBS / CFB friend leagu
 ## Founder ethos (non-negotiables)
 
 - **KISS** — if it needs a tutorial novel, simplify the product  
-- **Longevity** — design for year 5 of the same league, not week 1 churn  
+- **Simple to play, rich to discover** — Layer 1 (join → picks → confidence → Best Bet → Gazette → standings) is a 10/10 alone; depth is endless but never required on day 1. See `docs/DESIGN-PRINCIPLES.md`  
+- **Fun ≠ clutter** — Disney energy, not 87 rides at the entrance  
+- **Longevity** — design for year 5 of the same league, not week 1 churn; veterans *discover* layers that always existed  
 - **Fair play** — lock rules, progressive reveal, no shady defaults  
 - **Effortless invites** — every member can spread the word, entertaining copy included  
 - **Personality without friction** — sarcasm and roast culture *after* the job is clear  

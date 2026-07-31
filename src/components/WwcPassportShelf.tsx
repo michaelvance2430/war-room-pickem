@@ -27,14 +27,52 @@ function stampKind(def: BadgeStatus["def"]): WwcStampKind {
   return w.stamp || "visa";
 }
 
+function cleanName(name: string) {
+  return name.replace(/^⭐ |🌍 |🏆 |👑 |🌎 /g, "");
+}
+
 /**
- * World Cup progression as a passport of collectible stamps —
- * deliberately not the CFB bronze/silver/gold badge shelves.
+ * World Cup progression as a passport — discovery-first.
+ * Layer 1 players see recently earned + next goal.
+ * Full stamp book is optional explore (not day-1 homework).
  */
 export default function WwcPassportShelf({ badges }: Props) {
   const [selected, setSelected] = useState<BadgeStatus | null>(null);
-  const earned = badges.filter((b) => b.earned).length;
+  const [explore, setExplore] = useState(false);
+  const earnedList = useMemo(
+    () => badges.filter((b) => b.earned),
+    [badges]
+  );
+  const earned = earnedList.length;
   const { emerald, gold, royal, white } = WWC_BRAZIL_COLORS;
+
+  /** Next goal: first locked stamp with progress, else first locked common */
+  const nextGoal = useMemo(() => {
+    const withProgress = badges.find(
+      (b) =>
+        !b.earned &&
+        b.progress &&
+        b.progress.target > 0 &&
+        b.progress.current > 0
+    );
+    if (withProgress) return withProgress;
+    return (
+      badges.find((b) => !b.earned && b.def.tier === "common") ||
+      badges.find((b) => !b.earned) ||
+      null
+    );
+  }, [badges]);
+
+  const recent = useMemo(() => {
+    const list = [...earnedList];
+    // Prefer most recently stamped if we have meta; else catalog order
+    list.sort((a, b) => {
+      const at = a.earnedAt ? Date.parse(a.earnedAt) : 0;
+      const bt = b.earnedAt ? Date.parse(b.earnedAt) : 0;
+      return bt - at;
+    });
+    return list.slice(0, 4);
+  }, [earnedList]);
 
   const byTier = useMemo(
     () =>
@@ -74,7 +112,7 @@ export default function WwcPassportShelf({ badges }: Props) {
               FIFA Women&apos;s World Cup Brazil 2027™
             </h2>
             <p className="text-xs text-white/70 mt-0.5">
-              Stamps, not medals — magic, nations, knockout pressure.
+              Simple stamps. Endless book — explore when you&apos;re curious.
             </p>
           </div>
           <div
@@ -93,69 +131,174 @@ export default function WwcPassportShelf({ badges }: Props) {
           </div>
         </div>
 
-        <div className="p-4 space-y-6">
-          {byTier.map(({ tier, items }) => (
-            <div key={tier}>
-              <p
-                className="text-[10px] font-black uppercase tracking-[0.2em] mb-2"
-                style={{ color: TIER_INK[tier] }}
-              >
-                {TIER_LABEL[tier]} · {items.filter((i) => i.earned).length}/
-                {items.length}
+        <div className="p-4 space-y-5">
+          {/* Layer 2 surface — not 80 locked tiles */}
+          <div>
+            <p
+              className="text-[10px] font-black uppercase tracking-[0.18em] mb-2"
+              style={{ color: gold }}
+            >
+              Recently stamped
+            </p>
+            {recent.length === 0 ? (
+              <p className="text-sm text-white/65 leading-relaxed">
+                Lock a matchday. Stamps show up here — no homework, no wall of
+                grey.
               </p>
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2.5">
-                {items.map((status) => {
-                  const stamp = stampKind(status.def);
-                  const ink = TIER_INK[status.def.tier];
-                  return (
+            ) : (
+              <ul className="space-y-2">
+                {recent.map((s) => (
+                  <li key={s.def.id}>
                     <button
-                      key={status.def.id}
                       type="button"
-                      onClick={() => setSelected(status)}
-                      className={`relative aspect-[3/4] rounded-lg border-2 p-1.5 flex flex-col items-center justify-center text-center transition touch-manipulation ${
-                        status.earned
-                          ? "opacity-100 scale-100"
-                          : "opacity-45 grayscale"
-                      }`}
+                      onClick={() => setSelected(s)}
+                      className="w-full flex items-center gap-3 rounded-xl border px-3 py-2.5 text-left touch-manipulation"
                       style={{
-                        borderColor: status.earned ? ink : `${ink}44`,
-                        background: status.earned
-                          ? `linear-gradient(160deg, ${white}12, ${ink}28)`
-                          : "rgba(0,0,0,0.25)",
-                        boxShadow: status.earned
-                          ? `0 0 14px ${ink}44`
-                          : undefined,
+                        borderColor: `${gold}55`,
+                        background: `${emerald}22`,
                       }}
                     >
-                      <span className="text-2xl sm:text-3xl leading-none" aria-hidden>
-                        {status.earned
-                          ? WWC_STAMP_EMOJI[stamp]
-                          : "⬜"}
+                      <span className="text-2xl" aria-hidden>
+                        {WWC_STAMP_EMOJI[stampKind(s.def)]}
                       </span>
-                      <span className="mt-1 text-[9px] sm:text-[10px] font-bold text-white leading-tight line-clamp-2 px-0.5">
-                        {status.def.name.replace(/^⭐ |🌍 |🏆 |👑 |🌎 /g, "")}
-                      </span>
-                      {status.earned && (
-                        <span
-                          className="absolute top-1 right-1 text-[8px] font-black"
-                          style={{ color: gold }}
-                        >
-                          ✓
+                      <span className="min-w-0">
+                        <span className="block text-sm font-bold text-white truncate">
+                          ⭐ {cleanName(s.def.name)}
                         </span>
-                      )}
+                        <span className="text-[11px] text-white/60">
+                          {TIER_LABEL[s.def.tier]} · +{s.def.points} pts
+                        </span>
+                      </span>
                     </button>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
 
-        <p className="px-4 pb-3 text-[10px] text-white/50 leading-relaxed">
-          Collectible passport stamps — not CFB badge shelves. Many stamps wait
-          on full tournament structure (groups, nations, shootouts); early
-          stamps light up as you join, lock, and score.
-        </p>
+          {nextGoal && (
+            <div
+              className="rounded-xl border px-3 py-3"
+              style={{
+                borderColor: `${emerald}88`,
+                background: "rgba(0,0,0,0.28)",
+              }}
+            >
+              <p
+                className="text-[10px] font-black uppercase tracking-[0.18em] mb-1"
+                style={{ color: emerald }}
+              >
+                Next goal
+              </p>
+              <button
+                type="button"
+                onClick={() => setSelected(nextGoal)}
+                className="w-full text-left"
+              >
+                <p className="text-base font-bold text-white">
+                  🏆 {cleanName(nextGoal.def.name)}
+                </p>
+                <p className="text-xs text-white/65 mt-0.5 leading-snug">
+                  {nextGoal.def.howToEarn}
+                </p>
+                {nextGoal.progress && nextGoal.progress.target > 0 && (
+                  <div className="mt-2">
+                    <div className="flex justify-between text-[11px] text-white/70 mb-1">
+                      <span>Progress</span>
+                      <span className="font-bold" style={{ color: gold }}>
+                        {nextGoal.progress.current} / {nextGoal.progress.target}
+                      </span>
+                    </div>
+                    <div className="h-2 rounded-full bg-black/40 overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{
+                          width: `${Math.min(
+                            100,
+                            Math.round(
+                              (nextGoal.progress.current /
+                                nextGoal.progress.target) *
+                                100
+                            )
+                          )}%`,
+                          backgroundColor: emerald,
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </button>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setExplore((e) => !e)}
+            className="w-full py-2.5 rounded-xl border text-sm font-semibold touch-manipulation"
+            style={{
+              borderColor: `${gold}66`,
+              color: gold,
+              background: "rgba(0,0,0,0.2)",
+            }}
+          >
+            {explore
+              ? "Hide full passport"
+              : `Explore full passport (${badges.length} stamps)`}
+          </button>
+
+          {explore && (
+            <div className="space-y-6 pt-1 border-t" style={{ borderColor: `${gold}33` }}>
+              <p className="text-[11px] text-white/55 leading-relaxed">
+                Deep fan mode — the whole book. Not required. Discover when you
+                care.
+              </p>
+              {byTier.map(({ tier, items }) => (
+                <div key={tier}>
+                  <p
+                    className="text-[10px] font-black uppercase tracking-[0.2em] mb-2"
+                    style={{ color: TIER_INK[tier] }}
+                  >
+                    {TIER_LABEL[tier]} · {items.filter((i) => i.earned).length}/
+                    {items.length}
+                  </p>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2.5">
+                    {items.map((status) => {
+                      const stamp = stampKind(status.def);
+                      const ink = TIER_INK[status.def.tier];
+                      return (
+                        <button
+                          key={status.def.id}
+                          type="button"
+                          onClick={() => setSelected(status)}
+                          className={`relative aspect-[3/4] rounded-lg border-2 p-1.5 flex flex-col items-center justify-center text-center transition touch-manipulation ${
+                            status.earned
+                              ? "opacity-100"
+                              : "opacity-40 grayscale"
+                          }`}
+                          style={{
+                            borderColor: status.earned ? ink : `${ink}44`,
+                            background: status.earned
+                              ? `linear-gradient(160deg, ${white}12, ${ink}28)`
+                              : "rgba(0,0,0,0.25)",
+                          }}
+                        >
+                          <span className="text-2xl leading-none" aria-hidden>
+                            {status.earned
+                              ? WWC_STAMP_EMOJI[stamp]
+                              : "⬜"}
+                          </span>
+                          <span className="mt-1 text-[9px] font-bold text-white leading-tight line-clamp-2">
+                            {cleanName(status.def.name)}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {selected && (
@@ -218,7 +361,7 @@ export default function WwcPassportShelf({ badges }: Props) {
               className="mt-4 w-full py-3 rounded-xl font-bold text-sm"
               style={{ backgroundColor: emerald, color: white }}
             >
-              Close passport
+              Close
             </button>
           </div>
         </div>

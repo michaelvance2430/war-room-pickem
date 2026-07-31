@@ -14,6 +14,10 @@
 
 **Scope:** `sportId: soccer_wwc` only. CFB catalog stays separate.
 
+**Surface discipline (see `docs/DESIGN-PRINCIPLES.md`):**  
+Catalog can grow to hundreds. **Day-1 UI must not show 80 locked stamps.**  
+Default passport view = **Recently stamped** + **Next goal** (one progress line). Full stamp book is discovery (“Explore passport”).
+
 ## Counts
 
 | Tier | Count | Stamp vibe |
