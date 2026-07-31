@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import Nav from "@/components/Nav";
 import AvatarLightbox from "@/components/AvatarLightbox";
 import BadgeShelf from "@/components/BadgeShelf";
+import WwcPassportShelf from "@/components/WwcPassportShelf";
 import ProfileTrophyCase from "@/components/ProfileTrophyCase";
 import FootballResume from "@/components/FootballResume";
 import Avatar from "@/components/Avatar";
@@ -15,6 +16,7 @@ import {
   syncLeagueCheevoKing,
   withPermanentBadges,
 } from "@/lib/badges";
+import { getPlayerWwcBadges } from "@/lib/sports/wwc-badge-eval";
 import { buildFootballResume } from "@/lib/player-history";
 import { syncCareerWithPlayer } from "@/lib/career-cheevo";
 import { applyLegacyBadgeGrants } from "@/lib/legacy-badge-grants";
@@ -208,6 +210,17 @@ export default function ProfilePage() {
       return [];
     }
   }, [player, leaguePeers]);
+
+  const isWwcLeague = getLeague()?.sportId === "soccer_wwc";
+
+  const wwcBadges = useMemo(() => {
+    if (!player || !isWwcLeague) return [];
+    try {
+      return getPlayerWwcBadges(withPermanentBadges(player));
+    } catch {
+      return [];
+    }
+  }, [player, isWwcLeague]);
 
   const { seasonPoints, careerPoints } = useMemo(() => {
     if (!player) return { seasonPoints: 0, careerPoints: 0 };
@@ -494,19 +507,40 @@ export default function ProfilePage() {
           isSelf={isSelfProfile}
         />
 
-        {/* Badges — always mount when we have a player */}
-        <div className="rounded-2xl border border-border bg-card p-5 sm:p-6 mb-6">
-          {badges.length > 0 ? (
-            <BadgeShelf badges={badges} />
-          ) : (
-            <div>
-              <h2 className="font-semibold text-lg mb-2">Badge shelves</h2>
-              <p className="text-sm text-muted">
-                Could not load badges. Try a hard refresh.
-              </p>
+        {/* World Cup = passport stamps; CFB = classic badge shelves */}
+        {isWwcLeague && wwcBadges.length > 0 && (
+          <WwcPassportShelf badges={wwcBadges} />
+        )}
+
+        {!isWwcLeague && (
+          <div className="rounded-2xl border border-border bg-card p-5 sm:p-6 mb-6">
+            {badges.length > 0 ? (
+              <BadgeShelf badges={badges} />
+            ) : (
+              <div>
+                <h2 className="font-semibold text-lg mb-2">Badge shelves</h2>
+                <p className="text-sm text-muted">
+                  Could not load badges. Try a hard refresh.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {isWwcLeague && (
+          <details className="rounded-2xl border border-border bg-card p-5 sm:p-6 mb-6">
+            <summary className="font-semibold text-sm cursor-pointer text-muted hover:text-foreground">
+              Also show classic War Room badge shelves
+            </summary>
+            <div className="mt-4">
+              {badges.length > 0 ? (
+                <BadgeShelf badges={badges} />
+              ) : (
+                <p className="text-sm text-muted">No football badges loaded.</p>
+              )}
             </div>
-          )}
-        </div>
+          </details>
+        )}
       </main>
 
       <AvatarLightbox
