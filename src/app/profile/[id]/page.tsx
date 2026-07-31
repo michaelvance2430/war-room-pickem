@@ -107,6 +107,20 @@ export default function ProfilePage() {
             syncLeagueCheevoKing(
               leagueForSync.map((p) => withPermanentBadges(p))
             );
+            // Hard-scrub mistaken legends on every roster (Visconti in any league)
+            try {
+              const { sanitizeLegacyLegendsOnBoot } = await import(
+                "@/lib/legacy-badge-grants"
+              );
+              sanitizeLegacyLegendsOnBoot({
+                roster: leagueForSync.map((p) => ({
+                  id: p.id,
+                  name: p.name,
+                })),
+              });
+            } catch {
+              /* ignore */
+            }
           }
         } catch {
           /* no session / offline */
@@ -118,6 +132,15 @@ export default function ProfilePage() {
         }
 
         if (found) {
+          // Force grant/revoke before painting shelf (Visconti hard update)
+          try {
+            const { applyLegacyBadgeGrants } = await import(
+              "@/lib/legacy-badge-grants"
+            );
+            applyLegacyBadgeGrants(found);
+          } catch {
+            /* ignore */
+          }
           found = withPermanentBadges(withCreatorFlag(found));
         }
 

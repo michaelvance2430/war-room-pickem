@@ -92,6 +92,19 @@ export default function Home() {
         );
         setIsCommish(isCommissioner());
         setActuallyCommish(isActuallyCommissioner());
+        // Hard-scrub mistaken War Room Legend (Visconti etc.) for this browser
+        try {
+          const { sanitizeLegacyLegendsOnBoot } = await import(
+            "@/lib/legacy-badge-grants"
+          );
+          const sess = getSession();
+          sanitizeLegacyLegendsOnBoot({
+            playerId: sess?.playerId,
+            playerName: sess?.playerName,
+          });
+        } catch {
+          /* ignore */
+        }
         setReady(true);
       } catch (e: unknown) {
         setBootError(e instanceof Error ? e.message : "Failed to start");

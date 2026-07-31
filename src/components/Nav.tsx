@@ -27,6 +27,7 @@ import {
   countUnreadAnnouncements,
   countUnseenLockerPosts,
 } from "@/lib/room-unseen";
+import { sanitizeLegacyLegendsOnBoot } from "@/lib/legacy-badge-grants";
 
 type NavLink = {
   href: string;
@@ -94,8 +95,25 @@ export default function Nav() {
       if (p) {
         setName(p.displayName);
         setAvatarUrl(p.avatarUrl);
+        // Hard-scrub mistaken Legend (e.g. Visconti) even if they only open Commish
+        sanitizeLegacyLegendsOnBoot({
+          playerId: p.id || session?.playerId,
+          playerName: p.displayName || session?.playerName,
+        });
+      } else if (session?.playerId) {
+        sanitizeLegacyLegendsOnBoot({
+          playerId: session.playerId,
+          playerName: session.playerName,
+        });
       }
     });
+    // Immediate pass from session (before profile returns)
+    if (session?.playerId) {
+      sanitizeLegacyLegendsOnBoot({
+        playerId: session.playerId,
+        playerName: session.playerName,
+      });
+    }
 
     async function loadUnread() {
       if (!session?.playerId || !league?.id) return;
