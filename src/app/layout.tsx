@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import SeasonThemeApplier from "@/components/SeasonThemeApplier";
+import SportThemeApplier from "@/components/SportThemeApplier";
 import PullToRefresh from "@/components/PullToRefresh";
 import RouteHardSwitch from "@/components/RouteHardSwitch";
 
@@ -68,6 +69,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-background text-foreground phone-shell">
         <RouteHardSwitch />
+        <SportThemeApplier />
         <SeasonThemeApplier />
         <PullToRefresh>{children}</PullToRefresh>
       </body>

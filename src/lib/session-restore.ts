@@ -3,6 +3,15 @@ import { League, Session } from "@/lib/league";
 
 const LEAGUE_KEY = "warroom-league";
 const SESSION_KEY = "warroom-session";
+
+async function paintSportFromLeague(sportId?: string | null) {
+  try {
+    const { applySportTheme } = await import("@/lib/sports/sport-theme");
+    applySportTheme(sportId);
+  } catch {
+    /* ignore */
+  }
+}
 const ACTIVE_LEAGUE_KEY = "warroom-active-league-id";
 
 export interface LeagueMembership {
@@ -22,6 +31,8 @@ export interface LeagueMembership {
   homeTaglineId?: string;
   homeTaglineCustom?: string;
   seasonThemeId?: string;
+  /** Sport pack id (cfb, soccer_wwc, …) */
+  sportId?: string;
 }
 
 function canUseStorage() {
@@ -60,6 +71,7 @@ export function writeSessionAndLeague(
     code: membership.code,
     commissionerId: membership.commissionerId,
     createdAt: membership.createdAt,
+    sportId: membership.sportId || "cfb",
     settings: {
       cutPercent: membership.cutPercent ?? 50,
       regularSeasonWeeks: membership.regularSeasonWeeks ?? 18,
@@ -77,16 +89,16 @@ export function writeSessionAndLeague(
     localStorage.setItem(ACTIVE_LEAGUE_KEY, membership.leagueId);
   }
 
-  // Paint commissioner theme immediately for joiners / league switchers
+  // Paint commissioner theme + sport skin immediately for joiners / switchers
   if (typeof window !== "undefined") {
     try {
-      // Lazy to avoid SSR issues
       void import("./season-theme").then(({ applySeasonTheme }) => {
         applySeasonTheme(league.settings.seasonThemeId);
       });
     } catch {
       /* ignore */
     }
+    void paintSportFromLeague(league.sportId);
   }
 
   return { session, league };
@@ -109,17 +121,27 @@ export async function fetchMyMemberships(): Promise<LeagueMembership[]> {
     const res = await supabase
       .from("memberships")
       .select(
-        "role, is_moderator, is_deputy, league_id, leagues(id, name, code, commissioner_id, created_at, cut_percent, regular_season_weeks, games_per_week, crystal_ball_enabled, home_tagline_id, home_tagline_custom, season_theme_id)"
+        "role, is_moderator, is_deputy, league_id, leagues(id, name, code, commissioner_id, created_at, cut_percent, regular_season_weeks, games_per_week, crystal_ball_enabled, home_tagline_id, home_tagline_custom, season_theme_id, sport_id)"
       )
       .eq("user_id", userId);
-    if (res.error && /is_moderator|is_deputy|schema cache|column|season_theme|home_tagline|crystal_ball/i.test(res.error.message || "")) {
+    if (res.error && /is_moderator|is_deputy|schema cache|column|season_theme|home_tagline|crystal_ball|sport_id/i.test(res.error.message || "")) {
       const res2 = await supabase
         .from("memberships")
         .select(
-          "role, league_id, leagues(id, name, code, commissioner_id, created_at, cut_percent, regular_season_weeks, games_per_week)"
+          "role, league_id, leagues(id, name, code, commissioner_id, created_at, cut_percent, regular_season_weeks, games_per_week, sport_id)"
         )
         .eq("user_id", userId);
-      rows = (res2.data as Record<string, unknown>[] | null) || null;
+      if (res2.error && /sport_id/i.test(res2.error.message || "")) {
+        const res3 = await supabase
+          .from("memberships")
+          .select(
+            "role, league_id, leagues(id, name, code, commissioner_id, created_at, cut_percent, regular_season_weeks, games_per_week)"
+          )
+          .eq("user_id", userId);
+        rows = (res3.data as Record<string, unknown>[] | null) || null;
+      } else {
+        rows = (res2.data as Record<string, unknown>[] | null) || null;
+      }
     } else {
       rows = (res.data as Record<string, unknown>[] | null) || null;
     }
@@ -148,6 +170,7 @@ export async function fetchMyMemberships(): Promise<LeagueMembership[]> {
       homeTaglineId: (L.home_tagline_id as string) || "good-teams",
       homeTaglineCustom: (L.home_tagline_custom as string) || "",
       seasonThemeId: (L.season_theme_id as string) || "default",
+      sportId: (L.sport_id as string) || "cfb",
     });
   }
   return list;
@@ -206,11 +229,14 @@ export async function switchToLeague(leagueId: string): Promise<boolean> {
   const m = memberships.find((x) => x.leagueId === leagueId);
   if (!m) return false;
   writeSessionAndLeague(m, auth.user.id);
-  // Refresh full league (incl. season theme) from cloud when possible
+  // Refresh full league (incl. season theme + sport skin) from cloud when possible
   try {
     const { syncLeagueFromCloud } = await import("./league-sync");
     const { applySeasonTheme } = await import("./season-theme");
     const lg = await syncLeagueFromCloud();
+    if (lg?.sportId) {
+      void paintSportFromLeague(lg.sportId);
+    }
     if (lg?.settings?.seasonThemeId) {
       applySeasonTheme(lg.settings.seasonThemeId);
     }

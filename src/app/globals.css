@@ -36,6 +36,59 @@
   --color-foreground: var(--foreground);
 }
 
+/* ============================================================
+   FIFA Women's World Cup Brazil 2027™ — full-app sport skin
+   Emerald #009C3B · Gold #FFDF00 · Royal #002776 · White
+   Active when league.sport_id = soccer_wwc (html[data-sport])
+   ============================================================ */
+html[data-sport="soccer_wwc"] {
+  --background: #040a0c;
+  --foreground: #f7faf8;
+  --card: #0a1612;
+  --card-hover: #0f2218;
+  --border: #1a3d2e;
+  --primary: #009c3b;
+  --primary-dim: #007a2e;
+  --danger: #ef4444;
+  --warning: #ffdf00;
+  --muted: #8fa89a;
+  --toilet: #002776;
+  --badge-common: #009c3b;
+  --badge-rare: #002776;
+  --badge-epic: #1e4d9c;
+  --badge-legendary: #ffdf00;
+  color-scheme: dark;
+}
+
+html[data-sport="soccer_wwc"] body {
+  background:
+    radial-gradient(ellipse 90% 55% at 50% -5%, rgba(0, 156, 59, 0.22), transparent 52%),
+    radial-gradient(ellipse 55% 45% at 100% 90%, rgba(255, 223, 0, 0.08), transparent 50%),
+    radial-gradient(ellipse 50% 55% at 0% 80%, rgba(0, 39, 118, 0.32), transparent 52%),
+    var(--background);
+  background-attachment: fixed;
+}
+
+/* Nav / sticky chrome picks up primary + cards */
+html[data-sport="soccer_wwc"] .crt-frame {
+  box-shadow: inset 0 0 80px rgba(0, 39, 118, 0.15);
+}
+
+/* Soft gold focus rings for form controls */
+html[data-sport="soccer_wwc"] input:focus,
+html[data-sport="soccer_wwc"] textarea:focus,
+html[data-sport="soccer_wwc"] select:focus {
+  outline-color: #ffdf00;
+  border-color: rgba(0, 156, 59, 0.7);
+}
+
+/* Bottom tabs / primary buttons already use bg-primary — emerald now */
+
+/* Warning / gold callouts feel more "Brasil" */
+html[data-sport="soccer_wwc"] .text-warning {
+  color: #ffdf00;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

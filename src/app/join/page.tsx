@@ -178,6 +178,8 @@ function JoinPageInner() {
           leagueId,
         })
       );
+      const createdSportId =
+        (league.sport_id as string) || sportId || "cfb";
       localStorage.setItem(
         "warroom-league",
         JSON.stringify({
@@ -186,7 +188,7 @@ function JoinPageInner() {
           code: league.code as string,
           commissionerId: userId,
           createdAt: league.created_at as string,
-          sportId: (league.sport_id as string) || sportId || "cfb",
+          sportId: createdSportId,
           settings: {
             cutPercent: (league.cut_percent as number) ?? 50,
             regularSeasonWeeks: pack.defaultSeasonWeeks,
@@ -199,6 +201,12 @@ function JoinPageInner() {
           },
         })
       );
+      try {
+        const { applySportTheme } = await import("@/lib/sports/sport-theme");
+        applySportTheme(createdSportId);
+      } catch {
+        /* ignore */
+      }
       setCreatedCode(newCode);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Could not create league");
@@ -334,6 +342,12 @@ function JoinPageInner() {
       try {
         const { applySeasonTheme } = await import("@/lib/season-theme");
         applySeasonTheme(seasonThemeId);
+      } catch {
+        /* ignore */
+      }
+      try {
+        const { applySportTheme } = await import("@/lib/sports/sport-theme");
+        applySportTheme(joinedSportId);
       } catch {
         /* ignore */
       }
