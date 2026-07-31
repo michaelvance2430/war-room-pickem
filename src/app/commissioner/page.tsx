@@ -17,7 +17,12 @@ import { Game, Prop } from "@/lib/types";
 import { fetchNcaafOdds } from "@/lib/odds";
 import { generateDemoSlate, randomizeDemoResults } from "@/lib/demo-slate";
 import { formatMatchupConferences } from "@/lib/fbs-teams";
-import { formatRankedTeam } from "@/lib/rankings";
+import {
+  formatRankedTeam,
+  getRankedMatchupTier,
+  rankedMatchupBadge,
+  rankedMatchupShellClass,
+} from "@/lib/rankings";
 import { scoreWeek, GameResult } from "@/lib/scoring";
 import { applyWeekScores } from "@/lib/store";
 import {
@@ -2511,6 +2516,11 @@ function CommissionerPageInner() {
                   {availableGames.length} FBS games • Grouped by kickoff date
                   (ET)
                   {rankLabel ? ` • Ranks: ${rankLabel}` : ""}
+                  {" · "}
+                  <span className="text-amber-300/90">Gold</span> = both top 10
+                  {" · "}
+                  <span className="text-violet-300/90">Violet</span> = both top
+                  25
                 </p>
                 <div className="space-y-4 max-h-[28rem] overflow-y-auto mt-4">
                   {groupGamesByDate(availableGames).map((group) => (
@@ -2538,23 +2548,42 @@ function CommissionerPageInner() {
                             g.awayTeam,
                             g.homeTeam
                           );
+                          const rankTier = getRankedMatchupTier(
+                            g.awayRank,
+                            g.homeRank
+                          );
+                          const rankBadge = rankedMatchupBadge(rankTier);
                           return (
                             <button
                               key={g.id}
                               type="button"
                               onClick={() => toggleGame(g.id)}
-                              className={
-                                selected
-                                  ? "w-full text-left p-3 rounded-lg border border-primary bg-primary/10"
-                                  : "w-full text-left p-3 rounded-lg border border-border"
-                              }
+                              className={`w-full text-left p-3 rounded-lg border transition ${rankedMatchupShellClass(
+                                rankTier,
+                                { selected }
+                              )}`}
                             >
                               <div className="flex justify-between items-start gap-2">
                                 <div className="min-w-0">
-                                  <div className="font-medium truncate">
-                                    {formatRankedTeam(g.awayTeam, g.awayRank)}{" "}
-                                    @{" "}
-                                    {formatRankedTeam(g.homeTeam, g.homeRank)}
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <div
+                                      className={`font-medium truncate ${
+                                        rankTier === "legendary"
+                                          ? "text-amber-100"
+                                          : rankTier === "top25"
+                                            ? "text-violet-100"
+                                            : ""
+                                      }`}
+                                    >
+                                      {formatRankedTeam(g.awayTeam, g.awayRank)}{" "}
+                                      @{" "}
+                                      {formatRankedTeam(g.homeTeam, g.homeRank)}
+                                    </div>
+                                    {rankBadge && (
+                                      <span className={rankBadge.className}>
+                                        {rankBadge.label}
+                                      </span>
+                                    )}
                                   </div>
                                   <div className="text-xs text-primary mt-0.5">
                                     {kick.full}

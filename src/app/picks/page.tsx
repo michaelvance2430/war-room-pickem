@@ -17,7 +17,12 @@ import {
 } from "@/lib/cloud";
 import { resolvePlayerActiveWeek } from "@/lib/active-week";
 import { createClient } from "@/lib/supabase/client";
-import { formatRankedTeam } from "@/lib/rankings";
+import {
+  formatRankedTeam,
+  getRankedMatchupTier,
+  rankedMatchupBadge,
+  rankedMatchupShellClass,
+} from "@/lib/rankings";
 import {
   formatKickoff,
   formatCardDateRange,
@@ -914,23 +919,40 @@ export default function PicksPage() {
                 const locked =
                   !weekEditable || cardFrozen || isGameLocked(game, now, games);
                 const kick = formatKickoffLockLabel(game, now, games);
+                const rankTier = getRankedMatchupTier(
+                  game.awayRank,
+                  game.homeRank
+                );
+                const rankBadge = rankedMatchupBadge(rankTier);
 
                 return (
                   <div
                     key={game.id}
-                    className={`rounded-xl border bg-card p-4 transition ${
-                      isBest
-                        ? "border-primary/60 ring-1 ring-primary/30"
-                        : locked
-                          ? "border-border opacity-95"
-                          : "border-border"
-                    }`}
+                    className={`rounded-xl border bg-card p-4 transition ${rankedMatchupShellClass(
+                      rankTier,
+                      { bestBet: isBest }
+                    )} ${locked && !rankTier ? "opacity-95" : ""}`}
                   >
                     <div className="mb-3">
                       <div className="flex items-center justify-between gap-2">
-                        <div className="font-medium text-sm">
-                          {formatRankedTeam(game.awayTeam, game.awayRank)} @{" "}
-                          {formatRankedTeam(game.homeTeam, game.homeRank)}
+                        <div className="flex items-center gap-2 flex-wrap min-w-0">
+                          <div
+                            className={`font-medium text-sm ${
+                              rankTier === "legendary"
+                                ? "text-amber-100"
+                                : rankTier === "top25"
+                                  ? "text-violet-100"
+                                  : ""
+                            }`}
+                          >
+                            {formatRankedTeam(game.awayTeam, game.awayRank)} @{" "}
+                            {formatRankedTeam(game.homeTeam, game.homeRank)}
+                          </div>
+                          {rankBadge && (
+                            <span className={rankBadge.className}>
+                              {rankBadge.label}
+                            </span>
+                          )}
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
                           {locked && (

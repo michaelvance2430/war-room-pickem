@@ -233,3 +233,76 @@ export function formatRankedTeam(
   if (rank && rank >= 1 && rank <= 25) return `#${rank} ${name}`;
   return name;
 }
+
+/**
+ * Both teams ranked → visual heat for card builder + picks.
+ * - legendary: both top 10 (gold)
+ * - top25: both top 25, but not both top 10 (violet)
+ */
+export type RankedMatchupTier = "legendary" | "top25";
+
+export function getRankedMatchupTier(
+  awayRank?: number | null,
+  homeRank?: number | null
+): RankedMatchupTier | null {
+  const a =
+    typeof awayRank === "number" && awayRank >= 1 && awayRank <= 25
+      ? awayRank
+      : null;
+  const b =
+    typeof homeRank === "number" && homeRank >= 1 && homeRank <= 25
+      ? homeRank
+      : null;
+  if (a == null || b == null) return null;
+  if (a <= 10 && b <= 10) return "legendary";
+  return "top25";
+}
+
+/** Card / row shell classes for ranked-vs-ranked games. */
+export function rankedMatchupShellClass(
+  tier: RankedMatchupTier | null,
+  opts?: { selected?: boolean; bestBet?: boolean }
+): string {
+  if (!tier) {
+    if (opts?.bestBet) return "border-primary/60 ring-1 ring-primary/30";
+    if (opts?.selected) return "border-primary bg-primary/10";
+    return "border-border";
+  }
+  if (tier === "legendary") {
+    // Gold / legendary badge energy
+    const base =
+      "border-amber-400/70 bg-gradient-to-br from-amber-400/20 via-amber-500/10 to-yellow-600/5 ring-1 ring-amber-400/45 shadow-[0_0_28px_rgba(234,179,8,0.18)]";
+    if (opts?.selected || opts?.bestBet) {
+      return `${base} ring-2 ring-amber-300/70`;
+    }
+    return base;
+  }
+  // Both top 25 (11–25 band / mixed top-10 + 11–25)
+  const base =
+    "border-violet-400/55 bg-gradient-to-br from-violet-500/15 via-violet-500/8 to-fuchsia-500/5 ring-1 ring-violet-400/30";
+  if (opts?.selected || opts?.bestBet) {
+    return `${base} ring-2 ring-violet-300/50`;
+  }
+  return base;
+}
+
+export function rankedMatchupBadge(tier: RankedMatchupTier | null): {
+  label: string;
+  className: string;
+} | null {
+  if (tier === "legendary") {
+    return {
+      label: "TOP 10",
+      className:
+        "text-[9px] font-extrabold uppercase tracking-wider text-amber-200 bg-amber-400/20 border border-amber-400/50 px-1.5 py-0.5 rounded",
+    };
+  }
+  if (tier === "top25") {
+    return {
+      label: "TOP 25",
+      className:
+        "text-[9px] font-extrabold uppercase tracking-wider text-violet-200 bg-violet-500/20 border border-violet-400/45 px-1.5 py-0.5 rounded",
+    };
+  }
+  return null;
+}
