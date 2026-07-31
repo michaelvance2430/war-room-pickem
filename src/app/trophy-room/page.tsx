@@ -171,6 +171,13 @@ export default function TrophyRoomPage() {
             <span className="text-foreground font-medium">not</span> clear this
             room.
           </p>
+          {!commish && (
+            <p className="mt-3 text-xs text-muted border border-border/70 bg-card/60 rounded-lg px-3 py-2 inline-block">
+              <span className="text-foreground font-medium">View only</span>
+              {" · "}
+              only the commissioner can engrave trophies.
+            </p>
+          )}
         </div>
 
         {/* Legend pedestals */}
@@ -212,11 +219,6 @@ export default function TrophyRoomPage() {
               When the season ends, the commissioner engraves winners here.
               Friends come back next year and the hardware is still waiting.
             </p>
-            {!commish && (
-              <p className="text-xs text-muted mt-3">
-                Only the commissioner can award trophies.
-              </p>
-            )}
           </div>
         )}
 
