@@ -70,6 +70,7 @@ import {
   weekDateRangeLabel,
 } from "@/lib/season-calendar";
 import { autoFinishRemainingWeeks } from "@/lib/sandbox-auto-finish";
+import { advanceLeagueAfterScore } from "@/lib/active-week";
 import {
   fetchNcaafScores,
   buildResultsFromScores,
@@ -1157,13 +1158,25 @@ function CommissionerPageInner() {
       /* ignore */
     }
 
+    // Auto-advance league week so player homes/picks move to next card
+    let advanceNote = "";
+    try {
+      const adv = await advanceLeagueAfterScore(activeWeek);
+      if (adv.ok && adv.next != null && adv.next !== activeWeek) {
+        advanceNote = ` · League advanced to ${weekTitle(adv.next)}`;
+        setActiveWeek(adv.next);
+      }
+    } catch {
+      /* ignore */
+    }
+
     const lines = (cloud.details || [])
       .map((d) => `${d.name}: ${d.points} pts`)
       .join(" · ");
     setScoreReport(
       firstTime
-        ? `${weekTitle(activeWeek)} scored & locked · ${cloud.scoredCount} player(s). You're a real Commish now — Advanced tools unlocked. ${lines}`
-        : `${weekTitle(activeWeek)} scored & locked · ${cloud.scoredCount} player(s). ${lines}`
+        ? `${weekTitle(activeWeek)} scored & locked · ${cloud.scoredCount} player(s). You're a real Commish now — Advanced tools unlocked.${advanceNote} ${lines}`
+        : `${weekTitle(activeWeek)} scored & locked · ${cloud.scoredCount} player(s).${advanceNote} ${lines}`
     );
   }
 

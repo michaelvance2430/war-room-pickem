@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+} from "react";
 import Link from "next/link";
 import Nav from "@/components/Nav";
 import YouBadge from "@/components/YouBadge";
@@ -19,7 +26,15 @@ import {
   type LockerMessage,
 } from "@/lib/locker-room";
 import { markLockerSeen } from "@/lib/room-unseen";
+import { loadLeagueRoster } from "@/lib/cloud";
 import { refreshStaffSessionFlags } from "@/lib/cloud";
+import {
+  applyMention,
+  filterMentionMembers,
+  getActiveMention,
+  splitMentions,
+  type MentionMember,
+} from "@/lib/locker-mentions";
 
 export default function LockerRoomPage() {
   const [messages, setMessages] = useState<LockerMessage[]>([]);
@@ -34,9 +49,15 @@ export default function LockerRoomPage() {
   const [leagueName, setLeagueName] = useState("");
   const [cooldownLeft, setCooldownLeft] = useState(0);
   const [weekLabel, setWeekLabel] = useState("");
+  const [roster, setRoster] = useState<MentionMember[]>([]);
+  const [mentionOpen, setMentionOpen] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState("");
+  const [mentionIndex, setMentionIndex] = useState(0);
   const bottomRef = useRef<HTMLDivElement>(null);
   const lastPostAt = useRef(0);
   const listTopRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const caretRef = useRef(0);
 
   const reload = useCallback(async (opts?: { quiet?: boolean }) => {
     if (!opts?.quiet) setError(null);
@@ -49,7 +70,6 @@ export default function LockerRoomPage() {
     setMessages(list);
     if (res.weekLabel) setWeekLabel(res.weekLabel);
     setError(null);
-    // Opening Locker clears "unseen" for Home / nav (watermark = newest post or now)
     const newest = list[0]?.createdAt;
     markLockerSeen({ atIso: newest });
   }, []);
@@ -62,9 +82,15 @@ export default function LockerRoomPage() {
     void refreshStaffSessionFlags().then(() => setStaff(isStaff()));
     void amILockerMuted().then(setMuted);
     reload().finally(() => setLoading(false));
+    void loadLeagueRoster().then((rows) => {
+      setRoster(
+        rows
+          .filter((m) => !m.isBot)
+          .map((m) => ({ userId: m.userId, name: m.name }))
+      );
+    });
   }, [reload]);
 
-  // Poll for new takes (simple; no Realtime required)
   useEffect(() => {
     const t = setInterval(() => {
       void reload({ quiet: true });
@@ -79,9 +105,25 @@ export default function LockerRoomPage() {
   }, [cooldownLeft]);
 
   useEffect(() => {
-    // Stick near bottom when new messages arrive
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
+
+  const mentionSuggestions = mentionOpen
+    ? filterMentionMembers(roster, mentionQuery, 6)
+    : [];
+
+  function syncMention(text: string, caret: number) {
+    caretRef.current = caret;
+    const active = getActiveMention(text, caret);
+    if (!active) {
+      setMentionOpen(false);
+      setMentionQuery("");
+      return;
+    }
+    setMentionOpen(true);
+    setMentionQuery(active.query);
+    setMentionIndex(0);
+  }
 
   function insertEmoji(emoji: string) {
     setBody((prev) => {
@@ -89,6 +131,42 @@ export default function LockerRoomPage() {
       const next = prev + emoji;
       return next.slice(0, LOCKER_MAX_CHARS);
     });
+  }
+
+  function pickMention(member: MentionMember) {
+    const caret = caretRef.current;
+    const { text, caret: nextCaret } = applyMention(body, caret, member);
+    const clipped = text.slice(0, LOCKER_MAX_CHARS);
+    setBody(clipped);
+    setMentionOpen(false);
+    setMentionQuery("");
+    requestAnimationFrame(() => {
+      const el = textareaRef.current;
+      if (!el) return;
+      el.focus();
+      const pos = Math.min(nextCaret, clipped.length);
+      el.setSelectionRange(pos, pos);
+      caretRef.current = pos;
+    });
+  }
+
+  function onTextareaKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
+    if (!mentionOpen || mentionSuggestions.length === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setMentionIndex((i) => (i + 1) % mentionSuggestions.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setMentionIndex(
+        (i) => (i - 1 + mentionSuggestions.length) % mentionSuggestions.length
+      );
+    } else if (e.key === "Enter" || e.key === "Tab") {
+      e.preventDefault();
+      pickMention(mentionSuggestions[mentionIndex] || mentionSuggestions[0]);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      setMentionOpen(false);
+    }
   }
 
   async function onSubmit(e: FormEvent) {
@@ -101,8 +179,7 @@ export default function LockerRoomPage() {
       return;
     }
     const now = Date.now();
-    const wait =
-      LOCKER_COOLDOWN_SEC * 1000 - (now - lastPostAt.current);
+    const wait = LOCKER_COOLDOWN_SEC * 1000 - (now - lastPostAt.current);
     if (wait > 0) {
       setCooldownLeft(Math.ceil(wait / 1000));
       setPostError(`Slow down — ${Math.ceil(wait / 1000)}s cooldown.`);
@@ -120,7 +197,7 @@ export default function LockerRoomPage() {
     lastPostAt.current = Date.now();
     setCooldownLeft(LOCKER_COOLDOWN_SEC);
     setBody("");
-    // Show your post immediately (then reconcile with server)
+    setMentionOpen(false);
     if (res.message) {
       setMessages((prev) => {
         if (prev.some((m) => m.id === res.message!.id)) return prev;
@@ -167,7 +244,9 @@ export default function LockerRoomPage() {
                 {" · "}
               </>
             ) : null}
-            Drop hot takes ({LOCKER_MAX_CHARS} char max).{" "}
+            Drop hot takes ({LOCKER_MAX_CHARS} char max). Type{" "}
+            <strong className="text-foreground">@name</strong> to tag someone in
+            the league.{" "}
             <strong className="text-foreground">This week only</strong>
             {weekLabel ? (
               <>
@@ -175,12 +254,14 @@ export default function LockerRoomPage() {
                 <span className="text-foreground/80">({weekLabel})</span>
               </>
             ) : null}
-            — board clears every Monday ET for a fresh week. Staff can delete
-            posts and mute.
+            — board clears every Monday ET. Staff can delete posts and mute.
             {staff && (
               <>
                 {" "}
-                <Link href="/moderation" className="text-amber-300 hover:underline">
+                <Link
+                  href="/moderation"
+                  className="text-amber-300 hover:underline"
+                >
                   Mod tools →
                 </Link>
               </>
@@ -194,7 +275,6 @@ export default function LockerRoomPage() {
           </div>
         )}
 
-        {/* Feed */}
         <div
           ref={listTopRef}
           className="flex-1 min-h-[280px] max-h-[min(55vh,520px)] overflow-y-auto rounded-xl border border-border bg-card mb-4"
@@ -209,20 +289,23 @@ export default function LockerRoomPage() {
               </div>
               <p className="text-sm font-medium">Quiet in here</p>
               <p className="text-xs text-muted mt-1">
-                First take of the week. Don’t waste it.
+                First take of the week. Don&apos;t waste it. Try @someone.
               </p>
             </div>
           )}
           <ul className="divide-y divide-border/60">
             {messages.map((m) => {
               const mine = isSelfPlayer(m.userId, selfId);
+              const parts = splitMentions(m.body, roster);
               return (
                 <li
                   key={m.id}
                   className={`px-3 py-3 ${mine ? "bg-primary/5" : ""}`}
                 >
                   <div className="flex items-baseline justify-between gap-2 mb-0.5">
-                    <span className={selfNameClass(mine, "text-sm font-semibold")}>
+                    <span
+                      className={selfNameClass(mine, "text-sm font-semibold")}
+                    >
                       <PlayerLink id={m.userId} name={m.authorName} />
                       {mine && <YouBadge />}
                     </span>
@@ -231,7 +314,27 @@ export default function LockerRoomPage() {
                     </span>
                   </div>
                   <p className="text-sm text-foreground/95 whitespace-pre-wrap break-words leading-relaxed">
-                    {m.body}
+                    {parts.map((p, i) =>
+                      p.type === "mention" ? (
+                        p.userId ? (
+                          <PlayerLink
+                            key={`${m.id}-m-${i}`}
+                            id={p.userId}
+                            name={p.value}
+                            className="text-primary font-semibold hover:underline"
+                          />
+                        ) : (
+                          <span
+                            key={`${m.id}-m-${i}`}
+                            className="text-primary font-semibold"
+                          >
+                            {p.value}
+                          </span>
+                        )
+                      ) : (
+                        <span key={`${m.id}-t-${i}`}>{p.value}</span>
+                      )
+                    )}
                   </p>
                   {(mine || staff) && (
                     <button
@@ -249,7 +352,6 @@ export default function LockerRoomPage() {
           <div ref={bottomRef} />
         </div>
 
-        {/* Composer */}
         {muted ? (
           <div className="shrink-0 rounded-xl border border-danger/40 bg-danger/10 px-4 py-4 text-sm">
             <p className="font-semibold text-danger mb-1">You’re muted</p>
@@ -262,7 +364,7 @@ export default function LockerRoomPage() {
         ) : (
           <form
             onSubmit={(e) => void onSubmit(e)}
-            className="shrink-0 rounded-xl border border-border bg-card p-3 space-y-2"
+            className="shrink-0 rounded-xl border border-border bg-card p-3 space-y-2 relative"
           >
             <div className="flex flex-wrap gap-1.5">
               {LOCKER_EMOJIS.map((em) => (
@@ -277,16 +379,66 @@ export default function LockerRoomPage() {
                 </button>
               ))}
             </div>
-            <textarea
-              value={body}
-              onChange={(e) =>
-                setBody(e.target.value.slice(0, LOCKER_MAX_CHARS))
-              }
-              rows={3}
-              maxLength={LOCKER_MAX_CHARS}
-              placeholder="Talk your shit… (Best Bet locks, dogs that covered, Toilet Bowl prophecy)"
-              className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground resize-none focus:outline-none focus:ring-1 focus:ring-primary/50"
-            />
+
+            <div className="relative">
+              {mentionOpen && mentionSuggestions.length > 0 && (
+                <ul
+                  className="absolute bottom-full left-0 right-0 mb-1 max-h-48 overflow-y-auto rounded-lg border border-primary/40 bg-card shadow-xl z-20"
+                  role="listbox"
+                >
+                  {mentionSuggestions.map((m, i) => (
+                    <li key={m.userId}>
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected={i === mentionIndex}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          pickMention(m);
+                        }}
+                        className={`w-full text-left px-3 py-2.5 text-sm ${
+                          i === mentionIndex
+                            ? "bg-primary/15 text-primary font-semibold"
+                            : "text-foreground hover:bg-card-hover"
+                        }`}
+                      >
+                        @{m.name}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {mentionOpen &&
+                mentionQuery.length > 0 &&
+                mentionSuggestions.length === 0 && (
+                  <div className="absolute bottom-full left-0 right-0 mb-1 rounded-lg border border-border bg-card px-3 py-2 text-xs text-muted shadow-xl z-20">
+                    No one named “{mentionQuery}” in this league
+                  </div>
+                )}
+              <textarea
+                ref={textareaRef}
+                value={body}
+                onChange={(e) => {
+                  const v = e.target.value.slice(0, LOCKER_MAX_CHARS);
+                  setBody(v);
+                  const caret = e.target.selectionStart ?? v.length;
+                  syncMention(v, caret);
+                }}
+                onKeyUp={(e) => {
+                  const el = e.currentTarget;
+                  syncMention(el.value, el.selectionStart ?? el.value.length);
+                }}
+                onClick={(e) => {
+                  const el = e.currentTarget;
+                  syncMention(el.value, el.selectionStart ?? el.value.length);
+                }}
+                onKeyDown={onTextareaKeyDown}
+                rows={3}
+                maxLength={LOCKER_MAX_CHARS}
+                placeholder="Talk your shit… @someone to call them out"
+                className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground resize-none focus:outline-none focus:ring-1 focus:ring-primary/50"
+              />
+            </div>
             <div className="flex items-center justify-between gap-2">
               <span
                 className={`text-xs ${
@@ -295,6 +447,7 @@ export default function LockerRoomPage() {
               >
                 {remaining} left
                 {cooldownLeft > 0 ? ` · wait ${cooldownLeft}s` : ""}
+                {mentionOpen ? " · ↑↓ Enter to @tag" : ""}
               </span>
               <button
                 type="submit"
@@ -304,9 +457,7 @@ export default function LockerRoomPage() {
                 {posting ? "Sending…" : "Post"}
               </button>
             </div>
-            {postError && (
-              <p className="text-xs text-danger">{postError}</p>
-            )}
+            {postError && <p className="text-xs text-danger">{postError}</p>}
           </form>
         )}
       </main>

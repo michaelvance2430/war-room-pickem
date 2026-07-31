@@ -3,18 +3,21 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
-  loadLeagueActiveWeek,
   loadWeekCard,
   loadMyPicks,
   loadLeagueRoster,
-  listScoredWeekNumbers,
 } from "@/lib/cloud";
-import { getSession, getLeague, isOps, isCommissioner } from "@/lib/league";
+import { getLeague, isOps, isCommissioner } from "@/lib/league";
 import {
   formatCardLockDeadline,
   isCardLockDeadlinePassed,
   weekTitle,
 } from "@/lib/dates";
+import {
+  resolvePlayerActiveWeek,
+  weekProgressLabel,
+} from "@/lib/active-week";
+import { SEASON_MAX_WEEK } from "@/lib/season-calendar";
 
 type HeroState = {
   week: number;
@@ -28,6 +31,7 @@ type HeroState = {
   isCommish: boolean;
   isOps: boolean;
   leagueCode: string | null;
+  advancedFromScored: boolean;
 };
 
 /**
@@ -43,23 +47,22 @@ export default function HomeWeekHero() {
     let cancelled = false;
     async function load() {
       try {
-        const session = getSession();
-        const week = await loadLeagueActiveWeek();
+        const {
+          week,
+          advanced,
+          scored,
+        } = await resolvePlayerActiveWeek({ persistIfOps: true });
         const card = await loadWeekCard(week);
         const games = card?.games || [];
         const hasCard = games.length > 0;
         const now = Date.now();
         const frozen = hasCard && isCardLockDeadlinePassed(games, now);
         const mine = hasCard ? await loadMyPicks(week) : null;
-        const iLocked = !!(mine?.lockedAt && Object.keys(mine.picks || {}).length);
+        const iLocked = !!(
+          mine?.lockedAt && Object.keys(mine.picks || {}).length
+        );
         const roster = await loadLeagueRoster();
         const humans = roster.filter((m) => !m.isBot);
-        let scored: number[] = [];
-        try {
-          scored = await listScoredWeekNumbers();
-        } catch {
-          scored = [];
-        }
         if (cancelled) return;
         setState({
           week,
@@ -73,6 +76,7 @@ export default function HomeWeekHero() {
           isCommish: isCommissioner(),
           isOps: isOps(),
           leagueCode: getLeague()?.code || null,
+          advancedFromScored: advanced,
         });
       } catch {
         if (!cancelled) setState(null);
@@ -95,9 +99,10 @@ export default function HomeWeekHero() {
   }
 
   const weekLabel = weekTitle(state.week);
+  const progress = weekProgressLabel(state.week);
 
   // —— Player / everyone: primary job ——
-  let eyebrow = "This week";
+  let eyebrow = progress;
   let title = weekLabel;
   let body = "";
   let primaryHref = "/picks";
@@ -190,12 +195,22 @@ export default function HomeWeekHero() {
   return (
     <section className="mb-8">
       <div className="rounded-2xl border-2 border-primary/40 bg-gradient-to-br from-primary/15 via-black/50 to-black/70 p-5 sm:p-6 shadow-[0_0_50px_rgba(34,197,94,0.12)]">
-        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary mb-2">
-          {eyebrow}
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">
+            {eyebrow}
+          </p>
+          <span className="text-[11px] font-mono font-bold tabular-nums text-primary/90 border border-primary/35 rounded-full px-2.5 py-0.5 bg-primary/10">
+            {progress}
+          </span>
+        </div>
         <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2">
           {title}
         </h2>
+        {state.advancedFromScored && (
+          <p className="text-[11px] text-primary/90 mb-2 font-medium">
+            Last week is scored — you&apos;re on the next card ({progress}).
+          </p>
+        )}
         <p className="text-sm text-muted max-w-xl leading-relaxed mb-4">
           {body}
         </p>
@@ -227,12 +242,13 @@ export default function HomeWeekHero() {
           <span>
             Active:{" "}
             <span className="text-foreground/80 font-medium">{weekLabel}</span>
+            <span className="text-muted"> ({progress})</span>
           </span>
           <span className="text-border">·</span>
           <span>
             {state.scoredWeeks === 0
               ? "No weeks scored yet (preseason vibes)"
-              : `${state.scoredWeeks} week${state.scoredWeeks === 1 ? "" : "s"} scored`}
+              : `${state.scoredWeeks} of ${SEASON_MAX_WEEK + 1} slots scored`}
           </span>
         </div>
 

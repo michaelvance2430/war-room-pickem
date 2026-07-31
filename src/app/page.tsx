@@ -11,6 +11,7 @@ import PlayerWeekChecklist from "@/components/PlayerWeekChecklist";
 import CommishSetupBanner from "@/components/CommishSetupBanner";
 import HomeUnseenPulse from "@/components/HomeUnseenPulse";
 import HomeTileUnseen from "@/components/HomeTileUnseen";
+import LockPicksRoast from "@/components/LockPicksRoast";
 import {
   getSession,
   getLeague,
@@ -277,6 +278,9 @@ export default function Home() {
 
         {/* First-time Commish season setup */}
         <CommishSetupBanner />
+
+        {/* Didn't lock? Sarcastic adulting reminder */}
+        <LockPicksRoast />
 
         {/* One job: pick / wait / score path — strengths stay below */}
         <HomeWeekHero />

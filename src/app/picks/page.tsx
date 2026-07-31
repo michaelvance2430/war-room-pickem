@@ -15,6 +15,7 @@ import {
   cardRevision,
   type CloudCard,
 } from "@/lib/cloud";
+import { resolvePlayerActiveWeek } from "@/lib/active-week";
 import { createClient } from "@/lib/supabase/client";
 import { formatRankedTeam } from "@/lib/rankings";
 import {
@@ -235,14 +236,31 @@ export default function PicksPage() {
       }
 
       try {
-        const active = await loadLeagueActiveWeek();
+        // After a week is scored, home + picks auto-advance past it
+        const resolved = await resolvePlayerActiveWeek({
+          persistIfOps: true,
+        });
+        const active = resolved.week;
         setActiveWeek(active);
 
         let target = week;
         let cloud = await loadWeekCard(target);
 
-        // Initial only: if active has no card, land on first published week
-        if (opts.isInitial && !cloud?.games?.length) {
+        // Initial only: land on advanced active week (or first published)
+        if (opts.isInitial) {
+          target = active;
+          cloud = await loadWeekCard(target);
+          if (!cloud?.games?.length) {
+            const published = await refreshPublishedList();
+            const fallback = published.includes(active)
+              ? active
+              : published[published.length - 1] ?? active;
+            target = fallback;
+            cloud = await loadWeekCard(target);
+          } else {
+            void refreshPublishedList();
+          }
+        } else if (!cloud?.games?.length) {
           const published = await refreshPublishedList();
           const fallback = published.includes(active)
             ? active
