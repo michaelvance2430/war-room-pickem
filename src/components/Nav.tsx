@@ -20,6 +20,7 @@ import SeasonOpenWelcome from "@/components/SeasonOpenWelcome";
 import GuestDemoChrome from "@/components/GuestDemoChrome";
 import GuestOnboarding from "@/components/GuestOnboarding";
 import PlayerWalkthrough from "@/components/PlayerWalkthrough";
+import RingCeremonyModal from "@/components/RingCeremonyModal";
 import { loadMyProfile } from "@/lib/profile";
 import { isGuestMode } from "@/lib/guest-mode";
 import { refreshStaffSessionFlags } from "@/lib/cloud";
@@ -216,6 +217,11 @@ export default function Nav() {
     {
       href: "/trophy-room",
       label: "Trophies",
+      className: "text-amber-300 hover:text-amber-200",
+    },
+    {
+      href: "/museum",
+      label: "Museum",
       className: "text-amber-300 hover:text-amber-200",
     },
     ...(staff
@@ -582,6 +588,7 @@ export default function Nav() {
       {/* Until Aug 23 00:01 ET: countdown. After: ticker gone; one-time welcome splash */}
       {!isGuestMode() && <SeasonCountdownTicker />}
       {!isGuestMode() && <SeasonOpenWelcome />}
+      {!isGuestMode() && <RingCeremonyModal />}
       {!isGuestMode() && <RulesOnboardingModal />}
       <GazetteModal />
       <BadgeUnlockModal />

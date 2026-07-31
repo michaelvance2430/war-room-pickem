@@ -7,12 +7,14 @@ import Nav from "@/components/Nav";
 import AvatarLightbox from "@/components/AvatarLightbox";
 import BadgeShelf from "@/components/BadgeShelf";
 import ProfileTrophyCase from "@/components/ProfileTrophyCase";
+import FootballResume from "@/components/FootballResume";
 import {
   formatMemberSince,
   getPlayerBadges,
   syncLeagueCheevoKing,
   withPermanentBadges,
 } from "@/lib/badges";
+import { buildFootballResume } from "@/lib/player-history";
 import { syncCareerWithPlayer } from "@/lib/career-cheevo";
 import { applyLegacyBadgeGrants } from "@/lib/legacy-badge-grants";
 import { nukeAccumulatedSandboxCareersOnce } from "@/lib/sandbox-wipe";
@@ -255,6 +257,21 @@ export default function ProfilePage() {
   const ini = initials(player.name);
   const earnedCount = badges.filter((b) => b.earned).length;
 
+  let resume = null as ReturnType<typeof buildFootballResume> | null;
+  try {
+    resume = buildFootballResume({
+      player,
+      peers: leaguePeers.length ? leaguePeers : [player],
+      trophies: leagueTrophies,
+      badges,
+      memberSinceLabel: mock
+        ? "Never"
+        : formatMemberSince(player.memberSince),
+    });
+  } catch {
+    resume = null;
+  }
+
   return (
     <div className="min-h-screen flex flex-col">
       <Nav />
@@ -400,6 +417,8 @@ export default function ProfilePage() {
             </div>
           </div>
         </section>
+
+        {resume && <FootballResume resume={resume} playerId={player.id} />}
 
         <section className="rounded-2xl border border-border bg-card p-5 mb-6">
           <h2 className="font-semibold mb-3">Season snapshot</h2>

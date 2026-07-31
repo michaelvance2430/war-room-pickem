@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
-import Link from "next/link";
 import Nav from "@/components/Nav";
 import YouBadge from "@/components/YouBadge";
 import PlayerLink from "@/components/PlayerLink";
@@ -17,6 +16,8 @@ import {
   type LeagueTrophy,
   type TrophyType,
 } from "@/lib/trophies";
+import ChampionshipBanner from "@/components/ChampionshipBanner";
+import Link from "next/link";
 import { isSelfPlayer, selfNameClass } from "@/lib/self-highlight";
 
 const TYPES: TrophyType[] = ["championship", "toilet_bowl", "crystal_ball"];
@@ -171,6 +172,18 @@ export default function TrophyRoomPage() {
             <span className="text-foreground font-medium">not</span> clear this
             room.
           </p>
+          <p className="mt-2 text-xs">
+            <Link
+              href="/museum"
+              className="text-amber-300 font-semibold hover:underline"
+            >
+              Open War Room Museum →
+            </Link>
+            <span className="text-muted">
+              {" "}
+              timeline, records, season history
+            </span>
+          </p>
           {!commish && (
             <p className="mt-3 text-xs text-muted border border-border/70 bg-card/60 rounded-lg px-3 py-2 inline-block">
               <span className="text-foreground font-medium">View only</span>
@@ -179,6 +192,8 @@ export default function TrophyRoomPage() {
             </p>
           )}
         </div>
+
+        <ChampionshipBanner trophies={trophies} leagueName={leagueName} />
 
         {/* Legend pedestals */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-10">
