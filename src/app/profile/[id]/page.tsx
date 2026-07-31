@@ -14,6 +14,7 @@ import {
   syncLeagueCheevoKing,
   withPermanentBadges,
 } from "@/lib/badges";
+import { withCreatorFlag } from "@/lib/creator";
 import {
   isMockPlayer,
   mockRoastFor,
@@ -93,7 +94,7 @@ export default function ProfilePage() {
         }
 
         if (found) {
-          found = withPermanentBadges(found);
+          found = withPermanentBadges(withCreatorFlag(found));
         }
 
         if (cancelled) return;

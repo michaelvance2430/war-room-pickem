@@ -1,4 +1,5 @@
 import { BadgeDef, BadgeStatus, BadgeTier, Player } from "./types";
+import { isAppCreator, withCreatorFlag } from "./creator";
 import {
   getPermanentBadgeIds,
   grantPermanentBadgeId,
@@ -7,6 +8,9 @@ import {
 
 /** Permanent rare: most achievement points in the league */
 export const CHEEVO_KING_ID = "cheevo_king";
+
+/** Legendary creator badge — follows the app owner across every league */
+export const CREATOR_BADGE_ID = "the_commissioner";
 
 export function hasPermanentBadge(player: Player, badgeId: string): boolean {
   if (player.permanentBadgeIds?.includes(badgeId)) return true;
@@ -27,12 +31,13 @@ function grantPermanentBadge(player: Player, badgeId: string): Player {
   };
 }
 
-/** Attach permanent grants from local storage onto a player (live UUIDs). */
+/** Attach permanent grants + creator flag (live UUIDs, every league). */
 export function withPermanentBadges(player: Player): Player {
-  return {
+  const withPerm = {
     ...player,
     permanentBadgeIds: mergePermanentBadges(player.id, player.permanentBadgeIds),
   };
+  return withCreatorFlag(withPerm);
 }
 
 /** Point values by tier */
@@ -356,7 +361,13 @@ function evaluateBadge(badgeId: string, player: Player): EvalResult {
 
   switch (badgeId) {
     case "the_commissioner":
-      return { earned: !!player.isCreator };
+      // App creator — every league, not "commissioner of this league"
+      return {
+        earned:
+          isAppCreator(player.id) ||
+          !!player.isCreator ||
+          hasPermanentBadge(player, CREATOR_BADGE_ID),
+      };
 
     case "war_room_legend":
       // Manual / season-end award for now
@@ -458,6 +469,10 @@ function sortBadges(statuses: BadgeStatus[]): BadgeStatus[] {
  */
 export function getPlayerBadges(player: Player): BadgeStatus[] {
   const p = withPermanentBadges(player);
+  // Ensure creator always has the legendary permanently recorded for this id
+  if (isAppCreator(p.id)) {
+    grantPermanentBadgeId(p.id, CREATOR_BADGE_ID);
+  }
   const statuses: BadgeStatus[] = BADGE_CATALOG.map((def) => {
     try {
       const result = evaluateBadge(def.id, p);

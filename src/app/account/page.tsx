@@ -19,6 +19,7 @@ import {
   uploadMyAvatar,
   removeMyAvatar,
 } from "@/lib/profile";
+import { isAppCreator } from "@/lib/creator";
 
 export default function AccountPage() {
   const router = useRouter();
@@ -184,6 +185,21 @@ export default function AccountPage() {
                 >
                   View your badges &amp; public profile →
                 </Link>
+              )}
+              {userId && isAppCreator(userId) && (
+                <p className="text-xs text-yellow-500 font-medium">
+                  Creator legendary is active on your profile in every league.
+                </p>
+              )}
+              {userId && !isAppCreator(userId) && (
+                <p className="text-[11px] text-muted font-mono break-all">
+                  User ID: {userId}
+                  <span className="block text-muted/80 font-sans mt-0.5">
+                    App creator: set this on Vercel as{" "}
+                    <code className="text-[10px]">NEXT_PUBLIC_CREATOR_USER_IDS</code>{" "}
+                    so The Commissioner badge follows you in every league.
+                  </span>
+                </p>
               )}
               <p className="text-xs text-muted">
                 Any player can upload. JPG or PNG works best (max 2 MB after
