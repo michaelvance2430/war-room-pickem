@@ -30,7 +30,11 @@ import FeedbackForm from "@/components/FeedbackForm";
 import { startPlayerTutorial } from "@/lib/player-tutorial";
 import { isGuestMode } from "@/lib/guest-mode";
 import { getPlayerBadges, withPermanentBadges } from "@/lib/badges";
-import { listEquipableTitlesFromBadges } from "@/lib/equipable-titles";
+import {
+  listEquipableTitlesFromBadges,
+  titleVibeLabel,
+  type EquipableTitleOption,
+} from "@/lib/equipable-titles";
 import {
   getLocalEquippedBadgeId,
   setMyEquippedTitle,
@@ -38,7 +42,6 @@ import {
 } from "@/lib/equipped-title-store";
 import { loadLeaguePlayers } from "@/lib/cloud";
 import type { Player } from "@/lib/types";
-import type { BadgeTier } from "@/lib/types";
 
 export default function AccountPage() {
   const router = useRouter();
@@ -54,9 +57,9 @@ export default function AccountPage() {
   const [uploading, setUploading] = useState(false);
   const [playerView, setPlayerView] = useState(false);
   const [canPreviewPlayer, setCanPreviewPlayer] = useState(false);
-  const [titleOptions, setTitleOptions] = useState<
-    { badgeId: string; label: string; tier: BadgeTier }[]
-  >([]);
+  const [titleOptions, setTitleOptions] = useState<EquipableTitleOption[]>(
+    []
+  );
   const [equippedBadgeId, setEquippedBadgeId] = useState<string | null>(null);
   const [titleBusy, setTitleBusy] = useState(false);
 
@@ -327,21 +330,23 @@ export default function AccountPage() {
           </p>
           <h2 className="font-semibold mb-1">Equip a title</h2>
           <p className="text-xs text-muted mb-3 leading-relaxed">
-            Earned rare / epic / legendary badges can sit in front of your name
-            everywhere — e.g.{" "}
-            <span className="text-amber-300 font-bold">War Room Legend</span>{" "}
+            Only some achievements unlock a title.{" "}
+            <span className="text-amber-200 font-semibold">Flex</span> ones flex.{" "}
+            <span className="text-orange-300 font-semibold">Trash energy</span>{" "}
+            ones roast you on purpose — e.g.{" "}
+            <span className="text-amber-300 font-bold">Eater of Trash</span>{" "}
             <span className="text-primary font-semibold">
-              {name || "Kahmann"}
+              {name || "Mike"}
             </span>
-            . One title at a time. Clear anytime.
+            . One title at a time.
           </p>
           {titleOptions.length === 0 ? (
             <p className="text-sm text-muted">
-              No equipable titles yet. Win hardware, streaks, and rare badges —
-              then they show up here.
+              No title unlocks yet. Championship, Toilet Bowl, streaks, dogs,
+              props, and a few grind badges open the catalog.
             </p>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-3">
               <label className="block text-xs text-muted">
                 Active title
                 <select
@@ -369,28 +374,55 @@ export default function AccountPage() {
                   <option value="">No title (name only)</option>
                   {titleOptions.map((t) => (
                     <option key={t.badgeId} value={t.badgeId}>
-                      {t.label}
-                      {t.tier === "legendary"
-                        ? " · Legendary"
-                        : t.tier === "epic"
-                          ? " · Epic"
-                          : " · Rare"}
+                      {t.label} · {titleVibeLabel(t.vibe)}
                     </option>
                   ))}
                 </select>
               </label>
               {equippedBadgeId && (
-                <p className="text-sm text-foreground">
-                  Preview:{" "}
-                  <span className="text-amber-300 font-black uppercase tracking-wide text-xs">
-                    {titleOptions.find((t) => t.badgeId === equippedBadgeId)
-                      ?.label || "Title"}
-                  </span>{" "}
-                  <span className="font-semibold text-primary">
-                    {name || "You"}
-                  </span>
-                </p>
+                <>
+                  <p className="text-sm text-foreground">
+                    Preview:{" "}
+                    <span className="text-amber-300 font-black uppercase tracking-wide text-xs">
+                      {titleOptions.find((t) => t.badgeId === equippedBadgeId)
+                        ?.label || "Title"}
+                    </span>{" "}
+                    <span className="font-semibold text-primary">
+                      {name || "You"}
+                    </span>
+                  </p>
+                  {titleOptions.find((t) => t.badgeId === equippedBadgeId)
+                    ?.blurb && (
+                    <p className="text-[11px] text-muted">
+                      {
+                        titleOptions.find((t) => t.badgeId === equippedBadgeId)
+                          ?.blurb
+                      }
+                    </p>
+                  )}
+                </>
               )}
+              <details className="text-[11px] text-muted">
+                <summary className="cursor-pointer font-semibold text-foreground/80">
+                  Titles you can wear ({titleOptions.length})
+                </summary>
+                <ul className="mt-2 space-y-1.5 border border-border rounded-lg bg-background/60 px-3 py-2 max-h-48 overflow-y-auto">
+                  {titleOptions.map((t) => (
+                    <li key={t.badgeId} className="flex flex-col gap-0.5">
+                      <span>
+                        <span className="text-amber-200 font-bold">
+                          {t.label}
+                        </span>
+                        <span className="text-muted">
+                          {" "}
+                          · {titleVibeLabel(t.vibe)}
+                        </span>
+                      </span>
+                      <span className="text-[10px] text-muted">{t.blurb}</span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
             </div>
           )}
         </section>

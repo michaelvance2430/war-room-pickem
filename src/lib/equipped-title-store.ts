@@ -6,7 +6,10 @@
 
 import { createClient } from "@/lib/supabase/client";
 import { getSession } from "@/lib/league";
-import { titleLabelForBadgeId } from "./equipable-titles";
+import {
+  isEquipableTitleBadgeId,
+  titleLabelForBadgeId,
+} from "./equipable-titles";
 
 const LOCAL_KEY = "warroom-equipped-title-v1";
 
@@ -115,6 +118,9 @@ export async function setMyEquippedTitle(
   const userId = session?.playerId;
   if (!userId) return { ok: false, error: "Not signed in" };
 
+  if (badgeId && !isEquipableTitleBadgeId(badgeId) && badgeId !== "the_commissioner") {
+    return { ok: false, error: "That achievement doesn’t come with a nameplate title." };
+  }
   const label = badgeId ? titleLabelForBadgeId(badgeId) : null;
   if (badgeId && !label) {
     return { ok: false, error: "That badge can’t be used as a title." };
