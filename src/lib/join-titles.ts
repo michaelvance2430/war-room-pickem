@@ -7,7 +7,9 @@
  * Next 4 → lesser.
  * Everyone else → Bottom Feeder.
  *
- * Rank is by memberships.joined_at (humans only; bots excluded).
+ * Rank uses first-ever join time for that league (league_first_joins),
+ * not the current membership row — leave + rejoin cannot reset you
+ * from cool → Bottom Feeder.
  */
 
 export type JoinTitleMember = {

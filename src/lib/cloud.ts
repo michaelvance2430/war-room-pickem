@@ -1187,13 +1187,31 @@ export type LeagueRosterMember = {
   joinedAt?: string | null;
 };
 
-/** Load joined_at map for join-order titles (works even if roster RPC is old). */
+/**
+ * Load join times for profile titles.
+ * Prefer permanent first-join (survives leave/rejoin); fall back to memberships.joined_at.
+ */
 async function loadJoinedAtByUser(
   leagueId: string
 ): Promise<Map<string, string>> {
   const map = new Map<string, string>();
   try {
     const supabase = createClient();
+
+    // Permanent first join (leave + rejoin keeps rank)
+    const { data: firsts, error: firstErr } = await supabase
+      .from("league_first_joins")
+      .select("user_id, first_joined_at")
+      .eq("league_id", leagueId);
+    if (!firstErr && firsts?.length) {
+      for (const row of firsts) {
+        const uid = row.user_id as string;
+        const at = row.first_joined_at as string | null;
+        if (uid && at) map.set(uid, at);
+      }
+    }
+
+    // Memberships: fill gaps + never replace an earlier first-join
     const { data } = await supabase
       .from("memberships")
       .select("user_id, joined_at")
@@ -1201,12 +1219,75 @@ async function loadJoinedAtByUser(
     for (const row of data || []) {
       const uid = row.user_id as string;
       const at = row.joined_at as string | null;
-      if (uid && at) map.set(uid, at);
+      if (!uid || !at) continue;
+      const prev = map.get(uid);
+      if (!prev || new Date(at).getTime() < new Date(prev).getTime()) {
+        map.set(uid, at);
+      }
     }
   } catch {
     /* optional */
   }
   return map;
+}
+
+/**
+ * Stamp permanent first-join for this user in the league.
+ * Leave/rejoin cannot wipe OG / cool titles.
+ * Requires supabase/join-order.sql (safe no-op if missing).
+ */
+export async function recordLeagueFirstJoin(
+  leagueId?: string
+): Promise<{ ok: boolean; firstJoinedAt?: string }> {
+  const session = getSession();
+  const lid = leagueId || session?.leagueId;
+  if (!lid || !session?.playerId) return { ok: false };
+
+  try {
+    const supabase = createClient();
+    const { data: auth } = await supabase.auth.getUser();
+    const uid = auth.user?.id || session.playerId;
+
+    // Prefer RPC (restores memberships.joined_at to original)
+    const { data: rpcAt, error: rpcErr } = await supabase.rpc(
+      "record_league_first_join",
+      { p_league_id: lid, p_user_id: uid }
+    );
+    if (!rpcErr && rpcAt) {
+      return { ok: true, firstJoinedAt: String(rpcAt) };
+    }
+
+    // Direct insert if RPC not installed yet
+    const now = new Date().toISOString();
+    const { error: insErr } = await supabase.from("league_first_joins").insert({
+      league_id: lid,
+      user_id: uid,
+      first_joined_at: now,
+    });
+    if (insErr && !/duplicate|unique|23505/i.test(insErr.message || "")) {
+      // Table missing or blocked — ignore
+      return { ok: false };
+    }
+
+    const { data: row } = await supabase
+      .from("league_first_joins")
+      .select("first_joined_at")
+      .eq("league_id", lid)
+      .eq("user_id", uid)
+      .maybeSingle();
+
+    const at = (row?.first_joined_at as string) || now;
+    // Best-effort restore membership joined_at
+    await supabase
+      .from("memberships")
+      .update({ joined_at: at })
+      .eq("league_id", lid)
+      .eq("user_id", uid);
+
+    return { ok: true, firstJoinedAt: at };
+  } catch {
+    return { ok: false };
+  }
 }
 
 /** Live league roster from Supabase memberships (not local mock players). */

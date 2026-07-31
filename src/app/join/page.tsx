@@ -82,6 +82,12 @@ export default function JoinPage() {
         division: "North",
       });
       if (memError) throw memError;
+      try {
+        const { recordLeagueFirstJoin } = await import("@/lib/cloud");
+        await recordLeagueFirstJoin(league.id);
+      } catch {
+        /* optional until join-order.sql is run */
+      }
       localStorage.setItem(
         "warroom-session",
         JSON.stringify({
@@ -139,6 +145,16 @@ export default function JoinPage() {
         .eq("user_id", userId)
         .maybeSingle();
 
+      if (existingMem) {
+        // Ensure first-join stamp exists (idempotent)
+        try {
+          const { recordLeagueFirstJoin } = await import("@/lib/cloud");
+          await recordLeagueFirstJoin(league.id);
+        } catch {
+          /* optional */
+        }
+      }
+
       if (!existingMem) {
         const { count, error: countErr } = await supabase
           .from("memberships")
@@ -182,6 +198,13 @@ export default function JoinPage() {
             throw new Error(leagueFullMessage());
           }
           throw memError;
+        }
+        // Permanent first-join stamp — leave/rejoin cannot reset title rank
+        try {
+          const { recordLeagueFirstJoin } = await import("@/lib/cloud");
+          await recordLeagueFirstJoin(league.id);
+        } catch {
+          /* optional until join-order.sql is run */
         }
       }
       localStorage.setItem(
