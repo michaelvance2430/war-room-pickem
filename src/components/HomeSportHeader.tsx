@@ -5,6 +5,8 @@ import {
   type SportHomeChrome,
 } from "@/lib/sports/home-chrome";
 import WwcTrophyLogo from "@/components/WwcTrophyLogo";
+import NflBrandMark from "@/components/NflBrandMark";
+import { NFL_SUNDAY_COLORS } from "@/lib/sports/home-chrome";
 
 type Props = {
   chrome: SportHomeChrome;
@@ -30,7 +32,9 @@ export default function HomeSportHeader({
   onCopyCode,
 }: Props) {
   const isWwc = chrome.sportId === "soccer_wwc";
+  const isNfl = chrome.sportId === "nfl";
   const { emerald, gold, royal, white } = WWC_BRAZIL_COLORS;
+  const nfl = NFL_SUNDAY_COLORS;
 
   return (
     <section className="mb-4 sm:mb-6">
@@ -46,7 +50,6 @@ export default function HomeSportHeader({
           >
             <WwcTrophyLogo size={80} />
           </div>
-          {/* ESPN-style special-event stack under the mark */}
           <div className="min-w-0 pt-1">
             <p className="text-xl sm:text-3xl font-black text-white tracking-tight leading-none">
               War Room
@@ -65,6 +68,36 @@ export default function HomeSportHeader({
             </p>
           </div>
         </div>
+      ) : isNfl ? (
+        <div className="flex items-start gap-3 sm:gap-5 mb-5">
+          <div
+            className="shrink-0 rounded-2xl p-1.5 sm:p-2 border"
+            style={{
+              borderColor: `${nfl.silver}66`,
+              background: `linear-gradient(160deg, ${nfl.navy} 0%, ${nfl.crimson}55 100%)`,
+              boxShadow: `0 0 28px ${nfl.crimson}44`,
+            }}
+          >
+            <NflBrandMark size={80} />
+          </div>
+          <div className="min-w-0 pt-1">
+            <p className="text-xl sm:text-3xl font-black text-white tracking-tight leading-none">
+              War Room
+            </p>
+            <p className="mt-1.5 text-base sm:text-xl font-bold text-white/95 leading-tight">
+              Pro Football
+            </p>
+            <p
+              className="mt-0.5 text-base sm:text-xl font-extrabold leading-tight"
+              style={{ color: nfl.silver }}
+            >
+              Sunday
+            </p>
+            <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.16em] text-white/55">
+              Primetime presentation
+            </p>
+          </div>
+        </div>
       ) : (
         <div className="flex flex-wrap items-center gap-2 mb-2">
           <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.2em] px-2.5 py-1 rounded-full border border-primary/40 bg-primary/10 text-primary max-w-full">
@@ -74,7 +107,7 @@ export default function HomeSportHeader({
         </div>
       )}
 
-      {!isWwc && (
+      {!isWwc && !isNfl && (
         <h1
           className={`text-2xl sm:text-5xl font-bold tracking-tight mb-1.5 sm:mb-3 text-white ${chrome.atmosphere.titleGlow}`}
         >
@@ -91,6 +124,12 @@ export default function HomeSportHeader({
           the Cup — emerald, gold, and royal blue.
         </p>
       )}
+      {isNfl && (
+        <p className="mt-2 text-xs sm:text-sm max-w-xl leading-relaxed text-white/80">
+          Same picks loop as college — different skin. Holidays still available
+          in settings; this navy/crimson look is the NFL default.
+        </p>
+      )}
 
       {leagueName && (
         <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-muted/90">
@@ -100,9 +139,15 @@ export default function HomeSportHeader({
               <span className="text-border">|</span>
               <span
                 className="font-mono tracking-[0.2em] text-base font-bold"
-                style={isWwc ? { color: gold } : undefined}
+                style={
+                  isWwc
+                    ? { color: gold }
+                    : isNfl
+                      ? { color: nfl.silver }
+                      : undefined
+                }
               >
-                {isWwc ? (
+                {isWwc || isNfl ? (
                   leagueCode
                 ) : (
                   <span className="text-primary">{leagueCode}</span>
@@ -117,6 +162,19 @@ export default function HomeSportHeader({
                     borderColor: `${emerald}aa`,
                     color: white,
                     backgroundColor: `${emerald}28`,
+                  }}
+                >
+                  {codeCopied ? "Copied!" : "Copy invite code"}
+                </button>
+              ) : isNfl ? (
+                <button
+                  type="button"
+                  onClick={onCopyCode}
+                  className="text-xs px-3 py-2 min-h-[40px] rounded-md border font-semibold touch-manipulation"
+                  style={{
+                    borderColor: `${nfl.crimson}aa`,
+                    color: nfl.white,
+                    backgroundColor: `${nfl.crimson}33`,
                   }}
                 >
                   {codeCopied ? "Copied!" : "Copy invite code"}

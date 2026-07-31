@@ -26,12 +26,22 @@
    - Do **not** experiment on prod mid-Saturday  
 3. **Work only on `dev`** for multi-sport PRs; merge to `main` on planned cutovers  
 
+## Live for App Store direction
+
+| Sport | Status |
+|-------|--------|
+| **CFB** | Live — green War Room default |
+| **NFL** | Live — navy/crimson default (holidays still available) |
+| **WWC Brazil 2027** | Coming soon (theme + passport parked) |
+| Others | Coming soon |
+
+**Sport default ≠ holiday:** `data-sport` sets pack skin; Commish `seasonThemeId` (Halloween, etc.) still paints every page via `data-season-theme` and **overrides** pack colors when not “Sport default”.
+
 ## Next phases
 
-2. **WWC home shell + theme + WORLD CUP EDITION Gazette** — live on `dev`  
-3. **WWC passport achievements** — catalog + stamp UI (see `docs/WWC-ACHIEVEMENTS.md`); tournament-graph evals stubbed  
-4. CFB fully behind pack interface (calendar/scoring/copy entry points)  
-5. WWC matchday card markets (1X2 / ML) + tournament calendar + confederation tags  
+3. NFL Gazette flavor (Sunday paper) without clutter  
+4. CFB/NFL pack interface cleanup (calendar, odds adapters)  
+5. Un-pin WWC when 2027 is product-ready  
 6. Profile hardware tagged by `sport_id`  
 
 ## Rule of thumb

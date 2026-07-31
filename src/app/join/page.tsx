@@ -23,6 +23,7 @@ import {
 import { DEFAULT_SPORT_ID, type SportId } from "@/lib/sports/types";
 import OwnershipNotice from "@/components/OwnershipNotice";
 import WwcTrophyLogo from "@/components/WwcTrophyLogo";
+import NflBrandMark from "@/components/NflBrandMark";
 
 function generateCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -497,6 +498,7 @@ function JoinPageInner() {
                   const live = s.status === "live";
                   const selected = sportId === s.id;
                   const isWwc = s.id === "soccer_wwc";
+                  const isNfl = s.id === "nfl";
                   return (
                     <button
                       key={s.id}
@@ -508,16 +510,20 @@ function JoinPageInner() {
                       className={`w-full text-left rounded-xl border px-3 py-3 transition touch-manipulation ${
                         selected && isWwc
                           ? "border-[#FFDF00]/60 bg-[#009C3B]/15 shadow-[0_0_22px_rgba(0,156,59,0.2)]"
-                          : selected
-                            ? "border-primary bg-primary/15 shadow-[0_0_20px_rgba(34,197,94,0.12)]"
-                            : live
-                              ? "border-border bg-background hover:border-primary/40"
-                              : "border-border/50 bg-background/40 opacity-55 cursor-not-allowed"
+                          : selected && isNfl
+                            ? "border-[#C1121F]/70 bg-[#0B1426] shadow-[0_0_22px_rgba(193,18,31,0.25)]"
+                            : selected
+                              ? "border-primary bg-primary/15 shadow-[0_0_20px_rgba(34,197,94,0.12)]"
+                              : live
+                                ? "border-border bg-background hover:border-primary/40"
+                                : "border-border/50 bg-background/40 opacity-55 cursor-not-allowed"
                       }`}
                     >
                       <div className="flex items-start gap-2.5">
                         {isWwc ? (
                           <WwcTrophyLogo size={36} className="shrink-0 mt-0.5" />
+                        ) : isNfl ? (
+                          <NflBrandMark size={36} className="shrink-0 mt-0.5" />
                         ) : (
                           <span className="text-xl shrink-0" aria-hidden>
                             {s.emoji}
@@ -531,7 +537,11 @@ function JoinPageInner() {
                             {live ? (
                               <span
                                 className={`text-[10px] font-bold uppercase tracking-wide ${
-                                  isWwc ? "text-[#FFDF00]" : "text-primary"
+                                  isWwc
+                                    ? "text-[#FFDF00]"
+                                    : isNfl
+                                      ? "text-[#C5CCD3]"
+                                      : "text-primary"
                                 }`}
                               >
                                 Live
@@ -549,7 +559,11 @@ function JoinPageInner() {
                         {selected && live && (
                           <span
                             className={`text-sm font-black shrink-0 ${
-                              isWwc ? "text-[#FFDF00]" : "text-primary"
+                              isWwc
+                                ? "text-[#FFDF00]"
+                                : isNfl
+                                  ? "text-[#C1121F]"
+                                  : "text-primary"
                             }`}
                           >
                             ✓
@@ -589,7 +603,9 @@ function JoinPageInner() {
                 ? "Creating…"
                 : sportId === "soccer_wwc"
                   ? "Create FIFA WWC Brazil 2027™ league"
-                  : `Create ${getSportPack(sportId).shortLabel} league`}
+                  : sportId === "nfl"
+                    ? "Create NFL league"
+                    : `Create ${getSportPack(sportId).shortLabel} league`}
             </button>
             <button
               onClick={() => setMode("choose")}

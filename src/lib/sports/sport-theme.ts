@@ -1,6 +1,12 @@
 /**
- * Full-app sport skin — swaps CSS tokens so WWC feels nothing like CFB.
- * Applied on <html data-sport="…"> from the active league.
+ * Full-app sport skin — default look per pack.
+ * CFB = stock green tokens (no data-sport).
+ * NFL = primetime navy/crimson (data-sport=nfl).
+ * WWC = Brazil palette (data-sport=soccer_wwc) when live again.
+ *
+ * Holiday / season themes (Halloween, etc.) still apply on top:
+ * SeasonThemeApplier sets data-season-theme; CSS for seasons is loaded
+ * AFTER sport skins so holidays win when chosen.
  */
 
 import { normalizeSportId } from "./registry";
@@ -23,18 +29,20 @@ export function getLeagueSportIdFromLocal(): SportId {
 }
 
 /**
- * Paint sport skin on the whole app.
- * CFB / default → stock green War Room tokens (no data-sport).
- * soccer_wwc → Brazil 2027 palette via globals.css [data-sport="soccer_wwc"].
+ * Paint sport default skin on <html data-sport="…">.
+ * Does not clear holiday themes — those are a separate attribute.
  */
 export function applySportTheme(sportId: string | null | undefined) {
   if (typeof document === "undefined") return;
   const id = normalizeSportId(sportId);
   const root = document.documentElement;
 
-  if (id === "soccer_wwc") {
+  if (id === "nfl") {
+    root.setAttribute("data-sport", "nfl");
+  } else if (id === "soccer_wwc") {
     root.setAttribute("data-sport", "soccer_wwc");
   } else {
+    // CFB and others → college default tokens
     root.removeAttribute("data-sport");
   }
 

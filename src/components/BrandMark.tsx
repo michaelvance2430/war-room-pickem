@@ -5,6 +5,7 @@ import { getLeague } from "@/lib/league";
 import { normalizeSportId } from "@/lib/sports/registry";
 import { SPORT_THEME_EVENT } from "@/lib/sports/sport-theme";
 import WwcTrophyLogo from "@/components/WwcTrophyLogo";
+import NflBrandMark from "@/components/NflBrandMark";
 
 type Props = {
   size?: number;
@@ -14,8 +15,8 @@ type Props = {
 };
 
 /**
- * App mark: classic WR square (CFB) vs Brazil trophy (WWC).
- * Same placement — completely different aesthetic.
+ * App mark by sport: CFB monogram · NFL ball · WWC trophy.
+ * Same placement — completely different aesthetic. No official trademarks.
  */
 export default function BrandMark({
   size = 36,
@@ -48,6 +49,10 @@ export default function BrandMark({
         className={className}
       />
     );
+  }
+
+  if (sportId === "nfl") {
+    return <NflBrandMark size={size} className={`shrink-0 ${className}`} />;
   }
 
   // Classic CFB War Room monogram

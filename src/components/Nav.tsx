@@ -72,6 +72,7 @@ export default function Nav() {
   const [moreOpen, setMoreOpen] = useState(false);
   const [crystalBallOn, setCrystalBallOn] = useState(true);
   const [sportIsWwc, setSportIsWwc] = useState(false);
+  const [sportIsNfl, setSportIsNfl] = useState(false);
   const [playerPreview, setPlayerPreview] = useState(false);
 
   function refreshRoles() {
@@ -97,7 +98,9 @@ export default function Nav() {
     setName(session?.playerName || "You");
     setPlayerId(session?.playerId || null);
     setLeagueName(league?.name || "");
-    setSportIsWwc(normalizeSportId(league?.sportId) === "soccer_wwc");
+    const sid = normalizeSportId(league?.sportId);
+    setSportIsWwc(sid === "soccer_wwc");
+    setSportIsNfl(sid === "nfl");
     setCrystalBallOn(league?.settings?.crystalBallEnabled !== false);
 
     void refreshStaffSessionFlags().then(() => {
@@ -108,9 +111,9 @@ export default function Nav() {
       refreshRoles();
     }
     function onSportTheme() {
-      setSportIsWwc(
-        normalizeSportId(getLeague()?.sportId) === "soccer_wwc"
-      );
+      const sid = normalizeSportId(getLeague()?.sportId);
+      setSportIsWwc(sid === "soccer_wwc");
+      setSportIsNfl(sid === "nfl");
     }
     window.addEventListener("warroom-view-as-player", onPreview);
     window.addEventListener(SPORT_THEME_EVENT, onSportTheme);
@@ -405,7 +408,6 @@ export default function Nav() {
                   <span className="font-bold text-sm text-foreground tracking-tight leading-tight truncate">
                     {pathname === "/" ? "War Room" : "← Home"}
                   </span>
-                  {/* ESPN-style event stack */}
                   <span className="text-[10px] font-semibold text-white/90 leading-tight truncate">
                     Women&apos;s World Cup
                   </span>
@@ -414,6 +416,21 @@ export default function Nav() {
                     style={{ color: "#FFDF00" }}
                   >
                     Brazil 2027
+                  </span>
+                </>
+              ) : sportIsNfl ? (
+                <>
+                  <span className="font-bold text-sm text-foreground tracking-tight leading-tight truncate">
+                    {pathname === "/" ? "War Room" : "← Home"}
+                  </span>
+                  <span className="text-[10px] font-semibold text-white/90 leading-tight truncate">
+                    Pro Football
+                  </span>
+                  <span
+                    className="text-[10px] font-bold leading-tight truncate"
+                    style={{ color: "#C5CCD3" }}
+                  >
+                    Sunday
                   </span>
                 </>
               ) : (

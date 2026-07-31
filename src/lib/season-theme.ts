@@ -19,8 +19,9 @@ export const DEFAULT_SEASON_THEME_ID: SeasonThemeId = "default";
 export const SEASON_THEME_PRESETS: SeasonThemePreset[] = [
   {
     id: "default",
-    label: "War Room (default)",
-    blurb: "Classic dark green — no holiday dressing.",
+    label: "Sport default",
+    blurb:
+      "Pack skin: CFB green room · NFL navy/crimson primetime · (others when live). No holiday overlay.",
   },
   {
     id: "halloween",

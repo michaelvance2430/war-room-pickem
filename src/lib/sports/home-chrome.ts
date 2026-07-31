@@ -45,6 +45,31 @@ const CFB_ATMO: SportAtmosphere = {
   accentHex: "#22c55e",
 };
 
+/**
+ * Pro football Sunday palette — original War Room skin, not any league shield.
+ * Midnight navy · signal crimson · steel silver · white.
+ */
+export const NFL_SUNDAY_COLORS = {
+  navy: "#0B1426",
+  crimson: "#C1121F",
+  silver: "#C5CCD3",
+  white: "#F8FAFC",
+} as const;
+
+const NFL_ATMO: SportAtmosphere = {
+  baseGradient: `radial-gradient(ellipse 85% 55% at 50% -8%, rgba(193, 18, 31, 0.18), transparent 52%),
+     radial-gradient(ellipse 55% 45% at 100% 80%, rgba(197, 204, 211, 0.08), transparent 50%),
+     radial-gradient(ellipse 50% 50% at 0% 85%, rgba(11, 20, 38, 0.95), transparent 45%),
+     #070b14`,
+  gridLine: "rgba(197, 204, 211, 0.06)",
+  vignette:
+    "radial-gradient(ellipse at center, transparent 35%, rgba(5, 8, 16, 0.88) 100%)",
+  scanline:
+    "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.4) 3px)",
+  titleGlow: "drop-shadow-[0_0_28px_rgba(193,18,31,0.35)]",
+  accentHex: NFL_SUNDAY_COLORS.crimson,
+};
+
 /** FIFA WWC Brazil 2027™ — Brazilian flag palette (green / gold / blue / white) */
 export const WWC_BRAZIL_COLORS = {
   emerald: "#009C3B",
@@ -73,6 +98,25 @@ const WWC_ATMO: SportAtmosphere = {
 function chromeForPack(pack: SportPack): SportHomeChrome {
   const sportId = pack.id;
 
+  if (sportId === "nfl") {
+    return {
+      sportId,
+      pack,
+      welcomeTitle: "Welcome to the War Room",
+      defaultTagline:
+        "Sundays. Primetime. Same clubhouse — navy, crimson, and no mercy.",
+      sportBadge: "PRO FOOTBALL · SUNDAY",
+      periodWord: "Week",
+      periodProgressHint: "Season weeks — lock before first kickoff",
+      primaryPathLabel: "Championship Bracket",
+      primaryPathBlurb: "Top half. One path. Lights on.",
+      shamePathLabel: "Toilet Bowl",
+      shamePathBlurb: "Bottom half still matters. Sunday still hurts.",
+      jobCtaIdle: "Make my picks",
+      atmosphere: NFL_ATMO,
+    };
+  }
+
   if (sportId === "soccer_wwc") {
     return {
       sportId,
@@ -92,7 +136,7 @@ function chromeForPack(pack: SportPack): SportHomeChrome {
     };
   }
 
-  // Default / CFB gold standard
+  // Default / CFB gold standard (green War Room)
   return {
     sportId,
     pack,
