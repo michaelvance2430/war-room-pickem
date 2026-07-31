@@ -11,7 +11,6 @@ import {
   isCommissioner,
   isActuallyCommissioner,
 } from "@/lib/league";
-import { createClient } from "@/lib/supabase/client";
 import Avatar from "@/components/Avatar";
 import RulesOnboardingModal from "@/components/RulesOnboardingModal";
 import GazetteModal from "@/components/GazetteModal";
@@ -24,6 +23,10 @@ import {
   isViewAsPlayer,
   setViewAsPlayer,
 } from "@/lib/view-as-player";
+import {
+  countUnreadAnnouncements,
+  countUnseenLockerPosts,
+} from "@/lib/room-unseen";
 
 type NavLink = {
   href: string;
@@ -46,6 +49,7 @@ export default function Nav() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [leagueName, setLeagueName] = useState("");
   const [unreadCount, setUnreadCount] = useState(0);
+  const [lockerUnseen, setLockerUnseen] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [crystalBallOn, setCrystalBallOn] = useState(true);
@@ -96,35 +100,26 @@ export default function Nav() {
     async function loadUnread() {
       if (!session?.playerId || !league?.id) return;
       try {
-        const supabase = createClient();
-        const { data: announcements } = await supabase
-          .from("announcements")
-          .select("id")
-          .eq("league_id", league.id);
-
-        if (!announcements || announcements.length === 0) {
-          setUnreadCount(0);
-          return;
-        }
-
-        const ids = announcements.map((a) => a.id);
-        const { data: reads } = await supabase
-          .from("announcement_reads")
-          .select("announcement_id")
-          .eq("user_id", session.playerId)
-          .in("announcement_id", ids);
-
-        const readIds = new Set((reads || []).map((r) => r.announcement_id));
-        const unread = ids.filter((id) => !readIds.has(id)).length;
-        setUnreadCount(unread);
+        const [ann, lock] = await Promise.all([
+          countUnreadAnnouncements(),
+          countUnseenLockerPosts(),
+        ]);
+        setUnreadCount(ann);
+        setLockerUnseen(lock);
       } catch {
         setUnreadCount(0);
+        setLockerUnseen(0);
       }
     }
 
-    loadUnread();
+    void loadUnread();
+    function onVis() {
+      if (document.visibilityState === "visible") void loadUnread();
+    }
+    document.addEventListener("visibilitychange", onVis);
     return () => {
       window.removeEventListener("warroom-view-as-player", onPreview);
+      document.removeEventListener("visibilitychange", onVis);
     };
   }, []);
 
@@ -159,7 +154,7 @@ export default function Nav() {
     { href: "/", label: "Home" },
     { href: "/picks", label: "My Picks" },
     { href: "/standings", label: "Standings" },
-    { href: "/locker-room", label: "Locker" },
+    { href: "/locker-room", label: "Locker", badge: lockerUnseen },
     { href: "/gazette", label: "Gazette" },
     ...(ops
       ? [
@@ -422,9 +417,11 @@ export default function Nav() {
                   <path d="M4 7h16M4 12h16M4 17h16" />
                 </svg>
               )}
-              {!menuOpen && unreadCount > 0 && (
+              {!menuOpen && unreadCount + lockerUnseen > 0 && (
                 <span className="absolute top-0.5 right-0.5 min-w-[16px] h-4 px-0.5 rounded-full bg-primary text-black text-[9px] font-bold flex items-center justify-center">
-                  {unreadCount > 99 ? "99+" : unreadCount}
+                  {unreadCount + lockerUnseen > 99
+                    ? "99+"
+                    : unreadCount + lockerUnseen}
                 </span>
               )}
             </button>

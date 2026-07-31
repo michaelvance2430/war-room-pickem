@@ -9,6 +9,8 @@ import CrownAndShame from "@/components/CrownAndShame";
 import HomeWeekHero from "@/components/HomeWeekHero";
 import PlayerWeekChecklist from "@/components/PlayerWeekChecklist";
 import CommishSetupBanner from "@/components/CommishSetupBanner";
+import HomeUnseenPulse from "@/components/HomeUnseenPulse";
+import HomeTileUnseen from "@/components/HomeTileUnseen";
 import {
   getSession,
   getLeague,
@@ -279,6 +281,9 @@ export default function Home() {
         {/* One job: pick / wait / score path — strengths stay below */}
         <HomeWeekHero />
 
+        {/* Unseen News + Locker — tap the number to open */}
+        <HomeUnseenPulse />
+
         {/* Every member — not just Commish */}
         <PlayerWeekChecklist />
 
@@ -383,11 +388,28 @@ export default function Home() {
           </Link>
 
           <Link
+            href="/announcements"
+            className="group rounded-xl border border-border/80 bg-black/40 backdrop-blur-sm p-6 hover:border-primary/50 hover:bg-primary/5 transition shadow-[0_0_40px_rgba(0,0,0,0.35)]"
+          >
+            <div className="text-xs uppercase tracking-wider text-muted mb-2 flex items-center justify-between gap-2">
+              <span>News</span>
+              <HomeTileUnseen kind="announcements" />
+            </div>
+            <div className="text-lg font-semibold text-white group-hover:text-primary transition">
+              Announcements
+            </div>
+            <p className="text-sm text-muted mt-2">
+              Commish posts · milk cartons · league notes
+            </p>
+          </Link>
+
+          <Link
             href="/locker-room"
             className="group rounded-xl border border-orange-400/30 bg-black/40 backdrop-blur-sm p-6 hover:border-orange-300/60 hover:bg-orange-500/10 transition shadow-[0_0_40px_rgba(249,115,22,0.08)]"
           >
-            <div className="text-xs uppercase tracking-wider text-orange-300/70 mb-2">
-              Noise
+            <div className="text-xs uppercase tracking-wider text-orange-300/70 mb-2 flex items-center justify-between gap-2">
+              <span>Noise</span>
+              <HomeTileUnseen kind="locker" />
             </div>
             <div className="text-lg font-semibold text-orange-300">
               Locker Room

@@ -18,6 +18,7 @@ import {
   postLockerMessage,
   type LockerMessage,
 } from "@/lib/locker-room";
+import { markLockerSeen } from "@/lib/room-unseen";
 import { refreshStaffSessionFlags } from "@/lib/cloud";
 
 export default function LockerRoomPage() {
@@ -44,9 +45,13 @@ export default function LockerRoomPage() {
       if (!opts?.quiet) setError(res.error || "Could not load");
       return;
     }
-    setMessages(res.messages || []);
+    const list = res.messages || [];
+    setMessages(list);
     if (res.weekLabel) setWeekLabel(res.weekLabel);
     setError(null);
+    // Opening Locker clears "unseen" for Home / nav (watermark = newest post or now)
+    const newest = list[0]?.createdAt;
+    markLockerSeen({ atIso: newest });
   }, []);
 
   useEffect(() => {
