@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import Nav from "@/components/Nav";
 import AvatarLightbox from "@/components/AvatarLightbox";
 import BadgeShelf from "@/components/BadgeShelf";
+import ProfileTrophyCase from "@/components/ProfileTrophyCase";
 import {
   formatMemberSince,
   getPlayerBadges,
@@ -19,12 +20,17 @@ import {
   joinTitleTierLabel,
 } from "@/lib/join-titles";
 import {
+  getProfileHardware,
+  type ProfileTrophy,
+} from "@/lib/profile-hardware";
+import {
   isMockPlayer,
   mockRoastFor,
   mockRoastLabel,
 } from "@/lib/mock-roasts";
 import { findPlayer } from "@/lib/store";
 import { Player } from "@/lib/types";
+import type { LeagueTrophy } from "@/lib/trophies";
 
 function initials(name: string) {
   return (
@@ -50,6 +56,7 @@ export default function ProfilePage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   /** Join-order flex title (e.g. Day-One Demon, Bottom Feeder) */
   const [joinTitle, setJoinTitle] = useState<string | null>(null);
+  const [leagueTrophies, setLeagueTrophies] = useState<LeagueTrophy[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -57,10 +64,12 @@ export default function ProfilePage() {
     async function load() {
       setLoadError(null);
       setJoinTitle(null);
+      setLeagueTrophies([]);
       try {
         let found: Player | null = null;
         let leagueForSync: Player[] = [];
         let title: string | null = null;
+        let trophies: LeagueTrophy[] = [];
 
         // Live league first (real multiplayer)
         try {
@@ -86,6 +95,13 @@ export default function ProfilePage() {
             /* optional */
           }
 
+          try {
+            const { loadLeagueTrophies } = await import("@/lib/trophies");
+            trophies = await loadLeagueTrophies();
+          } catch {
+            /* Trophy Room optional */
+          }
+
           // Crown Cheevo King among live league (permanent storage by user id)
           if (leagueForSync.length) {
             syncLeagueCheevoKing(
@@ -108,6 +124,7 @@ export default function ProfilePage() {
         if (cancelled) return;
         setPlayer(found);
         setJoinTitle(title);
+        setLeagueTrophies(trophies);
       } catch (e) {
         if (!cancelled) {
           setLoadError(e instanceof Error ? e.message : "Failed to load");
@@ -142,6 +159,19 @@ export default function ProfilePage() {
       return { seasonPoints: 0, careerPoints: 0 };
     }
   }, [player, badges]);
+
+  const hardware: ProfileTrophy[] = useMemo(() => {
+    if (!player) return [];
+    try {
+      return getProfileHardware({
+        playerId: player.id,
+        playerName: player.name,
+        leagueTrophies,
+      });
+    } catch {
+      return [];
+    }
+  }, [player, leagueTrophies]);
 
   if (!ready) {
     return (
@@ -341,6 +371,9 @@ export default function ProfilePage() {
             />
           </div>
         </section>
+
+        {/* Career hardware — championship / toilet / nerd + division case */}
+        <ProfileTrophyCase items={hardware} playerName={player.name} />
 
         {/* Badges — always mount when we have a player */}
         <div className="rounded-2xl border border-border bg-card p-5 sm:p-6 mb-6">
