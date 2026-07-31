@@ -22,6 +22,7 @@ import {
 } from "@/lib/league-limits";
 import { DIVISIONS } from "@/lib/divisions";
 import { formatLastSeen, isRecentlyActive } from "@/lib/last-seen";
+import InviteFriends from "@/components/InviteFriends";
 
 export default function PlayersPage() {
   const [players, setPlayers] = useState<LeagueRosterMember[]>([]);
@@ -35,7 +36,6 @@ export default function PlayersPage() {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
 
   async function reload() {
@@ -140,17 +140,6 @@ export default function PlayersPage() {
     setBusy(false);
   }
 
-  async function copyCode() {
-    if (!leagueCode) return;
-    try {
-      await navigator.clipboard.writeText(leagueCode);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      /* ignore */
-    }
-  }
-
   const bots = players.filter((p) => p.isBot);
   const humans = players.filter((p) => !p.isBot);
   const openSeats = seatsRemaining(players.length);
@@ -190,34 +179,22 @@ export default function PlayersPage() {
           </div>
         )}
 
-        <div className="rounded-xl border border-border bg-card p-5 mb-6">
-          <h2 className="font-semibold mb-1">Invite players</h2>
-          <p className="text-sm text-muted mb-3">
-            Friends join with this code. Cap is {MAX_LEAGUE_PLAYERS}. If the
-            league is full of bots, remove specific bots below to free seats.
+        {!loading && isLeagueFull(players.length) && (
+          <p className="text-xs text-warning mb-3 border border-warning/30 rounded-lg px-3 py-2 bg-warning/10">
+            League full ({MAX_LEAGUE_PLAYERS}/{MAX_LEAGUE_PLAYERS}).
+            {bots.length > 0
+              ? " Remove a bot below to free a seat for a friend."
+              : " Remove a player or start a second league."}
           </p>
-          {!loading && isLeagueFull(players.length) && (
-            <p className="text-xs text-warning mb-3 border border-warning/30 rounded-lg px-3 py-2 bg-warning/10">
-              League full ({MAX_LEAGUE_PLAYERS}/{MAX_LEAGUE_PLAYERS}).
-              {bots.length > 0
-                ? " Remove a bot below to free a seat for a friend."
-                : " Remove a player or start a second league."}
-            </p>
-          )}
-          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-            <div className="flex-1 bg-background border border-border rounded-lg px-3 py-2 font-mono text-lg tracking-widest text-center sm:text-left">
-              {leagueCode || "———"}
-            </div>
-            <button
-              type="button"
-              onClick={copyCode}
-              disabled={!leagueCode}
-              className="px-4 py-2 rounded-lg bg-primary text-black text-sm font-medium hover:bg-primary-dim disabled:opacity-50"
-            >
-              {copied ? "Copied" : "Copy code"}
-            </button>
-          </div>
-        </div>
+        )}
+        {leagueCode && (
+          <InviteFriends
+            leagueName={leagueName || "War Room"}
+            code={leagueCode}
+            leagueId={getLeague()?.id}
+            className="mb-6"
+          />
+        )}
 
         {/* Commissioner: kick bots one-by-one to free seats */}
         {isCommish && !loading && bots.length > 0 && (

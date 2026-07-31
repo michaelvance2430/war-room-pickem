@@ -1,13 +1,18 @@
 "use client";
 
-import { useState, FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import { useState, FormEvent, Suspense, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { enterGuestDemo } from "@/lib/guest-mode";
 import Link from "next/link";
+import {
+  peekPendingJoinCode,
+  stashPendingJoinCode,
+} from "@/lib/commish-onboarding";
 
-export default function LoginPage() {
+function LoginPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -18,6 +23,29 @@ export default function LoginPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [guestLoading, setGuestLoading] = useState(false);
+  const [inviteHint, setInviteHint] = useState<string | null>(null);
+
+  // Preserve deep-link invite through login/signup
+  useEffect(() => {
+    const next = searchParams.get("next") || "";
+    const codeMatch = next.match(/[?&]code=([A-Za-z0-9]+)/i);
+    const code =
+      codeMatch?.[1]?.toUpperCase() ||
+      searchParams.get("code")?.toUpperCase() ||
+      peekPendingJoinCode();
+    if (code) {
+      stashPendingJoinCode(code);
+      setInviteHint(code);
+    }
+  }, [searchParams]);
+
+  function afterAuthPath(): string {
+    const next = searchParams.get("next");
+    if (next && next.startsWith("/") && !next.startsWith("//")) return next;
+    const code = peekPendingJoinCode();
+    if (code) return `/join?code=${encodeURIComponent(code)}`;
+    return "/";
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -41,7 +69,7 @@ export default function LoginPage() {
         });
         if (signError) throw signError;
         if (data.session) {
-          router.push("/");
+          router.push(afterAuthPath());
           router.refresh();
         } else {
           setMessage("Check your email to confirm, then log in.");
@@ -60,7 +88,7 @@ export default function LoginPage() {
           localStorage.removeItem("warroom-remember");
         }
 
-        router.push("/");
+        router.push(afterAuthPath());
         router.refresh();
       }
     } catch (err: unknown) {
@@ -81,6 +109,12 @@ export default function LoginPage() {
           <p className="text-sm text-muted mt-1">
             {mode === "login" ? "Log in to continue" : "Create an account"}
           </p>
+          {inviteHint && (
+            <p className="text-xs text-primary font-medium mt-2">
+              Invite code {inviteHint} ready — after login you&apos;ll join that
+              league.
+            </p>
+          )}
         </div>
 
         {/* Guest demo — primary invite path for “just show me” */}
@@ -241,5 +275,19 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center text-muted">
+          Loading…
+        </div>
+      }
+    >
+      <LoginPageInner />
+    </Suspense>
   );
 }

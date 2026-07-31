@@ -11,11 +11,10 @@ import {
 } from "@/lib/cloud";
 import { getLeague, isActuallyCommissioner } from "@/lib/league";
 import {
-  buildInviteShareText,
   getCommishSetup,
   isFirstTimeCommish,
-  markInviteCopied,
 } from "@/lib/commish-onboarding";
+import InviteFriends from "@/components/InviteFriends";
 
 /**
  * Home: first-time Commish season setup track.
@@ -27,7 +26,6 @@ export default function CommishSetupBanner() {
   const [scored, setScored] = useState(0);
   const [code, setCode] = useState("");
   const [leagueName, setLeagueName] = useState("War Room");
-  const [copied, setCopied] = useState(false);
   const [leagueId, setLeagueId] = useState("");
 
   useEffect(() => {
@@ -97,18 +95,6 @@ export default function CommishSetupBanner() {
   const doneN = steps.filter((s) => s.done).length;
   const next = steps.find((s) => !s.done);
 
-  async function copyInvite() {
-    const text = buildInviteShareText({ leagueName, code });
-    try {
-      await navigator.clipboard.writeText(text);
-      markInviteCopied(leagueId);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      /* ignore */
-    }
-  }
-
   return (
     <section className="mb-6 rounded-2xl border-2 border-primary/45 bg-primary/10 p-4 sm:p-5">
       <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary mb-1">
@@ -145,16 +131,17 @@ export default function CommishSetupBanner() {
         ))}
       </ol>
 
+      {code && (
+        <div className="mb-3">
+          <InviteFriends
+            leagueName={leagueName}
+            code={code}
+            leagueId={leagueId}
+            compact
+          />
+        </div>
+      )}
       <div className="flex flex-wrap gap-2">
-        {code && (
-          <button
-            type="button"
-            onClick={() => void copyInvite()}
-            className="px-4 py-2 rounded-lg border border-primary/50 text-primary text-sm font-semibold hover:bg-primary/10"
-          >
-            {copied ? "Invite text copied!" : "Copy invite text"}
-          </button>
-        )}
         {!hasCard && (
           <Link
             href="/commissioner?tab=card&first=1"

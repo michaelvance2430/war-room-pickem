@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import {
   MAX_LEAGUE_PLAYERS,
@@ -9,6 +9,12 @@ import {
   leagueFullMessage,
 } from "@/lib/league-limits";
 import Link from "next/link";
+import {
+  markHostScreenSeen,
+  stashPendingJoinCode,
+  takePendingJoinCode,
+} from "@/lib/commish-onboarding";
+import InviteFriends from "@/components/InviteFriends";
 
 function generateCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -17,8 +23,9 @@ function generateCode(): string {
   return code;
 }
 
-export default function JoinPage() {
+function JoinPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [userId, setUserId] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState("");
   const [mode, setMode] = useState<"choose" | "create" | "join">("choose");
@@ -29,6 +36,20 @@ export default function JoinPage() {
   const [createdCode, setCreatedCode] = useState<string | null>(null);
   const [checking, setChecking] = useState(true);
   const [hostCopied, setHostCopied] = useState<string | null>(null);
+  const [deepLinkCode, setDeepLinkCode] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Deep link: /join?code=ABC123 (or stashed from login)
+    const fromUrl = (searchParams.get("code") || "").trim().toUpperCase();
+    const pending = takePendingJoinCode();
+    const c = fromUrl || pending || "";
+    if (c) {
+      setCode(c);
+      setDeepLinkCode(c);
+      setMode("join");
+      stashPendingJoinCode(c); // keep if we bounce to login
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     try {
@@ -41,7 +62,13 @@ export default function JoinPage() {
       supabase.auth.getSession().then(({ data: sessionData }) => {
         const data = { user: sessionData.session?.user ?? null };
         if (!data.user) {
-          router.replace("/login");
+          // Keep code in URL for after login
+          const q = code || searchParams.get("code") || "";
+          if (q) stashPendingJoinCode(q);
+          const next = q
+            ? `/login?next=${encodeURIComponent(`/join?code=${q.trim().toUpperCase()}`)}`
+            : "/login";
+          router.replace(next);
           return;
         }
         setUserId(data.user.id);
@@ -53,7 +80,7 @@ export default function JoinPage() {
       setError(e instanceof Error ? e.message : "Failed to load");
       setChecking(false);
     }
-  }, [router]);
+  }, [router, code, searchParams]);
 
   async function handleCreate() {
     if (!userId) return;
@@ -268,16 +295,13 @@ export default function JoinPage() {
 
   if (createdCode) {
     const leagueLabel = leagueName.trim() || "War Room";
-    const inviteText = [
-      `You're in the War Room: ${leagueLabel}`,
-      `Join code: ${createdCode}`,
-      typeof window !== "undefined" ? `App: ${window.location.origin}` : null,
-      "",
-      "Make an account, enter the code, lock picks before first kickoff.",
-      "Don't ghost Saturday.",
-    ]
-      .filter(Boolean)
-      .join("\n");
+    let leagueId = "";
+    try {
+      const raw = localStorage.getItem("warroom-league");
+      leagueId = raw ? (JSON.parse(raw) as { id?: string }).id || "" : "";
+    } catch {
+      /* ignore */
+    }
 
     return (
       <div className="min-h-screen flex items-center justify-center px-4 py-10">
@@ -287,65 +311,27 @@ export default function JoinPage() {
           </p>
           <h1 className="text-2xl font-bold mb-1 text-center">League created</h1>
           <p className="text-sm text-muted mb-4 text-center">
-            {leagueLabel} — share the code, then build the first card.
+            {leagueLabel} — share the invite link, then build the first card.
           </p>
-          <div className="text-3xl font-bold tracking-[0.3em] text-primary text-center mb-2 font-mono">
+          <div className="text-3xl font-bold tracking-[0.3em] text-primary text-center mb-4 font-mono">
             {createdCode}
           </div>
-          <div className="flex gap-2 mb-2">
-            <button
-              type="button"
-              onClick={async () => {
-                try {
-                  await navigator.clipboard.writeText(createdCode);
-                  setHostCopied("Code copied");
-                } catch {
-                  setHostCopied("Copy failed — select the code manually");
-                }
-              }}
-              className="flex-1 py-2 rounded-lg border border-primary/40 text-primary text-sm font-semibold"
-            >
-              Copy code
-            </button>
-            <button
-              type="button"
-              onClick={async () => {
-                try {
-                  await navigator.clipboard.writeText(inviteText);
-                  setHostCopied("Invite text copied — paste in the group chat");
-                  try {
-                    const { markInviteCopied, markHostScreenSeen } = await import(
-                      "@/lib/commish-onboarding"
-                    );
-                    const raw = localStorage.getItem("warroom-league");
-                    const id = raw
-                      ? (JSON.parse(raw) as { id?: string }).id
-                      : null;
-                    if (id) {
-                      markInviteCopied(id);
-                      markHostScreenSeen(id);
-                    }
-                  } catch {
-                    /* ignore */
-                  }
-                } catch {
-                  setHostCopied("Copy failed");
-                }
-              }}
-              className="flex-1 py-2 rounded-lg bg-primary/15 border border-primary/40 text-primary text-sm font-semibold"
-            >
-              Copy invite text
-            </button>
-          </div>
+
+          <InviteFriends
+            leagueName={leagueLabel}
+            code={createdCode}
+            leagueId={leagueId}
+            className="mb-4 !border-primary/30"
+          />
+
           {hostCopied && (
-            <p className="text-xs text-primary text-center mb-4">{hostCopied}</p>
+            <p className="text-xs text-primary text-center mb-3">{hostCopied}</p>
           )}
-          {!hostCopied && <div className="mb-3" />}
 
           <ol className="text-left text-sm space-y-2 mb-6 rounded-lg border border-border bg-background/50 px-4 py-3">
             <li>
-              <span className="font-semibold text-primary">1.</span> Text the
-              code to your friends
+              <span className="font-semibold text-primary">1.</span> Share invite
+              (one tap above)
             </li>
             <li>
               <span className="font-semibold text-primary">2.</span> Build &amp;
@@ -360,19 +346,7 @@ export default function JoinPage() {
           <button
             type="button"
             onClick={() => {
-              try {
-                const raw = localStorage.getItem("warroom-league");
-                const id = raw
-                  ? (JSON.parse(raw) as { id?: string }).id
-                  : null;
-                if (id) {
-                  void import("@/lib/commish-onboarding").then((m) =>
-                    m.markHostScreenSeen(id)
-                  );
-                }
-              } catch {
-                /* ignore */
-              }
+              if (leagueId) markHostScreenSeen(leagueId);
               router.push("/commissioner?tab=card&first=1");
               router.refresh();
             }}
@@ -383,6 +357,7 @@ export default function JoinPage() {
           <button
             type="button"
             onClick={() => {
+              if (leagueId) markHostScreenSeen(leagueId);
               router.push("/");
               router.refresh();
             }}
@@ -442,20 +417,58 @@ export default function JoinPage() {
         {mode === "join" && (
           <div className="rounded-xl border border-border bg-card p-5 space-y-4">
             <h2 className="font-semibold">Join league</h2>
-            <p className="text-xs text-muted">
-              If the league already has {MAX_LEAGUE_PLAYERS} players, you&apos;ll
-              need another code or a free seat.
-            </p>
-            <input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="CODE" maxLength={6} className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm tracking-widest uppercase" />
-            <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Your name" className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm" />
+            {deepLinkCode ? (
+              <p className="text-xs text-primary font-medium leading-relaxed">
+                Invite link detected — code filled in. Confirm your name and
+                hit Join.
+              </p>
+            ) : (
+              <p className="text-xs text-muted">
+                If the league already has {MAX_LEAGUE_PLAYERS} players, you&apos;ll
+                need another code or a free seat.
+              </p>
+            )}
+            <input
+              value={code}
+              onChange={(e) => setCode(e.target.value.toUpperCase())}
+              placeholder="CODE"
+              maxLength={6}
+              className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm tracking-widest uppercase font-mono"
+            />
+            <input
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              placeholder="Your name"
+              className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm"
+            />
             {error && <p className="text-sm text-danger">{error}</p>}
-            <button onClick={handleJoin} disabled={loading} className="w-full py-3 rounded-xl bg-primary text-black font-semibold disabled:opacity-50">
-              {loading ? "Joining…" : "Join"}
+            <button
+              onClick={handleJoin}
+              disabled={loading || !code.trim()}
+              className="w-full py-3 rounded-xl bg-primary text-black font-semibold disabled:opacity-50 min-h-[48px]"
+            >
+              {loading ? "Joining…" : deepLinkCode ? "Join this league" : "Join"}
             </button>
-            <button onClick={() => setMode("choose")} className="w-full text-sm text-muted">Back</button>
+            <button onClick={() => setMode("choose")} className="w-full text-sm text-muted">
+              Back
+            </button>
           </div>
         )}
       </div>
     </div>
+  );
+}
+
+export default function JoinPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center text-muted">
+          Loading…
+        </div>
+      }
+    >
+      <JoinPageInner />
+    </Suspense>
   );
 }
