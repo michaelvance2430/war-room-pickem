@@ -58,6 +58,15 @@ export default function Nav() {
     setPlayerPreview(isViewAsPlayer() && isActuallyCommissioner());
   }
 
+  function exitPlayerView() {
+    setViewAsPlayer(false);
+    refreshRoles();
+    setMenuOpen(false);
+    setMoreOpen(false);
+    // Land in Commish tools — clearest “back to ops”
+    window.location.href = "/commissioner";
+  }
+
   useEffect(() => {
     const session = getSession();
     const league = getLeague();
@@ -285,6 +294,15 @@ export default function Nav() {
 
           {/* Desktop: primary + More */}
           <nav className="hidden md:flex flex-1 items-center justify-end gap-x-3 text-[13px] text-muted min-w-0">
+            {playerPreview && (
+              <button
+                type="button"
+                onClick={exitPlayerView}
+                className="shrink-0 px-3 py-1.5 rounded-lg bg-warning text-black text-xs font-extrabold uppercase tracking-wide hover:opacity-90 shadow-[0_0_12px_rgba(234,179,8,0.35)]"
+              >
+                Exit player view
+              </button>
+            )}
             {primaryLinks.map((link) => (
               <NavItem key={link.href} link={link} />
             ))}
@@ -340,6 +358,15 @@ export default function Nav() {
           </nav>
 
           <div className="flex items-center gap-1 sm:gap-2 shrink-0 ml-auto md:ml-2">
+            {playerPreview && (
+              <button
+                type="button"
+                onClick={exitPlayerView}
+                className="md:hidden shrink-0 px-2.5 py-1.5 rounded-lg bg-warning text-black text-[11px] font-extrabold uppercase tracking-wide"
+              >
+                Exit
+              </button>
+            )}
             <Link
               href={playerId ? `/profile/${playerId}` : "/account"}
               className="flex items-center gap-2 text-sm text-muted hover:text-foreground"
@@ -415,6 +442,17 @@ export default function Nav() {
               id="mobile-nav-menu"
               className="md:hidden absolute left-0 right-0 top-full z-50 border-b border-border bg-card shadow-xl max-h-[calc(100dvh-3.5rem)] overflow-y-auto"
             >
+              {playerPreview && (
+                <div className="px-4 pt-3 pb-2">
+                  <button
+                    type="button"
+                    onClick={exitPlayerView}
+                    className="w-full py-3 rounded-xl bg-warning text-black text-sm font-extrabold uppercase tracking-wide"
+                  >
+                    Exit player view → Commish
+                  </button>
+                </div>
+              )}
               <p className="px-4 pt-3 pb-1 text-[10px] uppercase tracking-wider text-muted font-semibold">
                 Main
               </p>
@@ -483,27 +521,30 @@ export default function Nav() {
         )}
       </header>
       {playerPreview && (
-        <div className="border-b border-warning/40 bg-warning/15 text-[11px] sm:text-xs">
-          <div className="max-w-6xl mx-auto px-3 sm:px-4 py-1.5 flex flex-wrap items-center justify-center gap-2 text-center">
-            <span className="font-bold uppercase tracking-wider text-warning">
-              Player preview
-            </span>
-            <span className="text-muted">
-              You&apos;re seeing the app like a regular player (no Commish tools).
-            </span>
+        <div className="sticky top-14 z-[45] border-b-2 border-warning bg-warning text-black">
+          <div className="max-w-6xl mx-auto px-3 sm:px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs sm:text-sm font-bold">
+              PLAYER VIEW — no Commish tools. Tap Exit anytime.
+            </p>
             <button
               type="button"
-              onClick={() => {
-                setViewAsPlayer(false);
-                refreshRoles();
-                window.location.href = "/";
-              }}
-              className="font-semibold text-warning hover:underline"
+              onClick={exitPlayerView}
+              className="shrink-0 px-4 py-2 rounded-lg bg-black text-warning text-xs sm:text-sm font-extrabold uppercase tracking-wide hover:bg-black/90"
             >
-              Exit → back to Commish
+              Exit → Commish tools
             </button>
           </div>
         </div>
+      )}
+      {/* Floating exit — always visible while scrolling any page */}
+      {playerPreview && (
+        <button
+          type="button"
+          onClick={exitPlayerView}
+          className="fixed bottom-5 right-4 z-[60] px-4 py-3 rounded-full bg-warning text-black text-xs sm:text-sm font-extrabold uppercase tracking-wide shadow-[0_4px_24px_rgba(0,0,0,0.45)] border-2 border-black/20 hover:scale-[1.03] active:scale-[0.98] transition"
+        >
+          Exit player view
+        </button>
       )}
       {/* Until Aug 23 00:01 ET: countdown. After: ticker gone; one-time welcome splash */}
       <SeasonCountdownTicker />
