@@ -1098,7 +1098,9 @@ export default function PicksPage() {
                                 ? "text-amber-100"
                                 : rankTier === "top25"
                                   ? "text-violet-100"
-                                  : ""
+                                  : rankTier === "ranked"
+                                    ? "text-emerald-100"
+                                    : ""
                             }`}
                           >
                             {formatRankedTeam(game.awayTeam, game.awayRank)} @{" "}

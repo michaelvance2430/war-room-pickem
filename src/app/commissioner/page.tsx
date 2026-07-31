@@ -2952,6 +2952,9 @@ function CommissionerPageInner() {
                   {" · "}
                   <span className="text-violet-300/90">Violet</span> = both top
                   25
+                  {" · "}
+                  <span className="text-emerald-300/90">Green</span> = one top
+                  25
                 </p>
                 {/* Games only in nested scroll — prop lives outside so mobile can change it */}
                 <div className="space-y-4 max-h-[28rem] overflow-y-auto mt-4 overscroll-contain">
@@ -3009,7 +3012,9 @@ function CommissionerPageInner() {
                                           ? "text-amber-100"
                                           : rankTier === "top25"
                                             ? "text-violet-100"
-                                            : ""
+                                            : rankTier === "ranked"
+                                              ? "text-emerald-100"
+                                              : ""
                                       }`}
                                     >
                                       {formatRankedTeam(g.awayTeam, g.awayRank)}{" "}

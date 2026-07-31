@@ -235,11 +235,12 @@ export function formatRankedTeam(
 }
 
 /**
- * Both teams ranked → visual heat for card builder + picks.
+ * Rank heat for card builder + picks:
  * - legendary: both top 10 (gold)
- * - top25: both top 25, but not both top 10 (violet)
+ * - top25: both top 25, not both top 10 (violet)
+ * - ranked: exactly one team in the top 25 (emerald green)
  */
-export type RankedMatchupTier = "legendary" | "top25";
+export type RankedMatchupTier = "legendary" | "top25" | "ranked";
 
 export function getRankedMatchupTier(
   awayRank?: number | null,
@@ -253,12 +254,16 @@ export function getRankedMatchupTier(
     typeof homeRank === "number" && homeRank >= 1 && homeRank <= 25
       ? homeRank
       : null;
-  if (a == null || b == null) return null;
-  if (a <= 10 && b <= 10) return "legendary";
-  return "top25";
+  if (a == null && b == null) return null;
+  if (a != null && b != null) {
+    if (a <= 10 && b <= 10) return "legendary";
+    return "top25";
+  }
+  // Exactly one side ranked in the Top 25
+  return "ranked";
 }
 
-/** Card / row shell classes for ranked-vs-ranked games. */
+/** Card / row shell classes for ranked heat. */
 export function rankedMatchupShellClass(
   tier: RankedMatchupTier | null,
   opts?: { selected?: boolean; bestBet?: boolean }
@@ -274,7 +279,7 @@ export function rankedMatchupShellClass(
     const base =
       "border-amber-400/70 bg-gradient-to-br from-amber-400/20 via-amber-500/10 to-yellow-600/5 ring-1 ring-amber-400/45 shadow-[0_0_28px_rgba(234,179,8,0.18)]";
     if (opts?.selected) {
-      // Green “on the card” signal on top of gold heat
+      // Bright primary outline = on the card (on top of gold heat)
       return `${base} border-2 border-primary ring-2 ring-primary/70 shadow-[0_0_0_2px_rgba(34,197,94,0.45),0_0_28px_rgba(234,179,8,0.2)] brightness-110`;
     }
     if (opts?.bestBet) {
@@ -282,15 +287,26 @@ export function rankedMatchupShellClass(
     }
     return base;
   }
-  // Both top 25 (11–25 band / mixed top-10 + 11–25)
+  if (tier === "top25") {
+    // Both top 25 (11–25 band / mixed top-10 + 11–25)
+    const base =
+      "border-violet-400/55 bg-gradient-to-br from-violet-500/15 via-violet-500/8 to-fuchsia-500/5 ring-1 ring-violet-400/30";
+    if (opts?.selected) {
+      return `${base} border-2 border-primary ring-2 ring-primary/70 shadow-[0_0_0_2px_rgba(34,197,94,0.5),0_0_20px_rgba(34,197,94,0.25)] brightness-110`;
+    }
+    if (opts?.bestBet) {
+      return `${base} ring-2 ring-violet-300/50`;
+    }
+    return base;
+  }
+  // Exactly one Top-25 team — emerald (distinct from selection primary outline)
   const base =
-    "border-violet-400/55 bg-gradient-to-br from-violet-500/15 via-violet-500/8 to-fuchsia-500/5 ring-1 ring-violet-400/30";
+    "border-emerald-400/55 bg-gradient-to-br from-emerald-500/14 via-emerald-600/8 to-teal-500/5 ring-1 ring-emerald-400/35 shadow-[0_0_20px_rgba(16,185,129,0.12)]";
   if (opts?.selected) {
-    // Violet heat stays; primary green outline = clearly selected
-    return `${base} border-2 border-primary ring-2 ring-primary/70 shadow-[0_0_0_2px_rgba(34,197,94,0.5),0_0_20px_rgba(34,197,94,0.25)] brightness-110`;
+    return `${base} border-2 border-primary ring-2 ring-primary/70 shadow-[0_0_0_2px_rgba(34,197,94,0.5),0_0_20px_rgba(16,185,129,0.2)] brightness-110`;
   }
   if (opts?.bestBet) {
-    return `${base} ring-2 ring-violet-300/50`;
+    return `${base} ring-2 ring-emerald-300/55`;
   }
   return base;
 }
@@ -311,6 +327,13 @@ export function rankedMatchupBadge(tier: RankedMatchupTier | null): {
       label: "TOP 25",
       className:
         "text-[9px] font-extrabold uppercase tracking-wider text-violet-200 bg-violet-500/20 border border-violet-400/45 px-1.5 py-0.5 rounded",
+    };
+  }
+  if (tier === "ranked") {
+    return {
+      label: "RANKED",
+      className:
+        "text-[9px] font-extrabold uppercase tracking-wider text-emerald-200 bg-emerald-500/20 border border-emerald-400/45 px-1.5 py-0.5 rounded",
     };
   }
   return null;
