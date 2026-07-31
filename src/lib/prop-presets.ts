@@ -3,6 +3,9 @@ import type { Prop } from "./types";
 /** Top-level prop menu (Commish picks category first). */
 export type PropCategory = "players" | "teams" | "funny" | "odd";
 
+/** Football sports that share the prop bank today. */
+export type PropSport = "cfb" | "nfl";
+
 export const PROP_CATEGORIES: {
   id: PropCategory;
   label: string;
@@ -30,6 +33,43 @@ export const PROP_CATEGORIES: {
   },
 ];
 
+/** Light sport-flavored category blurbs for the commish UI. */
+export function propCategoriesForSport(sportId?: string | null) {
+  const nfl = normalizePropSport(sportId) === "nfl";
+  return PROP_CATEGORIES.map((c) => {
+    if (c.id === "players") {
+      return {
+        ...c,
+        blurb: nfl
+          ? "Pro box-score props (yards, TDs, sacks). You set Yes/No after games."
+          : "Campus box-score props (air raids, workhorse RBs, pick parties). You set Yes/No after games.",
+      };
+    }
+    if (c.id === "teams") {
+      return {
+        ...c,
+        blurb: nfl
+          ? "NFL spreads, totals, covers on this week’s card — auto from finals."
+          : "Saturday spreads, shootout totals, covers on this week’s card — auto from finals.",
+      };
+    }
+    if (c.id === "funny") {
+      return {
+        ...c,
+        blurb: nfl
+          ? "Primetime dumb props — chalk sweeps, 3-spots, road dogs. Mostly auto."
+          : "Campus chaos props — 60-burgers, home dogs, chalk sweeps. Mostly auto.",
+      };
+    }
+    return {
+      ...c,
+      blurb: nfl
+        ? "Weird pro junk (returns, blocks, dual-100s). Commish settles after games."
+        : "Weird campus junk (pick-sixes, 2-pts, blocks). Commish settles after games.",
+    };
+  });
+}
+
 export type PropPreset = {
   id: string;
   category: PropCategory;
@@ -43,16 +83,33 @@ export type PropPreset = {
    * manual = commissioner picks the answer after games (player/odd stats)
    */
   settle: "auto" | "manual";
+  /**
+   * Which sports show this preset in the dropdown.
+   * Omit or empty = available for both CFB and NFL.
+   */
+  sports?: PropSport[];
 };
+
+export function normalizePropSport(sportId?: string | null): PropSport {
+  return sportId === "nfl" ? "nfl" : "cfb";
+}
+
+export function presetFitsSport(
+  p: PropPreset,
+  sportId?: string | null
+): boolean {
+  if (!p.sports || p.sports.length === 0) return true;
+  return p.sports.includes(normalizePropSport(sportId));
+}
 
 /**
  * Commissioner prop menu — category → question.
  *
- * Auto props: objective from final scores + locked spreads only.
- * Manual props: real pick’em flavor (yards, TDs, fumbles) — host settles from box score.
+ * Shared bank + CFB-only / NFL-only flavor lines so dual-sport rooms
+ * don't feel copy-pasted. Auto props still need scores/ATS only.
  */
 export const PROP_PRESETS: PropPreset[] = [
-  // ——— PLAYERS (manual — no player stats in odds feed yet) ———
+  // ——— PLAYERS (shared, manual) ———
   {
     id: "pl-qb-pass-yds-250",
     category: "players",
@@ -174,7 +231,99 @@ export const PROP_PRESETS: PropPreset[] = [
     settle: "manual",
   },
 
-  // ——— TEAMS (auto from scores / ATS) ———
+  // ——— PLAYERS · CFB-only (campus ceilings) ———
+  {
+    id: "pl-cfb-qb-pass-400",
+    category: "players",
+    sports: ["cfb"],
+    label: "Any QB 400+ pass yds? (air raid)",
+    question:
+      "Saturday special: will ANY QB in the five games on this week's card throw for 400 or more passing yards?",
+    options: ["Yes — at least one QB ≥ 400", "No — every QB ≤ 399"],
+    points: 3,
+    settle: "manual",
+  },
+  {
+    id: "pl-cfb-qb-pass-td-5",
+    category: "players",
+    sports: ["cfb"],
+    label: "Any QB 5+ pass TDs?",
+    question:
+      "Will ANY QB in the five games on this week's card throw 5 or more touchdown passes?",
+    options: ["Yes — at least one QB ≥ 5 pass TDs", "No — every QB ≤ 4"],
+    points: 3,
+    settle: "manual",
+  },
+  {
+    id: "pl-cfb-rb-rush-200",
+    category: "players",
+    sports: ["cfb"],
+    label: "Any RB 200+ rush yds?",
+    question:
+      "Will ANY running back in the five games on this week's card rush for 200 or more yards?",
+    options: ["Yes — at least one RB ≥ 200", "No — every RB ≤ 199"],
+    points: 3,
+    settle: "manual",
+  },
+  {
+    id: "pl-cfb-wr-rec-150",
+    category: "players",
+    sports: ["cfb"],
+    label: "Any WR 150+ rec yds?",
+    question:
+      "Will ANY wide receiver in the five games on this week's card post 150 or more receiving yards?",
+    options: ["Yes — at least one WR ≥ 150", "No — every WR ≤ 149"],
+    points: 3,
+    settle: "manual",
+  },
+
+  // ——— PLAYERS · NFL-only (pro ceilings) ———
+  {
+    id: "pl-nfl-qb-pass-350",
+    category: "players",
+    sports: ["nfl"],
+    label: "Any QB 350+ pass yds?",
+    question:
+      "Will ANY QB in the five games on this week's card throw for 350 or more passing yards?",
+    options: ["Yes — at least one QB ≥ 350", "No — every QB ≤ 349"],
+    points: 3,
+    settle: "manual",
+  },
+  {
+    id: "pl-nfl-rb-rush-150",
+    category: "players",
+    sports: ["nfl"],
+    label: "Any RB 150+ rush yds?",
+    question:
+      "Will ANY running back in the five games on this week's card rush for 150 or more yards?",
+    options: ["Yes — at least one RB ≥ 150", "No — every RB ≤ 149"],
+    points: 3,
+    settle: "manual",
+  },
+  {
+    id: "pl-nfl-wr-rec-150",
+    category: "players",
+    sports: ["nfl"],
+    label: "Any WR 150+ rec yds?",
+    question:
+      "Will ANY wide receiver in the five games on this week's card post 150 or more receiving yards?",
+    options: ["Yes — at least one WR ≥ 150", "No — every WR ≤ 149"],
+    points: 3,
+    settle: "manual",
+  },
+  {
+    id: "pl-nfl-k-fg-50",
+    category: "players",
+    sports: ["nfl"],
+    label: "Any made FG from 50+?",
+    question:
+      "Will ANY kicker on this week's card make a field goal from 50 or more yards?",
+    options: ["Yes — at least one FG ≥ 50", "No — no 50+ FG"],
+    points: 3,
+    settle: "manual",
+  },
+
+  // ——— TEAMS (shared, auto) ———
   {
     id: "tm-spreads-3-of-5-under-7",
     category: "teams",
@@ -296,7 +445,99 @@ export const PROP_PRESETS: PropPreset[] = [
     settle: "auto",
   },
 
-  // ——— FUNNY (mostly auto from scores) ———
+  // ——— TEAMS · CFB-only (Saturday scoring) ———
+  {
+    id: "tm-cfb-total-70",
+    category: "teams",
+    sports: ["cfb"],
+    label: "Any game total Over 70.5?",
+    question:
+      "Campus shootout watch: will ANY of the five games finish with a combined score of 71 or more?",
+    options: ["Yes — at least one total ≥ 71", "No — every total ≤ 70"],
+    points: 3,
+    settle: "auto",
+  },
+  {
+    id: "tm-cfb-team-56",
+    category: "teams",
+    sports: ["cfb"],
+    label: "Any team scores ≥ 56?",
+    question:
+      "Will ANY of the ten teams on this week's card finish with 56 or more points?",
+    options: ["Yes — at least one team ≥ 56", "No — every team ≤ 55"],
+    points: 3,
+    settle: "auto",
+  },
+  {
+    id: "tm-cfb-margin-35",
+    category: "teams",
+    sports: ["cfb"],
+    label: "Any blowout margin 35+?",
+    question:
+      "Will ANY of the five games be decided by 35 or more points?",
+    options: ["Yes — at least one margin ≥ 35", "No — every margin ≤ 34"],
+    points: 3,
+    settle: "auto",
+  },
+  {
+    id: "tm-cfb-both-30",
+    category: "teams",
+    sports: ["cfb"],
+    label: "Any game both teams ≥ 30?",
+    question:
+      "Will ANY game end with both home and away scoring 30 or more points each?",
+    options: ["Yes — at least one game both ≥ 30", "No — never both ≥ 30"],
+    points: 3,
+    settle: "auto",
+  },
+
+  // ——— TEAMS · NFL-only (pro scoring) ———
+  {
+    id: "tm-nfl-total-under-35",
+    category: "teams",
+    sports: ["nfl"],
+    label: "Any game total Under 35.5?",
+    question:
+      "Defensive Sunday: will ANY of the five games finish with a combined score of 35 or fewer?",
+    options: ["Yes — at least one total ≤ 35", "No — every total ≥ 36"],
+    points: 3,
+    settle: "auto",
+  },
+  {
+    id: "tm-nfl-team-under-14",
+    category: "teams",
+    sports: ["nfl"],
+    label: "Any team scores ≤ 13?",
+    question:
+      "Will ANY of the ten teams on this week's card finish with 13 or fewer points?",
+    options: ["Yes — at least one team ≤ 13", "No — every team ≥ 14"],
+    points: 3,
+    settle: "auto",
+  },
+  {
+    id: "tm-nfl-total-50",
+    category: "teams",
+    sports: ["nfl"],
+    label: "Any game total Over 50.5?",
+    question:
+      "Will ANY of the five games finish with a combined score of 51 or more?",
+    options: ["Yes — at least one total ≥ 51", "No — every total ≤ 50"],
+    points: 3,
+    settle: "auto",
+  },
+  {
+    id: "tm-nfl-margin-14",
+    category: "teams",
+    sports: ["nfl"],
+    label: "Any game margin 14+?",
+    question:
+      "Will ANY of the five games be decided by 14 or more points?",
+    options: ["Yes — at least one margin ≥ 14", "No — every margin ≤ 13"],
+    points: 3,
+    settle: "auto",
+  },
+
+  // ——— FUNNY (shared) ———
   {
     id: "fn-all-favorites-cover",
     category: "funny",
@@ -388,7 +629,77 @@ export const PROP_PRESETS: PropPreset[] = [
     settle: "manual",
   },
 
-  // ——— ODD (manual — box-score weirdness) ———
+  // ——— FUNNY · CFB-only ———
+  {
+    id: "fn-cfb-60-burger",
+    category: "funny",
+    sports: ["cfb"],
+    label: "Any team drops a 60-burger?",
+    question:
+      "Campus chaos: will ANY team on this week's card score 60 or more points?",
+    options: ["Yes — at least one team ≥ 60", "No — every team ≤ 59"],
+    points: 3,
+    settle: "auto",
+  },
+  {
+    id: "fn-cfb-dog-14-covers",
+    category: "funny",
+    sports: ["cfb"],
+    label: "Any 14+ dog covers?",
+    question:
+      "Using locked spreads: will ANY underdog listed at +14 or more cover this week? (Push does NOT count. If no dog is +14+, answer is No.)",
+    options: ["Yes — a big dog covers", "No — no +14 dog covers"],
+    points: 3,
+    settle: "auto",
+  },
+  {
+    id: "fn-cfb-home-dogs-2",
+    category: "funny",
+    sports: ["cfb"],
+    label: "2+ home underdogs win SU?",
+    question:
+      "Using locked spreads: will at least 2 home underdogs win straight up on this week's card?",
+    options: ["Yes — ≥ 2 home dogs win SU", "No — ≤ 1 home dog wins SU"],
+    points: 3,
+    settle: "auto",
+  },
+
+  // ——— FUNNY · NFL-only ———
+  {
+    id: "fn-nfl-exactly-3",
+    category: "funny",
+    sports: ["nfl"],
+    label: "Any team scores exactly 3?",
+    question:
+      "Field-goal special: will ANY team on this week's card finish with exactly 3 points?",
+    options: ["Yes — at least one team = 3", "No — nobody finishes on 3"],
+    points: 3,
+    settle: "auto",
+  },
+  {
+    id: "fn-nfl-exactly-17",
+    category: "funny",
+    sports: ["nfl"],
+    label: "Any team scores exactly 17?",
+    question:
+      "Will ANY team on this week's card finish with exactly 17 points?",
+    options: ["Yes — at least one team = 17", "No — nobody finishes on 17"],
+    points: 3,
+    settle: "auto",
+  },
+  {
+    id: "fn-nfl-dogs-win-2-su",
+    category: "funny",
+    sports: ["nfl"],
+    label: "2+ underdogs win straight up?",
+    question:
+      "Using locked spreads: will at least 2 underdogs win straight up (not just cover) on this week's card?",
+    options: ["Yes — ≥ 2 dogs win SU", "No — ≤ 1 dog wins SU"],
+    points: 3,
+    settle: "auto",
+  },
+
+  // ——— ODD (shared, manual) ———
   {
     id: "od-fumbles-3",
     category: "odd",
@@ -444,7 +755,7 @@ export const PROP_PRESETS: PropPreset[] = [
     category: "odd",
     label: "Any missed extra point?",
     question:
-      "Will ANY team miss an extra-point kick (or fail a 2-pt conversion attempt counts only if you choose kick XP miss — use official XP misses) on this week's card?",
+      "Will ANY team miss an extra-point kick (failed 2-pt does not count — XP kick miss only) on this week's card?",
     options: ["Yes — at least one missed XP", "No — every XP is good"],
     points: 3,
     settle: "manual",
@@ -469,12 +780,91 @@ export const PROP_PRESETS: PropPreset[] = [
     points: 3,
     settle: "manual",
   },
+
+  // ——— ODD · CFB-only ———
+  {
+    id: "od-cfb-pick6",
+    category: "odd",
+    sports: ["cfb"],
+    label: "Any pick-six?",
+    question:
+      "Will ANY interception be returned for a touchdown in the five games on this week's card?",
+    options: ["Yes — at least one pick-six", "No — no pick-six"],
+    points: 3,
+    settle: "manual",
+  },
+  {
+    id: "od-cfb-2pt",
+    category: "odd",
+    sports: ["cfb"],
+    label: "Any successful 2-pt conversion?",
+    question:
+      "Will ANY team convert a 2-point try on this week's card?",
+    options: ["Yes — at least one 2-pt good", "No — no successful 2-pt"],
+    points: 3,
+    settle: "manual",
+  },
+  {
+    id: "od-cfb-onside",
+    category: "odd",
+    sports: ["cfb"],
+    label: "Any successful onside kick?",
+    question:
+      "Will ANY team recover its own onside kick attempt on this week's card?",
+    options: ["Yes — at least one onside recovered", "No — no successful onside"],
+    points: 3,
+    settle: "manual",
+  },
+
+  // ——— ODD · NFL-only ———
+  {
+    id: "od-nfl-missed-fg",
+    category: "odd",
+    sports: ["nfl"],
+    label: "Any missed field goal?",
+    question:
+      "Will ANY field-goal attempt be missed (no good) in the five games on this week's card?",
+    options: ["Yes — at least one missed FG", "No — every FG is good"],
+    points: 3,
+    settle: "manual",
+  },
+  {
+    id: "od-nfl-failed-2pt",
+    category: "odd",
+    sports: ["nfl"],
+    label: "Any failed 2-pt conversion?",
+    question:
+      "Will ANY team attempt a 2-point conversion and fail on this week's card?",
+    options: ["Yes — at least one failed 2-pt", "No — no failed 2-pt"],
+    points: 3,
+    settle: "manual",
+  },
+  {
+    id: "od-nfl-qb-rush-td",
+    category: "odd",
+    sports: ["nfl"],
+    label: "Any QB rushing TD?",
+    question:
+      "Will ANY quarterback score a rushing touchdown in the five games on this week's card?",
+    options: ["Yes — at least one QB rush TD", "No — no QB rush TD"],
+    points: 3,
+    settle: "manual",
+  },
 ];
 
 export const CUSTOM_PROP_ID = "custom";
 
-export function presetsForCategory(cat: PropCategory): PropPreset[] {
-  return PROP_PRESETS.filter((p) => p.category === cat);
+export function presetsForSport(sportId?: string | null): PropPreset[] {
+  return PROP_PRESETS.filter((p) => presetFitsSport(p, sportId));
+}
+
+export function presetsForCategory(
+  cat: PropCategory,
+  sportId?: string | null
+): PropPreset[] {
+  return PROP_PRESETS.filter(
+    (p) => p.category === cat && presetFitsSport(p, sportId)
+  );
 }
 
 export function getPropPreset(id: string): PropPreset | undefined {
@@ -483,6 +873,23 @@ export function getPropPreset(id: string): PropPreset | undefined {
 
 export function categoryForPresetId(id: string): PropCategory {
   return getPropPreset(id)?.category || "teams";
+}
+
+/** First preset for a sport (used as draft default). */
+export function defaultPropPreset(sportId?: string | null): PropPreset {
+  const list = presetsForSport(sportId);
+  return list[0] || PROP_PRESETS[0];
+}
+
+/** Rotate presets within a sport bank (demo / sandbox). */
+export function rotatingPropPreset(
+  week: number,
+  sportId?: string | null
+): PropPreset {
+  const list = presetsForSport(sportId);
+  if (!list.length) return PROP_PRESETS[0];
+  const w = Math.max(0, Math.floor(week));
+  return list[w % list.length];
 }
 
 export function propFromPreset(preset: PropPreset, weekNumber = 1): Prop {
@@ -494,6 +901,10 @@ export function propFromPreset(preset: PropPreset, weekNumber = 1): Prop {
   };
 }
 
+/**
+ * Match a published prop back to a preset.
+ * Searches the full bank (all sports) so historical cards still resolve.
+ */
 export function matchPresetId(prop: Prop | null | undefined): string {
   if (!prop?.question) return PROP_PRESETS[0].id;
   const q = prop.question.trim();
@@ -517,7 +928,11 @@ export function propVibe(
     if (preset.id.includes("total")) return "totals";
     if (preset.id.includes("margin") || preset.id.includes("spread"))
       return "margins";
-    if (preset.id.includes("cover") || preset.id.includes("favorite") || preset.id.includes("dog"))
+    if (
+      preset.id.includes("cover") ||
+      preset.id.includes("favorite") ||
+      preset.id.includes("dog")
+    )
       return "covers";
     return "scoring";
   }

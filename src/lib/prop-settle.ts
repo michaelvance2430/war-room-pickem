@@ -376,6 +376,155 @@ export function settlePropFromScores(opts: {
       return settle(allRoad, allRoad ? "Road went 5–0." : "Road lost at least one.");
     }
 
+    // —— CFB flavor (auto) ——
+    case "tm-cfb-total-70": {
+      if (finalBoxes.some((b) => total(b) >= 71)) {
+        return settle(true, "At least one game total ≥ 71.");
+      }
+      if (!allFinal) {
+        return wait(`No total ≥ 71 yet (${nFinal}/${expected} final). Waiting…`);
+      }
+      return settle(false, "Every game total ≤ 70.");
+    }
+    case "tm-cfb-team-56": {
+      if (finalBoxes.some((b) => b.homeScore >= 56 || b.awayScore >= 56)) {
+        return settle(true, "At least one team scored ≥ 56.");
+      }
+      if (!allFinal) return wait("No team ≥ 56 yet. Waiting…");
+      return settle(false, "Every team scored ≤ 55.");
+    }
+    case "tm-cfb-margin-35": {
+      if (finalBoxes.some((b) => margin(b) >= 35)) {
+        return settle(true, "At least one margin ≥ 35.");
+      }
+      if (!allFinal) return wait("No 35+ margin yet. Waiting…");
+      return settle(false, "Every margin ≤ 34.");
+    }
+    case "tm-cfb-both-30": {
+      if (finalBoxes.some((b) => b.homeScore >= 30 && b.awayScore >= 30)) {
+        return settle(true, "At least one game had both teams ≥ 30.");
+      }
+      if (!allFinal) return wait("No both-≥30 game yet. Waiting…");
+      return settle(false, "No game had both teams ≥ 30.");
+    }
+    case "fn-cfb-60-burger": {
+      if (finalBoxes.some((b) => b.homeScore >= 60 || b.awayScore >= 60)) {
+        return settle(true, "Someone dropped a 60-burger.");
+      }
+      if (!allFinal) return wait("No 60-burger yet. Waiting…");
+      return settle(false, "Nobody hit 60.");
+    }
+    case "fn-cfb-dog-14-covers": {
+      // Home line is Game.spread; dog is +|spread| when they are the underdog.
+      let any = false;
+      let eligible = 0;
+      for (const g of games) {
+        const dogPts = Math.abs(Number(g.spread) || 0);
+        if (dogPts < 14) continue;
+        eligible += 1;
+        const b = byId.get(g.id);
+        if (!b) continue;
+        if (dogCovered(g, b)) {
+          any = true;
+          break;
+        }
+      }
+      if (any) return settle(true, "A +14 or bigger dog covered.");
+      if (!allFinal) {
+        return wait(
+          eligible === 0
+            ? "No +14 dogs on card so far — still waiting on finals."
+            : "No +14 dog cover yet. Waiting…"
+        );
+      }
+      if (eligible === 0) {
+        return settle(false, "No dog was listed at +14 or more on this card.");
+      }
+      return settle(false, "No +14 dog covered.");
+    }
+    case "fn-cfb-home-dogs-2": {
+      let homeDogWins = 0;
+      for (const g of games) {
+        const isHomeDog = g.favorite === "away";
+        if (!isHomeDog) continue;
+        const b = byId.get(g.id);
+        if (!b) continue;
+        if (b.homeScore > b.awayScore) homeDogWins += 1;
+      }
+      if (homeDogWins >= 2) {
+        return settle(true, `${homeDogWins} home underdogs won SU.`);
+      }
+      if (!allFinal) {
+        return wait(`${homeDogWins} home dog SU wins so far. Waiting…`);
+      }
+      return settle(false, `Only ${homeDogWins} home underdog(s) won SU.`);
+    }
+
+    // —— NFL flavor (auto) ——
+    case "tm-nfl-total-under-35": {
+      if (finalBoxes.some((b) => total(b) <= 35)) {
+        return settle(true, "At least one game total ≤ 35.");
+      }
+      if (!allFinal) return wait("No total ≤ 35 yet. Waiting…");
+      return settle(false, "Every game total ≥ 36.");
+    }
+    case "tm-nfl-team-under-14": {
+      if (finalBoxes.some((b) => b.homeScore <= 13 || b.awayScore <= 13)) {
+        return settle(true, "At least one team scored ≤ 13.");
+      }
+      if (!allFinal) return wait("No team ≤ 13 yet. Waiting…");
+      return settle(false, "Every team scored ≥ 14.");
+    }
+    case "tm-nfl-total-50": {
+      if (finalBoxes.some((b) => total(b) >= 51)) {
+        return settle(true, "At least one game total ≥ 51.");
+      }
+      if (!allFinal) return wait("No total ≥ 51 yet. Waiting…");
+      return settle(false, "Every game total ≤ 50.");
+    }
+    case "tm-nfl-margin-14": {
+      if (finalBoxes.some((b) => margin(b) >= 14)) {
+        return settle(true, "At least one margin ≥ 14.");
+      }
+      if (!allFinal) return wait("No 14+ margin yet. Waiting…");
+      return settle(false, "Every margin ≤ 13.");
+    }
+    case "fn-nfl-exactly-3": {
+      if (finalBoxes.some((b) => b.homeScore === 3 || b.awayScore === 3)) {
+        return settle(true, "Someone finished with exactly 3.");
+      }
+      if (!allFinal) return wait("No team on 3 yet. Waiting…");
+      return settle(false, "Nobody finished on 3.");
+    }
+    case "fn-nfl-exactly-17": {
+      if (finalBoxes.some((b) => b.homeScore === 17 || b.awayScore === 17)) {
+        return settle(true, "Someone finished with exactly 17.");
+      }
+      if (!allFinal) return wait("No team on 17 yet. Waiting…");
+      return settle(false, "Nobody finished on 17.");
+    }
+    case "fn-nfl-dogs-win-2-su": {
+      let dogWins = 0;
+      for (const g of games) {
+        const b = byId.get(g.id);
+        if (!b) continue;
+        const dogSide: "home" | "away" =
+          g.favorite === "home" ? "away" : "home";
+        const dogWon =
+          dogSide === "home"
+            ? b.homeScore > b.awayScore
+            : b.awayScore > b.homeScore;
+        if (dogWon) dogWins += 1;
+      }
+      if (dogWins >= 2) {
+        return settle(true, `${dogWins} underdogs won straight up.`);
+      }
+      if (!allFinal) {
+        return wait(`${dogWins} dog SU wins so far. Waiting…`);
+      }
+      return settle(false, `Only ${dogWins} underdog(s) won SU.`);
+    }
+
     default: {
       const known = PROP_PRESETS.some((p) => p.id === presetId);
       if (!known) {

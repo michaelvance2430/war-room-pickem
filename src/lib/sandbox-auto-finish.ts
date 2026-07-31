@@ -15,7 +15,7 @@ import {
   loadLeagueRoster,
   fillLeagueWithBotsToCap,
 } from "@/lib/cloud";
-import { PROP_PRESETS, propFromPreset } from "@/lib/prop-presets";
+import { propFromPreset, rotatingPropPreset } from "@/lib/prop-presets";
 import { SEASON_MAX_WEEK } from "@/lib/season-calendar";
 import { weekTitle } from "@/lib/dates";
 import { isOps } from "@/lib/league";
@@ -170,8 +170,7 @@ export async function autoFinishRemainingWeeks(opts?: {
           ? "nfl"
           : "cfb";
       const demoGames = generateDemoSlate(week, 5, sport);
-      const preset = PROP_PRESETS[week % PROP_PRESETS.length];
-      const prop = propFromPreset(preset, week);
+      const prop = propFromPreset(rotatingPropPreset(week, sport), week);
 
       opts?.onProgress?.({ week, label, step: "Publishing card…" });
       const pub = await publishWeekCard({

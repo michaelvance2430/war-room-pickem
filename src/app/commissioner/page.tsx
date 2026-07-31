@@ -97,12 +97,14 @@ import {
 import { settlePropFromScores } from "@/lib/prop-settle";
 import {
   PROP_PRESETS,
-  PROP_CATEGORIES,
   CUSTOM_PROP_ID,
   propFromPreset,
   matchPresetId,
   presetsForCategory,
   categoryForPresetId,
+  defaultPropPreset,
+  rotatingPropPreset,
+  propCategoriesForSport,
   type PropCategory,
 } from "@/lib/prop-presets";
 import { MAX_LEAGUE_PLAYERS } from "@/lib/league-limits";
@@ -194,12 +196,14 @@ function CommissionerPageInner() {
   const [publishedGames, setPublishedGames] = useState<Game[]>([]);
   /** Draft prop on Build Card (may differ until you re-publish). */
   const [prop, setProp] = useState<Prop>(() =>
-    propFromPreset(PROP_PRESETS[0], 1)
+    propFromPreset(defaultPropPreset("cfb"), 1)
   );
   const [propCategory, setPropCategory] = useState<PropCategory>(
-    PROP_PRESETS[0].category
+    () => defaultPropPreset("cfb").category
   );
-  const [propPresetId, setPropPresetId] = useState(PROP_PRESETS[0].id);
+  const [propPresetId, setPropPresetId] = useState(
+    () => defaultPropPreset("cfb").id
+  );
   /**
    * Prop last published for activeWeek — Enter Results + scoring use this only.
    * Never overwritten by Build Card dropdown clicks.
@@ -438,8 +442,12 @@ function CommissionerPageInner() {
     setResultsLocked(false);
     setScoredAtLabel(null);
     // Draft default only until we know this week's published card
-    setProp(propFromPreset(PROP_PRESETS[0], week));
-    setPropPresetId(PROP_PRESETS[0].id);
+    {
+      const def = defaultPropPreset(leagueFootballSport());
+      setProp(propFromPreset(def, week));
+      setPropPresetId(def.id);
+      setPropCategory(def.category);
+    }
 
     const keys = storageKeys(week);
     let loadedProp: Prop | null = null;
@@ -781,12 +789,12 @@ function CommissionerPageInner() {
     setSelectedIds(new Set(games.map((g) => g.id)));
     setCardSaved(false);
 
-    // Prefer the draft prop on the form; fall back to a rotating preset.
+    // Prefer the draft prop on the form; fall back to a rotating sport preset.
     let propToPublish = prop;
     if (propPresetId === CUSTOM_PROP_ID) {
       if (!customQuestion.trim()) {
         propToPublish = propFromPreset(
-          PROP_PRESETS[activeWeek % PROP_PRESETS.length],
+          rotatingPropPreset(activeWeek, sport),
           activeWeek
         );
       } else {
@@ -804,10 +812,7 @@ function CommissionerPageInner() {
       const preset = PROP_PRESETS.find((p) => p.id === propPresetId);
       propToPublish = preset
         ? propFromPreset(preset, activeWeek)
-        : propFromPreset(
-            PROP_PRESETS[activeWeek % PROP_PRESETS.length],
-            activeWeek
-          );
+        : propFromPreset(rotatingPropPreset(activeWeek, sport), activeWeek);
     }
     applyDraftFromProp(propToPublish);
 
@@ -989,7 +994,7 @@ function CommissionerPageInner() {
 
   function applyPropCategory(cat: PropCategory) {
     setPropCategory(cat);
-    const list = presetsForCategory(cat);
+    const list = presetsForCategory(cat, leagueFootballSport());
     const first = list[0];
     if (first) applyPropPreset(first.id);
   }
@@ -3388,8 +3393,11 @@ function CommissionerPageInner() {
                 <div>
                   <h3 className="font-semibold text-sm">Weekly prop</h3>
                   <p className="text-xs text-muted mt-0.5">
-                    Category → question. Worth {prop.points} pts. Publish to
-                    put it on the card.
+                    Category → question
+                    {leagueFootballSport() === "nfl"
+                      ? " (NFL bank)"
+                      : " (college bank)"}
+                    . Worth {prop.points} pts. Publish to put it on the card.
                   </p>
                   {publishedProp?.question &&
                     publishedProp.question !== prop.question && (
@@ -3409,7 +3417,7 @@ function CommissionerPageInner() {
                     }
                     className="mt-1 w-full min-h-[48px] bg-background border border-border rounded-lg px-3 py-3 text-base focus:outline-none focus:border-primary"
                   >
-                    {PROP_CATEGORIES.map((c) => (
+                    {propCategoriesForSport(leagueFootballSport()).map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.label}
                       </option>
@@ -3417,7 +3425,11 @@ function CommissionerPageInner() {
                   </select>
                 </label>
                 <p className="text-[11px] text-muted -mt-1">
-                  {PROP_CATEGORIES.find((c) => c.id === propCategory)?.blurb}
+                  {
+                    propCategoriesForSport(leagueFootballSport()).find(
+                      (c) => c.id === propCategory
+                    )?.blurb
+                  }
                 </p>
 
                 <label className="block text-xs text-muted">
@@ -3431,7 +3443,10 @@ function CommissionerPageInner() {
                     onChange={(e) => applyPropPreset(e.target.value)}
                     className="mt-1 w-full min-h-[48px] bg-background border border-border rounded-lg px-3 py-3 text-base focus:outline-none focus:border-primary"
                   >
-                    {presetsForCategory(propCategory).map((p) => (
+                    {presetsForCategory(
+                      propCategory,
+                      leagueFootballSport()
+                    ).map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.settle === "manual" ? "📝 " : "⚡ "}
                         {p.label}
@@ -3444,7 +3459,10 @@ function CommissionerPageInner() {
                 </label>
 
                 <div className="max-h-56 overflow-y-auto rounded-lg border border-border divide-y divide-border overscroll-contain">
-                  {presetsForCategory(propCategory).map((p) => {
+                  {presetsForCategory(
+                    propCategory,
+                    leagueFootballSport()
+                  ).map((p) => {
                     const active = propPresetId === p.id;
                     return (
                       <button

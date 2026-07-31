@@ -7,7 +7,7 @@ import type { Player } from "./types";
 import type { League, Session } from "./league";
 import { mockPlayers } from "./mock-data";
 import { generateDemoSlate } from "./demo-slate";
-import { propFromPreset, PROP_PRESETS } from "./prop-presets";
+import { propFromPreset, rotatingPropPreset } from "./prop-presets";
 import { savePlayers } from "./store";
 
 export const GUEST_LEAGUE_ID = "guest-demo-league";
@@ -114,7 +114,7 @@ function seedWeekCard(week: number) {
       });
     });
   }
-  const prop = propFromPreset(PROP_PRESETS[week % PROP_PRESETS.length], week);
+  const prop = propFromPreset(rotatingPropPreset(week, "cfb"), week);
   const payload = {
     games,
     prop,
