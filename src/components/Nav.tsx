@@ -22,6 +22,7 @@ import GuestOnboarding from "@/components/GuestOnboarding";
 import PlayerWalkthrough from "@/components/PlayerWalkthrough";
 import RingCeremonyModal from "@/components/RingCeremonyModal";
 import SeasonFinaleModal from "@/components/SeasonFinaleModal";
+import CardPublishedModal from "@/components/CardPublishedModal";
 import JoinBadgeHydrator from "@/components/JoinBadgeHydrator";
 import EquippedTitleHydrator from "@/components/EquippedTitleHydrator";
 import ProfileBorderHydrator from "@/components/ProfileBorderHydrator";
@@ -615,12 +616,14 @@ export default function Nav() {
               { href: "/", label: "Home", icon: "⌂" },
               { href: "/picks", label: "Picks", icon: "✓" },
               { href: "/board", label: "Board", icon: "▦" },
-              { href: "/standings", label: "Ranks", icon: "#" },
+              { href: "/locker-room", label: "Locker", icon: "💬" },
             ] as const
           ).map((tab) => {
             const active = linkActive(tab.href);
             const badge =
-              primaryLinks.find((p) => p.href === tab.href)?.badge || 0;
+              tab.href === "/locker-room"
+                ? lockerUnseen
+                : primaryLinks.find((p) => p.href === tab.href)?.badge || 0;
             return (
               <li key={tab.href} className="min-w-0">
                 <Link
@@ -660,11 +663,9 @@ export default function Nav() {
                 ☰
               </span>
               <span>More</span>
-              {(moreBadge > 0 || lockerUnseen > 0) && !menuOpen && (
+              {moreBadge > 0 && !menuOpen && (
                 <span className="absolute top-1.5 right-[18%] min-w-[14px] h-3.5 px-0.5 rounded-full bg-primary text-black text-[8px] font-bold flex items-center justify-center">
-                  {moreBadge + lockerUnseen > 9
-                    ? "9+"
-                    : moreBadge + lockerUnseen}
+                  {moreBadge > 9 ? "9+" : moreBadge}
                 </span>
               )}
             </button>
@@ -709,6 +710,8 @@ export default function Nav() {
       {!isGuestMode() && <RingCeremonyModal />}
       {/* End-of-season: who won champ / toilet / nerd — once per player when engraved */}
       {!isGuestMode() && <SeasonFinaleModal />}
+      {/* After host publishes a card — celebrate + share + player view */}
+      {!isGuestMode() && <CardPublishedModal />}
       {!isGuestMode() && <JoinBadgeHydrator />}
       {!isGuestMode() && <EquippedTitleHydrator />}
       {!isGuestMode() && <ProfileBorderHydrator />}

@@ -142,17 +142,21 @@ export default function HomeWeekHero() {
       secondaryLabel =
         state.rosterCount < 2 ? "Or build first card" : "Commish tools";
     } else {
-      eyebrow = "Season not live yet";
-      title = "Waiting on the card";
+      eyebrow = "You're in";
+      title = state.isOps
+        ? "Publish a card so people can pick"
+        : "You're in — waiting on the card";
       body = state.isOps
-        ? `${weekLabel} has no published games. Share the invite, then build & publish the card so people can lock.`
-        : `No picks yet for ${weekLabel}. Your commissioner hasn’t published this week’s card — hang tight.`;
-      primaryHref = state.isOps ? "/commissioner?tab=card&first=1" : "/locker-room";
+        ? `One job: publish ${weekLabel} (demo week is fine). Then text the crew.`
+        : `You're in the league. No games to pick yet — your host hasn't published ${weekLabel}. Hang in the Locker or check back soon.`;
+      primaryHref = state.isOps
+        ? "/commissioner?tab=card&first=1"
+        : "/locker-room";
       primaryLabel = state.isOps
-        ? "Publish this week’s card"
-        : "Talk shit in the Locker";
+        ? "Publish this week's card →"
+        : "Open Locker Room";
       secondaryHref = state.isOps ? "/locker-room" : "/standings";
-      secondaryLabel = state.isOps ? "Locker Room" : "See the board";
+      secondaryLabel = state.isOps ? "Locker" : "Peek standings";
     }
   } else if (state.iLocked) {
     eyebrow = state.frozen ? "Card locked" : "You’re in";

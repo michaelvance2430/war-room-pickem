@@ -23,17 +23,20 @@ export default function RulesOnboardingModal() {
   function dismiss() {
     markRulesSeen();
     setOpen(false);
-    // Real accounts: start walk-the-dog (Crystal Ball → picks) after briefing
+    // Real accounts: only start coach when a card is live (nothing to walk otherwise)
     try {
       if (typeof window !== "undefined") {
         const guest = localStorage.getItem("warroom-guest-mode-v1");
         const isGuest = guest && JSON.parse(guest)?.active;
         if (!isGuest) {
-          void import("@/lib/player-tutorial").then((m) => {
+          void (async () => {
+            const { leagueHasLiveCard } = await import("@/lib/first-session");
+            if (!(await leagueHasLiveCard())) return;
+            const m = await import("@/lib/player-tutorial");
             if (m.needsPlayerTutorial()) {
               m.startPlayerTutorial(getSession()?.playerId || undefined);
             }
-          });
+          })();
         }
       }
     } catch {
@@ -92,7 +95,8 @@ export default function RulesOnboardingModal() {
             Welcome to the War Room
           </h2>
           <p className="text-xs text-muted mt-1">
-            Four things. Then go lock picks. Full rules anytime under More.
+            The only stuff that matters. Then go do this week&apos;s job.
+            Full rules anytime under More.
           </p>
         </div>
 

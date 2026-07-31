@@ -27,6 +27,7 @@ import {
 } from "@/lib/player-tutorial";
 import { hasSeenRules } from "@/lib/rules";
 import { loadCrystalBall } from "@/lib/crystal-ball";
+import { leagueHasLiveCard } from "@/lib/first-session";
 
 const ORDER: PlayerTutorialStep[] = [
   "open_crystal",
@@ -59,19 +60,25 @@ export default function PlayerWalkthrough() {
     const session = getSession();
     if (!session?.playerId) return;
 
-    function maybeStart() {
+    async function maybeStart() {
       if (isGuestMode()) return;
       if (!getSession()?.playerId) return;
       if (!hasSeenRules()) return;
+      // KISS: no Crystal Ball walkthrough until there's a live card to pick
+      if (!(await leagueHasLiveCard())) {
+        syncFromStorage();
+        return;
+      }
       if (needsPlayerTutorial() && !isPlayerTutorialActive()) {
+        // Start at picks if crystal already done / keep simple path
         startPlayerTutorial(getSession()?.playerId || undefined);
       }
       syncFromStorage();
     }
 
-    maybeStart();
-    const t1 = setTimeout(maybeStart, 600);
-    const t2 = setTimeout(maybeStart, 2000);
+    void maybeStart();
+    const t1 = setTimeout(() => void maybeStart(), 600);
+    const t2 = setTimeout(() => void maybeStart(), 2500);
 
     function onTut() {
       syncFromStorage();

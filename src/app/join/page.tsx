@@ -350,9 +350,9 @@ function JoinPageInner() {
               router.push("/commissioner?tab=card&first=1");
               router.refresh();
             }}
-            className="w-full py-3 rounded-xl bg-primary text-black font-bold mb-2"
+            className="w-full py-4 min-h-[56px] rounded-xl bg-primary text-black text-base font-extrabold mb-2 touch-manipulation"
           >
-            Go build the first card →
+            Publish first card (one tap) →
           </button>
           <button
             type="button"
@@ -361,9 +361,9 @@ function JoinPageInner() {
               router.push("/");
               router.refresh();
             }}
-            className="w-full py-2.5 rounded-xl border border-border text-sm text-muted hover:text-foreground"
+            className="w-full py-3 min-h-[48px] rounded-xl border border-border text-sm text-muted hover:text-foreground touch-manipulation"
           >
-            Enter the War Room
+            Home first
           </button>
         </div>
       </div>
@@ -383,10 +383,18 @@ function JoinPageInner() {
 
         {mode === "choose" && (
           <div className="space-y-3">
-            <button onClick={() => setMode("create")} className="w-full py-3 rounded-xl bg-primary text-black font-semibold">
-              Create league (you&apos;re commissioner)
+            <button
+              type="button"
+              onClick={() => setMode("create")}
+              className="w-full py-4 min-h-[56px] rounded-xl bg-primary text-black text-base font-extrabold touch-manipulation"
+            >
+              Create league (you&apos;re host)
             </button>
-            <button onClick={() => setMode("join")} className="w-full py-3 rounded-xl border border-border bg-card font-semibold">
+            <button
+              type="button"
+              onClick={() => setMode("join")}
+              className="w-full py-4 min-h-[56px] rounded-xl border border-border bg-card text-base font-bold touch-manipulation"
+            >
               Join with code
             </button>
             <p className="text-center text-[11px] text-muted pt-1">

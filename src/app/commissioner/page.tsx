@@ -831,6 +831,15 @@ function CommissionerPageInner() {
         `Demo week published for ${weekTitle(activeWeek)}. Bots will pick if seats exist — then Randomize & score.`
       );
     }
+    try {
+      const { notifyCardPublished } = await import("@/lib/first-session");
+      notifyCardPublished({
+        weekNumber: activeWeek,
+        weekLabel: weekTitle(activeWeek),
+      });
+    } catch {
+      /* ignore */
+    }
   }
 
   function randomizeResultsForDryRun() {
@@ -1022,6 +1031,15 @@ function CommissionerPageInner() {
         `Published ${weekTitle(activeWeek)}. ${botFill.botsFilled} trial bot(s) locked fake picks.`
       );
       void refreshPickStatus(activeWeek);
+    }
+    try {
+      const { notifyCardPublished } = await import("@/lib/first-session");
+      notifyCardPublished({
+        weekNumber: activeWeek,
+        weekLabel: weekTitle(activeWeek),
+      });
+    } catch {
+      /* ignore */
     }
   }
 

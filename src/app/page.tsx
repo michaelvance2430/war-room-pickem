@@ -303,26 +303,26 @@ export default function Home() {
           )}
         </section>
 
-        {/* One job first — make picks (phones: don't bury this under invites) */}
+        {/* Host first-hour spine (invite → publish → score) before anything else */}
+        <CommishSetupBanner />
+
+        {/* One job first — make picks (or wait calmly) */}
         <HomeWeekHero />
 
         {/* Didn't lock? Sarcastic adulting reminder */}
         <LockPicksRoast />
 
-        {/* Every member — not just Commish */}
+        {/* Slim week checklist */}
         <PlayerWeekChecklist />
 
-        {/* Unseen News + Locker — tap the number to open */}
+        {/* Unseen News + Locker */}
         <HomeUnseenPulse />
 
-        {/* First-time Commish season setup */}
-        <CommishSetupBanner />
-
         {actuallyCommish && isCommish && (
-          <div className="mb-6 rounded-xl border-2 border-warning/50 bg-warning/10 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <p className="text-sm text-foreground">
-              <span className="font-bold text-warning">Commish tip:</span> Want
-              to see what your players see?
+          <div className="mb-5 rounded-xl border border-warning/40 bg-warning/10 px-3 py-2.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <p className="text-xs sm:text-sm text-foreground">
+              <span className="font-bold text-warning">Host:</span> See the app
+              as a player?
             </p>
             <button
               type="button"
@@ -331,15 +331,15 @@ export default function Home() {
                 setIsCommish(false);
                 window.location.href = "/";
               }}
-              className="shrink-0 px-4 py-3 min-h-[48px] rounded-lg bg-warning text-black text-sm font-bold touch-manipulation"
+              className="shrink-0 px-4 py-2.5 min-h-[44px] rounded-lg bg-warning text-black text-xs font-bold touch-manipulation"
             >
-              Enter player view →
+              Player view →
             </button>
           </div>
         )}
 
-        {/* Invite after the job — still one-tap, less scroll before picks */}
-        <div className="mb-6">
+        {/* Invite — collapsed one-tap Share */}
+        <div className="mb-5">
           <InviteFriends />
         </div>
 

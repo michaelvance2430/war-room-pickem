@@ -24,6 +24,7 @@ function LoginPageInner() {
   const [loading, setLoading] = useState(false);
   const [guestLoading, setGuestLoading] = useState(false);
   const [inviteHint, setInviteHint] = useState<string | null>(null);
+  const [showGuest, setShowGuest] = useState(false);
 
   // Preserve deep-link invite through login/signup
   useEffect(() => {
@@ -36,6 +37,8 @@ function LoginPageInner() {
     if (code) {
       stashPendingJoinCode(code);
       setInviteHint(code);
+      // Real invite → default to signup (new friends) not guest demo
+      setMode("signup");
     }
   }, [searchParams]);
 
@@ -81,7 +84,6 @@ function LoginPageInner() {
         });
         if (loginError) throw loginError;
 
-        // Remember me preference (Supabase already persists the session in localStorage)
         if (rememberMe) {
           localStorage.setItem("warroom-remember", "1");
         } else {
@@ -98,82 +100,79 @@ function LoginPageInner() {
     }
   }
 
+  const inputClass =
+    "w-full bg-background border border-border rounded-xl px-4 py-3.5 text-base min-h-[52px] touch-manipulation focus:outline-none focus:border-primary";
+
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
+    <div className="min-h-screen flex items-center justify-center px-4 py-8 pb-[max(2rem,env(safe-area-inset-bottom))]">
       <div className="max-w-md w-full">
-        <div className="text-center mb-8">
-          <div className="w-12 h-12 rounded-lg bg-primary text-black font-bold text-lg flex items-center justify-center mx-auto mb-3">
+        <div className="text-center mb-6">
+          <div className="w-14 h-14 rounded-xl bg-primary text-black font-bold text-xl flex items-center justify-center mx-auto mb-3">
             WR
           </div>
           <h1 className="text-2xl font-bold">War Room Pick&apos;Em</h1>
-          <p className="text-sm text-muted mt-1">
-            {mode === "login" ? "Log in to continue" : "Create an account"}
-          </p>
-          {inviteHint && (
-            <p className="text-xs text-primary font-medium mt-2">
-              Invite code {inviteHint} ready — after login you&apos;ll join that
-              league.
+          {inviteHint ? (
+            <div className="mt-3 rounded-xl border-2 border-primary/50 bg-primary/10 px-4 py-3">
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
+                You&apos;re invited
+              </p>
+              <p className="text-sm text-foreground mt-1 leading-snug">
+                Code{" "}
+                <span className="font-mono font-bold tracking-[0.2em] text-primary text-lg">
+                  {inviteHint}
+                </span>
+              </p>
+              <p className="text-xs text-muted mt-1">
+                Create an account (or log in) — you&apos;ll land in that league.
+              </p>
+            </div>
+          ) : (
+            <p className="text-sm text-muted mt-2">
+              {mode === "login"
+                ? "Log in to your league"
+                : "Create an account to host or join"}
             </p>
           )}
         </div>
 
-        {/* Guest demo — primary invite path for “just show me” */}
-        <div className="rounded-xl border-2 border-primary/50 bg-primary/10 p-4 mb-4 space-y-3">
-          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
-            Try before you host
-          </p>
-          <p className="text-sm text-foreground leading-relaxed">
-            Jump into a <strong>simulated season through Week 9</strong> —
-            bots, standings, and the full room. No account required.
-          </p>
-          <button
-            type="button"
-            disabled={guestLoading || loading}
-            onClick={() => {
-              setError(null);
-              setGuestLoading(true);
-              const res = enterGuestDemo();
-              setGuestLoading(false);
-              if (!res.ok) {
-                setError(res.error || "Could not start guest demo");
-                return;
-              }
-              router.push("/");
-              router.refresh();
-            }}
-            className="w-full py-3.5 rounded-xl bg-primary text-black font-extrabold text-base disabled:opacity-50"
-          >
-            {guestLoading ? "Loading demo…" : "Join as Guest →"}
-          </button>
-          <p className="text-[11px] text-muted text-center">
-            Or create an account for your real friend league below
-          </p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="rounded-xl border border-border bg-card p-5 space-y-4">
+        {/* Auth form FIRST when invited; always big phone fields */}
+        <form
+          onSubmit={handleSubmit}
+          className="rounded-xl border border-border bg-card p-5 space-y-4"
+        >
           {mode === "signup" && (
             <div>
-              <label className="text-xs text-muted block mb-1">Display name</label>
+              <label className="text-xs text-muted block mb-1.5 font-medium">
+                Your name in the league
+              </label>
               <input
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm"
-                placeholder="Your name in the league"
+                className={inputClass}
+                placeholder="What friends call you"
+                autoComplete="nickname"
               />
             </div>
           )}
           <div>
-            <label className="text-xs text-muted block mb-1">Email</label>
+            <label className="text-xs text-muted block mb-1.5 font-medium">
+              Email
+            </label>
             <input
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm"
+              className={inputClass}
+              autoComplete="email"
+              inputMode="email"
             />
           </div>
           <div>
-            <label className="text-xs text-muted block mb-1" htmlFor="warroom-password">
+            <label
+              className="text-xs text-muted block mb-1.5 font-medium"
+              htmlFor="warroom-password"
+            >
               Password
             </label>
             <div className="relative">
@@ -182,67 +181,37 @@ function LoginPageInner() {
                 type={showPassword ? "text" : "password"}
                 required
                 minLength={6}
-                autoComplete={mode === "login" ? "current-password" : "new-password"}
+                autoComplete={
+                  mode === "login" ? "current-password" : "new-password"
+                }
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-background border border-border rounded-lg px-3 py-2 pr-11 text-sm"
+                className={`${inputClass} pr-14`}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-muted hover:text-foreground hover:bg-card-hover transition"
+                className="absolute right-1 top-1/2 -translate-y-1/2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg text-muted hover:text-foreground"
                 aria-label={showPassword ? "Hide password" : "Show password"}
                 aria-pressed={showPassword}
-                title={showPassword ? "Hide password" : "Show password"}
               >
-                {showPassword ? (
-                  // Eye-off
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden
-                  >
-                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
-                    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
-                    <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24" />
-                    <line x1="1" y1="1" x2="23" y2="23" />
-                  </svg>
-                ) : (
-                  // Eye
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden
-                  >
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                    <circle cx="12" cy="12" r="3" />
-                  </svg>
-                )}
+                {showPassword ? "Hide" : "Show"}
               </button>
             </div>
+            {mode === "signup" && (
+              <p className="text-[11px] text-muted mt-1">At least 6 characters</p>
+            )}
           </div>
 
           {mode === "login" && (
-            <label className="flex items-center gap-2 text-sm text-muted cursor-pointer select-none">
+            <label className="flex items-center gap-3 text-sm text-muted cursor-pointer select-none min-h-[44px]">
               <input
                 type="checkbox"
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
-                className="rounded border-border"
+                className="w-5 h-5 rounded border-border"
               />
-              Remember me
+              Remember me on this phone
             </label>
           )}
 
@@ -252,9 +221,17 @@ function LoginPageInner() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 rounded-xl bg-primary text-black font-semibold disabled:opacity-50"
+            className="w-full py-4 min-h-[56px] rounded-xl bg-primary text-black text-base font-extrabold disabled:opacity-50 touch-manipulation"
           >
-            {loading ? "…" : mode === "login" ? "Log in" : "Sign up"}
+            {loading
+              ? "…"
+              : inviteHint
+                ? mode === "login"
+                  ? "Log in & join league"
+                  : "Sign up & join league"
+                : mode === "login"
+                  ? "Log in"
+                  : "Create account"}
           </button>
 
           <button
@@ -264,14 +241,66 @@ function LoginPageInner() {
               setError(null);
               setMessage(null);
             }}
-            className="w-full text-sm text-muted"
+            className="w-full text-sm text-muted min-h-[44px] touch-manipulation"
           >
-            {mode === "login" ? "Need an account? Sign up" : "Already have an account? Log in"}
+            {mode === "login"
+              ? "Need an account? Sign up"
+              : "Already have an account? Log in"}
           </button>
         </form>
 
+        {/* Guest: secondary — especially hidden when you have a real invite */}
+        {!inviteHint && (
+          <div className="mt-5">
+            {!showGuest ? (
+              <button
+                type="button"
+                onClick={() => setShowGuest(true)}
+                className="w-full py-3 min-h-[48px] rounded-xl border border-border text-sm text-muted font-medium touch-manipulation"
+              >
+                Just looking? Try a free demo
+              </button>
+            ) : (
+              <div className="rounded-xl border border-border bg-card/80 p-4 space-y-3">
+                <p className="text-sm text-muted leading-relaxed">
+                  Simulated season with bots — <strong className="text-foreground">not</strong> your
+                  friends&apos; league. No account needed.
+                </p>
+                <button
+                  type="button"
+                  disabled={guestLoading || loading}
+                  onClick={() => {
+                    setError(null);
+                    setGuestLoading(true);
+                    const res = enterGuestDemo();
+                    setGuestLoading(false);
+                    if (!res.ok) {
+                      setError(res.error || "Could not start guest demo");
+                      return;
+                    }
+                    router.push("/");
+                    router.refresh();
+                  }}
+                  className="w-full py-3.5 min-h-[52px] rounded-xl border border-primary/40 text-primary font-bold disabled:opacity-50 touch-manipulation"
+                >
+                  {guestLoading ? "Loading demo…" : "Open guest demo"}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {inviteHint && (
+          <p className="text-center text-[11px] text-muted mt-4 leading-relaxed">
+            Guest demo is off while you have an invite — we don&apos;t want you
+            in the wrong room.
+          </p>
+        )}
+
         <p className="text-center text-xs text-muted mt-4">
-          <Link href="/" className="hover:text-foreground">Back</Link>
+          <Link href="/" className="hover:text-foreground min-h-[44px] inline-flex items-center">
+            Back
+          </Link>
         </p>
       </div>
     </div>

@@ -103,79 +103,80 @@ export default function PlayerWeekChecklist() {
         }
         const anyScored = scored.length > 0;
 
-        const next: Step[] = [
-          {
-            id: "photo",
-            label: "1. Put a face on the franchise",
-            detail: hasPhoto
-              ? "Profile photo set — you’re not a grey circle"
-              : "Upload a photo so people know who they’re roasting",
-            done: hasPhoto,
-            href: "/account",
-            hrefLabel: "Account → photo",
-          },
-          ...(crystalOn
-            ? [
-                {
-                  id: "crystal",
-                  label: "2. Crystal Ball (national champ)",
-                  detail: crystalDone
-                    ? crystalLocked
-                      ? `Locked in${crystalTeam ? `: ${crystalTeam}` : ""} — no more changes`
-                      : `Pick is in${crystalTeam ? `: ${crystalTeam}` : ""} · green ✓ — you can still change until ${crystalLockLabel || "lock"}`
-                    : `Do it early — free pride pick. Locks ${crystalLockLabel || "when Week 0 freezes"}.`,
-                  done: crystalDone,
-                  href: "/crystal-ball",
-                  hrefLabel: crystalDone
-                    ? crystalLocked
-                      ? "View Crystal Ball"
-                      : "Change pick (still open)"
-                    : "Crystal Ball",
-                } as Step,
-              ]
-            : []),
-          {
-            id: "card",
-            label: crystalOn
-              ? "3. Lock this week’s card"
-              : "2. Lock this week’s card",
-            detail: !hasCard
-              ? `${weekTitle(w)} has no published games yet — wait on the commish`
-              : fullLock
-                ? frozen
-                  ? `Locked for ${weekTitle(w)} · card frozen`
-                  : `You’re locked for ${weekTitle(w)}${lockLabel ? ` · deadline was ${lockLabel}` : ""}`
-                : frozen
-                  ? "First kickoff hit and you never locked — 0 pts this week"
-                  : `Pick all games + confidence 1–5 + Best Bet + prop before first kickoff${lockLabel ? ` (${lockLabel})` : ""}`,
-            done: fullLock,
-            href: "/picks",
-            hrefLabel: hasCard ? "My Picks" : "My Picks (waiting)",
-          },
-          {
-            id: "board",
-            label: crystalOn
-              ? "4. Check the board"
-              : "3. Check the board",
-            detail: anyScored
-              ? "Standings are live — climb or cope"
-              : "Preseason board is up — names & vibes only until week 1 scores",
-            done: anyScored || locked || fullLock,
-            href: "/standings",
-            hrefLabel: "Standings",
-          },
-          {
-            id: "noise",
-            label: crystalOn
-              ? "5. Make some noise"
-              : "4. Make some noise",
-            detail:
-              "Locker Room for takes · Gazette after scores for crown & shame",
-            done: false, // never “done” — optional habit
-            href: "/locker-room",
-            hrefLabel: "Locker Room",
-          },
-        ];
+        // KISS: no live card → two calm steps only (don't homework the lobby)
+        const next: Step[] = !hasCard
+          ? [
+              {
+                id: "wait",
+                label: "1. Waiting on the host",
+                detail: `${weekTitle(w)} isn't published yet. You're in — hang tight.`,
+                done: false,
+                href: "/locker-room",
+                hrefLabel: "Chat in Locker",
+              },
+              {
+                id: "photo",
+                label: "2. Optional: add a photo",
+                detail: hasPhoto
+                  ? "Photo set — looking human"
+                  : "Nice when the room fills. Not required to wait.",
+                done: hasPhoto,
+                href: "/account",
+                hrefLabel: "Account",
+              },
+            ]
+          : [
+              ...(crystalOn
+                ? [
+                    {
+                      id: "crystal",
+                      label: "1. Crystal Ball (optional pride)",
+                      detail: crystalDone
+                        ? crystalLocked
+                          ? `Locked${crystalTeam ? `: ${crystalTeam}` : ""}`
+                          : `In${crystalTeam ? `: ${crystalTeam}` : ""} — change until ${crystalLockLabel || "lock"}`
+                        : `National champ pick. Free. Locks ${crystalLockLabel || "Week 0"}.`,
+                      done: crystalDone,
+                      href: "/crystal-ball",
+                      hrefLabel: crystalDone ? "View" : "Crystal Ball",
+                    } as Step,
+                  ]
+                : []),
+              {
+                id: "card",
+                label: crystalOn
+                  ? "2. Lock this week's picks"
+                  : "1. Lock this week's picks",
+                detail: fullLock
+                  ? frozen
+                    ? `Locked · ${weekTitle(w)} frozen`
+                    : `Locked for ${weekTitle(w)}`
+                  : frozen
+                    ? "Missed lock — 0 pts this week"
+                    : `Games + confidence 1–5 + Best Bet + prop before kickoff${lockLabel ? ` (${lockLabel})` : ""}`,
+                done: fullLock,
+                href: "/picks",
+                hrefLabel: "My Picks",
+              },
+              {
+                id: "board",
+                label: crystalOn ? "3. Check ranks" : "2. Check ranks",
+                detail: anyScored
+                  ? "Standings are live"
+                  : "Names & vibes until week 1 scores",
+                done: anyScored || locked || fullLock,
+                href: "/standings",
+                hrefLabel: "Standings",
+              },
+              {
+                id: "noise",
+                label: crystalOn ? "4. Locker Room" : "3. Locker Room",
+                detail: "Talk trash. Optional forever.",
+                done: false,
+                href: "/locker-room",
+                hrefLabel: "Locker",
+              },
+            ];
 
         // Mark noise done lightly if they've at least locked (engaged)
         if (fullLock || anyScored) {

@@ -78,14 +78,25 @@ export function needsPlayerTutorial(): boolean {
   return !getPlayerTutorialState().completed;
 }
 
-/** First login after rules — or Account re-run. */
-export function startPlayerTutorial(userId?: string) {
+/**
+ * First login after rules — or Account re-run.
+ * Prefer picks-first when crystal ball is off or card just went live.
+ */
+export function startPlayerTutorial(
+  userId?: string,
+  opts?: { startAt?: PlayerTutorialStep }
+) {
   write({
     completed: false,
     active: true,
-    step: "open_crystal",
+    step: opts?.startAt || "open_crystal",
     userId,
   });
+}
+
+/** Picks-only coach (skip crystal) — used when CB is off or user wants simple path. */
+export function startPicksOnlyTutorial(userId?: string) {
+  startPlayerTutorial(userId, { startAt: "open_picks" });
 }
 
 export function completePlayerTutorial() {
