@@ -145,8 +145,9 @@ export default function Nav() {
     return () => window.removeEventListener("keydown", onKey);
   }, [menuOpen, moreOpen]);
 
-  // Primary: weekly habit loop
+  // Primary: home first, then weekly habit loop
   const primaryLinks: NavLink[] = [
+    { href: "/", label: "Home" },
     { href: "/picks", label: "My Picks" },
     { href: "/standings", label: "Standings" },
     { href: "/locker-room", label: "Locker" },
@@ -247,17 +248,19 @@ export default function Nav() {
         <div className="max-w-6xl mx-auto px-3 sm:px-4 h-14 flex items-center gap-2 min-w-0">
           <Link
             href="/"
-            className="flex items-center gap-2 shrink-0 min-w-0 max-w-[9.5rem] sm:max-w-[11rem]"
+            className="flex items-center gap-2 shrink-0 min-w-0 max-w-[10rem] sm:max-w-[12rem] rounded-md hover:opacity-90 transition"
+            title="Back to Home"
+            aria-label="Home"
           >
             <div className="w-8 h-8 shrink-0 rounded bg-primary flex items-center justify-center font-bold text-black text-sm">
               WR
             </div>
-            <div className="flex flex-col min-w-0 hidden sm:flex">
+            <div className="flex flex-col min-w-0">
               <span className="font-semibold tracking-tight leading-tight truncate text-sm">
-                War Room
+                {pathname === "/" ? "War Room" : "← Home"}
               </span>
               {leagueName && (
-                <span className="text-[10px] text-muted leading-tight truncate">
+                <span className="text-[10px] text-muted leading-tight truncate hidden sm:block">
                   {leagueName}
                 </span>
               )}
@@ -397,7 +400,7 @@ export default function Nav() {
               className="md:hidden absolute left-0 right-0 top-full z-50 border-b border-border bg-card shadow-xl max-h-[calc(100dvh-3.5rem)] overflow-y-auto"
             >
               <p className="px-4 pt-3 pb-1 text-[10px] uppercase tracking-wider text-muted font-semibold">
-                This week
+                Main
               </p>
               <ul className="pb-1">
                 {primaryLinks.map((link) => {
