@@ -15,6 +15,12 @@ import {
   takePendingJoinCode,
 } from "@/lib/commish-onboarding";
 import InviteFriends from "@/components/InviteFriends";
+import {
+  getSportPack,
+  isLiveSport,
+  listSportPickerOptions,
+} from "@/lib/sports/registry";
+import { DEFAULT_SPORT_ID, type SportId } from "@/lib/sports/types";
 
 function generateCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -30,6 +36,8 @@ function JoinPageInner() {
   const [displayName, setDisplayName] = useState("");
   const [mode, setMode] = useState<"choose" | "create" | "join">("choose");
   const [leagueName, setLeagueName] = useState("War Room");
+  /** Multi-sport: only CFB is live in Phase 1 */
+  const [sportId, setSportId] = useState<SportId>(DEFAULT_SPORT_ID);
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -85,26 +93,70 @@ function JoinPageInner() {
   async function handleCreate() {
     if (!userId) return;
     setError(null);
+    if (!isLiveSport(sportId)) {
+      setError(
+        `${getSportPack(sportId).label} is coming soon. Pick College Football for now.`
+      );
+      return;
+    }
     setLoading(true);
     const supabase = createClient();
     const newCode = generateCode();
+    const pack = getSportPack(sportId);
     try {
       await supabase.from("profiles").upsert({
         id: userId,
         display_name: displayName.trim() || "Commissioner",
       });
-      const { data: league, error: leagueError } = await supabase
-        .from("leagues")
-        .insert({
-          name: leagueName.trim() || "War Room",
-          code: newCode,
-          commissioner_id: userId,
-        })
-        .select()
-        .single();
-      if (leagueError) throw leagueError;
+
+      const baseRow: Record<string, unknown> = {
+        name: leagueName.trim() || "War Room",
+        code: newCode,
+        commissioner_id: userId,
+      };
+      // Include sport when column exists (run supabase/sport-id.sql on dev DB)
+      const withSport = {
+        ...baseRow,
+        sport_id: sportId,
+        sport_settings: {},
+      };
+
+      let league: Record<string, unknown> | null = null;
+      let leagueError: { message?: string } | null = null;
+
+      {
+        const res = await supabase
+          .from("leagues")
+          .insert(withSport)
+          .select()
+          .single();
+        league = res.data as Record<string, unknown> | null;
+        leagueError = res.error;
+      }
+
+      // Column missing — retry without sport fields (prod freeze / pre-migration)
+      if (
+        leagueError &&
+        /sport_id|sport_settings|column|schema cache|PGRST/i.test(
+          leagueError.message || ""
+        )
+      ) {
+        const res = await supabase
+          .from("leagues")
+          .insert(baseRow)
+          .select()
+          .single();
+        league = res.data as Record<string, unknown> | null;
+        leagueError = res.error;
+      }
+
+      if (leagueError || !league) {
+        throw new Error(leagueError?.message || "Could not create league");
+      }
+
+      const leagueId = league.id as string;
       const { error: memError } = await supabase.from("memberships").insert({
-        league_id: league.id,
+        league_id: leagueId,
         user_id: userId,
         role: "commissioner",
         division: "North",
@@ -112,7 +164,7 @@ function JoinPageInner() {
       if (memError) throw memError;
       try {
         const { recordLeagueFirstJoin } = await import("@/lib/cloud");
-        await recordLeagueFirstJoin(league.id);
+        await recordLeagueFirstJoin(leagueId);
       } catch {
         /* optional until join-order.sql is run */
       }
@@ -122,21 +174,23 @@ function JoinPageInner() {
           playerId: userId,
           playerName: displayName.trim() || "Commissioner",
           isCommissioner: true,
-          leagueId: league.id,
+          leagueId,
         })
       );
       localStorage.setItem(
         "warroom-league",
         JSON.stringify({
-          id: league.id,
-          name: league.name,
-          code: league.code,
+          id: leagueId,
+          name: league.name as string,
+          code: league.code as string,
           commissionerId: userId,
-          createdAt: league.created_at,
+          createdAt: league.created_at as string,
+          sportId: (league.sport_id as string) || sportId || "cfb",
           settings: {
-            cutPercent: league.cut_percent ?? 50,
-            regularSeasonWeeks: 18, // fixed CFB calendar (app weeks 0–18)
-            gamesPerWeek: league.games_per_week ?? 5,
+            cutPercent: (league.cut_percent as number) ?? 50,
+            regularSeasonWeeks: pack.defaultSeasonWeeks,
+            gamesPerWeek:
+              (league.games_per_week as number) ?? pack.defaultGamesPerWeek,
             crystalBallEnabled: true,
             homeTaglineId: "good-teams",
             homeTaglineCustom: "",
@@ -186,6 +240,9 @@ function JoinPageInner() {
           /* optional */
         }
       }
+
+      const joinedSportId =
+        (league as { sport_id?: string }).sport_id || "cfb";
 
       if (!existingMem) {
         const { count, error: countErr } = await supabase
@@ -261,6 +318,7 @@ function JoinPageInner() {
           code: league.code,
           commissionerId: league.commissioner_id,
           createdAt: league.created_at,
+          sportId: joinedSportId,
           settings: {
             cutPercent: league.cut_percent ?? 50,
             regularSeasonWeeks: 18, // fixed CFB calendar (app weeks 0–18)
@@ -409,16 +467,102 @@ function JoinPageInner() {
           <div className="rounded-xl border border-border bg-card p-5 space-y-4">
             <h2 className="font-semibold">Create league</h2>
             <p className="text-xs text-muted">
-              Up to {MAX_LEAGUE_PLAYERS} players. Top half → Championship, bottom
-              half → Toilet Bowl.
+              Pick a sport, then name the room. Up to {MAX_LEAGUE_PLAYERS}{" "}
+              players. Same War Room soul — different field.
             </p>
-            <input value={leagueName} onChange={(e) => setLeagueName(e.target.value)} placeholder="League name" className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm" />
-            <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Your name" className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm" />
+
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-2">
+                Sport
+              </p>
+              <div className="space-y-2 max-h-[min(50vh,22rem)] overflow-y-auto pr-0.5">
+                {listSportPickerOptions().map((s) => {
+                  const live = s.status === "live";
+                  const selected = sportId === s.id;
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      disabled={!live}
+                      onClick={() => {
+                        if (live) setSportId(s.id as SportId);
+                      }}
+                      className={`w-full text-left rounded-xl border px-3 py-3 transition touch-manipulation ${
+                        selected
+                          ? "border-primary bg-primary/15 shadow-[0_0_20px_rgba(34,197,94,0.12)]"
+                          : live
+                            ? "border-border bg-background hover:border-primary/40"
+                            : "border-border/50 bg-background/40 opacity-55 cursor-not-allowed"
+                      }`}
+                    >
+                      <div className="flex items-start gap-2.5">
+                        <span className="text-xl shrink-0" aria-hidden>
+                          {s.emoji}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-sm font-bold text-foreground">
+                              {s.label}
+                            </span>
+                            {live ? (
+                              <span className="text-[10px] font-bold uppercase tracking-wide text-primary">
+                                Live
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-bold uppercase tracking-wide text-muted">
+                                Coming soon
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-muted mt-0.5 leading-snug">
+                            {s.blurb}
+                          </p>
+                        </div>
+                        {selected && live && (
+                          <span className="text-primary text-sm font-black shrink-0">
+                            ✓
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-muted mt-2 leading-relaxed">
+                College Football is fully playable today. Other sports share
+                this clubhouse when their packs ship — you&apos;re building on{" "}
+                <span className="text-foreground font-medium">dev</span>.
+              </p>
+            </div>
+
+            <input
+              value={leagueName}
+              onChange={(e) => setLeagueName(e.target.value)}
+              placeholder="League name"
+              className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm"
+            />
+            <input
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              placeholder="Your name"
+              className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm"
+            />
             {error && <p className="text-sm text-danger">{error}</p>}
-            <button onClick={handleCreate} disabled={loading} className="w-full py-3 rounded-xl bg-primary text-black font-semibold disabled:opacity-50">
-              {loading ? "Creating…" : "Create & get code"}
+            <button
+              onClick={() => void handleCreate()}
+              disabled={loading || !isLiveSport(sportId)}
+              className="w-full py-3 min-h-[48px] rounded-xl bg-primary text-black font-semibold disabled:opacity-50"
+            >
+              {loading
+                ? "Creating…"
+                : `Create ${getSportPack(sportId).shortLabel} league`}
             </button>
-            <button onClick={() => setMode("choose")} className="w-full text-sm text-muted">Back</button>
+            <button
+              onClick={() => setMode("choose")}
+              className="w-full text-sm text-muted"
+            >
+              Back
+            </button>
           </div>
         )}
 

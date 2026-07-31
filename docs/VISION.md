@@ -68,8 +68,8 @@ SlateClub is dead. The future is **War Room** — first **FBS / CFB friend leagu
 
 | When | What |
 |------|------|
-| **Now** | CFB / FBS War Room pick’em for friend leagues |
-| **Next** | Same War Room feel for **NFL** and other sports — shared identity, multi-sport expansion without becoming a generic “sports app” |
+| **Live (`main`)** | CFB / FBS War Room pick’em for friend leagues — freeze tag `cfb-v1-freeze` |
+| **Dev (`dev`)** | Multi-sport spine: commissioner picks sport; CFB is pack #1; more packs next — see `docs/MULTI_SPORT.md` |
 | **Always** | The brand is **the room + the people + the history**, not the odds feed |
 
 ---
