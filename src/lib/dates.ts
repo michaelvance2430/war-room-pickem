@@ -156,6 +156,7 @@ export {
   weekTitle,
   weekSubtitle,
   weekPillHint,
+  weekDateRangeLabel,
   seasonPhase,
   FULL_SEASON_MAX_WEEK,
   DEFAULT_CUT_LOCK_WEEK,
