@@ -90,7 +90,7 @@ export default function SeasonCountdownTicker() {
           {SEASON_OPEN_LABEL}
         </span>
         <span className="text-muted/70 truncate sm:hidden text-[10px]">
-          Aug 23 noon ET
+          Aug 23 · 12:01 AM ET
         </span>
       </div>
     </div>

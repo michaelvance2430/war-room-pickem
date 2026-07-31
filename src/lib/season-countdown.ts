@@ -1,14 +1,14 @@
 /**
  * Global “league starts” countdown — everyone sees it until doors open.
  *
- * Target: Sat Aug 23, 2026, 12:00 noon America/New_York
- * (Hype / card-open moment before Week 0 kickoff Sat Aug 29.)
+ * Target: Sun Aug 23, 2026, 00:01 America/New_York (EDT)
+ * (Hype / doors open before Week 0 kickoff Sat Aug 29.)
  */
 
-/** Fixed target as UTC ms for Aug 23, 2026 12:00:00 EDT (UTC-4). */
-export const SEASON_OPEN_AT_MS = Date.parse("2026-08-23T16:00:00.000Z");
+/** Fixed target as UTC ms for Aug 23, 2026 00:01:00 EDT (UTC-4). */
+export const SEASON_OPEN_AT_MS = Date.parse("2026-08-23T04:01:00.000Z");
 
-export const SEASON_OPEN_LABEL = "Sat Aug 23 · noon ET";
+export const SEASON_OPEN_LABEL = "Sun Aug 23 · 12:01 AM ET";
 
 export type CountdownParts = {
   totalMs: number;
