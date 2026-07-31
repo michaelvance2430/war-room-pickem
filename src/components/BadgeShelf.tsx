@@ -33,7 +33,7 @@ function BadgeTile({
       className="relative flex flex-col items-center gap-1 w-[4.5rem] sm:w-20 shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-lg transition hover:-translate-y-0.5"
     >
       <div
-        className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center text-xl sm:text-2xl border-2 bg-background ${
+        className={`relative w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center text-xl sm:text-2xl border-2 bg-background ${
           earned ? "" : "grayscale opacity-50"
         }`}
         style={{
