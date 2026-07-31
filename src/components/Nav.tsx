@@ -41,6 +41,9 @@ import {
 } from "@/lib/room-unseen";
 import { sanitizeLegacyLegendsOnBoot } from "@/lib/legacy-badge-grants";
 import { nukeAccumulatedSandboxCareersOnce } from "@/lib/sandbox-wipe";
+import BrandMark from "@/components/BrandMark";
+import { normalizeSportId } from "@/lib/sports/registry";
+import { SPORT_THEME_EVENT } from "@/lib/sports/sport-theme";
 
 type NavLink = {
   href: string;
@@ -68,6 +71,7 @@ export default function Nav() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [crystalBallOn, setCrystalBallOn] = useState(true);
+  const [sportIsWwc, setSportIsWwc] = useState(false);
   const [playerPreview, setPlayerPreview] = useState(false);
 
   function refreshRoles() {
@@ -93,6 +97,7 @@ export default function Nav() {
     setName(session?.playerName || "You");
     setPlayerId(session?.playerId || null);
     setLeagueName(league?.name || "");
+    setSportIsWwc(normalizeSportId(league?.sportId) === "soccer_wwc");
     setCrystalBallOn(league?.settings?.crystalBallEnabled !== false);
 
     void refreshStaffSessionFlags().then(() => {
@@ -102,7 +107,13 @@ export default function Nav() {
     function onPreview() {
       refreshRoles();
     }
+    function onSportTheme() {
+      setSportIsWwc(
+        normalizeSportId(getLeague()?.sportId) === "soccer_wwc"
+      );
+    }
     window.addEventListener("warroom-view-as-player", onPreview);
+    window.addEventListener(SPORT_THEME_EVENT, onSportTheme);
     // cleanup below after unread load setup
 
     loadMyProfile().then((p) => {
@@ -192,6 +203,7 @@ export default function Nav() {
     window.addEventListener(EVENT_LOCKER_SEEN, onLockerSeen);
     return () => {
       window.removeEventListener("warroom-view-as-player", onPreview);
+      window.removeEventListener(SPORT_THEME_EVENT, onSportTheme);
       document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener(EVENT_LOCKER_SEEN, onLockerSeen);
       window.removeEventListener("warroom-gazette-seen", onGazetteSeen);
@@ -382,13 +394,11 @@ export default function Nav() {
         <div className="max-w-6xl mx-auto px-3 sm:px-4 h-14 flex items-center gap-2 min-w-0">
           <Link
             href="/"
-            className="flex items-center gap-2 shrink-0 min-w-0 max-w-[10rem] sm:max-w-[12rem] rounded-md hover:opacity-90 transition"
+            className="flex items-center gap-2 shrink-0 min-w-0 max-w-[11rem] sm:max-w-[14rem] rounded-md hover:opacity-90 transition"
             title="Back to Home"
             aria-label="Home"
           >
-            <div className="w-8 h-8 shrink-0 rounded bg-primary flex items-center justify-center font-bold text-black text-sm">
-              WR
-            </div>
+            <BrandMark size={32} className="shrink-0" />
             <div className="flex flex-col min-w-0">
               <span
                 className={`tracking-tight leading-tight truncate ${
@@ -402,6 +412,14 @@ export default function Nav() {
               {leagueName && (
                 <span className="text-[10px] text-muted leading-tight truncate hidden sm:block">
                   {leagueName}
+                </span>
+              )}
+              {sportIsWwc && pathname === "/" && (
+                <span
+                  className="text-[9px] font-bold uppercase tracking-wide truncate"
+                  style={{ color: "#FFDF00" }}
+                >
+                  Brazil 2027™
                 </span>
               )}
             </div>

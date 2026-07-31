@@ -22,6 +22,7 @@ import {
 } from "@/lib/sports/registry";
 import { DEFAULT_SPORT_ID, type SportId } from "@/lib/sports/types";
 import OwnershipNotice from "@/components/OwnershipNotice";
+import WwcTrophyLogo from "@/components/WwcTrophyLogo";
 
 function generateCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -495,6 +496,7 @@ function JoinPageInner() {
                 {listSportPickerOptions().map((s) => {
                   const live = s.status === "live";
                   const selected = sportId === s.id;
+                  const isWwc = s.id === "soccer_wwc";
                   return (
                     <button
                       key={s.id}
@@ -504,24 +506,34 @@ function JoinPageInner() {
                         if (live) setSportId(s.id as SportId);
                       }}
                       className={`w-full text-left rounded-xl border px-3 py-3 transition touch-manipulation ${
-                        selected
-                          ? "border-primary bg-primary/15 shadow-[0_0_20px_rgba(34,197,94,0.12)]"
-                          : live
-                            ? "border-border bg-background hover:border-primary/40"
-                            : "border-border/50 bg-background/40 opacity-55 cursor-not-allowed"
+                        selected && isWwc
+                          ? "border-[#FFDF00]/60 bg-[#009C3B]/15 shadow-[0_0_22px_rgba(0,156,59,0.2)]"
+                          : selected
+                            ? "border-primary bg-primary/15 shadow-[0_0_20px_rgba(34,197,94,0.12)]"
+                            : live
+                              ? "border-border bg-background hover:border-primary/40"
+                              : "border-border/50 bg-background/40 opacity-55 cursor-not-allowed"
                       }`}
                     >
                       <div className="flex items-start gap-2.5">
-                        <span className="text-xl shrink-0" aria-hidden>
-                          {s.emoji}
-                        </span>
+                        {isWwc ? (
+                          <WwcTrophyLogo size={36} className="shrink-0 mt-0.5" />
+                        ) : (
+                          <span className="text-xl shrink-0" aria-hidden>
+                            {s.emoji}
+                          </span>
+                        )}
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="text-sm font-bold text-foreground">
                               {s.label}
                             </span>
                             {live ? (
-                              <span className="text-[10px] font-bold uppercase tracking-wide text-primary">
+                              <span
+                                className={`text-[10px] font-bold uppercase tracking-wide ${
+                                  isWwc ? "text-[#FFDF00]" : "text-primary"
+                                }`}
+                              >
                                 Live
                               </span>
                             ) : (
@@ -535,7 +547,11 @@ function JoinPageInner() {
                           </p>
                         </div>
                         {selected && live && (
-                          <span className="text-primary text-sm font-black shrink-0">
+                          <span
+                            className={`text-sm font-black shrink-0 ${
+                              isWwc ? "text-[#FFDF00]" : "text-primary"
+                            }`}
+                          >
                             ✓
                           </span>
                         )}
