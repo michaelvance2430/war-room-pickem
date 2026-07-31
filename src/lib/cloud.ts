@@ -732,18 +732,26 @@ export type WeekBoardSlip = {
 
 /**
  * Everyone's locked slips for a week.
- * Works when week is scored (RLS: picks-reveal-scored.sql) or caller is ops.
- * Returns empty slips list with ok:false if privacy blocks.
+ * Opens after first kickoff (card locked) or after scoring
+ * (RLS: picks-reveal-after-lock.sql). Secret until then.
  */
 export async function loadLeagueWeekBoard(weekNumber: number): Promise<{
   ok: boolean;
   slips: WeekBoardSlip[];
   scored: boolean;
+  /** True once first kickoff hit (or scored) — board should be open */
+  lockedOpen: boolean;
   error?: string;
 }> {
   const session = getSession();
   if (!session?.leagueId) {
-    return { ok: false, slips: [], scored: false, error: "No league" };
+    return {
+      ok: false,
+      slips: [],
+      scored: false,
+      lockedOpen: false,
+      error: "No league",
+    };
   }
   try {
     const supabase = createClient();
@@ -756,6 +764,18 @@ export async function loadLeagueWeekBoard(weekNumber: number): Promise<{
       .eq("week_number", weekNumber)
       .maybeSingle();
     const scored = !!wr;
+
+    // Client-side lock check (first kickoff) for messaging + soft gate
+    let lockedOpen = scored;
+    try {
+      const card = await loadWeekCard(weekNumber);
+      if (card?.games?.length) {
+        const { isCardLockDeadlinePassed } = await import("./dates");
+        if (isCardLockDeadlinePassed(card.games)) lockedOpen = true;
+      }
+    } catch {
+      /* ignore */
+    }
 
     const { data: members } = await supabase
       .from("memberships")
@@ -775,9 +795,22 @@ export async function loadLeagueWeekBoard(weekNumber: number): Promise<{
         ok: false,
         slips: [],
         scored,
-        error: scored
-          ? pickErr.message
-          : "Picks stay private until this week is scored. Run supabase/picks-reveal-scored.sql if already scored.",
+        lockedOpen,
+        error: lockedOpen
+          ? `${pickErr.message} — run supabase/picks-reveal-after-lock.sql in Supabase if you haven’t.`
+          : "Picks stay secret until the first kickoff on this card (then The Board opens).",
+      };
+    }
+
+    // If RLS only returns your row (old policies), still try — caller sees partial
+    if (!lockedOpen && !isOps()) {
+      return {
+        ok: false,
+        slips: [],
+        scored,
+        lockedOpen: false,
+        error:
+          "Picks stay secret until the first kickoff locks the card. Then everyone can open The Board.",
       };
     }
 
@@ -850,12 +883,13 @@ export async function loadLeagueWeekBoard(weekNumber: number): Promise<{
       return a.name.localeCompare(b.name);
     });
 
-    return { ok: true, slips, scored };
+    return { ok: true, slips, scored, lockedOpen };
   } catch (e: unknown) {
     return {
       ok: false,
       slips: [],
       scored: false,
+      lockedOpen: false,
       error: e instanceof Error ? e.message : "Failed to load board",
     };
   }

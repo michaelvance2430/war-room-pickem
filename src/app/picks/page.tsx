@@ -880,14 +880,14 @@ export default function PicksPage() {
               <span className="text-primary font-medium">Live</span> accepts
               new picks.{" "}
               <span className="text-foreground font-medium">Scored</span> weeks
-              show your results — and{" "}
+              show your results.{" "}
               <Link
                 href={`/board?week=${viewWeek}`}
                 className="text-primary font-medium hover:underline"
               >
                 The Board
               </Link>{" "}
-              shows everyone&apos;s cards after scoring.
+              shows everyone&apos;s cards after first kickoff locks the week.
             </p>
           </div>
         )}
@@ -965,7 +965,8 @@ export default function PicksPage() {
                   </button>{" "}
                   to make picks.
                 </p>
-                {viewIsScored && (
+                {(viewIsScored ||
+                  (hasCard && isCardLockDeadlinePassed(games, now))) && (
                   <p>
                     <Link
                       href={`/board?week=${viewWeek}`}
@@ -995,16 +996,30 @@ export default function PicksPage() {
               </div>
             )}
 
-            {weekEditable && viewIsScored === false && scoredWeeks.length > 0 && (
-              <div className="mb-4 rounded-lg border border-primary/30 bg-primary/5 px-4 py-2 text-sm">
-                <Link
-                  href={`/board?week=${scoredWeeks[scoredWeeks.length - 1]}`}
-                  className="text-primary font-semibold hover:underline"
-                >
-                  See last week&apos;s Board (everyone&apos;s picks) →
-                </Link>
-              </div>
-            )}
+            {weekEditable &&
+              hasCard &&
+              isCardLockDeadlinePassed(games, now) && (
+                <div className="mb-4 rounded-lg border border-primary/30 bg-primary/5 px-4 py-2 text-sm">
+                  <Link
+                    href={`/board?week=${viewWeek}`}
+                    className="text-primary font-semibold hover:underline"
+                  >
+                    First kickoff hit — The Board is open (everyone&apos;s picks) →
+                  </Link>
+                </div>
+              )}
+            {weekEditable &&
+              !isCardLockDeadlinePassed(games, now) &&
+              scoredWeeks.length > 0 && (
+                <div className="mb-4 rounded-lg border border-border bg-card-hover px-4 py-2 text-sm">
+                  <Link
+                    href={`/board?week=${scoredWeeks[scoredWeeks.length - 1]}`}
+                    className="text-primary font-semibold hover:underline"
+                  >
+                    See last week&apos;s Board →
+                  </Link>
+                </div>
+              )}
 
             {missedLockWindow && (
               <div className="mb-4 rounded-xl border-2 border-danger/60 bg-danger/15 px-4 py-3">

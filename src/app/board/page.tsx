@@ -37,6 +37,7 @@ function BoardInner() {
   const [propResult, setPropResult] = useState<string | null>(null);
   const [slips, setSlips] = useState<WeekBoardSlip[]>([]);
   const [scored, setScored] = useState(false);
+  const [lockedOpen, setLockedOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selfId, setSelfId] = useState<string | null>(null);
@@ -75,11 +76,12 @@ function BoardInner() {
       setResults(res?.results || {});
       setPropResult(res?.propResult ?? null);
       setScored(board.scored || scoredList.includes(target));
+      setLockedOpen(board.lockedOpen || board.scored);
       if (!board.ok) {
         setSlips([]);
         setError(
           board.error ||
-            "Board unlocks after this week is scored — then you can see every card."
+            "Board unlocks at first kickoff — when the card freezes, every slip opens."
         );
       } else {
         setSlips(board.slips);
@@ -113,9 +115,9 @@ function BoardInner() {
           </p>
           <h1 className="text-2xl font-black mt-1">The Board</h1>
           <p className="text-sm text-muted mt-2 leading-relaxed max-w-xl">
-            Once a week is scored, everyone&apos;s picks open up. See who took
-            the dog, who stacked the 5, who nailed the prop — not just a total
-            score.
+            When the first kickoff hits, the card locks and everyone&apos;s picks
+            open up. See who took the dog, who stacked the 5, who rode the prop
+            — live trash talk, not just a total score on Monday.
           </p>
         </div>
 
@@ -170,8 +172,9 @@ function BoardInner() {
           <div className="rounded-xl border border-warning/40 bg-warning/10 px-4 py-4 mb-6">
             <p className="text-sm text-warning font-medium">{error}</p>
             <p className="text-xs text-muted mt-2">
-              Privacy: picks stay secret until the commissioner scores the week.
-              Then the room can talk trash with full context.
+              Privacy: picks stay secret until the first kickoff on this card
+              (same moment your card freezes). After that, The Board opens for
+              the whole room — even before final scores.
             </p>
             <Link
               href="/picks"
@@ -190,9 +193,11 @@ function BoardInner() {
 
         {!loading && !error && games.length > 0 && (
           <>
-            {scored && (
+            {lockedOpen && (
               <p className="text-xs text-primary font-medium mb-4">
-                {weekTitle(week)} is scored — full room reveal is open.
+                {scored
+                  ? `${weekTitle(week)} is scored — full room reveal with results.`
+                  : `${weekTitle(week)} is locked (first kickoff hit) — slips are open. Results fill in when the commish scores.`}
               </p>
             )}
 
