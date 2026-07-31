@@ -784,7 +784,7 @@ export default function PicksPage() {
         />
       )}
 
-      <main className="flex-1 max-w-3xl mx-auto w-full px-4 py-8">
+      <main className="flex-1 max-w-3xl mx-auto w-full px-3 sm:px-4 py-5 sm:py-8 phone-picks-main">
         {/* Crystal-clear week banner */}
         <div
           className={`rounded-xl border px-4 py-3 mb-4 ${
@@ -846,7 +846,7 @@ export default function PicksPage() {
             <p className="text-[10px] uppercase tracking-wider text-muted mb-2 font-semibold">
               Jump to week
             </p>
-            <div className="flex flex-wrap gap-2">
+            <div className="phone-h-scroll sm:flex-wrap sm:overflow-visible">
               {weekPills.map((w) => {
                 const isView = w === viewWeek;
                 const isActive = w === activeWeek;
@@ -857,7 +857,7 @@ export default function PicksPage() {
                     type="button"
                     disabled={switching}
                     onClick={() => void selectWeek(w)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition ${
+                    className={`px-3.5 py-2.5 min-h-[40px] rounded-full text-xs font-semibold transition touch-manipulation ${
                       isView && isActive
                         ? "bg-primary text-black"
                         : isView
@@ -1158,24 +1158,24 @@ export default function PicksPage() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3 mb-4">
+                    <div className="grid grid-cols-2 gap-2 sm:gap-3 mb-4">
                       <button
                         type="button"
                         disabled={locked}
                         onClick={() => selectSide(game.id, "away")}
-                        className={`p-3 rounded-lg border text-left transition disabled:cursor-not-allowed ${
+                        className={`min-h-[72px] p-3 sm:p-3.5 rounded-xl border text-left transition touch-manipulation active:scale-[0.98] disabled:cursor-not-allowed ${
                           pick?.pick === "away"
-                            ? "border-primary bg-primary/10"
+                            ? "border-primary bg-primary/15 ring-2 ring-primary/40"
                             : "border-border hover:border-muted disabled:opacity-70"
                         }`}
                       >
                         <div className="text-[10px] uppercase tracking-wider text-muted mb-1">
                           Away
                         </div>
-                        <div className="font-medium">
+                        <div className="font-semibold text-[15px] sm:text-base leading-snug">
                           {formatRankedTeam(game.awayTeam, game.awayRank)}
                         </div>
-                        <div className="text-xs text-muted mt-0.5">
+                        <div className="text-sm text-muted mt-1 font-medium">
                           {formatSpread(displaySpread, displayFavorite, "away")}
                         </div>
                       </button>
@@ -1184,61 +1184,66 @@ export default function PicksPage() {
                         type="button"
                         disabled={locked}
                         onClick={() => selectSide(game.id, "home")}
-                        className={`p-3 rounded-lg border text-left transition disabled:cursor-not-allowed ${
+                        className={`min-h-[72px] p-3 sm:p-3.5 rounded-xl border text-left transition touch-manipulation active:scale-[0.98] disabled:cursor-not-allowed ${
                           pick?.pick === "home"
-                            ? "border-primary bg-primary/10"
+                            ? "border-primary bg-primary/15 ring-2 ring-primary/40"
                             : "border-border hover:border-muted disabled:opacity-70"
                         }`}
                       >
                         <div className="text-[10px] uppercase tracking-wider text-muted mb-1">
                           Home
                         </div>
-                        <div className="font-medium">
+                        <div className="font-semibold text-[15px] sm:text-base leading-snug">
                           {formatRankedTeam(game.homeTeam, game.homeRank)}
                         </div>
-                        <div className="text-xs text-muted mt-0.5">
+                        <div className="text-sm text-muted mt-1 font-medium">
                           {formatSpread(displaySpread, displayFavorite, "home")}
                         </div>
                       </button>
                     </div>
 
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex gap-1.5 items-center">
-                        {!pick?.pick && !locked && (
-                          <span className="text-xs text-muted mr-2">
-                            Pick a team first
-                          </span>
-                        )}
-                        {confidenceOptions.map((c) => {
-                          const usedElsewhere = Object.entries(picks).some(
-                            ([id, p]) => id !== game.id && p.confidence === c
-                          );
-                          return (
-                            <button
-                              key={c}
-                              type="button"
-                              disabled={
-                                locked || usedElsewhere || !pick?.pick
-                              }
-                              onClick={() => selectConfidence(game.id, c)}
-                              className={`w-8 h-8 rounded text-sm font-medium transition ${
-                                pick?.confidence === c
-                                  ? "bg-primary text-black"
-                                  : usedElsewhere || locked
-                                    ? "bg-border text-muted cursor-not-allowed opacity-50"
-                                    : "bg-card-hover hover:bg-border"
-                              }`}
-                            >
-                              {c}
-                            </button>
-                          );
-                        })}
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex flex-col gap-1.5">
+                        <span className="text-[10px] uppercase tracking-wider text-muted font-semibold">
+                          Confidence
+                        </span>
+                        <div className="flex gap-2 items-center">
+                          {!pick?.pick && !locked && (
+                            <span className="text-xs text-muted mr-1">
+                              Team first
+                            </span>
+                          )}
+                          {confidenceOptions.map((c) => {
+                            const usedElsewhere = Object.entries(picks).some(
+                              ([id, p]) => id !== game.id && p.confidence === c
+                            );
+                            return (
+                              <button
+                                key={c}
+                                type="button"
+                                disabled={
+                                  locked || usedElsewhere || !pick?.pick
+                                }
+                                onClick={() => selectConfidence(game.id, c)}
+                                className={`w-11 h-11 min-w-[44px] rounded-xl text-base font-bold transition touch-manipulation active:scale-95 ${
+                                  pick?.confidence === c
+                                    ? "bg-primary text-black shadow-[0_0_12px_rgba(34,197,94,0.35)]"
+                                    : usedElsewhere || locked
+                                      ? "bg-border text-muted cursor-not-allowed opacity-50"
+                                      : "bg-card-hover hover:bg-border border border-border"
+                                }`}
+                              >
+                                {c}
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
                       <button
                         type="button"
                         disabled={locked}
                         onClick={() => toggleBestBet(game.id)}
-                        className={`text-xs px-3 py-1.5 rounded-full border transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                        className={`min-h-[44px] text-sm px-4 py-2.5 rounded-xl border font-semibold transition touch-manipulation disabled:cursor-not-allowed disabled:opacity-60 self-stretch sm:self-auto ${
                           isBest
                             ? "border-primary bg-primary/20 text-primary"
                             : "border-border text-muted"
@@ -1314,12 +1319,12 @@ export default function PicksPage() {
             </div>
 
             {weekEditable ? (
-              <>
+              <div className="phone-sticky-action">
                 <button
                   type="button"
                   onClick={() => void savePicks()}
                   disabled={!allGamesPicked || saving || fullyLocked}
-                  className="w-full py-3 rounded-xl bg-primary text-black font-semibold disabled:opacity-50"
+                  className="w-full py-3.5 sm:py-3 rounded-xl bg-primary text-black text-base font-bold disabled:opacity-50 min-h-[52px] touch-manipulation shadow-lg shadow-primary/20"
                 >
                   {saving
                     ? "Saving…"
@@ -1327,21 +1332,21 @@ export default function PicksPage() {
                       ? "Picks locked"
                       : saved
                         ? "Update open picks"
-                        : "Save Picks"}
+                        : "Save / lock picks"}
                 </button>
                 {!allGamesPicked && !fullyLocked && (
-                  <p className="text-xs text-muted text-center mt-2">
+                  <p className="text-xs text-muted text-center mt-2 px-1">
                     Need: side + unique confidence on every open game, one Best
                     Bet, and a prop (until first kickoff).
                   </p>
                 )}
-              </>
+              </div>
             ) : (
               <p className="text-center text-sm text-muted py-3 rounded-xl border border-dashed border-border">
                 Archive view — no changes allowed.{" "}
                 <button
                   type="button"
-                  className="text-primary underline"
+                  className="text-primary underline min-h-[44px] px-1"
                   onClick={() => void selectWeek(activeWeek)}
                 >
                   Open {weekTitle(activeWeek)} live picks

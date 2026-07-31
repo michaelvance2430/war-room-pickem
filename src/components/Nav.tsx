@@ -454,8 +454,8 @@ export default function Nav() {
 
             <button
               type="button"
-              className="md:hidden relative p-2 -mr-1 rounded-md text-muted hover:text-foreground hover:bg-card-hover transition"
-              aria-label={menuOpen ? "Close menu" : "Open menu"}
+              className="md:hidden relative min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md text-muted hover:text-foreground hover:bg-card-hover transition touch-manipulation"
+              aria-label={menuOpen ? "Close menu" : "More menu"}
               aria-expanded={menuOpen}
               aria-controls="mobile-nav-menu"
               onClick={() => setMenuOpen((open) => !open)}
@@ -498,95 +498,180 @@ export default function Nav() {
           </div>
         </div>
 
-        {menuOpen && (
-          <>
-            <div
-              className="md:hidden fixed inset-0 top-14 z-40 bg-black/60"
-              aria-hidden
-              onClick={() => setMenuOpen(false)}
-            />
-            <nav
-              id="mobile-nav-menu"
-              className="md:hidden absolute left-0 right-0 top-full z-50 border-b border-border bg-card shadow-xl max-h-[calc(100dvh-3.5rem)] overflow-y-auto"
-            >
-              {playerPreview && (
-                <div className="px-4 pt-3 pb-2">
-                  <button
-                    type="button"
-                    onClick={exitPlayerView}
-                    className="w-full py-3 rounded-xl bg-warning text-black text-sm font-extrabold uppercase tracking-wide"
-                  >
-                    Exit → Home (Commish)
-                  </button>
-                </div>
-              )}
-              <p className="px-4 pt-3 pb-1 text-[10px] uppercase tracking-wider text-muted font-semibold">
-                Main
-              </p>
-              <ul className="pb-1">
-                {primaryLinks.map((link) => {
-                  const active = linkActive(link.href);
-                  const isHome = link.href === "/";
-                  return (
-                    <li key={link.href}>
-                      <Link
-                        href={link.href}
-                        onClick={() => setMenuOpen(false)}
-                        className={`flex items-center justify-between gap-3 px-4 py-3 transition ${
-                          isHome
-                            ? `text-lg font-extrabold ${
-                                active
-                                  ? "bg-primary/15 text-primary"
-                                  : "text-primary hover:bg-primary/10"
-                              }`
-                            : `text-base ${
-                                active
-                                  ? "bg-card-hover text-foreground"
-                                  : "text-muted hover:bg-card-hover hover:text-foreground"
-                              } ${link.className || ""}`
-                        }`}
-                      >
-                        <span className={isHome ? "font-extrabold" : "font-medium"}>
-                          {link.label}
-                        </span>
-                        {link.badge != null && link.badge > 0 && (
-                          <UnreadBadge count={link.badge} />
-                        )}
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-              <p className="px-4 pt-2 pb-1 text-[10px] uppercase tracking-wider text-muted font-semibold border-t border-border">
-                More of the room
-              </p>
-              <ul className="py-1 pb-2">
-                {moreLinks.map((link) => {
-                  const active = linkActive(link.href);
-                  return (
-                    <li key={link.href}>
-                      <Link
-                        href={link.href}
-                        onClick={() => setMenuOpen(false)}
-                        className={`flex items-center justify-between gap-3 px-4 py-2.5 text-sm transition ${
-                          active
-                            ? "bg-card-hover text-foreground"
-                            : "text-muted hover:bg-card-hover hover:text-foreground"
-                        } ${link.className || ""}`}
-                      >
-                        <span className="font-medium">{link.label}</span>
-                        {link.badge != null && link.badge > 0 && (
-                          <UnreadBadge count={link.badge} />
-                        )}
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            </nav>
-          </>
-        )}
       </header>
+
+      {/* Phone: More sheet from the bottom (thumb zone) */}
+      {menuOpen && (
+        <>
+          <div
+            className="md:hidden fixed inset-0 z-[55] bg-black/65 backdrop-blur-[2px]"
+            aria-hidden
+            onClick={() => setMenuOpen(false)}
+          />
+          <nav
+            id="mobile-nav-menu"
+            className="md:hidden fixed left-0 right-0 bottom-0 z-[60] rounded-t-2xl border-t border-border bg-card shadow-[0_-12px_40px_rgba(0,0,0,0.5)] max-h-[min(78dvh,640px)] overflow-y-auto overscroll-contain pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))]"
+          >
+            <div className="sticky top-0 bg-card/95 backdrop-blur pt-2 pb-1 border-b border-border z-10">
+              <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-border" />
+              <div className="flex items-center justify-between px-4 pb-2">
+                <p className="text-sm font-bold">More of the room</p>
+                <button
+                  type="button"
+                  onClick={() => setMenuOpen(false)}
+                  className="text-xs font-semibold text-muted hover:text-foreground min-h-[40px] px-2"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+            {playerPreview && (
+              <div className="px-4 pt-3 pb-2">
+                <button
+                  type="button"
+                  onClick={exitPlayerView}
+                  className="w-full py-3.5 rounded-xl bg-warning text-black text-sm font-extrabold uppercase tracking-wide min-h-[48px]"
+                >
+                  Exit → Home (Commish)
+                </button>
+              </div>
+            )}
+            <p className="px-4 pt-3 pb-1 text-[10px] uppercase tracking-wider text-muted font-semibold">
+              Weekly
+            </p>
+            <ul className="pb-1">
+              {primaryLinks.map((link) => {
+                const active = linkActive(link.href);
+                const isHome = link.href === "/";
+                return (
+                  <li key={link.href}>
+                    <Link
+                      href={link.href}
+                      onClick={() => setMenuOpen(false)}
+                      className={`flex items-center justify-between gap-3 px-4 min-h-[48px] transition touch-manipulation ${
+                        isHome
+                          ? `text-lg font-extrabold ${
+                              active
+                                ? "bg-primary/15 text-primary"
+                                : "text-primary hover:bg-primary/10"
+                            }`
+                          : `text-base ${
+                              active
+                                ? "bg-card-hover text-foreground"
+                                : "text-muted hover:bg-card-hover hover:text-foreground"
+                            } ${link.className || ""}`
+                      }`}
+                    >
+                      <span className={isHome ? "font-extrabold" : "font-medium"}>
+                        {link.label}
+                      </span>
+                      {link.badge != null && link.badge > 0 && (
+                        <UnreadBadge count={link.badge} />
+                      )}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+            <p className="px-4 pt-2 pb-1 text-[10px] uppercase tracking-wider text-muted font-semibold border-t border-border">
+              Everything else
+            </p>
+            <ul className="py-1 pb-3">
+              {moreLinks.map((link) => {
+                const active = linkActive(link.href);
+                return (
+                  <li key={link.href}>
+                    <Link
+                      href={link.href}
+                      onClick={() => setMenuOpen(false)}
+                      className={`flex items-center justify-between gap-3 px-4 min-h-[48px] text-base transition touch-manipulation ${
+                        active
+                          ? "bg-card-hover text-foreground"
+                          : "text-muted hover:bg-card-hover hover:text-foreground"
+                      } ${link.className || ""}`}
+                    >
+                      <span className="font-medium">{link.label}</span>
+                      {link.badge != null && link.badge > 0 && (
+                        <UnreadBadge count={link.badge} />
+                      )}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
+        </>
+      )}
+
+      {/* Phone thumb nav — Home / Picks / Board / Standings / More */}
+      <nav
+        className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-card/95 backdrop-blur-md"
+        style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+        aria-label="Primary"
+      >
+        <ul className="grid grid-cols-5 h-[3.75rem]">
+          {(
+            [
+              { href: "/", label: "Home", icon: "⌂" },
+              { href: "/picks", label: "Picks", icon: "✓" },
+              { href: "/board", label: "Board", icon: "▦" },
+              { href: "/standings", label: "Stand", icon: "#" },
+            ] as const
+          ).map((tab) => {
+            const active = linkActive(tab.href);
+            const badge =
+              primaryLinks.find((p) => p.href === tab.href)?.badge || 0;
+            return (
+              <li key={tab.href} className="min-w-0">
+                <Link
+                  href={tab.href}
+                  onClick={() => setMenuOpen(false)}
+                  className={`relative flex flex-col items-center justify-center h-full gap-0.5 text-[10px] font-semibold touch-manipulation transition ${
+                    active ? "text-primary" : "text-muted"
+                  }`}
+                >
+                  <span
+                    className={`text-lg leading-none ${active ? "scale-110" : ""}`}
+                    aria-hidden
+                  >
+                    {tab.icon}
+                  </span>
+                  <span className="truncate max-w-full px-0.5">{tab.label}</span>
+                  {badge > 0 && (
+                    <span className="absolute top-1.5 right-[18%] min-w-[14px] h-3.5 px-0.5 rounded-full bg-primary text-black text-[8px] font-bold flex items-center justify-center">
+                      {badge > 9 ? "9+" : badge}
+                    </span>
+                  )}
+                </Link>
+              </li>
+            );
+          })}
+          <li className="min-w-0">
+            <button
+              type="button"
+              onClick={() => setMenuOpen((o) => !o)}
+              className={`relative flex flex-col items-center justify-center h-full w-full gap-0.5 text-[10px] font-semibold touch-manipulation transition ${
+                menuOpen || moreActive ? "text-primary" : "text-muted"
+              }`}
+              aria-expanded={menuOpen}
+              aria-controls="mobile-nav-menu"
+            >
+              <span className="text-lg leading-none" aria-hidden>
+                ☰
+              </span>
+              <span>More</span>
+              {(moreBadge > 0 || lockerUnseen > 0) && !menuOpen && (
+                <span className="absolute top-1.5 right-[18%] min-w-[14px] h-3.5 px-0.5 rounded-full bg-primary text-black text-[8px] font-bold flex items-center justify-center">
+                  {moreBadge + lockerUnseen > 9
+                    ? "9+"
+                    : moreBadge + lockerUnseen}
+                </span>
+              )}
+            </button>
+          </li>
+        </ul>
+      </nav>
+
       {playerPreview && (
         <div className="sticky top-14 z-[45] border-b-2 border-warning bg-warning text-black">
           <div className="max-w-6xl mx-auto px-3 sm:px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
@@ -596,19 +681,19 @@ export default function Nav() {
             <button
               type="button"
               onClick={exitPlayerView}
-              className="shrink-0 px-4 py-2 rounded-lg bg-black text-warning text-xs sm:text-sm font-extrabold uppercase tracking-wide hover:bg-black/90"
+              className="shrink-0 px-4 py-2 rounded-lg bg-black text-warning text-xs sm:text-sm font-extrabold uppercase tracking-wide hover:bg-black/90 min-h-[44px]"
             >
               Exit → Home
             </button>
           </div>
         </div>
       )}
-      {/* Floating exit — always visible while scrolling any page */}
+      {/* Floating exit — above phone tab bar */}
       {playerPreview && (
         <button
           type="button"
           onClick={exitPlayerView}
-          className="fixed bottom-5 right-4 z-[60] px-4 py-3 rounded-full bg-warning text-black text-xs sm:text-sm font-extrabold uppercase tracking-wide shadow-[0_4px_24px_rgba(0,0,0,0.45)] border-2 border-black/20 hover:scale-[1.03] active:scale-[0.98] transition"
+          className="fixed right-4 z-[60] px-4 py-3 rounded-full bg-warning text-black text-xs sm:text-sm font-extrabold uppercase tracking-wide shadow-[0_4px_24px_rgba(0,0,0,0.45)] border-2 border-black/20 hover:scale-[1.03] active:scale-[0.98] transition bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] md:bottom-5"
         >
           Exit → Home
         </button>
