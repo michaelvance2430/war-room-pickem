@@ -16,6 +16,7 @@ import {
   grantPermanentBadgeId,
   mergePermanentBadges,
 } from "./permanent-badges";
+import { applyLegacyBadgeGrants, WAR_ROOM_LEGEND_ID } from "./legacy-badge-grants";
 
 /** Permanent rare: most achievement points in the league */
 export const CHEEVO_KING_ID = "cheevo_king";
@@ -95,8 +96,10 @@ export const BADGE_CATALOG: BadgeDef[] = [
   {
     id: "war_room_legend",
     name: "War Room Legend",
-    description: "Season champ. The board remembers.",
-    howToEarn: "Win the season-long championship.",
+    description:
+      "Trophy hardware. Season champ energy. The board remembers.",
+    howToEarn:
+      "Win a major War Room trophy (Championship / engraved hardware). Awarded by the room — career points stick forever.",
     tier: "legendary",
     points: 200,
     icon: "🏆",
@@ -412,8 +415,11 @@ function evaluateBadge(badgeId: string, player: Player): EvalResult {
     }
 
     case "war_room_legend":
-      // Manual / season-end award for now
-      return { earned: false };
+    case WAR_ROOM_LEGEND_ID:
+      // Trophy winners (permanent / legacy grants) — not auto from stats alone
+      return {
+        earned: hasPermanentBadge(player, WAR_ROOM_LEGEND_ID),
+      };
 
     case "immortal_streak":
       return progress(streak, 30);
@@ -519,6 +525,12 @@ export function getPlayerBadges(player: Player): BadgeStatus[] {
   // Credit active week if YOU are the league commissioner (tenure tracker)
   try {
     syncCommissionerTenureFromSession();
+  } catch {
+    /* ignore */
+  }
+  // Prior-season trophy winners (Andy, Bill ball Ben, …) → permanent + career bank
+  try {
+    applyLegacyBadgeGrants(player);
   } catch {
     /* ignore */
   }
