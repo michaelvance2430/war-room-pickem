@@ -117,7 +117,7 @@ export default function PlayerWeekChecklist() {
                   label: "2. Crystal Ball (national champ)",
                   detail: crystalDone
                     ? "Pick is in — zero points, infinite pride"
-                    : "Do it early — locks noon ET Sat Aug 29, 2026. No take-backs.",
+                    : "Do it early — locks noon ET Sat Aug 29, 2026, or when Week 0 freezes/scores. No take-backs.",
                   done: crystalDone,
                   href: "/crystal-ball",
                   hrefLabel: "Crystal Ball",

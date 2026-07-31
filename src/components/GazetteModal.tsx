@@ -213,6 +213,24 @@ export default function GazetteModal() {
             </article>
           )}
 
+          {edition.crystalBallMiss && (
+            <article className="border-t-2 border-dashed border-indigo-400 pt-4 bg-indigo-50/90 -mx-2 px-2 py-3 rounded">
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-indigo-900 mb-1">
+                🔮 Crystal Ball · No pick
+              </p>
+              <h3 className="font-serif text-lg sm:text-xl font-black leading-snug text-stone-950">
+                {edition.crystalBallMiss.headline}
+              </h3>
+              <p className="text-sm text-stone-700 mt-1.5 leading-snug">
+                {edition.crystalBallMiss.deck}
+              </p>
+              <p className="text-xs text-stone-600 mt-2 font-medium">
+                {edition.crystalBallMiss.names.join(" · ")} · blank orb · no
+                Witch/Wizard shot
+              </p>
+            </article>
+          )}
+
           <p className="text-[10px] text-stone-500 text-center italic pt-1">
             You only see this once per scored week. Rules live under Rules anytime.
           </p>

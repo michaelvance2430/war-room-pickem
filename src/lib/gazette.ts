@@ -38,6 +38,11 @@ export type GazetteEdition = {
    * Milk-carton missing-person energy.
    */
   noLock: GazetteStory | null;
+  /**
+   * Week 0 (or first freeze): humans who never locked Crystal Ball.
+   * Mild shit-talk — forgot the national champ pick.
+   */
+  crystalBallMiss: GazetteStory | null;
   samePerson: boolean;
   masthead: string;
 };
@@ -351,6 +356,33 @@ export const NO_LOCK_DECKS: ((count: number) => string)[] = [
       : `${c} players chose chaos by choosing nothing. The ledger recorded it as 0.`,
 ];
 
+/** Forgot Crystal Ball before Week 0 freeze — soft roast, not cruelty. */
+export const CRYSTAL_MISS_HEADLINES: ((names: string) => string)[] = [
+  (n) => `CRYSTAL BALL GHOSTS: ${n.toUpperCase()} NEVER PICKED A CHAMP`,
+  (n) => `ORACLE NO-SHOW: ${n.toUpperCase()} LEFT THE BALL ON THE SHELF`,
+  (n) => `WEEK 0 CLOSED — ${n.toUpperCase()} STILL HAD AN EMPTY CRYSTAL BALL`,
+  (n) => `PROPHECY MISSED: ${n.toUpperCase()} FORGOT THE NATIONAL CHAMP PICK`,
+  (n) => `${n.toUpperCase()} TREATED CRYSTAL BALL LIKE OPTIONAL HOMEWORK`,
+  (n) => `BREAKING: ${n.toUpperCase()} ARRIVED TO WEEK 1 WITH ZERO CHAMPION`,
+];
+
+export const CRYSTAL_MISS_DECKS: ((count: number) => string)[] = [
+  (c) =>
+    c === 1
+      ? "Zero points on the line. Infinite future \"I told you so\" — if you'd locked one. You didn't. Adulting: incomplete."
+      : `${c} players never locked Crystal Ball. The orb stays blank. Smugness season is cancelled for them.`,
+  (c) =>
+    c === 1
+      ? "They'll swear they meant to. Week 0 locked. The pick did not. Take your meds and lock next season's ball on time."
+      : `${c} blank crystal balls. Not window-licker energy — just chronically offline until it was too late.`,
+  () =>
+    "Crystal Ball locks with Week 0. No pick = no Witch/Wizard shot. Dignity is also optional, apparently.",
+  (c) =>
+    c === 1
+      ? "Forgot the free preseason flex. The rest of the room will never let it go. Quietly. Then loudly."
+      : `A ${c}-person reminder that \"do it early\" was not a suggestion.`,
+];
+
 /** Score fallback: 0 on the week while someone else scored > 0. */
 export function inferNoLockNamesFromScores(
   players: Player[],
@@ -492,6 +524,27 @@ export async function buildGazetteEdition(
     }
   }
 
+  // Week 0 scored / frozen → roast who never locked Crystal Ball
+  let crystalBallMiss: GazetteStory | null = null;
+  if (weekIndex === 0) {
+    try {
+      const { loadCrystalBallNoPickNames } = await import("./crystal-ball");
+      const missNames = await loadCrystalBallNoPickNames();
+      if (missNames.length) {
+        const label = formatNameList(missNames);
+        crystalBallMiss = {
+          names: missNames,
+          pts: 0,
+          kind: missNames.length > 1 ? "tie" : "clear",
+          headline: byWeek(CRYSTAL_MISS_HEADLINES, weekIndex, 1)(label),
+          deck: byWeek(CRYSTAL_MISS_DECKS, weekIndex, 1)(missNames.length),
+        };
+      }
+    } catch {
+      crystalBallMiss = null;
+    }
+  }
+
   return {
     weekIndex,
     weekLabel,
@@ -502,6 +555,7 @@ export async function buildGazetteEdition(
     shame,
     standingsDeadlock,
     noLock,
+    crystalBallMiss,
   };
 }
 

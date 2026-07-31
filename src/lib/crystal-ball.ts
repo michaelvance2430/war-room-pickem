@@ -39,6 +39,7 @@ export function crystalBallLockMs(): number {
   return t;
 }
 
+/** Calendar deadline only (sync). Prefer resolveCrystalBallLock for real gates. */
 export function isCrystalBallLocked(now = Date.now()): boolean {
   return now >= crystalBallLockMs();
 }
@@ -55,6 +56,65 @@ export function crystalBallLockLabel(): string {
     timeZoneName: "short",
     timeZone: "America/New_York",
   });
+}
+
+export type CrystalBallLockInfo = {
+  locked: boolean;
+  /** Why it's locked, for UI copy */
+  reason: "open" | "calendar" | "week0_scored" | "week0_frozen";
+  lockLabel: string;
+};
+
+/**
+ * Crystal Ball freezes if:
+ * - Calendar: noon ET Sat Aug 29, 2026, OR
+ * - Week 0 pick'em card already locked (first kickoff), OR
+ * - Week 0 has been scored (sandbox / late sim still freezes forever)
+ */
+export async function resolveCrystalBallLock(
+  now = Date.now()
+): Promise<CrystalBallLockInfo> {
+  const calendarLabel = crystalBallLockLabel();
+  if (now >= crystalBallLockMs()) {
+    return {
+      locked: true,
+      reason: "calendar",
+      lockLabel: calendarLabel,
+    };
+  }
+
+  try {
+    const { listScoredWeekNumbers, loadWeekCard } = await import("./cloud");
+    const scored = await listScoredWeekNumbers();
+    if (scored.includes(0)) {
+      return {
+        locked: true,
+        reason: "week0_scored",
+        lockLabel:
+          "Week 0 scored — Crystal Ball is closed. No late prophecies.",
+      };
+    }
+    const card = await loadWeekCard(0);
+    if (card?.games?.length) {
+      const { isCardLockDeadlinePassed } = await import("./dates");
+      if (isCardLockDeadlinePassed(card.games, now)) {
+        return {
+          locked: true,
+          reason: "week0_frozen",
+          lockLabel:
+            "Week 0 locked — Crystal Ball closed with first kickoff. No take-backs.",
+        };
+      }
+    }
+  } catch {
+    /* ignore cloud; fall through open */
+  }
+
+  return {
+    locked: false,
+    reason: "open",
+    lockLabel: calendarLabel,
+  };
 }
 
 export function crystalBallTeams() {
@@ -115,8 +175,9 @@ function writeLocal(leagueId: string, data: LocalStore) {
 export async function loadCrystalBall(): Promise<CrystalBallState> {
   const session = getSession();
   const league = getLeague();
-  const locked = isCrystalBallLocked();
-  const lockLabel = crystalBallLockLabel();
+  const lockInfo = await resolveCrystalBallLock();
+  const locked = lockInfo.locked;
+  const lockLabel = lockInfo.lockLabel;
   const empty: CrystalBallState = {
     myTeam: null,
     picks: [],
@@ -209,10 +270,11 @@ export async function saveCrystalBallPick(
   if (!session?.leagueId || !session.playerId) {
     return { ok: false, error: "Join a league first." };
   }
-  if (isCrystalBallLocked()) {
+  const lockInfo = await resolveCrystalBallLock();
+  if (lockInfo.locked) {
     return {
       ok: false,
-      error: `Crystal Ball locked at ${crystalBallLockLabel()}. No take-backs, oracle.`,
+      error: `${lockInfo.lockLabel} No take-backs, oracle.`,
     };
   }
   const team = teamName.trim();
@@ -243,6 +305,50 @@ export async function saveCrystalBallPick(
   };
   writeLocal(session.leagueId, local);
   return { ok: true, cloud: false };
+}
+
+/** Humans who never submitted a Crystal Ball pick (excludes bots). */
+export async function loadCrystalBallNoPickNames(): Promise<string[]> {
+  const session = getSession();
+  if (!session?.leagueId) return [];
+  try {
+    const supabase = createClient();
+    const { data: members, error: memErr } = await supabase
+      .from("memberships")
+      .select("user_id, is_bot, profiles(display_name)")
+      .eq("league_id", session.leagueId);
+    if (memErr || !members?.length) {
+      // Local fallback: only know yourself
+      const local = readLocal(session.leagueId);
+      if (!local.picks[session.playerId] && session.playerName) {
+        return [session.playerName];
+      }
+      return [];
+    }
+    const { data: picks } = await supabase
+      .from("crystal_ball_picks")
+      .select("user_id")
+      .eq("league_id", session.leagueId);
+    const picked = new Set((picks || []).map((p) => p.user_id as string));
+    // Merge local for this device
+    try {
+      const local = readLocal(session.leagueId);
+      for (const uid of Object.keys(local.picks)) picked.add(uid);
+    } catch {
+      /* ignore */
+    }
+    const names: string[] = [];
+    for (const m of members) {
+      if (m.is_bot) continue;
+      const uid = m.user_id as string;
+      if (picked.has(uid)) continue;
+      const prof = m.profiles as { display_name?: string } | null;
+      names.push(prof?.display_name || "Player");
+    }
+    return names.sort((a, b) => a.localeCompare(b));
+  } catch {
+    return [];
+  }
 }
 
 export async function crownNationalChampion(
