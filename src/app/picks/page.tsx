@@ -395,24 +395,25 @@ export default function PicksPage() {
   /** True if they previously saved/locked this week (from cloud). */
   const hadLockedCard = saved;
   /**
-   * After first kickoff of the card: if you never locked, no edits and no new lock.
-   * Same-day games also freeze at that day's first kickoff (isGameLocked).
+   * After first kickoff on the card: entire slate freezes.
+   * Never locked → cannot lock (0 pts). Already locked → read-only.
    */
   const missedLockWindow =
     weekEditable && cardDeadlinePassed && !hadLockedCard && hasCard;
-  const propLockedNow = isPropLocked(games, now) || missedLockWindow;
+  const cardFrozen = weekEditable && cardDeadlinePassed && hasCard;
+  const propLockedNow = isPropLocked(games, now) || cardFrozen;
   const openCount = openGameCount(games, now);
   const allGamesLocked = games.length > 0 && openCount === 0;
-  const canEditProp = weekEditable && !propLockedNow && !missedLockWindow;
+  const canEditProp = weekEditable && !propLockedNow && !cardFrozen;
   const fullyLocked =
     isPastOrOtherWeek ||
-    missedLockWindow ||
+    cardFrozen ||
     (allGamesLocked && (!prop.question || propLockedNow));
 
   const confidenceOptions = [1, 2, 3, 4, 5];
 
   function selectSide(gameId: string, side: "home" | "away") {
-    if (!weekEditable || missedLockWindow) return;
+    if (!weekEditable || cardFrozen) return;
     const game = games.find((g) => g.id === gameId);
     if (!game || isGameLocked(game, now, games)) return;
 
@@ -431,7 +432,7 @@ export default function PicksPage() {
   }
 
   function selectConfidence(gameId: string, conf: number) {
-    if (!weekEditable || missedLockWindow) return;
+    if (!weekEditable || cardFrozen) return;
     const game = games.find((g) => g.id === gameId);
     if (!game || isGameLocked(game, now, games)) return;
     if (!picks[gameId]?.pick) return;
@@ -463,7 +464,7 @@ export default function PicksPage() {
   }
 
   function toggleBestBet(gameId: string) {
-    if (!weekEditable || missedLockWindow) return;
+    if (!weekEditable || cardFrozen) return;
     const game = games.find((g) => g.id === gameId);
     if (!game || isGameLocked(game, now, games)) return;
     // Can't move BB off a locked game
@@ -520,14 +521,20 @@ export default function PicksPage() {
 
     const cardGames = latest.games;
     const prevCloud = await loadMyPicks(activeWeek);
-    const prevPicks = prevCloud?.picks || {};
     const tick = Date.now();
     const alreadyLocked = !!prevCloud?.lockedAt;
 
-    // First kickoff on the card has started and they never locked → out for the week
-    if (isCardLockDeadlinePassed(cardGames, tick) && !alreadyLocked) {
+    // First kickoff on the card: entire slate freezes — no new locks, no edits
+    if (isCardLockDeadlinePassed(cardGames, tick)) {
+      if (!alreadyLocked) {
+        setSaveError(
+          `Too late. First kickoff was ${formatCardLockDeadline(cardGames)}. All picks must be locked before then. You cannot lock after first kickoff — you score 0 this week.`
+        );
+        setSaving(false);
+        return;
+      }
       setSaveError(
-        `Too late. First kickoff was ${formatCardLockDeadline(cardGames)}. You must lock a full card before then — no lock after first kickoff. You score 0 this week.`
+        `Card is frozen. First kickoff was ${formatCardLockDeadline(cardGames)}. No more changes.`
       );
       setSaving(false);
       return;
@@ -535,14 +542,6 @@ export default function PicksPage() {
 
     const lockedPicks: Record<string, UserPick> = {};
     for (const g of cardGames) {
-      if (isGameLocked(g, tick, cardGames)) {
-        // Day already started: keep previously locked picks only — no new locks after deadline
-        if (prevPicks[g.id]) {
-          lockedPicks[g.id] = prevPicks[g.id];
-        }
-        // No late slip onto a frozen day if they never saved
-        continue;
-      }
       const p = picksRef.current[g.id];
       if (!p) continue;
       lockedPicks[g.id] = {
@@ -553,14 +552,7 @@ export default function PicksPage() {
       };
     }
 
-    // Best bet: locked game keeps previous BB if that game is locked
     let nextBest = bestBetRef.current;
-    if (prevCloud?.bestBetId) {
-      const bbGame = cardGames.find((g) => g.id === prevCloud.bestBetId);
-      if (bbGame && isGameLocked(bbGame, tick, cardGames)) {
-        nextBest = prevCloud.bestBetId;
-      }
-    }
     if (nextBest && !lockedPicks[nextBest]) nextBest = null;
     for (const id of Object.keys(lockedPicks)) {
       lockedPicks[id] = {
@@ -569,84 +561,30 @@ export default function PicksPage() {
       };
     }
 
-    let nextProp = propChoiceRef.current;
-    if (isPropLocked(cardGames, tick)) {
-      nextProp = prevCloud?.propChoice ?? nextProp;
-    }
+    const nextProp = propChoiceRef.current;
 
-    const openGames = cardGames.filter((g) => !isGameLocked(g, tick, cardGames));
-    if (openGames.length > 0) {
-      const filledOpen = openGames.filter(
-        (g) =>
-          lockedPicks[g.id]?.pick && (lockedPicks[g.id]?.confidence ?? 0) > 0
-      );
-      if (filledOpen.length !== openGames.length) {
-        setSaveError(
-          `Pick a side and confidence for every open game (${filledOpen.length}/${openGames.length}). Games freeze at the first kickoff of that day.`
-        );
-        setSaving(false);
-        return;
-      }
-    }
-
-    // Full-slip rules when all games still open
-    if (openGames.length === cardGames.length) {
-      if (Object.keys(lockedPicks).length !== cardGames.length) {
-        setSaveError("Pick a side and confidence for every game.");
-        setSaving(false);
-        return;
-      }
-      const confs = cardGames
-        .map((g) => lockedPicks[g.id].confidence)
-        .sort((a, b) => a - b);
-      const expected = [1, 2, 3, 4, 5].slice(0, cardGames.length);
-      if (confs.join() !== expected.join()) {
-        setSaveError("Use each confidence 1–5 exactly once.");
-        setSaving(false);
-        return;
-      }
-      if (!nextBest) {
-        setSaveError("Mark one Best Bet.");
-        setSaving(false);
-        return;
-      }
-      if (!nextProp) {
-        setSaveError("Pick a prop option.");
-        setSaving(false);
-        return;
-      }
-    } else {
-      // Partial: still require BB + prop if those slots aren't locked yet
-      if (!isPropLocked(cardGames, tick) && !nextProp) {
-        setSaveError(
-          "Pick a prop option (still open until the first kickoff on the card)."
-        );
-        setSaving(false);
-        return;
-      }
-      if (!nextBest) {
-        setSaveError("Mark one Best Bet on an open game (or keep locked BB).");
-        setSaving(false);
-        return;
-      }
-    }
-
-    // Don't allow incomplete full card if nothing was ever saved and some locked empty
-    if (
-      Object.keys(lockedPicks).length !== cardGames.length &&
-      openGames.length === 0
-    ) {
-      setSaveError(
-        "First kickoff of the day has hit. Incomplete slips can't be filled after that."
-      );
+    // Full card required before first kickoff
+    if (Object.keys(lockedPicks).length !== cardGames.length) {
+      setSaveError("Pick a side and confidence for every game before first kickoff.");
       setSaving(false);
       return;
     }
-
-    if (Object.keys(lockedPicks).length !== cardGames.length) {
-      setSaveError(
-        "Every game needs a pick before the first kickoff of its day. Frozen games without a pick stay blank (0)."
-      );
+    const confs = cardGames
+      .map((g) => lockedPicks[g.id].confidence)
+      .sort((a, b) => a - b);
+    const expected = [1, 2, 3, 4, 5].slice(0, cardGames.length);
+    if (confs.join() !== expected.join()) {
+      setSaveError("Use each confidence 1–5 exactly once.");
+      setSaving(false);
+      return;
+    }
+    if (!nextBest) {
+      setSaveError("Mark one Best Bet.");
+      setSaving(false);
+      return;
+    }
+    if (!nextProp) {
+      setSaveError("Pick a prop option.");
       setSaving(false);
       return;
     }
@@ -676,13 +614,12 @@ export default function PicksPage() {
   const allGamesPicked =
     hasCard &&
     weekEditable &&
-    !missedLockWindow &&
+    !cardFrozen &&
     games.length > 0 &&
-    games.every((g) => {
-      if (isGameLocked(g, now, games)) return true;
-      return picks[g.id]?.pick && (picks[g.id]?.confidence ?? 0) > 0;
-    }) &&
-    (canEditProp ? propChoice !== null : true) &&
+    games.every(
+      (g) => picks[g.id]?.pick && (picks[g.id]?.confidence ?? 0) > 0
+    ) &&
+    propChoice !== null &&
     bestBetId !== null;
 
   // Weeks shown in browser: published + active (even if not published yet)
@@ -742,8 +679,10 @@ export default function PicksPage() {
             {leagueName ? `${leagueName} · ` : ""}
             {weekEditable
               ? missedLockWindow
-                ? "First kickoff hit and you never locked — this card is closed for you (0 pts)."
-                : `Lock a full card before first kickoff (${formatCardLockDeadline(games)}). Games also freeze at the first kickoff of each day.`
+                ? "First kickoff hit and you never locked — card closed for you (0 pts)."
+                : cardFrozen
+                  ? "First kickoff hit — entire card is frozen. No more changes."
+                  : `All picks must be locked before first kickoff (${formatCardLockDeadline(games)}).`
               : viewWeek < activeWeek
                 ? `Past week · league is on ${weekTitle(activeWeek)}. You can review but not change picks.`
                 : `Not the active week (league is on ${weekTitle(activeWeek)}). Read-only.`}
@@ -751,11 +690,10 @@ export default function PicksPage() {
           {games.length > 0 && (
             <p className="text-xs text-muted mt-1">
               {formatCardDateRange(games) || weekSubtitle(viewWeek)}
-              {weekEditable && !fullyLocked && !missedLockWindow && (
+              {weekEditable && !cardFrozen && (
                 <>
                   {" · "}
-                  {openCount} of {games.length} game
-                  {games.length === 1 ? "" : "s"} still open
+                  Lock deadline: {formatCardLockDeadline(games)}
                 </>
               )}
             </p>
@@ -866,19 +804,18 @@ export default function PicksPage() {
                   🥛 Too late — first kickoff already hit
                 </p>
                 <p className="text-xs text-danger/90 mt-1.5 leading-relaxed">
-                  You never locked a card before{" "}
-                  <strong>{formatCardLockDeadline(games)}</strong>. After the
-                  first kickoff on the slate, you <strong>cannot</strong> lock
-                  picks. You score <strong>0</strong> this week. No makeups.
-                  Check the milk carton — Gazette will.
+                  All picks must be locked before{" "}
+                  <strong>{formatCardLockDeadline(games)}</strong>. You never
+                  locked. After first kickoff you <strong>cannot</strong> lock.
+                  You score <strong>0</strong> this week. No makeups. Gazette
+                  may put you on the milk carton.
                 </p>
               </div>
             )}
 
-            {weekEditable && fullyLocked && !missedLockWindow && (
+            {weekEditable && cardFrozen && !missedLockWindow && (
               <div className="mb-4 rounded-lg border border-border bg-card-hover px-4 py-2 text-sm text-muted">
-                🔒 All kickoffs for {weekTitle(viewWeek)} have passed. Picks are
-                locked — no exceptions.
+                🔒 First kickoff hit — entire card is frozen. No more changes.
               </div>
             )}
 
@@ -887,11 +824,12 @@ export default function PicksPage() {
                 {saveError}
               </div>
             )}
-            {saved && weekEditable && !fullyLocked && !missedLockWindow && (
+            {saved && weekEditable && !cardFrozen && (
               <div className="mb-4 rounded-lg border border-primary/40 bg-primary/10 px-4 py-2 text-sm text-primary">
-                ✓ Card locked. You can still edit games until the{" "}
-                <strong>first kickoff of that day</strong>. After first kickoff
-                of the day, that day&apos;s games freeze.
+                ✓ Card locked. You can still edit until{" "}
+                <strong>first kickoff</strong> (
+                {formatCardLockDeadline(games)}). After that the whole card
+                freezes.
               </div>
             )}
 
@@ -902,9 +840,7 @@ export default function PicksPage() {
                 const displaySpread = pick?.lockedSpread ?? game.spread;
                 const displayFavorite = pick?.lockedFavorite ?? game.favorite;
                 const locked =
-                  !weekEditable ||
-                  missedLockWindow ||
-                  isGameLocked(game, now, games);
+                  !weekEditable || cardFrozen || isGameLocked(game, now, games);
                 const kick = formatKickoffLockLabel(game, now, games);
 
                 return (

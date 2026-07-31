@@ -74,17 +74,16 @@ export const RULE_SECTIONS: RuleSection[] = [
     body: [
       {
         bold: true,
-        text: "FIRST KICKOFF = LOCK DEADLINE: You must lock a full card before the first kickoff on that week’s slate.",
+        text: "ALL PICKS MUST BE LOCKED BEFORE THE FIRST KICKOFF on that week’s slate.",
       },
       {
         bold: true,
-        text: "Miss that deadline and you cannot lock at all. You score 0 for the week. No makeups. No partial credit.",
+        text: "After first kickoff: the entire card freezes. No more edits for anyone. If you never locked, you cannot lock — you score 0 for the week.",
       },
-      "Same calendar day (Eastern Time): all games that day freeze at that day’s first kickoff. Example: once the first Saturday game starts, every Saturday game is frozen.",
-      "If you locked on time, you can still tweak later days until those days’ first kickoffs freeze them.",
+      "No makeups. No partial credit. Lock early. Fair is fair.",
       {
         bold: true,
-        text: "NO LOCK, NO POINTS. Gazette may put no-lockers on the milk carton. Fair is fair.",
+        text: "NO LOCK, NO POINTS. Gazette may put no-lockers on the milk carton.",
       },
     ],
   },

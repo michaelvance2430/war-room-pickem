@@ -39,7 +39,7 @@ export const PICKS_HOW_TO_STEPS: { title: string; body: string }[] = [
     body: "Answer the weekly prop for bonus points (usually 3).",
   },
   {
-    title: "5. Save / lock before first kickoff",
-    body: "Hit Save when all five games + Best Bet + prop are filled. First kickoff on the card = lock deadline. Miss it and you cannot lock — you score 0. Games also freeze at the first kickoff of each day. No makeups.",
+    title: "5. Lock before first kickoff",
+    body: "Hit Save when all five games + Best Bet + prop are filled. ALL picks must be locked before the first kickoff on the slate. After that the whole card freezes — no edits, no late locks. Miss it = 0 points. No makeups.",
   },
 ];

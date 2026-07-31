@@ -47,11 +47,6 @@ export function kickoffMs(g: Game): number {
   return Number.isNaN(t) ? 0 : t;
 }
 
-/** ET calendar day key (YYYY-MM-DD) for a timestamp. */
-export function etDayKeyFromMs(ms: number): string {
-  return new Date(ms).toLocaleDateString("en-CA", { timeZone: ET });
-}
-
 /** Earliest kickoff on the whole card (ms), or 0. */
 export function firstKickoffOnCardMs(games: Game[]): number {
   const times = games.map(kickoffMs).filter((t) => t > 0);
@@ -59,40 +54,8 @@ export function firstKickoffOnCardMs(games: Game[]): number {
 }
 
 /**
- * First kickoff that ET calendar day among games on the card.
- * e.g. first Saturday game freezes all Saturday games.
- */
-export function firstKickoffOfEtDayMs(game: Game, allGames: Game[]): number {
-  const t = kickoffMs(game);
-  if (!t) return 0;
-  const day = etDayKeyFromMs(t);
-  const sameDay = allGames
-    .map(kickoffMs)
-    .filter((ms) => ms > 0 && etDayKeyFromMs(ms) === day);
-  return sameDay.length ? Math.min(...sameDay) : 0;
-}
-
-/**
- * Hard lock for a game: once the **first kickoff that ET day** has started,
- * no more changes to any game on that day.
- * Pass `allGames` (the full card) so same-day slate freezes together.
- */
-export function isGameLocked(
-  g: Game,
-  now = Date.now(),
-  allGames?: Game[]
-): boolean {
-  const slate = allGames?.length ? allGames : [g];
-  const dayFirst = firstKickoffOfEtDayMs(g, slate);
-  if (dayFirst) return now >= dayFirst;
-  const t = kickoffMs(g);
-  if (!t) return false;
-  return now >= t;
-}
-
-/**
  * True once the first kickoff on the card has started.
- * After this, you cannot lock a card if you never locked before.
+ * Entire slate freezes then — all picks must already be locked.
  */
 export function isCardLockDeadlinePassed(
   games: Game[],
@@ -103,7 +66,25 @@ export function isCardLockDeadlinePassed(
   return now >= t;
 }
 
-/** Prop locks at the first kickoff on the card. */
+/**
+ * Hard lock: once the **first kickoff on the card** has started,
+ * every game is frozen. No late locks, no mid-slate edits.
+ * Pass `allGames` (the full card) so the deadline is card-wide.
+ */
+export function isGameLocked(
+  g: Game,
+  now = Date.now(),
+  allGames?: Game[]
+): boolean {
+  if (allGames?.length) {
+    return isCardLockDeadlinePassed(allGames, now);
+  }
+  const t = kickoffMs(g);
+  if (!t) return false;
+  return now >= t;
+}
+
+/** Prop locks at the first kickoff on the card (same as the whole slate). */
 export function isPropLocked(games: Game[], now = Date.now()): boolean {
   return isCardLockDeadlinePassed(games, now);
 }
@@ -117,29 +98,29 @@ export function formatKickoffLockLabel(
   now = Date.now(),
   allGames?: Game[]
 ): { locked: boolean; label: string } {
-  const slate = allGames?.length ? allGames : [g];
-  const dayFirst = firstKickoffOfEtDayMs(g, slate);
   const full = formatKickoff(g.commenceTime || g.startTime).full;
-  const lockAt = dayFirst || kickoffMs(g);
+  const slate = allGames?.length ? allGames : [g];
+  const cardFirst = firstKickoffOnCardMs(slate);
+  const lockAt = cardFirst || kickoffMs(g);
   if (!lockAt) return { locked: false, label: full };
   if (now >= lockAt) {
     return {
       locked: true,
-      label: `LOCKED · first kickoff of the day · ${full}`,
+      label: `LOCKED · card freezes at first kickoff · ${full}`,
     };
   }
   const mins = Math.round((lockAt - now) / 60_000);
   if (mins < 60) {
     return {
       locked: false,
-      label: `Day locks in ${mins} min · ${full}`,
+      label: `Card locks in ${mins} min · ${full}`,
     };
   }
   const hrs = Math.round(mins / 60);
   if (hrs < 48) {
     return {
       locked: false,
-      label: `Day locks in ~${hrs}h · ${full}`,
+      label: `Card locks in ~${hrs}h · ${full}`,
     };
   }
   return { locked: false, label: full };
