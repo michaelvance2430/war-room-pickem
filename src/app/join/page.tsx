@@ -106,9 +106,13 @@ export default function JoinPage() {
           commissionerId: userId,
           createdAt: league.created_at,
           settings: {
-            cutPercent: league.cut_percent,
+            cutPercent: league.cut_percent ?? 50,
             regularSeasonWeeks: 18, // fixed CFB calendar (app weeks 0–18)
-            gamesPerWeek: league.games_per_week,
+            gamesPerWeek: league.games_per_week ?? 5,
+            crystalBallEnabled: true,
+            homeTaglineId: "good-teams",
+            homeTaglineCustom: "",
+            seasonThemeId: "default",
           },
         })
       );
@@ -216,6 +220,11 @@ export default function JoinPage() {
           leagueId: league.id,
         })
       );
+      // Full settings from cloud so season theme paints immediately for joiners
+      const seasonThemeId =
+        typeof league.season_theme_id === "string" && league.season_theme_id
+          ? league.season_theme_id
+          : "default";
       localStorage.setItem(
         "warroom-league",
         JSON.stringify({
@@ -225,12 +234,22 @@ export default function JoinPage() {
           commissionerId: league.commissioner_id,
           createdAt: league.created_at,
           settings: {
-            cutPercent: league.cut_percent,
+            cutPercent: league.cut_percent ?? 50,
             regularSeasonWeeks: 18, // fixed CFB calendar (app weeks 0–18)
-            gamesPerWeek: league.games_per_week,
+            gamesPerWeek: league.games_per_week ?? 5,
+            crystalBallEnabled: league.crystal_ball_enabled !== false,
+            homeTaglineId: league.home_tagline_id || "good-teams",
+            homeTaglineCustom: league.home_tagline_custom || "",
+            seasonThemeId,
           },
         })
       );
+      try {
+        const { applySeasonTheme } = await import("@/lib/season-theme");
+        applySeasonTheme(seasonThemeId);
+      } catch {
+        /* ignore */
+      }
       router.push("/");
       router.refresh();
     } catch (err: unknown) {
