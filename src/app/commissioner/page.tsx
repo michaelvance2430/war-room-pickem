@@ -22,6 +22,10 @@ import {
   getRankedMatchupTier,
   rankedMatchupBadge,
   rankedMatchupShellClass,
+  sortGamesRankHeatFirst,
+  filterGamesByRankHeat,
+  countRankHeat,
+  type RankHeatFilter,
 } from "@/lib/rankings";
 import { scoreWeek, GameResult } from "@/lib/scoring";
 import { applyWeekScores } from "@/lib/store";
@@ -230,6 +234,9 @@ function CommissionerPageInner() {
   const [rosterCount, setRosterCount] = useState<number | null>(null);
   /** Skip week date filter on Pull Odds — all open FBS games for season dry-run. */
   const [dryRunOdds, setDryRunOdds] = useState(false);
+  /** Build Card: jump to ranked matchups first */
+  const [rankHeatFilter, setRankHeatFilter] =
+    useState<RankHeatFilter>("heat");
   /** Weeks already scored (locked for results entry unless unlocked). */
   const [scoredWeeks, setScoredWeeks] = useState<number[]>([]);
   const [resultsLocked, setResultsLocked] = useState(false);
@@ -2944,21 +2951,120 @@ function CommissionerPageInner() {
                   {selectedIds.size}/5)
                 </h2>
                 <p className="text-xs text-muted mb-2">
-                  {availableGames.length} FBS games • Grouped by kickoff date
-                  (ET)
+                  {availableGames.length} FBS games
                   {rankLabel ? ` • Ranks: ${rankLabel}` : ""}
                   {" · "}
-                  <span className="text-amber-300/90">Gold</span> = both top 10
+                  <span className="text-amber-300/90">Gold</span> both top 10
                   {" · "}
-                  <span className="text-violet-300/90">Violet</span> = both top
-                  25
+                  <span className="text-violet-300/90">Violet</span> both top 25
                   {" · "}
-                  <span className="text-emerald-300/90">Green</span> = one top
-                  25
+                  <span className="text-emerald-300/90">Green</span> one top 25
                 </p>
+                {(() => {
+                  const heatCounts = countRankHeat(availableGames);
+                  const filtered = sortGamesRankHeatFirst(
+                    filterGamesByRankHeat(availableGames, rankHeatFilter)
+                  );
+                  const chips: {
+                    id: RankHeatFilter;
+                    label: string;
+                    count: number;
+                    accent: string;
+                  }[] = [
+                    {
+                      id: "heat",
+                      label: "Good teams",
+                      count: heatCounts.heat,
+                      accent: "border-primary/50 text-primary",
+                    },
+                    {
+                      id: "legendary",
+                      label: "Top 10",
+                      count: heatCounts.legendary,
+                      accent: "border-amber-400/50 text-amber-200",
+                    },
+                    {
+                      id: "top25",
+                      label: "Both 25",
+                      count: heatCounts.top25,
+                      accent: "border-violet-400/50 text-violet-200",
+                    },
+                    {
+                      id: "ranked",
+                      label: "One ranked",
+                      count: heatCounts.ranked,
+                      accent: "border-emerald-400/50 text-emerald-200",
+                    },
+                    {
+                      id: "all",
+                      label: "All games",
+                      count: availableGames.length,
+                      accent: "border-border text-muted",
+                    },
+                  ];
+                  const dateGroups =
+                    rankHeatFilter === "all"
+                      ? groupGamesByDate(sortGamesRankHeatFirst(availableGames)).map(
+                          (g) => ({
+                            ...g,
+                            games: sortGamesRankHeatFirst(g.games),
+                          })
+                        )
+                      : [
+                          {
+                            dateKey: "heat",
+                            dateLabel:
+                              rankHeatFilter === "heat"
+                                ? "Ranked matchups first"
+                                : rankHeatFilter === "legendary"
+                                  ? "Both Top 10"
+                                  : rankHeatFilter === "top25"
+                                    ? "Both Top 25"
+                                    : "One team Top 25",
+                            games: filtered,
+                          },
+                        ];
+                  return (
+                    <>
+                      <p className="text-[10px] uppercase tracking-wider text-muted font-bold mb-1.5">
+                        Find good games
+                      </p>
+                      <div className="phone-h-scroll sm:flex-wrap sm:overflow-visible gap-1.5 mb-3">
+                        {chips.map((c) => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            disabled={c.count === 0 && c.id !== "all"}
+                            onClick={() => setRankHeatFilter(c.id)}
+                            className={`px-3 py-2 min-h-[40px] rounded-full text-[11px] font-bold border transition touch-manipulation disabled:opacity-40 ${
+                              rankHeatFilter === c.id
+                                ? "bg-primary/15 border-primary text-primary"
+                                : c.accent
+                            }`}
+                          >
+                            {c.label}
+                            <span className="ml-1 opacity-80 tabular-nums">
+                              {c.count}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                      {filtered.length === 0 && rankHeatFilter !== "all" ? (
+                        <p className="text-sm text-muted py-6 text-center border border-dashed border-border rounded-xl">
+                          No games in this bucket. Try{" "}
+                          <button
+                            type="button"
+                            className="text-primary font-semibold underline"
+                            onClick={() => setRankHeatFilter("all")}
+                          >
+                            All games
+                          </button>
+                          .
+                        </p>
+                      ) : null}
                 {/* Games only in nested scroll — prop lives outside so mobile can change it */}
-                <div className="space-y-4 max-h-[28rem] overflow-y-auto mt-4 overscroll-contain">
-                  {groupGamesByDate(availableGames).map((group) => (
+                <div className="space-y-4 max-h-[28rem] overflow-y-auto mt-2 overscroll-contain">
+                  {dateGroups.map((group) => (
                     <div key={group.dateKey}>
                       <div className="sticky top-0 bg-card/95 backdrop-blur py-1.5 mb-2 border-b border-border z-10">
                         <span className="text-xs font-semibold text-primary">
@@ -2967,6 +3073,9 @@ function CommissionerPageInner() {
                         <span className="text-[11px] text-muted ml-2">
                           {group.games.length} game
                           {group.games.length === 1 ? "" : "s"}
+                          {rankHeatFilter !== "all"
+                            ? " · best first"
+                            : " · ranked first within day"}
                         </span>
                       </div>
                       <div className="space-y-2">
@@ -3051,6 +3160,9 @@ function CommissionerPageInner() {
                     </div>
                   ))}
                 </div>
+                    </>
+                  );
+                })()}
               </div>
             )}
 

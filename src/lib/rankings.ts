@@ -338,3 +338,77 @@ export function rankedMatchupBadge(tier: RankedMatchupTier | null): {
   }
   return null;
 }
+
+/** Higher = hotter matchup for sort / filters. */
+export function rankTierPriority(tier: RankedMatchupTier | null): number {
+  if (tier === "legendary") return 3;
+  if (tier === "top25") return 2;
+  if (tier === "ranked") return 1;
+  return 0;
+}
+
+export type RankHeatFilter =
+  | "all"
+  | "heat"
+  | "legendary"
+  | "top25"
+  | "ranked";
+
+/** Best (lowest) rank on either side; 99 if none. */
+function bestRankOnCard(g: Game): number {
+  const ranks = [g.awayRank, g.homeRank].filter(
+    (r): r is number => typeof r === "number" && r >= 1 && r <= 25
+  );
+  return ranks.length ? Math.min(...ranks) : 99;
+}
+
+function kickoffMs(g: Game): number {
+  const t = new Date(g.commenceTime || g.startTime || 0).getTime();
+  return Number.isNaN(t) ? 0 : t;
+}
+
+/**
+ * Put good teams first: Top 10 clash → both Top 25 → one ranked → unranked,
+ * then better rank number, then earlier kickoff.
+ */
+export function sortGamesRankHeatFirst(games: Game[]): Game[] {
+  return [...games].sort((a, b) => {
+    const ta = getRankedMatchupTier(a.awayRank, a.homeRank);
+    const tb = getRankedMatchupTier(b.awayRank, b.homeRank);
+    const pd = rankTierPriority(tb) - rankTierPriority(ta);
+    if (pd !== 0) return pd;
+    const br = bestRankOnCard(a) - bestRankOnCard(b);
+    if (br !== 0) return br;
+    return kickoffMs(a) - kickoffMs(b);
+  });
+}
+
+export function filterGamesByRankHeat(
+  games: Game[],
+  filter: RankHeatFilter
+): Game[] {
+  if (filter === "all") return games;
+  return games.filter((g) => {
+    const t = getRankedMatchupTier(g.awayRank, g.homeRank);
+    if (filter === "heat") return t != null;
+    return t === filter;
+  });
+}
+
+export function countRankHeat(games: Game[]): {
+  legendary: number;
+  top25: number;
+  ranked: number;
+  heat: number;
+} {
+  let legendary = 0;
+  let top25 = 0;
+  let ranked = 0;
+  for (const g of games) {
+    const t = getRankedMatchupTier(g.awayRank, g.homeRank);
+    if (t === "legendary") legendary += 1;
+    else if (t === "top25") top25 += 1;
+    else if (t === "ranked") ranked += 1;
+  }
+  return { legendary, top25, ranked, heat: legendary + top25 + ranked };
+}
