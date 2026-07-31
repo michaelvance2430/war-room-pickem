@@ -3,6 +3,9 @@
 import { useState, type FormEvent } from "react";
 import { getSession, getLeague } from "@/lib/league";
 
+/** Personal inbox until a business address exists. */
+export const FEEDBACK_TO_EMAIL = "michaelvance2430@gmail.com";
+
 const KINDS = [
   { id: "issue", label: "Issue / bug", hint: "Something broken or confusing" },
   {
@@ -18,8 +21,9 @@ const KINDS = [
 ] as const;
 
 /**
- * Account → Feedback. Sends to Mike’s inbox via /api/feedback
- * (Resend, Web3Forms, or mailto fallback).
+ * Account → Feedback.
+ * Opens Apple Mail / Gmail / Android mail with a draft to Mike.
+ * (No Vercel email keys required.)
  */
 export default function FeedbackForm() {
   const [kind, setKind] = useState<string>("recommendation");
@@ -29,52 +33,62 @@ export default function FeedbackForm() {
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function onSubmit(e: FormEvent) {
+  function onSubmit(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
     setStatus(null);
     setError(null);
 
+    const text = message.trim();
+    if (text.length < 5) {
+      setError("Message needs at least a few words.");
+      setBusy(false);
+      return;
+    }
+
     const session = getSession();
     const league = getLeague();
+    const name = (session?.playerName || "Player").trim().slice(0, 80);
+    const reply = contactEmail.trim().slice(0, 120);
+    const leagueName = (league?.name || "").trim().slice(0, 120);
+    const userId = (session?.playerId || "").trim().slice(0, 80);
+
+    const kindLabel =
+      kind === "issue"
+        ? "Issue / bug"
+        : kind === "recommendation"
+          ? "Recommendation"
+          : kind === "discussion"
+            ? "Discussion / idea"
+            : "Feedback";
+
+    const subject = `[War Room] ${kindLabel} from ${name}`;
+    const body = [
+      `Type: ${kindLabel}`,
+      `From: ${name}`,
+      reply ? `Reply-to: ${reply}` : "Reply-to: (not provided)",
+      leagueName ? `League: ${leagueName}` : null,
+      userId ? `User ID: ${userId}` : null,
+      "",
+      text,
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    // mailto: opens Apple Mail, Gmail app, or Android default mail
+    const mailto = `mailto:${FEEDBACK_TO_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 
     try {
-      const res = await fetch("/api/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          kind,
-          message: message.trim(),
-          name: session?.playerName || "Player",
-          contactEmail: contactEmail.trim() || undefined,
-          leagueName: league?.name,
-          userId: session?.playerId,
-        }),
-      });
-      const data = (await res.json()) as {
-        ok?: boolean;
-        error?: string;
-        via?: string;
-        mailto?: string;
-      };
-
-      if (!res.ok || !data.ok) {
-        setError(data.error || "Could not send. Try again.");
-        setBusy(false);
-        return;
-      }
-
-      if (data.via === "mailto" && data.mailto) {
-        window.location.href = data.mailto;
-        setStatus(
-          "Opening your email app — hit send to deliver the note to Mike."
-        );
-      } else {
-        setStatus("Sent. Thanks — Mike will see it.");
-        setMessage("");
-      }
+      // location.href is most reliable on iOS Safari for opening Mail
+      window.location.href = mailto;
+      setStatus(
+        "Opening your mail app… address is already set to Mike. Hit Send when it opens."
+      );
+      setMessage("");
     } catch {
-      setError("Network error. Check connection and try again.");
+      setError(
+        `Could not open mail. Email Mike directly: ${FEEDBACK_TO_EMAIL}`
+      );
     } finally {
       setBusy(false);
     }
@@ -87,11 +101,11 @@ export default function FeedbackForm() {
     >
       <h2 className="font-semibold mb-1 text-sky-200">Feedback for Mike</h2>
       <p className="text-xs text-muted mb-4 leading-relaxed">
-        Bug, idea, or general take — it goes to the app creator. Be honest.
-        Optional email if you want a reply.
+        Bug, idea, or general take. Opens your phone&apos;s mail app with a
+        draft to Mike — just hit Send. Optional email if you want a reply.
       </p>
 
-      <form onSubmit={(e) => void onSubmit(e)} className="space-y-3">
+      <form onSubmit={onSubmit} className="space-y-3">
         <div className="flex flex-wrap gap-2">
           {KINDS.map((k) => (
             <button
@@ -140,8 +154,18 @@ export default function FeedbackForm() {
           disabled={busy || message.trim().length < 5}
           className="w-full py-2.5 rounded-lg bg-sky-400 text-black text-sm font-bold disabled:opacity-50 hover:opacity-90 transition"
         >
-          {busy ? "Sending…" : "Send feedback"}
+          {busy ? "Opening mail…" : "Open mail to send"}
         </button>
+
+        <p className="text-[11px] text-muted text-center">
+          Goes to{" "}
+          <a
+            href={`mailto:${FEEDBACK_TO_EMAIL}`}
+            className="text-sky-300 underline-offset-2 hover:underline"
+          >
+            {FEEDBACK_TO_EMAIL}
+          </a>
+        </p>
 
         {status && (
           <p className="text-xs text-primary border border-primary/30 rounded-lg px-3 py-2">

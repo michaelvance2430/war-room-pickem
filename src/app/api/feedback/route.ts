@@ -74,12 +74,13 @@ export async function POST(req: Request) {
     .filter(Boolean)
     .join("\n");
 
+  // Default personal inbox; override with FEEDBACK_TO_EMAIL when business email exists
   const to =
     process.env.FEEDBACK_TO_EMAIL ||
     process.env.NEXT_PUBLIC_FEEDBACK_EMAIL ||
-    "";
+    "michaelvance2430@gmail.com";
 
-  // 1) Resend
+  // 1) Resend (optional — only if keys configured)
   const resendKey = process.env.RESEND_API_KEY;
   if (resendKey && to) {
     try {
@@ -131,18 +132,7 @@ export async function POST(req: Request) {
     }
   }
 
-  // 3) Mailto fallback — client opens mail app
-  if (to) {
-    const mailto = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`;
-    return NextResponse.json({ ok: true, via: "mailto", mailto });
-  }
-
-  return NextResponse.json(
-    {
-      ok: false,
-      error:
-        "Feedback inbox not configured. Set FEEDBACK_TO_EMAIL (and RESEND_API_KEY or WEB3FORMS_ACCESS_KEY) on Vercel.",
-    },
-    { status: 503 }
-  );
+  // 3) Mailto — client opens Apple Mail / Gmail / Android mail
+  const mailto = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`;
+  return NextResponse.json({ ok: true, via: "mailto", mailto });
 }
