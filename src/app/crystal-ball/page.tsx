@@ -71,6 +71,17 @@ export default function CrystalBallPage() {
       setErr(res.error || "Could not save");
       return;
     }
+    try {
+      sessionStorage.setItem("warroom-tut-cb-selected", "1");
+      const { advancePlayerTutorialTo, isPlayerTutorialActive } = await import(
+        "@/lib/player-tutorial"
+      );
+      if (isPlayerTutorialActive()) {
+        advancePlayerTutorialTo("open_picks");
+      }
+    } catch {
+      /* ignore */
+    }
     setMsg(
       res.cloud
         ? `Locked in: ${selected}. Zero points. Maximum smugness potential.`
@@ -269,7 +280,14 @@ export default function CrystalBallPage() {
                   <button
                     key={t.name}
                     type="button"
-                    onClick={() => setSelected(t.name)}
+                    onClick={() => {
+                      setSelected(t.name);
+                      try {
+                        sessionStorage.setItem("warroom-tut-cb-selected", "1");
+                      } catch {
+                        /* ignore */
+                      }
+                    }}
                     className={`w-full text-left px-3 py-2 rounded-md text-sm flex justify-between gap-2 ${
                       selected === t.name
                         ? "bg-primary/15 border border-primary/40 text-primary"

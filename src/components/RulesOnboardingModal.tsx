@@ -23,6 +23,22 @@ export default function RulesOnboardingModal() {
   function dismiss() {
     markRulesSeen();
     setOpen(false);
+    // Real accounts: start walk-the-dog (Crystal Ball → picks) after briefing
+    try {
+      if (typeof window !== "undefined") {
+        const guest = localStorage.getItem("warroom-guest-mode-v1");
+        const isGuest = guest && JSON.parse(guest)?.active;
+        if (!isGuest) {
+          void import("@/lib/player-tutorial").then((m) => {
+            if (m.needsPlayerTutorial()) {
+              m.startPlayerTutorial(getSession()?.playerId || undefined);
+            }
+          });
+        }
+      }
+    } catch {
+      /* ignore */
+    }
   }
 
   if (!open) return null;

@@ -27,6 +27,8 @@ import {
 import { isAppCreator } from "@/lib/creator";
 import { isViewAsPlayer, setViewAsPlayer } from "@/lib/view-as-player";
 import FeedbackForm from "@/components/FeedbackForm";
+import { startPlayerTutorial } from "@/lib/player-tutorial";
+import { isGuestMode } from "@/lib/guest-mode";
 
 export default function AccountPage() {
   const router = useRouter();
@@ -234,6 +236,36 @@ export default function AccountPage() {
             </button>
           </section>
         )}
+
+        <section className="rounded-xl border border-primary/35 bg-primary/10 p-5 mb-6">
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-1">
+            First steps
+          </p>
+          <h2 className="font-semibold mb-1">Player tutorial</h2>
+          <p className="text-xs text-muted mb-3 leading-relaxed">
+            Walk the dog again: Crystal Ball → search a school → lock pick → My
+            Picks → fill the card → Save. One step at a time.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              if (isGuestMode()) {
+                setMessage(
+                  "Guest demo uses the onboarding popup — Exit demo first for the full Crystal Ball walkthrough."
+                );
+                return;
+              }
+              startPlayerTutorial(userId || undefined);
+              setMessage(
+                "Tutorial restarted — follow the coach bar at the bottom."
+              );
+              router.push("/crystal-ball");
+            }}
+            className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-primary text-black text-sm font-bold"
+          >
+            Run player tutorial again →
+          </button>
+        </section>
 
         <section className="rounded-xl border border-border bg-card p-5 mb-6">
           <h2 className="font-semibold mb-3">Profile photo</h2>

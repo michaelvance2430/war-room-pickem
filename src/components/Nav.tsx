@@ -19,6 +19,7 @@ import SeasonCountdownTicker from "@/components/SeasonCountdownTicker";
 import SeasonOpenWelcome from "@/components/SeasonOpenWelcome";
 import GuestDemoChrome from "@/components/GuestDemoChrome";
 import GuestOnboarding from "@/components/GuestOnboarding";
+import PlayerWalkthrough from "@/components/PlayerWalkthrough";
 import { loadMyProfile } from "@/lib/profile";
 import { isGuestMode } from "@/lib/guest-mode";
 import { refreshStaffSessionFlags } from "@/lib/cloud";
@@ -576,6 +577,8 @@ export default function Nav() {
       {/* Guest demo: sticky DEMO bar + welcome / role / tutorial */}
       <GuestDemoChrome />
       <GuestOnboarding />
+      {/* Real account: Crystal Ball + picks walk-the-dog coach */}
+      <PlayerWalkthrough />
       {/* Until Aug 23 00:01 ET: countdown. After: ticker gone; one-time welcome splash */}
       {!isGuestMode() && <SeasonCountdownTicker />}
       {!isGuestMode() && <SeasonOpenWelcome />}

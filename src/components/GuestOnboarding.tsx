@@ -46,18 +46,19 @@ export default function GuestOnboarding() {
 
   if (!open) return null;
 
+  // Guest lands on Week 9 — Crystal Ball is already locked; no CB in demo tour
   const playerSteps = [
     {
-      title: "1 · Crystal Ball",
-      body: "Preseason flex: pick who wins the national title. Zero points, infinite smug. Do it before Week 0 freezes.",
-      href: "/crystal-ball",
-      cta: "Open Crystal Ball",
+      title: "1 · Open My Picks",
+      body: "This demo is already through Week 9 (Crystal Ball is sealed). Open My Picks for the live card.",
+      href: "/picks",
+      cta: "Open My Picks →",
     },
     {
-      title: "2 · Weekly picks",
-      body: "Open My Picks. Pick every game, set confidence 1–5 (each once), choose a Best Bet, answer the prop.",
+      title: "2 · Fill the card",
+      body: "Pick every game, confidence 1–5 (each once), one Best Bet (2×), and the prop. Take your time.",
       href: "/picks",
-      cta: "Open My Picks",
+      cta: "I’m on My Picks",
     },
     {
       title: "3 · Save before kickoff",

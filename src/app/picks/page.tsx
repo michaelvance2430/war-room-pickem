@@ -635,6 +635,15 @@ export default function PicksPage() {
     setBestBetId(nextBest);
     setPropChoice(nextProp);
     setSaved(true);
+    try {
+      sessionStorage.setItem("warroom-tut-picks-saved", "1");
+      const { completePlayerTutorial, isPlayerTutorialActive } = await import(
+        "@/lib/player-tutorial"
+      );
+      if (isPlayerTutorialActive()) completePlayerTutorial();
+    } catch {
+      /* ignore */
+    }
 
     // First & Final: full popup (earn warning / forfeit point loss)
     if (result.firstFinal === "earned") {
@@ -673,6 +682,16 @@ export default function PicksPage() {
     ) &&
     propChoice !== null &&
     bestBetId !== null;
+
+  // Walk-the-dog tutorial: card filled → coach advances to Save
+  useEffect(() => {
+    if (!allGamesPicked) return;
+    try {
+      sessionStorage.setItem("warroom-tut-picks-filled", "1");
+    } catch {
+      /* ignore */
+    }
+  }, [allGamesPicked]);
 
   // Weeks shown in browser: published + active (even if not published yet)
   const weekPills = [
