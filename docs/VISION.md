@@ -60,6 +60,7 @@ SlateClub is dead. The future is **War Room** — first **FBS / CFB friend leagu
 - **Fair play** — lock rules, progressive reveal, no shady defaults  
 - **Effortless invites** — every member can spread the word, entertaining copy included  
 - **Personality without friction** — sarcasm and roast culture *after* the job is clear  
+- **Witty shit-talk, never bigotry** — sass and group-chat heat across every sport; never racist, sexist, homophobic, or xenophobic  
 - **Host power, player joy** — Commish can run the room; players never feel like admin  
 
 ---
