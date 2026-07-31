@@ -61,13 +61,14 @@ function namesMatch(a: string, b: string) {
  */
 export const LEGACY_PROFILE_HARDWARE: Omit<ProfileTrophy, "source">[] = [
   {
-    id: "legacy-kahmann-championship-2025",
+    id: "legacy-andy-championship-2025",
     kind: "championship",
     seasonYear: 2025,
     title: "Championship",
     subtitle: "War Room Champion",
     notes: "Last season's big one. The board still remembers.",
-    winnerName: "Kahmann",
+    // Standings: Andrew Visconti / Andy
+    winnerName: "Andrew Visconti",
   },
   {
     id: "legacy-bill-ball-ben-nerd-2025",
@@ -76,16 +77,18 @@ export const LEGACY_PROFILE_HARDWARE: Omit<ProfileTrophy, "source">[] = [
     title: "Village Nerd Award",
     subtitle: "Crystal Ball prophet",
     notes: "Called the national champ. Zero standings points. Infinite smug.",
-    // Exact standings display name (casing may vary)
+    // Standings: Bill ball Ben
     winnerName: "Bill ball Ben",
   },
 ];
 
 /** Also match these name aliases → legacy id */
 const LEGACY_NAME_ALIASES: { pattern: RegExp; legacyId: string }[] = [
-  { pattern: /\bkahmann\b/i, legacyId: "legacy-kahmann-championship-2025" },
   {
-    // "Bill ball Ben" / "Bill Ball Ben" / "BillBallBen"
+    pattern: /\bandy\b|\bandrew\s+visconti\b|\bvisconti\b/i,
+    legacyId: "legacy-andy-championship-2025",
+  },
+  {
     pattern: /\bbill\s*ball\s*ben\b|\bbillballben\b/i,
     legacyId: "legacy-bill-ball-ben-nerd-2025",
   },

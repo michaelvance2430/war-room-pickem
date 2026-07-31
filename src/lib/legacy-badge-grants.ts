@@ -1,10 +1,9 @@
 /**
- * Prior-season / manual trophy → permanent badges + career cheevo bank.
- * Matched by display name (same approach as profile hardware).
+ * Prior-season trophy → permanent War Room Legend + career cheevo bank.
  *
- * Correct winners (2025 hardware):
- *  - Kahmann → Championship → War Room Legend
- *  - Bill ball Ben → Village Nerd → War Room Legend
+ * 2025 winners:
+ *  - Andy / Andrew Visconti → Championship → War Room Legend (+200 career)
+ *  - Bill ball Ben → Village Nerd → War Room Legend (+200 career)
  */
 
 import {
@@ -23,10 +22,9 @@ type LegacyBadgeGrant = {
   reason: string;
 };
 
-/** Trophy winners who get War Room Legend + career points */
 export const LEGACY_BADGE_GRANTS: LegacyBadgeGrant[] = [
   {
-    pattern: /\bkahmann\b/i,
+    pattern: /\bandy\b|\bandrew\s+visconti\b|\bvisconti\b/i,
     badgeId: WAR_ROOM_LEGEND_ID,
     reason: "2025 Championship — War Room Legend",
   },
@@ -37,8 +35,8 @@ export const LEGACY_BADGE_GRANTS: LegacyBadgeGrant[] = [
   },
 ];
 
-/** Mistakenly granted earlier — strip if present */
-const MISTAKEN_LEGEND_PATTERN = /\bandy\b|\bandrew\s+visconti\b|\bvisconti\b/i;
+/** Wrongly granted when we thought Kahmann was champ */
+const MISTAKEN_LEGEND_PATTERN = /\bkahmann\b/i;
 
 /**
  * Grant permanent badges for legacy winners and bank career points once.
@@ -53,7 +51,7 @@ export function applyLegacyBadgeGrants(player: {
   const known = new Set(getPermanentBadgeIds(player.id));
   const pts = getBadgeDef(WAR_ROOM_LEGEND_ID)?.points ?? 200;
 
-  // Undo mistaken Andy / Andrew Visconti grant (if any)
+  // Strip mistaken Kahmann legend if present
   if (
     MISTAKEN_LEGEND_PATTERN.test(player.name) &&
     !LEGACY_BADGE_GRANTS.some((g) => g.pattern.test(player.name))
