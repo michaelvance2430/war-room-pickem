@@ -2522,10 +2522,11 @@ function CommissionerPageInner() {
                   <span className="text-violet-300/90">Violet</span> = both top
                   25
                 </p>
-                <div className="space-y-4 max-h-[28rem] overflow-y-auto mt-4">
+                {/* Games only in nested scroll — prop lives outside so mobile can change it */}
+                <div className="space-y-4 max-h-[28rem] overflow-y-auto mt-4 overscroll-contain">
                   {groupGamesByDate(availableGames).map((group) => (
                     <div key={group.dateKey}>
-                      <div className="sticky top-0 bg-card/95 backdrop-blur py-1.5 mb-2 border-b border-border">
+                      <div className="sticky top-0 bg-card/95 backdrop-blur py-1.5 mb-2 border-b border-border z-10">
                         <span className="text-xs font-semibold text-primary">
                           {group.dateLabel}
                         </span>
@@ -2614,88 +2615,170 @@ function CommissionerPageInner() {
                     </div>
                   ))}
                 </div>
-                {/* Weekly prop picker */}
-                <div className="mt-6 pt-5 border-t border-border space-y-3">
-                  <div>
-                    <h3 className="font-semibold text-sm">Weekly prop</h3>
-                    <p className="text-xs text-muted">
-                      Pick a fun preset (or custom). Worth {prop.points} pts.
-                      Must Publish to lock this onto the card / Enter Results.
-                    </p>
-                    {publishedProp?.question &&
-                      publishedProp.question !== prop.question && (
-                        <p className="text-[11px] text-warning mt-1">
-                          Draft differs from published prop. Players still see
-                          the published one until you Publish again.
-                        </p>
-                      )}
-                  </div>
+              </div>
+            )}
+
+            {/* Weekly prop — outside game scroller so phone can edit freely */}
+            {availableGames.length > 0 && (
+              <div className="rounded-xl border border-border bg-card p-5 mb-6 space-y-3">
+                <div>
+                  <h3 className="font-semibold text-sm">Weekly prop</h3>
+                  <p className="text-xs text-muted mt-0.5">
+                    Tap a preset (or Custom). Worth {prop.points} pts. Publish
+                    to put it on the card.
+                  </p>
+                  {publishedProp?.question &&
+                    publishedProp.question !== prop.question && (
+                      <p className="text-[11px] text-warning mt-1">
+                        Draft differs from published prop. Players still see
+                        the published one until you Publish again.
+                      </p>
+                    )}
+                </div>
+
+                {/* Native select as backup + large font (iOS won&apos;t zoom) */}
+                <label className="block text-xs text-muted">
+                  Quick pick
                   <select
                     value={propPresetId}
                     onChange={(e) => applyPropPreset(e.target.value)}
-                    className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-primary"
+                    className="mt-1 w-full min-h-[48px] bg-background border border-border rounded-lg px-3 py-3 text-base focus:outline-none focus:border-primary"
                   >
                     {PROP_PRESETS.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.label}
                       </option>
                     ))}
-                    <option value={CUSTOM_PROP_ID}>Custom prop (write your own)…</option>
+                    <option value={CUSTOM_PROP_ID}>
+                      Custom prop (write your own)…
+                    </option>
                   </select>
-                  <p className="text-[11px] text-muted">
-                    All presets refer only to the five games on this week&apos;s
-                    card. Worded so finals settle arguments.
-                  </p>
+                </label>
 
-                  {propPresetId === CUSTOM_PROP_ID ? (
-                    <div className="space-y-2 rounded-lg border border-border bg-background p-3">
+                {/* Big tappable list — primary path on phone */}
+                <div className="max-h-56 overflow-y-auto rounded-lg border border-border divide-y divide-border overscroll-contain">
+                  {PROP_PRESETS.map((p) => {
+                    const active = propPresetId === p.id;
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => applyPropPreset(p.id)}
+                        className={`w-full text-left px-3 py-3 min-h-[48px] text-sm transition active:bg-primary/15 ${
+                          active
+                            ? "bg-primary/15 text-primary font-semibold"
+                            : "bg-background text-foreground hover:bg-card-hover"
+                        }`}
+                      >
+                        {active ? "✓ " : ""}
+                        {p.label}
+                      </button>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => applyPropPreset(CUSTOM_PROP_ID)}
+                    className={`w-full text-left px-3 py-3 min-h-[48px] text-sm transition active:bg-primary/15 ${
+                      propPresetId === CUSTOM_PROP_ID
+                        ? "bg-primary/15 text-primary font-semibold"
+                        : "bg-background text-foreground hover:bg-card-hover"
+                    }`}
+                  >
+                    {propPresetId === CUSTOM_PROP_ID ? "✓ " : ""}
+                    Custom prop (write your own)…
+                  </button>
+                </div>
+
+                <p className="text-[11px] text-muted">
+                  All presets refer only to the five games on this week&apos;s
+                  card. Worded so finals settle arguments.
+                </p>
+
+                {propPresetId === CUSTOM_PROP_ID ? (
+                  <div className="space-y-2 rounded-lg border border-border bg-background p-3">
+                    <input
+                      type="text"
+                      value={customQuestion}
+                      onChange={(e) => {
+                        setCustomQuestion(e.target.value);
+                        // Live sync so phone users don&apos;t need blur
+                        const q = e.target.value;
+                        setProp({
+                          id: `prop-custom-w${activeWeek}`,
+                          question: q.trim() || "Custom prop",
+                          options: [
+                            customOptA.trim() || "Yes",
+                            customOptB.trim() || "No",
+                          ] as [string, string],
+                          points: 3,
+                        });
+                      }}
+                      onBlur={syncCustomProp}
+                      placeholder="Prop question"
+                      className="w-full min-h-[48px] bg-card border border-border rounded-lg px-3 py-3 text-base"
+                    />
+                    <div className="grid grid-cols-2 gap-2">
                       <input
                         type="text"
-                        value={customQuestion}
+                        value={customOptA}
                         onChange={(e) => {
-                          setCustomQuestion(e.target.value);
+                          setCustomOptA(e.target.value);
+                          setProp({
+                            id: `prop-custom-w${activeWeek}`,
+                            question:
+                              customQuestion.trim() || "Custom prop",
+                            options: [
+                              e.target.value.trim() || "Yes",
+                              customOptB.trim() || "No",
+                            ] as [string, string],
+                            points: 3,
+                          });
                         }}
                         onBlur={syncCustomProp}
-                        placeholder="Prop question"
-                        className="w-full bg-card border border-border rounded-lg px-3 py-2 text-sm"
+                        placeholder="Option A"
+                        className="min-h-[48px] bg-card border border-border rounded-lg px-3 py-3 text-base"
                       />
-                      <div className="grid grid-cols-2 gap-2">
-                        <input
-                          type="text"
-                          value={customOptA}
-                          onChange={(e) => setCustomOptA(e.target.value)}
-                          onBlur={syncCustomProp}
-                          placeholder="Option A"
-                          className="bg-card border border-border rounded-lg px-3 py-2 text-sm"
-                        />
-                        <input
-                          type="text"
-                          value={customOptB}
-                          onChange={(e) => setCustomOptB(e.target.value)}
-                          onBlur={syncCustomProp}
-                          placeholder="Option B"
-                          className="bg-card border border-border rounded-lg px-3 py-2 text-sm"
-                        />
-                      </div>
+                      <input
+                        type="text"
+                        value={customOptB}
+                        onChange={(e) => {
+                          setCustomOptB(e.target.value);
+                          setProp({
+                            id: `prop-custom-w${activeWeek}`,
+                            question:
+                              customQuestion.trim() || "Custom prop",
+                            options: [
+                              customOptA.trim() || "Yes",
+                              e.target.value.trim() || "No",
+                            ] as [string, string],
+                            points: 3,
+                          });
+                        }}
+                        onBlur={syncCustomProp}
+                        placeholder="Option B"
+                        className="min-h-[48px] bg-card border border-border rounded-lg px-3 py-3 text-base"
+                      />
                     </div>
-                  ) : (
-                    <div className="rounded-lg border border-border bg-background px-3 py-2.5 text-sm">
-                      <p className="text-foreground">{prop.question}</p>
-                      <p className="text-xs text-muted mt-1">
-                        Choices: {prop.options[0]} · {prop.options[1]}
-                      </p>
-                    </div>
-                  )}
-                </div>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-border bg-background px-3 py-3 text-sm">
+                    <p className="text-foreground leading-snug">
+                      {prop.question}
+                    </p>
+                    <p className="text-xs text-muted mt-1.5">
+                      Choices: {prop.options[0]} · {prop.options[1]}
+                    </p>
+                  </div>
+                )}
 
                 <button
                   type="button"
                   disabled={selectedIds.size !== 5}
-                  onClick={publishCard}
+                  onClick={() => void publishCard()}
                   className={
                     selectedIds.size === 5
-                      ? "w-full mt-4 py-3 rounded-xl font-semibold bg-primary text-black"
-                      : "w-full mt-4 py-3 rounded-xl font-semibold bg-border text-muted cursor-not-allowed"
+                      ? "w-full py-3.5 rounded-xl font-semibold bg-primary text-black min-h-[48px]"
+                      : "w-full py-3.5 rounded-xl font-semibold bg-border text-muted cursor-not-allowed min-h-[48px]"
                   }
                 >
                   Publish / Update {weekTitle(activeWeek)} Card

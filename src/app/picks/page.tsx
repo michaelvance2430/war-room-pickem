@@ -1096,8 +1096,8 @@ export default function PicksPage() {
                   </span>
                 )}
               </div>
-              <div className="font-medium mb-3">{prop.question}</div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="font-medium mb-3 leading-snug">{prop.question}</div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {prop.options.map((opt) => (
                   <button
                     key={opt}
@@ -1108,12 +1108,13 @@ export default function PicksPage() {
                       setSaved(false);
                       setPropChoice(opt);
                     }}
-                    className={`p-3 rounded-lg border text-sm transition disabled:cursor-not-allowed ${
+                    className={`min-h-[52px] p-3.5 rounded-lg border text-base sm:text-sm transition touch-manipulation disabled:cursor-not-allowed ${
                       propChoice === opt
-                        ? "border-primary bg-primary/10"
+                        ? "border-primary bg-primary/15 text-primary font-semibold ring-2 ring-primary/40"
                         : "border-border hover:border-muted disabled:opacity-70"
                     }`}
                   >
+                    {propChoice === opt ? "✓ " : ""}
                     {opt}
                   </button>
                 ))}
@@ -1121,6 +1122,11 @@ export default function PicksPage() {
               {weekEditable && propLockedNow && (
                 <p className="text-[11px] text-muted mt-2">
                   Prop locked at the first kickoff on this card.
+                </p>
+              )}
+              {weekEditable && canEditProp && !propChoice && (
+                <p className="text-[11px] text-warning mt-2">
+                  Tap one answer, then Save Picks.
                 </p>
               )}
             </div>
