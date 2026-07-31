@@ -8,6 +8,7 @@ import HotTakeTicker from "@/components/HotTakeTicker";
 import CrownAndShame from "@/components/CrownAndShame";
 import HomeWeekHero from "@/components/HomeWeekHero";
 import PlayerWeekChecklist from "@/components/PlayerWeekChecklist";
+import CommishSetupBanner from "@/components/CommishSetupBanner";
 import {
   getSession,
   getLeague,
@@ -271,6 +272,9 @@ export default function Home() {
             </button>
           </div>
         )}
+
+        {/* First-time Commish season setup */}
+        <CommishSetupBanner />
 
         {/* One job: pick / wait / score path — strengths stay below */}
         <HomeWeekHero />

@@ -1,9 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Nav from "@/components/Nav";
 import PlayerLink from "@/components/PlayerLink";
+import FirstCardWizard from "@/components/FirstCardWizard";
+import {
+  isFirstTimeCommish,
+  markFirstCardPublished,
+  markPracticeWeekDone,
+} from "@/lib/commish-onboarding";
 import { Game, Prop } from "@/lib/types";
 import { fetchNcaafOdds } from "@/lib/odds";
 import { generateDemoSlate, randomizeDemoResults } from "@/lib/demo-slate";
@@ -128,12 +134,16 @@ function weekChipClass(opts: {
   return `${base} bg-card-hover border border-border text-muted hover:text-foreground`;
 }
 
-export default function CommissionerPage() {
+function CommissionerPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [allowed, setAllowed] = useState<boolean | null>(null);
   /** True only for league owner — settings, bots, reset, pass, deputies */
   const [isOwner, setIsOwner] = useState(false);
   const [tab, setTab] = useState<"card" | "results" | "settings" | "picks">("card");
+  const [firstTime, setFirstTime] = useState(false);
+  const [showFirstWizard, setShowFirstWizard] = useState(true);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [league, setLeague] = useState<League | null>(null);
   const [leagueNameEdit, setLeagueNameEdit] = useState("");
   const [cutPercent, setCutPercent] = useState(50);
@@ -220,11 +230,41 @@ export default function CommissionerPage() {
       const ops = isOps();
       setIsOwner(owner);
       setAllowed(ops);
-      if (owner) setTab("settings");
-      else setTab("card");
       if (!ops) return;
 
       const lg = (await syncLeagueFromCloud()) || getLeague();
+      let scoredCount = 0;
+      try {
+        scoredCount = (await listScoredWeekNumbers()).length;
+      } catch {
+        scoredCount = 0;
+      }
+      const ft =
+        !!owner &&
+        !!lg?.id &&
+        isFirstTimeCommish({ leagueId: lg.id, scoredWeekCount: scoredCount });
+      setFirstTime(ft);
+      setAdvancedOpen(!ft);
+
+      // URL ?tab=card&first=1 or first-time owner → land on Build Card
+      const tabParam = searchParams.get("tab");
+      const firstParam = searchParams.get("first");
+      if (
+        tabParam === "card" ||
+        tabParam === "results" ||
+        tabParam === "settings" ||
+        tabParam === "picks"
+      ) {
+        if (tabParam === "settings" && !owner) setTab("card");
+        else setTab(tabParam);
+      } else if (ft || firstParam === "1") {
+        setTab("card");
+      } else if (owner) {
+        setTab("settings");
+      } else {
+        setTab("card");
+      }
+
       if (lg) {
         setLeague(lg);
         setLeagueNameEdit(lg.name);
@@ -278,7 +318,8 @@ export default function CommissionerPage() {
       }
     }
     void load();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- boot + URL tab/first
+  }, [searchParams]);
 
   /** Sync Build Card draft controls from a known prop (publish / full week load). */
   function applyDraftFromProp(loaded: Prop) {
@@ -762,6 +803,12 @@ export default function CommissionerPage() {
     applyDraftFromProp(propToPublish);
     setPublishedPropFromCard(propToPublish, activeWeek);
     setCardSaved(true);
+    try {
+      const lid = getSession()?.leagueId || getLeague()?.id;
+      if (lid) markFirstCardPublished(lid);
+    } catch {
+      /* ignore */
+    }
     try {
       localStorage.setItem(ACTIVE_WEEK_KEY, String(activeWeek));
       localStorage.setItem(
@@ -1789,6 +1836,21 @@ export default function CommissionerPage() {
               )}
             </div>
 
+            {firstTime && (
+              <button
+                type="button"
+                onClick={() => setAdvancedOpen((o) => !o)}
+                className="w-full text-left rounded-xl border border-border bg-card px-4 py-3 text-sm font-semibold flex justify-between items-center"
+              >
+                <span>Advanced (bots, reset, pass commissioner…)</span>
+                <span className="text-xs text-muted">
+                  {advancedOpen ? "Hide" : "Show"}
+                </span>
+              </button>
+            )}
+
+            {(advancedOpen || !firstTime) && (
+            <>
             <div className="rounded-xl border border-warning/40 bg-warning/5 p-5 space-y-3">
               <h2 className="font-semibold text-warning">
                 Sandbox: run entire season
@@ -2178,11 +2240,33 @@ export default function CommissionerPage() {
                 Delete league and reset app
               </button>
             </div>
+            </>
+            )}
           </div>
         )}
 
         {tab === "card" && (
           <div>
+            {showFirstWizard &&
+              publishedGames.length === 0 &&
+              (firstTime || searchParams.get("first") === "1") && (
+                <FirstCardWizard
+                  weekLabel={weekTitle(activeWeek)}
+                  hasDraftGames={selectedIds.size > 0}
+                  hasProp={!!(prop?.question?.trim())}
+                  onDemo={() => {
+                    generateDemoCard();
+                    try {
+                      const lid = getSession()?.leagueId || getLeague()?.id;
+                      if (lid) markPracticeWeekDone(lid);
+                    } catch {
+                      /* ignore */
+                    }
+                  }}
+                  onPublish={() => void publishCard()}
+                  onDismiss={() => setShowFirstWizard(false)}
+                />
+              )}
             <div className="rounded-xl border border-border bg-card p-5 mb-6">
               <h2 className="font-semibold mb-1">Pick&apos;em week</h2>
               <p className="text-xs text-muted mb-3">
@@ -2988,5 +3072,19 @@ export default function CommissionerPage() {
         )}
       </main>
     </div>
+  );
+}
+
+export default function CommissionerPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center text-muted">
+          Loading Commish tools…
+        </div>
+      }
+    >
+      <CommissionerPageInner />
+    </Suspense>
   );
 }

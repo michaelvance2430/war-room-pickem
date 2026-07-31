@@ -28,6 +28,7 @@ export default function JoinPage() {
   const [loading, setLoading] = useState(false);
   const [createdCode, setCreatedCode] = useState<string | null>(null);
   const [checking, setChecking] = useState(true);
+  const [hostCopied, setHostCopied] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -266,18 +267,126 @@ export default function JoinPage() {
   }
 
   if (createdCode) {
+    const leagueLabel = leagueName.trim() || "War Room";
+    const inviteText = [
+      `You're in the War Room: ${leagueLabel}`,
+      `Join code: ${createdCode}`,
+      typeof window !== "undefined" ? `App: ${window.location.origin}` : null,
+      "",
+      "Make an account, enter the code, lock picks before first kickoff.",
+      "Don't ghost Saturday.",
+    ]
+      .filter(Boolean)
+      .join("\n");
+
     return (
-      <div className="min-h-screen flex items-center justify-center px-4">
-        <div className="max-w-md w-full rounded-xl border border-border bg-card p-6 text-center">
-          <h1 className="text-2xl font-bold mb-2">League created</h1>
-          <p className="text-sm text-muted mb-4">Share this code with your friend:</p>
-          <div className="text-3xl font-bold tracking-[0.3em] text-primary mb-6">{createdCode}</div>
+      <div className="min-h-screen flex items-center justify-center px-4 py-10">
+        <div className="max-w-md w-full rounded-xl border-2 border-primary/40 bg-card p-6">
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary mb-2 text-center">
+            You&apos;re the host
+          </p>
+          <h1 className="text-2xl font-bold mb-1 text-center">League created</h1>
+          <p className="text-sm text-muted mb-4 text-center">
+            {leagueLabel} — share the code, then build the first card.
+          </p>
+          <div className="text-3xl font-bold tracking-[0.3em] text-primary text-center mb-2 font-mono">
+            {createdCode}
+          </div>
+          <div className="flex gap-2 mb-2">
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(createdCode);
+                  setHostCopied("Code copied");
+                } catch {
+                  setHostCopied("Copy failed — select the code manually");
+                }
+              }}
+              className="flex-1 py-2 rounded-lg border border-primary/40 text-primary text-sm font-semibold"
+            >
+              Copy code
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(inviteText);
+                  setHostCopied("Invite text copied — paste in the group chat");
+                  try {
+                    const { markInviteCopied, markHostScreenSeen } = await import(
+                      "@/lib/commish-onboarding"
+                    );
+                    const raw = localStorage.getItem("warroom-league");
+                    const id = raw
+                      ? (JSON.parse(raw) as { id?: string }).id
+                      : null;
+                    if (id) {
+                      markInviteCopied(id);
+                      markHostScreenSeen(id);
+                    }
+                  } catch {
+                    /* ignore */
+                  }
+                } catch {
+                  setHostCopied("Copy failed");
+                }
+              }}
+              className="flex-1 py-2 rounded-lg bg-primary/15 border border-primary/40 text-primary text-sm font-semibold"
+            >
+              Copy invite text
+            </button>
+          </div>
+          {hostCopied && (
+            <p className="text-xs text-primary text-center mb-4">{hostCopied}</p>
+          )}
+          {!hostCopied && <div className="mb-3" />}
+
+          <ol className="text-left text-sm space-y-2 mb-6 rounded-lg border border-border bg-background/50 px-4 py-3">
+            <li>
+              <span className="font-semibold text-primary">1.</span> Text the
+              code to your friends
+            </li>
+            <li>
+              <span className="font-semibold text-primary">2.</span> Build &amp;
+              publish a card (demo slate is fine first time)
+            </li>
+            <li>
+              <span className="font-semibold text-primary">3.</span> After games,
+              score the week
+            </li>
+          </ol>
+
           <button
+            type="button"
+            onClick={() => {
+              try {
+                const raw = localStorage.getItem("warroom-league");
+                const id = raw
+                  ? (JSON.parse(raw) as { id?: string }).id
+                  : null;
+                if (id) {
+                  void import("@/lib/commish-onboarding").then((m) =>
+                    m.markHostScreenSeen(id)
+                  );
+                }
+              } catch {
+                /* ignore */
+              }
+              router.push("/commissioner?tab=card&first=1");
+              router.refresh();
+            }}
+            className="w-full py-3 rounded-xl bg-primary text-black font-bold mb-2"
+          >
+            Go build the first card →
+          </button>
+          <button
+            type="button"
             onClick={() => {
               router.push("/");
               router.refresh();
             }}
-            className="w-full py-3 rounded-xl bg-primary text-black font-semibold"
+            className="w-full py-2.5 rounded-xl border border-border text-sm text-muted hover:text-foreground"
           >
             Enter the War Room
           </button>

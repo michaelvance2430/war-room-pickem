@@ -108,15 +108,37 @@ export default function HomeWeekHero() {
   let secondaryLabel = "Standings";
 
   if (!state.hasCard) {
-    eyebrow = "Season not live yet";
-    title = "Waiting on the card";
-    body = state.isOps
-      ? `${weekLabel} has no published games. Share the invite, then build & publish the card so people can lock.`
-      : `No picks yet for ${weekLabel}. Your commissioner hasn’t published this week’s card — hang tight.`;
-    primaryHref = state.isOps ? "/commissioner" : "/locker-room";
-    primaryLabel = state.isOps ? "Publish this week’s card" : "Talk shit in the Locker";
-    secondaryHref = state.isOps ? "/locker-room" : "/standings";
-    secondaryLabel = state.isOps ? "Locker Room" : "See the board";
+    if (state.isCommish && state.scoredWeeks === 0) {
+      eyebrow = "You’re the host";
+      title =
+        state.rosterCount < 2
+          ? "Share your code — fill the room"
+          : "Publish the first card";
+      body =
+        state.rosterCount < 2
+          ? `Copy your invite code, text the crew, then build a card for ${weekLabel}. Demo slate is fine the first time.`
+          : `${state.rosterCount} in the room. ${weekLabel} has no games yet — open Commish → First card wizard (demo → publish).`;
+      primaryHref =
+        state.rosterCount < 2
+          ? "/commissioner?tab=settings"
+          : "/commissioner?tab=card&first=1";
+      primaryLabel =
+        state.rosterCount < 2 ? "Get invite code" : "Build first card →";
+      secondaryHref = "/commissioner";
+      secondaryLabel = "Commish tools";
+    } else {
+      eyebrow = "Season not live yet";
+      title = "Waiting on the card";
+      body = state.isOps
+        ? `${weekLabel} has no published games. Share the invite, then build & publish the card so people can lock.`
+        : `No picks yet for ${weekLabel}. Your commissioner hasn’t published this week’s card — hang tight.`;
+      primaryHref = state.isOps ? "/commissioner?tab=card&first=1" : "/locker-room";
+      primaryLabel = state.isOps
+        ? "Publish this week’s card"
+        : "Talk shit in the Locker";
+      secondaryHref = state.isOps ? "/locker-room" : "/standings";
+      secondaryLabel = state.isOps ? "Locker Room" : "See the board";
+    }
   } else if (state.iLocked) {
     eyebrow = state.frozen ? "Card locked" : "You’re in";
     title = state.frozen
@@ -213,14 +235,20 @@ export default function HomeWeekHero() {
               </span>
               {" — "}
               {state.hasCard
-                ? "Card is live. After games: score the week, then drop Gazette energy."
-                : "Your job: invite friends → build card → publish. Use the checklist in Commish tools."}
+                ? state.scoredWeeks === 0
+                  ? "Card is live. After games: score the week so standings wake up."
+                  : "Card is live. After games: score the week, then Gazette."
+                : "Invite → First card wizard (demo) → Publish. Advanced tools wait until you score once."}
             </p>
             <Link
-              href="/commissioner"
+              href={
+                state.hasCard
+                  ? "/commissioner?tab=results"
+                  : "/commissioner?tab=card&first=1"
+              }
               className="shrink-0 text-xs font-semibold text-primary hover:underline"
             >
-              Run this week →
+              {state.hasCard ? "Score week →" : "First card wizard →"}
             </Link>
           </div>
         )}

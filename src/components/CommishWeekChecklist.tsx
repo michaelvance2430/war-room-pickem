@@ -15,6 +15,7 @@ type Step = {
   id: string;
   label: string;
   detail: string;
+  why: string;
   done: boolean;
   actionTab?: "settings" | "card" | "picks" | "results";
 };
@@ -74,6 +75,7 @@ export default function CommishWeekChecklist({
             detail: hasCode
               ? `Share code ${league?.code} · ${humans} human${humans === 1 ? "" : "s"} joined`
               : "Copy your league code from Settings and text the crew",
+            why: "No code = empty room.",
             done: humans >= 2,
             actionTab: "settings",
           },
@@ -82,7 +84,8 @@ export default function CommishWeekChecklist({
             label: "2. Build & publish the card",
             detail: hasCard
               ? `${weekTitle(w)} is live (${card!.games!.length} games)`
-              : `Pull odds or demo slate for ${weekTitle(w)}, then Publish`,
+              : `First time? Use the First card wizard (demo slate → publish)`,
+            why: "No card = friends can’t pick.",
             done: hasCard,
             actionTab: "card",
           },
@@ -92,7 +95,11 @@ export default function CommishWeekChecklist({
             detail: hasCard
               ? `${completeLocks}/${expected || humans} fully locked · milk carton the rest`
               : "Publish a card first — then chase locks on Who’s in",
-            done: hasCard && completeLocks > 0 && completeLocks >= Math.max(1, expected - 1),
+            why: "No locks = empty scores and salty group chat.",
+            done:
+              hasCard &&
+              completeLocks > 0 &&
+              completeLocks >= Math.max(1, expected - 1),
             actionTab: "picks",
           },
           {
@@ -103,6 +110,7 @@ export default function CommishWeekChecklist({
               : hasCard
                 ? "After games finish: sync scores or enter results, then Score League"
                 : "Need a published card before you can score",
+            why: "No score = standings look broken.",
             done: thisWeekScored,
             actionTab: "results",
           },
@@ -111,6 +119,7 @@ export default function CommishWeekChecklist({
             label: "5. Let the room cook",
             detail:
               "Gazette, Locker, standings drama — the app does the theater after you score",
+            why: "This is why they stay.",
             done: thisWeekScored || completeLocks > 0,
           },
         ];
@@ -158,7 +167,9 @@ export default function CommishWeekChecklist({
           </p>
           <p className="text-sm font-semibold text-foreground">
             {weekTitle(week)} · {doneCount}/{steps.length} done
-            {nextStep ? ` · Next: ${nextStep.label.replace(/^\d+\.\s*/, "")}` : " · Looking good"}
+            {nextStep
+              ? ` · Next: ${nextStep.label.replace(/^\d+\.\s*/, "")}`
+              : " · Looking good"}
           </p>
         </div>
         <span className="text-xs text-muted shrink-0">
@@ -198,6 +209,7 @@ export default function CommishWeekChecklist({
                 <p className="text-xs text-muted mt-0.5 leading-relaxed">
                   {s.detail}
                 </p>
+                <p className="text-[10px] text-primary/80 mt-0.5">Why: {s.why}</p>
                 {!s.done && s.actionTab && onGoTab && (
                   <button
                     type="button"
@@ -212,7 +224,7 @@ export default function CommishWeekChecklist({
           ))}
           <p className="text-[10px] text-muted pt-1 px-1">
             Advanced tools (bots, odds credits, reset, pass commissioner) stay
-            below — this list is the spine of every week.
+            under Settings → Advanced until your first scored week.
           </p>
         </ol>
       )}

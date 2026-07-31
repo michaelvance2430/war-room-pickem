@@ -2,7 +2,8 @@
  * Fake 5-game slates for full-season dry runs (no Odds API required).
  */
 
-import type { Game, GameResult } from "./types";
+import type { Game } from "./types";
+import type { GameResult } from "./scoring";
 import { listFbsTeams } from "./fbs-teams";
 import { weekDateWindow } from "./season-calendar";
 

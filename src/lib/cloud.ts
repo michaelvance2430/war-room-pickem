@@ -1390,7 +1390,8 @@ export async function loadLeagueRoster(): Promise<LeagueRosterMember[]> {
         display_name?: string;
         avatar_url?: string | null;
       } | null;
-      const role = m.role === "commissioner" ? "commissioner" : "player";
+      const role: LeagueRosterMember["role"] =
+        m.role === "commissioner" ? "commissioner" : "player";
       const division = (m.division as LeagueRosterMember["division"]) || "North";
       const uid = m.user_id as string;
       return {

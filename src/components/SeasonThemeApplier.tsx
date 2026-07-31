@@ -53,7 +53,7 @@ export default function SeasonThemeApplier() {
         fromLocal &&
         fromLocal !== "default" &&
         (!fromCloud || fromCloud === "default");
-      paint(preferLocal ? fromLocal : next, preferLocal);
+      paint(preferLocal ? fromLocal : next, Boolean(preferLocal));
     })();
 
     function onStorage(e: StorageEvent) {
