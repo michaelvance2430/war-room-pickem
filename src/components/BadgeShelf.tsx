@@ -219,9 +219,16 @@ function BadgeDetailModal({
           </div>
 
           <div className="flex items-center justify-between text-xs text-muted px-1">
-            <span>Achievement points</span>
+            <span>
+              {def.creatorOnly
+                ? "Career points only"
+                : "Achievement points"}
+            </span>
             <span className="font-semibold" style={{ color: hex }}>
               +{def.points}
+              {def.creatorOnly ? (
+                <span className="text-muted font-normal"> · not season</span>
+              ) : null}
             </span>
           </div>
         </div>

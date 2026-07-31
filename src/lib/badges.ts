@@ -69,7 +69,7 @@ export const BADGE_CATALOG: BadgeDef[] = [
     id: "the_commissioner",
     name: "The Commissioner",
     description:
-      "Created the War Room. Writes the rules. Still might fade your lock.",
+      "Created the War Room. Writes the rules. Still might fade your lock. Career points only — does not pad season cheevos or Cheevo King.",
     howToEarn:
       "You can't. Only the person who built this app gets the crown. Peasants stay grey — go earn something you can actually unlock.",
     lockedLabel: "Hard locked — peasants don't get this one",
@@ -499,7 +499,8 @@ export function getPlayerBadges(player: Player): BadgeStatus[] {
 
 /**
  * Sum of points from earned badges.
- * forRanking: exclude Cheevo King so the crown can't pad the race for itself.
+ * forRanking: exclude Cheevo King (can't pad its own race) and creator-only
+ * badges (career flex only — not the season cheevo race).
  */
 export function getAchievementPoints(
   player: Player,
@@ -507,7 +508,12 @@ export function getAchievementPoints(
 ): number {
   return getPlayerBadges(player)
     .filter((b) => b.earned)
-    .filter((b) => !(opts?.forRanking && b.def.id === CHEEVO_KING_ID))
+    .filter((b) => {
+      if (!opts?.forRanking) return true;
+      if (b.def.id === CHEEVO_KING_ID) return false;
+      if (b.def.creatorOnly) return false;
+      return true;
+    })
     .reduce((sum, b) => sum + b.def.points, 0);
 }
 

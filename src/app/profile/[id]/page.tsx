@@ -272,8 +272,9 @@ export default function ProfilePage() {
                 />
               </div>
               <p className="text-[10px] text-muted mt-2">
-                Season cheevo = this year&apos;s badge haul. Career = all-time
-                (keeps growing after season reset).
+                Season cheevo = this year&apos;s earnable badges. Career =
+                all-time (incl. creator legendary if you have it). Creator crown
+                never pads season totals.
               </p>
             </div>
           </div>

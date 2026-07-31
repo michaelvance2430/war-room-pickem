@@ -85,10 +85,13 @@ export function bankCareerCheevos(
   return { points: row.points, newlyBanked };
 }
 
-/** Season total from live badge list (may drop after season reset). */
+/**
+ * Season total from live badge list (may drop after season reset).
+ * Creator-only legendaries (The Commissioner) are career-only — not season race.
+ */
 export function seasonCheevoFromBadges(earnedOrAll: BadgeStatus[]): number {
   return earnedOrAll
-    .filter((b) => b.earned)
+    .filter((b) => b.earned && !b.def.creatorOnly)
     .reduce((sum, b) => sum + b.def.points, 0);
 }
 
@@ -99,7 +102,7 @@ export function syncCareerWithPlayer(
 ): { seasonPoints: number; careerPoints: number } {
   const seasonPoints = seasonCheevoFromBadges(badges);
   const { points: careerPoints } = bankCareerCheevos(player.id, badges);
-  // Career should never be below season (same badge set at minimum)
+  // Career includes creator + everything banked; never below season haul
   return {
     seasonPoints,
     careerPoints: Math.max(careerPoints, seasonPoints),
