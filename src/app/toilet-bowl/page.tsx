@@ -15,7 +15,7 @@ import {
   cfpWeekForRound,
   Bracket,
 } from "@/lib/brackets";
-import { DEFAULT_CUT_LOCK_WEEK } from "@/lib/season-calendar";
+import { cutLockWeek } from "@/lib/season-calendar";
 import { weekTitle } from "@/lib/dates";
 import { isSelfPlayer, selfNameClass, selfRowClass } from "@/lib/self-highlight";
 
@@ -43,7 +43,9 @@ export default function ToiletBowlPage() {
         listScoredWeekNumbers(),
       ]);
       setPlayerCount(players.length);
-      const locked = scoredWeeks.includes(DEFAULT_CUT_LOCK_WEEK);
+      const locked = scoredWeeks.includes(
+        cutLockWeek(getLeague()?.sportId)
+      );
       setCutLocked(locked);
 
       if (players.length < 2) {
@@ -55,17 +57,28 @@ export default function ToiletBowlPage() {
       const seeded = seedToiletBowl(players);
       setFieldSize(seeded.length);
       const built = buildBracket("toilet", seeded);
-      const advanced = advanceBracketFromCfpWeeks(built, scoredWeeks);
+      const advanced = advanceBracketFromCfpWeeks(
+        built,
+        scoredWeeks,
+        getLeague()?.sportId
+      );
       setBracket(advanced);
 
       const totalRounds = advanced.rounds.length;
       const nextUnscored = [...Array(totalRounds).keys()].find(
-        (r) => !scoredWeeks.includes(cfpWeekForRound(r, totalRounds))
+        (r) =>
+          !scoredWeeks.includes(
+            cfpWeekForRound(r, totalRounds, getLeague()?.sportId)
+          )
       );
       if (nextUnscored == null) {
         setProgressNote("All bracket rounds scored — flush champion is final.");
       } else {
-        const w = cfpWeekForRound(nextUnscored, totalRounds);
+        const w = cfpWeekForRound(
+          nextUnscored,
+          totalRounds,
+          getLeague()?.sportId
+        );
         setProgressNote(
           `Next round advances when ${weekTitle(w)} is scored (higher weekly pts wins).`
         );
@@ -117,13 +130,13 @@ export default function ToiletBowlPage() {
             {cutLocked ? (
               <p className="text-muted">
                 <span className="font-medium text-toilet">Cut locked.</span>{" "}
-                Seeds stay put after cut week 14. Playoff weeks 15–18 fill the
+                Seeds stay put after the cut week. Playoff cards fill the
                 board.
               </p>
             ) : (
               <p className="text-muted">
                 <span className="font-medium text-toilet">Not locked yet.</span>{" "}
-                Seeds update with standings until week 14 is scored.
+                Seeds update with standings until the cut week is scored.
               </p>
             )}
             {progressNote && (

@@ -195,20 +195,42 @@ export function scoreMatchup(
 }
 
 /** App weeks that power bracket rounds (CFP R1 → Final). */
+/** CFB / default: CFP rounds map to app weeks 15–18 */
 export const CFP_BRACKET_WEEKS = [15, 16, 17, 18] as const;
+
+/** NFL: playoff cards after full RS (official weeks 1–18) */
+export const NFL_BRACKET_WEEKS = [19, 20, 21, 22] as const;
+
+export function bracketWeeksForLeague(
+  sportId?: string | null
+): readonly number[] {
+  try {
+    if (sportId === "nfl") return NFL_BRACKET_WEEKS;
+    if (sportId == null) {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { getLeague } = require("./league") as typeof import("./league");
+      if (getLeague()?.sportId === "nfl") return NFL_BRACKET_WEEKS;
+    }
+  } catch {
+    /* ignore */
+  }
+  return CFP_BRACKET_WEEKS;
+}
 
 /**
  * Which season week scores a given bracket round index.
- * Aligns so the Final uses week 18 when the bracket has ≤ 4 rounds.
+ * CFB: Final → week 18. NFL: Final → Super Bowl week 22.
  */
 export function cfpWeekForRound(
   roundIndex: number,
-  totalRounds: number
+  totalRounds: number,
+  sportId?: string | null
 ): number {
-  const n = Math.min(totalRounds, CFP_BRACKET_WEEKS.length);
-  const offset = CFP_BRACKET_WEEKS.length - n;
-  const idx = Math.min(offset + roundIndex, CFP_BRACKET_WEEKS.length - 1);
-  return CFP_BRACKET_WEEKS[idx];
+  const weeks = bracketWeeksForLeague(sportId);
+  const n = Math.min(totalRounds, weeks.length);
+  const offset = weeks.length - n;
+  const idx = Math.min(offset + roundIndex, weeks.length - 1);
+  return weeks[idx];
 }
 
 function normalizeWeeklyPoints(raw: unknown): number[] {
@@ -322,7 +344,8 @@ function placeWinnerIntoNext(
  */
 export function advanceBracketFromCfpWeeks(
   bracket: Bracket,
-  scoredWeeks: number[] | Set<number>
+  scoredWeeks: number[] | Set<number>,
+  sportId?: string | null
 ): Bracket {
   const scored =
     scoredWeeks instanceof Set ? scoredWeeks : new Set(scoredWeeks);
@@ -355,7 +378,7 @@ export function advanceBracketFromCfpWeeks(
   }
 
   for (let r = 0; r < totalRounds; r++) {
-    const week = cfpWeekForRound(r, totalRounds);
+    const week = cfpWeekForRound(r, totalRounds, sportId);
     const playable = weekIsPlayable(week, scored, roster);
 
     for (const m of out.rounds[r]) {

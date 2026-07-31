@@ -15,7 +15,7 @@ import {
   cfpWeekForRound,
   Bracket,
 } from "@/lib/brackets";
-import { DEFAULT_CUT_LOCK_WEEK } from "@/lib/season-calendar";
+import { cutLockWeek } from "@/lib/season-calendar";
 import { weekTitle } from "@/lib/dates";
 import { isSelfPlayer, selfNameClass, selfRowClass } from "@/lib/self-highlight";
 
@@ -43,7 +43,9 @@ export default function ChampionshipPage() {
         listScoredWeekNumbers(),
       ]);
       setPlayerCount(players.length);
-      const locked = scoredWeeks.includes(DEFAULT_CUT_LOCK_WEEK);
+      const locked = scoredWeeks.includes(
+        cutLockWeek(getLeague()?.sportId)
+      );
       setCutLocked(locked);
 
       if (players.length < 2) {
@@ -56,7 +58,11 @@ export default function ChampionshipPage() {
       const seeded = seedChampionship(players);
       setFieldSize(seeded.length);
       const built = buildBracket("championship", seeded);
-      const advanced = advanceBracketFromCfpWeeks(built, scoredWeeks);
+      const advanced = advanceBracketFromCfpWeeks(
+        built,
+        scoredWeeks,
+        getLeague()?.sportId
+      );
       setBracket(advanced);
 
       const totalRounds = advanced.rounds.length;
@@ -65,7 +71,7 @@ export default function ChampionshipPage() {
         (m) => m.slotA.player || m.slotB.player
       );
       const nextUnscored = [...Array(totalRounds).keys()].find((r) => {
-        const w = cfpWeekForRound(r, totalRounds);
+        const w = cfpWeekForRound(r, totalRounds, getLeague()?.sportId);
         return !scoredWeeks.includes(w);
       });
       if (nextUnscored == null && qfFilled) {
@@ -77,7 +83,11 @@ export default function ChampionshipPage() {
           `Round 1 is seeded from standings. Score ${playoffWord} weeks 15–18 (or use Commish → finish remaining weeks) to fill Quarterfinals → Final. Higher weekly score advances.`
         );
       } else if (nextUnscored != null) {
-        const w = cfpWeekForRound(nextUnscored, totalRounds);
+        const w = cfpWeekForRound(
+          nextUnscored,
+          totalRounds,
+          getLeague()?.sportId
+        );
         const playoffWord =
           getLeague()?.sportId === "nfl" ? "Playoff" : "CFP";
         setProgressNote(
@@ -132,8 +142,8 @@ export default function ChampionshipPage() {
               <span className="font-medium text-primary">Cut locked</span>
               <span className="text-muted">
                 {" "}
-                after week 14 (cut). Seeds stay put; playoff weeks 15–18 decide
-                who advances.
+                after the cut week. Seeds stay put; playoff cards decide who
+                advances.
               </span>
             </p>
           ) : (

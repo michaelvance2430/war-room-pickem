@@ -160,9 +160,9 @@ const SCORING_NFL: RuleSection = {
     "Weekly score = confidence points for correct ATS picks (+ double for a correct Best Bet) + prop points if you hit the prop.",
     "Only locked picks are scored. No locked card for the week = zero points for that week.",
     "Season standings total your weekly points.",
-    "Week 0 is optional. Real season runs Week 1 → Week 14 cut → playoff cards.",
-    "After Week 14 (cut) is scored, the cut locks: top half → Championship bracket, bottom → Toilet Bowl.",
-    "Playoff weeks (Wild Card / Divisional / Conference / Super Bowl) advance those brackets — higher weekly score wins the matchup.",
+    "Real season = official NFL Weeks 1–18 (Thu–Mon). Same numbers as the league.",
+    "After Week 18 is scored, the cut locks: top half → Championship bracket, bottom → Toilet Bowl.",
+    "Then Wild Card / Divisional / Conference / Super Bowl cards advance those brackets — higher weekly score wins the matchup.",
   ],
 };
 

@@ -2166,16 +2166,17 @@ function CommissionerPageInner() {
                   <p className="text-xs text-muted mb-1">Season length</p>
                   <p className="text-sm font-semibold text-foreground">
                     {league?.sportId === "nfl"
-                      ? `Weeks 1–${SEASON_MAX_WEEK} (no Week 0)`
+                      ? "NFL Weeks 1–18 + playoffs (19–22)"
                       : `Weeks 0–${SEASON_MAX_WEEK}`}
                   </p>
                   <p className="text-[11px] text-muted mt-1 leading-relaxed">
                     {league?.sportId === "nfl" ? (
                       <>
-                        NFL: official Week 1–14 (Thu–Mon, Kickoff Sep 10–14) ·{" "}
-                        <span className="text-warning">14 Cut</span> · 15 Wild
-                        Card · 16 Divisional · 17 Conference · 18 Super Bowl.
-                        No Week 0.
+                        Matches the real NFL: Weeks 1–18 regular season
+                        (Thu–Mon) · <span className="text-warning">cut after
+                        Week 18</span> · then Wild Card / Divisional /
+                        Conference / Super Bowl. Same week numbers fans know —
+                        no made-up map.
                       </>
                     ) : (
                       <>
@@ -2946,17 +2947,24 @@ function CommissionerPageInner() {
                   (w) => {
                     const scored = scoredWeeks.includes(w);
                     const nfl = league?.sportId === "nfl";
-                    const hint =
-                      w === 14
+                    const hint = nfl
+                      ? w === 18
+                        ? " · CUT"
+                        : w === 19
+                          ? " · WC"
+                          : w === 20
+                            ? " · Div"
+                            : w === 21
+                              ? " · Conf"
+                              : w === 22
+                                ? " · SB"
+                                : ""
+                      : w === 14
                         ? " · CUT"
                         : w === 0
                           ? " · openers"
                           : w >= 15
-                            ? nfl
-                              ? w === 18
-                                ? " · SB"
-                                : " · playoff"
-                              : " · CFP"
+                            ? " · CFP"
                             : "";
                     return (
                       <button
