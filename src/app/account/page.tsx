@@ -26,6 +26,7 @@ import {
 } from "@/lib/profile";
 import { isAppCreator } from "@/lib/creator";
 import { isViewAsPlayer, setViewAsPlayer } from "@/lib/view-as-player";
+import FeedbackForm from "@/components/FeedbackForm";
 
 export default function AccountPage() {
   const router = useRouter();
@@ -400,6 +401,8 @@ export default function AccountPage() {
             </p>
           </div>
         </section>
+
+        <FeedbackForm />
 
         <section className="rounded-xl border border-border bg-card p-5">
           <h2 className="font-semibold mb-2">Account</h2>

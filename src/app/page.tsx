@@ -409,6 +409,21 @@ export default function Home() {
               </p>
             </Link>
           )}
+
+          <Link
+            href="/account"
+            className="group rounded-xl border border-sky-400/35 bg-sky-500/10 backdrop-blur-sm p-6 hover:border-sky-300/60 hover:bg-sky-500/15 transition shadow-[0_0_40px_rgba(56,189,248,0.08)] sm:col-span-2 lg:col-span-3"
+          >
+            <div className="text-xs uppercase tracking-wider text-sky-300/80 mb-2">
+              You
+            </div>
+            <div className="text-lg font-semibold text-sky-200 group-hover:text-sky-100 transition">
+              Account
+            </div>
+            <p className="text-sm text-muted mt-2">
+              Photo · leagues · player view · feedback for Mike
+            </p>
+          </Link>
         </section>
       </main>
     </div>
