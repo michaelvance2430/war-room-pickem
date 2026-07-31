@@ -21,6 +21,7 @@ import GuestDemoChrome from "@/components/GuestDemoChrome";
 import GuestOnboarding from "@/components/GuestOnboarding";
 import PlayerWalkthrough from "@/components/PlayerWalkthrough";
 import RingCeremonyModal from "@/components/RingCeremonyModal";
+import SeasonFinaleModal from "@/components/SeasonFinaleModal";
 import JoinBadgeHydrator from "@/components/JoinBadgeHydrator";
 import EquippedTitleHydrator from "@/components/EquippedTitleHydrator";
 import ProfileBorderHydrator from "@/components/ProfileBorderHydrator";
@@ -621,6 +622,8 @@ export default function Nav() {
       {!isGuestMode() && <SeasonCountdownTicker />}
       {!isGuestMode() && <SeasonOpenWelcome />}
       {!isGuestMode() && <RingCeremonyModal />}
+      {/* End-of-season: who won champ / toilet / nerd — once per player when engraved */}
+      {!isGuestMode() && <SeasonFinaleModal />}
       {!isGuestMode() && <JoinBadgeHydrator />}
       {!isGuestMode() && <EquippedTitleHydrator />}
       {!isGuestMode() && <ProfileBorderHydrator />}
