@@ -63,8 +63,7 @@ export default function Nav() {
     refreshRoles();
     setMenuOpen(false);
     setMoreOpen(false);
-    // Land in Commish tools — clearest “back to ops”
-    window.location.href = "/commissioner";
+    // Stay on this page — Commish chrome comes back without a full trip to /commissioner
   }
 
   useEffect(() => {
@@ -449,7 +448,7 @@ export default function Nav() {
                     onClick={exitPlayerView}
                     className="w-full py-3 rounded-xl bg-warning text-black text-sm font-extrabold uppercase tracking-wide"
                   >
-                    Exit player view → Commish
+                    Exit player view
                   </button>
                 </div>
               )}
@@ -524,14 +523,14 @@ export default function Nav() {
         <div className="sticky top-14 z-[45] border-b-2 border-warning bg-warning text-black">
           <div className="max-w-6xl mx-auto px-3 sm:px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs sm:text-sm font-bold">
-              PLAYER VIEW — no Commish tools. Tap Exit anytime.
+              PLAYER VIEW — no Commish tools. Exit anytime (stays on this page).
             </p>
             <button
               type="button"
               onClick={exitPlayerView}
               className="shrink-0 px-4 py-2 rounded-lg bg-black text-warning text-xs sm:text-sm font-extrabold uppercase tracking-wide hover:bg-black/90"
             >
-              Exit → Commish tools
+              Exit player view
             </button>
           </div>
         </div>
