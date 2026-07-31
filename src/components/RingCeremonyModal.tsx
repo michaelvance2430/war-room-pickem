@@ -9,17 +9,18 @@ import {
 } from "@/lib/cloud";
 import { loadLeagueTrophies } from "@/lib/trophies";
 import { getDefendingChampion } from "@/lib/player-history";
-import { isSeasonOpen } from "@/lib/season-countdown";
+import { weekWindowMs } from "@/lib/season-calendar";
 
 /**
  * Opening Day / ring ceremony.
- * Only once per player · league · season year, and only while the
- * first week of the live season is open (active week 0 or 1, season doors open).
- * Does not re-fire midseason or on every login after dismissal.
+ *
+ * Only when Week 0 (first CFB week) has actually started — not on
+ * account create, not on early logins, not the day before openers.
+ * Once per player · league · champ year, during the opening window only.
  */
-const SEEN_KEY = "warroom-ring-ceremony-seen-v2";
+const SEEN_KEY = "warroom-ring-ceremony-seen-v3";
 
-/** League active week counts as "opening week" */
+/** League active week still in opening stretch */
 const OPENING_WEEKS = new Set([0, 1]);
 
 function storageKey(
@@ -28,6 +29,20 @@ function storageKey(
   champYear: number
 ) {
   return `${SEEN_KEY}:${leagueId || "default"}:${playerId}:${champYear}`;
+}
+
+/**
+ * True only on/after Week 0 start (ET) through end of Week 1 window.
+ * Aug 23 "doors open" / signup / day-before does NOT qualify.
+ */
+export function isOpeningWeekLive(nowMs = Date.now()): boolean {
+  const w0 = weekWindowMs(0);
+  if (!w0) return false;
+  if (nowMs < w0.startMs) return false; // not a day early
+  const w1 = weekWindowMs(1);
+  const endMs = w1?.endMs ?? w0.endMs;
+  if (nowMs > endMs) return false;
+  return true;
 }
 
 export default function RingCeremonyModal() {
@@ -43,24 +58,21 @@ export default function RingCeremonyModal() {
     let cancelled = false;
     async function run() {
       try {
-        // Real season only — no preseason sandbox spam
-        if (!isSeasonOpen()) return;
+        // Hard calendar gate: Week 0 has started (not signup week, not Aug 23 doors)
+        if (!isOpeningWeekLive()) return;
 
         const league = getLeague();
         const session = getSession();
         if (!session?.playerId || !league?.id) return;
 
-        // First week open only (Week 0 openers or Week 1)
         const activeWeek = await loadLeagueActiveWeek();
         if (!OPENING_WEEKS.has(activeWeek)) return;
 
-        // If the room has already scored past opening, skip even if active week lag
         try {
           const scored = await listScoredWeekNumbers();
-          const pastOpening = scored.some((w) => w >= 2);
-          if (pastOpening) return;
+          if (scored.some((w) => w >= 2)) return;
         } catch {
-          /* ignore scored check */
+          /* ignore */
         }
 
         const trophies = await loadLeagueTrophies();
@@ -150,7 +162,7 @@ export default function RingCeremonyModal() {
             </p>
           )}
           <p className="text-xs text-muted mt-2 leading-relaxed">
-            First week is live. The ring is theirs until someone takes it.
+            Week 0 is live. The ring is theirs until someone takes it.
           </p>
         </div>
 
