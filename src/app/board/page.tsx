@@ -1,13 +1,14 @@
 "use client";
 
 /**
- * League pick board — after a week is scored, see everyone's slips.
- * Cross-talk: who took the dog, who maxed confidence, who nailed the prop.
+ * The Board — fantasy-football style league pick reveal.
+ * Opens at first kickoff (card locks). Secret until then.
+ * Views: By game (who took whom) · Full cards (matrix)
  */
 
-import { useCallback, useEffect, useState, Suspense } from "react";
+import { useCallback, useEffect, useMemo, useState, Suspense } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import Nav from "@/components/Nav";
 import PlayerLink from "@/components/PlayerLink";
 import {
@@ -21,12 +22,27 @@ import {
   type CloudCard,
 } from "@/lib/cloud";
 import { scoreWeek, type GameResult } from "@/lib/scoring";
-import { weekTitle } from "@/lib/dates";
+import {
+  weekTitle,
+  formatKickoff,
+  isCardLockDeadlinePassed,
+  firstKickoffOnCardMs,
+} from "@/lib/dates";
 import { getSession } from "@/lib/league";
 import { formatRankedTeam } from "@/lib/rankings";
+import type { Game } from "@/lib/types";
+
+type ViewMode = "games" | "cards";
+
+function shortTeam(name: string, rank?: number | null) {
+  const full = formatRankedTeam(name, rank);
+  const bare = full.replace(/^#\d+\s*/, "");
+  return bare.split(" ").pop() || bare;
+}
 
 function BoardInner() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const weekParam = searchParams.get("week");
 
   const [week, setWeek] = useState(1);
@@ -41,6 +57,13 @@ function BoardInner() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selfId, setSelfId] = useState<string | null>(null);
+  const [mode, setMode] = useState<ViewMode>("games");
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, []);
 
   const load = useCallback(async (w: number) => {
     setLoading(true);
@@ -60,10 +83,12 @@ function BoardInner() {
 
       let target = w;
       if (!all.includes(target)) {
-        target =
-          scoredList[scoredList.length - 1] ??
-          all[all.length - 1] ??
-          active;
+        // Prefer active week (live slate) then last scored
+        target = all.includes(active)
+          ? active
+          : scoredList[scoredList.length - 1] ??
+            all[all.length - 1] ??
+            active;
       }
       setWeek(target);
 
@@ -99,58 +124,138 @@ function BoardInner() {
       weekParam != null && weekParam !== ""
         ? parseInt(weekParam, 10)
         : NaN;
-    void load(Number.isNaN(w) ? 1 : w);
+    void load(Number.isNaN(w) ? -1 : w);
   }, [weekParam, load]);
+
+  function goWeek(w: number) {
+    router.replace(`/board?week=${w}`);
+    void load(w);
+  }
 
   const games = card?.games || [];
   const prop = card?.prop;
+  const lockedNow =
+    lockedOpen ||
+    (games.length > 0 && isCardLockDeadlinePassed(games, now));
+  const firstKick = firstKickoffOnCardMs(games);
+
+  const lockedCount = slips.filter((s) => s.lockedAt).length;
 
   return (
     <div className="min-h-screen flex flex-col">
       <Nav />
-      <main className="flex-1 max-w-4xl mx-auto w-full px-4 py-8">
-        <div className="mb-6">
+      <main className="flex-1 max-w-3xl mx-auto w-full px-4 py-8">
+        <div className="mb-5">
           <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
-            After the whistle
+            League pick reveal
           </p>
           <h1 className="text-2xl font-black mt-1">The Board</h1>
-          <p className="text-sm text-muted mt-2 leading-relaxed max-w-xl">
-            When the first kickoff hits, the card locks and everyone&apos;s picks
-            open up. See who took the dog, who stacked the 5, who rode the prop
-            — live trash talk, not just a total score on Monday.
+          <p className="text-sm text-muted mt-2 leading-relaxed">
+            Like fantasy football: once the first game kicks off, you can see
+            what everyone locked — sides, confidence, Best Bets, prop.
           </p>
         </div>
 
+        {/* Status banner */}
+        {!loading && games.length > 0 && (
+          <div
+            className={`rounded-xl border px-4 py-3 mb-5 ${
+              lockedNow
+                ? "border-primary/40 bg-primary/10"
+                : "border-border bg-card"
+            }`}
+          >
+            {lockedNow ? (
+              <>
+                <p className="text-sm font-bold text-primary">
+                  {scored
+                    ? `${weekTitle(week)} scored · full reveal`
+                    : `${weekTitle(week)} is live · picks are open`}
+                </p>
+                <p className="text-xs text-muted mt-1">
+                  {lockedCount} of {slips.length} locked a card
+                  {scored
+                    ? " · results shown in green / red"
+                    : " · results appear when the commissioner scores"}
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-semibold text-foreground">
+                  Picks still secret
+                </p>
+                <p className="text-xs text-muted mt-1">
+                  The Board opens at first kickoff
+                  {firstKick
+                    ? ` (${new Date(firstKick).toLocaleString(undefined, {
+                        weekday: "short",
+                        month: "short",
+                        day: "numeric",
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })})`
+                    : ""}
+                  . Same moment cards freeze.
+                </p>
+              </>
+            )}
+          </div>
+        )}
+
         {weeks.length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-6">
+          <div className="flex flex-wrap gap-2 mb-4">
             {weeks.map((w) => {
               const isScored = scoredWeeks.includes(w);
               return (
                 <button
                   key={w}
                   type="button"
-                  onClick={() => void load(w)}
+                  onClick={() => goWeek(w)}
                   className={`px-3 py-1.5 rounded-full text-xs font-medium transition ${
                     w === week
                       ? "bg-primary text-black"
                       : isScored
                         ? "border border-primary/40 text-primary hover:bg-primary/10"
-                        : "border border-border text-muted"
+                        : "border border-border text-muted hover:text-foreground"
                   }`}
                 >
                   {weekTitle(w)}
-                  {isScored ? " · scored" : ""}
+                  {isScored ? " · done" : ""}
                 </button>
               );
             })}
           </div>
         )}
 
+        {lockedNow && !error && (
+          <div className="flex rounded-lg border border-border p-1 mb-5 bg-card gap-1">
+            <button
+              type="button"
+              onClick={() => setMode("games")}
+              className={`flex-1 py-2 rounded-md text-xs font-bold transition ${
+                mode === "games"
+                  ? "bg-primary text-black"
+                  : "text-muted hover:text-foreground"
+              }`}
+            >
+              By game
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("cards")}
+              className={`flex-1 py-2 rounded-md text-xs font-bold transition ${
+                mode === "cards"
+                  ? "bg-primary text-black"
+                  : "text-muted hover:text-foreground"
+              }`}
+            >
+              Full cards
+            </button>
+          </div>
+        )}
+
         <div className="flex flex-wrap gap-3 mb-6 text-sm">
-          <Link
-            href={`/picks`}
-            className="text-primary font-medium hover:underline"
-          >
+          <Link href="/picks" className="text-primary font-medium hover:underline">
             ← My Picks
           </Link>
           <span className="text-muted">·</span>
@@ -171,10 +276,16 @@ function BoardInner() {
         {!loading && error && (
           <div className="rounded-xl border border-warning/40 bg-warning/10 px-4 py-4 mb-6">
             <p className="text-sm text-warning font-medium">{error}</p>
-            <p className="text-xs text-muted mt-2">
-              Privacy: picks stay secret until the first kickoff on this card
-              (same moment your card freezes). After that, The Board opens for
-              the whole room — even before final scores.
+            <p className="text-xs text-muted mt-2 leading-relaxed">
+              Until first kickoff, only you see your card (like fantasy before
+              lock). Then The Board is the group chat fuel.
+            </p>
+            <p className="text-[11px] text-muted mt-2">
+              Commish: if kickoff already hit but this still blocks, run{" "}
+              <code className="text-foreground">
+                supabase/picks-reveal-after-lock.sql
+              </code>{" "}
+              in Supabase.
             </p>
             <Link
               href="/picks"
@@ -191,164 +302,374 @@ function BoardInner() {
           </p>
         )}
 
-        {!loading && !error && games.length > 0 && (
-          <>
-            {lockedOpen && (
-              <p className="text-xs text-primary font-medium mb-4">
-                {scored
-                  ? `${weekTitle(week)} is scored — full room reveal with results.`
-                  : `${weekTitle(week)} is locked (first kickoff hit) — slips are open. Results fill in when the commish scores.`}
-              </p>
-            )}
+        {!loading && !error && games.length > 0 && lockedNow && mode === "games" && (
+          <ByGameView
+            games={games}
+            slips={slips}
+            results={results}
+            prop={prop}
+            propResult={propResult}
+            selfId={selfId}
+            scored={scored}
+          />
+        )}
 
-            {/* Compact matrix: players × games */}
-            <div className="rounded-xl border border-border bg-card overflow-x-auto mb-6">
-              <table className="w-full text-xs min-w-[640px]">
-                <thead>
-                  <tr className="border-b border-border text-left">
-                    <th className="p-2 sticky left-0 bg-card z-10 min-w-[7rem]">
-                      Player
-                    </th>
-                    {games.map((g, i) => (
-                      <th key={g.id} className="p-2 font-medium min-w-[5.5rem]">
-                        <div className="text-[10px] text-muted">G{i + 1}</div>
-                        <div className="truncate max-w-[5.5rem]" title={`${g.awayTeam} @ ${g.homeTeam}`}>
-                          {g.awayTeam.split(" ").pop()} @{" "}
-                          {g.homeTeam.split(" ").pop()}
-                        </div>
-                        {results[g.id]?.winner && (
-                          <div className="text-[10px] text-primary mt-0.5">
-                            {results[g.id].winner === "push"
-                              ? "Push"
-                              : results[g.id].winner === "away"
-                                ? "Away"
-                                : "Home"}
-                          </div>
-                        )}
-                      </th>
-                    ))}
-                    <th className="p-2">Prop</th>
-                    <th className="p-2">Pts</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {slips.map((s) => {
-                    const scoredSlip =
-                      scored && prop
-                        ? scoreWeek(
-                            s.picks,
-                            s.bestBetId,
-                            s.propChoice,
-                            games,
-                            results,
-                            prop,
-                            propResult
-                          )
-                        : null;
-                    const pts =
-                      s.totalPoints != null
-                        ? s.totalPoints
-                        : scoredSlip?.totalPoints;
-                    return (
-                      <tr
-                        key={s.userId}
-                        className={`border-b border-border/60 ${
-                          s.userId === selfId ? "bg-primary/5" : ""
-                        }`}
-                      >
-                        <td className="p-2 sticky left-0 bg-card z-10 font-medium">
-                          <PlayerLink id={s.userId} name={s.name} />
-                          {!s.lockedAt && (
-                            <span className="block text-[10px] text-danger">
-                              No lock
-                            </span>
-                          )}
-                        </td>
-                        {games.map((g) => {
-                          const pk = s.picks[g.id];
-                          const res = results[g.id];
-                          let tone = "text-muted";
-                          if (pk && res?.winner) {
-                            if (res.winner === "push") tone = "text-muted";
-                            else if (pk.pick === res.winner)
-                              tone = "text-primary font-semibold";
-                            else tone = "text-danger/80";
-                          }
-                          if (!pk) {
-                            return (
-                              <td key={g.id} className="p-2 text-muted">
-                                —
-                              </td>
-                            );
-                          }
-                          const side =
-                            pk.pick === "away"
-                              ? formatRankedTeam(g.awayTeam, g.awayRank).replace(
-                                  /^#\d+\s*/,
-                                  ""
-                                )
-                              : formatRankedTeam(g.homeTeam, g.homeRank).replace(
-                                  /^#\d+\s*/,
-                                  ""
-                                );
-                          const short = side.split(" ").pop() || side;
-                          return (
-                            <td key={g.id} className={`p-2 ${tone}`}>
-                              <span className="font-mono">{pk.confidence}</span>
-                              {pk.isBestBet || s.bestBetId === g.id ? (
-                                <span className="text-primary">×2</span>
-                              ) : null}{" "}
-                              {short}
-                            </td>
-                          );
-                        })}
-                        <td className="p-2">
-                          {s.propChoice ? (
-                            <span
-                              className={
-                                propResult && s.propChoice === propResult
-                                  ? "text-primary font-semibold"
-                                  : propResult
-                                    ? "text-danger/80"
-                                    : ""
-                              }
-                            >
-                              {s.propChoice}
-                            </span>
-                          ) : (
-                            <span className="text-muted">—</span>
-                          )}
-                        </td>
-                        <td className="p-2 font-bold tabular-nums">
-                          {pts != null ? pts : "—"}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {prop?.question && (
-              <p className="text-xs text-muted mb-4">
-                Prop: {prop.question}
-                {propResult ? (
-                  <span className="text-primary font-medium">
-                    {" "}
-                    · Result: {propResult}
-                  </span>
-                ) : null}
-              </p>
-            )}
-
-            <p className="text-[11px] text-muted leading-relaxed">
-              Green-ish / primary = correct · red = wrong · confidence number
-              shown first. Best Bet marked ×2. Sort order = week points when
-              available.
-            </p>
-          </>
+        {!loading && !error && games.length > 0 && lockedNow && mode === "cards" && (
+          <FullCardsView
+            games={games}
+            slips={slips}
+            results={results}
+            prop={prop}
+            propResult={propResult}
+            selfId={selfId}
+            scored={scored}
+          />
         )}
       </main>
+    </div>
+  );
+}
+
+function ByGameView({
+  games,
+  slips,
+  results,
+  prop,
+  propResult,
+  selfId,
+  scored,
+}: {
+  games: Game[];
+  slips: WeekBoardSlip[];
+  results: Record<string, GameResult>;
+  prop: CloudCard["prop"] | undefined;
+  propResult: string | null;
+  selfId: string | null;
+  scored: boolean;
+}) {
+  return (
+    <div className="space-y-5">
+      {games.map((g, i) => {
+        const res = results[g.id];
+        const awayPicks = slips.filter(
+          (s) => s.picks[g.id]?.pick === "away"
+        );
+        const homePicks = slips.filter(
+          (s) => s.picks[g.id]?.pick === "home"
+        );
+        const noPick = slips.filter((s) => !s.picks[g.id]);
+        const kick = formatKickoff(g.commenceTime || g.startTime);
+
+        return (
+          <section
+            key={g.id}
+            className="rounded-xl border border-border bg-card overflow-hidden"
+          >
+            <div className="px-4 py-3 border-b border-border bg-background/50">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-muted font-bold">
+                    Game {i + 1}
+                    {res?.winner
+                      ? res.winner === "push"
+                        ? " · Push"
+                        : res.winner === "away"
+                          ? " · Away covers"
+                          : " · Home covers"
+                      : ""}
+                  </p>
+                  <h2 className="font-bold text-base mt-0.5">
+                    {formatRankedTeam(g.awayTeam, g.awayRank)} @{" "}
+                    {formatRankedTeam(g.homeTeam, g.homeRank)}
+                  </h2>
+                  <p className="text-xs text-muted mt-0.5">
+                    {kick.full}
+                    {g.spread != null && (
+                      <>
+                        {" "}
+                        ·{" "}
+                        {g.favorite === "home"
+                          ? `${shortTeam(g.homeTeam)} ${g.spread}`
+                          : `${shortTeam(g.awayTeam)} ${g.spread}`}
+                      </>
+                    )}
+                  </p>
+                </div>
+                <div className="text-[11px] text-muted tabular-nums">
+                  {awayPicks.length} away · {homePicks.length} home
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-border">
+              <PickSide
+                label={shortTeam(g.awayTeam, g.awayRank)}
+                side="Away"
+                list={awayPicks}
+                gameId={g.id}
+                winner={res?.winner}
+                selfId={selfId}
+                scored={scored}
+              />
+              <PickSide
+                label={shortTeam(g.homeTeam, g.homeRank)}
+                side="Home"
+                list={homePicks}
+                gameId={g.id}
+                winner={res?.winner}
+                selfId={selfId}
+                scored={scored}
+              />
+            </div>
+
+            {noPick.length > 0 && (
+              <p className="px-4 py-2 text-[11px] text-muted border-t border-border">
+                No pick:{" "}
+                {noPick.map((s) => s.name).join(", ")}
+              </p>
+            )}
+          </section>
+        );
+      })}
+
+      {prop?.question && (
+        <section className="rounded-xl border border-border bg-card p-4">
+          <p className="text-[10px] uppercase tracking-wider text-muted font-bold">
+            Prop
+          </p>
+          <p className="text-sm font-medium mt-1">{prop.question}</p>
+          {propResult && (
+            <p className="text-xs text-primary mt-1">Result: {propResult}</p>
+          )}
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            {prop.options.map((opt) => {
+              const who = slips.filter((s) => s.propChoice === opt);
+              const hit = propResult === opt;
+              return (
+                <div
+                  key={opt}
+                  className={`rounded-lg border px-3 py-2 ${
+                    propResult
+                      ? hit
+                        ? "border-primary/40 bg-primary/10"
+                        : "border-border"
+                      : "border-border"
+                  }`}
+                >
+                  <p className="text-xs font-bold">{opt}</p>
+                  <p className="text-[11px] text-muted mt-1">
+                    {who.length
+                      ? who.map((s) => s.name).join(", ")
+                      : "—"}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
+
+function PickSide({
+  label,
+  side,
+  list,
+  gameId,
+  winner,
+  selfId,
+  scored,
+}: {
+  label: string;
+  side: "Away" | "Home";
+  list: WeekBoardSlip[];
+  gameId: string;
+  winner?: "home" | "away" | "push" | null;
+  selfId: string | null;
+  scored: boolean;
+}) {
+  const sideKey = side === "Away" ? "away" : "home";
+  const isWin = winner === sideKey;
+  const isLoss = winner && winner !== "push" && winner !== sideKey;
+
+  // Sort by confidence desc
+  const sorted = useMemo(
+    () =>
+      [...list].sort((a, b) => {
+        const ca = a.picks[gameId]?.confidence || 0;
+        const cb = b.picks[gameId]?.confidence || 0;
+        return cb - ca;
+      }),
+    [list, gameId]
+  );
+
+  return (
+    <div className="p-3 min-h-[4rem]">
+      <p
+        className={`text-xs font-bold mb-2 ${
+          scored && isWin
+            ? "text-primary"
+            : scored && isLoss
+              ? "text-muted"
+              : "text-foreground"
+        }`}
+      >
+        {side}: {label}
+        {scored && isWin ? " ✓" : ""}
+      </p>
+      {sorted.length === 0 ? (
+        <p className="text-[11px] text-muted">Nobody</p>
+      ) : (
+        <ul className="space-y-1.5">
+          {sorted.map((s) => {
+            const pk = s.picks[gameId];
+            const conf = pk?.confidence || 0;
+            const bb = pk?.isBestBet || s.bestBetId === gameId;
+            return (
+              <li
+                key={s.userId}
+                className={`flex items-center justify-between gap-2 text-sm ${
+                  s.userId === selfId ? "text-primary font-semibold" : ""
+                }`}
+              >
+                <PlayerLink id={s.userId} name={s.name} />
+                <span className="text-xs font-mono tabular-nums shrink-0">
+                  {conf}
+                  {bb ? (
+                    <span className="text-primary font-bold"> ×2</span>
+                  ) : null}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function FullCardsView({
+  games,
+  slips,
+  results,
+  prop,
+  propResult,
+  selfId,
+  scored,
+}: {
+  games: Game[];
+  slips: WeekBoardSlip[];
+  results: Record<string, GameResult>;
+  prop: CloudCard["prop"] | undefined;
+  propResult: string | null;
+  selfId: string | null;
+  scored: boolean;
+}) {
+  return (
+    <div className="space-y-4">
+      {slips.map((s) => {
+        const scoredSlip =
+          scored && prop
+            ? scoreWeek(
+                s.picks,
+                s.bestBetId,
+                s.propChoice,
+                games,
+                results,
+                prop,
+                propResult
+              )
+            : null;
+        const pts =
+          s.totalPoints != null ? s.totalPoints : scoredSlip?.totalPoints;
+
+        return (
+          <section
+            key={s.userId}
+            className={`rounded-xl border bg-card p-4 ${
+              s.userId === selfId
+                ? "border-primary/40 bg-primary/5"
+                : "border-border"
+            }`}
+          >
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <div>
+                <PlayerLink id={s.userId} name={s.name} />
+                {!s.lockedAt && (
+                  <span className="ml-2 text-[10px] text-danger font-bold uppercase">
+                    No lock
+                  </span>
+                )}
+              </div>
+              {pts != null && (
+                <span className="text-lg font-black tabular-nums text-primary">
+                  {pts}
+                </span>
+              )}
+            </div>
+            <ul className="space-y-1.5 text-sm">
+              {games.map((g) => {
+                const pk = s.picks[g.id];
+                const res = results[g.id];
+                const gs = scoredSlip?.gameScores.find(
+                  (x) => x.gameId === g.id
+                );
+                if (!pk) {
+                  return (
+                    <li key={g.id} className="text-muted text-xs">
+                      {shortTeam(g.awayTeam)} @ {shortTeam(g.homeTeam)} — —
+                    </li>
+                  );
+                }
+                const sideLabel =
+                  pk.pick === "away"
+                    ? shortTeam(g.awayTeam, g.awayRank)
+                    : shortTeam(g.homeTeam, g.homeRank);
+                let tone = "text-foreground";
+                if (gs) {
+                  if (gs.pushed) tone = "text-muted";
+                  else if (gs.correct) tone = "text-primary font-semibold";
+                  else tone = "text-danger/90";
+                }
+                return (
+                  <li key={g.id} className={tone}>
+                    <span className="font-mono text-xs">{pk.confidence}</span>
+                    {(pk.isBestBet || s.bestBetId === g.id) && (
+                      <span className="text-primary text-xs font-bold">
+                        {" "}
+                        ×2
+                      </span>
+                    )}{" "}
+                    {sideLabel}
+                    {res?.winner && gs && !gs.pushed && (
+                      <span className="text-[10px] ml-1 opacity-80">
+                        {gs.correct ? `+${gs.points}` : "miss"}
+                      </span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+            {s.propChoice && (
+              <p className="text-xs mt-2 text-muted">
+                Prop:{" "}
+                <span
+                  className={
+                    propResult
+                      ? s.propChoice === propResult
+                        ? "text-primary font-semibold"
+                        : "text-danger/80"
+                      : "text-foreground"
+                  }
+                >
+                  {s.propChoice}
+                </span>
+              </p>
+            )}
+          </section>
+        );
+      })}
     </div>
   );
 }

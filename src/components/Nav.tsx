@@ -211,6 +211,7 @@ export default function Nav() {
   const primaryLinks: NavLink[] = [
     { href: "/", label: "Home" },
     { href: "/picks", label: "My Picks" },
+    { href: "/board", label: "The Board" },
     { href: "/standings", label: "Standings" },
     { href: "/locker-room", label: "Locker", badge: lockerUnseen },
     { href: "/gazette", label: "Gazette" },
@@ -231,7 +232,6 @@ export default function Nav() {
       ? [{ href: "/crystal-ball", label: "Crystal Ball" }]
       : []),
     { href: "/stats", label: "Stats" },
-    { href: "/board", label: "The Board" },
     { href: "/announcements", label: "News", badge: unreadCount },
     { href: "/players", label: "Players" },
     { href: "/rules", label: "Rules" },
