@@ -122,8 +122,57 @@ export function advancePlayerTutorialTo(step: PlayerTutorialStep) {
   setPlayerTutorialStep(step);
 }
 
+/** Explicit back — one step only. */
+export function goBackPlayerTutorial(): PlayerTutorialStep | null {
+  const s = getPlayerTutorialState();
+  if (!s.active || s.completed) return null;
+  const cur = ORDER.indexOf(s.step);
+  if (cur <= 0) return null;
+  const prev = ORDER[cur - 1];
+  // Force step (bypass forward-only guard)
+  write({
+    ...s,
+    step: prev,
+    completed: false,
+    active: true,
+  });
+  // Pause path-based auto-advance so we don't instantly re-skip this step
+  try {
+    sessionStorage.setItem("warroom-tut-hold-step", prev);
+  } catch {
+    /* ignore */
+  }
+  return prev;
+}
+
+export function clearTutorialHold() {
+  try {
+    sessionStorage.removeItem("warroom-tut-hold-step");
+  } catch {
+    /* ignore */
+  }
+}
+
+/** True if coach is holding on this step after user hit Back. */
+export function isTutorialHeldOn(step: PlayerTutorialStep): boolean {
+  try {
+    return sessionStorage.getItem("warroom-tut-hold-step") === step;
+  } catch {
+    return false;
+  }
+}
+
 export function skipPlayerTutorial() {
   completePlayerTutorial();
+}
+
+export function playerTutorialStepIndex(step: PlayerTutorialStep): number {
+  return ORDER.indexOf(step);
+}
+
+export function playerTutorialStepCount(): number {
+  // Exclude "done"
+  return ORDER.length - 1;
 }
 
 export type CoachCopy = {

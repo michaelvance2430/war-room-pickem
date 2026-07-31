@@ -12,17 +12,31 @@ import { getSession } from "@/lib/league";
 import { isGuestMode } from "@/lib/guest-mode";
 import {
   advancePlayerTutorialTo,
+  clearTutorialHold,
   coachCopyForStep,
   completePlayerTutorial,
   getPlayerTutorialState,
+  goBackPlayerTutorial,
   isPlayerTutorialActive,
+  isTutorialHeldOn,
   needsPlayerTutorial,
+  playerTutorialStepIndex,
   skipPlayerTutorial,
   startPlayerTutorial,
   type PlayerTutorialStep,
 } from "@/lib/player-tutorial";
 import { hasSeenRules } from "@/lib/rules";
 import { loadCrystalBall } from "@/lib/crystal-ball";
+
+const ORDER: PlayerTutorialStep[] = [
+  "open_crystal",
+  "search_team",
+  "lock_crystal",
+  "open_picks",
+  "fill_picks",
+  "save_picks",
+  "done",
+];
 
 export default function PlayerWalkthrough() {
   const pathname = usePathname();
@@ -45,7 +59,6 @@ export default function PlayerWalkthrough() {
     const session = getSession();
     if (!session?.playerId) return;
 
-    // After rules briefing, auto-start walk-the-dog if never completed
     function maybeStart() {
       if (isGuestMode()) return;
       if (!getSession()?.playerId) return;
@@ -64,7 +77,10 @@ export default function PlayerWalkthrough() {
       syncFromStorage();
     }
     function onStorage(e: StorageEvent) {
-      if (e.key?.includes("warroom-rules") || e.key?.includes("player-tutorial")) {
+      if (
+        e.key?.includes("warroom-rules") ||
+        e.key?.includes("player-tutorial")
+      ) {
         maybeStart();
       }
     }
@@ -78,51 +94,59 @@ export default function PlayerWalkthrough() {
     };
   }, []);
 
-  // Path + live data advance
+  // Gentle path hints — respect hold after Back
   useEffect(() => {
     if (!isPlayerTutorialActive()) return;
     const s = getPlayerTutorialState().step;
-
-    if (pathname?.startsWith("/crystal-ball")) {
-      if (s === "open_crystal") advancePlayerTutorialTo("search_team");
-      void loadCrystalBall().then((cb) => {
-        if (cb.myTeam) {
-          advancePlayerTutorialTo("open_picks");
-        }
-      });
+    if (isTutorialHeldOn(s)) {
+      syncFromStorage();
+      return;
     }
 
-    if (pathname?.startsWith("/picks")) {
-      if (
-        s === "open_crystal" ||
-        s === "search_team" ||
-        s === "lock_crystal" ||
-        s === "open_picks"
-      ) {
-        advancePlayerTutorialTo("fill_picks");
+    if (pathname?.startsWith("/crystal-ball")) {
+      // Only auto-enter search when they first open CB from step 1
+      if (s === "open_crystal") {
+        advancePlayerTutorialTo("search_team");
       }
+      void loadCrystalBall().then((cb) => {
+        if (cb.myTeam && !isTutorialHeldOn("open_picks")) {
+          const cur = getPlayerTutorialState().step;
+          if (
+            cur === "search_team" ||
+            cur === "lock_crystal" ||
+            cur === "open_crystal"
+          ) {
+            advancePlayerTutorialTo("open_picks");
+          }
+        }
+      });
     }
 
     syncFromStorage();
   }, [pathname]);
 
-  // Poll crystal selection / pick lock while active on those pages
+  // Poll completion signals while active
   useEffect(() => {
     if (!active) return;
     const id = setInterval(() => {
       const s = getPlayerTutorialState().step;
+      if (isTutorialHeldOn(s)) return;
+
       if (pathname?.startsWith("/crystal-ball")) {
         void loadCrystalBall().then((cb) => {
-          if (cb.myTeam && (s === "search_team" || s === "lock_crystal")) {
-            advancePlayerTutorialTo("open_picks");
-            syncFromStorage();
+          if (cb.myTeam) {
+            const cur = getPlayerTutorialState().step;
+            if (cur === "search_team" || cur === "lock_crystal") {
+              advancePlayerTutorialTo("open_picks");
+              syncFromStorage();
+            }
           }
         });
-        // Selection without lock: listen via sessionStorage hint from crystal page
         try {
           if (
             sessionStorage.getItem("warroom-tut-cb-selected") === "1" &&
-            s === "search_team"
+            s === "search_team" &&
+            !isTutorialHeldOn("search_team")
           ) {
             advancePlayerTutorialTo("lock_crystal");
             syncFromStorage();
@@ -133,11 +157,13 @@ export default function PlayerWalkthrough() {
       }
       if (pathname?.startsWith("/picks")) {
         try {
-          if (sessionStorage.getItem("warroom-tut-picks-filled") === "1") {
-            if (s === "fill_picks") {
-              advancePlayerTutorialTo("save_picks");
-              syncFromStorage();
-            }
+          if (
+            sessionStorage.getItem("warroom-tut-picks-filled") === "1" &&
+            s === "fill_picks" &&
+            !isTutorialHeldOn("fill_picks")
+          ) {
+            advancePlayerTutorialTo("save_picks");
+            syncFromStorage();
           }
           if (sessionStorage.getItem("warroom-tut-picks-saved") === "1") {
             completePlayerTutorial();
@@ -145,6 +171,7 @@ export default function PlayerWalkthrough() {
               sessionStorage.removeItem("warroom-tut-picks-saved");
               sessionStorage.removeItem("warroom-tut-picks-filled");
               sessionStorage.removeItem("warroom-tut-cb-selected");
+              clearTutorialHold();
             } catch {
               /* ignore */
             }
@@ -161,25 +188,40 @@ export default function PlayerWalkthrough() {
   if (!active || isGuestMode()) return null;
 
   const copy = coachCopyForStep(step);
+  const stepIdx = playerTutorialStepIndex(step);
+  const canGoBack = stepIdx > 0;
 
   function manualNext() {
-    const order: PlayerTutorialStep[] = [
-      "open_crystal",
-      "search_team",
-      "lock_crystal",
-      "open_picks",
-      "fill_picks",
-      "save_picks",
-      "done",
-    ];
-    const i = order.indexOf(step);
-    const next = order[i + 1] || "done";
+    clearTutorialHold();
+    const i = ORDER.indexOf(step);
+    const next = ORDER[i + 1] || "done";
     if (next === "done") {
       completePlayerTutorial();
     } else {
       advancePlayerTutorialTo(next);
     }
     syncFromStorage();
+  }
+
+  function goBack() {
+    const prev = goBackPlayerTutorial();
+    if (prev) {
+      // Clear completion hints that would re-skip the step they returned to
+      try {
+        if (prev === "search_team" || prev === "open_crystal") {
+          sessionStorage.removeItem("warroom-tut-cb-selected");
+        }
+        if (prev === "fill_picks" || prev === "open_picks") {
+          sessionStorage.removeItem("warroom-tut-picks-filled");
+          sessionStorage.removeItem("warroom-tut-picks-saved");
+        }
+      } catch {
+        /* ignore */
+      }
+      syncFromStorage();
+      const href = coachCopyForStep(prev).ctaHref;
+      if (href) router.push(href);
+    }
   }
 
   return (
@@ -199,6 +241,7 @@ export default function PlayerWalkthrough() {
             type="button"
             onClick={() => {
               skipPlayerTutorial();
+              clearTutorialHold();
               syncFromStorage();
             }}
             className="text-[11px] text-muted hover:text-foreground shrink-0 px-1"
@@ -207,9 +250,28 @@ export default function PlayerWalkthrough() {
           </button>
         </div>
         <div className="px-4 pb-3 flex flex-wrap gap-2">
+          {canGoBack && (
+            <button
+              type="button"
+              onClick={goBack}
+              className="px-4 py-2.5 rounded-xl border border-border text-sm font-semibold text-foreground hover:bg-card-hover"
+            >
+              ← Back
+            </button>
+          )}
           {copy.ctaHref && (
             <Link
               href={copy.ctaHref}
+              onClick={() => {
+                // User intentionally continuing — release hold
+                clearTutorialHold();
+                if (step === "open_crystal") {
+                  advancePlayerTutorialTo("search_team");
+                }
+                if (step === "open_picks") {
+                  advancePlayerTutorialTo("fill_picks");
+                }
+              }}
               className="flex-1 min-w-[8rem] text-center py-2.5 rounded-xl bg-primary text-black text-sm font-bold"
             >
               {copy.ctaLabel}
@@ -228,6 +290,7 @@ export default function PlayerWalkthrough() {
             <button
               type="button"
               onClick={() => {
+                clearTutorialHold();
                 advancePlayerTutorialTo("open_picks");
                 syncFromStorage();
                 router.push("/picks");
