@@ -54,6 +54,7 @@ import {
   seedTrialBotsInCloud,
   clearTrialBotsInCloud,
   seedBotPicksForWeekInCloud,
+  applyRandomBotChaosForWeek,
   fillLeagueWithBotsToCap,
   listScoredWeekNumbers,
   loadWeekResultsFromCloud,
@@ -859,8 +860,12 @@ function CommissionerPageInner() {
     const botFill = await seedBotPicksForWeekInCloud(activeWeek);
     setDemoBusy(false);
     if (botFill.ok && (botFill.botsFilled || 0) > 0) {
+      const chaos =
+        (botFill.chaosCount ?? 0) > 0
+          ? ` · 💥 ${botFill.chaosCount} Chaos`
+          : "";
       setBotReport(
-        `Demo week published · ${botFill.botsFilled} bot(s) locked picks. Enter Results → Randomize & score.`
+        `Demo week published · ${botFill.botsFilled} bot(s) locked picks${chaos}. Enter Results → Randomize & score.`
       );
       void refreshPickStatus(activeWeek);
     } else {
@@ -1064,8 +1069,12 @@ function CommissionerPageInner() {
     // Trial bots auto-fill valid slips for this card (no-op if no bots / SQL missing)
     const botFill = await seedBotPicksForWeekInCloud(activeWeek);
     if (botFill.ok && (botFill.botsFilled || 0) > 0) {
+      const chaos =
+        (botFill.chaosCount ?? 0) > 0
+          ? ` · 💥 ${botFill.chaosCount} Chaos`
+          : "";
       setBotReport(
-        `Published ${weekTitle(activeWeek)}. ${botFill.botsFilled} trial bot(s) locked fake picks.`
+        `Published ${weekTitle(activeWeek)}. ${botFill.botsFilled} trial bot(s) locked fake picks${chaos}.`
       );
       void refreshPickStatus(activeWeek);
     }
@@ -1158,8 +1167,43 @@ function CommissionerPageInner() {
       setBotReport(res.error || "Failed to fill bot picks");
       return;
     }
+    const chaosBit =
+      (res.chaosCount ?? 0) > 0
+        ? ` · 💥 ${res.chaosCount} went Chaos${
+            res.chaosNames?.length
+              ? ` (${res.chaosNames.slice(0, 4).join(", ")}${
+                  (res.chaosNames.length || 0) > 4 ? "…" : ""
+                })`
+              : ""
+          } — 2× week when scored`
+        : res.error
+          ? ` · Chaos sim: ${res.error}`
+          : "";
     setBotReport(
-      `Filled ${res.botsFilled ?? 0} bot pick slip(s) for ${weekTitle(activeWeek)}.`
+      `Filled ${res.botsFilled ?? 0} bot pick slip(s) for ${weekTitle(activeWeek)}.${chaosBit}`
+    );
+    void refreshPickStatus(activeWeek);
+  }
+
+  /** Re-roll who goes nuclear without re-seeding all picks */
+  async function handleBotChaosReroll() {
+    if (!requirePreseasonTools()) return;
+    setBotReport(null);
+    setBotBusy(true);
+    const res = await applyRandomBotChaosForWeek(activeWeek, { chance: 22 });
+    setBotBusy(false);
+    if (!res.ok) {
+      setBotReport(res.error || "Bot Chaos failed");
+      return;
+    }
+    setBotReport(
+      (res.chaosCount ?? 0) > 0
+        ? `💥 ${res.chaosCount} bot(s) went Chaos for ${weekTitle(activeWeek)}${
+            res.names?.length
+              ? `: ${res.names.slice(0, 6).join(", ")}`
+              : ""
+          }. Randomize & score to see 2× impact + Gazette.`
+        : `No bots armed Chaos this roll (chance ~22%). Try again or Fill bot picks first.`
     );
     void refreshPickStatus(activeWeek);
   }
@@ -2600,6 +2644,17 @@ function CommissionerPageInner() {
                 <button
                   type="button"
                   disabled={botBusy}
+                  onClick={() => void handleBotChaosReroll()}
+                  className={`px-3 py-1.5 rounded-lg border border-orange-500/50 text-orange-200 text-xs font-medium hover:bg-orange-500/10 disabled:opacity-50 ${
+                    !preseasonToolsOk ? "opacity-45" : ""
+                  }`}
+                  title="~22% of bots lock Chaos (2× week). Needs bot-chaos-sim.sql once."
+                >
+                  💥 Bot Chaos (~1 in 5)
+                </button>
+                <button
+                  type="button"
+                  disabled={botBusy}
                   onClick={() => void handleClearBots()}
                   className="px-3 py-1.5 rounded-lg border border-warning text-warning text-xs font-medium hover:bg-warning/10 disabled:opacity-50"
                 >
@@ -2609,11 +2664,13 @@ function CommissionerPageInner() {
               <p className="text-[11px] text-muted">
                 Setup once if buttons fail:{" "}
                 <code className="text-foreground">supabase/trial-bots.sql</code>
-                , then optional{" "}
-                <code className="text-foreground">supabase/bot-picks-smarter.sql</code>{" "}
-                for persona-based leans. Also run{" "}
-                <code className="text-foreground">supabase/league-capacity-32.sql</code>{" "}
-                so bots can&apos;t exceed 32.
+                , optional{" "}
+                <code className="text-foreground">supabase/bot-picks-smarter.sql</code>
+                ,{" "}
+                <code className="text-foreground">supabase/bot-chaos-sim.sql</code>{" "}
+                (random bot Chaos for sims),{" "}
+                <code className="text-foreground">supabase/league-capacity-32.sql</code>
+                .
               </p>
               {botReport && (
                 <p

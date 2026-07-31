@@ -2414,8 +2414,15 @@ export async function clearTrialBotsInCloud(): Promise<{
 
 /** Auto-lock valid pick slips for every bot for a published week. */
 export async function seedBotPicksForWeekInCloud(
-  weekNumber: number
-): Promise<{ ok: boolean; botsFilled?: number; error?: string }> {
+  weekNumber: number,
+  opts?: { chaosChance?: number; skipChaos?: boolean }
+): Promise<{
+  ok: boolean;
+  botsFilled?: number;
+  chaosCount?: number;
+  chaosNames?: string[];
+  error?: string;
+}> {
   const session = getSession();
   if (!session?.leagueId || !session.isCommissioner) {
     return { ok: false, error: "Commissioner only" };
@@ -2436,7 +2443,73 @@ export async function seedBotPicksForWeekInCloud(
   if (row.ok === false) {
     return { ok: false, error: row.error || "Failed to fill bot picks" };
   }
-  return { ok: true, botsFilled: row.botsFilled ?? 0 };
+
+  const botsFilled = row.botsFilled ?? 0;
+  if (opts?.skipChaos || botsFilled === 0) {
+    return { ok: true, botsFilled, chaosCount: 0 };
+  }
+
+  // ~1 in 5 bots go Chaos so you can see 2× impact + Gazette detonation
+  const chaos = await applyRandomBotChaosForWeek(weekNumber, {
+    chance: opts?.chaosChance ?? 22,
+  });
+  return {
+    ok: true,
+    botsFilled,
+    chaosCount: chaos.ok ? chaos.chaosCount ?? 0 : 0,
+    chaosNames: chaos.names,
+    error: chaos.ok ? undefined : chaos.error,
+  };
+}
+
+/**
+ * Sandbox: randomly arm Chaos Mode on trial bots that already locked this week.
+ * Needs supabase/bot-chaos-sim.sql once. Scoring multiplies those weeks by 2×.
+ */
+export async function applyRandomBotChaosForWeek(
+  weekNumber: number,
+  opts?: { chance?: number }
+): Promise<{
+  ok: boolean;
+  chaosCount?: number;
+  names?: string[];
+  error?: string;
+}> {
+  const session = getSession();
+  if (!session?.leagueId || !session.isCommissioner) {
+    return { ok: false, error: "Commissioner only" };
+  }
+  const chance = Math.max(0, Math.min(100, opts?.chance ?? 22));
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("apply_random_bot_chaos", {
+    p_league_id: session.leagueId,
+    p_week_number: weekNumber,
+    p_chance: chance,
+  });
+  if (error) {
+    if (/apply_random_bot_chaos|function|schema cache|does not exist/i.test(error.message || "")) {
+      return {
+        ok: false,
+        error:
+          "Bot Chaos sim needs supabase/bot-chaos-sim.sql run once in Supabase SQL Editor.",
+      };
+    }
+    return { ok: false, error: error.message };
+  }
+  const row = (data || {}) as {
+    ok?: boolean;
+    chaosCount?: number;
+    names?: string[];
+    error?: string;
+  };
+  if (row.ok === false) {
+    return { ok: false, error: row.error || "Failed to arm bot chaos" };
+  }
+  return {
+    ok: true,
+    chaosCount: row.chaosCount ?? 0,
+    names: Array.isArray(row.names) ? row.names : [],
+  };
 }
 
 export async function updateMemberDivision(
