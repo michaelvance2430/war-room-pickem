@@ -3,7 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { getSession, getLeague, isStaff, isOps } from "@/lib/league";
+import {
+  getSession,
+  getLeague,
+  isStaff,
+  isOps,
+  isCommissioner,
+  isActuallyCommissioner,
+} from "@/lib/league";
 import { createClient } from "@/lib/supabase/client";
 import Avatar from "@/components/Avatar";
 import RulesOnboardingModal from "@/components/RulesOnboardingModal";
@@ -13,6 +20,10 @@ import SeasonCountdownTicker from "@/components/SeasonCountdownTicker";
 import SeasonOpenWelcome from "@/components/SeasonOpenWelcome";
 import { loadMyProfile } from "@/lib/profile";
 import { refreshStaffSessionFlags } from "@/lib/cloud";
+import {
+  isViewAsPlayer,
+  setViewAsPlayer,
+} from "@/lib/view-as-player";
 
 type NavLink = {
   href: string;
@@ -38,24 +49,33 @@ export default function Nav() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [crystalBallOn, setCrystalBallOn] = useState(true);
+  const [playerPreview, setPlayerPreview] = useState(false);
+
+  function refreshRoles() {
+    setIsCommish(isCommissioner());
+    setOps(isOps());
+    setStaff(isStaff());
+    setPlayerPreview(isViewAsPlayer() && isActuallyCommissioner());
+  }
 
   useEffect(() => {
     const session = getSession();
     const league = getLeague();
-    setIsCommish(!!session?.isCommissioner);
-    setOps(isOps());
-    setStaff(isStaff());
+    refreshRoles();
     setName(session?.playerName || "You");
     setPlayerId(session?.playerId || null);
     setLeagueName(league?.name || "");
     setCrystalBallOn(league?.settings?.crystalBallEnabled !== false);
 
     void refreshStaffSessionFlags().then(() => {
-      const s = getSession();
-      setIsCommish(!!s?.isCommissioner);
-      setOps(isOps());
-      setStaff(isStaff());
+      refreshRoles();
     });
+
+    function onPreview() {
+      refreshRoles();
+    }
+    window.addEventListener("warroom-view-as-player", onPreview);
+    // cleanup below after unread load setup
 
     loadMyProfile().then((p) => {
       if (p) {
@@ -94,6 +114,9 @@ export default function Nav() {
     }
 
     loadUnread();
+    return () => {
+      window.removeEventListener("warroom-view-as-player", onPreview);
+    };
   }, []);
 
   useEffect(() => {
@@ -306,7 +329,10 @@ export default function Nav() {
               <Avatar name={name} avatarUrl={avatarUrl} size="sm" />
               <span className="hidden sm:inline">
                 {name}
-                {isCommish && (
+                {playerPreview && (
+                  <span className="ml-1 text-xs text-warning">(Player view)</span>
+                )}
+                {isCommish && !playerPreview && (
                   <span className="ml-1 text-xs text-primary">(Commish)</span>
                 )}
                 {!isCommish && ops && (
@@ -426,6 +452,29 @@ export default function Nav() {
           </>
         )}
       </header>
+      {playerPreview && (
+        <div className="border-b border-warning/40 bg-warning/15 text-[11px] sm:text-xs">
+          <div className="max-w-6xl mx-auto px-3 sm:px-4 py-1.5 flex flex-wrap items-center justify-center gap-2 text-center">
+            <span className="font-bold uppercase tracking-wider text-warning">
+              Player preview
+            </span>
+            <span className="text-muted">
+              You&apos;re seeing the app like a regular player (no Commish tools).
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setViewAsPlayer(false);
+                refreshRoles();
+                window.location.href = "/";
+              }}
+              className="font-semibold text-warning hover:underline"
+            >
+              Exit → back to Commish
+            </button>
+          </div>
+        </div>
+      )}
       {/* Until Aug 23 00:01 ET: countdown. After: ticker gone; one-time welcome splash */}
       <SeasonCountdownTicker />
       <SeasonOpenWelcome />

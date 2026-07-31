@@ -9,7 +9,7 @@ import {
   loadLeagueRoster,
   listScoredWeekNumbers,
 } from "@/lib/cloud";
-import { getSession, isOps } from "@/lib/league";
+import { getSession, isOps, isCommissioner } from "@/lib/league";
 import {
   formatCardLockDeadline,
   isCardLockDeadlinePassed,
@@ -70,7 +70,7 @@ export default function HomeWeekHero() {
           iLocked,
           rosterCount: humans.length,
           scoredWeeks: scored.length,
-          isCommish: !!session?.isCommissioner,
+          isCommish: isCommissioner(),
           isOps: isOps(),
           leagueCode: null,
         });

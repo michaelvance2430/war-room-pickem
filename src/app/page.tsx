@@ -7,7 +7,7 @@ import Link from "next/link";
 import HotTakeTicker from "@/components/HotTakeTicker";
 import CrownAndShame from "@/components/CrownAndShame";
 import HomeWeekHero from "@/components/HomeWeekHero";
-import { getSession, getLeague } from "@/lib/league";
+import { getSession, getLeague, isCommissioner } from "@/lib/league";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import {
   restoreSessionFromCloud,
@@ -78,13 +78,18 @@ export default function Home() {
             homeTaglineCustom: fresh.settings?.homeTaglineCustom,
           })
         );
-        setIsCommish(!!session.isCommissioner);
+        setIsCommish(isCommissioner());
         setReady(true);
       } catch (e: unknown) {
         setBootError(e instanceof Error ? e.message : "Failed to start");
       }
     }
     boot();
+    function onPreview() {
+      setIsCommish(isCommissioner());
+    }
+    window.addEventListener("warroom-view-as-player", onPreview);
+    return () => window.removeEventListener("warroom-view-as-player", onPreview);
   }, [router]);
 
   async function chooseLeague(leagueId: string) {
@@ -109,7 +114,7 @@ export default function Home() {
         homeTaglineCustom: league.settings?.homeTaglineCustom,
       })
     );
-    setIsCommish(!!session.isCommissioner);
+    setIsCommish(isCommissioner());
     setReady(true);
   }
 

@@ -1,5 +1,6 @@
 import { Player } from "./types";
 import { loadPlayers, savePlayers } from "./store";
+import { isViewAsPlayer } from "./view-as-player";
 
 const LEAGUE_KEY = "warroom-league";
 const SESSION_KEY = "warroom-session";
@@ -85,19 +86,35 @@ export function getSession(): Session | null {
   }
 }
 
-export function isCommissioner(): boolean {
+/** True session role — ignores “view as player” preview. */
+export function isActuallyCommissioner(): boolean {
   const session = getSession();
   return !!session?.isCommissioner;
 }
 
-/** Commissioner or deputy — week ops (card, results, who's-in). */
-export function isOps(): boolean {
+export function isActuallyOps(): boolean {
   const session = getSession();
   return !!(session?.isCommissioner || session?.isDeputy);
 }
 
+/**
+ * UI role helpers. When “View as player” is on, these return false so
+ * Commish/Ops chrome hides — real server permissions still use session.
+ */
+export function isCommissioner(): boolean {
+  if (isViewAsPlayer()) return false;
+  return isActuallyCommissioner();
+}
+
+/** Commissioner or deputy — week ops (card, results, who's-in). */
+export function isOps(): boolean {
+  if (isViewAsPlayer()) return false;
+  return isActuallyOps();
+}
+
 /** Commissioner, deputy, or moderator (troll control / staff nav). */
 export function isStaff(): boolean {
+  if (isViewAsPlayer()) return false;
   const session = getSession();
   return !!(
     session?.isCommissioner ||

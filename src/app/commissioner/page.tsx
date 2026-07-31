@@ -1363,10 +1363,19 @@ export default function CommissionerPage() {
         <main className="flex-1 flex items-center justify-center px-4">
           <div className="max-w-md text-center rounded-xl border border-border bg-card p-6">
             <h1 className="text-xl font-bold mb-2">Ops only</h1>
-            <p className="text-sm text-muted">
+            <p className="text-sm text-muted mb-3">
               Only the league commissioner or an appointed deputy can open these
-              tools.
+              tools. If you turned on{" "}
+              <span className="text-foreground font-medium">View as player</span>
+              , exit that mode on Account (or the yellow bar) to use Commish
+              again.
             </p>
+            <a
+              href="/account"
+              className="text-sm text-primary font-semibold hover:underline"
+            >
+              Account → View as player
+            </a>
           </div>
         </main>
       </div>

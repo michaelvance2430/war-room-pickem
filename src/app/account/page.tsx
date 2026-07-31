@@ -5,7 +5,12 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Nav from "@/components/Nav";
 import Avatar from "@/components/Avatar";
-import { getSession, getLeague } from "@/lib/league";
+import {
+  getSession,
+  getLeague,
+  isActuallyCommissioner,
+  isActuallyOps,
+} from "@/lib/league";
 import {
   fetchMyMemberships,
   switchToLeague,
@@ -20,6 +25,7 @@ import {
   removeMyAvatar,
 } from "@/lib/profile";
 import { isAppCreator } from "@/lib/creator";
+import { isViewAsPlayer, setViewAsPlayer } from "@/lib/view-as-player";
 
 export default function AccountPage() {
   const router = useRouter();
@@ -33,11 +39,15 @@ export default function AccountPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [playerView, setPlayerView] = useState(false);
+  const [canPreviewPlayer, setCanPreviewPlayer] = useState(false);
 
   async function reload() {
     const session = getSession();
     const league = getLeague();
     setUserId(session?.playerId || null);
+    setPlayerView(isViewAsPlayer());
+    setCanPreviewPlayer(isActuallyCommissioner() || isActuallyOps());
     setActiveId(league?.id || session?.leagueId || null);
     const profile = await loadMyProfile();
     if (profile) {
@@ -262,6 +272,39 @@ export default function AccountPage() {
             </div>
           </div>
         </section>
+
+        {canPreviewPlayer && (
+          <section className="rounded-xl border border-warning/40 bg-warning/10 p-5 mb-6">
+            <h2 className="font-semibold mb-1 text-warning">View as player</h2>
+            <p className="text-xs text-muted mb-3 leading-relaxed">
+              See the app like a regular league member: no Commish nav, no ops
+              checklist, no invite-code flex. Your real commissioner powers stay
+              intact — this only changes what you see. Exit anytime from the
+              yellow bar or here.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                const next = !playerView;
+                setViewAsPlayer(next);
+                setPlayerView(next);
+                setMessage(
+                  next
+                    ? "Player view ON — open Home to see the player experience"
+                    : "Player view OFF — Commish tools are back"
+                );
+                router.refresh();
+              }}
+              className={`text-sm px-4 py-2 rounded-lg font-semibold ${
+                playerView
+                  ? "bg-warning text-black"
+                  : "border border-warning/50 text-warning hover:bg-warning/15"
+              }`}
+            >
+              {playerView ? "Exit player view" : "Enter player view"}
+            </button>
+          </section>
+        )}
 
         <section className="rounded-xl border border-border bg-card p-5 mb-6">
           <h2 className="font-semibold mb-3">Your leagues</h2>
