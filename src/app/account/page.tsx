@@ -188,18 +188,44 @@ export default function AccountPage() {
               )}
               {userId && isAppCreator(userId) && (
                 <p className="text-xs text-yellow-500 font-medium">
-                  Creator legendary is active on your profile in every league.
+                  👑 The Commissioner legendary is active — gold on your profile
+                  in every league. Everyone else stays grey.
                 </p>
               )}
               {userId && !isAppCreator(userId) && (
-                <p className="text-[11px] text-muted font-mono break-all">
-                  User ID: {userId}
-                  <span className="block text-muted/80 font-sans mt-0.5">
-                    App creator: set this on Vercel as{" "}
-                    <code className="text-[10px]">NEXT_PUBLIC_CREATOR_USER_IDS</code>{" "}
-                    so The Commissioner badge follows you in every league.
-                  </span>
-                </p>
+                <div className="rounded-lg border border-yellow-500/40 bg-yellow-500/10 px-3 py-2 space-y-2">
+                  <p className="text-xs text-yellow-200 font-medium">
+                    Your legendary creator badge is grey because live doesn&apos;t
+                    know your User ID yet.
+                  </p>
+                  <p className="text-[11px] text-muted font-mono break-all">
+                    {userId}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className="text-[11px] px-2 py-1 rounded border border-yellow-500/50 text-yellow-200 hover:bg-yellow-500/15"
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(userId);
+                          setMessage("User ID copied — paste into Vercel env");
+                        } catch {
+                          setMessage("Copy failed — select the ID manually");
+                        }
+                      }}
+                    >
+                      Copy User ID
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-muted leading-relaxed">
+                    Vercel → Project → Settings → Environment Variables → add{" "}
+                    <code className="text-foreground">
+                      NEXT_PUBLIC_CREATOR_USER_IDS
+                    </code>{" "}
+                    = your User ID (above) → Redeploy. After that, 👑 lights gold
+                    for you only; friends stay grey with the peasant roast.
+                  </p>
+                </div>
               )}
               <p className="text-xs text-muted">
                 Any player can upload. JPG or PNG works best (max 2 MB after

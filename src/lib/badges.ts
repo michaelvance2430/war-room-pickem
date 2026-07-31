@@ -70,8 +70,9 @@ export const BADGE_CATALOG: BadgeDef[] = [
     name: "The Commissioner",
     description:
       "Created the War Room. Writes the rules. Still might fade your lock.",
-    howToEarn: "Build the damn app.",
-    lockedLabel: "Locked — you are NOT the creator",
+    howToEarn:
+      "You can't. Only the person who built this app gets the crown. Peasants stay grey — go earn something you can actually unlock.",
+    lockedLabel: "Hard locked — peasants don't get this one",
     tier: "legendary",
     points: 250,
     creatorOnly: true,

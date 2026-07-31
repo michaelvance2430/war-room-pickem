@@ -119,10 +119,10 @@ function BadgeDetailModal({
 }) {
   const { def, earned, progress } = status;
   const hex = TIER_HEX[def.tier];
-  const lockedText =
-    def.creatorOnly && !earned
-      ? def.lockedLabel || "Locked — you are NOT the creator"
-      : null;
+  const isCreatorLocked = !!(def.creatorOnly && !earned);
+  const lockedText = isCreatorLocked
+    ? def.lockedLabel || "Hard locked — peasants don't get this one"
+    : null;
 
   return (
     <div
@@ -177,11 +177,23 @@ function BadgeDetailModal({
             )}
           </div>
 
-          <div className="rounded-lg bg-background border border-border px-3 py-2">
+          <div
+            className={`rounded-lg bg-background border px-3 py-2 ${
+              isCreatorLocked ? "border-warning/40" : "border-border"
+            }`}
+          >
             <div className="text-[10px] uppercase tracking-wider text-muted mb-0.5">
-              {earned ? "About" : "How to earn"}
+              {earned
+                ? "About"
+                : isCreatorLocked
+                  ? "For the peasants"
+                  : "How to earn"}
             </div>
-            <div className="text-foreground">
+            <div
+              className={
+                isCreatorLocked ? "text-warning/90" : "text-foreground"
+              }
+            >
               {earned && def.creatorOnly ? def.description : def.howToEarn}
             </div>
             {!earned && progress && progress.target > 1 && (
