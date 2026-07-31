@@ -11,6 +11,7 @@ import { compareForSeed } from "@/lib/brackets";
 import { isSelfPlayer, selfNameClass, selfRowClass } from "@/lib/self-highlight";
 import YouBadge from "@/components/YouBadge";
 import PlayerLink from "@/components/PlayerLink";
+import { standingsHardwareFlair } from "@/lib/profile-hardware";
 import { Division, Player } from "@/lib/types";
 
 const divisions: (Division | "Overall")[] = [
@@ -147,6 +148,16 @@ export default function StandingsPage() {
                           )}
                         >
                           <PlayerLink id={player.id} name={player.name} />
+                          {standingsHardwareFlair(player.name).map((f) => (
+                            <span
+                              key={f.title}
+                              className="ml-1 inline-block text-sm align-middle"
+                              title={f.title}
+                              aria-label={f.title}
+                            >
+                              {f.emoji}
+                            </span>
+                          ))}
                           {isSelfPlayer(player.id, selfId) && <YouBadge />}
                         </span>
                         {swingById[player.id] && (

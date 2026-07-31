@@ -76,7 +76,8 @@ export const LEGACY_PROFILE_HARDWARE: Omit<ProfileTrophy, "source">[] = [
     title: "Village Nerd Award",
     subtitle: "Crystal Ball prophet",
     notes: "Called the national champ. Zero standings points. Infinite smug.",
-    winnerName: "Bill Ball Ben",
+    // Exact standings display name (casing may vary)
+    winnerName: "Bill ball Ben",
   },
 ];
 
@@ -84,7 +85,8 @@ export const LEGACY_PROFILE_HARDWARE: Omit<ProfileTrophy, "source">[] = [
 const LEGACY_NAME_ALIASES: { pattern: RegExp; legacyId: string }[] = [
   { pattern: /\bkahmann\b/i, legacyId: "legacy-kahmann-championship-2025" },
   {
-    pattern: /\bbill\s*ball\s*ben\b|\bbillballben\b|\bbill\s*ben\b/i,
+    // "Bill ball Ben" / "Bill Ball Ben" / "BillBallBen"
+    pattern: /\bbill\s*ball\s*ben\b|\bbillballben\b/i,
     legacyId: "legacy-bill-ball-ben-nerd-2025",
   },
 ];
@@ -194,3 +196,27 @@ export const BIG_GAME_KINDS: ProfileTrophyKind[] = [
   "toilet_bowl",
   "crystal_ball",
 ];
+
+/** Tiny standings flair for players with career hardware. */
+export function standingsHardwareFlair(playerName: string): {
+  emoji: string;
+  title: string;
+}[] {
+  const items = getProfileHardware({
+    playerId: "",
+    playerName,
+    leagueTrophies: [],
+  });
+  const flair: { emoji: string; title: string }[] = [];
+  const seen = new Set<string>();
+  for (const h of items) {
+    if (seen.has(h.kind)) continue;
+    seen.add(h.kind);
+    const meta = HARDWARE_KIND_META[h.kind];
+    flair.push({
+      emoji: meta.emoji,
+      title: `${h.seasonYear} ${h.title}`,
+    });
+  }
+  return flair;
+}
