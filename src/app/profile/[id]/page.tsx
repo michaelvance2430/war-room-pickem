@@ -9,12 +9,15 @@ import BadgeShelf from "@/components/BadgeShelf";
 import {
   formatMemberSince,
   getPlayerBadges,
-  memberDuration,
   syncLeagueCheevoKing,
   withPermanentBadges,
 } from "@/lib/badges";
 import { syncCareerWithPlayer } from "@/lib/career-cheevo";
 import { withCreatorFlag } from "@/lib/creator";
+import {
+  computeJoinTitles,
+  joinTitleTierLabel,
+} from "@/lib/join-titles";
 import {
   isMockPlayer,
   mockRoastFor,
@@ -45,15 +48,19 @@ export default function ProfilePage() {
   const [ready, setReady] = useState(false);
   const [lightbox, setLightbox] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  /** Join-order flex title (e.g. Day-One Demon, Bottom Feeder) */
+  const [joinTitle, setJoinTitle] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
       setLoadError(null);
+      setJoinTitle(null);
       try {
         let found: Player | null = null;
         let leagueForSync: Player[] = [];
+        let title: string | null = null;
 
         // Live league first (real multiplayer)
         try {
@@ -62,20 +69,21 @@ export default function ProfilePage() {
           );
           leagueForSync = await loadLeaguePlayers();
           found = leagueForSync.find((p) => p.id === id) ?? null;
-          if (found) {
-            try {
-              const roster = await loadLeagueRoster();
-              const row = roster.find((m) => m.userId === id);
-              if (row) {
-                found = {
-                  ...found,
-                  avatarUrl: row.avatarUrl ?? found.avatarUrl,
-                  name: row.name || found.name,
-                };
-              }
-            } catch {
-              /* optional */
+          try {
+            const roster = await loadLeagueRoster();
+            const titles = computeJoinTitles(roster);
+            title = titles.get(id) || null;
+            const row = roster.find((m) => m.userId === id);
+            if (found && row) {
+              found = {
+                ...found,
+                avatarUrl: row.avatarUrl ?? found.avatarUrl,
+                name: row.name || found.name,
+                memberSince: row.joinedAt || found.memberSince,
+              };
             }
+          } catch {
+            /* optional */
           }
 
           // Crown Cheevo King among live league (permanent storage by user id)
@@ -99,6 +107,7 @@ export default function ProfilePage() {
 
         if (cancelled) return;
         setPlayer(found);
+        setJoinTitle(title);
       } catch (e) {
         if (!cancelled) {
           setLoadError(e instanceof Error ? e.message : "Failed to load");
@@ -246,9 +255,30 @@ export default function ProfilePage() {
               </div>
               <p className="text-sm text-muted mb-3">
                 {player.division} Division ·{" "}
-                {mock
-                  ? "Lab-grown for your league"
-                  : memberDuration(player.memberSince)}
+                {mock ? (
+                  "Lab-grown for your league"
+                ) : joinTitle ? (
+                  <>
+                    <span
+                      className={
+                        joinTitle === "Bottom Feeder"
+                          ? "text-muted"
+                          : joinTitle === "Opened the Room"
+                            ? "text-amber-300 font-medium"
+                            : "text-foreground font-medium"
+                      }
+                      title={
+                        joinTitleTierLabel(joinTitle)
+                          ? `Join wave: ${joinTitleTierLabel(joinTitle)}`
+                          : undefined
+                      }
+                    >
+                      {joinTitle}
+                    </span>
+                  </>
+                ) : (
+                  "New recruit"
+                )}
               </p>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">

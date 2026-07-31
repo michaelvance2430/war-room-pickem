@@ -1183,13 +1183,38 @@ export type LeagueRosterMember = {
   isModerator?: boolean;
   lockerMuted?: boolean;
   isDeputy?: boolean;
+  /** memberships.joined_at — join-order profile titles */
+  joinedAt?: string | null;
 };
+
+/** Load joined_at map for join-order titles (works even if roster RPC is old). */
+async function loadJoinedAtByUser(
+  leagueId: string
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  try {
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("memberships")
+      .select("user_id, joined_at")
+      .eq("league_id", leagueId);
+    for (const row of data || []) {
+      const uid = row.user_id as string;
+      const at = row.joined_at as string | null;
+      if (uid && at) map.set(uid, at);
+    }
+  } catch {
+    /* optional */
+  }
+  return map;
+}
 
 /** Live league roster from Supabase memberships (not local mock players). */
 export async function loadLeagueRoster(): Promise<LeagueRosterMember[]> {
   const session = getSession();
   if (!session?.leagueId) return [];
   const supabase = createClient();
+  const joinedMap = await loadJoinedAtByUser(session.leagueId);
 
   // Preferred: security-definer roster (includes bots reliably)
   {
@@ -1202,9 +1227,10 @@ export async function loadLeagueRoster(): Promise<LeagueRosterMember[]> {
           const role = m.role === "commissioner" ? "commissioner" : "player";
           const division =
             (m.division as LeagueRosterMember["division"]) || "North";
+          const userId = m.user_id as string;
           return {
             membershipId: m.membership_id as string,
-            userId: m.user_id as string,
+            userId,
             name: (m.display_name as string) || "Player",
             division,
             role: role as "commissioner" | "player",
@@ -1214,6 +1240,10 @@ export async function loadLeagueRoster(): Promise<LeagueRosterMember[]> {
             isModerator: !!m.is_moderator,
             lockerMuted: !!m.locker_muted,
             isDeputy: !!m.is_deputy,
+            joinedAt:
+              (m.joined_at as string | null) ||
+              joinedMap.get(userId) ||
+              null,
           };
         })
         .sort((a, b) => {
@@ -1230,14 +1260,14 @@ export async function loadLeagueRoster(): Promise<LeagueRosterMember[]> {
     const res = await supabase
       .from("memberships")
       .select(
-        "id, user_id, role, division, total_points, is_bot, is_moderator, locker_muted, is_deputy, profiles(display_name, avatar_url)"
+        "id, user_id, role, division, total_points, joined_at, is_bot, is_moderator, locker_muted, is_deputy, profiles(display_name, avatar_url)"
       )
       .eq("league_id", session.leagueId);
     if (res.error && /is_bot|schema cache|column/i.test(res.error.message)) {
       const res2 = await supabase
         .from("memberships")
         .select(
-          "id, user_id, role, division, total_points, profiles(display_name, avatar_url)"
+          "id, user_id, role, division, total_points, joined_at, profiles(display_name, avatar_url)"
         )
         .eq("league_id", session.leagueId);
       if (res2.error) {
@@ -1249,7 +1279,7 @@ export async function loadLeagueRoster(): Promise<LeagueRosterMember[]> {
       // Last resort without embeds
       const res3 = await supabase
         .from("memberships")
-        .select("id, user_id, role, division, total_points")
+        .select("id, user_id, role, division, total_points, joined_at")
         .eq("league_id", session.leagueId);
       rows = (res3.data as Record<string, unknown>[] | null) || null;
     } else {
@@ -1297,6 +1327,8 @@ export async function loadLeagueRoster(): Promise<LeagueRosterMember[]> {
         isModerator: !!m.is_moderator,
         lockerMuted: !!m.locker_muted,
         isDeputy: !!m.is_deputy,
+        joinedAt:
+          (m.joined_at as string | null) || joinedMap.get(uid) || null,
       };
     })
     .sort((a, b) => {
