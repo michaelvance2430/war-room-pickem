@@ -8,6 +8,7 @@ import AvatarLightbox from "@/components/AvatarLightbox";
 import BadgeShelf from "@/components/BadgeShelf";
 import ProfileTrophyCase from "@/components/ProfileTrophyCase";
 import FootballResume from "@/components/FootballResume";
+import Avatar from "@/components/Avatar";
 import {
   formatMemberSince,
   getPlayerBadges,
@@ -311,24 +312,17 @@ export default function ProfilePage() {
               className="shrink-0 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               title="Expand photo"
             >
-              {player.avatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={player.avatarUrl}
-                  alt={player.name}
-                  className="w-24 h-24 sm:w-28 sm:h-28 rounded-full object-cover border-2 border-border"
-                />
-              ) : (
-                <div
-                  className={`w-24 h-24 sm:w-28 sm:h-28 rounded-full border-2 flex items-center justify-center text-2xl font-bold bg-background ${
-                    mock
-                      ? "border-warning/50 text-warning"
-                      : "border-border text-primary"
-                  }`}
-                >
-                  {ini}
-                </div>
-              )}
+              <Avatar
+                name={player.name}
+                avatarUrl={player.avatarUrl}
+                size="xl"
+                userId={player.id}
+                borderId={
+                  mock
+                    ? "plain"
+                    : undefined
+                }
+              />
             </button>
 
             <div className="flex-1 min-w-0">

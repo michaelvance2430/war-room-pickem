@@ -23,6 +23,7 @@ import PlayerWalkthrough from "@/components/PlayerWalkthrough";
 import RingCeremonyModal from "@/components/RingCeremonyModal";
 import JoinBadgeHydrator from "@/components/JoinBadgeHydrator";
 import EquippedTitleHydrator from "@/components/EquippedTitleHydrator";
+import ProfileBorderHydrator from "@/components/ProfileBorderHydrator";
 import { loadMyProfile } from "@/lib/profile";
 import { isGuestMode } from "@/lib/guest-mode";
 import { refreshStaffSessionFlags } from "@/lib/cloud";
@@ -421,7 +422,12 @@ export default function Nav() {
               className="flex items-center gap-2 text-sm text-muted hover:text-foreground"
               title="Your profile & badges"
             >
-              <Avatar name={name} avatarUrl={avatarUrl} size="sm" />
+              <Avatar
+                name={name}
+                avatarUrl={avatarUrl}
+                size="sm"
+                userId={playerId}
+              />
               <span className="hidden sm:inline">
                 {name}
                 {playerPreview && (
@@ -608,6 +614,7 @@ export default function Nav() {
       {!isGuestMode() && <RingCeremonyModal />}
       {!isGuestMode() && <JoinBadgeHydrator />}
       {!isGuestMode() && <EquippedTitleHydrator />}
+      {!isGuestMode() && <ProfileBorderHydrator />}
       {!isGuestMode() && <RulesOnboardingModal />}
       <GazetteModal />
       <BadgeUnlockModal />

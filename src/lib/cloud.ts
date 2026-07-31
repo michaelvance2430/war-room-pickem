@@ -1329,9 +1329,11 @@ export type LeagueRosterMember = {
   joinedAt?: string | null;
   /** profiles.equipped_title_id — badge worn as name title */
   equippedTitleId?: string | null;
+  /** profiles.equipped_border_id — avatar ring style */
+  equippedBorderId?: string | null;
 };
 
-/** Best-effort: load equipped name titles for roster user ids. */
+/** Best-effort: load equipped name titles + borders for roster user ids. */
 async function attachEquippedTitles(
   members: LeagueRosterMember[]
 ): Promise<LeagueRosterMember[]> {
@@ -1342,19 +1344,47 @@ async function attachEquippedTitles(
     if (!ids.length) return members;
     const { data, error } = await supabase
       .from("profiles")
-      .select("id, equipped_title_id")
+      .select("id, equipped_title_id, equipped_border_id")
       .in("id", ids);
-    if (error || !data?.length) return members;
-    const map = new Map<string, string | null>();
+    if (error || !data?.length) {
+      // Column missing — try titles only
+      try {
+        const { data: d2 } = await supabase
+          .from("profiles")
+          .select("id, equipped_title_id")
+          .in("id", ids);
+        if (!d2?.length) return members;
+        const map = new Map<string, string | null>();
+        for (const row of d2) {
+          map.set(
+            row.id as string,
+            (row.equipped_title_id as string | null) || null
+          );
+        }
+        return members.map((m) => ({
+          ...m,
+          equippedTitleId: map.get(m.userId) ?? m.equippedTitleId ?? null,
+        }));
+      } catch {
+        return members;
+      }
+    }
+    const titleMap = new Map<string, string | null>();
+    const borderMap = new Map<string, string | null>();
     for (const row of data) {
-      map.set(
+      titleMap.set(
         row.id as string,
         (row.equipped_title_id as string | null) || null
+      );
+      borderMap.set(
+        row.id as string,
+        (row.equipped_border_id as string | null) || null
       );
     }
     return members.map((m) => ({
       ...m,
-      equippedTitleId: map.get(m.userId) ?? m.equippedTitleId ?? null,
+      equippedTitleId: titleMap.get(m.userId) ?? m.equippedTitleId ?? null,
+      equippedBorderId: borderMap.get(m.userId) ?? m.equippedBorderId ?? null,
     }));
   } catch {
     return members;

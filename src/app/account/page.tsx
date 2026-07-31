@@ -40,6 +40,16 @@ import {
   setMyEquippedTitle,
   syncMyEquippedTitleFromCloud,
 } from "@/lib/equipped-title-store";
+import {
+  PROFILE_BORDER_CATALOG,
+  isBorderUnlocked,
+  type ProfileBorderDef,
+} from "@/lib/profile-borders";
+import {
+  getLocalEquippedBorderId,
+  setMyEquippedBorder,
+  syncMyBorderFromCloud,
+} from "@/lib/profile-border-store";
 import { loadLeaguePlayers } from "@/lib/cloud";
 import type { Player } from "@/lib/types";
 
@@ -62,6 +72,11 @@ export default function AccountPage() {
   );
   const [equippedBadgeId, setEquippedBadgeId] = useState<string | null>(null);
   const [titleBusy, setTitleBusy] = useState(false);
+  const [earnedBadgeIds, setEarnedBadgeIds] = useState<Set<string>>(
+    () => new Set()
+  );
+  const [equippedBorderId, setEquippedBorderId] = useState<string>("plain");
+  const [borderBusy, setBorderBusy] = useState(false);
 
   async function reload() {
     const session = getSession();
@@ -79,10 +94,14 @@ export default function AccountPage() {
     const list = await fetchMyMemberships();
     setMemberships(list);
 
-    // Equipped name title options (earned rare+)
+    // Equipped name title + border (from earned badges)
     if (session?.playerId) {
       await syncMyEquippedTitleFromCloud();
+      await syncMyBorderFromCloud();
       setEquippedBadgeId(getLocalEquippedBadgeId(session.playerId));
+      setEquippedBorderId(
+        getLocalEquippedBorderId(session.playerId) || "plain"
+      );
       try {
         let peers: Player[] = [];
         try {
@@ -113,8 +132,12 @@ export default function AccountPage() {
         me = withPermanentBadges(withCreatorFlag(me));
         const badges = getPlayerBadges(me, peers.length ? peers : undefined);
         setTitleOptions(listEquipableTitlesFromBadges(badges));
+        setEarnedBadgeIds(
+          new Set(badges.filter((b) => b.earned).map((b) => b.def.id))
+        );
       } catch {
         setTitleOptions([]);
+        setEarnedBadgeIds(new Set());
       }
     }
     // Any path that means "you run a league" → can preview player UI
@@ -427,10 +450,99 @@ export default function AccountPage() {
           )}
         </section>
 
+        <section className="rounded-xl border border-sky-400/30 bg-sky-400/5 p-5 mb-6">
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-sky-300 mb-1">
+            Avatar ring
+          </p>
+          <h2 className="font-semibold mb-1">Profile border</h2>
+          <p className="text-xs text-muted mb-3 leading-relaxed">
+            Unlock rings with achievements. Easy badges = simple borders.
+            Legendary hardware = loud rings. Pick one to equip.
+          </p>
+          <div className="flex justify-center mb-4">
+            <Avatar
+              name={name || "You"}
+              avatarUrl={avatarUrl}
+              size="lg"
+              userId={userId}
+              borderId={equippedBorderId}
+            />
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-72 overflow-y-auto">
+            {PROFILE_BORDER_CATALOG.map((b: ProfileBorderDef) => {
+              const unlocked =
+                !!userId &&
+                isBorderUnlocked(b, {
+                  userId,
+                  earnedBadgeIds,
+                });
+              const active = equippedBorderId === b.id;
+              return (
+                <button
+                  key={b.id}
+                  type="button"
+                  disabled={!unlocked || borderBusy}
+                  onClick={async () => {
+                    if (!unlocked) return;
+                    setBorderBusy(true);
+                    setMessage(null);
+                    const res = await setMyEquippedBorder(b.id);
+                    setBorderBusy(false);
+                    if (!res.ok) {
+                      setMessage(res.error || "Could not equip border");
+                      return;
+                    }
+                    setEquippedBorderId(b.id);
+                    setMessage(`Border equipped: ${b.name}`);
+                  }}
+                  className={`text-left rounded-xl border px-2.5 py-2 transition ${
+                    active
+                      ? "border-primary bg-primary/15"
+                      : unlocked
+                        ? "border-border bg-background hover:border-primary/40"
+                        : "border-border/50 bg-background/40 opacity-50 cursor-not-allowed"
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <Avatar
+                      name={name || "You"}
+                      avatarUrl={avatarUrl}
+                      size="sm"
+                      borderId={b.id}
+                      plain={false}
+                    />
+                    <span className="text-[11px] font-bold leading-tight">
+                      {b.name}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-muted leading-snug">
+                    {unlocked ? (
+                      <>
+                        <span className="text-primary font-semibold">
+                          {b.tier}
+                        </span>
+                        {active ? " · equipped" : " · tap to equip"}
+                      </>
+                    ) : (
+                      b.unlockLabel
+                    )}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
         <section className="rounded-xl border border-border bg-card p-5 mb-6">
           <h2 className="font-semibold mb-3">Profile photo</h2>
           <div className="flex items-center gap-4">
-            <Avatar name={name || "You"} avatarUrl={avatarUrl} size="lg" />
+            <Avatar
+              name={name || "You"}
+              avatarUrl={avatarUrl}
+              size="lg"
+              userId={userId}
+              borderId={equippedBorderId}
+            />
             <div className="flex-1 min-w-0 space-y-2">
               <p className="text-sm font-medium truncate">{name || "Player"}</p>
               {userId && (
