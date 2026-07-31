@@ -97,9 +97,13 @@ import {
 import { settlePropFromScores } from "@/lib/prop-settle";
 import {
   PROP_PRESETS,
+  PROP_CATEGORIES,
   CUSTOM_PROP_ID,
   propFromPreset,
   matchPresetId,
+  presetsForCategory,
+  categoryForPresetId,
+  type PropCategory,
 } from "@/lib/prop-presets";
 import { MAX_LEAGUE_PLAYERS } from "@/lib/league-limits";
 import {
@@ -191,6 +195,9 @@ function CommissionerPageInner() {
   /** Draft prop on Build Card (may differ until you re-publish). */
   const [prop, setProp] = useState<Prop>(() =>
     propFromPreset(PROP_PRESETS[0], 1)
+  );
+  const [propCategory, setPropCategory] = useState<PropCategory>(
+    PROP_PRESETS[0].category
   );
   const [propPresetId, setPropPresetId] = useState(PROP_PRESETS[0].id);
   /**
@@ -382,6 +389,10 @@ function CommissionerPageInner() {
   /** Sync Build Card draft controls from a known prop (publish / full week load). */
   function applyDraftFromProp(loaded: Prop) {
     setProp(loaded);
+    const pid = matchPresetId(loaded);
+    if (pid !== CUSTOM_PROP_ID) {
+      setPropCategory(categoryForPresetId(pid));
+    }
     const presetId = matchPresetId(loaded);
     setPropPresetId(presetId);
     if (presetId === CUSTOM_PROP_ID) {
@@ -970,7 +981,17 @@ function CommissionerPageInner() {
       return;
     }
     const preset = PROP_PRESETS.find((p) => p.id === id);
-    if (preset) setProp(propFromPreset(preset, activeWeek));
+    if (preset) {
+      setPropCategory(preset.category);
+      setProp(propFromPreset(preset, activeWeek));
+    }
+  }
+
+  function applyPropCategory(cat: PropCategory) {
+    setPropCategory(cat);
+    const list = presetsForCategory(cat);
+    const first = list[0];
+    if (first) applyPropPreset(first.id);
   }
 
   function syncCustomProp() {
@@ -3361,14 +3382,14 @@ function CommissionerPageInner() {
               </div>
             )}
 
-            {/* Weekly prop — outside game scroller so phone can edit freely */}
+            {/* Weekly prop — category dropdown → question list */}
             {availableGames.length > 0 && (
               <div className="rounded-xl border border-border bg-card p-5 mb-6 space-y-3">
                 <div>
                   <h3 className="font-semibold text-sm">Weekly prop</h3>
                   <p className="text-xs text-muted mt-0.5">
-                    Tap a preset (or Custom). Worth {prop.points} pts. Publish
-                    to put it on the card.
+                    Category → question. Worth {prop.points} pts. Publish to
+                    put it on the card.
                   </p>
                   {publishedProp?.question &&
                     publishedProp.question !== prop.question && (
@@ -3379,16 +3400,40 @@ function CommissionerPageInner() {
                     )}
                 </div>
 
-                {/* Native select as backup + large font (iOS won&apos;t zoom) */}
                 <label className="block text-xs text-muted">
-                  Quick pick
+                  Prop type
                   <select
-                    value={propPresetId}
+                    value={propCategory}
+                    onChange={(e) =>
+                      applyPropCategory(e.target.value as PropCategory)
+                    }
+                    className="mt-1 w-full min-h-[48px] bg-background border border-border rounded-lg px-3 py-3 text-base focus:outline-none focus:border-primary"
+                  >
+                    {PROP_CATEGORIES.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <p className="text-[11px] text-muted -mt-1">
+                  {PROP_CATEGORIES.find((c) => c.id === propCategory)?.blurb}
+                </p>
+
+                <label className="block text-xs text-muted">
+                  Question
+                  <select
+                    value={
+                      propPresetId === CUSTOM_PROP_ID
+                        ? CUSTOM_PROP_ID
+                        : propPresetId
+                    }
                     onChange={(e) => applyPropPreset(e.target.value)}
                     className="mt-1 w-full min-h-[48px] bg-background border border-border rounded-lg px-3 py-3 text-base focus:outline-none focus:border-primary"
                   >
-                    {PROP_PRESETS.map((p) => (
+                    {presetsForCategory(propCategory).map((p) => (
                       <option key={p.id} value={p.id}>
+                        {p.settle === "manual" ? "📝 " : "⚡ "}
                         {p.label}
                       </option>
                     ))}
@@ -3398,9 +3443,8 @@ function CommissionerPageInner() {
                   </select>
                 </label>
 
-                {/* Big tappable list — primary path on phone */}
                 <div className="max-h-56 overflow-y-auto rounded-lg border border-border divide-y divide-border overscroll-contain">
-                  {PROP_PRESETS.map((p) => {
+                  {presetsForCategory(propCategory).map((p) => {
                     const active = propPresetId === p.id;
                     return (
                       <button
@@ -3413,8 +3457,15 @@ function CommissionerPageInner() {
                             : "bg-background text-foreground hover:bg-card-hover"
                         }`}
                       >
-                        {active ? "✓ " : ""}
-                        {p.label}
+                        <span className="block">
+                          {active ? "✓ " : ""}
+                          {p.label}
+                        </span>
+                        <span className="block text-[10px] text-muted font-normal mt-0.5">
+                          {p.settle === "auto"
+                            ? "Auto-scores from finals"
+                            : "You set Yes/No after games (box score)"}
+                        </span>
                       </button>
                     );
                   })}
@@ -3433,8 +3484,8 @@ function CommissionerPageInner() {
                 </div>
 
                 <p className="text-[11px] text-muted">
-                  All presets refer only to the five games on this week&apos;s
-                  card. Worded so finals settle arguments.
+                  ⚡ Teams / most Funny auto-settle from scores. 📝 Players &amp;
+                  Odd need a box-score check (no player-stat feed yet).
                 </p>
 
                 {propPresetId === CUSTOM_PROP_ID ? (
