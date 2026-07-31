@@ -9,6 +9,7 @@ import CrownAndShame from "@/components/CrownAndShame";
 import HomeWeekHero from "@/components/HomeWeekHero";
 import PlayerWeekChecklist from "@/components/PlayerWeekChecklist";
 import CommishSetupBanner from "@/components/CommishSetupBanner";
+import InviteFriends from "@/components/InviteFriends";
 import HomeUnseenPulse from "@/components/HomeUnseenPulse";
 import HomeTileUnseen from "@/components/HomeTileUnseen";
 import LockPicksRoast from "@/components/LockPicksRoast";
@@ -323,6 +324,11 @@ export default function Home() {
 
         {/* First-time Commish season setup */}
         <CommishSetupBanner />
+
+        {/* Everyone can invite — deep link + fun copy */}
+        <div className="mb-6">
+          <InviteFriends />
+        </div>
 
         {/* Didn't lock? Sarcastic adulting reminder */}
         <LockPicksRoast />

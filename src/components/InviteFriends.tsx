@@ -1,36 +1,58 @@
 "use client";
 
 /**
- * One-tap league invite for commissioners.
+ * One-tap league invite for EVERY member — not just Commish.
  * Deep link: /join?code=XXXX — friend lands with code filled in.
+ * Share copy rotates flavors (boomer / dad / group chat / chaos…).
  */
 
 import { useState } from "react";
+import { getSession, getLeague } from "@/lib/league";
 import {
   buildInviteJoinUrl,
   buildInviteShareText,
   markInviteCopied,
   shareLeagueInvite,
+  type InviteFlavor,
 } from "@/lib/commish-onboarding";
 
 type Props = {
-  leagueName: string;
-  code: string;
+  leagueName?: string;
+  code?: string;
   leagueId?: string;
   /** Compact for banners */
   compact?: boolean;
   className?: string;
 };
 
+const FLAVOR_CHIPS: { id: InviteFlavor | "random"; label: string }[] = [
+  { id: "random", label: "Surprise me" },
+  { id: "groupchat", label: "Group chat" },
+  { id: "dad", label: "Dad energy" },
+  { id: "boomer", label: "Keep it simple" },
+  { id: "xennial", label: "Tradition" },
+  { id: "chaos", label: "Chaos" },
+  { id: "warroom", label: "Classic" },
+];
+
 export default function InviteFriends({
-  leagueName,
-  code,
-  leagueId,
+  leagueName: leagueNameProp,
+  code: codeProp,
+  leagueId: leagueIdProp,
   compact,
   className = "",
 }: Props) {
+  const session = getSession();
+  const league = getLeague();
+  const code = (codeProp || league?.code || "").trim().toUpperCase();
+  const leagueName =
+    leagueNameProp || league?.name || "War Room";
+  const leagueId = leagueIdProp || league?.id || "";
+  const inviterName = session?.playerName || "";
+
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [flavor, setFlavor] = useState<InviteFlavor | "random">("random");
 
   if (!code) return null;
 
@@ -39,12 +61,17 @@ export default function InviteFriends({
   async function onShare() {
     setBusy(true);
     setStatus(null);
-    const result = await shareLeagueInvite({ leagueName, code });
+    const result = await shareLeagueInvite({
+      leagueName,
+      code,
+      inviterName,
+      flavor,
+    });
     setBusy(false);
     if (leagueId) markInviteCopied(leagueId);
     if (result === "shared") setStatus("Shared — they get the link + code");
     else if (result === "copied")
-      setStatus("Invite copied — paste in the group chat");
+      setStatus("Invite copied — paste it in the group chat");
     else setStatus("Couldn’t share — try Copy link");
     setTimeout(() => setStatus(null), 3500);
   }
@@ -71,6 +98,24 @@ export default function InviteFriends({
     }
   }
 
+  async function onCopyMessage() {
+    try {
+      await navigator.clipboard.writeText(
+        buildInviteShareText({
+          leagueName,
+          code,
+          inviterName,
+          flavor,
+        })
+      );
+      if (leagueId) markInviteCopied(leagueId);
+      setStatus("Full invite text copied — ready to paste");
+      setTimeout(() => setStatus(null), 2500);
+    } catch {
+      setStatus("Copy failed");
+    }
+  }
+
   if (compact) {
     return (
       <div className={className}>
@@ -90,6 +135,13 @@ export default function InviteFriends({
           >
             Copy link
           </button>
+          <button
+            type="button"
+            onClick={() => void onCopyMessage()}
+            className="px-3 py-2 rounded-xl border border-border text-muted text-sm font-medium min-h-[44px] hover:text-foreground"
+          >
+            Copy message
+          </button>
         </div>
         {status && (
           <p className="text-xs text-primary mt-2 font-medium">{status}</p>
@@ -100,13 +152,20 @@ export default function InviteFriends({
 
   return (
     <div
-      className={`rounded-xl border border-border bg-card p-5 ${className}`}
+      className={`rounded-xl border border-primary/30 bg-primary/5 p-5 ${className}`}
     >
-      <h2 className="font-semibold mb-1">Invite friends</h2>
-      <p className="text-sm text-muted mb-3 leading-relaxed">
-        One tap sends a link that opens the app with your code already filled
-        in. They sign up (or log in) and join — no hunting for a code box.
+      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-1">
+        Spread the word
       </p>
+      <h2 className="font-semibold mb-1">Bring your people</h2>
+      <p className="text-sm text-muted mb-3 leading-relaxed">
+        Not just the commissioner —{" "}
+        <strong className="text-foreground">anyone</strong> can invite. One
+        tap shares a link that opens the app with the code already filled
+        in. Message flips flavors so it hits dad group chats{" "}
+        <em>and</em> the chaos thread.
+      </p>
+
       <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center mb-3">
         <div className="flex-1 bg-background border border-border rounded-lg px-3 py-2.5 font-mono text-lg tracking-[0.25em] text-center sm:text-left text-primary font-bold">
           {code}
@@ -120,6 +179,27 @@ export default function InviteFriends({
           {busy ? "Sharing…" : "Share invite"}
         </button>
       </div>
+
+      <p className="text-[10px] uppercase tracking-wider text-muted font-bold mb-1.5">
+        Message vibe
+      </p>
+      <div className="flex flex-wrap gap-1.5 mb-3">
+        {FLAVOR_CHIPS.map((f) => (
+          <button
+            key={f.id}
+            type="button"
+            onClick={() => setFlavor(f.id)}
+            className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border transition ${
+              flavor === f.id
+                ? "border-primary bg-primary/15 text-primary"
+                : "border-border text-muted hover:text-foreground"
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
@@ -137,18 +217,7 @@ export default function InviteFriends({
         </button>
         <button
           type="button"
-          onClick={async () => {
-            try {
-              await navigator.clipboard.writeText(
-                buildInviteShareText({ leagueName, code })
-              );
-              if (leagueId) markInviteCopied(leagueId);
-              setStatus("Full invite text copied");
-              setTimeout(() => setStatus(null), 2500);
-            } catch {
-              setStatus("Copy failed");
-            }
-          }}
+          onClick={() => void onCopyMessage()}
           className="px-3 py-2 rounded-lg border border-border text-muted text-xs font-medium hover:text-foreground"
         >
           Copy full message

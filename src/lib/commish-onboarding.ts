@@ -105,28 +105,145 @@ export function buildInviteJoinUrl(opts: {
   return `${base.replace(/\/$/, "")}/join?code=${encodeURIComponent(code)}`;
 }
 
+export type InviteFlavor =
+  | "warroom"
+  | "groupchat"
+  | "dad"
+  | "boomer"
+  | "xennial"
+  | "chaos";
+
 /**
- * SMS / chat paste — link first so one tap opens the app with the code.
+ * Entertaining invite copy for group texts — boomers through millennials.
+ * Link first so one tap opens join with code filled in.
+ * Random flavor when flavor is omitted (fresh every share).
  */
 export function buildInviteShareText(opts: {
   leagueName: string;
   code: string;
   appUrl?: string;
+  /** Who’s sending — “Mike pulled you in” energy */
+  inviterName?: string;
+  flavor?: InviteFlavor | "random";
 }): string {
   const code = (opts.code || "").trim().toUpperCase();
+  const name = (opts.leagueName || "War Room").trim();
+  const who = (opts.inviterName || "").trim();
   const joinUrl = buildInviteJoinUrl({ code, appUrl: opts.appUrl });
-  return [
-    `You're in the War Room: ${opts.leagueName}`,
-    "",
-    joinUrl
-      ? `Join here (code already filled in):\n${joinUrl}`
-      : `Join code: ${code}`,
-    code ? `Code if you need it: ${code}` : null,
-    "",
-    "Create an account if you don't have one, then lock picks before first kickoff.",
-    "Don't ghost Saturday.",
-  ]
-    .filter(Boolean)
+  const linkBlock = joinUrl ? `👉 ${joinUrl}` : code ? `Code: ${code}` : "";
+  const codeLine = code ? `(Code if you need it: ${code})` : "";
+
+  const flavors: InviteFlavor[] = [
+    "warroom",
+    "groupchat",
+    "dad",
+    "boomer",
+    "xennial",
+    "chaos",
+  ];
+  let flavor: InviteFlavor =
+    opts.flavor && opts.flavor !== "random" ? opts.flavor : "warroom";
+  if (!opts.flavor || opts.flavor === "random") {
+    flavor = flavors[Math.floor(Math.random() * flavors.length)];
+  }
+
+  const by: Record<InviteFlavor, (string | null)[]> = {
+    warroom: [
+      who
+        ? `${who} just drafted you into ${name}.`
+        : `You're being drafted into ${name}.`,
+      "",
+      "It's college football pick'em with your actual people — confidence picks, a Best Bet, a weekly prop, and a Toilet Bowl bracket for the back half of the room.",
+      "",
+      "No fantasy drafts. No waivers. Just Saturdays and opinions.",
+      "",
+      linkBlock,
+      codeLine,
+      "",
+      "Make an account if you need one. Lock picks before first kickoff.",
+      "Don't ghost Saturday.",
+    ],
+    groupchat: [
+      "STOP SCROLLING.",
+      "",
+      who
+        ? `${who} put you in ${name} — our CFB pick'em league.`
+        : `You've been added to ${name} (CFB pick'em).`,
+      "",
+      "Every week: 5 games, confidence 1–5, one Best Bet, one prop.",
+      "Winner gets glory. Last place gets the Toilet Bowl and permanent group-chat content.",
+      "",
+      "Link (code already filled in):",
+      linkBlock,
+      codeLine,
+      "",
+      "30 seconds to join. Zero excuses next Saturday.",
+    ],
+    dad: [
+      `Subject: Important football business (${name})`,
+      "",
+      who
+        ? `${who} invited you. Don't make this weird.`
+        : "You've been invited. Don't make this weird.",
+      "",
+      "War Room Pick'em = college football against the spread with the group.",
+      "Pick games. Talk trash. Check the board after kickoff.",
+      "There's even a Toilet Bowl so the bottom half still has something to play for.",
+      "",
+      linkBlock,
+      codeLine,
+      "",
+      "Click the link → account if needed → join. See you Saturday.",
+    ],
+    boomer: [
+      `You're invited to ${name}.`,
+      "",
+      "College football pick'em with friends. Simple:",
+      "• Pick 5 games a week",
+      "• Lock before kickoff",
+      "• Standings update after the games",
+      "",
+      "Tap this link (it opens with our code ready):",
+      linkBlock,
+      codeLine,
+      "",
+      "If you can open email, you can do this.",
+    ],
+    xennial: [
+      who
+        ? `${who} is forcing a tradition. You're in ${name}.`
+        : `New tradition loading: ${name}.`,
+      "",
+      "Remember when friends watched games together and argued?",
+      "This is that — on your phone — with a scoreboard that keeps receipts.",
+      "",
+      "CFB pick'em. Confidence points. Best Bet. Props. Gazette headlines.",
+      "Championship for the top half. Toilet Bowl for the rest of us.",
+      "",
+      linkBlock,
+      codeLine,
+      "",
+      "Join once. Come back every Saturday. That's the whole product.",
+    ],
+    chaos: [
+      "GROUP CHAT EMERGENCY",
+      "",
+      `${name} needs bodies.`,
+      who ? `Blame: ${who}` : "Blame: whoever sent this",
+      "",
+      "It's free. It's college football. It's legal-ish trash talk.",
+      "You'll either win a title or star in the Toilet Bowl. Both are content.",
+      "",
+      "ONE TAP:",
+      linkBlock,
+      codeLine,
+      "",
+      "If you don't join, we're putting you on the milk carton in the Gazette.",
+    ],
+  };
+
+  return by[flavor]
+    .filter((line) => line != null && line !== "")
     .join("\n");
 }
 
@@ -172,8 +289,13 @@ export async function shareLeagueInvite(opts: {
   leagueName: string;
   code: string;
   appUrl?: string;
+  inviterName?: string;
+  flavor?: InviteFlavor | "random";
 }): Promise<"shared" | "copied" | "failed"> {
-  const text = buildInviteShareText(opts);
+  const text = buildInviteShareText({
+    ...opts,
+    flavor: opts.flavor ?? "random",
+  });
   const url = buildInviteJoinUrl(opts);
   try {
     if (typeof navigator !== "undefined" && navigator.share) {
