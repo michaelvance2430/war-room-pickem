@@ -65,16 +65,27 @@ export const RULE_SECTIONS: RuleSection[] = [
     title: "6. Save your card",
     body: [
       "Hit Save Picks when everything is filled in: side + confidence on all five, one Best Bet, and a prop choice.",
-      {
-        bold: true,
-        text: "LOCK DEADLINE: You must lock a full card before the first kickoff on that week’s slate. After first kickoff, if you never locked, you cannot lock — you score 0 for the week.",
-      },
-      "Games on the same calendar day (ET) freeze together at that day’s first kickoff — no more edits to that day’s games.",
-      {
-        bold: true,
-        text: "NO LOCK, NO POINTS: Miss the first-kickoff deadline and you get nothing. No makeups. No partial credit. Fair is fair. Gazette may put you on the milk carton.",
-      },
       "Only you can see your weekly picks — league mates cannot spy on your card.",
+    ],
+  },
+  {
+    title: "Lock deadlines — READ THIS",
+    callout: true,
+    body: [
+      {
+        bold: true,
+        text: "FIRST KICKOFF = LOCK DEADLINE: You must lock a full card before the first kickoff on that week’s slate.",
+      },
+      {
+        bold: true,
+        text: "Miss that deadline and you cannot lock at all. You score 0 for the week. No makeups. No partial credit.",
+      },
+      "Same calendar day (Eastern Time): all games that day freeze at that day’s first kickoff. Example: once the first Saturday game starts, every Saturday game is frozen.",
+      "If you locked on time, you can still tweak later days until those days’ first kickoffs freeze them.",
+      {
+        bold: true,
+        text: "NO LOCK, NO POINTS. Gazette may put no-lockers on the milk carton. Fair is fair.",
+      },
     ],
   },
   {
