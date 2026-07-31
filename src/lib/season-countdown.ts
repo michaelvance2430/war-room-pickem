@@ -10,6 +10,38 @@ export const SEASON_OPEN_AT_MS = Date.parse("2026-08-23T04:01:00.000Z");
 
 export const SEASON_OPEN_LABEL = "Sun Aug 23 · 12:01 AM ET";
 
+/** Display season tag on the one-time welcome splash */
+export const SEASON_DISPLAY_YEAR = "2026-27";
+
+/** localStorage key prefix — one splash per browser per league per season */
+export const SEASON_OPEN_WELCOME_KEY = "warroom-season-open-welcome-2026-27";
+
+export function seasonOpenWelcomeStorageKey(leagueId: string) {
+  return `${SEASON_OPEN_WELCOME_KEY}:${leagueId || "default"}`;
+}
+
+export function hasSeenSeasonOpenWelcome(leagueId: string): boolean {
+  if (typeof window === "undefined") return true;
+  try {
+    return localStorage.getItem(seasonOpenWelcomeStorageKey(leagueId)) === "1";
+  } catch {
+    return true;
+  }
+}
+
+export function markSeasonOpenWelcomeSeen(leagueId: string) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(seasonOpenWelcomeStorageKey(leagueId), "1");
+  } catch {
+    /* ignore */
+  }
+}
+
+export function isSeasonOpen(nowMs = Date.now()): boolean {
+  return nowMs >= SEASON_OPEN_AT_MS;
+}
+
 export type CountdownParts = {
   totalMs: number;
   done: boolean;

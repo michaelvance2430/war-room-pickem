@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import {
   formatCountdownCompact,
   getCountdownParts,
@@ -10,8 +9,8 @@ import {
 } from "@/lib/season-countdown";
 
 /**
- * Global strip under nav — always counting to league open (to the second).
- * After open: short “WE’RE LIVE” with path to picks.
+ * Global strip under nav — counts to league open (to the second).
+ * When the clock hits zero: ticker is GONE (welcome splash takes over once).
  */
 export default function SeasonCountdownTicker() {
   const [parts, setParts] = useState<CountdownParts | null>(null);
@@ -25,7 +24,7 @@ export default function SeasonCountdownTicker() {
     return () => window.clearInterval(id);
   }, []);
 
-  // Avoid SSR/client mismatch — wait for first tick
+  // Hydration placeholder only while counting (not after open)
   if (!parts) {
     return (
       <div
@@ -37,30 +36,8 @@ export default function SeasonCountdownTicker() {
     );
   }
 
-  if (parts.done) {
-    return (
-      <div
-        className="border-b border-primary/40 bg-primary/15 text-[11px] sm:text-xs"
-        role="status"
-      >
-        <div className="max-w-6xl mx-auto px-3 sm:px-4 py-1.5 flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 text-center">
-          <span className="font-bold uppercase tracking-[0.15em] text-primary">
-            Season open
-          </span>
-          <span className="text-border hidden sm:inline">·</span>
-          <span className="text-foreground/90">
-            The War Room is live — lock up when the card drops.
-          </span>
-          <Link
-            href="/picks"
-            className="font-semibold text-primary hover:underline"
-          >
-            My Picks →
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  // Countdown over — remove ticker entirely
+  if (parts.done) return null;
 
   const clock = formatCountdownCompact(parts);
 
@@ -76,7 +53,7 @@ export default function SeasonCountdownTicker() {
           Season
         </span>
         <span className="text-border shrink-0">·</span>
-        <span className="text-muted shrink-0 hidden xs:inline sm:inline">
+        <span className="text-muted shrink-0 hidden sm:inline">
           League opens in
         </span>
         <span

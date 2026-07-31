@@ -10,6 +10,7 @@ import RulesOnboardingModal from "@/components/RulesOnboardingModal";
 import GazetteModal from "@/components/GazetteModal";
 import BadgeUnlockModal from "@/components/BadgeUnlockModal";
 import SeasonCountdownTicker from "@/components/SeasonCountdownTicker";
+import SeasonOpenWelcome from "@/components/SeasonOpenWelcome";
 import { loadMyProfile } from "@/lib/profile";
 import { refreshStaffSessionFlags } from "@/lib/cloud";
 
@@ -425,8 +426,9 @@ export default function Nav() {
           </>
         )}
       </header>
-      {/* Every page: slow burn until the league opens */}
+      {/* Until Aug 23 00:01 ET: countdown. After: ticker gone; one-time welcome splash */}
       <SeasonCountdownTicker />
+      <SeasonOpenWelcome />
       <RulesOnboardingModal />
       <GazetteModal />
       <BadgeUnlockModal />
