@@ -1,12 +1,12 @@
 /**
  * Prior-season trophy → permanent War Room Legend + career cheevo bank.
  *
- * Confirmed:
+ * Confirmed 2025:
+ *  - Kahmann → Championship → War Room Legend (+200 career)
  *  - Bill ball Ben → Village Nerd (Crystal Ball) → War Room Legend (+200 career)
  *
- * NOT a legend (revoked if present):
- *  - Andrew Visconti / Andy — no engraved trophy; remove mistaken grant
- *  - Kahmann — earlier mistaken champ grant
+ * Mistaken (revoked if present):
+ *  - Andrew Visconti / Andy — was incorrectly given Kahmann’s champ seed
  */
 
 import {
@@ -27,6 +27,11 @@ type LegacyBadgeGrant = {
 
 export const LEGACY_BADGE_GRANTS: LegacyBadgeGrant[] = [
   {
+    pattern: /\bkahmann\b/i,
+    badgeId: WAR_ROOM_LEGEND_ID,
+    reason: "2025 Championship — War Room Legend",
+  },
+  {
     pattern: /\bbill\s*ball\s*ben\b|\bbillballben\b/i,
     badgeId: WAR_ROOM_LEGEND_ID,
     reason: "2025 Village Nerd — War Room Legend",
@@ -35,7 +40,6 @@ export const LEGACY_BADGE_GRANTS: LegacyBadgeGrant[] = [
 
 /** Names that should never hold a seeded War Room Legend */
 const REVOKE_LEGEND_PATTERNS: RegExp[] = [
-  /\bkahmann\b/i,
   /\bandy\b|\bandrew\s+visconti\b|\bvisconti\b/i,
 ];
 
@@ -52,7 +56,7 @@ export function applyLegacyBadgeGrants(player: {
   const known = new Set(getPermanentBadgeIds(player.id));
   const pts = getBadgeDef(WAR_ROOM_LEGEND_ID)?.points ?? 200;
 
-  // Strip mistaken legends (Andy/Visconti, Kahmann, etc.)
+  // Strip mistaken Visconti/Andy legend (was incorrectly given Kahmann’s seed)
   const isConfirmedLegend = LEGACY_BADGE_GRANTS.some((g) =>
     g.pattern.test(player.name)
   );

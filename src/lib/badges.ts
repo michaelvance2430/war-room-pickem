@@ -528,7 +528,7 @@ export function getPlayerBadges(player: Player): BadgeStatus[] {
   } catch {
     /* ignore */
   }
-  // Prior-season trophy winners (Andy, Bill ball Ben, …) → permanent + career bank
+  // Prior-season trophy winners (Kahmann champ, Bill ball Ben nerd) → permanent + career bank
   try {
     applyLegacyBadgeGrants(player);
   } catch {

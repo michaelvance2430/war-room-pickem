@@ -60,10 +60,20 @@ function namesMatch(a: string, b: string) {
  * Last CFB season relative to mid-2026 = 2025.
  */
 /**
- * Only seed hardware we can confirm. Andrew Visconti / Andy is NOT a champ —
- * no empty trophy case, no Legend badge.
+ * Confirmed prior-season hardware only.
+ * Kahmann = 2025 champ. Bill ball Ben = Village Nerd.
+ * Visconti/Andy is NOT a champ (mistaken swap — revoked).
  */
 export const LEGACY_PROFILE_HARDWARE: Omit<ProfileTrophy, "source">[] = [
+  {
+    id: "legacy-kahmann-championship-2025",
+    kind: "championship",
+    seasonYear: 2025,
+    title: "Championship",
+    subtitle: "War Room Champion",
+    notes: "Last season's big one. The board still remembers.",
+    winnerName: "Kahmann",
+  },
   {
     id: "legacy-bill-ball-ben-nerd-2025",
     kind: "crystal_ball",
@@ -71,13 +81,16 @@ export const LEGACY_PROFILE_HARDWARE: Omit<ProfileTrophy, "source">[] = [
     title: "Village Nerd Award",
     subtitle: "Crystal Ball prophet",
     notes: "Called the national champ. Zero standings points. Infinite smug.",
-    // Standings: Bill ball Ben
     winnerName: "Bill ball Ben",
   },
 ];
 
 /** Also match these name aliases → legacy id */
 const LEGACY_NAME_ALIASES: { pattern: RegExp; legacyId: string }[] = [
+  {
+    pattern: /\bkahmann\b/i,
+    legacyId: "legacy-kahmann-championship-2025",
+  },
   {
     pattern: /\bbill\s*ball\s*ben\b|\bbillballben\b/i,
     legacyId: "legacy-bill-ball-ben-nerd-2025",
