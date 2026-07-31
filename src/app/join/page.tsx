@@ -557,7 +557,9 @@ function JoinPageInner() {
             >
               {loading
                 ? "Creating…"
-                : `Create ${getSportPack(sportId).shortLabel} league`}
+                : sportId === "soccer_wwc"
+                  ? "Create FIFA WWC Brazil 2027™ league"
+                  : `Create ${getSportPack(sportId).shortLabel} league`}
             </button>
             <button
               onClick={() => setMode("choose")}

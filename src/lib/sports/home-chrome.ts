@@ -67,7 +67,7 @@ function chromeForPack(pack: SportPack): SportHomeChrome {
       welcomeTitle: "Welcome to the War Room",
       defaultTagline:
         "Same clubhouse. Global stage. Lock the card, roast the room, chase the Cup.",
-      sportBadge: "WOMEN'S WORLD CUP",
+      sportBadge: "FIFA WOMEN'S WORLD CUP BRAZIL 2027™",
       periodWord: "Matchday",
       periodProgressHint: "Tournament matchdays — short, loud, zero chill",
       primaryPathLabel: "Championship path",

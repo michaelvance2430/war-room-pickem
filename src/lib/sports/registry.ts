@@ -26,15 +26,16 @@ const PACKS: SportPack[] = [
   },
   {
     id: "soccer_wwc",
-    label: "Women's World Cup",
-    shortLabel: "WWC",
+    label: "FIFA Women's World Cup Brazil 2027™",
+    shortLabel: "WWC 2027",
     emoji: "🏆",
-    blurb: "Event pack — short calendar, big Gazette energy. Live shell on dev.",
+    blurb:
+      "Official event pack — Brazil 2027. Short calendar, big Gazette energy. Live shell on dev.",
     sortOrder: 2,
     status: "live",
     defaultSeasonWeeks: 5,
     defaultGamesPerWeek: 5,
-    pridePickLabel: "World Cup winner",
+    pridePickLabel: "FIFA Women's World Cup winner",
     rulesOneLiner: "Event mode · matchday card · same War Room sass",
   },
   {
