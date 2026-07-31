@@ -29,7 +29,9 @@ export function scoreWeek(
   games: Game[],
   results: Record<string, GameResult>,
   prop: Prop,
-  propResult: string | null
+  propResult: string | null,
+  /** Chaos Mode: pure random card — double the whole week total */
+  isChaos = false
 ): WeekScore {
   const gameScores: ScoredPick[] = [];
   let totalPoints = 0;
@@ -77,9 +79,18 @@ export function scoreWeek(
 
   const propCorrect =
     propChoice !== null && propResult !== null && propChoice === propResult;
-  const propPoints = propCorrect ? prop.points : 0;
+  let propPoints = propCorrect ? prop.points : 0;
   totalPoints += propPoints;
   if (propCorrect) correctCount += 1;
+
+  // Chaos Mode: double entire week (games pts + prop)
+  if (isChaos && totalPoints > 0) {
+    totalPoints *= 2;
+    propPoints *= 2;
+    for (const gs of gameScores) {
+      if (gs.points > 0) gs.points *= 2;
+    }
+  }
 
   return {
     gameScores,

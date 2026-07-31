@@ -577,7 +577,11 @@ function PickSide({
                   s.userId === selfId ? "text-primary font-semibold" : ""
                 }`}
               >
-                <PlayerLink id={s.userId} name={s.name} />
+                <PlayerLink
+                  id={s.userId}
+                  name={s.name}
+                  chaosFlames={!!s.isChaos}
+                />
                 <span className="text-xs font-mono tabular-nums shrink-0">
                   {conf}
                   {bb ? (
@@ -626,23 +630,47 @@ function FullCardsView({
                 games,
                 results,
                 prop,
-                propResult
+                propResult,
+                !!s.isChaos
               )
             : null;
         const pts =
           s.totalPoints != null ? s.totalPoints : scoredSlip?.totalPoints;
         const isSelf = s.userId === selfId;
+        const chaosTag =
+          s.isChaos && pts != null
+            ? pts >= 28
+              ? "CHAOS NUKE"
+              : pts <= 6
+                ? "CHAOS MELTDOWN"
+                : "CHAOS"
+            : s.isChaos
+              ? "CHAOS"
+              : null;
 
         return (
           <section
             key={s.userId}
             className={`rounded-xl border bg-card p-4 ${
-              isSelf ? "border-primary/40 bg-primary/5" : "border-border"
+              s.isChaos
+                ? "border-orange-500/50 bg-orange-500/5"
+                : isSelf
+                  ? "border-primary/40 bg-primary/5"
+                  : "border-border"
             }`}
           >
             <div className="flex items-center justify-between gap-2 mb-3">
               <div>
-                <PlayerLink id={s.userId} name={s.name} />
+                <PlayerLink
+                  id={s.userId}
+                  name={s.name}
+                  chaosFlames={!!s.isChaos}
+                />
+                {chaosTag && (
+                  <span className="ml-2 text-[10px] text-orange-300 font-extrabold uppercase tracking-wide">
+                    🔥 {chaosTag}
+                  </span>
+                )}
                 {!s.lockedAt && (
                   <span className="ml-2 text-[10px] text-danger font-bold uppercase">
                     No lock
@@ -652,6 +680,9 @@ function FullCardsView({
               {pts != null && scored && (
                 <span className="text-lg font-black tabular-nums text-primary">
                   {pts}
+                  {s.isChaos ? (
+                    <span className="text-[10px] text-orange-300 ml-1">2×</span>
+                  ) : null}
                 </span>
               )}
             </div>

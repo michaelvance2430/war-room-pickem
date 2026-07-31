@@ -442,6 +442,8 @@ export async function savePicksToCloud(opts: {
   picks: Record<string, UserPick>;
   bestBetId: string | null;
   propChoice: string | null;
+  /** Chaos Mode lock — pure random card, 2× week points */
+  isChaos?: boolean;
 }): Promise<{
   ok: boolean;
   error?: string;
@@ -466,11 +468,22 @@ export async function savePicksToCloud(opts: {
         bestBetId: opts.bestBetId,
         propChoice: opts.propChoice,
         lockedAt: new Date().toISOString(),
+        isChaos: !!opts.isChaos,
       };
       localStorage.setItem(
         `warroom-picks-week-${opts.weekNumber}`,
         JSON.stringify(payload)
       );
+      if (opts.isChaos) {
+        try {
+          const { spendChaosUse, CHAOS_BADGE_ID } = await import("./chaos-mode");
+          spendChaosUse(opts.weekNumber, session.leagueId, session.playerId);
+          const { grantPermanentBadgeId } = await import("./permanent-badges");
+          grantPermanentBadgeId(session.playerId, CHAOS_BADGE_ID);
+        } catch {
+          /* ignore */
+        }
+      }
       try {
         const { markEngagement } = await import("./engagement");
         const hour = new Date().getHours();
@@ -503,34 +516,77 @@ export async function savePicksToCloud(opts: {
 
   const isFirstSave = !existing?.id;
   let pickId: string;
+  // Chaos spend + badge before write (so flames fire even if column missing)
+  if (opts.isChaos) {
+    try {
+      const { spendChaosUse, CHAOS_BADGE_ID } = await import("./chaos-mode");
+      const spent = spendChaosUse(opts.weekNumber, leagueId, uid);
+      if (!spent.ok) return { ok: false, error: spent.error };
+      const { grantPermanentBadgeId } = await import("./permanent-badges");
+      grantPermanentBadgeId(uid, CHAOS_BADGE_ID);
+    } catch {
+      /* ignore badge */
+    }
+  }
+
   if (existing?.id) {
     pickId = existing.id;
     // Keep original locked_at — re-save is an edit, not a new first-lock time
+    // Once Chaos, stay Chaos (no silent un-chaos on edit — use already spent)
+    const updatePayload: Record<string, unknown> = {
+      prop_choice: opts.propChoice,
+      best_bet_game_id: opts.bestBetId,
+      updated_at: new Date().toISOString(),
+    };
+    if (opts.isChaos) updatePayload.is_chaos = true;
     const { error } = await supabase
       .from("picks")
-      .update({
-        prop_choice: opts.propChoice,
-        best_bet_game_id: opts.bestBetId,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq("id", pickId);
-    if (error) return { ok: false, error: error.message };
+    if (error) {
+      // Column missing: retry without is_chaos
+      if (/is_chaos|column/i.test(error.message || "")) {
+        const { error: e2 } = await supabase
+          .from("picks")
+          .update({
+            prop_choice: opts.propChoice,
+            best_bet_game_id: opts.bestBetId,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", pickId);
+        if (e2) return { ok: false, error: e2.message };
+      } else {
+        return { ok: false, error: error.message };
+      }
+    }
     await supabase.from("pick_games").delete().eq("pick_id", pickId);
   } else {
-    const { data: row, error } = await supabase
+    const insertPayload: Record<string, unknown> = {
+      league_id: leagueId,
+      user_id: uid,
+      week_number: opts.weekNumber,
+      prop_choice: opts.propChoice,
+      best_bet_game_id: opts.bestBetId,
+      locked_at: new Date().toISOString(),
+    };
+    if (opts.isChaos) insertPayload.is_chaos = true;
+    let { data: row, error } = await supabase
       .from("picks")
-      .insert({
-        league_id: leagueId,
-        user_id: uid,
-        week_number: opts.weekNumber,
-        prop_choice: opts.propChoice,
-        best_bet_game_id: opts.bestBetId,
-        locked_at: new Date().toISOString(),
-      })
+      .insert(insertPayload)
       .select("id")
       .single();
+    if (error && /is_chaos|column/i.test(error.message || "")) {
+      delete insertPayload.is_chaos;
+      const retry = await supabase
+        .from("picks")
+        .insert(insertPayload)
+        .select("id")
+        .single();
+      row = retry.data;
+      error = retry.error;
+    }
     if (error || !row) return { ok: false, error: error?.message || "Failed to save picks" };
-    pickId = row.id;
+    pickId = row.id as string;
   }
 
   const { error: pgError } = await supabase.from("pick_games").insert(
@@ -672,6 +728,7 @@ export async function loadMyPicks(weekNumber = 1) {
         bestBetId?: string | null;
         propChoice?: string | null;
         lockedAt?: string | null;
+        isChaos?: boolean;
       };
       if (!data.picks || !Object.keys(data.picks).length) return null;
       return {
@@ -679,6 +736,7 @@ export async function loadMyPicks(weekNumber = 1) {
         bestBetId: data.bestBetId ?? null,
         propChoice: data.propChoice ?? null,
         lockedAt: data.lockedAt ?? null,
+        isChaos: !!data.isChaos,
       };
     }
   } catch {
@@ -710,11 +768,27 @@ export async function loadMyPicks(weekNumber = 1) {
       lockedFavorite: g.locked_favorite === "away" ? "away" : "home",
     };
   }
+  const isChaos =
+    !!(pick as { is_chaos?: boolean }).is_chaos ||
+    (await import("./chaos-mode")).isWeekChaosForUser(
+      weekNumber,
+      session.leagueId,
+      uid
+    );
+  if (isChaos && pick.locked_at) {
+    try {
+      const { markChaosActive } = await import("./chaos-mode");
+      markChaosActive(session.leagueId, uid, weekNumber);
+    } catch {
+      /* ignore */
+    }
+  }
   return {
     picks,
     bestBetId: pick.best_bet_game_id as string | null,
     propChoice: pick.prop_choice as string | null,
     lockedAt: pick.locked_at as string | null,
+    isChaos,
   };
 }
 
@@ -728,6 +802,8 @@ export type WeekBoardSlip = {
   propChoice: string | null;
   lockedAt: string | null;
   totalPoints: number | null;
+  /** Chaos Mode this week — flames on the name */
+  isChaos?: boolean;
 };
 
 /**
@@ -782,13 +858,31 @@ export async function loadLeagueWeekBoard(weekNumber: number): Promise<{
       .select("user_id, is_bot, profiles(display_name)")
       .eq("league_id", leagueId);
 
-    const { data: pickRows, error: pickErr } = await supabase
-      .from("picks")
-      .select(
-        "id, user_id, prop_choice, best_bet_game_id, locked_at, total_points"
-      )
-      .eq("league_id", leagueId)
-      .eq("week_number", weekNumber);
+    let pickRows: Record<string, unknown>[] | null = null;
+    let pickErr: { message?: string } | null = null;
+    {
+      const res = await supabase
+        .from("picks")
+        .select(
+          "id, user_id, prop_choice, best_bet_game_id, locked_at, total_points, is_chaos"
+        )
+        .eq("league_id", leagueId)
+        .eq("week_number", weekNumber);
+      if (res.error && /is_chaos|column/i.test(res.error.message || "")) {
+        const res2 = await supabase
+          .from("picks")
+          .select(
+            "id, user_id, prop_choice, best_bet_game_id, locked_at, total_points"
+          )
+          .eq("league_id", leagueId)
+          .eq("week_number", weekNumber);
+        pickRows = (res2.data || null) as Record<string, unknown>[] | null;
+        pickErr = res2.error;
+      } else {
+        pickRows = (res.data || null) as Record<string, unknown>[] | null;
+        pickErr = res.error;
+      }
+    }
 
     if (pickErr) {
       return {
@@ -859,8 +953,18 @@ export async function loadLeagueWeekBoard(weekNumber: number): Promise<{
           propChoice: null,
           lockedAt: null,
           totalPoints: null,
+          isChaos: false,
         });
         continue;
+      }
+      const chaos = !!(pick as { is_chaos?: boolean }).is_chaos;
+      if (chaos) {
+        try {
+          const { markChaosActive } = await import("./chaos-mode");
+          markChaosActive(leagueId, userId, weekNumber);
+        } catch {
+          /* ignore */
+        }
       }
       slips.push({
         userId,
@@ -872,6 +976,7 @@ export async function loadLeagueWeekBoard(weekNumber: number): Promise<{
         lockedAt: (pick.locked_at as string) || null,
         totalPoints:
           pick.total_points != null ? Number(pick.total_points) : null,
+        isChaos: chaos,
       });
     }
 
@@ -1258,13 +1363,28 @@ export async function saveResultsAndScoreWeek(opts: {
     if (error) return { ok: false, scoredCount: 0, error: error.message };
   }
 
-  const { data: allPicks, error: picksError } = await supabase
-    .from("picks")
-    .select("id, user_id, prop_choice, best_bet_game_id, total_points")
-    .eq("league_id", leagueId)
-    .eq("week_number", weekNumber);
-
-  if (picksError) return { ok: false, scoredCount: 0, error: picksError.message };
+  let allPicks: Record<string, unknown>[] | null = null;
+  {
+    const res = await supabase
+      .from("picks")
+      .select("id, user_id, prop_choice, best_bet_game_id, total_points, is_chaos")
+      .eq("league_id", leagueId)
+      .eq("week_number", weekNumber);
+    if (res.error && /is_chaos|column/i.test(res.error.message || "")) {
+      const res2 = await supabase
+        .from("picks")
+        .select("id, user_id, prop_choice, best_bet_game_id, total_points")
+        .eq("league_id", leagueId)
+        .eq("week_number", weekNumber);
+      if (res2.error)
+        return { ok: false, scoredCount: 0, error: res2.error.message };
+      allPicks = (res2.data || []) as Record<string, unknown>[];
+    } else if (res.error) {
+      return { ok: false, scoredCount: 0, error: res.error.message };
+    } else {
+      allPicks = (res.data || []) as Record<string, unknown>[];
+    }
+  }
   if (!allPicks?.length) {
     return { ok: true, scoredCount: 0, error: "No locked picks found for this week yet" };
   }
@@ -1273,10 +1393,12 @@ export async function saveResultsAndScoreWeek(opts: {
   let scoredCount = 0;
 
   for (const pickRow of allPicks) {
+    const pickId = pickRow.id as string;
+    const userId = pickRow.user_id as string;
     const { data: pickGames } = await supabase
       .from("pick_games")
       .select("*")
-      .eq("pick_id", pickRow.id);
+      .eq("pick_id", pickId);
 
     const picksMap: Record<string, UserPick> = {};
     for (const pg of pickGames || []) {
@@ -1290,14 +1412,16 @@ export async function saveResultsAndScoreWeek(opts: {
       };
     }
 
+    const isChaos = !!pickRow.is_chaos;
     const weekScore = scoreWeek(
       picksMap,
-      pickRow.best_bet_game_id,
-      pickRow.prop_choice,
+      (pickRow.best_bet_game_id as string) || null,
+      (pickRow.prop_choice as string) || null,
       opts.games,
       opts.results,
       opts.prop,
-      opts.propResult
+      opts.propResult,
+      isChaos
     );
 
     const previousPoints = pickRow.total_points as number | null;
@@ -1306,13 +1430,13 @@ export async function saveResultsAndScoreWeek(opts: {
     await supabase
       .from("picks")
       .update({ total_points: weekScore.totalPoints })
-      .eq("id", pickRow.id);
+      .eq("id", pickId);
 
     const { data: membership } = await supabase
       .from("memberships")
       .select("*")
       .eq("league_id", leagueId)
-      .eq("user_id", pickRow.user_id)
+      .eq("user_id", userId)
       .maybeSingle();
 
     if (!membership) continue;

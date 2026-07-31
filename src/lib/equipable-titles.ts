@@ -51,6 +51,12 @@ export const EQUIPABLE_TITLE_CATALOG: EquipableTitleDef[] = [
     blurb: "Career last-place champion. Wear it. Own it.",
   },
   {
+    badgeId: "let_them_cook",
+    title: "Chaos Agent",
+    vibe: "chaos",
+    blurb: "Locked a robot card. Dad went Chaos. The room knows.",
+  },
+  {
     badgeId: "championship_ring",
     title: "Ring Bearer",
     vibe: "brag",

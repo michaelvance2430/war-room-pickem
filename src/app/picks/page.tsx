@@ -39,6 +39,12 @@ import {
   openGameCount,
   formatKickoffLockLabel,
 } from "@/lib/dates";
+import {
+  CHAOS_USES_PER_SEASON,
+  generateChaosCard,
+  getChaosUsesRemaining,
+  isWeekChaosForUser,
+} from "@/lib/chaos-mode";
 
 function formatSpread(
   spread: number,
@@ -75,6 +81,11 @@ export default function PicksPage() {
   const [usedConfidence, setUsedConfidence] = useState<number[]>([]);
   const [saved, setSaved] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  /** Chaos Mode: robots filled the card; edits void the double (use already spent on lock) */
+  const [chaosArmed, setChaosArmed] = useState(false);
+  const [chaosConfirm, setChaosConfirm] = useState(false);
+  const [chaosRemaining, setChaosRemaining] = useState(CHAOS_USES_PER_SEASON);
+  const [chaosLockedWeek, setChaosLockedWeek] = useState(false);
   const [prop, setProp] = useState<Prop>(EMPTY_PROP);
   const [hasCard, setHasCard] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -139,6 +150,11 @@ export default function PicksPage() {
           .map((p) => p.confidence)
           .filter((c) => c > 0);
         setUsedConfidence(used);
+        const wasChaos =
+          !!(mine as { isChaos?: boolean }).isChaos ||
+          isWeekChaosForUser(week);
+        setChaosLockedWeek(wasChaos);
+        setChaosArmed(wasChaos);
       } else {
         picksRef.current = {};
         bestBetRef.current = null;
@@ -148,7 +164,10 @@ export default function PicksPage() {
         setPropChoice(null);
         setSaved(false);
         setUsedConfidence([]);
+        setChaosLockedWeek(false);
+        setChaosArmed(false);
       }
+      setChaosRemaining(getChaosUsesRemaining());
     },
     []
   );
@@ -485,6 +504,11 @@ export default function PicksPage() {
 
   function selectSide(gameId: string, side: "home" | "away") {
     if (!weekEditable || cardFrozen) return;
+    if (chaosArmed && !chaosLockedWeek) {
+      // Editing after robots filled voids Chaos before lock
+      setChaosArmed(false);
+    }
+    if (chaosLockedWeek) return;
     const game = games.find((g) => g.id === gameId);
     if (!game || isGameLocked(game, now, games)) return;
 
@@ -503,7 +527,8 @@ export default function PicksPage() {
   }
 
   function selectConfidence(gameId: string, conf: number) {
-    if (!weekEditable || cardFrozen) return;
+    if (!weekEditable || cardFrozen || chaosLockedWeek) return;
+    if (chaosArmed) setChaosArmed(false);
     const game = games.find((g) => g.id === gameId);
     if (!game || isGameLocked(game, now, games)) return;
     if (!picks[gameId]?.pick) return;
@@ -535,7 +560,8 @@ export default function PicksPage() {
   }
 
   function toggleBestBet(gameId: string) {
-    if (!weekEditable || cardFrozen) return;
+    if (!weekEditable || cardFrozen || chaosLockedWeek) return;
+    if (chaosArmed) setChaosArmed(false);
     const game = games.find((g) => g.id === gameId);
     if (!game || isGameLocked(game, now, games)) return;
     // Can't move BB off a locked game
@@ -665,6 +691,7 @@ export default function PicksPage() {
       picks: lockedPicks,
       bestBetId: nextBest,
       propChoice: nextProp,
+      isChaos: chaosArmed || chaosLockedWeek,
     });
 
     if (!result.ok) {
@@ -677,6 +704,11 @@ export default function PicksPage() {
     setBestBetId(nextBest);
     setPropChoice(nextProp);
     setSaved(true);
+    if (chaosArmed || chaosLockedWeek) {
+      setChaosLockedWeek(true);
+      setChaosArmed(true);
+      setChaosRemaining(getChaosUsesRemaining());
+    }
     try {
       sessionStorage.setItem("warroom-tut-picks-saved", "1");
       const { completePlayerTutorial, isPlayerTutorialActive } = await import(
@@ -785,11 +817,116 @@ export default function PicksPage() {
       )}
 
       <main className="flex-1 max-w-3xl mx-auto w-full px-3 sm:px-4 py-5 sm:py-8 phone-picks-main">
+        {/* Chaos Mode — robots cook; room sees flames */}
+        {weekEditable && hasCard && !cardFrozen && !missedLockWindow && (
+          <div className="rounded-xl border-2 border-orange-500/50 bg-gradient-to-br from-orange-950/50 via-red-950/30 to-black/40 px-4 py-3 mb-4">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-orange-300 mb-1">
+              🤖 Chaos Mode · pure RNG
+            </p>
+            <p className="text-sm text-foreground/90 leading-snug">
+              Tired of thinking? Let the machines cook. Completely random sides,
+              confidence, Best Bet, and prop —{" "}
+              <strong className="text-orange-200">no edge</strong>. Correct week{" "}
+              <strong className="text-orange-200">doubles</strong>. Your name
+              gets <strong className="text-orange-200">🔥 CHAOS flames</strong>{" "}
+              so the whole room knows.{" "}
+              <span className="text-muted">
+                {chaosRemaining}/{CHAOS_USES_PER_SEASON} left this season.
+              </span>
+            </p>
+            {(chaosArmed || chaosLockedWeek) && (
+              <p className="text-xs font-bold text-orange-300 mt-2">
+                {chaosLockedWeek
+                  ? "🔥 Chaos locked — card frozen to the robots. No edits. Flames are live."
+                  : "🔥 Robots filled your card. Save/lock to spend a charge & light the flames. Edit now = cancel Chaos (no charge yet)."}
+              </p>
+            )}
+            {weekEditable &&
+              !chaosLockedWeek &&
+              chaosRemaining > 0 &&
+              !fullyLocked && (
+                <button
+                  type="button"
+                  onClick={() => setChaosConfirm(true)}
+                  className="mt-3 w-full py-3 min-h-[48px] rounded-xl bg-gradient-to-r from-orange-600 to-red-600 text-white text-sm font-extrabold touch-manipulation shadow-lg"
+                >
+                  Let them cook 🔥 ({chaosRemaining} left)
+                </button>
+              )}
+            {chaosRemaining <= 0 && !chaosLockedWeek && (
+              <p className="text-[11px] text-muted mt-2">
+                No Chaos charges left this season. Hand-pick like a human.
+              </p>
+            )}
+          </div>
+        )}
+
+        {chaosConfirm && (
+          <div className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <button
+              type="button"
+              className="absolute inset-0 bg-black/75"
+              aria-label="Close"
+              onClick={() => setChaosConfirm(false)}
+            />
+            <div className="relative w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl border-2 border-orange-500/60 bg-card p-5 space-y-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-orange-300">
+                Chaos Mode
+              </p>
+              <h2 className="text-xl font-black">Let the robots cook?</h2>
+              <ul className="text-sm text-muted space-y-1.5 list-disc pl-4">
+                <li>Pure random — coin flips, no favorites, no AI edge</li>
+                <li>Legal card: sides + confidence 1–5 + Best Bet + prop</li>
+                <li>
+                  <strong className="text-foreground">2× week points</strong>{" "}
+                  when scored (if anything hits)
+                </li>
+                <li>
+                  Uses <strong className="text-foreground">1 of 2</strong> Chaos
+                  charges this season when you lock
+                </li>
+                <li>
+                  After lock: no edits · 🔥 CHAOS on your name so dad&apos;s
+                  week is public
+                </li>
+              </ul>
+              <button
+                type="button"
+                onClick={() => {
+                  const filled = generateChaosCard({ games, prop });
+                  setPicks(filled.picks);
+                  setBestBetId(filled.bestBetId);
+                  setPropChoice(filled.propChoice);
+                  const used = Object.values(filled.picks)
+                    .map((p) => p.confidence)
+                    .filter((c) => c > 0);
+                  setUsedConfidence(used);
+                  setChaosArmed(true);
+                  setSaved(false);
+                  setChaosConfirm(false);
+                }}
+                className="w-full py-3.5 min-h-[52px] rounded-xl bg-orange-600 text-white font-extrabold"
+              >
+                Fill my card with chaos
+              </button>
+              <button
+                type="button"
+                onClick={() => setChaosConfirm(false)}
+                className="w-full py-3 min-h-[48px] rounded-xl border border-border text-muted font-semibold"
+              >
+                Never mind — I&apos;ll think
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Crystal-clear week banner */}
         <div
           className={`rounded-xl border px-4 py-3 mb-4 ${
             weekEditable
-              ? "border-primary/50 bg-primary/10"
+              ? chaosArmed || chaosLockedWeek
+                ? "border-orange-500/50 bg-orange-500/10"
+                : "border-primary/50 bg-primary/10"
               : "border-border bg-card"
           }`}
         >
@@ -1330,11 +1467,15 @@ export default function PicksPage() {
                 >
                   {saving
                     ? "Saving…"
-                    : fullyLocked
-                      ? "Picks locked"
-                      : saved
-                        ? "Update open picks"
-                        : "Save / lock picks"}
+                    : fullyLocked || chaosLockedWeek
+                      ? chaosLockedWeek
+                        ? "🔥 Chaos locked"
+                        : "Picks locked"
+                      : chaosArmed
+                        ? "Lock Chaos card 🔥"
+                        : saved
+                          ? "Update open picks"
+                          : "Save / lock picks"}
                 </button>
                 {!allGamesPicked && !fullyLocked && (
                   <p className="text-xs text-muted text-center mt-2 px-1">

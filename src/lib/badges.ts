@@ -43,6 +43,7 @@ const STACKABLE_IDS = new Set<string>([
   "four_green_friday",
   "sweep_adjacent",
   "first_final",
+  "let_them_cook",
 ]);
 
 export function isStackableBadge(badgeId: string): boolean {
@@ -328,6 +329,17 @@ export const BADGE_CATALOG: BadgeDef[] = [
     tier: "rare",
     points: 25,
     icon: "👑",
+  },
+  {
+    id: "let_them_cook",
+    name: "Let Them Cook",
+    description:
+      "You handed the card to pure chaos. Completely random. Room saw the flames. No take-backs on the nerve.",
+    howToEarn:
+      "Lock a Chaos Mode card (robots cook — pure RNG, 2× week points, 2 per season). Permanent flex.",
+    tier: "rare",
+    points: 25,
+    icon: "🤖",
   },
 
   // —— Common ——
@@ -1287,6 +1299,11 @@ function evaluateBadge(
     case "cheevo_king":
       return {
         earned: hasPermanentBadge(player, CHEEVO_KING_ID),
+      };
+
+    case "let_them_cook":
+      return {
+        earned: hasPermanentBadge(player, "let_them_cook"),
       };
 
     case "first_blood":

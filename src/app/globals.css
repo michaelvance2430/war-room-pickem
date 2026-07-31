@@ -153,6 +153,35 @@ body {
   }
 }
 
+/* Chaos Mode — everyone sees dad went Chaos this week */
+.chaos-flames {
+  background: linear-gradient(
+    105deg,
+    rgba(249, 115, 22, 0.25),
+    rgba(239, 68, 68, 0.2),
+    rgba(234, 179, 8, 0.22),
+    rgba(249, 115, 22, 0.25)
+  );
+  background-size: 200% 100%;
+  animation: chaos-flicker 1.4s ease-in-out infinite;
+  box-shadow:
+    0 0 12px rgba(249, 115, 22, 0.45),
+    0 0 4px rgba(239, 68, 68, 0.5),
+    inset 0 0 8px rgba(251, 146, 60, 0.2);
+  border: 1px solid rgba(251, 146, 60, 0.55);
+}
+@keyframes chaos-flicker {
+  0%,
+  100% {
+    background-position: 0% 50%;
+    filter: brightness(1);
+  }
+  50% {
+    background-position: 100% 50%;
+    filter: brightness(1.15);
+  }
+}
+
 /* Subtle scanline overlay (all themes) */
 body::after {
   content: "";
