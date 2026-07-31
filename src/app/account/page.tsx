@@ -313,7 +313,45 @@ export default function AccountPage() {
           </div>
         )}
 
-        {/* Always first so it’s impossible to miss */}
+        {/* Top of Account — change name (buddy request; don't bury under titles) */}
+        <section className="rounded-xl border-2 border-primary/50 bg-primary/10 p-5 mb-6">
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-1">
+            Identity
+          </p>
+          <h2 className="font-semibold text-lg mb-1">Display name</h2>
+          <p className="text-xs text-muted mb-3 leading-relaxed">
+            What the room sees on standings, the board, and the Gazette. Change
+            it anytime.
+          </p>
+          <label className="block text-xs text-muted mb-3">
+            Your name
+            <input
+              type="text"
+              value={nameDraft}
+              onChange={(e) => setNameDraft(e.target.value)}
+              maxLength={40}
+              autoComplete="nickname"
+              placeholder="e.g. Mike V"
+              disabled={nameBusy || isGuestMode()}
+              className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-3 text-base text-foreground font-medium disabled:opacity-50"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={() => void onSaveName()}
+            disabled={
+              nameBusy ||
+              isGuestMode() ||
+              nameDraft.trim().replace(/\s+/g, " ") === name.trim() ||
+              !nameDraft.trim()
+            }
+            className="w-full py-3 min-h-[48px] rounded-xl bg-primary text-black text-sm font-bold disabled:opacity-40 touch-manipulation"
+          >
+            {nameBusy ? "Saving…" : "Save name"}
+          </button>
+        </section>
+
+        {/* Commish preview next */}
         {canPreviewPlayer && (
           <section className="rounded-xl border-2 border-warning bg-warning/15 p-5 mb-6 shadow-[0_0_24px_rgba(234,179,8,0.12)]">
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-warning mb-1">
@@ -596,40 +634,6 @@ export default function AccountPage() {
               );
             })}
           </div>
-        </section>
-
-        <section className="rounded-xl border border-border bg-card p-5 mb-6">
-          <h2 className="font-semibold mb-1">Display name</h2>
-          <p className="text-xs text-muted mb-3 leading-relaxed">
-            What the room sees on standings, picks, and the Gazette. Change it
-            anytime.
-          </p>
-          <label className="block text-xs text-muted mb-3">
-            Your name
-            <input
-              type="text"
-              value={nameDraft}
-              onChange={(e) => setNameDraft(e.target.value)}
-              maxLength={40}
-              autoComplete="nickname"
-              placeholder="e.g. Mike V"
-              disabled={nameBusy || isGuestMode()}
-              className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground font-medium disabled:opacity-50"
-            />
-          </label>
-          <button
-            type="button"
-            onClick={() => void onSaveName()}
-            disabled={
-              nameBusy ||
-              isGuestMode() ||
-              nameDraft.trim().replace(/\s+/g, " ") === name.trim() ||
-              !nameDraft.trim()
-            }
-            className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-primary text-black text-sm font-bold disabled:opacity-40"
-          >
-            {nameBusy ? "Saving…" : "Save name"}
-          </button>
         </section>
 
         <section className="rounded-xl border border-border bg-card p-5 mb-6">
