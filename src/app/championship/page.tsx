@@ -71,17 +71,23 @@ export default function ChampionshipPage() {
       if (nextUnscored == null && qfFilled) {
         setProgressNote("All bracket rounds scored — champion is final.");
       } else if (!cfpScored.length) {
+        const playoffWord =
+          getLeague()?.sportId === "nfl" ? "playoff" : "CFP";
         setProgressNote(
-          "Round 1 is seeded from standings. Score CFP weeks 15–18 (or use Commish → finish remaining weeks) to fill Quarterfinals → Final. Higher weekly score advances."
+          `Round 1 is seeded from standings. Score ${playoffWord} weeks 15–18 (or use Commish → finish remaining weeks) to fill Quarterfinals → Final. Higher weekly score advances.`
         );
       } else if (nextUnscored != null) {
         const w = cfpWeekForRound(nextUnscored, totalRounds);
+        const playoffWord =
+          getLeague()?.sportId === "nfl" ? "Playoff" : "CFP";
         setProgressNote(
-          `CFP weeks scored: ${cfpScored.join(", ") || "none"}. Next: score ${weekTitle(w)} to keep advancing.`
+          `${playoffWord} weeks scored: ${cfpScored.join(", ") || "none"}. Next: score ${weekTitle(w)} to keep advancing.`
         );
       } else {
+        const playoffWord =
+          getLeague()?.sportId === "nfl" ? "Playoff" : "CFP";
         setProgressNote(
-          `CFP weeks ${cfpScored.join(", ")} scored — winners should show with weekly points.`
+          `${playoffWord} weeks ${cfpScored.join(", ")} scored — winners should show with weekly points.`
         );
       }
 
@@ -116,7 +122,7 @@ export default function ChampionshipPage() {
           <p className="text-sm text-muted">
             {leagueName ? `${leagueName} • ` : ""}
             Division leaders preferred as seeds 1–4 • Higher weekly score
-            advances each CFP week
+            advances each playoff week
           </p>
         </div>
 
@@ -126,8 +132,8 @@ export default function ChampionshipPage() {
               <span className="font-medium text-primary">Cut locked</span>
               <span className="text-muted">
                 {" "}
-                after Conference Championship (week 14). Seeds stay put; CFP
-                weeks 15–18 decide who advances.
+                after week 14 (cut). Seeds stay put; playoff weeks 15–18 decide
+                who advances.
               </span>
             </p>
           ) : (

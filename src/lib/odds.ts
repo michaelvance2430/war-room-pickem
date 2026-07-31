@@ -119,7 +119,7 @@ export async function fetchFootballOdds(
     weekNumber != null &&
     Number.isFinite(weekNumber)
   ) {
-    games = filterGamesForWeek(games, weekNumber);
+    games = filterGamesForWeek(games, weekNumber, sport);
   }
 
   return {
@@ -132,7 +132,7 @@ export async function fetchFootballOdds(
     weekFilter:
       (body as { weekLabel?: string | null }).weekLabel ||
       (weekNumber != null && !dryRun
-        ? weekDateRangeLabel(weekNumber)
+        ? weekDateRangeLabel(weekNumber, sport)
         : null),
     unfilteredCount,
     dryRun,

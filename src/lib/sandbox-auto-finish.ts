@@ -257,7 +257,7 @@ export async function autoFinishRemainingWeeks(opts?: {
           ? start === end
             ? `${weekTitle(start)} was already scored (or nothing to run).`
             : `No unscored weeks in ${weekTitle(start)} → ${weekTitle(end)}. Already done or empty range.`
-          : `Auto-run: finished ${finished.length} week(s) (${finished.map(weekTitle).join(", ")}).${
+          : `Auto-run: finished ${finished.length} week(s) (${finished.map((w) => weekTitle(w)).join(", ")}).${
               hardErrors.length
                 ? ` Issues: ${hardErrors.join(" · ")}`
                 : rangeComplete

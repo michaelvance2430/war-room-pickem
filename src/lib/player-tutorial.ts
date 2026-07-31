@@ -301,13 +301,13 @@ export function coachCopyForStep(step: PlayerTutorialStep): CoachCopy {
       return picksOnly
         ? {
             title: "Step 3 of 3 · Save Picks",
-            body: "Hit the big Save Picks button. After first kickoff the whole card freezes — so save before Saturday. That’s the whole weekly job.",
+            body: "Hit the big Save Picks button. After first kickoff the whole card freezes — so save before kickoff. That’s the whole weekly job.",
             ctaLabel: "Open My Picks",
             ctaHref: "/picks",
           }
         : {
             title: "Step 6 of 6 · Save Picks",
-            body: "Hit the big Save Picks button. After first kickoff the whole card freezes — so save before Saturday.",
+            body: "Hit the big Save Picks button. After first kickoff the whole card freezes — so save before kickoff.",
             ctaLabel: "Open My Picks",
             ctaHref: "/picks",
           };

@@ -488,7 +488,7 @@ function JoinPageInner() {
             </button>
             <p className="text-center text-[11px] text-muted pt-1">
               Leagues cap at {MAX_LEAGUE_PLAYERS} players so Championship + Toilet
-              Bowl both finish in the CFP weeks.
+              Bowl both finish in the playoff weeks.
             </p>
             <Link href="/login" className="block text-center text-xs text-muted mt-4">Switch account</Link>
             <OwnershipNotice className="mt-6" />
@@ -589,9 +589,10 @@ function JoinPageInner() {
                 })}
               </div>
               <p className="text-[11px] text-muted mt-2 leading-relaxed">
-                College Football is fully playable today. Other sports share
-                this clubhouse when their packs ship — you&apos;re building on{" "}
-                <span className="text-foreground font-medium">dev</span>.
+                <span className="text-foreground font-medium">CFB</span> and{" "}
+                <span className="text-foreground font-medium">NFL</span> are
+                live. World Cup and others ship next — same clubhouse, different
+                desk.
               </p>
             </div>
 

@@ -143,6 +143,49 @@ export const EQUIPABLE_TITLE_CATALOG: EquipableTitleDef[] = [
     vibe: "brag",
     blurb: "Full card green.",
   },
+  // —— NFL primetime titles ——
+  {
+    badgeId: "nfl_perfect_sunday",
+    title: "Perfect Sunday",
+    vibe: "brag",
+    blurb: "Clean sheet on a primetime card.",
+  },
+  {
+    badgeId: "nfl_primetime_general",
+    title: "Primetime General",
+    vibe: "brag",
+    blurb: "Owned a Sunday. Throne temporary or not.",
+  },
+  {
+    badgeId: "nfl_red_zone_assassin",
+    title: "Red Zone Assassin",
+    vibe: "brag",
+    blurb: "Best Bets stacking. Witnesses present.",
+  },
+  {
+    badgeId: "nfl_film_dont_lie",
+    title: "Film Don't Lie",
+    vibe: "brag",
+    blurb: "Ten-straight. Unholy.",
+  },
+  {
+    badgeId: "nfl_immortal_sunday",
+    title: "Immortal Sunday",
+    vibe: "brag",
+    blurb: "Thirty straight. Close the film room.",
+  },
+  {
+    badgeId: "nfl_super_bowl_desk",
+    title: "Super Bowl Desk",
+    vibe: "brag",
+    blurb: "Title weekend cashed.",
+  },
+  {
+    badgeId: "nfl_late_window_legend",
+    title: "Late Window Legend",
+    vibe: "brag",
+    blurb: "Owned a week when it got loud.",
+  },
   {
     badgeId: "best_bet_assassin",
     title: "Best Bet Assassin",

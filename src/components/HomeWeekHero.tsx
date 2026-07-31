@@ -98,7 +98,9 @@ export default function HomeWeekHero() {
     );
   }
 
-  const weekLabel = weekTitle(state.week);
+  const sportId = getLeague()?.sportId || "cfb";
+  const isNfl = sportId === "nfl";
+  const weekLabel = weekTitle(state.week, sportId);
   const progress = weekProgressLabel(state.week);
 
   // —— Player / everyone: primary job ——
@@ -193,14 +195,23 @@ export default function HomeWeekHero() {
     }. After that the whole card freezes.`;
     primaryHref = "/picks";
     primaryLabel = "Make my picks";
-    primaryClass = "bg-primary text-black hover:opacity-90 shadow-[0_0_24px_rgba(34,197,94,0.25)]";
+    primaryClass = isNfl
+      ? "bg-primary text-black hover:opacity-90 shadow-[0_0_24px_rgba(193,18,31,0.35)]"
+      : "bg-primary text-black hover:opacity-90 shadow-[0_0_24px_rgba(34,197,94,0.25)]";
     secondaryHref = "/rules";
     secondaryLabel = "Quick rules";
   }
 
+  const glow = isNfl
+    ? "rgba(193,18,31,0.22)"
+    : "rgba(34,197,94,0.12)";
+
   return (
     <section className="mb-5 sm:mb-8">
-      <div className="rounded-2xl border-2 border-primary/40 bg-gradient-to-br from-primary/15 via-black/50 to-black/70 p-4 sm:p-6 shadow-[0_0_50px_rgba(34,197,94,0.12)]">
+      <div
+        className="rounded-2xl border-2 border-primary/40 bg-gradient-to-br from-primary/15 via-black/50 to-black/70 p-4 sm:p-6"
+        style={{ boxShadow: `0 0 50px ${glow}` }}
+      >
         <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">
             {eyebrow}

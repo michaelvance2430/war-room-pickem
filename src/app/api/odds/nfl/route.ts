@@ -81,9 +81,9 @@ export async function GET(req: Request) {
     let weekLabel: string | null = null;
     let window: { startDate: string; endDate: string } | null = null;
     if (filterByWeek) {
-      games = filterGamesForWeek(games, weekNumber);
-      weekLabel = weekDateRangeLabel(weekNumber);
-      const w = weekDateWindow(weekNumber);
+      games = filterGamesForWeek(games, weekNumber, "nfl");
+      weekLabel = weekDateRangeLabel(weekNumber, "nfl");
+      const w = weekDateWindow(weekNumber, "nfl");
       if (w) window = { startDate: w.startDate, endDate: w.endDate };
     }
 

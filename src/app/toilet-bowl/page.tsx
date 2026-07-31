@@ -99,7 +99,7 @@ export default function ToiletBowlPage() {
           </div>
           <p className="text-sm text-muted">
             {leagueName ? `${leagueName} • ` : ""}
-            Worst record = #1 seed (easiest path) • Same CFP weekly cards as
+            Worst record = #1 seed (easiest path) • Same playoff weekly cards as
             Championship
           </p>
         </div>
@@ -117,13 +117,13 @@ export default function ToiletBowlPage() {
             {cutLocked ? (
               <p className="text-muted">
                 <span className="font-medium text-toilet">Cut locked.</span>{" "}
-                Seeds stay put after Conf Champ week 14. CFP weeks 15–18 fill
-                the board.
+                Seeds stay put after cut week 14. Playoff weeks 15–18 fill the
+                board.
               </p>
             ) : (
               <p className="text-muted">
                 <span className="font-medium text-toilet">Not locked yet.</span>{" "}
-                Seeds update with standings until Conf Champ week is scored.
+                Seeds update with standings until week 14 is scored.
               </p>
             )}
             {progressNote && (

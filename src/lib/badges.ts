@@ -951,7 +951,14 @@ const CATALOG_BY_ID = Object.fromEntries(
 ) as Record<string, BadgeDef>;
 
 export function getBadgeDef(id: string): BadgeDef | undefined {
-  return CATALOG_BY_ID[id];
+  if (CATALOG_BY_ID[id]) return CATALOG_BY_ID[id];
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getNflBadgeDef } = require("./sports/nfl-achievements") as typeof import("./sports/nfl-achievements");
+    return getNflBadgeDef(id);
+  } catch {
+    return undefined;
+  }
 }
 
 type EvalResult = {
@@ -1465,7 +1472,29 @@ export function getPlayerBadges(
   }
 
   const sandbox = isSandboxMode();
-  const statuses: BadgeStatus[] = BADGE_CATALOG.map((def) => {
+  let sportIsNfl = false;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getLeague } = require("./league") as typeof import("./league");
+    sportIsNfl = getLeague()?.sportId === "nfl";
+  } catch {
+    sportIsNfl = false;
+  }
+
+  let catalog = BADGE_CATALOG;
+  if (sportIsNfl) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const nflMod = require("./sports/nfl-achievements") as typeof import("./sports/nfl-achievements");
+      catalog = BADGE_CATALOG.filter(
+        (d) => !nflMod.CFB_ONLY_BADGE_IDS.has(d.id)
+      ).map((d) => nflMod.nflDisplayOverlay(d));
+    } catch {
+      catalog = BADGE_CATALOG;
+    }
+  }
+
+  const statuses: BadgeStatus[] = catalog.map((def) => {
     try {
       const result = evaluateBadge(def.id, p, peers);
       const permanent = hasPermanentBadge(p, def.id);
@@ -1552,6 +1581,19 @@ export function getPlayerBadges(
       };
     }
   });
+
+  // NFL-only cheevos (primetime bank) — appended when in an NFL room
+  if (sportIsNfl) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { getNflPlayerBadges } = require("./sports/nfl-badge-eval") as typeof import("./sports/nfl-badge-eval");
+      const nflStatuses = getNflPlayerBadges(p, peers);
+      statuses.push(...nflStatuses);
+    } catch {
+      /* ignore */
+    }
+  }
+
   return sortBadges(statuses);
 }
 

@@ -17,6 +17,7 @@ import {
 export default function SeasonOpenWelcome() {
   const [open, setOpen] = useState(false);
   const [leagueName, setLeagueName] = useState("the War Room");
+  const [isNfl, setIsNfl] = useState(false);
 
   useEffect(() => {
     if (!isSeasonOpen()) return;
@@ -27,6 +28,7 @@ export default function SeasonOpenWelcome() {
     const league = getLeague();
     const name = league?.name?.trim() || "the War Room";
     setLeagueName(name);
+    setIsNfl(league?.sportId === "nfl");
 
     // Let the page paint, then hit them with the splash
     const t = window.setTimeout(() => setOpen(true), 500);
@@ -57,18 +59,19 @@ export default function SeasonOpenWelcome() {
         onClick={dismiss}
       />
 
-      {/* Glow layers */}
+      {/* Glow layers — green CFB vs crimson NFL */}
       <div
         className="pointer-events-none absolute inset-0 -z-0"
         style={{
-          background:
-            "radial-gradient(ellipse 70% 50% at 50% 40%, rgba(34,197,94,0.25), transparent 60%)",
+          background: isNfl
+            ? "radial-gradient(ellipse 70% 50% at 50% 40%, rgba(193,18,31,0.28), transparent 60%)"
+            : "radial-gradient(ellipse 70% 50% at 50% 40%, rgba(34,197,94,0.25), transparent 60%)",
         }}
       />
 
       <div className="relative z-10 w-full max-w-3xl text-center px-2">
         <p className="text-[11px] sm:text-xs font-bold uppercase tracking-[0.35em] text-primary mb-4 sm:mb-6 animate-pulse">
-          Doors are open
+          {isNfl ? "Primetime is open" : "Doors are open"}
         </p>
 
         <p className="text-sm sm:text-base uppercase tracking-[0.25em] text-muted mb-3 sm:mb-4">
@@ -77,7 +80,12 @@ export default function SeasonOpenWelcome() {
 
         <h1
           id="season-open-title"
-          className="text-4xl sm:text-6xl md:text-7xl font-black tracking-tight text-white leading-[1.05] mb-4 sm:mb-6 drop-shadow-[0_0_40px_rgba(34,197,94,0.35)]"
+          className="text-4xl sm:text-6xl md:text-7xl font-black tracking-tight text-white leading-[1.05] mb-4 sm:mb-6"
+          style={{
+            filter: isNfl
+              ? "drop-shadow(0 0 40px rgba(193,18,31,0.4))"
+              : "drop-shadow(0 0 40px rgba(34,197,94,0.35))",
+          }}
         >
           {leagueName}
         </h1>
@@ -87,15 +95,21 @@ export default function SeasonOpenWelcome() {
         </p>
 
         <p className="text-sm sm:text-base text-muted max-w-md mx-auto leading-relaxed mb-8">
-          The countdown is over. Lock picks before first kickoff. Standings,
-          Gazette, Locker — the room is yours. Don&apos;t ghost week one.
+          {isNfl
+            ? "The countdown is over. Lock picks before first kickoff. Late windows, Sunday Gazette, Locker — the room is yours. Don’t ghost week one."
+            : "The countdown is over. Lock picks before first kickoff. Standings, Gazette, Locker — the room is yours. Don’t ghost week one."}
         </p>
 
         <div className="flex flex-col sm:flex-row gap-3 justify-center items-stretch sm:items-center">
           <Link
             href="/picks"
             onClick={dismiss}
-            className="px-8 py-4 rounded-xl bg-primary text-black text-base sm:text-lg font-bold hover:opacity-90 transition shadow-[0_0_30px_rgba(34,197,94,0.35)]"
+            className="px-8 py-4 rounded-xl bg-primary text-black text-base sm:text-lg font-bold hover:opacity-90 transition"
+            style={{
+              boxShadow: isNfl
+                ? "0 0 30px rgba(193,18,31,0.4)"
+                : "0 0 30px rgba(34,197,94,0.35)",
+            }}
           >
             Enter the War Room
           </Link>

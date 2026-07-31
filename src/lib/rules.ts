@@ -20,6 +20,9 @@ export const RULES_SEEN_KEY = "warroom-rules-seen-v2";
 export const RULES_INTRO =
   "College football pick'em against the spread. Five games each week, confidence points, one Best Bet multiplier, and a weekly prop. Tap any green player name to open their profile.";
 
+export const RULES_INTRO_NFL =
+  "Pro football pick'em against the spread. Five games each week, confidence points, one Best Bet multiplier, and a weekly prop. Sundays, primetime, no campus. Tap any player name to open their profile.";
+
 export const RULE_SECTIONS: RuleSection[] = [
   {
     title: "1. Go to My Picks",
@@ -150,6 +153,82 @@ export const RULE_SECTIONS: RuleSection[] = [
     ],
   },
 ];
+
+const SCORING_NFL: RuleSection = {
+  title: "Scoring & standings",
+  body: [
+    "Weekly score = confidence points for correct ATS picks (+ double for a correct Best Bet) + prop points if you hit the prop.",
+    "Only locked picks are scored. No locked card for the week = zero points for that week.",
+    "Season standings total your weekly points.",
+    "Week 0 is optional. Real season runs Week 1 → Week 14 cut → playoff cards.",
+    "After Week 14 (cut) is scored, the cut locks: top half → Championship bracket, bottom → Toilet Bowl.",
+    "Playoff weeks (Wild Card / Divisional / Conference / Super Bowl) advance those brackets — higher weekly score wins the matchup.",
+  ],
+};
+
+const LOCK_NFL: RuleSection = {
+  title: "Lock deadlines — READ THIS",
+  callout: true,
+  body: [
+    {
+      bold: true,
+      text: "ALL PICKS MUST BE LOCKED BEFORE THE FIRST KICKOFF on that week’s slate.",
+    },
+    {
+      bold: true,
+      text: "After first kickoff: the entire card freezes. No more edits for anyone. If you never locked, you cannot lock — you score 0 for the week.",
+    },
+    "No makeups. No partial credit. Lock early. Fair is fair.",
+    {
+      bold: true,
+      text: "NO LOCK, NO POINTS. Gazette may put no-lockers on the inactive list.",
+    },
+  ],
+};
+
+const TROPHY_NFL: RuleSection = {
+  title: "Trophy Room",
+  body: [
+    "After the season, the commissioner engraves winners: Championship and Toilet Bowl.",
+    "History stays with the league year after year — even if players join/leave or the commissioner is passed on.",
+    "Season reset does not wipe the Trophy Room.",
+  ],
+};
+
+/**
+ * Sport-aware rules for onboarding + Rules page.
+ * NFL drops Crystal Ball national-champ copy and uses pro week map language.
+ */
+export function getRulesForSport(sportId?: string | null): {
+  intro: string;
+  sections: RuleSection[];
+} {
+  if (sportId === "nfl") {
+    const core = RULE_SECTIONS.filter(
+      (s) =>
+        !s.title.startsWith("Crystal Ball") &&
+        s.title !== "Scoring & standings" &&
+        s.title !== "Lock deadlines — READ THIS" &&
+        s.title !== "Trophy Room" &&
+        s.title !== "Locker Room" &&
+        s.title !== "League size" &&
+        s.title !== "Profile & tips"
+    );
+    const tail = RULE_SECTIONS.filter(
+      (s) =>
+        s.title === "Locker Room" ||
+        s.title === "League size" ||
+        s.title === "Profile & tips"
+    );
+    return {
+      intro: RULES_INTRO_NFL,
+      sections: [...core, LOCK_NFL, SCORING_NFL, TROPHY_NFL, ...tail],
+    };
+  }
+  return { intro: RULES_INTRO, sections: RULE_SECTIONS };
+}
+
+
 
 export function hasSeenRules(): boolean {
   if (typeof window === "undefined") return true;

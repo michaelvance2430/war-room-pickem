@@ -30,13 +30,13 @@ const PACKS: SportPack[] = [
     shortLabel: "NFL",
     emoji: "🏈",
     blurb:
-      "Sundays. Primetime. Same War Room soul — different colors, different default skin.",
+      "Sundays. Primetime. Late windows. Same War Room soul — navy, crimson, no campus filler.",
     sortOrder: 2,
     status: "live",
     defaultSeasonWeeks: 18,
     defaultGamesPerWeek: 5,
-    pridePickLabel: "League champion (pride pick)",
-    rulesOneLiner: "ATS confidence card · Best Bet · prop",
+    pridePickLabel: "Super Bowl champion (pride pick)",
+    rulesOneLiner: "ATS confidence · Best Bet · prop · Sunday Gazette",
   },
   {
     id: "soccer_wwc",

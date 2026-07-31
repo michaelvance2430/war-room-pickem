@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { getSession } from "@/lib/league";
+import { getLeague, getSession } from "@/lib/league";
 import { hasSeenRules, markRulesSeen } from "@/lib/rules";
 
 /**
@@ -118,10 +118,27 @@ export default function RulesOnboardingModal() {
             </div>
           ))}
 
-          <p className="text-[11px] text-muted leading-relaxed px-0.5">
-            Optional later: Crystal Ball (national champ flex, 0 standings pts)
-            lives under More when you’re ready — not required for week one.
-          </p>
+          {(() => {
+            const lg = getLeague();
+            if (
+              lg?.sportId === "nfl" ||
+              lg?.settings?.crystalBallEnabled === false
+            ) {
+              return (
+                <p className="text-[11px] text-muted leading-relaxed px-0.5">
+                  That&apos;s the whole weekly job. Gazette and standings wake up
+                  after the host scores — not day one homework.
+                </p>
+              );
+            }
+            return (
+              <p className="text-[11px] text-muted leading-relaxed px-0.5">
+                Optional later: Crystal Ball (national champ flex, 0 standings
+                pts) lives under More when you’re ready — not required for week
+                one.
+              </p>
+            );
+          })()}
         </div>
 
         <div className="px-5 py-4 border-t border-border shrink-0 flex flex-col sm:flex-row gap-2">

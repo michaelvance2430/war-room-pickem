@@ -2095,9 +2095,20 @@ function CommissionerPageInner() {
                     Always weeks 0–{SEASON_MAX_WEEK}
                   </p>
                   <p className="text-[11px] text-muted mt-1 leading-relaxed">
-                    Fixed CFB map: Week 0 openers · 1–13 regular ·{" "}
-                    <span className="text-warning">14 Conf Champ (CUT)</span> ·
-                    15–18 CFP (R1 / QF / SF / Final). Not configurable.
+                    {league?.sportId === "nfl" ? (
+                      <>
+                        Fixed NFL map: Week 0 optional · 1–13 regular ·{" "}
+                        <span className="text-warning">14 Cut week</span> ·
+                        15–18 playoffs (Wild Card / Divisional / Conference /
+                        Super Bowl). Not configurable.
+                      </>
+                    ) : (
+                      <>
+                        Fixed CFB map: Week 0 openers · 1–13 regular ·{" "}
+                        <span className="text-warning">14 Conf Champ (CUT)</span>{" "}
+                        · 15–18 CFP (R1 / QF / SF / Final). Not configurable.
+                      </>
+                    )}
                   </p>
                 </div>
               </div>
@@ -2108,9 +2119,9 @@ function CommissionerPageInner() {
                     Crystal Ball
                   </p>
                   <p className="text-xs text-muted mt-1 leading-relaxed">
-                    Preseason tab: pick who wins the national title (0 points).
-                    Correct picks earn a sarcastic Witch/Wizard achievement.
-                    Turn off to hide the tab for everyone in this league.
+                    {league?.sportId === "nfl"
+                      ? "Pride pick tab (0 points). Off by default for NFL — turn on only if you want a Super Bowl–style flex pick. Hide anytime."
+                      : "Preseason tab: pick who wins the national title (0 points). Correct picks earn a sarcastic Witch/Wizard achievement. Turn off to hide the tab for everyone in this league."}
                   </p>
                 </div>
                 <button

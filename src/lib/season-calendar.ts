@@ -104,6 +104,56 @@ function buildRegularWindows2026(): WeekDateWindow[] {
 
 const WINDOWS_2026 = buildRegularWindows2026();
 
+/**
+ * 2026 NFL pick'em windows (America/New_York civil dates, inclusive).
+ * Thu–Mon pro windows. Week 1 ≈ Sep 10–14, 2026 (opening weekend).
+ * Weeks 15–18 map to playoff card slots (Wild Card → Super Bowl).
+ */
+function buildNflWindows2026(): WeekDateWindow[] {
+  const out: WeekDateWindow[] = [
+    // Optional early card (TNF / openers hang)
+    { weekNumber: 0, startDate: "2026-09-03", endDate: "2026-09-08" },
+  ];
+  // Week 1: Thu Sep 10 → Mon Sep 14, 2026
+  let start = utcNoonFromYmd("2026-09-10");
+  for (let w = 1; w <= 14; w++) {
+    const end = new Date(start);
+    end.setUTCDate(end.getUTCDate() + 4); // Thu→Mon
+    out.push({
+      weekNumber: w,
+      startDate: ymdFromUtcNoon(start),
+      endDate: ymdFromUtcNoon(end),
+    });
+    start = new Date(start);
+    start.setUTCDate(start.getUTCDate() + 7);
+  }
+  // Playoff card windows (approx 2027)
+  out.push(
+    { weekNumber: 15, startDate: "2027-01-09", endDate: "2027-01-12" },
+    { weekNumber: 16, startDate: "2027-01-16", endDate: "2027-01-18" },
+    { weekNumber: 17, startDate: "2027-01-24", endDate: "2027-01-25" },
+    { weekNumber: 18, startDate: "2027-02-07", endDate: "2027-02-08" }
+  );
+  return out;
+}
+
+const NFL_WINDOWS_2026 = buildNflWindows2026();
+
+/** Active league sport when available (client). Safe default: cfb. */
+export function resolveCalendarSport(
+  explicit?: string | null
+): "cfb" | "nfl" {
+  if (explicit === "nfl" || explicit === "cfb") return explicit;
+  try {
+    // Lazy import avoids any circular load issues at module init
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getLeague } = require("./league") as typeof import("./league");
+    return getLeague()?.sportId === "nfl" ? "nfl" : "cfb";
+  } catch {
+    return "cfb";
+  }
+}
+
 function utcNoonFromYmd(ymd: string): Date {
   const [y, m, d] = ymd.split("-").map(Number);
   return new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
@@ -116,13 +166,21 @@ function ymdFromUtcNoon(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
-export function weekDateWindow(weekNumber: number): WeekDateWindow | null {
-  return WINDOWS_2026.find((w) => w.weekNumber === weekNumber) || null;
+export function weekDateWindow(
+  weekNumber: number,
+  sportId?: string | null
+): WeekDateWindow | null {
+  const sport = resolveCalendarSport(sportId);
+  const bank = sport === "nfl" ? NFL_WINDOWS_2026 : WINDOWS_2026;
+  return bank.find((w) => w.weekNumber === weekNumber) || null;
 }
 
 /** Human range e.g. "Aug 29, 2026" or "Sep 3–7, 2026" */
-export function weekDateRangeLabel(weekNumber: number): string {
-  const w = weekDateWindow(weekNumber);
+export function weekDateRangeLabel(
+  weekNumber: number,
+  sportId?: string | null
+): string {
+  const w = weekDateWindow(weekNumber, sportId);
   if (!w) return "";
   const fmt = (ymd: string) => {
     const [y, m, d] = ymd.split("-").map(Number);
@@ -151,11 +209,14 @@ export function weekDateRangeLabel(weekNumber: number): string {
 /**
  * Inclusive ET window: startDate 00:00:00 America/New_York → endDate 23:59:59.999 ET.
  */
-export function weekWindowMs(weekNumber: number): {
+export function weekWindowMs(
+  weekNumber: number,
+  sportId?: string | null
+): {
   startMs: number;
   endMs: number;
 } | null {
-  const w = weekDateWindow(weekNumber);
+  const w = weekDateWindow(weekNumber, sportId);
   if (!w) return null;
   return {
     startMs: etStartOfDayMs(w.startDate),
@@ -190,8 +251,8 @@ function etYmd(ms: number): string {
 
 export function filterGamesForWeek<
   T extends { commenceTime?: string; startTime?: string },
->(games: T[], weekNumber: number): T[] {
-  const win = weekWindowMs(weekNumber);
+>(games: T[], weekNumber: number, sportId?: string | null): T[] {
+  const win = weekWindowMs(weekNumber, sportId);
   if (!win) return games;
   return games.filter((g) => {
     const raw = g.commenceTime || g.startTime;
@@ -213,7 +274,29 @@ export function seasonPhase(weekNumber: number): SeasonPhase {
   return "other";
 }
 
-export function weekTitle(weekNumber: number): string {
+export function weekTitle(
+  weekNumber: number,
+  sportId?: string | null
+): string {
+  const sport = resolveCalendarSport(sportId);
+  if (sport === "nfl") {
+    switch (seasonPhase(weekNumber)) {
+      case "week0":
+        return "Week 0";
+      case "conf_championship":
+        return "Week 14 · Cut";
+      case "cfp_r1":
+        return "Wild Card";
+      case "cfp_qf":
+        return "Divisional";
+      case "cfp_sf":
+        return "Conference";
+      case "cfp_final":
+        return "Super Bowl";
+      default:
+        return `Week ${weekNumber}`;
+    }
+  }
   switch (seasonPhase(weekNumber)) {
     case "week0":
       return "Week 0";
@@ -232,9 +315,41 @@ export function weekTitle(weekNumber: number): string {
   }
 }
 
-export function weekSubtitle(weekNumber: number): string {
-  const range = weekDateRangeLabel(weekNumber);
+export function weekSubtitle(
+  weekNumber: number,
+  sportId?: string | null
+): string {
+  const sport = resolveCalendarSport(sportId);
+  const range = weekDateRangeLabel(weekNumber, sport);
   const rangeBit = range ? ` ${range}.` : "";
+  if (sport === "nfl") {
+    switch (seasonPhase(weekNumber)) {
+      case "week0":
+        return `Optional early card (${range || "early Sep"}). Separate from Week 1. Primetime desk.`;
+      case "regular":
+        if (weekNumber === 1) {
+          return `Opening weekend Thu–Mon.${rangeBit} Counts toward standings.`;
+        }
+        if (weekNumber === 13) {
+          return `Late regular season.${rangeBit} Cut week is next.`;
+        }
+        return `Regular-season Thu–Mon window.${rangeBit} Counts toward standings & the cut.`;
+      case "conf_championship":
+        return `Final RS / cut week.${rangeBit} After scoring, Championship vs Toilet locks.`;
+      case "cfp_r1":
+        return `Wild Card card.${rangeBit} Bracket advancement week.`;
+      case "cfp_qf":
+        return `Divisional round.${rangeBit} Bracket advancement week.`;
+      case "cfp_sf":
+        return `Conference championships.${rangeBit} Bracket advancement week.`;
+      case "cfp_final":
+        return `Super Bowl week.${rangeBit} Final bracket week.`;
+      default:
+        return range
+          ? `Pick'em card · ${range}.`
+          : "Pick'em card for this week.";
+    }
+  }
   switch (seasonPhase(weekNumber)) {
     case "week0":
       return `Special kickoff Saturday only (${range || "Aug 29, 2026"}). Separate card from Week 1.`;
@@ -261,20 +376,24 @@ export function weekSubtitle(weekNumber: number): string {
   }
 }
 
-export function weekPillHint(weekNumber: number): string {
+export function weekPillHint(
+  weekNumber: number,
+  sportId?: string | null
+): string {
+  const sport = resolveCalendarSport(sportId);
   switch (seasonPhase(weekNumber)) {
     case "week0":
       return "openers";
     case "conf_championship":
       return "CUT";
     case "cfp_r1":
-      return "playoff";
+      return sport === "nfl" ? "wild card" : "playoff";
     case "cfp_qf":
-      return "playoff";
+      return sport === "nfl" ? "divisional" : "playoff";
     case "cfp_sf":
-      return "playoff";
+      return sport === "nfl" ? "conference" : "playoff";
     case "cfp_final":
-      return "title";
+      return sport === "nfl" ? "Super Bowl" : "title";
     default:
       return "";
   }
@@ -287,5 +406,15 @@ export const SEASON_SCRUB_SUMMARY = {
   confChampionship: "1 week (app week 14) — locks Championship vs Toilet cut",
   cfpPlayoffs: "4 weeks (15–18): R1, QF, SF, National Championship",
   totalCardsMax: 19, // weeks 0 through 18 inclusive
+  cutLocksAfterWeek: DEFAULT_CUT_LOCK_WEEK,
+};
+
+/** NFL-facing season map copy for commissioner settings */
+export const NFL_SEASON_SCRUB_SUMMARY = {
+  week0: "1 optional early card (run alone if you want)",
+  regularSeason: "13 pick'em weeks (Week 1–13)",
+  cutWeek: "Week 14 — locks Championship vs Toilet cut",
+  playoffs: "4 weeks (15–18): Wild Card, Divisional, Conference, Super Bowl",
+  totalCardsMax: 19,
   cutLocksAfterWeek: DEFAULT_CUT_LOCK_WEEK,
 };

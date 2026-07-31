@@ -34,7 +34,7 @@ export function generateDemoSlate(
   const seedBoost = sport === "nfl" ? 33331 : 0;
   const rand = mulberry(10007 + weekNumber * 9973 + seedBoost);
   const used = new Set<string>();
-  const win = weekDateWindow(weekNumber);
+  const win = weekDateWindow(weekNumber, sport);
   const baseDay = win?.startDate || "2026-09-01";
 
   const games: Game[] = [];

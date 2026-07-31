@@ -7,7 +7,7 @@ import { Player } from "./types";
 export const MOCK_NPC_ROASTS: string[] = [
   "This ain't a person. It's a spreadsheet with a gambling problem and a fake name.",
   "NPC energy. Built in a lab to pad divisions and steal your Best Bet aura.",
-  "Not real. Never locked a Saturday card. Still somehow mid in your division.",
+  "Not real. Never locked a card. Still somehow mid in your division.",
   "If you trash-talk this profile, you're arguing with the furniture. Respectfully: it's furniture.",
   "Demo account. All the swagger of a pregame show, none of the consequences.",
   "No heartbeat, no bad beats, no group chat. Just vibes and made-up ATS%.",
