@@ -61,6 +61,18 @@ export type GazetteEdition = {
   classifieds: string[];
   /** Pull quote for layout drama */
   pullQuote: { text: string; by: string };
+  /**
+   * Funny sub-stories — sarcastic “fake news” (often non-football).
+   * One may name-drop the crown/shame; others are pure absurdity.
+   */
+  sideStories: GazetteSideStory[];
+};
+
+/** Sidebar / “also in this paper” bit */
+export type GazetteSideStory = {
+  kicker: string;
+  headline: string;
+  body: string;
 };
 
 function storageKey(leagueId: string, weekIndex: number): string {
@@ -632,6 +644,19 @@ export async function buildGazetteEdition(
     pts: cp,
   });
 
+  // Sub-stories: one name-tied roast + one pure non-football absurdity
+  const sideCtx: SideStoryCtx = {
+    crown: cn,
+    shame: sn,
+    league: leagueName,
+    pts: cp,
+    weekLabel,
+  };
+  const sideStories: GazetteSideStory[] = [
+    byWeek(SIDE_STORIES_NAMED, weekIndex, 0)(sideCtx),
+    byWeek(SIDE_STORIES_ABSURD, weekIndex, 1)(sideCtx),
+  ];
+
   const printedLine = `${weekLabel.toUpperCase()} EDITION · ${year} SEASON · ${leagueName.toUpperCase()} · NOT FIT FOR FRAMING (BUT YOU WILL)`;
 
   return {
@@ -644,6 +669,7 @@ export async function buildGazetteEdition(
     weather,
     classifieds,
     pullQuote,
+    sideStories,
     samePerson: data.samePerson,
     crown,
     shame,
@@ -680,6 +706,12 @@ export function formatGazetteShareText(edition: GazetteEdition): string {
       edition.standingsDeadlock.deck,
       ""
     );
+  }
+  if (edition.sideStories?.length) {
+    lines.push("— ALSO IN THIS PAPER —", "");
+    for (const s of edition.sideStories) {
+      lines.push(`${s.kicker}: ${s.headline}`, s.body, "");
+    }
   }
   lines.push(`— ${edition.pullQuote.text}`, `   — ${edition.pullQuote.by}`);
   lines.push("", "War Room Pick'Em · don't ghost next week");
@@ -839,6 +871,146 @@ const SWING_DOWN_DECKS: SwingDK[] = [
     `−${s} on the board. Now #${rank}. Bring a helmet next week.`,
   (s, rank) =>
     `Fell ${s} spots (now #${rank}). The cut line sent a “thinking of you” card.`,
+];
+
+// ——— Non-football (and barely-football) side stories ———
+
+type SideStoryCtx = {
+  crown: string;
+  shame: string;
+  league: string;
+  pts: number;
+  weekLabel: string;
+};
+
+type SideFn = (c: SideStoryCtx) => GazetteSideStory;
+
+/** Uses the week’s hero/villain names — still silly, not real sports recaps. */
+const SIDE_STORIES_NAMED: SideFn[] = [
+  (c) => ({
+    kicker: "Lifestyle",
+    headline: `${c.crown.toUpperCase()} DECLARED “FINANCIALLY RESPONSIBLE” AFTER ${c.pts}-POINT WEEK`,
+    body: `Local sources confirm ${c.crown} immediately spent the aura on imaginary swagger. ${c.shame} was seen Googling “how to reverse a Best Bet.” Experts say the market for humility is still closed.`,
+  }),
+  (c) => ({
+    kicker: "Science",
+    headline: `STUDY: ${c.crown.toUpperCase()}'S BRAIN NOW 12% MORE ANNOYING`,
+    body: `Peer-reviewed in the group chat. Symptoms include unsolicited “I told you so,” selective memory, and claiming the prop was “always the play.” ${c.shame} declined a control-group invitation.`,
+  }),
+  (c) => ({
+    kicker: "Metro",
+    headline: `CITY RENAMES A SPEED BUMP AFTER ${c.shame.toUpperCase()}`,
+    body: `“It slows everyone down for no good reason,” said a council member who requested anonymity and better dogs. ${c.crown} declined the ribbon-cutting, citing “main character conflicts.”`,
+  }),
+  (c) => ({
+    kicker: "Business",
+    headline: `${c.crown.toUpperCase()} LAUNCHES CONSULTING FIRM: “JUST HIT YOUR FIVES”`,
+    body: `Rates start at one brag per hour. ${c.league} members can pay in shame. ${c.shame} is reportedly a founding client and also the product.`,
+  }),
+  (c) => ({
+    kicker: "Obituaries",
+    headline: `${c.shame.toUpperCase()}'S EXCUSES, 2024–${new Date().getFullYear()}`,
+    body: `Survived by “the refs,” “the line moved,” and “I was busy.” In lieu of flowers, please lock next week. ${c.crown} sent a fruit basket labeled ${c.pts} PTS.`,
+  }),
+  (c) => ({
+    kicker: "Travel",
+    headline: `${c.crown.toUpperCase()} BOOKS ONE-WAY FLIGHT TO THE MORAL HIGH GROUND`,
+    body: `TSA confiscated false modesty. ${c.shame} is still at the gate arguing with the boarding pass that says 0. ${c.weekLabel} travel advisory: pack dignity or don't pack at all.`,
+  }),
+  (c) => ({
+    kicker: "Food",
+    headline: `RECIPE OF THE WEEK: WHATEVER ${c.crown.toUpperCase()} COOKED (${c.pts} SERVINGS)`,
+    body: `Ingredients: five spreads, one Best Bet, zero mercy. ${c.shame} attempted the same dish and invented a new way to undercook confidence.`,
+  }),
+  (c) => ({
+    kicker: "Tech",
+    headline: `APP UPDATE: MUTE BUTTON ADDED FOR ${c.crown.toUpperCase()} SPECIFICALLY`,
+    body: `Beta testers report ${c.shame} held the button so long the phone overheated. Developers say “it’s a feature, not a bug, and also a cry for help.”`,
+  }),
+  (c) => ({
+    kicker: "Politics",
+    headline: `${c.crown.toUpperCase()} WINS LANDSLIDE IN POLL OF ONE (THEMSELF)`,
+    body: `Opposition candidate ${c.shame} conceded after discovering ballots required locking before kickoff. International observers called the process “fair, mean, and hilarious.”`,
+  }),
+  (c) => ({
+    kicker: "Real estate",
+    headline: `${c.shame.toUpperCase()} LISTS PRIDE AT A LOSS`,
+    body: `Open house Saturday. Bring snacks. ${c.crown} is the nosy neighbor measuring the property line with a ruler labeled STANDINGS. HOA fines start at one public roast.`,
+  }),
+  (c) => ({
+    kicker: "Crime blotter",
+    headline: `${c.crown.toUpperCase()} CAUGHT STEALING A WHOLE WEEK (${c.pts} PTS)`,
+    body: `Witnesses say the crime was “too clean.” ${c.shame} filed a report under “emotional damages.” Bail set at one better card next week.`,
+  }),
+  (c) => ({
+    kicker: "Horoscope",
+    headline: `${c.crown.toUpperCase()}: SUN IN BEST BET. ${c.shame.toUpperCase()}: MOON IN “WHY”`,
+    body: `Mercury is in retrograde only for people who didn’t lock. Lucky numbers: 1 through 5, used once, unlike your excuses.`,
+  }),
+];
+
+/** Pure absurd non-football filler — Onion energy, no real sports. */
+const SIDE_STORIES_ABSURD: SideFn[] = [
+  () => ({
+    kicker: "World",
+    headline: `NATION AGREES TO “JUST ONE MORE GROUP CHAT” THEN SLEEP`,
+    body: `Treaty collapses at 1:14 a.m. when someone posts a meme. Historians note this is the 400th consecutive failed summit. Coffee futures surge.`,
+  }),
+  () => ({
+    kicker: "Science",
+    headline: `RESEARCHERS CONFIRM “I’LL DO IT LATER” IS A COMPLETE PERSONALITY`,
+    body: `Subjects shown a green Save button chose scrolling instead. Control group locked picks and felt superior in a sustainable, annoying way.`,
+  }),
+  () => ({
+    kicker: "Business",
+    headline: `LOCAL MAN PIVOTS TO “ vibes-based economics ”`,
+    body: `Shareholders asked for a spreadsheet. He replied with a shrug emoji. Markets briefly rallied on pure spite, then remembered math.`,
+  }),
+  () => ({
+    kicker: "Metro",
+    headline: `CITY INSTALLS “THOUGHTS AND PRAYERS” AS OFFICIAL PUBLIC TRANSIT`,
+    body: `Riders report frequent delays and no actual movement. Mayor insists the system is “working as designed for people who never lock.”`,
+  }),
+  () => ({
+    kicker: "Lifestyle",
+    headline: `EXPERTS WARN AGAINST “MAIN CHARACTER ENERGY” WITHOUT A PLOT`,
+    body: `Side characters in the group chat demand better writing. One anonymous source whispered, “At least give us a Best Bet.”`,
+  }),
+  () => ({
+    kicker: "Tech",
+    headline: `NEW AI WRITES APOLOGIES SO YOU DON’T HAVE TO MEAN THEM`,
+    body: `Early reviews: “Sounds like me after a 4-point week.” Subscription includes optional sincerity upgrade (sold separately, rarely used).`,
+  }),
+  () => ({
+    kicker: "Weather",
+    headline: `NATIONAL WEATHER SERVICE ISSUES “MID” ADVISORY`,
+    body: `Conditions: meh with scattered opinions. Residents advised to stay indoors unless they have a take. Wind chill measured in lost confidence points.`,
+  }),
+  () => ({
+    kicker: "Culture",
+    headline: `DOCUMENTARY “WAITING FOR THE PROP” WINS NOTHING, DESERVES LESS`,
+    body: `Runtime: three hours of a loading spinner. Critics call it “a meditation on hope” and “please just score the week already.”`,
+  }),
+  () => ({
+    kicker: "Health",
+    headline: `DOCTORS LINK GROUP-CHAT REFRESHING TO “COMPETITIVE STRESS DISORDER”`,
+    body: `Treatment: touch grass, lock earlier, stop checking standings at red lights. Side effects of recovery include accidentally being fun at parties.`,
+  }),
+  () => ({
+    kicker: "Opinion",
+    headline: `IN DEFENSE OF PEOPLE WHO ARE WRONG LOUDLY`,
+    body: `Without them, the paper would be two paragraphs and a weather box. Wrongness is content. Content is love. Love is a 0 on the card.`,
+  }),
+  () => ({
+    kicker: "Odd news",
+    headline: `MAN CLAIMS DOG ATE HOMEWORK, DOG RELEASES STATEMENT`,
+    body: `“I only eat quality content,” the dog said. “That card was not it.” The man has been reassigned to the milk carton beat.`,
+  }),
+  () => ({
+    kicker: "Obituaries",
+    headline: `“I’LL START NEXT WEEK,” 1998–THIS WEEK`,
+    body: `Survived by a long list of next weeks. Services will be held every Saturday until someone actually locks. In lieu of flowers: hit Save.`,
+  }),
 ];
 
 /**

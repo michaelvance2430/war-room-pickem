@@ -39,6 +39,15 @@ export function normalizeEdition(raw: GazetteEdition): GazetteEdition {
       text: `"Trust the process."`,
       by: "Someone mid-process",
     },
+    sideStories: raw.sideStories?.length
+      ? raw.sideStories
+      : [
+          {
+            kicker: "Odd news",
+            headline: "SIDEBAR MISSING FROM ARCHIVE",
+            body: "This old edition predated our fake-news desk. Re-score the week for full absurdity.",
+          },
+        ],
     swing: raw.swing ?? null,
     crystalBallMiss: raw.crystalBallMiss ?? null,
     standingsDeadlock: raw.standingsDeadlock ?? null,
@@ -227,6 +236,31 @@ export default function GazettePaper({
             <p className="text-xs text-stone-600 mt-2 font-bold">
               {edition.crystalBallMiss.names?.join(" · ")} · blank orb
             </p>
+          </div>
+        )}
+
+        {/* Funny non-football (and barely-football) sub-stories */}
+        {edition.sideStories?.length > 0 && (
+          <div className="border-t-4 border-double border-stone-900 pt-3 space-y-3">
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-stone-800 text-center">
+              Also in this paper · totally real news
+            </p>
+            {edition.sideStories.map((s, i) => (
+              <article
+                key={i}
+                className="rounded-lg border border-stone-400 bg-stone-50/90 px-3 py-2.5"
+              >
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-stone-500 mb-0.5">
+                  {s.kicker}
+                </p>
+                <h3 className="font-serif text-[15px] sm:text-base font-black leading-snug text-stone-950">
+                  {s.headline}
+                </h3>
+                <p className="text-[13px] text-stone-700 mt-1.5 leading-snug">
+                  {s.body}
+                </p>
+              </article>
+            ))}
           </div>
         )}
 
