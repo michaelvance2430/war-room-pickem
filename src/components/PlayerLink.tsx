@@ -6,30 +6,41 @@ import {
   getJustJoinedBadge,
   subscribeJoinBadges,
 } from "@/lib/join-badge-store";
+import {
+  getEquippedTitleLabel,
+  subscribeEquippedTitles,
+} from "@/lib/equipped-title-store";
 
 /**
  * Name → /profile/[id].
- * Shows a 24h “{join title} · just joined” pill when applicable.
+ * Optional equipped badge title (e.g. War Room Legend) + 24h just-joined pill.
  */
 export default function PlayerLink({
   id,
   name,
   className = "",
   showYou = false,
-  /** Hide just-joined chip (dense tables if needed) */
   hideJoinBadge = false,
+  hideEquippedTitle = false,
 }: {
   id: string | null | undefined;
   name: string | null | undefined;
   className?: string;
   showYou?: boolean;
   hideJoinBadge?: boolean;
+  hideEquippedTitle?: boolean;
 }) {
   const label = name?.trim() || "TBD";
 
   const joinBadge = useSyncExternalStore(
     subscribeJoinBadges,
     () => (hideJoinBadge || !id ? null : getJustJoinedBadge(id)),
+    () => null
+  );
+
+  const equippedTitle = useSyncExternalStore(
+    subscribeEquippedTitles,
+    () => (hideEquippedTitle || !id ? null : getEquippedTitleLabel(id)),
     () => null
   );
 
@@ -41,10 +52,18 @@ export default function PlayerLink({
     <span className="inline-flex flex-wrap items-center gap-1 max-w-full">
       <Link
         href={`/profile/${id}`}
-        title={`View ${label}'s profile`}
-        aria-label={`View ${label}'s profile`}
+        title={
+          equippedTitle
+            ? `${equippedTitle} ${label} — view profile`
+            : `View ${label}'s profile`
+        }
+        aria-label={
+          equippedTitle
+            ? `View ${equippedTitle} ${label}'s profile`
+            : `View ${label}'s profile`
+        }
         className={[
-          "inline-flex items-center gap-1 max-w-full",
+          "inline-flex items-center gap-1 max-w-full min-w-0",
           "font-semibold text-primary",
           "underline decoration-primary decoration-2 underline-offset-[3px]",
           "active:opacity-80 touch-manipulation",
@@ -54,6 +73,14 @@ export default function PlayerLink({
           .filter(Boolean)
           .join(" ")}
       >
+        {equippedTitle && (
+          <span
+            className="shrink-0 text-[10px] sm:text-[11px] font-black uppercase tracking-wide text-amber-300 no-underline"
+            title="Equipped title from Account"
+          >
+            {equippedTitle}
+          </span>
+        )}
         <span className="truncate">{label}</span>
         <span
           className="shrink-0 text-[10px] font-bold opacity-80 no-underline leading-none"

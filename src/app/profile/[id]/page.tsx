@@ -26,6 +26,7 @@ import {
   joinTitleTierLabel,
   justJoinedBadgeLabel,
 } from "@/lib/join-titles";
+import { getEquippedTitleLabel } from "@/lib/equipped-title-store";
 import {
   getProfileHardware,
   type ProfileTrophy,
@@ -332,6 +333,14 @@ export default function ProfilePage() {
 
             <div className="flex-1 min-w-0">
               <div className="flex flex-wrap items-center gap-2 mb-1">
+                {getEquippedTitleLabel(player.id) && (
+                  <span
+                    className="text-xs sm:text-sm font-black uppercase tracking-wide text-amber-300 shrink-0"
+                    title="Equipped on Account"
+                  >
+                    {getEquippedTitleLabel(player.id)}
+                  </span>
+                )}
                 <h1 className="text-2xl font-bold truncate">{player.name}</h1>
                 {!mock &&
                   isJustJoined(player.memberSince) && (

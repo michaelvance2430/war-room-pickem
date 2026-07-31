@@ -24,11 +24,21 @@ import {
   uploadMyAvatar,
   removeMyAvatar,
 } from "@/lib/profile";
-import { isAppCreator } from "@/lib/creator";
+import { isAppCreator, withCreatorFlag } from "@/lib/creator";
 import { isViewAsPlayer, setViewAsPlayer } from "@/lib/view-as-player";
 import FeedbackForm from "@/components/FeedbackForm";
 import { startPlayerTutorial } from "@/lib/player-tutorial";
 import { isGuestMode } from "@/lib/guest-mode";
+import { getPlayerBadges, withPermanentBadges } from "@/lib/badges";
+import { listEquipableTitlesFromBadges } from "@/lib/equipable-titles";
+import {
+  getLocalEquippedBadgeId,
+  setMyEquippedTitle,
+  syncMyEquippedTitleFromCloud,
+} from "@/lib/equipped-title-store";
+import { loadLeaguePlayers } from "@/lib/cloud";
+import type { Player } from "@/lib/types";
+import type { BadgeTier } from "@/lib/types";
 
 export default function AccountPage() {
   const router = useRouter();
@@ -44,6 +54,11 @@ export default function AccountPage() {
   const [uploading, setUploading] = useState(false);
   const [playerView, setPlayerView] = useState(false);
   const [canPreviewPlayer, setCanPreviewPlayer] = useState(false);
+  const [titleOptions, setTitleOptions] = useState<
+    { badgeId: string; label: string; tier: BadgeTier }[]
+  >([]);
+  const [equippedBadgeId, setEquippedBadgeId] = useState<string | null>(null);
+  const [titleBusy, setTitleBusy] = useState(false);
 
   async function reload() {
     const session = getSession();
@@ -60,6 +75,45 @@ export default function AccountPage() {
     }
     const list = await fetchMyMemberships();
     setMemberships(list);
+
+    // Equipped name title options (earned rare+)
+    if (session?.playerId) {
+      await syncMyEquippedTitleFromCloud();
+      setEquippedBadgeId(getLocalEquippedBadgeId(session.playerId));
+      try {
+        let peers: Player[] = [];
+        try {
+          peers = await loadLeaguePlayers();
+        } catch {
+          peers = [];
+        }
+        let me =
+          peers.find((p) => p.id === session.playerId) ||
+          ({
+            id: session.playerId,
+            name: session.playerName || profile?.displayName || "You",
+            division: "North",
+            totalPoints: 0,
+            weeklyPoints: [],
+            atsCorrect: 0,
+            atsTotal: 0,
+            currentStreak: 0,
+            bestWeek: 0,
+            worstWeek: 0,
+            perfectWeeks: 0,
+            bestBetHits: 0,
+            bestBetTotal: 0,
+            propHits: 0,
+            propTotal: 0,
+            weeksPlayed: 0,
+          } as Player);
+        me = withPermanentBadges(withCreatorFlag(me));
+        const badges = getPlayerBadges(me, peers.length ? peers : undefined);
+        setTitleOptions(listEquipableTitlesFromBadges(badges));
+      } catch {
+        setTitleOptions([]);
+      }
+    }
     // Any path that means "you run a league" → can preview player UI
     const runsALeague =
       isActuallyCommissioner() ||
@@ -265,6 +319,80 @@ export default function AccountPage() {
           >
             Run player tutorial again →
           </button>
+        </section>
+
+        <section className="rounded-xl border border-amber-400/35 bg-amber-400/10 p-5 mb-6">
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-amber-300 mb-1">
+            Nameplate
+          </p>
+          <h2 className="font-semibold mb-1">Equip a title</h2>
+          <p className="text-xs text-muted mb-3 leading-relaxed">
+            Earned rare / epic / legendary badges can sit in front of your name
+            everywhere — e.g.{" "}
+            <span className="text-amber-300 font-bold">War Room Legend</span>{" "}
+            <span className="text-primary font-semibold">
+              {name || "Kahmann"}
+            </span>
+            . One title at a time. Clear anytime.
+          </p>
+          {titleOptions.length === 0 ? (
+            <p className="text-sm text-muted">
+              No equipable titles yet. Win hardware, streaks, and rare badges —
+              then they show up here.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              <label className="block text-xs text-muted">
+                Active title
+                <select
+                  value={equippedBadgeId || ""}
+                  disabled={titleBusy}
+                  onChange={async (e) => {
+                    const v = e.target.value || null;
+                    setTitleBusy(true);
+                    setMessage(null);
+                    const res = await setMyEquippedTitle(v);
+                    setTitleBusy(false);
+                    if (!res.ok) {
+                      setMessage(res.error || "Could not save title");
+                      return;
+                    }
+                    setEquippedBadgeId(v);
+                    setMessage(
+                      v
+                        ? `Title equipped: ${res.label}. Shows on your name league-wide.`
+                        : "Title cleared."
+                    );
+                  }}
+                  className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground font-medium disabled:opacity-50"
+                >
+                  <option value="">No title (name only)</option>
+                  {titleOptions.map((t) => (
+                    <option key={t.badgeId} value={t.badgeId}>
+                      {t.label}
+                      {t.tier === "legendary"
+                        ? " · Legendary"
+                        : t.tier === "epic"
+                          ? " · Epic"
+                          : " · Rare"}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {equippedBadgeId && (
+                <p className="text-sm text-foreground">
+                  Preview:{" "}
+                  <span className="text-amber-300 font-black uppercase tracking-wide text-xs">
+                    {titleOptions.find((t) => t.badgeId === equippedBadgeId)
+                      ?.label || "Title"}
+                  </span>{" "}
+                  <span className="font-semibold text-primary">
+                    {name || "You"}
+                  </span>
+                </p>
+              )}
+            </div>
+          )}
         </section>
 
         <section className="rounded-xl border border-border bg-card p-5 mb-6">

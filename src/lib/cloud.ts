@@ -1327,7 +1327,39 @@ export type LeagueRosterMember = {
   isDeputy?: boolean;
   /** memberships.joined_at — join-order profile titles */
   joinedAt?: string | null;
+  /** profiles.equipped_title_id — badge worn as name title */
+  equippedTitleId?: string | null;
 };
+
+/** Best-effort: load equipped name titles for roster user ids. */
+async function attachEquippedTitles(
+  members: LeagueRosterMember[]
+): Promise<LeagueRosterMember[]> {
+  if (!members.length) return members;
+  try {
+    const supabase = createClient();
+    const ids = [...new Set(members.map((m) => m.userId).filter(Boolean))];
+    if (!ids.length) return members;
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, equipped_title_id")
+      .in("id", ids);
+    if (error || !data?.length) return members;
+    const map = new Map<string, string | null>();
+    for (const row of data) {
+      map.set(
+        row.id as string,
+        (row.equipped_title_id as string | null) || null
+      );
+    }
+    return members.map((m) => ({
+      ...m,
+      equippedTitleId: map.get(m.userId) ?? m.equippedTitleId ?? null,
+    }));
+  } catch {
+    return members;
+  }
+}
 
 /**
  * Load join times for profile titles.
@@ -1445,7 +1477,7 @@ export async function loadLeagueRoster(): Promise<LeagueRosterMember[]> {
       p_league_id: session.leagueId,
     });
     if (!error && Array.isArray(data) && data.length) {
-      return (data as Record<string, unknown>[])
+      const mapped = (data as Record<string, unknown>[])
         .map((m) => {
           const role = m.role === "commissioner" ? "commissioner" : "player";
           const division =
@@ -1467,6 +1499,8 @@ export async function loadLeagueRoster(): Promise<LeagueRosterMember[]> {
               (m.joined_at as string | null) ||
               joinedMap.get(userId) ||
               null,
+            equippedTitleId:
+              (m.equipped_title_id as string | null) || null,
           };
         })
         .sort((a, b) => {
@@ -1474,6 +1508,7 @@ export async function loadLeagueRoster(): Promise<LeagueRosterMember[]> {
           if (!!a.isBot !== !!b.isBot) return a.isBot ? 1 : -1;
           return a.name.localeCompare(b.name);
         });
+      return attachEquippedTitles(mapped);
     }
   }
 
@@ -1526,11 +1561,12 @@ export async function loadLeagueRoster(): Promise<LeagueRosterMember[]> {
     }
   }
 
-  return rows
+  const mapped = rows
     .map((m: Record<string, unknown>) => {
       const profile = m.profiles as {
         display_name?: string;
         avatar_url?: string | null;
+        equipped_title_id?: string | null;
       } | null;
       const role: LeagueRosterMember["role"] =
         m.role === "commissioner" ? "commissioner" : "player";
@@ -1553,12 +1589,14 @@ export async function loadLeagueRoster(): Promise<LeagueRosterMember[]> {
         isDeputy: !!m.is_deputy,
         joinedAt:
           (m.joined_at as string | null) || joinedMap.get(uid) || null,
+        equippedTitleId: profile?.equipped_title_id ?? null,
       };
     })
     .sort((a, b) => {
       if (!!a.isBot !== !!b.isBot) return a.isBot ? 1 : -1;
       return a.name.localeCompare(b.name);
     });
+  return attachEquippedTitles(mapped);
 }
 
 /** Commissioner appoints mods/deputies; staff can mute for Locker Room. */
