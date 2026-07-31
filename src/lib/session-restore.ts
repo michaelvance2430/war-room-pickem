@@ -99,6 +99,14 @@ export function writeSessionAndLeague(
       /* ignore */
     }
     void paintSportFromLeague(league.sportId);
+    // Multi-sport cheevo progress (Bare Minimum Dual, later rungs)
+    try {
+      void import("./sports-played").then(({ recordSportPlayed }) => {
+        recordSportPlayed(userId, league.sportId);
+      });
+    } catch {
+      /* ignore */
+    }
   }
 
   return { session, league };
@@ -149,6 +157,7 @@ export async function fetchMyMemberships(): Promise<LeagueMembership[]> {
 
   if (!rows) return [];
 
+  // Build list below; also stamp multi-sport tracker from all memberships
   const list: LeagueMembership[] = [];
   for (const row of rows) {
     const L = row.leagues as Record<string, unknown> | null;
@@ -172,6 +181,12 @@ export async function fetchMyMemberships(): Promise<LeagueMembership[]> {
       seasonThemeId: (L.season_theme_id as string) || "default",
       sportId: (L.sport_id as string) || "cfb",
     });
+  }
+  try {
+    const { mergeSportsFromMemberships } = require("./sports-played") as typeof import("./sports-played");
+    mergeSportsFromMemberships(userId, list);
+  } catch {
+    /* ignore */
   }
   return list;
 }

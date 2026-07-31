@@ -8,6 +8,10 @@ import {
   syncCommissionerTenureFromSession,
 } from "./commish-tenure";
 import {
+  getSportsPlayedCount,
+  recordSportPlayed,
+} from "./sports-played";
+import {
   FIRST_FINAL_BADGE_ID,
   firstFinalEarned,
   countCleanFirstFinalWeeks,
@@ -945,6 +949,17 @@ export const BADGE_CATALOG: BadgeDef[] = [
     points: 10,
     icon: "🔁",
   },
+  {
+    id: "bare_minimum_dual",
+    name: "Bare Minimum Dual",
+    description:
+      "Two sports. Two leagues. Absolute floor of multi-sport effort. Congrats on clearing the bar we set on the ground.",
+    howToEarn:
+      "Join (or play in) leagues for 2 different sports — e.g. CFB + NFL. More sports unlock more cheevos later.",
+    tier: "common",
+    points: 10,
+    icon: "🥈",
+  },
 ];
 
 function ladderDefs(): BadgeDef[] {
@@ -1358,6 +1373,20 @@ function evaluateBadge(
 
     case "rematch_ready":
       return progress(weeks, 2);
+
+    case "bare_minimum_dual": {
+      // Stamp current league sport so dual-sport is detectable this session
+      try {
+        const { getLeague, getSession } = require("./league") as typeof import("./league");
+        const sid = getSession()?.playerId;
+        if (sid === player.id || !sid) {
+          recordSportPlayed(player.id, getLeague()?.sportId);
+        }
+      } catch {
+        /* ignore */
+      }
+      return progress(getSportsPlayedCount(player.id), 2);
+    }
 
     case "war_room_recruit":
       return progress(player.name?.trim() ? 1 : 0, 1);
