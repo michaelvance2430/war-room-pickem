@@ -20,13 +20,15 @@ const TIER_HEX: Record<BadgeTier, string> = {
 };
 
 /**
- * After Gazette (or if no paper), celebrate newly earned badges.
- * First-ever run baselines silently so you don't get 12 toasts day one.
+ * After Gazette (or if no paper), celebrate badges one at a time.
+ * Queue: dismiss → next badge until empty.
  */
 export default function BadgeUnlockModal() {
-  const [open, setOpen] = useState(false);
-  const [badges, setBadges] = useState<BadgeStatus[]>([]);
+  const [queue, setQueue] = useState<BadgeStatus[]>([]);
   const [checked, setChecked] = useState(false);
+
+  const current = queue[0] ?? null;
+  const remaining = Math.max(0, queue.length - 1);
 
   const tryCelebrate = useCallback(async () => {
     if (checked) return;
@@ -39,17 +41,10 @@ export default function BadgeUnlockModal() {
       return;
     }
 
-    // Sort flashiest first
-    const order: BadgeTier[] = ["legendary", "epic", "rare", "common"];
-    const sorted = [...result.newBadges].sort(
-      (a, b) => order.indexOf(a.def.tier) - order.indexOf(b.def.tier)
-    );
-    setBadges(sorted);
-    setOpen(true);
+    setQueue(result.newBadges);
     setChecked(true);
   }, [checked]);
 
-  // Gazette finished (shown or skipped) → celebrate
   useEffect(() => {
     function onGazetteDone() {
       void tryCelebrate();
@@ -58,7 +53,7 @@ export default function BadgeUnlockModal() {
     return () => window.removeEventListener(EVENT_GAZETTE_DONE, onGazetteDone);
   }, [tryCelebrate]);
 
-  // Fallback: if gazette never fires (disabled / no edition), still check after rules
+  // Fallback if gazette never fires
   useEffect(() => {
     if (checked) return;
     const timers = [3000, 6000, 10000].map((ms) =>
@@ -70,23 +65,17 @@ export default function BadgeUnlockModal() {
     return () => timers.forEach(clearTimeout);
   }, [checked, tryCelebrate]);
 
-  function dismiss() {
+  function advance() {
     const session = getSession();
-    if (session?.playerId && badges.length) {
-      markBadgesCelebrated(
-        session.playerId,
-        badges.map((b) => b.def.id)
-      );
+    if (session?.playerId && current) {
+      markBadgesCelebrated(session.playerId, [current.def.id]);
     }
-    setOpen(false);
+    setQueue((q) => q.slice(1));
   }
 
-  if (!open || badges.length === 0) return null;
+  if (!current) return null;
 
-  const headline =
-    badges.length === 1
-      ? "Achievement unlocked!"
-      : `${badges.length} achievements unlocked!`;
+  const hex = TIER_HEX[current.def.tier];
 
   return (
     <div
@@ -99,11 +88,10 @@ export default function BadgeUnlockModal() {
         type="button"
         className="absolute inset-0 bg-black/80 backdrop-blur-sm"
         aria-label="Close"
-        onClick={dismiss}
+        onClick={advance}
       />
 
       <div className="relative w-full sm:max-w-md max-h-[90vh] flex flex-col rounded-t-2xl sm:rounded-2xl border-2 border-primary/60 bg-card shadow-[0_0_40px_rgba(34,197,94,0.25)] overflow-hidden">
-        {/* Confetti-ish top bar */}
         <div
           className="h-1.5 w-full"
           style={{
@@ -120,64 +108,54 @@ export default function BadgeUnlockModal() {
             id="badge-unlock-title"
             className="text-2xl font-black text-foreground tracking-tight"
           >
-            {headline}
+            Achievement unlocked!
           </h2>
-          <p className="text-xs text-muted mt-1.5">
-            Something hit while you were away. Look at you.
-          </p>
+          {remaining > 0 && (
+            <p className="text-[11px] text-muted mt-1.5">
+              {remaining} more after this
+            </p>
+          )}
         </div>
 
-        <div className="px-5 py-4 overflow-y-auto flex-1 min-h-0 space-y-3">
-          {badges.map((b) => {
-            const hex = TIER_HEX[b.def.tier];
-            return (
-              <div
-                key={b.def.id}
-                className="flex items-center gap-3 rounded-xl border border-border bg-background/80 px-3 py-3"
-                style={{
-                  boxShadow: `inset 0 0 0 1px ${hex}33`,
-                }}
-              >
-                <div
-                  className="w-14 h-14 rounded-full flex items-center justify-center text-2xl border-2 shrink-0 bg-card"
-                  style={{
-                    borderColor: hex,
-                    boxShadow: `0 0 16px ${hex}66`,
-                  }}
-                >
-                  {b.def.icon}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold text-foreground">
-                      {b.def.name}
-                    </span>
-                    <span
-                      className="text-[10px] font-bold uppercase tracking-wider"
-                      style={{ color: hex }}
-                    >
-                      {TIER_LABEL[b.def.tier]}
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted mt-0.5 leading-snug">
-                    {b.def.description}
-                  </p>
-                  <p className="text-[11px] font-semibold mt-1" style={{ color: hex }}>
-                    +{b.def.points} achievement pts
-                  </p>
-                </div>
-              </div>
-            );
-          })}
+        <div className="px-5 py-6 flex flex-col items-center text-center">
+          <div
+            className="w-24 h-24 rounded-full flex items-center justify-center text-5xl border-2 bg-background mb-4"
+            style={{
+              borderColor: hex,
+              boxShadow: `0 0 28px ${hex}88`,
+            }}
+          >
+            {current.def.icon}
+          </div>
+          <div className="flex items-center justify-center gap-2 flex-wrap mb-1">
+            <span className="text-xl font-black text-foreground">
+              {current.def.name}
+            </span>
+            <span
+              className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border"
+              style={{ color: hex, borderColor: `${hex}66` }}
+            >
+              {TIER_LABEL[current.def.tier]}
+            </span>
+          </div>
+          <p className="text-sm text-muted leading-snug max-w-sm">
+            {current.def.description}
+          </p>
+          <p
+            className="text-sm font-bold mt-3"
+            style={{ color: hex }}
+          >
+            +{current.def.points} achievement pts
+          </p>
         </div>
 
         <div className="px-5 py-4 border-t border-border flex flex-col sm:flex-row gap-2">
           <button
             type="button"
-            onClick={dismiss}
+            onClick={advance}
             className="flex-1 py-3 rounded-xl bg-primary text-black font-bold text-sm"
           >
-            Hell yeah
+            {remaining > 0 ? "Hell yeah — next" : "Hell yeah"}
           </button>
           <Link
             href={
@@ -185,7 +163,7 @@ export default function BadgeUnlockModal() {
                 ? `/profile/${getSession()!.playerId}`
                 : "/standings"
             }
-            onClick={dismiss}
+            onClick={advance}
             className="flex-1 py-3 rounded-xl border border-border text-center text-sm font-medium text-muted hover:text-foreground"
           >
             View badge shelves

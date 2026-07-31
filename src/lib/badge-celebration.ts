@@ -1,13 +1,26 @@
 /**
  * Track which badges we've already celebrated for a user.
- * First run baselines current unlocks (no spam). Later unlocks fire the popup.
+ *
+ * Bump CELEBRATION_EPOCH to force every client to re-see unlocks
+ * (new storage key → empty celebrated list → all current earned fire one-by-one).
  */
 
-import { getPlayerBadges, withPermanentBadges, syncLeagueCheevoKing } from "./badges";
-import type { BadgeStatus, Player } from "./types";
+import {
+  getPlayerBadges,
+  withPermanentBadges,
+  syncLeagueCheevoKing,
+} from "./badges";
+import type { BadgeStatus, BadgeTier, Player } from "./types";
 import { getSession } from "./league";
 
-const STORAGE_PREFIX = "warroom-badges-celebrated-v1:";
+/**
+ * Bump this number to reset achievement notifications for everyone.
+ * Next login: each earned badge that isn't in the new key is celebrated
+ * one at a time (after Gazette).
+ */
+export const CELEBRATION_EPOCH = 2;
+
+const STORAGE_PREFIX = `warroom-badges-celebrated-e${CELEBRATION_EPOCH}:`;
 
 /** Gazette closed or skipped — safe to show achievement toast */
 export const EVENT_GAZETTE_DONE = "warroom-gazette-done";
@@ -21,12 +34,12 @@ function storageKey(userId: string) {
   return `${STORAGE_PREFIX}${userId}`;
 }
 
-/** null = never initialized (baseline next) */
-export function readCelebratedIds(userId: string): string[] | null {
-  if (typeof window === "undefined" || !userId) return null;
+/** Always returns an array (missing key = none celebrated yet). */
+export function readCelebratedIds(userId: string): string[] {
+  if (typeof window === "undefined" || !userId) return [];
   try {
     const raw = localStorage.getItem(storageKey(userId));
-    if (raw == null) return null;
+    if (raw == null) return [];
     const parsed = JSON.parse(raw) as string[];
     return Array.isArray(parsed) ? parsed : [];
   } catch {
@@ -44,27 +57,33 @@ export function writeCelebratedIds(userId: string, ids: string[]) {
 }
 
 export function markBadgesCelebrated(userId: string, badgeIds: string[]) {
-  const prev = readCelebratedIds(userId) || [];
+  const prev = readCelebratedIds(userId);
   writeCelebratedIds(userId, [...prev, ...badgeIds]);
 }
 
+const TIER_ORDER: BadgeTier[] = ["legendary", "epic", "rare", "common"];
+
+/** Sort flashiest first for the one-at-a-time queue. */
+export function sortBadgesForCelebration(badges: BadgeStatus[]): BadgeStatus[] {
+  return [...badges].sort(
+    (a, b) =>
+      TIER_ORDER.indexOf(a.def.tier) - TIER_ORDER.indexOf(b.def.tier) ||
+      a.def.name.localeCompare(b.def.name)
+  );
+}
+
 /**
- * Badges earned since last celebration.
- * First visit: record current earned as baseline, return [] (no party).
+ * Badges earned that we haven't celebrated yet.
+ * Missing storage key = none celebrated → return all currently earned
+ * (used for epoch resets so everyone sees the popup next login).
  */
 export function getUncelebratedBadges(player: Player): BadgeStatus[] {
   const p = withPermanentBadges(player);
   const earned = getPlayerBadges(p).filter((b) => b.earned);
-  const earnedIds = earned.map((b) => b.def.id);
-  const celebrated = readCelebratedIds(player.id);
-
-  if (celebrated === null) {
-    writeCelebratedIds(player.id, earnedIds);
-    return [];
-  }
-
-  const known = new Set(celebrated);
-  return earned.filter((b) => !known.has(b.def.id));
+  const known = new Set(readCelebratedIds(player.id));
+  return sortBadgesForCelebration(
+    earned.filter((b) => !known.has(b.def.id))
+  );
 }
 
 /** Load me from league list + cheevo sync, then find new unlocks. */
