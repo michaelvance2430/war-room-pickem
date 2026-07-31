@@ -9,6 +9,9 @@ import {
   isFirstTimeCommish,
   markFirstCardPublished,
   markPracticeWeekDone,
+  markCommishGraduated,
+  markInviteCopied,
+  buildInviteShareText,
 } from "@/lib/commish-onboarding";
 import { Game, Prop } from "@/lib/types";
 import { fetchNcaafOdds } from "@/lib/odds";
@@ -803,6 +806,7 @@ function CommissionerPageInner() {
     applyDraftFromProp(propToPublish);
     setPublishedPropFromCard(propToPublish, activeWeek);
     setCardSaved(true);
+    setShowFirstWizard(false);
     try {
       const lid = getSession()?.leagueId || getLeague()?.id;
       if (lid) markFirstCardPublished(lid);
@@ -1141,11 +1145,25 @@ function CommissionerPageInner() {
       return;
     }
 
+    // First real score = graduate out of first-time mode (Advanced unlocks)
+    try {
+      const lid = getSession()?.leagueId || getLeague()?.id;
+      if (lid && firstTime) {
+        markCommishGraduated(lid);
+        setFirstTime(false);
+        setAdvancedOpen(true);
+      }
+    } catch {
+      /* ignore */
+    }
+
     const lines = (cloud.details || [])
       .map((d) => `${d.name}: ${d.points} pts`)
       .join(" · ");
     setScoreReport(
-      `${weekTitle(activeWeek)} scored & locked · ${cloud.scoredCount} player(s). ${lines}`
+      firstTime
+        ? `${weekTitle(activeWeek)} scored & locked · ${cloud.scoredCount} player(s). You're a real Commish now — Advanced tools unlocked. ${lines}`
+        : `${weekTitle(activeWeek)} scored & locked · ${cloud.scoredCount} player(s). ${lines}`
     );
   }
 
@@ -1383,8 +1401,31 @@ function CommissionerPageInner() {
   function copyCode() {
     if (!league) return;
     navigator.clipboard?.writeText(league.code);
+    try {
+      const lid = getSession()?.leagueId || league.id;
+      if (lid) markInviteCopied(lid);
+    } catch {
+      /* ignore */
+    }
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
+  }
+
+  async function copyInviteText() {
+    if (!league) return;
+    const text = buildInviteShareText({
+      leagueName: league.name || "War Room",
+      code: league.code,
+    });
+    try {
+      await navigator.clipboard.writeText(text);
+      const lid = getSession()?.leagueId || league.id;
+      if (lid) markInviteCopied(lid);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* ignore */
+    }
   }
 
   const allResultsIn =
@@ -1492,13 +1533,33 @@ function CommissionerPageInner() {
       <main className="flex-1 max-w-3xl mx-auto w-full px-4 py-8">
         <div className="mb-6">
           <h1 className="text-2xl font-bold">
-            {isOwner ? "Commissioner Tools" : "Deputy Ops"}
+            {isOwner
+              ? firstTime
+                ? "Your first week as host"
+                : "Commissioner Tools"
+              : "Deputy Ops"}
           </h1>
           <p className="text-sm text-muted">
             {isOwner
-              ? "Settings • Build card • Who\u2019s in • Results"
+              ? firstTime
+                ? "Invite → publish a card (demo is fine) → score once. Advanced tools unlock after."
+                : "Settings • Build card • Who\u2019s in • Results"
               : "Build card • Who\u2019s in • Results (settings stay with the commissioner)"}
           </p>
+          {firstTime && isOwner && (
+            <div className="mt-3 rounded-xl border-2 border-primary/50 bg-primary/10 px-4 py-3">
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-1">
+                First-time mode
+              </p>
+              <p className="text-sm text-foreground leading-relaxed">
+                Stick to the checklist.{" "}
+                <strong className="text-primary">Demo slate</strong> costs zero
+                odds credits — perfect for a practice week with bots or just
+                you. Full toolbox (bots bulk, reset, pass) stays under Settings
+                → Advanced until you score a real week.
+              </p>
+            </div>
+          )}
           <div className="mt-3 rounded-xl border-2 border-warning bg-warning/15 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div>
               <p className="text-sm font-bold text-warning">View as player</p>
@@ -1635,23 +1696,38 @@ function CommissionerPageInner() {
               </div>
               <div>
                 <label className="text-xs text-muted block mb-1">Invite code</label>
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 font-mono text-2xl tracking-[0.25em] text-primary font-bold">
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex-1 min-w-[8rem] font-mono text-2xl tracking-[0.25em] text-primary font-bold">
                     {league.code}
                   </div>
                   <button
+                    type="button"
                     onClick={copyCode}
                     className="px-3 py-2 text-xs rounded-lg border border-border"
                   >
-                    {copied ? "Copied" : "Copy"}
+                    {copied ? "Copied!" : "Copy code"}
                   </button>
                   <button
+                    type="button"
+                    onClick={() => void copyInviteText()}
+                    className="px-3 py-2 text-xs rounded-lg border border-primary/40 text-primary font-semibold"
+                  >
+                    Copy invite text
+                  </button>
+                  <button
+                    type="button"
                     onClick={handleRegenCode}
                     className="px-3 py-2 text-xs rounded-lg border border-border"
                   >
                     New code
                   </button>
                 </div>
+                {firstTime && (
+                  <p className="text-[11px] text-muted mt-2 leading-relaxed">
+                    Text the invite to the group chat first — empty room is the
+                    #1 first-week failure mode.
+                  </p>
+                )}
               </div>
               <div className="text-sm text-muted">
                 Commissioner:{" "}
@@ -2764,7 +2840,23 @@ function CommissionerPageInner() {
 
         {tab === "results" && (
           <div>
-            {/* Full-season dry-run — one-click for sandbox */}
+            {firstTime && (
+              <div className="rounded-xl border-2 border-primary/45 bg-primary/10 p-4 mb-6 space-y-2">
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
+                  Practice path
+                </p>
+                <p className="text-sm text-foreground leading-relaxed">
+                  Demo card? Enter winners (or Sync if you used real odds), set
+                  the prop result, then{" "}
+                  <strong className="text-primary">
+                    Save Results &amp; Score League
+                  </strong>
+                  . That one click wakes standings and unlocks Advanced tools.
+                </p>
+              </div>
+            )}
+            {/* Full-season dry-run — hide until first scored week */}
+            {!firstTime && (
             <div className="rounded-xl border border-warning/50 bg-warning/10 p-5 mb-6 space-y-3">
               <h2 className="font-semibold text-warning">
                 Running an entire season?
@@ -2800,6 +2892,7 @@ function CommissionerPageInner() {
                 </p>
               )}
             </div>
+            )}
 
             {/* Week picker for scoring */}
             <div className="rounded-xl border border-border bg-card p-5 mb-6">

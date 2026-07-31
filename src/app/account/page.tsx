@@ -213,16 +213,15 @@ export default function AccountPage() {
                 const next = !playerView;
                 setViewAsPlayer(next);
                 setPlayerView(next);
-                setMessage(
-                  next
-                    ? "Player view ON — go to Home. Yellow bar exits anytime."
-                    : "Player view OFF — Commish is back."
-                );
                 if (next) {
+                  setMessage(
+                    "Player view ON — go to Home. Yellow bar exits anytime."
+                  );
                   router.push("/");
                   router.refresh();
                 } else {
-                  router.refresh();
+                  // Match Nav: leave current page → Home as commissioner
+                  window.location.href = "/";
                 }
               }}
               className={`w-full sm:w-auto text-base px-5 py-3 rounded-xl font-bold ${
@@ -231,7 +230,7 @@ export default function AccountPage() {
                   : "bg-warning text-black hover:opacity-90"
               }`}
             >
-              {playerView ? "Exit player view" : "Enter player view →"}
+              {playerView ? "Exit → Home as Commish" : "Enter player view →"}
             </button>
           </section>
         )}

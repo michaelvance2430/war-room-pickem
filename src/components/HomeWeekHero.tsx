@@ -9,7 +9,7 @@ import {
   loadLeagueRoster,
   listScoredWeekNumbers,
 } from "@/lib/cloud";
-import { getSession, isOps, isCommissioner } from "@/lib/league";
+import { getSession, getLeague, isOps, isCommissioner } from "@/lib/league";
 import {
   formatCardLockDeadline,
   isCardLockDeadlinePassed,
@@ -72,7 +72,7 @@ export default function HomeWeekHero() {
           scoredWeeks: scored.length,
           isCommish: isCommissioner(),
           isOps: isOps(),
-          leagueCode: null,
+          leagueCode: getLeague()?.code || null,
         });
       } catch {
         if (!cancelled) setState(null);
@@ -116,16 +116,26 @@ export default function HomeWeekHero() {
           : "Publish the first card";
       body =
         state.rosterCount < 2
-          ? `Copy your invite code, text the crew, then build a card for ${weekLabel}. Demo slate is fine the first time.`
+          ? state.leagueCode
+            ? `Your code is ${state.leagueCode} — text the crew, then build a card for ${weekLabel}. Demo slate is fine the first time.`
+            : `Copy your invite code, text the crew, then build a card for ${weekLabel}. Demo slate is fine the first time.`
           : `${state.rosterCount} in the room. ${weekLabel} has no games yet — open Commish → First card wizard (demo → publish).`;
       primaryHref =
         state.rosterCount < 2
           ? "/commissioner?tab=settings"
           : "/commissioner?tab=card&first=1";
       primaryLabel =
-        state.rosterCount < 2 ? "Get invite code" : "Build first card →";
-      secondaryHref = "/commissioner";
-      secondaryLabel = "Commish tools";
+        state.rosterCount < 2
+          ? state.leagueCode
+            ? `Invite code: ${state.leagueCode}`
+            : "Get invite code"
+          : "Build first card →";
+      secondaryHref =
+        state.rosterCount < 2
+          ? "/commissioner?tab=card&first=1"
+          : "/commissioner";
+      secondaryLabel =
+        state.rosterCount < 2 ? "Or build first card" : "Commish tools";
     } else {
       eyebrow = "Season not live yet";
       title = "Waiting on the card";
