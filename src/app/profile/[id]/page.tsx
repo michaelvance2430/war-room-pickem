@@ -8,12 +8,12 @@ import AvatarLightbox from "@/components/AvatarLightbox";
 import BadgeShelf from "@/components/BadgeShelf";
 import {
   formatMemberSince,
-  getAchievementPoints,
   getPlayerBadges,
   memberDuration,
   syncLeagueCheevoKing,
   withPermanentBadges,
 } from "@/lib/badges";
+import { syncCareerWithPlayer } from "@/lib/career-cheevo";
 import { withCreatorFlag } from "@/lib/creator";
 import {
   isMockPlayer,
@@ -125,14 +125,14 @@ export default function ProfilePage() {
     }
   }, [player]);
 
-  const points = useMemo(() => {
-    if (!player) return 0;
+  const { seasonPoints, careerPoints } = useMemo(() => {
+    if (!player) return { seasonPoints: 0, careerPoints: 0 };
     try {
-      return getAchievementPoints(player);
+      return syncCareerWithPlayer(player, badges);
     } catch {
-      return 0;
+      return { seasonPoints: 0, careerPoints: 0 };
     }
-  }, [player]);
+  }, [player, badges]);
 
   if (!ready) {
     return (
@@ -248,18 +248,33 @@ export default function ProfilePage() {
                   : memberDuration(player.memberSince)}
               </p>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 <Chip
                   label="Member since"
                   value={mock ? "Never" : formatMemberSince(player.memberSince)}
                 />
-                <Chip label="Achievement pts" value={String(points)} accent />
-                <Chip label="Season pts" value={String(player.totalPoints)} />
+                <Chip
+                  label="Season cheevo pts"
+                  value={String(seasonPoints)}
+                  accent
+                />
+                <Chip
+                  label="Career cheevo pts"
+                  value={String(careerPoints)}
+                />
+                <Chip
+                  label="Pick'em season pts"
+                  value={String(player.totalPoints)}
+                />
                 <Chip
                   label="Badges earned"
                   value={`${earnedCount}/${badges.length || "?"}`}
                 />
               </div>
+              <p className="text-[10px] text-muted mt-2">
+                Season cheevo = this year&apos;s badge haul. Career = all-time
+                (keeps growing after season reset).
+              </p>
             </div>
           </div>
         </section>

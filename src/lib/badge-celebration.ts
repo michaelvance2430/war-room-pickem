@@ -10,6 +10,7 @@ import {
   withPermanentBadges,
   syncLeagueCheevoKing,
 } from "./badges";
+import { bankCareerCheevos } from "./career-cheevo";
 import type { BadgeStatus, BadgeTier, Player } from "./types";
 import { getSession } from "./league";
 
@@ -102,6 +103,8 @@ export async function findNewBadgeUnlocksForSession(): Promise<{
     if (!me) return null;
     const tagged = withPermanentBadges(me);
     const newBadges = getUncelebratedBadges(tagged);
+    // Bank career points whenever we detect earned badges
+    bankCareerCheevos(tagged.id, getPlayerBadges(tagged));
     return { player: tagged, newBadges };
   } catch {
     return null;
