@@ -1330,20 +1330,30 @@ function CommissionerPageInner() {
   async function handleResetSeason() {
     setSeasonResetReport(null);
 
+    const { isSandboxMode } = await import("@/lib/season-mode");
+    const sandbox = isSandboxMode();
     const ok1 = confirm(
       "RESET SEASON?\n\n" +
         "This will DELETE:\n" +
         "• All week cards & games\n" +
         "• All player picks\n" +
         "• All results & season scores/stats\n" +
-        "• League announcements\n\n" +
-        "This will KEEP:\n" +
+        "• League announcements\n" +
+        (sandbox
+          ? "• Sandbox Trophy Room engravings (dry-run rings)\n" +
+            "• Sim achievement points / First & Final / Elite Commish on this device\n"
+          : "") +
+        "\nThis will KEEP:\n" +
         "• Every player who joined\n" +
         "• Divisions, roles, league code & settings\n" +
         "• Profile photos\n" +
-        "• Trophy Room (past champions / toilet / nerd awards)\n\n" +
-        "Also clears Gazette Archive headlines for this season.\n\n" +
-        "Use this after testing, before the real season.\n\n" +
+        (sandbox
+          ? "• Real prior-season Legends only (Kahmann / Bill ball Ben / creator)\n"
+          : "• Trophy Room history + career cheevos (real season)\n") +
+        "\nAlso clears Gazette Archive headlines for this season.\n\n" +
+        (sandbox
+          ? "SANDBOX MODE: fake weeks do not stick after reset.\n\n"
+          : "REAL SEASON: career cheevos stay after reset.\n\n") +
         "Continue?"
     );
     if (!ok1) return;

@@ -1,10 +1,15 @@
 /**
- * Career (all-time) achievement points — survive season resets.
- * Each badge id counts once per player, ever.
+ * Career (all-time) achievement points — survive real-season resets.
+ * Sandbox dry-runs do NOT bank career points (wiped if already banked).
+ * Each badge id counts once per player, ever (real season).
  */
 
 import { getBadgeDef } from "./badges";
 import type { BadgeStatus, Player } from "./types";
+import {
+  isSandboxMode,
+  isSandboxProtectedBadge,
+} from "./season-mode";
 
 const KEY = "warroom-career-cheevo-v1";
 
@@ -62,6 +67,14 @@ export function bankCareerCheevos(
 ): { points: number; newlyBanked: string[] } {
   if (!playerId) return { points: 0, newlyBanked: [] };
 
+  // Preseason dry-run: show season points only — do not stick career
+  if (isSandboxMode()) {
+    return {
+      points: getCareerCheevoPoints(playerId),
+      newlyBanked: [],
+    };
+  }
+
   const map = readAll();
   const row: CareerRow = map[playerId] || { badgeIds: [], points: 0 };
   const known = new Set(row.badgeIds);
@@ -92,6 +105,10 @@ export function bankCareerBadgeId(
   points?: number
 ): { banked: boolean; careerPoints: number } {
   if (!playerId || !badgeId) return { banked: false, careerPoints: 0 };
+  // Sandbox: only bank protected prior-season / creator legends
+  if (isSandboxMode() && !isSandboxProtectedBadge(badgeId)) {
+    return { banked: false, careerPoints: getCareerCheevoPoints(playerId) };
+  }
   const map = readAll();
   const row: CareerRow = map[playerId] || { badgeIds: [], points: 0 };
   if (row.badgeIds.includes(badgeId)) {
@@ -150,10 +167,45 @@ export function syncCareerWithPlayer(
   badges: BadgeStatus[]
 ): { seasonPoints: number; careerPoints: number } {
   const seasonPoints = seasonCheevoFromBadges(badges);
+  if (isSandboxMode()) {
+    // Dry-run: career = protected bank only (legend/creator); season is live eval
+    return {
+      seasonPoints,
+      careerPoints: getCareerCheevoPoints(player.id),
+    };
+  }
   const { points: careerPoints } = bankCareerCheevos(player.id, badges);
   // Career includes creator + everything banked; never below season haul
   return {
     seasonPoints,
     careerPoints: Math.max(careerPoints, seasonPoints),
   };
+}
+
+/** Remove non-protected badge ids from career bank (sandbox reset). */
+export function stripSandboxCareerCheevos(playerId: string): string[] {
+  if (!playerId) return [];
+  const map = readAll();
+  const row = map[playerId];
+  if (!row?.badgeIds?.length) return [];
+  const removed: string[] = [];
+  let pts = 0;
+  const kept: string[] = [];
+  for (const id of row.badgeIds) {
+    if (isSandboxProtectedBadge(id)) {
+      kept.push(id);
+      pts += getBadgeDef(id)?.points || 0;
+    } else {
+      removed.push(id);
+    }
+  }
+  if (removed.length) {
+    map[playerId] = { badgeIds: kept, points: pts };
+    writeAll(map);
+  }
+  return removed;
+}
+
+export function listCareerPlayerIds(): string[] {
+  return Object.keys(readAll());
 }

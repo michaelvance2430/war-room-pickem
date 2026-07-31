@@ -162,6 +162,37 @@ export async function removeTrophy(
   return { ok: true };
 }
 
+/**
+ * Sandbox season reset: wipe Trophy Room engravings so a dry-run "I won it all"
+ * does not stick on profiles after reset.
+ * Real-season reset keeps Trophy Room history.
+ */
+export async function wipeLeagueTrophiesForSandbox(
+  leagueId: string
+): Promise<{ ok: boolean; deleted?: number; error?: string }> {
+  if (!leagueId) return { ok: false, error: "No league" };
+  try {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("league_trophies")
+      .delete()
+      .eq("league_id", leagueId)
+      .select("id");
+    if (error) {
+      if (/does not exist|schema cache/i.test(error.message || "")) {
+        return { ok: true, deleted: 0 };
+      }
+      return { ok: false, error: error.message };
+    }
+    return { ok: true, deleted: data?.length ?? 0 };
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "Trophy wipe failed",
+    };
+  }
+}
+
 export async function transferCommissioner(
   newCommissionerUserId: string
 ): Promise<{

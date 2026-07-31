@@ -94,6 +94,22 @@ export function countCleanFirstFinalWeeks(userId: string): number {
   return listFor(userId).filter((c) => c.wasFirst && c.clean).length;
 }
 
+/** Drop all First & Final claims for a league (sandbox season reset). */
+export function clearFirstFinalForLeague(leagueId: string): void {
+  if (!leagueId) return;
+  const map = readAll();
+  let changed = false;
+  for (const userId of Object.keys(map)) {
+    const next = (map[userId] || []).filter((c) => c.leagueId !== leagueId);
+    if (next.length !== (map[userId] || []).length) {
+      map[userId] = next;
+      changed = true;
+      syncPermanent(userId);
+    }
+  }
+  if (changed) writeAll(map);
+}
+
 function syncPermanent(userId: string) {
   if (hasCleanFirstFinal(userId)) {
     grantPermanentBadgeId(userId, FIRST_FINAL_BADGE_ID);

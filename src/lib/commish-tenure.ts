@@ -96,6 +96,7 @@ export function recordCommissionerWeek(opts: {
 
   const best = getBestCommishWeeks(userId);
   if (best >= IRON_COMMISH_TARGET) {
+    // grantPermanentBadgeId is a no-op in sandbox for non-protected badges
     grantPermanentBadgeId(userId, IRON_COMMISH_BADGE_ID);
   }
   return best;
@@ -127,4 +128,25 @@ export function syncCommissionerTenureFromSession(): number {
     leagueId: session.leagueId,
     weekNumber: readActiveWeek(),
   });
+}
+
+/** Clear tenure rows for one league (all seasons) — sandbox season reset. */
+export function clearCommishTenureForLeague(leagueId: string): void {
+  if (!leagueId) return;
+  const map = readAll();
+  let changed = false;
+  for (const userId of Object.keys(map)) {
+    const row = map[userId];
+    if (!row?.runs) continue;
+    const next: Record<string, number[]> = {};
+    for (const [k, weeks] of Object.entries(row.runs)) {
+      if (k.startsWith(`${leagueId}:`)) {
+        changed = true;
+        continue;
+      }
+      next[k] = weeks;
+    }
+    map[userId] = { runs: next };
+  }
+  if (changed) writeAll(map);
 }

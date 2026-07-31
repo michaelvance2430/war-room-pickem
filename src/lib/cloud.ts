@@ -2246,5 +2246,18 @@ export async function resetSeasonInCloud(): Promise<ResetSeasonResult> {
     /* ignore */
   }
 
+  // Sandbox: wipe sim trophies + local cheevo banks that should not stick.
+  // Real season: career permanent cheevos stay.
+  try {
+    const { afterSeasonResetLocalCleanup } = await import("./sandbox-wipe");
+    const roster = await loadLeagueRoster();
+    await afterSeasonResetLocalCleanup({
+      leagueId,
+      playerIds: roster.map((m) => m.userId),
+    });
+  } catch {
+    /* best-effort */
+  }
+
   return result;
 }

@@ -105,6 +105,15 @@ export default function Home() {
         } catch {
           /* ignore */
         }
+        // Sandbox: strip already-banked sim cheevos so fake weeks don't stick
+        try {
+          const { scrubSandboxProgressOnThisDevice } = await import(
+            "@/lib/sandbox-wipe"
+          );
+          scrubSandboxProgressOnThisDevice();
+        } catch {
+          /* ignore */
+        }
         setReady(true);
       } catch (e: unknown) {
         setBootError(e instanceof Error ? e.message : "Failed to start");

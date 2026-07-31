@@ -1,7 +1,15 @@
 /**
  * Permanent badge grants (survive reloads).
  * Keyed by player/user id so live Supabase UUIDs work, not just local mock ids.
+ *
+ * Sandbox: only creator + prior-season Legend can stick; sim grants are blocked
+ * and wiped on season reset.
  */
+
+import {
+  isSandboxMode,
+  isSandboxProtectedBadge,
+} from "./season-mode";
 
 const KEY = "warroom-permanent-badges";
 
@@ -51,12 +59,36 @@ export function grantPermanentBadgeId(
   badgeId: string
 ): boolean {
   if (!playerId || !badgeId) return false;
+  // Dry-run / preseason: don't stick First & Final, Elite Commish, Cheevo King, etc.
+  if (isSandboxMode() && !isSandboxProtectedBadge(badgeId)) {
+    return false;
+  }
   const map = readAll();
   const list = map[playerId] || [];
   if (list.includes(badgeId)) return false;
   map[playerId] = [...list, badgeId];
   writeAll(map);
   return true;
+}
+
+/** Strip non-protected permanent grants (sandbox reset). */
+export function stripSandboxPermanentBadges(playerId: string): string[] {
+  if (!playerId) return [];
+  const map = readAll();
+  const list = map[playerId] || [];
+  if (!list.length) return [];
+  const kept = list.filter((id) => isSandboxProtectedBadge(id));
+  const removed = list.filter((id) => !isSandboxProtectedBadge(id));
+  if (removed.length) {
+    map[playerId] = kept;
+    writeAll(map);
+  }
+  return removed;
+}
+
+/** All player ids that have any permanent badge entry (for wipe fan-out). */
+export function listPermanentBadgePlayerIds(): string[] {
+  return Object.keys(readAll());
 }
 
 /** Remove a permanent grant (e.g. First & Final after editing picks). */
