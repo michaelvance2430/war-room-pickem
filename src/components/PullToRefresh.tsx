@@ -2,15 +2,19 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
-const THRESHOLD = 72;
+const THRESHOLD = 78;
 const MAX_PULL = 120;
+/** Ignore tiny finger jitter so taps on links still fire. */
+const ARM_PX = 18;
 
 /**
- * Mobile pull-down at top of page → full reload (fresh data from phone).
- * Desktop: no-op (scroll behaves normally).
+ * Mobile pull-down at top of page → full reload.
+ * Careful not to steal taps on checklist links / buttons.
  */
 export default function PullToRefresh({ children }: { children: ReactNode }) {
   const startY = useRef(0);
+  const startX = useRef(0);
+  const armed = useRef(false);
   const pulling = useRef(false);
   const offsetRef = useRef(0);
   const refreshingRef = useRef(false);
@@ -23,7 +27,6 @@ export default function PullToRefresh({ children }: { children: ReactNode }) {
     setRefreshing(true);
     offsetRef.current = THRESHOLD;
     setOffset(THRESHOLD);
-    // Full reload so home/picks/locker all re-fetch clean
     window.location.reload();
   }, []);
 
@@ -34,40 +37,77 @@ export default function PullToRefresh({ children }: { children: ReactNode }) {
       setHint(n >= THRESHOLD * 0.55);
     }
 
+    function reset() {
+      armed.current = false;
+      pulling.current = false;
+      setPull(0);
+    }
+
     function onTouchStart(e: TouchEvent) {
       if (refreshingRef.current) return;
-      if (window.scrollY > 2) return;
+      // Only candidate when truly at top
+      if (window.scrollY > 1) return;
       const t = e.touches[0];
       if (!t) return;
+      // Don't start a pull when the finger lands on a real control
+      const target = e.target as HTMLElement | null;
+      if (
+        target?.closest?.(
+          "a, button, input, textarea, select, label, [role='button'], [role='link'], [data-no-ptr]"
+        )
+      ) {
+        return;
+      }
       startY.current = t.clientY;
-      pulling.current = true;
+      startX.current = t.clientX;
+      armed.current = true;
+      pulling.current = false;
     }
 
     function onTouchMove(e: TouchEvent) {
-      if (!pulling.current || refreshingRef.current) return;
-      if (window.scrollY > 2) {
-        pulling.current = false;
-        setPull(0);
+      if (!armed.current || refreshingRef.current) return;
+      if (window.scrollY > 1) {
+        reset();
         return;
       }
       const t = e.touches[0];
       if (!t) return;
       const dy = t.clientY - startY.current;
+      const dx = Math.abs(t.clientX - startX.current);
+
+      // Horizontal or upward = not a pull-to-refresh gesture
+      if (!pulling.current) {
+        if (dy < ARM_PX) return;
+        if (dx > dy * 0.7) {
+          // side swipe / scroll intention
+          armed.current = false;
+          return;
+        }
+        pulling.current = true;
+      }
+
       if (dy <= 0) {
         setPull(0);
         return;
       }
-      const damped = Math.min(MAX_PULL, dy * 0.45);
+
+      const damped = Math.min(MAX_PULL, (dy - ARM_PX) * 0.5);
       setPull(damped);
-      if (damped > 8 && e.cancelable) {
+      // Only block native scroll once we've committed to a pull
+      if (damped > 4 && e.cancelable) {
         e.preventDefault();
       }
     }
 
     function onTouchEnd() {
-      if (!pulling.current) return;
+      if (!armed.current && !pulling.current) return;
+      const shouldRefresh =
+        pulling.current &&
+        offsetRef.current >= THRESHOLD &&
+        !refreshingRef.current;
+      armed.current = false;
       pulling.current = false;
-      if (offsetRef.current >= THRESHOLD && !refreshingRef.current) {
+      if (shouldRefresh) {
         doRefresh();
       } else {
         setPull(0);
@@ -93,7 +133,7 @@ export default function PullToRefresh({ children }: { children: ReactNode }) {
         className="fixed left-0 right-0 z-[70] flex justify-center pointer-events-none transition-opacity"
         style={{
           top: Math.max(8, offset - 28),
-          opacity: offset > 8 || refreshing ? 1 : 0,
+          opacity: offset > 6 || refreshing ? 1 : 0,
         }}
         aria-hidden
       >

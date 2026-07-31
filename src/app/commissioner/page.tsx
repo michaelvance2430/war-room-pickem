@@ -1643,9 +1643,11 @@ function CommissionerPageInner() {
           }}
         />
 
+        <div id="commish-tab-panel" className="scroll-mt-20">
         <div className="flex flex-wrap gap-2 mb-6">
           {isOwner && (
             <button
+              type="button"
               onClick={() => setTab("settings")}
               className={
                 tab === "settings"
@@ -1657,6 +1659,7 @@ function CommissionerPageInner() {
             </button>
           )}
           <button
+            type="button"
             onClick={() => setTab("card")}
             className={
               tab === "card"
@@ -1667,6 +1670,7 @@ function CommissionerPageInner() {
             Build Card
           </button>
           <button
+            type="button"
             onClick={() => {
               setTab("picks");
               void refreshPickStatus();
@@ -1680,6 +1684,7 @@ function CommissionerPageInner() {
             Who&apos;s in
           </button>
           <button
+            type="button"
             onClick={() => {
               setTab("results");
               // Always re-load published prop so Finalize Scores matches the card
@@ -3176,6 +3181,7 @@ function CommissionerPageInner() {
             )}
           </div>
         )}
+        </div>
       </main>
     </div>
   );

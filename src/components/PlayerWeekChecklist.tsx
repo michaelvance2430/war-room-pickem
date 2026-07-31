@@ -274,9 +274,9 @@ export default function PlayerWeekChecklist() {
                 {!s.done && s.href && (
                   <Link
                     href={s.href}
-                    className="inline-block mt-1.5 text-xs font-semibold text-primary hover:underline"
+                    className="inline-flex items-center mt-2 min-h-[44px] px-3 py-2 rounded-lg border border-primary/40 bg-primary/10 text-sm font-bold text-primary active:bg-primary/20"
                   >
-                    {s.hrefLabel || "Go"} →
+                    {s.hrefLabel || "Go there"} →
                   </Link>
                 )}
               </div>

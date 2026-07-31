@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   loadLeagueActiveWeek,
   loadWeekCard,
@@ -11,13 +12,22 @@ import {
 import { getLeague } from "@/lib/league";
 import { weekTitle } from "@/lib/dates";
 
+type ActionTab = "settings" | "card" | "picks" | "results";
+
 type Step = {
   id: string;
   label: string;
   detail: string;
   why: string;
   done: boolean;
-  actionTab?: "settings" | "card" | "picks" | "results";
+  actionTab?: ActionTab;
+};
+
+const TAB_HREF: Record<ActionTab, string> = {
+  settings: "/commissioner?tab=settings",
+  card: "/commissioner?tab=card",
+  picks: "/commissioner?tab=picks",
+  results: "/commissioner?tab=results",
 };
 
 /**
@@ -27,7 +37,7 @@ type Step = {
 export default function CommishWeekChecklist({
   onGoTab,
 }: {
-  onGoTab?: (tab: "settings" | "card" | "picks" | "results") => void;
+  onGoTab?: (tab: ActionTab) => void;
 }) {
   const [week, setWeek] = useState(1);
   const [steps, setSteps] = useState<Step[]>([]);
@@ -210,14 +220,39 @@ export default function CommishWeekChecklist({
                   {s.detail}
                 </p>
                 <p className="text-[10px] text-primary/80 mt-0.5">Why: {s.why}</p>
-                {!s.done && s.actionTab && onGoTab && (
-                  <button
-                    type="button"
-                    onClick={() => onGoTab(s.actionTab!)}
-                    className="mt-1.5 text-xs font-semibold text-primary hover:underline"
+                {!s.done && s.actionTab && (
+                  <Link
+                    href={TAB_HREF[s.actionTab]}
+                    onClick={(e) => {
+                      // Same-page tab switch when parent provided a handler
+                      if (onGoTab) {
+                        e.preventDefault();
+                        onGoTab(s.actionTab!);
+                        // Keep URL in sync so back/refresh land on the right tab
+                        try {
+                          window.history.replaceState(
+                            null,
+                            "",
+                            TAB_HREF[s.actionTab!]
+                          );
+                        } catch {
+                          /* ignore */
+                        }
+                        // Scroll tab content into view (mobile)
+                        requestAnimationFrame(() => {
+                          document
+                            .getElementById("commish-tab-panel")
+                            ?.scrollIntoView({
+                              behavior: "smooth",
+                              block: "start",
+                            });
+                        });
+                      }
+                    }}
+                    className="inline-flex items-center mt-2 min-h-[44px] px-3 py-2 rounded-lg border border-primary/40 bg-primary/10 text-sm font-bold text-primary active:bg-primary/20"
                   >
                     Go there →
-                  </button>
+                  </Link>
                 )}
               </div>
             </li>
