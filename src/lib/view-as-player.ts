@@ -3,6 +3,8 @@
  * UI-only: hides Commish/Ops/Mod chrome. Server permissions unchanged.
  */
 
+import { reapplySeasonThemeFromLocal } from "./season-theme";
+
 const KEY = "warroom-view-as-player";
 
 function canUseStorage() {
@@ -26,9 +28,16 @@ export function setViewAsPlayer(on: boolean) {
   } catch {
     /* ignore */
   }
-  // Let open tabs / nav re-read
+  // Keep season theme painted when switching Commish ↔ player preview
   if (typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent("warroom-view-as-player", { detail: on }));
+    try {
+      reapplySeasonThemeFromLocal();
+    } catch {
+      /* ignore */
+    }
+    window.dispatchEvent(
+      new CustomEvent("warroom-view-as-player", { detail: on })
+    );
   }
 }
 

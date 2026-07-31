@@ -17,6 +17,7 @@ import {
   getLeague,
   getSession,
   resetLeague,
+  updateLeagueSettings,
   League,
 } from "@/lib/league";
 import {
@@ -1692,7 +1693,9 @@ export default function CommissionerPage() {
                     onChange={(e) => {
                       const id = resolveSeasonThemeId(e.target.value);
                       setSeasonThemeId(id);
+                      // Paint + stash on local league so View as player still sees it
                       applySeasonTheme(id);
+                      updateLeagueSettings({ seasonThemeId: id });
                     }}
                     className="mt-1 w-full bg-card border border-border rounded-lg px-3 py-2 text-sm text-foreground"
                   >
@@ -1706,7 +1709,9 @@ export default function CommissionerPage() {
                 <p className="text-[11px] text-muted leading-relaxed">
                   {SEASON_THEME_PRESETS.find((p) => p.id === seasonThemeId)
                     ?.blurb || ""}{" "}
-                  Preview applies immediately; hit{" "}
+                  Preview applies immediately (and sticks if you{" "}
+                  <strong className="text-foreground">View as player</strong>
+                  ). Hit{" "}
                   <strong className="text-foreground">Save settings</strong> so
                   the rest of the league gets it.
                 </p>

@@ -63,8 +63,32 @@ export function resolveSeasonThemeId(
 
 export const SEASON_THEME_EVENT = "warroom-season-theme";
 
+const LEAGUE_KEY = "warroom-league";
+
+/**
+ * Keep theme on local league cache so View as player / reload still sees it
+ * even before (or after) Save settings hits the cloud.
+ */
+function persistThemeToLocalLeague(theme: SeasonThemeId) {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = localStorage.getItem(LEAGUE_KEY);
+    if (!raw) return;
+    const league = JSON.parse(raw) as {
+      settings?: Record<string, unknown>;
+    };
+    league.settings = { ...(league.settings || {}), seasonThemeId: theme };
+    localStorage.setItem(LEAGUE_KEY, JSON.stringify(league));
+  } catch {
+    /* ignore */
+  }
+}
+
 /** Apply theme on <html> so CSS variables hit the whole app. */
-export function applySeasonTheme(id: string | null | undefined) {
+export function applySeasonTheme(
+  id: string | null | undefined,
+  opts?: { persistLocal?: boolean }
+) {
   if (typeof document === "undefined") return;
   const theme = resolveSeasonThemeId(id);
   const root = document.documentElement;
@@ -73,11 +97,28 @@ export function applySeasonTheme(id: string | null | undefined) {
   } else {
     root.setAttribute("data-season-theme", theme);
   }
+  // Default: persist so Commish → View as player keeps the wash
+  if (opts?.persistLocal !== false) {
+    persistThemeToLocalLeague(theme);
+  }
   try {
     window.dispatchEvent(
       new CustomEvent(SEASON_THEME_EVENT, { detail: theme })
     );
   } catch {
     /* ignore */
+  }
+}
+
+/** Re-read league cache and paint theme (call after View as player / navigation). */
+export function reapplySeasonThemeFromLocal() {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = localStorage.getItem(LEAGUE_KEY);
+    const league = raw ? JSON.parse(raw) : null;
+    const id = league?.settings?.seasonThemeId as string | undefined;
+    applySeasonTheme(id, { persistLocal: false });
+  } catch {
+    applySeasonTheme(DEFAULT_SEASON_THEME_ID, { persistLocal: false });
   }
 }
