@@ -231,6 +231,7 @@ export default function Nav() {
       ? [{ href: "/crystal-ball", label: "Crystal Ball" }]
       : []),
     { href: "/stats", label: "Stats" },
+    { href: "/board", label: "The Board" },
     { href: "/announcements", label: "News", badge: unreadCount },
     { href: "/players", label: "Players" },
     { href: "/rules", label: "Rules" },

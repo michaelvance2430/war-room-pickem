@@ -718,6 +718,149 @@ export async function loadMyPicks(weekNumber = 1) {
   };
 }
 
+/** One player's full slip for the week board (after scoring / RLS allows). */
+export type WeekBoardSlip = {
+  userId: string;
+  name: string;
+  isBot?: boolean;
+  picks: Record<string, UserPick>;
+  bestBetId: string | null;
+  propChoice: string | null;
+  lockedAt: string | null;
+  totalPoints: number | null;
+};
+
+/**
+ * Everyone's locked slips for a week.
+ * Works when week is scored (RLS: picks-reveal-scored.sql) or caller is ops.
+ * Returns empty slips list with ok:false if privacy blocks.
+ */
+export async function loadLeagueWeekBoard(weekNumber: number): Promise<{
+  ok: boolean;
+  slips: WeekBoardSlip[];
+  scored: boolean;
+  error?: string;
+}> {
+  const session = getSession();
+  if (!session?.leagueId) {
+    return { ok: false, slips: [], scored: false, error: "No league" };
+  }
+  try {
+    const supabase = createClient();
+    const leagueId = session.leagueId;
+
+    const { data: wr } = await supabase
+      .from("week_results")
+      .select("id, week_number")
+      .eq("league_id", leagueId)
+      .eq("week_number", weekNumber)
+      .maybeSingle();
+    const scored = !!wr;
+
+    const { data: members } = await supabase
+      .from("memberships")
+      .select("user_id, is_bot, profiles(display_name)")
+      .eq("league_id", leagueId);
+
+    const { data: pickRows, error: pickErr } = await supabase
+      .from("picks")
+      .select(
+        "id, user_id, prop_choice, best_bet_game_id, locked_at, total_points"
+      )
+      .eq("league_id", leagueId)
+      .eq("week_number", weekNumber);
+
+    if (pickErr) {
+      return {
+        ok: false,
+        slips: [],
+        scored,
+        error: scored
+          ? pickErr.message
+          : "Picks stay private until this week is scored. Run supabase/picks-reveal-scored.sql if already scored.",
+      };
+    }
+
+    const pickIds = (pickRows || []).map((p) => p.id as string);
+    const gamesByPick = new Map<string, Record<string, UserPick>>();
+    if (pickIds.length) {
+      const { data: pgs } = await supabase
+        .from("pick_games")
+        .select(
+          "pick_id, card_game_id, side, confidence, is_best_bet, locked_spread, locked_favorite"
+        )
+        .in("pick_id", pickIds);
+      for (const g of pgs || []) {
+        const pid = g.pick_id as string;
+        const map = gamesByPick.get(pid) || {};
+        map[g.card_game_id as string] = {
+          gameId: g.card_game_id as string,
+          pick: g.side === "away" ? "away" : "home",
+          confidence: Number(g.confidence) || 0,
+          isBestBet: !!g.is_best_bet,
+          lockedSpread: Number(g.locked_spread ?? 0),
+          lockedFavorite: g.locked_favorite === "away" ? "away" : "home",
+        };
+        gamesByPick.set(pid, map);
+      }
+    }
+
+    const pickByUser = new Map(
+      (pickRows || []).map((p) => [p.user_id as string, p])
+    );
+    const slips: WeekBoardSlip[] = [];
+
+    for (const m of members || []) {
+      if (m.is_bot) continue;
+      const userId = m.user_id as string;
+      const profile = m.profiles as { display_name?: string } | null;
+      const name = profile?.display_name || "Player";
+      const pick = pickByUser.get(userId);
+      if (!pick) {
+        slips.push({
+          userId,
+          name,
+          isBot: false,
+          picks: {},
+          bestBetId: null,
+          propChoice: null,
+          lockedAt: null,
+          totalPoints: null,
+        });
+        continue;
+      }
+      slips.push({
+        userId,
+        name,
+        isBot: false,
+        picks: gamesByPick.get(pick.id as string) || {},
+        bestBetId: (pick.best_bet_game_id as string) || null,
+        propChoice: (pick.prop_choice as string) || null,
+        lockedAt: (pick.locked_at as string) || null,
+        totalPoints:
+          pick.total_points != null ? Number(pick.total_points) : null,
+      });
+    }
+
+    // Sort: most points first, then name
+    slips.sort((a, b) => {
+      const pa = a.totalPoints ?? -1;
+      const pb = b.totalPoints ?? -1;
+      if (pb !== pa) return pb - pa;
+      return a.name.localeCompare(b.name);
+    });
+
+    return { ok: true, slips, scored };
+  } catch (e: unknown) {
+    return {
+      ok: false,
+      slips: [],
+      scored: false,
+      error: e instanceof Error ? e.message : "Failed to load board",
+    };
+  }
+}
+
 export type PickSubmissionStatus = {
   userId: string;
   name: string;

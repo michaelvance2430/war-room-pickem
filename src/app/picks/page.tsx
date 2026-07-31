@@ -6,17 +6,21 @@ import PicksHowToModal from "@/components/PicksHowToModal";
 import FirstFinalModal from "@/components/FirstFinalModal";
 import { Game, UserPick, Prop } from "@/lib/types";
 import { getSession, getLeague } from "@/lib/league";
+import Link from "next/link";
 import {
   loadWeekCard,
   savePicksToCloud,
   loadMyPicks,
   loadLeagueActiveWeek,
   listPublishedWeekNumbers,
+  listScoredWeekNumbers,
+  loadWeekResultsFromCloud,
   cardRevision,
   type CloudCard,
 } from "@/lib/cloud";
 import { resolvePlayerActiveWeek } from "@/lib/active-week";
 import { createClient } from "@/lib/supabase/client";
+import { scoreWeek, type GameResult } from "@/lib/scoring";
 import {
   formatRankedTeam,
   getRankedMatchupTier,
@@ -63,6 +67,7 @@ export default function PicksPage() {
   /** Week the user is viewing (may be past = read-only). */
   const [viewWeek, setViewWeek] = useState(1);
   const [publishedWeeks, setPublishedWeeks] = useState<number[]>([]);
+  const [scoredWeeks, setScoredWeeks] = useState<number[]>([]);
   const [games, setGames] = useState<Game[]>([]);
   const [picks, setPicks] = useState<Record<string, UserPick>>({});
   const [bestBetId, setBestBetId] = useState<string | null>(null);
@@ -79,6 +84,12 @@ export default function PicksPage() {
   const [cardNotice, setCardNotice] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [switching, setSwitching] = useState(false);
+  /** Covers + prop after week is scored (past-week review) */
+  const [weekResults, setWeekResults] = useState<Record<string, GameResult>>(
+    {}
+  );
+  const [weekPropResult, setWeekPropResult] = useState<string | null>(null);
+  const [weekScoredAt, setWeekScoredAt] = useState<string | null>(null);
   const [firstFinalModal, setFirstFinalModal] = useState<{
     mode: "earned" | "forfeit";
     weekNumber: number;
@@ -209,19 +220,29 @@ export default function PicksPage() {
   );
 
   const refreshPublishedList = useCallback(async () => {
-    const weeks = await listPublishedWeekNumbers();
+    const [weeks, scored] = await Promise.all([
+      listPublishedWeekNumbers(),
+      listScoredWeekNumbers(),
+    ]);
     setPublishedWeeks(weeks);
+    setScoredWeeks(scored);
     return weeks;
   }, []);
 
   /**
    * Load a specific week into the UI.
-   * Polls only refresh the week the user is currently viewing (won't yank you off Week 1).
+   * Explicit week picks (Jump to week) never redirect away — even if empty.
+   * Initial load lands on live active week.
    */
   const loadWeek = useCallback(
     async (
       week: number,
-      opts: { isInitial?: boolean; forceReloadPicks?: boolean } = {}
+      opts: {
+        isInitial?: boolean;
+        forceReloadPicks?: boolean;
+        /** User chose this week in the browser — do not fallback elsewhere */
+        explicit?: boolean;
+      } = {}
     ) => {
       const session = getSession();
       const league = getLeague();
@@ -265,6 +286,9 @@ export default function PicksPage() {
           } else {
             void refreshPublishedList();
           }
+        } else if (opts.explicit) {
+          // Stay on requested week even if no card (show empty state)
+          void refreshPublishedList();
         } else if (!cloud?.games?.length) {
           const published = await refreshPublishedList();
           const fallback = published.includes(active)
@@ -279,6 +303,24 @@ export default function PicksPage() {
         setViewWeek(target);
         viewWeekRef.current = target;
 
+        // Load covers for scored weeks (your card + hit/miss)
+        try {
+          const res = await loadWeekResultsFromCloud(target);
+          if (res) {
+            setWeekResults(res.results);
+            setWeekPropResult(res.propResult);
+            setWeekScoredAt(res.scoredAt);
+          } else {
+            setWeekResults({});
+            setWeekPropResult(null);
+            setWeekScoredAt(null);
+          }
+        } catch {
+          setWeekResults({});
+          setWeekPropResult(null);
+          setWeekScoredAt(null);
+        }
+
         if (!cloud || !cloud.games.length) {
           setHasCard(false);
           setGames([]);
@@ -288,7 +330,7 @@ export default function PicksPage() {
 
         await applyCard(cloud, {
           isInitial: !!opts.isInitial,
-          forceReloadPicks: opts.forceReloadPicks,
+          forceReloadPicks: opts.forceReloadPicks || !!opts.explicit,
         });
         return cloud;
       } catch (e: unknown) {
@@ -324,7 +366,7 @@ export default function PicksPage() {
     setCardNotice(null);
     revisionRef.current = "";
     try {
-      await loadWeek(week, { forceReloadPicks: true });
+      await loadWeek(week, { forceReloadPicks: true, explicit: true });
     } finally {
       setSwitching(false);
     }
@@ -693,10 +735,29 @@ export default function PicksPage() {
     }
   }, [allGamesPicked]);
 
-  // Weeks shown in browser: published + active (even if not published yet)
+  // Weeks shown: published + scored + active (so past scored weeks stay clickable)
   const weekPills = [
-    ...new Set([...publishedWeeks, activeWeek].filter((w) => w >= 0)),
+    ...new Set(
+      [...publishedWeeks, ...scoredWeeks, activeWeek].filter((w) => w >= 0)
+    ),
   ].sort((a, b) => a - b);
+
+  const viewIsScored = scoredWeeks.includes(viewWeek);
+  const myWeekScore =
+    hasCard &&
+    viewIsScored &&
+    Object.keys(weekResults).length > 0 &&
+    Object.keys(picks).length > 0
+      ? scoreWeek(
+          picks,
+          bestBetId,
+          propChoice,
+          games,
+          weekResults,
+          prop,
+          weekPropResult
+        )
+      : null;
 
   if (!loaded) {
     return (
@@ -789,6 +850,7 @@ export default function PicksPage() {
               {weekPills.map((w) => {
                 const isView = w === viewWeek;
                 const isActive = w === activeWeek;
+                const isScored = scoredWeeks.includes(w);
                 return (
                   <button
                     key={w}
@@ -802,20 +864,30 @@ export default function PicksPage() {
                           ? "bg-card-hover border-2 border-primary text-foreground"
                           : isActive
                             ? "border border-primary/50 text-primary hover:bg-primary/10"
-                            : "border border-border text-muted hover:text-foreground"
+                            : isScored
+                              ? "border border-border text-foreground hover:bg-card-hover"
+                              : "border border-border text-muted hover:text-foreground"
                     }`}
                   >
                     {weekTitle(w)}
-                    {isActive ? " · live" : ""}
-                    {!isActive && publishedWeeks.includes(w) ? "" : ""}
+                    {isActive ? " · live" : isScored ? " · scored" : ""}
                   </button>
                 );
               })}
             </div>
             <p className="text-[11px] text-muted mt-2">
-              Past weeks are read-only so you can see how you did. Only the{" "}
-              <span className="text-primary font-medium">live</span> week accepts
-              new picks.
+              Tap any week to review.{" "}
+              <span className="text-primary font-medium">Live</span> accepts
+              new picks.{" "}
+              <span className="text-foreground font-medium">Scored</span> weeks
+              show your results — and{" "}
+              <Link
+                href={`/board?week=${viewWeek}`}
+                className="text-primary font-medium hover:underline"
+              >
+                The Board
+              </Link>{" "}
+              shows everyone&apos;s cards after scoring.
             </p>
           </div>
         )}
@@ -881,16 +953,56 @@ export default function PicksPage() {
         {hasCard && (
           <>
             {isPastOrOtherWeek && (
-              <div className="mb-4 rounded-lg border border-border bg-card-hover px-4 py-2 text-sm text-muted">
-                🔒 Read-only archive of {weekTitle(viewWeek)}. Switch to{" "}
-                <button
-                  type="button"
-                  className="text-primary underline font-medium"
-                  onClick={() => void selectWeek(activeWeek)}
+              <div className="mb-4 rounded-lg border border-border bg-card-hover px-4 py-3 text-sm text-muted space-y-2">
+                <p>
+                  🔒 Read-only archive of {weekTitle(viewWeek)}. Switch to{" "}
+                  <button
+                    type="button"
+                    className="text-primary underline font-medium"
+                    onClick={() => void selectWeek(activeWeek)}
+                  >
+                    {weekTitle(activeWeek)} (live)
+                  </button>{" "}
+                  to make picks.
+                </p>
+                {viewIsScored && (
+                  <p>
+                    <Link
+                      href={`/board?week=${viewWeek}`}
+                      className="text-primary font-semibold hover:underline"
+                    >
+                      Open The Board → see everyone&apos;s picks for{" "}
+                      {weekTitle(viewWeek)}
+                    </Link>
+                  </p>
+                )}
+                {myWeekScore && (
+                  <p className="text-foreground font-medium">
+                    Your score:{" "}
+                    <span className="text-primary text-lg tabular-nums">
+                      {myWeekScore.totalPoints}
+                    </span>{" "}
+                    pts · {myWeekScore.correctCount}/{games.length} ATS
+                    {weekPropResult ? (
+                      <>
+                        {" "}
+                        · prop{" "}
+                        {propChoice === weekPropResult ? "✓" : "✗"}
+                      </>
+                    ) : null}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {weekEditable && viewIsScored === false && scoredWeeks.length > 0 && (
+              <div className="mb-4 rounded-lg border border-primary/30 bg-primary/5 px-4 py-2 text-sm">
+                <Link
+                  href={`/board?week=${scoredWeeks[scoredWeeks.length - 1]}`}
+                  className="text-primary font-semibold hover:underline"
                 >
-                  {weekTitle(activeWeek)} (live)
-                </button>{" "}
-                to make picks.
+                  See last week&apos;s Board (everyone&apos;s picks) →
+                </Link>
               </div>
             )}
 
@@ -943,6 +1055,10 @@ export default function PicksPage() {
                   game.homeRank
                 );
                 const rankBadge = rankedMatchupBadge(rankTier);
+                const cover = weekResults[game.id];
+                const gameScore = myWeekScore?.gameScores.find(
+                  (s) => s.gameId === game.id
+                );
 
                 return (
                   <div
@@ -950,7 +1066,13 @@ export default function PicksPage() {
                     className={`rounded-xl border bg-card p-4 transition ${rankedMatchupShellClass(
                       rankTier,
                       { bestBet: isBest }
-                    )} ${locked && !rankTier ? "opacity-95" : ""}`}
+                    )} ${locked && !rankTier ? "opacity-95" : ""} ${
+                      gameScore?.correct
+                        ? "ring-1 ring-primary/40"
+                        : gameScore && cover && !gameScore.pushed
+                          ? "ring-1 ring-danger/30"
+                          : ""
+                    }`}
                   >
                     <div className="mb-3">
                       <div className="flex items-center justify-between gap-2">
@@ -974,7 +1096,33 @@ export default function PicksPage() {
                           )}
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
-                          {locked && (
+                          {cover?.winner && (
+                            <span className="text-[10px] font-bold uppercase tracking-wide text-primary border border-primary/40 px-1.5 py-0.5 rounded">
+                              {cover.winner === "push"
+                                ? "Push"
+                                : cover.winner === "away"
+                                  ? "Away covers"
+                                  : "Home covers"}
+                            </span>
+                          )}
+                          {gameScore && cover && (
+                            <span
+                              className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${
+                                gameScore.pushed
+                                  ? "border border-border text-muted"
+                                  : gameScore.correct
+                                    ? "bg-primary/20 text-primary"
+                                    : "bg-danger/15 text-danger"
+                              }`}
+                            >
+                              {gameScore.pushed
+                                ? "Push"
+                                : gameScore.correct
+                                  ? `+${gameScore.points}`
+                                  : "Miss"}
+                            </span>
+                          )}
+                          {locked && !cover && (
                             <span className="text-[10px] font-bold uppercase tracking-wide text-muted border border-border px-1.5 py-0.5 rounded">
                               Locked
                             </span>
