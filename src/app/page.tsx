@@ -264,16 +264,17 @@ export default function Home() {
       />
 
       <Nav />
-      <main className="flex-1 max-w-6xl mx-auto w-full px-4 py-10 relative z-10">
-        <section className="mb-6">
-          <h1 className="text-3xl sm:text-5xl font-bold tracking-tight mb-3 text-white drop-shadow-[0_0_30px_rgba(34,197,94,0.15)]">
+      {/* Phone-first: less chrome padding, job-first stack (most users are on phones) */}
+      <main className="flex-1 max-w-6xl mx-auto w-full px-3 sm:px-4 py-5 sm:py-10 relative z-10">
+        <section className="mb-4 sm:mb-6">
+          <h1 className="text-2xl sm:text-5xl font-bold tracking-tight mb-1.5 sm:mb-3 text-white drop-shadow-[0_0_30px_rgba(34,197,94,0.15)]">
             Welcome to the War Room
           </h1>
-          <p className="text-muted max-w-xl text-base sm:text-lg leading-relaxed">
+          <p className="text-muted max-w-xl text-sm sm:text-lg leading-relaxed">
             {homeTagline}
           </p>
           {leagueName && (
-            <div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-muted/90">
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-muted/90">
               <span className="text-foreground/90 font-medium">{leagueName}</span>
               {isCommish && leagueCode && (
                 <>
@@ -292,7 +293,7 @@ export default function Home() {
                         /* ignore */
                       }
                     }}
-                    className="text-xs px-2 py-1 rounded-md border border-primary/40 text-primary hover:bg-primary/10 font-semibold"
+                    className="text-xs px-3 py-2 min-h-[40px] rounded-md border border-primary/40 text-primary hover:bg-primary/10 font-semibold touch-manipulation"
                   >
                     {codeCopied ? "Copied!" : "Copy invite code"}
                   </button>
@@ -301,6 +302,21 @@ export default function Home() {
             </div>
           )}
         </section>
+
+        {/* One job first — make picks (phones: don't bury this under invites) */}
+        <HomeWeekHero />
+
+        {/* Didn't lock? Sarcastic adulting reminder */}
+        <LockPicksRoast />
+
+        {/* Every member — not just Commish */}
+        <PlayerWeekChecklist />
+
+        {/* Unseen News + Locker — tap the number to open */}
+        <HomeUnseenPulse />
+
+        {/* First-time Commish season setup */}
+        <CommishSetupBanner />
 
         {actuallyCommish && isCommish && (
           <div className="mb-6 rounded-xl border-2 border-warning/50 bg-warning/10 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
@@ -315,45 +331,30 @@ export default function Home() {
                 setIsCommish(false);
                 window.location.href = "/";
               }}
-              className="shrink-0 px-4 py-2 rounded-lg bg-warning text-black text-sm font-bold"
+              className="shrink-0 px-4 py-3 min-h-[48px] rounded-lg bg-warning text-black text-sm font-bold touch-manipulation"
             >
               Enter player view →
             </button>
           </div>
         )}
 
-        {/* First-time Commish season setup */}
-        <CommishSetupBanner />
-
-        {/* Everyone can invite — deep link + fun copy */}
+        {/* Invite after the job — still one-tap, less scroll before picks */}
         <div className="mb-6">
           <InviteFriends />
         </div>
-
-        {/* Didn't lock? Sarcastic adulting reminder */}
-        <LockPicksRoast />
-
-        {/* One job: pick / wait / score path — strengths stay below */}
-        <HomeWeekHero />
-
-        {/* Unseen News + Locker — tap the number to open */}
-        <HomeUnseenPulse />
-
-        {/* Every member — not just Commish */}
-        <PlayerWeekChecklist />
 
         <section className="mb-6">
           <HotTakeTicker variant="warroom" />
         </section>
 
-        <section className="mb-10">
+        <section className="mb-8 sm:mb-10">
           <CrownAndShame />
         </section>
 
         <p className="text-[10px] uppercase tracking-[0.18em] text-muted mb-3 font-semibold">
           The rest of the room
         </p>
-        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           <Link
             href="/standings"
             className="group rounded-xl border border-border/80 bg-black/40 backdrop-blur-sm p-6 hover:border-primary/50 hover:bg-primary/5 transition shadow-[0_0_40px_rgba(0,0,0,0.35)]"

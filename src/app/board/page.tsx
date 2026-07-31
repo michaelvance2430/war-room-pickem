@@ -146,7 +146,7 @@ function BoardInner() {
   return (
     <div className="min-h-screen flex flex-col">
       <Nav />
-      <main className="flex-1 max-w-3xl mx-auto w-full px-4 py-8">
+      <main className="flex-1 max-w-3xl mx-auto w-full px-3 sm:px-4 py-5 sm:py-8">
         <div className="mb-5">
           <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
             League pick reveal
@@ -207,7 +207,7 @@ function BoardInner() {
         )}
 
         {weeks.length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-4">
+          <div className="phone-h-scroll sm:flex-wrap sm:overflow-visible mb-4">
             {weeks.map((w) => {
               const isScored = scoredWeeks.includes(w);
               return (
@@ -215,7 +215,7 @@ function BoardInner() {
                   key={w}
                   type="button"
                   onClick={() => goWeek(w)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition ${
+                  className={`px-3.5 py-2.5 min-h-[40px] rounded-full text-xs font-semibold transition touch-manipulation ${
                     w === week
                       ? "bg-primary text-black"
                       : isScored
@@ -232,11 +232,11 @@ function BoardInner() {
         )}
 
         {lockedNow && !error && (
-          <div className="flex rounded-lg border border-border p-1 mb-5 bg-card gap-1">
+          <div className="flex rounded-xl border border-border p-1 mb-5 bg-card gap-1">
             <button
               type="button"
               onClick={() => setMode("games")}
-              className={`flex-1 py-2 rounded-md text-xs font-bold transition ${
+              className={`flex-1 py-3 min-h-[48px] rounded-lg text-sm font-bold transition touch-manipulation ${
                 mode === "games"
                   ? "bg-primary text-black"
                   : "text-muted hover:text-foreground"
@@ -247,7 +247,7 @@ function BoardInner() {
             <button
               type="button"
               onClick={() => setMode("cards")}
-              className={`flex-1 py-2 rounded-md text-xs font-bold transition ${
+              className={`flex-1 py-3 min-h-[48px] rounded-lg text-sm font-bold transition touch-manipulation ${
                 mode === "cards"
                   ? "bg-primary text-black"
                   : "text-muted hover:text-foreground"
@@ -259,7 +259,10 @@ function BoardInner() {
         )}
 
         <div className="flex flex-wrap gap-3 mb-6 text-sm">
-          <Link href="/picks" className="text-primary font-medium hover:underline">
+          <Link
+            href="/picks"
+            className="text-primary font-semibold hover:underline min-h-[44px] inline-flex items-center"
+          >
             ← My Picks
           </Link>
           <span className="text-muted">·</span>

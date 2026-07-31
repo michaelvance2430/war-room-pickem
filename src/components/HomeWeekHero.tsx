@@ -193,8 +193,8 @@ export default function HomeWeekHero() {
   }
 
   return (
-    <section className="mb-8">
-      <div className="rounded-2xl border-2 border-primary/40 bg-gradient-to-br from-primary/15 via-black/50 to-black/70 p-5 sm:p-6 shadow-[0_0_50px_rgba(34,197,94,0.12)]">
+    <section className="mb-5 sm:mb-8">
+      <div className="rounded-2xl border-2 border-primary/40 bg-gradient-to-br from-primary/15 via-black/50 to-black/70 p-4 sm:p-6 shadow-[0_0_50px_rgba(34,197,94,0.12)]">
         <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">
             {eyebrow}
@@ -203,7 +203,7 @@ export default function HomeWeekHero() {
             {progress}
           </span>
         </div>
-        <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2">
+        <h2 className="text-xl sm:text-3xl font-bold text-white mb-2 leading-tight">
           {title}
         </h2>
         {state.advancedFromScored && (
@@ -215,17 +215,18 @@ export default function HomeWeekHero() {
           {body}
         </p>
 
-        <div className="flex flex-wrap gap-2 mb-4">
+        {/* Full-width primary on phone = one-thumb job */}
+        <div className="flex flex-col sm:flex-row gap-2 mb-4">
           <Link
             href={primaryHref}
-            className={`inline-flex items-center justify-center px-5 py-2.5 rounded-xl text-sm font-semibold transition ${primaryClass}`}
+            className={`inline-flex items-center justify-center w-full sm:w-auto px-5 py-3.5 sm:py-2.5 min-h-[52px] sm:min-h-0 rounded-xl text-base sm:text-sm font-bold transition touch-manipulation active:scale-[0.98] ${primaryClass}`}
           >
             {primaryLabel}
           </Link>
           {secondaryHref && (
             <Link
               href={secondaryHref}
-              className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl text-sm font-medium border border-border text-muted hover:text-foreground hover:bg-card/50 transition"
+              className="inline-flex items-center justify-center w-full sm:w-auto px-4 py-3 sm:py-2.5 min-h-[48px] sm:min-h-0 rounded-xl text-sm font-medium border border-border text-muted hover:text-foreground hover:bg-card/50 transition touch-manipulation"
             >
               {secondaryLabel}
             </Link>

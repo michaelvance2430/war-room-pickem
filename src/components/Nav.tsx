@@ -615,7 +615,7 @@ export default function Nav() {
               { href: "/", label: "Home", icon: "⌂" },
               { href: "/picks", label: "Picks", icon: "✓" },
               { href: "/board", label: "Board", icon: "▦" },
-              { href: "/standings", label: "Stand", icon: "#" },
+              { href: "/standings", label: "Ranks", icon: "#" },
             ] as const
           ).map((tab) => {
             const active = linkActive(tab.href);

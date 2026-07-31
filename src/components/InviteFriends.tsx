@@ -59,6 +59,11 @@ export default function InviteFriends({
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [flavor, setFlavor] = useState<InviteFlavor | "random">("random");
+  /**
+   * Collapsed by default (phone-first — most players live on phones).
+   * One-tap Share stays visible; "More vibes" expands flavors/preview.
+   */
+  const [expanded, setExpanded] = useState(false);
 
   if (!code) return null;
 
@@ -168,14 +173,68 @@ export default function InviteFriends({
           flavor,
         });
 
+  // Collapsed strip on phone until they expand (desktop always full)
+  if (!expanded && !compact) {
+    return (
+      <div
+        className={`rounded-xl border border-primary/25 bg-primary/5 p-3 sm:p-4 ${className}`}
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">
+              Invite · everyone
+            </p>
+            <p className="text-sm text-foreground font-medium truncate">
+              Code{" "}
+              <span className="font-mono text-primary tracking-widest">
+                {code}
+              </span>
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void onShare()}
+              className="flex-1 sm:flex-none px-4 py-3 min-h-[48px] rounded-xl bg-primary text-black text-sm font-bold disabled:opacity-50 touch-manipulation"
+            >
+              {busy ? "…" : "Share"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setExpanded(true)}
+              className="px-3 py-3 min-h-[48px] rounded-xl border border-border text-xs font-semibold text-muted hover:text-foreground touch-manipulation"
+            >
+              More vibes
+            </button>
+          </div>
+        </div>
+        {status && (
+          <p className="text-xs text-primary mt-2 font-medium">{status}</p>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div
-      className={`rounded-xl border border-primary/30 bg-primary/5 p-5 ${className}`}
+      className={`rounded-xl border border-primary/30 bg-primary/5 p-4 sm:p-5 ${className}`}
     >
-      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-1">
-        Spread the word · everyone
-      </p>
-      <h2 className="font-semibold mb-1">Bring your people</h2>
+      <div className="flex items-start justify-between gap-2 mb-1">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-1">
+            Spread the word · everyone
+          </p>
+          <h2 className="font-semibold mb-1">Bring your people</h2>
+        </div>
+        <button
+          type="button"
+          onClick={() => setExpanded(false)}
+          className="sm:hidden text-[11px] text-muted font-semibold min-h-[40px] px-2"
+        >
+          Less
+        </button>
+      </div>
       <p className="text-sm text-muted mb-3 leading-relaxed">
         <strong className="text-foreground">Every member</strong> can invite —
         not just the commissioner. One tap shares a deep link (code already

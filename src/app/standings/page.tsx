@@ -89,7 +89,7 @@ export default function StandingsPage() {
     <div className="min-h-screen flex flex-col">
       <Nav />
 
-      <main className="flex-1 max-w-5xl mx-auto w-full px-4 py-8">
+      <main className="flex-1 max-w-5xl mx-auto w-full px-3 sm:px-4 py-5 sm:py-8">
         <div className="mb-6">
           <h1 className="text-2xl font-bold">Standings</h1>
           <p className="text-sm text-muted">
@@ -155,12 +155,13 @@ export default function StandingsPage() {
           </div>
         )}
 
-        <div className="flex flex-wrap gap-2 mb-6">
+        <div className="phone-h-scroll sm:flex-wrap sm:overflow-visible mb-5">
           {divisions.map((d) => (
             <button
               key={d}
+              type="button"
               onClick={() => setActive(d)}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
+              className={`px-4 py-2.5 min-h-[44px] rounded-full text-sm font-semibold transition touch-manipulation ${
                 active === d
                   ? "bg-primary text-black"
                   : "bg-card border border-border text-muted hover:text-foreground"
@@ -171,12 +172,14 @@ export default function StandingsPage() {
           ))}
         </div>
 
-        <div className="rounded-xl border border-border overflow-hidden">
+        <div className="rounded-xl border border-border overflow-hidden overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-card text-muted text-xs uppercase tracking-wide">
               <tr>
-                <th className="text-left px-4 py-3 font-medium">#</th>
-                <th className="text-left px-4 py-3 font-medium">Player</th>
+                <th className="text-left px-3 sm:px-4 py-3 font-medium">#</th>
+                <th className="text-left px-3 sm:px-4 py-3 font-medium">
+                  Player
+                </th>
                 {active === "Overall" && (
                   <th className="text-left px-4 py-3 font-medium">Div</th>
                 )}
@@ -215,8 +218,10 @@ export default function StandingsPage() {
                       }`
                     )}
                   >
-                    <td className="px-4 py-3 text-muted">{idx + 1}</td>
-                    <td className="px-4 py-3 font-medium">
+                    <td className="px-3 sm:px-4 py-3.5 text-muted align-middle">
+                      {idx + 1}
+                    </td>
+                    <td className="px-3 sm:px-4 py-3.5 font-medium align-middle">
                       <div className="flex flex-col gap-1 min-w-0">
                         <span
                           className={selfNameClass(
@@ -244,22 +249,24 @@ export default function StandingsPage() {
                       </div>
                     </td>
                     {active === "Overall" && (
-                      <td className="px-4 py-3 text-muted">{player.division}</td>
+                      <td className="px-3 sm:px-4 py-3.5 text-muted align-middle text-xs sm:text-sm">
+                        {player.division}
+                      </td>
                     )}
-                    <td className="px-3 py-3 hidden md:table-cell">
+                    <td className="px-3 py-3.5 hidden md:table-cell align-middle">
                       {swingById[player.id] ? (
                         <SwingBadge swing={swingById[player.id]} />
                       ) : (
                         <span className="text-muted">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-right font-semibold">
+                    <td className="px-3 sm:px-4 py-3.5 text-right font-semibold align-middle text-base">
                       {player.totalPoints}
                     </td>
-                    <td className="px-4 py-3 text-right text-muted hidden sm:table-cell">
+                    <td className="px-4 py-3.5 text-right text-muted hidden sm:table-cell align-middle">
                       {atsPct(player)}
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-3 sm:px-4 py-3.5 text-right align-middle">
                       {streakDisplay(player.currentStreak)}
                     </td>
                   </tr>
