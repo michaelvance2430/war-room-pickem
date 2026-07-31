@@ -9,6 +9,7 @@ import Avatar from "@/components/Avatar";
 import RulesOnboardingModal from "@/components/RulesOnboardingModal";
 import GazetteModal from "@/components/GazetteModal";
 import BadgeUnlockModal from "@/components/BadgeUnlockModal";
+import SeasonCountdownTicker from "@/components/SeasonCountdownTicker";
 import { loadMyProfile } from "@/lib/profile";
 import { refreshStaffSessionFlags } from "@/lib/cloud";
 
@@ -424,6 +425,8 @@ export default function Nav() {
           </>
         )}
       </header>
+      {/* Every page: slow burn until the league opens */}
+      <SeasonCountdownTicker />
       <RulesOnboardingModal />
       <GazetteModal />
       <BadgeUnlockModal />
