@@ -39,6 +39,7 @@ import {
   mockRoastLabel,
 } from "@/lib/mock-roasts";
 import { findPlayer } from "@/lib/store";
+import { getLeague, getSession } from "@/lib/league";
 import { Player } from "@/lib/types";
 import type { LeagueTrophy } from "@/lib/trophies";
 
@@ -229,6 +230,10 @@ export default function ProfilePage() {
       return [];
     }
   }, [player, leagueTrophies]);
+
+  const leagueName = getLeague()?.name || "War Room";
+  const sessionPlayerId = getSession()?.playerId;
+  const isSelfProfile = !!(player && sessionPlayerId && sessionPlayerId === player.id);
 
   if (!ready) {
     return (
@@ -482,7 +487,12 @@ export default function ProfilePage() {
         </section>
 
         {/* Career hardware — championship / toilet / nerd + division case */}
-        <ProfileTrophyCase items={hardware} playerName={player.name} />
+        <ProfileTrophyCase
+          items={hardware}
+          playerName={player.name}
+          leagueName={leagueName}
+          isSelf={isSelfProfile}
+        />
 
         {/* Badges — always mount when we have a player */}
         <div className="rounded-2xl border border-border bg-card p-5 sm:p-6 mb-6">

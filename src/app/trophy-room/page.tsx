@@ -17,8 +17,10 @@ import {
   type TrophyType,
 } from "@/lib/trophies";
 import ChampionshipBanner from "@/components/ChampionshipBanner";
+import TrophyShareButton from "@/components/TrophyShareButton";
 import Link from "next/link";
 import { isSelfPlayer, selfNameClass } from "@/lib/self-highlight";
+import type { ProfileTrophyKind } from "@/lib/profile-hardware";
 
 const TYPES: TrophyType[] = ["championship", "toilet_bowl", "crystal_ball"];
 
@@ -263,12 +265,42 @@ export default function TrophyRoomPage() {
                     );
                   }
                   const mine = isSelfPlayer(item.winnerUserId, selfId);
+                  const shareKind = item.trophyType as ProfileTrophyKind;
                   return (
                     <div
                       key={item.id}
                       className={`rounded-xl border ${m.border} bg-gradient-to-b from-card to-black/40 p-5 min-h-[140px] ${m.glow} relative`}
                     >
-                      <div className="text-3xl mb-2">{m.emoji}</div>
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <div className="text-3xl">{m.emoji}</div>
+                        <div className="flex items-center gap-1.5">
+                          <TrophyShareButton
+                            compact
+                            trophy={{
+                              kind: shareKind,
+                              seasonYear: item.seasonYear,
+                              winnerName: item.winnerName,
+                              leagueName,
+                              subtitle: item.subtitle,
+                            }}
+                          />
+                          {commish && (
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() =>
+                                void onRemove(
+                                  item.id,
+                                  `${y} ${m.title} — ${item.winnerName}`
+                                )
+                              }
+                              className="text-[10px] text-muted hover:text-danger px-1"
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
+                      </div>
                       <div
                         className={`text-xs uppercase tracking-wide font-semibold ${m.accent}`}
                       >
@@ -291,21 +323,19 @@ export default function TrophyRoomPage() {
                           {item.notes}
                         </p>
                       )}
-                      {commish && (
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() =>
-                            void onRemove(
-                              item.id,
-                              `${y} ${m.title} — ${item.winnerName}`
-                            )
-                          }
-                          className="absolute top-3 right-3 text-[10px] text-muted hover:text-danger"
-                        >
-                          Remove
-                        </button>
-                      )}
+                      <div className="mt-3">
+                        <TrophyShareButton
+                          trophy={{
+                            kind: shareKind,
+                            seasonYear: item.seasonYear,
+                            winnerName: item.winnerName,
+                            leagueName,
+                            subtitle: item.subtitle,
+                          }}
+                          label={mine ? "Share my win" : "Share this win"}
+                          className="w-full justify-center"
+                        />
+                      </div>
                     </div>
                   );
                 })}

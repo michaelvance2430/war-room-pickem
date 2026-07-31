@@ -7,15 +7,36 @@ import {
   type ProfileTrophy,
   type ProfileTrophyKind,
 } from "@/lib/profile-hardware";
+import TrophyShareButton from "@/components/TrophyShareButton";
 
-function Plaque({ item }: { item: ProfileTrophy }) {
+function Plaque({
+  item,
+  leagueName,
+  canShare,
+}: {
+  item: ProfileTrophy;
+  leagueName?: string;
+  canShare: boolean;
+}) {
   const meta = HARDWARE_KIND_META[item.kind];
+  const sharePayload = {
+    kind: item.kind,
+    seasonYear: item.seasonYear,
+    winnerName: item.winnerName,
+    leagueName,
+    division: item.division,
+    subtitle: item.subtitle,
+  };
+
   return (
     <div
       className={`rounded-xl border ${meta.border} bg-gradient-to-b from-card to-black/40 p-4 min-h-[120px] relative`}
     >
-      <div className="text-2xl mb-1" aria-hidden>
-        {meta.emoji}
+      <div className="flex items-start justify-between gap-2 mb-1">
+        <div className="text-2xl" aria-hidden>
+          {meta.emoji}
+        </div>
+        {canShare && <TrophyShareButton compact trophy={sharePayload} />}
       </div>
       <div className={`text-[10px] uppercase tracking-wide font-semibold ${meta.accent}`}>
         {item.seasonYear} · {item.title}
@@ -32,9 +53,18 @@ function Plaque({ item }: { item: ProfileTrophy }) {
         </p>
       )}
       {item.source === "legacy" && (
-        <span className="absolute top-2 right-2 text-[9px] uppercase tracking-wider text-muted">
+        <span className="absolute bottom-2 right-3 text-[9px] uppercase tracking-wider text-muted">
           Legacy
         </span>
+      )}
+      {canShare && (
+        <div className="mt-3">
+          <TrophyShareButton
+            trophy={sharePayload}
+            label="Share win"
+            className="w-full justify-center"
+          />
+        </div>
       )}
     </div>
   );
@@ -64,9 +94,14 @@ function EmptySlot({ kind }: { kind: ProfileTrophyKind }) {
 export default function ProfileTrophyCase({
   items,
   playerName,
+  leagueName,
+  /** When true (viewing your own profile), show share on every plaque */
+  isSelf = false,
 }: {
   items: ProfileTrophy[];
   playerName: string;
+  leagueName?: string;
+  isSelf?: boolean;
 }) {
   const { bigGame, division } = splitHardwareCases(items);
 
@@ -74,6 +109,9 @@ export default function ProfileTrophyCase({
     bigGame.filter((i) => i.kind === kind);
 
   const hasAny = items.length > 0;
+  // Anyone can flex hardware (yours or a buddy's roast share)
+  const canShare = true;
+  void isSelf; // reserved for future "only you" accent
 
   return (
     <section className="rounded-2xl border border-border bg-card p-5 sm:p-6 mb-6">
@@ -82,6 +120,8 @@ export default function ProfileTrophyCase({
         <p className="text-xs text-muted mt-0.5">
           Championship &amp; Toilet hardware, Village Nerd, and division titles —
           career flex for {playerName.split(/\s+/)[0] || "this player"}.
+          Won something? Hit <strong className="text-foreground">Share</strong>{" "}
+          for a custom IG/FB graphic.
         </p>
       </div>
 
@@ -102,7 +142,12 @@ export default function ProfileTrophyCase({
             return (
               <div key={kind} className="space-y-2">
                 {won.map((item) => (
-                  <Plaque key={item.id} item={item} />
+                  <Plaque
+                    key={item.id}
+                    item={item}
+                    leagueName={leagueName}
+                    canShare={canShare}
+                  />
                 ))}
               </div>
             );
@@ -132,7 +177,12 @@ export default function ProfileTrophyCase({
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {division.map((item) => (
-              <Plaque key={item.id} item={item} />
+              <Plaque
+                key={item.id}
+                item={item}
+                leagueName={leagueName}
+                canShare={canShare}
+              />
             ))}
           </div>
         )}
@@ -141,6 +191,7 @@ export default function ProfileTrophyCase({
       {!hasAny && (
         <p className="text-[11px] text-muted mt-4 text-center">
           Empty shelves — win a championship, toilet, nerd award, or division.
+          Then share it to IG/FB with one tap.
         </p>
       )}
     </section>
