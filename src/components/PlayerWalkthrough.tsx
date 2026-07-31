@@ -232,7 +232,13 @@ export default function PlayerWalkthrough() {
   }
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-[65] p-3 sm:p-4 pointer-events-none">
+    <div
+      className="fixed bottom-0 left-0 right-0 z-[45] p-3 sm:p-4 pointer-events-none"
+      style={{
+        // Sit above content but below bottom tabs (z-50) so tabs always hard-switch
+        paddingBottom: "calc(3.75rem + env(safe-area-inset-bottom, 0px) + 0.5rem)",
+      }}
+    >
       <div className="max-w-lg mx-auto pointer-events-auto rounded-2xl border-2 border-primary bg-card shadow-[0_-8px_40px_rgba(0,0,0,0.45)] overflow-hidden">
         <div className="px-4 pt-3 pb-2 flex items-start justify-between gap-2">
           <div className="min-w-0">

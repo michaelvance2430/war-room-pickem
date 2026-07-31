@@ -68,6 +68,14 @@ body {
     padding-bottom: var(--mobile-chrome-bottom);
     padding-left: env(safe-area-inset-left, 0px);
     padding-right: env(safe-area-inset-right, 0px);
+    /* One screen at a time — avoid iOS “ghost” previous page under the next */
+    overflow-x: hidden;
+  }
+
+  /* Hard switch: main content should not trap vertical scroll with overflow-hidden ancestors */
+  main {
+    position: relative;
+    z-index: 1;
   }
 
   /* Sticky top header respects notch */

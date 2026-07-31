@@ -231,7 +231,7 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col relative overflow-hidden crt-frame scan-sweep home-war-room">
+    <div className="min-h-screen flex flex-col relative overflow-x-hidden crt-frame scan-sweep home-war-room">
       {/* War room atmosphere layers (always stay — season themes overlay on top via SeasonThemeApplier) */}
       <div
         className="home-war-base pointer-events-none absolute inset-0 -z-10"

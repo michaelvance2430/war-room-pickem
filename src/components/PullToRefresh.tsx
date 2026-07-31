@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { usePathname } from "next/navigation";
 
 const THRESHOLD = 72;
 const MAX_PULL = 120;
@@ -19,6 +20,7 @@ type Phase = "idle" | "pulling" | "holding" | "ready" | "refreshing";
  * 4) Release → reload (early release cancels)
  */
 export default function PullToRefresh({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
   const startY = useRef(0);
   const startX = useRef(0);
   const armed = useRef(false);
@@ -32,6 +34,19 @@ export default function PullToRefresh({ children }: { children: ReactNode }) {
   const [offset, setOffset] = useState(0);
   const [phase, setPhase] = useState<Phase>("idle");
   const [secondsLeft, setSecondsLeft] = useState(HOLD_MS / 1000);
+
+  // Hard page switch: never leave the shell translated mid-nav
+  useEffect(() => {
+    armed.current = false;
+    pulling.current = false;
+    offsetRef.current = 0;
+    setOffset(0);
+    setSecondsLeft(HOLD_MS / 1000);
+    if (phaseRef.current !== "refreshing") {
+      phaseRef.current = "idle";
+      setPhase("idle");
+    }
+  }, [pathname]);
 
   const setPhaseBoth = useCallback((p: Phase) => {
     phaseRef.current = p;

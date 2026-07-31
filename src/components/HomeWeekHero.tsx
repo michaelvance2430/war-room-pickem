@@ -221,18 +221,32 @@ export default function HomeWeekHero() {
           {body}
         </p>
 
-        {/* Full-width primary on phone = one-thumb job */}
+        {/* Full-width primary on phone = one-thumb job; hard nav prepare = clean switch */}
         <div className="flex flex-col sm:flex-row gap-2 mb-4">
           <Link
             href={primaryHref}
-            className={`inline-flex items-center justify-center w-full sm:w-auto px-5 py-3.5 sm:py-2.5 min-h-[52px] sm:min-h-0 rounded-xl text-base sm:text-sm font-bold transition touch-manipulation active:scale-[0.98] ${primaryClass}`}
+            onClick={() => {
+              try {
+                document.body.style.overflow = "";
+              } catch {
+                /* ignore */
+              }
+            }}
+            className={`inline-flex items-center justify-center w-full sm:w-auto px-5 py-3.5 sm:py-2.5 min-h-[52px] sm:min-h-0 rounded-xl text-base sm:text-sm font-bold transition touch-manipulation active:scale-[0.98] relative z-10 ${primaryClass}`}
           >
             {primaryLabel}
           </Link>
           {secondaryHref && (
             <Link
               href={secondaryHref}
-              className="inline-flex items-center justify-center w-full sm:w-auto px-4 py-3 sm:py-2.5 min-h-[48px] sm:min-h-0 rounded-xl text-sm font-medium border border-border text-muted hover:text-foreground hover:bg-card/50 transition touch-manipulation"
+              onClick={() => {
+                try {
+                  document.body.style.overflow = "";
+                } catch {
+                  /* ignore */
+                }
+              }}
+              className="inline-flex items-center justify-center w-full sm:w-auto px-4 py-3 sm:py-2.5 min-h-[48px] sm:min-h-0 rounded-xl text-sm font-medium border border-border text-muted hover:text-foreground hover:bg-card/50 transition touch-manipulation relative z-10"
             >
               {secondaryLabel}
             </Link>

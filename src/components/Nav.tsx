@@ -185,8 +185,15 @@ export default function Nav() {
   }, []);
 
   useEffect(() => {
+    // Hard switch: close sheets + never leave body scroll locked
     setMenuOpen(false);
     setMoreOpen(false);
+    try {
+      document.body.style.overflow = "";
+      document.documentElement.style.overflow = "";
+    } catch {
+      /* ignore */
+    }
     // On locker route: badge off immediately (mark runs on the page too)
     if (pathname === "/locker-room" || pathname.startsWith("/locker-room/")) {
       setLockerUnseen(0);
@@ -204,11 +211,17 @@ export default function Nav() {
   }, [pathname]);
 
   useEffect(() => {
-    if (!menuOpen) return;
-    const prev = document.body.style.overflow;
+    if (!menuOpen) {
+      try {
+        document.body.style.overflow = "";
+      } catch {
+        /* ignore */
+      }
+      return;
+    }
     document.body.style.overflow = "hidden";
     return () => {
-      document.body.style.overflow = prev;
+      document.body.style.overflow = "";
     };
   }, [menuOpen]);
 
@@ -309,12 +322,23 @@ export default function Nav() {
     );
   }
 
+  function closeChrome() {
+    setMenuOpen(false);
+    setMoreOpen(false);
+    try {
+      document.body.style.overflow = "";
+    } catch {
+      /* ignore */
+    }
+  }
+
   function NavItem({ link }: { link: NavLink }) {
     const isHome = link.href === "/";
     const active = linkActive(link.href);
     return (
       <Link
         href={link.href}
+        onClick={closeChrome}
         className={`transition relative whitespace-nowrap shrink-0 ${
           isHome
             ? `text-[15px] sm:text-base font-extrabold tracking-tight ${
@@ -643,7 +667,7 @@ export default function Nav() {
               <li key={tab.href} className="min-w-0">
                 <Link
                   href={tab.href}
-                  onClick={() => setMenuOpen(false)}
+                  onClick={closeChrome}
                   className={`relative flex flex-col items-center justify-center h-full gap-0.5 text-[10px] font-semibold touch-manipulation transition ${
                     active ? "text-primary" : "text-muted"
                   }`}
