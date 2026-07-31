@@ -1331,9 +1331,11 @@ export type LeagueRosterMember = {
   equippedTitleId?: string | null;
   /** profiles.equipped_border_id — avatar ring style */
   equippedBorderId?: string | null;
+  /** profiles.last_seen_at — last app open */
+  lastSeenAt?: string | null;
 };
 
-/** Best-effort: load equipped name titles + borders for roster user ids. */
+/** Best-effort: load titles, borders, last_seen for roster user ids. */
 async function attachEquippedTitles(
   members: LeagueRosterMember[]
 ): Promise<LeagueRosterMember[]> {
@@ -1344,33 +1346,43 @@ async function attachEquippedTitles(
     if (!ids.length) return members;
     const { data, error } = await supabase
       .from("profiles")
-      .select("id, equipped_title_id, equipped_border_id")
+      .select("id, equipped_title_id, equipped_border_id, last_seen_at")
       .in("id", ids);
     if (error || !data?.length) {
-      // Column missing — try titles only
+      // Columns may be partial — try smaller selects
       try {
         const { data: d2 } = await supabase
           .from("profiles")
-          .select("id, equipped_title_id")
+          .select("id, equipped_title_id, equipped_border_id")
           .in("id", ids);
-        if (!d2?.length) return members;
-        const map = new Map<string, string | null>();
-        for (const row of d2) {
-          map.set(
-            row.id as string,
-            (row.equipped_title_id as string | null) || null
-          );
+        if (d2?.length) {
+          const titleMap = new Map<string, string | null>();
+          const borderMap = new Map<string, string | null>();
+          for (const row of d2) {
+            titleMap.set(
+              row.id as string,
+              (row.equipped_title_id as string | null) || null
+            );
+            borderMap.set(
+              row.id as string,
+              (row.equipped_border_id as string | null) || null
+            );
+          }
+          return members.map((m) => ({
+            ...m,
+            equippedTitleId: titleMap.get(m.userId) ?? m.equippedTitleId ?? null,
+            equippedBorderId:
+              borderMap.get(m.userId) ?? m.equippedBorderId ?? null,
+          }));
         }
-        return members.map((m) => ({
-          ...m,
-          equippedTitleId: map.get(m.userId) ?? m.equippedTitleId ?? null,
-        }));
       } catch {
-        return members;
+        /* fall through */
       }
+      return members;
     }
     const titleMap = new Map<string, string | null>();
     const borderMap = new Map<string, string | null>();
+    const seenMap = new Map<string, string | null>();
     for (const row of data) {
       titleMap.set(
         row.id as string,
@@ -1380,11 +1392,16 @@ async function attachEquippedTitles(
         row.id as string,
         (row.equipped_border_id as string | null) || null
       );
+      seenMap.set(
+        row.id as string,
+        (row.last_seen_at as string | null) || null
+      );
     }
     return members.map((m) => ({
       ...m,
       equippedTitleId: titleMap.get(m.userId) ?? m.equippedTitleId ?? null,
       equippedBorderId: borderMap.get(m.userId) ?? m.equippedBorderId ?? null,
+      lastSeenAt: seenMap.get(m.userId) ?? m.lastSeenAt ?? null,
     }));
   } catch {
     return members;

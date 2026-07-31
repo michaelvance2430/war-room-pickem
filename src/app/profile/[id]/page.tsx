@@ -28,6 +28,7 @@ import {
   justJoinedBadgeLabel,
 } from "@/lib/join-titles";
 import { getEquippedTitleLabel } from "@/lib/equipped-title-store";
+import { formatLastSeen, isRecentlyActive } from "@/lib/last-seen";
 import {
   getProfileHardware,
   type ProfileTrophy,
@@ -67,6 +68,7 @@ export default function ProfilePage() {
   const [joinTitle, setJoinTitle] = useState<string | null>(null);
   const [leagueTrophies, setLeagueTrophies] = useState<LeagueTrophy[]>([]);
   const [leaguePeers, setLeaguePeers] = useState<Player[]>([]);
+  const [lastSeenAt, setLastSeenAt] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -75,11 +77,13 @@ export default function ProfilePage() {
       setLoadError(null);
       setJoinTitle(null);
       setLeagueTrophies([]);
+      setLastSeenAt(null);
       try {
         let found: Player | null = null;
         let leagueForSync: Player[] = [];
         let title: string | null = null;
         let trophies: LeagueTrophy[] = [];
+        let seen: string | null = null;
 
         // Live league first (real multiplayer)
         try {
@@ -93,6 +97,7 @@ export default function ProfilePage() {
             const titles = computeJoinTitles(roster);
             title = titles.get(id) || null;
             const row = roster.find((m) => m.userId === id);
+            if (row?.lastSeenAt) seen = row.lastSeenAt;
             if (found && row) {
               found = {
                 ...found,
@@ -170,6 +175,7 @@ export default function ProfilePage() {
         setLeaguePeers(leagueForSync.length ? leagueForSync : found ? [found] : []);
         setJoinTitle(title);
         setLeagueTrophies(trophies);
+        setLastSeenAt(seen);
       } catch (e) {
         if (!cancelled) {
           setLoadError(e instanceof Error ? e.message : "Failed to load");
@@ -394,6 +400,15 @@ export default function ProfilePage() {
                 <Chip
                   label="Member since"
                   value={mock ? "Never" : formatMemberSince(player.memberSince)}
+                />
+                <Chip
+                  label="Last in"
+                  value={
+                    mock
+                      ? "NPC"
+                      : formatLastSeen(lastSeenAt)
+                  }
+                  accent={isRecentlyActive(lastSeenAt)}
                 />
                 <Chip
                   label={

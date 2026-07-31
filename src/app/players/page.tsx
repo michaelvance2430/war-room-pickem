@@ -21,6 +21,7 @@ import {
   seatsRemaining,
 } from "@/lib/league-limits";
 import { DIVISIONS } from "@/lib/divisions";
+import { formatLastSeen, isRecentlyActive } from "@/lib/last-seen";
 
 export default function PlayersPage() {
   const [players, setPlayers] = useState<LeagueRosterMember[]>([]);
@@ -324,6 +325,7 @@ export default function PlayersPage() {
                         name={p.name}
                         avatarUrl={p.avatarUrl}
                         size="sm"
+                        userId={p.userId}
                       />
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium truncate">
@@ -344,8 +346,27 @@ export default function PlayersPage() {
                             </span>
                           )}
                         </div>
-                        <div className="text-xs text-muted">
-                          {p.totalPoints} pts
+                        <div className="text-xs text-muted flex flex-wrap items-center gap-x-1.5">
+                          <span>{p.totalPoints} pts</span>
+                          {!p.isBot && (
+                            <>
+                              <span className="text-border">·</span>
+                              <span
+                                className={
+                                  isRecentlyActive(p.lastSeenAt)
+                                    ? "text-primary"
+                                    : ""
+                                }
+                                title={
+                                  p.lastSeenAt
+                                    ? `Last in: ${new Date(p.lastSeenAt).toLocaleString()}`
+                                    : "No last-seen yet (open app after SQL)"
+                                }
+                              >
+                                {formatLastSeen(p.lastSeenAt)}
+                              </span>
+                            </>
+                          )}
                         </div>
                       </div>
                       {canManageDivs ? (

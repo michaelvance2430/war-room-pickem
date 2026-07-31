@@ -24,6 +24,7 @@ import RingCeremonyModal from "@/components/RingCeremonyModal";
 import JoinBadgeHydrator from "@/components/JoinBadgeHydrator";
 import EquippedTitleHydrator from "@/components/EquippedTitleHydrator";
 import ProfileBorderHydrator from "@/components/ProfileBorderHydrator";
+import { touchLastSeen } from "@/lib/last-seen";
 import { loadMyProfile } from "@/lib/profile";
 import { isGuestMode } from "@/lib/guest-mode";
 import { refreshStaffSessionFlags } from "@/lib/cloud";
@@ -149,8 +150,15 @@ export default function Nav() {
     }
 
     void loadUnread();
+    // Presence: last logged in / last open (throttled write)
+    if (!isGuestMode()) {
+      void touchLastSeen();
+    }
     function onVis() {
-      if (document.visibilityState === "visible") void loadUnread();
+      if (document.visibilityState === "visible") {
+        void loadUnread();
+        if (!isGuestMode()) void touchLastSeen();
+      }
     }
     function onLockerSeen() {
       // Instant clear — walking into locker marks seen without extra taps
