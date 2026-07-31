@@ -597,6 +597,17 @@ export const BADGE_CATALOG: BadgeDef[] = [
     icon: "🏃",
   },
   {
+    id: "bottom_of_the_barrel",
+    name: "Bottom of the Barrel",
+    description:
+      "Dead last for a week. Alone. No ties. Pure basement energy.",
+    howToEarn:
+      "Finish sole last in weekly points among players who scored that week — no ties for last.",
+    tier: "rare",
+    points: 25,
+    icon: "🛢️",
+  },
+  {
     id: "streak_starter",
     name: "Streak Starter",
     description: "Three correct in a row. Don’t blink.",
@@ -908,6 +919,47 @@ function weeksWithPoints(player: Player): number {
   return weeklyArr(player).filter((w) => (w || 0) > 0).length;
 }
 
+/**
+ * True if this player was sole last in weekly points for any week index
+ * (among peers who have a score that week). Ties for last do not count.
+ */
+function hadSoleLastPlaceWeek(player: Player, peers: Player[]): boolean {
+  const league = peers.length ? peers : [player];
+  if (league.length < 2) return false;
+  const mine = weeklyArr(player);
+  if (!mine.length) return false;
+
+  const maxLen = Math.max(
+    0,
+    ...league.map((p) => weeklyArr(p).length),
+    mine.length
+  );
+
+  for (let w = 0; w < maxLen; w++) {
+    if (w >= mine.length) continue;
+    const myPts = mine[w];
+    // Must have a real entry for that week (0 is a valid "last place" score)
+    if (myPts == null || Number.isNaN(myPts)) continue;
+
+    const field: number[] = [];
+    for (const p of league) {
+      const arr = weeklyArr(p);
+      if (w >= arr.length) continue;
+      const pts = arr[w];
+      if (pts == null || Number.isNaN(pts)) continue;
+      field.push(pts);
+    }
+    // Need a real field (you + at least one other)
+    if (field.length < 2) continue;
+
+    const min = Math.min(...field);
+    if (myPts !== min) continue;
+    const lastCount = field.filter((s) => s === min).length;
+    if (lastCount === 1) return true;
+  }
+  return false;
+}
+
 function maxWeekClimb(player: Player): number {
   const w = weeklyArr(player);
   let best = 0;
@@ -1146,6 +1198,9 @@ function evaluateBadge(
       return {
         earned: n >= 2 && rank > 0 && rank <= Math.ceil(n / 2),
       };
+
+    case "bottom_of_the_barrel":
+      return progress(hadSoleLastPlaceWeek(player, league) ? 1 : 0, 1);
 
     case "silence_the_room": {
       if (n < 2 || bestWeek <= 0) return { earned: false };

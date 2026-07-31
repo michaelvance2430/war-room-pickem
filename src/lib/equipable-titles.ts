@@ -243,6 +243,12 @@ export const EQUIPABLE_TITLE_CATALOG: EquipableTitleDef[] = [
     blurb: "Toilet Bowl champion. Crown of filth. Wear it.",
   },
   {
+    badgeId: "bottom_of_the_barrel",
+    title: "Bottom of the Barrel",
+    vibe: "roast",
+    blurb: "Sole last for a week. No ties. Pure basement.",
+  },
+  {
     badgeId: "chalk_eater",
     title: "Chalk Eater",
     vibe: "roast",
