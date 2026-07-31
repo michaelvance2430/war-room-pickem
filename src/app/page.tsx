@@ -28,6 +28,7 @@ export default function Home() {
   const [isCommish, setIsCommish] = useState(false);
   const [bootError, setBootError] = useState<string | null>(null);
   const [pickList, setPickList] = useState<LeagueMembership[] | null>(null);
+  const [codeCopied, setCodeCopied] = useState(false);
 
   useEffect(() => {
     async function boot() {
@@ -206,20 +207,32 @@ export default function Home() {
             {homeTagline}
           </p>
           {leagueName && (
-            <p className="text-sm mt-4 text-muted/90">
+            <div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-muted/90">
               <span className="text-foreground/90 font-medium">{leagueName}</span>
               {isCommish && leagueCode && (
                 <>
-                  <span className="mx-2 text-border">|</span>
-                  <span className="font-mono text-primary tracking-[0.2em]">
+                  <span className="text-border">|</span>
+                  <span className="font-mono text-primary tracking-[0.2em] text-base font-bold">
                     {leagueCode}
                   </span>
-                  <span className="text-muted text-xs ml-2">
-                    (invite code — share it)
-                  </span>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(leagueCode);
+                        setCodeCopied(true);
+                        setTimeout(() => setCodeCopied(false), 2000);
+                      } catch {
+                        /* ignore */
+                      }
+                    }}
+                    className="text-xs px-2 py-1 rounded-md border border-primary/40 text-primary hover:bg-primary/10 font-semibold"
+                  >
+                    {codeCopied ? "Copied!" : "Copy invite code"}
+                  </button>
                 </>
               )}
-            </p>
+            </div>
           )}
         </section>
 

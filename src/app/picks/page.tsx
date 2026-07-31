@@ -799,23 +799,40 @@ export default function PicksPage() {
 
         {!loadError && !hasCard && (
           <div className="rounded-xl border border-border bg-card p-8 text-center">
+            <p className="text-[10px] uppercase tracking-wider text-muted font-bold mb-2">
+              Not broken — no card yet
+            </p>
             <p className="font-medium mb-2">
               No card for {weekTitle(viewWeek)} yet
             </p>
-            <p className="text-sm text-muted mb-4">
+            <p className="text-sm text-muted mb-4 max-w-md mx-auto leading-relaxed">
               {viewWeek === activeWeek
-                ? "The commissioner has to publish this week’s card before anyone can pick."
+                ? "The commissioner has to publish this week’s games before anyone can lock picks. Hang in the Locker or check Standings until the card goes live."
                 : "This week was never published (or was cleared)."}
             </p>
-            {viewWeek !== activeWeek && (
-              <button
-                type="button"
-                onClick={() => void selectWeek(activeWeek)}
-                className="text-sm text-primary hover:underline"
+            <div className="flex flex-wrap justify-center gap-3">
+              {viewWeek !== activeWeek && (
+                <button
+                  type="button"
+                  onClick={() => void selectWeek(activeWeek)}
+                  className="text-sm text-primary hover:underline font-medium"
+                >
+                  Go to live {weekTitle(activeWeek)} →
+                </button>
+              )}
+              <a
+                href="/locker-room"
+                className="text-sm text-muted hover:text-foreground underline-offset-2 hover:underline"
               >
-                Go to live {weekTitle(activeWeek)} →
-              </button>
-            )}
+                Locker Room
+              </a>
+              <a
+                href="/"
+                className="text-sm text-muted hover:text-foreground underline-offset-2 hover:underline"
+              >
+                Home
+              </a>
+            </div>
           </div>
         )}
 
