@@ -23,7 +23,7 @@ import { wipeLeagueTrophiesForSandbox } from "./trophies";
 import { getSession } from "./league";
 
 /** Bump to force another one-time full scrub on every browser. */
-const NUKE_FLAG = "warroom-sandbox-career-nuke-v2";
+const NUKE_FLAG = "warroom-sandbox-career-nuke-v3";
 
 export type SandboxWipeReport = {
   mode: string;

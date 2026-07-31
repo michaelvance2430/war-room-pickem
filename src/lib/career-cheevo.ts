@@ -168,14 +168,15 @@ export function syncCareerWithPlayer(
 ): { seasonPoints: number; careerPoints: number } {
   const seasonPoints = seasonCheevoFromBadges(badges);
   if (isSandboxMode()) {
-    // Dry-run: career = protected bank only (legend/creator); season is live eval
+    // Dry-run: lifetime career is ONLY protected bank (Legend / creator).
+    // Never lift career up to season haul — that was how sim runs inflated it.
     return {
       seasonPoints,
       careerPoints: getCareerCheevoPoints(player.id),
     };
   }
   const { points: careerPoints } = bankCareerCheevos(player.id, badges);
-  // Career includes creator + everything banked; never below season haul
+  // Real season: career includes everything banked; never below season haul
   return {
     seasonPoints,
     careerPoints: Math.max(careerPoints, seasonPoints),

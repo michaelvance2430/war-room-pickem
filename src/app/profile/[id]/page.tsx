@@ -14,6 +14,9 @@ import {
   withPermanentBadges,
 } from "@/lib/badges";
 import { syncCareerWithPlayer } from "@/lib/career-cheevo";
+import { applyLegacyBadgeGrants } from "@/lib/legacy-badge-grants";
+import { nukeAccumulatedSandboxCareersOnce } from "@/lib/sandbox-wipe";
+import { isSandboxMode } from "@/lib/season-mode";
 import { withCreatorFlag } from "@/lib/creator";
 import {
   computeJoinTitles,
@@ -168,6 +171,9 @@ export default function ProfilePage() {
   const badges = useMemo(() => {
     if (!player) return [];
     try {
+      // Scrub sim career before badge/career paint (accurate shelf numbers)
+      nukeAccumulatedSandboxCareersOnce([player.id]);
+      applyLegacyBadgeGrants({ id: player.id, name: player.name });
       return getPlayerBadges(player);
     } catch {
       return [];
@@ -340,7 +346,11 @@ export default function ProfilePage() {
                   value={mock ? "Never" : formatMemberSince(player.memberSince)}
                 />
                 <Chip
-                  label="Season cheevo pts"
+                  label={
+                    isSandboxMode()
+                      ? "Dry-run cheevo pts"
+                      : "Season cheevo pts"
+                  }
                   value={String(seasonPoints)}
                   accent
                 />
@@ -358,9 +368,18 @@ export default function ProfilePage() {
                 />
               </div>
               <p className="text-[10px] text-muted mt-2">
-                Season cheevo = this year&apos;s earnable badges. Career =
-                all-time (incl. creator legendary if you have it). Creator crown
-                never pads season totals.
+                {isSandboxMode() ? (
+                  <>
+                    Sandbox: career = real Legends / creator only (sim runs do
+                    not stick). Dry-run cheevo pts clear on season reset.
+                  </>
+                ) : (
+                  <>
+                    Season cheevo = this year&apos;s earnable badges. Career =
+                    all-time (incl. creator legendary if you have it). Creator
+                    crown never pads season totals.
+                  </>
+                )}
               </p>
             </div>
           </div>
