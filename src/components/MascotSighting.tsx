@@ -56,31 +56,34 @@ export default function MascotSighting() {
   const [foundHere, setFoundHere] = useState(false);
   const [visible, setVisible] = useState(false);
 
-  const spot = useMemo(() => {
-    // ~1/3 of days the mascot is out; which spot by day
+  // Always out — rotates hideout by day so people can actually find it.
+  // Home is always a second hideout so you can test without hunting.
+  const dailySpot = useMemo(() => {
     const seed = daySeed();
-    if (seed % 3 !== 0) return null;
     return SPOTS[seed % SPOTS.length];
   }, []);
 
-  useEffect(() => {
-    if (!spot) {
-      setVisible(false);
-      return;
+  const activeSpot = useMemo(() => {
+    if (pathname === "/" || pathname === "") {
+      return SPOTS.find((s) => s.id === "home_corner") || dailySpot;
     }
-    const onPath = spot.paths.some(
+    const onDaily = dailySpot.paths.some(
       (p) => pathname === p || (p !== "/" && pathname.startsWith(p))
     );
-    setVisible(onPath);
-    setFoundHere(false);
-  }, [pathname, spot]);
+    return onDaily ? dailySpot : null;
+  }, [pathname, dailySpot]);
 
-  if (isGuestMode() || !spot || !visible || foundHere) return null;
+  useEffect(() => {
+    setFoundHere(false);
+    setVisible(!!activeSpot);
+  }, [activeSpot]);
+
+  if (isGuestMode() || !activeSpot || !visible || foundHere) return null;
 
   function onFind() {
     const pid = getSession()?.playerId;
-    if (!pid || !spot) return;
-    const moment = recordMascotFind(pid, spot.id);
+    if (!pid || !activeSpot) return;
+    const moment = recordMascotFind(pid, activeSpot.id);
     setFoundHere(true);
     if (moment) {
       try {
@@ -90,14 +93,12 @@ export default function MascotSighting() {
       } catch {
         /* ignore */
       }
-    }
-    // Even without new discovery, soft feedback via title
-    if (!moment && getMascotFindCount(pid) > 0) {
+    } else if (getMascotFindCount(pid) > 0) {
       try {
         window.dispatchEvent(
           new CustomEvent(EVENT_EASTER_EGG, {
             detail: {
-              id: `mascot_${spot.id}`,
+              id: `mascot_${activeSpot.id}`,
               title: "Helmet spotted",
               body: "Another hideout. The mascot will move again.",
               icon: "🪖",
@@ -114,7 +115,7 @@ export default function MascotSighting() {
     <button
       type="button"
       onClick={onFind}
-      className={`${spot.className} text-lg opacity-40 hover:opacity-100 transition-opacity p-1 rounded-full hover:bg-white/5`}
+      className={`${activeSpot.className} text-xl opacity-70 hover:opacity-100 transition-opacity p-1.5 rounded-full hover:bg-white/10 border border-white/10 shadow-sm`}
       aria-label="Something small"
       title=""
     >
