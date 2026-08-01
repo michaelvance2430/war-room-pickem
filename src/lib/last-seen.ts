@@ -80,14 +80,55 @@ export function formatLastSeen(
   }
 }
 
-/** True if seen within window (default 24h). */
+/** True if seen within window (default 6h = "green" tier). */
 export function isRecentlyActive(
   iso: string | null | undefined,
-  withinMs = 24 * 60 * 60 * 1000,
+  withinMs = 6 * 60 * 60 * 1000,
   nowMs = Date.now()
 ): boolean {
   if (!iso) return false;
   const t = new Date(iso).getTime();
   if (Number.isNaN(t)) return false;
   return nowMs - t <= withinMs;
+}
+
+const HOUR_MS = 60 * 60 * 1000;
+
+/**
+ * Last-in freshness for UI color:
+ *  - fresh (green):  ≤ 6 hours
+ *  - warm (yellow):  > 6 and < 18 hours
+ *  - stale (red):    ≥ 18 hours
+ *  - unknown:        never seen / bad timestamp
+ */
+export type LastSeenTone = "fresh" | "warm" | "stale" | "unknown";
+
+export function getLastSeenTone(
+  iso: string | null | undefined,
+  nowMs = Date.now()
+): LastSeenTone {
+  if (!iso) return "unknown";
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return "unknown";
+  const hrs = Math.max(0, nowMs - t) / HOUR_MS;
+  if (hrs <= 6) return "fresh";
+  if (hrs < 18) return "warm";
+  return "stale";
+}
+
+/** Tailwind classes for last-seen text (standings, board, roster, profile). */
+export function lastSeenToneClass(
+  iso: string | null | undefined,
+  nowMs = Date.now()
+): string {
+  switch (getLastSeenTone(iso, nowMs)) {
+    case "fresh":
+      return "text-emerald-400 font-semibold";
+    case "warm":
+      return "text-amber-400 font-semibold";
+    case "stale":
+      return "text-red-400 font-semibold";
+    default:
+      return "text-muted";
+  }
 }

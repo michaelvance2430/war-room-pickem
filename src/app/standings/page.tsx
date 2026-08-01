@@ -14,7 +14,7 @@ import PlayerLink from "@/components/PlayerLink";
 import { standingsHardwareFlair } from "@/lib/profile-hardware";
 import { Division, Player } from "@/lib/types";
 import { divisionTabLabel } from "@/lib/divisions";
-import { formatLastSeen, isRecentlyActive } from "@/lib/last-seen";
+import { formatLastSeen, lastSeenToneClass } from "@/lib/last-seen";
 
 const divisions: (Division | "Overall")[] = [
   "Overall",
@@ -254,11 +254,7 @@ export default function StandingsPage() {
                         </span>
                         {/* Phone: last-in under the name */}
                         <span
-                          className={`text-[11px] font-normal sm:hidden ${
-                            isRecentlyActive(player.lastSeenAt)
-                              ? "text-primary"
-                              : "text-muted"
-                          }`}
+                          className={`text-[11px] sm:hidden ${lastSeenToneClass(player.lastSeenAt)}`}
                           title={
                             player.lastSeenAt
                               ? `Last in: ${new Date(player.lastSeenAt).toLocaleString()}`
@@ -290,11 +286,7 @@ export default function StandingsPage() {
                       )}
                     </td>
                     <td
-                      className={`px-3 sm:px-4 py-3.5 text-right align-middle text-xs hidden sm:table-cell ${
-                        isRecentlyActive(player.lastSeenAt)
-                          ? "text-primary font-semibold"
-                          : "text-muted"
-                      }`}
+                      className={`px-3 sm:px-4 py-3.5 text-right align-middle text-xs hidden sm:table-cell ${lastSeenToneClass(player.lastSeenAt)}`}
                       title={
                         player.lastSeenAt
                           ? `Last in: ${new Date(player.lastSeenAt).toLocaleString()}`

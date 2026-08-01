@@ -39,7 +39,7 @@ import {
   justJoinedBadgeLabel,
 } from "@/lib/join-titles";
 import { getEquippedTitleLabel } from "@/lib/equipped-title-store";
-import { formatLastSeen, isRecentlyActive } from "@/lib/last-seen";
+import { formatLastSeen, lastSeenToneClass } from "@/lib/last-seen";
 import {
   getProfileHardware,
   type ProfileTrophy,
@@ -491,7 +491,9 @@ export default function ProfilePage() {
                 <Chip
                   label="Last in"
                   value={mock ? "NPC" : formatLastSeen(lastSeenAt)}
-                  accent={isRecentlyActive(lastSeenAt)}
+                  valueClassName={
+                    mock ? undefined : lastSeenToneClass(lastSeenAt)
+                  }
                 />
                 {!mock && (
                   <Chip
@@ -628,10 +630,13 @@ function Chip({
   label,
   value,
   accent,
+  valueClassName,
 }: {
   label: string;
   value: string;
   accent?: boolean;
+  /** Overrides accent color (e.g. last-seen green / yellow / red) */
+  valueClassName?: string;
 }) {
   return (
     <div className="rounded-lg bg-background border border-border px-3 py-2">
@@ -639,7 +644,9 @@ function Chip({
         {label}
       </div>
       <div
-        className={`text-sm font-semibold truncate ${accent ? "text-primary" : ""}`}
+        className={`text-sm font-semibold truncate ${
+          valueClassName || (accent ? "text-primary" : "")
+        }`}
       >
         {value}
       </div>

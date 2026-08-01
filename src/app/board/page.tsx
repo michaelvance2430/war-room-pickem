@@ -33,7 +33,7 @@ import {
 import { getSession } from "@/lib/league";
 import { formatRankedTeam } from "@/lib/rankings";
 import type { Game } from "@/lib/types";
-import { formatLastSeen, isRecentlyActive } from "@/lib/last-seen";
+import { formatLastSeen, lastSeenToneClass } from "@/lib/last-seen";
 
 type ViewMode = "games" | "cards";
 
@@ -679,11 +679,7 @@ function FullCardsView({
                 )}
                 {!s.isBot && (
                   <p
-                    className={`text-[11px] mt-0.5 font-normal ${
-                      isRecentlyActive(s.lastSeenAt)
-                        ? "text-primary"
-                        : "text-muted"
-                    }`}
+                    className={`text-[11px] mt-0.5 ${lastSeenToneClass(s.lastSeenAt)}`}
                     title={
                       s.lastSeenAt
                         ? `Last in: ${new Date(s.lastSeenAt).toLocaleString()}`

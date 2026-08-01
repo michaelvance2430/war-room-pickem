@@ -25,7 +25,7 @@ import {
   divisionDisplayLabel,
   divisionFullLabel,
 } from "@/lib/divisions";
-import { formatLastSeen, isRecentlyActive } from "@/lib/last-seen";
+import { formatLastSeen, lastSeenToneClass } from "@/lib/last-seen";
 import InviteFriends from "@/components/InviteFriends";
 import { isPreseasonCommishToolsAllowed } from "@/lib/season-mode";
 import { getBlueFalconCount, hydrateBlueFalconFromCloud } from "@/lib/blue-falcon";
@@ -392,11 +392,7 @@ export default function PlayersPage() {
                             <>
                               <span className="text-border">·</span>
                               <span
-                                className={
-                                  isRecentlyActive(p.lastSeenAt)
-                                    ? "text-primary"
-                                    : ""
-                                }
+                                className={lastSeenToneClass(p.lastSeenAt)}
                                 title={
                                   p.lastSeenAt
                                     ? `Last in: ${new Date(p.lastSeenAt).toLocaleString()}`
