@@ -1210,18 +1210,18 @@ export default function PicksPage() {
         {practiceMode && (
           <div className="mb-4 rounded-xl border-2 border-dashed border-primary/50 bg-primary/10 px-4 py-3">
             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-1">
-              Practice · not the live season
+              Fake week · standings unharmed
             </p>
             <p className="text-xs sm:text-sm text-foreground/90 leading-relaxed">
               {practiceScored || saved
-                ? "Week finished on this private card. Check the ending popup for Gazette / Board / Locker — or go Home and do another fake week."
-                : "Fake games only. Lock the full card and we’ll score it instantly, then show how a real week ends (Gazette, Board, the room)."}
+                ? "You finished the pretend loop. Ending popup has the Gazette / Board / Locker tour — or go Home and cook another fake week."
+                : "These games are made up. Lock the whole card; we grade it on purpose and show you how a real week ends. Zero live standings. Zero excuses."}
             </p>
             <Link
               href="/"
               className="inline-block mt-2 text-xs font-bold text-primary hover:underline"
             >
-              ← Back to Home
+              ← Flee to Home
             </Link>
           </div>
         )}
@@ -1229,7 +1229,7 @@ export default function PicksPage() {
         {quietPicks && !practiceMode && weekEditable && hasCard && !cardFrozen && (
           <div className="mb-4 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-xs text-muted leading-relaxed">
             <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary mb-1">
-              First lock · keep it simple
+              First lock · don&apos;t overthink it
             </p>
             <p className="text-foreground/90">{quietPicksIntro()}</p>
           </div>
@@ -1461,11 +1461,11 @@ export default function PicksPage() {
             >
               {practiceMode
                 ? practiceScored || saved
-                  ? "Practice week finished"
-                  : "Practice picks"
+                  ? "Fake week · finished"
+                  : "Fake week · go cook"
                 : weekEditable
-                  ? "You are picking"
-                  : "Viewing only"}
+                  ? "You are cooking"
+                  : "Just looking"}
             </span>
             {practiceMode ? (
               <span className="text-xs px-2 py-0.5 rounded-full border border-primary/50 text-primary font-semibold">
@@ -1484,25 +1484,25 @@ export default function PicksPage() {
           <h1 className="text-2xl font-bold">
             {practiceMode
               ? practiceScored || saved
-                ? "Practice week — done"
+                ? "Practice week — you survived"
                 : "Practice week picks"
               : `${weekTitle(viewWeek)}${weekEditable ? " Picks" : " — your card"}`}
           </h1>
           <p className="text-sm text-muted mt-1">
             {practiceMode
               ? practiceScored || saved
-                ? "Scored on your device only. Real standings untouched."
-                : "Private dry-run · lock when ready · we score it and show the room."
+                ? "Graded on your phone only. Real standings never noticed."
+                : "Private dry-run. Lock when ready — we grade it and show how the room wakes up."
               : `${leagueName ? `${leagueName} · ` : ""}${
                   weekEditable
                     ? missedLockWindow
-                      ? "First kickoff hit and you never locked — card closed for you (0 pts)."
+                      ? "First kickoff hit and you never locked. Card closed. 0 pts. The Gazette remembers."
                       : cardFrozen
-                        ? "First kickoff hit — entire card is frozen. No more changes."
-                        : `All picks must be locked before first kickoff (${formatCardLockDeadline(games)}).`
+                        ? "First kickoff hit — entire card is frozen. No more hero edits."
+                        : `Lock everything before first kickoff (${formatCardLockDeadline(games)}) or cry later.`
                     : viewWeek < activeWeek
-                      ? `Past week · league is on ${weekTitle(activeWeek)}. You can review but not change picks.`
-                      : `Not the active week (league is on ${weekTitle(activeWeek)}). Read-only.`
+                      ? `Past week · league is on ${weekTitle(activeWeek)}. Look, don’t touch.`
+                      : `Not the active week (league is on ${weekTitle(activeWeek)}). Read-only. Enjoy the archive.`
                 }`}
           </p>
           {games.length > 0 && (
@@ -2056,14 +2056,14 @@ export default function PicksPage() {
             {practiceMode && (practiceScored || saved) ? (
               <div className="rounded-xl border border-primary/40 bg-primary/10 px-4 py-4 space-y-2 text-center">
                 <p className="text-sm font-bold text-foreground">
-                  Practice week scored
+                  Fake week graded
                   {weekScoredAt
-                    ? ` · ${Object.keys(weekResults).length} games graded`
+                    ? ` · ${Object.keys(weekResults).length} games roasted`
                     : ""}
                 </p>
                 <p className="text-xs text-muted leading-relaxed">
-                  Ending popup has Gazette / Board / Locker. Or start another
-                  fake week from Home.
+                  Ending popup has the Gazette / Board / Locker tour. Or go Home
+                  and do another one for fun.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-2 pt-1">
                   <Link
@@ -2096,7 +2096,7 @@ export default function PicksPage() {
                 >
                   {saving
                     ? practiceMode
-                      ? "Scoring practice week…"
+                      ? "Grading your fake week…"
                       : "Locking…"
                     : fullyLocked || chaosLockedWeek
                       ? chaosLockedWeek
@@ -2107,7 +2107,7 @@ export default function PicksPage() {
                         : saved
                           ? "Update open picks"
                           : practiceMode
-                            ? "Lock & finish practice week"
+                            ? "Lock & finish this fake week"
                             : "Lock it in"}
                 </button>
                 {!allGamesPicked && !fullyLocked && (

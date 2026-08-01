@@ -78,7 +78,7 @@ export async function startBoredPracticeWeek(): Promise<{
     weekNumber: BORED_PRACTICE_WEEK,
     goToPicks: true,
     message:
-      "Private practice week ready — not the live season. Lock the card; we’ll score it and show you how the room wakes up.",
+      "Fake week locked and loaded. Not the live season. Fill it, lock it, we grade it, then we show you how the real room gets loud.",
   };
 }
 

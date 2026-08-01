@@ -75,10 +75,10 @@ export default function PicksHowToModal() {
             id="picks-howto-title"
             className="text-xl font-bold text-foreground"
           >
-            How to lock your card
+            How not to mess this up
           </h2>
           <p className="text-xs text-muted mt-1">
-            30-second cheat sheet. Full rules live under Rules anytime.
+            30 seconds. Read it once. Pretend you always knew.
           </p>
         </div>
 
@@ -99,9 +99,9 @@ export default function PicksHowToModal() {
 
           <div className="rounded-lg border-2 border-danger/50 bg-danger/10 px-3 py-2.5">
             <p className="text-xs font-bold text-danger leading-snug">
-              All picks must be locked before the first kickoff. After that the
-              whole card freezes — no late locks, no edits. Miss it = 0 points.
-              Fair is fair.
+              Lock before first kickoff or the card freezes you out. No late
+              saves. No “one more second.” Miss it = 0 pts and a milk carton in
+              the Gazette. Fair is fair. Cruel is funnier.
             </p>
           </div>
         </div>
@@ -117,7 +117,7 @@ export default function PicksHowToModal() {
             <span className="text-sm text-foreground">
               Never show me this again
               <span className="block text-xs text-muted font-normal mt-0.5">
-                You can still read full rules under Rules in the menu.
+                For people who already proved they can read. Rules still exist.
               </span>
             </span>
           </label>
@@ -128,7 +128,7 @@ export default function PicksHowToModal() {
               onClick={close}
               className="flex-1 py-2.5 rounded-xl bg-primary text-black font-semibold text-sm"
             >
-              Got it — let’s pick
+              Cool — let me cook
             </button>
             <Link
               href="/rules"

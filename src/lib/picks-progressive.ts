@@ -21,13 +21,14 @@ export function isQuietPicksPath(playerId?: string | null): boolean {
 
 export function quietPicksIntro(): string {
   return (
-    "One job: pick each side, set confidence 1–5 (each once), mark a Best Bet, " +
-    "answer the bonus below, then Lock it in before first kickoff."
+    "One job, genius: pick every side, slap confidence 1–5 (each once — no freestyling), " +
+    "mark a Best Bet, answer the little bonus, then Lock before first kickoff. " +
+    "That's it. We believe in you. Mostly."
   );
 }
 
 export function quietPicksBonusHint(): string {
-  return "Bonus is required — pick one side, then lock. Same rules as every week.";
+  return "Bonus is required. Yes, really. Pick a side or the lock button stays mad at you.";
 }
 
 /** Quiet path: prop starts open so “needed” isn’t hidden. */

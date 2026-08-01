@@ -99,15 +99,16 @@ export default function SoftUnlockBanner() {
     >
       <div className="flex-1 min-w-0">
         <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-1">
-          Room unlocked
+          Look at you · room unlocked
         </p>
         <p className="text-sm text-foreground font-semibold leading-snug">
-          You locked a card — more of the room just opened.
+          You locked a card. Congrats — we&apos;re legally allowed to show you
+          more buttons now.
         </p>
         <p className="text-xs text-muted mt-1 leading-relaxed">
-          The Board is in the main nav now. Home will get louder (checklist,
-          takes, crowns). The Gazette paper still pops when the host scores —
-          that&apos;s the weekly appointment.
+          The Board just appeared in the nav. Home gets louder (takes, crowns,
+          chaos). Gazette still drops when the host scores — that&apos;s the
+          Sunday/Monday paper the room actually waits for.
         </p>
       </div>
       <div className="flex flex-wrap gap-2 shrink-0">
@@ -116,14 +117,14 @@ export default function SoftUnlockBanner() {
           onClick={dismiss}
           className="px-4 py-2.5 min-h-[44px] rounded-xl bg-primary text-black text-sm font-bold inline-flex items-center"
         >
-          Open Board
+          Peek the Board
         </Link>
         <button
           type="button"
           onClick={dismiss}
           className="px-4 py-2.5 min-h-[44px] rounded-xl border border-border text-sm font-semibold text-muted hover:text-foreground"
         >
-          Got it
+          I&apos;m cool · dismiss
         </button>
       </div>
     </div>

@@ -44,8 +44,8 @@ export default function BoredLameSandboxCta() {
   const openLabel = weekTitle(first, sportId);
   const sub =
     first === 0
-      ? "Available until Week 0 kickoff. Then this goes away for good."
-      : `Available until ${openLabel} kickoff. Then this goes away for good.`;
+      ? "Dies at Week 0 kickoff. Enjoy the sandbox while it lasts."
+      : `Dies at ${openLabel} kickoff. Enjoy the sandbox while it lasts.`;
 
   async function onBored() {
     setNote(null);
@@ -68,7 +68,7 @@ export default function BoredLameSandboxCta() {
   return (
     <section className="mb-5 rounded-2xl border-2 border-dashed border-muted/40 bg-black/30 px-4 py-5 sm:px-5">
       <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted mb-2 text-center">
-        Private practice · not the live season
+        Nothing to do · make your own fun
       </p>
       <button
         type="button"
@@ -77,17 +77,18 @@ export default function BoredLameSandboxCta() {
         className="w-full py-5 sm:py-6 min-h-[64px] rounded-2xl bg-primary text-black text-lg sm:text-xl font-black tracking-tight disabled:opacity-50 shadow-[0_0_40px_rgba(34,197,94,0.2)] active:scale-[0.99] transition"
       >
         {busy
-          ? "Building a fake week…"
+          ? "Cooking a fake week…"
           : again
-            ? "I’m bored again. New fake week."
+            ? "Still bored. Hit me again."
             : "I’m bored. Fake week."}
       </button>
       <p className="text-[11px] sm:text-xs text-muted text-center mt-2.5 leading-relaxed max-w-md mx-auto">
         {sub}
       </p>
       <p className="text-[10px] text-muted/80 text-center mt-1.5 leading-relaxed max-w-sm mx-auto">
-        One private practice week — never touches live picks or standings. Lock
-        → we score it → you see how the room wakes up. Re-do anytime.
+        Private. Fake. Zero standings. Lock → we grade it on purpose → you get
+        the little “here&apos;s how the room wakes up” tour. Break it. Redo it.
+        We don&apos;t care. Yet.
       </p>
       {note && (
         <p className="text-xs text-primary text-center mt-3 font-medium leading-relaxed">

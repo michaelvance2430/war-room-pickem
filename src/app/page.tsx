@@ -375,20 +375,21 @@ export default function Home() {
           <p className="text-xs text-muted mb-4 leading-relaxed max-w-xl -mt-1">
             {isCommish ? (
               <>
-                Keep it boring:{" "}
+                First ten minutes, host edition:{" "}
                 <strong className="text-foreground">
-                  share invite → publish card → lock your picks
+                  spam the invite → drop a card → lock your own picks
                 </strong>
-                . No trophies, papers, or fireworks until you lock once.
+                . No trophies, papers, or fireworks until somebody actually
+                locks. Yes, including you.
               </>
             ) : (
               <>
-                Keep it boring:{" "}
+                First ten minutes:{" "}
                 <strong className="text-foreground">
                   open My Picks and lock before kickoff
                 </strong>
-                . That&apos;s the whole first ten minutes. Everything flashy
-                waits.
+                . That&apos;s the whole movie. Everything flashy waits until you
+                prove you can press one button.
               </>
             )}
           </p>

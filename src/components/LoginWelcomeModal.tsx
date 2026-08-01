@@ -206,12 +206,12 @@ export default function LoginWelcomeModal() {
               {openTease.open ? (
                 <>
                   <span className="text-primary">{openTease.weekLabel}</span>{" "}
-                  is live. When a real card drops, lock it — until then, poke
-                  around and see what you can break.
+                  is live. When a real card drops, lock it like you mean it —
+                  until then, poke around and see what you can break.
                 </>
               ) : (
                 <>
-                  We&apos;ve got{" "}
+                  Clock says we&apos;ve got{" "}
                   <span className="text-primary tabular-nums">
                     {openTease.days}{" "}
                     {openTease.days === 1 ? "day" : "days"}
@@ -221,7 +221,8 @@ export default function LoginWelcomeModal() {
                   <span className="uppercase tracking-wide font-extrabold text-foreground">
                     officially opens
                   </span>
-                  . Poke around and see what you can break.
+                  . That is not an invitation to behave. Poke around. See what
+                  you can break.
                 </>
               )}
             </p>

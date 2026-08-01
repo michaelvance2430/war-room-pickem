@@ -76,10 +76,10 @@ export default function HomeHostScoreStrip() {
       <div className="flex flex-col sm:flex-row sm:items-center gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">
-            Host
+            Host · your one job
           </p>
           <p className="text-sm text-foreground font-semibold leading-snug mt-0.5">
-            {label} is live — score when games finish
+            {label} is still ungraded — score it when the games die
           </p>
         </div>
         <Link

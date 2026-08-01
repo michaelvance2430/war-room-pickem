@@ -96,24 +96,24 @@ export default function CommishSetupBanner() {
     <section className="mb-5 rounded-2xl border-2 border-primary/50 bg-primary/10 p-4 sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
         <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">
-          Host · first hour
+          Host · don&apos;t overthink it
         </p>
         <p className="text-[10px] font-semibold tabular-nums text-muted">
           Step {step === "invite" ? 1 : step === "card" ? 2 : 3} of 3
         </p>
       </div>
       <h2 className="text-lg sm:text-xl font-bold text-foreground mb-1">
-        {step === "invite" && "Get friends in"}
-        {step === "card" && "Open picks for the room"}
-        {step === "score" && `Score ${weekLabel} when games finish`}
+        {step === "invite" && "Text the group chat already"}
+        {step === "card" && "Give them something to pick"}
+        {step === "score" && `Score ${weekLabel} when the chaos ends`}
       </h2>
       <p className="text-sm text-muted mb-3 leading-relaxed">
         {step === "invite" &&
-          "Share the link. One tap. That’s the whole step."}
+          "Share the link. One tap. If they don’t join, that’s a them problem."}
         {step === "card" &&
-          `${humans} in the room. Publish ${weekLabel} with the demo week button — one tap, no odds needed.`}
+          `${humans} in the room staring at nothing. Hit demo publish for ${weekLabel} — one tap, no odds API required, no excuses.`}
         {step === "score" &&
-          "Card is live. When the games are done, one tap scores the room and drops the paper."}
+          "Card’s live. When games are done: one tap scores the room and drops the paper. That’s the whole host flex."}
       </p>
 
       {/* Progress dots */}
@@ -154,7 +154,7 @@ export default function CommishSetupBanner() {
           href="/commissioner?tab=card&first=1"
           className="flex items-center justify-center w-full py-4 min-h-[56px] rounded-xl bg-primary text-black text-base font-extrabold touch-manipulation active:scale-[0.99]"
         >
-          Publish {weekLabel} (one tap) →
+          Publish {weekLabel} (stop stalling) →
         </Link>
       )}
 
@@ -170,14 +170,14 @@ export default function CommishSetupBanner() {
             href="/picks"
             className="flex items-center justify-center w-full py-2.5 min-h-[44px] text-sm font-semibold text-muted hover:text-foreground touch-manipulation"
           >
-            Still need to lock your own picks?
+            Wait — did I lock my own picks?
           </Link>
         </div>
       )}
 
       {step !== "score" && (
         <p className="text-[11px] text-muted mt-3 text-center">
-          Advanced tools wait until you score once.
+          Fancy host toys wait until you score once. Keep it dumb for now.
         </p>
       )}
     </section>

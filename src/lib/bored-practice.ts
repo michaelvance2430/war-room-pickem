@@ -198,29 +198,29 @@ function buildGazetteTease(
   const name = "YOU";
   if (botRank === 1) {
     return {
-      gazetteHeadline: `${name} TAKES THE PRACTICE CROWN`,
-      gazetteDeck: `${totalPoints} pts on a dry-run card — when the real week scores, this is the front page energy.`,
-      boardTease: `Board would show you #1 of ${botField} (practice bots). Real room = real names.`,
+      gazetteHeadline: `${name} STOMPS FAKE BOTS, DEMANDS A PARADE`,
+      gazetteDeck: `${totalPoints} pts on a dry-run card. When the real week scores, this is the front-page energy — minus the robots.`,
+      boardTease: `Board would put you #1 of ${botField} (practice bots). Real room = real names and real salt.`,
     };
   }
   if (botRank >= botField - 1) {
     return {
       gazetteHeadline: `TOILET WATCH: ${name} NEEDS A REBOOT`,
-      gazetteDeck: `${correctCount}/${games} right, ${totalPoints} pts. Gazette would roast this. Do it again before Week 0.`,
-      boardTease: `You’d sit near the bottom of the Board. That’s the shame lane — also how the room laughs together.`,
+      gazetteDeck: `${correctCount}/${games} right, ${totalPoints} pts. Even the fake paper is roasting you. Try again before Week 0.`,
+      boardTease: `You’d be near the bottom of the Board. That’s the shame lane — also how the room bonds.`,
     };
   }
   if (totalPoints >= 12) {
     return {
-      gazetteHeadline: `SOLID CARD: ${name} IN THE MIX`,
-      gazetteDeck: `${totalPoints} pts · ${correctCount}/${games}. Real Gazette drops after the host scores — same vibe, real standings.`,
+      gazetteHeadline: `SOLID CARD: ${name} IN THE MIX (BARELY FAMOUS)`,
+      gazetteDeck: `${totalPoints} pts · ${correctCount}/${games}. Real Gazette drops after the host scores — same vibe, meaner nicknames.`,
       boardTease: `Roughly #${botRank} of ${botField} on a fake field. Live Board updates when results post.`,
     };
   }
   return {
-    gazetteHeadline: `WEEKLY PAPER: PRACTICE EDITION`,
-    gazetteDeck: `${totalPoints} pts locked in. After a real week, Home lights up with Gazette, Board swings, and Locker chatter.`,
-    boardTease: `Practice rank #${botRank} of ${botField}. Next real Monday you’ll open the paper, not this fake one.`,
+    gazetteHeadline: `WEEKLY PAPER: PRACTICE EDITION (NOBODY CARED)`,
+    gazetteDeck: `${totalPoints} pts locked in. After a real week, Home lights up with Gazette, Board swings, and Locker trash.`,
+    boardTease: `Practice rank #${botRank} of ${botField}. Next real Monday you’ll open the paper — this one doesn’t count.`,
   };
 }
 

@@ -98,13 +98,13 @@ export default function BoredPracticeDoneModal() {
           <BrandMark size={48} variant="force" className="rounded-lg" />
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
-              Practice week complete
+              Fake week · you did a thing
             </p>
             <h2
               id="bored-done-title"
               className="text-lg font-extrabold text-foreground leading-snug"
             >
-              Week finished. Here&apos;s the room.
+              Loop complete. Here&apos;s the real room.
             </h2>
           </div>
         </div>
@@ -113,7 +113,7 @@ export default function BoredPracticeDoneModal() {
           {/* Mini scoreboard — how scoring feels */}
           <div className="rounded-xl border border-border bg-black/40 px-4 py-3">
             <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary mb-2">
-              Final · practice only
+              Final · against robots who don&apos;t care
             </p>
             <div className="flex flex-wrap items-end justify-between gap-2">
               <div>
@@ -124,7 +124,8 @@ export default function BoredPracticeDoneModal() {
                   </span>
                 </p>
                 <p className="text-xs text-muted mt-0.5">
-                  {recap.correctCount}/{recap.games} correct · fake bots only
+                  {recap.correctCount}/{recap.games} correct · bots only · ego
+                  optional
                 </p>
               </div>
               <div className="text-right">
@@ -147,7 +148,7 @@ export default function BoredPracticeDoneModal() {
                 Sample Gazette
               </p>
               <span className="text-[9px] font-bold uppercase tracking-wider text-amber-200/70">
-                Fake edition
+                Fake · still rude
               </span>
             </div>
             <p className="text-sm font-black text-foreground leading-snug uppercase tracking-tight">
@@ -158,8 +159,8 @@ export default function BoredPracticeDoneModal() {
                 "After a real week, the host scores and this paper hits Home."}
             </p>
             <p className="text-[11px] text-muted border-t border-amber-500/20 pt-2">
-              Real Gazette = crown, shame, swings, milk-carton no-locks. Same
-              energy, louder, with your room&apos;s names.
+              Real Gazette = crown, shame, freefalls, milk-carton no-locks.
+              Same energy. Louder. With your actual friends&apos; names.
             </p>
           </div>
 
@@ -177,39 +178,40 @@ export default function BoredPracticeDoneModal() {
           {/* Here's how next week / the room feels */}
           <div className="rounded-xl border border-primary/30 bg-primary/10 px-4 py-3 space-y-2">
             <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">
-              How the start of a real week feels
+              How a real week actually feels
             </p>
             <ul className="text-xs text-foreground/90 space-y-1.5">
               <li>
                 <strong className="text-primary">My Picks</strong> — new card
-                drops; you lock before first kickoff (like you just did).
+                drops; you lock before first kickoff or you eat zero. You just
+                practiced that.
               </li>
               <li>
                 <strong className="text-primary">Home</strong> — countdown,
-                who&apos;s in, then after games the paper.
+                who&apos;s in, then the paper when games die.
               </li>
               <li>
-                <strong className="text-primary">Gazette</strong> — Sunday/Monday
-                drop when the host scores. Front page energy.
+                <strong className="text-primary">Gazette</strong> —
+                Sunday/Monday roast package. Front page energy. No soft landings.
               </li>
               <li>
                 <strong className="text-primary">The Board</strong> — season
-                standings + week swings
+                standings + weekly swings
                 {unlocked
-                  ? " (unlocked)."
-                  : " — unlocked after this practice lock."}
+                  ? " (you unlocked it, superstar)."
+                  : " — unlocked after this little practice lock."}
               </li>
               <li>
                 <strong className="text-primary">Locker</strong> — trash talk
-                while you wait on cards and scores.
+                while you wait. Use it. That&apos;s the point.
               </li>
             </ul>
           </div>
 
           <p className="text-[11px] text-muted">
-            Private dry-run only. Did not touch the live season card, real
-            standings, or anyone else&apos;s picks. Re-do anytime until Week 0
-            kickoff — then practice disappears for good.
+            Private dry-run only. Live card, real standings, and your friends&apos;
+            pride: untouched. Redo until Week 0 kickoff — then this toy gets
+            confiscated for good.
           </p>
         </div>
 
@@ -220,7 +222,7 @@ export default function BoredPracticeDoneModal() {
             onClick={() => void doItAgain()}
             className="w-full py-3.5 min-h-[48px] rounded-xl bg-primary text-black font-bold text-sm disabled:opacity-50"
           >
-            {busy ? "New fake week…" : "Do it again"}
+            {busy ? "Cooking another fake week…" : "Do it again (we dare you)"}
           </button>
           <div className="grid grid-cols-3 gap-2">
             <Link
@@ -250,7 +252,7 @@ export default function BoredPracticeDoneModal() {
             onClick={dismiss}
             className="w-full py-2.5 text-sm font-semibold text-muted hover:text-foreground"
           >
-            I&apos;m good · Home
+            I&apos;m good · flee to Home
           </button>
         </div>
       </div>
