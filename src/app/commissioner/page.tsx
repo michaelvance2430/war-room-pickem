@@ -66,6 +66,7 @@ import {
 } from "@/lib/cloud";
 import { transferCommissioner } from "@/lib/trophies";
 import { recordCommissionerWeek } from "@/lib/commish-tenure";
+import { seedBotLockerTalk } from "@/lib/bot-locker-talk";
 import CommishWeekChecklist from "@/components/CommishWeekChecklist";
 import SportPoolCommishPanel from "@/components/SportPoolCommishPanel";
 import { setViewAsPlayer } from "@/lib/view-as-player";
@@ -883,6 +884,23 @@ function CommissionerPageInner() {
     void setLeagueActiveWeek(activeWeek);
 
     const botFill = await seedBotPicksForWeekInCloud(activeWeek);
+    // Pre-season only: bots talk trash so Locker badges / unseen work
+    let lockerBit = "";
+    try {
+      const talk = await seedBotLockerTalk({
+        weekNumber: activeWeek,
+        weekLabel: weekTitle(activeWeek),
+        sportId: sport,
+        count: 8,
+      });
+      if (talk.ok && (talk.inserted || 0) > 0) {
+        lockerBit = ` · 💬 ${talk.inserted} locker posts`;
+      } else if (talk.error && /bot-locker-sim/i.test(talk.error)) {
+        lockerBit = " · (run bot-locker-sim.sql for locker talk)";
+      }
+    } catch {
+      /* optional */
+    }
     setDemoBusy(false);
     if (botFill.ok && (botFill.botsFilled || 0) > 0) {
       const chaos =
@@ -890,12 +908,12 @@ function CommissionerPageInner() {
           ? ` · 💥 ${botFill.chaosCount} Chaos`
           : "";
       setBotReport(
-        `Demo week published · ${botFill.botsFilled} bot(s) locked picks${chaos}. Enter Results → Randomize & score.`
+        `Demo week published · ${botFill.botsFilled} bot(s) locked picks${chaos}${lockerBit}. Enter Results → Randomize & score. Check Locker for unread.`
       );
       void refreshPickStatus(activeWeek);
     } else {
       setBotReport(
-        `Demo week published for ${weekTitle(activeWeek)}. Bots will pick if seats exist — then Randomize & score.`
+        `Demo week published for ${weekTitle(activeWeek)}${lockerBit}. Bots will pick if seats exist — then Randomize & score.`
       );
     }
     try {
@@ -1189,7 +1207,40 @@ function CommissionerPageInner() {
     } else if (!hasCard) {
       parts.push("publish a week so bots get picks (or Fill bot picks)");
     }
+    try {
+      const talk = await seedBotLockerTalk({
+        weekNumber: activeWeek,
+        weekLabel: weekTitle(activeWeek),
+        sportId: leagueFootballSport(),
+        count: 6,
+      });
+      if (talk.ok && (talk.inserted || 0) > 0) {
+        parts.push(`💬 ${talk.inserted} locker shit-talk posts`);
+      }
+    } catch {
+      /* optional */
+    }
     setBotReport(parts.join(" · ") + ".");
+  }
+
+  async function handleSeedBotLockerTalk() {
+    if (!requirePreseasonTools()) return;
+    setBotReport(null);
+    setBotBusy(true);
+    const res = await seedBotLockerTalk({
+      weekNumber: activeWeek,
+      weekLabel: weekTitle(activeWeek),
+      sportId: leagueFootballSport(),
+      count: 10,
+    });
+    setBotBusy(false);
+    if (!res.ok) {
+      setBotReport(res.error || "Failed to seed locker talk");
+      return;
+    }
+    setBotReport(
+      `💬 ${res.inserted ?? 0} bot locker posts for ${weekTitle(activeWeek)} (demo only). Open Locker — nav badge should light up if you haven't been there.`
+    );
   }
 
   async function handleFillBotPicks() {
@@ -2692,6 +2743,17 @@ function CommissionerPageInner() {
                 <button
                   type="button"
                   disabled={botBusy}
+                  onClick={() => void handleSeedBotLockerTalk()}
+                  className={`px-3 py-1.5 rounded-lg border border-emerald-500/50 text-emerald-200 text-xs font-medium hover:bg-emerald-500/10 disabled:opacity-50 ${
+                    !preseasonToolsOk ? "opacity-45" : ""
+                  }`}
+                  title="Bots drop week-flavored shit-talk in Locker so you can test badges / unread. Needs bot-locker-sim.sql once."
+                >
+                  💬 Bot locker talk
+                </button>
+                <button
+                  type="button"
+                  disabled={botBusy}
                   onClick={() => void handleClearBots()}
                   className="px-3 py-1.5 rounded-lg border border-warning text-warning text-xs font-medium hover:bg-warning/10 disabled:opacity-50"
                 >
@@ -2704,10 +2766,12 @@ function CommissionerPageInner() {
                 , optional{" "}
                 <code className="text-foreground">supabase/bot-picks-smarter.sql</code>
                 ,{" "}
-                <code className="text-foreground">supabase/bot-chaos-sim.sql</code>{" "}
-                (random bot Chaos for sims),{" "}
+                <code className="text-foreground">supabase/bot-chaos-sim.sql</code>
+                ,{" "}
+                <code className="text-foreground">supabase/bot-locker-sim.sql</code>{" "}
+                (locker shit-talk for badge tests),{" "}
                 <code className="text-foreground">supabase/league-capacity-32.sql</code>
-                .
+                . Demo posts are for smoke only — Mon–Sun locker purge still applies.
               </p>
               {botReport && (
                 <p

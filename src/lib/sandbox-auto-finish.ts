@@ -192,6 +192,20 @@ export async function autoFinishRemainingWeeks(opts?: {
         );
       }
 
+      try {
+        opts?.onProgress?.({ week, label, step: "Bot locker talk…" });
+        const { seedBotLockerTalk } = await import("./bot-locker-talk");
+        await seedBotLockerTalk({
+          weekNumber: week,
+          weekLabel: label,
+          sportId: sport,
+          count: 6,
+          force: true,
+        });
+      } catch {
+        /* optional demo spice */
+      }
+
       opts?.onProgress?.({ week, label, step: "Random results…" });
       const { results, propResult } = randomizeDemoResults(games, prop.options);
 
