@@ -43,7 +43,13 @@ export const PRIOR_SEASON_2025_SEEDS: SeedRow[] = [
   {
     trophyType: "toilet_bowl",
     winnerName: "Justin Strayer",
-    namePatterns: [/\bjustin\s+strayer\b/i, /\bstrayer\b/i],
+    // Joined as "Jstray" — keep full name engraved, match live profile aliases
+    namePatterns: [
+      /\bjustin\s+strayer\b/i,
+      /\bstrayer\b/i,
+      /\bjstray\b/i,
+      /^j\s*stray$/i,
+    ],
     subtitle: `Toilet Bowl · ${PRIOR_SEASON_LABEL}`,
     notes: `Bottom-half crown · ${PRIOR_SEASON_LABEL}. Still hardware. Wear it proudly.`,
   },
@@ -96,20 +102,24 @@ export function hasPriorSeasonBigHardware(trophies: LeagueTrophy[]): boolean {
 /**
  * Fill any missing Excel-era plaques for Museum / history display.
  * Does not write to the DB — use seedPriorSeason2025Trophies for that.
- * Links winnerUserId when roster/player names match.
+ * Links winnerUserId when roster/player names match (incl. late joiners like Jstray).
  */
 export function mergePriorSeasonTrophies(
   trophies: LeagueTrophy[],
   opts?: { players?: { id: string; name: string }[] }
 ): LeagueTrophy[] {
-  const out = [...trophies];
+  const out = trophies.map((t) => ({ ...t }));
   for (const row of PRIOR_SEASON_2025_SEEDS) {
-    const exists = out.some(
+    const idx = out.findIndex(
       (t) =>
         t.seasonYear === PRIOR_SEASON_YEAR && t.trophyType === row.trophyType
     );
-    if (exists) {
-      // Ensure empty winner names don't blank the known Excel winners
+    if (idx >= 0) {
+      // Late join: link profile id when missing (Jstray → toilet, etc.)
+      if (!out[idx].winnerUserId) {
+        const uid = matchPlayerId(opts?.players, row.namePatterns);
+        if (uid) out[idx] = { ...out[idx], winnerUserId: uid };
+      }
       continue;
     }
     out.push({
@@ -129,6 +139,51 @@ export function mergePriorSeasonTrophies(
 }
 
 /**
+ * Patterns that match a live display name to an engraved Excel winner.
+ * Used when holders rebrand (Justin Strayer → Jstray).
+ */
+export function excelHolderPatternsForName(engravedName: string): RegExp[] {
+  const row = PRIOR_SEASON_2025_SEEDS.find(
+    (s) => s.winnerName.toLowerCase() === (engravedName || "").toLowerCase()
+  );
+  if (row) return row.namePatterns;
+  // Also try loose contains
+  for (const s of PRIOR_SEASON_2025_SEEDS) {
+    if (
+      namesLooseMatch(s.winnerName, engravedName) ||
+      s.namePatterns.some((p) => p.test(engravedName || ""))
+    ) {
+      return s.namePatterns;
+    }
+  }
+  return [];
+}
+
+function namesLooseMatch(a: string, b: string) {
+  const na = (a || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const nb = (b || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  if (!na || !nb) return false;
+  return na === nb || na.includes(nb) || nb.includes(na);
+}
+
+/**
+ * Re-upsert Excel trophies so winner_user_id links when someone joins later
+ * (e.g. Jstray = Justin Strayer Toilet Bowl). Commissioner/ops.
+ * Safe to re-run — keeps engraving, refreshes profile link.
+ */
+export async function relinkPriorSeasonWinners(): Promise<{
+  ok: boolean;
+  message: string;
+  linked: string[];
+}> {
+  return seedPriorSeason2025Trophies().then((r) => ({
+    ok: r.ok,
+    message: r.message,
+    linked: r.awarded,
+  }));
+}
+
+/**
  * Engrave 2025 plaques into the active league. Commissioner/ops only.
  */
 export async function seedPriorSeason2025Trophies(): Promise<{
@@ -138,10 +193,11 @@ export async function seedPriorSeason2025Trophies(): Promise<{
   errors: string[];
 }> {
   const session = getSession();
-  if (!session?.leagueId || !session.isCommissioner) {
+  const { isOps } = await import("./league");
+  if (!session?.leagueId || !(session.isCommissioner || isOps())) {
     return {
       ok: false,
-      message: "Commissioner only — open the league as host first.",
+      message: "Commissioner or ops only — open the league as host first.",
       awarded: [],
       errors: ["Not commissioner"],
     };

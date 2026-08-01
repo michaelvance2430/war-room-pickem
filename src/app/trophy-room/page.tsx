@@ -30,7 +30,7 @@ import { autoEngraveAllTrophies } from "@/lib/auto-trophies";
 import { divisionFromTrophyType } from "@/lib/division-champions";
 import { divisionDisplayLabel } from "@/lib/divisions";
 import { seedPriorSeason2025Trophies } from "@/lib/prior-season-seed";
-import { resolveWinnerAvatarFromRoster } from "@/lib/trophy-share";
+import { resolveLiveTrophyHolder } from "@/lib/trophy-share";
 
 const BIG_TYPES: TrophyType[] = [
   "championship",
@@ -77,12 +77,12 @@ export default function TrophyRoomPage() {
     }
   }
 
-  /** Resolve face for any engraved holder (user id or display-name match). */
-  function resolveWinnerAvatar(
+  /** Live name + face — updates when holders rename / change photos. */
+  function liveHolder(
     winnerUserId: string | null | undefined,
     winnerName: string
-  ): string | undefined {
-    return resolveWinnerAvatarFromRoster(roster, winnerUserId, winnerName);
+  ) {
+    return resolveLiveTrophyHolder(roster, winnerUserId, winnerName);
   }
 
   useEffect(() => {
@@ -99,6 +99,8 @@ export default function TrophyRoomPage() {
         if (isCommissioner() || isOps()) {
           try {
             await autoEngraveAllTrophies({});
+            // Re-link Excel winners (e.g. Jstray → Toilet Bowl) + profile ids
+            await seedPriorSeason2025Trophies();
             await reload();
             await loadRosterAvatars();
           } catch {
@@ -114,8 +116,14 @@ export default function TrophyRoomPage() {
     setSyncMsg(null);
     try {
       const res = await autoEngraveAllTrophies({});
-      setSyncMsg(res.message);
+      const relink = await seedPriorSeason2025Trophies();
+      setSyncMsg(
+        [res.message, relink.ok ? "Excel holders re-linked to live profiles." : null]
+          .filter(Boolean)
+          .join(" · ")
+      );
       await reload();
+      await loadRosterAvatars();
     } catch (e) {
       setSyncMsg(e instanceof Error ? e.message : "Sync failed");
     }
@@ -198,7 +206,8 @@ export default function TrophyRoomPage() {
         </div>
       );
     }
-    const mine = isSelfPlayer(item.winnerUserId, selfId);
+    const live = liveHolder(item.winnerUserId, item.winnerName);
+    const mine = isSelfPlayer(live.userId || item.winnerUserId, selfId);
     const shareKind = (
       t.startsWith("division_") ? "division" : t
     ) as ProfileTrophyKind;
@@ -206,13 +215,13 @@ export default function TrophyRoomPage() {
     const sharePayload = {
       kind: shareKind,
       seasonYear: item.seasonYear,
-      winnerName: item.winnerName,
+      winnerName: live.name,
       leagueName,
       subtitle: item.subtitle,
       sportId,
       division: divKey || undefined,
-      winnerUserId: item.winnerUserId || undefined,
-      winnerAvatarUrl: resolveWinnerAvatar(item.winnerUserId, item.winnerName),
+      winnerUserId: live.userId || item.winnerUserId || undefined,
+      winnerAvatarUrl: live.avatarUrl || undefined,
     };
     const title = item.subtitle || m.title;
     return (
@@ -240,7 +249,7 @@ export default function TrophyRoomPage() {
                 onClick={() =>
                   void onRemove(
                     item.id,
-                    `${y} ${title} — ${item.winnerName}`
+                    `${y} ${title} — ${live.name}`
                   )
                 }
                 className="text-[10px] text-muted hover:text-danger px-1"
@@ -254,7 +263,10 @@ export default function TrophyRoomPage() {
           {title}
         </div>
         <div className={`text-lg mt-1 ${selfNameClass(mine, "font-bold")}`}>
-          <PlayerLink id={item.winnerUserId} name={item.winnerName} />
+          <PlayerLink
+            id={live.userId || item.winnerUserId}
+            name={live.name}
+          />
           {mine && <YouBadge />}
         </div>
         {item.notes && (

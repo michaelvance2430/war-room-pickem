@@ -101,7 +101,7 @@ const LEGACY_NAME_ALIASES: { pattern: RegExp; legacyId: string }[] = [
     legacyId: "legacy-kahmann-championship-2025",
   },
   {
-    pattern: /\bjustin\s+strayer\b|\bstrayer\b/i,
+    pattern: /\bjustin\s+strayer\b|\bstrayer\b|\bjstray\b|^j\s*stray$/i,
     legacyId: "legacy-justin-strayer-toilet-2025",
   },
   {

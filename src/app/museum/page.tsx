@@ -22,6 +22,7 @@ import {
   PRIOR_SEASON_LABEL,
   seedPriorSeason2025Trophies,
 } from "@/lib/prior-season-seed";
+import { resolveLiveTrophyHolder } from "@/lib/trophy-share";
 
 function MuseumInner() {
   const searchParams = useSearchParams();
@@ -106,6 +107,22 @@ function MuseumInner() {
     ? players.find((p) => p.id === focusId)?.name
     : null;
 
+  /** Roster-shaped list so Museum shows live names (Jstray, etc.). */
+  const rosterHits = useMemo(
+    () =>
+      players.map((p) => ({
+        userId: p.id,
+        name: p.name,
+        avatarUrl: p.avatarUrl ?? null,
+        isBot: !!p.isMock,
+      })),
+    [players]
+  );
+
+  function liveHolder(userId?: string | null, name?: string | null) {
+    return resolveLiveTrophyHolder(rosterHits, userId, name);
+  }
+
   return (
     <div className="min-h-screen flex flex-col">
       <Nav />
@@ -169,7 +186,7 @@ function MuseumInner() {
         )}
 
         {!loading && tab === "timeline" && (
-          <Timeline events={timeline} />
+          <Timeline events={timeline} rosterHits={rosterHits} />
         )}
 
         {!loading && tab === "records" && (
@@ -231,24 +248,36 @@ function MuseumInner() {
                     {h.year === 2025 ? `${h.year} · ${PRIOR_SEASON_LABEL} Excel` : h.year}
                   </h2>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
-                    <HistCell
-                      label="Champion"
-                      emoji="🏆"
-                      name={h.champion?.name}
-                      userId={h.champion?.userId}
-                    />
-                    <HistCell
-                      label="Toilet Bowl"
-                      emoji="🚽"
-                      name={h.toilet?.name}
-                      userId={h.toilet?.userId}
-                    />
-                    <HistCell
-                      label="Village Nerd"
-                      emoji="🔮"
-                      name={h.nerd?.name}
-                      userId={h.nerd?.userId}
-                    />
+                    {(() => {
+                      const c = liveHolder(
+                        h.champion?.userId,
+                        h.champion?.name
+                      );
+                      const t = liveHolder(h.toilet?.userId, h.toilet?.name);
+                      const n = liveHolder(h.nerd?.userId, h.nerd?.name);
+                      return (
+                        <>
+                          <HistCell
+                            label="Champion"
+                            emoji="🏆"
+                            name={h.champion ? c.name : null}
+                            userId={c.userId || h.champion?.userId}
+                          />
+                          <HistCell
+                            label="Toilet Bowl"
+                            emoji="🚽"
+                            name={h.toilet ? t.name : null}
+                            userId={t.userId || h.toilet?.userId}
+                          />
+                          <HistCell
+                            label="Village Nerd"
+                            emoji="🔮"
+                            name={h.nerd ? n.name : null}
+                            userId={n.userId || h.nerd?.userId}
+                          />
+                        </>
+                      );
+                    })()}
                   </div>
                 </section>
               ))
@@ -258,15 +287,27 @@ function MuseumInner() {
 
         <p className="text-[11px] text-muted mt-10 text-center leading-relaxed">
           Museum v1 · Excel {PRIOR_SEASON_LABEL} hardware is part of the
-          permanent record (Kahmann / Strayer / Big Ball Ben). Live season +
-          deeper multi-year archives still fill in as you play.
+          permanent record (Kahmann / Jstray · Toilet / Big Ball Ben). Names
+          and photos follow live profiles. Live season + deeper archives still
+          fill in as you play.
         </p>
       </main>
     </div>
   );
 }
 
-function Timeline({ events }: { events: MuseumEvent[] }) {
+function Timeline({
+  events,
+  rosterHits,
+}: {
+  events: MuseumEvent[];
+  rosterHits: {
+    userId: string;
+    name: string;
+    avatarUrl?: string | null;
+    isBot?: boolean;
+  }[];
+}) {
   if (!events.length) {
     return (
       <Empty
@@ -277,7 +318,15 @@ function Timeline({ events }: { events: MuseumEvent[] }) {
   }
   return (
     <ol className="relative border-l border-amber-400/40 ml-3 space-y-0">
-      {events.map((e) => (
+      {events.map((e) => {
+        const live = resolveLiveTrophyHolder(
+          rosterHits,
+          e.userId,
+          e.userName || e.body
+        );
+        const showName = e.kind === "trophy" ? live.name : e.body;
+        const showId = live.userId || e.userId;
+        return (
         <li key={e.id} className="ml-4 pb-8 relative">
           <span className="absolute -left-[1.4rem] top-1 w-6 h-6 rounded-full bg-card border border-amber-400/50 flex items-center justify-center text-xs">
             {e.emoji}
@@ -287,18 +336,19 @@ function Timeline({ events }: { events: MuseumEvent[] }) {
           </p>
           <p className="font-semibold text-foreground">{e.title}</p>
           <p className="text-sm text-muted">
-            {e.userId ? (
+            {showId ? (
               <PlayerLink
-                id={e.userId}
-                name={e.body}
+                id={showId}
+                name={showName}
                 className="hover:text-primary"
               />
             ) : (
-              e.body
+              showName
             )}
           </p>
         </li>
-      ))}
+        );
+      })}
     </ol>
   );
 }

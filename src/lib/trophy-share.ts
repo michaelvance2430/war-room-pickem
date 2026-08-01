@@ -49,27 +49,108 @@ function shareNamesMatch(a: string, b: string) {
   return false;
 }
 
+export type LiveTrophyHolder = {
+  /** Current display name (profile) when known */
+  name: string;
+  /** Engraved / historical name if different */
+  engravedName: string;
+  userId: string | null;
+  avatarUrl: string | null;
+};
+
+/**
+ * Always prefer live roster profile for shares + plaques.
+ * When Kahmann / Jstray / Big Ball Ben update their name or photo,
+ * old and current trophy shares pick up the new face + name.
+ */
+export function resolveLiveTrophyHolder(
+  roster: RosterAvatarHit[],
+  winnerUserId?: string | null,
+  winnerName?: string | null
+): LiveTrophyHolder {
+  const engraved = (winnerName || "").trim() || "Champion";
+  if (!roster?.length) {
+    return {
+      name: engraved,
+      engravedName: engraved,
+      userId: winnerUserId || null,
+      avatarUrl: null,
+    };
+  }
+
+  // 1) Linked user id
+  if (winnerUserId) {
+    const byId = roster.find((m) => m.userId === winnerUserId && !m.isBot);
+    if (byId) {
+      return {
+        name: (byId.name || engraved).trim() || engraved,
+        engravedName: engraved,
+        userId: byId.userId,
+        avatarUrl: byId.avatarUrl || null,
+      };
+    }
+  }
+
+  // 2) Exact / loose display-name match
+  const byName = roster.find(
+    (m) => !m.isBot && shareNamesMatch(m.name, engraved)
+  );
+  if (byName) {
+    return {
+      name: (byName.name || engraved).trim() || engraved,
+      engravedName: engraved,
+      userId: byName.userId,
+      avatarUrl: byName.avatarUrl || null,
+    };
+  }
+
+  // 3) Excel-era aliases (Justin Strayer ↔ Jstray, etc.)
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { PRIOR_SEASON_2025_SEEDS } =
+      require("./prior-season-seed") as typeof import("./prior-season-seed");
+    for (const seed of PRIOR_SEASON_2025_SEEDS) {
+      const engravedHits =
+        shareNamesMatch(seed.winnerName, engraved) ||
+        seed.namePatterns.some((p) => p.test(engraved));
+      if (!engravedHits) continue;
+      const hit = roster.find(
+        (m) => !m.isBot && seed.namePatterns.some((p) => p.test(m.name || ""))
+      );
+      if (hit) {
+        return {
+          name: (hit.name || engraved).trim() || engraved,
+          engravedName: engraved,
+          userId: hit.userId,
+          avatarUrl: hit.avatarUrl || null,
+        };
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+
+  return {
+    name: engraved,
+    engravedName: engraved,
+    userId: winnerUserId || null,
+    avatarUrl: null,
+  };
+}
+
 /**
  * Resolve a trophy holder's face from the league roster.
- * Prefer user id; fall back to display-name match so legacy engravings
- * (Kahmann, Justin Strayer, Big Ball Ben, …) still get their photo.
+ * Prefer user id; fall back to display-name / Excel aliases.
  */
 export function resolveWinnerAvatarFromRoster(
   roster: RosterAvatarHit[],
   winnerUserId?: string | null,
   winnerName?: string | null
 ): string | undefined {
-  if (!roster?.length) return undefined;
-  if (winnerUserId) {
-    const byId = roster.find((m) => m.userId === winnerUserId && m.avatarUrl);
-    if (byId?.avatarUrl) return byId.avatarUrl;
-  }
-  const name = (winnerName || "").trim();
-  if (!name) return undefined;
-  const byName = roster.find(
-    (m) => !m.isBot && m.avatarUrl && shareNamesMatch(m.name, name)
+  return (
+    resolveLiveTrophyHolder(roster, winnerUserId, winnerName).avatarUrl ||
+    undefined
   );
-  return byName?.avatarUrl || undefined;
 }
 
 function resolveShareSport(sportId?: string | null): "cfb" | "nfl" {

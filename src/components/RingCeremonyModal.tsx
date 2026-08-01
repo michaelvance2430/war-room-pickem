@@ -19,7 +19,7 @@ import {
 } from "@/lib/cloud";
 import { loadLeagueTrophies } from "@/lib/trophies";
 import { getDefendingChampion } from "@/lib/player-history";
-import { resolveWinnerAvatarFromRoster } from "@/lib/trophy-share";
+import { resolveLiveTrophyHolder } from "@/lib/trophy-share";
 import {
   EVENT_RING_CEREMONY_PREVIEW,
   getCommishPreviewOpt,
@@ -102,13 +102,6 @@ export default function RingCeremonyModal() {
   );
 
   const session = typeof window !== "undefined" ? getSession() : null;
-  const isYou =
-    !!champ &&
-    !!session?.playerId &&
-    ((champ.userId && champ.userId === session.playerId) ||
-      (!!session.playerName &&
-        session.playerName.toLowerCase().trim() ===
-          champ.name.toLowerCase().trim()));
 
   const openWith = useCallback(
     async (
@@ -134,10 +127,21 @@ export default function RingCeremonyModal() {
     []
   );
 
-  const champAvatar = useMemo(() => {
-    if (!champ) return undefined;
-    return resolveWinnerAvatarFromRoster(roster, champ.userId, champ.name);
+  const liveChamp = useMemo(() => {
+    if (!champ) return null;
+    return resolveLiveTrophyHolder(roster, champ.userId, champ.name);
   }, [roster, champ]);
+
+  const isYou =
+    !!champ &&
+    !!session?.playerId &&
+    ((champ.userId && champ.userId === session.playerId) ||
+      (liveChamp?.userId && liveChamp.userId === session.playerId) ||
+      (!!session.playerName &&
+        (session.playerName.toLowerCase().trim() ===
+          champ.name.toLowerCase().trim() ||
+          session.playerName.toLowerCase().trim() ===
+            (liveChamp?.name || "").toLowerCase().trim())));
 
   const tryRealCeremony = useCallback(async () => {
     const league = getLeague();
@@ -376,21 +380,21 @@ export default function RingCeremonyModal() {
             <p className="relative text-[10px] uppercase tracking-[0.18em] text-white/60 font-bold">
               {pack.champKicker} · {champ.year}
             </p>
-            {champ.userId ? (
+            {(liveChamp?.userId || champ.userId) ? (
               <Link
-                href={`/profile/${champ.userId}`}
+                href={`/profile/${liveChamp?.userId || champ.userId}`}
                 className="relative text-3xl sm:text-4xl font-black block mt-1.5 hover:underline leading-none"
                 style={{ color: pack.accent }}
                 onClick={dismiss}
               >
-                {champ.name}
+                {liveChamp?.name || champ.name}
               </Link>
             ) : (
               <p
                 className="relative text-3xl sm:text-4xl font-black mt-1.5 leading-none"
                 style={{ color: pack.accent }}
               >
-                {champ.name}
+                {liveChamp?.name || champ.name}
               </p>
             )}
             {isYou && (
@@ -425,12 +429,13 @@ export default function RingCeremonyModal() {
                 trophy={{
                   kind: "championship",
                   seasonYear: champ.year,
-                  winnerName: champ.name,
+                  winnerName: liveChamp?.name || champ.name,
                   leagueName,
                   subtitle: pack.champKicker,
                   sportId: sportId || undefined,
-                  winnerUserId: champ.userId || undefined,
-                  winnerAvatarUrl: champAvatar,
+                  winnerUserId:
+                    liveChamp?.userId || champ.userId || undefined,
+                  winnerAvatarUrl: liveChamp?.avatarUrl || undefined,
                 }}
                 label={pack.ctaShare}
                 className="!bg-white !text-black !border-0 !font-extrabold min-h-[48px] px-6 w-full sm:w-auto justify-center"

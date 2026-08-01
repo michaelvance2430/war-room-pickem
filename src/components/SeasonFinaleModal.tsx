@@ -22,7 +22,7 @@ import HardwareTrophyIcon from "@/components/HardwareTrophyIcon";
 import type { ProfileTrophyKind } from "@/lib/profile-hardware";
 import { isGuestMode } from "@/lib/guest-mode";
 import { isOpeningWeekLive } from "@/components/RingCeremonyModal";
-import { resolveWinnerAvatarFromRoster } from "@/lib/trophy-share";
+import { resolveLiveTrophyHolder } from "@/lib/trophy-share";
 
 export default function SeasonFinaleModal() {
   const [open, setOpen] = useState(false);
@@ -128,9 +128,9 @@ export default function SeasonFinaleModal() {
       ? slide.kind
       : null;
 
-  const slideAvatar = useMemo(() => {
-    if (!slide?.winnerName && !slide?.winnerUserId) return undefined;
-    return resolveWinnerAvatarFromRoster(
+  const liveWinner = useMemo(() => {
+    if (!slide?.winnerName && !slide?.winnerUserId) return null;
+    return resolveLiveTrophyHolder(
       roster,
       slide?.winnerUserId,
       slide?.winnerName
@@ -227,21 +227,21 @@ export default function SeasonFinaleModal() {
             )}
           </div>
 
-          {slide.winnerName && (
+          {(liveWinner?.name || slide.winnerName) && (
             <div
               className={`rounded-xl border ${slide.border} bg-black/30 px-4 py-4 text-center`}
             >
-              {slide.winnerUserId ? (
+              {(liveWinner?.userId || slide.winnerUserId) ? (
                 <Link
-                  href={`/profile/${slide.winnerUserId}`}
+                  href={`/profile/${liveWinner?.userId || slide.winnerUserId}`}
                   onClick={dismissAll}
                   className={`text-2xl font-black ${slide.accent} hover:underline`}
                 >
-                  {slide.winnerName}
+                  {liveWinner?.name || slide.winnerName}
                 </Link>
               ) : (
                 <p className={`text-2xl font-black ${slide.accent}`}>
-                  {slide.winnerName}
+                  {liveWinner?.name || slide.winnerName}
                 </p>
               )}
               <p className="text-[11px] text-muted mt-1">
@@ -254,7 +254,7 @@ export default function SeasonFinaleModal() {
             {slide.body}
           </p>
 
-          {shareKind && slide.winnerName && (
+          {shareKind && (liveWinner?.name || slide.winnerName) && (
             <div className="rounded-xl border border-border bg-black/25 px-3 py-3 space-y-2">
               <p className="text-[11px] text-center text-muted leading-snug">
                 {slide.isYou
@@ -266,12 +266,15 @@ export default function SeasonFinaleModal() {
                   trophy={{
                     kind: shareKind,
                     seasonYear: year,
-                    winnerName: slide.winnerName,
+                    winnerName: liveWinner?.name || slide.winnerName || "",
                     leagueName,
                     subtitle: slide.kicker,
                     sportId: getLeague()?.sportId,
-                    winnerUserId: slide.winnerUserId || undefined,
-                    winnerAvatarUrl: slideAvatar,
+                    winnerUserId:
+                      liveWinner?.userId ||
+                      slide.winnerUserId ||
+                      undefined,
+                    winnerAvatarUrl: liveWinner?.avatarUrl || undefined,
                   }}
                   label={slide.isYou ? "Share my win" : "Share this win"}
                   className="min-h-[48px] px-5 font-bold"

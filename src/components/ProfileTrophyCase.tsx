@@ -25,6 +25,7 @@ function Plaque({
   onTrophyTap,
   sportId,
   winnerAvatarUrl,
+  liveWinnerName,
 }: {
   item: ProfileTrophy;
   leagueName?: string;
@@ -34,12 +35,15 @@ function Plaque({
   sportId?: string | null;
   /** Profile photo of this trophy-case owner (NFL + CFB holders) */
   winnerAvatarUrl?: string | null;
+  /** Current display name (updates when they rename) */
+  liveWinnerName?: string | null;
 }) {
   const meta = HARDWARE_KIND_META[item.kind];
+  // Live profile name/photo — not the frozen engraving (Jstray vs Justin Strayer)
   const sharePayload = {
     kind: item.kind,
     seasonYear: item.seasonYear,
-    winnerName: item.winnerName,
+    winnerName: liveWinnerName || item.winnerName,
     leagueName,
     division: item.division,
     subtitle: item.subtitle,
@@ -242,6 +246,7 @@ export default function ProfileTrophyCase({
                     canShare={canShare}
                     sportId={sportId}
                     winnerAvatarUrl={winnerAvatarUrl}
+                    liveWinnerName={playerName}
                     spinny={spinId === item.id}
                     onTrophyTap={() => handleTrophyTap(item.id)}
                   />
@@ -281,6 +286,7 @@ export default function ProfileTrophyCase({
                 canShare={canShare}
                 sportId={sportId}
                 winnerAvatarUrl={winnerAvatarUrl}
+                liveWinnerName={playerName}
               />
             ))}
           </div>
