@@ -14,8 +14,14 @@ import {
 } from "@/lib/player-history";
 import { loadLeaguePlayers } from "@/lib/cloud";
 import { loadLeagueTrophies, type LeagueTrophy } from "@/lib/trophies";
-import { getLeague } from "@/lib/league";
+import { getLeague, isCommissioner, isOps } from "@/lib/league";
 import type { Player } from "@/lib/types";
+import {
+  hasPriorSeasonBigHardware,
+  mergePriorSeasonTrophies,
+  PRIOR_SEASON_LABEL,
+  seedPriorSeason2025Trophies,
+} from "@/lib/prior-season-seed";
 
 function MuseumInner() {
   const searchParams = useSearchParams();
@@ -28,6 +34,7 @@ function MuseumInner() {
   const [tab, setTab] = useState<"timeline" | "records" | "history">(
     "timeline"
   );
+  const [excelNote, setExcelNote] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -35,17 +42,43 @@ function MuseumInner() {
       setLoading(true);
       try {
         setLeagueName(getLeague()?.name || "");
-        const [plist, tlist] = await Promise.all([
+        let [plist, tlist] = await Promise.all([
           loadLeaguePlayers(),
           loadLeagueTrophies(),
         ]);
+
+        // Host: permanently engrave Excel-era hardware if missing
+        // (Kahmann champ · Strayer toilet · Big Ball Ben nerd)
+        if (
+          (isCommissioner() || isOps()) &&
+          !hasPriorSeasonBigHardware(tlist)
+        ) {
+          try {
+            const seeded = await seedPriorSeason2025Trophies();
+            if (seeded.ok) {
+              tlist = await loadLeagueTrophies();
+              if (!cancelled) {
+                setExcelNote(
+                  `${PRIOR_SEASON_LABEL} Excel season locked into the archives.`
+                );
+              }
+            }
+          } catch {
+            /* display merge still fills the gap */
+          }
+        }
+
         if (cancelled) return;
+        // Always merge so Museum shows Excel winners even before DB seed
+        const withExcel = mergePriorSeasonTrophies(tlist, { players: plist });
         setPlayers(plist);
-        setTrophies(tlist);
+        setTrophies(withExcel);
       } catch {
         if (!cancelled) {
           setPlayers([]);
-          setTrophies([]);
+          setTrophies(
+            mergePriorSeasonTrophies([], undefined)
+          );
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -85,7 +118,15 @@ function MuseumInner() {
           <p className="text-sm text-muted mt-2 leading-relaxed max-w-xl">
             Not just stats — the story of this room. Trophies, streaks, and
             milestones that make next August feel continuous with this one.
+            Includes the full {PRIOR_SEASON_LABEL} Excel season:{" "}
+            <strong className="text-foreground">Kahmann</strong> champion,{" "}
+            <strong className="text-foreground">Justin Strayer</strong> Toilet
+            Bowl, <strong className="text-foreground">Big Ball Ben</strong>{" "}
+            Village Nerd.
           </p>
+          {excelNote && (
+            <p className="mt-2 text-xs text-primary font-medium">{excelNote}</p>
+          )}
           {focusName && (
             <p className="mt-2 text-xs text-primary font-medium">
               Showing timeline for {focusName}.{" "}
@@ -186,7 +227,9 @@ function MuseumInner() {
                   key={h.year}
                   className="rounded-xl border border-border bg-card p-4"
                 >
-                  <h2 className="font-bold text-lg mb-3">{h.year}</h2>
+                  <h2 className="font-bold text-lg mb-3">
+                    {h.year === 2025 ? `${h.year} · ${PRIOR_SEASON_LABEL} Excel` : h.year}
+                  </h2>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
                     <HistCell
                       label="Champion"
@@ -214,8 +257,9 @@ function MuseumInner() {
         )}
 
         <p className="text-[11px] text-muted mt-10 text-center leading-relaxed">
-          Museum v1 · feeds from trophies + live season. Season archive freeze
-          will deepen multi-year memory next.
+          Museum v1 · Excel {PRIOR_SEASON_LABEL} hardware is part of the
+          permanent record (Kahmann / Strayer / Big Ball Ben). Live season +
+          deeper multi-year archives still fill in as you play.
         </p>
       </main>
     </div>

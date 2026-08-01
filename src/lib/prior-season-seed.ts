@@ -10,11 +10,16 @@
  * a roster display name matches.
  */
 
-import { awardTrophy, loadLeagueTrophies, type TrophyType } from "@/lib/trophies";
+import {
+  awardTrophy,
+  loadLeagueTrophies,
+  type LeagueTrophy,
+  type TrophyType,
+} from "@/lib/trophies";
 import { loadLeagueRoster } from "@/lib/cloud";
 import { getSession } from "@/lib/league";
 
-/** CFB campaign year (2025–26 season → 2025 in Trophy Room). */
+/** CFB campaign year (2025–26 season → 2025 in Trophy Room / Museum). */
 export const PRIOR_SEASON_YEAR = 2025;
 export const PRIOR_SEASON_LABEL = "2025–26";
 
@@ -65,6 +70,62 @@ function matchUserId(
     if (patterns.some((p) => p.test(n))) return m.userId;
   }
   return null;
+}
+
+function matchPlayerId(
+  players: { id: string; name: string }[] | undefined,
+  patterns: RegExp[]
+): string | null {
+  if (!players?.length) return null;
+  for (const p of players) {
+    if (patterns.some((re) => re.test(p.name || ""))) return p.id;
+  }
+  return null;
+}
+
+/** True when champ + toilet + nerd are already engraved for the Excel year. */
+export function hasPriorSeasonBigHardware(trophies: LeagueTrophy[]): boolean {
+  const y = trophies.filter((t) => t.seasonYear === PRIOR_SEASON_YEAR);
+  return (
+    y.some((t) => t.trophyType === "championship") &&
+    y.some((t) => t.trophyType === "toilet_bowl") &&
+    y.some((t) => t.trophyType === "crystal_ball")
+  );
+}
+
+/**
+ * Fill any missing Excel-era plaques for Museum / history display.
+ * Does not write to the DB — use seedPriorSeason2025Trophies for that.
+ * Links winnerUserId when roster/player names match.
+ */
+export function mergePriorSeasonTrophies(
+  trophies: LeagueTrophy[],
+  opts?: { players?: { id: string; name: string }[] }
+): LeagueTrophy[] {
+  const out = [...trophies];
+  for (const row of PRIOR_SEASON_2025_SEEDS) {
+    const exists = out.some(
+      (t) =>
+        t.seasonYear === PRIOR_SEASON_YEAR && t.trophyType === row.trophyType
+    );
+    if (exists) {
+      // Ensure empty winner names don't blank the known Excel winners
+      continue;
+    }
+    out.push({
+      id: `prior-seed-${row.trophyType}`,
+      leagueId: "prior-excel",
+      seasonYear: PRIOR_SEASON_YEAR,
+      trophyType: row.trophyType,
+      winnerName: row.winnerName,
+      winnerUserId: matchPlayerId(opts?.players, row.namePatterns),
+      subtitle: row.subtitle,
+      notes: row.notes,
+      // After Excel season closed (winter 2026)
+      awardedAt: "2026-01-20T12:00:00.000Z",
+    });
+  }
+  return out;
 }
 
 /**

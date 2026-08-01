@@ -560,19 +560,44 @@ export function buildMuseumTimeline(opts: {
     ) {
       continue;
     }
+    const excelEra = t.id.startsWith("prior-seed-") || t.leagueId === "prior-excel";
     const meta =
       t.trophyType === "championship"
-        ? { emoji: "🏆", title: "Championship engraved" }
+        ? {
+            emoji: "🏆",
+            title: excelEra
+              ? "Championship · Excel era"
+              : "Championship engraved",
+          }
         : t.trophyType === "toilet_bowl"
-          ? { emoji: "🚽", title: "Toilet Bowl engraved" }
-          : { emoji: "🔮", title: "Village Nerd engraved" };
+          ? {
+              emoji: "🚽",
+              title: excelEra
+                ? "Toilet Bowl King · Excel era"
+                : "Toilet Bowl engraved",
+            }
+          : t.trophyType === "crystal_ball"
+            ? {
+                emoji: "🔮",
+                title: excelEra
+                  ? "Village Nerd · Excel era"
+                  : "Village Nerd engraved",
+              }
+            : {
+                emoji: "🛡️",
+                title: excelEra
+                  ? "Division title · Excel era"
+                  : "Division title engraved",
+              };
     events.push({
       id: `trophy-${t.id}`,
       year: t.seasonYear,
       sortKey: `${t.seasonYear}-${t.awardedAt}-trophy`,
       emoji: meta.emoji,
       title: meta.title,
-      body: `${t.winnerName}${t.subtitle ? ` · ${t.subtitle}` : ""}`,
+      body: `${t.winnerName}${t.subtitle ? ` · ${t.subtitle}` : ""}${
+        excelEra ? " · pre-app season" : ""
+      }`,
       userId: t.winnerUserId,
       userName: t.winnerName,
       kind: "trophy",
