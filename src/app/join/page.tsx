@@ -876,12 +876,27 @@ function JoinPageInner() {
               maxLength={6}
               className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm tracking-widest uppercase font-mono"
             />
-            <input
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              placeholder="Your name"
-              className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm"
-            />
+            {displayName.trim() ? (
+              <p className="text-xs text-muted">
+                Joining as{" "}
+                <strong className="text-foreground">{displayName.trim()}</strong>
+                {" · "}
+                <button
+                  type="button"
+                  className="text-primary underline"
+                  onClick={() => setDisplayName("")}
+                >
+                  change name
+                </button>
+              </p>
+            ) : (
+              <input
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="Your name in the league"
+                className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm"
+              />
+            )}
             {error && <p className="text-sm text-danger">{error}</p>}
             <button
               onClick={handleJoin}

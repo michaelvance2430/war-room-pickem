@@ -108,7 +108,7 @@ export default function CommishSetupBanner() {
         {step === "card" &&
           `${humans} in the room. Publish ${weekLabel} with the demo week button — one tap, no odds needed.`}
         {step === "score" &&
-          "Card is live. When games finish: Commish → Enter Results → Randomize & score (practice) or real scores."}
+          "Card is live. When games finish: Host → Enter Results → Score (practice) or pull real scores."}
       </p>
 
       {/* Progress dots */}

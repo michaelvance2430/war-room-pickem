@@ -738,8 +738,18 @@ export default function PicksPage() {
       return;
     }
     if (!nextProp) {
-      setSaveError("Pick a prop option.");
+      setBonusOpen(true);
+      setSaveError(
+        "Bonus is required — pick one side on the prop below, then lock."
+      );
       setSaving(false);
+      try {
+        document
+          .getElementById("weekly-prop-card")
+          ?.scrollIntoView({ behavior: "smooth", block: "center" });
+      } catch {
+        /* ignore */
+      }
       return;
     }
 
@@ -1664,6 +1674,7 @@ export default function PicksPage() {
             </div>
 
             <div
+              id="weekly-prop-card"
               className={`rounded-xl border bg-card p-4 mb-8 ${
                 !canEditProp ? "border-border opacity-95" : "border-border"
               }`}
@@ -1767,9 +1778,13 @@ export default function PicksPage() {
                 </button>
                 {!allGamesPicked && !fullyLocked && (
                   <p className="text-xs text-muted text-center mt-2 px-1">
-                    {quietPicks
-                      ? "Need: side + confidence on every game, one Best Bet, and open Bonus to pick an answer."
-                      : "Need: side + unique confidence on every open game, one Best Bet, and a bonus pick (until first kickoff)."}
+                    {!propChoice
+                      ? "Almost — pick the bonus (prop) answer, then lock."
+                      : !bestBetId
+                        ? "Almost — mark one Best Bet, then lock."
+                        : quietPicks
+                          ? "Need: side + confidence on every game, one Best Bet, and the bonus."
+                          : "Need: side + unique confidence on every open game, one Best Bet, and a bonus pick."}
                   </p>
                 )}
               </div>

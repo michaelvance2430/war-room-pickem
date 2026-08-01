@@ -367,13 +367,24 @@ export default function Home() {
 
         {firstWeekChrome && (
           <p className="text-xs text-muted mb-4 leading-relaxed max-w-xl -mt-1">
-            One job:{" "}
-            <strong className="text-foreground">
-              {isCommish
-                ? "invite → publish a card → lock your picks"
-                : "lock your picks before kickoff"}
-            </strong>
-            . Locker is for trash talk. Everything else opens after you lock.
+            {isCommish ? (
+              <>
+                Host spine:{" "}
+                <strong className="text-foreground">
+                  share invite → publish card → lock your picks
+                </strong>
+                . Score once later to unlock advanced tools.
+              </>
+            ) : (
+              <>
+                One job:{" "}
+                <strong className="text-foreground">
+                  lock your picks before kickoff
+                </strong>
+                . Locker is optional trash talk. Everything else opens after
+                you lock.
+              </>
+            )}
           </p>
         )}
 
