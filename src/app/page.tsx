@@ -37,6 +37,7 @@ import HomeSportAtmosphere from "@/components/HomeSportAtmosphere";
 import HomeSportHeader from "@/components/HomeSportHeader";
 import LeagueMembershipCard from "@/components/LeagueMembershipCard";
 import OpenRoomLeaveNudge from "@/components/OpenRoomLeaveNudge";
+import MultiLeagueHomeHub from "@/components/MultiLeagueHomeHub";
 
 export default function Home() {
   const router = useRouter();
@@ -283,6 +284,17 @@ export default function Home() {
         <IncidentBanner />
         {/* All sports — testers are builders; bugs are part of the game */}
         <BetaLeagueBanner />
+
+        {/*
+          Account hub + league home:
+          Multi-league strip first (when 2+ rooms), then THIS room’s chrome.
+        */}
+        <MultiLeagueHomeHub
+          onSwitched={() => {
+            // Full reload paints sport theme + week hero for the new room
+            window.location.href = "/";
+          }}
+        />
 
         <HomeSportHeader
           chrome={homeChrome}
