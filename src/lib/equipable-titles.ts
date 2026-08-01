@@ -71,6 +71,13 @@ export const EQUIPABLE_TITLE_CATALOG: EquipableTitleDef[] = [
       "Opened Deep stats & legacy math. Curtains twitching. Spreadsheet in the window.",
   },
   {
+    badgeId: "calendar_cosplayer",
+    title: "Calendar Cosplayer",
+    vibe: "roast",
+    blurb:
+      "Wore a holiday border. Decorations left. The shame did not.",
+  },
+  {
     badgeId: "championship_ring",
     title: "Ring Bearer",
     vibe: "brag",

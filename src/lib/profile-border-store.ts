@@ -11,6 +11,8 @@ import {
   isHolidayBorderId,
 } from "./profile-borders";
 
+const CALENDAR_COSPLAYER_ID = "calendar_cosplayer";
+
 const LOCAL_KEY = "warroom-equipped-border-v1";
 
 type LocalMap = Record<string, string | null>;
@@ -125,6 +127,48 @@ export async function setMyEquippedBorder(
   local[userId] = id;
   writeLocal(local);
   setStoreBorder(userId, id);
+
+  // Rare: first time you cosplay a holiday ring
+  if (isHolidayBorderId(id)) {
+    try {
+      const { getPermanentBadgeIds, grantPermanentBadgeId } =
+        await import("./permanent-badges");
+      if (!getPermanentBadgeIds(userId).includes(CALENDAR_COSPLAYER_ID)) {
+        const granted = grantPermanentBadgeId(userId, CALENDAR_COSPLAYER_ID);
+        if (granted) {
+          try {
+            const { bankCareerBadgeId } = await import("./career-cheevo");
+            bankCareerBadgeId(userId, CALENDAR_COSPLAYER_ID);
+          } catch {
+            /* ignore */
+          }
+          try {
+            const { getBadgeDef } = await import("./badges");
+            const def = getBadgeDef(CALENDAR_COSPLAYER_ID);
+            if (def) {
+              window.dispatchEvent(
+                new CustomEvent("warroom-badge-force-celebrate", {
+                  detail: {
+                    badges: [
+                      {
+                        def,
+                        earned: true,
+                        earnedAt: new Date().toISOString(),
+                      },
+                    ],
+                  },
+                })
+              );
+            }
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  }
 
   try {
     const supabase = createClient();

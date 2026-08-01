@@ -357,6 +357,17 @@ export const BADGE_CATALOG: BadgeDef[] = [
     points: 25,
     icon: "🪟",
   },
+  {
+    id: "calendar_cosplayer",
+    name: "Calendar Cosplayer",
+    description:
+      "You put on a holiday border the second Commish flipped the theme. When the decorations come down, the ring vanishes — but everyone still remembers you dressed for the group chat.",
+    howToEarn:
+      "Equip any holiday profile border while that season theme is live (Halloween, Thanksgiving, Christmas, or New Year).",
+    tier: "rare",
+    points: 25,
+    icon: "🎭",
+  },
 
   // —— Easter eggs (zero pick'em impact; viewable shelf; NO how-to spoilers) ——
   {
@@ -1551,6 +1562,11 @@ function evaluateBadge(
     case "neighborhood_creeper":
       return {
         earned: hasPermanentBadge(player, "neighborhood_creeper"),
+      };
+
+    case "calendar_cosplayer":
+      return {
+        earned: hasPermanentBadge(player, "calendar_cosplayer"),
       };
 
     // Easter eggs — permanent local + cloud cache (no spoilers in howToEarn)
