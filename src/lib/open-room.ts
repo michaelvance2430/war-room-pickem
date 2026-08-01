@@ -218,11 +218,14 @@ export async function seatPlayerInLeague(opts: {
     }
     const division = leastPopulatedDivision(counts);
 
+    // Late joiners (season already rolling): start at 0 pts, enjoy the ride
     const { error: memError } = await supabase.from("memberships").insert({
       league_id: league.id,
       user_id: userId,
       role: "player",
       division,
+      total_points: 0,
+      weeks_played: 0,
     });
     if (memError) {
       if (/full|max 32|check_violation|duplicate|unique/i.test(memError.message || "")) {

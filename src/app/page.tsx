@@ -36,6 +36,7 @@ import { resolveHomeChrome } from "@/lib/sports/home-chrome";
 import HomeSportAtmosphere from "@/components/HomeSportAtmosphere";
 import HomeSportHeader from "@/components/HomeSportHeader";
 import LeagueMembershipCard from "@/components/LeagueMembershipCard";
+import OpenRoomLeaveNudge from "@/components/OpenRoomLeaveNudge";
 
 export default function Home() {
   const router = useRouter();
@@ -276,6 +277,8 @@ export default function Home() {
       <Nav />
       {/* Phone-first: less chrome padding, job-first stack (most users are on phones) */}
       <main className="flex-1 max-w-6xl mx-auto w-full px-3 sm:px-4 py-5 sm:py-10 relative z-10">
+        {/* Commish: someone left — open the room for late joiners? */}
+        <OpenRoomLeaveNudge />
         {/* Incident first (calm), then beta expectations */}
         <IncidentBanner />
         {/* All sports — testers are builders; bugs are part of the game */}
