@@ -55,6 +55,8 @@ export default function LockerRoomPage() {
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionQuery, setMentionQuery] = useState("");
   const [mentionIndex, setMentionIndex] = useState(0);
+  /** Which message has the + emoji picker open */
+  const [reactPickerFor, setReactPickerFor] = useState<string | null>(null);
   const [reactBusyId, setReactBusyId] = useState<string | null>(null);
   const [reactError, setReactError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -281,6 +283,7 @@ export default function LockerRoomPage() {
         return { ...m, reactions: list };
       })
     );
+    setReactPickerFor(null); // picker closes as soon as you stamp
     const res = await toggleLockerReaction(messageId, emoji);
     setReactBusyId(null);
     if (!res.ok) {
@@ -290,7 +293,6 @@ export default function LockerRoomPage() {
       await reload({ quiet: true });
       return;
     }
-    // Prefer server tally when present; otherwise soft-reload so markers stick
     if (res.reactions) {
       setMessages((prev) =>
         prev.map((m) =>
@@ -298,7 +300,6 @@ export default function LockerRoomPage() {
         )
       );
     }
-    // Confirm from server (picks up everyone else's reacts too)
     void reload({ quiet: true });
   }
 
@@ -329,8 +330,9 @@ export default function LockerRoomPage() {
                 {" · "}
               </>
             ) : null}
-            Drop hot takes ({LOCKER_MAX_CHARS} char max). Tap an emoji under any
-            post (yours or theirs) to react. Type{" "}
+            Drop hot takes ({LOCKER_MAX_CHARS} char max). Hit{" "}
+            <strong className="text-foreground">+</strong> on a post to react —
+            stamps stack bottom-left. Type{" "}
             <strong className="text-foreground">@name</strong> to tag someone in
             the league.{" "}
             <strong className="text-foreground">This week only</strong>
@@ -389,6 +391,8 @@ export default function LockerRoomPage() {
             {messages.map((m) => {
               const mine = isSelfPlayer(m.userId, selfId);
               const parts = splitMentions(m.body, roster);
+              const rx = m.reactions || [];
+              const pickerOpen = reactPickerFor === m.id;
               return (
                 <li
                   key={m.id}
@@ -405,90 +409,123 @@ export default function LockerRoomPage() {
                       {formatLockerTime(m.createdAt)}
                     </span>
                   </div>
-                  <p className="text-sm text-foreground/95 whitespace-pre-wrap break-words leading-relaxed">
-                    {parts.map((p, i) =>
-                      p.type === "mention" ? (
-                        p.userId ? (
-                          <PlayerLink
-                            key={`${m.id}-m-${i}`}
-                            id={p.userId}
-                            name={p.value}
-                            className="text-primary font-semibold hover:underline"
-                          />
-                        ) : (
-                          <span
-                            key={`${m.id}-m-${i}`}
-                            className="text-primary font-semibold"
-                          >
-                            {p.value}
-                          </span>
-                        )
-                      ) : (
-                        <span key={`${m.id}-t-${i}`}>{p.value}</span>
-                      )
-                    )}
-                  </p>
 
-                  {/* React to ANY post (yours or theirs) — always visible strip */}
-                  {!muted && (
-                    <div className="mt-2 flex flex-wrap items-center gap-1">
-                      {LOCKER_REACTION_EMOJIS.map((em) => {
-                        const hit = (m.reactions || []).find(
-                          (r) => r.emoji === em
-                        );
-                        return (
-                          <button
-                            key={`${m.id}-rx-${em}`}
-                            type="button"
-                            disabled={reactBusyId === m.id}
-                            onClick={() => void onReact(m.id, em)}
-                            className={`inline-flex items-center gap-0.5 min-h-[40px] min-w-[40px] px-1.5 rounded-lg border text-base leading-none touch-manipulation ${
-                              hit?.mine
-                                ? "border-primary/60 bg-primary/15"
-                                : "border-border/70 bg-background/50 hover:border-primary/40 hover:bg-primary/10"
-                            } disabled:opacity-50`}
-                            title={
-                              hit?.mine
+                  {/* Chat box: body + stamps bottom-left, stack L→R */}
+                  <div
+                    className={`relative mt-1 rounded-2xl border px-3 pt-2.5 pb-2 ${
+                      mine
+                        ? "border-primary/30 bg-primary/10"
+                        : "border-border bg-background/60"
+                    }`}
+                  >
+                    <p className="text-sm text-foreground/95 whitespace-pre-wrap break-words leading-relaxed">
+                      {parts.map((p, i) =>
+                        p.type === "mention" ? (
+                          p.userId ? (
+                            <PlayerLink
+                              key={`${m.id}-m-${i}`}
+                              id={p.userId}
+                              name={p.value}
+                              className="text-primary font-semibold hover:underline"
+                            />
+                          ) : (
+                            <span
+                              key={`${m.id}-m-${i}`}
+                              className="text-primary font-semibold"
+                            >
+                              {p.value}
+                            </span>
+                          )
+                        ) : (
+                          <span key={`${m.id}-t-${i}`}>{p.value}</span>
+                        )
+                      )}
+                    </p>
+
+                    {/* Bottom of bubble: stamps L→R, then + */}
+                    <div className="mt-2 flex flex-wrap items-center justify-start gap-1 min-h-[28px]">
+                      {rx.map((r) => (
+                        <button
+                          key={`${m.id}-stamp-${r.emoji}`}
+                          type="button"
+                          disabled={!!muted || reactBusyId === m.id}
+                          onClick={() => {
+                            if (muted) return;
+                            void onReact(m.id, r.emoji);
+                          }}
+                          className={`inline-flex items-center gap-0.5 h-7 pl-1.5 pr-1.5 rounded-full border text-sm leading-none touch-manipulation ${
+                            r.mine
+                              ? "border-primary/55 bg-primary/20"
+                              : "border-border/80 bg-card/90"
+                          } disabled:opacity-60`}
+                          title={
+                            muted
+                              ? `${r.emoji} × ${r.count}`
+                              : r.mine
                                 ? "Tap to remove your reaction"
-                                : "React to this post"
-                            }
-                            aria-label={`React ${em}`}
-                          >
-                            <span aria-hidden>{em}</span>
-                            {hit && hit.count > 0 ? (
-                              <span className="text-[10px] font-bold tabular-nums text-muted">
-                                {hit.count}
-                              </span>
-                            ) : null}
-                          </button>
-                        );
-                      })}
+                                : "Tap to add this reaction"
+                          }
+                        >
+                          <span aria-hidden>{r.emoji}</span>
+                          {r.count > 1 ? (
+                            <span className="text-[10px] font-bold tabular-nums text-muted">
+                              {r.count}
+                            </span>
+                          ) : null}
+                        </button>
+                      ))}
+
+                      {!muted && (
+                        <button
+                          type="button"
+                          disabled={reactBusyId === m.id}
+                          onClick={() =>
+                            setReactPickerFor((cur) =>
+                              cur === m.id ? null : m.id
+                            )
+                          }
+                          className={`inline-flex items-center justify-center h-7 w-7 rounded-full border text-sm font-bold touch-manipulation ${
+                            pickerOpen
+                              ? "border-primary bg-primary/20 text-primary"
+                              : "border-dashed border-border text-muted hover:border-primary/50 hover:text-foreground"
+                          } disabled:opacity-50`}
+                          title="Add reaction"
+                          aria-label="Add reaction"
+                          aria-expanded={pickerOpen}
+                        >
+                          +
+                        </button>
+                      )}
+
                       {(mine || staff) && (
                         <button
                           type="button"
                           onClick={() => void onDelete(m.id)}
-                          className="text-[10px] text-muted hover:text-danger ml-1 min-h-[40px] px-1"
+                          className="ml-auto text-[10px] text-muted hover:text-danger min-h-[28px] px-1"
                         >
                           Delete
                         </button>
                       )}
                     </div>
-                  )}
-                  {muted && (m.reactions || []).length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-1.5 text-sm">
-                      {(m.reactions || []).map((r) => (
-                        <span
-                          key={`${m.id}-ro-${r.emoji}`}
-                          className="inline-flex items-center gap-1 px-2 py-1 rounded-full border border-border bg-background/40"
-                        >
-                          <span aria-hidden>{r.emoji}</span>
-                          <span className="text-[11px] font-bold">
-                            {r.count}
-                          </span>
-                        </span>
-                      ))}
-                    </div>
-                  )}
+
+                    {/* + picker: pick one → stamps & closes */}
+                    {pickerOpen && !muted && (
+                      <div className="mt-2 pt-2 border-t border-border/50 flex flex-wrap gap-1.5">
+                        {LOCKER_REACTION_EMOJIS.map((em) => (
+                          <button
+                            key={`${m.id}-pick-${em}`}
+                            type="button"
+                            disabled={reactBusyId === m.id}
+                            onClick={() => void onReact(m.id, em)}
+                            className="h-10 w-10 rounded-xl bg-card border border-border hover:border-primary/50 hover:bg-primary/10 text-lg leading-none touch-manipulation disabled:opacity-50"
+                            title="Stamp this emoji"
+                          >
+                            {em}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </li>
               );
             })}
