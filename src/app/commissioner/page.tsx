@@ -73,6 +73,7 @@ import {
   requestRingCeremonyPreview,
 } from "@/lib/ring-ceremony";
 import OpenRoomBotsNudge from "@/components/OpenRoomBotsNudge";
+import OpenRoomLeaveNudge from "@/components/OpenRoomLeaveNudge";
 import CommishWeekChecklist from "@/components/CommishWeekChecklist";
 import SportPoolCommishPanel from "@/components/SportPoolCommishPanel";
 import { setViewAsPlayer } from "@/lib/view-as-player";
@@ -2083,6 +2084,7 @@ function CommissionerPageInner() {
   return (
     <div className="min-h-screen flex flex-col">
       <Nav />
+      <OpenRoomLeaveNudge />
       <OpenRoomBotsNudge
         open={openRoomBotsNudge}
         onClose={() => setOpenRoomBotsNudge(false)}

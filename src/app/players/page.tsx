@@ -27,6 +27,8 @@ import {
 } from "@/lib/divisions";
 import { formatLastSeen, isRecentlyActive } from "@/lib/last-seen";
 import InviteFriends from "@/components/InviteFriends";
+import { isPreseasonCommishToolsAllowed } from "@/lib/season-mode";
+import { getBlueFalconCount, hydrateBlueFalconFromCloud } from "@/lib/blue-falcon";
 
 export default function PlayersPage() {
   const [players, setPlayers] = useState<LeagueRosterMember[]>([]);
@@ -41,6 +43,9 @@ export default function PlayersPage() {
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  /** userId → Blue Falcon Count for kick risk */
+  const [falconByUser, setFalconByUser] = useState<Record<string, number>>({});
+  const preseasonKickOk = isPreseasonCommishToolsAllowed();
 
   async function reload() {
     setError(null);
@@ -62,6 +67,20 @@ export default function PlayersPage() {
 
     const roster = await loadLeagueRoster();
     setPlayers(roster);
+    // Blue Falcon counts for preseason kick risk
+    const falcon: Record<string, number> = {};
+    await Promise.all(
+      roster
+        .filter((m) => !m.isBot && m.userId)
+        .map(async (m) => {
+          try {
+            falcon[m.userId] = await hydrateBlueFalconFromCloud(m.userId);
+          } catch {
+            falcon[m.userId] = getBlueFalconCount(m.userId);
+          }
+        })
+    );
+    setFalconByUser(falcon);
     setLoading(false);
   }
 
@@ -97,9 +116,19 @@ export default function PlayersPage() {
   ) {
     if (!isCommish || busy) return;
     const isBot = !!member.isBot;
+    const bf = falconByUser[member.userId] ?? getBlueFalconCount(member.userId);
     const msg = isBot
       ? `Remove bot "${member.name}"?\n\nFrees 1 seat so a friend can join (league cap ${MAX_LEAGUE_PLAYERS}).`
-      : `Remove "${member.name}" from the league?\n\nThey can rejoin later with the code if a seat is open.`;
+      : preseasonKickOk
+        ? `Kick "${member.name}" before the season starts?\n\n` +
+          `Blue Falcon Count: ${bf}\n` +
+          (bf > 0
+            ? "High risk — they quit other rooms mid-season. Preseason is the time to protect the unit.\n\n"
+            : "Clean Blue Falcon record so far.\n\n") +
+          "They can rejoin later with the code if a seat is open."
+        : `Remove "${member.name}" from the league?\n\n` +
+          `Blue Falcon Count: ${bf}\n` +
+          "Season is live — only kick if you must. They can rejoin with the code if a seat is open.";
     if (!confirm(msg)) return;
 
     setBusy(true);
@@ -180,6 +209,21 @@ export default function PlayersPage() {
         {error && (
           <div className="rounded-xl border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger mb-6">
             {error}
+          </div>
+        )}
+
+        {isCommish && preseasonKickOk && !loading && (
+          <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 mb-4">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-amber-300 mb-1">
+              Preseason · high-risk kick window
+            </p>
+            <p className="text-xs text-muted leading-relaxed">
+              Before kickoff you can remove anyone who looks like a{" "}
+              <strong className="text-foreground">Blue Falcon</strong> (quit
+              other leagues mid-season). Check their count on their profile or
+              next to their name. Protect the room — once the season is live,
+              kicks should be rare.
+            </p>
           </div>
         )}
 
@@ -317,6 +361,15 @@ export default function PlayersPage() {
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium truncate">
                           <PlayerLink id={p.userId} name={p.name} />
+                          {!p.isBot &&
+                            (falconByUser[p.userId] ?? 0) > 0 && (
+                              <span
+                                className="ml-1.5 text-[9px] font-bold uppercase tracking-wide text-amber-300 border border-amber-500/40 bg-amber-500/10 px-1 py-0.5 rounded"
+                                title={`Blue Falcon Count: ${falconByUser[p.userId]} — quit leagues mid-season`}
+                              >
+                                BF {falconByUser[p.userId]}
+                              </span>
+                            )}
                           {p.isBot ? (
                             <span className="ml-1.5 text-[10px] uppercase text-muted border border-border px-1 rounded">
                               Bot
@@ -395,13 +448,21 @@ export default function PlayersPage() {
                                 ? "px-2 py-0.5 rounded border border-danger/40 text-danger font-medium"
                                 : "text-danger opacity-70 sm:opacity-0 sm:group-hover:opacity-100"
                             }`}
-                            title={p.isBot ? "Remove bot" : "Remove player"}
+                            title={
+                              p.isBot
+                                ? "Remove bot"
+                                : preseasonKickOk
+                                  ? "Kick before season (check Blue Falcon Count)"
+                                  : "Remove player"
+                            }
                           >
                             {p.isBot
                               ? removingId === p.userId
                                 ? "…"
                                 : "Remove"
-                              : "✕"}
+                              : preseasonKickOk
+                                ? "Kick"
+                                : "✕"}
                           </button>
                         )}
                     </div>

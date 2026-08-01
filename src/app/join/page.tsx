@@ -387,11 +387,14 @@ function JoinPageInner() {
           }
         }
 
+        // Mid-season OK — join for fun at 0 points (never catch-up pad)
         const { error: memError } = await supabase.from("memberships").insert({
           league_id: league.id,
           user_id: userId,
           role: "player",
           division,
+          total_points: 0,
+          weeks_played: 0,
         });
         if (memError) {
           if (/full|max 32|check_violation/i.test(memError.message || "")) {
@@ -783,6 +786,15 @@ function JoinPageInner() {
                 need another code or a free seat.
               </p>
             )}
+            <div className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-2.5 text-xs text-muted leading-relaxed">
+              <p className="font-semibold text-foreground text-xs mb-0.5">
+                Season already rolling?
+              </p>
+              You can still join. You start at{" "}
+              <strong className="text-foreground">0 points</strong> — no catch-up
+              — and still enjoy the ride (picks, Locker, Gazette). Empty seats
+              only.
+            </div>
             <input
               value={code}
               onChange={(e) => setCode(e.target.value.toUpperCase())}

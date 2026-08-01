@@ -367,6 +367,10 @@ export async function leaveLeague(leagueId: string): Promise<{
   /** Early leave forfeit summary (when season still open) */
   forfeitMessage?: string;
   forfeitedCount?: number;
+  /** Early leave only — new Blue Falcon Count after this quit */
+  blueFalconCount?: number;
+  /** Season already finished — no Blue Falcon / forfeit */
+  seasonFinished?: boolean;
 }> {
   const supabase = createClient();
   const { data: auth } = await supabase.auth.getUser();
@@ -386,21 +390,92 @@ export async function leaveLeague(leagueId: string): Promise<{
     };
   }
 
+  const sportId = (league as { sport_id?: string | null } | null)?.sport_id;
+
   // PRODUCT: leave before season ends → forfeit league-earned cheevos / hardware.
   // Knocked out of brackets but still in the room keeps everything.
   let forfeitMessage: string | undefined;
   let forfeitedCount = 0;
+  let seasonFinished = false;
+  let blueFalconCount: number | undefined;
+
   try {
-    const { forfeitRewardsOnEarlyLeave } = await import(
-      "./league-earned-ledger"
-    );
-    const result = await forfeitRewardsOnEarlyLeave({
-      playerId: auth.user.id,
-      leagueId,
-      sportId: (league as { sport_id?: string | null } | null)?.sport_id,
-    });
-    forfeitedCount = result.forfeitedBadgeIds.length;
-    forfeitMessage = result.message;
+    const { isLeagueSeasonFinishedForRewards, forfeitRewardsOnEarlyLeave } =
+      await import("./league-earned-ledger");
+    seasonFinished = await isLeagueSeasonFinishedForRewards(leagueId, sportId);
+
+    if (!seasonFinished) {
+      const result = await forfeitRewardsOnEarlyLeave({
+        playerId: auth.user.id,
+        leagueId,
+        sportId,
+      });
+      forfeitedCount = result.forfeitedBadgeIds.length;
+      forfeitMessage = result.message;
+
+      // Blue Falcon Count + commissioner open-room nudge (before membership delete)
+      try {
+        const { incrementBlueFalconCount, getBlueFalconCount } = await import(
+          "./blue-falcon"
+        );
+        // Prefer RPC that bumps cloud + flags league
+        const { data: authProf } = await supabase
+          .from("profiles")
+          .select("display_name")
+          .eq("id", auth.user.id)
+          .maybeSingle();
+        const leftName =
+          (authProf as { display_name?: string } | null)?.display_name ||
+          "A player";
+
+        const { data: rpcData, error: rpcErr } = await supabase.rpc(
+          "record_early_leave",
+          {
+            p_league_id: leagueId,
+            p_left_name: leftName,
+          }
+        );
+        if (!rpcErr && rpcData && typeof rpcData === "object") {
+          const c = Number(
+            (rpcData as { blueFalconCount?: number }).blueFalconCount
+          );
+          if (Number.isFinite(c) && c > 0) {
+            const { setBlueFalconCountLocal } = await import("./blue-falcon");
+            setBlueFalconCountLocal(auth.user.id, c);
+            blueFalconCount = c;
+          } else {
+            blueFalconCount = await incrementBlueFalconCount(auth.user.id);
+          }
+        } else {
+          blueFalconCount = await incrementBlueFalconCount(auth.user.id);
+          const { flagOpenRoomNudgeAfterLeave } = await import(
+            "./open-room-nudge"
+          );
+          await flagOpenRoomNudgeAfterLeave({
+            leagueId,
+            leftName,
+          });
+        }
+        if (blueFalconCount == null) {
+          blueFalconCount = getBlueFalconCount(auth.user.id);
+        }
+      } catch {
+        try {
+          const { incrementBlueFalconCount } = await import("./blue-falcon");
+          blueFalconCount = await incrementBlueFalconCount(auth.user.id);
+        } catch {
+          /* ignore */
+        }
+      }
+    } else {
+      // Still clear ledger if any; no forfeit
+      const result = await forfeitRewardsOnEarlyLeave({
+        playerId: auth.user.id,
+        leagueId,
+        sportId,
+      });
+      forfeitMessage = result.message;
+    }
   } catch {
     /* don't block leave if forfeit fails */
   }
@@ -421,7 +496,13 @@ export async function leaveLeague(leagueId: string): Promise<{
       localStorage.removeItem(ACTIVE_LEAGUE_KEY);
     }
   }
-  return { ok: true, forfeitMessage, forfeitedCount };
+  return {
+    ok: true,
+    forfeitMessage,
+    forfeitedCount,
+    blueFalconCount,
+    seasonFinished,
+  };
 }
 
 /**

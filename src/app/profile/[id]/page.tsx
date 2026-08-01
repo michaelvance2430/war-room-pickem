@@ -81,6 +81,7 @@ export default function ProfilePage() {
   const [leagueTrophies, setLeagueTrophies] = useState<LeagueTrophy[]>([]);
   const [leaguePeers, setLeaguePeers] = useState<Player[]>([]);
   const [lastSeenAt, setLastSeenAt] = useState<string | null>(null);
+  const [blueFalconCount, setBlueFalconCount] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -90,6 +91,7 @@ export default function ProfilePage() {
       setJoinTitle(null);
       setLeagueTrophies([]);
       setLastSeenAt(null);
+      setBlueFalconCount(0);
       try {
         let found: Player | null = null;
         let leagueForSync: Player[] = [];
@@ -201,12 +203,26 @@ export default function ProfilePage() {
           }
         }
 
+        // Blue Falcon Count (leagues quit mid-season)
+        let bf = 0;
+        try {
+          const { hydrateBlueFalconFromCloud, getBlueFalconCount } =
+            await import("@/lib/blue-falcon");
+          if (id) {
+            bf = await hydrateBlueFalconFromCloud(id);
+            if (!bf) bf = getBlueFalconCount(id);
+          }
+        } catch {
+          bf = 0;
+        }
+
         if (cancelled) return;
         setPlayer(found);
         setLeaguePeers(leagueForSync.length ? leagueForSync : found ? [found] : []);
         setJoinTitle(title);
         setLeagueTrophies(trophies);
         setLastSeenAt(seen);
+        setBlueFalconCount(bf);
       } catch (e) {
         if (!cancelled) {
           setLoadError(e instanceof Error ? e.message : "Failed to load");
@@ -476,10 +492,32 @@ export default function ProfilePage() {
                   value={mock ? "NPC" : formatLastSeen(lastSeenAt)}
                   accent={isRecentlyActive(lastSeenAt)}
                 />
+                {!mock && (
+                  <Chip
+                    label="Blue Falcon Count"
+                    value={String(blueFalconCount)}
+                    accent={blueFalconCount > 0}
+                  />
+                )}
+                {!mock && blueFalconCount > 0 && (
+                  <div className="col-span-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-amber-300 mb-0.5">
+                      Quit mid-season
+                    </p>
+                    <p className="text-[11px] text-muted leading-relaxed">
+                      Left {blueFalconCount} league
+                      {blueFalconCount === 1 ? "" : "s"} before finishing —
+                      not bracket knockout, walking out of the room. Commish
+                      may kick high Blue Falcons before kickoff.
+                    </p>
+                  </div>
+                )}
               </div>
               {isSelfProfile && !mock && (
                 <p className="text-[10px] text-muted mt-2 leading-relaxed">
                   Standings own season points. Hardware and the plot live here.
+                  Blue Falcon Count tracks leagues you quit before the season
+                  ended.
                   {isSandboxMode()
                     ? " Sandbox: sim cheevos don't stick to career."
                     : ""}

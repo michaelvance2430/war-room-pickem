@@ -278,6 +278,8 @@ export default function AccountPage() {
     busy: boolean;
     /** When true, season is over — rewards may stick */
     seasonFinished: boolean | null;
+    /** Current Blue Falcon Count before this leave */
+    blueFalconCount: number;
   } | null>(null);
 
   async function onLeave(
@@ -286,12 +288,26 @@ export default function AccountPage() {
     sportId?: string | null
   ) {
     setMessage(null);
+    let bf = 0;
+    try {
+      const { getBlueFalconCount, hydrateBlueFalconFromCloud } = await import(
+        "@/lib/blue-falcon"
+      );
+      if (userId) {
+        bf = await hydrateBlueFalconFromCloud(userId);
+      } else {
+        bf = getBlueFalconCount(userId);
+      }
+    } catch {
+      bf = 0;
+    }
     setLeaveModal({
       leagueId,
       leagueName,
       sportId,
       busy: false,
       seasonFinished: null,
+      blueFalconCount: bf,
     });
     // Best-effort: soften copy if championship already engraved / calendar past final
     try {
@@ -327,12 +343,21 @@ export default function AccountPage() {
       setLeaveModal(null);
       return;
     }
-    setMessage(
-      result.forfeitMessage ||
-        (result.forfeitedCount
-          ? `Left league — forfeited ${result.forfeitedCount} unlock(s).`
-          : "Left league")
-    );
+    const parts: string[] = [];
+    if (result.forfeitMessage) parts.push(result.forfeitMessage);
+    else if (result.forfeitedCount) {
+      parts.push(`Left league — forfeited ${result.forfeitedCount} unlock(s).`);
+    } else {
+      parts.push("Left league");
+    }
+    if (
+      !result.seasonFinished &&
+      result.blueFalconCount != null &&
+      result.blueFalconCount > 0
+    ) {
+      parts.push(`Blue Falcon Count: ${result.blueFalconCount}`);
+    }
+    setMessage(parts.join(" · "));
     setLeaveModal(null);
     await reload();
     if (getSession() === null) {
@@ -1050,7 +1075,8 @@ export default function AccountPage() {
               <p className="text-sm text-muted leading-relaxed">
                 This season looks finished. Your cheevos and hardware from this
                 league should stay. You&apos;ll still leave the room and drop off
-                the roster.
+                the roster. Blue Falcon Count does not go up after a finished
+                season.
               </p>
             ) : (
               <>
@@ -1074,10 +1100,41 @@ export default function AccountPage() {
                     </li>
                   </ul>
                   <p className="text-xs text-muted leading-relaxed pt-1">
-                    Forfeited rewards do <strong className="text-foreground">not</strong> come
-                    back if you rejoin later.
+                    Forfeited rewards do{" "}
+                    <strong className="text-foreground">not</strong> come back
+                    if you rejoin later.
                   </p>
                 </div>
+
+                {/* Blue Falcon Count — call out hard so people feel the heat */}
+                <div className="rounded-xl border-2 border-amber-500/50 bg-amber-500/10 px-4 py-3 space-y-1.5">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-amber-300">
+                    Your Blue Falcon Count
+                  </p>
+                  <p className="text-3xl font-black text-amber-200 tabular-nums">
+                    {leaveModal.blueFalconCount}
+                    <span className="text-base font-bold text-amber-200/80 ml-2">
+                      → {leaveModal.blueFalconCount + 1}
+                    </span>
+                  </p>
+                  <p className="text-xs text-muted leading-relaxed">
+                    <strong className="text-foreground">Blue Falcon</strong>{" "}
+                    = quitting the unit mid-season and screwing the rest of the
+                    room. This number is{" "}
+                    <strong className="text-foreground">
+                      public on your profile
+                    </strong>
+                    . Commissioners check it before kickoff when they kick high
+                    risk. Don&apos;t be that guy.
+                  </p>
+                  {leaveModal.blueFalconCount === 0 && (
+                    <p className="text-xs text-amber-100/90 font-medium leading-relaxed">
+                      First time? This leave makes your Blue Falcon Count{" "}
+                      <strong>1</strong>. The room will see it.
+                    </p>
+                  )}
+                </div>
+
                 <p className="text-sm text-muted leading-relaxed">
                   Fun stuff only sticks if you{" "}
                   <strong className="text-foreground">finish the season</strong>
