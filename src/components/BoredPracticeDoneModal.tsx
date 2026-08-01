@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import {
   EVENT_BORED_PRACTICE_DONE,
   isBoredPracticeWindowOpen,
+  markBoredPracticeStarted,
   takeBoredPracticeDoneModal,
 } from "@/lib/bored-practice";
 import { getLeague, isOps } from "@/lib/league";
@@ -21,7 +22,6 @@ import {
 } from "@/lib/cloud";
 import { generateDemoSlate } from "@/lib/demo-slate";
 import { propFromPreset, rotatingPropPreset } from "@/lib/prop-presets";
-import { markBoredPracticeStarted } from "@/lib/bored-practice";
 import { isPreseasonCommishToolsAllowed } from "@/lib/season-mode";
 import BrandMark from "@/components/BrandMark";
 
