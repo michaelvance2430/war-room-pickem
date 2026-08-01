@@ -1536,9 +1536,22 @@ export async function saveResultsAndScoreWeek(opts: {
    * When any game is 6–7 or 7–6, grant Sixxxxx Seveennnn to everyone who locked.
    */
   finalBoxes?: { gameId: string; homeScore: number; awayScore: number }[];
+  /** Pre–Week 0 practice loop: allow scoring when bored-practice is active */
+  allowBoredPractice?: boolean;
 }): Promise<ScoreWeekResult> {
   const session = getSession();
-  if (!session?.leagueId || !isOps()) {
+  let mayScore = !!(session?.leagueId && isOps());
+  if (!mayScore && opts.allowBoredPractice && session?.leagueId) {
+    try {
+      const { isBoredPracticeScoringAllowed } = await import(
+        "./bored-practice"
+      );
+      mayScore = isBoredPracticeScoringAllowed();
+    } catch {
+      mayScore = false;
+    }
+  }
+  if (!mayScore) {
     return { ok: false, scoredCount: 0, error: "Commissioner or deputy only" };
   }
 

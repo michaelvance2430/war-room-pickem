@@ -793,6 +793,24 @@ export default function PicksPage() {
       /* ignore */
     }
 
+    // Bored practice week: auto-score so the one-week loop completes
+    try {
+      const { isBoredPracticeActive } = await import("@/lib/bored-practice");
+      const { autoScoreBoredPracticeIfActive } = await import(
+        "@/lib/bored-practice-run"
+      );
+      if (isBoredPracticeActive()) {
+        const scored = await autoScoreBoredPracticeIfActive(activeWeek);
+        if (scored.ok) {
+          // Done modal will open from BoredPracticeDoneModal
+        } else if (scored.message) {
+          setSaveError(scored.message);
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+
     // Easter egg: Lucky Seven (7:07:07 lock) — zero points
     try {
       const { checkLuckySevenLock, EVENT_EASTER_EGG } = await import(

@@ -1724,6 +1724,17 @@ function CommissionerPageInner() {
       return;
     }
 
+    // Bored practice: thank-you / re-do modal for the room
+    try {
+      const { isBoredPracticeActive, queueBoredPracticeDoneModal } =
+        await import("@/lib/bored-practice");
+      if (isBoredPracticeActive()) {
+        queueBoredPracticeDoneModal();
+      }
+    } catch {
+      /* ok */
+    }
+
     // Lock this week after a successful score pass
     setResultsLocked(true);
     setScoredAtLabel(new Date().toLocaleString());

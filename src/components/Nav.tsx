@@ -26,6 +26,7 @@ import PlayerWalkthrough from "@/components/PlayerWalkthrough";
 import RingCeremonyModal from "@/components/RingCeremonyModal";
 import SeasonFinaleModal from "@/components/SeasonFinaleModal";
 import CardPublishedModal from "@/components/CardPublishedModal";
+import BoredPracticeDoneModal from "@/components/BoredPracticeDoneModal";
 import JoinBadgeHydrator from "@/components/JoinBadgeHydrator";
 import EquippedTitleHydrator from "@/components/EquippedTitleHydrator";
 import ProfileBorderHydrator from "@/components/ProfileBorderHydrator";
@@ -947,6 +948,7 @@ export default function Nav() {
       {!isGuestMode() && <SeasonFinaleModal />}
       {/* After host publishes a card — celebrate + share + player view */}
       {!isGuestMode() && <CardPublishedModal />}
+      {!isGuestMode() && <BoredPracticeDoneModal />}
       {!isGuestMode() && <JoinBadgeHydrator />}
       {!isGuestMode() && <EquippedTitleHydrator />}
       {!isGuestMode() && <ProfileBorderHydrator />}
