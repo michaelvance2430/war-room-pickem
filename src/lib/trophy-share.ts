@@ -59,8 +59,16 @@ function firstName(full: string) {
 }
 
 function divisionLabel(div?: string | null) {
-  const d = (div || "").trim();
-  return d ? `${d} Division` : "Division";
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { divisionFullLabel } = require("./divisions") as typeof import("./divisions");
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getLeague } = require("./league") as typeof import("./league");
+    return divisionFullLabel(div, getLeague()?.sportId) || "Division";
+  } catch {
+    const d = (div || "").trim();
+    return d ? `${d} Division` : "Division";
+  }
 }
 
 /** Hilarious, distinct write-ups — different personality per hardware type. */

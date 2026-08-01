@@ -20,7 +20,11 @@ import {
   isLeagueFull,
   seatsRemaining,
 } from "@/lib/league-limits";
-import { DIVISIONS } from "@/lib/divisions";
+import {
+  DIVISIONS,
+  divisionDisplayLabel,
+  divisionFullLabel,
+} from "@/lib/divisions";
 import { formatLastSeen, isRecentlyActive } from "@/lib/last-seen";
 import InviteFriends from "@/components/InviteFriends";
 
@@ -233,7 +237,11 @@ export default function PlayersPage() {
                         </span>
                       </div>
                       <div className="text-xs text-muted">
-                        {b.division} · {b.totalPoints} pts
+                        {divisionDisplayLabel(
+                          b.division,
+                          getLeague()?.sportId
+                        )}{" "}
+                        · {b.totalPoints} pts
                       </div>
                     </div>
                     <button
@@ -284,7 +292,9 @@ export default function PlayersPage() {
                 className="rounded-xl border border-border bg-card overflow-hidden"
               >
                 <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-                  <span className="font-semibold">{division}</span>
+                  <span className="font-semibold">
+                    {divisionFullLabel(division, getLeague()?.sportId)}
+                  </span>
                   <span className="text-xs text-muted">{list.length}</span>
                 </div>
                 <div className="p-2 space-y-1 min-h-[120px]">
@@ -356,12 +366,15 @@ export default function PlayersPage() {
                               e.target.value as Division
                             )
                           }
-                          className="text-xs bg-background border border-border rounded px-1 py-0.5 max-w-[4.5rem]"
+                          className="text-xs bg-background border border-border rounded px-1 py-0.5 max-w-[6.5rem]"
                           title="Change division (ops only)"
                         >
                           {DIVISIONS.map((d) => (
                             <option key={d} value={d}>
-                              {d}
+                              {divisionDisplayLabel(
+                                d,
+                                getLeague()?.sportId
+                              )}
                             </option>
                           ))}
                         </select>

@@ -8,6 +8,8 @@ import {
   type ProfileTrophyKind,
 } from "@/lib/profile-hardware";
 import TrophyShareButton from "@/components/TrophyShareButton";
+import { divisionFullLabel } from "@/lib/divisions";
+import { getLeague } from "@/lib/league";
 
 function Plaque({
   item,
@@ -42,7 +44,9 @@ function Plaque({
         {item.seasonYear} · {item.title}
       </div>
       {item.division && (
-        <div className="text-sm font-bold mt-1">{item.division} Division</div>
+        <div className="text-sm font-bold mt-1">
+          {divisionFullLabel(item.division, getLeague()?.sportId)}
+        </div>
       )}
       {item.subtitle && (
         <p className="text-xs text-muted mt-1">{item.subtitle}</p>

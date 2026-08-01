@@ -13,6 +13,7 @@ import YouBadge from "@/components/YouBadge";
 import PlayerLink from "@/components/PlayerLink";
 import { standingsHardwareFlair } from "@/lib/profile-hardware";
 import { Division, Player } from "@/lib/types";
+import { divisionTabLabel } from "@/lib/divisions";
 
 const divisions: (Division | "Overall")[] = [
   "Overall",
@@ -167,7 +168,7 @@ export default function StandingsPage() {
                   : "bg-card border border-border text-muted hover:text-foreground"
               }`}
             >
-              {d}
+              {divisionTabLabel(d, getLeague()?.sportId)}
             </button>
           ))}
         </div>
@@ -250,7 +251,10 @@ export default function StandingsPage() {
                     </td>
                     {active === "Overall" && (
                       <td className="px-3 sm:px-4 py-3.5 text-muted align-middle text-xs sm:text-sm">
-                        {player.division}
+                        {divisionTabLabel(
+                          player.division,
+                          getLeague()?.sportId
+                        )}
                       </td>
                     )}
                     <td className="px-3 py-3.5 hidden md:table-cell align-middle">

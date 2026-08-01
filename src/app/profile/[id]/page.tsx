@@ -16,6 +16,7 @@ import {
   buildSeasonPlot,
   buildSignatureStyle,
 } from "@/lib/profile-signature";
+import { divisionFullLabel } from "@/lib/divisions";
 import {
   formatMemberSince,
   getPlayerBadges,
@@ -409,7 +410,7 @@ export default function ProfilePage() {
                 )}
               </div>
               <p className="text-sm text-muted mb-2">
-                {player.division} Division ·{" "}
+                {divisionFullLabel(player.division, sportId)} ·{" "}
                 {mock ? (
                   "Lab-grown for your league"
                 ) : joinTitle ? (
