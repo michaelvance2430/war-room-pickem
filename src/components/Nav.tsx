@@ -13,6 +13,7 @@ import {
 } from "@/lib/league";
 import Avatar from "@/components/Avatar";
 import RulesOnboardingModal from "@/components/RulesOnboardingModal";
+import LoginWelcomeModal from "@/components/LoginWelcomeModal";
 import GazetteModal from "@/components/GazetteModal";
 import GazetteShelfReveal from "@/components/GazetteShelfReveal";
 import StoryDoorModal from "@/components/StoryDoorModal";
@@ -939,6 +940,7 @@ export default function Nav() {
       {!isGuestMode() && <JoinBadgeHydrator />}
       {!isGuestMode() && <EquippedTitleHydrator />}
       {!isGuestMode() && <ProfileBorderHydrator />}
+      {!isGuestMode() && <LoginWelcomeModal />}
       {!isGuestMode() && <RulesOnboardingModal />}
       <GazetteModal />
       <GazetteShelfReveal />
