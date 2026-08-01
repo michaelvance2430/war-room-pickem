@@ -1952,6 +1952,8 @@ function CommissionerPageInner() {
     const text = buildInviteShareText({
       leagueName: league.name || "War Room",
       code: league.code,
+      sportId: league.sportId || "cfb",
+      inviterName: getSession()?.playerName,
     });
     try {
       await navigator.clipboard.writeText(text);

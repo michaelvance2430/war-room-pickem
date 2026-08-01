@@ -148,6 +148,15 @@ export function buildInviteShareText(opts: {
     }
   }
   const nfl = sportId === "nfl";
+  // Always explicit — dual-sport invites must not be ambiguous
+  const sportLabel = nfl ? "NFL" : "CFB";
+  const sportFull = nfl
+    ? "NFL (pro football)"
+    : "CFB (college football)";
+  const sportDay = nfl ? "Sundays" : "Saturdays";
+  const sportBanner = nfl
+    ? "🏈 LEAGUE TYPE: NFL — pro football pick'em"
+    : "🏟️ LEAGUE TYPE: CFB — college football pick'em";
 
   const flavors: InviteFlavor[] = [
     "warroom",
@@ -166,13 +175,15 @@ export function buildInviteShareText(opts: {
   }
 
   // Keep blank lines (""): they make SMS/iMessage readable. Only drop null.
+  // Every flavor must name CFB or NFL (not just "football").
   const byCfb: Record<InviteFlavor, (string | null)[]> = {
     warroom: [
+      sportBanner,
       who
         ? `${who} just drafted you into ${name}.`
         : `You're being drafted into ${name}.`,
       "",
-      "War Room Pick'em = college football with YOUR people.",
+      `War Room Pick'em · CFB (college football) with YOUR people.`,
       "5 confidence picks · one Best Bet · one prop · standings that don't lie.",
       "Championship for the top. Toilet Bowl for the rest (still a trophy).",
       "",
@@ -185,13 +196,14 @@ export function buildInviteShareText(opts: {
       "Tap → account if you need one → you're in. Don't ghost Saturday.",
     ],
     groupchat: [
+      sportBanner,
       "STOP SCROLLING 🛑",
       "",
       who
         ? `${who} just put you in ${name}.`
         : `You've been voluntold for ${name}.`,
       "",
-      "It's our CFB pick'em league — the one that will live in this chat all fall.",
+      "It's our CFB (college football) pick'em league — not NFL — and it'll live in this chat all fall.",
       "Every week: 5 games, confidence 1–5, Best Bet, prop.",
       "Winner gets glory. Last place gets the Toilet Bowl and permanent meme status.",
       "",
@@ -202,13 +214,15 @@ export function buildInviteShareText(opts: {
       "30 seconds. Zero excuses next Saturday. Do it now before you forget 😤",
     ],
     dad: [
-      `Subject: Important football business (${name})`,
+      sportBanner,
+      `Subject: CFB league invite — ${name}`,
       "",
       who
         ? `${who} invited you. Don't make this weird.`
         : "You've been invited. Don't make this weird.",
       "",
-      "War Room Pick'em = college football against the spread with the group.",
+      "War Room Pick'em = CFB (college football) against the spread with the group.",
+      "This is NOT the NFL room — Saturdays, campus, the whole thing.",
       "Pick games. Talk trash. Check the board after kickoff.",
       "There's a Toilet Bowl so the bottom half still has something to play for (and something to roast).",
       "",
@@ -220,13 +234,14 @@ export function buildInviteShareText(opts: {
       "See you Saturday. Love you. Don't reply-all if this is email.",
     ],
     boomer: [
-      `Hello — you're invited to our football league: ${name}.`,
+      sportBanner,
+      `Hello — you're invited to our CFB (college football) league: ${name}.`,
       "",
-      "This is college football pick'em with friends. No gambling required. No complicated fantasy draft.",
+      "This is college football pick'em with friends — CFB, not the NFL. No gambling required. No complicated fantasy draft.",
       "",
       "What you do each week:",
       "1) Open the link below",
-      "2) Pick 5 games (who covers the spread)",
+      "2) Pick 5 CFB games (who covers the spread)",
       "3) Lock before kickoff",
       "4) Watch standings update after the games",
       "",
@@ -238,14 +253,15 @@ export function buildInviteShareText(opts: {
       "Call me if you get stuck. Looking forward to having you in the group!",
     ],
     genx: [
+      sportBanner,
       who
         ? `${who} is not asking. You're in ${name}.`
         : `Plot twist: you're in ${name} now.`,
       "",
-      "Remember when Saturday meant actual football opinions and nobody was \"building a brand\"?",
+      "Remember when Saturday meant actual CFB opinions and nobody was \"building a brand\"?",
       "This is that. On your phone. With a scoreboard that keeps receipts.",
       "",
-      "CFB pick'em. Confidence points. Best Bet. Props. Toilet Bowl for the cursed half of the room.",
+      "CFB (college football) pick'em — not NFL. Confidence points. Best Bet. Props. Toilet Bowl for the cursed half of the room.",
       "No NFT. No crypto. No \"engage with our content.\" Just the group being wrong together.",
       "",
       linkBlock,
@@ -254,14 +270,15 @@ export function buildInviteShareText(opts: {
       "Join once. Show up Saturdays. That's the whole product — we kept it simple on purpose.",
     ],
     xennial: [
+      sportBanner,
       who
         ? `${who} is forcing a tradition. You're in ${name}.`
         : `New tradition loading: ${name}.`,
       "",
-      "Remember hanging at somebody's place, pizza boxes, arguing about the line until kickoff?",
+      "Remember hanging at somebody's place, pizza boxes, arguing about the CFB line until kickoff?",
       "We ported that energy to 2026 — without the weird apps that want your kidney data.",
       "",
-      "War Room: CFB pick'em · confidence · Best Bet · props · Gazette headlines · real standings.",
+      "War Room: CFB (college football) pick'em · confidence · Best Bet · props · Gazette headlines · real standings.",
       "Championship banner if you're good. Toilet Bowl if you're content.",
       "",
       linkBlock,
@@ -270,13 +287,14 @@ export function buildInviteShareText(opts: {
       "Join once. Come back every Saturday. That's it. That's the product.",
     ],
     millennial: [
+      sportBanner,
       "ok so hear me out 🏈",
       "",
       who
         ? `${who} is dragging you into ${name} and honestly? correct decision.`
         : `you've been summoned to ${name}.`,
       "",
-      "it's college football pick'em with the group — not another \"download this app and also our sister apps\" situation.",
+      "it's CFB (college football) pick'em with the group — not NFL, not another \"download this app and also our sister apps\" situation.",
       "5 picks a week. confidence points. one Best Bet. one prop. standings that will absolutely live rent-free in the group chat.",
       "top half: championship energy. bottom half: Toilet Bowl (still a trophy, still a personality).",
       "",
@@ -287,12 +305,13 @@ export function buildInviteShareText(opts: {
       "seriously 30 seconds. then we can all be wrong about Alabama together. do it before the ADHD fairies take this text away ✨",
     ],
     chaos: [
+      sportBanner,
       "🚨 GROUP CHAT EMERGENCY 🚨",
       "",
-      `${name} needs bodies.`,
+      `${name} needs bodies. (CFB league — college football, not NFL.)`,
       who ? `Blame: ${who}` : "Blame: whoever sent this",
       "",
-      "It's free. It's college football. It's legal-ish trash talk.",
+      "It's free. It's CFB. It's legal-ish trash talk.",
       "You will either win a title OR star in the Toilet Bowl.",
       "Both are content. Both go in the Gazette. Both will be brought up at Thanksgiving.",
       "",
@@ -307,11 +326,12 @@ export function buildInviteShareText(opts: {
 
   const byNfl: Record<InviteFlavor, (string | null)[]> = {
     warroom: [
+      sportBanner,
       who
         ? `${who} just drafted you into ${name}.`
         : `You're being drafted into ${name}.`,
       "",
-      "War Room Pick'em = pro football with YOUR people.",
+      "War Room Pick'em · NFL (pro football) with YOUR people.",
       "5 confidence picks · one Best Bet · one prop · standings that don't lie.",
       "Championship for the top. Toilet Bowl for the rest (still a trophy).",
       "",
@@ -324,13 +344,14 @@ export function buildInviteShareText(opts: {
       "Tap → account if you need one → you're in. Don't ghost Sunday.",
     ],
     groupchat: [
+      sportBanner,
       "STOP SCROLLING 🛑",
       "",
       who
         ? `${who} just put you in ${name}.`
         : `You've been voluntold for ${name}.`,
       "",
-      "It's our NFL pick'em league — the one that will live in this chat all fall.",
+      "It's our NFL pick'em league — pro football, not college — and it'll live in this chat all season.",
       "Every week: 5 games, confidence 1–5, Best Bet, prop.",
       "Winner gets glory. Last place gets the Toilet Bowl and permanent meme status.",
       "",
@@ -341,13 +362,15 @@ export function buildInviteShareText(opts: {
       "30 seconds. Zero excuses next Sunday. Do it now before you forget 😤",
     ],
     dad: [
-      `Subject: Important football business (${name})`,
+      sportBanner,
+      `Subject: NFL league invite — ${name}`,
       "",
       who
         ? `${who} invited you. Don't make this weird.`
         : "You've been invited. Don't make this weird.",
       "",
-      "War Room Pick'em = pro football against the spread with the group.",
+      "War Room Pick'em = NFL (pro football) against the spread with the group.",
+      "This is NOT the CFB/college room — Sundays, late windows, the whole thing.",
       "Pick games. Talk trash. Check the board after kickoff.",
       "There's a Toilet Bowl so the bottom half still has something to play for (and something to roast).",
       "",
@@ -359,13 +382,14 @@ export function buildInviteShareText(opts: {
       "See you Sunday. Love you. Don't reply-all if this is email.",
     ],
     boomer: [
-      `Hello — you're invited to our football league: ${name}.`,
+      sportBanner,
+      `Hello — you're invited to our NFL (pro football) league: ${name}.`,
       "",
-      "This is NFL pick'em with friends. No gambling required. No complicated fantasy draft.",
+      "This is NFL pick'em with friends — pro football, not college. No gambling required. No complicated fantasy draft.",
       "",
       "What you do each week:",
       "1) Open the link below",
-      "2) Pick 5 games (who covers the spread)",
+      "2) Pick 5 NFL games (who covers the spread)",
       "3) Lock before kickoff",
       "4) Watch standings update after the games",
       "",
@@ -377,14 +401,15 @@ export function buildInviteShareText(opts: {
       "Call me if you get stuck. Looking forward to having you in the group!",
     ],
     genx: [
+      sportBanner,
       who
         ? `${who} is not asking. You're in ${name}.`
         : `Plot twist: you're in ${name} now.`,
       "",
-      "Remember when Sunday meant actual football opinions and nobody was \"building a brand\"?",
+      "Remember when Sunday meant actual NFL opinions and nobody was \"building a brand\"?",
       "This is that. On your phone. With a scoreboard that keeps receipts.",
       "",
-      "NFL pick'em. Confidence points. Best Bet. Props. Toilet Bowl for the cursed half of the room.",
+      "NFL (pro football) pick'em — not CFB. Confidence points. Best Bet. Props. Toilet Bowl for the cursed half of the room.",
       "No NFT. No crypto. No \"engage with our content.\" Just the group being wrong together.",
       "",
       linkBlock,
@@ -393,11 +418,12 @@ export function buildInviteShareText(opts: {
       "Join once. Show up Sundays. That's the whole product — we kept it simple on purpose.",
     ],
     xennial: [
+      sportBanner,
       who
         ? `${who} is forcing a tradition. You're in ${name}.`
         : `New tradition loading: ${name}.`,
       "",
-      "Remember hanging at somebody's place, pizza boxes, arguing about the line until kickoff?",
+      "Remember hanging at somebody's place, pizza boxes, arguing about the NFL line until kickoff?",
       "We ported that energy to 2026 — without the weird apps that want your kidney data.",
       "",
       "War Room: NFL pick'em · confidence · Best Bet · props · Sunday Gazette · real standings.",
@@ -409,13 +435,14 @@ export function buildInviteShareText(opts: {
       "Join once. Come back every Sunday. That's it. That's the product.",
     ],
     millennial: [
+      sportBanner,
       "ok so hear me out 🏈",
       "",
       who
         ? `${who} is dragging you into ${name} and honestly? correct decision.`
         : `you've been summoned to ${name}.`,
       "",
-      "it's NFL pick'em with the group — not another \"download this app and also our sister apps\" situation.",
+      "it's NFL pick'em with the group — pro football, not CFB, not another \"download this app and also our sister apps\" situation.",
       "5 picks a week. confidence points. one Best Bet. one prop. standings that will absolutely live rent-free in the group chat.",
       "top half: championship energy. bottom half: Toilet Bowl (still a trophy, still a personality).",
       "",
@@ -426,9 +453,10 @@ export function buildInviteShareText(opts: {
       "seriously 30 seconds. then we can all be wrong about the late window together. do it before the ADHD fairies take this text away ✨",
     ],
     chaos: [
+      sportBanner,
       "🚨 GROUP CHAT EMERGENCY 🚨",
       "",
-      `${name} needs bodies.`,
+      `${name} needs bodies. (NFL league — pro football, not CFB.)`,
       who ? `Blame: ${who}` : "Blame: whoever sent this",
       "",
       "It's free. It's NFL. It's legal-ish trash talk.",
@@ -446,9 +474,33 @@ export function buildInviteShareText(opts: {
 
   const by = nfl ? byNfl : byCfb;
 
+  void sportLabel;
+  void sportFull;
+  void sportDay;
+
   return by[flavor]
     .filter((line) => line != null)
     .join("\n");
+}
+
+/** Share-sheet title — always names the sport. */
+export function buildInviteShareTitle(opts: {
+  leagueName: string;
+  sportId?: string | null;
+}): string {
+  let sportId = opts.sportId;
+  if (!sportId) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { getLeague } = require("./league") as typeof import("./league");
+      sportId = getLeague()?.sportId;
+    } catch {
+      sportId = "cfb";
+    }
+  }
+  const sport = sportId === "nfl" ? "NFL" : "CFB";
+  const name = (opts.leagueName || "War Room").trim();
+  return `War Room ${sport}: ${name}`;
 }
 
 const PENDING_CODE_KEY = "warroom-pending-join-code";
@@ -505,7 +557,10 @@ export async function shareLeagueInvite(opts: {
   try {
     if (typeof navigator !== "undefined" && navigator.share) {
       await navigator.share({
-        title: `War Room: ${opts.leagueName}`,
+        title: buildInviteShareTitle({
+          leagueName: opts.leagueName,
+          sportId: opts.sportId,
+        }),
         text,
         url: url || undefined,
       });
