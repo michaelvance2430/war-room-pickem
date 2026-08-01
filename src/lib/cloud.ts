@@ -329,6 +329,28 @@ export async function publishWeekCard(opts: {
     );
   } catch {}
 
+  // Human/ops publish clears lazy-commish auto-post streak
+  try {
+    await supabase
+      .from("leagues")
+      .update({
+        auto_publish_streak: 0,
+        last_auto_publish_week: null,
+      })
+      .eq("id", leagueId);
+  } catch {
+    /* columns may not exist until lazy-commish-auto-card.sql is run */
+  }
+  // Best-effort: mark card as not auto if column exists
+  try {
+    await supabase
+      .from("week_cards")
+      .update({ auto_published: false })
+      .eq("id", weekCardId);
+  } catch {
+    /* ignore */
+  }
+
   return { ok: true, weekCardId, games: gamesWithIds };
 }
 

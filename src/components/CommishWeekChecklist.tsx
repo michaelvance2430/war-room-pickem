@@ -94,8 +94,8 @@ export default function CommishWeekChecklist({
             label: "2. Build & publish the card",
             detail: hasCard
               ? `${weekTitle(w)} is live (${card!.games!.length} games)`
-              : `First time? Publish demo week (one tap) on Build Card`,
-            why: "No card = friends can’t pick.",
+              : `Publish by 48h before first kickoff — or the system auto-posts (2 misses = gavel to 1st place)`,
+            why: "No card = friends can’t pick. Miss two weeks and you lose the gavel.",
             done: hasCard,
             actionTab: "card",
           },

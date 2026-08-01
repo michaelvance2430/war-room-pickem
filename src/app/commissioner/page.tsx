@@ -3213,6 +3213,18 @@ function CommissionerPageInner() {
                   onDismiss={() => setShowFirstWizard(false)}
                 />
               )}
+            <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 mb-4 text-xs text-foreground leading-relaxed">
+              <p className="font-bold text-amber-200">
+                Lazy commissioner protection
+              </p>
+              <p className="mt-1 text-muted">
+                Post the card by <strong className="text-foreground">48 hours before first kickoff</strong>.
+                Miss it and War Room auto-selects 5 games + a prop so the room can still pick.
+                Miss <strong className="text-foreground">two weeks in a row</strong> and the gavel
+                goes to whoever is in <strong className="text-foreground">1st place</strong>.
+                Publishing yourself clears the strike count.
+              </p>
+            </div>
             <div className="rounded-xl border border-border bg-card p-5 mb-6">
               <h2 className="font-semibold mb-1">Pick&apos;em week</h2>
               <p className="text-xs text-muted mb-3">
