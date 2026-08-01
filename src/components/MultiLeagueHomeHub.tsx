@@ -373,12 +373,21 @@ export default function MultiLeagueHomeHub({ onSwitched }: Props) {
               </span>
             )}
           </p>
+          {/*
+            Do NOT repeat the active room name here — the masthead owns that.
+            This control is only “switch desks / rooms.”
+          */}
           <p className="text-sm font-bold text-white truncate mt-0.5">
             {activeInScope ? (
-              <>
-                {activeInScope.leagueName || "War Room"}
-                <span className="text-primary font-extrabold"> · here</span>
-              </>
+              <span className="text-muted font-semibold">
+                Tap to switch rooms
+                {scopedRooms.length > 1 ? (
+                  <span className="text-foreground/80">
+                    {" "}
+                    · {scopedRooms.length} on this desk
+                  </span>
+                ) : null}
+              </span>
             ) : (
               <span className="text-muted font-semibold">
                 Tap to open a {scopePack.shortLabel} room
