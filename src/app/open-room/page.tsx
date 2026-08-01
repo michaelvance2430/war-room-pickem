@@ -173,7 +173,7 @@ export default function OpenRoomPage() {
       <div className="max-w-md w-full">
         <div className="text-center mb-6">
           <div className="flex justify-center mb-3">
-            <BrandMark size={64} variant="force" className="rounded-xl" />
+            <BrandMark size={80} variant="force" className="rounded-xl" />
           </div>
           <h1 className="text-2xl font-bold">Open room lobby</h1>
           <p className="text-sm text-muted mt-2 leading-relaxed">

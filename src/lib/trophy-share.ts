@@ -436,12 +436,17 @@ export async function renderTrophyShareCanvas(
   const s = size / 1080;
   const name = (t.winnerName || "Champion").trim();
 
-  // Prefetch face so layout can reserve the portrait block
+  // Prefetch face + house crest (same-origin — reliable on canvas)
   let face: HTMLImageElement | null = null;
   const avatarUrl = (t.winnerAvatarUrl || "").trim();
   if (avatarUrl) {
     face = await loadShareImage(avatarUrl);
   }
+  const crestSrc =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/brand/war-room-crest.png`
+      : "/brand/war-room-crest.png";
+  const crest = await loadShareImage(crestSrc);
 
   // Background gradient
   const g = ctx.createLinearGradient(0, 0, size, size);
@@ -489,34 +494,35 @@ export async function renderTrophyShareCanvas(
   roundRect(ctx, 52 * s, 52 * s, size - 104 * s, size - 104 * s, 32 * s);
   ctx.stroke();
 
-  // Brand strip
-  ctx.fillStyle = hexAlpha(colors.accent, 0.12);
-  roundRect(ctx, 100 * s, 100 * s, size - 200 * s, 56 * s, 16 * s);
-  ctx.fill();
-  ctx.font = `700 ${22 * s}px system-ui, -apple-system, Segoe UI, sans-serif`;
-  ctx.fillStyle = colors.muted;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText("WAR ROOM PICK'EM", size / 2, 128 * s);
+  // Brand lockup — crest + wordmark (billboard-readable on phone)
+  drawShareBrandLockup(ctx, {
+    size,
+    s,
+    crest,
+    accent: colors.accent,
+    muted: colors.muted,
+    text: colors.text,
+  });
 
   // Hardware art — slightly smaller so the face owns the center
   if (t.kind === "championship") {
-    drawChampionshipTrophyArt(ctx, size / 2, 250 * s, 150 * s, t.sportId);
+    drawChampionshipTrophyArt(ctx, size / 2, 268 * s, 140 * s, t.sportId);
   } else if (t.kind === "toilet_bowl") {
-    drawToiletTrophyArt(ctx, size / 2, 250 * s, 140 * s);
+    drawToiletTrophyArt(ctx, size / 2, 268 * s, 130 * s);
   } else if (t.kind === "crystal_ball") {
-    drawNerdTrophyArt(ctx, size / 2, 250 * s, 150 * s);
+    drawNerdTrophyArt(ctx, size / 2, 268 * s, 140 * s);
   } else {
-    ctx.font = `${120 * s}px "Segoe UI Emoji", "Apple Color Emoji", sans-serif`;
+    ctx.font = `${110 * s}px "Segoe UI Emoji", "Apple Color Emoji", sans-serif`;
     ctx.textBaseline = "middle";
-    ctx.fillText(pack.emoji, size / 2, 250 * s);
+    ctx.textAlign = "center";
+    ctx.fillText(pack.emoji, size / 2, 268 * s);
   }
 
   // Winner face (always — monogram if no photo / CORS fail)
   drawWinnerPortrait(ctx, {
     cx: size / 2,
-    cy: 400 * s,
-    r: 88 * s,
+    cy: 410 * s,
+    r: 86 * s,
     name,
     img: face,
     accent: colors.accent,
@@ -529,7 +535,7 @@ export async function renderTrophyShareCanvas(
   ctx.fillStyle = colors.accent;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(pack.heroLine, size / 2, 530 * s);
+  ctx.fillText(pack.heroLine, size / 2, 535 * s);
 
   // Winner name
   let nameSize = 68 * s;
@@ -539,12 +545,12 @@ export async function renderTrophyShareCanvas(
     ctx.font = `800 ${nameSize}px system-ui, -apple-system, Segoe UI, sans-serif`;
   }
   ctx.fillStyle = colors.text;
-  ctx.fillText(name, size / 2, 595 * s);
+  ctx.fillText(name, size / 2, 598 * s);
 
   // Sub line
   ctx.font = `600 ${26 * s}px system-ui, -apple-system, Segoe UI, sans-serif`;
   ctx.fillStyle = colors.muted;
-  ctx.fillText(pack.subLine, size / 2, 650 * s);
+  ctx.fillText(pack.subLine, size / 2, 652 * s);
 
   if (t.subtitle) {
     ctx.font = `500 ${22 * s}px system-ui, -apple-system, Segoe UI, sans-serif`;
@@ -565,12 +571,110 @@ export async function renderTrophyShareCanvas(
   ctx.fillStyle = colors.text;
   wrapCenter(ctx, pack.footerRoast, size / 2, 780 * s, size - 180 * s, 34 * s);
 
-  // Bottom brand
+  // Bottom brand — small crest + tagline as one lockup
+  const footLine = "Share the hardware · Tag the haters";
+  const footCrest = 26 * s;
   ctx.font = `700 ${20 * s}px system-ui, -apple-system, Segoe UI, sans-serif`;
-  ctx.fillStyle = hexAlpha(colors.accent, 0.75);
-  ctx.fillText("Share the hardware · Tag the haters", size / 2, 980 * s);
+  const footTextW = ctx.measureText(footLine).width;
+  const footGap = 10 * s;
+  const footTotal =
+    (crest && crest.naturalWidth > 0 ? footCrest + footGap : 0) + footTextW;
+  let footX = size / 2 - footTotal / 2;
+  const footY = 980 * s;
+  if (crest && crest.naturalWidth > 0) {
+    ctx.drawImage(
+      crest,
+      footX,
+      footY - footCrest / 2,
+      footCrest,
+      footCrest
+    );
+    footX += footCrest + footGap;
+  }
+  ctx.fillStyle = hexAlpha(colors.accent, 0.8);
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillText(footLine, footX, footY);
 
   return canvas;
+}
+
+/**
+ * Top lockup: crest (large) + wordmark so shares read as War Room at a glance.
+ */
+function drawShareBrandLockup(
+  ctx: CanvasRenderingContext2D,
+  opts: {
+    size: number;
+    s: number;
+    crest: HTMLImageElement | null;
+    accent: string;
+    muted: string;
+    text: string;
+  }
+) {
+  const { size, s, crest, accent, muted, text } = opts;
+  const barX = 88 * s;
+  const barY = 78 * s;
+  const barW = size - 176 * s;
+  const barH = 96 * s;
+
+  ctx.fillStyle = hexAlpha(accent, 0.14);
+  roundRect(ctx, barX, barY, barW, barH, 20 * s);
+  ctx.fill();
+  ctx.strokeStyle = hexAlpha(accent, 0.35);
+  ctx.lineWidth = 2 * s;
+  roundRect(ctx, barX, barY, barW, barH, 20 * s);
+  ctx.stroke();
+
+  const crestSize = 72 * s;
+  const hasCrest = !!(crest && crest.naturalWidth > 0);
+  const gap = 18 * s;
+  const title = "WAR ROOM";
+  const sub = "PICK'EM";
+
+  ctx.font = `900 ${30 * s}px system-ui, -apple-system, Segoe UI, sans-serif`;
+  const titleW = ctx.measureText(title).width;
+  ctx.font = `700 ${18 * s}px system-ui, -apple-system, Segoe UI, sans-serif`;
+  const subW = ctx.measureText(sub).width;
+  const textBlockW = Math.max(titleW, subW);
+  const totalW = (hasCrest ? crestSize + gap : 0) + textBlockW;
+  const startX = size / 2 - totalW / 2;
+  const midY = barY + barH / 2;
+
+  if (hasCrest && crest) {
+    // Soft plate behind crest so dark edges still read
+    const plateR = 12 * s;
+    const cx = startX + crestSize / 2;
+    const cy = midY;
+    ctx.fillStyle = "rgba(0,0,0,0.35)";
+    roundRect(
+      ctx,
+      cx - crestSize / 2 - 4 * s,
+      cy - crestSize / 2 - 4 * s,
+      crestSize + 8 * s,
+      crestSize + 8 * s,
+      plateR
+    );
+    ctx.fill();
+    ctx.drawImage(
+      crest,
+      startX,
+      midY - crestSize / 2,
+      crestSize,
+      crestSize
+    );
+  }
+
+  const textX = startX + (hasCrest ? crestSize + gap : 0);
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.font = `900 ${30 * s}px system-ui, -apple-system, Segoe UI, sans-serif`;
+  ctx.fillStyle = text;
+  ctx.fillText(title, textX, midY - 14 * s);
+  ctx.font = `700 ${18 * s}px system-ui, -apple-system, Segoe UI, sans-serif`;
+  ctx.fillStyle = muted;
+  ctx.fillText(sub, textX, midY + 16 * s);
 }
 
 /**

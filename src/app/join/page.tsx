@@ -530,7 +530,7 @@ function JoinPageInner() {
         )}
         <div className="max-w-md w-full rounded-xl border-2 border-primary/40 bg-card p-6">
           <div className="flex justify-center mb-3">
-            <BrandMark size={56} variant="force" />
+            <BrandMark size={72} variant="force" />
           </div>
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary mb-2 text-center">
             You&apos;re the host
@@ -627,7 +627,7 @@ function JoinPageInner() {
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
           <div className="flex justify-center mb-3">
-            <BrandMark size={64} variant="force" className="rounded-xl" />
+            <BrandMark size={80} variant="force" className="rounded-xl" />
           </div>
           <h1 className="text-2xl font-bold">War Room Pick&apos;Em</h1>
           <p className="text-sm text-muted mt-1">Signed in as {displayName}</p>

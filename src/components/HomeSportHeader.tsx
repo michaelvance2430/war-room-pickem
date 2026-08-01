@@ -58,7 +58,7 @@ export default function HomeSportHeader({
         </div>
       ) : isNfl ? (
         <div className="flex items-center gap-2 mb-2">
-          <BrandMark size={32} variant="force" className="rounded-lg shrink-0" />
+          <BrandMark size={40} variant="force" className="rounded-lg shrink-0" />
           <div
             className="shrink-0 rounded-lg p-0.5 border"
             style={{
@@ -74,7 +74,7 @@ export default function HomeSportHeader({
         </div>
       ) : (
         <div className="flex flex-wrap items-center gap-2 mb-2">
-          <BrandMark size={32} variant="force" className="rounded-lg shrink-0" />
+          <BrandMark size={40} variant="force" className="rounded-lg shrink-0" />
           <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.16em] px-2 py-0.5 rounded-full border border-primary/35 bg-primary/10 text-primary">
             <span aria-hidden>{chrome.pack.emoji}</span>
             War Room · {chrome.pack.shortLabel}
