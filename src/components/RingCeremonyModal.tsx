@@ -162,6 +162,13 @@ export default function RingCeremonyModal() {
     } catch {
       /* ok */
     }
+    // One full-screen drama per session (don't stack on welcome/finale)
+    try {
+      const { claimSessionDrama } = await import("@/lib/session-drama");
+      if (!claimSessionDrama("ring")) return false;
+    } catch {
+      /* ok */
+    }
 
     const activeWeek = await loadLeagueActiveWeek();
     if (!isOpeningActiveWeek(activeWeek, sid)) return false;

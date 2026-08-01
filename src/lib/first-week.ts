@@ -151,9 +151,14 @@ export function isCoreLoopUnlocked(playerId?: string | null): boolean {
   return hasLockedPicksOnce(playerId) || hasSeasonComeAlive(playerId);
 }
 
-/** Inverse of core unlock — first-week chrome / demote deep destinations. */
+/**
+ * Demoted chrome until THIS player locks once.
+ * Late joiners on a live season still get "first hour" home/nav until they lock —
+ * season-alive alone no longer opens the full room surface.
+ * (Veteran "full room" override is applied in progressive-disclosure snapshot.)
+ */
 export function isFirstWeekChrome(playerId?: string | null): boolean {
-  return !isCoreLoopUnlocked(playerId);
+  return !hasLockedPicksOnce(playerId);
 }
 
 /**

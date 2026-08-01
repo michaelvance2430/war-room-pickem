@@ -358,6 +358,9 @@ export default function Home() {
 
         <HomeWeekHero />
 
+        {/* Host first-hour spine — under the job hero, not buried at the footer */}
+        <CommishSetupBanner />
+
         {/* One-time: first lock opened the full room */}
         <SoftUnlockBanner />
 
@@ -409,11 +412,26 @@ export default function Home() {
         {firstWeekChrome ? (
           <section className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
             <Link
+              href="/picks"
+              className="group rounded-xl border-2 border-primary/50 bg-primary/10 p-5 hover:border-primary transition sm:col-span-2"
+            >
+              <div className="text-xs uppercase tracking-wider text-primary mb-1">
+                Do this
+              </div>
+              <div className="text-lg font-semibold text-white">
+                My Picks
+              </div>
+              <p className="text-xs text-muted mt-1">
+                If a card is live, lock it. If not — your host hasn&apos;t
+                published yet. Chill in the Locker until they do.
+              </p>
+            </Link>
+            <Link
               href="/locker-room"
               className="group rounded-xl border border-orange-400/30 bg-black/40 p-5 hover:border-orange-300/60 transition"
             >
               <div className="text-xs uppercase tracking-wider text-orange-300/70 mb-1">
-                Talk shit
+                While you wait
               </div>
               <div className="text-lg font-semibold text-orange-300">
                 Locker Room
@@ -645,8 +663,7 @@ export default function Home() {
           </>
         )}
 
-        {/* ── BOTTOM: recruiting / host invite (after the job + room) ── */}
-        <CommishSetupBanner />
+        {/* ── BOTTOM: recruiting (after the job + room) ── */}
         {!firstWeekChrome && (
           <div className="mt-5 mb-2">
             <InviteFriends />

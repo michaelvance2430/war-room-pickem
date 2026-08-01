@@ -188,13 +188,13 @@ export default function HomeWeekHero() {
         : "You're in — waiting on the card";
       body = state.isOps
         ? `One job: publish ${weekLabel} (demo week is fine). Then text the crew.`
-        : `You're in the league. No games to pick yet — your host hasn't published ${weekLabel}. Hang in the Locker or check back soon.`;
+        : `You're seated. Your host hasn't published ${weekLabel} yet — there's nothing to pick. Hang in the Locker, poke Standings if you want, or check back when they drop a card. First ten minutes = chill.`;
       primaryHref = state.isOps
         ? "/commissioner?tab=card&first=1"
         : "/locker-room";
       primaryLabel = state.isOps
         ? "Publish this week's card →"
-        : "Open Locker Room";
+        : "Hang in the Locker";
       secondaryHref = state.isOps ? "/locker-room" : "/standings";
       secondaryLabel = state.isOps ? "Locker" : "Peek standings";
     }

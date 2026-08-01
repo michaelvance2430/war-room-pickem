@@ -51,6 +51,12 @@ export default function SeasonFinaleModal() {
         } catch {
           /* ok */
         }
+        try {
+          const { claimSessionDrama } = await import("@/lib/session-drama");
+          if (!claimSessionDrama("finale")) return;
+        } catch {
+          /* ok */
+        }
         // Don't stack multi-slide finale on first-login walkthrough
         try {
           const { isPlayerTutorialActive, needsPlayerTutorial } =

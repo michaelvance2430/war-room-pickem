@@ -14,8 +14,11 @@ import {
 } from "@/lib/first-week";
 import { getSession } from "@/lib/league";
 import { isGuestMode } from "@/lib/guest-mode";
+import { claimSessionDrama, clearSessionDrama } from "@/lib/session-drama";
 
 const KEY = "warroom-soft-unlock-seen-v1";
+/** Same browser session after lock: don't re-show SoftUnlock on next page */
+const SESSION_SHOWN = "warroom-soft-unlock-session-v1";
 
 function readSeen(playerId: string): boolean {
   try {
@@ -51,6 +54,18 @@ export default function SoftUnlockBanner() {
       if (readSeen(id)) return;
       // Only celebrate a real first lock (not late join on already-scored season alone)
       if (!hasLockedPicksOnce(id)) return;
+      try {
+        if (sessionStorage.getItem(SESSION_SHOWN) === "1") return;
+      } catch {
+        /* ok */
+      }
+      // Claim banner slot so full-screen welcome doesn't stack same session
+      claimSessionDrama("soft_unlock");
+      try {
+        sessionStorage.setItem(SESSION_SHOWN, "1");
+      } catch {
+        /* ok */
+      }
       setOpen(true);
     }
     check();
@@ -67,6 +82,13 @@ export default function SoftUnlockBanner() {
   function dismiss() {
     const id = getSession()?.playerId;
     if (id) markSeen(id);
+    clearSessionDrama("soft_unlock");
+    // Don't also fire LoginWelcome in the same session as SoftUnlock
+    try {
+      sessionStorage.setItem("warroom-no-welcome-this-session", "1");
+    } catch {
+      /* ok */
+    }
     setOpen(false);
   }
 

@@ -14,7 +14,8 @@ import {
   isPlayerTutorialActive,
   needsPlayerTutorial,
 } from "@/lib/player-tutorial";
-import { isPreLockCalm } from "@/lib/first-week";
+import { hasLockedPicksOnce, isPreLockCalm } from "@/lib/first-week";
+import { claimSessionDrama } from "@/lib/session-drama";
 
 const FOREVER_KEY = "warroom-login-welcome-v1-dismissed";
 const SESSION_KEY = "warroom-login-welcome-v1-session";
@@ -63,29 +64,56 @@ export default function LoginWelcomeModal() {
 
   useEffect(() => {
     if (isGuestMode()) return;
-    const session = getSession();
-    if (!session?.playerId) return;
-    if (isDismissedForever()) return;
-    if (wasShownThisSession()) return;
-    // First 10 minutes: lame and easy — no shop splash until after first lock
-    if (isPreLockCalm(session.playerId)) return;
-    // Never stack on the player walkthrough
-    if (needsPlayerTutorial() || isPlayerTutorialActive()) return;
-    // Opening week: ring ceremony owns the moment
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { isOpeningWeekLive } =
-        require("@/components/RingCeremonyModal") as typeof import("@/components/RingCeremonyModal");
-      if (isOpeningWeekLive()) return;
-    } catch {
-      /* ok */
-    }
 
-    const t = window.setTimeout(() => {
+    function tryOpen() {
+      const session = getSession();
+      if (!session?.playerId) return;
+      if (isDismissedForever()) return;
+      if (wasShownThisSession()) return;
+      // First 10 minutes: lame and easy — no shop splash until after first lock
+      if (isPreLockCalm(session.playerId)) return;
+      // Never stack on the player walkthrough
+      if (needsPlayerTutorial() || isPlayerTutorialActive()) return;
+      // Soft unlock owns the first-lock session — welcome next login
+      try {
+        if (sessionStorage.getItem("warroom-no-welcome-this-session") === "1") {
+          return;
+        }
+        if (sessionStorage.getItem("warroom-soft-unlock-session-v1") === "1") {
+          return;
+        }
+      } catch {
+        /* ok */
+      }
+      // Opening week: ring ceremony owns the moment
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { isOpeningWeekLive } =
+          require("@/components/RingCeremonyModal") as typeof import("@/components/RingCeremonyModal");
+        if (isOpeningWeekLive()) return;
+      } catch {
+        /* ok */
+      }
+      if (!claimSessionDrama("welcome")) return;
+      if (!hasLockedPicksOnce(session.playerId)) return;
+
       markShownThisSession();
       setOpen(true);
-    }, 1200);
-    return () => window.clearTimeout(t);
+    }
+
+    // Re-check after lock (first mount may have been pre-lock)
+    tryOpen();
+    const t = window.setTimeout(tryOpen, 1500);
+    function onProgress() {
+      tryOpen();
+    }
+    window.addEventListener("warroom-first-week-progress", onProgress);
+    window.addEventListener("warroom-progressive-disclosure", onProgress);
+    return () => {
+      window.clearTimeout(t);
+      window.removeEventListener("warroom-first-week-progress", onProgress);
+      window.removeEventListener("warroom-progressive-disclosure", onProgress);
+    };
   }, []);
 
   function dismiss() {

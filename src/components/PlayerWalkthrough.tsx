@@ -243,16 +243,17 @@ export default function PlayerWalkthrough() {
     }
   }
 
+  // On phone: sit above thumb nav (3.75rem). On sm+: no tab bar, tighter.
   return (
     <div
-      className="fixed bottom-0 left-0 right-0 z-[45] p-3 sm:p-4 pointer-events-none"
+      className="fixed left-0 right-0 z-[55] px-3 sm:px-4 pointer-events-none md:bottom-4"
       style={{
-        // Sit above content but below bottom tabs (z-50) so tabs always hard-switch
-        paddingBottom: "calc(3.75rem + env(safe-area-inset-bottom, 0px) + 0.5rem)",
+        // Above phone tabs (z-50) so coach is readable; padding clears tab height
+        bottom: "calc(3.75rem + env(safe-area-inset-bottom, 0px))",
       }}
     >
-      <div className="max-w-lg mx-auto pointer-events-auto rounded-2xl border-2 border-primary bg-card shadow-[0_-8px_40px_rgba(0,0,0,0.45)] overflow-hidden">
-        <div className="px-4 pt-3 pb-2 flex items-start justify-between gap-2">
+      <div className="max-w-lg mx-auto pointer-events-auto rounded-2xl border-2 border-primary bg-card shadow-[0_-8px_40px_rgba(0,0,0,0.45)] overflow-hidden mb-2 sm:mb-0">
+        <div className="px-3 pt-2.5 pb-1.5 sm:px-4 sm:pt-3 sm:pb-2 flex items-start justify-between gap-2">
           <div className="min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-0.5">
               Walk the dog
@@ -260,7 +261,9 @@ export default function PlayerWalkthrough() {
             <p className="text-sm font-bold text-foreground leading-snug">
               {copy.title}
             </p>
-            <p className="text-xs text-muted mt-1 leading-relaxed">{copy.body}</p>
+            <p className="text-[11px] sm:text-xs text-muted mt-0.5 sm:mt-1 leading-snug sm:leading-relaxed line-clamp-2 sm:line-clamp-none">
+              {copy.body}
+            </p>
           </div>
           <button
             type="button"

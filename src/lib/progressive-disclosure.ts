@@ -18,6 +18,7 @@ import {
   isCoreLoopUnlocked,
   isFirstWeekChrome,
 } from "@/lib/first-week";
+// hasLockedPicksOnce used for deep tiles / late-joiner calm
 import { getSession } from "@/lib/league";
 
 const KEY_GAZETTE_REVEAL = "warroom-gazette-shelf-reveal-v1";
@@ -125,6 +126,8 @@ export function canShowGazetteShelf(opts: {
   sportId?: string | null;
 }): boolean {
   if (wantsFullRoom(opts.playerId)) return true;
+  // Late joiners: own lock first, then pack timing
+  if (!hasLockedPicksOnce(opts.playerId)) return false;
   if (!isCoreLoopUnlocked(opts.playerId)) return false;
   return (
     isWeekThreeish(opts) || hasSeenGazetteShelfReveal(opts.playerId)
@@ -159,7 +162,8 @@ export function canShowNewsShelf(opts: {
 /** Deep home tiles: stats, brackets, trophies, museum. */
 export function canShowDeepHomeTiles(playerId?: string | null): boolean {
   if (wantsFullRoom(playerId)) return true;
-  return isCoreLoopUnlocked(playerId);
+  // Own first lock only — late joiners don't get museum/board dump pre-lock
+  return hasLockedPicksOnce(playerId);
 }
 
 /** Re-export first-week helpers for one import surface. */

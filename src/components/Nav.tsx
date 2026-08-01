@@ -828,20 +828,29 @@ export default function Nav() {
         </>
       )}
 
-      {/* Phone thumb nav — same for CFB + NFL: Home / Picks / Standings / Locker / More */}
+      {/* Phone thumb nav — early: 4 tabs; after lock: 5 with More */}
       <nav
         className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-card/95 backdrop-blur-md"
         style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
         aria-label="Primary"
       >
-        <ul className="grid grid-cols-5 h-[3.75rem]">
+        <ul
+          className={`grid h-[3.75rem] ${earlyNav ? "grid-cols-4" : "grid-cols-5"}`}
+        >
           {(
-            [
-              { href: "/", label: "Home", icon: "⌂" },
-              { href: "/picks", label: "Picks", icon: "✓" },
-              { href: "/standings", label: "Table", icon: "#" },
-              { href: "/locker-room", label: "Locker", icon: "💬" },
-            ] as const
+            earlyNav
+              ? ([
+                  { href: "/", label: "Home", icon: "⌂" },
+                  { href: "/picks", label: "Picks", icon: "✓" },
+                  { href: "/standings", label: "Table", icon: "#" },
+                  { href: "/locker-room", label: "Locker", icon: "💬" },
+                ] as const)
+              : ([
+                  { href: "/", label: "Home", icon: "⌂" },
+                  { href: "/picks", label: "Picks", icon: "✓" },
+                  { href: "/standings", label: "Table", icon: "#" },
+                  { href: "/locker-room", label: "Locker", icon: "💬" },
+                ] as const)
           ).map((tab) => {
             const active = linkActive(tab.href);
             const badge =
@@ -873,6 +882,7 @@ export default function Nav() {
               </li>
             );
           })}
+          {!earlyNav && (
           <li className="min-w-0">
             <button
               type="button"
@@ -894,6 +904,7 @@ export default function Nav() {
               )}
             </button>
           </li>
+          )}
         </ul>
       </nav>
 
