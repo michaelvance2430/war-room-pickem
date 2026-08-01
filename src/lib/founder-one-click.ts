@@ -288,6 +288,84 @@ export async function founderScoreWeek(weekNumber: number): Promise<OneClickLog>
   }
 }
 
+/**
+ * Force The Board open for a week: kickoffs moved to the past so
+ * progressive pick reveal unlocks (locked, not scored). You can compare
+ * slips with friends/bots before scoring.
+ */
+export async function founderOpenLockedBoard(
+  weekNumber: number
+): Promise<OneClickLog> {
+  const steps: string[] = [];
+  const gate = assertCreator();
+  if (gate) return { ok: false, message: gate, steps };
+
+  await exitEyesIfNeeded(steps);
+
+  // Ensure card + bot picks exist
+  let card = await loadWeekCard(weekNumber);
+  if (!card?.games?.length) {
+    const post = await founderPostWeek(weekNumber);
+    steps.push(...post.steps.map((s) => `post: ${s}`));
+    if (!post.ok) return { ok: false, message: post.message, steps };
+    card = await loadWeekCard(weekNumber);
+  } else {
+    const fill = await seedBotPicksForWeekInCloud(weekNumber);
+    if (fill.ok) {
+      steps.push(`Bot slips locked: ${fill.botsFilled ?? 0}`);
+    }
+  }
+
+  if (!card?.games?.length || !card.weekCardId) {
+    return {
+      ok: false,
+      message: "No card to unlock — Post week first",
+      steps,
+    };
+  }
+
+  try {
+    const { createClient } = await import("./supabase/client");
+    const supabase = createClient();
+    // First game kicked off ~3h ago; rest every 30 min — progressive reveal demo
+    const base = Date.now() - 3 * 3600 * 1000;
+    let i = 0;
+    for (const g of card.games) {
+      const t = new Date(base + i * 30 * 60 * 1000).toISOString();
+      const { error } = await supabase
+        .from("card_games")
+        .update({ start_time: t })
+        .eq("id", g.id);
+      if (error) {
+        steps.push(`kickoff update warn ${g.id.slice(0, 8)}: ${error.message}`);
+      }
+      i += 1;
+    }
+    steps.push(
+      "Kickoffs set in the past — card frozen, Board progressive reveal on"
+    );
+
+    await setLeagueActiveWeek(weekNumber);
+    try {
+      localStorage.setItem("warroom-active-week", String(weekNumber));
+    } catch {
+      /* ignore */
+    }
+
+    return {
+      ok: true,
+      message: `${weekTitle(weekNumber, sport())} Board unlocked (not scored) · open The Board to compare picks`,
+      steps,
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : "Board unlock failed",
+      steps,
+    };
+  }
+}
+
 /** Post demo card + bot world + score in one tap. */
 export async function founderPostAndScoreWeek(
   weekNumber: number
