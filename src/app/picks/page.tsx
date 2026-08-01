@@ -95,6 +95,8 @@ export default function PicksPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [leagueName, setLeagueName] = useState("");
   const [cardNotice, setCardNotice] = useState<string | null>(null);
+  /** Tooltip / flash when confidence tapped before a winner side */
+  const [confTipGameId, setConfTipGameId] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [switching, setSwitching] = useState(false);
   /** Covers + prop after week is scored (past-week review) */
@@ -517,6 +519,7 @@ export default function PicksPage() {
     if (!game || isGameLocked(game, now, games)) return;
 
     setSaved(false);
+    setConfTipGameId(null);
     setPicks((prev) => ({
       ...prev,
       [gameId]: {
@@ -534,7 +537,40 @@ export default function PicksPage() {
     if (!weekEditable || cardFrozen || chaosArmed || chaosLockedWeek) return;
     const game = games.find((g) => g.id === gameId);
     if (!game || isGameLocked(game, now, games)) return;
-    if (!picks[gameId]?.pick) return;
+
+    // Must pick a winner (side) before confidence
+    if (!picks[gameId]?.pick) {
+      setConfTipGameId(gameId);
+      return;
+    }
+
+    setConfTipGameId(null);
+
+    // Tap selected number again → deselect (free that confidence for another game)
+    if (picks[gameId]?.confidence === conf) {
+      setSaved(false);
+      setPicks((prev) => {
+        const next = {
+          ...prev,
+          [gameId]: {
+            ...prev[gameId],
+            gameId,
+            pick: prev[gameId].pick,
+            confidence: 0,
+            isBestBet: bestBetId === gameId,
+            lockedSpread: game.spread,
+            lockedFavorite: game.favorite,
+          },
+        };
+        const used = Object.values(next)
+          .map((p) => p.confidence)
+          .filter((c) => c >= 1 && c <= 5);
+        setUsedConfidence(used);
+        return next;
+      });
+      return;
+    }
+
     const takenByOther = Object.entries(picks).some(
       ([id, p]) => id !== gameId && p.confidence === conf
     );
@@ -1390,29 +1426,42 @@ export default function PicksPage() {
                           Confidence
                         </span>
                         <div className="flex gap-2 items-center">
-                          {!pick?.pick && !locked && (
-                            <span className="text-xs text-muted mr-1">
-                              Team first
-                            </span>
-                          )}
                           {confidenceOptions.map((c) => {
                             const usedElsewhere = Object.entries(picks).some(
                               ([id, p]) => id !== game.id && p.confidence === c
                             );
+                            const selected = pick?.confidence === c;
+                            const needSide = !pick?.pick && !locked;
                             return (
                               <button
                                 key={c}
                                 type="button"
-                                disabled={
-                                  locked || usedElsewhere || !pick?.pick
+                                disabled={locked || usedElsewhere}
+                                title={
+                                  needSide
+                                    ? "You must pick a winner before assigning confidence points."
+                                    : selected
+                                      ? "Tap again to clear this confidence"
+                                      : usedElsewhere
+                                        ? "Already used on another game"
+                                        : `Confidence ${c}`
+                                }
+                                aria-label={
+                                  needSide
+                                    ? "Pick a winner before assigning confidence"
+                                    : selected
+                                      ? `Clear confidence ${c}`
+                                      : `Set confidence ${c}`
                                 }
                                 onClick={() => selectConfidence(game.id, c)}
                                 className={`w-11 h-11 min-w-[44px] rounded-xl text-base font-bold transition touch-manipulation active:scale-95 ${
-                                  pick?.confidence === c
+                                  selected
                                     ? "bg-primary text-black shadow-[0_0_12px_rgba(34,197,94,0.35)]"
                                     : usedElsewhere || locked
                                       ? "bg-border text-muted cursor-not-allowed opacity-50"
-                                      : "bg-card-hover hover:bg-border border border-border"
+                                      : needSide
+                                        ? "bg-card-hover hover:bg-border border border-border opacity-80"
+                                        : "bg-card-hover hover:bg-border border border-border"
                                 }`}
                               >
                                 {c}
@@ -1420,6 +1469,15 @@ export default function PicksPage() {
                             );
                           })}
                         </div>
+                        {confTipGameId === game.id && !pick?.pick && !locked && (
+                          <p
+                            role="tooltip"
+                            className="text-xs text-amber-200 font-medium leading-snug max-w-xs"
+                          >
+                            You must pick a winner before assigning confidence
+                            points.
+                          </p>
+                        )}
                       </div>
                       <button
                         type="button"
