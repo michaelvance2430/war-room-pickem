@@ -252,44 +252,79 @@ export async function seatPlayerInLeague(opts: {
       ? league.season_theme_id
       : "default";
 
-  localStorage.setItem(
-    "warroom-session",
-    JSON.stringify({
-      playerId: userId,
-      playerName: displayName.trim() || "Player",
-      isCommissioner: league.commissioner_id === userId,
-      leagueId: league.id,
-    })
-  );
-  localStorage.setItem(
-    "warroom-league",
-    JSON.stringify({
-      id: league.id,
-      name: league.name,
-      code: league.code,
-      commissionerId: league.commissioner_id,
-      createdAt: league.created_at,
-      sportId,
-      settings: {
-        cutPercent: league.cut_percent ?? 50,
+  try {
+    const { writeSessionAndLeague, saveActiveLeagueId } = await import(
+      "@/lib/session-restore"
+    );
+    writeSessionAndLeague(
+      {
+        leagueId: league.id as string,
+        leagueName: (league.name as string) || "War Room",
+        code: (league.code as string) || "",
+        commissionerId: league.commissioner_id as string,
+        createdAt: (league.created_at as string) || "",
+        cutPercent: (league.cut_percent as number) ?? 50,
         regularSeasonWeeks: 18,
-        gamesPerWeek: league.games_per_week ?? 5,
-        crystalBallEnabled: league.crystal_ball_enabled !== false,
-        homeTaglineId: league.home_tagline_id || "good-teams",
-        homeTaglineCustom: league.home_tagline_custom || "",
+        gamesPerWeek: (league.games_per_week as number) ?? 5,
+        role:
+          league.commissioner_id === userId ? "commissioner" : "player",
+        displayName: displayName.trim() || "Player",
+        crystalBallEnabled:
+          sportId === "nfl"
+            ? false
+            : league.crystal_ball_enabled !== false,
+        homeTaglineId: (league.home_tagline_id as string) || "good-teams",
+        homeTaglineCustom: (league.home_tagline_custom as string) || "",
         seasonThemeId,
+        sportId,
+        isOpen: true,
       },
-    })
-  );
-  try {
-    applySeasonTheme(seasonThemeId);
+      userId
+    );
+    saveActiveLeagueId(league.id as string);
   } catch {
-    /* ignore */
-  }
-  try {
-    applySportTheme(sportId);
-  } catch {
-    /* ignore */
+    localStorage.setItem(
+      "warroom-session",
+      JSON.stringify({
+        playerId: userId,
+        playerName: displayName.trim() || "Player",
+        isCommissioner: league.commissioner_id === userId,
+        leagueId: league.id,
+      })
+    );
+    localStorage.setItem(
+      "warroom-league",
+      JSON.stringify({
+        id: league.id,
+        name: league.name,
+        code: league.code,
+        commissionerId: league.commissioner_id,
+        createdAt: league.created_at,
+        sportId,
+        settings: {
+          cutPercent: league.cut_percent ?? 50,
+          regularSeasonWeeks: 18,
+          gamesPerWeek: league.games_per_week ?? 5,
+          crystalBallEnabled:
+            sportId === "nfl"
+              ? false
+              : league.crystal_ball_enabled !== false,
+          homeTaglineId: league.home_tagline_id || "good-teams",
+          homeTaglineCustom: league.home_tagline_custom || "",
+          seasonThemeId,
+        },
+      })
+    );
+    try {
+      applySeasonTheme(seasonThemeId);
+    } catch {
+      /* ignore */
+    }
+    try {
+      applySportTheme(sportId);
+    } catch {
+      /* ignore */
+    }
   }
 
   return {

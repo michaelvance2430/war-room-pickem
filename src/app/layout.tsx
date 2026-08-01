@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import SeasonThemeApplier from "@/components/SeasonThemeApplier";
 import SportThemeApplier from "@/components/SportThemeApplier";
+import FoundrySessionChrome from "@/components/FoundrySessionChrome";
 import PullToRefresh from "@/components/PullToRefresh";
 import RouteHardSwitch from "@/components/RouteHardSwitch";
 
@@ -71,6 +72,7 @@ export default function RootLayout({
         <RouteHardSwitch />
         <SportThemeApplier />
         <SeasonThemeApplier />
+        <FoundrySessionChrome />
         <PullToRefresh>{children}</PullToRefresh>
       </body>
     </html>

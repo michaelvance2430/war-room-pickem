@@ -444,6 +444,20 @@ export async function postLockerMessage(body: string): Promise<{
     };
   }
 
+  // Creator eyes: never post into the real locker
+  try {
+    const eyes = await import("./creator-eyes");
+    if (eyes.isEyesLocalPlayActive()) {
+      return {
+        ok: false,
+        error:
+          "PREVIEW mode — Locker posts stay off the real room. Exit → Foundry to post for real.",
+      };
+    }
+  } catch {
+    /* continue */
+  }
+
   const supabase = createClient();
   // Ensure auth uid matches session (common cause of “posted but can’t see”)
   const { data: auth } = await supabase.auth.getUser();

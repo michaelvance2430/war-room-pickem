@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Nav from "@/components/Nav";
@@ -19,6 +19,13 @@ import {
   deleteLeague,
   LeagueMembership,
 } from "@/lib/session-restore";
+import {
+  resolveSportScope,
+  setSportScope,
+  syncSportScopeToActiveLeague,
+} from "@/lib/sport-room-scope";
+import { getSportPack, normalizeSportId } from "@/lib/sports/registry";
+import type { SportId } from "@/lib/sports/types";
 import {
   loadMyProfile,
   uploadMyAvatar,
@@ -69,6 +76,7 @@ export default function AccountPage() {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const [memberships, setMemberships] = useState<LeagueMembership[]>([]);
+  const [leagueSportScope, setLeagueSportScope] = useState<SportId>("cfb");
   const [activeId, setActiveId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [nameDraft, setNameDraft] = useState("");
@@ -120,6 +128,15 @@ export default function AccountPage() {
     }
     const list = await fetchMyMemberships();
     setMemberships(list);
+    const activeSport =
+      list.find((m) => m.leagueId === (league?.id || session?.leagueId))
+        ?.sportId || league?.sportId;
+    setLeagueSportScope(
+      resolveSportScope({
+        membershipSportIds: list.map((m) => m.sportId || "cfb"),
+        activeSportId: activeSport,
+      })
+    );
 
     // Equipped name title + border (from earned badges)
     if (session?.playerId) {
@@ -272,11 +289,47 @@ export default function AccountPage() {
       setMessage("Could not switch leagues");
       return;
     }
+    const m = memberships.find((x) => x.leagueId === leagueId);
+    if (m?.sportId) {
+      setSportScope(m.sportId);
+      setLeagueSportScope(normalizeSportId(m.sportId));
+    } else {
+      syncSportScopeToActiveLeague();
+    }
     setActiveId(leagueId);
     setMessage("Switched league");
     router.push("/");
     router.refresh();
   }
+
+  const sportBuckets = useMemo(() => {
+    const map = new Map<SportId, LeagueMembership[]>();
+    for (const m of memberships) {
+      const sid = normalizeSportId(m.sportId || "cfb");
+      const arr = map.get(sid) || [];
+      arr.push(m);
+      map.set(sid, arr);
+    }
+    return [...map.entries()]
+      .map(([sportId, rooms]) => ({
+        sportId,
+        rooms: rooms.sort((a, b) =>
+          (a.leagueName || "").localeCompare(b.leagueName || "")
+        ),
+      }))
+      .sort(
+        (a, b) =>
+          getSportPack(a.sportId).sortOrder - getSportPack(b.sportId).sortOrder
+      );
+  }, [memberships]);
+
+  const scopedMemberships = useMemo(() => {
+    if (sportBuckets.length <= 1) return memberships;
+    return (
+      sportBuckets.find((b) => b.sportId === leagueSportScope)?.rooms ||
+      memberships
+    );
+  }, [memberships, sportBuckets, leagueSportScope]);
 
   const [leaveModal, setLeaveModal] = useState<{
     leagueId: string;
@@ -980,15 +1033,57 @@ export default function AccountPage() {
         <section className="rounded-xl border border-border bg-card p-5 mb-6">
           <h2 className="font-semibold mb-1">Your leagues</h2>
           <p className="text-xs text-muted mb-3 leading-relaxed">
-            Sport, your seat (Commissioner / Player), open vs private, and
-            whether the room has bots — so multi-league switching is obvious.
+            Pick a sport desk first — you only see rooms for that sport. When
+            baseball or soccer season hits, football stays off this list.
           </p>
           {loading && <p className="text-sm text-muted">Loading…</p>}
           {!loading && memberships.length === 0 && (
             <p className="text-sm text-muted mb-3">No leagues yet.</p>
           )}
+
+          {sportBuckets.length >= 2 && (
+            <div className="flex flex-wrap gap-2 mb-4">
+              {sportBuckets.map((b) => {
+                const pack = getSportPack(b.sportId);
+                const selected = b.sportId === leagueSportScope;
+                return (
+                  <button
+                    key={b.sportId}
+                    type="button"
+                    onClick={() => {
+                      setSportScope(b.sportId);
+                      setLeagueSportScope(b.sportId);
+                    }}
+                    className={`inline-flex items-center gap-2 min-h-[44px] px-3 rounded-xl border-2 text-sm font-bold touch-manipulation ${
+                      selected
+                        ? "border-primary bg-primary/15 text-primary"
+                        : "border-border bg-background text-foreground hover:border-primary/40"
+                    }`}
+                    aria-pressed={selected}
+                  >
+                    <span aria-hidden>{pack.emoji}</span>
+                    {pack.shortLabel}
+                    <span className="text-[11px] font-semibold text-muted">
+                      ({b.rooms.length})
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {sportBuckets.length >= 2 && (
+            <p className="text-[11px] text-muted mb-3">
+              Showing{" "}
+              <strong className="text-foreground">
+                {getSportPack(leagueSportScope).shortLabel}
+              </strong>{" "}
+              rooms only.
+            </p>
+          )}
+
           <div className="space-y-3">
-            {memberships.map((m) => {
+            {scopedMemberships.map((m) => {
               const active = m.leagueId === activeId;
               const isCommish =
                 m.role === "commissioner" || m.commissionerId === userId;
@@ -1046,8 +1141,8 @@ export default function AccountPage() {
               Create or join another league
             </Link>
             <p className="text-xs text-muted text-center">
-              You can be in more than one league. Use Switch to change the active
-              one.
+              Multi-sport? Use the sport chips above. Switch enters that room as
+              your active desk.
             </p>
           </div>
         </section>

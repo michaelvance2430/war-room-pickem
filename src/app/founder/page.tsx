@@ -18,6 +18,8 @@ import {
   EVENT_CREATOR_EYES,
   getCreatorEyesMode,
   setCreatorEyesMode,
+  startFirstHourAsNewCommissioner,
+  startFirstHourAsNewPlayer,
   type CreatorEyesMode,
 } from "@/lib/creator-eyes";
 import {
@@ -28,6 +30,14 @@ import {
   founderScoreWeek,
 } from "@/lib/founder-one-click";
 import { useRouter } from "next/navigation";
+import { markFoundrySessionActive } from "@/components/FoundrySessionChrome";
+import { switchToLeague } from "@/lib/session-restore";
+import {
+  loadFounderLeagueFleetHealth,
+  type LeagueFleetHealth,
+  type RoomHealth,
+  type RoomLight,
+} from "@/lib/founder-league-health";
 
 type Light = "green" | "yellow" | "red";
 
@@ -52,6 +62,13 @@ const DOT: Record<Light, string> = {
   red: "🔴",
 };
 
+const ROOM_DOT: Record<RoomLight, string> = {
+  green: "🟢",
+  yellow: "🟡",
+  red: "🔴",
+  gray: "⚪",
+};
+
 export default function FounderDashboardPage() {
   const router = useRouter();
   const [allowed, setAllowed] = useState<boolean | null>(null);
@@ -71,6 +88,10 @@ export default function FounderDashboardPage() {
   const [labBusy, setLabBusy] = useState(false);
   const [labLog, setLabLog] = useState<string | null>(null);
   const [labSteps, setLabSteps] = useState<string[]>([]);
+  const [fleet, setFleet] = useState<LeagueFleetHealth | null>(null);
+  const [fleetBusy, setFleetBusy] = useState(false);
+  const [fleetError, setFleetError] = useState<string | null>(null);
+  const [enterBusy, setEnterBusy] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const session = getSession();
@@ -80,6 +101,7 @@ export default function FounderDashboardPage() {
       return;
     }
     setAllowed(true);
+    markFoundrySessionActive();
 
     const t0 = performance.now();
     try {
@@ -114,10 +136,36 @@ export default function FounderDashboardPage() {
     }
     setLeagueName(getLeague()?.name || null);
 
+    setFleetBusy(true);
+    setFleetError(null);
+    try {
+      const f = await loadFounderLeagueFleetHealth();
+      setFleet(f);
+    } catch (e) {
+      setFleet(null);
+      setFleetError(
+        e instanceof Error ? e.message : "Could not load league fleet"
+      );
+    }
+    setFleetBusy(false);
+
     const inc = await loadPlatformIncident();
     setIncident(inc);
     setIncidentMsg(inc.message || DEFAULT_INCIDENT_MESSAGE);
   }, []);
+
+  async function enterRoom(leagueId: string) {
+    if (enterBusy) return;
+    setEnterBusy(leagueId);
+    const ok = await switchToLeague(leagueId);
+    setEnterBusy(null);
+    if (!ok) {
+      setLabLog("❌ Could not switch into that room");
+      return;
+    }
+    void refresh();
+    router.push("/");
+  }
 
   useEffect(() => {
     void refresh();
@@ -126,6 +174,14 @@ export default function FounderDashboardPage() {
       setEyes(getCreatorEyesMode());
     }
     window.addEventListener(EVENT_CREATOR_EYES, onEyes);
+    // Deep link / exit-from-eyes: scroll to eyes desk
+    if (typeof window !== "undefined" && window.location.hash === "#eyes") {
+      window.setTimeout(() => {
+        document
+          .getElementById("eyes")
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 200);
+    }
     return () => window.removeEventListener(EVENT_CREATOR_EYES, onEyes);
   }, [refresh]);
 
@@ -141,6 +197,7 @@ export default function FounderDashboardPage() {
   }
 
   function enterEyes(mode: CreatorEyesMode, href: string) {
+    markFoundrySessionActive();
     setCreatorEyesMode(mode, { weekNumber: week });
     setEyes(mode);
     router.push(href);
@@ -149,6 +206,35 @@ export default function FounderDashboardPage() {
   function exitEyes() {
     setCreatorEyesMode("off");
     setEyes("off");
+    // Stay on Foundry (eyes desk) — never bounce Home after a preview
+    try {
+      router.replace("/founder#eyes");
+      window.setTimeout(() => {
+        document
+          .getElementById("eyes")
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 100);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function runFirstHourPlayer() {
+    markFoundrySessionActive();
+    startFirstHourAsNewPlayer({
+      sportId: getLeague()?.sportId === "nfl" ? "nfl" : "cfb",
+    });
+    setEyes("new_player");
+    router.push("/");
+  }
+
+  function runFirstHourCommish() {
+    markFoundrySessionActive();
+    startFirstHourAsNewCommissioner({
+      sportId: getLeague()?.sportId === "nfl" ? "nfl" : "cfb",
+    });
+    setEyes("new_commissioner");
+    router.push("/commissioner?tab=card&first=1");
   }
 
   async function runLab(
@@ -270,12 +356,12 @@ export default function FounderDashboardPage() {
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">
-              Cockpit
+              Foundry Hub
             </p>
             <h1 className="text-xl font-bold mt-0.5">Founder Dashboard</h1>
             <p className="text-xs text-muted mt-1 leading-relaxed">
-              Your playground. One week. Run the room. Walk the app. Wear their
-              eyes.
+              First hour first. Then playground. Sticky ← Foundry bar stays on
+              while you walk the app.
             </p>
           </div>
           <button
@@ -286,6 +372,146 @@ export default function FounderDashboardPage() {
             Refresh
           </button>
         </div>
+
+        {/* ========== CRITICAL: first hour ========== */}
+        <section
+          id="first-hour"
+          className="rounded-2xl border-2 border-amber-400/50 bg-amber-500/10 p-4 space-y-3 shadow-[0_0_32px_rgba(245,158,11,0.12)] scroll-mt-24"
+        >
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-200">
+              Critical · first hour
+            </p>
+            <h2 className="text-base font-bold text-foreground mt-0.5">
+              Hone the onboarding
+            </h2>
+            <p className="text-xs text-muted mt-1 leading-relaxed">
+              If the first hour is busy or confusing, it&apos;s a real product
+              issue. Walk these before anything else — quiet chrome, local
+              demo card, one-tap back to Foundry.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={runFirstHourPlayer}
+            className="w-full py-3.5 min-h-[52px] rounded-xl border-2 border-sky-400/50 bg-sky-500/15 text-left px-3.5 touch-manipulation"
+          >
+            <span className="block text-sm font-extrabold text-sky-100">
+              Start new player from beginning →
+            </span>
+            <span className="block text-[11px] text-muted mt-0.5 leading-snug">
+              Week 0 · no locked picks · what a joiner actually sees on Home +
+              Picks
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={runFirstHourCommish}
+            className="w-full py-3.5 min-h-[52px] rounded-xl border-2 border-primary/45 bg-primary/10 text-left px-3.5 touch-manipulation"
+          >
+            <span className="block text-sm font-extrabold text-primary">
+              Join as new commissioner →
+            </span>
+            <span className="block text-[11px] text-muted mt-0.5 leading-snug">
+              Simple host · first card · the first-hour host path (not deep
+              tools)
+            </span>
+          </button>
+          {eyes !== "off" && (
+            <button
+              type="button"
+              onClick={exitEyes}
+              className="w-full py-2.5 rounded-lg border border-border text-xs font-bold text-muted"
+            >
+              Exit eyes · back to normal creator view
+            </button>
+          )}
+        </section>
+
+        {/* Fleet health — every room as the product grows */}
+        <section
+          id="fleet-health"
+          className="rounded-2xl border-2 border-primary/35 bg-card p-4 space-y-3 scroll-mt-24"
+        >
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-primary">
+                Fleet
+              </p>
+              <h2 className="text-sm font-semibold">All leagues health</h2>
+              <p className="text-[11px] text-muted leading-relaxed mt-0.5">
+                Every room you&apos;re in — CFB, NFL, and later sports. Lights
+                = empty / behind / live. Not just the active desk.
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={fleetBusy}
+              onClick={() => void refresh()}
+              className="shrink-0 text-[11px] font-bold px-2.5 py-1.5 rounded-lg border border-border disabled:opacity-50"
+            >
+              {fleetBusy ? "…" : "Refresh"}
+            </button>
+          </div>
+
+          {fleetError && (
+            <p className="text-xs text-danger">{fleetError}</p>
+          )}
+          {fleetBusy && !fleet && (
+            <p className="text-xs text-muted">Probing every room…</p>
+          )}
+
+          {fleet && (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <FleetStat label="Rooms" value={String(fleet.totals.rooms)} />
+                <FleetStat
+                  label="Humans"
+                  value={String(fleet.totals.humans)}
+                />
+                <FleetStat
+                  label="OK / watch"
+                  value={`${fleet.totals.green} · ${fleet.totals.yellow + fleet.totals.red}`}
+                />
+                <FleetStat
+                  label="Open lobby"
+                  value={String(fleet.totals.openRooms)}
+                />
+              </div>
+
+              {fleet.bySport.map((bucket) => (
+                <div key={bucket.sportId} className="space-y-2">
+                  <p className="text-[11px] font-bold text-foreground">
+                    {bucket.emoji} {bucket.label} · {bucket.rooms.length} room
+                    {bucket.rooms.length === 1 ? "" : "s"}
+                  </p>
+                  <ul className="space-y-2">
+                    {bucket.rooms.map((r) => (
+                      <RoomHealthCard
+                        key={r.leagueId}
+                        room={r}
+                        busy={enterBusy === r.leagueId}
+                        onEnter={() => void enterRoom(r.leagueId)}
+                      />
+                    ))}
+                  </ul>
+                </div>
+              ))}
+
+              <p className="text-[10px] text-muted">
+                Probed{" "}
+                {fleet.loadedAt
+                  ? new Date(fleet.loadedAt).toLocaleTimeString()
+                  : "—"}
+                . Platform lights (website / DB / odds) are below.
+              </p>
+            </>
+          )}
+
+          {!fleetBusy && !fleet && !fleetError && (
+            <p className="text-xs text-muted">No rooms yet.</p>
+          )}
+        </section>
 
         {/* ========== THE PLAYGROUND (everything simple) ========== */}
         <section className="rounded-2xl border-2 border-primary/40 bg-card p-4 space-y-5 shadow-[0_0_40px_rgba(34,197,94,0.08)]">
@@ -383,8 +609,9 @@ export default function FounderDashboardPage() {
                 : `Open Board locked (not scored) · week ${week}`}
             </button>
             <p className="text-[10px] text-muted leading-relaxed">
-              Freezes the card + reveals picks as if kickoffs already hit — so
-              you can compare slips with bots/friends before scoring.
+              Fills bot slips (and yours if empty), freezes kickoffs in the past,
+              and opens The Board so every side lists who picked whom — no score
+              yet.
             </p>
             {labLog && (
               <p
@@ -431,11 +658,20 @@ export default function FounderDashboardPage() {
             </div>
           </div>
 
-          {/* D — Eyes */}
-          <div className="space-y-2">
+          {/* D — Eyes (mid/late season week knob — first hour is above) */}
+          <div id="eyes" className="space-y-2 scroll-mt-24">
             <p className="text-[10px] font-bold uppercase tracking-wide text-muted">
-              4 · Wear their eyes (week {week}) ·{" "}
+              4 · Wear their eyes at week {week} ·{" "}
               <span className="text-sky-300">PREVIEW only</span>
+            </p>
+            <p className="text-[10px] text-muted leading-relaxed">
+              First-hour sims are in the amber box at the top. These jump to a
+              chosen week after that.{" "}
+              <strong className="text-sky-200">
+                Eyes = any page, real league untouched
+              </strong>{" "}
+              (picks/cards local; score &amp; locker posts blocked until you
+              Exit → Foundry).
             </p>
             {eyes !== "off" && (
               <div className="rounded-lg border border-sky-400/40 bg-sky-500/10 px-3 py-2 text-xs">
@@ -710,5 +946,88 @@ function Stat({ label, value }: { label: string; value: string }) {
       <p className="text-[10px] uppercase tracking-wide text-muted">{label}</p>
       <p className="text-lg font-bold tabular-nums mt-0.5">{value}</p>
     </div>
+  );
+}
+
+function FleetStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-border/70 bg-background/50 px-2.5 py-2">
+      <p className="text-[9px] uppercase tracking-wide text-muted font-bold">
+        {label}
+      </p>
+      <p className="text-base font-black tabular-nums mt-0.5">{value}</p>
+    </div>
+  );
+}
+
+function RoomHealthCard({
+  room,
+  busy,
+  onEnter,
+}: {
+  room: RoomHealth;
+  busy: boolean;
+  onEnter: () => void;
+}) {
+  return (
+    <li
+      className={`rounded-xl border px-3 py-2.5 ${
+        room.isActive
+          ? "border-primary/45 bg-primary/10"
+          : "border-border/70 bg-background/40"
+      }`}
+    >
+      <div className="flex items-start gap-2">
+        <span className="text-base shrink-0" aria-hidden>
+          {ROOM_DOT[room.light]}
+        </span>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-bold text-white truncate leading-tight">
+            {room.name}
+            {room.isActive && (
+              <span className="ml-1.5 text-[10px] uppercase text-primary font-extrabold">
+                here
+              </span>
+            )}
+            {room.isOpen && (
+              <span className="ml-1.5 text-[9px] uppercase text-sky-300 font-bold">
+                open
+              </span>
+            )}
+          </p>
+          <p className="text-[11px] text-muted mt-0.5 leading-snug">
+            {room.summary}
+          </p>
+          <p className="text-[10px] text-muted/90 mt-1 font-mono">
+            {room.code}
+            {" · "}
+            {room.humans}h
+            {room.bots > 0 ? ` · ${room.bots}b` : ""}
+            {room.active7d != null ? ` · ${room.active7d} active 7d` : ""}
+            {room.role === "commissioner" ? " · host" : ""}
+          </p>
+        </div>
+        <div className="flex flex-col gap-1 shrink-0">
+          {!room.isActive && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={onEnter}
+              className="min-h-[36px] px-2.5 rounded-lg border border-primary/40 text-primary text-[11px] font-bold disabled:opacity-50"
+            >
+              {busy ? "…" : "Enter"}
+            </button>
+          )}
+          {room.isActive && (
+            <Link
+              href="/standings"
+              className="min-h-[36px] px-2.5 rounded-lg bg-primary text-black text-[11px] font-bold inline-flex items-center justify-center"
+            >
+              Table
+            </Link>
+          )}
+        </div>
+      </div>
+    </li>
   );
 }

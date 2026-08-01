@@ -84,6 +84,7 @@ create policy "sport_pool_votes_select"
   );
 
 drop policy if exists "sport_pool_votes_upsert" on public.sport_pool_votes;
+drop policy if exists "sport_pool_votes_insert" on public.sport_pool_votes;
 create policy "sport_pool_votes_insert"
   on public.sport_pool_votes for insert to authenticated
   with check (

@@ -217,15 +217,20 @@ export default function HomeWeekHero() {
         style={{ boxShadow: `0 0 50px ${glow}` }}
       >
         <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">
-            {eyebrow}
+          <div className="min-w-0">
             {roomName && (
-              <span className="text-muted font-semibold normal-case tracking-normal ml-1.5">
-                · {sportShort} · {roomName}
-              </span>
+              <p className="text-sm sm:text-base font-black text-white truncate leading-tight mb-0.5">
+                {roomName}
+                <span className="text-muted font-semibold text-[11px] sm:text-xs ml-1.5">
+                  {sportShort}
+                </span>
+              </p>
             )}
-          </p>
-          <span className="text-[11px] font-mono font-bold tabular-nums text-primary/90 border border-primary/35 rounded-full px-2.5 py-0.5 bg-primary/10">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">
+              {eyebrow}
+            </p>
+          </div>
+          <span className="text-[11px] font-mono font-bold tabular-nums text-primary/90 border border-primary/35 rounded-full px-2.5 py-0.5 bg-primary/10 shrink-0">
             {progress}
           </span>
         </div>

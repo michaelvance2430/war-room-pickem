@@ -6,6 +6,13 @@
  *
  * Fairness: once the season is live (or any week scored), filler bots stay.
  * No clearing bots to climb the board.
+ *
+ * PRODUCT RULE — bots play like humans:
+ * Once seated, trial/filler bots are full members of the competition.
+ * They lock slips, appear on The Board under each side, score weeks,
+ * sit on standings / Gazette / crowns the same as any human. Never skip
+ * them on competitive surfaces just because is_bot is true. Host-only
+ * roster tools may still label or remove them (pre-lock only).
  */
 
 import { isAppCreator } from "@/lib/creator";

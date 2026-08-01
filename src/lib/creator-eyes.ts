@@ -64,7 +64,13 @@ export function isCreatorEyesActive(): boolean {
   return getCreatorEyesMode() !== "off";
 }
 
-/** True when load/save week card & picks should use local eyes storage. */
+/**
+ * True when load/save week card & picks should use local eyes storage.
+ *
+ * PRODUCT RULE: While eyes are on, the real league is read-only for destructive
+ * writes (picks, cards, scores, locker posts, current_week). You can browse any
+ * page; preview data lives on this device only.
+ */
 export function isEyesLocalPlayActive(): boolean {
   return isCreatorEyesSession() && isCreatorEyesActive();
 }
@@ -268,5 +274,60 @@ export function creatorEyesBlurb(mode: CreatorEyesMode): string {
       return `Hosting as a new commissioner on week ${w} · simple Run the Room`;
     default:
       return "Normal creator view";
+  }
+}
+
+/**
+ * First-hour sim: wipe local eyes picks, start week 0, onboarding chrome.
+ * "What does a brand-new player actually see?"
+ */
+export function startFirstHourAsNewPlayer(opts?: {
+  sportId?: "cfb" | "nfl";
+}): void {
+  if (!canUse() || !isCreatorEyesSession()) return;
+  try {
+    // Clear prior eyes slips so the card feels new
+    for (let w = 0; w <= 22; w++) {
+      localStorage.removeItem(eyesPicksStorageKey(w));
+      localStorage.removeItem(eyesCardStorageKey(w));
+    }
+  } catch {
+    /* ignore */
+  }
+  setCreatorEyesMode("new_player", {
+    weekNumber: 0,
+    sportId: opts?.sportId,
+  });
+  try {
+    // Force progressive onboarding chrome for this session
+    localStorage.setItem("warroom-show-full-room-v1", "{}");
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * First-hour host sim: simple Run the Room, week 0, no deep tools.
+ */
+export function startFirstHourAsNewCommissioner(opts?: {
+  sportId?: "cfb" | "nfl";
+}): void {
+  if (!canUse() || !isCreatorEyesSession()) return;
+  try {
+    for (let w = 0; w <= 22; w++) {
+      localStorage.removeItem(eyesPicksStorageKey(w));
+      localStorage.removeItem(eyesCardStorageKey(w));
+    }
+  } catch {
+    /* ignore */
+  }
+  setCreatorEyesMode("new_commissioner", {
+    weekNumber: 0,
+    sportId: opts?.sportId,
+  });
+  try {
+    localStorage.setItem("warroom-show-full-room-v1", "{}");
+  } catch {
+    /* ignore */
   }
 }
