@@ -374,6 +374,33 @@ export function hasDiscovery(playerId: string, id: string): boolean {
   return getEggState(playerId).discoveries.some((d) => d.id === id);
 }
 
+/**
+ * True egg catalog (not silent sport passport stamps).
+ * Used for profile “Easter eggs X / XX” after first discovery.
+ */
+export function listEasterEggDefs(): DiscoveryDef[] {
+  return DISCOVERY_CATALOG.filter(
+    (d) => d.kind !== "passport" && d.id.startsWith("egg_")
+  );
+}
+
+export function getEasterEggProgress(playerId: string): {
+  found: number;
+  total: number;
+  /** True once they've found at least one real egg — safe to show the counter */
+  unlocked: boolean;
+} {
+  const catalog = listEasterEggDefs();
+  const total = catalog.length;
+  if (!playerId) return { found: 0, total, unlocked: false };
+  const earned = new Set(listEarnedDiscoveries(playerId).map((d) => d.id));
+  let found = 0;
+  for (const d of catalog) {
+    if (earned.has(d.id)) found += 1;
+  }
+  return { found, total, unlocked: found > 0 };
+}
+
 function emitMoment(moment: EasterEggMoment) {
   if (typeof window === "undefined") return;
   try {
