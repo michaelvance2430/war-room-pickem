@@ -422,9 +422,10 @@ export async function isLockerReactionsReady(): Promise<boolean> {
 }
 
 /**
- * Toggle a reaction on any message (including your own).
- * Uses locker_message_reactions when present; otherwise WR_RX| markers
- * in locker_messages (hidden from the chat list).
+ * Toggle a reaction on ANY message (yours or theirs).
+ *
+ * Storage: hidden WR_RX| rows in locker_messages (table may not exist on prod).
+ * Also tries locker_message_reactions when present — never required.
  */
 export async function toggleLockerReaction(
   messageId: string,
@@ -443,7 +444,7 @@ export async function toggleLockerReaction(
   if (!em || [...em].length > 12) {
     return { ok: false, error: "Pick a reaction emoji." };
   }
-  if (!messageId || !/^[0-9a-f-]{36}$/i.test(messageId)) {
+  if (!messageId || String(messageId).length < 8) {
     return { ok: false, error: "Invalid message." };
   }
 
@@ -460,14 +461,31 @@ export async function toggleLockerReaction(
   }
 
   const supabase = createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  // Match postLockerMessage: prefer auth uid, fall back to session
-  const uid = auth.user?.id || session.playerId;
+  // getSession is more reliable than getUser when token is refreshing
+  const { data: authData } = await supabase.auth.getSession();
+  const uid =
+    authData.session?.user?.id ||
+    (await supabase.auth.getUser()).data.user?.id ||
+    session.playerId;
   if (!uid) {
     return { ok: false, error: "Session expired — sign in again to react." };
   }
 
-  // Try dedicated table first (no separate probe — one less failure mode)
+  // Primary path: markers in locker_messages (always available if chat works)
+  const markerRes = await toggleReactionViaMarkers(
+    supabase,
+    session.leagueId,
+    messageId,
+    em,
+    uid
+  );
+  if (markerRes.ok) {
+    // Best-effort dual-write to real table if it ever exists
+    void toggleReactionViaTable(supabase, messageId, em, uid).catch(() => {});
+    return markerRes;
+  }
+
+  // Markers failed — try dedicated table once
   const tableRes = await toggleReactionViaTable(
     supabase,
     messageId,
@@ -475,35 +493,14 @@ export async function toggleLockerReaction(
     uid
   );
   if (tableRes.ok) return tableRes;
-  if (!tableRes.needsSetup && tableRes.error) {
-    // Real error (muted, RLS, etc.) — still try markers if it looked like missing table
-    if (!isMissingReactionsTable(tableRes.error)) {
-      // Fall through to markers only for missing-table; otherwise surface error
-      // UNLESS it's a network blip on a missing table that wasn't classified —
-      // try markers as last resort for insert failures that are clearly "no table"
-    }
-  }
-  if (tableRes.needsSetup || isMissingReactionsTable(tableRes.error)) {
-    return toggleReactionViaMarkers(
-      supabase,
-      session.leagueId,
-      messageId,
-      em,
-      uid
-    );
-  }
 
-  // Table exists but insert failed (muted etc.)
-  if (tableRes.error) return tableRes;
-
-  // Last resort markers
-  return toggleReactionViaMarkers(
-    supabase,
-    session.leagueId,
-    messageId,
-    em,
-    uid
-  );
+  return {
+    ok: false,
+    error:
+      markerRes.error ||
+      tableRes.error ||
+      "Could not save reaction. Try again.",
+  };
 }
 
 async function toggleReactionViaTable(
@@ -599,46 +596,49 @@ async function toggleReactionViaMarkers(
   const marker = formatReactionMarker(messageId, em);
   const { startIso } = getLockerWeekBounds();
 
-  // Find my existing reaction rows for this message (any emoji) this week
-  // Client-side filter — no fragile LIKE with unicode
+  // Load recent rows for this league (mine + others) — filter markers in JS
   const { data: weekRows, error: findErr } = await supabase
     .from("locker_messages")
     .select("id, user_id, body")
     .eq("league_id", leagueId)
-    .eq("user_id", uid)
     .gte("created_at", startIso)
     .order("created_at", { ascending: false })
-    .limit(200);
+    .limit(400);
 
   if (findErr) {
     return { ok: false, error: findErr.message };
   }
 
-  const myRx = (weekRows || [])
-    .map((r) => {
-      const parsed = parseReactionMarker(String((r as { body?: string }).body || ""));
-      if (!parsed || parsed.messageId !== messageId) return null;
-      return {
-        id: String((r as { id: string }).id),
-        emoji: parsed.emoji,
-      };
-    })
-    .filter(Boolean) as { id: string; emoji: string }[];
+  const rows = (weekRows || []) as {
+    id: string;
+    user_id: string;
+    body: string;
+  }[];
 
-  const mineSame = myRx.find((r) => r.emoji === em);
+  const mineSame = rows.find((r) => {
+    if (r.user_id !== uid) return false;
+    const parsed = parseReactionMarker(r.body || "");
+    return !!parsed && parsed.messageId === messageId && parsed.emoji === em;
+  });
 
   if (mineSame) {
     const { error } = await supabase
       .from("locker_messages")
       .delete()
-      .eq("id", mineSame.id);
+      .eq("id", mineSame.id)
+      .eq("user_id", uid);
     if (error) return { ok: false, error: error.message };
   } else {
-    const { error } = await supabase.from("locker_messages").insert({
-      league_id: leagueId,
-      user_id: uid,
-      body: marker,
-    });
+    // RLS requires user_id = auth.uid() — use the uid we resolved from auth
+    const { data: inserted, error } = await supabase
+      .from("locker_messages")
+      .insert({
+        league_id: leagueId,
+        user_id: uid,
+        body: marker,
+      })
+      .select("id, user_id, body")
+      .single();
     if (error) {
       if (/policy|row-level|muted|violates|42501/i.test(error.message || "")) {
         return {
@@ -652,41 +652,28 @@ async function toggleReactionViaMarkers(
         error: error.message || "Could not save reaction",
       };
     }
+    // Ensure insert is in our local set for tally
+    if (inserted) {
+      rows.unshift(inserted as { id: string; user_id: string; body: string });
+    } else {
+      rows.unshift({ id: "local", user_id: uid, body: marker });
+    }
   }
 
-  // Reload ALL markers for this parent (all users) — filter in JS
-  const { data: allRows, error: allErr } = await supabase
-    .from("locker_messages")
-    .select("user_id, body")
-    .eq("league_id", leagueId)
-    .gte("created_at", startIso)
-    .order("created_at", { ascending: false })
-    .limit(400);
-
-  if (allErr || !allRows) {
-    // Write worked — never return empty and wipe the UI
-    return {
-      ok: true,
-      reactions: mineSame
-        ? []
-        : [{ emoji: em, count: 1, mine: true }],
-    };
-  }
-
+  // Tally from the set we already have (+ filter out deleted)
   const tallies = new Map<string, { count: number; mine: boolean }>();
-  for (const r of allRows) {
-    const parsed = parseReactionMarker(
-      String((r as { body?: string }).body || "")
-    );
+  for (const r of rows) {
+    if (mineSame && r.id === mineSame.id) continue; // removed
+    const parsed = parseReactionMarker(r.body || "");
     if (!parsed || parsed.messageId !== messageId) continue;
     const prev = tallies.get(parsed.emoji) || { count: 0, mine: false };
     prev.count += 1;
-    if (String((r as { user_id: string }).user_id) === uid) prev.mine = true;
+    if (r.user_id === uid) prev.mine = true;
     tallies.set(parsed.emoji, prev);
   }
 
-  // If we just added and parse still empty (shouldn't), keep optimistic single
   if (tallies.size === 0 && !mineSame) {
+    // We just added — always return at least this react
     return { ok: true, reactions: [{ emoji: em, count: 1, mine: true }] };
   }
 
