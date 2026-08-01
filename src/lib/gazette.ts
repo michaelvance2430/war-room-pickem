@@ -8,6 +8,10 @@ import { getSession, getLeague } from "./league";
 import { hasSeenRules } from "./rules";
 import { createClient } from "@/lib/supabase/client";
 import { defaultSeasonYear } from "./trophies";
+import {
+  gazetteSecretLetterForWeek,
+  pickRareGazetteLine,
+} from "./easter-eggs";
 
 const SEEN_PREFIX = "warroom-gazette-seen-v1";
 
@@ -82,6 +86,16 @@ export type GazetteEdition = {
   stampLine?: string;
   /** Subline under masthead (e.g. Brazil 2027) */
   eventLine?: string;
+  /**
+   * Easter egg — rare absurd desk line (~4% of editions). Zero points.
+   * Discoverable; not announced in a secret menu.
+   */
+  rareEgg?: { headline: string; deck: string } | null;
+  /**
+   * Quiet acrostic letter for the week (spells NEVER GIVE UP over time).
+   * Rendered as a subtle highlight — never explained in UI chrome.
+   */
+  secretLetter?: string | null;
 };
 
 /** Sidebar / “also in this paper” bit */
@@ -768,6 +782,17 @@ export const GAZETTE_COPY_COUNTS = {
  * 3) Optional: forgot-to-lock milk carton story
  * Weekly multi-way same scores do NOT get special deadlock copy.
  */
+function eggFields(weekIndex: number): {
+  rareEgg: { headline: string; deck: string } | null;
+  secretLetter: string;
+} {
+  const leagueId = getLeague()?.id || "local";
+  return {
+    rareEgg: pickRareGazetteLine(leagueId, weekIndex),
+    secretLetter: gazetteSecretLetterForWeek(weekIndex),
+  };
+}
+
 export async function buildGazetteEdition(
   players: Player[]
 ): Promise<GazetteEdition | null> {
@@ -781,6 +806,7 @@ export async function buildGazetteEdition(
 
   const weekIndex = data.weekIndex;
   const weekLabel = weekTitle(weekIndex);
+  const eggs = eggFields(weekIndex);
 
   const cn = data.crown.player.name;
   const cp = data.crown.pts;
@@ -1121,6 +1147,8 @@ export async function buildGazetteEdition(
       sportId: "nfl",
       stampLine: "Extra · Extra",
       eventLine: "Pro football · primetime desk · not college",
+      rareEgg: eggs.rareEgg,
+      secretLetter: eggs.secretLetter,
     };
   }
 
@@ -1197,6 +1225,8 @@ export async function buildGazetteEdition(
       sportId: "soccer_wwc",
       stampLine: "EXTRA!",
       eventLine: "FIFA Women's World Cup Brazil 2027™ · War Room desk",
+      rareEgg: eggs.rareEgg,
+      secretLetter: eggs.secretLetter,
     };
   }
 
@@ -1260,6 +1290,8 @@ export async function buildGazetteEdition(
     sportId: "cfb",
     stampLine: "Extra · Extra",
     eventLine: undefined,
+    rareEgg: eggs.rareEgg,
+    secretLetter: eggs.secretLetter,
   };
 }
 

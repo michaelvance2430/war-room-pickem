@@ -728,6 +728,21 @@ export default function PicksPage() {
       /* ignore */
     }
 
+    // Easter egg: Lucky Seven (7:07:07 lock) — zero points
+    try {
+      const { checkLuckySevenLock, EVENT_EASTER_EGG } = await import(
+        "@/lib/easter-eggs"
+      );
+      const moment = checkLuckySevenLock(getSession()?.playerId || "");
+      if (moment) {
+        window.dispatchEvent(
+          new CustomEvent(EVENT_EASTER_EGG, { detail: moment })
+        );
+      }
+    } catch {
+      /* ignore */
+    }
+
     // First & Final: full popup (earn warning / forfeit point loss)
     if (result.firstFinal === "earned") {
       setFirstFinalModal({ mode: "earned", weekNumber: activeWeek });

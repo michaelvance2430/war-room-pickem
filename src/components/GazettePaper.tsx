@@ -5,10 +5,17 @@
  * Phone-first newspaper energy: big A1, weather, movers, classifieds, share.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { GazetteEdition } from "@/lib/gazette";
 import GazetteShareSheet from "@/components/GazetteShareSheet";
+import { getSession } from "@/lib/league";
+import {
+  collectGazetteSecretLetter,
+  getPersonalGazetteOverlay,
+  noteRareHeadlineSeen,
+  EVENT_EASTER_EGG,
+} from "@/lib/easter-eggs";
 
 type Props = {
   edition: GazetteEdition;
@@ -57,6 +64,8 @@ export function normalizeEdition(raw: GazetteEdition): GazetteEdition {
     sportId: raw.sportId,
     stampLine: raw.stampLine || (wwc ? "EXTRA!" : "Extra · Extra"),
     eventLine: raw.eventLine,
+    rareEgg: raw.rareEgg ?? null,
+    secretLetter: raw.secretLetter ?? null,
   };
 }
 
@@ -68,6 +77,29 @@ export default function GazettePaper({
 }: Props) {
   const edition = normalizeEdition(raw);
   const [shareOpen, setShareOpen] = useState(false);
+  const [personal, setPersonal] = useState<{
+    headline: string;
+    deck: string;
+  } | null>(null);
+
+  useEffect(() => {
+    const pid = getSession()?.playerId;
+    if (!pid) return;
+    setPersonal(getPersonalGazetteOverlay(pid));
+    if (edition.rareEgg) {
+      noteRareHeadlineSeen(pid);
+    }
+    const moment = collectGazetteSecretLetter(pid, edition.weekIndex);
+    if (moment) {
+      try {
+        window.dispatchEvent(
+          new CustomEvent(EVENT_EASTER_EGG, { detail: moment })
+        );
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [edition.weekIndex, edition.rareEgg]);
 
   return (
     <div
@@ -170,6 +202,14 @@ export default function GazettePaper({
         )}
         <p className="text-[11px] italic text-stone-600 mt-2">
           {edition.tagline}
+          {edition.secretLetter ? (
+            <span
+              className="ml-1 font-serif font-black text-stone-800 underline decoration-dotted decoration-stone-400"
+              title=""
+            >
+              {edition.secretLetter}
+            </span>
+          ) : null}
         </p>
         <p className="text-[11px] uppercase tracking-widest text-stone-700 mt-2 border-t border-b border-stone-400 py-1.5 font-semibold">
           {edition.volumeLabel}
@@ -177,6 +217,38 @@ export default function GazettePaper({
       </div>
 
       <div className="px-4 py-4 space-y-4">
+        {/* Personal / rare egg lines — zero points, pure desk energy */}
+        {(personal || edition.rareEgg) && (
+          <div className="rounded border border-stone-400 bg-stone-100/80 px-3 py-2">
+            <p className="text-[9px] uppercase tracking-[0.2em] text-stone-500 font-bold mb-1">
+              Desk note
+            </p>
+            {personal && (
+              <>
+                <p className="font-serif font-black text-sm text-stone-900 leading-snug">
+                  {personal.headline}
+                </p>
+                <p className="text-[11px] text-stone-600 mt-0.5">
+                  {personal.deck}
+                </p>
+              </>
+            )}
+            {edition.rareEgg && (
+              <>
+                <p
+                  className={`font-serif font-black text-sm text-stone-900 leading-snug ${
+                    personal ? "mt-2 pt-2 border-t border-stone-300" : ""
+                  }`}
+                >
+                  {edition.rareEgg.headline}
+                </p>
+                <p className="text-[11px] text-stone-600 mt-0.5">
+                  {edition.rareEgg.deck}
+                </p>
+              </>
+            )}
+          </div>
+        )}
         {/* A1 Crown */}
         <article className="relative">
           <div className="flex items-start gap-3">

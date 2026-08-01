@@ -26,6 +26,8 @@ import CardPublishedModal from "@/components/CardPublishedModal";
 import JoinBadgeHydrator from "@/components/JoinBadgeHydrator";
 import EquippedTitleHydrator from "@/components/EquippedTitleHydrator";
 import ProfileBorderHydrator from "@/components/ProfileBorderHydrator";
+import EasterEggHost from "@/components/EasterEggHost";
+import MascotSighting from "@/components/MascotSighting";
 import { touchLastSeen } from "@/lib/last-seen";
 import { loadMyProfile } from "@/lib/profile";
 import { isGuestMode } from "@/lib/guest-mode";
@@ -819,6 +821,9 @@ export default function Nav() {
       {!isGuestMode() && <RulesOnboardingModal />}
       <GazetteModal />
       <BadgeUnlockModal />
+      {/* Easter eggs — discoverable, zero points, never a secret menu */}
+      {!isGuestMode() && <EasterEggHost />}
+      {!isGuestMode() && <MascotSighting />}
     </>
   );
 }

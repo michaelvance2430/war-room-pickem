@@ -58,6 +58,10 @@ import {
 } from "@/lib/profile-border-store";
 import { loadLeaguePlayers } from "@/lib/cloud";
 import type { Player } from "@/lib/types";
+import {
+  getPlayerBirthday,
+  setPlayerBirthday,
+} from "@/lib/easter-eggs";
 
 export default function AccountPage() {
   const router = useRouter();
@@ -67,6 +71,7 @@ export default function AccountPage() {
   const [name, setName] = useState("");
   const [nameDraft, setNameDraft] = useState("");
   const [nameBusy, setNameBusy] = useState(false);
+  const [birthdayDraft, setBirthdayDraft] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -109,6 +114,8 @@ export default function AccountPage() {
 
     // Equipped name title + border (from earned badges)
     if (session?.playerId) {
+      const bday = getPlayerBirthday(session.playerId);
+      setBirthdayDraft(bday || "");
       await syncMyEquippedTitleFromCloud();
       await syncMyBorderFromCloud();
       setEquippedBadgeId(getLocalEquippedBadgeId(session.playerId));
@@ -350,6 +357,53 @@ export default function AccountPage() {
           >
             {nameBusy ? "Saving…" : "Save name"}
           </button>
+
+          <div className="mt-5 pt-4 border-t border-border/60">
+            <p className="text-xs text-muted mb-2 leading-relaxed">
+              Birthday (optional, MM-DD) — private. One quiet Gazette line if
+              you open the app that day. No points. Clear the field to remove.
+            </p>
+            <label className="block text-xs text-muted mb-2">
+              Birthday
+              <input
+                type="text"
+                value={birthdayDraft}
+                onChange={(e) => setBirthdayDraft(e.target.value)}
+                maxLength={5}
+                placeholder="MM-DD"
+                disabled={isGuestMode()}
+                className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-3 text-base text-foreground font-medium disabled:opacity-50"
+              />
+            </label>
+            <button
+              type="button"
+              disabled={isGuestMode() || !userId}
+              onClick={() => {
+                if (!userId) return;
+                const raw = birthdayDraft.trim();
+                if (!raw) {
+                  setPlayerBirthday(userId, null);
+                  setBirthdayDraft("");
+                  setMessage("Birthday cleared.");
+                  return;
+                }
+                if (!/^\d{2}-\d{2}$/.test(raw)) {
+                  setMessage("Use MM-DD (e.g. 07-31).");
+                  return;
+                }
+                const [mm, dd] = raw.split("-").map(Number);
+                if (mm < 1 || mm > 12 || dd < 1 || dd > 31) {
+                  setMessage("That date looks off.");
+                  return;
+                }
+                setPlayerBirthday(userId, raw);
+                setMessage("Birthday saved — private, zero points.");
+              }}
+              className="w-full py-2.5 min-h-[44px] rounded-xl border border-border text-sm font-semibold disabled:opacity-40"
+            >
+              Save birthday
+            </button>
+          </div>
         </section>
 
         {/* Commish preview next */}

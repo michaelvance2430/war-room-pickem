@@ -7,6 +7,7 @@ import Nav from "@/components/Nav";
 import AvatarLightbox from "@/components/AvatarLightbox";
 import BadgeShelf from "@/components/BadgeShelf";
 import WwcPassportShelf from "@/components/WwcPassportShelf";
+import DiscoveryPassportShelf from "@/components/DiscoveryPassportShelf";
 import ProfileTrophyCase from "@/components/ProfileTrophyCase";
 import FootballResume from "@/components/FootballResume";
 import ProfileSeasonPlot from "@/components/ProfileSeasonPlot";
@@ -473,6 +474,12 @@ export default function ProfilePage() {
           items={hardware}
           playerName={player.name}
           leagueName={leagueName}
+          isSelf={isSelfProfile}
+        />
+
+        {/* Passport stamps & zero-point discoveries */}
+        <DiscoveryPassportShelf
+          playerId={player.id}
           isSelf={isSelfProfile}
         />
 

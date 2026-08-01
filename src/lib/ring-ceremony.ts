@@ -59,30 +59,42 @@ export function resolveRingSport(sportId?: string | null): RingCeremonySport {
 
 /** Sport-specific ceremony voice + palette — not a generic trophy pop. */
 export function getRingCeremonyPack(
-  sportId?: string | null
+  sportId?: string | null,
+  opts?: { threePeat?: boolean }
 ): RingCeremonyPack {
   const sport = resolveRingSport(sportId);
+  const threePeat = !!opts?.threePeat;
 
   if (sport === "nfl") {
     return {
       sport,
-      stamp: "Opening night · Super Bowl energy",
-      title: "The ring ceremony",
-      stageLine:
-        "Lights. Confetti. A blurry league-office silhouette at the mic. This is how Sundays begin.",
-      champKicker: "Defending War Room champion",
-      ringLease:
-        "One-year lease. The late window is open. The silver stays with them until someone takes it on the field.",
+      stamp: threePeat
+        ? "Opening night · Dynasty edition"
+        : "Opening night · Super Bowl energy",
+      title: threePeat ? "The three-peat ceremony" : "The ring ceremony",
+      stageLine: threePeat
+        ? "Three straight years. The lights got hotter. The ring animation changed. People notice."
+        : "Lights. Confetti. A blurry league-office silhouette at the mic. This is how Sundays begin.",
+      champKicker: threePeat
+        ? "Defending three-peat champion"
+        : "Defending War Room champion",
+      ringLease: threePeat
+        ? "Dynasty lease. The silver doesn't want to leave. Someone still has to take it on the field."
+        : "One-year lease. The late window is open. The silver stays with them until someone takes it on the field.",
       stageFigureLabel: "League office · stage mic",
-      hardwareName: "Championship ring",
+      hardwareName: threePeat ? "Dynasty ring" : "Championship ring",
       ctaHardware: "View championship hardware",
       ctaEnter: "Hit the locker room",
-      confetti: ["#C1121F", "#C5CCD3", "#F8FAFC", "#fbbf24", "#0B1426"],
-      accent: "#C1121F",
-      accentSoft: "rgba(193, 18, 31, 0.2)",
+      confetti: threePeat
+        ? ["#fbbf24", "#C1121F", "#F8FAFC", "#f59e0b", "#C5CCD3", "#0B1426"]
+        : ["#C1121F", "#C5CCD3", "#F8FAFC", "#fbbf24", "#0B1426"],
+      accent: threePeat ? "#fbbf24" : "#C1121F",
+      accentSoft: threePeat
+        ? "rgba(251, 191, 36, 0.22)"
+        : "rgba(193, 18, 31, 0.2)",
       stageGradient:
         "linear-gradient(180deg, #0B1426 0%, #151d2e 45%, #1a1020 100%)",
-      heroGlyph: "💍🏈",
+      heroGlyph: threePeat ? "💍💍💍" : "💍🏈",
       previewNote:
         "Preview · you only (commissioner). League does not see this test.",
     };
@@ -116,23 +128,31 @@ export function getRingCeremonyPack(
   // CFB / default — campus opening day
   return {
     sport: sport === "other" ? "other" : "cfb",
-    stamp: "Opening day · campus night",
-    title: "The ring ceremony",
-    stageLine:
-      "Night lights. Student-section volume. The defending champ walks the paper-bag red carpet.",
-    champKicker: "Defending national champ of this room",
-    ringLease:
-      "Week 0 / openers energy. The ring is theirs until someone takes it — Saturdays will decide.",
+    stamp: threePeat
+      ? "Opening day · Dynasty campus night"
+      : "Opening day · campus night",
+    title: threePeat ? "The three-peat ceremony" : "The ring ceremony",
+    stageLine: threePeat
+      ? "Three straight years. The band got louder. The ring animation changed. People notice."
+      : "Night lights. Student-section volume. The defending champ walks the paper-bag red carpet.",
+    champKicker: threePeat
+      ? "Defending three-peat champ of this room"
+      : "Defending national champ of this room",
+    ringLease: threePeat
+      ? "Dynasty lease. The ring is getting heavy. Saturdays still decide who takes it."
+      : "Week 0 / openers energy. The ring is theirs until someone takes it — Saturdays will decide.",
     stageFigureLabel: "Campus stage · band energy",
-    hardwareName: "Championship ring",
+    hardwareName: threePeat ? "Dynasty ring" : "Championship ring",
     ctaHardware: "View championship banner",
     ctaEnter: "Enter the War Room",
-    confetti: ["#22c55e", "#fbbf24", "#f4f0e6", "#991b1b", "#a3e635"],
+    confetti: threePeat
+      ? ["#fbbf24", "#22c55e", "#f4f0e6", "#f59e0b", "#991b1b", "#a3e635"]
+      : ["#22c55e", "#fbbf24", "#f4f0e6", "#991b1b", "#a3e635"],
     accent: "#fbbf24",
     accentSoft: "rgba(251, 191, 36, 0.18)",
     stageGradient:
       "linear-gradient(180deg, #050805 0%, #0a1a0c 50%, #1a1208 100%)",
-    heroGlyph: "💍🏆",
+    heroGlyph: threePeat ? "💍💍💍" : "💍🏆",
     previewNote:
       "Preview · you only (commissioner). Real ceremony still waits for opening week.",
   };

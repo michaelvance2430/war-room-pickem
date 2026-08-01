@@ -178,6 +178,21 @@ export default function FounderDashboardPage() {
           </button>
         </div>
 
+        {/* Founder Binder — product law (not a user feature list) */}
+        <section className="rounded-xl border border-primary/40 bg-primary/5 p-4 space-y-2">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">
+            Founder Binder
+          </p>
+          <h2 className="text-sm font-semibold">Easter eggs</h2>
+          <p className="text-xs text-muted leading-relaxed">
+            Easter eggs should reward curiosity, loyalty, and joy — not
+            competition. They should make players smile, laugh, or feel
+            appreciated, never make them feel like they missed out on an
+            advantage. Discoverable, not announced. Never points, standings,
+            competitive edge, or payment.
+          </p>
+        </section>
+
         {/* Today's health */}
         <section className="rounded-xl border border-border bg-card p-4 space-y-3">
           <h2 className="text-sm font-semibold">Today&apos;s health</h2>

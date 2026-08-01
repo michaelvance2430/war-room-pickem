@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   BIG_GAME_KINDS,
   HARDWARE_KIND_META,
@@ -9,16 +10,24 @@ import {
 } from "@/lib/profile-hardware";
 import TrophyShareButton from "@/components/TrophyShareButton";
 import { divisionFullLabel } from "@/lib/divisions";
-import { getLeague } from "@/lib/league";
+import { getLeague, getSession } from "@/lib/league";
+import {
+  EVENT_EASTER_EGG,
+  recordTrophyTap,
+} from "@/lib/easter-eggs";
 
 function Plaque({
   item,
   leagueName,
   canShare,
+  spinny,
+  onTrophyTap,
 }: {
   item: ProfileTrophy;
   leagueName?: string;
   canShare: boolean;
+  spinny?: boolean;
+  onTrophyTap?: () => void;
 }) {
   const meta = HARDWARE_KIND_META[item.kind];
   const sharePayload = {
@@ -35,9 +44,19 @@ function Plaque({
       className={`rounded-xl border ${meta.border} bg-gradient-to-b from-card to-black/40 p-4 min-h-[120px] relative`}
     >
       <div className="flex items-start justify-between gap-2 mb-1">
-        <div className="text-2xl" aria-hidden>
+        <button
+          type="button"
+          className={`text-2xl select-none ${
+            spinny ? "animate-spin" : ""
+          } ${item.kind === "championship" ? "cursor-pointer" : "cursor-default"}`}
+          aria-hidden
+          tabIndex={item.kind === "championship" ? 0 : -1}
+          onClick={() => {
+            if (item.kind === "championship") onTrophyTap?.();
+          }}
+        >
           {meta.emoji}
-        </div>
+        </button>
         {canShare && <TrophyShareButton compact trophy={sharePayload} />}
       </div>
       <div className={`text-[10px] uppercase tracking-wide font-semibold ${meta.accent}`}>
@@ -74,13 +93,31 @@ function Plaque({
   );
 }
 
-function EmptySlot({ kind }: { kind: ProfileTrophyKind }) {
+function EmptySlot({
+  kind,
+  spinny,
+  onTrophyTap,
+}: {
+  kind: ProfileTrophyKind;
+  spinny?: boolean;
+  onTrophyTap?: () => void;
+}) {
   const meta = HARDWARE_KIND_META[kind];
   return (
     <div className="rounded-xl border border-dashed border-border/70 bg-card/30 p-4 min-h-[120px] flex flex-col justify-center opacity-50">
-      <div className="text-2xl mb-1 grayscale" aria-hidden>
+      <button
+        type="button"
+        className={`text-2xl mb-1 grayscale text-left ${
+          spinny ? "animate-spin" : ""
+        } ${kind === "championship" ? "cursor-pointer" : "cursor-default"}`}
+        aria-hidden
+        tabIndex={kind === "championship" ? 0 : -1}
+        onClick={() => {
+          if (kind === "championship") onTrophyTap?.();
+        }}
+      >
         {meta.emoji}
-      </div>
+      </button>
       <div className="text-[10px] uppercase tracking-wide text-muted">
         {kind === "championship"
           ? "Championship"
@@ -108,6 +145,7 @@ export default function ProfileTrophyCase({
   isSelf?: boolean;
 }) {
   const { bigGame, division } = splitHardwareCases(items);
+  const [spinId, setSpinId] = useState<string | null>(null);
 
   const byKind = (kind: ProfileTrophyKind) =>
     bigGame.filter((i) => i.kind === kind);
@@ -115,7 +153,26 @@ export default function ProfileTrophyCase({
   const hasAny = items.length > 0;
   // Anyone can flex hardware (yours or a buddy's roast share)
   const canShare = true;
-  void isSelf; // reserved for future "only you" accent
+  void isSelf;
+  void hasAny;
+  void getLeague;
+
+  function handleTrophyTap(itemId: string) {
+    setSpinId(itemId);
+    window.setTimeout(() => setSpinId(null), 900);
+    const pid = getSession()?.playerId;
+    if (!pid || !isSelf) return;
+    const moment = recordTrophyTap(pid);
+    if (moment) {
+      try {
+        window.dispatchEvent(
+          new CustomEvent(EVENT_EASTER_EGG, { detail: moment })
+        );
+      } catch {
+        /* ignore */
+      }
+    }
+  }
 
   return (
     <section className="rounded-2xl border border-border bg-card p-5 sm:p-6 mb-6">
@@ -141,7 +198,14 @@ export default function ProfileTrophyCase({
           {BIG_GAME_KINDS.map((kind) => {
             const won = byKind(kind);
             if (won.length === 0) {
-              return <EmptySlot key={kind} kind={kind} />;
+              return (
+                <EmptySlot
+                  key={kind}
+                  kind={kind}
+                  spinny={spinId === `empty-${kind}`}
+                  onTrophyTap={() => handleTrophyTap(`empty-${kind}`)}
+                />
+              );
             }
             return (
               <div key={kind} className="space-y-2">
@@ -151,6 +215,8 @@ export default function ProfileTrophyCase({
                     item={item}
                     leagueName={leagueName}
                     canShare={canShare}
+                    spinny={spinId === item.id}
+                    onTrophyTap={() => handleTrophyTap(item.id)}
                   />
                 ))}
               </div>

@@ -1441,8 +1441,15 @@ html[data-season-theme="newyear"] body::before {
   animation-timing-function: linear;
   animation-iteration-count: infinite;
 }
+.egg-confetti-bit {
+  animation-name: ring-confetti-fall;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+  animation-iteration-count: 1;
+}
 @media (prefers-reduced-motion: reduce) {
-  .ring-confetti-bit {
+  .ring-confetti-bit,
+  .egg-confetti-bit {
     animation: none !important;
     opacity: 0 !important;
   }

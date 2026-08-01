@@ -26,6 +26,11 @@ import {
   RING_CEREMONY_SESSION_PREVIEW,
   type RingCeremonyPack,
 } from "@/lib/ring-ceremony";
+import {
+  consecutiveChampionshipStreak,
+  hasThreePeat,
+  noteChampionshipYears,
+} from "@/lib/easter-eggs";
 
 export { isOpeningWeekLive, isOpeningCeremonyLive };
 
@@ -132,15 +137,26 @@ export default function RingCeremonyModal() {
   const [champ, setChamp] = useState<Champ | null>(null);
   const [leagueName, setLeagueName] = useState("");
   const [sportId, setSportId] = useState<string | null>(null);
+  const [threePeat, setThreePeat] = useState(false);
 
-  const pack = useMemo(() => getRingCeremonyPack(sportId), [sportId]);
+  const pack = useMemo(
+    () => getRingCeremonyPack(sportId, { threePeat }),
+    [sportId, threePeat]
+  );
 
   const openWith = useCallback(
-    (c: Champ, lgName: string, sid: string | null | undefined, isPrev: boolean) => {
+    (
+      c: Champ,
+      lgName: string,
+      sid: string | null | undefined,
+      isPrev: boolean,
+      isThreePeat = false
+    ) => {
       setChamp(c);
       setLeagueName(lgName);
       setSportId(sid || null);
       setPreview(isPrev);
+      setThreePeat(isThreePeat);
       setOpen(true);
     },
     []
@@ -172,7 +188,27 @@ export default function RingCeremonyModal() {
     const key = ringCeremonySeenKey(league.id, session.playerId, d.year);
     if (localStorage.getItem(key) === "1") return false;
 
-    openWith(d, league.name || "War Room", sid, false);
+    // Dynasty flair: three consecutive champ years for defending champ
+    let isThree = false;
+    try {
+      const champYears = trophies
+        .filter(
+          (t) =>
+            t.trophyType === "championship" &&
+            ((d.userId && t.winnerUserId === d.userId) ||
+              t.winnerName === d.name)
+        )
+        .map((t) => t.seasonYear);
+      isThree = consecutiveChampionshipStreak(champYears) >= 3;
+      if (d.userId) {
+        noteChampionshipYears(d.userId, champYears);
+        if (hasThreePeat(d.userId)) isThree = true;
+      }
+    } catch {
+      /* ok */
+    }
+
+    openWith(d, league.name || "War Room", sid, false, isThree);
     return true;
   }, [openWith]);
 
