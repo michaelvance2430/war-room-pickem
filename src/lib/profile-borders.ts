@@ -301,10 +301,11 @@ export const PROFILE_BORDER_CATALOG: ProfileBorderDef[] = [
   },
 
   // —— Holiday (everyone, only while that season theme is on) ——
+  // Quiet unlock — Commish doesn't announce; players discover on Account.
   {
     id: "holiday_halloween_pumpkin",
     name: "Pumpkin Patch",
-    unlockLabel: "Available while Halloween theme is on",
+    unlockLabel: "👀 Something seasonal…",
     unlock: { kind: "holiday", themeId: "halloween" },
     tier: "holiday",
     ringClass: "ring-[3px] ring-orange-400 border-2 border-purple-500",
@@ -314,16 +315,26 @@ export const PROFILE_BORDER_CATALOG: ProfileBorderDef[] = [
   {
     id: "holiday_halloween_ghost",
     name: "Boo Ring",
-    unlockLabel: "Available while Halloween theme is on",
+    unlockLabel: "👀 Something seasonal…",
     unlock: { kind: "holiday", themeId: "halloween" },
     tier: "holiday",
     ringClass: "ring-[3px] ring-purple-300 border-2 border-white/70 border-dashed",
     glowClass: "shadow-[0_0_14px_rgba(216,180,254,0.5)] holiday-border-bob",
   },
   {
+    id: "holiday_halloween_candy",
+    name: "Trick-or-Treat",
+    unlockLabel: "👀 Something seasonal…",
+    unlock: { kind: "holiday", themeId: "halloween" },
+    tier: "holiday",
+    ringClass: "ring-[3px] ring-fuchsia-400 border-2 border-orange-300 border-dotted",
+    glowClass:
+      "shadow-[0_0_14px_rgba(232,121,249,0.45),0_0_8px_rgba(253,186,116,0.4)] holiday-border-bob",
+  },
+  {
     id: "holiday_thanks_harvest",
     name: "Harvest Gold",
-    unlockLabel: "Available while Thanksgiving theme is on",
+    unlockLabel: "👀 Something seasonal…",
     unlock: { kind: "holiday", themeId: "thanksgiving" },
     tier: "holiday",
     ringClass: "ring-[3px] ring-amber-500 border-2 border-orange-700",
@@ -332,16 +343,25 @@ export const PROFILE_BORDER_CATALOG: ProfileBorderDef[] = [
   {
     id: "holiday_thanks_leaf",
     name: "Autumn Leaf",
-    unlockLabel: "Available while Thanksgiving theme is on",
+    unlockLabel: "👀 Something seasonal…",
     unlock: { kind: "holiday", themeId: "thanksgiving" },
     tier: "holiday",
     ringClass: "ring-[3px] ring-red-600 border-2 border-amber-400",
     glowClass: "shadow-[0_0_12px_rgba(220,38,38,0.35)] holiday-border-bob",
   },
   {
+    id: "holiday_thanks_gravy",
+    name: "Gravy Boat",
+    unlockLabel: "👀 Something seasonal…",
+    unlock: { kind: "holiday", themeId: "thanksgiving" },
+    tier: "holiday",
+    ringClass: "ring-[3px] ring-yellow-700 border-2 border-stone-400",
+    glowClass: "shadow-[0_0_12px_rgba(161,98,7,0.4)] holiday-border-bob",
+  },
+  {
     id: "holiday_xmas_candy",
     name: "Candy Cane",
-    unlockLabel: "Available while Christmas theme is on",
+    unlockLabel: "👀 Something seasonal…",
     unlock: { kind: "holiday", themeId: "christmas" },
     tier: "holiday",
     ringClass: "ring-[3px] ring-red-500 border-2 border-emerald-400",
@@ -351,16 +371,26 @@ export const PROFILE_BORDER_CATALOG: ProfileBorderDef[] = [
   {
     id: "holiday_xmas_snow",
     name: "Snow Globe",
-    unlockLabel: "Available while Christmas theme is on",
+    unlockLabel: "👀 Something seasonal…",
     unlock: { kind: "holiday", themeId: "christmas" },
     tier: "holiday",
     ringClass: "ring-[3px] ring-sky-200 border-2 border-white/90",
     glowClass: "shadow-[0_0_16px_rgba(186,230,253,0.55)] holiday-border-twinkle",
   },
   {
+    id: "holiday_xmas_holly",
+    name: "Holly Jolly",
+    unlockLabel: "👀 Something seasonal…",
+    unlock: { kind: "holiday", themeId: "christmas" },
+    tier: "holiday",
+    ringClass: "ring-[3px] ring-emerald-500 border-2 border-red-400",
+    glowClass:
+      "shadow-[0_0_14px_rgba(16,185,129,0.45),0_0_8px_rgba(248,113,113,0.35)] holiday-border-twinkle",
+  },
+  {
     id: "holiday_ny_sparkle",
     name: "Midnight Sparkle",
-    unlockLabel: "Available while New Year theme is on",
+    unlockLabel: "👀 Something seasonal…",
     unlock: { kind: "holiday", themeId: "newyear" },
     tier: "holiday",
     ringClass: "ring-[3px] ring-yellow-300 border-2 border-fuchsia-400",
@@ -370,11 +400,21 @@ export const PROFILE_BORDER_CATALOG: ProfileBorderDef[] = [
   {
     id: "holiday_ny_ball",
     name: "Ball Drop",
-    unlockLabel: "Available while New Year theme is on",
+    unlockLabel: "👀 Something seasonal…",
     unlock: { kind: "holiday", themeId: "newyear" },
     tier: "holiday",
     ringClass: "ring-[3px] ring-white border-2 border-yellow-400",
     glowClass: "shadow-[0_0_20px_rgba(255,255,255,0.45)] holiday-border-twinkle",
+  },
+  {
+    id: "holiday_ny_confetti",
+    name: "Confetti Hangover",
+    unlockLabel: "👀 Something seasonal…",
+    unlock: { kind: "holiday", themeId: "newyear" },
+    tier: "holiday",
+    ringClass: "ring-[3px] ring-pink-400 border-2 border-sky-300 border-dashed",
+    glowClass:
+      "shadow-[0_0_14px_rgba(244,114,182,0.45),0_0_8px_rgba(125,211,252,0.4)] holiday-border-twinkle",
   },
 ];
 

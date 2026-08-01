@@ -361,9 +361,8 @@ export const BADGE_CATALOG: BadgeDef[] = [
     id: "calendar_cosplayer",
     name: "Calendar Cosplayer",
     description:
-      "You put on a holiday border the second Commish flipped the theme. When the decorations come down, the ring vanishes — but everyone still remembers you dressed for the group chat.",
-    howToEarn:
-      "Equip any holiday profile border while that season theme is live (Halloween, Thanksgiving, Christmas, or New Year).",
+      "You found the seasonal rings nobody announced. When the decorations come down, the border vanishes — the cosplay charge sticks forever.",
+    howToEarn: "No spoilers. Dress for the season. Curiosity only.",
     tier: "rare",
     points: 25,
     icon: "🎭",
