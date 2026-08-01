@@ -1744,6 +1744,33 @@ export function getPlayerBadges(
   } catch {
     /* ignore */
   }
+  // Multi-season same-room loyalty: keyed by league UUID only (never name)
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getLeague } = require("./league") as typeof import("./league");
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { syncLeagueSeasonFromSession } =
+      require("./league-seasons") as typeof import("./league-seasons");
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { defaultSeasonYear } =
+      require("./trophies") as typeof import("./trophies");
+    const lg = getLeague();
+    const weeks = Array.isArray(player.weeklyPoints)
+      ? player.weeklyPoints.filter((w) => (w || 0) > 0).length
+      : player.weeksPlayed || 0;
+    // Stamp once they have a real season under their belt in this room
+    if (lg?.id && weeks >= 10) {
+      syncLeagueSeasonFromSession({
+        playerId: player.id,
+        leagueId: lg.id,
+        weeksPlayed: weeks,
+        code: lg.code,
+        seasonYear: defaultSeasonYear(),
+      });
+    }
+  } catch {
+    /* ignore */
+  }
   // Prior-season trophy winners (Kahmann champ, Bill ball Ben nerd) → permanent + career bank
   try {
     applyLegacyBadgeGrants(player);

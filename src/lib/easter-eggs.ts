@@ -1028,6 +1028,11 @@ export function noteRareHeadlineSeen(playerId: string): void {
 /**
  * Type 6 — same last-name rival, 10 seasons finished above them.
  * Call with current league peer list + season year when standings exist.
+ *
+ * Streaks are keyed by `${leagueId}:${rivalUserId}` so:
+ * - Room renames don't matter (league UUID, never name)
+ * - Beating a rival in room A doesn't pad room B
+ * Rival match uses last name for discovery; identity is user id + room id.
  */
 export function noteSiblingStandings(opts: {
   playerId: string;
@@ -1036,14 +1041,29 @@ export function noteSiblingStandings(opts: {
   peers: { id: string; name: string; totalPoints: number }[];
   seasonYear: number;
   weeksPlayed: number;
+  /** League UUID — required for stable multi-season room tracking */
+  leagueId?: string | null;
 }): EasterEggMoment | null {
-  const { playerId, playerName, myPoints, peers, seasonYear, weeksPlayed } =
-    opts;
+  const {
+    playerId,
+    playerName,
+    myPoints,
+    peers,
+    seasonYear,
+    weeksPlayed,
+    leagueId,
+  } = opts;
   if (!playerId || weeksPlayed < 8) return null;
   const myLast = lastName(playerName);
   if (!myLast || myLast.length < 3) return null;
   const state = getEggState(playerId);
-  if (state.siblingLastSeasonYear === seasonYear) return null;
+  // Per-room season stamp so multi-league players get fair credits
+  const room = (leagueId || "").trim() || "unknown";
+  const seasonStamp = `${room}:${seasonYear}`;
+  if (state.siblingLastSeasonYear === seasonYear && !leagueId) return null;
+  // Track last stamped room-year in siblingStreaks meta via a reserved key
+  const stampedKey = `__stamp__${seasonStamp}`;
+  if (state.siblingStreaks[stampedKey]) return null;
 
   const rivals = peers.filter(
     (p) => p.id !== playerId && lastName(p.name) === myLast
@@ -1051,8 +1071,10 @@ export function noteSiblingStandings(opts: {
   if (!rivals.length) return null;
 
   state.siblingLastSeasonYear = seasonYear;
+  state.siblingStreaks[stampedKey] = 1;
   for (const r of rivals) {
-    const key = r.id;
+    // Room UUID + rival user id — never league display name
+    const key = `${room}:${r.id}`;
     if (myPoints > r.totalPoints) {
       state.siblingStreaks[key] = (state.siblingStreaks[key] || 0) + 1;
     } else {

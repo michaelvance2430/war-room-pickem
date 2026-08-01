@@ -95,6 +95,8 @@ export default function EasterEggHost() {
             })),
           seasonYear: defaultSeasonYear(),
           weeksPlayed: me?.weeksPlayed || 0,
+          // Room UUID only — rename-safe; never league display name
+          leagueId: league?.id || session?.leagueId || null,
         });
         if (sibling && !cancelled) pushMoments([sibling]);
       } catch {
