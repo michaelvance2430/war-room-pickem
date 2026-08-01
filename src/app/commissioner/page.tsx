@@ -765,9 +765,11 @@ function CommissionerPageInner() {
     const games = generateDemoSlate(activeWeek, 5, sport);
     setAvailableGames(games);
     setSelectedIds(new Set(games.map((g) => g.id)));
+    // Demo / NFL games have no AP ranks — "Good teams" bucket is empty by design
+    setRankHeatFilter("all");
     setCardSaved(false);
     setBotReport(
-      `Demo slate ready for ${weekTitle(activeWeek)} (5 fake ${sport === "nfl" ? "NFL" : "CFB"} games). Or use “Publish demo week” for one tap.`
+      `Demo slate ready for ${weekTitle(activeWeek)} (5 fake ${sport === "nfl" ? "NFL" : "CFB"} games, all selected). Scroll down to see them, or use “Publish demo week” for one tap.`
     );
   }
 
@@ -787,6 +789,8 @@ function CommissionerPageInner() {
     const games = generateDemoSlate(activeWeek, 5, sport);
     setAvailableGames(games);
     setSelectedIds(new Set(games.map((g) => g.id)));
+    // Unranked demo slate — show All games, not empty "Good teams"
+    setRankHeatFilter("all");
     setCardSaved(false);
 
     // Prefer the draft prop on the form; fall back to a rotating sport preset.
@@ -3030,17 +3034,24 @@ function CommissionerPageInner() {
                         <span className="text-warning font-semibold">
                           DRY RUN
                         </span>{" "}
-                        · all open FBS games (no week date filter) · assign any
-                        5 to {weekTitle(activeWeek)} for season testing
+                        · all open{" "}
+                        {leagueFootballSport() === "nfl" ? "NFL" : "FBS"} games
+                        (no week date filter) · assign any 5 to{" "}
+                        {weekTitle(activeWeek)} for season testing
                       </>
                     ) : (
                       <>
-                        FBS only · filtered to{" "}
+                        {leagueFootballSport() === "nfl" ? "NFL" : "FBS only"} ·
+                        filtered to{" "}
                         <span className="text-foreground font-medium">
-                          {weekDateRangeLabel(activeWeek) ||
-                            weekTitle(activeWeek)}
-                        </span>{" "}
-                        (Week 0 ≠ Week 1)
+                          {weekDateRangeLabel(
+                            activeWeek,
+                            leagueFootballSport()
+                          ) || weekTitle(activeWeek)}
+                        </span>
+                        {leagueFootballSport() === "nfl"
+                          ? " (official NFL week window)"
+                          : " (Week 0 ≠ Week 1)"}
                       </>
                     )}
                   </p>
@@ -3157,10 +3168,14 @@ function CommissionerPageInner() {
                 <p className="text-sm text-danger mt-2">{oddsError}</p>
               )}
               {availableGames.length > 0 &&
-                availableGames.every((g) => g.bookmaker === "demo-sim") && (
+                availableGames.every(
+                  (g) =>
+                    g.bookmaker === "demo-sim" || g.bookmaker === "demo-nfl-sim"
+                ) && (
                   <p className="text-xs text-warning mt-2 font-medium">
                     Demo slate loaded ({availableGames.length} fake games,
-                    pre-selected). Hit Publish below.
+                    pre-selected). Scroll down — or hit Publish / Publish demo
+                    week.
                   </p>
                 )}
             </div>
@@ -3172,19 +3187,44 @@ function CommissionerPageInner() {
                   {selectedIds.size}/5)
                 </h2>
                 <p className="text-xs text-muted mb-2">
-                  {availableGames.length} FBS games
+                  {availableGames.length}{" "}
+                  {leagueFootballSport() === "nfl" ? "NFL" : "FBS"} games
                   {rankLabel ? ` • Ranks: ${rankLabel}` : ""}
-                  {" · "}
-                  <span className="text-amber-300/90">Gold</span> both top 10
-                  {" · "}
-                  <span className="text-violet-300/90">Violet</span> both top 25
-                  {" · "}
-                  <span className="text-emerald-300/90">Green</span> one top 25
+                  {leagueFootballSport() === "nfl" ? (
+                    <> · NFL has no AP heat ranks — use All games</>
+                  ) : (
+                    <>
+                      {" · "}
+                      <span className="text-amber-300/90">Gold</span> both top
+                      10{" · "}
+                      <span className="text-violet-300/90">Violet</span> both
+                      top 25{" · "}
+                      <span className="text-emerald-300/90">Green</span> one top
+                      25
+                    </>
+                  )}
                 </p>
                 {(() => {
                   const heatCounts = countRankHeat(availableGames);
+                  const isDemoSlate = availableGames.every(
+                    (g) =>
+                      g.bookmaker === "demo-sim" ||
+                      g.bookmaker === "demo-nfl-sim"
+                  );
+                  const noRankHeat =
+                    isDemoSlate ||
+                    leagueFootballSport() === "nfl" ||
+                    (heatCounts.heat === 0 &&
+                      heatCounts.ranked === 0 &&
+                      heatCounts.top25 === 0 &&
+                      heatCounts.legendary === 0);
+                  // If user is stuck on an empty heat bucket, show all games
+                  const effectiveFilter: RankHeatFilter =
+                    noRankHeat && rankHeatFilter !== "all"
+                      ? "all"
+                      : rankHeatFilter;
                   const filtered = sortGamesRankHeatFirst(
-                    filterGamesByRankHeat(availableGames, rankHeatFilter)
+                    filterGamesByRankHeat(availableGames, effectiveFilter)
                   );
                   const chips: {
                     id: RankHeatFilter;
@@ -3224,22 +3264,22 @@ function CommissionerPageInner() {
                     },
                   ];
                   const dateGroups =
-                    rankHeatFilter === "all"
-                      ? groupGamesByDate(sortGamesRankHeatFirst(availableGames)).map(
-                          (g) => ({
-                            ...g,
-                            games: sortGamesRankHeatFirst(g.games),
-                          })
-                        )
+                    effectiveFilter === "all"
+                      ? groupGamesByDate(
+                          sortGamesRankHeatFirst(availableGames)
+                        ).map((g) => ({
+                          ...g,
+                          games: sortGamesRankHeatFirst(g.games),
+                        }))
                       : [
                           {
                             dateKey: "heat",
                             dateLabel:
-                              rankHeatFilter === "heat"
+                              effectiveFilter === "heat"
                                 ? "Ranked matchups first"
-                                : rankHeatFilter === "legendary"
+                                : effectiveFilter === "legendary"
                                   ? "Both Top 10"
-                                  : rankHeatFilter === "top25"
+                                  : effectiveFilter === "top25"
                                     ? "Both Top 25"
                                     : "One team Top 25",
                             games: filtered,
@@ -3247,30 +3287,41 @@ function CommissionerPageInner() {
                         ];
                   return (
                     <>
-                      <p className="text-[10px] uppercase tracking-wider text-muted font-bold mb-1.5">
-                        Find good games
-                      </p>
-                      <div className="phone-h-scroll sm:flex-wrap sm:overflow-visible gap-1.5 mb-3">
-                        {chips.map((c) => (
-                          <button
-                            key={c.id}
-                            type="button"
-                            disabled={c.count === 0 && c.id !== "all"}
-                            onClick={() => setRankHeatFilter(c.id)}
-                            className={`px-3 py-2 min-h-[40px] rounded-full text-[11px] font-bold border transition touch-manipulation disabled:opacity-40 ${
-                              rankHeatFilter === c.id
-                                ? "bg-primary/15 border-primary text-primary"
-                                : c.accent
-                            }`}
-                          >
-                            {c.label}
-                            <span className="ml-1 opacity-80 tabular-nums">
-                              {c.count}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                      {filtered.length === 0 && rankHeatFilter !== "all" ? (
+                      {!noRankHeat && (
+                        <>
+                          <p className="text-[10px] uppercase tracking-wider text-muted font-bold mb-1.5">
+                            Find good games
+                          </p>
+                          <div className="phone-h-scroll sm:flex-wrap sm:overflow-visible gap-1.5 mb-3">
+                            {chips.map((c) => (
+                              <button
+                                key={c.id}
+                                type="button"
+                                disabled={c.count === 0 && c.id !== "all"}
+                                onClick={() => setRankHeatFilter(c.id)}
+                                className={`px-3 py-2 min-h-[40px] rounded-full text-[11px] font-bold border transition touch-manipulation disabled:opacity-40 ${
+                                  effectiveFilter === c.id
+                                    ? "bg-primary/15 border-primary text-primary"
+                                    : c.accent
+                                }`}
+                              >
+                                {c.label}
+                                <span className="ml-1 opacity-80 tabular-nums">
+                                  {c.count}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                      {noRankHeat && (
+                        <p className="text-[11px] text-warning mb-2">
+                          {isDemoSlate
+                            ? "Demo slate — all 5 fake games listed below (already selected)."
+                            : "No AP ranks on this slate — showing all games."}
+                        </p>
+                      )}
+                      {filtered.length === 0 && effectiveFilter !== "all" ? (
                         <p className="text-sm text-muted py-6 text-center border border-dashed border-border rounded-xl">
                           No games in this bucket. Try{" "}
                           <button
@@ -3294,9 +3345,11 @@ function CommissionerPageInner() {
                         <span className="text-[11px] text-muted ml-2">
                           {group.games.length} game
                           {group.games.length === 1 ? "" : "s"}
-                          {rankHeatFilter !== "all"
+                          {effectiveFilter !== "all"
                             ? " · best first"
-                            : " · ranked first within day"}
+                            : noRankHeat
+                              ? ""
+                              : " · ranked first within day"}
                         </span>
                       </div>
                       <div className="space-y-2">
