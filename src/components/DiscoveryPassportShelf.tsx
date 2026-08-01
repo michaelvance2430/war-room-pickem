@@ -9,7 +9,6 @@ import { useEffect, useMemo, useState } from "react";
 import {
   EVENT_EASTER_EGG,
   EVENT_PASSPORT_STAMP,
-  getEasterEggProgress,
   getPassportRows,
   type DiscoveryDef,
 } from "@/lib/easter-eggs";
@@ -20,6 +19,10 @@ type Props = {
   isSelf?: boolean;
 };
 
+/**
+ * Quiet passport stamps only — egg *achievements* live on the badge shelf.
+ * No X/Y counter (no spoiler map).
+ */
 export default function DiscoveryPassportShelf({ playerId, isSelf }: Props) {
   const [tick, setTick] = useState(0);
   const [open, setOpen] = useState(false);
@@ -39,18 +42,17 @@ export default function DiscoveryPassportShelf({ playerId, isSelf }: Props) {
 
   const rows = useMemo(() => {
     void tick;
-    return getPassportRows(playerId);
-  }, [playerId, tick]);
-
-  const eggProgress = useMemo(() => {
-    void tick;
-    return getEasterEggProgress(playerId);
+    // Stamps only — not egg_* (those are on Achievements shelf)
+    return getPassportRows(playerId).filter(
+      (r) => r.def.kind === "passport" || !r.def.id.startsWith("egg_")
+    );
   }, [playerId, tick]);
 
   const earned = rows.filter((r) => r.earned);
-  // Hide empty passport for other people's profiles (unless eggs unlocked)
-  if (!isSelf && earned.length === 0 && !eggProgress.unlocked) return null;
+  if (!isSelf && earned.length === 0) return null;
   if (!playerId) return null;
+  // Hide empty self passport section (eggs are badges now)
+  if (earned.length === 0 && isSelf) return null;
 
   return (
     <section className="rounded-2xl border border-border bg-card p-5 sm:p-6 mb-6">
@@ -59,20 +61,11 @@ export default function DiscoveryPassportShelf({ playerId, isSelf }: Props) {
           <p className="text-[10px] uppercase tracking-wider text-muted font-bold mb-0.5">
             Passport
           </p>
-          <h2 className="font-semibold text-lg">Stamps &amp; discoveries</h2>
+          <h2 className="font-semibold text-lg">Stamps</h2>
           <p className="text-xs text-muted mt-1 leading-relaxed">
-            {earned.length === 0 && !eggProgress.unlocked
-              ? "Nothing here yet. Curiosity writes its own itinerary."
-              : earned.length > 0
-                ? `${earned.length} quiet mark${earned.length === 1 ? "" : "s"} — no points, no standings.`
-                : "Quiet marks and eggs you found. No points. No standings."}
+            Quiet marks from the road. Egg finds live under Achievements —
+            same shelf as the rest, no map.
           </p>
-          {eggProgress.unlocked && (
-            <p className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-violet-400/40 bg-violet-500/15 px-2.5 py-1 text-xs font-bold text-violet-100 tabular-nums">
-              <span aria-hidden>🥚</span>
-              Easter eggs {eggProgress.found} / {eggProgress.total}
-            </p>
-          )}
         </div>
         <span className="text-2xl" aria-hidden>
           🛂

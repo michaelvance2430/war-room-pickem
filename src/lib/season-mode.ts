@@ -22,6 +22,26 @@ export const SANDBOX_PROTECTED_BADGE_IDS = new Set([
   "the_commissioner", // app creator legendary
   "war_room_legend", // Kahmann / Bill ball Ben prior-season
   "neighborhood_creeper", // discovery flex — stick in dry-run too
+  // Easter eggs stick in sandbox (local + cloud when SQL is live)
+  "egg_anniversary",
+  "egg_curiosity_trophy",
+  "egg_hidden_headline",
+  "egg_leap_day",
+  "egg_birthday",
+  "egg_sibling_supremacy",
+  "egg_lucky_seven",
+  "egg_obsession",
+  "egg_halloween",
+  "egg_christmas",
+  "egg_thanksgiving",
+  "egg_newyear",
+  "egg_three_peat",
+  "egg_never_give_up",
+  "egg_developer_thanks",
+  "egg_impossible",
+  "egg_mascot_scout",
+  "egg_veterans",
+  "egg_welcome_home",
 ]);
 
 function currentSportId(): string | null {
