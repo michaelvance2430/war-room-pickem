@@ -48,6 +48,20 @@ export async function resolvePlayerActiveWeek(opts?: {
   scored: number[];
 }> {
   const leagueWeek = await loadLeagueActiveWeek();
+  // Creator eyes: stay on the preview week (don't auto-advance past "scored")
+  try {
+    const { isEyesLocalPlayActive } = await import("./creator-eyes");
+    if (isEyesLocalPlayActive()) {
+      return {
+        week: leagueWeek,
+        leagueWeek,
+        advanced: false,
+        scored: [],
+      };
+    }
+  } catch {
+    /* continue */
+  }
   let scored: number[] = [];
   try {
     scored = await listScoredWeekNumbers();

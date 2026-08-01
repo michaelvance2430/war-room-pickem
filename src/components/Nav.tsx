@@ -469,9 +469,13 @@ export default function Nav() {
     <>
       {eyesLabel ? (
         <div className="bg-sky-400 text-black text-[11px] font-bold text-center py-1.5 px-3 sticky top-0 z-[60]">
-          {eyesLabel} —{" "}
+          {eyesLabel} — playable preview ·{" "}
+          <Link href="/picks" className="underline">
+            picks
+          </Link>
+          {" · "}
           <Link href="/founder" className="underline">
-            exit on Founder
+            founder
           </Link>
           {" · "}
           <button
