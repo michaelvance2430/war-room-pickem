@@ -178,6 +178,24 @@ export default function FounderDashboardPage() {
           </button>
         </div>
 
+        {/* Test Mode — creator flight simulator */}
+        <section className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 space-y-2">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-300">
+            Lab
+          </p>
+          <h2 className="text-sm font-semibold text-foreground">Test Mode</h2>
+          <p className="text-xs text-muted leading-relaxed">
+            Fake week + progressive phase. Jump buttons for ring ceremony, card
+            published, Gazette shelf unlock — no bots, no delete league.
+          </p>
+          <Link
+            href="/founder/test-mode"
+            className="inline-flex items-center justify-center w-full min-h-[48px] rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-50 text-sm font-bold px-4 hover:bg-amber-500/30"
+          >
+            Open Test Mode →
+          </Link>
+        </section>
+
         {/* Founder Binder — product law (not a user feature list) */}
         <section className="rounded-xl border border-primary/40 bg-primary/5 p-4 space-y-2">
           <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">

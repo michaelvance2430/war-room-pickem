@@ -86,6 +86,7 @@ export default function Nav() {
   const [showGazetteNav, setShowGazetteNav] = useState(true);
   const [showNewsNav, setShowNewsNav] = useState(true);
   const [earlyNav, setEarlyNav] = useState(false);
+  const [sandboxOn, setSandboxOn] = useState(false);
 
   function refreshRoles() {
     setIsCommish(isCommissioner());
@@ -109,20 +110,24 @@ export default function Nav() {
         setShowGazetteNav(true);
         setShowNewsNav(true);
         setEarlyNav(false);
+        setSandboxOn(false);
         return;
       }
       void loadProgressiveSnapshot().then((snap) => {
         setShowGazetteNav(snap.showGazetteShelf);
         setShowNewsNav(snap.showNewsShelf);
         setEarlyNav(snap.firstWeekChrome);
+        setSandboxOn(!!snap.sandbox);
       });
     }
     syncProgressive();
     window.addEventListener(EVENT_PROGRESSIVE, syncProgressive);
     window.addEventListener("warroom-first-week-progress", syncProgressive);
+    window.addEventListener("warroom-creator-sandbox", syncProgressive);
     return () => {
       window.removeEventListener(EVENT_PROGRESSIVE, syncProgressive);
       window.removeEventListener("warroom-first-week-progress", syncProgressive);
+      window.removeEventListener("warroom-creator-sandbox", syncProgressive);
     };
   }, [pathname]);
 
@@ -453,6 +458,14 @@ export default function Nav() {
 
   return (
     <>
+      {sandboxOn && (
+        <div className="bg-amber-500 text-black text-[11px] font-bold text-center py-1.5 px-3 sticky top-0 z-[60]">
+          CREATOR TEST MODE — progressive knobs active ·{" "}
+          <Link href="/founder/test-mode" className="underline">
+            open lab
+          </Link>
+        </div>
+      )}
       <header className="border-b border-border bg-card/80 backdrop-blur sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-3 sm:px-4 h-14 flex items-center gap-2 min-w-0">
           <Link

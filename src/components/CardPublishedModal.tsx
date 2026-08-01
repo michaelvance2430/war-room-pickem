@@ -11,8 +11,9 @@ import {
   takeJustPublished,
   type CardPublishedDetail,
 } from "@/lib/first-session";
-import { getLeague, isActuallyCommissioner } from "@/lib/league";
+import { getLeague, getSession, isActuallyCommissioner } from "@/lib/league";
 import { isGuestMode } from "@/lib/guest-mode";
+import { isAppCreator } from "@/lib/creator";
 import { weekTitle } from "@/lib/dates";
 import { setViewAsPlayer } from "@/lib/view-as-player";
 import InviteFriends from "@/components/InviteFriends";
@@ -22,7 +23,13 @@ export default function CardPublishedModal() {
 
   useEffect(() => {
     if (isGuestMode()) return;
-    if (!isActuallyCommissioner()) return;
+    // Creator test-mode jumps + real hosts
+    if (
+      !isActuallyCommissioner() &&
+      !isAppCreator(getSession()?.playerId)
+    ) {
+      return;
+    }
 
     const pending = takeJustPublished();
     if (pending) {

@@ -13,6 +13,7 @@ import {
   loadProgressiveSnapshot,
   markGazetteShelfRevealSeen,
 } from "@/lib/progressive-disclosure";
+import { EVENT_FORCE_GAZETTE_SHELF_REVEAL } from "@/lib/creator-sandbox";
 import { isGuestMode } from "@/lib/guest-mode";
 
 export default function GazetteShelfReveal() {
@@ -37,12 +38,17 @@ export default function GazetteShelfReveal() {
     function onProg() {
       void check();
     }
+    function onForce() {
+      setOpen(true);
+    }
     window.addEventListener(EVENT_PROGRESSIVE, onProg);
     window.addEventListener("warroom-first-week-progress", onProg);
+    window.addEventListener(EVENT_FORCE_GAZETTE_SHELF_REVEAL, onForce);
     return () => {
       cancelled = true;
       window.removeEventListener(EVENT_PROGRESSIVE, onProg);
       window.removeEventListener("warroom-first-week-progress", onProg);
+      window.removeEventListener(EVENT_FORCE_GAZETTE_SHELF_REVEAL, onForce);
     };
   }, [pathname]);
 
