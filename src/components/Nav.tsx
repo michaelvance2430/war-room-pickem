@@ -317,86 +317,100 @@ export default function Nav() {
     return () => window.removeEventListener("keydown", onKey);
   }, [menuOpen, moreOpen]);
 
-  // Primary: home first, then weekly habit loop
-  // Early: fewer links. Gazette shelf waits until ~week 3 (paper still pops).
-  const primaryLinks: NavLink[] = [
-    { href: "/", label: "Home" },
-    { href: "/picks", label: "Picks" },
-    { href: "/board", label: "The Board" },
-    // Standings = same idea as Board; hide early to avoid double chrome
-    ...(!earlyNav
-      ? [{ href: "/standings", label: "Standings" } as NavLink]
-      : []),
-    { href: "/locker-room", label: "Locker", badge: lockerUnseen },
-    ...(showGazetteNav
-      ? [
-          {
-            href: "/gazette",
-            label: "Gazette",
-            badge: gazetteUnseen,
-          } as NavLink,
-        ]
-      : []),
-    ...(ops
-      ? [
-          {
-            href: "/commissioner",
-            label: isCommish ? "Run the Room" : "Ops",
-            className: "text-primary",
-          } as NavLink,
-        ]
-      : []),
-  ];
+  // Standings always in primary (CFB + NFL) — last-in / login presence lives there.
+  // First hour: Home · Picks · Standings · Locker (+ Host). Then Board + Gazette.
+  const primaryLinks: NavLink[] = earlyNav
+    ? [
+        { href: "/", label: "Home" },
+        { href: "/picks", label: "Picks" },
+        { href: "/standings", label: "Standings" },
+        { href: "/locker-room", label: "Locker", badge: lockerUnseen },
+        ...(ops
+          ? [
+              {
+                href: "/commissioner",
+                label: isCommish ? "Host" : "Ops",
+                className: "text-primary",
+              } as NavLink,
+            ]
+          : []),
+      ]
+    : [
+        { href: "/", label: "Home" },
+        { href: "/picks", label: "Picks" },
+        { href: "/board", label: "The Board" },
+        { href: "/standings", label: "Standings" },
+        { href: "/locker-room", label: "Locker", badge: lockerUnseen },
+        ...(showGazetteNav
+          ? [
+              {
+                href: "/gazette",
+                label: "Gazette",
+                badge: gazetteUnseen,
+              } as NavLink,
+            ]
+          : []),
+        ...(ops
+          ? [
+              {
+                href: "/commissioner",
+                label: isCommish ? "Run the Room" : "Ops",
+                className: "text-primary",
+              } as NavLink,
+            ]
+          : []),
+      ];
 
-  // More: flavor + depth (still all there — progressive hides primary only)
-  const moreLinks: NavLink[] = [
-    ...(crystalBallOn
-      ? [{ href: "/crystal-ball", label: "Crystal Ball" }]
-      : []),
-    ...(!earlyNav ? [{ href: "/stats", label: "Stats" } as NavLink] : []),
-    ...(showNewsNav
-      ? [{ href: "/announcements", label: "News", badge: unreadCount } as NavLink]
-      : []),
-    // Deep links available in More once core unlocked; early = rules + account only
-    ...(!earlyNav
-      ? [
-          { href: "/players", label: "Players" } as NavLink,
-          { href: "/championship", label: "Champ" } as NavLink,
-          {
-            href: "/toilet-bowl",
-            label: "Toilet",
-            className: "text-toilet hover:text-toilet",
-          } as NavLink,
-          {
-            href: "/trophy-room",
-            label: "Trophies",
-            className: "text-amber-300 hover:text-amber-200",
-          } as NavLink,
-          {
-            href: "/museum",
-            label: "Museum",
-            className: "text-amber-300 hover:text-amber-200",
-          } as NavLink,
-        ]
-      : []),
-    { href: "/rules", label: "How to play" },
-    // Always allow finding Gazette/News via More after unlock if not in primary
-    ...(!showGazetteNav
-      ? []
-      : earlyNav
-        ? [{ href: "/gazette", label: "Gazette", badge: gazetteUnseen } as NavLink]
-        : []),
-    ...(staff
-      ? [
-          {
-            href: "/moderation",
-            label: "Mod",
-            className: "text-amber-300 hover:text-amber-200",
-          } as NavLink,
-        ]
-      : []),
-    { href: "/account", label: "Account" },
-  ];
+  // More: first hour = Board + rules + account. Depth after first lock.
+  const moreLinks: NavLink[] = earlyNav
+    ? [
+        { href: "/board", label: "The Board" },
+        { href: "/rules", label: "How to play" },
+        { href: "/account", label: "Account" },
+      ]
+    : [
+        ...(crystalBallOn
+          ? [{ href: "/crystal-ball", label: "Crystal Ball" }]
+          : []),
+        { href: "/stats", label: "Stats" },
+        ...(showNewsNav
+          ? [
+              {
+                href: "/announcements",
+                label: "News",
+                badge: unreadCount,
+              } as NavLink,
+            ]
+          : []),
+        { href: "/players", label: "Players" },
+        { href: "/championship", label: "Champ" },
+        {
+          href: "/toilet-bowl",
+          label: "Toilet",
+          className: "text-toilet hover:text-toilet",
+        },
+        {
+          href: "/trophy-room",
+          label: "Trophies",
+          className: "text-amber-300 hover:text-amber-200",
+        },
+        {
+          href: "/museum",
+          label: "Museum",
+          className: "text-amber-300 hover:text-amber-200",
+        },
+        { href: "/rules", label: "How to play" },
+        ...(staff
+          ? [
+              {
+                href: "/moderation",
+                label: "Mod",
+                className: "text-amber-300 hover:text-amber-200",
+              } as NavLink,
+            ]
+          : []),
+        { href: "/account", label: "Account" },
+      ];
 
   const allMobileLinks = [...primaryLinks, ...moreLinks];
 
@@ -486,11 +500,12 @@ export default function Nav() {
               void import("@/lib/creator-eyes").then((m) => {
                 m.setCreatorEyesMode("off");
                 setEyesLabel("");
-                window.location.href = "/founder";
+                // Land on Foundry eyes desk so you can switch previews quickly
+                window.location.href = "/founder#eyes";
               });
             }}
           >
-            exit now
+            exit → Foundry
           </button>
         </div>
       ) : sandboxOn ? (
@@ -813,7 +828,7 @@ export default function Nav() {
         </>
       )}
 
-      {/* Phone thumb nav — Home / Picks / Board / Standings / More */}
+      {/* Phone thumb nav — same for CFB + NFL: Home / Picks / Standings / Locker / More */}
       <nav
         className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-card/95 backdrop-blur-md"
         style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
@@ -824,7 +839,7 @@ export default function Nav() {
             [
               { href: "/", label: "Home", icon: "⌂" },
               { href: "/picks", label: "Picks", icon: "✓" },
-              { href: "/board", label: "Board", icon: "▦" },
+              { href: "/standings", label: "Table", icon: "#" },
               { href: "/locker-room", label: "Locker", icon: "💬" },
             ] as const
           ).map((tab) => {

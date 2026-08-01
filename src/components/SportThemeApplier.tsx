@@ -21,7 +21,21 @@ export default function SportThemeApplier() {
     void (async () => {
       const lg = await syncLeagueFromCloud();
       if (cancelled) return;
-      applySportTheme(lg?.sportId || getLeague()?.sportId);
+      // Prefer local after sync — create pin + anti-cfb clobber live in local
+      reapplySportThemeFromLocal();
+      if (lg?.sportId) {
+        // Only paint cloud if local agrees or has no sport yet
+        const local = getLeague();
+        if (
+          !local?.sportId ||
+          local.sportId === lg.sportId ||
+          (local.sportId === "cfb" && lg.sportId !== "cfb")
+        ) {
+          applySportTheme(lg.sportId);
+        } else {
+          reapplySportThemeFromLocal();
+        }
+      }
     })();
 
     function onStorage(e: StorageEvent) {

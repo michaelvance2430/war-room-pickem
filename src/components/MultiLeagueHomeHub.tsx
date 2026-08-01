@@ -1,17 +1,12 @@
 "use client";
 
 /**
- * Slim multi-league switcher on Home.
+ * Multi-league switcher — sport desk first, then rooms for that sport only.
  *
- * SINGLE LEAGUE: null — no chrome, no gap.
+ * Tap CFB / NFL / … icons → only that sport’s leagues appear.
+ * When baseball season starts you never see football rooms in the list.
  *
- * 2–4 LEAGUES: collapsed bar + up to 3 needs-picks chips; expand = full short list.
- *
- * 5–10+ LEAGUES (scale mode):
- *   Collapsed: "Your rooms · 10 · CFB here · 4 need picks"
- *   Chips: max 2 + "+N more"
- *   Expand: active + rooms that need picks only (scrollable)
- *   Quiet rooms stay on Account — Home is a job list, not a directory.
+ * Within a sport: dropdown of room names (not a mixed multi-sport dump).
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -25,14 +20,17 @@ import {
 import { getSession, getLeague } from "@/lib/league";
 import { getSportPack } from "@/lib/sports/registry";
 import { createClient } from "@/lib/supabase/client";
+import {
+  resolveSportScope,
+  setSportScope,
+  EVENT_SPORT_ROOM_SCOPE,
+  syncSportScopeToActiveLeague,
+} from "@/lib/sport-room-scope";
+import { normalizeSportId } from "@/lib/sports/registry";
+import type { SportId } from "@/lib/sports/types";
+import NflBrandMark from "@/components/NflBrandMark";
 
-/** At this count we stop listing “quiet” rooms on Home */
-const SCALE_AT = 5;
-/** Max amber chips when collapsed */
-const CHIP_CAP_SMALL = 3;
-const CHIP_CAP_SCALE = 2;
-/** Max rows in the expanded needs list before scroll */
-const NEEDS_SCROLL_MAX = 6;
+const NEEDS_SCROLL_MAX = 8;
 
 type LeaguePulse = {
   leagueId: string;
@@ -46,6 +44,34 @@ type Props = {
   onSwitched?: () => void;
 };
 
+type SportBucket = {
+  sportId: SportId;
+  rooms: LeagueMembership[];
+  needsCount: number;
+};
+
+function SportDeskIcon({
+  sportId,
+  size = 28,
+}: {
+  sportId: string;
+  size?: number;
+}) {
+  if (sportId === "nfl") {
+    return <NflBrandMark size={size} className="rounded-lg" />;
+  }
+  const pack = getSportPack(sportId);
+  return (
+    <span
+      className="inline-flex items-center justify-center rounded-lg bg-black/40 border border-border/60"
+      style={{ width: size, height: size, fontSize: size * 0.48 }}
+      aria-hidden
+    >
+      {pack.emoji}
+    </span>
+  );
+}
+
 export default function MultiLeagueHomeHub({ onSwitched }: Props) {
   const router = useRouter();
   const [list, setList] = useState<LeagueMembership[]>([]);
@@ -53,8 +79,7 @@ export default function MultiLeagueHomeHub({ onSwitched }: Props) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
-  /** Scale mode only: show quiet rooms in expand */
-  const [showQuiet, setShowQuiet] = useState(false);
+  const [scope, setScope] = useState<SportId>("cfb");
 
   const activeId = getSession()?.leagueId || getLeague()?.id || "";
   const me = getSession()?.playerId;
@@ -66,10 +91,19 @@ export default function MultiLeagueHomeHub({ onSwitched }: Props) {
         setList([]);
         setPulse({});
         setExpanded(false);
-        setShowQuiet(false);
         return;
       }
       setList(ms);
+
+      const activeSport =
+        ms.find((m) => m.leagueId === activeId)?.sportId ||
+        getLeague()?.sportId;
+      const nextScope = resolveSportScope({
+        membershipSportIds: ms.map((m) => m.sportId || "cfb"),
+        activeSportId: activeSport,
+      });
+      setScope(nextScope);
+
       const uid = getSession()?.playerId;
       if (!uid) return;
       const supabase = createClient();
@@ -133,63 +167,81 @@ export default function MultiLeagueHomeHub({ onSwitched }: Props) {
     } catch {
       /* optional */
     }
-  }, []);
+  }, [activeId]);
 
   useEffect(() => {
     void load();
   }, [load, activeId]);
 
-  const active = useMemo(
-    () => list.find((m) => m.leagueId === activeId) || list[0],
-    [list, activeId]
+  useEffect(() => {
+    function onScope(e: Event) {
+      const id = (e as CustomEvent<string>).detail;
+      if (id) setScope(normalizeSportId(id));
+    }
+    window.addEventListener(EVENT_SPORT_ROOM_SCOPE, onScope);
+    return () => window.removeEventListener(EVENT_SPORT_ROOM_SCOPE, onScope);
+  }, []);
+
+  const buckets: SportBucket[] = useMemo(() => {
+    const map = new Map<SportId, LeagueMembership[]>();
+    for (const m of list) {
+      const sid = normalizeSportId(m.sportId || "cfb");
+      const arr = map.get(sid) || [];
+      arr.push(m);
+      map.set(sid, arr);
+    }
+    return [...map.entries()]
+      .map(([sportId, rooms]) => ({
+        sportId,
+        rooms: rooms.sort((a, b) =>
+          (a.leagueName || "").localeCompare(b.leagueName || "")
+        ),
+        needsCount: rooms.filter(
+          (r) =>
+            r.leagueId !== activeId && pulse[r.leagueId]?.needsPicks
+        ).length,
+      }))
+      .sort((a, b) => {
+        const pa = getSportPack(a.sportId).sortOrder;
+        const pb = getSportPack(b.sportId).sortOrder;
+        return pa - pb;
+      });
+  }, [list, pulse, activeId]);
+
+  const multiSport = buckets.length >= 2;
+
+  const scopedRooms = useMemo(() => {
+    return (
+      buckets.find((b) => b.sportId === scope)?.rooms ||
+      buckets[0]?.rooms ||
+      []
+    );
+  }, [buckets, scope]);
+
+  const scopedNeeds = useMemo(() => {
+    return scopedRooms.filter(
+      (m) => m.leagueId !== activeId && pulse[m.leagueId]?.needsPicks
+    );
+  }, [scopedRooms, pulse, activeId]);
+
+  const activeInScope = useMemo(
+    () => scopedRooms.find((m) => m.leagueId === activeId) || null,
+    [scopedRooms, activeId]
   );
 
-  const needsYou = useMemo(() => {
-    return list.filter((m) => {
-      const p = pulse[m.leagueId];
-      if (!p || m.leagueId === activeId) return false;
-      return p.needsPicks;
-    });
-  }, [list, pulse, activeId]);
+  const scopePack = getSportPack(scope);
 
-  const quietOthers = useMemo(() => {
-    return list.filter((m) => {
-      if (m.leagueId === activeId) return false;
-      return !pulse[m.leagueId]?.needsPicks;
-    });
-  }, [list, pulse, activeId]);
-
-  const scale = list.length >= SCALE_AT;
-
-  /** Rows to paint when expanded */
-  const expandedRows: LeagueMembership[] = useMemo(() => {
-    const activeRow = list.find((m) => m.leagueId === activeId);
-    const needs = [...needsYou].sort((a, b) =>
-      (a.leagueName || "").localeCompare(b.leagueName || "")
-    );
-    if (!scale || showQuiet) {
-      const rest = list
-        .filter((m) => m.leagueId !== activeId && !needsYou.includes(m))
-        .sort((a, b) =>
-          (a.leagueName || "").localeCompare(b.leagueName || "")
-        );
-      return [activeRow, ...needs, ...rest].filter(
-        Boolean
-      ) as LeagueMembership[];
-    }
-    return [activeRow, ...needs].filter(Boolean) as LeagueMembership[];
-  }, [list, activeId, needsYou, scale, showQuiet]);
-
-  if (list.length < 2 || !active) return null;
-
-  const chipCap = scale ? CHIP_CAP_SCALE : CHIP_CAP_SMALL;
-  const chipShow = needsYou.slice(0, chipCap);
-  const chipMore = needsYou.length - chipShow.length;
-  const activePack = getSportPack(active.sportId || "cfb");
+  /** Show hub when 2+ rooms total, OR 2+ sports (edge), OR 2+ in same sport */
+  if (list.length < 2) return null;
 
   async function enterRoom(leagueId: string, goPicks: boolean) {
     if (busyId) return;
     setError(null);
+    const target = list.find((m) => m.leagueId === leagueId);
+    if (target?.sportId) {
+      setSportScope(target.sportId);
+      setScope(normalizeSportId(target.sportId));
+    }
     if (leagueId === activeId) {
       if (goPicks) router.push("/picks");
       return;
@@ -201,6 +253,7 @@ export default function MultiLeagueHomeHub({ onSwitched }: Props) {
       setError("Could not switch leagues");
       return;
     }
+    syncSportScopeToActiveLeague();
     if (goPicks) {
       router.push("/picks");
       router.refresh();
@@ -208,6 +261,14 @@ export default function MultiLeagueHomeHub({ onSwitched }: Props) {
     }
     if (onSwitched) onSwitched();
     else window.location.href = "/";
+  }
+
+  function pickSport(sportId: SportId) {
+    setSportScope(sportId);
+    setScope(sportId);
+    setExpanded(true);
+    // If active room is a different sport, stay — user just browsing that desk.
+    // They enter a room to switch active league.
   }
 
   function rowNeed(m: LeagueMembership): string {
@@ -229,107 +290,163 @@ export default function MultiLeagueHomeHub({ onSwitched }: Props) {
   return (
     <section
       className="mb-4 rounded-xl border border-primary/30 bg-black/45 backdrop-blur-sm overflow-hidden"
-      aria-label="Your leagues"
+      aria-label="Your leagues by sport"
     >
+      {/* Sport desk rail — only sports you actually play */}
+      <div className="px-3 pt-3 pb-2 border-b border-border/40">
+        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-primary mb-2">
+          Your sports · pick a desk
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {buckets.map((b) => {
+            const pack = getSportPack(b.sportId);
+            const selected = b.sportId === scope;
+            const isNfl = b.sportId === "nfl";
+            return (
+              <button
+                key={b.sportId}
+                type="button"
+                onClick={() => pickSport(b.sportId)}
+                className={`inline-flex items-center gap-2 min-h-[48px] px-3 rounded-xl border-2 touch-manipulation transition ${
+                  selected
+                    ? isNfl
+                      ? "border-red-500/60 bg-red-500/15 shadow-[0_0_18px_rgba(193,18,31,0.2)]"
+                      : "border-primary/60 bg-primary/15 shadow-[0_0_18px_rgba(34,197,94,0.15)]"
+                    : "border-border/60 bg-background/40 hover:border-primary/35"
+                }`}
+                aria-pressed={selected}
+                title={`${pack.label} · ${b.rooms.length} room${
+                  b.rooms.length === 1 ? "" : "s"
+                }`}
+              >
+                <SportDeskIcon sportId={b.sportId} size={32} />
+                <span className="text-left">
+                  <span
+                    className={`block text-sm font-black leading-none ${
+                      selected
+                        ? isNfl
+                          ? "text-red-100"
+                          : "text-primary"
+                        : "text-foreground"
+                    }`}
+                  >
+                    {pack.shortLabel}
+                  </span>
+                  <span className="block text-[10px] text-muted mt-0.5 font-semibold">
+                    {b.rooms.length} room{b.rooms.length === 1 ? "" : "s"}
+                    {b.needsCount > 0 ? (
+                      <span className="text-amber-300">
+                        {" "}
+                        · {b.needsCount} need picks
+                      </span>
+                    ) : null}
+                  </span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        {multiSport && (
+          <p className="text-[10px] text-muted mt-2 leading-relaxed">
+            Only <strong className="text-foreground">{scopePack.shortLabel}</strong>{" "}
+            rooms below — other sports stay on their own desk.
+          </p>
+        )}
+      </div>
+
+      {/* Dropdown for rooms in the selected sport only */}
       <button
         type="button"
         onClick={() => setExpanded((e) => !e)}
-        className="w-full text-left px-3 py-2.5 flex items-center gap-2 min-h-[48px] touch-manipulation hover:bg-white/5"
+        className="w-full text-left px-3 py-3 flex items-center gap-2 min-h-[52px] touch-manipulation hover:bg-white/5"
         aria-expanded={expanded}
       >
+        <SportDeskIcon sportId={scope} size={28} />
         <div className="flex-1 min-w-0">
-          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-primary">
-            Your rooms · {list.length}
-            {scale && (
-              <span className="text-muted font-semibold normal-case tracking-normal ml-1">
-                · jobs only
+          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">
+            {scopePack.emoji} {scopePack.shortLabel} rooms ·{" "}
+            {scopedRooms.length}
+            {scopedNeeds.length > 0 && (
+              <span className="text-amber-300 font-semibold normal-case tracking-normal">
+                {" "}
+                · {scopedNeeds.length} need picks
               </span>
             )}
           </p>
-          <p className="text-xs text-foreground font-medium truncate mt-0.5">
-            <span className="text-primary">
-              {activePack.emoji} {activePack.shortLabel}
-            </span>
-            <span className="text-muted"> · </span>
-            <span className="truncate">{active.leagueName}</span>
-            <span className="text-primary font-bold"> · here</span>
-            {needsYou.length > 0 && (
+          <p className="text-sm font-bold text-white truncate mt-0.5">
+            {activeInScope ? (
               <>
-                <span className="text-muted"> · </span>
-                <span className="text-amber-300 font-semibold">
-                  {needsYou.length === 1
-                    ? `${getSportPack(needsYou[0].sportId || "cfb").shortLabel} needs picks`
-                    : `${needsYou.length} need picks`}
-                </span>
+                {activeInScope.leagueName || "War Room"}
+                <span className="text-primary font-extrabold"> · here</span>
               </>
-            )}
-            {needsYou.length === 0 && scale && (
-              <>
-                <span className="text-muted"> · </span>
-                <span className="text-muted font-normal">all caught up</span>
-              </>
+            ) : (
+              <span className="text-muted font-semibold">
+                Tap to open a {scopePack.shortLabel} room
+              </span>
             )}
           </p>
         </div>
-        <span className="shrink-0 text-muted text-xs font-bold px-1">
+        <span className="shrink-0 text-muted text-sm font-bold px-1">
           {expanded ? "▴" : "▾"}
         </span>
       </button>
 
-      {/* Collapsed: needs chips + overflow count */}
-      {!expanded && needsYou.length > 0 && (
+      {/* Collapsed: needs-picks chips within this sport only */}
+      {!expanded && scopedNeeds.length > 0 && (
         <div className="px-3 pb-2.5 flex flex-wrap gap-1.5 items-center">
-          {chipShow.map((m) => {
-            const pack = getSportPack(m.sportId || "cfb");
+          {scopedNeeds.slice(0, 4).map((m) => {
             const p = pulse[m.leagueId];
             const week =
               p?.openWeek != null ? `W${p.openWeek}` : "picks";
+            const shortName = (m.leagueName || "Room").trim();
+            const chipName =
+              shortName.length > 20
+                ? `${shortName.slice(0, 18)}…`
+                : shortName;
             return (
               <button
                 key={m.leagueId}
                 type="button"
                 disabled={!!busyId}
                 onClick={() => void enterRoom(m.leagueId, true)}
-                className="inline-flex items-center gap-1 min-h-[36px] px-2.5 rounded-full border border-amber-400/40 bg-amber-500/15 text-amber-100 text-[11px] font-bold touch-manipulation disabled:opacity-50 max-w-[11rem] truncate"
+                className="inline-flex items-center gap-1 min-h-[36px] px-2.5 rounded-full border border-amber-400/40 bg-amber-500/15 text-amber-100 text-[11px] font-bold touch-manipulation disabled:opacity-50 max-w-[14rem] truncate"
                 title={m.leagueName}
               >
-                {pack.emoji} {pack.shortLabel} · {week}
-                {busyId === m.leagueId ? "…" : " →"}
+                {chipName}
+                <span className="opacity-80">· {week} →</span>
               </button>
             );
           })}
-          {chipMore > 0 && (
+          {scopedNeeds.length > 4 && (
             <button
               type="button"
               onClick={() => setExpanded(true)}
-              className="inline-flex items-center min-h-[36px] px-2.5 rounded-full border border-border text-muted text-[11px] font-bold touch-manipulation"
+              className="inline-flex items-center min-h-[36px] px-2.5 rounded-full border border-border text-muted text-[11px] font-bold"
             >
-              +{chipMore} more
+              +{scopedNeeds.length - 4} more
             </button>
           )}
         </div>
       )}
 
       {expanded && (
-        <div className="border-t border-border/50 px-3 py-2">
-          {scale && (
-            <p className="text-[10px] text-muted leading-relaxed mb-2">
-              With {list.length} rooms, Home only lists{" "}
-              <strong className="text-foreground">here</strong> +{" "}
-              <strong className="text-amber-200">needs picks</strong>. Full
-              directory lives on Account.
-            </p>
-          )}
-
+        <div className="border-t border-border/50 px-3 py-2.5">
+          <p className="text-[10px] text-muted mb-2 leading-relaxed">
+            {scopePack.shortLabel} desk only —{" "}
+            {scopedRooms.length} room
+            {scopedRooms.length === 1 ? "" : "s"}
+            {multiSport
+              ? ". Switch the sport chips above for other desks."
+              : "."}
+          </p>
           <div
             className={`space-y-1.5 ${
-              expandedRows.length > NEEDS_SCROLL_MAX
+              scopedRooms.length > NEEDS_SCROLL_MAX
                 ? "max-h-[min(50vh,22rem)] overflow-y-auto overscroll-contain pr-0.5"
                 : ""
             }`}
           >
-            {expandedRows.map((m) => {
-              const pack = getSportPack(m.sportId || "cfb");
+            {scopedRooms.map((m) => {
               const isActive = m.leagueId === activeId;
               const p = pulse[m.leagueId];
               const busy = busyId === m.leagueId;
@@ -342,24 +459,26 @@ export default function MultiLeagueHomeHub({ onSwitched }: Props) {
               return (
                 <div
                   key={m.leagueId}
-                  className={`flex items-center gap-2 rounded-lg px-2 py-2 min-h-[44px] ${
-                    isActive ? "bg-primary/10" : "bg-background/30"
+                  className={`flex items-center gap-2 rounded-lg px-2.5 py-2.5 min-h-[48px] ${
+                    isActive ? "bg-primary/12 border border-primary/30" : "bg-background/30"
                   }`}
                 >
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-foreground truncate">
-                      <span className="text-primary mr-1">
-                        {pack.emoji} {pack.shortLabel}
-                      </span>
-                      {m.leagueName}
-                      {isHost && !isActive && (
-                        <span className="ml-1 text-[9px] uppercase text-amber-200/80">
+                    <p className="text-sm font-bold text-white truncate leading-tight">
+                      {m.leagueName || "War Room"}
+                      {isActive && (
+                        <span className="ml-1.5 text-[10px] uppercase text-primary font-extrabold">
+                          here
+                        </span>
+                      )}
+                      {isHost && (
+                        <span className="ml-1.5 text-[9px] uppercase text-amber-200/80">
                           host
                         </span>
                       )}
                     </p>
                     <p
-                      className={`text-[10px] mt-0.5 ${
+                      className={`text-[11px] mt-0.5 ${
                         p?.needsPicks && !isActive
                           ? "text-amber-200 font-medium"
                           : "text-muted"
@@ -374,7 +493,7 @@ export default function MultiLeagueHomeHub({ onSwitched }: Props) {
                         type="button"
                         disabled={!!busyId}
                         onClick={() => void enterRoom(m.leagueId, true)}
-                        className="min-h-[36px] px-2.5 rounded-lg bg-primary text-black text-[11px] font-bold disabled:opacity-50"
+                        className="min-h-[40px] px-3 rounded-lg bg-primary text-black text-[11px] font-bold disabled:opacity-50"
                       >
                         Picks
                       </button>
@@ -383,7 +502,7 @@ export default function MultiLeagueHomeHub({ onSwitched }: Props) {
                         type="button"
                         disabled={!!busyId}
                         onClick={() => void enterRoom(m.leagueId, true)}
-                        className="min-h-[36px] px-2.5 rounded-lg border border-amber-400/50 text-amber-100 text-[11px] font-bold disabled:opacity-50"
+                        className="min-h-[40px] px-3 rounded-lg border border-amber-400/50 text-amber-100 text-[11px] font-bold disabled:opacity-50"
                       >
                         {busy ? "…" : "Lock picks"}
                       </button>
@@ -392,7 +511,7 @@ export default function MultiLeagueHomeHub({ onSwitched }: Props) {
                         type="button"
                         disabled={!!busyId}
                         onClick={() => void enterRoom(m.leagueId, false)}
-                        className="min-h-[36px] px-2.5 rounded-lg border border-border text-[11px] font-bold text-muted hover:text-foreground disabled:opacity-50"
+                        className="min-h-[40px] px-3 rounded-lg border border-border text-[11px] font-bold text-muted hover:text-foreground disabled:opacity-50"
                       >
                         {busy ? "…" : "Enter"}
                       </button>
@@ -403,50 +522,25 @@ export default function MultiLeagueHomeHub({ onSwitched }: Props) {
             })}
           </div>
 
-          {scale && quietOthers.length > 0 && !showQuiet && (
-            <button
-              type="button"
-              onClick={() => setShowQuiet(true)}
-              className="w-full mt-2 min-h-[40px] rounded-lg border border-border/60 text-[11px] font-semibold text-muted hover:text-foreground"
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Link
+              href={`/join?mode=create`}
+              className="text-[11px] font-semibold text-primary hover:underline"
             >
-              +{quietOthers.length} quiet room
-              {quietOthers.length === 1 ? "" : "s"} (no open picks)
-            </button>
-          )}
-          {scale && showQuiet && quietOthers.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setShowQuiet(false)}
-              className="w-full mt-2 min-h-[36px] text-[11px] font-medium text-muted"
-            >
-              Hide quiet rooms
-            </button>
-          )}
-
-          <div className="flex items-center justify-between pt-2 pb-0.5 gap-2">
+              + New {scopePack.shortLabel} room
+            </Link>
             <Link
               href="/account"
-              className="text-[11px] font-semibold text-primary min-h-[32px] inline-flex items-center"
+              className="text-[11px] font-semibold text-muted hover:text-foreground"
             >
-              {scale
-                ? `All ${list.length} on Account →`
-                : "Manage leagues →"}
+              All rooms on Account
             </Link>
-            <button
-              type="button"
-              onClick={() => {
-                setExpanded(false);
-                setShowQuiet(false);
-              }}
-              className="text-[11px] text-muted font-medium min-h-[32px] px-2"
-            >
-              Collapse
-            </button>
           </div>
-          {error && (
-            <p className="text-xs text-danger font-medium pb-1">{error}</p>
-          )}
         </div>
+      )}
+
+      {error && (
+        <p className="px-3 pb-2 text-xs text-danger">{error}</p>
       )}
     </section>
   );

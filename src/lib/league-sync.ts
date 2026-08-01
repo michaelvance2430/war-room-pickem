@@ -14,6 +14,15 @@ function canUseStorage() {
   return typeof window !== "undefined" && typeof localStorage !== "undefined";
 }
 
+function readPrevLocalLeague(): League | null {
+  if (!canUseStorage()) return null;
+  try {
+    return JSON.parse(localStorage.getItem(LEAGUE_KEY) || "null") as League | null;
+  } catch {
+    return null;
+  }
+}
+
 function toLocalLeague(row: {
   id: string;
   name: string;
@@ -29,45 +38,61 @@ function toLocalLeague(row: {
   season_theme_id?: string | null;
   sport_id?: string | null;
 }): League {
+  const prev = readPrevLocalLeague();
+  const sameRoom = !!prev?.id && prev.id === row.id;
+
+  // Create pin wins (NFL create can briefly rehydrate DB default cfb).
   let sportId = "cfb";
-  if (typeof row.sport_id === "string" && row.sport_id.trim()) {
-    sportId = row.sport_id.trim();
-  } else if (canUseStorage()) {
-    try {
-      const prev = JSON.parse(
-        localStorage.getItem(LEAGUE_KEY) || "null"
-      ) as League | null;
-      if (prev?.sportId) sportId = prev.sportId;
-    } catch {
-      /* default cfb */
+  try {
+    const { forcedSportForLeague } = require("./sports/sport-theme") as typeof import("./sports/sport-theme");
+    const forced = forcedSportForLeague(row.id);
+    if (forced) {
+      sportId = forced;
+    } else if (typeof row.sport_id === "string" && row.sport_id.trim()) {
+      sportId = row.sport_id.trim();
+      // Cloud default cfb must not clobber a just-written non-cfb local stamp
+      // for the same room (race: insert default → update nfl still in flight).
+      if (
+        sameRoom &&
+        prev?.sportId &&
+        prev.sportId !== "cfb" &&
+        sportId === "cfb" &&
+        prev.sportId !== sportId
+      ) {
+        sportId = prev.sportId;
+      }
+    } else if (sameRoom && prev?.sportId) {
+      sportId = prev.sportId;
+    } else if (prev?.sportId && prev.id === row.id) {
+      sportId = prev.sportId;
+    }
+  } catch {
+    if (typeof row.sport_id === "string" && row.sport_id.trim()) {
+      sportId = row.sport_id.trim();
+    } else if (sameRoom && prev?.sportId) {
+      sportId = prev.sportId;
     }
   }
+
   // Prefer cloud flag; if column missing from select, keep prior local value
-  let crystalBallEnabled = true;
+  let crystalBallEnabled = sportId === "cfb";
   let homeTaglineId = "good-teams";
   let homeTaglineCustom = "";
   let seasonThemeId = "default";
   if (typeof row.crystal_ball_enabled === "boolean") {
     crystalBallEnabled = row.crystal_ball_enabled;
-  } else if (canUseStorage()) {
-    try {
-      const prev = JSON.parse(
-        localStorage.getItem(LEAGUE_KEY) || "null"
-      ) as League | null;
-      if (typeof prev?.settings?.crystalBallEnabled === "boolean") {
-        crystalBallEnabled = prev.settings.crystalBallEnabled;
-      }
-      if (prev?.settings?.homeTaglineId) {
-        homeTaglineId = prev.settings.homeTaglineId;
-      }
-      if (typeof prev?.settings?.homeTaglineCustom === "string") {
-        homeTaglineCustom = prev.settings.homeTaglineCustom;
-      }
-      if (prev?.settings?.seasonThemeId) {
-        seasonThemeId = prev.settings.seasonThemeId;
-      }
-    } catch {
-      /* default true */
+  } else if (sameRoom) {
+    if (typeof prev?.settings?.crystalBallEnabled === "boolean") {
+      crystalBallEnabled = prev.settings.crystalBallEnabled;
+    }
+    if (prev?.settings?.homeTaglineId) {
+      homeTaglineId = prev.settings.homeTaglineId;
+    }
+    if (typeof prev?.settings?.homeTaglineCustom === "string") {
+      homeTaglineCustom = prev.settings.homeTaglineCustom;
+    }
+    if (prev?.settings?.seasonThemeId) {
+      seasonThemeId = prev.settings.seasonThemeId;
     }
   }
 
@@ -79,17 +104,8 @@ function toLocalLeague(row: {
   }
   if (typeof row.season_theme_id === "string" && row.season_theme_id) {
     seasonThemeId = row.season_theme_id;
-  } else if (canUseStorage() && !row.season_theme_id) {
-    try {
-      const prev = JSON.parse(
-        localStorage.getItem(LEAGUE_KEY) || "null"
-      ) as League | null;
-      if (prev?.settings?.seasonThemeId) {
-        seasonThemeId = prev.settings.seasonThemeId;
-      }
-    } catch {
-      /* keep default */
-    }
+  } else if (sameRoom && prev?.settings?.seasonThemeId) {
+    seasonThemeId = prev.settings.seasonThemeId;
   }
 
   return {
@@ -221,8 +237,44 @@ export async function saveLeagueToCloud(opts: {
   if (opts.settings?.seasonThemeId !== undefined) {
     league.settings.seasonThemeId = opts.settings.seasonThemeId;
   }
+  // Settings-only saves must not clobber a just-created NFL (etc.) sport stamp
+  // when PostgREST omits sport_id or the row still has the column default.
+  if (local.sportId && local.id === league.id) {
+    const cloudSport =
+      typeof (data as { sport_id?: string | null }).sport_id === "string"
+        ? String((data as { sport_id?: string }).sport_id).trim()
+        : "";
+    if (!cloudSport || (cloudSport === "cfb" && local.sportId !== "cfb")) {
+      league.sportId = local.sportId;
+    }
+  }
+  try {
+    const { forcedSportForLeague } = await import("./sports/sport-theme");
+    const forced = forcedSportForLeague(league.id);
+    if (forced) league.sportId = forced;
+  } catch {
+    /* ignore */
+  }
   if (canUseStorage()) {
     localStorage.setItem(LEAGUE_KEY, JSON.stringify(league));
+  }
+  // Re-assert sport on cloud if local/forced is non-cfb and cloud still cfb
+  if (
+    league.sportId &&
+    league.sportId !== "cfb" &&
+    (data as { sport_id?: string }).sport_id === "cfb"
+  ) {
+    try {
+      await supabase
+        .from("leagues")
+        .update({
+          sport_id: league.sportId,
+          crystal_ball_enabled: league.sportId === "cfb",
+        })
+        .eq("id", session.leagueId);
+    } catch {
+      /* best-effort */
+    }
   }
   return { ok: true, league };
 }

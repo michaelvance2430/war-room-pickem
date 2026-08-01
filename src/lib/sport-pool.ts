@@ -474,6 +474,40 @@ export async function spinUpLeagueFromPoll(opts: {
   }
 
   const leagueId = (league as { id: string }).id;
+
+  // Force sport (DB default is cfb — bare insert path would otherwise open CFB)
+  {
+    const { data: sportRow, error: sportErr } = await supabase
+      .from("leagues")
+      .update({
+        sport_id: sportId,
+        crystal_ball_enabled: sportId === "cfb",
+      })
+      .eq("id", leagueId)
+      .select("sport_id")
+      .single();
+    if (
+      sportErr &&
+      /sport_id|column|schema cache|PGRST/i.test(sportErr.message || "")
+    ) {
+      return {
+        ok: false,
+        error:
+          "Database missing sport column. Run supabase/sport-id.sql, then try again.",
+      };
+    }
+    const got =
+      sportRow &&
+      typeof (sportRow as { sport_id?: string }).sport_id === "string"
+        ? String((sportRow as { sport_id: string }).sport_id).trim()
+        : "";
+    if (got && got !== sportId) {
+      return {
+        ok: false,
+        error: `Could not set sport to ${sportId} (database has "${got}").`,
+      };
+    }
+  }
   const divisions = ["North", "South", "East", "West"] as const;
   let di = 0;
   let seated = 0;

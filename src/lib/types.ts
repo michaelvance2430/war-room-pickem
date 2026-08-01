@@ -29,6 +29,8 @@ export interface Player {
   isMock?: boolean;
   /** Permanent badges (e.g. Cheevo King) — never revoked */
   permanentBadgeIds?: string[];
+  /** profiles.last_seen_at — last app open (presence) */
+  lastSeenAt?: string | null;
 }
 
 export interface BadgeDef {

@@ -289,9 +289,99 @@ export async function founderScoreWeek(weekNumber: number): Promise<OneClickLog>
 }
 
 /**
+ * If the founder has no locked cloud slip for the week, lock a random full
+ * card so they appear under teams on The Board with the bots.
+ */
+async function founderLockSelfSlipIfEmpty(
+  weekNumber: number,
+  steps: string[]
+): Promise<void> {
+  try {
+    const session = getSession();
+    if (!session?.leagueId || !session.playerId) return;
+    const card = await loadWeekCard(weekNumber);
+    if (!card?.games?.length || !card.prop) return;
+
+    const { createClient } = await import("./supabase/client");
+    const supabase = createClient();
+    const { data: existing } = await supabase
+      .from("picks")
+      .select("id, locked_at")
+      .eq("league_id", session.leagueId)
+      .eq("user_id", session.playerId)
+      .eq("week_number", weekNumber)
+      .maybeSingle();
+    if (existing?.locked_at) {
+      steps.push("Your slip already locked");
+      return;
+    }
+
+    const games = card.games;
+    const n = games.length;
+    const confs = Array.from({ length: n }, (_, i) => i + 1);
+    // Shuffle confidences
+    for (let i = n - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const t = confs[i];
+      confs[i] = confs[j];
+      confs[j] = t;
+    }
+    const bestIdx = Math.floor(Math.random() * n);
+    const picks: Record<
+      string,
+      {
+        gameId: string;
+        pick: "home" | "away";
+        confidence: number;
+        isBestBet: boolean;
+        lockedSpread: number;
+        lockedFavorite: "home" | "away";
+      }
+    > = {};
+    games.forEach((g, i) => {
+      const side: "home" | "away" = Math.random() < 0.5 ? "home" : "away";
+      const fav =
+        g.favorite === "away" || g.favorite === "home" ? g.favorite : "home";
+      picks[g.id] = {
+        gameId: g.id,
+        pick: side,
+        confidence: confs[i],
+        isBestBet: i === bestIdx,
+        lockedSpread: Number(g.spread ?? 0),
+        lockedFavorite: fav,
+      };
+    });
+    const propChoice =
+      card.prop.options[
+        Math.random() < 0.5 ? 0 : Math.min(1, card.prop.options.length - 1)
+      ] || card.prop.options[0];
+
+    const saved = await import("./cloud").then((c) =>
+      c.savePicksToCloud({
+        weekNumber,
+        picks,
+        bestBetId: games[bestIdx]?.id || null,
+        propChoice,
+      })
+    );
+    if (saved.ok) {
+      steps.push("Your slip locked (random sim card)");
+    } else {
+      steps.push(`Your slip skip: ${saved.error || "failed"}`);
+    }
+  } catch (e) {
+    steps.push(
+      `Your slip skip: ${e instanceof Error ? e.message : "failed"}`
+    );
+  }
+}
+
+/**
  * Force The Board open for a week: kickoffs moved to the past so
- * progressive pick reveal unlocks (locked, not scored). You can compare
- * slips with friends/bots before scoring.
+ * progressive pick reveal unlocks (locked, not scored).
+ *
+ * Seeds bot slips like real locks (+ your slip if empty). Bots are full
+ * players on The Board — same as humans once the room is filled.
  */
 export async function founderOpenLockedBoard(
   weekNumber: number
@@ -302,6 +392,13 @@ export async function founderOpenLockedBoard(
 
   await exitEyesIfNeeded(steps);
 
+  // Ensure full bot roster so “everyone” is a real room, not just you
+  const pad = await founderEnsureFullBotRoster();
+  steps.push(...pad.steps.map((s) => `roster: ${s}`));
+  if (!pad.ok) {
+    steps.push(`roster warn: ${pad.message}`);
+  }
+
   // Ensure card + bot picks exist
   let card = await loadWeekCard(weekNumber);
   if (!card?.games?.length) {
@@ -309,12 +406,23 @@ export async function founderOpenLockedBoard(
     steps.push(...post.steps.map((s) => `post: ${s}`));
     if (!post.ok) return { ok: false, message: post.message, steps };
     card = await loadWeekCard(weekNumber);
-  } else {
-    const fill = await seedBotPicksForWeekInCloud(weekNumber);
-    if (fill.ok) {
-      steps.push(`Bot slips locked: ${fill.botsFilled ?? 0}`);
-    }
   }
+
+  // Always re-seed bots (idempotent) so Board has names under each side
+  const fill = await seedBotPicksForWeekInCloud(weekNumber);
+  if (fill.ok) {
+    steps.push(
+      `Bot slips locked: ${fill.botsFilled ?? 0}${
+        (fill.chaosCount ?? 0) > 0 ? ` · Chaos ${fill.chaosCount}` : ""
+      }`
+    );
+  } else {
+    steps.push(
+      `Bot picks warning: ${fill.error || "failed"} — Board may look empty`
+    );
+  }
+
+  await founderLockSelfSlipIfEmpty(weekNumber, steps);
 
   if (!card?.games?.length || !card.weekCardId) {
     return {
@@ -352,9 +460,10 @@ export async function founderOpenLockedBoard(
       /* ignore */
     }
 
+    const filled = fill.botsFilled ?? 0;
     return {
       ok: true,
-      message: `${weekTitle(weekNumber, sport())} Board unlocked (not scored) · open The Board to compare picks`,
+      message: `${weekTitle(weekNumber, sport())} Board unlocked (not scored) · ${filled} bot slip(s) · open The Board to compare picks`,
       steps,
     };
   } catch (e) {

@@ -72,18 +72,25 @@ export function writeSessionAndLeague(
     leagueId: membership.leagueId,
   };
 
+  const sportId = (membership.sportId || "cfb").trim() || "cfb";
+  // NFL (and non-CFB packs) default Crystal Ball off unless cloud says otherwise
+  const crystalBallEnabled =
+    typeof membership.crystalBallEnabled === "boolean"
+      ? membership.crystalBallEnabled
+      : sportId === "cfb";
+
   const league: League = {
     id: membership.leagueId,
     name: membership.leagueName,
     code: membership.code,
     commissionerId: membership.commissionerId,
     createdAt: membership.createdAt,
-    sportId: membership.sportId || "cfb",
+    sportId,
     settings: {
       cutPercent: membership.cutPercent ?? 50,
       regularSeasonWeeks: membership.regularSeasonWeeks ?? 18,
       gamesPerWeek: membership.gamesPerWeek ?? 5,
-      crystalBallEnabled: membership.crystalBallEnabled !== false,
+      crystalBallEnabled,
       homeTaglineId: membership.homeTaglineId || "good-teams",
       homeTaglineCustom: membership.homeTaglineCustom || "",
       seasonThemeId: membership.seasonThemeId || "default",
@@ -98,6 +105,13 @@ export function writeSessionAndLeague(
 
   // Paint commissioner theme + sport skin immediately for joiners / switchers
   if (typeof window !== "undefined") {
+    try {
+      void import("./sport-room-scope").then(({ setSportScope }) => {
+        if (league.sportId) setSportScope(league.sportId);
+      });
+    } catch {
+      /* ignore */
+    }
     try {
       void import("./season-theme").then(({ applySeasonTheme }) => {
         applySeasonTheme(league.settings.seasonThemeId);
@@ -297,22 +311,29 @@ export async function restoreSessionFromCloud(): Promise<RestoreResult> {
   const memberships = await fetchMyMemberships();
   if (!memberships.length) return { status: "no_leagues" };
 
-  const activeId = getActiveLeagueId();
-  let chosen =
-    (activeId && memberships.find((m) => m.leagueId === activeId)) ||
-    (memberships.length === 1 ? memberships[0] : null);
-
-  // If local session already points at a valid membership, keep it
-  if (!chosen && canUseStorage()) {
+  // Prefer the league this browser is already pointed at (create / join / switch)
+  // over a stale warroom-active-league-id from an older CFB room.
+  let chosen: LeagueMembership | null = null;
+  if (canUseStorage()) {
     try {
       const raw = localStorage.getItem(SESSION_KEY);
       if (raw) {
         const s = JSON.parse(raw) as Session;
-        chosen = memberships.find((m) => m.leagueId === s.leagueId) || null;
+        if (s?.leagueId) {
+          chosen =
+            memberships.find((m) => m.leagueId === s.leagueId) || null;
+        }
       }
     } catch {
-      // ignore
+      /* ignore */
     }
+  }
+
+  if (!chosen) {
+    const activeId = getActiveLeagueId();
+    chosen =
+      (activeId && memberships.find((m) => m.leagueId === activeId)) ||
+      (memberships.length === 1 ? memberships[0] : null);
   }
 
   if (chosen) {
@@ -331,6 +352,13 @@ export async function switchToLeague(leagueId: string): Promise<boolean> {
   const m = memberships.find((x) => x.leagueId === leagueId);
   if (!m) return false;
   writeSessionAndLeague(m, auth.user.id);
+  // Keep multi-sport “desk” filter on this room’s sport
+  try {
+    const { setSportScope } = await import("./sport-room-scope");
+    if (m.sportId) setSportScope(m.sportId);
+  } catch {
+    /* ignore */
+  }
   // Refresh full league (incl. season theme + sport skin) from cloud when possible
   try {
     const { syncLeagueFromCloud } = await import("./league-sync");
@@ -338,6 +366,12 @@ export async function switchToLeague(leagueId: string): Promise<boolean> {
     const lg = await syncLeagueFromCloud();
     if (lg?.sportId) {
       void paintSportFromLeague(lg.sportId);
+      try {
+        const { setSportScope } = await import("./sport-room-scope");
+        setSportScope(lg.sportId);
+      } catch {
+        /* ignore */
+      }
     }
     if (lg?.settings?.seasonThemeId) {
       applySeasonTheme(lg.settings.seasonThemeId);

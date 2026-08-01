@@ -127,9 +127,25 @@ export default function Home() {
 
         // Refresh settings (tagline) from cloud when possible
         const fresh = (await syncLeagueFromCloud()) || league;
+        // Create pin: cloud default cfb must not repaint NFL as green
+        let sport = fresh.sportId || league?.sportId || "cfb";
+        try {
+          const { forcedSportForLeague, applySportTheme, pinLeagueSport } =
+            await import("@/lib/sports/sport-theme");
+          const forced = forcedSportForLeague(fresh.id);
+          if (forced) {
+            sport = forced;
+            if (fresh.sportId !== forced) {
+              pinLeagueSport(fresh.id, forced);
+            }
+          }
+          applySportTheme(sport);
+        } catch {
+          /* ignore */
+        }
         setLeagueCode(fresh.code);
         setLeagueName(fresh.name);
-        setSportId(fresh.sportId || "cfb");
+        setSportId(sport);
         setHomeTagline(
           resolveHomeTagline({
             homeTaglineId: fresh.settings?.homeTaglineId,
@@ -289,31 +305,30 @@ export default function Home() {
       <Nav />
       {/* Phone-first: less chrome padding, job-first stack (most users are on phones) */}
       <main className="flex-1 max-w-6xl mx-auto w-full px-3 sm:px-4 py-5 sm:py-10 relative z-10">
-        {/* Commish: someone left — open the room for late joiners? */}
-        <OpenRoomLeaveNudge />
-        {/* Incident first (calm), then beta expectations */}
+        {/* Platform incident always wins; beta + open-room noise after first lock */}
         <IncidentBanner />
-        {/* All sports — testers are builders; bugs are part of the game */}
-        <BetaLeagueBanner />
+        {!firstWeekChrome && (
+          <>
+            <OpenRoomLeaveNudge />
+            <BetaLeagueBanner />
+          </>
+        )}
 
-        {/*
-          Account hub + league home:
-          Multi-league strip first (when 2+ rooms), then THIS room’s chrome.
-        */}
+        {/* Multi-league: keep if 2+ rooms (collapsed sport desk) */}
         <MultiLeagueHomeHub
           onSwitched={() => {
             window.location.href = "/";
           }}
         />
 
-        {/* Sport skin — light; room identity is the strip below */}
+        {/* Full masthead after first lock only */}
         {!firstWeekChrome && (
           <HomeSportHeader
             chrome={homeChrome}
             tagline={homeTagline}
-            leagueName={null}
-            leagueCode={null}
-            isCommish={false}
+            leagueName={leagueName}
+            leagueCode={leagueCode}
+            isCommish={isCommish}
             codeCopied={codeCopied}
             onCopyCode={async () => {
               if (!leagueCode) return;
@@ -328,7 +343,7 @@ export default function Home() {
           />
         )}
 
-        {/* 1) Which room / sport / host — always clear */}
+        {/* FIRST HOUR: room identity + one job (+ host checklist). Nothing else. */}
         <HomeRoomContext
           leagueName={leagueName}
           sportId={sportId}
@@ -337,33 +352,36 @@ export default function Home() {
           leagueCode={leagueCode}
         />
 
-        {/* 2) ONE primary job — not buried under banners */}
         <HomeWeekHero />
 
-        {/* Ops: score path when card exists and week not scored yet */}
-        <HomeHostScoreStrip />
+        {/* Host score path only when not in quiet first hour (or always for ops after card) */}
+        {!firstWeekChrome && <HomeHostScoreStrip />}
+        {firstWeekChrome && isCommish && <HomeHostScoreStrip />}
 
         {firstWeekChrome && (
-          <p className="text-xs text-muted mb-4 leading-relaxed max-w-xl -mt-2">
+          <p className="text-xs text-muted mb-4 leading-relaxed max-w-xl -mt-1">
             One job:{" "}
             <strong className="text-foreground">
               {isCommish
-                ? "invite the crew, post the card, then lock it in"
-                : "lock it in before kickoff"}
+                ? "invite → publish a card → lock your picks"
+                : "lock your picks before kickoff"}
             </strong>
-            . Talk shit in the Locker. Everything else opens as the season goes.
+            . Locker is for trash talk. Everything else opens after you lock.
           </p>
         )}
 
-        {/* Host first-hour spine only */}
+        {/* Host first-hour spine (invite + publish) */}
         <CommishSetupBanner />
 
-        {/* Invite = same room as context strip */}
-        <div className="mb-5">
-          <InviteFriends />
-        </div>
+        {/* Invite strip: hosts only in first hour (banner already covers invite);
+            everyone after first lock */}
+        {!firstWeekChrome && (
+          <div className="mb-5">
+            <InviteFriends />
+          </div>
+        )}
 
-        {/* Secondary room life — after first lock week only */}
+        {/* Secondary room life — after first lock only */}
         {!firstWeekChrome && (
           <>
             <SportPoolPollBanner />
@@ -380,211 +398,245 @@ export default function Home() {
           </>
         )}
 
-        <p className="text-[10px] uppercase tracking-[0.18em] text-muted mb-3 font-semibold">
-          {firstWeekChrome ? "Quick links" : "The rest of the room"}
-        </p>
-        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-          <Link
-            href="/board"
-            className="group rounded-xl border border-border/80 bg-black/40 backdrop-blur-sm p-6 hover:border-primary/50 hover:bg-primary/5 transition shadow-[0_0_40px_rgba(0,0,0,0.35)]"
-          >
-            <div className="text-xs uppercase tracking-wider text-muted mb-2">
-              Who&apos;s winning
-            </div>
-            <div className="text-lg font-semibold text-white group-hover:text-primary transition">
-              The Board
-            </div>
-            <p className="text-sm text-muted mt-2">
-              Season points · divisions · cut line
-            </p>
-          </Link>
-
-          <Link
-            href="/rules"
-            className="group rounded-xl border border-border/80 bg-black/40 backdrop-blur-sm p-6 hover:border-primary/50 hover:bg-primary/5 transition shadow-[0_0_40px_rgba(0,0,0,0.35)]"
-          >
-            <div className="text-xs uppercase tracking-wider text-muted mb-2">
-              Playbook
-            </div>
-            <div className="text-lg font-semibold text-white group-hover:text-primary transition">
-              How to play
-            </div>
-            <p className="text-sm text-muted mt-2">
-              {firstWeekChrome
-                ? "Spreads · confidence · lock it in"
-                : "Spreads · confidence · Best Bet · bonus · lock"}
-            </p>
-          </Link>
-
-          {!firstWeekChrome && (
+        {/* First hour: only Locker (+ Host). Full tile grid after lock. */}
+        {firstWeekChrome ? (
+          <section className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
             <Link
-              href="/stats"
-              className="group rounded-xl border border-border/80 bg-black/40 backdrop-blur-sm p-6 hover:border-primary/50 hover:bg-primary/5 transition shadow-[0_0_40px_rgba(0,0,0,0.35)]"
+              href="/locker-room"
+              className="group rounded-xl border border-orange-400/30 bg-black/40 p-5 hover:border-orange-300/60 transition"
             >
-              <div className="text-xs uppercase tracking-wider text-muted mb-2">
-                Pulse
+              <div className="text-xs uppercase tracking-wider text-orange-300/70 mb-1">
+                Talk shit
               </div>
-              <div className="text-lg font-semibold text-white group-hover:text-primary transition">
-                Stats
+              <div className="text-lg font-semibold text-orange-300">
+                Locker Room
               </div>
-              <p className="text-sm text-muted mt-2">
-                Power rankings · season table · league lore
+            </Link>
+            {isCommish && (
+              <Link
+                href="/commissioner?tab=card&first=1"
+                className="group rounded-xl border border-primary/40 bg-primary/10 p-5 hover:border-primary transition"
+              >
+                <div className="text-xs uppercase tracking-wider text-primary mb-1">
+                  Host
+                </div>
+                <div className="text-lg font-semibold text-white">
+                  Publish card
+                </div>
+              </Link>
+            )}
+            <Link
+              href="/rules"
+              className="group rounded-xl border border-border/80 bg-black/40 p-5 hover:border-primary/40 transition sm:col-span-2"
+            >
+              <div className="text-xs uppercase tracking-wider text-muted mb-1">
+                Optional
+              </div>
+              <div className="text-base font-semibold text-white">
+                How to play
+              </div>
+              <p className="text-xs text-muted mt-1">
+                Spreads · confidence · lock before kickoff
               </p>
             </Link>
-          )}
+          </section>
+        ) : (
+          <>
+            <p className="text-[10px] uppercase tracking-[0.18em] text-muted mb-3 font-semibold">
+              The rest of the room
+            </p>
+            <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+              <Link
+                href="/board"
+                className="group rounded-xl border border-border/80 bg-black/40 backdrop-blur-sm p-6 hover:border-primary/50 hover:bg-primary/5 transition shadow-[0_0_40px_rgba(0,0,0,0.35)]"
+              >
+                <div className="text-xs uppercase tracking-wider text-muted mb-2">
+                  Who&apos;s winning
+                </div>
+                <div className="text-lg font-semibold text-white group-hover:text-primary transition">
+                  The Board
+                </div>
+                <p className="text-sm text-muted mt-2">
+                  Season points · divisions · cut line
+                </p>
+              </Link>
 
-          {!firstWeekChrome && (
-            <Link
-              href="/championship"
-              className={
-                homeChrome.sportId === "soccer_wwc"
-                  ? "group rounded-xl border bg-black/40 backdrop-blur-sm p-6 transition border-[#009C3B]/50 hover:border-[#FFDF00]/70 hover:bg-[#009C3B]/10 shadow-[0_0_40px_rgba(0,156,59,0.15)]"
-                  : "group rounded-xl border bg-black/40 backdrop-blur-sm p-6 transition border-primary/30 hover:border-primary hover:bg-primary/10 shadow-[0_0_40px_rgba(34,197,94,0.08)]"
-              }
-            >
-              <div
+              <Link
+                href="/rules"
+                className="group rounded-xl border border-border/80 bg-black/40 backdrop-blur-sm p-6 hover:border-primary/50 hover:bg-primary/5 transition shadow-[0_0_40px_rgba(0,0,0,0.35)]"
+              >
+                <div className="text-xs uppercase tracking-wider text-muted mb-2">
+                  Playbook
+                </div>
+                <div className="text-lg font-semibold text-white group-hover:text-primary transition">
+                  How to play
+                </div>
+                <p className="text-sm text-muted mt-2">
+                  Spreads · confidence · Best Bet · bonus · lock
+                </p>
+              </Link>
+
+              <Link
+                href="/stats"
+                className="group rounded-xl border border-border/80 bg-black/40 backdrop-blur-sm p-6 hover:border-primary/50 hover:bg-primary/5 transition shadow-[0_0_40px_rgba(0,0,0,0.35)]"
+              >
+                <div className="text-xs uppercase tracking-wider text-muted mb-2">
+                  Pulse
+                </div>
+                <div className="text-lg font-semibold text-white group-hover:text-primary transition">
+                  Stats
+                </div>
+                <p className="text-sm text-muted mt-2">
+                  Power rankings · season table · league lore
+                </p>
+              </Link>
+
+              <Link
+                href="/championship"
                 className={
                   homeChrome.sportId === "soccer_wwc"
-                    ? "text-xs uppercase tracking-wider mb-2 text-[#FFDF00]/90"
-                    : "text-xs uppercase tracking-wider mb-2 text-primary/70"
+                    ? "group rounded-xl border bg-black/40 backdrop-blur-sm p-6 transition border-[#009C3B]/50 hover:border-[#FFDF00]/70 hover:bg-[#009C3B]/10 shadow-[0_0_40px_rgba(0,156,59,0.15)]"
+                    : "group rounded-xl border bg-black/40 backdrop-blur-sm p-6 transition border-primary/30 hover:border-primary hover:bg-primary/10 shadow-[0_0_40px_rgba(34,197,94,0.08)]"
                 }
               >
-                Postseason
-              </div>
-              <div
-                className={
-                  homeChrome.sportId === "soccer_wwc"
-                    ? "text-lg font-semibold text-white"
-                    : "text-lg font-semibold text-primary"
-                }
+                <div
+                  className={
+                    homeChrome.sportId === "soccer_wwc"
+                      ? "text-xs uppercase tracking-wider mb-2 text-[#FFDF00]/90"
+                      : "text-xs uppercase tracking-wider mb-2 text-primary/70"
+                  }
+                >
+                  Postseason
+                </div>
+                <div
+                  className={
+                    homeChrome.sportId === "soccer_wwc"
+                      ? "text-lg font-semibold text-white"
+                      : "text-lg font-semibold text-primary"
+                  }
+                >
+                  {homeChrome.primaryPathLabel}
+                </div>
+                <p className="text-sm text-muted mt-2">
+                  {homeChrome.primaryPathBlurb}
+                </p>
+              </Link>
+
+              <Link
+                href="/toilet-bowl"
+                className="group rounded-xl border border-purple-500/30 bg-black/40 backdrop-blur-sm p-6 hover:border-purple-400/60 hover:bg-purple-500/10 transition shadow-[0_0_40px_rgba(0,0,0,0.35)]"
               >
-                {homeChrome.primaryPathLabel}
-              </div>
-              <p className="text-sm text-muted mt-2">
-                {homeChrome.primaryPathBlurb}
-              </p>
-            </Link>
-          )}
+                <div className="text-xs uppercase tracking-wider text-purple-300/70 mb-2">
+                  Bottom half
+                </div>
+                <div className="text-lg font-semibold text-purple-300">
+                  {homeChrome.shamePathLabel}
+                </div>
+                <p className="text-sm text-muted mt-2">
+                  {homeChrome.shamePathBlurb}
+                </p>
+              </Link>
 
-          {!firstWeekChrome && (
-            <Link
-              href="/toilet-bowl"
-              className="group rounded-xl border border-purple-500/30 bg-black/40 backdrop-blur-sm p-6 hover:border-purple-400/60 hover:bg-purple-500/10 transition shadow-[0_0_40px_rgba(0,0,0,0.35)]"
-            >
-              <div className="text-xs uppercase tracking-wider text-purple-300/70 mb-2">
-                Bottom half
-              </div>
-              <div className="text-lg font-semibold text-purple-300">
-                {homeChrome.shamePathLabel}
-              </div>
-              <p className="text-sm text-muted mt-2">
-                {homeChrome.shamePathBlurb}
-              </p>
-            </Link>
-          )}
+              <Link
+                href="/trophy-room"
+                className="group rounded-xl border border-amber-400/30 bg-black/40 backdrop-blur-sm p-6 hover:border-amber-300/60 hover:bg-amber-400/10 transition shadow-[0_0_40px_rgba(251,191,36,0.08)]"
+              >
+                <div className="text-xs uppercase tracking-wider text-amber-300/70 mb-2">
+                  Legacy
+                </div>
+                <div className="text-lg font-semibold text-amber-300">
+                  Trophy Room
+                </div>
+                <p className="text-sm text-muted mt-2">
+                  Champs · Toilet · Village Nerd — year after year
+                </p>
+              </Link>
 
-          {!firstWeekChrome && (
-            <Link
-              href="/trophy-room"
-              className="group rounded-xl border border-amber-400/30 bg-black/40 backdrop-blur-sm p-6 hover:border-amber-300/60 hover:bg-amber-400/10 transition shadow-[0_0_40px_rgba(251,191,36,0.08)]"
-            >
-              <div className="text-xs uppercase tracking-wider text-amber-300/70 mb-2">
-                Legacy
-              </div>
-              <div className="text-lg font-semibold text-amber-300">
-                Trophy Room
-              </div>
-              <p className="text-sm text-muted mt-2">
-                Champs · Toilet · Village Nerd — year after year
-              </p>
-            </Link>
-          )}
+              {showGazetteShelf && (
+                <Link
+                  href="/gazette"
+                  className="group rounded-xl border border-red-700/40 bg-black/40 backdrop-blur-sm p-6 hover:border-red-500/60 hover:bg-red-950/30 transition shadow-[0_0_40px_rgba(185,28,28,0.12)]"
+                >
+                  <div className="text-xs uppercase tracking-wider text-red-300/80 mb-2">
+                    The paper
+                  </div>
+                  <div className="text-lg font-semibold text-red-200 group-hover:text-red-100 transition">
+                    Gazette
+                  </div>
+                  <p className="text-sm text-muted mt-2">
+                    Every week&apos;s headlines for the season
+                  </p>
+                </Link>
+              )}
 
-          {showGazetteShelf && (
-            <Link
-              href="/gazette"
-              className="group rounded-xl border border-red-700/40 bg-black/40 backdrop-blur-sm p-6 hover:border-red-500/60 hover:bg-red-950/30 transition shadow-[0_0_40px_rgba(185,28,28,0.12)]"
-            >
-              <div className="text-xs uppercase tracking-wider text-red-300/80 mb-2">
-                The paper
-              </div>
-              <div className="text-lg font-semibold text-red-200 group-hover:text-red-100 transition">
-                Gazette
-              </div>
-              <p className="text-sm text-muted mt-2">
-                Every week&apos;s headlines for the season
-              </p>
-            </Link>
-          )}
+              {showGazetteShelf && (
+                <Link
+                  href="/announcements"
+                  className="group rounded-xl border border-border/80 bg-black/40 backdrop-blur-sm p-6 hover:border-primary/50 hover:bg-primary/5 transition shadow-[0_0_40px_rgba(0,0,0,0.35)]"
+                >
+                  <div className="text-xs uppercase tracking-wider text-muted mb-2 flex items-center justify-between gap-2">
+                    <span>News</span>
+                    <HomeTileUnseen kind="announcements" />
+                  </div>
+                  <div className="text-lg font-semibold text-white group-hover:text-primary transition">
+                    League notes
+                  </div>
+                  <p className="text-sm text-muted mt-2">
+                    Host posts · milk cartons · room updates
+                  </p>
+                </Link>
+              )}
 
-          {showGazetteShelf && (
-            <Link
-              href="/announcements"
-              className="group rounded-xl border border-border/80 bg-black/40 backdrop-blur-sm p-6 hover:border-primary/50 hover:bg-primary/5 transition shadow-[0_0_40px_rgba(0,0,0,0.35)]"
-            >
-              <div className="text-xs uppercase tracking-wider text-muted mb-2 flex items-center justify-between gap-2">
-                <span>News</span>
-                <HomeTileUnseen kind="announcements" />
-              </div>
-              <div className="text-lg font-semibold text-white group-hover:text-primary transition">
-                League notes
-              </div>
-              <p className="text-sm text-muted mt-2">
-                Host posts · milk cartons · room updates
-              </p>
-            </Link>
-          )}
+              <Link
+                href="/locker-room"
+                className="group rounded-xl border border-orange-400/30 bg-black/40 backdrop-blur-sm p-6 hover:border-orange-300/60 hover:bg-orange-500/10 transition shadow-[0_0_40px_rgba(249,115,22,0.08)]"
+              >
+                <div className="text-xs uppercase tracking-wider text-orange-300/70 mb-2 flex items-center justify-between gap-2">
+                  <span>Talk shit</span>
+                  <HomeTileUnseen kind="locker" />
+                </div>
+                <div className="text-lg font-semibold text-orange-300">
+                  Locker Room
+                </div>
+                <p className="text-sm text-muted mt-2">
+                  Short takes · emojis · pure noise
+                </p>
+              </Link>
 
-          <Link
-            href="/locker-room"
-            className="group rounded-xl border border-orange-400/30 bg-black/40 backdrop-blur-sm p-6 hover:border-orange-300/60 hover:bg-orange-500/10 transition shadow-[0_0_40px_rgba(249,115,22,0.08)]"
-          >
-            <div className="text-xs uppercase tracking-wider text-orange-300/70 mb-2 flex items-center justify-between gap-2">
-              <span>Talk shit</span>
-              <HomeTileUnseen kind="locker" />
-            </div>
-            <div className="text-lg font-semibold text-orange-300">
-              Locker Room
-            </div>
-            <p className="text-sm text-muted mt-2">
-              Short takes · emojis · pure noise
-            </p>
-          </Link>
+              {isCommish && (
+                <Link
+                  href="/commissioner"
+                  className="group rounded-xl border border-border/80 bg-black/40 backdrop-blur-sm p-6 hover:border-primary/50 hover:bg-primary/5 transition"
+                >
+                  <div className="text-xs uppercase tracking-wider text-muted mb-2">
+                    Host
+                  </div>
+                  <div className="text-lg font-semibold text-white group-hover:text-primary transition">
+                    Run the Room
+                  </div>
+                  <p className="text-sm text-muted mt-2">
+                    Card · results · settings
+                  </p>
+                </Link>
+              )}
 
-          {isCommish && (
-            <Link
-              href="/commissioner"
-              className="group rounded-xl border border-border/80 bg-black/40 backdrop-blur-sm p-6 hover:border-primary/50 hover:bg-primary/5 transition"
-            >
-              <div className="text-xs uppercase tracking-wider text-muted mb-2">
-                Host
-              </div>
-              <div className="text-lg font-semibold text-white group-hover:text-primary transition">
-                Run the Room
-              </div>
-              <p className="text-sm text-muted mt-2">
-                Card · results · settings
-              </p>
-            </Link>
-          )}
-
-          <Link
-            href="/account"
-            className={`group rounded-xl border border-sky-400/35 bg-sky-500/10 backdrop-blur-sm p-6 hover:border-sky-300/60 hover:bg-sky-500/15 transition shadow-[0_0_40px_rgba(56,189,248,0.08)] ${
-              firstWeekChrome ? "" : "sm:col-span-2 lg:col-span-3"
-            }`}
-          >
-            <div className="text-xs uppercase tracking-wider text-sky-300/80 mb-2">
-              You
-            </div>
-            <div className="text-lg font-semibold text-sky-200 group-hover:text-sky-100 transition">
-              Account
-            </div>
-            <p className="text-sm text-muted mt-2">
-              Photo · leagues · player view · feedback for Mike
-            </p>
-          </Link>
-        </section>
+              <Link
+                href="/account"
+                className="group rounded-xl border border-sky-400/35 bg-sky-500/10 backdrop-blur-sm p-6 hover:border-sky-300/60 hover:bg-sky-500/15 transition shadow-[0_0_40px_rgba(56,189,248,0.08)] sm:col-span-2 lg:col-span-3"
+              >
+                <div className="text-xs uppercase tracking-wider text-sky-300/80 mb-2">
+                  You
+                </div>
+                <div className="text-lg font-semibold text-sky-200 group-hover:text-sky-100 transition">
+                  Account
+                </div>
+                <p className="text-sm text-muted mt-2">
+                  Photo · leagues · player view · feedback for Mike
+                </p>
+              </Link>
+            </section>
+          </>
+        )}
       </main>
     </div>
   );

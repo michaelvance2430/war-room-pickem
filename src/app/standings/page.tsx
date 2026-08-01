@@ -14,6 +14,7 @@ import PlayerLink from "@/components/PlayerLink";
 import { standingsHardwareFlair } from "@/lib/profile-hardware";
 import { Division, Player } from "@/lib/types";
 import { divisionTabLabel } from "@/lib/divisions";
+import { formatLastSeen, isRecentlyActive } from "@/lib/last-seen";
 
 const divisions: (Division | "Overall")[] = [
   "Overall",
@@ -98,7 +99,13 @@ export default function StandingsPage() {
               ? "No weeks scored yet — everyone is tied at zero until the first card is locked and scored."
               : "Live points · Bottom 50% of each division gets flushed · Swing labels after each scored week"}
           </p>
-          <p className="text-xs text-primary/90 mt-1.5 font-medium">
+          <p className="text-xs text-muted mt-1.5 leading-relaxed">
+            <span className="text-primary font-medium">Last in</span> = how
+            recently they opened the app (same on CFB and NFL rooms). Works on
+            phone via the <strong className="text-foreground">Table</strong>{" "}
+            tab.
+          </p>
+          <p className="text-xs text-primary/90 mt-1 font-medium">
             Tap a green name → open their profile (badges &amp; trophies).
           </p>
           {showNameTip && (
@@ -187,6 +194,9 @@ export default function StandingsPage() {
                 <th className="text-left px-3 py-3 font-medium hidden md:table-cell">
                   Swing
                 </th>
+                <th className="text-right px-3 sm:px-4 py-3 font-medium hidden sm:table-cell">
+                  Last in
+                </th>
                 <th className="text-right px-4 py-3 font-medium">Pts</th>
                 <th className="text-right px-4 py-3 font-medium hidden sm:table-cell">
                   ATS%
@@ -200,7 +210,7 @@ export default function StandingsPage() {
                   {idx === cutIndex && (
                     <tr className="bg-danger/10">
                       <td
-                        colSpan={active === "Overall" ? 7 : 6}
+                        colSpan={active === "Overall" ? 8 : 7}
                         className="px-4 py-1.5 text-center text-xs text-danger font-medium"
                       >
                         — Cut Line (bottom 50% → Toilet Bowl) —
@@ -242,6 +252,21 @@ export default function StandingsPage() {
                           ))}
                           {isSelfPlayer(player.id, selfId) && <YouBadge />}
                         </span>
+                        {/* Phone: last-in under the name */}
+                        <span
+                          className={`text-[11px] font-normal sm:hidden ${
+                            isRecentlyActive(player.lastSeenAt)
+                              ? "text-primary"
+                              : "text-muted"
+                          }`}
+                          title={
+                            player.lastSeenAt
+                              ? `Last in: ${new Date(player.lastSeenAt).toLocaleString()}`
+                              : "No last-seen yet"
+                          }
+                        >
+                          {formatLastSeen(player.lastSeenAt)}
+                        </span>
                         {swingById[player.id] && (
                           <span className="md:hidden">
                             <SwingBadge swing={swingById[player.id]} />
@@ -263,6 +288,20 @@ export default function StandingsPage() {
                       ) : (
                         <span className="text-muted">—</span>
                       )}
+                    </td>
+                    <td
+                      className={`px-3 sm:px-4 py-3.5 text-right align-middle text-xs hidden sm:table-cell ${
+                        isRecentlyActive(player.lastSeenAt)
+                          ? "text-primary font-semibold"
+                          : "text-muted"
+                      }`}
+                      title={
+                        player.lastSeenAt
+                          ? `Last in: ${new Date(player.lastSeenAt).toLocaleString()}`
+                          : "No last-seen yet — open app after last_seen SQL"
+                      }
+                    >
+                      {formatLastSeen(player.lastSeenAt)}
                     </td>
                     <td className="px-3 sm:px-4 py-3.5 text-right font-semibold align-middle text-base">
                       {player.totalPoints}

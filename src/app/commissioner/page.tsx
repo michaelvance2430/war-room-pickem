@@ -51,12 +51,14 @@ import {
   postMissingPicksAnnouncement,
   setLeagueActiveWeek,
   resetSeasonInCloud,
+  startNextSeasonInCloud,
   seedTrialBotsInCloud,
   clearTrialBotsInCloud,
   seedBotPicksForWeekInCloud,
   applyRandomBotChaosForWeek,
   fillLeagueWithBotsToCap,
   listScoredWeekNumbers,
+  clearWeekScoreInCloud,
   loadWeekResultsFromCloud,
   loadLeagueRoster,
   setMemberModeration,
@@ -360,7 +362,8 @@ function CommissionerPageInner() {
       ) {
         if (tabParam === "settings" && !owner) setTab("card");
         else setTab(tabParam);
-      } else if (ft || firstParam === "1") {
+      } else if (ft || firstParam === "1" || eyesNewCommish) {
+        // Simple host / first hour: always land on Build Card
         setTab("card");
       } else if (owner) {
         setTab("settings");
@@ -1936,64 +1939,77 @@ function CommissionerPageInner() {
   }
 
   /**
-   * Wipe picks / cards / results / scores. Keep every member.
+   * Decade room: open the next season in THIS league.
+   * Same wipe as reset — framed for year-over-year, not "delete everything."
    * Triple confirmation so it can't fire mid-season by accident.
    */
-  async function handleResetSeason() {
+  async function handleStartNextSeason(opts?: { advancedResetLabel?: boolean }) {
     setSeasonResetReport(null);
+    const advanced = !!opts?.advancedResetLabel;
 
     const { isSandboxMode } = await import("@/lib/season-mode");
     const sandbox = isSandboxMode();
+    const roomName = league?.name?.trim() || "this room";
     const ok1 = confirm(
-      "RESET SEASON?\n\n" +
-        "This will DELETE:\n" +
-        "• All week cards & games\n" +
-        "• All player picks (including bot trial picks)\n" +
-        "• All results & season scores/stats (ATS, weeks, streaks, props)\n" +
-        "• Crystal Ball / Super Bowl pride picks + crown\n" +
-        "• League achievements from this season\n" +
-        "• League announcements + Gazette archive + locker board\n" +
+      (advanced ? "RESET SEASON (same room)?\n\n" : "START NEXT SEASON?\n\n") +
+        `Room: ${roomName}\n` +
+        "Same league forever — friends come back to THIS clubhouse.\n\n" +
+        "This will CLEAR the live board:\n" +
+        "• Week cards & games\n" +
+        "• All picks (humans + bots)\n" +
+        "• Results & season standings stats\n" +
+        "• Crystal Ball / pride picks for this run\n" +
+        "• This season’s Gazette, announcements, locker board\n" +
         (sandbox
-          ? "• Sandbox Trophy Room engravings (dry-run rings)\n" +
-            "• Sim achievement points / First & Final / Elite Commish on this device\n"
+          ? "• Sandbox dry-run Trophy engravings on this device\n"
           : "") +
-        "\nThis will KEEP:\n" +
-        "• Every player who joined (including bots until you Clear bots)\n" +
-        "• Divisions, roles, league code & settings\n" +
+        "\nThis will KEEP (decade room):\n" +
+        "• Every member (humans + bots until you clear bots)\n" +
+        "• League code, name, settings, divisions, roles\n" +
+        "• Commissioner ownership\n" +
         "• Profile photos\n" +
         (sandbox
-          ? "• Real prior-season Legends only (Kahmann / Bill ball Ben / creator)\n"
-          : "• Trophy Room history + career cheevos (real season only)\n") +
+          ? "• Real prior-season Legends only\n"
+          : "• Trophy Room history (all prior years) + career cheevos\n") +
         "\n" +
         (sandbox
-          ? "SANDBOX: trial/bot stats must not stick — profile deep stats go to zero.\n\n"
-          : "REAL SEASON: career cheevos stay after reset; season board zeros.\n\n") +
+          ? "SANDBOX: trial stats zero out.\n\n"
+          : "REAL: board zeros; the wall of hardware stays.\n\n") +
         "Continue?"
     );
     if (!ok1) return;
 
     const ok2 = confirm(
       "Last chance.\n\n" +
-        "This cannot be undone.\n" +
-        "Players stay in the league with zeroed scores.\n\n" +
-        "Reset the season now?"
+        "Cannot undo. Players stay in the room with a clean season board.\n" +
+        "Trophy Room is NOT deleted.\n\n" +
+        (advanced ? "Reset the season now?" : "Start the next season now?")
     );
     if (!ok2) return;
 
+    const phrase = advanced ? "RESET" : "NEXT";
     const typed = window.prompt(
-      'Type RESET (all caps) to confirm season reset.\n\nAnything else cancels.'
+      advanced
+        ? 'Type RESET (all caps) to confirm.\n\nAnything else cancels.'
+        : 'Type NEXT (all caps) to open the next season in this same room.\n\nAnything else cancels.'
     );
-    if (typed !== "RESET") {
-      setSeasonResetReport("Season reset cancelled — you must type RESET exactly.");
+    if (typed !== phrase) {
+      setSeasonResetReport(
+        advanced
+          ? "Cancelled — type RESET exactly."
+          : "Cancelled — type NEXT exactly to start the next season."
+      );
       return;
     }
 
     setResettingSeason(true);
-    const result = await resetSeasonInCloud();
+    const result = advanced
+      ? await resetSeasonInCloud()
+      : await startNextSeasonInCloud();
     setResettingSeason(false);
 
     if (!result.ok) {
-      setSeasonResetReport(result.error || "Season reset failed");
+      setSeasonResetReport(result.error || "Could not start next season");
       return;
     }
 
@@ -2025,8 +2041,8 @@ function CommissionerPageInner() {
     const stillScored = await refreshScoredWeeks();
     if (stillScored.length > 0) {
       setSeasonResetReport(
-        `Reset ran but ${stillScored.length} scored week(s) still exist (${stillScored.join(", ")}). ` +
-          "Run supabase/reset-season.sql in Supabase SQL Editor, then reset again."
+        `Wipe ran but ${stillScored.length} scored week(s) still exist (${stillScored.join(", ")}). ` +
+          "Run supabase/reset-season.sql in Supabase SQL Editor, then try again."
       );
       return;
     }
@@ -2035,11 +2051,18 @@ function CommissionerPageInner() {
     const picks = result.picksDeleted ?? 0;
     const cards = result.cardsDeleted ?? 0;
     const results = result.resultsDeleted ?? 0;
+    const openWeek =
+      leagueFootballSport() === "nfl" ? "Week 1" : "Week 0";
     setSeasonResetReport(
-      `Season reset complete. Kept ${kept} member(s). Removed ${cards} card(s), ${picks} pick sheet(s), ${results} scored week(s). Scores zeroed. Ready for ${
-        leagueFootballSport() === "nfl" ? "Week 1" : "Week 0"
-      } — re-add bots, then Run season.`
+      `Next season open in ${roomName}. Kept ${kept} member(s). ` +
+        `Cleared ${cards} card(s), ${picks} pick sheet(s), ${results} scored week(s). ` +
+        `Trophy Room stays. Ready for ${openWeek} — publish a card and text the crew.`
     );
+  }
+
+  /** @deprecated name — same as start next season (advanced confirm word) */
+  async function handleResetSeason() {
+    return handleStartNextSeason({ advancedResetLabel: true });
   }
 
   function copyCode() {
@@ -2235,93 +2258,95 @@ function CommissionerPageInner() {
                 : "Settings • Build card • Who\u2019s in • Results"
               : "Build card • Who\u2019s in • Results (settings stay with the commissioner)"}
           </p>
-          {firstTime && isOwner && (
+          {(firstTime || simpleHost) && isOwner && (
             <div className="mt-3 rounded-xl border-2 border-primary/50 bg-primary/10 px-4 py-3">
               <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-1">
-                First-time mode
+                Simple host
               </p>
               <p className="text-sm text-foreground leading-relaxed">
-                Stick to the checklist.{" "}
-                <strong className="text-primary">Demo slate</strong> costs zero
-                odds credits — perfect for a practice week with bots or just
-                you. Full toolbox (bots bulk, reset, pass) stays under Settings
-                → Advanced until you score a real week.
+                Three jobs:{" "}
+                <strong className="text-primary">Build Card</strong>
+                {" · "}
+                <strong className="text-primary">Who&apos;s in</strong>
+                {" · "}
+                <strong className="text-primary">Enter Results</strong>
+                . Demo slate costs zero odds credits. Settings stay buried until
+                you score a week.
               </p>
             </div>
           )}
-          <div className="mt-3 rounded-xl border-2 border-warning bg-warning/15 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <div>
-              <p className="text-sm font-bold text-warning">View as player</p>
-              <p className="text-xs text-muted">
-                Hide Commish tools and see the app like your league mates.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                setViewAsPlayer(true);
-                router.push("/");
-              }}
-              className="shrink-0 px-4 py-2 rounded-lg bg-warning text-black text-sm font-bold"
-            >
-              Enter player view →
-            </button>
-          </div>
-          {oddsCreditsRemaining != null && (
-            <div
-              className={`mt-3 rounded-xl border px-4 py-3 text-sm ${
-                Number(oddsCreditsRemaining) <= 20
-                  ? "border-warning/50 bg-warning/10 text-warning"
-                  : Number(oddsCreditsRemaining) === 0
-                    ? "border-danger/50 bg-danger/10 text-danger"
-                    : "border-primary/30 bg-primary/5 text-foreground"
-              }`}
-            >
-              <p className="font-semibold">
-                Odds API credits left:{" "}
-                <span className="font-mono text-lg">
-                  {oddsCreditsRemaining}
-                </span>
-                {oddsCreditsUsed != null && (
-                  <span className="text-muted font-normal text-xs ml-2">
-                    (used this period: {oddsCreditsUsed}
-                    {oddsCreditsLast != null
-                      ? ` · last call: ${oddsCreditsLast}`
-                      : ""}
-                    )
-                  </span>
-                )}
-              </p>
-              <p className="text-[11px] text-muted mt-1 leading-relaxed">
-                Free plan is usually 500 credits/month (Pull Odds ≈ 1, Sync
-                scores ≈ 2). Updates after each Pull Odds or Sync final scores.
-                Demo slate uses zero credits. Upgrade mid-season by replacing{" "}
-                <code className="text-foreground">ODDS_API_KEY</code> in Vercel
-                and redeploying — league scores/picks are untouched.
-              </p>
-            </div>
-          )}
-          {oddsCreditsRemaining == null && (
-            <p className="mt-2 text-[11px] text-muted">
-              Odds API credit balance appears after you{" "}
-              <strong className="text-foreground">Pull Odds</strong> or{" "}
-              <strong className="text-foreground">Sync final scores</strong>{" "}
-              once.
-            </p>
+          {/* Player view + odds: not day-one noise */}
+          {!(firstTime || simpleHost) && (
+            <>
+              <div className="mt-3 rounded-xl border-2 border-warning bg-warning/15 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div>
+                  <p className="text-sm font-bold text-warning">
+                    View as player
+                  </p>
+                  <p className="text-xs text-muted">
+                    Hide Commish tools and see the app like your league mates.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setViewAsPlayer(true);
+                    router.push("/");
+                  }}
+                  className="shrink-0 px-4 py-2 rounded-lg bg-warning text-black text-sm font-bold"
+                >
+                  Enter player view →
+                </button>
+              </div>
+              {oddsCreditsRemaining != null && (
+                <div
+                  className={`mt-3 rounded-xl border px-4 py-3 text-sm ${
+                    Number(oddsCreditsRemaining) <= 20
+                      ? "border-warning/50 bg-warning/10 text-warning"
+                      : Number(oddsCreditsRemaining) === 0
+                        ? "border-danger/50 bg-danger/10 text-danger"
+                        : "border-primary/30 bg-primary/5 text-foreground"
+                  }`}
+                >
+                  <p className="font-semibold">
+                    Odds API credits left:{" "}
+                    <span className="font-mono text-lg">
+                      {oddsCreditsRemaining}
+                    </span>
+                    {oddsCreditsUsed != null && (
+                      <span className="text-muted font-normal text-xs ml-2">
+                        (used this period: {oddsCreditsUsed}
+                        {oddsCreditsLast != null
+                          ? ` · last call: ${oddsCreditsLast}`
+                          : ""}
+                        )
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-[11px] text-muted mt-1 leading-relaxed">
+                    Free plan is usually 500 credits/month (Pull Odds ≈ 1, Sync
+                    scores ≈ 2). Demo slate uses zero credits.
+                  </p>
+                </div>
+              )}
+            </>
           )}
         </div>
 
-        <CommishWeekChecklist
-          onGoTab={(t) => {
-            setTab(t);
-            if (t === "picks") void refreshPickStatus();
-            if (t === "results") void refreshPublishedProp(activeWeek);
-          }}
-        />
+        {!(firstTime || simpleHost) && (
+          <CommishWeekChecklist
+            onGoTab={(t) => {
+              setTab(t);
+              if (t === "picks") void refreshPickStatus();
+              if (t === "results") void refreshPublishedProp(activeWeek);
+            }}
+          />
+        )}
 
         <div id="commish-tab-panel" className="scroll-mt-20">
         <div className="flex flex-wrap gap-2 mb-6">
-          {isOwner && (
+          {/* Simple host: Card · Who's in · Results only. Settings buried. */}
+          {isOwner && !(firstTime || simpleHost) && (
             <button
               type="button"
               onClick={() => setTab("settings")}
@@ -2375,6 +2400,21 @@ function CommissionerPageInner() {
             Enter Results
           </button>
         </div>
+        {isOwner && (firstTime || simpleHost) && (
+          <p className="text-[11px] text-muted mb-4 -mt-2">
+            Need bots, open room, or advanced tools?{" "}
+            <button
+              type="button"
+              onClick={() => {
+                setTab("settings");
+                setAdvancedOpen(true);
+              }}
+              className="text-primary font-semibold underline-offset-2 hover:underline"
+            >
+              League settings
+            </button>
+          </p>
+        )}
 
         {tab === "settings" && isOwner && league && (
           <div className="space-y-6">
@@ -3222,35 +3262,55 @@ function CommissionerPageInner() {
               </p>
             </div>
 
-            <div className="rounded-xl border border-warning/40 bg-card p-5 space-y-3">
-              <h2 className="font-semibold text-warning">Reset season</h2>
-              <p className="text-xs text-muted leading-relaxed">
-                After testing (or before kickoff of the real season): wipe all
-                cards, picks, results, and scores.{" "}
-                <span className="text-foreground font-medium">
-                  Everyone who joined stays in the league
-                </span>{" "}
-                with zeroed stats. League code, settings, divisions, profile
-                photos, and{" "}
-                <span className="text-foreground font-medium">Trophy Room</span>{" "}
-                history are kept. Requires typing{" "}
-                <span className="font-mono text-foreground">RESET</span> to
-                confirm — hard to do by accident mid-season.
+            <div className="rounded-xl border-2 border-primary/45 bg-primary/10 p-5 space-y-3">
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
+                Decade room
               </p>
+              <h2 className="font-semibold text-foreground text-lg">
+                Start next season
+              </h2>
+              <p className="text-xs text-muted leading-relaxed">
+                Same league, same code, same friends — new year on the board.
+                Use this after a season ends (or when trial runs are done) so the
+                crew comes back to{" "}
+                <span className="text-foreground font-medium">
+                  this clubhouse
+                </span>
+                , not a brand-new room.
+              </p>
+              <ul className="text-[11px] text-muted space-y-1 leading-relaxed list-disc pl-4">
+                <li>
+                  <span className="text-foreground font-medium">Keeps:</span>{" "}
+                  members, invite code, commissioner, divisions,{" "}
+                  <span className="text-foreground font-medium">
+                    Trophy Room / Museum years
+                  </span>
+                </li>
+                <li>
+                  <span className="text-foreground font-medium">Clears:</span>{" "}
+                  cards, picks, standings, this season&apos;s Gazette / Crystal
+                  Ball / locker noise
+                </li>
+              </ul>
               <button
                 type="button"
                 disabled={resettingSeason}
-                onClick={() => void handleResetSeason()}
-                className="px-4 py-2 rounded-lg border border-warning text-warning text-sm font-medium hover:bg-warning/10 disabled:opacity-50"
+                onClick={() => void handleStartNextSeason()}
+                className="w-full sm:w-auto min-h-[48px] px-5 py-2.5 rounded-xl bg-primary text-black text-sm font-extrabold hover:opacity-90 disabled:opacity-50 touch-manipulation"
               >
                 {resettingSeason
-                  ? "Resetting season…"
-                  : "Reset season (keep players)"}
+                  ? "Opening next season…"
+                  : "Start next season (same room)"}
               </button>
+              <p className="text-[10px] text-muted">
+                Confirm by typing{" "}
+                <span className="font-mono text-foreground">NEXT</span> — hard
+                to do by accident mid-season.
+              </p>
               {seasonResetReport && (
                 <p
                   className={`text-xs leading-relaxed ${
-                    seasonResetReport.toLowerCase().includes("complete")
+                    /open|complete|kept/i.test(seasonResetReport)
                       ? "text-primary"
                       : "text-danger"
                   }`}
@@ -3260,11 +3320,31 @@ function CommissionerPageInner() {
               )}
             </div>
 
+            <div className="rounded-xl border border-warning/35 bg-card p-4 space-y-2">
+              <h3 className="text-sm font-semibold text-warning">
+                Advanced · same wipe
+              </h3>
+              <p className="text-[11px] text-muted leading-relaxed">
+                Identical board clear (type{" "}
+                <span className="font-mono text-foreground">RESET</span>). Prefer{" "}
+                <strong className="text-foreground">Start next season</strong>{" "}
+                above — same room, clearer story.
+              </p>
+              <button
+                type="button"
+                disabled={resettingSeason}
+                onClick={() => void handleResetSeason()}
+                className="px-3 py-2 rounded-lg border border-warning/60 text-warning text-xs font-medium hover:bg-warning/10 disabled:opacity-50"
+              >
+                {resettingSeason ? "Working…" : "Reset season (keep players)"}
+              </button>
+            </div>
+
             <div className="rounded-xl border border-danger/40 bg-card p-5 space-y-3">
               <h2 className="font-semibold text-danger">Danger zone</h2>
               <p className="text-xs text-muted">
-                Permanently deletes the whole league for everyone. Not the same
-                as reset season.
+                Permanently deletes the whole league for everyone — kills the
+                decade room. Not the same as starting next season.
               </p>
               <button
                 type="button"
@@ -4578,20 +4658,38 @@ function CommissionerPageInner() {
                     <button
                       type="button"
                       onClick={() => {
-                        if (
-                          confirm(
-                            `Unlock ${weekTitle(activeWeek)} for re-scoring?\n\nUse only for dry runs.`
-                          )
-                        ) {
+                        void (async () => {
+                          if (
+                            !confirm(
+                              `Clear the “done” mark on ${weekTitle(activeWeek)}?\n\n` +
+                                "Removes week results so the pill is not struck through.\n" +
+                                "Does NOT delete the published card or player picks.\n" +
+                                "Use for dry runs / accidental Founder score."
+                            )
+                          ) {
+                            return;
+                          }
+                          const res = await clearWeekScoreInCloud(activeWeek);
+                          if (!res.ok) {
+                            setScoreReport(
+                              res.error || "Could not clear week score"
+                            );
+                            return;
+                          }
                           setResultsLocked(false);
+                          setResults({});
+                          setPropResult(null);
+                          setResultsSaved(false);
+                          setScoredAtLabel(null);
+                          await refreshScoredWeeks();
                           setScoreReport(
-                            `${weekTitle(activeWeek)} unlocked — edit covers and score again.`
+                            `${weekTitle(activeWeek)} cleared — no longer marked done. Card & picks kept.`
                           );
-                        }
+                        })();
                       }}
                       className="px-4 py-2 rounded-lg border border-border text-muted text-sm font-medium"
                     >
-                      Unlock to re-score
+                      Clear done · unlock week
                     </button>
                   )}
                 </div>

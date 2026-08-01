@@ -4,6 +4,9 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import Nav from "@/components/Nav";
 import PicksHowToModal from "@/components/PicksHowToModal";
 import FirstFinalModal from "@/components/FirstFinalModal";
+import PicksSavedModal, {
+  type PicksSavedModalDetail,
+} from "@/components/PicksSavedModal";
 import { Game, UserPick, Prop } from "@/lib/types";
 import { getSession, getLeague } from "@/lib/league";
 import Link from "next/link";
@@ -117,6 +120,9 @@ export default function PicksPage() {
     weekNumber: number;
     pointsRemoved?: number;
   } | null>(null);
+  /** Loud "YES you're saved" after lock / re-save */
+  const [picksSavedModal, setPicksSavedModal] =
+    useState<PicksSavedModalDetail | null>(null);
   /** First-time path: quieter chrome until first lock */
   const [quietPicks, setQuietPicks] = useState(true);
   const [bonusOpen, setBonusOpen] = useState(false);
@@ -790,21 +796,17 @@ export default function PicksPage() {
       /* ignore */
     }
 
-    // First & Final: full popup (earn warning / forfeit point loss)
+    const lockLabel = formatCardLockDeadline(cardGames);
+    const weekLabel =
+      weekTitle(activeWeek, getLeague()?.sportId) || `Week ${activeWeek}`;
+
+    // Always confirm save loudly — First & Final note rides in the same modal
     if (result.firstFinal === "earned") {
-      setFirstFinalModal({ mode: "earned", weekNumber: activeWeek });
       setCardNotice(
         `🔒 First & Final active for Week ${activeWeek} — change any pick and you lose +25 season & career.`
       );
     } else if (result.firstFinal === "forfeit") {
       const removed = Math.abs(result.firstFinalPointsDelta ?? 25);
-      setFirstFinalModal({
-        mode: "forfeit",
-        weekNumber: activeWeek,
-        pointsRemoved: result.firstFinalPointsDelta
-          ? Math.abs(result.firstFinalPointsDelta)
-          : 0,
-      });
       setCardNotice(
         (result.firstFinalPointsDelta ?? 0) < 0
           ? `First & Final voided — −${removed} season & career cheevo pts.`
@@ -813,6 +815,23 @@ export default function PicksPage() {
     } else {
       setCardNotice(null);
     }
+
+    // One clear popup: YES saved (+ optional First & Final note). No double stack.
+    setFirstFinalModal(null);
+    setPicksSavedModal({
+      weekLabel,
+      lockDeadlineLabel: lockLabel || null,
+      isUpdate: alreadyLocked,
+      firstFinal:
+        result.firstFinal === "earned" || result.firstFinal === "forfeit"
+          ? result.firstFinal
+          : null,
+      firstFinalPointsRemoved:
+        result.firstFinal === "forfeit"
+          ? Math.abs(result.firstFinalPointsDelta ?? 0) || undefined
+          : undefined,
+    });
+
     setSaving(false);
     await applyCard(latest, { isInitial: false, forceReloadPicks: true });
   }
@@ -888,6 +907,10 @@ export default function PicksPage() {
     <div className="min-h-screen flex flex-col">
       <Nav />
       <PicksHowToModal />
+      <PicksSavedModal
+        detail={picksSavedModal}
+        onClose={() => setPicksSavedModal(null)}
+      />
       {firstFinalModal && (
         <FirstFinalModal
           mode={firstFinalModal.mode}
@@ -899,11 +922,23 @@ export default function PicksPage() {
 
       <main className="flex-1 max-w-3xl mx-auto w-full px-3 sm:px-4 py-5 sm:py-8 phone-picks-main">
         {eyesPreview && (
-          <div className="mb-4 rounded-lg border border-sky-400/50 bg-sky-500/15 px-3 py-2 text-xs font-bold text-sky-100">
-            PREVIEW · local card · not your real standings ·{" "}
-            <Link href="/founder" className="underline">
-              Founder
+          <div className="mb-4 rounded-lg border border-sky-400/50 bg-sky-500/15 px-3 py-2 text-xs font-bold text-sky-100 flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span>PREVIEW · local card · not your real standings</span>
+            <Link href="/founder#eyes" className="underline">
+              Foundry eyes
             </Link>
+            <button
+              type="button"
+              className="underline font-extrabold"
+              onClick={() => {
+                void import("@/lib/creator-eyes").then((m) => {
+                  m.setCreatorEyesMode("off");
+                  window.location.href = "/founder#eyes";
+                });
+              }}
+            >
+              Exit → Foundry
+            </button>
           </div>
         )}
 

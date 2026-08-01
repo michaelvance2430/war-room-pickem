@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
-import { getSession, isOps } from "@/lib/league";
+import { getSession, getLeague, isOps } from "@/lib/league";
 import {
   countByDivision,
   pickLeastPopulatedDivision,
@@ -74,6 +74,21 @@ export async function setLeagueActiveWeek(
   const session = getSession();
   if (!session?.leagueId || !isOps()) {
     return { ok: false, error: "Commissioner or deputy required" };
+  }
+  // Eyes: only move local preview week — never leagues.current_week
+  try {
+    const eyes = await import("./creator-eyes");
+    if (eyes.isEyesLocalPlayActive()) {
+      try {
+        localStorage.setItem("warroom-active-week", String(weekNumber));
+      } catch {
+        /* ignore */
+      }
+      eyes.applyEyesWeek(weekNumber);
+      return { ok: true };
+    }
+  } catch {
+    /* real path */
   }
   const supabase = createClient();
   const { error } = await supabase
@@ -210,6 +225,40 @@ export async function publishWeekCard(opts: {
   }
   if (opts.games.length !== 5) {
     return { ok: false, error: "Select exactly 5 games" };
+  }
+
+  // Creator eyes: never publish to the real room — local demo card only
+  try {
+    const eyes = await import("./creator-eyes");
+    if (eyes.isEyesLocalPlayActive()) {
+      const key = eyes.eyesCardStorageKey(opts.weekNumber);
+      const stamped = opts.games.map((g, i) => {
+        if (g.commenceTime) return g;
+        const t = new Date(Date.now() + (3 + i) * 3600 * 1000);
+        return {
+          ...g,
+          commenceTime: t.toISOString(),
+          startTime: t.toISOString(),
+        };
+      });
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          games: stamped,
+          prop: opts.prop,
+          weekNumber: opts.weekNumber,
+          eyes: true,
+          publishedAt: new Date().toISOString(),
+        })
+      );
+      return {
+        ok: true,
+        weekCardId: `eyes-card-w${opts.weekNumber}`,
+        games: stamped,
+      };
+    }
+  } catch {
+    /* fall through — real publish */
   }
 
   const supabase = createClient();
@@ -514,7 +563,8 @@ export async function savePicksToCloud(opts: {
   try {
     const { isGuestMode } = await import("./guest-mode");
     const eyes = await import("./creator-eyes");
-    const localPlay = isGuestMode() || eyes.isEyesLocalPlayActive();
+    const eyesOn = eyes.isEyesLocalPlayActive();
+    const localPlay = isGuestMode() || eyesOn;
     if (localPlay) {
       const pickList = Object.values(opts.picks);
       if (!pickList.length) return { ok: false, error: "No picks to save" };
@@ -525,34 +575,41 @@ export async function savePicksToCloud(opts: {
         lockedAt: new Date().toISOString(),
         isChaos: !!opts.isChaos,
       };
-      const key = eyes.isEyesLocalPlayActive()
+      const key = eyesOn
         ? eyes.eyesPicksStorageKey(opts.weekNumber)
         : `warroom-picks-week-${opts.weekNumber}`;
       localStorage.setItem(key, JSON.stringify(payload));
-      if (opts.isChaos) {
+      // Eyes preview must not bank real cheevos / progressive / chaos uses
+      if (!eyesOn) {
+        if (opts.isChaos) {
+          try {
+            const { spendChaosUse, CHAOS_BADGE_ID } = await import(
+              "./chaos-mode"
+            );
+            spendChaosUse(opts.weekNumber, session.leagueId, session.playerId);
+            const { grantPermanentBadgeId } = await import(
+              "./permanent-badges"
+            );
+            grantPermanentBadgeId(session.playerId, CHAOS_BADGE_ID);
+          } catch {
+            /* ignore */
+          }
+        }
         try {
-          const { spendChaosUse, CHAOS_BADGE_ID } = await import("./chaos-mode");
-          spendChaosUse(opts.weekNumber, session.leagueId, session.playerId);
-          const { grantPermanentBadgeId } = await import("./permanent-badges");
-          grantPermanentBadgeId(session.playerId, CHAOS_BADGE_ID);
+          const { markHasLockedPicksOnce } = await import("./first-week");
+          markHasLockedPicksOnce(session.playerId);
         } catch {
           /* ignore */
         }
-      }
-      try {
-        const { markHasLockedPicksOnce } = await import("./first-week");
-        markHasLockedPicksOnce(session.playerId);
-      } catch {
-        /* ignore */
-      }
-      try {
-        const { markEngagement } = await import("./engagement");
-        const hour = new Date().getHours();
-        if (hour >= 22 || hour < 5) {
-          markEngagement(session.playerId, "locked_after_22");
+        try {
+          const { markEngagement } = await import("./engagement");
+          const hour = new Date().getHours();
+          if (hour >= 22 || hour < 5) {
+            markEngagement(session.playerId, "locked_after_22");
+          }
+        } catch {
+          /* ignore */
         }
-      } catch {
-        /* ignore */
       }
       return { ok: true, firstFinal: "ignored" };
     }
@@ -869,12 +926,16 @@ export type WeekBoardSlip = {
   totalPoints: number | null;
   /** Chaos Mode this week — flames on the name */
   isChaos?: boolean;
+  /** profiles.last_seen_at — last app open (CFB + NFL) */
+  lastSeenAt?: string | null;
 };
 
 /**
- * Everyone's locked slips for a week.
+ * Everyone's locked slips for a week — humans and bots equally.
  * Opens after first kickoff (card locked) or after scoring
  * (RLS: picks-reveal-after-lock.sql). Secret until then.
+ *
+ * Filler bots are full competitors: never omit is_bot seats from slips.
  */
 export async function loadLeagueWeekBoard(weekNumber: number): Promise<{
   ok: boolean;
@@ -1002,17 +1063,19 @@ export async function loadLeagueWeekBoard(weekNumber: number): Promise<{
     );
     const slips: WeekBoardSlip[] = [];
 
+    // Every member with a seat — humans and bots play the same game.
+    // Never skip is_bot on The Board (filler bots must show under teams).
     for (const m of members || []) {
-      if (m.is_bot) continue;
       const userId = m.user_id as string;
+      const isBot = !!m.is_bot;
       const profile = m.profiles as { display_name?: string } | null;
-      const name = profile?.display_name || "Player";
+      const name = profile?.display_name || (isBot ? "Bot" : "Player");
       const pick = pickByUser.get(userId);
       if (!pick) {
         slips.push({
           userId,
           name,
-          isBot: false,
+          isBot,
           picks: {},
           bestBetId: null,
           propChoice: null,
@@ -1034,7 +1097,7 @@ export async function loadLeagueWeekBoard(weekNumber: number): Promise<{
       slips.push({
         userId,
         name,
-        isBot: false,
+        isBot,
         picks: gamesByPick.get(pick.id as string) || {},
         bestBetId: (pick.best_bet_game_id as string) || null,
         propChoice: (pick.prop_choice as string) || null,
@@ -1045,13 +1108,38 @@ export async function loadLeagueWeekBoard(weekNumber: number): Promise<{
       });
     }
 
-    // Sort: most points first, then name
+    // Same sort for everyone: week points, then name (no human/bot demotion)
     slips.sort((a, b) => {
       const pa = a.totalPoints ?? -1;
       const pb = b.totalPoints ?? -1;
       if (pb !== pa) return pb - pa;
       return a.name.localeCompare(b.name);
     });
+
+    // Attach last_seen for CFB + NFL boards (same profiles table)
+    try {
+      const ids = [...new Set(slips.map((s) => s.userId).filter(Boolean))];
+      if (ids.length) {
+        const { data: seenRows } = await supabase
+          .from("profiles")
+          .select("id, last_seen_at")
+          .in("id", ids);
+        if (seenRows?.length) {
+          const seen = new Map<string, string | null>();
+          for (const row of seenRows) {
+            seen.set(
+              row.id as string,
+              (row.last_seen_at as string | null) || null
+            );
+          }
+          for (const s of slips) {
+            s.lastSeenAt = seen.get(s.userId) ?? null;
+          }
+        }
+      }
+    } catch {
+      /* optional */
+    }
 
     return { ok: true, slips, scored, lockedOpen };
   } catch (e: unknown) {
@@ -1215,10 +1303,11 @@ export async function loadWeekNoLockNames(
 
     const ghosts: string[] = [];
     for (const m of members) {
-      if (m.is_bot) continue;
+      // Bots play like humans — milk carton if they never locked a full card
       const userId = m.user_id as string;
       const profile = m.profiles as { display_name?: string } | null;
-      const name = profile?.display_name || "Player";
+      const name =
+        profile?.display_name || (!!m.is_bot ? "Bot" : "Player");
       const pick = pickByUser.get(userId);
       const gamePickCount = pick
         ? countByPickId.get(pick.id as string) || 0
@@ -1298,7 +1387,49 @@ export async function postMissingPicksAnnouncement(
   return { ok: true, missingCount: incomplete.length };
 }
 
-/** Weeks that already have a week_results row (scored). */
+/**
+ * Remove a week's score mark (week_results + game_results).
+ * Commissioner dry-run / accidental Founder score cleanup.
+ * Does not delete the published card or player picks.
+ */
+export async function clearWeekScoreInCloud(
+  weekNumber: number
+): Promise<{ ok: boolean; error?: string }> {
+  const session = getSession();
+  if (!session?.leagueId || !session.isCommissioner) {
+    return { ok: false, error: "Commissioner only" };
+  }
+  try {
+    const supabase = createClient();
+    const { data: wr } = await supabase
+      .from("week_results")
+      .select("id")
+      .eq("league_id", session.leagueId)
+      .eq("week_number", weekNumber)
+      .maybeSingle();
+    if (wr?.id) {
+      await supabase.from("game_results").delete().eq("week_result_id", wr.id);
+      await supabase.from("week_results").delete().eq("id", wr.id);
+    }
+    try {
+      localStorage.removeItem(`warroom-results-week-${weekNumber}`);
+    } catch {
+      /* ignore */
+    }
+    return { ok: true };
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "Could not clear week score",
+    };
+  }
+}
+
+/**
+ * Weeks that are truly scored (host finalized results).
+ * Requires a week_results row WITH at least one game_results line —
+ * empty shells (score clicked with 0 locked picks) must not strike the pill.
+ */
 export async function listScoredWeekNumbers(): Promise<number[]> {
   try {
     const { isGuestMode } = await import("./guest-mode");
@@ -1315,10 +1446,32 @@ export async function listScoredWeekNumbers(): Promise<number[]> {
     const supabase = createClient();
     const { data, error } = await supabase
       .from("week_results")
-      .select("week_number")
+      .select("id, week_number")
       .eq("league_id", session.leagueId);
-    if (error || !data) return [];
+    if (error || !data?.length) return [];
+
+    const ids = data.map((r) => r.id as string).filter(Boolean);
+    if (!ids.length) return [];
+
+    const { data: gr, error: grErr } = await supabase
+      .from("game_results")
+      .select("week_result_id")
+      .in("week_result_id", ids);
+
+    // If game_results query fails (table missing), fall back to any week_results
+    if (grErr) {
+      return data
+        .map((r) => Number(r.week_number))
+        .filter((n) => !Number.isNaN(n))
+        .sort((a, b) => a - b);
+    }
+
+    const withGames = new Set(
+      (gr || []).map((g) => g.week_result_id as string)
+    );
+    // Only weeks that actually have ATS winners recorded
     return data
+      .filter((r) => withGames.has(r.id as string))
       .map((r) => Number(r.week_number))
       .filter((n) => !Number.isNaN(n))
       .sort((a, b) => a - b);
@@ -1384,50 +1537,41 @@ export async function saveResultsAndScoreWeek(opts: {
     return { ok: false, scoredCount: 0, error: "Commissioner or deputy only" };
   }
 
+  // Eyes preview must never score the real league
+  try {
+    const eyes = await import("./creator-eyes");
+    if (eyes.isEyesLocalPlayActive()) {
+      return {
+        ok: false,
+        scoredCount: 0,
+        error:
+          "PREVIEW mode — scoring is blocked for the real room. Exit eyes (→ Foundry) first, or use Foundry playground post/score on the live room.",
+      };
+    }
+  } catch {
+    /* continue */
+  }
+
   const supabase = createClient();
   const leagueId = session.leagueId;
   const weekNumber = opts.weekNumber;
 
-  const { data: existingRes } = await supabase
-    .from("week_results")
-    .select("id")
-    .eq("league_id", leagueId)
-    .eq("week_number", weekNumber)
-    .maybeSingle();
-
-  let weekResultId: string;
-  if (existingRes?.id) {
-    weekResultId = existingRes.id;
-    await supabase
-      .from("week_results")
-      .update({ prop_result: opts.propResult, scored_at: new Date().toISOString() })
-      .eq("id", weekResultId);
-    await supabase.from("game_results").delete().eq("week_result_id", weekResultId);
-  } else {
-    const { data: wr, error } = await supabase
-      .from("week_results")
-      .insert({ league_id: leagueId, week_number: weekNumber, prop_result: opts.propResult })
-      .select("id")
-      .single();
-    if (error || !wr) {
-      return { ok: false, scoredCount: 0, error: error?.message || "Failed to save results" };
-    }
-    weekResultId = wr.id;
-  }
-
-  const resultRows = opts.games
+  // ATS winners required before writing
+  const resultRowsPreview = opts.games
     .filter((g) => opts.results[g.id]?.winner)
     .map((g) => ({
-      week_result_id: weekResultId,
       card_game_id: g.id,
       winner: opts.results[g.id].winner as string,
     }));
-
-  if (resultRows.length) {
-    const { error } = await supabase.from("game_results").insert(resultRows);
-    if (error) return { ok: false, scoredCount: 0, error: error.message };
+  if (!resultRowsPreview.length) {
+    return {
+      ok: false,
+      scoredCount: 0,
+      error: "Enter a cover (home/away/push) for each game before scoring.",
+    };
   }
 
+  // Picks first — never create week_results if nobody locked (false "done" pill)
   let allPicks: Record<string, unknown>[] | null = null;
   {
     const res = await supabase
@@ -1451,7 +1595,62 @@ export async function saveResultsAndScoreWeek(opts: {
     }
   }
   if (!allPicks?.length) {
-    return { ok: true, scoredCount: 0, error: "No locked picks found for this week yet" };
+    return {
+      ok: false,
+      scoredCount: 0,
+      error:
+        "No locked picks for this week yet — fill the room (or bot picks) before scoring. Week will not be marked done.",
+    };
+  }
+
+  const { data: existingRes } = await supabase
+    .from("week_results")
+    .select("id")
+    .eq("league_id", leagueId)
+    .eq("week_number", weekNumber)
+    .maybeSingle();
+
+  let weekResultId: string;
+  if (existingRes?.id) {
+    weekResultId = existingRes.id;
+    await supabase
+      .from("week_results")
+      .update({
+        prop_result: opts.propResult,
+        scored_at: new Date().toISOString(),
+      })
+      .eq("id", weekResultId);
+    await supabase.from("game_results").delete().eq("week_result_id", weekResultId);
+  } else {
+    const { data: wr, error } = await supabase
+      .from("week_results")
+      .insert({
+        league_id: leagueId,
+        week_number: weekNumber,
+        prop_result: opts.propResult,
+        scored_at: new Date().toISOString(),
+      })
+      .select("id")
+      .single();
+    if (error || !wr) {
+      return {
+        ok: false,
+        scoredCount: 0,
+        error: error?.message || "Failed to save results",
+      };
+    }
+    weekResultId = wr.id;
+  }
+
+  const resultRows = resultRowsPreview.map((r) => ({
+    week_result_id: weekResultId,
+    card_game_id: r.card_game_id,
+    winner: r.winner,
+  }));
+
+  {
+    const { error } = await supabase.from("game_results").insert(resultRows);
+    if (error) return { ok: false, scoredCount: 0, error: error.message };
   }
 
   const details: { name: string; points: number }[] = [];
@@ -1668,7 +1867,7 @@ export async function loadLeaguePlayers(): Promise<
     /* fall through */
   }
   const cloud = await loadLeagueStandings();
-  return cloud.map((c) => ({
+  const players: import("./types").Player[] = cloud.map((c) => ({
     id: c.userId,
     name: c.name,
     division: (c.division as import("./types").Player["division"]) || "North",
@@ -1686,6 +1885,31 @@ export async function loadLeaguePlayers(): Promise<
     propTotal: c.propTotal,
     weeksPlayed: c.weeksPlayed,
   }));
+
+  // Attach last_seen_at so Standings / Stats can show "last in"
+  try {
+    const ids = [...new Set(players.map((p) => p.id).filter(Boolean))];
+    if (!ids.length) return players;
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, last_seen_at")
+      .in("id", ids);
+    if (error || !data?.length) return players;
+    const seen = new Map<string, string | null>();
+    for (const row of data) {
+      seen.set(
+        row.id as string,
+        (row.last_seen_at as string | null) || null
+      );
+    }
+    return players.map((p) => ({
+      ...p,
+      lastSeenAt: seen.get(p.id) ?? null,
+    }));
+  } catch {
+    return players;
+  }
 }
 
 export type LeagueRosterMember = {
@@ -2910,7 +3134,66 @@ export type ResetSeasonResult = {
   picksDeleted?: number;
   cardsDeleted?: number;
   resultsDeleted?: number;
+  /** Decade-room framing: same league, new board */
+  nextSeasonReady?: boolean;
+  message?: string;
 };
+
+/**
+ * Start the next season in the SAME league (decade clubhouse).
+ *
+ * Wipes the live board (cards, picks, results, season stats, this season's
+ * Gazette / Crystal Ball / locker noise). Keeps:
+ *  - league id, code, name, settings, commissioner
+ *  - every membership (humans + bots until host clears)
+ *  - Trophy Room engravings (multi-year hardware)
+ *  - Museum / career permanence outside this season's board
+ *
+ * This is the intentional year-over-year path — not "delete league."
+ */
+export async function startNextSeasonInCloud(): Promise<ResetSeasonResult> {
+  const session = getSession();
+  if (!session?.leagueId || !session.isCommissioner) {
+    return {
+      ok: false,
+      error: "Only the commissioner can start the next season",
+    };
+  }
+
+  // Stamp room loyalty for humans who finished enough weeks before wipe
+  try {
+    const scored = await listScoredWeekNumbers();
+    if (scored.length >= 6) {
+      const roster = await loadLeagueRoster();
+      const { recordSeasonInLeague } = await import("./league-seasons");
+      const { defaultSeasonYear } = await import("./trophies");
+      const year = defaultSeasonYear();
+      const league = getLeague();
+      for (const m of roster) {
+        if (m.isBot) continue;
+        recordSeasonInLeague({
+          playerId: m.userId,
+          leagueId: session.leagueId,
+          seasonYear: year,
+          code: league?.code,
+          weeksPlayed: scored.length,
+        });
+      }
+    }
+  } catch {
+    /* loyalty stamp optional */
+  }
+
+  const result = await resetSeasonInCloud();
+  if (!result.ok) return result;
+
+  return {
+    ...result,
+    nextSeasonReady: true,
+    message:
+      "Next season is open in this same room. Players, code, and Trophy Room stay. Publish a card when you're ready.",
+  };
+}
 
 /**
  * Client-side wipe when RPC is missing or incomplete.
