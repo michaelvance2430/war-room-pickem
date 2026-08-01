@@ -658,12 +658,20 @@ export default function AccountPage() {
                 </Link>
               )}
               {userId && isAppCreator(userId) && (
-                <p className="text-xs text-yellow-500 font-medium">
-                  👑 The Creator legendary is active — gold on your profile, and
-                  your nameplate defaults to{" "}
-                  <span className="font-black uppercase">The Creator</span>{" "}
-                  {name || "Mike V."}. Peasants stay grey.
-                </p>
+                <div className="space-y-2">
+                  <p className="text-xs text-yellow-500 font-medium">
+                    👑 The Creator legendary is active — gold on your profile, and
+                    your nameplate defaults to{" "}
+                    <span className="font-black uppercase">The Creator</span>{" "}
+                    {name || "Mike V."}. Peasants stay grey.
+                  </p>
+                  <Link
+                    href="/founder"
+                    className="inline-block text-xs font-semibold text-primary hover:underline"
+                  >
+                    Founder Dashboard (cockpit) →
+                  </Link>
+                </div>
               )}
               {userId && !isAppCreator(userId) && (
                 <div className="rounded-lg border border-yellow-500/40 bg-yellow-500/10 px-3 py-2 space-y-2">
