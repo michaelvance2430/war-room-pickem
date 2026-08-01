@@ -28,7 +28,9 @@ export default function CrystalBallPage() {
   const [crownTeam, setCrownTeam] = useState("");
   const [crowning, setCrowning] = useState(false);
 
-  const teams = useMemo(() => crystalBallTeams(), []);
+  const sportId = getLeague()?.sportId || "cfb";
+  const nfl = sportId === "nfl";
+  const teams = useMemo(() => crystalBallTeams(sportId), [sportId]);
 
   async function reload() {
     const s = await loadCrystalBall();
@@ -94,7 +96,9 @@ export default function CrystalBallPage() {
     if (!crownTeam || crowning) return;
     if (
       !confirm(
-        `Crown ${crownTeam} as national champion and hand out Witch/Wizard badges?`
+        nfl
+          ? `Crown ${crownTeam} as Super Bowl champion and hand out Witch/Wizard badges?`
+          : `Crown ${crownTeam} as national champion and hand out Witch/Wizard badges?`
       )
     ) {
       return;
@@ -174,8 +178,10 @@ export default function CrystalBallPage() {
           </div>
           <p className="text-sm text-muted leading-relaxed">
             Before the first kickoff, pick who wins the{" "}
-            <strong className="text-foreground">national championship</strong>.
-            No standings points. If you&apos;re right, you get a sarcastic
+            <strong className="text-foreground">
+              {nfl ? "Super Bowl" : "national championship"}
+            </strong>
+            . No standings points. If you&apos;re right, you get a sarcastic
             achievement and eternal bragging rights.
           </p>
         </div>
@@ -257,7 +263,9 @@ export default function CrystalBallPage() {
 
         {/* Your pick */}
         <section className="rounded-xl border border-border bg-card p-5 mb-6">
-          <h2 className="font-semibold mb-1">Your national champ</h2>
+          <h2 className="font-semibold mb-1">
+            {nfl ? "Your Super Bowl pick" : "Your national champ"}
+          </h2>
           <p className="text-xs text-muted mb-3">
             {state.locked
               ? state.myTeam
@@ -387,9 +395,12 @@ export default function CrystalBallPage() {
               Commissioner · Crown champion
             </h2>
             <p className="text-xs text-muted mb-3">
-              After the title game, set the real national champion. Correct
+              After the title game, set the real{" "}
+              {nfl ? "Super Bowl champion" : "national champion"}. Correct
               Crystal Ball picks get{" "}
-              <strong className="text-foreground">Village Witch / Wizard Nerd</strong>{" "}
+              <strong className="text-foreground">
+                Village Witch / Wizard Nerd
+              </strong>{" "}
               — still zero points.
             </p>
             <select
@@ -397,7 +408,9 @@ export default function CrystalBallPage() {
               onChange={(e) => setCrownTeam(e.target.value)}
               className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm mb-3"
             >
-              <option value="">Select champion…</option>
+              <option value="">
+                {nfl ? "Select Super Bowl champ…" : "Select champion…"}
+              </option>
               {teams.map((t) => (
                 <option key={t.name} value={t.name}>
                   {t.name} ({t.conference})

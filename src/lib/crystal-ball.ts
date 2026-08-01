@@ -6,6 +6,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { getSession, getLeague } from "@/lib/league";
 import { listFbsTeams } from "@/lib/fbs-teams";
+import { listNflPrideTeams } from "@/lib/nfl-teams";
 
 export type CrystalBallPick = {
   userId: string;
@@ -117,7 +118,24 @@ export async function resolveCrystalBallLock(
   };
 }
 
-export function crystalBallTeams() {
+/**
+ * Pride-pick roster for Crystal Ball / Super Bowl flex.
+ * NFL leagues get 32 pro teams — never the FBS list.
+ */
+export function crystalBallTeams(sportId?: string | null): {
+  name: string;
+  conference: string;
+}[] {
+  const sid =
+    sportId ??
+    (() => {
+      try {
+        return getLeague()?.sportId;
+      } catch {
+        return null;
+      }
+    })();
+  if (sid === "nfl") return listNflPrideTeams();
   return listFbsTeams();
 }
 
