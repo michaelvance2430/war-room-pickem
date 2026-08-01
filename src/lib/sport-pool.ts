@@ -31,7 +31,28 @@ function sqlMissing(msg: string): boolean {
 }
 
 export function sportPoolSqlHint(): string {
-  return "Sport pool polls need supabase/sport-pool-polls.sql run once in Supabase.";
+  return (
+    "One-time setup: open Supabase → SQL Editor → paste & run " +
+    "supabase/sport-pool-polls.sql (in the repo). Then hard-refresh this page."
+  );
+}
+
+/** Humans in the source room who should answer (non-bots). */
+export async function countSourceLeagueHumans(
+  leagueId: string
+): Promise<number> {
+  if (!hasSupabaseConfig() || !leagueId) return 0;
+  const supabase = createClient();
+  try {
+    const { data, error } = await supabase
+      .from("memberships")
+      .select("user_id, is_bot")
+      .eq("league_id", leagueId);
+    if (error || !data) return 0;
+    return data.filter((r) => !(r as { is_bot?: boolean }).is_bot).length;
+  } catch {
+    return 0;
+  }
 }
 
 function generateCode(): string {
@@ -90,7 +111,22 @@ export async function createSportPoolPoll(opts: {
     return { ok: false, error: error.message };
   }
 
-  return { ok: true, poll: mapPoll(data) };
+  const poll = mapPoll(data);
+  // Host is always a yes — seats themselves when the room spins up
+  try {
+    await supabase.from("sport_pool_votes").upsert(
+      {
+        poll_id: poll.id,
+        user_id: session.playerId,
+        response: "yes",
+      },
+      { onConflict: "poll_id,user_id" }
+    );
+  } catch {
+    /* vote table may still be missing if partial SQL */
+  }
+
+  return { ok: true, poll };
 }
 
 function mapPoll(raw: Record<string, unknown>): SportPoolPoll {
@@ -356,39 +392,36 @@ export async function spinUpLeagueFromPoll(opts: {
   const leagueId = (league as { id: string }).id;
   const divisions = ["North", "South", "East", "West"] as const;
   let di = 0;
+  let seated = 0;
+  const finalComm =
+    opts.newCommissionerId?.trim() &&
+    opts.newCommissionerId !== session.playerId &&
+    yesIds.has(opts.newCommissionerId)
+      ? opts.newCommissionerId
+      : session.playerId;
+
   for (const uid of seatList) {
-    const role =
-      uid === session.playerId ? "commissioner" : "player";
+    const role = uid === finalComm ? "commissioner" : "player";
     const { error: mErr } = await supabase.from("memberships").insert({
       league_id: leagueId,
       user_id: uid,
       role,
       division: divisions[di % 4],
+      total_points: 0,
+      weeks_played: 0,
     });
     di++;
-    if (mErr && !/duplicate|unique/i.test(mErr.message || "")) {
-      // continue seating others
+    if (!mErr) seated += 1;
+    else if (!/duplicate|unique/i.test(mErr.message || "")) {
       console.warn("seat failed", uid, mErr.message);
     }
   }
 
-  // Optional: hand the gavel to someone who said yes
-  const newComm = opts.newCommissionerId?.trim();
-  if (newComm && newComm !== session.playerId && yesIds.has(newComm)) {
+  if (finalComm !== session.playerId) {
     await supabase
       .from("leagues")
-      .update({ commissioner_id: newComm })
+      .update({ commissioner_id: finalComm })
       .eq("id", leagueId);
-    await supabase
-      .from("memberships")
-      .update({ role: "player" })
-      .eq("league_id", leagueId)
-      .eq("user_id", session.playerId);
-    await supabase
-      .from("memberships")
-      .update({ role: "commissioner" })
-      .eq("league_id", leagueId)
-      .eq("user_id", newComm);
   }
 
   await supabase
@@ -405,7 +438,7 @@ export async function spinUpLeagueFromPoll(opts: {
     leagueId,
     code: (league as { code: string }).code || code,
     leagueName: name,
-    seated: seatList.length,
+    seated,
     sportId,
   };
 }
