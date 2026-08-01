@@ -7,10 +7,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import {
-  formatGazetteShareText,
-  type GazetteEdition,
-} from "@/lib/gazette";
+import type { GazetteEdition } from "@/lib/gazette";
+import GazetteShareSheet from "@/components/GazetteShareSheet";
 
 type Props = {
   edition: GazetteEdition;
@@ -69,32 +67,7 @@ export default function GazettePaper({
   className = "",
 }: Props) {
   const edition = normalizeEdition(raw);
-  const [shareStatus, setShareStatus] = useState<string | null>(null);
-
-  async function sharePaper() {
-    const text = formatGazetteShareText(edition);
-    try {
-      if (typeof navigator !== "undefined" && navigator.share) {
-        await navigator.share({
-          title: edition.masthead,
-          text,
-        });
-        setShareStatus("Shared to the chat 🔥");
-        setTimeout(() => setShareStatus(null), 2500);
-        return;
-      }
-    } catch (e: unknown) {
-      if (e instanceof Error && /Abort|cancel/i.test(e.message)) return;
-    }
-    try {
-      await navigator.clipboard.writeText(text);
-      setShareStatus("Copied — paste in the group chat");
-      setTimeout(() => setShareStatus(null), 3000);
-    } catch {
-      setShareStatus("Couldn’t share — screenshot it");
-      setTimeout(() => setShareStatus(null), 3000);
-    }
-  }
+  const [shareOpen, setShareOpen] = useState(false);
 
   return (
     <div
@@ -395,12 +368,6 @@ export default function GazettePaper({
             ? "You only see this splash once per scored week. Archive lives under Gazette anytime."
             : "Filed forever in the archive. Share it. Frame it. Deny it."}
         </p>
-
-        {shareStatus && (
-          <p className="text-xs text-center font-bold text-emerald-800">
-            {shareStatus}
-          </p>
-        )}
       </div>
 
       {/* Actions */}
@@ -413,11 +380,19 @@ export default function GazettePaper({
       >
         <button
           type="button"
-          onClick={() => void sharePaper()}
+          onClick={() => setShareOpen(true)}
           className="w-full py-3.5 min-h-[52px] rounded-xl bg-red-700 text-[#f4f0e6] text-sm font-black uppercase tracking-wide touch-manipulation active:scale-[0.99]"
         >
           Share this edition
         </button>
+        <p className="text-[10px] text-stone-500 text-center leading-snug -mt-0.5">
+          Newspaper graphic · IG / FB / chat · War Room flex
+        </p>
+        <GazetteShareSheet
+          edition={edition}
+          open={shareOpen}
+          onClose={() => setShareOpen(false)}
+        />
         {variant === "modal" && (
           <div className="flex flex-col sm:flex-row gap-2">
             <button

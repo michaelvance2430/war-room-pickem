@@ -1307,7 +1307,11 @@ export function formatGazetteShareText(edition: GazetteEdition): string {
     }
   }
   lines.push(`— ${edition.pullQuote.text}`, `   — ${edition.pullQuote.by}`);
-  lines.push("", "War Room Pick'Em · don't ghost next week");
+  lines.push(
+    "",
+    "War Room Pick'Em · friend leagues · confidence · Best Bet · Toilet Bowl",
+    "Don't ghost next week."
+  );
   return lines.filter((l) => l != null).join("\n");
 }
 
