@@ -323,7 +323,8 @@ export default function FounderDashboardPage() {
           {/* B — Run a week */}
           <div className="space-y-2">
             <p className="text-[10px] font-bold uppercase tracking-wide text-muted">
-              2 · Run week {week} (real league)
+              2 · Run week {week} ·{" "}
+              <span className="text-amber-300">REAL ROOM</span> (writes standings)
             </p>
             <button
               type="button"
@@ -399,7 +400,8 @@ export default function FounderDashboardPage() {
           {/* D — Eyes */}
           <div className="space-y-2">
             <p className="text-[10px] font-bold uppercase tracking-wide text-muted">
-              4 · Wear their eyes (week {week})
+              4 · Wear their eyes (week {week}) ·{" "}
+              <span className="text-sky-300">PREVIEW only</span>
             </p>
             {eyes !== "off" && (
               <div className="rounded-lg border border-sky-400/40 bg-sky-500/10 px-3 py-2 text-xs">
@@ -471,8 +473,11 @@ export default function FounderDashboardPage() {
           </div>
 
           <p className="text-[10px] text-muted leading-relaxed border-t border-border pt-3">
-            Tip: ⚡ Post + score → open Gazette & Board. Then “As new player” on
-            week 1 vs week 3 to feel progressive unlock. Exit eyes when done.
+            <strong className="text-foreground">REAL ROOM</strong> = amber
+            buttons (cloud standings).{" "}
+            <strong className="text-foreground">PREVIEW</strong> = eyes mode
+            (local picks only). Tip: ⚡ Post + score → Gazette & Board → then
+            wear player eyes on week 1 vs 3.
           </p>
         </section>
 

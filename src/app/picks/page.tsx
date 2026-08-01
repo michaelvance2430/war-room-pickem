@@ -47,6 +47,13 @@ import {
   isWeekChaosForUser,
   spendChaosUse,
 } from "@/lib/chaos-mode";
+import { canSurfaceChaosMode } from "@/lib/first-week";
+import {
+  isQuietPicksPath,
+  quietPicksBonusHint,
+  quietPicksIntro,
+} from "@/lib/picks-progressive";
+import { isEyesLocalPlayActive } from "@/lib/creator-eyes";
 
 function formatSpread(
   spread: number,
@@ -110,6 +117,10 @@ export default function PicksPage() {
     weekNumber: number;
     pointsRemoved?: number;
   } | null>(null);
+  /** First-time path: quieter chrome until first lock */
+  const [quietPicks, setQuietPicks] = useState(true);
+  const [bonusOpen, setBonusOpen] = useState(false);
+  const [eyesPreview, setEyesPreview] = useState(false);
 
   const revisionRef = useRef<string>("");
   const viewWeekRef = useRef(1);
@@ -817,6 +828,16 @@ export default function PicksPage() {
     propChoice !== null &&
     bestBetId !== null;
 
+  // Keep quiet mode in sync (unlocks after first lock)
+  useEffect(() => {
+    setQuietPicks(isQuietPicksPath());
+    try {
+      setEyesPreview(isEyesLocalPlayActive());
+    } catch {
+      setEyesPreview(false);
+    }
+  }, [saved, loaded, fullyLocked]);
+
   // Walk-the-dog tutorial: card filled → coach advances to Save
   useEffect(() => {
     if (!allGamesPicked) return;
@@ -877,14 +898,33 @@ export default function PicksPage() {
       )}
 
       <main className="flex-1 max-w-3xl mx-auto w-full px-3 sm:px-4 py-5 sm:py-8 phone-picks-main">
-        {/* Chaos Mode — mid-season spice (week 2+); not a first-week teach */}
+        {eyesPreview && (
+          <div className="mb-4 rounded-lg border border-sky-400/50 bg-sky-500/15 px-3 py-2 text-xs font-bold text-sky-100">
+            PREVIEW · local card · not your real standings ·{" "}
+            <Link href="/founder" className="underline">
+              Founder
+            </Link>
+          </div>
+        )}
+
+        {quietPicks && weekEditable && hasCard && !cardFrozen && (
+          <div className="mb-4 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-xs text-muted leading-relaxed">
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary mb-1">
+              First lock · keep it simple
+            </p>
+            <p className="text-foreground/90">{quietPicksIntro()}</p>
+          </div>
+        )}
+
+        {/* Chaos Mode — mid-season spice (week 2+); hide on quiet first path */}
         {weekEditable &&
           hasCard &&
           !cardFrozen &&
           !missedLockWindow &&
-          (chaosArmed ||
-            chaosLockedWeek ||
-            activeWeek >= 2) && (
+          !quietPicks &&
+          canSurfaceChaosMode(activeWeek, {
+            alreadyChaosThisWeek: chaosArmed || chaosLockedWeek,
+          }) && (
           <div className="rounded-xl border-2 border-orange-500/50 bg-gradient-to-br from-orange-950/50 via-red-950/30 to-black/40 px-4 py-3 mb-4">
             <p className="text-[10px] font-black uppercase tracking-[0.18em] text-orange-300 mb-1">
               🤖 Chaos Mode · pure RNG
@@ -1513,48 +1553,80 @@ export default function PicksPage() {
                 !canEditProp ? "border-border opacity-95" : "border-border"
               }`}
             >
-              <div className="flex items-center justify-between gap-2 mb-1">
-                <div className="text-xs text-muted">
-                  Weekly Prop • {prop.points} pts
+              <button
+                type="button"
+                className="w-full flex items-center justify-between gap-2 text-left"
+                onClick={() => setBonusOpen((o) => !o)}
+                disabled={!quietPicks}
+              >
+                <div>
+                  <div className="text-xs text-muted">
+                    {quietPicks ? "Bonus" : "Weekly Prop"} · {prop.points} pts
+                    {propChoice ? (
+                      <span className="text-primary font-semibold"> · set</span>
+                    ) : quietPicks ? (
+                      <span className="text-warning"> · needed</span>
+                    ) : null}
+                  </div>
+                  {(!quietPicks || bonusOpen || propChoice) && (
+                    <div className="font-medium mt-1 leading-snug">
+                      {prop.question}
+                    </div>
+                  )}
                 </div>
+                {quietPicks && (
+                  <span className="text-xs text-primary font-bold shrink-0">
+                    {bonusOpen || propChoice ? "Hide" : "Open"}
+                  </span>
+                )}
                 {!canEditProp && (
                   <span className="text-[10px] font-bold uppercase tracking-wide text-muted border border-border px-1.5 py-0.5 rounded">
                     Locked
                   </span>
                 )}
-              </div>
-              <div className="font-medium mb-3 leading-snug">{prop.question}</div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {prop.options.map((opt) => (
-                  <button
-                    key={opt}
-                    type="button"
-                    disabled={!canEditProp || chaosArmed || chaosLockedWeek}
-                    onClick={() => {
-                      if (!canEditProp || chaosArmed || chaosLockedWeek) return;
-                      setSaved(false);
-                      setPropChoice(opt);
-                    }}
-                    className={`min-h-[52px] p-3.5 rounded-lg border text-base sm:text-sm transition touch-manipulation disabled:cursor-not-allowed ${
-                      propChoice === opt
-                        ? "border-primary bg-primary/15 text-primary font-semibold ring-2 ring-primary/40"
-                        : "border-border hover:border-muted disabled:opacity-70"
-                    }`}
-                  >
-                    {propChoice === opt ? "✓ " : ""}
-                    {opt}
-                  </button>
-                ))}
-              </div>
-              {weekEditable && propLockedNow && (
+              </button>
+              {quietPicks && !bonusOpen && !propChoice && (
                 <p className="text-[11px] text-muted mt-2">
-                  Prop locked at the first kickoff on this card.
+                  {quietPicksBonusHint()}
                 </p>
               )}
-              {weekEditable && canEditProp && !propChoice && (
-                <p className="text-[11px] text-warning mt-2">
-                  Tap one answer, then Lock it in.
-                </p>
+              {(!quietPicks || bonusOpen || !!propChoice) && (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                    {prop.options.map((opt) => (
+                      <button
+                        key={opt}
+                        type="button"
+                        disabled={!canEditProp || chaosArmed || chaosLockedWeek}
+                        onClick={() => {
+                          if (!canEditProp || chaosArmed || chaosLockedWeek)
+                            return;
+                          setSaved(false);
+                          setPropChoice(opt);
+                          setBonusOpen(true);
+                        }}
+                        className={`min-h-[52px] p-3.5 rounded-lg border text-base sm:text-sm transition touch-manipulation disabled:cursor-not-allowed ${
+                          propChoice === opt
+                            ? "border-primary bg-primary/15 text-primary font-semibold ring-2 ring-primary/40"
+                            : "border-border hover:border-muted disabled:opacity-70"
+                        }`}
+                      >
+                        {propChoice === opt ? "✓ " : ""}
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                  {weekEditable && propLockedNow && (
+                    <p className="text-[11px] text-muted mt-2">
+                      Bonus locked at the first kickoff on this card.
+                    </p>
+                  )}
+                  {weekEditable && canEditProp && !propChoice && (
+                    <p className="text-[11px] text-warning mt-2">
+                      Tap one answer, then Lock it in.
+                    </p>
+                  )}
+                </>
               )}
             </div>
 
@@ -1580,8 +1652,9 @@ export default function PicksPage() {
                 </button>
                 {!allGamesPicked && !fullyLocked && (
                   <p className="text-xs text-muted text-center mt-2 px-1">
-                    Need: side + unique confidence on every open game, one Best
-                    Bet, and a bonus pick (until first kickoff).
+                    {quietPicks
+                      ? "Need: side + confidence on every game, one Best Bet, and open Bonus to pick an answer."
+                      : "Need: side + unique confidence on every open game, one Best Bet, and a bonus pick (until first kickoff)."}
                   </p>
                 )}
               </div>
