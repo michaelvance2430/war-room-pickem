@@ -2086,37 +2086,123 @@ function trialBotsSetupHint(raw: string) {
   return raw;
 }
 
+/**
+ * Mid-season replacement bots enter at the league-average of real humans
+ * so they stay competitive (challenge for the rest of the field).
+ * Pre-season practice bots stay at 0.
+ */
+async function boostNewBotsToLeagueAverage(beforeBotUserIds: Set<string>): Promise<{
+  boosted: number;
+  avgPoints: number;
+  avgWeeks: number;
+}> {
+  const session = getSession();
+  if (!session?.leagueId) return { boosted: 0, avgPoints: 0, avgWeeks: 0 };
+
+  const supabase = createClient();
+  const { data: rows, error } = await supabase
+    .from("memberships")
+    .select("id, user_id, total_points, weeks_played, is_bot")
+    .eq("league_id", session.leagueId);
+
+  if (error || !rows?.length) {
+    return { boosted: 0, avgPoints: 0, avgWeeks: 0 };
+  }
+
+  type Mem = {
+    id: string;
+    user_id: string;
+    total_points?: number | null;
+    weeks_played?: number | null;
+    is_bot?: boolean | null;
+  };
+  const list = rows as Mem[];
+  const humans = list.filter((r) => !r.is_bot);
+  // League average of real players (the competitive pack)
+  if (!humans.length) return { boosted: 0, avgPoints: 0, avgWeeks: 0 };
+
+  const avgPoints = Math.round(
+    humans.reduce((s, r) => s + (Number(r.total_points) || 0), 0) /
+      humans.length
+  );
+  const avgWeeks = Math.round(
+    humans.reduce((s, r) => s + (Number(r.weeks_played) || 0), 0) /
+      humans.length
+  );
+
+  const newBots = list.filter(
+    (r) => !!r.is_bot && r.user_id && !beforeBotUserIds.has(r.user_id)
+  );
+  if (!newBots.length) {
+    return { boosted: 0, avgPoints, avgWeeks };
+  }
+
+  let boosted = 0;
+  for (const bot of newBots) {
+    const { error: upErr } = await supabase
+      .from("memberships")
+      .update({
+        total_points: avgPoints,
+        weeks_played: avgWeeks,
+      })
+      .eq("id", bot.id);
+    if (!upErr) boosted += 1;
+  }
+  return { boosted, avgPoints, avgWeeks };
+}
+
 /** Add trial bots up to league capacity (32). Requires trial-bots.sql. */
 export async function seedTrialBotsInCloud(
-  count = 50
+  count = 50,
+  opts?: {
+    /**
+     * Mid-season: allow pad bots for empty seats after people leave.
+     * New bots get league-average points so they can still compete.
+     */
+    midSeasonReplacement?: boolean;
+  }
 ): Promise<{
   ok: boolean;
   added?: number;
   totalBots?: number;
   seatsRemaining?: number;
+  /** Mid-season: points assigned to each new bot */
+  avgPoints?: number;
   error?: string;
 }> {
   const session = getSession();
   if (!session?.leagueId || !session.isCommissioner) {
     return { ok: false, error: "Commissioner only" };
   }
-  // Live season: no new trial bots (pre-season practice only)
+
+  let midSeason = !!opts?.midSeasonReplacement;
   try {
     const { isPreseasonCommishToolsAllowed, preseasonCommishToolsBody } =
       await import("./season-mode");
     if (!isPreseasonCommishToolsAllowed()) {
-      return {
-        ok: false,
-        error: preseasonCommishToolsBody().replace(/\n+/g, " "),
-      };
+      // Live season: only replacement bots (cover leavers), not free practice pads
+      if (!midSeason) {
+        return {
+          ok: false,
+          error:
+            preseasonCommishToolsBody().replace(/\n+/g, " ") +
+            " Mid-season: use replacement bots from Commissioner → Pad bots (enter at league average).",
+        };
+      }
+    } else {
+      midSeason = false; // preseason: bots start at 0
     }
   } catch {
     /* if import fails, fall through */
   }
+
   // Respect public 32-player cap — only empty seats, never replace humans/bots
   const roster = await loadLeagueRoster();
   const seats = seatsRemaining(roster.length);
   const existingBots = roster.filter((m) => m.isBot).length;
+  const beforeBotUserIds = new Set(
+    roster.filter((m) => m.isBot).map((m) => m.userId)
+  );
   if (seats <= 0) {
     return {
       ok: true,
@@ -2153,11 +2239,20 @@ export async function seedTrialBotsInCloud(
   if (row.ok === false) {
     return { ok: false, error: row.error || "seed_trial_bots returned not ok" };
   }
+
+  const added = row.added ?? 0;
+  let avgPoints: number | undefined;
+  if (midSeason && added > 0) {
+    const boost = await boostNewBotsToLeagueAverage(beforeBotUserIds);
+    avgPoints = boost.avgPoints;
+  }
+
   return {
     ok: true,
-    added: row.added ?? 0,
+    added,
     totalBots: row.totalBots ?? 0,
-    seatsRemaining: seats - (row.added ?? 0),
+    seatsRemaining: seats - added,
+    avgPoints,
   };
 }
 
@@ -2167,6 +2262,7 @@ export async function seedTrialBotsInCloud(
  * - addCount: how many NEW bots to try to add (capped by open seats)
  * - targetTotal: optional "fill until league has N players" (e.g. 16 ideal, 32 max)
  * - weekNumber: if set and a card exists, lock bot picks for that week
+ * - midSeasonReplacement: live season cover for leavers; bots enter at league avg pts
  *
  * Ideal totals for clean dual brackets: 8 (4+4), 16 (8+8), 32 (16+16).
  */
@@ -2176,6 +2272,8 @@ export async function fillLeagueWithBotsToCap(opts?: {
   addCount?: number;
   /** Grow roster toward this total size (e.g. 16 or 32). */
   targetTotal?: number;
+  /** Live season: pad empty seats after people left; bots start at league average. */
+  midSeasonReplacement?: boolean;
 }): Promise<{
   ok: boolean;
   added?: number;
@@ -2186,26 +2284,38 @@ export async function fillLeagueWithBotsToCap(opts?: {
   seatsBefore?: number;
   rosterBefore?: number;
   rosterAfter?: number;
+  /** Mid-season: points each new bot received */
+  avgPoints?: number;
   error?: string;
 }> {
   const session = getSession();
   if (!session?.leagueId || !session.isCommissioner) {
     return { ok: false, error: "Commissioner only" };
   }
+
+  let midSeason = !!opts?.midSeasonReplacement;
   try {
     const { isPreseasonCommishToolsAllowed, preseasonCommishToolsBody } =
       await import("./season-mode");
     if (!isPreseasonCommishToolsAllowed()) {
-      return {
-        ok: false,
-        error: preseasonCommishToolsBody().replace(/\n+/g, " "),
-      };
+      if (!midSeason) {
+        return {
+          ok: false,
+          error:
+            preseasonCommishToolsBody().replace(/\n+/g, " ") +
+            " Mid-season: use replacement bots (league average points).",
+        };
+      }
+    } else {
+      midSeason = false;
     }
   } catch {
     /* fall through */
   }
 
   async function seedCrystalBallForBots(): Promise<number> {
+    // Crystal ball pride picks are a pre-season smoke tool — skip mid-season
+    if (midSeason) return 0;
     try {
       const { seedBotCrystalBallPicks } = await import("./crystal-ball");
       const cb = await seedBotCrystalBallPicks();
@@ -2259,12 +2369,15 @@ export async function fillLeagueWithBotsToCap(opts?: {
     };
   }
 
-  const seed = await seedTrialBotsInCloud(want);
+  const seed = await seedTrialBotsInCloud(want, {
+    midSeasonReplacement: midSeason,
+  });
   if (!seed.ok) {
     return { ok: false, error: seed.error || "Failed to add bots" };
   }
 
   let botsFilled = 0;
+  // Mid-season: fill picks for the open week so bots can play going forward
   if (opts?.weekNumber != null) {
     const card = await loadWeekCard(opts.weekNumber);
     if (card && card.games.length > 0) {
@@ -2276,7 +2389,6 @@ export async function fillLeagueWithBotsToCap(opts?: {
     }
   }
 
-  // Every trial bot gets a Crystal Ball / Super Bowl pride pick (if feature on)
   const crystalFilled = await seedCrystalBallForBots();
 
   const added = seed.added ?? 0;
@@ -2289,6 +2401,7 @@ export async function fillLeagueWithBotsToCap(opts?: {
     seatsBefore,
     rosterBefore,
     rosterAfter: rosterBefore + added,
+    avgPoints: seed.avgPoints,
   };
 }
 

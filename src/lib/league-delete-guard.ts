@@ -2,8 +2,10 @@
  * Mid-season league delete protection.
  *
  * PRODUCT RULE: A commissioner who is getting crushed cannot nuke the room
- * for everyone. Mid-season delete is blocked; the role passes to first place
- * (or they use Commissioner tools to hand the keys off deliberately).
+ * for everyone. Mid-season delete is blocked so the team stays together.
+ *
+ * Nobody is forced to become commissioner. The room stays open; any other
+ * real player can voluntarily take the keys so everyone can finish the season.
  */
 
 import { createClient } from "@/lib/supabase/client";
@@ -16,6 +18,13 @@ export type FirstPlaceCandidate = {
   totalPoints: number;
 };
 
+/** Any other human who could voluntarily take the gavel. */
+export type PassCandidate = {
+  userId: string;
+  name: string;
+  totalPoints: number;
+};
+
 export type LeagueDeleteEval = {
   /** True if hard delete is allowed (preseason / empty / solo) */
   canHardDelete: boolean;
@@ -23,8 +32,10 @@ export type LeagueDeleteEval = {
   reason: string;
   otherHumans: number;
   scoredWeeks: number;
-  /** Standing leader among non-bot humans (not the current commish) */
+  /** Standing leader among non-bot humans (not the current commish) — suggestion only */
   firstPlace: FirstPlaceCandidate | null;
+  /** All other humans who can step up voluntarily (sorted by points desc) */
+  candidates: PassCandidate[];
 };
 
 /**
@@ -40,6 +51,7 @@ export async function evaluateLeagueDelete(
     otherHumans: 0,
     scoredWeeks: 0,
     firstPlace: null,
+    candidates: [],
   };
   if (!leagueId) return empty;
 
@@ -96,24 +108,30 @@ export async function evaluateLeagueDelete(
   const midSeason =
     otherHumans >= 1 && (scoredWeeks > 0 || anyonePlayed);
 
-  // First place among other humans (standings = total_points)
-  let firstPlace: FirstPlaceCandidate | null = null;
-  if (others.length) {
-    const sorted = [...others].sort((a, b) => {
+  // All other humans, points high → low (for voluntary pick list)
+  const candidates: PassCandidate[] = [...others]
+    .sort((a, b) => {
       const pa = a.total_points || 0;
       const pb = b.total_points || 0;
       if (pb !== pa) return pb - pa;
       const na = (a.profiles?.display_name || "").toLowerCase();
       const nb = (b.profiles?.display_name || "").toLowerCase();
       return na.localeCompare(nb);
-    });
-    const top = sorted[0];
-    firstPlace = {
-      userId: top.user_id,
-      name: top.profiles?.display_name?.trim() || "Player",
-      totalPoints: top.total_points || 0,
-    };
-  }
+    })
+    .map((r) => ({
+      userId: r.user_id,
+      name: r.profiles?.display_name?.trim() || "Player",
+      totalPoints: r.total_points || 0,
+    }));
+
+  // First place is only a suggestion — never a forced assignment
+  const firstPlace: FirstPlaceCandidate | null = candidates[0]
+    ? {
+        userId: candidates[0].userId,
+        name: candidates[0].name,
+        totalPoints: candidates[0].totalPoints,
+      }
+    : null;
 
   if (!midSeason) {
     return {
@@ -125,21 +143,23 @@ export async function evaluateLeagueDelete(
       otherHumans,
       scoredWeeks,
       firstPlace,
+      candidates,
     };
   }
 
   return {
     canHardDelete: false,
     reason:
-      "This season is live with other players. You can't delete the room to escape the board. Pass commissioner instead — first place gets the keys by default.",
+      "This season is live with other players. The room stays so the team can finish — you can't delete it mid-season. Nobody is forced to be commissioner: when someone is ready to jump in, pass them the keys.",
     otherHumans,
     scoredWeeks,
     firstPlace,
+    candidates,
   };
 }
 
 /**
- * Pass commissioner to first place (or a chosen member).
+ * Pass commissioner to a chosen member (voluntary).
  * Works from Account even when that league is not the active session.
  */
 export async function passCommissionerForLeague(

@@ -1187,6 +1187,8 @@ function CommissionerPageInner() {
 
   /**
    * Add bots for empty seats only.
+   * Pre-season: practice pad at 0 pts.
+   * Mid-season: replacement bots enter at league average (stay competitive).
    * mode: exact count | grow to target total (16 ideal / 32 max).
    */
   async function handleAddBots(opts: {
@@ -1194,7 +1196,7 @@ function CommissionerPageInner() {
     targetTotal?: number;
     label: string;
   }) {
-    if (!requirePreseasonTools()) return;
+    const midSeason = !isPreseasonCommishToolsAllowed();
     const n =
       opts.addCount != null
         ? opts.addCount
@@ -1205,14 +1207,18 @@ function CommissionerPageInner() {
       setBotReport("Pick how many bots to add (1 or more).");
       return;
     }
-    if (
-      !confirm(
-        `${opts.label}\n\n` +
-          "• Only fills EMPTY seats (never removes humans or existing bots)\n" +
-          "• Soft cap 32 · Ideal pad target is often 16 (clean 8+8 brackets)\n" +
-          "• New bots auto-pick if this week’s card is published"
-      )
-    ) {
+    const confirmBody = midSeason
+      ? `${opts.label}\n\n` +
+        "Mid-season replacement bots (cover for people who left):\n" +
+        "• Only fills EMPTY seats (never removes humans or existing bots)\n" +
+        "• New bots enter at the LEAGUE AVERAGE of points so they stay competitive\n" +
+        "• Soft cap 32 · they can still challenge for the win\n" +
+        "• New bots lock picks if this week’s card is published"
+      : `${opts.label}\n\n` +
+        "• Only fills EMPTY seats (never removes humans or existing bots)\n" +
+        "• Soft cap 32 · Ideal pad target is often 16 (clean 8+8 brackets)\n" +
+        "• New bots auto-pick if this week’s card is published";
+    if (!confirm(confirmBody)) {
       return;
     }
     setBotReport(null);
@@ -1222,6 +1228,7 @@ function CommissionerPageInner() {
       ...(hasCard ? { weekNumber: activeWeek } : {}),
       ...(opts.addCount != null ? { addCount: opts.addCount } : {}),
       ...(opts.targetTotal != null ? { targetTotal: opts.targetTotal } : {}),
+      ...(midSeason ? { midSeasonReplacement: true } : {}),
     });
     setBotBusy(false);
     if (!res.ok) {
@@ -1243,6 +1250,11 @@ function CommissionerPageInner() {
       `roster ${res.rosterBefore} → ${res.rosterAfter}`,
       `${res.totalBots} bots in league`,
     ];
+    if (midSeason && res.avgPoints != null) {
+      parts.push(
+        `started at league avg ${res.avgPoints} pts (competitive mid-season pad)`
+      );
+    }
     if ((res.botsFilled ?? 0) > 0) {
       parts.push(
         `locked ${res.botsFilled} bot slip(s) for ${weekTitle(activeWeek)}`
@@ -1255,18 +1267,21 @@ function CommissionerPageInner() {
         `🔮 ${res.crystalFilled} bot Crystal Ball / Super Bowl picks`
       );
     }
-    try {
-      const talk = await seedBotLockerTalk({
-        weekNumber: activeWeek,
-        weekLabel: weekTitle(activeWeek),
-        sportId: leagueFootballSport(),
-        count: 6,
-      });
-      if (talk.ok && (talk.inserted || 0) > 0) {
-        parts.push(`💬 ${talk.inserted} locker shit-talk posts`);
+    // Pre-season only: bot locker smoke posts
+    if (!midSeason) {
+      try {
+        const talk = await seedBotLockerTalk({
+          weekNumber: activeWeek,
+          weekLabel: weekTitle(activeWeek),
+          sportId: leagueFootballSport(),
+          count: 6,
+        });
+        if (talk.ok && (talk.inserted || 0) > 0) {
+          parts.push(`💬 ${talk.inserted} locker shit-talk posts`);
+        }
+      } catch {
+        /* optional */
       }
-    } catch {
-      /* optional */
     }
     setBotReport(parts.join(" · ") + ".");
   }
@@ -1318,7 +1333,7 @@ function CommissionerPageInner() {
   }
 
   async function handleFillBotPicks() {
-    if (!requirePreseasonTools()) return;
+    // Allowed mid-season so replacement bots can lock the open week
     setBotReport(null);
     setBotBusy(true);
     const res = await seedBotPicksForWeekInCloud(activeWeek);
@@ -2732,21 +2747,13 @@ function CommissionerPageInner() {
 
             <div
               id="commish-bots"
-              className={`rounded-xl border p-5 space-y-3 scroll-mt-24 ${
-                preseasonToolsOk
-                  ? "border-primary/40 bg-primary/5"
-                  : "border-border bg-card"
-              }`}
+              className="rounded-xl border border-primary/40 bg-primary/5 p-5 space-y-3 scroll-mt-24"
             >
-              <h2
-                className={`font-semibold ${
-                  preseasonToolsOk ? "text-primary" : "text-muted"
-                }`}
-              >
+              <h2 className="font-semibold text-primary">
                 Pad league with bots
                 {!preseasonToolsOk && (
-                  <span className="ml-2 text-[10px] font-bold uppercase tracking-wide text-muted border border-border px-1.5 py-0.5 rounded">
-                    Pre-season only
+                  <span className="ml-2 text-[10px] font-bold uppercase tracking-wide text-primary/80 border border-primary/40 px-1.5 py-0.5 rounded">
+                    Mid-season · league avg
                   </span>
                 )}
               </h2>
@@ -2761,9 +2768,15 @@ function CommissionerPageInner() {
                   </>
                 ) : (
                   <>
-                    Trial bots are a pre-season practice tool (learn the
-                    Commish role before {getSeasonOpenLabel(league?.sportId)}). Add / fill locked
-                    now — Clear bots still works if leftovers remain.
+                    People left? Cover empty seats with replacement bots. New
+                    bots enter at the{" "}
+                    <strong className="text-foreground">
+                      league average of points
+                    </strong>{" "}
+                    so they stay competitive — a real challenge for the rest of
+                    the field. Empty seats only; never removes humans. Demo
+                    tools (Chaos, locker talk, Crystal Ball) stay pre-season
+                    only.
                   </>
                 )}
               </p>
@@ -2829,18 +2842,18 @@ function CommissionerPageInner() {
                   onClick={() =>
                     void handleAddBots({
                       addCount: botAddCount,
-                      label: `Add ${botAddCount} bot(s)?`,
+                      label: preseasonToolsOk
+                        ? `Add ${botAddCount} bot(s)?`
+                        : `Add ${botAddCount} mid-season replacement bot(s) at league average?`,
                     })
                   }
-                  className={`px-4 py-2 rounded-lg bg-primary text-black text-sm font-semibold disabled:opacity-50 ${
-                    !preseasonToolsOk ? "opacity-45" : ""
-                  }`}
+                  className="px-4 py-2 rounded-lg bg-primary text-black text-sm font-semibold disabled:opacity-50"
                 >
                   {botBusy
                     ? "Working…"
                     : preseasonToolsOk
                       ? `Add ${botAddCount} bot${botAddCount === 1 ? "" : "s"}`
-                      : "Add bots (locked)"}
+                      : `Add ${botAddCount} @ league avg`}
                 </button>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -2850,13 +2863,12 @@ function CommissionerPageInner() {
                   onClick={() =>
                     void handleAddBots({
                       targetTotal: 16,
-                      label:
-                        "Fill roster toward 16 (ideal 8+8 brackets)? Only adds what’s missing.",
+                      label: preseasonToolsOk
+                        ? "Fill roster toward 16 (ideal 8+8 brackets)? Only adds what’s missing."
+                        : "Fill toward 16 with mid-season bots at league average? Only empty seats.",
                     })
                   }
-                  className={`px-3 py-1.5 rounded-lg border border-primary/50 text-primary text-xs font-medium hover:bg-primary/10 disabled:opacity-50 ${
-                    !preseasonToolsOk ? "opacity-45" : ""
-                  }`}
+                  className="px-3 py-1.5 rounded-lg border border-primary/50 text-primary text-xs font-medium hover:bg-primary/10 disabled:opacity-50"
                 >
                   Fill to 16 (ideal)
                 </button>
@@ -2866,13 +2878,12 @@ function CommissionerPageInner() {
                   onClick={() =>
                     void handleAddBots({
                       targetTotal: 32,
-                      label:
-                        "Fill roster to 32 (max / 16+16 brackets)? Only empty seats.",
+                      label: preseasonToolsOk
+                        ? "Fill roster to 32 (max / 16+16 brackets)? Only empty seats."
+                        : "Fill to 32 with mid-season bots at league average? Only empty seats.",
                     })
                   }
-                  className={`px-3 py-1.5 rounded-lg border border-border text-xs font-medium hover:bg-card-hover disabled:opacity-50 ${
-                    !preseasonToolsOk ? "opacity-45" : ""
-                  }`}
+                  className="px-3 py-1.5 rounded-lg border border-border text-xs font-medium hover:bg-card-hover disabled:opacity-50"
                 >
                   Fill to 32 (max)
                 </button>
@@ -2880,9 +2891,8 @@ function CommissionerPageInner() {
                   type="button"
                   disabled={botBusy}
                   onClick={() => void handleFillBotPicks()}
-                  className={`px-3 py-1.5 rounded-lg border border-border text-xs font-medium hover:bg-card-hover disabled:opacity-50 ${
-                    !preseasonToolsOk ? "opacity-45" : ""
-                  }`}
+                  className="px-3 py-1.5 rounded-lg border border-border text-xs font-medium hover:bg-card-hover disabled:opacity-50"
+                  title="Lock bot slips for the published week (works mid-season for replacement bots)"
                 >
                   Fill bot picks (this week)
                 </button>
@@ -3056,8 +3066,13 @@ function CommissionerPageInner() {
             <div className="rounded-xl border border-primary/30 bg-card p-5 space-y-3">
               <h2 className="font-semibold text-primary">Pass commissioner</h2>
               <p className="text-xs text-muted leading-relaxed">
-                Stepping down? Hand the keys to another member. They become
-                commissioner; you stay as a player.{" "}
+                Stepping down?{" "}
+                <span className="text-foreground font-medium">
+                  Nobody is forced
+                </span>
+                — only pass when someone is ready to jump in so the room can
+                finish the season. They become commissioner; you stay as a
+                player.{" "}
                 <span className="text-foreground font-medium">
                   Trophy Room travels with the league
                 </span>
