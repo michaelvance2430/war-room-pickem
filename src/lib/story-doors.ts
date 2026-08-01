@@ -87,15 +87,24 @@ export function markStoryDoorSeen(
 }
 
 /**
- * Cut line is "approaching": within 2 weeks of cut lock, or enough weeks scored.
+ * Cut line is "approaching": pack lead weeks before cut lock.
+ * Short event packs use a shorter lead (pack-progressive).
  */
 export function isCutLineApproaching(opts: {
   activeWeek: number;
   scoredCount: number;
   sportId?: string | null;
 }): boolean {
-  const cut = cutLockWeek(opts.sportId ?? getLeague()?.sportId);
-  return opts.activeWeek >= cut - 2 || opts.scoredCount >= Math.max(0, cut - 2);
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { isCutApproachingForPack } = require("./pack-progressive") as typeof import("./pack-progressive");
+    return isCutApproachingForPack(opts);
+  } catch {
+    const cut = cutLockWeek(opts.sportId ?? getLeague()?.sportId);
+    return (
+      opts.activeWeek >= cut - 2 || opts.scoredCount >= Math.max(0, cut - 2)
+    );
+  }
 }
 
 /** Cut has locked / playoff story is live. */
