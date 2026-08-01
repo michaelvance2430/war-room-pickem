@@ -7,7 +7,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { getLeague, getSession } from "@/lib/league";
+import { getSession } from "@/lib/league";
 import { isGuestMode } from "@/lib/guest-mode";
 import {
   loadUnseenEggFlexes,
@@ -56,8 +56,8 @@ export default function EggFlexNewspaper() {
   const pull = useCallback(async () => {
     if (isGuestMode()) return;
     if (!getSession()?.playerId) return;
-    const league = getLeague();
-    const unseen = await loadUnseenEggFlexes(league?.id);
+    // Platform-wide — every account, every sport, every league
+    const unseen = await loadUnseenEggFlexes();
     if (!unseen.length) return;
     setQueue((q) => {
       const ids = new Set(q.map((x) => x.id));
@@ -90,7 +90,6 @@ export default function EggFlexNewspaper() {
 
   if (!current) return null;
 
-  const leagueName = getLeague()?.name || "War Room";
   const isYou = getSession()?.playerId === current.finderUserId;
 
   return (
@@ -110,13 +109,13 @@ export default function EggFlexNewspaper() {
             Extra · Extra
           </span>
           <span className="text-[10px] font-bold uppercase tracking-wider opacity-90">
-            War Room Special Edition
+            World Edition · All rooms
           </span>
         </div>
 
         <div className="px-5 pt-5 pb-2 text-center border-b-4 border-double border-stone-900">
           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-red-800 mb-1">
-            Breaking · Hidden Layer
+            Breaking · Account-wide · Every sport
           </p>
           <p className="text-[11px] uppercase tracking-widest text-stone-600 mb-2">
             {formatFlexDate(current.createdAt)}
@@ -146,7 +145,7 @@ export default function EggFlexNewspaper() {
               ) : null}
             </p>
             <p className="text-sm font-semibold text-stone-700 mt-2">
-              {leagueName}
+              War Room Pick&apos;Em · all leagues · all sports
             </p>
             <p className="text-[11px] text-stone-500 mt-1 font-mono">
               {formatFlexDate(current.createdAt)}

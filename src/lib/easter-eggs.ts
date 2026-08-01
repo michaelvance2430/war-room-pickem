@@ -5,6 +5,13 @@
  * NEVER: points · standings impact · competitive advantage · payment.
  * ONLY: curiosity, loyalty, joy — “…did you know…” moments.
  *
+ * ACCOUNT-WIDE (not sport-specific): one find sticks across CFB, NFL, every pack.
+ * Discover while playing any sport. Rare sport-tied moments are the exception,
+ * not the rule — we don’t force multi-sport homework for the catalog.
+ *
+ * Milestone flexes (7 / 10 / full) are PLATFORM-WIDE newspapers — every player
+ * in every league sees them. Ready Player One energy.
+ *
  * Discoveries are separate from season/career cheevo scoring (always 0 pts).
  */
 

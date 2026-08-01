@@ -108,7 +108,6 @@ export type EggMilestoneFlex = {
   id: string;
   finderUserId: string;
   finderName: string;
-  leagueId: string;
   found: number;
   total: number;
   milestone: number;
@@ -144,21 +143,21 @@ export function markEggFlexSeen(flexId: string) {
   writeSeenFlexIds(s);
 }
 
-/** Unseen milestone newspapers for leagues you're in. */
-export async function loadUnseenEggFlexes(
-  leagueId: string | null | undefined
-): Promise<EggMilestoneFlex[]> {
-  if (!leagueId) return [];
+/**
+ * Unseen milestone newspapers — PLATFORM-WIDE.
+ * Every signed-in player in every league / sport can see them.
+ * Eggs are account-wide, not sport-specific.
+ */
+export async function loadUnseenEggFlexes(): Promise<EggMilestoneFlex[]> {
   try {
     const supabase = createClient();
     const { data, error } = await supabase
       .from("egg_milestone_flexes")
       .select(
-        "id, finder_user_id, finder_name, league_id, found, total, milestone, created_at"
+        "id, finder_user_id, finder_name, found, total, milestone, created_at"
       )
-      .eq("league_id", leagueId)
       .order("created_at", { ascending: false })
-      .limit(20);
+      .limit(30);
     if (error || !data) return [];
     const seen = readSeenFlexIds();
     return data
@@ -166,7 +165,6 @@ export async function loadUnseenEggFlexes(
         id: r.id as string,
         finderUserId: r.finder_user_id as string,
         finderName: (r.finder_name as string) || "A player",
-        leagueId: r.league_id as string,
         found: r.found as number,
         total: r.total as number,
         milestone: r.milestone as number,
