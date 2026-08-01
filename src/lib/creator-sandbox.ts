@@ -199,6 +199,27 @@ export function jumpGazetteShelfReveal(): void {
   }
 }
 
+export function jumpCutStoryDoor(): void {
+  // Approaching cut (CFB ~12–14)
+  saveCreatorSandbox({
+    enabled: true,
+    weekNumber: 13,
+    scoredCount: 12,
+    phase: "full",
+  });
+  void import("./story-doors").then((m) => m.forceStoryDoor("cut"));
+}
+
+export function jumpTrophyStoryDoor(): void {
+  saveCreatorSandbox({
+    enabled: true,
+    weekNumber: 15,
+    scoredCount: 14,
+    phase: "full",
+  });
+  void import("./story-doors").then((m) => m.forceStoryDoor("trophy"));
+}
+
 export function jumpOpenHome(): void {
   if (typeof window === "undefined") return;
   window.location.href = "/";

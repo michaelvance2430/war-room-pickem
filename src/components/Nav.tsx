@@ -15,6 +15,7 @@ import Avatar from "@/components/Avatar";
 import RulesOnboardingModal from "@/components/RulesOnboardingModal";
 import GazetteModal from "@/components/GazetteModal";
 import GazetteShelfReveal from "@/components/GazetteShelfReveal";
+import StoryDoorModal from "@/components/StoryDoorModal";
 import BadgeUnlockModal from "@/components/BadgeUnlockModal";
 import SeasonCountdownTicker from "@/components/SeasonCountdownTicker";
 import SeasonOpenWelcome from "@/components/SeasonOpenWelcome";
@@ -926,6 +927,7 @@ export default function Nav() {
       {!isGuestMode() && <RulesOnboardingModal />}
       <GazetteModal />
       <GazetteShelfReveal />
+      <StoryDoorModal />
       <BadgeUnlockModal />
       {/* Easter eggs — discoverable, zero points, never a secret menu */}
       {!isGuestMode() && <EasterEggHost />}

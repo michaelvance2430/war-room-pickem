@@ -172,7 +172,9 @@ export default function FounderDashboardPage() {
     setLabBusy(false);
   }
 
-  function jumpPopup(kind: "ring" | "card" | "gazette") {
+  function jumpPopup(
+    kind: "ring" | "card" | "gazette" | "cut" | "trophy"
+  ) {
     void import("@/lib/creator-sandbox").then(async (sb) => {
       if (kind === "ring") {
         await sb.jumpRingCeremony();
@@ -181,6 +183,16 @@ export default function FounderDashboardPage() {
       }
       if (kind === "card") {
         await sb.jumpCardPublished(week);
+        router.push("/");
+        return;
+      }
+      if (kind === "cut") {
+        sb.jumpCutStoryDoor();
+        router.push("/");
+        return;
+      }
+      if (kind === "trophy") {
+        sb.jumpTrophyStoryDoor();
         router.push("/");
         return;
       }
@@ -468,6 +480,20 @@ export default function FounderDashboardPage() {
                 className="py-2.5 rounded-lg border border-border text-xs font-semibold hover:bg-background"
               >
                 Week-3 Gazette shelf unlock
+              </button>
+              <button
+                type="button"
+                onClick={() => jumpPopup("cut")}
+                className="py-2.5 rounded-lg border border-border text-xs font-semibold hover:bg-background"
+              >
+                Cut line door → Board
+              </button>
+              <button
+                type="button"
+                onClick={() => jumpPopup("trophy")}
+                className="py-2.5 rounded-lg border border-border text-xs font-semibold hover:bg-background"
+              >
+                Trophy / brackets door
               </button>
             </div>
           </div>
