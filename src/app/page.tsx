@@ -40,6 +40,7 @@ import MultiLeagueHomeHub from "@/components/MultiLeagueHomeHub";
 import HomeRoomContext from "@/components/HomeRoomContext";
 import HomeHostScoreStrip from "@/components/HomeHostScoreStrip";
 import SoftUnlockBanner from "@/components/SoftUnlockBanner";
+import BoredLameSandboxCta from "@/components/BoredLameSandboxCta";
 import SandboxSimBanner from "@/components/SandboxSimBanner";
 
 export default function Home() {
@@ -357,6 +358,9 @@ export default function Home() {
         <SandboxSimBanner />
 
         <HomeWeekHero />
+
+        {/* Pre–Week 0: sarcastic practice escape when nothing real is up */}
+        <BoredLameSandboxCta />
 
         {/* Host first-hour spine — under the job hero, not buried at the footer */}
         <CommishSetupBanner />
