@@ -428,7 +428,7 @@ export async function deleteLeague(leagueId: string): Promise<{ ok: boolean; err
         ok: false,
         error:
           eval_.reason ||
-          "Mid-season rooms can't be deleted. Pass commissioner instead.",
+          "Mid-season rooms can't be deleted. Keep the team together — pass the keys when someone is ready to jump in.",
       };
     }
   } catch {
