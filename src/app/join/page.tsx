@@ -24,6 +24,7 @@ import { DEFAULT_SPORT_ID, type SportId } from "@/lib/sports/types";
 import OwnershipNotice from "@/components/OwnershipNotice";
 import WwcTrophyLogo from "@/components/WwcTrophyLogo";
 import NflBrandMark from "@/components/NflBrandMark";
+import OpenRoomBotsNudge from "@/components/OpenRoomBotsNudge";
 
 function generateCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -50,6 +51,8 @@ function JoinPageInner() {
   const [checking, setChecking] = useState(true);
   const [hostCopied, setHostCopied] = useState<string | null>(null);
   const [deepLinkCode, setDeepLinkCode] = useState<string | null>(null);
+  /** Host created as open room — offer bot pad deep link */
+  const [showOpenRoomBotsNudge, setShowOpenRoomBotsNudge] = useState(false);
 
   useEffect(() => {
     // Deep link: /join?code=ABC123 (or stashed from login)
@@ -253,6 +256,7 @@ function JoinPageInner() {
         /* ignore */
       }
       setCreatedCode(newCode);
+      if (listAsOpen) setShowOpenRoomBotsNudge(true);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Could not create league");
     } finally {
@@ -423,6 +427,12 @@ function JoinPageInner() {
 
     return (
       <div className="min-h-screen flex items-center justify-center px-4 py-10">
+        {listAsOpen && (
+          <OpenRoomBotsNudge
+            open={showOpenRoomBotsNudge}
+            onClose={() => setShowOpenRoomBotsNudge(false)}
+          />
+        )}
         <div className="max-w-md w-full rounded-xl border-2 border-primary/40 bg-card p-6">
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary mb-2 text-center">
             You&apos;re the host
@@ -430,6 +440,7 @@ function JoinPageInner() {
           <h1 className="text-2xl font-bold mb-1 text-center">League created</h1>
           <p className="text-sm text-muted mb-4 text-center">
             {leagueLabel} — share the invite link, then build the first card.
+            {listAsOpen ? " Listed in the open room lobby." : ""}
           </p>
           <div className="text-3xl font-bold tracking-[0.3em] text-primary text-center mb-4 font-mono">
             {createdCode}
@@ -444,6 +455,16 @@ function JoinPageInner() {
 
           {hostCopied && (
             <p className="text-xs text-primary text-center mb-3">{hostCopied}</p>
+          )}
+
+          {listAsOpen && (
+            <button
+              type="button"
+              onClick={() => setShowOpenRoomBotsNudge(true)}
+              className="w-full py-3 min-h-[48px] rounded-xl border border-primary/40 bg-primary/10 text-primary text-sm font-bold mb-3 touch-manipulation"
+            >
+              Round out with bots? →
+            </button>
           )}
 
           <ol className="text-left text-sm space-y-2 mb-6 rounded-lg border border-border bg-background/50 px-4 py-3">

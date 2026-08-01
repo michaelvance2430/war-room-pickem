@@ -72,6 +72,7 @@ import {
   setCommishPreviewOpt,
   requestRingCeremonyPreview,
 } from "@/lib/ring-ceremony";
+import OpenRoomBotsNudge from "@/components/OpenRoomBotsNudge";
 import CommishWeekChecklist from "@/components/CommishWeekChecklist";
 import SportPoolCommishPanel from "@/components/SportPoolCommishPanel";
 import { setViewAsPlayer } from "@/lib/view-as-player";
@@ -277,6 +278,8 @@ function CommissionerPageInner() {
   const [autoSeasonReport, setAutoSeasonReport] = useState<string | null>(null);
   /** Commish-only: personal ring ceremony preview (never league-wide) */
   const [ringPreviewOpt, setRingPreviewOpt] = useState(false);
+  /** After listing open room — nudge host to pad bots */
+  const [openRoomBotsNudge, setOpenRoomBotsNudge] = useState(false);
   /** Inclusive range for sandbox auto-score (one week … full season) */
   const [autoFromWeek, setAutoFromWeek] = useState(0);
   const [autoToWeek, setAutoToWeek] = useState(SEASON_MAX_WEEK);
@@ -307,6 +310,8 @@ function CommissionerPageInner() {
       // URL ?tab=card&first=1 or first-time owner → land on Build Card
       const tabParam = searchParams.get("tab");
       const firstParam = searchParams.get("first");
+      const hash =
+        typeof window !== "undefined" ? window.location.hash.replace("#", "") : "";
       if (
         tabParam === "card" ||
         tabParam === "results" ||
@@ -321,6 +326,22 @@ function CommissionerPageInner() {
         setTab("settings");
       } else {
         setTab("card");
+      }
+      // Deep link from open-room bots nudge
+      if (owner && (hash === "commish-bots" || tabParam === "settings")) {
+        if (hash === "commish-bots") {
+          setTab("settings");
+          setAdvancedOpen(true);
+          window.setTimeout(() => {
+            try {
+              document
+                .getElementById("commish-bots")
+                ?.scrollIntoView({ behavior: "smooth", block: "start" });
+            } catch {
+              /* ignore */
+            }
+          }, 400);
+        }
       }
 
       if (lg) {
@@ -2012,6 +2033,10 @@ function CommissionerPageInner() {
   return (
     <div className="min-h-screen flex flex-col">
       <Nav />
+      <OpenRoomBotsNudge
+        open={openRoomBotsNudge}
+        onClose={() => setOpenRoomBotsNudge(false)}
+      />
       {preseasonToolsPopup && (
         <div
           className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-4 bg-black/70"
@@ -2435,6 +2460,7 @@ function CommissionerPageInner() {
                             ? "Listed — open lobby can find you"
                             : "Unlisted from open lobby"
                         );
+                        if (next) setOpenRoomBotsNudge(true);
                       } catch (e: unknown) {
                         setOpenRoomNote(
                           e instanceof Error ? e.message : "Could not update"
@@ -2670,7 +2696,8 @@ function CommissionerPageInner() {
             </div>
 
             <div
-              className={`rounded-xl border p-5 space-y-3 ${
+              id="commish-bots"
+              className={`rounded-xl border p-5 space-y-3 scroll-mt-24 ${
                 preseasonToolsOk
                   ? "border-primary/40 bg-primary/5"
                   : "border-border bg-card"
