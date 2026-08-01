@@ -100,14 +100,21 @@ export function markGazetteShelfRevealSeen(playerId?: string | null): void {
 }
 
 /**
- * Calendar / season signal that "week 3" energy has arrived.
- * scoredCount >= 2 (two papers already) OR active week index >= 3.
+ * Calendar / season signal that paper-shelf energy has arrived.
+ * Full seasons: week 3 / 2 scored. Short packs (e.g. WWC): earlier (pack-progressive).
  */
 export function isWeekThreeish(opts: {
   activeWeek: number;
   scoredCount: number;
+  sportId?: string | null;
 }): boolean {
-  return opts.scoredCount >= 2 || opts.activeWeek >= 3;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { isGazetteShelfTiming } = require("./pack-progressive") as typeof import("./pack-progressive");
+    return isGazetteShelfTiming(opts);
+  } catch {
+    return opts.scoredCount >= 2 || opts.activeWeek >= 3;
+  }
 }
 
 /** Gazette nav + archive entry points. Paper modal can still fire anytime. */
@@ -115,6 +122,7 @@ export function canShowGazetteShelf(opts: {
   activeWeek: number;
   scoredCount: number;
   playerId?: string | null;
+  sportId?: string | null;
 }): boolean {
   if (wantsFullRoom(opts.playerId)) return true;
   if (!isCoreLoopUnlocked(opts.playerId)) return false;
@@ -125,12 +133,13 @@ export function canShowGazetteShelf(opts: {
 
 /**
  * One-time "here's where the papers live" popup.
- * After week-3 threshold, if they haven't seen the tip yet.
+ * After pack shelf threshold, if they haven't seen the tip yet.
  */
 export function shouldShowGazetteShelfReveal(opts: {
   activeWeek: number;
   scoredCount: number;
   playerId?: string | null;
+  sportId?: string | null;
 }): boolean {
   if (wantsFullRoom(opts.playerId)) return false;
   if (!isCoreLoopUnlocked(opts.playerId)) return false;

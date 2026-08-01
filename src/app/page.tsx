@@ -38,6 +38,7 @@ import LeagueMembershipCard from "@/components/LeagueMembershipCard";
 import OpenRoomLeaveNudge from "@/components/OpenRoomLeaveNudge";
 import MultiLeagueHomeHub from "@/components/MultiLeagueHomeHub";
 import HomeRoomContext from "@/components/HomeRoomContext";
+import HomeHostScoreStrip from "@/components/HomeHostScoreStrip";
 
 export default function Home() {
   const router = useRouter();
@@ -338,6 +339,9 @@ export default function Home() {
 
         {/* 2) ONE primary job — not buried under banners */}
         <HomeWeekHero />
+
+        {/* Ops: score path when card exists and week not scored yet */}
+        <HomeHostScoreStrip />
 
         {firstWeekChrome && (
           <p className="text-xs text-muted mb-4 leading-relaxed max-w-xl -mt-2">

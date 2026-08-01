@@ -79,13 +79,22 @@ export function eyesPicksStorageKey(week: number): string {
 
 /** Progressive phase from week number (what a player would have unlocked). */
 export function phaseForWeek(weekNumber: number): SandboxPhase {
-  if (weekNumber <= 1) return "onboarding";
-  if (weekNumber === 2) return "core";
-  return "deepening";
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { packProgressiveConfig } = require("./pack-progressive") as typeof import("./pack-progressive");
+    const c = packProgressiveConfig(getLeague()?.sportId);
+    if (weekNumber < c.gazetteMinWeek && weekNumber <= 1) return "onboarding";
+    if (weekNumber < c.gazetteMinWeek) return "core";
+    return "deepening";
+  } catch {
+    if (weekNumber <= 1) return "onboarding";
+    if (weekNumber === 2) return "core";
+    return "deepening";
+  }
 }
 
 function scoredCountForWeek(weekNumber: number): number {
-  // Pretend prior weeks already scored so shelf unlocks at week 3+
+  // Pretend prior weeks already scored so shelf unlocks on pack cadence
   return Math.max(0, weekNumber - 1);
 }
 
