@@ -11,6 +11,7 @@ import {
   resolveSeasonThemeId,
   type SeasonThemeId,
 } from "@/lib/season-theme";
+import { stripHolidayBordersIfThemeEnded } from "@/lib/profile-border-store";
 import ChristmasLights from "@/components/ChristmasLights";
 import HalloweenDecor from "@/components/HalloweenDecor";
 import ThanksgivingDecor from "@/components/ThanksgivingDecor";
@@ -28,6 +29,12 @@ export default function SeasonThemeApplier() {
       const next = resolveSeasonThemeId(id);
       applySeasonTheme(next, { persistLocal });
       setTheme(next);
+      // Holiday borders only last while that theme is on → snap to plain
+      try {
+        stripHolidayBordersIfThemeEnded();
+      } catch {
+        /* ignore */
+      }
     }
 
     const initial = resolveSeasonThemeId(
