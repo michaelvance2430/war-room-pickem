@@ -673,6 +673,17 @@ export const BADGE_CATALOG: BadgeDef[] = [
     points: 200,
     icon: "🛡️",
   },
+  {
+    id: "six_seven",
+    name: "Sixxxxx Seveennnn",
+    description:
+      "A game finished 6–7 (or 7–6) on your slate. Your brain typed it before the box score did. Sixxxxx. Seveennnnn. Sixxx sevennnnn. You were there.",
+    howToEarn:
+      "Lock a card the week any War Room slate game ends 6–7 or 7–6. Either order. Both sports. Brainrot optional, points mandatory.",
+    tier: "legendary",
+    points: 200,
+    icon: "6️⃣",
+  },
 
   // —— Epic (batch 2) ——
   {
@@ -1348,6 +1359,13 @@ function evaluateBadge(
 
     case "unbreakable":
       return progress(streak, 20);
+
+    case "six_seven":
+      return {
+        earned:
+          hasPermanentBadge(player, "six_seven") ||
+          hasEngagement(player.id, "six_seven_final"),
+      };
 
     case "the_closer":
       // CFP weeks 15–18: any solid score on late weeks

@@ -81,6 +81,28 @@ export type FinalBoxScore = {
   atsWinner: "home" | "away" | "push";
 };
 
+/**
+ * Meme final: 6–7 or 7–6 (order doesn't matter).
+ * Kids of the timeline will not stop saying sixxxxx seveennnn.
+ */
+export function isSixSevenFinal(
+  homeScore: number,
+  awayScore: number
+): boolean {
+  const a = Math.round(Number(homeScore));
+  const b = Math.round(Number(awayScore));
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return false;
+  return (a === 6 && b === 7) || (a === 7 && b === 6);
+}
+
+/** True if any completed box is a 6–7 / 7–6 final. */
+export function anySixSevenFinal(
+  boxes: { homeScore: number; awayScore: number }[] | null | undefined
+): boolean {
+  if (!boxes?.length) return false;
+  return boxes.some((b) => isSixSevenFinal(b.homeScore, b.awayScore));
+}
+
 export type AutoScoreResult = {
   results: Record<string, GameResult>;
   /** Completed games with numeric scores (for auto prop settle) */

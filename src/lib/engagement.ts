@@ -41,7 +41,9 @@ export type EngagementKey =
   | "posted_locker"
   | "locked_after_22"
   | "crystal_ball_picked"
-  | "push_recorded";
+  | "push_recorded"
+  /** Witnessed a 6–7 / 7–6 final on a scored slate */
+  | "six_seven_final";
 
 export function markEngagement(
   userId: string,

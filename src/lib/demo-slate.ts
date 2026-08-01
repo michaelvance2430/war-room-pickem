@@ -107,16 +107,39 @@ function demoKickoffIso(
 export function randomizeDemoResults(
   games: Game[],
   propOptions: [string, string] | string[]
-): { results: Record<string, GameResult>; propResult: string } {
+): {
+  results: Record<string, GameResult>;
+  propResult: string;
+  /** Box scores when we force a meme final (or for prop settle tests) */
+  finalBoxes: { gameId: string; homeScore: number; awayScore: number }[];
+} {
   const rand = mulberry(Date.now() % 1_000_000);
   const results: Record<string, GameResult> = {};
+  const finalBoxes: {
+    gameId: string;
+    homeScore: number;
+    awayScore: number;
+  }[] = [];
   for (const g of games) {
     const r = rand();
     const winner: "home" | "away" | "push" =
       r < 0.08 ? "push" : r < 0.54 ? "home" : "away";
     results[g.id] = { gameId: g.id, winner };
   }
+  // ~1 in 5 demo weeks: force a 6–7 final for Sixxxxx Seveennnn testing
+  if (games.length > 0 && rand() < 0.22) {
+    const g = games[Math.floor(rand() * games.length)];
+    const homeSix = rand() < 0.5;
+    const homeScore = homeSix ? 6 : 7;
+    const awayScore = homeSix ? 7 : 6;
+    // Straight-up winner matches the higher score (ATS may still push on the line)
+    results[g.id] = {
+      gameId: g.id,
+      winner: homeScore > awayScore ? "home" : "away",
+    };
+    finalBoxes.push({ gameId: g.id, homeScore, awayScore });
+  }
   const opts = propOptions?.length >= 2 ? propOptions : ["Yes", "No"];
   const propResult = opts[rand() < 0.5 ? 0 : 1];
-  return { results, propResult };
+  return { results, propResult, finalBoxes };
 }

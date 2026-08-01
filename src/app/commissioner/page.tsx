@@ -245,6 +245,10 @@ function CommissionerPageInner() {
   const [cardSaved, setCardSaved] = useState(false);
   const [results, setResults] = useState<Record<string, GameResult>>({});
   const [propResult, setPropResult] = useState<string | null>(null);
+  /** Final boxes from Odds API / demo — used for Sixxxxx Seveennnn cheevo */
+  const [finalBoxes, setFinalBoxes] = useState<
+    { gameId: string; homeScore: number; awayScore: number }[]
+  >([]);
   const [resultsSaved, setResultsSaved] = useState(false);
   const [demoScore, setDemoScore] = useState<{ totalPoints: number } | null>(null);
   const [hasPlayerPicks, setHasPlayerPicks] = useState(false);
@@ -514,6 +518,7 @@ function CommissionerPageInner() {
     setPublishedProp(null);
     setResults({});
     setPropResult(null);
+    setFinalBoxes([]);
     setResultsSaved(false);
     setDemoScore(null);
     setScoreReport(null);
@@ -1026,15 +1031,21 @@ function CommissionerPageInner() {
     }
     const propOpts =
       publishedProp?.options || prop.options || (["Yes", "No"] as [string, string]);
-    const { results: r, propResult: pr } = randomizeDemoResults(
-      publishedGames,
-      propOpts
-    );
+    const { results: r, propResult: pr, finalBoxes: boxes } =
+      randomizeDemoResults(publishedGames, propOpts);
     setResults(r);
     setPropResult(pr);
+    setFinalBoxes(boxes);
     setResultsSaved(false);
+    const sixSeven = boxes.some(
+      (b) =>
+        (b.homeScore === 6 && b.awayScore === 7) ||
+        (b.homeScore === 7 && b.awayScore === 6)
+    );
     setScoreReport(
-      `Randomized covers + prop for ${weekTitle(activeWeek)}. Or use “Randomize & score” for one tap.`
+      `Randomized covers + prop for ${weekTitle(activeWeek)}.${
+        sixSeven ? " 6️⃣7️⃣ Sixxxxx Seveennnn on the slate." : ""
+      } Or use “Randomize & score” for one tap.`
     );
   }
 
@@ -1060,15 +1071,18 @@ function CommissionerPageInner() {
     }
     const propOpts =
       publishedProp.options || (["Yes", "No"] as [string, string]);
-    const { results: r, propResult: pr } = randomizeDemoResults(
-      publishedGames,
-      propOpts
-    );
+    const { results: r, propResult: pr, finalBoxes: boxes } =
+      randomizeDemoResults(publishedGames, propOpts);
     setResults(r);
     setPropResult(pr);
+    setFinalBoxes(boxes);
     setResultsSaved(false);
     setScoreReport(`Randomized ${weekTitle(activeWeek)} — scoring…`);
-    await handleSaveResults({ results: r, propResult: pr });
+    await handleSaveResults({
+      results: r,
+      propResult: pr,
+      finalBoxes: boxes,
+    });
   }
 
   function toggleGame(id: string) {
@@ -1536,12 +1550,26 @@ function CommissionerPageInner() {
       const events = scoreRes.events;
       const built = buildResultsFromScores(publishedGames, events);
       setResults((prev) => ({ ...prev, ...built.results }));
+      setFinalBoxes(built.boxes);
       setResultsSaved(false);
+
+      const sixSevenHit = built.boxes.some(
+        (b) =>
+          (b.homeScore === 6 && b.awayScore === 7) ||
+          (b.homeScore === 7 && b.awayScore === 6)
+      );
 
       const lines = built.details
         .map((d) => {
           if (d.status === "final") {
-            return `✓ ${d.label}: ${d.scoreLine} → ${d.winner?.toUpperCase()} covers`;
+            const meme =
+              d.homeScore != null &&
+              d.awayScore != null &&
+              ((d.homeScore === 6 && d.awayScore === 7) ||
+                (d.homeScore === 7 && d.awayScore === 6))
+                ? " · 6️⃣7️⃣ SIXXXXX SEVENNNNN"
+                : "";
+            return `✓ ${d.label}: ${d.scoreLine} → ${d.winner?.toUpperCase()} covers${meme}`;
           }
           if (d.status === "live") return `… ${d.label}: still live`;
           if (d.status === "unmatched") return `? ${d.label}: no score feed match`;
@@ -1576,7 +1604,9 @@ function CommissionerPageInner() {
       }
 
       setSyncReport(
-        `Auto-filled ${built.filled} of ${publishedGames.length} games (last 3 days of scores).\n${lines}${propLine}`
+        `Auto-filled ${built.filled} of ${publishedGames.length} games (last 3 days of scores).${
+          sixSevenHit ? "\n\n6️⃣7️⃣ SIXXXXX SEVENNNNN is live on this slate." : ""
+        }\n${lines}${propLine}`
       );
 
       const mergedResults = { ...results, ...built.results };
@@ -1590,6 +1620,7 @@ function CommissionerPageInner() {
             publishedProp?.options?.includes(propResult)
               ? propResult
               : null),
+          finalBoxes: built.boxes,
         });
         return;
       }
@@ -1605,6 +1636,7 @@ function CommissionerPageInner() {
   async function handleSaveResults(override?: {
     results?: Record<string, GameResult>;
     propResult?: string | null;
+    finalBoxes?: { gameId: string; homeScore: number; awayScore: number }[];
   }) {
     if (scoring) return;
     if (resultsLocked) {
@@ -1622,6 +1654,7 @@ function CommissionerPageInner() {
       override && "propResult" in override
         ? override.propResult ?? null
         : propResult;
+    const boxesToUse = override?.finalBoxes ?? finalBoxes;
 
     localStorage.setItem(
       keys.results,
@@ -1677,6 +1710,7 @@ function CommissionerPageInner() {
       prop: propForScoring,
       results: resultsToUse,
       propResult: propResultToUse,
+      finalBoxes: boxesToUse,
     });
 
     setResultsSaved(true);
@@ -1693,10 +1727,18 @@ function CommissionerPageInner() {
     setScoredAtLabel(new Date().toLocaleString());
     void refreshScoredWeeks();
 
+    const sixSevenNote = boxesToUse.some(
+      (b) =>
+        (b.homeScore === 6 && b.awayScore === 7) ||
+        (b.homeScore === 7 && b.awayScore === 6)
+    )
+      ? " · 6️⃣7️⃣ Sixxxxx Seveennnn granted to locked cards"
+      : "";
+
     if (cloud.scoredCount === 0) {
       setScoreReport(
         cloud.error ||
-          `Saved results for ${weekTitle(activeWeek)} (locked). No locked picks found yet — fill bot picks first.`
+          `Saved results for ${weekTitle(activeWeek)} (locked). No locked picks found yet — fill bot picks first.${sixSevenNote}`
       );
       applyWeekScores();
       return;
@@ -1731,8 +1773,8 @@ function CommissionerPageInner() {
       .join(" · ");
     setScoreReport(
       firstTime
-        ? `${weekTitle(activeWeek)} scored & locked · ${cloud.scoredCount} player(s). You're a real Commish now — Advanced tools unlocked.${advanceNote} ${lines}`
-        : `${weekTitle(activeWeek)} scored & locked · ${cloud.scoredCount} player(s).${advanceNote} ${lines}`
+        ? `${weekTitle(activeWeek)} scored & locked · ${cloud.scoredCount} player(s). You're a real Commish now — Advanced tools unlocked.${advanceNote}${sixSevenNote} ${lines}`
+        : `${weekTitle(activeWeek)} scored & locked · ${cloud.scoredCount} player(s).${advanceNote}${sixSevenNote} ${lines}`
     );
   }
 

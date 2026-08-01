@@ -226,7 +226,10 @@ export async function autoFinishRemainingWeeks(opts?: {
       }
 
       opts?.onProgress?.({ week, label, step: "Random results…" });
-      const { results, propResult } = randomizeDemoResults(games, prop.options);
+      const { results, propResult, finalBoxes } = randomizeDemoResults(
+        games,
+        prop.options
+      );
 
       opts?.onProgress?.({ week, label, step: "Scoring league…" });
       const scoredRes = await saveResultsAndScoreWeek({
@@ -235,6 +238,7 @@ export async function autoFinishRemainingWeeks(opts?: {
         prop,
         results,
         propResult,
+        finalBoxes,
       });
       if (!scoredRes.ok) {
         errors.push(`${label}: score failed — ${scoredRes.error || "unknown"}`);

@@ -298,6 +298,13 @@ export function nflDisplayOverlay(def: BadgeDef): BadgeDef {
       description: "Every leg hit on a Sunday slate.",
       howToEarn: "Go perfect on a weekly card.",
     },
+    six_seven: {
+      name: "Sixxxxx Seveennnn",
+      description:
+        "A primetime (or any window) final went 6–7. The timeline is already saying it. You were on the card.",
+      howToEarn:
+        "Lock an NFL card the week any slate game ends 6–7 or 7–6.",
+    },
     saturday_starter: {
       name: "Sunday Starter",
       description: "First Sunday in the War Room.",

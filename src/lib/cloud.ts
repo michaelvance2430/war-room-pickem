@@ -1531,6 +1531,11 @@ export async function saveResultsAndScoreWeek(opts: {
   prop: Prop;
   results: Record<string, GameResult>;
   propResult: string | null;
+  /**
+   * Optional final box scores (from Odds API / demo).
+   * When any game is 6–7 or 7–6, grant Sixxxxx Seveennnn to everyone who locked.
+   */
+  finalBoxes?: { gameId: string; homeScore: number; awayScore: number }[];
 }): Promise<ScoreWeekResult> {
   const session = getSession();
   if (!session?.leagueId || !isOps()) {
@@ -1656,6 +1661,15 @@ export async function saveResultsAndScoreWeek(opts: {
   const details: { name: string; points: number }[] = [];
   let scoredCount = 0;
 
+  // Sixxxxx Seveennnn — any final box 6–7 / 7–6 on this slate
+  let sixSevenWeek = false;
+  try {
+    const { anySixSevenFinal } = await import("./scores");
+    sixSevenWeek = anySixSevenFinal(opts.finalBoxes);
+  } catch {
+    sixSevenWeek = false;
+  }
+
   for (const pickRow of allPicks) {
     const pickId = pickRow.id as string;
     const userId = pickRow.user_id as string;
@@ -1714,6 +1728,18 @@ export async function saveResultsAndScoreWeek(opts: {
       try {
         const { markEngagement } = await import("./engagement");
         markEngagement(pickRow.user_id as string, "push_recorded");
+      } catch {
+        /* ignore */
+      }
+    }
+
+    // Legendary: any slate final is 6–7 / 7–6 (sixxxxx seveennnn)
+    if (sixSevenWeek) {
+      try {
+        const { markEngagement } = await import("./engagement");
+        markEngagement(userId, "six_seven_final");
+        const { grantPermanentBadgeId } = await import("./permanent-badges");
+        grantPermanentBadgeId(userId, "six_seven", { leagueId });
       } catch {
         /* ignore */
       }
