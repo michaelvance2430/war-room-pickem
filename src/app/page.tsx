@@ -322,8 +322,9 @@ export default function Home() {
           }}
         />
 
-        {/* Full masthead after first lock only */}
-        {!firstWeekChrome && (
+        {/* ── TOP QUARTER: room identity (screenshot zone) ── */}
+        {/* Full masthead after first lock; compact plaque only in first hour */}
+        {!firstWeekChrome ? (
           <HomeSportHeader
             chrome={homeChrome}
             tagline={homeTagline}
@@ -342,17 +343,17 @@ export default function Home() {
               }
             }}
           />
+        ) : (
+          <HomeRoomContext
+            leagueName={leagueName}
+            sportId={sportId}
+            isCommish={isCommish}
+            actuallyCommish={actuallyCommish}
+            leagueCode={leagueCode}
+          />
         )}
 
-        {/* FIRST HOUR: room identity + one job (+ host checklist). Nothing else. */}
-        <HomeRoomContext
-          leagueName={leagueName}
-          sportId={sportId}
-          isCommish={isCommish}
-          actuallyCommish={actuallyCommish}
-          leagueCode={leagueCode}
-        />
-
+        {/* ── THE JOB: immediately under room identity ── */}
         <HomeWeekHero />
 
         {/* Host score path only when not in quiet first hour (or always for ops after card) */}
@@ -371,18 +372,7 @@ export default function Home() {
           </p>
         )}
 
-        {/* Host first-hour spine (invite + publish) */}
-        <CommishSetupBanner />
-
-        {/* Invite strip: hosts only in first hour (banner already covers invite);
-            everyone after first lock */}
-        {!firstWeekChrome && (
-          <div className="mb-5">
-            <InviteFriends />
-          </div>
-        )}
-
-        {/* Secondary room life — after first lock only */}
+        {/* Secondary room life — after first lock only (same order as before) */}
         {!firstWeekChrome && (
           <>
             <SportPoolPollBanner />
@@ -637,6 +627,14 @@ export default function Home() {
               </Link>
             </section>
           </>
+        )}
+
+        {/* ── BOTTOM: recruiting / host invite (after the job + room) ── */}
+        <CommishSetupBanner />
+        {!firstWeekChrome && (
+          <div className="mt-5 mb-2">
+            <InviteFriends />
+          </div>
         )}
       </main>
     </div>
