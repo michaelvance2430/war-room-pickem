@@ -6,7 +6,7 @@
  * Share copy rotates multi-gen flavors (boomer → Gen X → millennial → chaos).
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { getSession, getLeague } from "@/lib/league";
 import {
   buildInviteJoinUrl,
@@ -73,6 +73,24 @@ export default function InviteFriends({
    * One-tap Share stays visible; "More vibes" expands flavors/preview.
    */
   const [expanded, setExpanded] = useState(false);
+  /** Only label Share with sport/room when multi-league (avoids clutter for 1-room players) */
+  const [multiLeague, setMultiLeague] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { fetchMyMemberships } = await import("@/lib/session-restore");
+        const ms = await fetchMyMemberships();
+        if (!cancelled) setMultiLeague(ms.length >= 2);
+      } catch {
+        if (!cancelled) setMultiLeague(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [leagueId]);
 
   if (!code) return null;
 
@@ -141,12 +159,14 @@ export default function InviteFriends({
   if (compact) {
     return (
       <div className={className}>
-        <p className="text-[10px] font-bold uppercase tracking-wider text-muted mb-1.5">
-          Sharing as{" "}
-          <span className={isNfl ? "text-blue-300" : "text-amber-200"}>
-            {isNfl ? "NFL" : "CFB"}
-          </span>
-        </p>
+        {multiLeague && (
+          <p className="text-[10px] font-bold uppercase tracking-wider text-muted mb-1.5">
+            Sharing as{" "}
+            <span className={isNfl ? "text-blue-300" : "text-amber-200"}>
+              {isNfl ? "NFL" : "CFB"}
+            </span>
+          </p>
+        )}
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
@@ -200,10 +220,15 @@ export default function InviteFriends({
         <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
           <div className="flex-1 min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">
-              Invite · everyone ·{" "}
-              <span className={isNfl ? "text-blue-300" : "text-amber-200"}>
-                {isNfl ? "NFL" : "CFB"}
-              </span>
+              Invite · everyone
+              {multiLeague && (
+                <>
+                  {" · "}
+                  <span className={isNfl ? "text-blue-300" : "text-amber-200"}>
+                    {isNfl ? "NFL" : "CFB"}
+                  </span>
+                </>
+              )}
             </p>
             <p className="text-sm text-foreground font-medium truncate">
               Code{" "}
@@ -220,9 +245,7 @@ export default function InviteFriends({
               className="flex-1 sm:flex-none px-4 py-3 min-h-[48px] rounded-xl bg-primary text-black text-sm font-bold disabled:opacity-50 touch-manipulation"
               title={`Share ${isNfl ? "NFL" : "CFB"} invite for ${leagueName}`}
             >
-              {busy
-                ? "…"
-                : `Share · ${isNfl ? "NFL" : "CFB"}`}
+              {busy ? "…" : multiLeague ? `Share · ${isNfl ? "NFL" : "CFB"}` : "Share"}
             </button>
             <button
               type="button"
@@ -247,10 +270,15 @@ export default function InviteFriends({
       <div className="flex items-start justify-between gap-2 mb-1">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-1">
-            Spread the word · everyone ·{" "}
-            <span className={isNfl ? "text-blue-300" : "text-amber-200"}>
-              {isNfl ? "NFL" : "CFB"}
-            </span>
+            Spread the word · everyone
+            {multiLeague && (
+              <>
+                {" · "}
+                <span className={isNfl ? "text-blue-300" : "text-amber-200"}>
+                  {isNfl ? "NFL" : "CFB"}
+                </span>
+              </>
+            )}
           </p>
           <h2 className="font-semibold mb-1">Bring your people</h2>
         </div>
@@ -264,12 +292,20 @@ export default function InviteFriends({
       </div>
       <p className="text-sm text-muted mb-3 leading-relaxed">
         <strong className="text-foreground">Every member</strong> can invite —
-        not just the commissioner. Messages always say{" "}
-        <strong className={isNfl ? "text-blue-300" : "text-amber-200"}>
-          {isNfl ? "NFL (pro football)" : "CFB (college football)"}
-        </strong>
-        {" — "}never the wrong sport. One tap shares a deep link plus a vibe for
-        boomers, Gen X, millennials, dad chats, or chaos. Surprise me randomizes.
+        not just the commissioner.
+        {multiLeague ? (
+          <>
+            {" "}
+            Messages always say{" "}
+            <strong className={isNfl ? "text-blue-300" : "text-amber-200"}>
+              {isNfl ? "NFL (pro football)" : "CFB (college football)"}
+            </strong>
+            {" — "}check you&apos;re in the right room first.
+          </>
+        ) : (
+          <> One tap shares a deep link plus a message vibe.</>
+        )}{" "}
+        Surprise me randomizes the tone.
       </p>
 
       <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center mb-3">
@@ -284,11 +320,13 @@ export default function InviteFriends({
         >
           {busy
             ? "Sharing…"
-            : `Share · ${isNfl ? "NFL" : "CFB"} · ${
-                leagueName.length > 18
-                  ? `${leagueName.slice(0, 16)}…`
-                  : leagueName
-              }`}
+            : multiLeague
+              ? `Share · ${isNfl ? "NFL" : "CFB"} · ${
+                  leagueName.length > 18
+                    ? `${leagueName.slice(0, 16)}…`
+                    : leagueName
+                }`
+              : "Share invite"}
         </button>
       </div>
 

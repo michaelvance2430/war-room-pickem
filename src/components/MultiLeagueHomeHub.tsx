@@ -1,10 +1,12 @@
 "use client";
 
 /**
- * Slim multi-league switcher on Home (2+ leagues only).
- * Collapsed by default: "Your rooms · sport You're here · N need you"
- * Expand for one-line rooms + one primary CTA each.
- * Active-league cockpit stays below — this is not a second homepage.
+ * Slim multi-league switcher on Home.
+ *
+ * SINGLE LEAGUE: renders nothing (null). No bar, no margin, no layout gap —
+ * Home looks like a normal one-room page.
+ *
+ * 2+ LEAGUES: collapsed strip + needs-picks chips. Active room cockpit stays below.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -46,11 +48,14 @@ export default function MultiLeagueHomeHub({ onSwitched }: Props) {
   const load = useCallback(async () => {
     try {
       const ms = await fetchMyMemberships();
-      setList(ms);
+      // One room (or none): stay invisible — no multi-league chrome at all
       if (ms.length < 2) {
+        setList([]);
         setPulse({});
+        setExpanded(false);
         return;
       }
+      setList(ms);
       const uid = getSession()?.playerId;
       if (!uid) return;
       const supabase = createClient();
@@ -136,6 +141,7 @@ export default function MultiLeagueHomeHub({ onSwitched }: Props) {
     });
   }, [list, pulse, activeId]);
 
+  // Critical: 0–1 leagues → zero DOM (no empty card, no spacing)
   if (list.length < 2 || !active) return null;
 
   const activePack = getSportPack(active.sportId || "cfb");
