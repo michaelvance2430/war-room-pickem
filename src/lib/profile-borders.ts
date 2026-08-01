@@ -1,10 +1,16 @@
 /**
  * Profile avatar borders — ~20 looks, unlocked by achievements.
  * Easy unlocks = simple rings. Legendary = loud flex.
+ * Holiday borders: available to everyone only while that season theme is live.
  */
 
 import type { BadgeStatus, BadgeTier } from "./types";
 import { isAppCreator } from "./creator";
+import {
+  DEFAULT_SEASON_THEME_ID,
+  resolveSeasonThemeId,
+  type SeasonThemeId,
+} from "./season-theme";
 
 /** Special animated Creator rings (app owner only) */
 export type CreatorBorderEffect = "flame" | "forge" | "circuit";
@@ -14,12 +20,13 @@ export type ProfileBorderDef = {
   name: string;
   /** Short unlock hint for Account */
   unlockLabel: string;
-  /** Badge id required, or "free" / "creator" */
+  /** Badge id required, or "free" / "creator" / holiday theme */
   unlock:
     | { kind: "free" }
     | { kind: "creator" }
-    | { kind: "badge"; badgeId: string };
-  tier: BadgeTier | "starter";
+    | { kind: "badge"; badgeId: string }
+    | { kind: "holiday"; themeId: SeasonThemeId };
+  tier: BadgeTier | "starter" | "holiday";
   /**
    * Tailwind classes applied to the avatar ring wrapper.
    * Use ring + border + shadow for progressive flex.
@@ -292,6 +299,83 @@ export const PROFILE_BORDER_CATALOG: ProfileBorderDef[] = [
     glowClass: "shadow-[0_0_36px_rgba(250,204,21,0.8)]",
     creatorEffect: "flame",
   },
+
+  // —— Holiday (everyone, only while that season theme is on) ——
+  {
+    id: "holiday_halloween_pumpkin",
+    name: "Pumpkin Patch",
+    unlockLabel: "Available while Halloween theme is on",
+    unlock: { kind: "holiday", themeId: "halloween" },
+    tier: "holiday",
+    ringClass: "ring-[3px] ring-orange-400 border-2 border-purple-500",
+    glowClass:
+      "shadow-[0_0_16px_rgba(251,146,60,0.45),0_0_8px_rgba(168,85,247,0.35)] holiday-border-bob",
+  },
+  {
+    id: "holiday_halloween_ghost",
+    name: "Boo Ring",
+    unlockLabel: "Available while Halloween theme is on",
+    unlock: { kind: "holiday", themeId: "halloween" },
+    tier: "holiday",
+    ringClass: "ring-[3px] ring-purple-300 border-2 border-white/70 border-dashed",
+    glowClass: "shadow-[0_0_14px_rgba(216,180,254,0.5)] holiday-border-bob",
+  },
+  {
+    id: "holiday_thanks_harvest",
+    name: "Harvest Gold",
+    unlockLabel: "Available while Thanksgiving theme is on",
+    unlock: { kind: "holiday", themeId: "thanksgiving" },
+    tier: "holiday",
+    ringClass: "ring-[3px] ring-amber-500 border-2 border-orange-700",
+    glowClass: "shadow-[0_0_14px_rgba(217,119,6,0.45)]",
+  },
+  {
+    id: "holiday_thanks_leaf",
+    name: "Autumn Leaf",
+    unlockLabel: "Available while Thanksgiving theme is on",
+    unlock: { kind: "holiday", themeId: "thanksgiving" },
+    tier: "holiday",
+    ringClass: "ring-[3px] ring-red-600 border-2 border-amber-400",
+    glowClass: "shadow-[0_0_12px_rgba(220,38,38,0.35)] holiday-border-bob",
+  },
+  {
+    id: "holiday_xmas_candy",
+    name: "Candy Cane",
+    unlockLabel: "Available while Christmas theme is on",
+    unlock: { kind: "holiday", themeId: "christmas" },
+    tier: "holiday",
+    ringClass: "ring-[3px] ring-red-500 border-2 border-emerald-400",
+    glowClass:
+      "shadow-[0_0_14px_rgba(239,68,68,0.4),0_0_8px_rgba(52,211,153,0.35)] holiday-border-twinkle",
+  },
+  {
+    id: "holiday_xmas_snow",
+    name: "Snow Globe",
+    unlockLabel: "Available while Christmas theme is on",
+    unlock: { kind: "holiday", themeId: "christmas" },
+    tier: "holiday",
+    ringClass: "ring-[3px] ring-sky-200 border-2 border-white/90",
+    glowClass: "shadow-[0_0_16px_rgba(186,230,253,0.55)] holiday-border-twinkle",
+  },
+  {
+    id: "holiday_ny_sparkle",
+    name: "Midnight Sparkle",
+    unlockLabel: "Available while New Year theme is on",
+    unlock: { kind: "holiday", themeId: "newyear" },
+    tier: "holiday",
+    ringClass: "ring-[3px] ring-yellow-300 border-2 border-fuchsia-400",
+    glowClass:
+      "shadow-[0_0_18px_rgba(250,204,21,0.55),0_0_10px_rgba(232,121,249,0.4)] holiday-border-twinkle",
+  },
+  {
+    id: "holiday_ny_ball",
+    name: "Ball Drop",
+    unlockLabel: "Available while New Year theme is on",
+    unlock: { kind: "holiday", themeId: "newyear" },
+    tier: "holiday",
+    ringClass: "ring-[3px] ring-white border-2 border-yellow-400",
+    glowClass: "shadow-[0_0_20px_rgba(255,255,255,0.45)] holiday-border-twinkle",
+  },
 ];
 
 const byId = new Map(PROFILE_BORDER_CATALOG.map((b) => [b.id, b]));
@@ -307,15 +391,65 @@ export function defaultProfileBorderId(): string {
   return "plain";
 }
 
+/** Active league holiday theme (for unlock + display). */
+export function getActiveSeasonThemeId(): SeasonThemeId {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getLeague } = require("./league") as typeof import("./league");
+    return resolveSeasonThemeId(
+      getLeague()?.settings?.seasonThemeId || DEFAULT_SEASON_THEME_ID
+    );
+  } catch {
+    return DEFAULT_SEASON_THEME_ID;
+  }
+}
+
+export function isHolidayBorderId(id: string | null | undefined): boolean {
+  if (!id) return false;
+  const def = getProfileBorderDef(id);
+  return def?.unlock.kind === "holiday";
+}
+
+/** True if this border is allowed under the current league theme. */
+export function isHolidayBorderActiveNow(
+  borderId: string | null | undefined,
+  themeId?: SeasonThemeId | null
+): boolean {
+  const def = getProfileBorderDef(borderId);
+  if (!def || def.unlock.kind !== "holiday") return true;
+  const theme = themeId ?? getActiveSeasonThemeId();
+  return theme === def.unlock.themeId;
+}
+
+/**
+ * Border to actually paint: holiday borders snap to plain when theme is off.
+ */
+export function resolveDisplayBorderId(
+  borderId: string | null | undefined
+): string {
+  const id = borderId || defaultProfileBorderId();
+  if (!isHolidayBorderActiveNow(id)) return defaultProfileBorderId();
+  return getProfileBorderDef(id) ? id : defaultProfileBorderId();
+}
+
 export function isBorderUnlocked(
   border: ProfileBorderDef,
   opts: {
     userId: string;
     earnedBadgeIds: Set<string>;
+    /** Override theme (tests / Account live preview) */
+    seasonThemeId?: SeasonThemeId | null;
   }
 ): boolean {
   if (border.unlock.kind === "free") return true;
   if (border.unlock.kind === "creator") return isAppCreator(opts.userId);
+  if (border.unlock.kind === "holiday") {
+    const theme =
+      opts.seasonThemeId !== undefined && opts.seasonThemeId !== null
+        ? resolveSeasonThemeId(opts.seasonThemeId)
+        : getActiveSeasonThemeId();
+    return theme === border.unlock.themeId;
+  }
   return opts.earnedBadgeIds.has(border.unlock.badgeId);
 }
 
@@ -332,6 +466,7 @@ export function listUnlockedBorders(
 }
 
 export function borderWrapperClass(borderId: string | null | undefined): string {
-  const def = getProfileBorderDef(borderId) || byId.get("plain")!;
+  const displayId = resolveDisplayBorderId(borderId);
+  const def = getProfileBorderDef(displayId) || byId.get("plain")!;
   return [def.ringClass, def.glowClass || "", "rounded-full"].filter(Boolean).join(" ");
 }

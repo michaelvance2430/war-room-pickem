@@ -6,6 +6,7 @@ import {
   borderWrapperClass,
   defaultProfileBorderId,
   resolveCreatorEffect,
+  resolveDisplayBorderId,
 } from "@/lib/profile-borders";
 import {
   getEquippedBorderId,
@@ -50,10 +51,15 @@ export default function Avatar({
     () => null
   );
 
-  const resolvedBorder =
+  const rawBorder =
     borderId ||
     storeBorder ||
     (plain ? null : defaultProfileBorderId());
+
+  // Holiday borders only paint while that season theme is live
+  const resolvedBorder = plain
+    ? null
+    : resolveDisplayBorderId(rawBorder);
 
   const creatorFx =
     !plain && resolvedBorder ? resolveCreatorEffect(resolvedBorder) : null;

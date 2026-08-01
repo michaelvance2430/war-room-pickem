@@ -1482,6 +1482,40 @@ html[data-season-theme="newyear"] body::before {
   }
 }
 
+/* Holiday borders — cute soft motion while theme is live */
+@keyframes holiday-border-bob {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.03);
+  }
+}
+@keyframes holiday-border-twinkle {
+  0%,
+  100% {
+    filter: brightness(1);
+    opacity: 1;
+  }
+  50% {
+    filter: brightness(1.2);
+    opacity: 0.92;
+  }
+}
+.holiday-border-bob {
+  animation: holiday-border-bob 2.4s ease-in-out infinite;
+}
+.holiday-border-twinkle {
+  animation: holiday-border-twinkle 1.8s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .holiday-border-bob,
+  .holiday-border-twinkle {
+    animation: none !important;
+  }
+}
+
 /* Championship trophy — soft float on ceremony stage */
 @keyframes champ-trophy-float {
   0%,

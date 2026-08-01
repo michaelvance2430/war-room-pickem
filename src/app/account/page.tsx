@@ -48,6 +48,7 @@ import {
 import { isChaosTitleLocked } from "@/lib/chaos-mode";
 import {
   PROFILE_BORDER_CATALOG,
+  getActiveSeasonThemeId,
   isBorderUnlocked,
   type ProfileBorderDef,
 } from "@/lib/profile-borders";
@@ -179,6 +180,29 @@ export default function AccountPage() {
   useEffect(() => {
     reload();
   }, []);
+
+  // Holiday borders appear/disappear with Commish season theme
+  const [themeTick, setThemeTick] = useState(0);
+  useEffect(() => {
+    function onTheme() {
+      setThemeTick((t) => t + 1);
+      try {
+        const {
+          getLocalEquippedBorderId,
+          stripHolidayBordersIfThemeEnded,
+        } = require("@/lib/profile-border-store") as typeof import("@/lib/profile-border-store");
+        stripHolidayBordersIfThemeEnded();
+        if (userId) {
+          const id = getLocalEquippedBorderId(userId);
+          if (id) setEquippedBorderId(id);
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    window.addEventListener("warroom-season-theme", onTheme);
+    return () => window.removeEventListener("warroom-season-theme", onTheme);
+  }, [userId]);
 
   async function onPickFile(file: File | null) {
     if (!file) return;
@@ -628,9 +652,10 @@ export default function AccountPage() {
           </p>
           <h2 className="font-semibold mb-1">Profile border</h2>
           <p className="text-xs text-muted mb-3 leading-relaxed">
-            Unlock rings with achievements. Easy badges = simple borders.
-            Legendary hardware = loud rings. Creator-only flame / forge /
-            circuit rings live at the bottom of the list (Mike only).
+            Unlock rings with achievements. When Commish drops a holiday theme,
+            cute holiday borders unlock for everyone — they auto-return to Plain
+            when the theme turns off. Creator-only flame / forge / circuit stay
+            Mike-only.
           </p>
           <div className="flex justify-center mb-4">
             <Avatar
@@ -643,11 +668,14 @@ export default function AccountPage() {
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-72 overflow-y-auto">
             {PROFILE_BORDER_CATALOG.map((b: ProfileBorderDef) => {
+              void themeTick;
+              const seasonThemeId = getActiveSeasonThemeId();
               const unlocked =
                 !!userId &&
                 isBorderUnlocked(b, {
                   userId,
                   earnedBadgeIds,
+                  seasonThemeId,
                 });
               const active = equippedBorderId === b.id;
               return (
