@@ -2972,7 +2972,7 @@ function CommissionerPageInner() {
             <div className="rounded-xl border border-amber-400/30 bg-card p-5 space-y-3">
               <h2 className="font-semibold text-amber-300">Trophy Room</h2>
               <p className="text-xs text-muted leading-relaxed">
-                Engrave Championship, Toilet Bowl, and Village Nerd (Crystal
+                Auto-engraves Championship, Toilet Bowl, conference titles, and Village Nerd (Crystal
                 Ball) winners by season year. History lives on this league —
                 season reset does not wipe it, and it stays when you pass
                 commissioner.

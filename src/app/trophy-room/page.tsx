@@ -1,14 +1,18 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+/**
+ * Trophy Room — view engraved hardware.
+ * All awards auto-engrave (no manual fill form). Host can Sync anytime.
+ */
+
+import { useEffect, useState } from "react";
 import Nav from "@/components/Nav";
 import YouBadge from "@/components/YouBadge";
 import PlayerLink from "@/components/PlayerLink";
-import { getSession, getLeague, isCommissioner } from "@/lib/league";
+import { getSession, getLeague, isCommissioner, isOps } from "@/lib/league";
 import { loadLeagueRoster, type LeagueRosterMember } from "@/lib/cloud";
 import {
   TROPHY_META,
-  awardTrophy,
   defaultSeasonYear,
   groupTrophiesBySeason,
   loadLeagueTrophies,
@@ -22,38 +26,39 @@ import HardwareTrophyIcon from "@/components/HardwareTrophyIcon";
 import Link from "next/link";
 import { isSelfPlayer, selfNameClass } from "@/lib/self-highlight";
 import type { ProfileTrophyKind } from "@/lib/profile-hardware";
+import { autoEngraveAllTrophies } from "@/lib/auto-trophies";
+import { divisionFromTrophyType } from "@/lib/division-champions";
+import { divisionDisplayLabel } from "@/lib/divisions";
 
-const TYPES: TrophyType[] = ["championship", "toilet_bowl", "crystal_ball"];
+const BIG_TYPES: TrophyType[] = [
+  "championship",
+  "toilet_bowl",
+  "crystal_ball",
+];
+
+const DIV_TYPES: TrophyType[] = [
+  "division_north",
+  "division_south",
+  "division_east",
+  "division_west",
+];
 
 export default function TrophyRoomPage() {
   const [trophies, setTrophies] = useState<LeagueTrophy[]>([]);
-  const [roster, setRoster] = useState<LeagueRosterMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [leagueName, setLeagueName] = useState("");
   const [sportId, setSportId] = useState<string>("cfb");
   const [selfId, setSelfId] = useState<string | null>(null);
-  const [commish, setCommish] = useState(false);
-
-  // Award form
-  const [year, setYear] = useState(defaultSeasonYear());
-  const [type, setType] = useState<TrophyType>("championship");
-  const [winnerUserId, setWinnerUserId] = useState("");
-  const [winnerName, setWinnerName] = useState("");
-  const [subtitle, setSubtitle] = useState("");
-  const [notes, setNotes] = useState("");
+  const [canSync, setCanSync] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [formMsg, setFormMsg] = useState<string | null>(null);
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);
 
   async function reload() {
     setLoadError(null);
     try {
-      const [list, members] = await Promise.all([
-        loadLeagueTrophies(),
-        loadLeagueRoster(),
-      ]);
+      const list = await loadLeagueTrophies();
       setTrophies(list);
-      setRoster(members.filter((m) => !m.isBot));
     } catch {
       setLoadError("Could not load trophy room.");
     }
@@ -63,79 +68,35 @@ export default function TrophyRoomPage() {
     const session = getSession();
     const league = getLeague();
     setSelfId(session?.playerId || null);
-    setCommish(isCommissioner());
+    setCanSync(isCommissioner() || isOps());
     setLeagueName(league?.name || "");
     setSportId(league?.sportId || "cfb");
-    reload().finally(() => setLoading(false));
+    reload()
+      .then(async () => {
+        // Quiet auto-sync when host opens the room
+        if (isCommissioner() || isOps()) {
+          try {
+            await autoEngraveAllTrophies({});
+            await reload();
+          } catch {
+            /* ignore */
+          }
+        }
+      })
+      .finally(() => setLoading(false));
   }, []);
 
-  function onPickMember(userId: string) {
-    setWinnerUserId(userId);
-    const m = roster.find((r) => r.userId === userId);
-    if (m) setWinnerName(m.name);
-  }
-
-  async function onAward(e: FormEvent) {
-    e.preventDefault();
-    setFormMsg(null);
-    const name = (winnerName || "Unknown").trim();
-    if (!name) {
-      setFormMsg("Winner name is required");
-      return;
-    }
-
-    // Warn before overwriting an existing plaque for this year + trophy type
-    const existing = trophies.find(
-      (t) => t.seasonYear === year && t.trophyType === type
-    );
-    if (existing) {
-      const prev = existing.winnerName || "the current winner";
-      const trophyTitle = TROPHY_META[type].title;
-      if (prev.toLowerCase() === name.toLowerCase()) {
-        // Same person re-save (subtitle/notes only) — still confirm lightly
-        if (
-          !confirm(
-            `Update the ${year} ${trophyTitle} for ${prev}?\n\nThis keeps them as winner and refreshes subtitle/notes.`
-          )
-        ) {
-          return;
-        }
-      } else {
-        if (
-          !confirm(
-            `Replace ${prev}?\n\n` +
-              `A ${year} ${trophyTitle} is already engraved for ${prev}.\n\n` +
-              `Confirm you want to replace "${prev}" with "${name}".\n\n` +
-              `This cannot be undone except by awarding again.`
-          )
-        ) {
-          return;
-        }
-      }
-    }
-
+  async function onSync() {
     setBusy(true);
-    const result = await awardTrophy({
-      seasonYear: year,
-      trophyType: type,
-      winnerName: name,
-      winnerUserId: winnerUserId || null,
-      subtitle: subtitle || null,
-      notes: notes || null,
-    });
-    setBusy(false);
-    if (!result.ok) {
-      setFormMsg(result.error || "Failed to award");
-      return;
+    setSyncMsg(null);
+    try {
+      const res = await autoEngraveAllTrophies({});
+      setSyncMsg(res.message);
+      await reload();
+    } catch (e) {
+      setSyncMsg(e instanceof Error ? e.message : "Sync failed");
     }
-    setFormMsg(
-      existing
-        ? `Updated ${year} ${TROPHY_META[type].title}: ${name} (replaced ${existing.winnerName}).`
-        : "Trophy engraved."
-    );
-    setSubtitle("");
-    setNotes("");
-    await reload();
+    setBusy(false);
   }
 
   async function onRemove(id: string, label: string) {
@@ -144,14 +105,120 @@ export default function TrophyRoomPage() {
     const result = await removeTrophy(id);
     setBusy(false);
     if (!result.ok) {
-      setFormMsg(result.error || "Could not remove");
+      setSyncMsg(result.error || "Could not remove");
       return;
     }
     await reload();
   }
 
   const seasons = groupTrophiesBySeason(trophies);
-  const meta = TROPHY_META[type];
+  const year = defaultSeasonYear();
+
+  function plaque(
+    y: number,
+    t: TrophyType,
+    items: LeagueTrophy[]
+  ) {
+    const m = TROPHY_META[t];
+    const item = items.find((i) => i.trophyType === t);
+    if (!item) {
+      return (
+        <div
+          key={t}
+          className="rounded-xl border border-border/60 border-dashed bg-card/30 p-5 min-h-[160px] flex flex-col justify-center opacity-50"
+        >
+          <div className="mb-2">
+            <HardwareTrophyIcon
+              kind={
+                t.startsWith("division_")
+                  ? "championship"
+                  : (t as "championship" | "toilet_bowl" | "crystal_ball")
+              }
+              sportId={sportId}
+              size={52}
+              empty
+            />
+          </div>
+          <div className="text-xs uppercase tracking-wide text-muted">
+            {t.startsWith("division_")
+              ? divisionDisplayLabel(
+                  divisionFromTrophyType(t) || "North",
+                  sportId
+                )
+              : m.short}
+          </div>
+          <p className="text-sm text-muted mt-1">Not yet · auto when ready</p>
+        </div>
+      );
+    }
+    const mine = isSelfPlayer(item.winnerUserId, selfId);
+    const shareKind = (
+      t.startsWith("division_") ? "division" : t
+    ) as ProfileTrophyKind;
+    const sharePayload = {
+      kind: shareKind,
+      seasonYear: item.seasonYear,
+      winnerName: item.winnerName,
+      leagueName,
+      subtitle: item.subtitle,
+      sportId,
+    };
+    const title = item.subtitle || m.title;
+    return (
+      <div
+        key={item.id}
+        className={`rounded-xl border ${m.border} bg-gradient-to-b from-card to-black/40 p-5 min-h-[160px] ${m.glow} relative`}
+      >
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <HardwareTrophyIcon
+            kind={
+              t.startsWith("division_")
+                ? "championship"
+                : (t as "championship" | "toilet_bowl" | "crystal_ball")
+            }
+            sportId={sportId}
+            size={76}
+            animate
+          />
+          <div className="flex items-center gap-1.5">
+            <TrophyShareButton compact trophy={sharePayload} />
+            {canSync && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() =>
+                  void onRemove(
+                    item.id,
+                    `${y} ${title} — ${item.winnerName}`
+                  )
+                }
+                className="text-[10px] text-muted hover:text-danger px-1"
+              >
+                Remove
+              </button>
+            )}
+          </div>
+        </div>
+        <div className={`text-xs uppercase tracking-wide font-semibold ${m.accent}`}>
+          {title}
+        </div>
+        <div className={`text-lg mt-1 ${selfNameClass(mine, "font-bold")}`}>
+          <PlayerLink id={item.winnerUserId} name={item.winnerName} />
+          {mine && <YouBadge />}
+        </div>
+        {item.notes && (
+          <p className="text-[11px] text-muted/80 mt-2 italic">{item.notes}</p>
+        )}
+        <div className="mt-3">
+          <TrophyShareButton
+            trophy={sharePayload}
+            label={mine ? "Share my win" : "Share this win"}
+            className="w-full justify-center"
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -162,7 +229,7 @@ export default function TrophyRoomPage() {
           <div className="flex items-center gap-3 mb-1 flex-wrap">
             <h1 className="text-2xl font-bold">Trophy Room</h1>
             <span className="text-xs px-2 py-0.5 rounded-full bg-amber-400/10 text-amber-300 border border-amber-400/30">
-              League history
+              Auto-engraved
             </span>
           </div>
           <p className="text-sm text-muted max-w-2xl leading-relaxed">
@@ -172,11 +239,16 @@ export default function TrophyRoomPage() {
                 {" · "}
               </>
             ) : null}
-            Championships, Toilet Bowls, and Village Nerd awards — year after
-            year. Stays with this league even when players join, leave, or the
-            commissioner is passed on. Season reset does{" "}
+            Championships, Toilet Bowls, conference/division titles, and Village
+            Nerd — written by the season, not by a form. Stays with this league
+            forever. Season reset does{" "}
             <span className="text-foreground font-medium">not</span> clear this
             room.
+          </p>
+          <p className="mt-2 text-xs text-muted leading-relaxed max-w-xl">
+            <strong className="text-foreground">How it locks in:</strong>{" "}
+            conference titles after cut week · Championship / Toilet when the
+            bracket final is decided · Village Nerd when Crystal Ball is crowned.
           </p>
           <p className="mt-2 text-xs">
             <Link
@@ -185,16 +257,26 @@ export default function TrophyRoomPage() {
             >
               Open War Room Museum →
             </Link>
-            <span className="text-muted">
-              {" "}
-              timeline, records, season history
-            </span>
           </p>
-          {!commish && (
-            <p className="mt-3 text-xs text-muted border border-border/70 bg-card/60 rounded-lg px-3 py-2 inline-block">
-              <span className="text-foreground font-medium">View only</span>
-              {" · "}
-              only the commissioner can engrave trophies.
+
+          {canSync && (
+            <div className="mt-4 flex flex-col sm:flex-row gap-2 sm:items-center">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void onSync()}
+                className="min-h-[44px] px-4 rounded-xl bg-primary text-black text-sm font-bold disabled:opacity-50"
+              >
+                {busy ? "Syncing…" : "Sync trophies now"}
+              </button>
+              <p className="text-[11px] text-muted">
+                Host only · re-runs auto-engrave for {year}
+              </p>
+            </div>
+          )}
+          {syncMsg && (
+            <p className="mt-2 text-xs text-primary font-medium leading-relaxed">
+              {syncMsg}
             </p>
           )}
         </div>
@@ -205,9 +287,8 @@ export default function TrophyRoomPage() {
           sportId={sportId}
         />
 
-        {/* Legend pedestals — championship uses sport hardware art */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-10">
-          {TYPES.map((t) => {
+          {BIG_TYPES.map((t) => {
             const m = TROPHY_META[t];
             return (
               <div
@@ -224,15 +305,7 @@ export default function TrophyRoomPage() {
                 </div>
                 <div className={`font-semibold ${m.accent}`}>{m.title}</div>
                 <p className="text-xs text-muted mt-1 leading-relaxed">
-                  {t === "championship"
-                    ? sportId === "nfl"
-                      ? "Top half. One path. Silver football energy — the big one."
-                      : sportId === "soccer_wwc"
-                        ? "Top half. One path. Cup hardware — the big one."
-                        : "Top half. One path. National crystal — the big one."
-                    : t === "crystal_ball"
-                      ? "Big Brain Nerd Cup. Zero points. Infinite smug. Correct once."
-                      : m.blurb}
+                  {m.blurb}
                 </p>
               </div>
             );
@@ -240,7 +313,9 @@ export default function TrophyRoomPage() {
         </div>
 
         {loading && (
-          <p className="text-sm text-muted py-8 text-center">Opening the vault…</p>
+          <p className="text-sm text-muted py-8 text-center">
+            Opening the vault…
+          </p>
         )}
 
         {loadError && (
@@ -259,8 +334,9 @@ export default function TrophyRoomPage() {
             </div>
             <p className="font-medium mb-1">Empty shelves — for now</p>
             <p className="text-sm text-muted max-w-md mx-auto">
-              When the season ends, the commissioner engraves winners here.
-              Friends come back next year and the hardware is still waiting.
+              Hardware appears automatically when the season decides it — cut
+              week, bracket finals, Crystal Ball crown. Hosts can hit Sync
+              anytime.
             </p>
           </div>
         )}
@@ -272,235 +348,33 @@ export default function TrophyRoomPage() {
                 <h2 className="text-lg font-bold tracking-tight">{y} Season</h2>
                 <div className="flex-1 h-px bg-border" />
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {TYPES.map((t) => {
-                  const m = TROPHY_META[t];
-                  const item = items.find((i) => i.trophyType === t);
-                  if (!item) {
-                    return (
-                      <div
-                        key={t}
-                        className="rounded-xl border border-border/60 border-dashed bg-card/30 p-5 min-h-[160px] flex flex-col justify-center opacity-50"
-                      >
-                        <div className="mb-2">
-                          <HardwareTrophyIcon
-                            kind={t}
-                            sportId={sportId}
-                            size={52}
-                            empty
-                          />
-                        </div>
-                        <div className="text-xs uppercase tracking-wide text-muted">
-                          {m.short}
-                        </div>
-                        <p className="text-sm text-muted mt-1">Not awarded</p>
-                      </div>
-                    );
-                  }
-                  const mine = isSelfPlayer(item.winnerUserId, selfId);
-                  const shareKind = item.trophyType as ProfileTrophyKind;
-                  const sharePayload = {
-                    kind: shareKind,
-                    seasonYear: item.seasonYear,
-                    winnerName: item.winnerName,
-                    leagueName,
-                    subtitle: item.subtitle,
-                    sportId,
-                  };
-                  return (
-                    <div
-                      key={item.id}
-                      className={`rounded-xl border ${m.border} bg-gradient-to-b from-card to-black/40 p-5 min-h-[160px] ${m.glow} relative`}
-                    >
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <HardwareTrophyIcon
-                          kind={t}
-                          sportId={sportId}
-                          size={76}
-                          animate
-                        />
-                        <div className="flex items-center gap-1.5">
-                          <TrophyShareButton
-                            compact
-                            trophy={sharePayload}
-                          />
-                          {commish && (
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() =>
-                                void onRemove(
-                                  item.id,
-                                  `${y} ${m.title} — ${item.winnerName}`
-                                )
-                              }
-                              className="text-[10px] text-muted hover:text-danger px-1"
-                            >
-                              Remove
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                      <div
-                        className={`text-xs uppercase tracking-wide font-semibold ${m.accent}`}
-                      >
-                        {m.title}
-                      </div>
-                      <div
-                        className={`text-lg mt-1 ${selfNameClass(mine, "font-bold")}`}
-                      >
-                        <PlayerLink
-                          id={item.winnerUserId}
-                          name={item.winnerName}
-                        />
-                        {mine && <YouBadge />}
-                      </div>
-                      {item.subtitle && (
-                        <p className="text-xs text-muted mt-1">{item.subtitle}</p>
-                      )}
-                      {item.notes && (
-                        <p className="text-[11px] text-muted/80 mt-2 italic">
-                          {item.notes}
-                        </p>
-                      )}
-                      <div className="mt-3">
-                        <TrophyShareButton
-                          trophy={sharePayload}
-                          label={mine ? "Share my win" : "Share this win"}
-                          className="w-full justify-center"
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
+              <p className="text-[10px] uppercase tracking-wider text-muted font-bold mb-2">
+                Big hardware
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                {BIG_TYPES.map((t) => plaque(y, t, items))}
+              </div>
+              <p className="text-[10px] uppercase tracking-wider text-muted font-bold mb-2">
+                {sportId === "nfl"
+                  ? "Division titles"
+                  : "Conference titles"}
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {DIV_TYPES.map((t) => plaque(y, t, items))}
               </div>
             </section>
           ))}
 
-        {commish && (
-          <section className="rounded-xl border border-primary/30 bg-card p-5 space-y-4">
-            <div>
-              <h2 className="font-semibold text-primary">Engrave a trophy</h2>
-              <p className="text-xs text-muted mt-1">
-                One of each type per season year. If that plaque already exists,
-                you&apos;ll get a confirm popup before replacing the name. Setup:{" "}
-                <code className="text-foreground">supabase/trophy-room.sql</code>{" "}
-                if awards fail.
-              </p>
-            </div>
-
-            <form onSubmit={(e) => void onAward(e)} className="space-y-3">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <label className="block text-xs text-muted">
-                  Season year
-                  <input
-                    type="number"
-                    min={2000}
-                    max={2100}
-                    value={year}
-                    onChange={(e) => setYear(Number(e.target.value) || year)}
-                    className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground"
-                  />
-                </label>
-                <label className="block text-xs text-muted sm:col-span-2">
-                  Trophy
-                  <select
-                    value={type}
-                    onChange={(e) => setType(e.target.value as TrophyType)}
-                    className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground"
-                  >
-                    {TYPES.map((t) => (
-                      <option key={t} value={t}>
-                        {TROPHY_META[t].title}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-
-              <label className="block text-xs text-muted">
-                Winner (from roster)
-                <select
-                  value={winnerUserId}
-                  onChange={(e) => onPickMember(e.target.value)}
-                  className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground"
-                >
-                  <option value="">— Select player —</option>
-                  {roster.map((m) => (
-                    <option key={m.userId} value={m.userId}>
-                      {m.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="block text-xs text-muted">
-                Name on plaque (auto-fills from roster; edit if they left)
-                <input
-                  value={winnerName}
-                  onChange={(e) => setWinnerName(e.target.value)}
-                  placeholder="Display name"
-                  required
-                  className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground"
-                />
-              </label>
-
-              <label className="block text-xs text-muted">
-                Subtitle (optional)
-                <input
-                  value={subtitle}
-                  onChange={(e) => setSubtitle(e.target.value)}
-                  placeholder={
-                    type === "crystal_ball"
-                      ? "e.g. Predicted Ohio State"
-                      : type === "toilet_bowl"
-                        ? "e.g. Flush King"
-                        : "e.g. Undefeated bracket"
-                  }
-                  className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground"
-                />
-              </label>
-
-              <label className="block text-xs text-muted">
-                Notes (optional)
-                <input
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Lore for next year…"
-                  className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground"
-                />
-              </label>
-
-              <p className={`text-xs ${meta.accent}`}>{meta.blurb}</p>
-
-              <button
-                type="submit"
-                disabled={busy || !winnerName.trim()}
-                className="px-4 py-2 rounded-lg bg-primary text-black text-sm font-semibold disabled:opacity-50"
-              >
-                {busy ? "Engraving…" : "Award trophy"}
-              </button>
-              {formMsg && (
-                <p
-                  className={`text-xs ${
-                    formMsg.toLowerCase().includes("engrave")
-                      ? "text-primary"
-                      : "text-danger"
-                  }`}
-                >
-                  {formMsg}
-                </p>
-              )}
-            </form>
-
-            <p className="text-[11px] text-muted">
-              Stepping down?{" "}
-              <Link href="/commissioner" className="text-primary hover:underline">
-                Pass commissioner
-              </Link>{" "}
-              — the Trophy Room stays with the league.
-            </p>
-          </section>
+        {canSync && (
+          <p className="text-[11px] text-muted mt-6">
+            Stepping down?{" "}
+            <Link href="/commissioner" className="text-primary hover:underline">
+              Pass commissioner
+            </Link>{" "}
+            — the Trophy Room stays with the league. Optional SQL:{" "}
+            <code className="text-foreground">supabase/division-trophies.sql</code>
+            .
+          </p>
         )}
       </main>
     </div>
