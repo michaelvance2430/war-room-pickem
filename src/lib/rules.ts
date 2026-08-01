@@ -189,15 +189,40 @@ const LOCK_NFL: RuleSection = {
 const TROPHY_NFL: RuleSection = {
   title: "Trophy Room",
   body: [
-    "After the season, the commissioner engraves winners: Championship and Toilet Bowl.",
+    "After the season, the commissioner engraves winners: Championship and Toilet Bowl (and Village Nerd if pride pick is on).",
     "History stays with the league year after year — even if players join/leave or the commissioner is passed on.",
     "Season reset does not wipe the Trophy Room.",
   ],
 };
 
+const LEAGUE_SIZE_NFL: RuleSection = {
+  title: "League size",
+  body: [
+    "Leagues cap at 32 players.",
+    "Why: top half → Championship (up to 16), bottom half → Toilet Bowl (up to 16). A 16-team bracket needs 4 rounds — Wild Card through Super Bowl (app weeks 19–22).",
+    "Divisions display as AFC East, AFC West, NFC East, NFC West — each division sends a champ into championship seeding.",
+    "If your group is bigger, start a second league with its own code.",
+    "Optional: commissioner can pad empty seats with bots up to 32. Clear bots anytime — real players stay.",
+  ],
+};
+
+const CRYSTAL_NFL: RuleSection = {
+  title: "Super Bowl pride pick (optional) — READ THIS",
+  callout: true,
+  body: [
+    "Optional — commissioner can turn it on under Settings (off by default for NFL).",
+    "Pick who you think wins the Super Bowl. Worth zero standings points — pure flex.",
+    {
+      bold: true,
+      text: "LOCK: pride pick freezes at noon ET on Kickoff Thursday, Sep 10, 2026, or when Week 1 locks — whichever first. No take-backs.",
+    },
+    "If you're right when the commissioner crowns the champ, you earn Village Witch / Wizard Nerd (still zero points).",
+  ],
+};
+
 /**
  * Sport-aware rules for onboarding + Rules page.
- * NFL drops Crystal Ball national-champ copy and uses pro week map language.
+ * NFL drops CFB week/Crystal Ball copy and uses pro week map language.
  */
 export function getRulesForSport(sportId?: string | null): {
   intro: string;
@@ -215,14 +240,19 @@ export function getRulesForSport(sportId?: string | null): {
         s.title !== "Profile & tips"
     );
     const tail = RULE_SECTIONS.filter(
-      (s) =>
-        s.title === "Locker Room" ||
-        s.title === "League size" ||
-        s.title === "Profile & tips"
+      (s) => s.title === "Locker Room" || s.title === "Profile & tips"
     );
     return {
       intro: RULES_INTRO_NFL,
-      sections: [...core, LOCK_NFL, SCORING_NFL, TROPHY_NFL, ...tail],
+      sections: [
+        ...core,
+        LOCK_NFL,
+        SCORING_NFL,
+        CRYSTAL_NFL,
+        TROPHY_NFL,
+        LEAGUE_SIZE_NFL,
+        ...tail,
+      ],
     };
   }
   return { intro: RULES_INTRO, sections: RULE_SECTIONS };

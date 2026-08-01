@@ -29,7 +29,7 @@ export default function FootballResume({
             Permanent record
           </p>
           <h2 className="text-lg font-bold text-foreground mt-0.5">
-            Football resume
+            Season résumé
           </h2>
           <p className="text-xs text-muted mt-1 max-w-md leading-relaxed">
             Hardware years and titles stick. Spreadsheet lives under the fold.

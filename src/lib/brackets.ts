@@ -430,8 +430,29 @@ function getSeedPositions(size: number): number[] {
   return Array.from({ length: size }, (_, i) => i);
 }
 
-export function roundLabel(roundIndex: number, totalRounds: number): string {
+export function roundLabel(
+  roundIndex: number,
+  totalRounds: number,
+  sportId?: string | null
+): string {
   const remaining = totalRounds - roundIndex;
+  let nfl = sportId === "nfl";
+  if (!nfl && sportId == null) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { getLeague } = require("./league") as typeof import("./league");
+      nfl = getLeague()?.sportId === "nfl";
+    } catch {
+      nfl = false;
+    }
+  }
+  // NFL 4-round champ path: WC → Div → Conf → Super Bowl
+  if (nfl && totalRounds === 4) {
+    if (remaining === 1) return "Super Bowl";
+    if (remaining === 2) return "Conference";
+    if (remaining === 3) return "Divisional";
+    return "Wild Card";
+  }
   if (remaining === 1) return "Final";
   if (remaining === 2) return "Semifinals";
   if (remaining === 3) return "Quarterfinals";

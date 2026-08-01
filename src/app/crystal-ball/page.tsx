@@ -200,9 +200,23 @@ export default function CrystalBallPage() {
           <p className="text-sm sm:text-base font-bold text-foreground leading-snug">
             {state.locked ? (
               <>
-                Crystal Ball is sealed.{" "}
+                {nfl ? "Pride pick" : "Crystal Ball"} is sealed.{" "}
                 <span className="text-primary">{state.lockLabel}</span> You
-                cannot change your national champion pick. No exceptions.
+                cannot change your{" "}
+                {nfl ? "Super Bowl" : "national champion"} pick. No exceptions.
+              </>
+            ) : nfl ? (
+              <>
+                Your pick locks at the{" "}
+                <span className="text-primary">earlier</span> of{" "}
+                <span className="text-primary">
+                  noon ET Thu Sep 10, 2026
+                </span>{" "}
+                or when{" "}
+                <span className="text-primary">Week 1 freezes / scores</span>.
+                After that you{" "}
+                <span className="underline decoration-2">cannot change it</span>
+                . No take-backs.
               </>
             ) : (
               <>
