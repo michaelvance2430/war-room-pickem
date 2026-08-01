@@ -61,7 +61,7 @@ export const DISCOVERY_CATALOG: DiscoveryDef[] = [
     id: "egg_curiosity_trophy",
     name: "Curiosity Didn't Kill the Cat",
     description: "You tapped the hardware until it spun.",
-    flavor: "Five taps. One spin. Zero competitive edge.",
+    flavor: "Five taps in a row. One spin. Zero competitive edge.",
     kind: "secret_tap",
     icon: "🏆",
     stampLabel: "Curious hands",
@@ -278,7 +278,10 @@ type PlayerEggState = {
   /** Current consecutive open-day streak */
   openStreak: number;
   lastOpenDay: string | null;
+  /** Consecutive trophy taps in the current streak (resets if you pause) */
   trophyTaps: number;
+  /** Last championship trophy tap (ms) — for consecutive-window reset */
+  lastTrophyTapAt: number | null;
   mascotFinds: string[];
   /** Letters collected toward NEVER GIVE UP (unique week keys) */
   secretLetters: Record<string, string>;
@@ -313,6 +316,7 @@ function emptyState(): PlayerEggState {
     openStreak: 0,
     lastOpenDay: null,
     trophyTaps: 0,
+    lastTrophyTapAt: null,
     mascotFinds: [],
     secretLetters: {},
     anniversaryShownYear: null,
@@ -823,18 +827,34 @@ export function noteAppOpen(opts: {
   return moments;
 }
 
-/** Type 2 — championship trophy multi-tap */
+/**
+ * Type 2 — championship trophy multi-tap.
+ * Must be 5 *consecutive* taps (within ~1.5s of each other).
+ * Pausing resets the streak — not a lifetime “5 clicks ever” log.
+ */
+const TROPHY_TAP_WINDOW_MS = 1500;
+
 export function recordTrophyTap(playerId: string): EasterEggMoment | null {
   if (!playerId) return null;
   const state = getEggState(playerId);
-  state.trophyTaps = (state.trophyTaps || 0) + 1;
+  const now = Date.now();
+  const last = state.lastTrophyTapAt ?? 0;
+  if (!last || now - last > TROPHY_TAP_WINDOW_MS) {
+    state.trophyTaps = 1;
+  } else {
+    state.trophyTaps = (state.trophyTaps || 0) + 1;
+  }
+  state.lastTrophyTapAt = now;
   saveEggState(playerId, state);
   if (state.trophyTaps >= 5 && !hasDiscovery(playerId, "egg_curiosity_trophy")) {
+    state.trophyTaps = 0;
+    state.lastTrophyTapAt = null;
+    saveEggState(playerId, state);
     grantDiscovery(playerId, "egg_curiosity_trophy", { silent: true });
     return {
       id: "egg_curiosity_trophy",
       title: "Curiosity Didn't Kill the Cat",
-      body: "The trophy spun. You found it.",
+      body: "Five taps in a row. The trophy spun. You found it.",
       icon: "🏆",
       confetti: true,
     };
