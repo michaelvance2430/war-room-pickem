@@ -387,7 +387,7 @@ function JoinPageInner() {
           }
         }
 
-        // Mid-season OK — join for fun at 0 points (never catch-up pad)
+        // Mid-season OK: 0 season pts (no catch-up). Cheevos/trophies still earnable.
         const { error: memError } = await supabase.from("memberships").insert({
           league_id: league.id,
           user_id: userId,
@@ -791,9 +791,11 @@ function JoinPageInner() {
                 Season already rolling?
               </p>
               You can still join. You start at{" "}
-              <strong className="text-foreground">0 points</strong> — no catch-up
-              — and still enjoy the ride (picks, Locker, Gazette). Empty seats
-              only.
+              <strong className="text-foreground">0 season points</strong> — no
+              catch-up for weeks you missed. From here on you still pick, chase{" "}
+              <strong className="text-foreground">cheevos</strong>, and can win{" "}
+              <strong className="text-foreground">trophies</strong> like anyone
+              else. Empty seats only.
             </div>
             <input
               value={code}

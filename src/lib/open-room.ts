@@ -218,7 +218,7 @@ export async function seatPlayerInLeague(opts: {
     }
     const division = leastPopulatedDivision(counts);
 
-    // Late joiners (season already rolling): start at 0 pts, enjoy the ride
+    // Late joiners: 0 season pts (no catch-up). Still earn cheevos/trophies going forward.
     const { error: memError } = await supabase.from("memberships").insert({
       league_id: league.id,
       user_id: userId,
