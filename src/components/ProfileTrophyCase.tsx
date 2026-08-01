@@ -15,6 +15,7 @@ import {
   EVENT_EASTER_EGG,
   recordTrophyTap,
 } from "@/lib/easter-eggs";
+import SportChampionshipTrophy from "@/components/SportChampionshipTrophy";
 
 function Plaque({
   item,
@@ -22,12 +23,14 @@ function Plaque({
   canShare,
   spinny,
   onTrophyTap,
+  sportId,
 }: {
   item: ProfileTrophy;
   leagueName?: string;
   canShare: boolean;
   spinny?: boolean;
   onTrophyTap?: () => void;
+  sportId?: string | null;
 }) {
   const meta = HARDWARE_KIND_META[item.kind];
   const sharePayload = {
@@ -37,6 +40,7 @@ function Plaque({
     leagueName,
     division: item.division,
     subtitle: item.subtitle,
+    sportId: sportId || undefined,
   };
 
   return (
@@ -46,7 +50,7 @@ function Plaque({
       <div className="flex items-start justify-between gap-2 mb-1">
         <button
           type="button"
-          className={`text-2xl select-none ${
+          className={`select-none ${
             spinny ? "animate-spin" : ""
           } ${item.kind === "championship" ? "cursor-pointer" : "cursor-default"}`}
           aria-hidden
@@ -55,7 +59,15 @@ function Plaque({
             if (item.kind === "championship") onTrophyTap?.();
           }}
         >
-          {meta.emoji}
+          {item.kind === "championship" ? (
+            <SportChampionshipTrophy
+              sport={sportId}
+              size={48}
+              animate={false}
+            />
+          ) : (
+            <span className="text-2xl">{meta.emoji}</span>
+          )}
         </button>
         {canShare && <TrophyShareButton compact trophy={sharePayload} />}
       </div>
@@ -97,17 +109,19 @@ function EmptySlot({
   kind,
   spinny,
   onTrophyTap,
+  sportId,
 }: {
   kind: ProfileTrophyKind;
   spinny?: boolean;
   onTrophyTap?: () => void;
+  sportId?: string | null;
 }) {
   const meta = HARDWARE_KIND_META[kind];
   return (
     <div className="rounded-xl border border-dashed border-border/70 bg-card/30 p-4 min-h-[120px] flex flex-col justify-center opacity-50">
       <button
         type="button"
-        className={`text-2xl mb-1 grayscale text-left ${
+        className={`mb-1 grayscale text-left ${
           spinny ? "animate-spin" : ""
         } ${kind === "championship" ? "cursor-pointer" : "cursor-default"}`}
         aria-hidden
@@ -116,7 +130,15 @@ function EmptySlot({
           if (kind === "championship") onTrophyTap?.();
         }}
       >
-        {meta.emoji}
+        {kind === "championship" ? (
+          <SportChampionshipTrophy
+            sport={sportId}
+            size={40}
+            animate={false}
+          />
+        ) : (
+          <span className="text-2xl">{meta.emoji}</span>
+        )}
       </button>
       <div className="text-[10px] uppercase tracking-wide text-muted">
         {kind === "championship"
@@ -155,7 +177,7 @@ export default function ProfileTrophyCase({
   const canShare = true;
   void isSelf;
   void hasAny;
-  void getLeague;
+  const sportId = getLeague()?.sportId || null;
 
   function handleTrophyTap(itemId: string) {
     setSpinId(itemId);
@@ -202,6 +224,7 @@ export default function ProfileTrophyCase({
                 <EmptySlot
                   key={kind}
                   kind={kind}
+                  sportId={sportId}
                   spinny={spinId === `empty-${kind}`}
                   onTrophyTap={() => handleTrophyTap(`empty-${kind}`)}
                 />
@@ -215,6 +238,7 @@ export default function ProfileTrophyCase({
                     item={item}
                     leagueName={leagueName}
                     canShare={canShare}
+                    sportId={sportId}
                     spinny={spinId === item.id}
                     onTrophyTap={() => handleTrophyTap(item.id)}
                   />
