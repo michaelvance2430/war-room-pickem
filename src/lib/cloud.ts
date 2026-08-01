@@ -3525,6 +3525,15 @@ export async function resetSeasonInCloud(): Promise<ResetSeasonResult> {
       if (!k) continue;
       if (prefixes.some((p) => k.startsWith(p))) localStorage.removeItem(k);
     }
+    // Gazette copy uniqueness memory — new season gets a fresh bank pass
+    try {
+      const { clearGazetteCopyForLeague } = await import(
+        "./gazette-copy-engine"
+      );
+      clearGazetteCopyForLeague(leagueId);
+    } catch {
+      /* ignore */
+    }
   } catch {
     /* ignore */
   }

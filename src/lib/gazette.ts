@@ -12,8 +12,33 @@ import {
   gazetteSecretLetterForWeek,
   pickRareGazetteLine,
 } from "./easter-eggs";
+import {
+  pickFromFnBank,
+  pickBankSlot,
+  comboCrownHeadline,
+  comboCrownDeck,
+  comboShameHeadline,
+  comboShameDeck,
+  comboSoloHeadline,
+  comboSoloDeck,
+} from "./gazette-copy-engine";
 
 const SEEN_PREFIX = "warroom-gazette-seen-v1";
+
+/** Combo factories keyed by bank id (exhausted-season forever lines). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const GAZETTE_COMBO: Record<string, ((salt: number) => any) | undefined> = {
+  crown_headlines: comboCrownHeadline,
+  crown_decks: comboCrownDeck,
+  shame_headlines: comboShameHeadline,
+  shame_decks: comboShameDeck,
+  solo_headlines: comboSoloHeadline,
+  solo_decks: comboSoloDeck,
+  nfl_crown_headlines: comboCrownHeadline,
+  nfl_crown_decks: comboCrownDeck,
+  nfl_shame_headlines: comboShameHeadline,
+  nfl_shame_decks: comboShameDeck,
+};
 
 /** Feature flag — set false or delete modal to kill the trial. */
 export const GAZETTE_ENABLED = true;
@@ -286,15 +311,45 @@ export async function getGazetteUnreadState(): Promise<{
 }
 
 /**
- * Pick by week index so each scored week gets a distinct line.
- * 18 templates → weeks 0–17 unique; week 18+ wraps once.
- * `offset` keeps crown vs shame from sharing the same “slot vibe.”
+ * Pick copy for this week — unique per league-season when possible.
+ * After the bank is exhausted, combinatorial generators (or spice-wrap)
+ * keep lines fresh forever. Same week always rebuilds the same line.
+ *
+ * `bankKey` scopes uniqueness (crown vs shame don't share slots).
+ * Prefer passing an explicit key; falls back to a hash of list identity.
  */
-function byWeek<T>(list: T[], weekIndex: number, offset = 0): T {
+function byWeek<T>(
+  list: T[],
+  weekIndex: number,
+  offset = 0,
+  bankKey?: string
+): T {
   const n = list.length;
   if (n === 0) throw new Error("empty copy bank");
-  const i = (((weekIndex + offset) % n) + n) % n;
-  return list[i];
+  const key =
+    bankKey ||
+    `anon_${n}_${offset}_${typeof list[0] === "function" ? "fn" : "val"}`;
+
+  if (typeof list[0] === "function") {
+    return pickFromFnBank(
+      key,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      list as any,
+      weekIndex,
+      offset,
+      GAZETTE_COMBO[key]
+    ) as T;
+  }
+
+  const slot = pickBankSlot({
+    bankKey: key,
+    bankLen: n,
+    weekIndex,
+    offset,
+  });
+  if (slot.mode === "bank") return list[slot.index]!;
+  const i = (slot.comboSalt + weekIndex + offset) % n;
+  return list[i]!;
 }
 
 type HN = (n: string, pts: number) => string;
@@ -535,9 +590,9 @@ async function buildChaosDetonationStory(
   const label = formatNameList(names);
   const multi = names.length > 1;
   const hn = multi
-    ? byWeek(CHAOS_LOCK_MULTI_HEADLINES, weekIndex)(label)
-    : byWeek(CHAOS_LOCK_HEADLINES, weekIndex)(label);
-  const deck = byWeek(CHAOS_LOCK_DECKS, weekIndex)(names.length, topPts);
+    ? byWeek(CHAOS_LOCK_MULTI_HEADLINES, weekIndex, 0, "chaos_lock_multi_headlines")(label)
+    : byWeek(CHAOS_LOCK_HEADLINES, weekIndex, 0, "chaos_lock_headlines")(label);
+  const deck = byWeek(CHAOS_LOCK_DECKS, weekIndex, 0, "chaos_lock_decks")(names.length, topPts);
 
   return {
     names,
@@ -776,6 +831,8 @@ export const GAZETTE_COPY_COUNTS = {
   standingsTieDecks: STANDINGS_TIE_DECKS.length,
   noLockHeadlines: NO_LOCK_HEADLINES.length,
   noLockDecks: NO_LOCK_DECKS.length,
+  /** Hand banks are finite; after exhaust, combinatorial lines run forever */
+  uniquePerSeasonThenCombo: true,
 } as const;
 
 /**
@@ -824,11 +881,11 @@ export async function buildGazetteEdition(
     pts: cp,
     kind: "clear",
     headline: data.samePerson
-      ? byWeek(SOLO_HEADLINES, weekIndex)(cn, cp)
-      : byWeek(CROWN_HEADLINES, weekIndex, 0)(cn, cp),
+      ? byWeek(SOLO_HEADLINES, weekIndex, 0, "solo_headlines")(cn, cp)
+      : byWeek(CROWN_HEADLINES, weekIndex, 0, "crown_headlines")(cn, cp),
     deck: data.samePerson
-      ? byWeek(SOLO_DECKS, weekIndex)(cp)
-      : byWeek(CROWN_DECKS, weekIndex, 0)(cp),
+      ? byWeek(SOLO_DECKS, weekIndex, 0, "solo_decks")(cp)
+      : byWeek(CROWN_DECKS, weekIndex, 0, "crown_decks")(cp),
   };
 
   let shame: GazetteStory | null = null;
@@ -837,8 +894,8 @@ export async function buildGazetteEdition(
       names: [sn],
       pts: sp,
       kind: "clear",
-      headline: byWeek(SHAME_HEADLINES, weekIndex, 0)(sn, sp),
-      deck: byWeek(SHAME_DECKS, weekIndex, 0)(sp),
+      headline: byWeek(SHAME_HEADLINES, weekIndex, 0, "shame_headlines")(sn, sp),
+      deck: byWeek(SHAME_DECKS, weekIndex, 0, "shame_decks")(sp),
     };
   }
 
@@ -851,12 +908,12 @@ export async function buildGazetteEdition(
       names: overallTie.names,
       pts: overallTie.pts,
       kind: "tie",
-      headline: byWeek(STANDINGS_TIE_HEADLINES, weekIndex)(
+      headline: byWeek(STANDINGS_TIE_HEADLINES, weekIndex, 0, "standings_tie_headlines")(
         label,
         overallTie.pts,
         overallTie.names.length
       ),
-      deck: byWeek(STANDINGS_TIE_DECKS, weekIndex)(
+      deck: byWeek(STANDINGS_TIE_DECKS, weekIndex, 0, "standings_tie_decks")(
         overallTie.pts,
         overallTie.names.length
       ),
@@ -881,8 +938,8 @@ export async function buildGazetteEdition(
       names: ghostNames,
       pts: 0,
       kind: ghostNames.length > 1 ? "tie" : "clear",
-      headline: byWeek(NO_LOCK_HEADLINES, weekIndex, 3)(label),
-      deck: byWeek(NO_LOCK_DECKS, weekIndex, 3)(ghostNames.length),
+      headline: byWeek(NO_LOCK_HEADLINES, weekIndex, 3, "no_lock_headlines")(label),
+      deck: byWeek(NO_LOCK_DECKS, weekIndex, 3, "no_lock_decks")(ghostNames.length),
     };
     // If the "shame" player is only on the carton for ghosting, prefer milk carton copy
     // and still keep shame for legit low scores who did lock.
@@ -909,8 +966,8 @@ export async function buildGazetteEdition(
           names: missNames,
           pts: 0,
           kind: missNames.length > 1 ? "tie" : "clear",
-          headline: byWeek(CRYSTAL_MISS_HEADLINES, weekIndex, 1)(label),
-          deck: byWeek(CRYSTAL_MISS_DECKS, weekIndex, 1)(missNames.length),
+          headline: byWeek(CRYSTAL_MISS_HEADLINES, weekIndex, 1, "crystal_miss_headlines")(label),
+          deck: byWeek(CRYSTAL_MISS_DECKS, weekIndex, 1, "crystal_miss_decks")(missNames.length),
         };
       }
     } catch {
@@ -979,23 +1036,23 @@ export async function buildGazetteEdition(
         pts: star.lastWeekPts ?? star.totalPoints,
         kind: "clear",
         headline: up
-          ? byWeek(SWING_UP_HEADLINES, weekIndex)(
+          ? byWeek(SWING_UP_HEADLINES, weekIndex, 0, "swing_up_headlines")(
               star.name,
               star.swing.delta,
               star.swing.text
             )
-          : byWeek(SWING_DOWN_HEADLINES, weekIndex)(
+          : byWeek(SWING_DOWN_HEADLINES, weekIndex, 0, "swing_down_headlines")(
               star.name,
               Math.abs(star.swing.delta),
               star.swing.text
             ),
         deck: up
-          ? byWeek(SWING_UP_DECKS, weekIndex)(
+          ? byWeek(SWING_UP_DECKS, weekIndex, 0, "swing_up_decks")(
               star.swing.delta,
               star.rank,
               star.swing.text
             )
-          : byWeek(SWING_DOWN_DECKS, weekIndex)(
+          : byWeek(SWING_DOWN_DECKS, weekIndex, 0, "swing_down_decks")(
               Math.abs(star.swing.delta),
               star.rank,
               star.swing.text
@@ -1053,17 +1110,17 @@ export async function buildGazetteEdition(
       NFL_SWING_DOWN_DECKS,
     } = await import("./sports/nfl-voice");
 
-    const tagline = byWeek(NFL_EDITION_TAGLINES, weekIndex);
-    const weather = byWeek(NFL_WEATHER_BOXES, weekIndex, 1);
+    const tagline = byWeek(NFL_EDITION_TAGLINES, weekIndex, 0, "nfl_edition_taglines");
+    const weather = byWeek(NFL_WEATHER_BOXES, weekIndex, 1, "nfl_weather_boxes");
     const classifieds =
       flavor === "slim"
-        ? [byWeek(NFL_CLASSIFIEDS, weekIndex, 0)(classifiedCtx)]
+        ? [byWeek(NFL_CLASSIFIEDS, weekIndex, 0, "nfl_classifieds")(classifiedCtx)]
         : [
-            byWeek(NFL_CLASSIFIEDS, weekIndex, 0),
-            byWeek(NFL_CLASSIFIEDS, weekIndex, 1),
-            byWeek(NFL_CLASSIFIEDS, weekIndex, 2),
+            byWeek(NFL_CLASSIFIEDS, weekIndex, 0, "nfl_classifieds"),
+            byWeek(NFL_CLASSIFIEDS, weekIndex, 1, "nfl_classifieds"),
+            byWeek(NFL_CLASSIFIEDS, weekIndex, 2, "nfl_classifieds"),
           ].map((fn) => fn(classifiedCtx));
-    const pullQuote = byWeek(NFL_PULL_QUOTES, weekIndex, 1)({
+    const pullQuote = byWeek(NFL_PULL_QUOTES, weekIndex, 1, "nfl_pull_quotes")({
       crown: cn,
       shame: sn,
       pts: cp,
@@ -1077,25 +1134,25 @@ export async function buildGazetteEdition(
     };
     const sideStories: GazetteSideStory[] =
       flavor === "slim"
-        ? [byWeek(NFL_SIDE_STORIES, weekIndex, 0)(sideCtx)]
+        ? [byWeek(NFL_SIDE_STORIES, weekIndex, 0, "nfl_side_stories")(sideCtx)]
         : [
-            byWeek(NFL_SIDE_STORIES, weekIndex, 0)(sideCtx),
-            byWeek(NFL_SIDE_STORIES, weekIndex, 1)(sideCtx),
+            byWeek(NFL_SIDE_STORIES, weekIndex, 0, "nfl_side_stories")(sideCtx),
+            byWeek(NFL_SIDE_STORIES, weekIndex, 1, "nfl_side_stories")(sideCtx),
           ];
 
     const nflCrown: GazetteStory = {
       ...crown,
       headline: data.samePerson
-        ? byWeek(NFL_CROWN_HEADLINES, weekIndex)(cn, cp)
-        : byWeek(NFL_CROWN_HEADLINES, weekIndex, 0)(cn, cp),
-      deck: byWeek(NFL_CROWN_DECKS, weekIndex, 0)(cp),
+        ? byWeek(NFL_CROWN_HEADLINES, weekIndex, 0, "nfl_crown_headlines")(cn, cp)
+        : byWeek(NFL_CROWN_HEADLINES, weekIndex, 0, "nfl_crown_headlines")(cn, cp),
+      deck: byWeek(NFL_CROWN_DECKS, weekIndex, 0, "nfl_crown_decks")(cp),
     };
     let nflShame: GazetteStory | null = shame;
     if (shame && !data.samePerson) {
       nflShame = {
         ...shame,
-        headline: byWeek(NFL_SHAME_HEADLINES, weekIndex, 0)(sn, sp),
-        deck: byWeek(NFL_SHAME_DECKS, weekIndex, 0)(sp),
+        headline: byWeek(NFL_SHAME_HEADLINES, weekIndex, 0, "nfl_shame_headlines")(sn, sp),
+        deck: byWeek(NFL_SHAME_DECKS, weekIndex, 0, "nfl_shame_decks")(sp),
       };
     }
 
@@ -1105,8 +1162,8 @@ export async function buildGazetteEdition(
       const label = formatNameList(noLock.names);
       nflNoLock = {
         ...noLock,
-        headline: byWeek(NFL_NO_LOCK_HEADLINES, weekIndex, 3)(label),
-        deck: byWeek(NFL_NO_LOCK_DECKS, weekIndex, 3)(noLock.names.length),
+        headline: byWeek(NFL_NO_LOCK_HEADLINES, weekIndex, 3, "nfl_no_lock_headlines")(label),
+        deck: byWeek(NFL_NO_LOCK_DECKS, weekIndex, 3, "nfl_no_lock_decks")(noLock.names.length),
       };
     }
 
@@ -1126,23 +1183,23 @@ export async function buildGazetteEdition(
           nflSwing = {
             ...swing,
             headline: up
-              ? byWeek(NFL_SWING_UP_HEADLINES, weekIndex)(
+              ? byWeek(NFL_SWING_UP_HEADLINES, weekIndex, 0, "nfl_swing_up_headlines")(
                   star.name,
                   d,
                   star.swing.text
                 )
-              : byWeek(NFL_SWING_DOWN_HEADLINES, weekIndex)(
+              : byWeek(NFL_SWING_DOWN_HEADLINES, weekIndex, 0, "nfl_swing_down_headlines")(
                   star.name,
                   d,
                   star.swing.text
                 ),
             deck: up
-              ? byWeek(NFL_SWING_UP_DECKS, weekIndex)(
+              ? byWeek(NFL_SWING_UP_DECKS, weekIndex, 0, "nfl_swing_up_decks")(
                   d,
                   star.rank,
                   star.swing.text
                 )
-              : byWeek(NFL_SWING_DOWN_DECKS, weekIndex)(
+              : byWeek(NFL_SWING_DOWN_DECKS, weekIndex, 0, "nfl_swing_down_decks")(
                   d,
                   star.rank,
                   star.swing.text
@@ -1192,17 +1249,17 @@ export async function buildGazetteEdition(
 
   // --- World Cup Edition voice (same engine, different newspaper) ---
   if (wwc) {
-    const tagline = byWeek(WWC_EDITION_TAGLINES, weekIndex);
-    const weather = byWeek(WWC_WEATHER_BOXES, weekIndex, 1);
+    const tagline = byWeek(WWC_EDITION_TAGLINES, weekIndex, 0, "wwc_edition_taglines");
+    const weather = byWeek(WWC_WEATHER_BOXES, weekIndex, 1, "wwc_weather_boxes");
     const classifieds =
       flavor === "slim"
-        ? [byWeek(WWC_CLASSIFIEDS, weekIndex, 0)(classifiedCtx)]
+        ? [byWeek(WWC_CLASSIFIEDS, weekIndex, 0, "wwc_classifieds")(classifiedCtx)]
         : [
-            byWeek(WWC_CLASSIFIEDS, weekIndex, 0),
-            byWeek(WWC_CLASSIFIEDS, weekIndex, 1),
-            byWeek(WWC_CLASSIFIEDS, weekIndex, 2),
+            byWeek(WWC_CLASSIFIEDS, weekIndex, 0, "wwc_classifieds"),
+            byWeek(WWC_CLASSIFIEDS, weekIndex, 1, "wwc_classifieds"),
+            byWeek(WWC_CLASSIFIEDS, weekIndex, 2, "wwc_classifieds"),
           ].map((fn) => fn(classifiedCtx));
-    const pullQuote = byWeek(WWC_PULL_QUOTES, weekIndex, 2)({
+    const pullQuote = byWeek(WWC_PULL_QUOTES, weekIndex, 2, "wwc_pull_quotes")({
       crown: cn,
       shame: sn,
       pts: cp,
@@ -1216,24 +1273,24 @@ export async function buildGazetteEdition(
     };
     const sideStories: GazetteSideStory[] =
       flavor === "slim"
-        ? [byWeek(WWC_SIDE_STORIES, weekIndex, 0)(sideCtx)]
+        ? [byWeek(WWC_SIDE_STORIES, weekIndex, 0, "wwc_side_stories")(sideCtx)]
         : [
-            byWeek(WWC_SIDE_STORIES, weekIndex, 0)(sideCtx),
-            byWeek(WWC_SIDE_STORIES, weekIndex, 1)(sideCtx),
+            byWeek(WWC_SIDE_STORIES, weekIndex, 0, "wwc_side_stories")(sideCtx),
+            byWeek(WWC_SIDE_STORIES, weekIndex, 1, "wwc_side_stories")(sideCtx),
           ];
 
     // Tournament-splash headlines on top of scored results
     const wwcCrown: GazetteStory = {
       ...crown,
-      headline: byWeek(WWC_CROWN_HEADLINES, weekIndex)(cn, cp),
-      deck: byWeek(WWC_CROWN_DECKS, weekIndex)(cp),
+      headline: byWeek(WWC_CROWN_HEADLINES, weekIndex, 0, "wwc_crown_headlines")(cn, cp),
+      deck: byWeek(WWC_CROWN_DECKS, weekIndex, 0, "wwc_crown_decks")(cp),
     };
     let wwcShame: GazetteStory | null = shame;
     if (shame) {
       wwcShame = {
         ...shame,
-        headline: byWeek(WWC_SHAME_HEADLINES, weekIndex)(sn, sp),
-        deck: byWeek(WWC_SHAME_DECKS, weekIndex)(sp),
+        headline: byWeek(WWC_SHAME_HEADLINES, weekIndex, 0, "wwc_shame_headlines")(sn, sp),
+        deck: byWeek(WWC_SHAME_DECKS, weekIndex, 0, "wwc_shame_decks")(sp),
       };
     }
 
@@ -1270,18 +1327,18 @@ export async function buildGazetteEdition(
   }
 
   // --- Classic CFB War Room Gazette ---
-  const tagline = byWeek(EDITION_TAGLINES, weekIndex);
-  const weather = byWeek(WEATHER_BOXES, weekIndex, 2);
+  const tagline = byWeek(EDITION_TAGLINES, weekIndex, 0, "edition_taglines");
+  const weather = byWeek(WEATHER_BOXES, weekIndex, 2, "weather_boxes");
 
   const classifieds =
     flavor === "slim"
-      ? [byWeek(CLASSIFIEDS_A, weekIndex, 0)(classifiedCtx)]
+      ? [byWeek(CLASSIFIEDS_A, weekIndex, 0, "classifieds_a")(classifiedCtx)]
       : [
-          byWeek(CLASSIFIEDS_A, weekIndex, 0),
-          byWeek(CLASSIFIEDS_B, weekIndex, 1),
-          byWeek(CLASSIFIEDS_C, weekIndex, 2),
+          byWeek(CLASSIFIEDS_A, weekIndex, 0, "classifieds_a"),
+          byWeek(CLASSIFIEDS_B, weekIndex, 1, "classifieds_b"),
+          byWeek(CLASSIFIEDS_C, weekIndex, 2, "classifieds_c"),
         ].map((fn) => fn(classifiedCtx));
-  const pullQuote = byWeek(PULL_QUOTES, weekIndex, 4)({
+  const pullQuote = byWeek(PULL_QUOTES, weekIndex, 4, "pull_quotes")({
     crown: cn,
     shame: sn,
     pts: cp,
@@ -1299,8 +1356,8 @@ export async function buildGazetteEdition(
     flavor === "slim"
       ? []
       : [
-          byWeek(SIDE_STORIES_NAMED, weekIndex, 0)(sideCtx),
-          byWeek(SIDE_STORIES_ABSURD, weekIndex, 1)(sideCtx),
+          byWeek(SIDE_STORIES_NAMED, weekIndex, 0, "side_stories_named")(sideCtx),
+          byWeek(SIDE_STORIES_ABSURD, weekIndex, 1, "side_stories_absurd")(sideCtx),
         ];
 
   const ritualName = ritualEditionName();
