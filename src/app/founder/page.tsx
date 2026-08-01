@@ -22,6 +22,7 @@ import {
 } from "@/lib/creator-eyes";
 import {
   founderEnsureFullBotRoster,
+  founderOpenLockedBoard,
   founderPostAndScoreWeek,
   founderPostWeek,
   founderScoreWeek,
@@ -150,7 +151,9 @@ export default function FounderDashboardPage() {
     setEyes("off");
   }
 
-  async function runLab(kind: "roster" | "post" | "score" | "both") {
+  async function runLab(
+    kind: "roster" | "post" | "score" | "both" | "board"
+  ) {
     setLabBusy(true);
     setLabLog(null);
     setLabSteps([]);
@@ -162,10 +165,15 @@ export default function FounderDashboardPage() {
             ? await founderPostWeek(week)
             : kind === "score"
               ? await founderScoreWeek(week)
-              : await founderPostAndScoreWeek(week);
+              : kind === "board"
+                ? await founderOpenLockedBoard(week)
+                : await founderPostAndScoreWeek(week);
       setLabSteps(res.steps);
       setLabLog(res.ok ? `✅ ${res.message}` : `❌ ${res.message}`);
       void refresh();
+      if (kind === "board" && res.ok) {
+        router.push(`/board?week=${week}`);
+      }
     } catch (e) {
       setLabLog(e instanceof Error ? e.message : "Lab action failed");
     }
@@ -364,6 +372,20 @@ export default function FounderDashboardPage() {
                 Score only
               </button>
             </div>
+            <button
+              type="button"
+              disabled={labBusy}
+              onClick={() => void runLab("board")}
+              className="w-full py-3.5 min-h-[52px] rounded-xl border-2 border-sky-400/50 bg-sky-500/10 text-sm font-extrabold text-sky-100 disabled:opacity-50"
+            >
+              {labBusy
+                ? "Working…"
+                : `Open Board locked (not scored) · week ${week}`}
+            </button>
+            <p className="text-[10px] text-muted leading-relaxed">
+              Freezes the card + reveals picks as if kickoffs already hit — so
+              you can compare slips with bots/friends before scoring.
+            </p>
             {labLog && (
               <p
                 className={`text-xs font-semibold ${
