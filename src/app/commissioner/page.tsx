@@ -98,6 +98,15 @@ import {
   preseasonCommishToolsBody,
 } from "@/lib/season-mode";
 import { getSeasonOpenLabel } from "@/lib/season-countdown";
+import {
+  SIMPLE_BOT_FILL_TARGET,
+  areBotsRosterLocked,
+  botsLockedMessage,
+  canShowDeepHostTools,
+  isSimpleHostSurface,
+  simpleFillEmptySeatsWithBots,
+  simpleRemoveFillerBots,
+} from "@/lib/simple-host";
 import { advanceLeagueAfterScore } from "@/lib/active-week";
 import {
   fetchFootballScores,
@@ -252,6 +261,11 @@ function CommissionerPageInner() {
   );
   const [botBusy, setBotBusy] = useState(false);
   const [botReport, setBotReport] = useState<string | null>(null);
+  /** Fairness: bots locked once season live / week scored */
+  const [botsLocked, setBotsLocked] = useState(false);
+  const [botCount, setBotCount] = useState(0);
+  const [deepHostTools, setDeepHostTools] = useState(false);
+  const [simpleHost, setSimpleHost] = useState(true);
   /** One-tap demo publish busy flag (generate + publish + bots). */
   const [demoBusy, setDemoBusy] = useState(false);
   /** Real season: explain why demo/bot/auto-score tools are locked. */
@@ -306,7 +320,23 @@ function CommissionerPageInner() {
         !!lg?.id &&
         isFirstTimeCommish({ leagueId: lg.id, scoredWeekCount: scoredCount });
       setFirstTime(ft);
-      setAdvancedOpen(!ft);
+      const creator = canShowDeepHostTools(getSession()?.playerId);
+      setDeepHostTools(creator);
+      setSimpleHost(
+        !!lg?.id &&
+          isSimpleHostSurface({
+            leagueId: lg.id,
+            scoredWeekCount: scoredCount,
+            userId: getSession()?.playerId,
+          })
+      );
+      // New hosts: stay simple. Creators / graduated: advanced open by default.
+      setAdvancedOpen(creator || !ft);
+      try {
+        setBotsLocked(await areBotsRosterLocked());
+      } catch {
+        setBotsLocked(false);
+      }
 
       // URL ?tab=card&first=1 or first-time owner → land on Build Card
       const tabParam = searchParams.get("tab");
@@ -408,6 +438,7 @@ function CommissionerPageInner() {
         const session = getSession();
         const roster = await loadLeagueRoster();
         setRosterCount(roster.length);
+        setBotCount(roster.filter((m) => m.isBot).length);
         setPassRoster(
           roster.filter(
             (m) => !m.isBot && m.userId !== session?.playerId
@@ -415,7 +446,7 @@ function CommissionerPageInner() {
         );
         // Sensible default: add enough to reach ideal 16 if under; else a few
         const open = Math.max(0, MAX_LEAGUE_PLAYERS - roster.length);
-        const toIdeal = Math.max(0, 16 - roster.length);
+        const toIdeal = Math.max(0, SIMPLE_BOT_FILL_TARGET - roster.length);
         if (toIdeal > 0 && toIdeal <= open) setBotAddCount(toIdeal);
         else if (open > 0) setBotAddCount(Math.min(6, open));
       } catch {
@@ -1385,29 +1416,81 @@ function CommissionerPageInner() {
   }
 
   async function handleClearBots() {
+    if (botsLocked) {
+      setBotReport(botsLockedMessage());
+      return;
+    }
     if (
       !confirm(
-        "Remove ALL trial bots and their picks?\n\nReal players who signed up stay in the league."
+        "Remove filler bots and their picks?\n\nReal players who signed up stay in the league."
       )
     ) {
       return;
     }
     setBotReport(null);
     setBotBusy(true);
-    const res = await clearTrialBotsInCloud();
+    const res = await simpleRemoveFillerBots();
     setBotBusy(false);
     if (!res.ok) {
       setBotReport(res.error || "Failed to clear bots");
+      if (res.locked) setBotsLocked(true);
       return;
     }
     if ((res.removed ?? 0) === 0) {
+      setBotReport("No filler bots to remove.");
+      setBotCount(0);
+      return;
+    }
+    setBotCount(0);
+    try {
+      const roster = await loadLeagueRoster();
+      setRosterCount(roster.length);
+      setBotCount(roster.filter((m) => m.isBot).length);
+    } catch {
+      /* ignore */
+    }
+    setBotReport(
+      `Removed ${res.removed ?? 0} filler bot(s). Real members unchanged.`
+    );
+    void refreshPickStatus(activeWeek);
+  }
+
+  /** Simple host: one yes — fill empty seats toward 16 (or mid-season replacements). */
+  async function handleSimpleFillBots() {
+    setBotReport(null);
+    setBotBusy(true);
+    const hasCard = publishedGames.length > 0;
+    const res = await simpleFillEmptySeatsWithBots({
+      targetTotal: SIMPLE_BOT_FILL_TARGET,
+      ...(hasCard ? { weekNumber: activeWeek } : {}),
+    });
+    setBotBusy(false);
+    if (!res.ok) {
+      setBotReport(res.error || "Could not add filler bots");
+      return;
+    }
+    if (res.rosterAfter != null) setRosterCount(res.rosterAfter);
+    try {
+      const roster = await loadLeagueRoster();
+      setRosterCount(roster.length);
+      setBotCount(roster.filter((m) => m.isBot).length);
+      setBotsLocked(await areBotsRosterLocked());
+    } catch {
+      /* ignore */
+    }
+    if ((res.added ?? 0) === 0) {
       setBotReport(
-        "No trial bots found to remove (0). If you still see bot names on Players, run supabase/clear-trial-bots-now.sql in Supabase SQL Editor once — that force-wipes @warroom.trial bots."
+        rosterCount != null && rosterCount >= SIMPLE_BOT_FILL_TARGET
+          ? `Room already at ${rosterCount} — no empty seats to fill toward ${SIMPLE_BOT_FILL_TARGET}.`
+          : "No empty seats to fill right now."
       );
       return;
     }
+    const mid = !preseasonToolsOk;
     setBotReport(
-      `Removed ${res.removed ?? 0} trial bot(s). Real members unchanged. Check Players to confirm.`
+      mid
+        ? `Added ${res.added} bot(s) at league average points so they stay competitive. They stay for the season.`
+        : `Added ${res.added} filler bot(s) toward a full room (~${SIMPLE_BOT_FILL_TARGET}). You can remove them until the season starts.`
     );
     void refreshPickStatus(activeWeek);
   }
@@ -2286,7 +2369,22 @@ function CommissionerPageInner() {
 
         {tab === "settings" && isOwner && league && (
           <div className="space-y-6">
-            <SportPoolCommishPanel />
+            {simpleHost && (
+              <div className="rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-xs text-muted leading-relaxed">
+                <p className="font-bold text-primary text-sm">
+                  Simple host mode
+                </p>
+                <p className="mt-1">
+                  Your jobs: <strong className="text-foreground">invite</strong>
+                  , <strong className="text-foreground">post the card</strong>,{" "}
+                  <strong className="text-foreground">fill seats?</strong>,{" "}
+                  <strong className="text-foreground">score the week</strong>.
+                  Extra tools open after you score your first week.
+                </p>
+              </div>
+            )}
+            {/* Multi-sport pool after first week — not day-one noise */}
+            {!simpleHost && <SportPoolCommishPanel />}
 
             <div className="rounded-xl border border-border bg-card p-5 space-y-4">
               <h2 className="font-semibold">League</h2>
@@ -2751,221 +2849,205 @@ function CommissionerPageInner() {
               id="commish-bots"
               className="rounded-xl border border-primary/40 bg-primary/5 p-5 space-y-3 scroll-mt-24"
             >
-              <h2 className="font-semibold text-primary">
-                Pad league with bots
-                {!preseasonToolsOk && (
-                  <span className="ml-2 text-[10px] font-bold uppercase tracking-wide text-primary/80 border border-primary/40 px-1.5 py-0.5 rounded">
-                    Mid-season · league avg
-                  </span>
-                )}
-              </h2>
+              <h2 className="font-semibold text-primary">Fill empty seats?</h2>
               <p className="text-xs text-muted leading-relaxed">
-                {preseasonToolsOk ? (
-                  <>
-                    Optional. Adds bots to{" "}
-                    <strong className="text-foreground">empty seats only</strong>{" "}
-                    (max {MAX_LEAGUE_PLAYERS}). Real humans stay. Choose a count
-                    so you can round out brackets without stuffing the room to
-                    32.
-                  </>
-                ) : (
-                  <>
-                    People left? Cover empty seats with replacement bots. New
-                    bots enter at the{" "}
-                    <strong className="text-foreground">
-                      league average of points
-                    </strong>{" "}
-                    so they stay competitive — a real challenge for the rest of
-                    the field. Empty seats only; never removes humans. Demo
-                    tools (Chaos, locker talk, Crystal Ball) stay pre-season
-                    only.
-                  </>
-                )}
+                Optional. Add filler bots so the room feels full (empty seats
+                only — real friends stay).{" "}
+                <strong className="text-foreground">
+                  Once the season starts, bots stay
+                </strong>{" "}
+                so nobody can clear them to climb the board.
               </p>
-              <div className="rounded-lg border border-border/60 bg-background/50 px-3 py-2 text-[11px] text-muted leading-relaxed">
-                <p className="text-foreground font-medium text-xs mb-1">
-                  Ideal roster sizes (dual brackets)
+              {rosterCount != null && (
+                <p className="text-xs text-foreground">
+                  Roster: <strong>{rosterCount}</strong>
+                  {botCount > 0 ? (
+                    <>
+                      {" "}
+                      · <strong>{botCount}</strong> filler bot
+                      {botCount === 1 ? "" : "s"}
+                    </>
+                  ) : null}
+                  {" · "}
+                  {Math.max(0, MAX_LEAGUE_PLAYERS - rosterCount)} open
                 </p>
-                <ul className="list-disc pl-4 space-y-0.5">
-                  <li>
-                    <strong className="text-foreground">16 total</strong> —
-                    sweet spot (8 Champ + 8 Toilet, clean byes)
-                  </li>
-                  <li>
-                    <strong className="text-foreground">8</strong> — minimum
-                    that still feels like a league (4+4)
-                  </li>
-                  <li>
-                    <strong className="text-foreground">32</strong> — hard max
-                    (16+16, full CFP window)
-                  </li>
-                  <li>12–24 is the usual friend-group range</li>
-                </ul>
-                {rosterCount != null && (
-                  <p className="mt-2 text-foreground/90">
-                    Now: <strong>{rosterCount}</strong> players ·{" "}
-                    <strong>
-                      {Math.max(0, MAX_LEAGUE_PLAYERS - rosterCount)}
-                    </strong>{" "}
-                    open
-                    {rosterCount < 16
-                      ? ` · need ${16 - rosterCount} more to hit 16`
-                      : rosterCount < 32
-                        ? " · already past ideal 16"
-                        : " · full"}
+              )}
+
+              {botsLocked ? (
+                <div className="rounded-lg border border-border bg-background/60 px-3 py-2.5 text-xs text-muted leading-relaxed">
+                  <p className="font-semibold text-foreground">
+                    Bots locked for fairness
                   </p>
-                )}
-              </div>
-              <div className="flex flex-wrap items-end gap-3">
-                <label className="block text-xs text-muted">
-                  Add this many bots
-                  <input
-                    type="number"
-                    min={1}
-                    max={MAX_LEAGUE_PLAYERS}
-                    value={botAddCount}
-                    onChange={(e) =>
-                      setBotAddCount(
-                        Math.max(
-                          1,
-                          Math.min(
-                            MAX_LEAGUE_PLAYERS,
-                            parseInt(e.target.value, 10) || 1
-                          )
-                        )
-                      )
-                    }
-                    className="mt-1 w-24 bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground font-mono"
-                  />
-                </label>
-                <button
-                  type="button"
-                  disabled={botBusy}
-                  onClick={() =>
-                    void handleAddBots({
-                      addCount: botAddCount,
-                      label: preseasonToolsOk
-                        ? `Add ${botAddCount} bot(s)?`
-                        : `Add ${botAddCount} mid-season replacement bot(s) at league average?`,
-                    })
-                  }
-                  className="px-4 py-2 rounded-lg bg-primary text-black text-sm font-semibold disabled:opacity-50"
-                >
-                  {botBusy
-                    ? "Working…"
-                    : preseasonToolsOk
-                      ? `Add ${botAddCount} bot${botAddCount === 1 ? "" : "s"}`
-                      : `Add ${botAddCount} @ league avg`}
-                </button>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  disabled={botBusy}
-                  onClick={() =>
-                    void handleAddBots({
-                      targetTotal: 16,
-                      label: preseasonToolsOk
-                        ? "Fill roster toward 16 (ideal 8+8 brackets)? Only adds what’s missing."
-                        : "Fill toward 16 with mid-season bots at league average? Only empty seats.",
-                    })
-                  }
-                  className="px-3 py-1.5 rounded-lg border border-primary/50 text-primary text-xs font-medium hover:bg-primary/10 disabled:opacity-50"
-                >
-                  Fill to 16 (ideal)
-                </button>
-                <button
-                  type="button"
-                  disabled={botBusy}
-                  onClick={() =>
-                    void handleAddBots({
-                      targetTotal: 32,
-                      label: preseasonToolsOk
-                        ? "Fill roster to 32 (max / 16+16 brackets)? Only empty seats."
-                        : "Fill to 32 with mid-season bots at league average? Only empty seats.",
-                    })
-                  }
-                  className="px-3 py-1.5 rounded-lg border border-border text-xs font-medium hover:bg-card-hover disabled:opacity-50"
-                >
-                  Fill to 32 (max)
-                </button>
-                <button
-                  type="button"
-                  disabled={botBusy}
-                  onClick={() => void handleFillBotPicks()}
-                  className="px-3 py-1.5 rounded-lg border border-border text-xs font-medium hover:bg-card-hover disabled:opacity-50"
-                  title="Lock bot slips for the published week (works mid-season for replacement bots)"
-                >
-                  Fill bot picks (this week)
-                </button>
-                <button
-                  type="button"
-                  disabled={botBusy}
-                  onClick={() => void handleBotChaosReroll()}
-                  className={`px-3 py-1.5 rounded-lg border border-orange-500/50 text-orange-200 text-xs font-medium hover:bg-orange-500/10 disabled:opacity-50 ${
-                    !preseasonToolsOk ? "opacity-45" : ""
-                  }`}
-                  title="~22% of bots lock Chaos (2× week). Needs bot-chaos-sim.sql once."
-                >
-                  💥 Bot Chaos (~1 in 5)
-                </button>
-                <button
-                  type="button"
-                  disabled={botBusy}
-                  onClick={() => void handleSeedBotLockerTalk()}
-                  className={`px-3 py-1.5 rounded-lg border border-emerald-500/50 text-emerald-200 text-xs font-medium hover:bg-emerald-500/10 disabled:opacity-50 ${
-                    !preseasonToolsOk ? "opacity-45" : ""
-                  }`}
-                  title="Bots drop week-flavored shit-talk in Locker so you can test badges / unread. Needs bot-locker-sim.sql once."
-                >
-                  💬 Bot locker talk
-                </button>
-                <button
-                  type="button"
-                  disabled={botBusy}
-                  onClick={() => void handleSeedBotCrystalBall()}
-                  className={`px-3 py-1.5 rounded-lg border border-violet-500/50 text-violet-200 text-xs font-medium hover:bg-violet-500/10 disabled:opacity-50 ${
-                    !preseasonToolsOk ? "opacity-45" : ""
-                  }`}
-                  title="Every trial bot locks a Crystal Ball / Super Bowl pride pick. Needs bot-crystal-ball.sql once."
-                >
-                  🔮 Bot Crystal Ball picks
-                </button>
-                <button
-                  type="button"
-                  disabled={botBusy}
-                  onClick={() => void handleClearBots()}
-                  className="px-3 py-1.5 rounded-lg border border-warning text-warning text-xs font-medium hover:bg-warning/10 disabled:opacity-50"
-                >
-                  Clear bots
-                </button>
-              </div>
-              <p className="text-[11px] text-muted">
-                Setup once if buttons fail:{" "}
-                <code className="text-foreground">supabase/trial-bots.sql</code>
-                , optional{" "}
-                <code className="text-foreground">supabase/bot-picks-smarter.sql</code>
-                ,{" "}
-                <code className="text-foreground">supabase/bot-chaos-sim.sql</code>
-                ,{" "}
-                <code className="text-foreground">supabase/bot-locker-sim.sql</code>
-                ,{" "}
-                <code className="text-foreground">supabase/bot-crystal-ball.sql</code>{" "}
-                (bots auto pride-pick for board smoke tests),{" "}
-                <code className="text-foreground">supabase/league-capacity-32.sql</code>
-                . Demo posts are for smoke only — Mon–Sun locker purge still applies.
-              </p>
+                  <p className="mt-1">{botsLockedMessage()}</p>
+                  {botCount > 0 && (
+                    <p className="mt-1 text-foreground">
+                      {botCount} bot{botCount === 1 ? "" : "s"} still on the
+                      roster.
+                    </p>
+                  )}
+                  {!preseasonToolsOk && (
+                    <button
+                      type="button"
+                      disabled={botBusy}
+                      onClick={() => void handleSimpleFillBots()}
+                      className="mt-3 w-full py-2.5 min-h-[44px] rounded-xl bg-primary text-black text-sm font-bold disabled:opacity-50"
+                    >
+                      {botBusy
+                        ? "Working…"
+                        : "Someone left? Fill empty seats with bots"}
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    disabled={botBusy}
+                    onClick={() => void handleSimpleFillBots()}
+                    className="w-full py-3 min-h-[48px] rounded-xl bg-primary text-black text-sm font-bold disabled:opacity-50"
+                  >
+                    {botBusy
+                      ? "Working…"
+                      : botCount > 0
+                        ? `Yes — fill empty seats (toward ${SIMPLE_BOT_FILL_TARGET})`
+                        : `Yes — fill empty seats with bots`}
+                  </button>
+                  {botCount > 0 && (
+                    <button
+                      type="button"
+                      disabled={botBusy}
+                      onClick={() => void handleClearBots()}
+                      className="w-full py-2.5 min-h-[44px] rounded-xl border border-border text-sm font-semibold text-muted hover:text-foreground disabled:opacity-50"
+                    >
+                      No / remove filler bots
+                    </button>
+                  )}
+                  <p className="text-[11px] text-muted leading-relaxed">
+                    Before the season starts you can change your mind. After
+                    kickoff (or the first scored week), filler bots stay.
+                  </p>
+                </div>
+              )}
+
               {botReport && (
                 <p
                   className={`text-xs leading-relaxed ${
                     botReport.toLowerCase().includes("fail") ||
-                    botReport.toLowerCase().includes("missing")
+                    botReport.toLowerCase().includes("honest") ||
+                    botReport.toLowerCase().includes("can’t") ||
+                    botReport.toLowerCase().includes("can't")
                       ? "text-danger"
                       : "text-primary"
                   }`}
                 >
                   {botReport}
                 </p>
+              )}
+
+              {/* Creator-only deep bot lab (not for normal hosts) */}
+              {deepHostTools && (
+                <details className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2">
+                  <summary className="text-xs font-bold text-amber-200 cursor-pointer">
+                    Creator advanced bot tools
+                  </summary>
+                  <div className="mt-3 space-y-2">
+                    <div className="flex flex-wrap items-end gap-2">
+                      <label className="block text-[11px] text-muted">
+                        Add N bots
+                        <input
+                          type="number"
+                          min={1}
+                          max={MAX_LEAGUE_PLAYERS}
+                          value={botAddCount}
+                          onChange={(e) =>
+                            setBotAddCount(
+                              Math.max(
+                                1,
+                                Math.min(
+                                  MAX_LEAGUE_PLAYERS,
+                                  parseInt(e.target.value, 10) || 1
+                                )
+                              )
+                            )
+                          }
+                          className="mt-1 w-20 bg-background border border-border rounded-lg px-2 py-1.5 text-sm font-mono"
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        disabled={botBusy}
+                        onClick={() =>
+                          void handleAddBots({
+                            addCount: botAddCount,
+                            label: `Add ${botAddCount} bot(s)?`,
+                          })
+                        }
+                        className="px-3 py-1.5 rounded-lg bg-primary text-black text-xs font-semibold disabled:opacity-50"
+                      >
+                        Add {botAddCount}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={botBusy}
+                        onClick={() =>
+                          void handleAddBots({
+                            targetTotal: 32,
+                            label: "Fill to 32?",
+                          })
+                        }
+                        className="px-3 py-1.5 rounded-lg border border-border text-xs disabled:opacity-50"
+                      >
+                        Fill 32
+                      </button>
+                      <button
+                        type="button"
+                        disabled={botBusy}
+                        onClick={() => void handleFillBotPicks()}
+                        className="px-3 py-1.5 rounded-lg border border-border text-xs disabled:opacity-50"
+                      >
+                        Fill picks
+                      </button>
+                      <button
+                        type="button"
+                        disabled={botBusy || botsLocked}
+                        onClick={() => void handleClearBots()}
+                        className="px-3 py-1.5 rounded-lg border border-warning text-warning text-xs disabled:opacity-50"
+                      >
+                        Clear bots
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        disabled={botBusy}
+                        onClick={() => void handleBotChaosReroll()}
+                        className="px-2.5 py-1 rounded border border-orange-500/40 text-orange-200 text-[11px] disabled:opacity-50"
+                      >
+                        Bot Chaos
+                      </button>
+                      <button
+                        type="button"
+                        disabled={botBusy}
+                        onClick={() => void handleSeedBotLockerTalk()}
+                        className="px-2.5 py-1 rounded border border-emerald-500/40 text-emerald-200 text-[11px] disabled:opacity-50"
+                      >
+                        Bot locker
+                      </button>
+                      <button
+                        type="button"
+                        disabled={botBusy}
+                        onClick={() => void handleSeedBotCrystalBall()}
+                        className="px-2.5 py-1 rounded border border-violet-500/40 text-violet-200 text-[11px] disabled:opacity-50"
+                      >
+                        Bot Crystal Ball
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-muted">
+                      Prefer Founder → Test Mode for UI jumps without a real
+                      roster.
+                    </p>
+                  </div>
+                </details>
               )}
             </div>
 

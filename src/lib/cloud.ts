@@ -2507,6 +2507,17 @@ export async function clearTrialBotsInCloud(): Promise<{
   if (!session?.leagueId || !session.isCommissioner) {
     return { ok: false, error: "Commissioner only" };
   }
+  // Fairness: no clearing bots after season is live / weeks scored
+  try {
+    const { areBotsRosterLocked, botsLockedMessage } = await import(
+      "./simple-host"
+    );
+    if (await areBotsRosterLocked()) {
+      return { ok: false, error: botsLockedMessage() };
+    }
+  } catch {
+    /* if helper missing, allow clear (legacy) */
+  }
   const supabase = createClient();
   let removed = 0;
   let rpcNote = "";
@@ -2728,6 +2739,22 @@ export async function removeLeagueMember(
   }
   if (userId === session.playerId) {
     return { ok: false, error: "Can't remove yourself (use Account to leave or delete the league)" };
+  }
+
+  // Fairness: cannot kick filler bots after season lock
+  try {
+    const roster = await loadLeagueRoster();
+    const target = roster.find((m) => m.userId === userId);
+    if (target?.isBot) {
+      const { areBotsRosterLocked, botsLockedMessage } = await import(
+        "./simple-host"
+      );
+      if (await areBotsRosterLocked()) {
+        return { ok: false, error: botsLockedMessage() };
+      }
+    }
+  } catch {
+    /* continue */
   }
 
   const supabase = createClient();
