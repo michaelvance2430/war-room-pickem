@@ -21,7 +21,10 @@ import TrophyShareButton from "@/components/TrophyShareButton";
 import HardwareTrophyIcon from "@/components/HardwareTrophyIcon";
 import type { ProfileTrophyKind } from "@/lib/profile-hardware";
 import { isGuestMode } from "@/lib/guest-mode";
-import { isOpeningWeekLive } from "@/components/RingCeremonyModal";
+import {
+  hasOpeningWeekStarted,
+  isOpeningWeekLive,
+} from "@/lib/ring-ceremony";
 import { resolveLiveTrophyHolder } from "@/lib/trophy-share";
 
 export default function SeasonFinaleModal() {
@@ -53,6 +56,10 @@ export default function SeasonFinaleModal() {
         const league = getLeague();
         const session = getSession();
         if (!session?.playerId || !league?.id) return;
+
+        // Hold hardware / championship ceremony until Week 0 (CFB) / Week 1 (NFL)
+        // starts — museum engravings shouldn't dump a multi-slide popup in June.
+        if (!hasOpeningWeekStarted(league.sportId)) return;
 
         const [trophies, rosterRows] = await Promise.all([
           loadLeagueTrophies(),

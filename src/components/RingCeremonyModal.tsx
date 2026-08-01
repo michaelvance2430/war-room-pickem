@@ -40,7 +40,11 @@ import SportChampionshipTrophy, {
 } from "@/components/SportChampionshipTrophy";
 import TrophyShareButton from "@/components/TrophyShareButton";
 
-export { isOpeningWeekLive, isOpeningCeremonyLive };
+export {
+  isOpeningWeekLive,
+  isOpeningCeremonyLive,
+  hasOpeningWeekStarted,
+} from "@/lib/ring-ceremony";
 
 type Champ = {
   year: number;

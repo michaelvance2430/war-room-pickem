@@ -177,44 +177,60 @@ export function getRingCeremonyPack(
 }
 
 /**
- * Real ceremony window — sport calendar, not "any login".
- * CFB: Week 0 start → end of Week 1.
- * NFL: Week 1 start → end of Week 2.
- * WWC / other: first season week window + next.
+ * Calendar has reached the first pick'em week of the season.
+ * CFB = Week 0 start · NFL = Week 1 start.
+ * Before this, no championship / ring popup — hold the flex.
+ */
+export function hasOpeningWeekStarted(
+  sportId?: string | null,
+  nowMs = Date.now()
+): boolean {
+  const sid = sportId ?? getLeague()?.sportId;
+  const first = firstSeasonWeek(sid);
+  const win = weekWindowMs(first, sid === "nfl" ? "nfl" : "cfb");
+  if (!win) return false;
+  return nowMs >= win.startMs;
+}
+
+/**
+ * Real ceremony window — only the opening week, not any login.
+ * Held until start of Week 0 (CFB) / Week 1 (NFL).
+ * CFB: Week 0 window only.
+ * NFL: Week 1 window only.
+ * WWC / other: first season week window only.
  */
 export function isOpeningCeremonyLive(
   sportId?: string | null,
   nowMs = Date.now()
 ): boolean {
-  const sport = resolveRingSport(sportId ?? getLeague()?.sportId);
+  const sid = sportId ?? getLeague()?.sportId;
+  const sport = resolveRingSport(sid);
+  if (!hasOpeningWeekStarted(sid, nowMs)) return false;
+
   if (sport === "nfl") {
     const w1 = weekWindowMs(1, "nfl");
-    if (!w1 || nowMs < w1.startMs) return false;
-    const w2 = weekWindowMs(2, "nfl");
-    const endMs = w2?.endMs ?? w1.endMs;
-    return nowMs <= endMs;
+    if (!w1) return false;
+    return nowMs >= w1.startMs && nowMs <= w1.endMs;
   }
-  // CFB + default: Week 0 → Week 1
+  if (sport === "soccer_wwc") {
+    const first = firstSeasonWeek(sid);
+    const w = weekWindowMs(first, "cfb");
+    if (!w) return false;
+    return nowMs >= w.startMs && nowMs <= w.endMs;
+  }
+  // CFB + default: Week 0 only (not through Week 1)
   const w0 = weekWindowMs(0, "cfb");
   if (!w0) return false;
-  if (nowMs < w0.startMs) return false;
-  const w1 = weekWindowMs(1, "cfb");
-  const endMs = w1?.endMs ?? w0.endMs;
-  return nowMs <= endMs;
+  return nowMs >= w0.startMs && nowMs <= w0.endMs;
 }
 
-/** Active league week still in opening stretch */
+/** Active league week must be the opening week (not the whole stretch). */
 export function isOpeningActiveWeek(
   activeWeek: number,
   sportId?: string | null
 ): boolean {
-  const sport = resolveRingSport(sportId);
-  if (sport === "nfl") return activeWeek === 1 || activeWeek === 2;
-  if (sport === "soccer_wwc") {
-    const first = firstSeasonWeek(sportId);
-    return activeWeek === first || activeWeek === first + 1;
-  }
-  return activeWeek === 0 || activeWeek === 1;
+  const first = firstSeasonWeek(sportId);
+  return activeWeek === first;
 }
 
 /** @deprecated use isOpeningCeremonyLive — kept for SeasonFinaleModal */
