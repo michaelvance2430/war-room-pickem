@@ -29,6 +29,7 @@ export const RULE_SECTIONS: RuleSection[] = [
     body: [
       "Open My Picks once the commissioner publishes the week’s card.",
       "You’ll see five games plus a weekly prop.",
+      "If the commissioner doesn’t post the card by 48 hours before first kickoff, the system auto-selects five games so the room isn’t stuck. Two weeks in a row of that and the gavel goes to whoever is in 1st place.",
     ],
   },
   {
