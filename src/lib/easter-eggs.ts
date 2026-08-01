@@ -387,7 +387,7 @@ export function hasDiscovery(playerId: string, id: string): boolean {
 
 /**
  * True egg catalog (not silent sport passport stamps).
- * Used for profile “Easter eggs X / XX” after first discovery.
+ * Profile tracker shows “found / xx” — never the real total (no spoiler map).
  */
 export function listEasterEggDefs(): DiscoveryDef[] {
   return DISCOVERY_CATALOG.filter(
@@ -397,19 +397,35 @@ export function listEasterEggDefs(): DiscoveryDef[] {
 
 export function getEasterEggProgress(playerId: string): {
   found: number;
+  /** Catalog size — internal only; UI should show "xx" not this number */
   total: number;
   /** True once they've found at least one real egg — safe to show the counter */
   unlocked: boolean;
+  /** Public display e.g. "3 / xx" — never leaks catalog size */
+  display: string;
 } {
   const catalog = listEasterEggDefs();
   const total = catalog.length;
-  if (!playerId) return { found: 0, total, unlocked: false };
+  if (!playerId) return { found: 0, total, unlocked: false, display: "0 / xx" };
   const earned = new Set(listEarnedDiscoveries(playerId).map((d) => d.id));
+  let perm: string[] = [];
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getPermanentBadgeIds } = require("./permanent-badges") as typeof import("./permanent-badges");
+    perm = getPermanentBadgeIds(playerId);
+  } catch {
+    /* local only */
+  }
   let found = 0;
   for (const d of catalog) {
-    if (earned.has(d.id)) found += 1;
+    if (earned.has(d.id) || perm.includes(d.id)) found += 1;
   }
-  return { found, total, unlocked: found > 0 };
+  return {
+    found,
+    total,
+    unlocked: found > 0,
+    display: `${found} / xx`,
+  };
 }
 
 function emitMoment(moment: EasterEggMoment) {

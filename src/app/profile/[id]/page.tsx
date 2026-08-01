@@ -8,6 +8,7 @@ import AvatarLightbox from "@/components/AvatarLightbox";
 import BadgeShelf from "@/components/BadgeShelf";
 import WwcPassportShelf from "@/components/WwcPassportShelf";
 import DiscoveryPassportShelf from "@/components/DiscoveryPassportShelf";
+import EasterEggTracker from "@/components/EasterEggTracker";
 import ProfileTrophyCase from "@/components/ProfileTrophyCase";
 import FootballResume from "@/components/FootballResume";
 import ProfileSeasonPlot from "@/components/ProfileSeasonPlot";
@@ -539,6 +540,12 @@ export default function ProfilePage() {
         <DiscoveryPassportShelf
           playerId={player.id}
           isSelf={isSelfProfile}
+        />
+
+        {/* Easter egg finds — count only, never total catalog size */}
+        <EasterEggTracker
+          playerId={player.id}
+          isSelf={!!isSelfProfile}
         />
 
         {/* 2. Season plot — rival, streak, last card */}
