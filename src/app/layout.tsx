@@ -19,7 +19,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "War Room Pick'Em",
   description:
-    "College Football Pick'Em with divisions, confidence, Best Bets, props, and dual brackets. Championship + Toilet Bowl. © Mike Vance. Owned by Mike Vance.",
+    "War Room Pick'Em — friend leagues for CFB & NFL. Confidence picks, Best Bets, props, dual brackets. Championship + Toilet Bowl. © Mike Vance.",
   applicationName: "War Room Pick'Em",
   authors: [{ name: "Mike Vance" }],
   creator: "Mike Vance",

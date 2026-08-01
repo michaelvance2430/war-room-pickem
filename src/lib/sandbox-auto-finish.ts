@@ -1,8 +1,6 @@
 /**
  * Sandbox helper: publish demo card → bot picks → random results → score
- * for every week that isn't already scored, through CFP Final.
- *
- * Use this to run an entire CFB season dry-run without clicking each week.
+ * for every week that isn't already scored (CFB → CFP Final, NFL → Super Bowl).
  */
 
 import { generateDemoSlate, randomizeDemoResults } from "@/lib/demo-slate";
@@ -16,9 +14,12 @@ import {
   fillLeagueWithBotsToCap,
 } from "@/lib/cloud";
 import { propFromPreset, rotatingPropPreset } from "@/lib/prop-presets";
-import { SEASON_MAX_WEEK } from "@/lib/season-calendar";
+import {
+  firstSeasonWeek,
+  seasonMaxWeek,
+} from "@/lib/season-calendar";
 import { weekTitle } from "@/lib/dates";
-import { isOps } from "@/lib/league";
+import { getLeague, isOps } from "@/lib/league";
 import {
   isPreseasonCommishToolsAllowed,
   preseasonCommishToolsBody,
@@ -40,7 +41,7 @@ export type AutoFinishResult = {
 
 /**
  * Finish unscored weeks in a range.
- * - Default: first unscored → CFP Final (18)
+ * - Default: first unscored → sport season end (CFB 18 / NFL 22)
  * - fromWeek / toWeek: run only that inclusive range (one week = same both)
  * Safe to re-run: already-scored weeks are skipped.
  *
@@ -50,7 +51,7 @@ export type AutoFinishResult = {
 export async function autoFinishRemainingWeeks(opts?: {
   /** Inclusive start (default: first unscored) */
   fromWeek?: number;
-  /** Inclusive end (default: SEASON_MAX_WEEK). One week: set fromWeek === toWeek. */
+  /** Inclusive end (default: sport max week). One week: set fromWeek === toWeek. */
   toWeek?: number;
   /** Grow roster toward this size before the run (default 16; set 0 to skip pad) */
   padRosterTo?: number;
@@ -76,6 +77,9 @@ export async function autoFinishRemainingWeeks(opts?: {
     };
   }
 
+  const sportId = getLeague()?.sportId;
+  const minW = firstSeasonWeek(sportId);
+  const maxW = seasonMaxWeek(sportId);
   const scored = new Set(await listScoredWeekNumbers());
   const finished: number[] = [];
   const skipped: number[] = [];
@@ -83,26 +87,29 @@ export async function autoFinishRemainingWeeks(opts?: {
 
   const start =
     opts?.fromWeek != null
-      ? Math.max(0, Math.min(SEASON_MAX_WEEK, opts.fromWeek))
+      ? Math.max(minW, Math.min(maxW, opts.fromWeek))
       : (() => {
-          for (let w = 0; w <= SEASON_MAX_WEEK; w++) {
+          for (let w = minW; w <= maxW; w++) {
             if (!scored.has(w)) return w;
           }
-          return SEASON_MAX_WEEK + 1;
+          return maxW + 1;
         })();
 
   const end =
     opts?.toWeek != null
-      ? Math.max(0, Math.min(SEASON_MAX_WEEK, opts.toWeek))
-      : SEASON_MAX_WEEK;
+      ? Math.max(minW, Math.min(maxW, opts.toWeek))
+      : maxW;
 
-  if (start > SEASON_MAX_WEEK) {
+  if (start > maxW) {
     return {
       ok: true,
       finished: [],
       skipped: [...scored].sort((a, b) => a - b),
       errors: [],
-      message: "Every week 0–18 is already scored. Season complete — check Champ / Toilet / Trophies.",
+      message:
+        sportId === "nfl"
+          ? "Every NFL week (1–22) is already scored. Season complete — check Champ / Toilet / Trophies."
+          : "Every week 0–18 is already scored. Season complete — check Champ / Toilet / Trophies.",
     };
   }
 

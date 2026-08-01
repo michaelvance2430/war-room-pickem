@@ -82,6 +82,7 @@ import {
   weekDateRangeLabel,
   listSeasonWeekNumbers,
   firstSeasonWeek,
+  seasonMaxWeek,
 } from "@/lib/season-calendar";
 import { autoFinishRemainingWeeks } from "@/lib/sandbox-auto-finish";
 import {
@@ -698,6 +699,15 @@ function CommissionerPageInner() {
 
   function leagueFootballSport(): "cfb" | "nfl" {
     return getLeague()?.sportId === "nfl" ? "nfl" : "cfb";
+  }
+
+  /** Sport-aware season ends (NFL Super Bowl = 22, CFB CFP = 18). */
+  function leagueSeasonMax(): number {
+    return seasonMaxWeek(getLeague()?.sportId);
+  }
+
+  function leagueSeasonMin(): number {
+    return firstSeasonWeek(getLeague()?.sportId);
   }
 
   async function pullOdds() {
@@ -1553,7 +1563,7 @@ function CommissionerPageInner() {
 
   /**
    * Sandbox auto-run: demo card → bots → random results → score
-   * for a chosen inclusive week range (one week up to full 0–18).
+   * for a chosen inclusive week range (CFB 0–18, NFL 1–22).
    */
   async function handleAutoFinishRange(opts?: {
     from?: number;
@@ -1561,10 +1571,12 @@ function CommissionerPageInner() {
     skipConfirm?: boolean;
   }) {
     if (!requirePreseasonTools()) return;
+    const minW = leagueSeasonMin();
+    const maxW = leagueSeasonMax();
     let from = opts?.from ?? autoFromWeek;
     let to = opts?.to ?? autoToWeek;
-    from = Math.max(0, Math.min(SEASON_MAX_WEEK, from));
-    to = Math.max(0, Math.min(SEASON_MAX_WEEK, to));
+    from = Math.max(minW, Math.min(maxW, from));
+    to = Math.max(minW, Math.min(maxW, to));
     if (to < from) {
       setAutoSeasonReport("End week must be ≥ start week.");
       return;
@@ -1584,7 +1596,7 @@ function CommissionerPageInner() {
     }
 
     const one = from === to;
-    const full = from === 0 && to === SEASON_MAX_WEEK;
+    const full = from === minW && to === maxW;
     if (
       !opts?.skipConfirm &&
       !confirm(
@@ -1593,12 +1605,19 @@ function CommissionerPageInner() {
               "Demo card → bot picks → random results → score.\n" +
               "Sandbox / dry-run."
           : full
-            ? `Run ENTIRE season (Week 0 → CFP Final)?\n\n` +
-              `• ${inRange.length} unscored week(s)\n` +
-              "• Pads bots toward 16 if thin\n" +
-              "• Demo card → bots → random results → score each week\n" +
-              "• Leave this tab open until finished\n\n" +
-              "Sandbox / dry-run only."
+            ? leagueFootballSport() === "nfl"
+              ? `Run ENTIRE NFL season (Week 1 → Super Bowl)?\n\n` +
+                `• ${inRange.length} unscored week(s)\n` +
+                "• Pads bots toward 16 if thin\n" +
+                "• Demo card → bots → random results → score each week\n" +
+                "• Leave this tab open until finished\n\n" +
+                "Sandbox / dry-run only."
+              : `Run ENTIRE season (Week 0 → CFP Final)?\n\n` +
+                `• ${inRange.length} unscored week(s)\n` +
+                "• Pads bots toward 16 if thin\n" +
+                "• Demo card → bots → random results → score each week\n" +
+                "• Leave this tab open until finished\n\n" +
+                "Sandbox / dry-run only."
             : `Auto-score ${weekTitle(from)} → ${weekTitle(to)}?\n\n` +
               `• ${inRange.length} unscored week(s) in range\n` +
               "• Already-scored weeks skipped\n" +
@@ -1640,23 +1659,27 @@ function CommissionerPageInner() {
 
   /** Back-compat: full remaining season */
   async function handleAutoFinishSeason() {
+    const minW = leagueSeasonMin();
+    const maxW = leagueSeasonMax();
     const firstUnscored = (() => {
-      for (let w = 0; w <= SEASON_MAX_WEEK; w++) {
+      for (let w = minW; w <= maxW; w++) {
         if (!scoredWeeks.includes(w)) return w;
       }
       return null;
     })();
     if (firstUnscored == null) {
       setAutoSeasonReport(
-        "All weeks 0–18 are already scored. Season complete — open Champ / Toilet / Trophies."
+        leagueFootballSport() === "nfl"
+          ? "All NFL weeks (1–22) are already scored. Season complete — open Champ / Toilet / Trophies."
+          : "All weeks 0–18 are already scored. Season complete — open Champ / Toilet / Trophies."
       );
       return;
     }
     setAutoFromWeek(firstUnscored);
-    setAutoToWeek(SEASON_MAX_WEEK);
+    setAutoToWeek(maxW);
     await handleAutoFinishRange({
       from: firstUnscored,
-      to: SEASON_MAX_WEEK,
+      to: maxW,
     });
   }
 
@@ -1839,7 +1862,9 @@ function CommissionerPageInner() {
     const cards = result.cardsDeleted ?? 0;
     const results = result.resultsDeleted ?? 0;
     setSeasonResetReport(
-      `Season reset complete. Kept ${kept} member(s). Removed ${cards} card(s), ${picks} pick sheet(s), ${results} scored week(s). Scores zeroed. Ready for Week 0 — re-add bots, then Run season.`
+      `Season reset complete. Kept ${kept} member(s). Removed ${cards} card(s), ${picks} pick sheet(s), ${results} scored week(s). Scores zeroed. Ready for ${
+        leagueFootballSport() === "nfl" ? "Week 1" : "Week 0"
+      } — re-add bots, then Run season.`
     );
   }
 
@@ -2530,7 +2555,11 @@ function CommissionerPageInner() {
                   <>
                     Full control (one week → full season) lives on{" "}
                     <strong className="text-foreground">Enter Results</strong>.
-                    Shortcut here: finish everything left through CFP Final.
+                    Shortcut here: finish everything left through{" "}
+                    {leagueFootballSport() === "nfl"
+                      ? "Super Bowl"
+                      : "CFP Final"}
+                    .
                   </>
                 ) : (
                   <>
@@ -2550,7 +2579,9 @@ function CommissionerPageInner() {
                 {autoSeasonBusy
                   ? "Season running… keep this tab open"
                   : preseasonToolsOk
-                    ? "Finish remaining → CFP Final"
+                    ? leagueFootballSport() === "nfl"
+                      ? "Finish remaining → Super Bowl"
+                      : "Finish remaining → CFP Final"
                     : "Finish remaining (locked)"}
               </button>
               <button
@@ -4020,15 +4051,17 @@ function CommissionerPageInner() {
                   disabled={autoSeasonBusy || !preseasonToolsOk}
                   onClick={() => {
                     if (!requirePreseasonTools()) return;
+                    const minW = leagueSeasonMin();
+                    const maxW = leagueSeasonMax();
                     const start =
                       scoredWeeks.length === 0
-                        ? 0
+                        ? minW
                         : Math.min(
-                            SEASON_MAX_WEEK,
-                            Math.max(...scoredWeeks) + 1
+                            maxW,
+                            Math.max(minW, Math.max(...scoredWeeks) + 1)
                           );
                     setAutoFromWeek(start);
-                    setAutoToWeek(Math.min(SEASON_MAX_WEEK, start));
+                    setAutoToWeek(Math.min(maxW, start));
                   }}
                   className="px-3 py-1.5 rounded-lg border border-border text-xs font-medium hover:bg-card-hover disabled:opacity-50"
                 >
@@ -4039,15 +4072,17 @@ function CommissionerPageInner() {
                   disabled={autoSeasonBusy || !preseasonToolsOk}
                   onClick={() => {
                     if (!requirePreseasonTools()) return;
+                    const minW = leagueSeasonMin();
+                    const maxW = leagueSeasonMax();
                     const start =
                       scoredWeeks.length === 0
-                        ? 0
+                        ? minW
                         : Math.min(
-                            SEASON_MAX_WEEK,
-                            Math.max(...scoredWeeks) + 1
+                            maxW,
+                            Math.max(minW, Math.max(...scoredWeeks) + 1)
                           );
                     setAutoFromWeek(start);
-                    setAutoToWeek(SEASON_MAX_WEEK);
+                    setAutoToWeek(maxW);
                   }}
                   className="px-3 py-1.5 rounded-lg border border-border text-xs font-medium hover:bg-card-hover disabled:opacity-50"
                 >
@@ -4058,12 +4093,14 @@ function CommissionerPageInner() {
                   disabled={autoSeasonBusy || !preseasonToolsOk}
                   onClick={() => {
                     if (!requirePreseasonTools()) return;
-                    setAutoFromWeek(0);
-                    setAutoToWeek(SEASON_MAX_WEEK);
+                    setAutoFromWeek(leagueSeasonMin());
+                    setAutoToWeek(leagueSeasonMax());
                   }}
                   className="px-3 py-1.5 rounded-lg border border-warning/50 text-warning text-xs font-medium hover:bg-warning/10 disabled:opacity-50"
                 >
-                  Full 0 → Final
+                  {leagueFootballSport() === "nfl"
+                    ? "Full 1 → Super Bowl"
+                    : "Full 0 → Final"}
                 </button>
               </div>
 

@@ -495,6 +495,7 @@ export async function shareLeagueInvite(opts: {
   appUrl?: string;
   inviterName?: string;
   flavor?: InviteFlavor | "random";
+  sportId?: string | null;
 }): Promise<"shared" | "copied" | "failed"> {
   const text = buildInviteShareText({
     ...opts,

@@ -12,7 +12,22 @@ export type ShareableTrophy = {
   leagueName?: string;
   division?: string | null;
   subtitle?: string | null;
+  /** cfb | nfl — dual-sport hashtags / day-of-week energy */
+  sportId?: string | null;
 };
+
+function resolveShareSport(sportId?: string | null): "cfb" | "nfl" {
+  if (sportId === "nfl") return "nfl";
+  if (sportId === "cfb") return "cfb";
+  try {
+    // Lazy — avoid circular imports at module init
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getLeague } = require("./league") as typeof import("./league");
+    return getLeague()?.sportId === "nfl" ? "nfl" : "cfb";
+  } catch {
+    return "cfb";
+  }
+}
 
 export type TrophySharePack = {
   kind: ProfileTrophyKind;
@@ -55,30 +70,35 @@ export function buildTrophySharePack(t: ShareableTrophy): TrophySharePack {
   const first = firstName(name);
   const league = (t.leagueName || "War Room").trim();
   const div = divisionLabel(t.division);
+  const nfl = resolveShareSport(t.sportId) === "nfl";
+  const sportTag = nfl ? "#NFL" : "#CFB";
+  const dayWord = nfl ? "Sundays" : "Saturdays";
+  const champHero = nfl ? "WAR ROOM CHAMPION" : "NATIONAL CHAMPION";
+  const champLabel = nfl ? "Champion" : "National title";
 
   const packs: Record<ProfileTrophyKind, TrophySharePack> = {
     championship: {
       kind: "championship",
-      shortLabel: "National title",
+      shortLabel: champLabel,
       shareTitle: `${year} War Room Champion — ${name}`,
       emoji: "🏆",
-      heroLine: "NATIONAL CHAMPION",
+      heroLine: champHero,
       subLine: `${year} · ${league}`,
       footerRoast: "They said it was a long season. They were right. And wrong.",
       caption: [
-        `🏆 ${name} is your ${year} ${league} NATIONAL CHAMPION.`,
+        `🏆 ${name} is your ${year} ${league} ${nfl ? "WAR ROOM CHAMPION" : "NATIONAL CHAMPION"}.`,
         ``,
         `Not "pretty good." Not "top of the chat." The big one.`,
-        `Confidence picks. Best Bets. Props. Saturdays that aged like fine trash talk.`,
+        `Confidence picks. Best Bets. Props. ${dayWord} that aged like fine trash talk.`,
         ``,
         `If you doubted ${first} all year: this post is your apology form.`,
         `If you rode with them: cash the clout, buy the pizza.`,
         ``,
         `Hardware is permanent. Group-chat amnesia is not.`,
         ``,
-        `#WarRoomPickEm #CFB #Champion #${year}`,
+        `#WarRoomPickEm ${sportTag} #Champion #${year}`,
       ].join("\n"),
-      hashtags: "#WarRoomPickEm #CFB #Champion",
+      hashtags: `#WarRoomPickEm ${sportTag} #Champion`,
       colors: {
         bg0: "#0c0a06",
         bg1: "#1a1408",
@@ -111,9 +131,9 @@ export function buildTrophySharePack(t: ShareableTrophy): TrophySharePack {
         ``,
         `Proudly engraved. Loudly shared. Zero shame. Maximum content.`,
         ``,
-        `#ToiletBowl #WarRoomPickEm #CFB #StillATrophy #${year}`,
+        `#ToiletBowl #WarRoomPickEm ${sportTag} #StillATrophy #${year}`,
       ].join("\n"),
-      hashtags: "#ToiletBowl #WarRoomPickEm #CFB #StillATrophy",
+      hashtags: `#ToiletBowl #WarRoomPickEm ${sportTag} #StillATrophy`,
       colors: {
         bg0: "#0a0612",
         bg1: "#1a0b2e",
@@ -129,12 +149,16 @@ export function buildTrophySharePack(t: ShareableTrophy): TrophySharePack {
       shareTitle: `${year} Village Nerd — ${name}`,
       emoji: "🔮",
       heroLine: "VILLAGE NERD KING",
-      subLine: `${year} · Crystal Ball national champ`,
+      subLine: nfl
+        ? `${year} · Pride pick · Super Bowl flex`
+        : `${year} · Crystal Ball national champ`,
       footerRoast: "Zero standings points. Infinite smug. Correct once.",
       caption: [
         `🔮 ANNOUNCING YOUR ${year} VILLAGE NERD / NERD KING: ${name}`,
         ``,
-        `While y'all were sweating spreads, ${first} was out here calling the NATIONAL CHAMPION in the Crystal Ball.`,
+        nfl
+          ? `While y'all were sweating spreads, ${first} was out here calling the Super Bowl champ as a pride pick.`
+          : `While y'all were sweating spreads, ${first} was out here calling the NATIONAL CHAMPION in the Crystal Ball.`,
         ``,
         `Prize pool: $0`,
         `Standings impact: also $0`,
@@ -143,9 +167,9 @@ export function buildTrophySharePack(t: ShareableTrophy): TrophySharePack {
         `They get a plaque. You get the "I told you so" for free.`,
         `This is pure prophecy energy. Nerd hardware. Absolute cinema.`,
         ``,
-        `#VillageNerd #NerdKing #CrystalBall #WarRoomPickEm #CFB #${year}`,
+        `#VillageNerd #NerdKing #CrystalBall #WarRoomPickEm ${sportTag} #${year}`,
       ].join("\n"),
-      hashtags: "#VillageNerd #NerdKing #CrystalBall #WarRoomPickEm",
+      hashtags: `#VillageNerd #NerdKing #CrystalBall #WarRoomPickEm ${sportTag}`,
       colors: {
         bg0: "#020617",
         bg1: "#0c1929",
@@ -174,9 +198,9 @@ export function buildTrophySharePack(t: ShareableTrophy): TrophySharePack {
         `National title is another conversation.`,
         `This post is about LOCAL DOMINANCE and making three other divisions slightly mad.`,
         ``,
-        `#DivisionChamp #WarRoomPickEm #CFB #${year}`,
+        `#DivisionChamp #WarRoomPickEm ${sportTag} #${year}`,
       ].join("\n"),
-      hashtags: "#DivisionChamp #WarRoomPickEm #CFB",
+      hashtags: `#DivisionChamp #WarRoomPickEm ${sportTag}`,
       colors: {
         bg0: "#04140f",
         bg1: "#0a2e22",

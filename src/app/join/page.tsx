@@ -39,7 +39,7 @@ function JoinPageInner() {
   const [displayName, setDisplayName] = useState("");
   const [mode, setMode] = useState<"choose" | "create" | "join">("choose");
   const [leagueName, setLeagueName] = useState("War Room");
-  /** Multi-sport: only CFB is live in Phase 1 */
+  /** Multi-sport: CFB + NFL live; others coming soon */
   const [sportId, setSportId] = useState<SportId>(DEFAULT_SPORT_ID);
   /** List new league in open-room lobby for strangers to fill seats */
   const [listAsOpen, setListAsOpen] = useState(false);
@@ -108,7 +108,7 @@ function JoinPageInner() {
     setError(null);
     if (!isLiveSport(sportId)) {
       setError(
-        `${getSportPack(sportId).label} is coming soon. Pick College Football for now.`
+        `${getSportPack(sportId).label} is coming soon. Pick CFB or NFL for now.`
       );
       return;
     }
