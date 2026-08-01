@@ -39,8 +39,19 @@ export function botsLockedMessage(): string {
   );
 }
 
+function eyesMode(): string {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const eyes = require("./creator-eyes") as typeof import("./creator-eyes");
+    return eyes.getCreatorEyesMode();
+  } catch {
+    return "off";
+  }
+}
+
 /** Deep bot ops (Chaos, locker seed, Crystal Ball bots, SQL copy, exact counts). */
 export function canShowDeepHostTools(userId?: string | null): boolean {
+  if (eyesMode() === "new_commissioner") return false;
   const id = userId ?? getSession()?.playerId;
   return isAppCreator(id);
 }
@@ -54,8 +65,9 @@ export function isSimpleHostSurface(opts: {
   scoredWeekCount: number;
   userId?: string | null;
 }): boolean {
-  // Creator can still use simple surface but may expand advanced
-  if (canShowDeepHostTools(opts.userId)) return false;
+  if (eyesMode() === "new_commissioner") return true;
+  // Creator’s normal view keeps full tools
+  if (isAppCreator(opts.userId ?? getSession()?.playerId)) return false;
   return isFirstTimeCommish({
     leagueId: opts.leagueId,
     scoredWeekCount: opts.scoredWeekCount,

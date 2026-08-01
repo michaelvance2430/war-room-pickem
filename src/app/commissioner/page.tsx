@@ -315,23 +315,32 @@ function CommissionerPageInner() {
       } catch {
         scoredCount = 0;
       }
+      let eyesNewCommish = false;
+      try {
+        const { getCreatorEyesMode } = await import("@/lib/creator-eyes");
+        eyesNewCommish = getCreatorEyesMode() === "new_commissioner";
+      } catch {
+        eyesNewCommish = false;
+      }
       const ft =
-        !!owner &&
-        !!lg?.id &&
-        isFirstTimeCommish({ leagueId: lg.id, scoredWeekCount: scoredCount });
+        eyesNewCommish ||
+        (!!owner &&
+          !!lg?.id &&
+          isFirstTimeCommish({ leagueId: lg.id, scoredWeekCount: scoredCount }));
       setFirstTime(ft);
-      const creator = canShowDeepHostTools(getSession()?.playerId);
-      setDeepHostTools(creator);
+      const deep = canShowDeepHostTools(getSession()?.playerId);
+      setDeepHostTools(deep);
       setSimpleHost(
-        !!lg?.id &&
-          isSimpleHostSurface({
-            leagueId: lg.id,
-            scoredWeekCount: scoredCount,
-            userId: getSession()?.playerId,
-          })
+        eyesNewCommish ||
+          (!!lg?.id &&
+            isSimpleHostSurface({
+              leagueId: lg.id,
+              scoredWeekCount: scoredCount,
+              userId: getSession()?.playerId,
+            }))
       );
-      // New hosts: stay simple. Creators / graduated: advanced open by default.
-      setAdvancedOpen(creator || !ft);
+      // New hosts / eyes: stay simple. Creators normal: advanced open.
+      setAdvancedOpen(deep && !eyesNewCommish && !ft);
       try {
         setBotsLocked(await areBotsRosterLocked());
       } catch {

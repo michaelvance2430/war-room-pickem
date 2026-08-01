@@ -12,6 +12,15 @@ import {
   setPlatformIncident,
   type PlatformIncident,
 } from "@/lib/platform-status";
+import {
+  creatorEyesBlurb,
+  creatorEyesLabel,
+  EVENT_CREATOR_EYES,
+  getCreatorEyesMode,
+  setCreatorEyesMode,
+  type CreatorEyesMode,
+} from "@/lib/creator-eyes";
+import { useRouter } from "next/navigation";
 
 type Light = "green" | "yellow" | "red";
 
@@ -37,6 +46,7 @@ const DOT: Record<Light, string> = {
 };
 
 export default function FounderDashboardPage() {
+  const router = useRouter();
   const [allowed, setAllowed] = useState<boolean | null>(null);
   const [health, setHealth] = useState<HealthPayload | null>(null);
   const [healthError, setHealthError] = useState<string | null>(null);
@@ -48,6 +58,7 @@ export default function FounderDashboardPage() {
   const [busy, setBusy] = useState(false);
   const [saveNote, setSaveNote] = useState<string | null>(null);
   const [clientMs, setClientMs] = useState<number | null>(null);
+  const [eyes, setEyes] = useState<CreatorEyesMode>("off");
 
   const refresh = useCallback(async () => {
     const session = getSession();
@@ -98,7 +109,24 @@ export default function FounderDashboardPage() {
 
   useEffect(() => {
     void refresh();
+    setEyes(getCreatorEyesMode());
+    function onEyes() {
+      setEyes(getCreatorEyesMode());
+    }
+    window.addEventListener(EVENT_CREATOR_EYES, onEyes);
+    return () => window.removeEventListener(EVENT_CREATOR_EYES, onEyes);
   }, [refresh]);
+
+  function enterEyes(mode: CreatorEyesMode, href: string) {
+    setCreatorEyesMode(mode);
+    setEyes(mode);
+    router.push(href);
+  }
+
+  function exitEyes() {
+    setCreatorEyesMode("off");
+    setEyes("off");
+  }
 
   async function toggleIncident(active: boolean) {
     setBusy(true);
@@ -177,6 +205,64 @@ export default function FounderDashboardPage() {
             Refresh
           </button>
         </div>
+
+        {/* Everyone’s eyes — brand-new player / commissioner previews */}
+        <section className="rounded-xl border-2 border-sky-400/50 bg-sky-500/10 p-4 space-y-3">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-sky-300">
+            Everyone&apos;s eyes
+          </p>
+          <h2 className="text-sm font-semibold text-foreground">
+            See what they see
+          </h2>
+          <p className="text-xs text-muted leading-relaxed">
+            One click. Your browser only. Server powers unchanged — this only
+            changes chrome (nav, Home, Run the Room). Exit when you&apos;re done
+            testing.
+          </p>
+
+          {eyes !== "off" && (
+            <div className="rounded-lg border border-sky-400/40 bg-sky-950/40 px-3 py-2.5 text-xs text-sky-100 leading-relaxed">
+              <p className="font-bold">{creatorEyesLabel(eyes)} ON</p>
+              <p className="mt-0.5 text-sky-200/80">{creatorEyesBlurb(eyes)}</p>
+              <button
+                type="button"
+                onClick={exitEyes}
+                className="mt-2 w-full py-2 min-h-[40px] rounded-lg bg-sky-400 text-black text-xs font-bold"
+              >
+                Exit eyes · back to creator view
+              </button>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 gap-2">
+            <button
+              type="button"
+              onClick={() => enterEyes("new_player", "/")}
+              className="w-full text-left rounded-xl border border-sky-400/40 bg-background/80 hover:bg-sky-500/15 px-3 py-3 min-h-[56px] transition"
+            >
+              <span className="block text-sm font-bold text-foreground">
+                Brand-new player
+              </span>
+              <span className="block text-[11px] text-muted mt-0.5">
+                Opens Home · quiet nav · Picks · Board · Locker · no Gazette
+                shelf · no Run the Room
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => enterEyes("new_commissioner", "/commissioner")}
+              className="w-full text-left rounded-xl border border-primary/40 bg-background/80 hover:bg-primary/10 px-3 py-3 min-h-[56px] transition"
+            >
+              <span className="block text-sm font-bold text-foreground">
+                Brand-new commissioner
+              </span>
+              <span className="block text-[11px] text-muted mt-0.5">
+                Opens Run the Room · simple host banner · fill seats yes/no ·
+                deep bot tools hidden
+              </span>
+            </button>
+          </div>
+        </section>
 
         {/* Test Mode — creator flight simulator */}
         <section className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 space-y-2">
