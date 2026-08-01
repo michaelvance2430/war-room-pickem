@@ -66,6 +66,9 @@ export function normalizeEdition(raw: GazetteEdition): GazetteEdition {
     eventLine: raw.eventLine,
     rareEgg: raw.rareEgg ?? null,
     secretLetter: raw.secretLetter ?? null,
+    conferenceChampions: Array.isArray(raw.conferenceChampions)
+      ? raw.conferenceChampions
+      : raw.conferenceChampions ?? null,
   };
 }
 
@@ -249,6 +252,48 @@ export default function GazettePaper({
             )}
           </div>
         )}
+        {/* Conference / division clinch — cut-lock week only */}
+        {edition.conferenceChampions &&
+          edition.conferenceChampions.length > 0 && (
+            <div className="rounded-lg border-4 border-amber-800 bg-gradient-to-br from-amber-100 via-yellow-50 to-amber-50 px-3 py-3 space-y-3 shadow-md">
+              <div className="flex items-center gap-2 border-b-2 border-amber-900/30 pb-2">
+                <span className="text-2xl" aria-hidden>
+                  🛡️
+                </span>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-950">
+                    {edition.sportId === "nfl"
+                      ? "★ Division clinch night"
+                      : "★ Conference title night"}
+                  </p>
+                  <p className="text-[11px] font-bold text-amber-900/80">
+                    Engraved in the Trophy Room · not a drill
+                  </p>
+                </div>
+              </div>
+              {edition.conferenceChampions.map((story, i) => (
+                <article
+                  key={`${story.names[0]}-${i}`}
+                  className={
+                    i > 0 ? "pt-2 border-t border-amber-800/25" : undefined
+                  }
+                >
+                  <h3 className="font-serif text-lg sm:text-xl font-black leading-[1.2] text-stone-950">
+                    {story.headline}
+                  </h3>
+                  {story.deck && (
+                    <p className="text-sm text-stone-800 mt-1.5 leading-snug font-medium">
+                      {story.deck}
+                    </p>
+                  )}
+                  <p className="text-xs text-amber-950/70 mt-1.5 font-bold">
+                    {story.names.join(" · ")} · {story.pts} season pts
+                  </p>
+                </article>
+              ))}
+            </div>
+          )}
+
         {/* A1 Crown */}
         <article className="relative">
           <div className="flex items-start gap-3">

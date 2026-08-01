@@ -1,7 +1,15 @@
 import { createClient } from "@/lib/supabase/client";
 import { getSession } from "@/lib/league";
 
-export type TrophyType = "championship" | "toilet_bowl" | "crystal_ball";
+export type TrophyType =
+  | "championship"
+  | "toilet_bowl"
+  | "crystal_ball"
+  /** CFB conference / NFL division titles (one per compass slot) */
+  | "division_north"
+  | "division_south"
+  | "division_east"
+  | "division_west";
 
 export type LeagueTrophy = {
   id: string;
@@ -55,6 +63,42 @@ export const TROPHY_META: Record<
     border: "border-sky-400/40",
     glow: "shadow-[0_0_40px_rgba(56,189,248,0.1)]",
   },
+  division_north: {
+    title: "Conference / Division Title",
+    short: "Title",
+    emoji: "🛡️",
+    blurb: "Won your conference or division race (SEC, AFC East, …).",
+    accent: "text-primary",
+    border: "border-primary/40",
+    glow: "shadow-[0_0_40px_rgba(34,197,94,0.1)]",
+  },
+  division_south: {
+    title: "Conference / Division Title",
+    short: "Title",
+    emoji: "🛡️",
+    blurb: "Won your conference or division race.",
+    accent: "text-primary",
+    border: "border-primary/40",
+    glow: "shadow-[0_0_40px_rgba(34,197,94,0.1)]",
+  },
+  division_east: {
+    title: "Conference / Division Title",
+    short: "Title",
+    emoji: "🛡️",
+    blurb: "Won your conference or division race.",
+    accent: "text-primary",
+    border: "border-primary/40",
+    glow: "shadow-[0_0_40px_rgba(34,197,94,0.1)]",
+  },
+  division_west: {
+    title: "Conference / Division Title",
+    short: "Title",
+    emoji: "🛡️",
+    blurb: "Won your conference or division race.",
+    accent: "text-primary",
+    border: "border-primary/40",
+    glow: "shadow-[0_0_40px_rgba(34,197,94,0.1)]",
+  },
 };
 
 function mapRow(r: Record<string, unknown>): LeagueTrophy {
@@ -101,9 +145,15 @@ export async function awardTrophy(opts: {
   winnerUserId?: string | null;
   subtitle?: string | null;
   notes?: string | null;
+  /** Auto-engrave after cut (ops scoring) */
+  allowOps?: boolean;
 }): Promise<{ ok: boolean; error?: string }> {
   const session = getSession();
-  if (!session?.leagueId || !session.isCommissioner) {
+  const { isOps } = await import("./league");
+  const canAward =
+    session?.leagueId &&
+    (session.isCommissioner || (opts.allowOps && isOps()));
+  if (!canAward || !session?.leagueId) {
     return { ok: false, error: "Only the commissioner can award trophies" };
   }
   const name = opts.winnerName.trim();
@@ -288,7 +338,15 @@ export function groupTrophiesBySeason(
     list.push(t);
     map.set(t.seasonYear, list);
   }
-  const order: TrophyType[] = ["championship", "toilet_bowl", "crystal_ball"];
+  const order: TrophyType[] = [
+    "championship",
+    "toilet_bowl",
+    "crystal_ball",
+    "division_north",
+    "division_south",
+    "division_east",
+    "division_west",
+  ];
   return [...map.entries()]
     .sort((a, b) => b[0] - a[0])
     .map(([year, items]) => ({
