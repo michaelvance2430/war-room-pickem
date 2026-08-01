@@ -1543,6 +1543,15 @@ export async function saveResultsAndScoreWeek(opts: {
     /* best-effort */
   }
 
+  // Auto Trophy Room — champs / toilet / divisions / nerd (no manual form)
+  try {
+    const { autoEngraveAllTrophies } = await import("./auto-trophies");
+    const players = await loadLeaguePlayers();
+    await autoEngraveAllTrophies({ weekNumber, players });
+  } catch {
+    /* best-effort */
+  }
+
   return { ok: true, scoredCount, details };
 }
 

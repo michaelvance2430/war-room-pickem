@@ -461,6 +461,13 @@ export async function crownNationalChampion(
           /* ignore */
         }
       }
+      // Auto-engrave Village Nerd when champ is crowned
+      try {
+        const { autoEngraveAllTrophies } = await import("./auto-trophies");
+        await autoEngraveAllTrophies({});
+      } catch {
+        /* best-effort */
+      }
       return { ok: true, winners: winners.length };
     }
   } catch {
@@ -491,6 +498,12 @@ export async function crownNationalChampion(
     }
   }
   writeLocal(session.leagueId, local);
+  try {
+    const { autoEngraveAllTrophies } = await import("./auto-trophies");
+    await autoEngraveAllTrophies({});
+  } catch {
+    /* best-effort */
+  }
   return { ok: true, winners: winners.length };
 }
 
