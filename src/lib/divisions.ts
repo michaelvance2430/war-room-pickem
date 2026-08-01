@@ -6,13 +6,23 @@ export const DIVISIONS: DivisionName[] = ["North", "South", "East", "West"];
 
 /**
  * Stored enum values stay North/South/East/West (Postgres).
- * NFL leagues display as AFC/NFC East–West for pro identity.
+ * Display labels are sport flavor only — no logos, no official affiliation.
+ *
+ * NFL → AFC/NFC East–West (pro postseason story).
+ * CFB → SEC / Big Ten / ACC / Big 12 (campus identity for brackets).
  */
 const NFL_DIVISION_LABELS: Record<DivisionName, string> = {
   North: "AFC East",
   South: "AFC West",
   East: "NFC East",
   West: "NFC West",
+};
+
+const CFB_DIVISION_LABELS: Record<DivisionName, string> = {
+  North: "SEC",
+  South: "Big Ten",
+  East: "ACC",
+  West: "Big 12",
 };
 
 export function isDivisionName(v: unknown): v is DivisionName {
@@ -26,10 +36,15 @@ export function divisionDisplayLabel(
 ): string {
   const d = isDivisionName(division) ? division : "North";
   if (sportId === "nfl") return NFL_DIVISION_LABELS[d];
+  if (sportId === "cfb" || sportId == null || sportId === "") {
+    // Default / classic War Room pack = CFB conference flavor
+    return CFB_DIVISION_LABELS[d];
+  }
+  // Other packs (WWC, future): plain compass until they get their own map
   return d;
 }
 
-/** Tab / chip label — "AFC East" vs "North" */
+/** Tab / chip label — "SEC" vs "AFC East" vs "Overall" */
 export function divisionTabLabel(
   division: DivisionName | "Overall",
   sportId?: string | null
@@ -38,13 +53,19 @@ export function divisionTabLabel(
   return divisionDisplayLabel(division, sportId);
 }
 
-/** Longer form: "AFC East" or "North Division" */
+/**
+ * Longer form for sentences.
+ * Conference names already read complete (SEC, AFC East) — no "Division" suffix.
+ * Unknown packs keep "North Division".
+ */
 export function divisionFullLabel(
   division: string | null | undefined,
   sportId?: string | null
 ): string {
   const short = divisionDisplayLabel(division, sportId);
-  if (sportId === "nfl") return short;
+  if (sportId === "nfl" || sportId === "cfb" || sportId == null || sportId === "") {
+    return short;
+  }
   return `${short} Division`;
 }
 
