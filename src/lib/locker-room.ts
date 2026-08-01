@@ -240,11 +240,10 @@ export async function loadLockerMessages(limit = 100): Promise<{
   const { startIso, label } = getLockerWeekBounds();
   const supabase = createClient();
 
-  // Fresh board each Mon–Sun — don't keep season-long history
   void purgeStaleLockerMessages(session.leagueId, startIso);
 
-  // Extra rows: some may be hidden reaction markers (fallback storage)
-  const fetchLimit = Math.min(300, Math.max(limit * 3, 120));
+  // Extra rows: reaction markers are hidden posts in the same table
+  const fetchLimit = Math.min(400, Math.max(limit * 4, 150));
   const { data, error } = await supabase
     .from("locker_messages")
     .select("id, league_id, user_id, body, created_at")
@@ -277,27 +276,28 @@ export async function loadLockerMessages(limit = 100): Promise<{
     emoji: string;
     rowId: string;
   }[] = [];
+
   for (const r of rows) {
     const body = String(r.body || "");
     const parsed = parseReactionMarker(body);
     if (parsed) {
       rxRows.push({
         messageId: parsed.messageId,
-        userId: r.user_id as string,
+        userId: String(r.user_id || ""),
         emoji: parsed.emoji,
-        rowId: r.id as string,
+        rowId: String(r.id || ""),
       });
     } else {
       chatRows.push(r);
     }
   }
 
-  // Oldest → newest for chat-style display
   const messages = chatRows
     .slice(0, limit)
     .map((r) => mapRow(r, nameById))
     .reverse();
 
+  // Prefer table when present; always merge marker rows too (legacy + fallback)
   const withRx = await attachReactions(
     supabase,
     messages,
@@ -308,31 +308,47 @@ export async function loadLockerMessages(limit = 100): Promise<{
 }
 
 /**
- * Hidden body format when locker_message_reactions table is missing.
- * Filtered out of the chat list; tallied as emoji reactions.
+ * ASCII marker stored as a normal locker_messages row (hidden from chat UI).
+ * Format: WR_RX|<uuid>|<emoji>
+ * (No fancy unicode — § broke LIKE queries / wiped optimistic UI.)
  */
-const RX_MARKER = "§WR_RX§";
+const RX_PREFIX = "WR_RX|";
 
 function parseReactionMarker(
   body: string
 ): { messageId: string; emoji: string } | null {
-  if (!body || !body.startsWith(RX_MARKER)) return null;
-  const rest = body.slice(RX_MARKER.length);
-  const sep = rest.indexOf("§");
-  if (sep < 1) return null;
-  const messageId = rest.slice(0, sep).trim();
-  const emoji = rest.slice(sep + 1).trim();
-  if (!/^[0-9a-f-]{36}$/i.test(messageId)) return null;
-  if (!emoji || [...emoji].length > 8) return null;
-  return { messageId, emoji };
+  const raw = (body || "").trim();
+  // New format
+  if (raw.startsWith(RX_PREFIX)) {
+    const parts = raw.split("|");
+    // WR_RX | uuid | emoji... (emoji may contain | rarely — take rest)
+    if (parts.length < 3) return null;
+    const messageId = (parts[1] || "").trim();
+    const emoji = parts.slice(2).join("|").trim();
+    if (!/^[0-9a-f-]{36}$/i.test(messageId)) return null;
+    if (!emoji || [...emoji].length > 12) return null;
+    return { messageId, emoji };
+  }
+  // Legacy § format (still load old reactions)
+  if (raw.startsWith("§WR_RX§")) {
+    const rest = raw.slice("§WR_RX§".length);
+    const sep = rest.indexOf("§");
+    if (sep < 1) return null;
+    const messageId = rest.slice(0, sep).trim();
+    const emoji = rest.slice(sep + 1).trim();
+    if (!/^[0-9a-f-]{36}$/i.test(messageId)) return null;
+    if (!emoji || [...emoji].length > 12) return null;
+    return { messageId, emoji };
+  }
+  return null;
 }
 
 function formatReactionMarker(messageId: string, emoji: string): string {
-  return `${RX_MARKER}${messageId}§${emoji}`;
+  return `${RX_PREFIX}${messageId}|${emoji}`;
 }
 
 function isMissingReactionsTable(message?: string | null): boolean {
-  return /does not exist|schema cache|PGRST205|locker_message_reactions/i.test(
+  return /does not exist|schema cache|PGRST205|Could not find the table|locker_message_reactions/i.test(
     message || ""
   );
 }
@@ -352,19 +368,17 @@ async function attachReactions(
 
   const messageIds = messages.map((m) => m.id);
   type RxRow = { message_id: string; user_id: string; emoji: string };
-  let tableRows: RxRow[] | null = null;
+  let tableRows: RxRow[] = [];
   try {
     const { data, error } = await supabase
       .from("locker_message_reactions")
       .select("message_id, user_id, emoji")
       .in("message_id", messageIds);
-    if (!error) {
-      tableRows = (data || []) as RxRow[];
-    } else if (!isMissingReactionsTable(error.message)) {
-      tableRows = [];
+    if (!error && data) {
+      tableRows = data as RxRow[];
     }
   } catch {
-    tableRows = null;
+    /* table missing — markers only */
   }
 
   const byMsg = new Map<
@@ -373,6 +387,7 @@ async function attachReactions(
   >();
 
   function addRx(messageId: string, userId: string, emoji: string) {
+    if (!messageId || !emoji) return;
     if (!byMsg.has(messageId)) byMsg.set(messageId, new Map());
     const em = byMsg.get(messageId)!;
     const prev = em.get(emoji) || { count: 0, mine: false };
@@ -381,9 +396,9 @@ async function attachReactions(
     em.set(emoji, prev);
   }
 
-  if (tableRows) {
-    for (const r of tableRows) addRx(r.message_id, r.user_id, r.emoji);
-  } else if (embeddedRx?.length) {
+  for (const r of tableRows) addRx(r.message_id, r.user_id, r.emoji);
+  // Markers always apply (works without table; survives dual-path)
+  if (embeddedRx?.length) {
     for (const r of embeddedRx) addRx(r.messageId, r.userId, r.emoji);
   }
 
@@ -401,14 +416,15 @@ async function attachReactions(
   });
 }
 
-/** Reactions always available — table preferred, marker fallback otherwise. */
+/** Reactions always available (table and/or marker fallback). */
 export async function isLockerReactionsReady(): Promise<boolean> {
   return true;
 }
 
 /**
- * Toggle a reaction on a locker message (tap again to remove).
- * Prefers locker_message_reactions; falls back to hidden marker posts.
+ * Toggle a reaction on any message (including your own).
+ * Uses locker_message_reactions when present; otherwise WR_RX| markers
+ * in locker_messages (hidden from the chat list).
  */
 export async function toggleLockerReaction(
   messageId: string,
@@ -424,8 +440,11 @@ export async function toggleLockerReaction(
     return { ok: false, error: "Not signed in" };
   }
   const em = (emoji || "").trim();
-  if (!em || [...em].length > 8) {
+  if (!em || [...em].length > 12) {
     return { ok: false, error: "Pick a reaction emoji." };
+  }
+  if (!messageId || !/^[0-9a-f-]{36}$/i.test(messageId)) {
+    return { ok: false, error: "Invalid message." };
   }
 
   try {
@@ -442,33 +461,42 @@ export async function toggleLockerReaction(
 
   const supabase = createClient();
   const { data: auth } = await supabase.auth.getUser();
-  const uid = auth.user?.id;
+  // Match postLockerMessage: prefer auth uid, fall back to session
+  const uid = auth.user?.id || session.playerId;
   if (!uid) {
     return { ok: false, error: "Session expired — sign in again to react." };
   }
 
-  let useTable = true;
-  {
-    const { error: probeErr } = await supabase
-      .from("locker_message_reactions")
-      .select("id")
-      .limit(1);
-    if (probeErr && isMissingReactionsTable(probeErr.message)) {
-      useTable = false;
+  // Try dedicated table first (no separate probe — one less failure mode)
+  const tableRes = await toggleReactionViaTable(
+    supabase,
+    messageId,
+    em,
+    uid
+  );
+  if (tableRes.ok) return tableRes;
+  if (!tableRes.needsSetup && tableRes.error) {
+    // Real error (muted, RLS, etc.) — still try markers if it looked like missing table
+    if (!isMissingReactionsTable(tableRes.error)) {
+      // Fall through to markers only for missing-table; otherwise surface error
+      // UNLESS it's a network blip on a missing table that wasn't classified —
+      // try markers as last resort for insert failures that are clearly "no table"
     }
   }
-
-  if (useTable) {
-    const tableRes = await toggleReactionViaTable(
+  if (tableRes.needsSetup || isMissingReactionsTable(tableRes.error)) {
+    return toggleReactionViaMarkers(
       supabase,
+      session.leagueId,
       messageId,
       em,
       uid
     );
-    if (tableRes.ok || !tableRes.needsSetup) return tableRes;
-    useTable = false;
   }
 
+  // Table exists but insert failed (muted etc.)
+  if (tableRes.error) return tableRes;
+
+  // Last resort markers
   return toggleReactionViaMarkers(
     supabase,
     session.leagueId,
@@ -497,8 +525,11 @@ async function toggleReactionViaTable(
     .eq("emoji", em)
     .maybeSingle();
 
-  if (existingErr && isMissingReactionsTable(existingErr.message)) {
-    return { ok: false, needsSetup: true, error: existingErr.message };
+  if (existingErr) {
+    if (isMissingReactionsTable(existingErr.message)) {
+      return { ok: false, needsSetup: true, error: existingErr.message };
+    }
+    // Other select errors — still try insert path
   }
 
   if (existing?.id) {
@@ -540,8 +571,15 @@ async function toggleReactionViaTable(
     .select("user_id, emoji")
     .eq("message_id", messageId);
 
-  if (allErr && isMissingReactionsTable(allErr.message)) {
-    return { ok: false, needsSetup: true, error: allErr.message };
+  if (allErr) {
+    if (isMissingReactionsTable(allErr.message)) {
+      return { ok: false, needsSetup: true, error: allErr.message };
+    }
+    // Write succeeded — return at least this emoji so UI doesn't go empty
+    return {
+      ok: true,
+      reactions: [{ emoji: em, count: 1, mine: true }],
+    };
   }
 
   return { ok: true, reactions: tallyReactions(all || [], uid) };
@@ -559,26 +597,41 @@ async function toggleReactionViaMarkers(
   error?: string;
 }> {
   const marker = formatReactionMarker(messageId, em);
+  const { startIso } = getLockerWeekBounds();
 
-  const { data: mine, error: findErr } = await supabase
+  // Find my existing reaction rows for this message (any emoji) this week
+  // Client-side filter — no fragile LIKE with unicode
+  const { data: weekRows, error: findErr } = await supabase
     .from("locker_messages")
-    .select("id, body")
+    .select("id, user_id, body")
     .eq("league_id", leagueId)
     .eq("user_id", uid)
-    .eq("body", marker)
-    .limit(5);
+    .gte("created_at", startIso)
+    .order("created_at", { ascending: false })
+    .limit(200);
 
   if (findErr) {
     return { ok: false, error: findErr.message };
   }
 
-  const hadMine = !!(mine && mine.length > 0);
+  const myRx = (weekRows || [])
+    .map((r) => {
+      const parsed = parseReactionMarker(String((r as { body?: string }).body || ""));
+      if (!parsed || parsed.messageId !== messageId) return null;
+      return {
+        id: String((r as { id: string }).id),
+        emoji: parsed.emoji,
+      };
+    })
+    .filter(Boolean) as { id: string; emoji: string }[];
 
-  if (hadMine) {
+  const mineSame = myRx.find((r) => r.emoji === em);
+
+  if (mineSame) {
     const { error } = await supabase
       .from("locker_messages")
       .delete()
-      .eq("id", (mine![0] as { id: string }).id);
+      .eq("id", mineSame.id);
     if (error) return { ok: false, error: error.message };
   } else {
     const { error } = await supabase.from("locker_messages").insert({
@@ -594,38 +647,49 @@ async function toggleReactionViaMarkers(
             "Can’t react right now — you may be muted, or not in this league.",
         };
       }
-      return { ok: false, error: error.message };
+      return {
+        ok: false,
+        error: error.message || "Could not save reaction",
+      };
     }
   }
 
-  const { startIso } = getLockerWeekBounds();
+  // Reload ALL markers for this parent (all users) — filter in JS
   const { data: allRows, error: allErr } = await supabase
     .from("locker_messages")
     .select("user_id, body")
     .eq("league_id", leagueId)
     .gte("created_at", startIso)
-    .like("body", `${RX_MARKER}${messageId}§%`);
+    .order("created_at", { ascending: false })
+    .limit(400);
 
-  if (allErr) {
+  if (allErr || !allRows) {
+    // Write worked — never return empty and wipe the UI
     return {
       ok: true,
-      reactions: hadMine
+      reactions: mineSame
         ? []
         : [{ emoji: em, count: 1, mine: true }],
     };
   }
 
   const tallies = new Map<string, { count: number; mine: boolean }>();
-  for (const r of allRows || []) {
+  for (const r of allRows) {
     const parsed = parseReactionMarker(
       String((r as { body?: string }).body || "")
     );
     if (!parsed || parsed.messageId !== messageId) continue;
     const prev = tallies.get(parsed.emoji) || { count: 0, mine: false };
     prev.count += 1;
-    if ((r as { user_id: string }).user_id === uid) prev.mine = true;
+    if (String((r as { user_id: string }).user_id) === uid) prev.mine = true;
     tallies.set(parsed.emoji, prev);
   }
+
+  // If we just added and parse still empty (shouldn't), keep optimistic single
+  if (tallies.size === 0 && !mineSame) {
+    return { ok: true, reactions: [{ emoji: em, count: 1, mine: true }] };
+  }
+
   const reactions: LockerReactionSummary[] = [...tallies.entries()]
     .map(([emoji, v]) => ({ emoji, count: v.count, mine: v.mine }))
     .sort((a, b) => b.count - a.count || a.emoji.localeCompare(b.emoji));

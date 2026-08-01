@@ -290,15 +290,19 @@ export default function LockerRoomPage() {
       const msg = res.error || "Could not react";
       setReactError(msg);
       setPostError(msg);
-      // Roll back by reloading
       await reload({ quiet: true });
       return;
     }
-    setMessages((prev) =>
-      prev.map((m) =>
-        m.id === messageId ? { ...m, reactions: res.reactions || [] } : m
-      )
-    );
+    // Prefer server tally when present; otherwise soft-reload so markers stick
+    if (res.reactions) {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === messageId ? { ...m, reactions: res.reactions! } : m
+        )
+      );
+    }
+    // Confirm from server (picks up everyone else's reacts too)
+    void reload({ quiet: true });
   }
 
   const remaining = LOCKER_MAX_CHARS - body.length;
