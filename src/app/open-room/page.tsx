@@ -13,6 +13,7 @@ import {
 } from "@/lib/open-room";
 import { MAX_LEAGUE_PLAYERS } from "@/lib/league-limits";
 import OwnershipNotice from "@/components/OwnershipNotice";
+import BrandMark from "@/components/BrandMark";
 
 type Phase =
   | "boot"
@@ -171,8 +172,8 @@ export default function OpenRoomPage() {
     <div className="min-h-screen flex items-center justify-center px-4 py-10 pb-[max(2rem,env(safe-area-inset-bottom))]">
       <div className="max-w-md w-full">
         <div className="text-center mb-6">
-          <div className="w-14 h-14 rounded-xl bg-primary text-black font-bold text-xl flex items-center justify-center mx-auto mb-3">
-            WR
+          <div className="flex justify-center mb-3">
+            <BrandMark size={64} variant="force" className="rounded-xl" />
           </div>
           <h1 className="text-2xl font-bold">Open room lobby</h1>
           <p className="text-sm text-muted mt-2 leading-relaxed">

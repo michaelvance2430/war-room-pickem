@@ -24,6 +24,7 @@ import { DEFAULT_SPORT_ID, type SportId } from "@/lib/sports/types";
 import OwnershipNotice from "@/components/OwnershipNotice";
 import WwcTrophyLogo from "@/components/WwcTrophyLogo";
 import NflBrandMark from "@/components/NflBrandMark";
+import BrandMark from "@/components/BrandMark";
 import OpenRoomBotsNudge from "@/components/OpenRoomBotsNudge";
 import {
   saveActiveLeagueId,
@@ -528,6 +529,9 @@ function JoinPageInner() {
           />
         )}
         <div className="max-w-md w-full rounded-xl border-2 border-primary/40 bg-card p-6">
+          <div className="flex justify-center mb-3">
+            <BrandMark size={56} variant="force" />
+          </div>
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary mb-2 text-center">
             You&apos;re the host
           </p>
@@ -622,8 +626,8 @@ function JoinPageInner() {
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
-          <div className="w-12 h-12 rounded-lg bg-primary text-black font-bold text-lg flex items-center justify-center mx-auto mb-3">
-            WR
+          <div className="flex justify-center mb-3">
+            <BrandMark size={64} variant="force" className="rounded-xl" />
           </div>
           <h1 className="text-2xl font-bold">War Room Pick&apos;Em</h1>
           <p className="text-sm text-muted mt-1">Signed in as {displayName}</p>

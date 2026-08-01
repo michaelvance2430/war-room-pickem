@@ -29,6 +29,7 @@ import {
 import { normalizeSportId } from "@/lib/sports/registry";
 import type { SportId } from "@/lib/sports/types";
 import NflBrandMark from "@/components/NflBrandMark";
+import BrandMark from "@/components/BrandMark";
 
 const NEEDS_SCROLL_MAX = 8;
 
@@ -59,6 +60,9 @@ function SportDeskIcon({
 }) {
   if (sportId === "nfl") {
     return <NflBrandMark size={size} className="rounded-lg" />;
+  }
+  if (sportId === "cfb" || !sportId) {
+    return <BrandMark size={size} variant="force" className="rounded-lg" />;
   }
   const pack = getSportPack(sportId);
   return (

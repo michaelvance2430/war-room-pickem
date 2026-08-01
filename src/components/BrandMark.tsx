@@ -5,23 +5,32 @@ import { getLeague } from "@/lib/league";
 import { normalizeSportId } from "@/lib/sports/registry";
 import { SPORT_THEME_EVENT } from "@/lib/sports/sport-theme";
 import WwcTrophyLogo from "@/components/WwcTrophyLogo";
-import NflBrandMark from "@/components/NflBrandMark";
 
 type Props = {
   size?: number;
   className?: string;
-  /** Nav home: show short wordmark next to trophy on WWC */
+  /** Show “War Room” wordmark next to crest */
   withWordmark?: boolean;
+  /**
+   * force — always crest (login, join, marketing)
+   * sport — WWC keeps trophy mark; everything else uses crest
+   * default sport
+   */
+  variant?: "sport" | "force";
 };
 
+/** Platform crest path (logo #2 shield — multi-sport War Room Pick'Em) */
+export const WAR_ROOM_CREST_SRC = "/brand/war-room-crest.png";
+
 /**
- * App mark by sport: CFB monogram · NFL ball · WWC trophy.
- * Same placement — completely different aesthetic. No official trademarks.
+ * War Room brand mark — crest #2 as the house identity.
+ * WWC rooms can still show the event trophy when variant="sport".
  */
 export default function BrandMark({
   size = 36,
   className = "",
   withWordmark = false,
+  variant = "sport",
 }: Props) {
   const [sportId, setSportId] = useState("cfb");
 
@@ -40,7 +49,7 @@ export default function BrandMark({
     };
   }, []);
 
-  if (sportId === "soccer_wwc") {
+  if (variant === "sport" && sportId === "soccer_wwc") {
     return (
       <WwcTrophyLogo
         size={size}
@@ -51,18 +60,32 @@ export default function BrandMark({
     );
   }
 
-  if (sportId === "nfl") {
-    return <NflBrandMark size={size} className={`shrink-0 ${className}`} />;
-  }
+  const crest = (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={WAR_ROOM_CREST_SRC}
+      alt="War Room Pick'Em"
+      width={size}
+      height={size}
+      className={`shrink-0 object-contain rounded-lg ${className}`}
+      style={{ width: size, height: size }}
+      draggable={false}
+    />
+  );
 
-  // Classic CFB War Room monogram
+  if (!withWordmark) return crest;
+
   return (
-    <div
-      className={`rounded-lg bg-primary text-black font-bold flex items-center justify-center shrink-0 ${className}`}
-      style={{ width: size, height: size, fontSize: size * 0.38 }}
-      aria-label="War Room"
-    >
-      WR
-    </div>
+    <span className={`inline-flex items-center gap-2 min-w-0 ${className}`}>
+      {crest}
+      <span className="flex flex-col min-w-0 leading-tight">
+        <span className="font-extrabold text-sm tracking-tight text-foreground truncate">
+          War Room
+        </span>
+        <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted truncate">
+          Pick&apos;Em
+        </span>
+      </span>
+    </span>
   );
 }

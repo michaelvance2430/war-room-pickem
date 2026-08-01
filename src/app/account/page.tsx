@@ -548,10 +548,23 @@ export default function AccountPage() {
     <div className="min-h-screen flex flex-col">
       <Nav />
       <main className="flex-1 max-w-lg mx-auto w-full px-4 py-8">
-        <h1 className="text-2xl font-bold mb-1">Account</h1>
-        <p className="text-sm text-muted mb-4">
-          {name ? `Signed in as ${name}` : "Manage profile, leagues, and sign out"}
-        </p>
+        <div className="flex items-center gap-3 mb-4">
+          {/* brand crest — house identity on account */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/brand/war-room-crest.png"
+            alt="War Room Pick'Em"
+            width={48}
+            height={48}
+            className="rounded-lg shrink-0 object-contain"
+          />
+          <div>
+            <h1 className="text-2xl font-bold mb-0.5">Account</h1>
+            <p className="text-sm text-muted">
+              {name ? `Signed in as ${name}` : "Manage profile, leagues, and sign out"}
+            </p>
+          </div>
+        </div>
 
         {message && (
           <div className="mb-4 text-sm text-primary border border-primary/40 rounded-lg px-3 py-2">

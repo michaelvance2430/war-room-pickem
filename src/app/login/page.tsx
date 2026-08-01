@@ -10,6 +10,7 @@ import {
   stashPendingJoinCode,
 } from "@/lib/commish-onboarding";
 import OwnershipNotice from "@/components/OwnershipNotice";
+import BrandMark from "@/components/BrandMark";
 
 function LoginPageInner() {
   const router = useRouter();
@@ -107,8 +108,8 @@ function LoginPageInner() {
     <div className="min-h-screen flex items-center justify-center px-4 py-8 pb-[max(2rem,env(safe-area-inset-bottom))]">
       <div className="max-w-md w-full">
         <div className="text-center mb-6">
-          <div className="w-14 h-14 rounded-xl bg-primary text-black font-bold text-xl flex items-center justify-center mx-auto mb-3">
-            WR
+          <div className="flex justify-center mb-3">
+            <BrandMark size={72} variant="force" className="rounded-2xl shadow-[0_0_40px_rgba(34,197,94,0.2)]" />
           </div>
           <h1 className="text-2xl font-bold">War Room Pick&apos;Em</h1>
           {inviteHint ? (

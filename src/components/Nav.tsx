@@ -525,7 +525,7 @@ export default function Nav() {
             title="Back to Home"
             aria-label="Home"
           >
-            <BrandMark size={32} className="shrink-0" />
+            <BrandMark size={36} className="shrink-0" variant="force" />
             <div className="flex flex-col min-w-0 justify-center">
               {sportIsWwc ? (
                 <>

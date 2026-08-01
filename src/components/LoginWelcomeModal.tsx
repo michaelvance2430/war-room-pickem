@@ -9,6 +9,7 @@
 import { useEffect, useState } from "react";
 import { getSession } from "@/lib/league";
 import { isGuestMode } from "@/lib/guest-mode";
+import BrandMark from "@/components/BrandMark";
 
 const FOREVER_KEY = "warroom-login-welcome-v1-dismissed";
 const SESSION_KEY = "warroom-login-welcome-v1-session";
@@ -93,15 +94,20 @@ export default function LoginWelcomeModal() {
       />
       <div className="relative w-full sm:max-w-md max-h-[90vh] flex flex-col rounded-t-2xl sm:rounded-2xl border border-primary/40 bg-card shadow-[0_0_60px_rgba(34,197,94,0.12)] overflow-hidden">
         <div className="px-5 pt-5 pb-3 border-b border-border shrink-0 bg-primary/10">
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary mb-1.5">
-            Official transmission
-          </p>
-          <h2
-            id="login-welcome-title"
-            className="text-xl font-extrabold text-foreground leading-snug"
-          >
-            Thanks for joining
-          </h2>
+          <div className="flex items-center gap-3 mb-2">
+            <BrandMark size={44} variant="force" className="rounded-lg" />
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">
+                Official transmission
+              </p>
+              <h2
+                id="login-welcome-title"
+                className="text-xl font-extrabold text-foreground leading-snug"
+              >
+                Thanks for joining
+              </h2>
+            </div>
+          </div>
         </div>
 
         <div className="px-5 py-4 overflow-y-auto flex-1 min-h-0 space-y-3 text-sm text-muted leading-relaxed">

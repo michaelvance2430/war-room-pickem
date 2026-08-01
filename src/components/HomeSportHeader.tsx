@@ -6,6 +6,7 @@ import {
 } from "@/lib/sports/home-chrome";
 import WwcTrophyLogo from "@/components/WwcTrophyLogo";
 import NflBrandMark from "@/components/NflBrandMark";
+import BrandMark from "@/components/BrandMark";
 import { NFL_SUNDAY_COLORS } from "@/lib/sports/home-chrome";
 
 type Props = {
@@ -57,6 +58,7 @@ export default function HomeSportHeader({
         </div>
       ) : isNfl ? (
         <div className="flex items-center gap-2 mb-2">
+          <BrandMark size={32} variant="force" className="rounded-lg shrink-0" />
           <div
             className="shrink-0 rounded-lg p-0.5 border"
             style={{
@@ -64,7 +66,7 @@ export default function HomeSportHeader({
               background: `linear-gradient(160deg, ${nfl.navy} 0%, ${nfl.crimson}55 100%)`,
             }}
           >
-            <NflBrandMark size={28} />
+            <NflBrandMark size={22} />
           </div>
           <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/55">
             War Room · NFL
@@ -72,6 +74,7 @@ export default function HomeSportHeader({
         </div>
       ) : (
         <div className="flex flex-wrap items-center gap-2 mb-2">
+          <BrandMark size={32} variant="force" className="rounded-lg shrink-0" />
           <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.16em] px-2 py-0.5 rounded-full border border-primary/35 bg-primary/10 text-primary">
             <span aria-hidden>{chrome.pack.emoji}</span>
             War Room · {chrome.pack.shortLabel}
