@@ -57,10 +57,6 @@ export default function SeasonFinaleModal() {
         const session = getSession();
         if (!session?.playerId || !league?.id) return;
 
-        // Hold hardware / championship ceremony until Week 0 (CFB) / Week 1 (NFL)
-        // starts — museum engravings shouldn't dump a multi-slide popup in June.
-        if (!hasOpeningWeekStarted(league.sportId)) return;
-
         const [trophies, rosterRows] = await Promise.all([
           loadLeagueTrophies(),
           loadLeagueRoster().catch(() => [] as LeagueRosterMember[]),
@@ -73,6 +69,25 @@ export default function SeasonFinaleModal() {
           session.playerId
         );
         if (!pack || !pack.hasNew) return;
+
+        // Museum / prior-season engravings (e.g. 2025 Excel) must NOT multi-slide
+        // on every login. Defending champ flex is Ring Ceremony at Week 0 start.
+        // Season finale is for hardware from the current campaign year only.
+        try {
+          const { defaultSeasonYear } =
+            await import("@/lib/trophies");
+          const campaign = defaultSeasonYear();
+          if (pack.year < campaign) {
+            // Hold forever for prior museum years — or only during opening week
+            // as a soft re-announce? Product: hold until Week 0, then ring owns it.
+            if (!hasOpeningWeekStarted(league.sportId)) return;
+            // Even after Week 0 starts, skip multi-slide for prior museum years.
+            // Ring ceremony is the championship popup from the museum.
+            return;
+          }
+        } catch {
+          /* if year helper fails, fall through with other gates */
+        }
 
         const built = buildFinaleSlides({
           year: pack.year,

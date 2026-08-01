@@ -75,6 +75,9 @@ const ORDER: TrophyType[] = ["championship", "toilet_bowl", "crystal_ball"];
  * Trophies the player has not been announced for yet (latest season first).
  * If any are new for that year, return the full year slate for a proper ceremony
  * (re-announcing already-seen ones in the pack is fine; we only gate on "any new").
+ *
+ * Note: callers should still gate prior museum years (year < campaign year) —
+ * those are Ring Ceremony at Week 0, not a multi-slide season finale.
  */
 export function getUnseenFinaleTrophies(
   trophies: LeagueTrophy[],
