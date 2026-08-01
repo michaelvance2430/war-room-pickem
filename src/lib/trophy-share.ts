@@ -104,12 +104,13 @@ export function resolveLiveTrophyHolder(
     };
   }
 
-  // 3) Excel-era aliases (Justin Strayer ↔ Jstray, etc.)
+  // 3) Prior-season aliases (Justin Strayer ↔ Jstray, Maria Super Bowl, etc.)
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { PRIOR_SEASON_2025_SEEDS } =
+    const { PRIOR_SEASON_2025_SEEDS, NFL_PRIOR_SEASON_SEEDS } =
       require("./prior-season-seed") as typeof import("./prior-season-seed");
-    for (const seed of PRIOR_SEASON_2025_SEEDS) {
+    const banks = [...PRIOR_SEASON_2025_SEEDS, ...NFL_PRIOR_SEASON_SEEDS];
+    for (const seed of banks) {
       const engravedHits =
         shareNamesMatch(seed.winnerName, engraved) ||
         seed.namePatterns.some((p) => p.test(engraved));

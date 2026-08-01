@@ -155,13 +155,7 @@ export default function RingCeremonyModal() {
     const sid = league.sportId || "cfb";
     if (!isOpeningCeremonyLive(sid)) return false;
 
-    // First 10 minutes: lame and easy — lock a card before museum champ flex
-    try {
-      const { isPreLockCalm } = await import("@/lib/first-week");
-      if (isPreLockCalm(sess.playerId)) return false;
-    } catch {
-      /* ok */
-    }
+    // Opening-week walk-out is the start-of-season moment — do not wait on first lock.
     // One full-screen drama per session (don't stack on welcome/finale)
     try {
       const { claimSessionDrama } = await import("@/lib/session-drama");
@@ -179,6 +173,19 @@ export default function RingCeremonyModal() {
       if (scored.some((w) => w >= cut)) return false;
     } catch {
       /* ignore */
+    }
+
+    // NFL: ensure Maria Super Bowl plaque exists before announcing (ops/host)
+    try {
+      const { isOps } = await import("@/lib/league");
+      if (sid === "nfl" && isOps()) {
+        const { seedPriorSeason2025Trophies } = await import(
+          "@/lib/prior-season-seed"
+        );
+        await seedPriorSeason2025Trophies();
+      }
+    } catch {
+      /* ok */
     }
 
     const trophies = await loadLeagueTrophies();
@@ -231,11 +238,22 @@ export default function RingCeremonyModal() {
       }
 
       const sid = league.sportId || "cfb";
+      // Preview should show real defending hardware when we can engrave it
+      try {
+        if (sid === "nfl") {
+          const { seedPriorSeason2025Trophies } = await import(
+            "@/lib/prior-season-seed"
+          );
+          await seedPriorSeason2025Trophies();
+        }
+      } catch {
+        /* ok */
+      }
       const trophies = await loadLeagueTrophies();
       const d = getDefendingChampion(trophies);
       const champRow: Champ = d || {
         year: new Date().getFullYear() - 1,
-        name: "Last Season's Champ",
+        name: sid === "nfl" ? "Maria" : "Last Season's Champ",
         userId: null,
       };
 

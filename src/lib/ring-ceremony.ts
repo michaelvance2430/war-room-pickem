@@ -80,19 +80,19 @@ export function getRingCeremonyPack(
         ? "Three years in a row. The trophy is basically renting a locker with their name on it."
         : "Lights up. Phones out. This is the flex that starts every Sunday season.",
       champKicker: threePeat
-        ? "Three-peat champ — still wearing it"
-        : "Defending champion",
+        ? "Three-peat Super Bowl champ — still wearing it"
+        : "Defending Super Bowl champion",
       ringLease: threePeat
         ? "Nobody's taking this without a knife fight on the card. Until then? It's theirs. Loudly."
-        : "They own the hardware until someone rips it off them. Late windows. No mercy. Take a picture.",
+        : "Last year's Super Bowl. Their name on the hardware until someone rips it off them. Late windows. No mercy.",
       youWonLine:
-        "That's YOU on the hardware. Screenshot this. Text the group chat. Make them mad before kickoff.",
+        "That's YOU on the Super Bowl hardware. Screenshot this. Text the group chat. Make them mad before kickoff.",
       theyWonLine:
-        "This is the person everyone's hunting. Bow once, then try to steal it all year.",
+        "This is the Super Bowl champ everyone's hunting. Bow once, then try to steal it all year.",
       stageFigureLabel: "Stage lights · big moment",
       hardwareName: threePeat
-        ? "Dynasty championship trophy"
-        : "Championship trophy",
+        ? "Dynasty Super Bowl trophy"
+        : "Super Bowl trophy",
       ctaHardware: "See the trophy room",
       ctaShare: "Share this flex",
       ctaEnter: "Alright, let's play",

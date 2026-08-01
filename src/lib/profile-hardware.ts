@@ -92,6 +92,15 @@ export const LEGACY_PROFILE_HARDWARE: Omit<ProfileTrophy, "source">[] = [
     notes: "2025–26 Crystal Ball. Zero standings points. Infinite smug.",
     winnerName: "Big Ball Ben",
   },
+  {
+    id: "legacy-maria-super-bowl-2025",
+    kind: "championship",
+    seasonYear: 2025,
+    title: "Super Bowl",
+    subtitle: "Super Bowl Champion · 2025",
+    notes: "Defending Super Bowl champ. Announced at the start of Week 1.",
+    winnerName: "Maria",
+  },
 ];
 
 /** Also match these name aliases → legacy id */
@@ -107,6 +116,10 @@ const LEGACY_NAME_ALIASES: { pattern: RegExp; legacyId: string }[] = [
   {
     pattern: /\bbig\s*ball\s*ben\b|\bbill\s*ball\s*ben\b|\bbillballben\b/i,
     legacyId: "legacy-bill-ball-ben-nerd-2025",
+  },
+  {
+    pattern: /\bmaria\b/i,
+    legacyId: "legacy-maria-super-bowl-2025",
   },
 ];
 

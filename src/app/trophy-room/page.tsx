@@ -29,7 +29,10 @@ import type { ProfileTrophyKind } from "@/lib/profile-hardware";
 import { autoEngraveAllTrophies } from "@/lib/auto-trophies";
 import { divisionFromTrophyType } from "@/lib/division-champions";
 import { divisionDisplayLabel } from "@/lib/divisions";
-import { seedPriorSeason2025Trophies } from "@/lib/prior-season-seed";
+import {
+  seedPriorSeason2025Trophies,
+  getPriorSeasonLabel,
+} from "@/lib/prior-season-seed";
 import { resolveLiveTrophyHolder } from "@/lib/trophy-share";
 
 const BIG_TYPES: TrophyType[] = [
@@ -99,11 +102,12 @@ export default function TrophyRoomPage() {
         if (isCommissioner() || isOps()) {
           try {
             await autoEngraveAllTrophies({});
-            // Re-link Excel only if this league already has prior-season plaques
-            // (founder rooms). Never auto-seed stranger leagues with friend-group lore.
+            // Prior-season hardware: NFL always ensures Maria Super Bowl;
+            // CFB re-links Excel only if this room already has 2025 plaques.
             const list = await loadLeagueTrophies();
-            const hasExcel = list.some((t) => t.seasonYear === 2025);
-            if (hasExcel) {
+            const sid = getLeague()?.sportId || "cfb";
+            const hasPrior = list.some((t) => t.seasonYear === 2025);
+            if (sid === "nfl" || hasPrior) {
               await seedPriorSeason2025Trophies();
             }
             await reload();
@@ -122,11 +126,17 @@ export default function TrophyRoomPage() {
     try {
       const res = await autoEngraveAllTrophies({});
       const list = await loadLeagueTrophies();
-      const hasExcel = list.some((t) => t.seasonYear === 2025);
+      const sid = getLeague()?.sportId || "cfb";
+      const hasPrior = list.some((t) => t.seasonYear === 2025);
       let relinkMsg: string | null = null;
-      if (hasExcel) {
+      if (sid === "nfl" || hasPrior) {
         const relink = await seedPriorSeason2025Trophies();
-        if (relink.ok) relinkMsg = "Excel holders re-linked to live profiles.";
+        if (relink.ok) {
+          relinkMsg =
+            sid === "nfl"
+              ? "Maria Super Bowl linked to live profile."
+              : "Excel holders re-linked to live profiles.";
+        }
       }
       setSyncMsg([res.message, relinkMsg].filter(Boolean).join(" · "));
       await reload();
@@ -138,15 +148,18 @@ export default function TrophyRoomPage() {
   }
 
   async function onImport2025() {
-    if (
-      !confirm(
-        "Engrave full 2025–26 Excel season into this Trophy Room?\n\n" +
+    const sid = sportId || getLeague()?.sportId || "cfb";
+    const confirmMsg =
+      sid === "nfl"
+        ? "Award last year's Super Bowl trophy in this NFL room?\n\n" +
+          "· Super Bowl Champion → Maria\n\n" +
+          "Announced at the start of Week 1 (ring ceremony). Safe to re-run. Links her profile when “Maria” is on the roster."
+        : "Engrave full 2025–26 Excel season into this Trophy Room?\n\n" +
           "· Championship → Kahmann\n" +
           "· Toilet Bowl → Justin Strayer\n" +
           "· Village Nerd → Big Ball Ben\n\n" +
-          "Safe to re-run. Links profiles when those names are in the roster."
-      )
-    ) {
+          "Safe to re-run. Links profiles when those names are in the roster.";
+    if (!confirm(confirmMsg)) {
       return;
     }
     setBusy(true);
@@ -155,6 +168,7 @@ export default function TrophyRoomPage() {
       const res = await seedPriorSeason2025Trophies();
       setSyncMsg(res.message);
       await reload();
+      await loadRosterAvatars();
     } catch (e) {
       setSyncMsg(e instanceof Error ? e.message : "Import failed");
     }
@@ -351,11 +365,16 @@ export default function TrophyRoomPage() {
                   onClick={() => void onImport2025()}
                   className="min-h-[44px] px-4 rounded-xl border-2 border-amber-400/50 bg-amber-500/15 text-amber-100 text-sm font-bold disabled:opacity-50"
                 >
-                  {busy ? "Engraving…" : "Import 2025–26 season (Excel)"}
+                  {busy
+                    ? "Engraving…"
+                    : sportId === "nfl"
+                      ? "Award Maria Super Bowl (2025)"
+                      : "Import 2025–26 season (Excel)"}
                 </button>
                 <p className="text-[11px] text-muted">
-                  Full 2025–26 · Kahmann Champ · Strayer Toilet · Big Ball Ben
-                  Nerd
+                  {sportId === "nfl"
+                    ? `NFL ${getPriorSeasonLabel("nfl")} · Maria Super Bowl · ring at Week 1 open`
+                    : "Full 2025–26 · Kahmann Champ · Strayer Toilet · Big Ball Ben Nerd"}
                 </p>
               </div>
             </div>

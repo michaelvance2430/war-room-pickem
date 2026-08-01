@@ -1,10 +1,13 @@
 /**
- * Seed last Excel / friend-group season into THIS league's Trophy Room.
+ * Seed last season hardware into THIS league's Trophy Room.
  *
- * Full 2025–26 season (fall 2025 → winter 2026; stored as season_year 2025):
+ * CFB (Excel 2025–26, season_year 2025):
  *  - Championship → Kahmann
  *  - Toilet Bowl → Justin Strayer
- *  - Village Nerd (Crystal Ball) → Big Ball Ben / Bill ball Ben
+ *  - Village Nerd (Crystal Ball) → Big Ball Ben
+ *
+ * NFL (2025 season Super Bowl → season_year 2025):
+ *  - Championship → Maria (defending Super Bowl champ; ring at Week 1 open)
  *
  * Safe to re-run (upsert by league+year+type). Links winner_user_id when
  * a roster display name matches.
@@ -17,11 +20,12 @@ import {
   type TrophyType,
 } from "@/lib/trophies";
 import { loadLeagueRoster } from "@/lib/cloud";
-import { getSession } from "@/lib/league";
+import { getLeague, getSession } from "@/lib/league";
 
-/** CFB campaign year (2025–26 season → 2025 in Trophy Room / Museum). */
+/** Campaign year stored on plaques (CFB 2025–26 / NFL 2025 SB). */
 export const PRIOR_SEASON_YEAR = 2025;
 export const PRIOR_SEASON_LABEL = "2025–26";
+export const NFL_PRIOR_SEASON_LABEL = "2025";
 
 type SeedRow = {
   trophyType: TrophyType;
@@ -29,9 +33,11 @@ type SeedRow = {
   namePatterns: RegExp[];
   subtitle: string;
   notes: string;
+  /** ISO when the hardware was earned (display / sort) */
+  awardedAt?: string;
 };
 
-/** Confirmed 2025–26 Excel season hardware for this friend group. */
+/** Confirmed CFB Excel-era hardware for this friend group. */
 export const PRIOR_SEASON_2025_SEEDS: SeedRow[] = [
   {
     trophyType: "championship",
@@ -39,11 +45,11 @@ export const PRIOR_SEASON_2025_SEEDS: SeedRow[] = [
     namePatterns: [/\bkahmann\b/i],
     subtitle: `War Room Champion · ${PRIOR_SEASON_LABEL}`,
     notes: `Reigning champ — full ${PRIOR_SEASON_LABEL} season (Excel era). The board still remembers.`,
+    awardedAt: "2026-01-20T12:00:00.000Z",
   },
   {
     trophyType: "toilet_bowl",
     winnerName: "Justin Strayer",
-    // Joined as "Jstray" — keep full name engraved, match live profile aliases
     namePatterns: [
       /\bjustin\s+strayer\b/i,
       /\bstrayer\b/i,
@@ -52,6 +58,7 @@ export const PRIOR_SEASON_2025_SEEDS: SeedRow[] = [
     ],
     subtitle: `Toilet Bowl · ${PRIOR_SEASON_LABEL}`,
     notes: `Bottom-half crown · ${PRIOR_SEASON_LABEL}. Still hardware. Wear it proudly.`,
+    awardedAt: "2026-01-20T12:00:00.000Z",
   },
   {
     trophyType: "crystal_ball",
@@ -63,8 +70,43 @@ export const PRIOR_SEASON_2025_SEEDS: SeedRow[] = [
     ],
     subtitle: `Village Nerd · Crystal Ball · ${PRIOR_SEASON_LABEL}`,
     notes: `Called the national champ · ${PRIOR_SEASON_LABEL}. Zero standings points. Infinite smug.`,
+    awardedAt: "2026-01-20T12:00:00.000Z",
   },
 ];
+
+/** NFL prior Super Bowl hardware — Maria walks first at Week 1 open. */
+export const NFL_PRIOR_SEASON_SEEDS: SeedRow[] = [
+  {
+    trophyType: "championship",
+    winnerName: "Maria",
+    namePatterns: [/\bmaria\b/i],
+    subtitle: `Super Bowl Champion · ${NFL_PRIOR_SEASON_LABEL}`,
+    notes: `Defending Super Bowl champ of this room · ${NFL_PRIOR_SEASON_LABEL} season. Ring ceremony drops at the start of Week 1.`,
+    awardedAt: "2026-02-09T12:00:00.000Z",
+  },
+];
+
+/** @deprecated use getPriorSeasonSeeds — CFB Excel list (back-compat for share resolve) */
+export const ALL_PRIOR_SEASON_SEEDS = PRIOR_SEASON_2025_SEEDS;
+
+export function resolvePriorSport(
+  sportId?: string | null
+): "cfb" | "nfl" {
+  if (sportId === "nfl" || sportId === "cfb") return sportId;
+  return getLeague()?.sportId === "nfl" ? "nfl" : "cfb";
+}
+
+export function getPriorSeasonSeeds(sportId?: string | null): SeedRow[] {
+  return resolvePriorSport(sportId) === "nfl"
+    ? NFL_PRIOR_SEASON_SEEDS
+    : PRIOR_SEASON_2025_SEEDS;
+}
+
+export function getPriorSeasonLabel(sportId?: string | null): string {
+  return resolvePriorSport(sportId) === "nfl"
+    ? NFL_PRIOR_SEASON_LABEL
+    : PRIOR_SEASON_LABEL;
+}
 
 function matchUserId(
   roster: { userId: string; name: string; isBot?: boolean }[],
@@ -89,33 +131,33 @@ function matchPlayerId(
   return null;
 }
 
-/** True when champ + toilet + nerd are already engraved for the Excel year. */
-export function hasPriorSeasonBigHardware(trophies: LeagueTrophy[]): boolean {
+/** True when this sport's prior-season big hardware is already engraved. */
+export function hasPriorSeasonBigHardware(
+  trophies: LeagueTrophy[],
+  sportId?: string | null
+): boolean {
+  const seeds = getPriorSeasonSeeds(sportId);
   const y = trophies.filter((t) => t.seasonYear === PRIOR_SEASON_YEAR);
-  return (
-    y.some((t) => t.trophyType === "championship") &&
-    y.some((t) => t.trophyType === "toilet_bowl") &&
-    y.some((t) => t.trophyType === "crystal_ball")
-  );
+  return seeds.every((s) => y.some((t) => t.trophyType === s.trophyType));
 }
 
 /**
- * Fill any missing Excel-era plaques for Museum / history display.
+ * Fill any missing prior plaques for Museum / history display.
  * Does not write to the DB — use seedPriorSeason2025Trophies for that.
- * Links winnerUserId when roster/player names match (incl. late joiners like Jstray).
  */
 export function mergePriorSeasonTrophies(
   trophies: LeagueTrophy[],
-  opts?: { players?: { id: string; name: string }[] }
+  opts?: { players?: { id: string; name: string }[]; sportId?: string | null }
 ): LeagueTrophy[] {
+  const sport = resolvePriorSport(opts?.sportId);
+  const seeds = getPriorSeasonSeeds(sport);
   const out = trophies.map((t) => ({ ...t }));
-  for (const row of PRIOR_SEASON_2025_SEEDS) {
+  for (const row of seeds) {
     const idx = out.findIndex(
       (t) =>
         t.seasonYear === PRIOR_SEASON_YEAR && t.trophyType === row.trophyType
     );
     if (idx >= 0) {
-      // Late join: link profile id when missing (Jstray → toilet, etc.)
       if (!out[idx].winnerUserId) {
         const uid = matchPlayerId(opts?.players, row.namePatterns);
         if (uid) out[idx] = { ...out[idx], winnerUserId: uid };
@@ -123,7 +165,7 @@ export function mergePriorSeasonTrophies(
       continue;
     }
     out.push({
-      id: `prior-seed-${row.trophyType}`,
+      id: `prior-seed-${sport}-${row.trophyType}`,
       leagueId: "prior-excel",
       seasonYear: PRIOR_SEASON_YEAR,
       trophyType: row.trophyType,
@@ -131,24 +173,23 @@ export function mergePriorSeasonTrophies(
       winnerUserId: matchPlayerId(opts?.players, row.namePatterns),
       subtitle: row.subtitle,
       notes: row.notes,
-      // After Excel season closed (winter 2026)
-      awardedAt: "2026-01-20T12:00:00.000Z",
+      awardedAt: row.awardedAt || "2026-01-20T12:00:00.000Z",
     });
   }
   return out;
 }
 
 /**
- * Patterns that match a live display name to an engraved Excel winner.
- * Used when holders rebrand (Justin Strayer → Jstray).
+ * Patterns that match a live display name to an engraved prior winner.
+ * Searches both CFB + NFL seed banks (share resolve / late rebrand).
  */
 export function excelHolderPatternsForName(engravedName: string): RegExp[] {
-  const row = PRIOR_SEASON_2025_SEEDS.find(
+  const banks = [...PRIOR_SEASON_2025_SEEDS, ...NFL_PRIOR_SEASON_SEEDS];
+  const row = banks.find(
     (s) => s.winnerName.toLowerCase() === (engravedName || "").toLowerCase()
   );
   if (row) return row.namePatterns;
-  // Also try loose contains
-  for (const s of PRIOR_SEASON_2025_SEEDS) {
+  for (const s of banks) {
     if (
       namesLooseMatch(s.winnerName, engravedName) ||
       s.namePatterns.some((p) => p.test(engravedName || ""))
@@ -167,9 +208,7 @@ function namesLooseMatch(a: string, b: string) {
 }
 
 /**
- * Re-upsert Excel trophies so winner_user_id links when someone joins later
- * (e.g. Jstray = Justin Strayer Toilet Bowl). Commissioner/ops.
- * Safe to re-run — keeps engraving, refreshes profile link.
+ * Re-upsert prior trophies so winner_user_id links when someone joins later.
  */
 export async function relinkPriorSeasonWinners(): Promise<{
   ok: boolean;
@@ -184,7 +223,8 @@ export async function relinkPriorSeasonWinners(): Promise<{
 }
 
 /**
- * Engrave 2025 plaques into the active league. Commissioner/ops only.
+ * Engrave prior-season plaques into the active league (sport-aware).
+ * Commissioner/ops only.
  */
 export async function seedPriorSeason2025Trophies(): Promise<{
   ok: boolean;
@@ -203,6 +243,10 @@ export async function seedPriorSeason2025Trophies(): Promise<{
     };
   }
 
+  const sport = resolvePriorSport(getLeague()?.sportId);
+  const seeds = getPriorSeasonSeeds(sport);
+  const label = getPriorSeasonLabel(sport);
+
   let roster: { userId: string; name: string; isBot?: boolean }[] = [];
   try {
     roster = await loadLeagueRoster();
@@ -213,7 +257,7 @@ export async function seedPriorSeason2025Trophies(): Promise<{
   const awarded: string[] = [];
   const errors: string[] = [];
 
-  for (const row of PRIOR_SEASON_2025_SEEDS) {
+  for (const row of seeds) {
     const uid = matchUserId(roster, row.namePatterns);
     const res = await awardTrophy({
       seasonYear: PRIOR_SEASON_YEAR,
@@ -233,7 +277,6 @@ export async function seedPriorSeason2025Trophies(): Promise<{
     }
   }
 
-  // Confirm load
   try {
     const list = await loadLeagueTrophies();
     const y25 = list.filter((t) => t.seasonYear === PRIOR_SEASON_YEAR);
@@ -258,9 +301,14 @@ export async function seedPriorSeason2025Trophies(): Promise<{
     };
   }
 
+  const crown =
+    sport === "nfl"
+      ? "Opening Week 1 ring ceremony can crown Maria."
+      : "Opening-week ring ceremony can crown Kahmann.";
+
   return {
     ok: true,
-    message: `${PRIOR_SEASON_LABEL} hardware locked in: ${awarded.join(" · ")}. Opening-week ring ceremony can crown Kahmann. Refresh Trophy Room.`,
+    message: `${sport === "nfl" ? "NFL" : "CFB"} ${label} hardware locked in: ${awarded.join(" · ")}. ${crown} Refresh Trophy Room.`,
     awarded,
     errors,
   };

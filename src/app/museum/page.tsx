@@ -48,34 +48,38 @@ function MuseumInner() {
           loadLeagueTrophies(),
         ]);
 
-        // Host: re-link Excel winners only if this league already has 2025 plaques.
-        // Never auto-seed friend-group lore into brand-new stranger leagues.
-        if (
-          (isCommissioner() || isOps()) &&
-          tlist.some((t) => t.seasonYear === 2025) &&
-          !hasPriorSeasonBigHardware(tlist)
-        ) {
-          try {
-            const seeded = await seedPriorSeason2025Trophies();
-            if (seeded.ok) {
-              tlist = await loadLeagueTrophies();
-              if (!cancelled) {
-                setExcelNote(
-                  `${PRIOR_SEASON_LABEL} hardware re-linked to live profiles.`
-                );
+        const sport = getLeague()?.sportId || "cfb";
+        // Host: NFL always ensures Maria Super Bowl; CFB re-links Excel when already present.
+        if (isCommissioner() || isOps()) {
+          const hasPrior = tlist.some((t) => t.seasonYear === 2025);
+          if (
+            sport === "nfl" ||
+            (hasPrior && !hasPriorSeasonBigHardware(tlist, sport))
+          ) {
+            try {
+              const seeded = await seedPriorSeason2025Trophies();
+              if (seeded.ok) {
+                tlist = await loadLeagueTrophies();
+                if (!cancelled) {
+                  setExcelNote(
+                    sport === "nfl"
+                      ? "Maria Super Bowl hardware locked / re-linked."
+                      : `${PRIOR_SEASON_LABEL} hardware re-linked to live profiles.`
+                  );
+                }
               }
+            } catch {
+              /* ignore */
             }
-          } catch {
-            /* ignore */
           }
         }
 
         if (cancelled) return;
-        // Merge Excel display only when this room already has 2025 engravings
-        // (or synthetic prior plaques from a prior import).
-        const hasExcel = tlist.some((t) => t.seasonYear === 2025);
+        // Merge prior display when this room already has prior plaques (or NFL seed path).
+        const hasExcel =
+          tlist.some((t) => t.seasonYear === 2025) || sport === "nfl";
         const withExcel = hasExcel
-          ? mergePriorSeasonTrophies(tlist, { players: plist })
+          ? mergePriorSeasonTrophies(tlist, { players: plist, sportId: sport })
           : tlist;
         setPlayers(plist);
         setTrophies(withExcel);
