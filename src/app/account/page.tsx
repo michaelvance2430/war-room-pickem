@@ -629,7 +629,8 @@ export default function AccountPage() {
           <h2 className="font-semibold mb-1">Profile border</h2>
           <p className="text-xs text-muted mb-3 leading-relaxed">
             Unlock rings with achievements. Easy badges = simple borders.
-            Legendary hardware = loud rings. Pick one to equip.
+            Legendary hardware = loud rings. Creator-only flame / forge /
+            circuit rings live at the bottom of the list (Mike only).
           </p>
           <div className="flex justify-center mb-4">
             <Avatar
