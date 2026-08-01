@@ -652,10 +652,10 @@ export default function AccountPage() {
           </p>
           <h2 className="font-semibold mb-1">Profile border</h2>
           <p className="text-xs text-muted mb-3 leading-relaxed">
-            Unlock rings with achievements. When Commish drops a holiday theme,
-            cute holiday borders unlock for everyone — they auto-return to Plain
-            when the theme turns off. Creator-only flame / forge / circuit stay
-            Mike-only.
+            Unlock rings with achievements. Seasonal rings sometimes show up
+            when the room feels festive — nobody will announce them. They
+            vanish when the theme does. Creator-only flame / forge / circuit
+            stay Mike-only.
           </p>
           <div className="flex justify-center mb-4">
             <Avatar
