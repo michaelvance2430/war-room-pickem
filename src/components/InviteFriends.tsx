@@ -218,8 +218,11 @@ export default function InviteFriends({
               disabled={busy}
               onClick={() => void onShare()}
               className="flex-1 sm:flex-none px-4 py-3 min-h-[48px] rounded-xl bg-primary text-black text-sm font-bold disabled:opacity-50 touch-manipulation"
+              title={`Share ${isNfl ? "NFL" : "CFB"} invite for ${leagueName}`}
             >
-              {busy ? "…" : "Share"}
+              {busy
+                ? "…"
+                : `Share · ${isNfl ? "NFL" : "CFB"}`}
             </button>
             <button
               type="button"
@@ -279,7 +282,13 @@ export default function InviteFriends({
           onClick={() => void onShare()}
           className="px-5 py-3 rounded-xl bg-primary text-black text-sm font-bold disabled:opacity-50 min-h-[48px]"
         >
-          {busy ? "Sharing…" : "Share invite"}
+          {busy
+            ? "Sharing…"
+            : `Share · ${isNfl ? "NFL" : "CFB"} · ${
+                leagueName.length > 18
+                  ? `${leagueName.slice(0, 16)}…`
+                  : leagueName
+              }`}
         </button>
       </div>
 
