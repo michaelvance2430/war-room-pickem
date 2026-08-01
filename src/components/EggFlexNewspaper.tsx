@@ -160,7 +160,7 @@ export default function EggFlexNewspaper() {
               {current.found}
               <span className="text-2xl text-stone-500 font-bold">
                 {" "}
-                / {current.total}
+                / xx
               </span>
             </p>
             <p className="text-xs text-stone-600 mt-2 leading-relaxed max-w-sm mx-auto">

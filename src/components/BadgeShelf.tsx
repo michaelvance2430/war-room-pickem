@@ -328,7 +328,14 @@ interface BadgeShelfProps {
 
 export default function BadgeShelf({ badges }: BadgeShelfProps) {
   const [selected, setSelected] = useState<BadgeStatus | null>(null);
-  const earnedCount = badges.filter((b) => b.earned).length;
+  // Easter eggs: only show found ones — never locked placeholders (catalog size is secret)
+  const visible = badges.filter(
+    (b) => !b.def.id.startsWith("egg_") || b.earned
+  );
+  const earnedCount = visible.filter((b) => b.earned).length;
+  const lockedNonEgg = visible.filter(
+    (b) => !b.earned && !b.def.id.startsWith("egg_")
+  ).length;
   const [firstWeek, setFirstWeek] = useState(false);
 
   useEffect(() => {
@@ -339,7 +346,7 @@ export default function BadgeShelf({ badges }: BadgeShelfProps) {
 
   const byTier = TIER_ORDER.map((tier) => ({
     tier,
-    items: badges
+    items: visible
       .filter((b) => b.def.tier === tier)
       .sort((a, b) => {
         if (a.earned !== b.earned) return a.earned ? -1 : 1;
@@ -361,8 +368,8 @@ export default function BadgeShelf({ badges }: BadgeShelfProps) {
       <div className="mb-4">
         <h2 className="font-semibold text-lg">Badge shelves</h2>
         <p className="text-xs text-muted">
-          {earnedCount} earned · {badges.length - earnedCount} locked · each
-          tier on its own shelf · tap for details
+          {earnedCount} earned · {lockedNonEgg} locked · each tier on its own
+          shelf · tap for details
         </p>
         {firstWeek && (
           <p className="text-xs text-primary/90 mt-1.5 leading-relaxed">
