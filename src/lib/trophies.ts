@@ -143,21 +143,22 @@ export async function awardTrophy(opts: {
     return { ok: false, error: error.message };
   }
 
-  // Permanent badge grants for trophy hardware
+  // Permanent badge grants for trophy hardware (tagged to this league)
   try {
     const { grantPermanentBadgeId } = await import("./permanent-badges");
     const uid = opts.winnerUserId;
+    const lid = session?.leagueId || null;
     if (uid) {
       if (opts.trophyType === "championship") {
-        grantPermanentBadgeId(uid, "championship_ring");
-        grantPermanentBadgeId(uid, "war_room_legend");
+        grantPermanentBadgeId(uid, "championship_ring", { leagueId: lid });
+        grantPermanentBadgeId(uid, "war_room_legend", { leagueId: lid });
       }
       if (opts.trophyType === "toilet_bowl") {
-        grantPermanentBadgeId(uid, "toilet_crown");
+        grantPermanentBadgeId(uid, "toilet_crown", { leagueId: lid });
       }
       if (opts.trophyType === "crystal_ball") {
-        grantPermanentBadgeId(uid, "national_nightmare");
-        grantPermanentBadgeId(uid, "war_room_legend");
+        grantPermanentBadgeId(uid, "national_nightmare", { leagueId: lid });
+        grantPermanentBadgeId(uid, "war_room_legend", { leagueId: lid });
       }
     }
   } catch {

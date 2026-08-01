@@ -274,7 +274,10 @@ export default function AccountPage() {
   async function onLeave(leagueId: string, leagueName: string) {
     if (
       !confirm(
-        `Leave "${leagueName}"? You can join again later with the code if someone still has it.`
+        `Leave "${leagueName}"?\n\n` +
+          "If the season is still running, you FORFEIT every cheevo, title, and hardware badge you earned in this league. " +
+          "Fun stuff only sticks if you finish the season (getting knocked out of brackets is fine — quitting the room is not).\n\n" +
+          "You can rejoin later with the code if someone still has it — but forfeited rewards do not come back."
       )
     )
       return;
@@ -286,7 +289,12 @@ export default function AccountPage() {
       setMessage(result.error || "Could not leave");
       return;
     }
-    setMessage("Left league");
+    setMessage(
+      result.forfeitMessage ||
+        (result.forfeitedCount
+          ? `Left league — forfeited ${result.forfeitedCount} unlock(s).`
+          : "Left league")
+    );
     await reload();
     if (getSession() === null) {
       const list = await fetchMyMemberships();
@@ -925,6 +933,7 @@ export default function AccountPage() {
                       type="button"
                       onClick={() => onLeave(m.leagueId, m.leagueName)}
                       disabled={busy}
+                      title="Leave mid-season forfeits cheevos earned in this league"
                       className="text-xs px-3 py-1.5 rounded-lg border border-border text-muted hover:text-foreground disabled:opacity-50"
                     >
                       Leave

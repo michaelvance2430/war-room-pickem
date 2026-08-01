@@ -361,7 +361,13 @@ export async function signOutFully() {
 }
 
 
-export async function leaveLeague(leagueId: string): Promise<{ ok: boolean; error?: string }> {
+export async function leaveLeague(leagueId: string): Promise<{
+  ok: boolean;
+  error?: string;
+  /** Early leave forfeit summary (when season still open) */
+  forfeitMessage?: string;
+  forfeitedCount?: number;
+}> {
   const supabase = createClient();
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return { ok: false, error: "Not signed in" };
@@ -369,7 +375,7 @@ export async function leaveLeague(leagueId: string): Promise<{ ok: boolean; erro
   // Commissioner must pass the role first so the league (and Trophy Room) stay owned
   const { data: league } = await supabase
     .from("leagues")
-    .select("commissioner_id")
+    .select("commissioner_id, sport_id")
     .eq("id", leagueId)
     .maybeSingle();
   if (league?.commissioner_id === auth.user.id) {
@@ -378,6 +384,25 @@ export async function leaveLeague(leagueId: string): Promise<{ ok: boolean; erro
       error:
         "You're the commissioner. Pass commissioner to another member first (Commissioner → Pass commissioner), then leave. That keeps the Trophy Room with the league.",
     };
+  }
+
+  // PRODUCT: leave before season ends → forfeit league-earned cheevos / hardware.
+  // Knocked out of brackets but still in the room keeps everything.
+  let forfeitMessage: string | undefined;
+  let forfeitedCount = 0;
+  try {
+    const { forfeitRewardsOnEarlyLeave } = await import(
+      "./league-earned-ledger"
+    );
+    const result = await forfeitRewardsOnEarlyLeave({
+      playerId: auth.user.id,
+      leagueId,
+      sportId: (league as { sport_id?: string | null } | null)?.sport_id,
+    });
+    forfeitedCount = result.forfeitedBadgeIds.length;
+    forfeitMessage = result.message;
+  } catch {
+    /* don't block leave if forfeit fails */
   }
 
   const { error } = await supabase
@@ -396,7 +421,7 @@ export async function leaveLeague(leagueId: string): Promise<{ ok: boolean; erro
       localStorage.removeItem(ACTIVE_LEAGUE_KEY);
     }
   }
-  return { ok: true };
+  return { ok: true, forfeitMessage, forfeitedCount };
 }
 
 /**

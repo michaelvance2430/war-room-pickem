@@ -56,7 +56,8 @@ export function mergePermanentBadges(
 /** Grant forever. Returns true if newly granted. */
 export function grantPermanentBadgeId(
   playerId: string,
-  badgeId: string
+  badgeId: string,
+  opts?: { leagueId?: string | null }
 ): boolean {
   if (!playerId || !badgeId) return false;
   // Dry-run / preseason: don't stick First & Final, Elite Commish, Cheevo King, etc.
@@ -68,6 +69,19 @@ export function grantPermanentBadgeId(
   if (list.includes(badgeId)) return false;
   map[playerId] = [...list, badgeId];
   writeAll(map);
+
+  // Track league provenance for early-leave forfeit
+  try {
+    const {
+      activeLeagueIdForEarn,
+      recordLeagueEarnedBadge,
+    } = require("./league-earned-ledger") as typeof import("./league-earned-ledger");
+    const lid = opts?.leagueId ?? activeLeagueIdForEarn();
+    if (lid) recordLeagueEarnedBadge(playerId, lid, badgeId);
+  } catch {
+    /* ignore */
+  }
+
   return true;
 }
 
