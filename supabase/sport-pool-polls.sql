@@ -105,3 +105,93 @@ create policy "sport_pool_votes_update"
 
 comment on table public.sport_pool_polls is
   'Commissioner asks the current room if they want a new sport/league; yeses get spun up together.';
+
+-- ============================================================
+-- Trial bots answer the poll (practice / padded rooms).
+-- RLS only allows voting as yourself — commissioner seeds bot votes here.
+-- ============================================================
+create or replace function public.seed_bot_sport_pool_votes(p_poll_id uuid)
+returns json
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_league uuid;
+  v_status text;
+  v_bot uuid;
+  v_yes int := 0;
+  v_no int := 0;
+  v_skipped int := 0;
+  v_response text;
+  v_hash int;
+begin
+  if v_uid is null then
+    return json_build_object('ok', false, 'error', 'Not authenticated');
+  end if;
+
+  select p.source_league_id, p.status
+    into v_league, v_status
+  from public.sport_pool_polls p
+  where p.id = p_poll_id;
+
+  if v_league is null then
+    return json_build_object('ok', false, 'error', 'Poll not found');
+  end if;
+
+  if v_status is distinct from 'open' then
+    return json_build_object('ok', false, 'error', 'Poll is not open');
+  end if;
+
+  if not exists (
+    select 1 from public.leagues l
+    where l.id = v_league and l.commissioner_id = v_uid
+  ) then
+    return json_build_object('ok', false, 'error', 'Commissioner only');
+  end if;
+
+  for v_bot in
+    select m.user_id
+    from public.memberships m
+    where m.league_id = v_league
+      and coalesce(m.is_bot, false) = true
+  loop
+    -- ~80% yes / 20% no, stable per poll+bot so re-seed is idempotent flavor
+    v_hash := abs(hashtext(p_poll_id::text || v_bot::text));
+    if (v_hash % 10) < 8 then
+      v_response := 'yes';
+    else
+      v_response := 'no';
+    end if;
+
+    begin
+      insert into public.sport_pool_votes (poll_id, user_id, response)
+      values (p_poll_id, v_bot, v_response)
+      on conflict (poll_id, user_id) do update
+        set response = excluded.response;
+
+      if v_response = 'yes' then
+        v_yes := v_yes + 1;
+      else
+        v_no := v_no + 1;
+      end if;
+    exception when others then
+      v_skipped := v_skipped + 1;
+    end;
+  end loop;
+
+  return json_build_object(
+    'ok', true,
+    'yes', v_yes,
+    'no', v_no,
+    'skipped', v_skipped,
+    'bots', v_yes + v_no
+  );
+end;
+$$;
+
+revoke all on function public.seed_bot_sport_pool_votes(uuid) from public;
+grant execute on function public.seed_bot_sport_pool_votes(uuid) to authenticated;
+
+notify pgrst, 'reload schema';

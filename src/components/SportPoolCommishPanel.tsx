@@ -7,10 +7,11 @@ import { listSportPickerOptions, getSportPack } from "@/lib/sports/registry";
 import type { SportId } from "@/lib/sports/types";
 import {
   closeSportPoolPoll,
-  countSourceLeagueHumans,
+  countSourceLeagueVoters,
   createSportPoolPoll,
   loadOpenPollForLeague,
   loadPollVotes,
+  seedBotSportPoolVotes,
   spinUpLeagueFromPoll,
   sportPoolSqlHint,
   type SportPoolPoll,
@@ -19,8 +20,8 @@ import {
 import { switchToLeague } from "@/lib/session-restore";
 
 /**
- * Commissioner: poll this room’s humans for a different sport, then
- * one-click create a league seating every yes.
+ * Commissioner: poll this room for a different sport, then
+ * one-click create a league seating every yes (trial bots auto-vote for practice).
  */
 export default function SportPoolCommishPanel() {
   const router = useRouter();
@@ -37,7 +38,8 @@ export default function SportPoolCommishPanel() {
   const [message, setMessage] = useState("");
   const [poll, setPoll] = useState<SportPoolPoll | null>(null);
   const [votes, setVotes] = useState<SportPoolVote[]>([]);
-  const [humanCount, setHumanCount] = useState(0);
+  const [voterTotal, setVoterTotal] = useState(0);
+  const [botCount, setBotCount] = useState(0);
   const [newCommId, setNewCommId] = useState<string>("");
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
@@ -53,8 +55,9 @@ export default function SportPoolCommishPanel() {
 
   const refresh = useCallback(async () => {
     if (!league?.id) return;
-    const humans = await countSourceLeagueHumans(league.id);
-    setHumanCount(humans);
+    const counts = await countSourceLeagueVoters(league.id);
+    setVoterTotal(counts.total);
+    setBotCount(counts.bots);
 
     const { poll: p, error } = await loadOpenPollForLeague(league.id);
     if (error && /sport-pool-polls\.sql|SQL Editor/i.test(error)) {
@@ -84,9 +87,9 @@ export default function SportPoolCommishPanel() {
   const yeses = votes.filter((v) => v.response === "yes");
   const nos = votes.filter((v) => v.response === "no");
   const answered = votes.length;
-  // Host auto-yes counts; "everyone" = all humans have a vote
+  // Host + bots auto-vote; "everyone" = full roster (humans + bots)
   const allAnswered =
-    humanCount > 0 && answered >= humanCount && humanCount === answered;
+    voterTotal > 0 && answered >= voterTotal;
 
   async function sendPoll() {
     setBusy(true);
@@ -113,8 +116,34 @@ export default function SportPoolCommishPanel() {
     }
     setPoll(res.poll);
     setNote(
-      "Poll is live on Home for everyone in this room. You’re already counted as yes."
+      botCount > 0
+        ? "Poll is live. You’re yes — trial bots cast their votes automatically so you can practice create."
+        : "Poll is live on Home for everyone in this room. You’re already counted as yes."
     );
+    void refresh();
+  }
+
+  async function botsAnswer() {
+    if (!poll) return;
+    setBusy(true);
+    setErr(null);
+    setNote(null);
+    const res = await seedBotSportPoolVotes(poll.id);
+    setBusy(false);
+    if (!res.ok) {
+      if (/sport-pool-polls\.sql|SQL Editor/i.test(res.error)) {
+        setSqlNeeded(true);
+      }
+      setErr(res.error);
+      return;
+    }
+    if (res.bots < 1) {
+      setNote("No trial bots in this room — pad bots first, then try again.");
+    } else {
+      setNote(
+        `Bots answered: ${res.yes} yes · ${res.no} no. Create when you’re ready.`
+      );
+    }
     void refresh();
   }
 
@@ -127,7 +156,7 @@ export default function SportPoolCommishPanel() {
     if (
       !allAnswered &&
       !confirm(
-        `${answered} of ${humanCount || "?"} have answered.\n\n` +
+        `${answered} of ${voterTotal || "?"} have answered.\n\n` +
           `Create the ${getSportPack(poll.targetSportId).shortLabel} room now with ` +
           `${yeses.length} yes${yeses.length === 1 ? "" : "es"} (plus you if not already)?\n\n` +
           `People who haven’t voted yet won’t be seated.`
@@ -201,7 +230,8 @@ export default function SportPoolCommishPanel() {
           Poll everyone in <strong className="text-foreground">this</strong>{" "}
           room. When you&apos;re ready, one tap creates the new sport league and
           seats every <strong className="text-foreground">yes</strong>{" "}
-          (you&apos;re always included).
+          (you&apos;re always included). Trial bots auto-vote so you can practice
+          without waiting on humans.
         </p>
       </div>
 
@@ -286,8 +316,11 @@ export default function SportPoolCommishPanel() {
               <span className="text-muted">{nos.length} no</span>
               {" · "}
               <span className="text-foreground font-medium">
-                {answered} of {humanCount || "?"} answered
+                {answered} of {voterTotal || "?"} answered
               </span>
+              {botCount > 0 && (
+                <span className="text-muted"> · {botCount} bots in room</span>
+              )}
             </p>
             {allAnswered ? (
               <p className="text-xs text-primary font-bold mt-1.5">
@@ -347,6 +380,16 @@ export default function SportPoolCommishPanel() {
                 ? `Create ${getSportPack(poll.targetSportId).shortLabel} league · all ${yeses.length} yeses`
                 : `Create ${getSportPack(poll.targetSportId).shortLabel} league with ${yeses.length} yes${yeses.length === 1 ? "" : "es"}`}
           </button>
+          {botCount > 0 && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void botsAnswer()}
+              className="w-full py-2.5 min-h-[44px] rounded-xl border border-border bg-background text-sm font-semibold text-foreground disabled:opacity-50"
+            >
+              Bots answer now (practice)
+            </button>
+          )}
           <button
             type="button"
             disabled={busy}
