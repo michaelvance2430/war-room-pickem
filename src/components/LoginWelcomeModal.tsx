@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { getSession } from "@/lib/league";
+import { getLeague, getSession } from "@/lib/league";
 import { isGuestMode } from "@/lib/guest-mode";
 import BrandMark from "@/components/BrandMark";
 import {
@@ -16,6 +16,26 @@ import {
 } from "@/lib/player-tutorial";
 import { hasLockedPicksOnce, isPreLockCalm } from "@/lib/first-week";
 import { claimSessionDrama } from "@/lib/session-drama";
+import { firstSeasonWeek, weekWindowMs } from "@/lib/season-calendar";
+import { weekTitle } from "@/lib/dates";
+
+/** Days until the sport’s first official pick’em week (CFB Week 0 / NFL Week 1). */
+function getOfficialOpenTease(): {
+  open: boolean;
+  days: number;
+  weekLabel: string;
+} {
+  const sid = getLeague()?.sportId;
+  const first = firstSeasonWeek(sid);
+  const weekLabel = weekTitle(first, sid);
+  const win = weekWindowMs(first, sid === "nfl" ? "nfl" : "cfb");
+  if (!win) return { open: true, days: 0, weekLabel };
+  const left = win.startMs - Date.now();
+  if (left <= 0) return { open: true, days: 0, weekLabel };
+  // Full calendar days remaining (at least 1 while still before open)
+  const days = Math.max(1, Math.ceil(left / 86_400_000));
+  return { open: false, days, weekLabel };
+}
 
 const FOREVER_KEY = "warroom-login-welcome-v1-dismissed";
 const SESSION_KEY = "warroom-login-welcome-v1-session";
@@ -61,6 +81,11 @@ function markDismissedForever() {
 export default function LoginWelcomeModal() {
   const [open, setOpen] = useState(false);
   const [dontShowAgain, setDontShowAgain] = useState(false);
+  const [openTease, setOpenTease] = useState(() => ({
+    open: true,
+    days: 0,
+    weekLabel: "Week 0",
+  }));
 
   useEffect(() => {
     if (isGuestMode()) return;
@@ -98,6 +123,7 @@ export default function LoginWelcomeModal() {
       if (!hasLockedPicksOnce(session.playerId)) return;
 
       markShownThisSession();
+      setOpenTease(getOfficialOpenTease());
       setOpen(true);
     }
 
@@ -173,19 +199,36 @@ export default function LoginWelcomeModal() {
             </p>
             <p className="text-foreground text-sm leading-relaxed">
               Improvements are being made around the clock (well, around{" "}
-              <em>our</em> clock — it&apos;s messy). Check back when you can;
-              new stuff will keep landing.
+              <em>our</em> clock — it&apos;s messy). New stuff will keep
+              landing.
             </p>
             <p className="text-foreground text-sm leading-relaxed font-medium">
-              One real job this week: open{" "}
-              <span className="text-primary">My Picks</span>, fill the card,
-              and lock before first kickoff.
+              {openTease.open ? (
+                <>
+                  <span className="text-primary">{openTease.weekLabel}</span>{" "}
+                  is live. When a real card drops, lock it — until then, poke
+                  around and see what you can break.
+                </>
+              ) : (
+                <>
+                  We&apos;ve got{" "}
+                  <span className="text-primary tabular-nums">
+                    {openTease.days}{" "}
+                    {openTease.days === 1 ? "day" : "days"}
+                  </span>{" "}
+                  until{" "}
+                  <span className="text-primary">{openTease.weekLabel}</span>{" "}
+                  <span className="uppercase tracking-wide font-extrabold text-foreground">
+                    officially opens
+                  </span>
+                  . Poke around and see what you can break.
+                </>
+              )}
             </p>
           </div>
           <p className="text-xs text-muted leading-relaxed">
-            In the meantime, search around, mash some buttons, and see what you
-            can discover… sorta like your first… well. Never mind. We believe
-            in you. Mostly.
+            Mash buttons. Break stuff (gently). Sorta like your first… well.
+            Never mind. We believe in you. Mostly.
           </p>
         </div>
 
