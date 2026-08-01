@@ -315,15 +315,7 @@ export default function Home() {
           </>
         )}
 
-        {/* Multi-league: keep if 2+ rooms (collapsed sport desk) */}
-        <MultiLeagueHomeHub
-          onSwitched={() => {
-            window.location.href = "/";
-          }}
-        />
-
-        {/* ── TOP QUARTER: room identity (screenshot zone) ── */}
-        {/* Full masthead after first lock; compact plaque only in first hour */}
+        {/* ── Room name once, then slim switcher, then the job ── */}
         {!firstWeekChrome ? (
           <HomeSportHeader
             chrome={homeChrome}
@@ -353,7 +345,13 @@ export default function Home() {
           />
         )}
 
-        {/* ── THE JOB: immediately under room identity ── */}
+        {/* Switcher sits under the name — never above it, never repeats the title */}
+        <MultiLeagueHomeHub
+          onSwitched={() => {
+            window.location.href = "/";
+          }}
+        />
+
         <HomeWeekHero />
 
         {/* Host score path only when not in quiet first hour (or always for ops after card) */}

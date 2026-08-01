@@ -287,17 +287,19 @@ export default function MultiLeagueHomeHub({ onSwitched }: Props) {
     return "Switch anytime";
   }
 
+  // Hidden when only one room total — no switcher chrome at all
+  if (list.length < 2) return null;
+
+  const needsTotal = buckets.reduce((n, b) => n + b.needsCount, 0);
+
   return (
     <section
-      className="mb-4 rounded-xl border border-primary/30 bg-black/45 backdrop-blur-sm overflow-hidden"
-      aria-label="Your leagues by sport"
+      className="mb-4 rounded-xl border border-border/50 bg-black/35 overflow-hidden"
+      aria-label="Switch rooms"
     >
-      {/* Sport desk rail — only sports you actually play */}
-      <div className="px-3 pt-3 pb-2 border-b border-border/40">
-        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-primary mb-2">
-          Your sports · pick a desk
-        </p>
-        <div className="flex flex-wrap gap-2">
+      {/* One slim bar — never restates the active room name */}
+      <div className="px-2.5 py-2 flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap gap-1.5 flex-1 min-w-0">
           {buckets.map((b) => {
             const pack = getSportPack(b.sportId);
             const selected = b.sportId === scope;
@@ -306,148 +308,52 @@ export default function MultiLeagueHomeHub({ onSwitched }: Props) {
               <button
                 key={b.sportId}
                 type="button"
-                onClick={() => pickSport(b.sportId)}
-                className={`inline-flex items-center gap-2 min-h-[48px] px-3 rounded-xl border-2 touch-manipulation transition ${
+                onClick={() => {
+                  pickSport(b.sportId);
+                  setExpanded(true);
+                }}
+                className={`inline-flex items-center gap-1.5 min-h-[40px] px-2.5 rounded-lg border touch-manipulation text-xs font-bold transition ${
                   selected
                     ? isNfl
-                      ? "border-red-500/60 bg-red-500/15 shadow-[0_0_18px_rgba(193,18,31,0.2)]"
-                      : "border-primary/60 bg-primary/15 shadow-[0_0_18px_rgba(34,197,94,0.15)]"
-                    : "border-border/60 bg-background/40 hover:border-primary/35"
+                      ? "border-red-500/55 bg-red-500/15 text-red-100"
+                      : "border-primary/55 bg-primary/15 text-primary"
+                    : "border-border/50 bg-background/30 text-muted hover:text-foreground"
                 }`}
                 aria-pressed={selected}
                 title={`${pack.label} · ${b.rooms.length} room${
                   b.rooms.length === 1 ? "" : "s"
                 }`}
               >
-                <SportDeskIcon sportId={b.sportId} size={32} />
-                <span className="text-left">
-                  <span
-                    className={`block text-sm font-black leading-none ${
-                      selected
-                        ? isNfl
-                          ? "text-red-100"
-                          : "text-primary"
-                        : "text-foreground"
-                    }`}
-                  >
-                    {pack.shortLabel}
-                  </span>
-                  <span className="block text-[10px] text-muted mt-0.5 font-semibold">
-                    {b.rooms.length} room{b.rooms.length === 1 ? "" : "s"}
-                    {b.needsCount > 0 ? (
-                      <span className="text-amber-300">
-                        {" "}
-                        · {b.needsCount} need picks
-                      </span>
-                    ) : null}
-                  </span>
+                <SportDeskIcon sportId={b.sportId} size={22} />
+                <span>{pack.shortLabel}</span>
+                <span className="opacity-70 font-semibold tabular-nums">
+                  {b.rooms.length}
                 </span>
-              </button>
-            );
-          })}
-        </div>
-        {multiSport && (
-          <p className="text-[10px] text-muted mt-2 leading-relaxed">
-            Only <strong className="text-foreground">{scopePack.shortLabel}</strong>{" "}
-            rooms below — other sports stay on their own desk.
-          </p>
-        )}
-      </div>
-
-      {/* Dropdown for rooms in the selected sport only */}
-      <button
-        type="button"
-        onClick={() => setExpanded((e) => !e)}
-        className="w-full text-left px-3 py-3 flex items-center gap-2 min-h-[52px] touch-manipulation hover:bg-white/5"
-        aria-expanded={expanded}
-      >
-        <SportDeskIcon sportId={scope} size={28} />
-        <div className="flex-1 min-w-0">
-          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">
-            {scopePack.emoji} {scopePack.shortLabel} rooms ·{" "}
-            {scopedRooms.length}
-            {scopedNeeds.length > 0 && (
-              <span className="text-amber-300 font-semibold normal-case tracking-normal">
-                {" "}
-                · {scopedNeeds.length} need picks
-              </span>
-            )}
-          </p>
-          {/*
-            Do NOT repeat the active room name here — the masthead owns that.
-            This control is only “switch desks / rooms.”
-          */}
-          <p className="text-sm font-bold text-white truncate mt-0.5">
-            {activeInScope ? (
-              <span className="text-muted font-semibold">
-                Tap to switch rooms
-                {scopedRooms.length > 1 ? (
-                  <span className="text-foreground/80">
-                    {" "}
-                    · {scopedRooms.length} on this desk
+                {b.needsCount > 0 ? (
+                  <span className="text-amber-300 text-[10px]">
+                    ·{b.needsCount}
                   </span>
                 ) : null}
-              </span>
-            ) : (
-              <span className="text-muted font-semibold">
-                Tap to open a {scopePack.shortLabel} room
-              </span>
-            )}
-          </p>
-        </div>
-        <span className="shrink-0 text-muted text-sm font-bold px-1">
-          {expanded ? "▴" : "▾"}
-        </span>
-      </button>
-
-      {/* Collapsed: needs-picks chips within this sport only */}
-      {!expanded && scopedNeeds.length > 0 && (
-        <div className="px-3 pb-2.5 flex flex-wrap gap-1.5 items-center">
-          {scopedNeeds.slice(0, 4).map((m) => {
-            const p = pulse[m.leagueId];
-            const week =
-              p?.openWeek != null ? `W${p.openWeek}` : "picks";
-            const shortName = (m.leagueName || "Room").trim();
-            const chipName =
-              shortName.length > 20
-                ? `${shortName.slice(0, 18)}…`
-                : shortName;
-            return (
-              <button
-                key={m.leagueId}
-                type="button"
-                disabled={!!busyId}
-                onClick={() => void enterRoom(m.leagueId, true)}
-                className="inline-flex items-center gap-1 min-h-[36px] px-2.5 rounded-full border border-amber-400/40 bg-amber-500/15 text-amber-100 text-[11px] font-bold touch-manipulation disabled:opacity-50 max-w-[14rem] truncate"
-                title={m.leagueName}
-              >
-                {chipName}
-                <span className="opacity-80">· {week} →</span>
               </button>
             );
           })}
-          {scopedNeeds.length > 4 && (
-            <button
-              type="button"
-              onClick={() => setExpanded(true)}
-              className="inline-flex items-center min-h-[36px] px-2.5 rounded-full border border-border text-muted text-[11px] font-bold"
-            >
-              +{scopedNeeds.length - 4} more
-            </button>
-          )}
         </div>
-      )}
+        <button
+          type="button"
+          onClick={() => setExpanded((e) => !e)}
+          className="shrink-0 min-h-[40px] px-3 rounded-lg border border-border/60 text-xs font-bold text-foreground hover:bg-white/5 touch-manipulation"
+          aria-expanded={expanded}
+        >
+          {expanded ? "Close" : "Switch"}
+          {needsTotal > 0 && !expanded ? (
+            <span className="text-amber-300"> · {needsTotal}</span>
+          ) : null}
+          <span className="ml-1 opacity-60">{expanded ? "▴" : "▾"}</span>
+        </button>
+      </div>
 
       {expanded && (
-        <div className="border-t border-border/50 px-3 py-2.5">
-          <p className="text-[10px] text-muted mb-2 leading-relaxed">
-            {scopePack.shortLabel} desk only —{" "}
-            {scopedRooms.length} room
-            {scopedRooms.length === 1 ? "" : "s"}
-            {multiSport
-              ? ". Switch the sport chips above for other desks."
-              : "."}
-          </p>
+        <div className="border-t border-border/40 px-3 py-2.5">
           <div
             className={`space-y-1.5 ${
               scopedRooms.length > NEEDS_SCROLL_MAX

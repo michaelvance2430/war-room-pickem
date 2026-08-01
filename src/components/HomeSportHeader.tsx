@@ -19,8 +19,8 @@ type Props = {
 };
 
 /**
- * Home masthead — LEAGUE NAME first (people bounce multi-room).
- * War Room + sport are brand context, not the headline.
+ * Home masthead — one room name, once.
+ * Sport is a quiet chip. No “you're in this room” essay, no second brand line.
  */
 export default function HomeSportHeader({
   chrome,
@@ -36,70 +36,56 @@ export default function HomeSportHeader({
   const { emerald, gold, royal, white } = WWC_BRAZIL_COLORS;
   const nfl = NFL_SUNDAY_COLORS;
   const room = (leagueName || "").trim() || "War Room";
-  const showBrandAsSecondary = room.toLowerCase() !== "war room";
 
   return (
-    <section className="mb-4 sm:mb-6">
-      {/* Sport mark + brand line (quiet) */}
+    <section className="mb-3 sm:mb-4">
+      {/* Sport chip only — not a second headline */}
       {isWwc ? (
-        <div className="flex items-center gap-2.5 mb-3">
+        <div className="flex items-center gap-2 mb-2">
           <div
-            className="shrink-0 rounded-xl p-1 border"
+            className="shrink-0 rounded-lg p-0.5 border"
             style={{
               borderColor: `${gold}66`,
               background: `linear-gradient(160deg, ${royal}ee 0%, ${emerald}55 100%)`,
             }}
           >
-            <WwcTrophyLogo size={40} />
+            <WwcTrophyLogo size={28} />
           </div>
-          <p className="text-[11px] sm:text-xs font-bold uppercase tracking-[0.16em] text-white/60">
-            War Room · Women&apos;s World Cup · Brazil 2027
+          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/55">
+            War Room · WWC · Brazil 2027
           </p>
         </div>
       ) : isNfl ? (
-        <div className="flex items-center gap-2.5 mb-3">
+        <div className="flex items-center gap-2 mb-2">
           <div
-            className="shrink-0 rounded-xl p-1 border"
+            className="shrink-0 rounded-lg p-0.5 border"
             style={{
               borderColor: `${nfl.silver}55`,
               background: `linear-gradient(160deg, ${nfl.navy} 0%, ${nfl.crimson}55 100%)`,
             }}
           >
-            <NflBrandMark size={40} />
+            <NflBrandMark size={28} />
           </div>
-          <p className="text-[11px] sm:text-xs font-bold uppercase tracking-[0.16em] text-white/60">
-            War Room · Pro Football · Sunday
+          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/55">
+            War Room · NFL
           </p>
         </div>
       ) : (
-        <div className="flex flex-wrap items-center gap-2 mb-2.5">
-          <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.18em] px-2.5 py-1 rounded-full border border-primary/40 bg-primary/10 text-primary">
+        <div className="flex flex-wrap items-center gap-2 mb-2">
+          <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.16em] px-2 py-0.5 rounded-full border border-primary/35 bg-primary/10 text-primary">
             <span aria-hidden>{chrome.pack.emoji}</span>
-            War Room · {chrome.sportBadge}
+            War Room · {chrome.pack.shortLabel}
           </span>
         </div>
       )}
 
-      {/* THE thing people scan for when they have 3+ rooms */}
-      <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.2em] text-muted mb-1">
-        You&apos;re in this room
-      </p>
       <h1
         className={`text-3xl sm:text-5xl font-black tracking-tight leading-[1.08] text-white break-words ${chrome.atmosphere.titleGlow}`}
       >
         {room}
       </h1>
-      {showBrandAsSecondary && (
-        <p className="mt-1.5 text-sm sm:text-base text-white/55 font-medium">
-          {chrome.welcomeTitle.replace(/^Welcome to the\s+/i, "") || "War Room"}
-          <span className="text-muted font-normal">
-            {" "}
-            · {chrome.pack.emoji} {chrome.pack.shortLabel}
-          </span>
-        </p>
-      )}
 
-      <p className="mt-2.5 text-muted max-w-xl text-sm sm:text-base leading-relaxed">
+      <p className="mt-2 text-muted max-w-xl text-sm sm:text-base leading-relaxed">
         {tagline || chrome.defaultTagline}
       </p>
 
