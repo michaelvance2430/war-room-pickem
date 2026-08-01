@@ -1,25 +1,18 @@
 /**
- * Start / score one bored-practice week (re-do friendly).
+ * Start / finish bored practice — 100% client-side, never touches live weeks.
  */
 
-import { getLeague, isOps } from "@/lib/league";
-import { firstSeasonWeek } from "@/lib/season-calendar";
-import {
-  clearWeekScoreInCloud,
-  loadWeekCard,
-  publishWeekCard,
-  saveResultsAndScoreWeek,
-  seedBotPicksForWeekInCloud,
-  setLeagueActiveWeek,
-} from "@/lib/cloud";
-import { generateDemoSlate, randomizeDemoResults } from "@/lib/demo-slate";
+import { getLeague } from "@/lib/league";
+import { generateDemoSlate } from "@/lib/demo-slate";
 import { propFromPreset, rotatingPropPreset } from "@/lib/prop-presets";
 import {
-  getBoredPracticeState,
-  isBoredPracticeScoringAllowed,
+  BORED_PRACTICE_WEEK,
   isBoredPracticeWindowOpen,
   markBoredPracticeStarted,
-  queueBoredPracticeDoneModal,
+  saveBoredLocalCard,
+  saveBoredLocalPicks,
+  scoreBoredPracticeLocally,
+  type BoredLocalCard,
 } from "@/lib/bored-practice";
 
 export async function startBoredPracticeWeek(): Promise<{
@@ -31,125 +24,80 @@ export async function startBoredPracticeWeek(): Promise<{
   if (!isBoredPracticeWindowOpen()) {
     return {
       ok: false,
-      message: "Practice is closed — Week 0 already kicked off.",
+      message: "Practice is closed — opening week already kicked off.",
     };
   }
 
   const league = getLeague();
   const sid = league?.sportId === "nfl" ? "nfl" : "cfb";
-  // Dedicated practice slot = first calendar week (CFB 0 / NFL 1)
-  const week = firstSeasonWeek(sid);
+  const state = markBoredPracticeStarted(sid);
 
-  // Always mark this run so lock → auto-score knows it's practice
-  markBoredPracticeStarted(week);
-
-  // Host: always stand up a *fresh* demo slate (don't open an old season card)
-  if (isOps()) {
-    await clearWeekScoreInCloud(week).catch(() => undefined);
-    // New seed every click so it's clearly a new fake week, not last season's card
-    const games = generateDemoSlate(week + Date.now() % 97, 5, sid).map(
-      (g, i) => ({
-        ...g,
-        id: `bored-w${week}-${Date.now()}-${i}`,
-      })
-    );
-    // Kickoffs in the future so the card isn't frozen
-    const stamped = games.map((g, i) => {
-      const t = new Date(Date.now() + (2 + i) * 3600 * 1000);
-      return {
-        ...g,
-        commenceTime: t.toISOString(),
-        startTime: t.toISOString(),
-      };
-    });
-    const prop = propFromPreset(rotatingPropPreset(week, sid), week);
-    const pub = await publishWeekCard({
-      weekNumber: week,
-      games: stamped,
-      prop,
-    });
-    if (!pub.ok) {
-      return {
-        ok: false,
-        message:
-          pub.error ||
-          "Couldn’t publish fake week. Open Host → Build Card → Publish demo week.",
-      };
-    }
-    await seedBotPicksForWeekInCloud(week).catch(() => undefined);
-    await setLeagueActiveWeek(week).catch(() => undefined);
-    markBoredPracticeStarted(week);
-
+  // Fresh demo slate — never loads live season cards / never publishWeekCard
+  const seed = Date.now() % 100000;
+  const games = generateDemoSlate(seed, 5, sid).map((g, i) => {
+    // Kickoffs far enough out that lock deadline never freezes the practice card
+    const t = new Date(Date.now() + (24 + i) * 3600 * 1000);
     return {
-      ok: true,
-      weekNumber: week,
-      goToPicks: true,
-      message:
-        "Brand-new fake week is live. Lock your card — bots already did. After you lock, we auto-score and say thanks.",
+      ...g,
+      id: `bored-local-${state.runId}-${i}`,
+      oddsEventId: `bored-local-${state.runId}-${i}`,
+      commenceTime: t.toISOString(),
+      startTime: t.toLocaleString("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        timeZoneName: "short",
+        timeZone: "America/New_York",
+      }),
     };
-  }
+  });
+  const prop = propFromPreset(rotatingPropPreset(seed % 20, sid), seed % 20);
+  prop.id = `bored-prop-${state.runId}`;
 
-  // Player: only join if host already stood up the practice card
-  const existing = await loadWeekCard(week);
-  if (existing?.games?.length) {
-    await setLeagueActiveWeek(week).catch(() => undefined);
-    return {
-      ok: true,
-      weekNumber: week,
-      goToPicks: true,
-      message: "Fake week ready. Lock your card.",
-    };
-  }
+  const card: BoredLocalCard = {
+    weekNumber: BORED_PRACTICE_WEEK,
+    runId: state.runId,
+    games,
+    prop,
+    sportId: sid,
+  };
+  saveBoredLocalCard(card);
+  // Clear picks for this run
+  saveBoredLocalPicks({
+    runId: state.runId,
+    picks: {},
+    bestBetId: null,
+    propChoice: null,
+    lockedAt: null,
+  });
 
   return {
-    ok: false,
+    ok: true,
+    weekNumber: BORED_PRACTICE_WEEK,
+    goToPicks: true,
     message:
-      "No practice card yet. Ask your host to tap “I’m bored. Fake week.” once — then the whole room can pick and re-do until Week 0.",
+      "Private practice week ready — not the live season. Lock the card; we’ll score it and show you how the room wakes up.",
   };
 }
 
-/**
- * After the player locks a practice week — auto-score so the loop completes.
- * Host or allowed practice scoring path.
- */
+/** After lock in practice mode — local score + done modal. Never cloud. */
 export async function autoScoreBoredPracticeIfActive(
   weekNumber: number
 ): Promise<{ ok: boolean; message?: string }> {
-  const active = getBoredPracticeState();
-  if (!active || active.weekNumber !== weekNumber) {
+  if (weekNumber !== BORED_PRACTICE_WEEK) {
     return { ok: false };
   }
-  if (!isBoredPracticeScoringAllowed()) {
+  const res = scoreBoredPracticeLocally();
+  if (!res.ok) {
     return {
       ok: false,
-      message: "Practice locked — host can score the week to finish the loop.",
+      message: res.message || "Couldn’t finish practice week.",
     };
   }
-
-  const card = await loadWeekCard(weekNumber);
-  if (!card?.games?.length || !card.prop) {
-    return { ok: false, message: "No practice card to score." };
-  }
-
-  const { results, propResult, finalBoxes } = randomizeDemoResults(
-    card.games,
-    card.prop.options
-  );
-
-  const scored = await saveResultsAndScoreWeek({
-    weekNumber,
-    games: card.games,
-    prop: card.prop,
-    results,
-    propResult,
-    finalBoxes,
-    allowBoredPractice: true,
-  });
-
-  if (!scored.ok) {
-    return { ok: false, message: scored.error || "Score failed" };
-  }
-
-  queueBoredPracticeDoneModal(active.runId);
-  return { ok: true, message: "Practice week scored." };
+  return {
+    ok: true,
+    message: "Practice week complete.",
+  };
 }

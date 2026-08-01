@@ -129,6 +129,10 @@ export default function PicksPage() {
   /** Quiet first card: prop open by default so lock isn't blocked by a hidden control */
   const [bonusOpen, setBonusOpen] = useState(() => quietPicksBonusStartsOpen());
   const [eyesPreview, setEyesPreview] = useState(false);
+  /** Client-only bored practice — never touches live season cards */
+  const [practiceMode, setPracticeMode] = useState(false);
+  /** True after local practice score — show W/L on the card */
+  const [practiceScored, setPracticeScored] = useState(false);
 
   const revisionRef = useRef<string>("");
   const viewWeekRef = useRef(1);
@@ -136,11 +140,14 @@ export default function PicksPage() {
   const bestBetRef = useRef(bestBetId);
   const propChoiceRef = useRef(propChoice);
   const savedRef = useRef(saved);
+  /** Mount-once softRefresh must read current practice flag (not a stale false). */
+  const practiceModeRef = useRef(false);
   picksRef.current = picks;
   bestBetRef.current = bestBetId;
   propChoiceRef.current = propChoice;
   savedRef.current = saved;
   viewWeekRef.current = viewWeek;
+  practiceModeRef.current = practiceMode;
 
   const loadPicksIntoState = useCallback(
     async (cloud: CloudCard, week: number) => {
@@ -396,6 +403,8 @@ export default function PicksPage() {
 
   /** Poll / realtime: refresh current view week + active week number only. */
   const softRefresh = useCallback(async () => {
+    // Private practice must never pull live cards / active week (stale closure safe via ref)
+    if (practiceModeRef.current) return;
     const active = await loadLeagueActiveWeek();
     setActiveWeek(active);
     void refreshPublishedList();
@@ -421,27 +430,99 @@ export default function PicksPage() {
 
   useEffect(() => {
     void (async () => {
-      // Bored practice / deep links: ?week=0&practice=1 force that card
-      let forced: number | null = null;
+      // Bored practice: fully client-side card (never live season)
+      let practice = false;
       try {
         const sp = new URLSearchParams(window.location.search);
-        const w = sp.get("week");
-        if (w != null && w !== "" && !Number.isNaN(Number(w))) {
-          forced = Number(w);
+        practice =
+          sp.get("practice") === "1" ||
+          sp.get("week") === "99" ||
+          sp.get("week") === String(
+            (await import("@/lib/bored-practice")).BORED_PRACTICE_WEEK
+          );
+        if (!practice) {
+          const { isBoredPracticeActive, loadBoredLocalCard } = await import(
+            "@/lib/bored-practice"
+          );
+          practice = isBoredPracticeActive() && !!loadBoredLocalCard();
         }
       } catch {
         /* ok */
       }
+
+      if (practice) {
+        try {
+          const {
+            BORED_PRACTICE_WEEK,
+            loadBoredLocalCard,
+            loadBoredLocalPicks,
+            loadBoredLocalResults,
+            isBoredPracticeActive,
+          } = await import("@/lib/bored-practice");
+          if (!isBoredPracticeActive()) {
+            // Stale query — fall through to live
+          } else {
+            const card = loadBoredLocalCard();
+            if (card?.games?.length) {
+              setPracticeMode(true);
+              practiceModeRef.current = true;
+              setActiveWeek(BORED_PRACTICE_WEEK);
+              setViewWeek(BORED_PRACTICE_WEEK);
+              viewWeekRef.current = BORED_PRACTICE_WEEK;
+              setGames(card.games);
+              setProp(card.prop);
+              setHasCard(true);
+              setLeagueName("Practice (not live)");
+              setPublishedWeeks([]);
+              setScoredWeeks([]);
+              setLoadError(null);
+              setCardNotice(null);
+              const mine = loadBoredLocalPicks();
+              if (mine?.picks) {
+                setPicks(mine.picks);
+                picksRef.current = mine.picks;
+                setBestBetId(mine.bestBetId);
+                bestBetRef.current = mine.bestBetId;
+                setPropChoice(mine.propChoice);
+                propChoiceRef.current = mine.propChoice;
+                setSaved(!!mine.lockedAt);
+                savedRef.current = !!mine.lockedAt;
+                const used = Object.values(mine.picks)
+                  .map((p) => p.confidence)
+                  .filter((c) => c > 0);
+                setUsedConfidence(used);
+              }
+              const localRes = loadBoredLocalResults();
+              if (localRes?.results) {
+                setWeekResults(localRes.results);
+                setWeekPropResult(localRes.propResult);
+                setWeekScoredAt(localRes.scoredAt);
+                setPracticeScored(true);
+              }
+              setLoaded(true);
+              return; // never start live poll / realtime for practice
+            }
+          }
+        } catch {
+          /* fall through */
+        }
+      }
+
+      setPracticeMode(false);
+      practiceModeRef.current = false;
       const active = await loadLeagueActiveWeek();
-      setActiveWeek(forced != null ? forced : active);
-      await loadWeek(forced != null ? forced : active, { isInitial: true });
+      setActiveWeek(active);
+      await loadWeek(active, { isInitial: true });
     })();
 
+    // Live-only poll / realtime — practice path returned early and never needs these
+    // (still register; softRefresh no-ops while practiceModeRef is true)
     const poll = setInterval(() => {
       void softRefresh();
     }, POLL_MS);
 
     const onVisible = () => {
+      if (practiceModeRef.current) return;
       if (document.visibilityState === "visible") void softRefresh();
     };
     document.addEventListener("visibilitychange", onVisible);
@@ -453,7 +534,15 @@ export default function PicksPage() {
       null;
     try {
       const session = getSession();
-      if (session?.leagueId) {
+      // Skip cloud subscriptions entirely when URL is already practice (fast path)
+      const sp =
+        typeof window !== "undefined"
+          ? new URLSearchParams(window.location.search)
+          : null;
+      const urlPractice =
+        sp?.get("practice") === "1" ||
+        sp?.get("week") === "99";
+      if (session?.leagueId && !urlPractice) {
         const supabase = createClient();
         channel = supabase
           .channel(`week-card-${session.leagueId}`)
@@ -516,28 +605,54 @@ export default function PicksPage() {
   }, []);
 
   // Viewing past week, or any week that isn't the league active week → full read-only
-  const isPastOrOtherWeek = viewWeek !== activeWeek;
-  /** Can edit anything on this view? Only active week. */
-  const weekEditable = !isPastOrOtherWeek;
-  /** First kickoff on the card has started — must already be locked or you're out. */
-  const cardDeadlinePassed = isCardLockDeadlinePassed(games, now);
-  /** True if they previously saved/locked this week (from cloud). */
+  // Practice always stays on week 99 for both active + view (never live active week).
+  const isPastOrOtherWeek = practiceMode
+    ? false
+    : viewWeek !== activeWeek;
+  /** Can edit anything on this view? Active week, or open practice card. */
+  const weekEditable = practiceMode
+    ? hasCard && !practiceScored && !saved
+    : !isPastOrOtherWeek;
+  /** Practice: never freeze on kickoff — only after local lock/score. */
+  const cardDeadlinePassed = practiceMode
+    ? false
+    : isCardLockDeadlinePassed(games, now);
+  /** True if they previously saved/locked this week (from cloud or practice). */
   const hadLockedCard = saved;
   /**
    * After first kickoff on the card: entire slate freezes.
    * Never locked → cannot lock (0 pts). Already locked → read-only.
+   * Practice: freeze only after lock so the week can finish cleanly.
    */
   const missedLockWindow =
-    weekEditable && cardDeadlinePassed && !hadLockedCard && hasCard;
-  const cardFrozen = weekEditable && cardDeadlinePassed && hasCard;
-  const propLockedNow = isPropLocked(games, now) || cardFrozen;
-  const openCount = openGameCount(games, now);
+    !practiceMode &&
+    weekEditable &&
+    cardDeadlinePassed &&
+    !hadLockedCard &&
+    hasCard;
+  const cardFrozen = practiceMode
+    ? saved || practiceScored
+    : weekEditable && cardDeadlinePassed && hasCard;
+  const propLockedNow =
+    practiceMode
+      ? saved || practiceScored
+      : isPropLocked(games, now) || cardFrozen;
+  const openCount = practiceMode
+    ? saved || practiceScored
+      ? 0
+      : games.length
+    : openGameCount(games, now);
   const allGamesLocked = games.length > 0 && openCount === 0;
-  const canEditProp = weekEditable && !propLockedNow && !cardFrozen;
-  const fullyLocked =
-    isPastOrOtherWeek ||
-    cardFrozen ||
-    (allGamesLocked && (!prop.question || propLockedNow));
+  const canEditProp =
+    practiceMode
+      ? !saved && !practiceScored
+      : weekEditable && !propLockedNow && !cardFrozen;
+  /** Practice stays editable until lock (weekEditable handles post-lock). */
+  const fullyLocked = practiceMode
+    ? saved || practiceScored
+    : isPastOrOtherWeek ||
+      cardFrozen ||
+      (allGamesLocked && (!prop.question || propLockedNow));
 
   const confidenceOptions = [1, 2, 3, 4, 5];
 
@@ -667,9 +782,130 @@ export default function PicksPage() {
   }
 
   async function savePicks() {
-    if (saving || !hasCard || !weekEditable) return;
+    // Practice: allow lock while still open (weekEditable may flip after score)
+    const canPracticeLock =
+      practiceMode && hasCard && !saved && !practiceScored;
+    if (saving || !hasCard) return;
+    if (!practiceMode && !weekEditable) return;
+    if (practiceMode && !canPracticeLock) return;
     setSaving(true);
     setSaveError(null);
+
+    // —— Private bored practice (client-only, no live season) ——
+    if (practiceMode) {
+      try {
+        const {
+          loadBoredLocalCard,
+          saveBoredLocalPicks,
+          loadBoredLocalResults,
+          getBoredPracticeState,
+          scoreBoredPracticeLocally,
+        } = await import("@/lib/bored-practice");
+        const card = loadBoredLocalCard();
+        const state = getBoredPracticeState();
+        if (!card?.games?.length || !state) {
+          setSaveError(
+            "Practice card missing — go Home and tap I’m bored again."
+          );
+          setSaving(false);
+          return;
+        }
+        const cardGames = card.games;
+        const lockedPicks: Record<string, UserPick> = {};
+        for (const g of cardGames) {
+          const p = picksRef.current[g.id];
+          if (!p) continue;
+          lockedPicks[g.id] = {
+            ...p,
+            lockedSpread: g.spread,
+            lockedFavorite: g.favorite,
+            isBestBet: false,
+          };
+        }
+        let nextBest = bestBetRef.current;
+        if (nextBest && !lockedPicks[nextBest]) nextBest = null;
+        for (const id of Object.keys(lockedPicks)) {
+          lockedPicks[id] = {
+            ...lockedPicks[id],
+            isBestBet: id === nextBest,
+          };
+        }
+        const nextProp = propChoiceRef.current;
+        if (Object.keys(lockedPicks).length !== cardGames.length) {
+          setSaveError("Pick a side and confidence for every game.");
+          setSaving(false);
+          return;
+        }
+        const confs = cardGames
+          .map((g) => lockedPicks[g.id].confidence)
+          .sort((a, b) => a - b);
+        const expected = [1, 2, 3, 4, 5].slice(0, cardGames.length);
+        if (confs.join() !== expected.join()) {
+          setSaveError("Use each confidence 1–5 exactly once.");
+          setSaving(false);
+          return;
+        }
+        if (!nextBest) {
+          setSaveError("Mark one Best Bet.");
+          setSaving(false);
+          return;
+        }
+        if (!nextProp) {
+          setBonusOpen(true);
+          setSaveError("Bonus is required — pick a prop side, then lock.");
+          setSaving(false);
+          return;
+        }
+        saveBoredLocalPicks({
+          runId: state.runId,
+          picks: lockedPicks,
+          bestBetId: nextBest,
+          propChoice: nextProp,
+          lockedAt: new Date().toISOString(),
+        });
+        setPicks(lockedPicks);
+        picksRef.current = lockedPicks;
+        setBestBetId(nextBest);
+        bestBetRef.current = nextBest;
+        setPropChoice(nextProp);
+        propChoiceRef.current = nextProp;
+        setSaved(true);
+        savedRef.current = true;
+        try {
+          const { markHasLockedPicksOnce } = await import("@/lib/first-week");
+          markHasLockedPicksOnce(getSession()?.playerId);
+          const { completePlayerTutorial, isPlayerTutorialActive } =
+            await import("@/lib/player-tutorial");
+          if (isPlayerTutorialActive()) completePlayerTutorial();
+        } catch {
+          /* ok */
+        }
+        // Instant local score → done modal (never cloud, never live week)
+        const scored = scoreBoredPracticeLocally();
+        if (!scored.ok) {
+          setSaveError(scored.message || "Couldn’t finish practice week.");
+          setSaving(false);
+          return;
+        }
+        const localRes = loadBoredLocalResults();
+        if (localRes?.results) {
+          setWeekResults(localRes.results);
+          setWeekPropResult(localRes.propResult);
+          setWeekScoredAt(localRes.scoredAt);
+        }
+        setPracticeScored(true);
+        // No generic “saved” popup — BoredPracticeDoneModal is the ending
+        setPicksSavedModal(null);
+        setSaving(false);
+        return;
+      } catch (e) {
+        setSaveError(
+          e instanceof Error ? e.message : "Practice lock failed"
+        );
+        setSaving(false);
+        return;
+      }
+    }
 
     // Refresh active week card only
     const latest = await loadWeekCard(activeWeek);
@@ -804,24 +1040,6 @@ export default function PicksPage() {
       /* ignore */
     }
 
-    // Bored practice week: auto-score so the one-week loop completes
-    try {
-      const { isBoredPracticeActive } = await import("@/lib/bored-practice");
-      const { autoScoreBoredPracticeIfActive } = await import(
-        "@/lib/bored-practice-run"
-      );
-      if (isBoredPracticeActive()) {
-        const scored = await autoScoreBoredPracticeIfActive(activeWeek);
-        if (scored.ok) {
-          // Done modal will open from BoredPracticeDoneModal
-        } else if (scored.message) {
-          setSaveError(scored.message);
-        }
-      }
-    } catch {
-      /* ignore */
-    }
-
     // Easter egg: Lucky Seven (7:07:07 lock) — zero points
     try {
       const { checkLuckySevenLock, EVENT_EASTER_EGG } = await import(
@@ -915,10 +1133,13 @@ export default function PicksPage() {
     ),
   ].sort((a, b) => a - b);
 
-  const viewIsScored = scoredWeeks.includes(viewWeek);
+  const viewIsScored =
+    practiceMode && practiceScored
+      ? true
+      : scoredWeeks.includes(viewWeek);
   const myWeekScore =
     hasCard &&
-    viewIsScored &&
+    (viewIsScored || (practiceMode && Object.keys(weekResults).length > 0)) &&
     Object.keys(weekResults).length > 0 &&
     Object.keys(picks).length > 0
       ? scoreWeek(
@@ -983,7 +1204,26 @@ export default function PicksPage() {
           </div>
         )}
 
-        {quietPicks && weekEditable && hasCard && !cardFrozen && (
+        {practiceMode && (
+          <div className="mb-4 rounded-xl border-2 border-dashed border-primary/50 bg-primary/10 px-4 py-3">
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-1">
+              Practice · not the live season
+            </p>
+            <p className="text-xs sm:text-sm text-foreground/90 leading-relaxed">
+              {practiceScored || saved
+                ? "Week finished on this private card. Check the ending popup for Gazette / Board / Locker — or go Home and do another fake week."
+                : "Fake games only. Lock the full card and we’ll score it instantly, then show how a real week ends (Gazette, Board, the room)."}
+            </p>
+            <Link
+              href="/"
+              className="inline-block mt-2 text-xs font-bold text-primary hover:underline"
+            >
+              ← Back to Home
+            </Link>
+          </div>
+        )}
+
+        {quietPicks && !practiceMode && weekEditable && hasCard && !cardFrozen && (
           <div className="mb-4 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-xs text-muted leading-relaxed">
             <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary mb-1">
               First lock · keep it simple
@@ -1070,8 +1310,9 @@ export default function PicksPage() {
           </div>
         )}
 
-        {/* Chaos Mode — mid-season spice (week 2+); hide on quiet first path */}
-        {weekEditable &&
+        {/* Chaos Mode — mid-season spice (week 2+); hide on quiet first path + practice */}
+        {!practiceMode &&
+          weekEditable &&
           hasCard &&
           !cardFrozen &&
           !missedLockWindow &&
@@ -1196,22 +1437,38 @@ export default function PicksPage() {
         {/* Crystal-clear week banner */}
         <div
           className={`rounded-xl border px-4 py-3 mb-4 ${
-            weekEditable
-              ? chaosArmed || chaosLockedWeek
-                ? "border-orange-500/50 bg-orange-500/10"
-                : "border-primary/50 bg-primary/10"
-              : "border-border bg-card"
+            practiceMode
+              ? "border-primary/40 bg-black/40"
+              : weekEditable
+                ? chaosArmed || chaosLockedWeek
+                  ? "border-orange-500/50 bg-orange-500/10"
+                  : "border-primary/50 bg-primary/10"
+                : "border-border bg-card"
           }`}
         >
           <div className="flex flex-wrap items-center gap-2 mb-1">
             <span
               className={`text-[10px] font-bold uppercase tracking-[0.2em] ${
-                weekEditable ? "text-primary" : "text-muted"
+                practiceMode
+                  ? "text-primary"
+                  : weekEditable
+                    ? "text-primary"
+                    : "text-muted"
               }`}
             >
-              {weekEditable ? "You are picking" : "Viewing only"}
+              {practiceMode
+                ? practiceScored || saved
+                  ? "Practice week finished"
+                  : "Practice picks"
+                : weekEditable
+                  ? "You are picking"
+                  : "Viewing only"}
             </span>
-            {weekEditable ? (
+            {practiceMode ? (
+              <span className="text-xs px-2 py-0.5 rounded-full border border-primary/50 text-primary font-semibold">
+                NOT LIVE
+              </span>
+            ) : weekEditable ? (
               <span className="text-xs px-2 py-0.5 rounded-full bg-primary text-black font-semibold">
                 LIVE
               </span>
@@ -1222,20 +1479,28 @@ export default function PicksPage() {
             )}
           </div>
           <h1 className="text-2xl font-bold">
-            {weekTitle(viewWeek)}
-            {weekEditable ? " Picks" : " — your card"}
+            {practiceMode
+              ? practiceScored || saved
+                ? "Practice week — done"
+                : "Practice week picks"
+              : `${weekTitle(viewWeek)}${weekEditable ? " Picks" : " — your card"}`}
           </h1>
           <p className="text-sm text-muted mt-1">
-            {leagueName ? `${leagueName} · ` : ""}
-            {weekEditable
-              ? missedLockWindow
-                ? "First kickoff hit and you never locked — card closed for you (0 pts)."
-                : cardFrozen
-                  ? "First kickoff hit — entire card is frozen. No more changes."
-                  : `All picks must be locked before first kickoff (${formatCardLockDeadline(games)}).`
-              : viewWeek < activeWeek
-                ? `Past week · league is on ${weekTitle(activeWeek)}. You can review but not change picks.`
-                : `Not the active week (league is on ${weekTitle(activeWeek)}). Read-only.`}
+            {practiceMode
+              ? practiceScored || saved
+                ? "Scored on your device only. Real standings untouched."
+                : "Private dry-run · lock when ready · we score it and show the room."
+              : `${leagueName ? `${leagueName} · ` : ""}${
+                  weekEditable
+                    ? missedLockWindow
+                      ? "First kickoff hit and you never locked — card closed for you (0 pts)."
+                      : cardFrozen
+                        ? "First kickoff hit — entire card is frozen. No more changes."
+                        : `All picks must be locked before first kickoff (${formatCardLockDeadline(games)}).`
+                    : viewWeek < activeWeek
+                      ? `Past week · league is on ${weekTitle(activeWeek)}. You can review but not change picks.`
+                      : `Not the active week (league is on ${weekTitle(activeWeek)}). Read-only.`
+                }`}
           </p>
           {games.length > 0 && (
             <p className="text-xs text-muted mt-1">
@@ -1250,8 +1515,8 @@ export default function PicksPage() {
           )}
         </div>
 
-        {/* Week browser */}
-        {weekPills.length > 0 && (
+        {/* Week browser — never show live weeks during private practice */}
+        {!practiceMode && weekPills.length > 0 && (
           <div className="rounded-xl border border-border bg-card p-3 mb-6">
             <p className="text-[10px] uppercase tracking-wider text-muted mb-2 font-semibold">
               Jump to week
@@ -1785,7 +2050,40 @@ export default function PicksPage() {
               )}
             </div>
 
-            {weekEditable ? (
+            {practiceMode && (practiceScored || saved) ? (
+              <div className="rounded-xl border border-primary/40 bg-primary/10 px-4 py-4 space-y-2 text-center">
+                <p className="text-sm font-bold text-foreground">
+                  Practice week scored
+                  {weekScoredAt
+                    ? ` · ${Object.keys(weekResults).length} games graded`
+                    : ""}
+                </p>
+                <p className="text-xs text-muted leading-relaxed">
+                  Ending popup has Gazette / Board / Locker. Or start another
+                  fake week from Home.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                  <Link
+                    href="/"
+                    className="flex-1 py-3 min-h-[48px] rounded-xl bg-primary text-black text-sm font-bold flex items-center justify-center"
+                  >
+                    Home
+                  </Link>
+                  <Link
+                    href="/board"
+                    className="flex-1 py-3 min-h-[48px] rounded-xl border border-border text-sm font-bold text-foreground flex items-center justify-center"
+                  >
+                    Peek Board
+                  </Link>
+                  <Link
+                    href="/gazette"
+                    className="flex-1 py-3 min-h-[48px] rounded-xl border border-amber-500/40 text-sm font-bold text-amber-100 flex items-center justify-center"
+                  >
+                    Gazette
+                  </Link>
+                </div>
+              </div>
+            ) : weekEditable || (practiceMode && !saved) ? (
               <div className="phone-sticky-action">
                 <button
                   type="button"
@@ -1794,7 +2092,9 @@ export default function PicksPage() {
                   className="w-full py-3.5 sm:py-3 rounded-xl bg-primary text-black text-base font-bold disabled:opacity-50 min-h-[52px] touch-manipulation shadow-lg shadow-primary/20"
                 >
                   {saving
-                    ? "Locking…"
+                    ? practiceMode
+                      ? "Scoring practice week…"
+                      : "Locking…"
                     : fullyLocked || chaosLockedWeek
                       ? chaosLockedWeek
                         ? "🔥 Chaos locked"
@@ -1803,7 +2103,9 @@ export default function PicksPage() {
                         ? "Lock Chaos card 🔥"
                         : saved
                           ? "Update open picks"
-                          : "Lock it in"}
+                          : practiceMode
+                            ? "Lock & finish practice week"
+                            : "Lock it in"}
                 </button>
                 {!allGamesPicked && !fullyLocked && (
                   <p className="text-xs text-muted text-center mt-2 px-1">
@@ -1811,7 +2113,7 @@ export default function PicksPage() {
                       ? "Almost — pick the bonus (prop) answer, then lock."
                       : !bestBetId
                         ? "Almost — mark one Best Bet, then lock."
-                        : quietPicks
+                        : quietPicks || practiceMode
                           ? "Need: side + confidence on every game, one Best Bet, and the bonus."
                           : "Need: side + unique confidence on every open game, one Best Bet, and a bonus pick."}
                   </p>
