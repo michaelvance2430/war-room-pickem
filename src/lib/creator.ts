@@ -23,6 +23,10 @@ function envCreatorIds(): string[] {
     .filter(Boolean);
 }
 
+function normalizeId(id: string): string {
+  return id.trim().toLowerCase();
+}
+
 /**
  * True if this user built the game (not "is commissioner of a league").
  * Checked by UUID only — role/commish flags never matter.
@@ -31,8 +35,9 @@ export function isAppCreator(userId: string | null | undefined): boolean {
   if (!userId) return false;
   // Local demo seat only
   if (userId === "1") return true;
-  if (HARDCODED_CREATOR_IDS.includes(userId)) return true;
-  return envCreatorIds().includes(userId);
+  const id = normalizeId(userId);
+  if (HARDCODED_CREATOR_IDS.some((x) => normalizeId(x) === id)) return true;
+  return envCreatorIds().some((x) => normalizeId(x) === id);
 }
 
 /** Tag player for badge eval / UI (game creator flag, not league role). */

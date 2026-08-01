@@ -663,7 +663,8 @@ export default function AccountPage() {
                     👑 The Creator legendary is active — gold on your profile, and
                     your nameplate defaults to{" "}
                     <span className="font-black uppercase">The Creator</span>{" "}
-                    {name || "Mike V."}. Peasants stay grey.
+                    {name || "Mike V."}. Friends stay grey (that badge is only for
+                    the person who built the app).
                   </p>
                   <Link
                     href="/founder"
@@ -671,41 +672,6 @@ export default function AccountPage() {
                   >
                     Founder Dashboard (cockpit) →
                   </Link>
-                </div>
-              )}
-              {userId && !isAppCreator(userId) && (
-                <div className="rounded-lg border border-yellow-500/40 bg-yellow-500/10 px-3 py-2 space-y-2">
-                  <p className="text-xs text-yellow-200 font-medium">
-                    Your legendary creator badge is grey because live doesn&apos;t
-                    know your User ID yet.
-                  </p>
-                  <p className="text-[11px] text-muted font-mono break-all">
-                    {userId}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      className="text-[11px] px-2 py-1 rounded border border-yellow-500/50 text-yellow-200 hover:bg-yellow-500/15"
-                      onClick={async () => {
-                        try {
-                          await navigator.clipboard.writeText(userId);
-                          setMessage("User ID copied — paste into Vercel env");
-                        } catch {
-                          setMessage("Copy failed — select the ID manually");
-                        }
-                      }}
-                    >
-                      Copy User ID
-                    </button>
-                  </div>
-                  <p className="text-[11px] text-muted leading-relaxed">
-                    Vercel → Project → Settings → Environment Variables → add{" "}
-                    <code className="text-foreground">
-                      NEXT_PUBLIC_CREATOR_USER_IDS
-                    </code>{" "}
-                    = your User ID (above) → Redeploy. After that, 👑 lights gold
-                    for you only; friends stay grey with the peasant roast.
-                  </p>
                 </div>
               )}
               <p className="text-xs text-muted">
