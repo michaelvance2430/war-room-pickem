@@ -1422,6 +1422,66 @@ html[data-season-theme="newyear"] body::before {
   }
 }
 
+/* Creator profile borders — subtle living chrome */
+@keyframes creator-fx-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes creator-fx-spin-rev {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+@keyframes creator-fx-flicker {
+  0%,
+  100% {
+    opacity: 0.75;
+  }
+  40% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 0.55;
+  }
+}
+@keyframes creator-fx-shimmer {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.25);
+  }
+}
+.creator-fx-spin {
+  animation: creator-fx-spin 10s linear infinite;
+  transform-origin: 50% 50%;
+}
+.creator-fx-spin-slow {
+  animation: creator-fx-spin 14s linear infinite;
+  transform-origin: 50% 50%;
+}
+.creator-fx-spin-rev {
+  animation: creator-fx-spin-rev 18s linear infinite;
+  transform-origin: 50% 50%;
+}
+.creator-fx-flicker {
+  animation: creator-fx-flicker 1.8s ease-in-out infinite;
+}
+.creator-fx-shimmer {
+  animation: creator-fx-shimmer 2.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .creator-fx-spin,
+  .creator-fx-spin-slow,
+  .creator-fx-spin-rev,
+  .creator-fx-flicker,
+  .creator-fx-shimmer {
+    animation: none !important;
+  }
+}
+
 /* Championship trophy — soft float on ceremony stage */
 @keyframes champ-trophy-float {
   0%,

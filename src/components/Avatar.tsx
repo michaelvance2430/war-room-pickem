@@ -5,11 +5,13 @@ import { initialsFromName } from "@/lib/profile";
 import {
   borderWrapperClass,
   defaultProfileBorderId,
+  resolveCreatorEffect,
 } from "@/lib/profile-borders";
 import {
   getEquippedBorderId,
   subscribeProfileBorders,
 } from "@/lib/profile-border-store";
+import CreatorBorderFx from "@/components/CreatorBorderFx";
 
 type Props = {
   name: string;
@@ -53,10 +55,17 @@ export default function Avatar({
     storeBorder ||
     (plain ? null : defaultProfileBorderId());
 
+  const creatorFx =
+    !plain && resolvedBorder ? resolveCreatorEffect(resolvedBorder) : null;
+
   const ring =
-    !plain && resolvedBorder
+    !plain && resolvedBorder && !creatorFx
       ? borderWrapperClass(resolvedBorder)
-      : "rounded-full border border-border";
+      : plain
+        ? "rounded-full border border-border"
+        : creatorFx
+          ? ""
+          : "rounded-full border border-border";
 
   const inner = avatarUrl ? (
     // eslint-disable-next-line @next/next/no-img-element
@@ -73,6 +82,14 @@ export default function Avatar({
       {initials}
     </div>
   );
+
+  if (creatorFx) {
+    return (
+      <CreatorBorderFx effect={creatorFx} size={size}>
+        {inner}
+      </CreatorBorderFx>
+    );
+  }
 
   return (
     <div className={`inline-flex p-0.5 shrink-0 ${ring}`}>{inner}</div>

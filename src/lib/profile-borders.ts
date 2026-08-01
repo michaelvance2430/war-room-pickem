@@ -6,6 +6,9 @@
 import type { BadgeStatus, BadgeTier } from "./types";
 import { isAppCreator } from "./creator";
 
+/** Special animated Creator rings (app owner only) */
+export type CreatorBorderEffect = "flame" | "forge" | "circuit";
+
 export type ProfileBorderDef = {
   id: string;
   name: string;
@@ -24,7 +27,32 @@ export type ProfileBorderDef = {
   ringClass: string;
   /** Optional outer glow wrapper */
   glowClass?: string;
+  /** Animated Creator-only chrome (rendered by Avatar) */
+  creatorEffect?: CreatorBorderEffect;
 };
+
+export const CREATOR_BORDER_IDS = [
+  "creator_flame",
+  "creator_forge",
+  "creator_circuit",
+  /** legacy id — maps to flame */
+  "creator",
+] as const;
+
+export function isCreatorBorderId(id: string | null | undefined): boolean {
+  if (!id) return false;
+  return (CREATOR_BORDER_IDS as readonly string[]).includes(id);
+}
+
+export function resolveCreatorEffect(
+  id: string | null | undefined
+): CreatorBorderEffect | null {
+  if (!id) return null;
+  if (id === "creator_forge") return "forge";
+  if (id === "creator_circuit") return "circuit";
+  if (id === "creator_flame" || id === "creator") return "flame";
+  return null;
+}
 
 /**
  * Ordered simple → badass. First free default.
@@ -222,15 +250,47 @@ export const PROFILE_BORDER_CATALOG: ProfileBorderDef[] = [
     glowClass:
       "shadow-[0_0_30px_rgba(249,115,22,0.7),0_0_12px_rgba(239,68,68,0.5)]",
   },
+  // —— Creator only (Mike) — three legendary looks ——
   {
-    id: "creator",
-    name: "The Creator",
-    unlockLabel: "App creator only — not a peasant",
+    id: "creator_flame",
+    name: "Living Flame",
+    unlockLabel: "Creator only — ring of living fire",
     unlock: { kind: "creator" },
     tier: "legendary",
-    ringClass: "ring-4 ring-yellow-300 border-[3px] border-white/80",
-    glowClass:
-      "shadow-[0_0_36px_rgba(250,204,21,0.8),0_0_14px_rgba(255,255,255,0.35)]",
+    ringClass: "ring-0 border-0",
+    glowClass: "shadow-[0_0_28px_rgba(249,115,22,0.55)]",
+    creatorEffect: "flame",
+  },
+  {
+    id: "creator_forge",
+    name: "Molten Forge",
+    unlockLabel: "Creator only — molten gold forge crown",
+    unlock: { kind: "creator" },
+    tier: "legendary",
+    ringClass: "ring-0 border-0",
+    glowClass: "shadow-[0_0_32px_rgba(250,204,21,0.65)]",
+    creatorEffect: "forge",
+  },
+  {
+    id: "creator_circuit",
+    name: "Creator Circuit",
+    unlockLabel: "Creator only — emerald code orbit",
+    unlock: { kind: "creator" },
+    tier: "legendary",
+    ringClass: "ring-0 border-0",
+    glowClass: "shadow-[0_0_28px_rgba(16,185,129,0.45)]",
+    creatorEffect: "circuit",
+  },
+  {
+    /** Legacy equipped id — same as Living Flame */
+    id: "creator",
+    name: "The Creator (classic)",
+    unlockLabel: "Creator only — maps to Living Flame chrome",
+    unlock: { kind: "creator" },
+    tier: "legendary",
+    ringClass: "ring-0 border-0",
+    glowClass: "shadow-[0_0_36px_rgba(250,204,21,0.8)]",
+    creatorEffect: "flame",
   },
 ];
 
