@@ -78,7 +78,7 @@ export default function BoredPracticeDoneModal() {
         markBoredPracticeStarted(week);
         await setLeagueActiveWeek(week).catch(() => undefined);
         setOpen(false);
-        router.push("/picks");
+        router.push(`/picks?week=${week}&practice=1`);
         router.refresh();
         setBusy(false);
         return;
@@ -87,7 +87,7 @@ export default function BoredPracticeDoneModal() {
       // Player: clear local flag and send them to picks (host may re-score)
       markBoredPracticeStarted(week);
       setOpen(false);
-      router.push("/picks");
+      router.push(`/picks?week=${week}&practice=1`);
     } catch {
       /* still close */
       setOpen(false);

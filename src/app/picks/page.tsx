@@ -421,9 +421,20 @@ export default function PicksPage() {
 
   useEffect(() => {
     void (async () => {
+      // Bored practice / deep links: ?week=0&practice=1 force that card
+      let forced: number | null = null;
+      try {
+        const sp = new URLSearchParams(window.location.search);
+        const w = sp.get("week");
+        if (w != null && w !== "" && !Number.isNaN(Number(w))) {
+          forced = Number(w);
+        }
+      } catch {
+        /* ok */
+      }
       const active = await loadLeagueActiveWeek();
-      setActiveWeek(active);
-      await loadWeek(active, { isInitial: true });
+      setActiveWeek(forced != null ? forced : active);
+      await loadWeek(forced != null ? forced : active, { isInitial: true });
     })();
 
     const poll = setInterval(() => {

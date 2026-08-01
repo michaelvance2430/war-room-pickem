@@ -58,8 +58,11 @@ export default function BoredLameSandboxCta() {
       setNote(res.message);
       if (res.ok) setAgain(true);
       if (res.goToPicks) {
+        const w = res.weekNumber;
+        const href =
+          w != null ? `/picks?week=${w}&practice=1` : "/picks?practice=1";
         // Brief beat so they see the status line
-        window.setTimeout(() => router.push("/picks"), 400);
+        window.setTimeout(() => router.push(href), 400);
       }
     } catch (e) {
       setNote(e instanceof Error ? e.message : "Couldn’t start practice.");
