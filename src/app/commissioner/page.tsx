@@ -1968,7 +1968,7 @@ function CommissionerPageInner() {
     const text = buildInviteShareText({
       leagueName: league.name || "War Room",
       code: league.code,
-      sportId: league.sportId || "cfb",
+      sportId: league.sportId,
       inviterName: getSession()?.playerName,
     });
     try {

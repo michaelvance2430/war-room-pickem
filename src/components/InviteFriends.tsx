@@ -12,6 +12,7 @@ import {
   buildInviteJoinUrl,
   buildInviteShareText,
   markInviteCopied,
+  resolveInviteSportId,
   shareLeagueInvite,
   type InviteFlavor,
 } from "@/lib/commish-onboarding";
@@ -20,6 +21,8 @@ type Props = {
   leagueName?: string;
   code?: string;
   leagueId?: string;
+  /** Explicit sport — never let NFL/CFB invites mix */
+  sportId?: string | null;
   /** Compact for banners */
   compact?: boolean;
   className?: string;
@@ -38,6 +41,9 @@ const FLAVOR_CHIPS: {
   { id: "millennial", label: "Millennial", hint: "Group-chat soft launch" },
   { id: "dad", label: "Dad energy", hint: "Subject line + love you" },
   { id: "chaos", label: "Chaos", hint: "Milk-carton threat" },
+  { id: "primetime", label: "Primetime", hint: "TV window energy" },
+  { id: "tailgate", label: "Tailgate", hint: "Grill + trash talk" },
+  { id: "redzone", label: "Red zone", hint: "Urgent roster fill" },
   { id: "warroom", label: "Classic", hint: "Straight product pitch" },
 ];
 
@@ -45,6 +51,7 @@ export default function InviteFriends({
   leagueName: leagueNameProp,
   code: codeProp,
   leagueId: leagueIdProp,
+  sportId: sportIdProp,
   compact,
   className = "",
 }: Props) {
@@ -55,6 +62,8 @@ export default function InviteFriends({
     leagueNameProp || league?.name || "War Room";
   const leagueId = leagueIdProp || league?.id || "";
   const inviterName = session?.playerName || "";
+  const sportId = resolveInviteSportId(sportIdProp ?? league?.sportId);
+  const isNfl = sportId === "nfl";
 
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -77,7 +86,7 @@ export default function InviteFriends({
       code,
       inviterName,
       flavor,
-      sportId: getLeague()?.sportId,
+      sportId,
     });
     setBusy(false);
     if (leagueId) markInviteCopied(leagueId);
@@ -118,7 +127,7 @@ export default function InviteFriends({
           code,
           inviterName,
           flavor,
-          sportId: getLeague()?.sportId,
+          sportId,
         })
       );
       if (leagueId) markInviteCopied(leagueId);
@@ -132,6 +141,12 @@ export default function InviteFriends({
   if (compact) {
     return (
       <div className={className}>
+        <p className="text-[10px] font-bold uppercase tracking-wider text-muted mb-1.5">
+          Sharing as{" "}
+          <span className={isNfl ? "text-blue-300" : "text-amber-200"}>
+            {isNfl ? "NFL" : "CFB"}
+          </span>
+        </p>
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
@@ -173,7 +188,7 @@ export default function InviteFriends({
           code,
           inviterName,
           flavor,
-          sportId: getLeague()?.sportId,
+          sportId,
         });
 
   // Collapsed strip on phone until they expand (desktop always full)
@@ -185,7 +200,10 @@ export default function InviteFriends({
         <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
           <div className="flex-1 min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">
-              Invite · everyone
+              Invite · everyone ·{" "}
+              <span className={isNfl ? "text-blue-300" : "text-amber-200"}>
+                {isNfl ? "NFL" : "CFB"}
+              </span>
             </p>
             <p className="text-sm text-foreground font-medium truncate">
               Code{" "}
@@ -226,7 +244,10 @@ export default function InviteFriends({
       <div className="flex items-start justify-between gap-2 mb-1">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-1">
-            Spread the word · everyone
+            Spread the word · everyone ·{" "}
+            <span className={isNfl ? "text-blue-300" : "text-amber-200"}>
+              {isNfl ? "NFL" : "CFB"}
+            </span>
           </p>
           <h2 className="font-semibold mb-1">Bring your people</h2>
         </div>
@@ -240,10 +261,12 @@ export default function InviteFriends({
       </div>
       <p className="text-sm text-muted mb-3 leading-relaxed">
         <strong className="text-foreground">Every member</strong> can invite —
-        not just the commissioner. One tap shares a deep link (code already
-        filled in) plus a message that hits boomers, Gen X, millennials, dad
-        group chats, <em>and</em> the chaos thread. Pick a vibe or hit
-        Surprise me.
+        not just the commissioner. Messages always say{" "}
+        <strong className={isNfl ? "text-blue-300" : "text-amber-200"}>
+          {isNfl ? "NFL (pro football)" : "CFB (college football)"}
+        </strong>
+        {" — "}never the wrong sport. One tap shares a deep link plus a vibe for
+        boomers, Gen X, millennials, dad chats, or chaos. Surprise me randomizes.
       </p>
 
       <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center mb-3">
