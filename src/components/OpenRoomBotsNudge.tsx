@@ -1,9 +1,8 @@
 "use client";
 
 /**
- * When a commissioner lists an open room, nudge them to pad bots
- * so the league can hit clean bracket sizes (8 / 16 / 32).
- * Does not auto-add bots — just points to the pad-bots tools.
+ * When a commissioner lists an open room, nudge them to fill empty seats
+ * with bots (simple yes/no on Run the Room). Does not auto-add.
  */
 
 import Link from "next/link";
@@ -13,7 +12,7 @@ type Props = {
   onClose: () => void;
 };
 
-/** Deep link: Commish Settings → Pad league with bots */
+/** Deep link: Run the Room → Fill empty seats? */
 export const COMMISH_BOTS_HREF = "/commissioner?tab=settings#commish-bots";
 
 export default function OpenRoomBotsNudge({ open, onClose }: Props) {
@@ -49,27 +48,13 @@ export default function OpenRoomBotsNudge({ open, onClose }: Props) {
               Round out your numbers with bots?
             </h2>
             <p className="text-sm text-muted mt-2 leading-relaxed">
-              Open lobby seats real people first. If you want a full field for
-              brackets (sweet spot{" "}
-              <strong className="text-foreground">16</strong>, or{" "}
-              <strong className="text-foreground">8</strong> /{" "}
-              <strong className="text-foreground">32</strong>), you can pad{" "}
-              <strong className="text-foreground">empty seats only</strong> with
-              trial bots — never replaces humans.
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-border bg-background/80 px-3 py-3 text-xs text-muted leading-relaxed">
-            <p className="font-semibold text-foreground text-sm mb-1">
-              Where to go
-            </p>
-            <p>
-              Commish tools →{" "}
-              <strong className="text-foreground">Settings</strong> →{" "}
+              Real people join first. If you want a fuller room, one question
+              on Run the Room:{" "}
               <strong className="text-foreground">
-                Advanced · Pad league with bots
-              </strong>
-              . Fill to 16 is the usual move for dual brackets.
+                Fill empty seats with bots?
+              </strong>{" "}
+              Empty seats only — never replaces humans. Once the season starts,
+              bots stay (fairness).
             </p>
           </div>
 
@@ -79,7 +64,7 @@ export default function OpenRoomBotsNudge({ open, onClose }: Props) {
               onClick={onClose}
               className="w-full py-3.5 min-h-[52px] rounded-xl bg-primary text-black font-extrabold text-center flex items-center justify-center touch-manipulation"
             >
-              Take me to add bots
+              Yes — take me there
             </Link>
             <button
               type="button"

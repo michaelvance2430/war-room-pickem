@@ -100,8 +100,18 @@ export default function CommishWeekChecklist({
             actionTab: "card",
           },
           {
+            id: "bots",
+            label: "3. Fill empty seats? (optional)",
+            detail:
+              "Yes = filler bots toward a full room. No = humans only. Once the season starts, bots stay.",
+            why: "Empty seats only — never removes friends. Fairness lock after kickoff.",
+            // Optional — never blocks the host path
+            done: true,
+            actionTab: "settings",
+          },
+          {
             id: "locks",
-            label: "3. Get locks in",
+            label: "4. Get locks in",
             detail: hasCard
               ? `${completeLocks}/${expected || humans} fully locked · milk carton the rest`
               : "Publish a card first — then chase locks on Who’s in",
@@ -114,7 +124,7 @@ export default function CommishWeekChecklist({
           },
           {
             id: "score",
-            label: "4. Enter results & score",
+            label: "5. Enter results & score",
             detail: thisWeekScored
               ? `${weekTitle(w)} is scored`
               : hasCard
@@ -126,7 +136,7 @@ export default function CommishWeekChecklist({
           },
           {
             id: "vibe",
-            label: "5. Let the room cook",
+            label: "6. Let the room cook",
             detail:
               "Gazette, Locker, standings drama — the app does the theater after you score",
             why: "This is why they stay.",
