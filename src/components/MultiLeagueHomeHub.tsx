@@ -208,8 +208,6 @@ export default function MultiLeagueHomeHub({ onSwitched }: Props) {
       });
   }, [list, pulse, activeId]);
 
-  const multiSport = buckets.length >= 2;
-
   const scopedRooms = useMemo(() => {
     return (
       buckets.find((b) => b.sportId === scope)?.rooms ||
@@ -218,21 +216,7 @@ export default function MultiLeagueHomeHub({ onSwitched }: Props) {
     );
   }, [buckets, scope]);
 
-  const scopedNeeds = useMemo(() => {
-    return scopedRooms.filter(
-      (m) => m.leagueId !== activeId && pulse[m.leagueId]?.needsPicks
-    );
-  }, [scopedRooms, pulse, activeId]);
-
-  const activeInScope = useMemo(
-    () => scopedRooms.find((m) => m.leagueId === activeId) || null,
-    [scopedRooms, activeId]
-  );
-
   const scopePack = getSportPack(scope);
-
-  /** Show hub when 2+ rooms total, OR 2+ sports (edge), OR 2+ in same sport */
-  if (list.length < 2) return null;
 
   async function enterRoom(leagueId: string, goPicks: boolean) {
     if (busyId) return;
@@ -287,7 +271,7 @@ export default function MultiLeagueHomeHub({ onSwitched }: Props) {
     return "Switch anytime";
   }
 
-  // Hidden when only one room total — no switcher chrome at all
+  // No switcher chrome when you only have one room
   if (list.length < 2) return null;
 
   const needsTotal = buckets.reduce((n, b) => n + b.needsCount, 0);
