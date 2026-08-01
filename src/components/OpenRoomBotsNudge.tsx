@@ -2,7 +2,7 @@
 
 /**
  * When a commissioner lists an open room, nudge them to fill empty seats
- * with bots (simple yes/no on Run the Room). Does not auto-add.
+ * with bots (simple yes/no on Host). Does not auto-add.
  */
 
 import Link from "next/link";
@@ -12,7 +12,7 @@ type Props = {
   onClose: () => void;
 };
 
-/** Deep link: Run the Room → Fill empty seats? */
+/** Deep link: Host → Fill empty seats? */
 export const COMMISH_BOTS_HREF = "/commissioner?tab=settings#commish-bots";
 
 export default function OpenRoomBotsNudge({ open, onClose }: Props) {
