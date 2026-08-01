@@ -361,19 +361,32 @@ export default function AccountPage() {
 
           <div className="mt-5 pt-4 border-t border-border/60">
             <p className="text-xs text-muted mb-2 leading-relaxed">
-              Birthday (optional, MM-DD) — private. One quiet Gazette line if
-              you open the app that day. No points. Clear the field to remove.
+              Birthday (optional) — private. Type month and day; the dash fills
+              in for you (e.g. 0731 → 07-31). One quiet Gazette line if you open
+              the app that day. Clear the field to remove.
             </p>
             <label className="block text-xs text-muted mb-2">
               Birthday
               <input
                 type="text"
+                inputMode="numeric"
+                autoComplete="bday"
                 value={birthdayDraft}
-                onChange={(e) => setBirthdayDraft(e.target.value)}
+                onChange={(e) => {
+                  // Digits only → auto MM-DD (0731 → 07-31)
+                  const digits = e.target.value.replace(/\D/g, "").slice(0, 4);
+                  if (digits.length <= 2) {
+                    setBirthdayDraft(digits);
+                  } else {
+                    setBirthdayDraft(
+                      `${digits.slice(0, 2)}-${digits.slice(2)}`
+                    );
+                  }
+                }}
                 maxLength={5}
                 placeholder="MM-DD"
                 disabled={isGuestMode()}
-                className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-3 text-base text-foreground font-medium disabled:opacity-50"
+                className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-3 text-base text-foreground font-medium disabled:opacity-50 tracking-wide"
               />
             </label>
             <button
