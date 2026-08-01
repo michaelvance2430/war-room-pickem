@@ -217,23 +217,26 @@ export async function wipeLeagueTrophiesForSandbox(
 }
 
 export async function transferCommissioner(
-  newCommissionerUserId: string
+  newCommissionerUserId: string,
+  opts?: { leagueId?: string }
 ): Promise<{
   ok: boolean;
   error?: string;
   newCommissionerName?: string;
 }> {
   const session = getSession();
-  if (!session?.leagueId || !session.isCommissioner) {
-    return { ok: false, error: "Only the commissioner can pass the role" };
+  const leagueId = opts?.leagueId || session?.leagueId;
+  if (!leagueId) {
+    return { ok: false, error: "No league" };
   }
-  if (newCommissionerUserId === session.playerId) {
+  if (newCommissionerUserId === session?.playerId) {
     return { ok: false, error: "Pick someone else" };
   }
 
   const supabase = createClient();
+  // RPC enforces current commissioner — works from Account for any league you own
   const { data, error } = await supabase.rpc("transfer_commissioner", {
-    p_league_id: session.leagueId,
+    p_league_id: leagueId,
     p_new_commissioner_id: newCommissionerUserId,
   });
 
@@ -255,14 +258,16 @@ export async function transferCommissioner(
   const name =
     (row as { newCommissionerName?: string }).newCommissionerName || "Player";
 
-  // Demote local session so UI updates immediately
+  // Demote local session if this was the active league
   if (typeof window !== "undefined") {
     try {
       const raw = localStorage.getItem("warroom-session");
       if (raw) {
         const s = JSON.parse(raw) as Record<string, unknown>;
-        s.isCommissioner = false;
-        localStorage.setItem("warroom-session", JSON.stringify(s));
+        if (s.leagueId === leagueId) {
+          s.isCommissioner = false;
+          localStorage.setItem("warroom-session", JSON.stringify(s));
+        }
       }
     } catch {
       /* ignore */

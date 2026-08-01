@@ -399,7 +399,11 @@ export async function leaveLeague(leagueId: string): Promise<{ ok: boolean; erro
   return { ok: true };
 }
 
-/** Commissioner only — deletes the league (cascades memberships, cards, etc.) */
+/**
+ * Commissioner only — deletes the league (cascades memberships, cards, etc.).
+ * Mid-season with other humans: blocked (see league-delete-guard). Call
+ * evaluateLeagueDelete first; hard-delete only when canHardDelete is true.
+ */
 export async function deleteLeague(leagueId: string): Promise<{ ok: boolean; error?: string }> {
   const supabase = createClient();
   const { data: auth } = await supabase.auth.getUser();
@@ -413,6 +417,22 @@ export async function deleteLeague(leagueId: string): Promise<{ ok: boolean; err
 
   if (!league || league.commissioner_id !== auth.user.id) {
     return { ok: false, error: "Only the commissioner can delete this league" };
+  }
+
+  // Server-side belt: block nuke mid-season even if UI is bypassed
+  try {
+    const { evaluateLeagueDelete } = await import("./league-delete-guard");
+    const eval_ = await evaluateLeagueDelete(leagueId);
+    if (!eval_.canHardDelete) {
+      return {
+        ok: false,
+        error:
+          eval_.reason ||
+          "Mid-season rooms can't be deleted. Pass commissioner instead.",
+      };
+    }
+  } catch {
+    /* if eval fails, still allow delete only for empty rooms below */
   }
 
   const { error } = await supabase.from("leagues").delete().eq("id", leagueId);
