@@ -1553,7 +1553,7 @@ export default function PicksPage() {
               )}
               {weekEditable && canEditProp && !propChoice && (
                 <p className="text-[11px] text-warning mt-2">
-                  Tap one answer, then Save Picks.
+                  Tap one answer, then Lock it in.
                 </p>
               )}
             </div>
@@ -1567,21 +1567,21 @@ export default function PicksPage() {
                   className="w-full py-3.5 sm:py-3 rounded-xl bg-primary text-black text-base font-bold disabled:opacity-50 min-h-[52px] touch-manipulation shadow-lg shadow-primary/20"
                 >
                   {saving
-                    ? "Saving…"
+                    ? "Locking…"
                     : fullyLocked || chaosLockedWeek
                       ? chaosLockedWeek
                         ? "🔥 Chaos locked"
-                        : "Picks locked"
+                        : "Locked in"
                       : chaosArmed
                         ? "Lock Chaos card 🔥"
                         : saved
                           ? "Update open picks"
-                          : "Save / lock picks"}
+                          : "Lock it in"}
                 </button>
                 {!allGamesPicked && !fullyLocked && (
                   <p className="text-xs text-muted text-center mt-2 px-1">
                     Need: side + unique confidence on every open game, one Best
-                    Bet, and a prop (until first kickoff).
+                    Bet, and a bonus pick (until first kickoff).
                   </p>
                 )}
               </div>

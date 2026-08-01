@@ -78,6 +78,7 @@ export default function AccountPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
+  const [fullRoom, setFullRoom] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [playerView, setPlayerView] = useState(false);
@@ -101,6 +102,12 @@ export default function AccountPage() {
     setPlayerView(isViewAsPlayer());
     setActiveId(league?.id || session?.leagueId || null);
     setChaosTitleLock(isChaosTitleLocked(session?.playerId, league?.id));
+    try {
+      const { wantsFullRoom } = await import("@/lib/progressive-disclosure");
+      setFullRoom(wantsFullRoom(session?.playerId));
+    } catch {
+      setFullRoom(false);
+    }
     const profile = await loadMyProfile();
     if (profile) {
       setName(profile.displayName);
@@ -1043,6 +1050,35 @@ export default function AccountPage() {
               one.
             </p>
           </div>
+        </section>
+
+        <section className="rounded-xl border border-border bg-card p-5 space-y-3">
+          <h2 className="font-semibold">Room surface</h2>
+          <p className="text-xs text-muted leading-relaxed">
+            New seasons start simple (Picks · Board · Locker). Depth opens as
+            weeks roll. Turn this on if you already know the room and want
+            everything visible now.
+          </p>
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              className="mt-1 rounded border-border"
+              checked={fullRoom}
+              onChange={(e) => {
+                const on = e.target.checked;
+                setFullRoom(on);
+                void import("@/lib/progressive-disclosure").then((pd) => {
+                  pd.setWantsFullRoom(on, userId);
+                });
+              }}
+            />
+            <span className="text-sm text-foreground">
+              <span className="font-semibold">Show full room</span>
+              <span className="block text-xs text-muted mt-0.5">
+                Gazette, News, trophies, stats — no progressive hide
+              </span>
+            </span>
+          </label>
         </section>
 
         <FeedbackForm />

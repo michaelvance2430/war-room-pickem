@@ -169,38 +169,38 @@ export default function HomeWeekHero() {
     body = state.frozen
       ? "First kickoff hit. Sit tight for scores — then the Sunday / Monday Gazette drops. That’s the paper the room waits for."
       : `You’re locked before first kickoff${state.lockLabel ? ` (${state.lockLabel})` : ""}. Change nothing if you want First & Final.`;
-    // After freeze: Gazette is the appointment; standings still one tap away
-    primaryHref = state.frozen ? "/gazette" : "/standings";
-    primaryLabel = state.frozen ? "Gazette · the weekly paper" : "Standings";
+    // After freeze: paper is the appointment; board still one tap away
+    primaryHref = state.frozen ? "/gazette" : "/board";
+    primaryLabel = state.frozen ? "Read the paper" : "The Board";
     primaryClass = state.frozen
       ? "bg-red-700 text-white hover:bg-red-600 shadow-[0_0_24px_rgba(185,28,28,0.35)]"
       : "border border-primary/50 text-primary hover:bg-primary/10 bg-transparent";
-    secondaryHref = state.frozen ? "/standings" : "/gazette";
-    secondaryLabel = state.frozen ? "Standings" : "Gazette";
+    secondaryHref = state.frozen ? "/board" : "/locker-room";
+    secondaryLabel = state.frozen ? "The Board" : "Locker";
   } else if (state.frozen) {
     eyebrow = "Too late";
     title = `${weekLabel} already kicked off`;
     body =
       "First kickoff hit and you never locked — you score 0 this week. Don’t ghost next week.";
-    primaryHref = "/standings";
-    primaryLabel = "Standings";
+    primaryHref = "/board";
+    primaryLabel = "The Board";
     primaryClass =
       "border border-danger/50 text-danger hover:bg-danger/10 bg-transparent";
     secondaryHref = "/locker-room";
-    secondaryLabel = "Locker Room";
+    secondaryLabel = "Locker";
   } else {
     eyebrow = "Do this now";
-    title = `Make your ${weekLabel} picks`;
-    body = `Lock all ${state.gameCount || 5} games + Best Bet + prop before first kickoff${
+    title = `Lock in ${weekLabel}`;
+    body = `Pick all ${state.gameCount || 5} games, set confidence, then Lock it in before first kickoff${
       state.lockLabel ? ` (${state.lockLabel})` : ""
     }. After that the whole card freezes.`;
     primaryHref = "/picks";
-    primaryLabel = "Make my picks";
+    primaryLabel = "Lock it in";
     primaryClass = isNfl
       ? "bg-primary text-black hover:opacity-90 shadow-[0_0_24px_rgba(193,18,31,0.35)]"
       : "bg-primary text-black hover:opacity-90 shadow-[0_0_24px_rgba(34,197,94,0.25)]";
-    secondaryHref = "/rules";
-    secondaryLabel = "Quick rules";
+    secondaryHref = "/locker-room";
+    secondaryLabel = "Locker";
   }
 
   const glow = isNfl
