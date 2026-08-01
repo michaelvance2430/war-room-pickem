@@ -14,6 +14,7 @@ import {
 import Avatar from "@/components/Avatar";
 import RulesOnboardingModal from "@/components/RulesOnboardingModal";
 import GazetteModal from "@/components/GazetteModal";
+import GazetteShelfReveal from "@/components/GazetteShelfReveal";
 import BadgeUnlockModal from "@/components/BadgeUnlockModal";
 import SeasonCountdownTicker from "@/components/SeasonCountdownTicker";
 import SeasonOpenWelcome from "@/components/SeasonOpenWelcome";
@@ -47,6 +48,10 @@ import { nukeAccumulatedSandboxCareersOnce } from "@/lib/sandbox-wipe";
 import BrandMark from "@/components/BrandMark";
 import { normalizeSportId } from "@/lib/sports/registry";
 import { SPORT_THEME_EVENT } from "@/lib/sports/sport-theme";
+import {
+  EVENT_PROGRESSIVE,
+  loadProgressiveSnapshot,
+} from "@/lib/progressive-disclosure";
 
 type NavLink = {
   href: string;
@@ -77,6 +82,10 @@ export default function Nav() {
   const [sportIsWwc, setSportIsWwc] = useState(false);
   const [sportIsNfl, setSportIsNfl] = useState(false);
   const [playerPreview, setPlayerPreview] = useState(false);
+  /** Progressive disclosure — Gazette shelf after ~week 3 */
+  const [showGazetteNav, setShowGazetteNav] = useState(true);
+  const [showNewsNav, setShowNewsNav] = useState(true);
+  const [earlyNav, setEarlyNav] = useState(false);
 
   function refreshRoles() {
     setIsCommish(isCommissioner());
@@ -93,6 +102,29 @@ export default function Nav() {
     // Leave current page → Home as commissioner (invite code, hero, tiles)
     window.location.href = "/";
   }
+
+  useEffect(() => {
+    function syncProgressive() {
+      if (isGuestMode()) {
+        setShowGazetteNav(true);
+        setShowNewsNav(true);
+        setEarlyNav(false);
+        return;
+      }
+      void loadProgressiveSnapshot().then((snap) => {
+        setShowGazetteNav(snap.showGazetteShelf);
+        setShowNewsNav(snap.showNewsShelf);
+        setEarlyNav(snap.firstWeekChrome);
+      });
+    }
+    syncProgressive();
+    window.addEventListener(EVENT_PROGRESSIVE, syncProgressive);
+    window.addEventListener("warroom-first-week-progress", syncProgressive);
+    return () => {
+      window.removeEventListener(EVENT_PROGRESSIVE, syncProgressive);
+      window.removeEventListener("warroom-first-week-progress", syncProgressive);
+    };
+  }, [pathname]);
 
   useEffect(() => {
     const session = getSession();
@@ -271,49 +303,74 @@ export default function Nav() {
   }, [menuOpen, moreOpen]);
 
   // Primary: home first, then weekly habit loop
+  // Early: fewer links. Gazette shelf waits until ~week 3 (paper still pops).
   const primaryLinks: NavLink[] = [
     { href: "/", label: "Home" },
-    { href: "/picks", label: "My Picks" },
+    { href: "/picks", label: "Picks" },
     { href: "/board", label: "The Board" },
-    { href: "/standings", label: "Standings" },
+    // Standings = same idea as Board; hide early to avoid double chrome
+    ...(!earlyNav
+      ? [{ href: "/standings", label: "Standings" } as NavLink]
+      : []),
     { href: "/locker-room", label: "Locker", badge: lockerUnseen },
-    { href: "/gazette", label: "Gazette", badge: gazetteUnseen },
+    ...(showGazetteNav
+      ? [
+          {
+            href: "/gazette",
+            label: "Gazette",
+            badge: gazetteUnseen,
+          } as NavLink,
+        ]
+      : []),
     ...(ops
       ? [
           {
             href: "/commissioner",
-            label: isCommish ? "Commish" : "Ops",
+            label: isCommish ? "Run the Room" : "Ops",
             className: "text-primary",
           } as NavLink,
         ]
       : []),
   ];
 
-  // More: flavor + depth (still all there)
+  // More: flavor + depth (still all there — progressive hides primary only)
   const moreLinks: NavLink[] = [
     ...(crystalBallOn
       ? [{ href: "/crystal-ball", label: "Crystal Ball" }]
       : []),
-    { href: "/stats", label: "Stats" },
-    { href: "/announcements", label: "News", badge: unreadCount },
-    { href: "/players", label: "Players" },
-    { href: "/rules", label: "Rules" },
-    { href: "/championship", label: "Champ" },
-    {
-      href: "/toilet-bowl",
-      label: "Toilet",
-      className: "text-toilet hover:text-toilet",
-    },
-    {
-      href: "/trophy-room",
-      label: "Trophies",
-      className: "text-amber-300 hover:text-amber-200",
-    },
-    {
-      href: "/museum",
-      label: "Museum",
-      className: "text-amber-300 hover:text-amber-200",
-    },
+    ...(!earlyNav ? [{ href: "/stats", label: "Stats" } as NavLink] : []),
+    ...(showNewsNav
+      ? [{ href: "/announcements", label: "News", badge: unreadCount } as NavLink]
+      : []),
+    // Deep links available in More once core unlocked; early = rules + account only
+    ...(!earlyNav
+      ? [
+          { href: "/players", label: "Players" } as NavLink,
+          { href: "/championship", label: "Champ" } as NavLink,
+          {
+            href: "/toilet-bowl",
+            label: "Toilet",
+            className: "text-toilet hover:text-toilet",
+          } as NavLink,
+          {
+            href: "/trophy-room",
+            label: "Trophies",
+            className: "text-amber-300 hover:text-amber-200",
+          } as NavLink,
+          {
+            href: "/museum",
+            label: "Museum",
+            className: "text-amber-300 hover:text-amber-200",
+          } as NavLink,
+        ]
+      : []),
+    { href: "/rules", label: "How to play" },
+    // Always allow finding Gazette/News via More after unlock if not in primary
+    ...(!showGazetteNav
+      ? []
+      : earlyNav
+        ? [{ href: "/gazette", label: "Gazette", badge: gazetteUnseen } as NavLink]
+        : []),
     ...(staff
       ? [
           {
@@ -821,6 +878,7 @@ export default function Nav() {
       {!isGuestMode() && <ProfileBorderHydrator />}
       {!isGuestMode() && <RulesOnboardingModal />}
       <GazetteModal />
+      <GazetteShelfReveal />
       <BadgeUnlockModal />
       {/* Easter eggs — discoverable, zero points, never a secret menu */}
       {!isGuestMode() && <EasterEggHost />}

@@ -55,6 +55,8 @@ export default function Home() {
   const [codeCopied, setCodeCopied] = useState(false);
   /** Demote museum/lore/brackets until first lock or first scores */
   const [firstWeekChrome, setFirstWeekChrome] = useState(true);
+  /** Gazette / News shelf ~week 3 */
+  const [showGazetteShelf, setShowGazetteShelf] = useState(false);
 
   useEffect(() => {
     async function boot() {
@@ -82,6 +84,7 @@ export default function Home() {
           setActuallyCommish(isActuallyCommissioner());
           // Guest demo: show the full room (sandbox playground)
           setFirstWeekChrome(false);
+          setShowGazetteShelf(true);
           setReady(true);
           return;
         }
@@ -158,11 +161,13 @@ export default function Home() {
           /* ignore */
         }
         try {
-          const fw = await import("@/lib/first-week");
-          await fw.syncFirstWeekFromCloud(getSession()?.playerId);
-          setFirstWeekChrome(fw.isFirstWeekChrome(getSession()?.playerId));
+          const pd = await import("@/lib/progressive-disclosure");
+          const snap = await pd.loadProgressiveSnapshot(getSession()?.playerId);
+          setFirstWeekChrome(snap.firstWeekChrome);
+          setShowGazetteShelf(snap.showGazetteShelf);
         } catch {
           setFirstWeekChrome(false);
+          setShowGazetteShelf(true);
         }
         setReady(true);
       } catch (e: unknown) {
@@ -175,15 +180,19 @@ export default function Home() {
       setActuallyCommish(isActuallyCommissioner());
     }
     function onFirstWeek() {
-      void import("@/lib/first-week").then((fw) => {
-        setFirstWeekChrome(fw.isFirstWeekChrome(getSession()?.playerId));
+      void import("@/lib/progressive-disclosure").then(async (pd) => {
+        const snap = await pd.loadProgressiveSnapshot(getSession()?.playerId);
+        setFirstWeekChrome(snap.firstWeekChrome);
+        setShowGazetteShelf(snap.showGazetteShelf);
       });
     }
     window.addEventListener("warroom-view-as-player", onPreview);
     window.addEventListener("warroom-first-week-progress", onFirstWeek);
+    window.addEventListener("warroom-progressive-disclosure", onFirstWeek);
     return () => {
       window.removeEventListener("warroom-view-as-player", onPreview);
       window.removeEventListener("warroom-first-week-progress", onFirstWeek);
+      window.removeEventListener("warroom-progressive-disclosure", onFirstWeek);
     };
   }, [router]);
 
@@ -214,9 +223,10 @@ export default function Home() {
     setIsCommish(isCommissioner());
     setActuallyCommish(isActuallyCommissioner());
     try {
-      const fw = await import("@/lib/first-week");
-      await fw.syncFirstWeekFromCloud(getSession()?.playerId);
-      setFirstWeekChrome(fw.isFirstWeekChrome(getSession()?.playerId));
+      const pd = await import("@/lib/progressive-disclosure");
+      const snap = await pd.loadProgressiveSnapshot(getSession()?.playerId);
+      setFirstWeekChrome(snap.firstWeekChrome);
+      setShowGazetteShelf(snap.showGazetteShelf);
     } catch {
       setFirstWeekChrome(false);
     }
@@ -334,10 +344,10 @@ export default function Home() {
             One job:{" "}
             <strong className="text-foreground">
               {isCommish
-                ? "invite the crew + publish a card, then lock your picks"
-                : "lock your picks before kickoff"}
+                ? "invite the crew, post the card, then lock it in"
+                : "lock it in before kickoff"}
             </strong>
-            . Everything else waits.
+            . Talk shit in the Locker. Everything else opens as the season goes.
           </p>
         )}
 
@@ -371,17 +381,17 @@ export default function Home() {
         </p>
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           <Link
-            href="/standings"
+            href="/board"
             className="group rounded-xl border border-border/80 bg-black/40 backdrop-blur-sm p-6 hover:border-primary/50 hover:bg-primary/5 transition shadow-[0_0_40px_rgba(0,0,0,0.35)]"
           >
             <div className="text-xs uppercase tracking-wider text-muted mb-2">
-              Board
+              Who&apos;s winning
             </div>
             <div className="text-lg font-semibold text-white group-hover:text-primary transition">
-              Standings
+              The Board
             </div>
             <p className="text-sm text-muted mt-2">
-              Divisions · cut line · season points
+              Season points · divisions · cut line
             </p>
           </Link>
 
@@ -393,10 +403,12 @@ export default function Home() {
               Playbook
             </div>
             <div className="text-lg font-semibold text-white group-hover:text-primary transition">
-              Rules
+              How to play
             </div>
             <p className="text-sm text-muted mt-2">
-              Spreads · confidence · Best Bet · prop · how to save
+              {firstWeekChrome
+                ? "Spreads · confidence · lock it in"
+                : "Spreads · confidence · Best Bet · bonus · lock"}
             </p>
           </Link>
 
@@ -484,35 +496,54 @@ export default function Home() {
             </Link>
           )}
 
-          <Link
-            href="/announcements"
-            className="group rounded-xl border border-border/80 bg-black/40 backdrop-blur-sm p-6 hover:border-primary/50 hover:bg-primary/5 transition shadow-[0_0_40px_rgba(0,0,0,0.35)]"
-          >
-            <div className="text-xs uppercase tracking-wider text-muted mb-2 flex items-center justify-between gap-2">
-              <span>News</span>
-              <HomeTileUnseen kind="announcements" />
-            </div>
-            <div className="text-lg font-semibold text-white group-hover:text-primary transition">
-              Announcements
-            </div>
-            <p className="text-sm text-muted mt-2">
-              Commish posts · milk cartons · league notes
-            </p>
-          </Link>
+          {showGazetteShelf && (
+            <Link
+              href="/gazette"
+              className="group rounded-xl border border-red-700/40 bg-black/40 backdrop-blur-sm p-6 hover:border-red-500/60 hover:bg-red-950/30 transition shadow-[0_0_40px_rgba(185,28,28,0.12)]"
+            >
+              <div className="text-xs uppercase tracking-wider text-red-300/80 mb-2">
+                The paper
+              </div>
+              <div className="text-lg font-semibold text-red-200 group-hover:text-red-100 transition">
+                Gazette
+              </div>
+              <p className="text-sm text-muted mt-2">
+                Every week&apos;s headlines for the season
+              </p>
+            </Link>
+          )}
+
+          {showGazetteShelf && (
+            <Link
+              href="/announcements"
+              className="group rounded-xl border border-border/80 bg-black/40 backdrop-blur-sm p-6 hover:border-primary/50 hover:bg-primary/5 transition shadow-[0_0_40px_rgba(0,0,0,0.35)]"
+            >
+              <div className="text-xs uppercase tracking-wider text-muted mb-2 flex items-center justify-between gap-2">
+                <span>News</span>
+                <HomeTileUnseen kind="announcements" />
+              </div>
+              <div className="text-lg font-semibold text-white group-hover:text-primary transition">
+                League notes
+              </div>
+              <p className="text-sm text-muted mt-2">
+                Host posts · milk cartons · room updates
+              </p>
+            </Link>
+          )}
 
           <Link
             href="/locker-room"
             className="group rounded-xl border border-orange-400/30 bg-black/40 backdrop-blur-sm p-6 hover:border-orange-300/60 hover:bg-orange-500/10 transition shadow-[0_0_40px_rgba(249,115,22,0.08)]"
           >
             <div className="text-xs uppercase tracking-wider text-orange-300/70 mb-2 flex items-center justify-between gap-2">
-              <span>Noise</span>
+              <span>Talk shit</span>
               <HomeTileUnseen kind="locker" />
             </div>
             <div className="text-lg font-semibold text-orange-300">
               Locker Room
             </div>
             <p className="text-sm text-muted mt-2">
-              Short takes · emojis · pure shit talk
+              Short takes · emojis · pure noise
             </p>
           </Link>
 
@@ -522,10 +553,10 @@ export default function Home() {
               className="group rounded-xl border border-border/80 bg-black/40 backdrop-blur-sm p-6 hover:border-primary/50 hover:bg-primary/5 transition"
             >
               <div className="text-xs uppercase tracking-wider text-muted mb-2">
-                Ops
+                Host
               </div>
               <div className="text-lg font-semibold text-white group-hover:text-primary transition">
-                Commissioner tools
+                Run the Room
               </div>
               <p className="text-sm text-muted mt-2">
                 Card · results · settings
