@@ -75,13 +75,22 @@ export const LEGACY_PROFILE_HARDWARE: Omit<ProfileTrophy, "source">[] = [
     winnerName: "Kahmann",
   },
   {
+    id: "legacy-justin-strayer-toilet-2025",
+    kind: "toilet_bowl",
+    seasonYear: 2025,
+    title: "Toilet Bowl",
+    subtitle: "Bottom-half crown",
+    notes: "Still a crown. Wear it proudly.",
+    winnerName: "Justin Strayer",
+  },
+  {
     id: "legacy-bill-ball-ben-nerd-2025",
     kind: "crystal_ball",
     seasonYear: 2025,
     title: "Village Nerd Award",
     subtitle: "Crystal Ball prophet",
     notes: "Called the national champ. Zero standings points. Infinite smug.",
-    winnerName: "Bill ball Ben",
+    winnerName: "Big Ball Ben",
   },
 ];
 
@@ -92,7 +101,11 @@ const LEGACY_NAME_ALIASES: { pattern: RegExp; legacyId: string }[] = [
     legacyId: "legacy-kahmann-championship-2025",
   },
   {
-    pattern: /\bbill\s*ball\s*ben\b|\bbillballben\b/i,
+    pattern: /\bjustin\s+strayer\b|\bstrayer\b/i,
+    legacyId: "legacy-justin-strayer-toilet-2025",
+  },
+  {
+    pattern: /\bbig\s*ball\s*ben\b|\bbill\s*ball\s*ben\b|\bbillballben\b/i,
     legacyId: "legacy-bill-ball-ben-nerd-2025",
   },
 ];

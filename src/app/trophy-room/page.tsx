@@ -29,6 +29,7 @@ import type { ProfileTrophyKind } from "@/lib/profile-hardware";
 import { autoEngraveAllTrophies } from "@/lib/auto-trophies";
 import { divisionFromTrophyType } from "@/lib/division-champions";
 import { divisionDisplayLabel } from "@/lib/divisions";
+import { seedPriorSeason2025Trophies } from "@/lib/prior-season-seed";
 
 const BIG_TYPES: TrophyType[] = [
   "championship",
@@ -95,6 +96,30 @@ export default function TrophyRoomPage() {
       await reload();
     } catch (e) {
       setSyncMsg(e instanceof Error ? e.message : "Sync failed");
+    }
+    setBusy(false);
+  }
+
+  async function onImport2025() {
+    if (
+      !confirm(
+        "Engrave 2025 Excel season into this Trophy Room?\n\n" +
+          "· Championship → Kahmann\n" +
+          "· Toilet Bowl → Justin Strayer\n" +
+          "· Village Nerd → Big Ball Ben\n\n" +
+          "Safe to re-run. Links profiles when those names are in the roster."
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
+    setSyncMsg(null);
+    try {
+      const res = await seedPriorSeason2025Trophies();
+      setSyncMsg(res.message);
+      await reload();
+    } catch (e) {
+      setSyncMsg(e instanceof Error ? e.message : "Import failed");
     }
     setBusy(false);
   }
@@ -260,18 +285,33 @@ export default function TrophyRoomPage() {
           </p>
 
           {canSync && (
-            <div className="mt-4 flex flex-col sm:flex-row gap-2 sm:items-center">
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => void onSync()}
-                className="min-h-[44px] px-4 rounded-xl bg-primary text-black text-sm font-bold disabled:opacity-50"
-              >
-                {busy ? "Syncing…" : "Sync trophies now"}
-              </button>
-              <p className="text-[11px] text-muted">
-                Host only · re-runs auto-engrave for {year}
-              </p>
+            <div className="mt-4 flex flex-col gap-2">
+              <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void onSync()}
+                  className="min-h-[44px] px-4 rounded-xl bg-primary text-black text-sm font-bold disabled:opacity-50"
+                >
+                  {busy ? "Syncing…" : "Sync trophies now"}
+                </button>
+                <p className="text-[11px] text-muted">
+                  Host only · re-runs auto-engrave for {year}
+                </p>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void onImport2025()}
+                  className="min-h-[44px] px-4 rounded-xl border-2 border-amber-400/50 bg-amber-500/15 text-amber-100 text-sm font-bold disabled:opacity-50"
+                >
+                  {busy ? "Engraving…" : "Import 2025 season (Excel)"}
+                </button>
+                <p className="text-[11px] text-muted">
+                  Kahmann · Champ · Justin Strayer · Toilet · Big Ball Ben · Nerd
+                </p>
+              </div>
             </div>
           )}
           {syncMsg && (
