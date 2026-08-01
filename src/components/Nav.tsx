@@ -27,6 +27,7 @@ import JoinBadgeHydrator from "@/components/JoinBadgeHydrator";
 import EquippedTitleHydrator from "@/components/EquippedTitleHydrator";
 import ProfileBorderHydrator from "@/components/ProfileBorderHydrator";
 import EasterEggHost from "@/components/EasterEggHost";
+import EggFlexNewspaper from "@/components/EggFlexNewspaper";
 import MascotSighting from "@/components/MascotSighting";
 import { touchLastSeen } from "@/lib/last-seen";
 import { loadMyProfile } from "@/lib/profile";
@@ -823,6 +824,7 @@ export default function Nav() {
       <BadgeUnlockModal />
       {/* Easter eggs — discoverable, zero points, never a secret menu */}
       {!isGuestMode() && <EasterEggHost />}
+      {!isGuestMode() && <EggFlexNewspaper />}
       {!isGuestMode() && <MascotSighting />}
     </>
   );

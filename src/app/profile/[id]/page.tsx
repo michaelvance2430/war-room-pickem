@@ -52,11 +52,7 @@ import { findPlayer } from "@/lib/store";
 import { getLeague, getSession } from "@/lib/league";
 import { Player } from "@/lib/types";
 import type { LeagueTrophy } from "@/lib/trophies";
-import {
-  EVENT_EASTER_EGG,
-  EVENT_PASSPORT_STAMP,
-  getEasterEggProgress,
-} from "@/lib/easter-eggs";
+
 
 function initials(name: string) {
   return (
@@ -171,6 +167,25 @@ export default function ProfilePage() {
             applyLegacyBadgeGrants(found);
           } catch {
             /* ignore */
+          }
+          // Cloud easter eggs → permanent merge so shelf matches for viewers
+          try {
+            const { loadCloudEggFinds } = await import("@/lib/egg-cloud");
+            const { grantPermanentBadgeId, mergePermanentBadges } =
+              await import("@/lib/permanent-badges");
+            const eggIds = await loadCloudEggFinds(found.id);
+            for (const eid of eggIds) {
+              grantPermanentBadgeId(found.id, eid);
+            }
+            found = {
+              ...found,
+              permanentBadgeIds: mergePermanentBadges(
+                found.id,
+                found.permanentBadgeIds
+              ),
+            };
+          } catch {
+            /* SQL not run yet — local eggs still work for self */
           }
           found = withPermanentBadges(withCreatorFlag(found));
           // Profile peeker — viewing someone else
@@ -462,10 +477,6 @@ export default function ProfilePage() {
                   accent={isRecentlyActive(lastSeenAt)}
                 />
               </div>
-              {/* Easter egg tally — only after first real egg (not a secret menu) */}
-              {!mock && (
-                <EggProgressLine playerId={player.id} />
-              )}
               {isSelfProfile && !mock && (
                 <p className="text-[10px] text-muted mt-2 leading-relaxed">
                   Standings own season points. Hardware and the plot live here.
@@ -590,33 +601,6 @@ function Chip({
   );
 }
 
-/** Hidden until first real egg — then shows Easter eggs X / XX */
-function EggProgressLine({ playerId }: { playerId: string }) {
-  const [progress, setProgress] = useState(() =>
-    getEasterEggProgress(playerId)
-  );
 
-  useEffect(() => {
-    function refresh() {
-      setProgress(getEasterEggProgress(playerId));
-    }
-    refresh();
-    window.addEventListener(EVENT_EASTER_EGG, refresh);
-    window.addEventListener(EVENT_PASSPORT_STAMP, refresh);
-    return () => {
-      window.removeEventListener(EVENT_EASTER_EGG, refresh);
-      window.removeEventListener(EVENT_PASSPORT_STAMP, refresh);
-    };
-  }, [playerId]);
-
-  if (!progress.unlocked) return null;
-
-  return (
-    <p className="mt-2.5 inline-flex items-center gap-1.5 rounded-full border border-violet-400/40 bg-violet-500/15 px-2.5 py-1 text-[11px] font-bold text-violet-100 tabular-nums">
-      <span aria-hidden>🥚</span>
-      Easter eggs {progress.found} / {progress.total}
-    </p>
-  );
-}
 
 

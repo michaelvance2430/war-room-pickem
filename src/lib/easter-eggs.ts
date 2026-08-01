@@ -416,7 +416,7 @@ function emitMoment(moment: EasterEggMoment) {
   }
 }
 
-/** Grant discovery if new. Never awards points. */
+/** Grant discovery if new. Never awards pick'em points. Cloud + badge shelf. */
 export function grantDiscovery(
   playerId: string,
   discoveryId: string,
@@ -436,6 +436,45 @@ export function grantDiscovery(
     },
   ];
   saveEggState(playerId, state);
+
+  // Permanent badge so it shows on the shelf like other achievements
+  if (discoveryId.startsWith("egg_")) {
+    try {
+      const { grantPermanentBadgeId } = require("./permanent-badges") as typeof import("./permanent-badges");
+      grantPermanentBadgeId(playerId, discoveryId);
+    } catch {
+      /* ignore */
+    }
+    // Cloud + maybe Ready Player One flex (7 / 10 / full)
+    try {
+      const { getSession } = require("./league") as typeof import("./league");
+      const name =
+        getSession()?.playerName ||
+        opts?.note ||
+        "A player";
+      void import("./egg-cloud").then(({ syncEasterEggFindToCloud }) => {
+        void syncEasterEggFindToCloud({
+          discoveryId,
+          playerName: name,
+        }).then((res) => {
+          if (res.flexesInserted && res.flexesInserted > 0) {
+            try {
+              window.dispatchEvent(
+                new CustomEvent("warroom-egg-flex-check", {
+                  detail: res,
+                })
+              );
+            } catch {
+              /* ignore */
+            }
+          }
+        });
+      });
+    } catch {
+      /* ignore */
+    }
+  }
+
   if (!opts?.silent) {
     emitMoment({
       id: discoveryId,

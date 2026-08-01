@@ -358,6 +358,179 @@ export const BADGE_CATALOG: BadgeDef[] = [
     icon: "🪟",
   },
 
+  // —— Easter eggs (zero pick'em impact; viewable shelf; NO how-to spoilers) ——
+  {
+    id: "egg_anniversary",
+    name: "One Year of Bad Picks",
+    description: "Loyalty. Another lap around the sun in the room.",
+    howToEarn: "No spoilers. Curiosity only.",
+    tier: "rare",
+    points: 0,
+    icon: "🎉",
+  },
+  {
+    id: "egg_curiosity_trophy",
+    name: "Curiosity Didn't Kill the Cat",
+    description: "You found something on the hardware. Hands busy.",
+    howToEarn: "No spoilers. Curiosity only.",
+    tier: "rare",
+    points: 0,
+    icon: "🏆",
+  },
+  {
+    id: "egg_hidden_headline",
+    name: "Ink Stain",
+    description: "You caught a paper that shouldn't exist.",
+    howToEarn: "No spoilers. Curiosity only.",
+    tier: "rare",
+    points: 0,
+    icon: "📰",
+  },
+  {
+    id: "egg_leap_day",
+    name: "Time Traveler",
+    description: "The calendar winked. You were there.",
+    howToEarn: "No spoilers. Curiosity only.",
+    tier: "rare",
+    points: 0,
+    icon: "🌍",
+  },
+  {
+    id: "egg_birthday",
+    name: "Local Legend Aged Up",
+    description: "The desk noticed. Cake optional.",
+    howToEarn: "No spoilers. Curiosity only.",
+    tier: "rare",
+    points: 0,
+    icon: "🎂",
+  },
+  {
+    id: "egg_sibling_supremacy",
+    name: "Sibling Supremacy",
+    description: "A quiet family war. The room never said it out loud.",
+    howToEarn: "No spoilers. Curiosity only.",
+    tier: "epic",
+    points: 0,
+    icon: "🩸",
+  },
+  {
+    id: "egg_lucky_seven",
+    name: "Lucky Seven",
+    description: "Perfect timing. Zero standings help. Infinite smug.",
+    howToEarn: "No spoilers. Curiosity only.",
+    tier: "rare",
+    points: 0,
+    icon: "7️⃣",
+  },
+  {
+    id: "egg_obsession",
+    name: "Authorities Concerned",
+    description: "Daily devotion. Touch grass optional.",
+    howToEarn: "No spoilers. Curiosity only.",
+    tier: "epic",
+    points: 0,
+    icon: "🕵️",
+  },
+  {
+    id: "egg_halloween",
+    name: "Boo!",
+    description: "Seasonal energy. Spooky spreads only.",
+    howToEarn: "No spoilers. Curiosity only.",
+    tier: "rare",
+    points: 0,
+    icon: "👻",
+  },
+  {
+    id: "egg_christmas",
+    name: "Candy Cane Edition",
+    description: "Festive borders in spirit. Dignity not included.",
+    howToEarn: "No spoilers. Curiosity only.",
+    tier: "rare",
+    points: 0,
+    icon: "🎄",
+  },
+  {
+    id: "egg_thanksgiving",
+    name: "Gravy Boat",
+    description: "Thanks for locking. Pass the shame.",
+    howToEarn: "No spoilers. Curiosity only.",
+    tier: "rare",
+    points: 0,
+    icon: "🦃",
+  },
+  {
+    id: "egg_newyear",
+    name: "Resolution Already Broken",
+    description: "New year. Same card.",
+    howToEarn: "No spoilers. Curiosity only.",
+    tier: "rare",
+    points: 0,
+    icon: "✨",
+  },
+  {
+    id: "egg_three_peat",
+    name: "Dynasty Ink",
+    description: "Three straight. The ring remembered.",
+    howToEarn: "No spoilers. Curiosity only.",
+    tier: "epic",
+    points: 0,
+    icon: "💍",
+  },
+  {
+    id: "egg_never_give_up",
+    name: "Never Give Up",
+    description: "You noticed something quiet in the paper.",
+    howToEarn: "No spoilers. Curiosity only.",
+    tier: "epic",
+    points: 0,
+    icon: "🔤",
+  },
+  {
+    id: "egg_developer_thanks",
+    name: "Believer",
+    description: "The desk said thank you once. No explanation.",
+    howToEarn: "No spoilers. Curiosity only.",
+    tier: "rare",
+    points: 0,
+    icon: "🛠️",
+  },
+  {
+    id: "egg_impossible",
+    name: "???",
+    description: "???",
+    howToEarn: "???",
+    tier: "legendary",
+    points: 0,
+    icon: "❓",
+  },
+  {
+    id: "egg_mascot_scout",
+    name: "Mascot Spotter",
+    description: "You found the helmet. It will hide again.",
+    howToEarn: "No spoilers. Curiosity only.",
+    tier: "rare",
+    points: 0,
+    icon: "🪖",
+  },
+  {
+    id: "egg_veterans",
+    name: "The Veterans Have Returned",
+    description: "Long-timer energy. Small. Powerful.",
+    howToEarn: "No spoilers. Curiosity only.",
+    tier: "epic",
+    points: 0,
+    icon: "🫡",
+  },
+  {
+    id: "egg_welcome_home",
+    name: "Welcome Home",
+    description: "A decade in the room. Pure gratitude. No pad.",
+    howToEarn: "No spoilers. Curiosity only.",
+    tier: "legendary",
+    points: 0,
+    icon: "🏠",
+  },
+
   // —— Common ——
   {
     id: "first_blood",
@@ -1379,6 +1552,38 @@ function evaluateBadge(
       return {
         earned: hasPermanentBadge(player, "neighborhood_creeper"),
       };
+
+    // Easter eggs — permanent local + cloud cache (no spoilers in howToEarn)
+    case "egg_anniversary":
+    case "egg_curiosity_trophy":
+    case "egg_hidden_headline":
+    case "egg_leap_day":
+    case "egg_birthday":
+    case "egg_sibling_supremacy":
+    case "egg_lucky_seven":
+    case "egg_obsession":
+    case "egg_halloween":
+    case "egg_christmas":
+    case "egg_thanksgiving":
+    case "egg_newyear":
+    case "egg_three_peat":
+    case "egg_never_give_up":
+    case "egg_developer_thanks":
+    case "egg_impossible":
+    case "egg_mascot_scout":
+    case "egg_veterans":
+    case "egg_welcome_home": {
+      let cloud = false;
+      try {
+        const { hasCachedCloudEgg } = require("./egg-cloud") as typeof import("./egg-cloud");
+        cloud = hasCachedCloudEgg(player.id, badgeId);
+      } catch {
+        /* ignore */
+      }
+      return {
+        earned: hasPermanentBadge(player, badgeId) || cloud,
+      };
+    }
 
     case "first_blood":
     case "lock_it_in":
