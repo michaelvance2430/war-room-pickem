@@ -34,7 +34,7 @@ export const LEGACY_BADGE_GRANTS: LegacyBadgeGrant[] = [
     reason: "2025 Championship — War Room Legend",
   },
   {
-    pattern: /\bbill\s*ball\s*ben\b|\bbillballben\b/i,
+    pattern: /\bbig\s*ball\s*ben\b|\bbill\s*ball\s*ben\b|\bbillballben\b/i,
     badgeId: WAR_ROOM_LEGEND_ID,
     reason: "2025 Village Nerd — War Room Legend",
   },
