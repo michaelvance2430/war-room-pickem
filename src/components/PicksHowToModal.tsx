@@ -12,10 +12,15 @@ import {
   isPlayerTutorialActive,
   needsPlayerTutorial,
 } from "@/lib/player-tutorial";
+import {
+  isPicksPreOpenOddsWindowOpen,
+  hasSeenPicksPreOpenOddsNotice,
+} from "@/lib/picks-preopen-odds";
 
 /**
  * Picks cheat sheet — never on first-card quiet path or while the
  * walkthrough coach is running (coach + quiet banner are enough).
+ * Also yields to the one-time pre–Week 0 / Week 1 odds notice.
  */
 export default function PicksHowToModal() {
   const [open, setOpen] = useState(false);
@@ -26,6 +31,13 @@ export default function PicksHowToModal() {
     // First lock path already has quiet intro on the page
     if (isQuietPicksPath()) return;
     if (needsPlayerTutorial() || isPlayerTutorialActive()) return;
+    // Don't stack under the pre-open odds popup (that one is once-only first)
+    if (
+      isPicksPreOpenOddsWindowOpen() &&
+      !hasSeenPicksPreOpenOddsNotice()
+    ) {
+      return;
+    }
     const t = setTimeout(() => setOpen(true), 250);
     return () => clearTimeout(t);
   }, []);

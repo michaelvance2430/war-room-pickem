@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import Nav from "@/components/Nav";
 import PicksHowToModal from "@/components/PicksHowToModal";
+import PicksPreOpenOddsModal from "@/components/PicksPreOpenOddsModal";
 import FirstFinalModal from "@/components/FirstFinalModal";
 import PicksSavedModal, {
   type PicksSavedModalDetail,
@@ -1157,6 +1158,7 @@ export default function PicksPage() {
     return (
       <div className="min-h-screen flex flex-col">
         <Nav />
+        {!practiceMode && <PicksPreOpenOddsModal />}
         <PicksHowToModal />
         <main className="flex-1 flex items-center justify-center text-muted">
           Loading…
@@ -1168,6 +1170,7 @@ export default function PicksPage() {
   return (
     <div className="min-h-screen flex flex-col">
       <Nav />
+      {!practiceMode && <PicksPreOpenOddsModal />}
       <PicksHowToModal />
       <PicksSavedModal
         detail={picksSavedModal}
