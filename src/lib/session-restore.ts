@@ -72,7 +72,19 @@ export function writeSessionAndLeague(
     leagueId: membership.leagueId,
   };
 
-  const sportId = (membership.sportId || "cfb").trim() || "cfb";
+  let sportId = (membership.sportId || "cfb").trim() || "cfb";
+  try {
+    const { resolveLeagueSportId, pinLeagueSport } = require("./sports/sport-theme") as typeof import("./sports/sport-theme");
+    sportId = resolveLeagueSportId({
+      leagueId: membership.leagueId,
+      cloudSportId: membership.sportId,
+      localSportId: sportId,
+    });
+    // Persist desk stamp whenever we land in a room
+    pinLeagueSport(membership.leagueId, sportId);
+  } catch {
+    /* keep sportId */
+  }
   // NFL (and non-CFB packs) default Crystal Ball off unless cloud says otherwise
   const crystalBallEnabled =
     typeof membership.crystalBallEnabled === "boolean"
@@ -213,6 +225,37 @@ export async function fetchMyMemberships(): Promise<LeagueMembership[]> {
       sportId: (L.sport_id as string) || "cfb",
       isOpen: L.is_open === true,
     });
+  }
+
+  // Harden sport desks: durable stamps so logout doesn't drop NFL from the desk
+  try {
+    const {
+      resolveLeagueSportId,
+      reassertLeagueSportToCloud,
+    } = require("./sports/sport-theme") as typeof import("./sports/sport-theme");
+    for (const m of list) {
+      const cloudSport = m.sportId || "cfb";
+      const resolved = resolveLeagueSportId({
+        leagueId: m.leagueId,
+        cloudSportId: cloudSport,
+      });
+      m.sportId = resolved;
+      if (resolved === "nfl" || resolved === "soccer_wwc") {
+        // Don't inherit CFB crystal-ball default onto pro/event packs
+        if (m.crystalBallEnabled !== true) {
+          m.crystalBallEnabled = false;
+        }
+      }
+      // Cloud still default cfb while we know better → push stamp up
+      if (resolved !== "cfb" && cloudSport === "cfb") {
+        void reassertLeagueSportToCloud(
+          m.leagueId,
+          resolved as import("./sports/types").SportId
+        );
+      }
+    }
+  } catch {
+    /* ignore */
   }
 
   // Roster counts (humans vs bots) for clear multi-league scan
@@ -363,12 +406,19 @@ export async function switchToLeague(leagueId: string): Promise<boolean> {
   try {
     const { syncLeagueFromCloud } = await import("./league-sync");
     const { applySeasonTheme } = await import("./season-theme");
+    const {
+      reapplySportThemeFromLocal,
+      getLeagueSportIdFromLocal,
+    } = await import("./sports/sport-theme");
     const lg = await syncLeagueFromCloud();
-    if (lg?.sportId) {
-      void paintSportFromLeague(lg.sportId);
+    // Always paint from resolved local stamp (not a raw cloud cfb flash)
+    reapplySportThemeFromLocal();
+    const sport = getLeagueSportIdFromLocal() || lg?.sportId;
+    if (sport) {
+      void paintSportFromLeague(sport);
       try {
         const { setSportScope } = await import("./sport-room-scope");
-        setSportScope(lg.sportId);
+        setSportScope(sport);
       } catch {
         /* ignore */
       }
@@ -386,6 +436,7 @@ export async function signOutFully() {
   const supabase = createClient();
   await supabase.auth.signOut();
   if (canUseStorage()) {
+    // Keep warroom-league-sport-stamps-v1 — league sport desks must survive logout
     localStorage.removeItem(SESSION_KEY);
     // keep league list preference optional — clear active only
     localStorage.removeItem(ACTIVE_LEAGUE_KEY);

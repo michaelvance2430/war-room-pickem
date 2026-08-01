@@ -41,30 +41,34 @@ function toLocalLeague(row: {
   const prev = readPrevLocalLeague();
   const sameRoom = !!prev?.id && prev.id === row.id;
 
-  // Create pin wins (NFL create can briefly rehydrate DB default cfb).
+  // Durable resolve: create pin → cloud non-cfb → stamp → local (never lose NFL on login)
   let sportId = "cfb";
   try {
-    const { forcedSportForLeague } = require("./sports/sport-theme") as typeof import("./sports/sport-theme");
-    const forced = forcedSportForLeague(row.id);
-    if (forced) {
-      sportId = forced;
-    } else if (typeof row.sport_id === "string" && row.sport_id.trim()) {
-      sportId = row.sport_id.trim();
-      // Cloud default cfb must not clobber a just-written non-cfb local stamp
-      // for the same room (race: insert default → update nfl still in flight).
-      if (
-        sameRoom &&
-        prev?.sportId &&
-        prev.sportId !== "cfb" &&
-        sportId === "cfb" &&
-        prev.sportId !== sportId
-      ) {
-        sportId = prev.sportId;
-      }
-    } else if (sameRoom && prev?.sportId) {
-      sportId = prev.sportId;
-    } else if (prev?.sportId && prev.id === row.id) {
-      sportId = prev.sportId;
+    const {
+      resolveLeagueSportId,
+      reassertLeagueSportToCloud,
+    } = require("./sports/sport-theme") as typeof import("./sports/sport-theme");
+    const cloudSport =
+      typeof row.sport_id === "string" && row.sport_id.trim()
+        ? row.sport_id.trim()
+        : null;
+    const localSport =
+      sameRoom && prev?.sportId
+        ? prev.sportId
+        : prev?.id === row.id
+          ? prev?.sportId
+          : null;
+    sportId = resolveLeagueSportId({
+      leagueId: row.id,
+      cloudSportId: cloudSport,
+      localSportId: localSport,
+    });
+    // If stamp says NFL but cloud still default cfb, push up so logout stays correct
+    if (
+      sportId !== "cfb" &&
+      (!cloudSport || cloudSport === "cfb")
+    ) {
+      void reassertLeagueSportToCloud(row.id, sportId as import("./sports/types").SportId);
     }
   } catch {
     if (typeof row.sport_id === "string" && row.sport_id.trim()) {
