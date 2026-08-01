@@ -245,7 +245,9 @@ export default function InviteFriends({
               className="flex-1 sm:flex-none px-4 py-3 min-h-[48px] rounded-xl bg-primary text-black text-sm font-bold disabled:opacity-50 touch-manipulation"
               title={`Share ${isNfl ? "NFL" : "CFB"} invite for ${leagueName}`}
             >
-              {busy ? "…" : multiLeague ? `Share · ${isNfl ? "NFL" : "CFB"}` : "Share"}
+              {busy
+                ? "…"
+                : `Share · ${isNfl ? "NFL" : "CFB"}`}
             </button>
             <button
               type="button"
@@ -320,13 +322,11 @@ export default function InviteFriends({
         >
           {busy
             ? "Sharing…"
-            : multiLeague
-              ? `Share · ${isNfl ? "NFL" : "CFB"} · ${
-                  leagueName.length > 18
-                    ? `${leagueName.slice(0, 16)}…`
-                    : leagueName
-                }`
-              : "Share invite"}
+            : `Share · ${isNfl ? "NFL" : "CFB"} · ${
+                leagueName.length > 16
+                  ? `${leagueName.slice(0, 14)}…`
+                  : leagueName
+              }`}
         </button>
       </div>
 

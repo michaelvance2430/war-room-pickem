@@ -23,7 +23,6 @@ import {
   isCommissioner,
   isActuallyCommissioner,
 } from "@/lib/league";
-import { setViewAsPlayer } from "@/lib/view-as-player";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import {
   restoreSessionFromCloud,
@@ -38,6 +37,7 @@ import HomeSportHeader from "@/components/HomeSportHeader";
 import LeagueMembershipCard from "@/components/LeagueMembershipCard";
 import OpenRoomLeaveNudge from "@/components/OpenRoomLeaveNudge";
 import MultiLeagueHomeHub from "@/components/MultiLeagueHomeHub";
+import HomeRoomContext from "@/components/HomeRoomContext";
 
 export default function Home() {
   const router = useRouter();
@@ -291,94 +291,84 @@ export default function Home() {
         */}
         <MultiLeagueHomeHub
           onSwitched={() => {
-            // Full reload paints sport theme + week hero for the new room
             window.location.href = "/";
           }}
         />
 
-        <HomeSportHeader
-          chrome={homeChrome}
-          tagline={homeTagline}
-          leagueName={leagueName}
-          leagueCode={leagueCode}
-          isCommish={isCommish}
-          codeCopied={codeCopied}
-          onCopyCode={async () => {
-            if (!leagueCode) return;
-            try {
-              await navigator.clipboard.writeText(leagueCode);
-              setCodeCopied(true);
-              setTimeout(() => setCodeCopied(false), 2000);
-            } catch {
-              /* ignore */
-            }
-          }}
-        />
-
-        {/* Host first-hour spine (invite → publish → score) before anything else */}
-        <CommishSetupBanner />
-
-        {/* Cross-sport pool: “want NFL/CFB in a new room?” */}
-        <SportPoolPollBanner />
-
-        {/* Weekly paper ritual — unread splash or Sunday/Monday tease */}
-        <HomeGazetteSpotlight />
-
-        {/* One job first — make picks (or wait calmly) */}
-        <HomeWeekHero />
-
-        {/* Didn't lock? Sarcastic adulting reminder */}
-        <LockPicksRoast />
-
-        {/* Slim week checklist */}
-        <PlayerWeekChecklist />
-
-        {/* Unseen News + Locker */}
-        <HomeUnseenPulse />
-
-        {actuallyCommish && isCommish && (
-          <div className="mb-5 rounded-xl border border-warning/40 bg-warning/10 px-3 py-2.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <p className="text-xs sm:text-sm text-foreground">
-              <span className="font-bold text-warning">Host:</span> See the app
-              as a player?
-            </p>
-            <button
-              type="button"
-              onClick={() => {
-                setViewAsPlayer(true);
-                setIsCommish(false);
-                window.location.href = "/";
-              }}
-              className="shrink-0 px-4 py-2.5 min-h-[44px] rounded-lg bg-warning text-black text-xs font-bold touch-manipulation"
-            >
-              Player view →
-            </button>
-          </div>
+        {/* Sport skin — light; room identity is the strip below */}
+        {!firstWeekChrome && (
+          <HomeSportHeader
+            chrome={homeChrome}
+            tagline={homeTagline}
+            leagueName={null}
+            leagueCode={null}
+            isCommish={false}
+            codeCopied={codeCopied}
+            onCopyCode={async () => {
+              if (!leagueCode) return;
+              try {
+                await navigator.clipboard.writeText(leagueCode);
+                setCodeCopied(true);
+                setTimeout(() => setCodeCopied(false), 2000);
+              } catch {
+                /* ignore */
+              }
+            }}
+          />
         )}
 
-        {/* Invite — collapsed one-tap Share */}
+        {/* 1) Which room / sport / host — always clear */}
+        <HomeRoomContext
+          leagueName={leagueName}
+          sportId={sportId}
+          isCommish={isCommish}
+          actuallyCommish={actuallyCommish}
+          leagueCode={leagueCode}
+        />
+
+        {/* 2) ONE primary job — not buried under banners */}
+        <HomeWeekHero />
+
+        {firstWeekChrome && (
+          <p className="text-xs text-muted mb-4 leading-relaxed max-w-xl -mt-2">
+            One job:{" "}
+            <strong className="text-foreground">
+              {isCommish
+                ? "invite the crew + publish a card, then lock your picks"
+                : "lock your picks before kickoff"}
+            </strong>
+            . Everything else waits.
+          </p>
+        )}
+
+        {/* Host first-hour spine only */}
+        <CommishSetupBanner />
+
+        {/* Invite = same room as context strip */}
         <div className="mb-5">
           <InviteFriends />
         </div>
 
-        <section className="mb-6">
-          <HotTakeTicker variant="warroom" />
-        </section>
-
-        <section className="mb-8 sm:mb-10">
-          <CrownAndShame />
-        </section>
+        {/* Secondary room life — after first lock week only */}
+        {!firstWeekChrome && (
+          <>
+            <SportPoolPollBanner />
+            <HomeGazetteSpotlight />
+            <LockPicksRoast />
+            <PlayerWeekChecklist />
+            <HomeUnseenPulse />
+            <section className="mb-6">
+              <HotTakeTicker variant="warroom" />
+            </section>
+            <section className="mb-8 sm:mb-10">
+              <CrownAndShame />
+            </section>
+          </>
+        )}
 
         <p className="text-[10px] uppercase tracking-[0.18em] text-muted mb-3 font-semibold">
-          {firstWeekChrome ? "This week’s job" : "The rest of the room"}
+          {firstWeekChrome ? "Quick links" : "The rest of the room"}
         </p>
-        {firstWeekChrome && (
-          <p className="text-xs text-muted mb-3 leading-relaxed max-w-xl">
-            Lock your picks first. Stats, brackets, trophy room, and lore open
-            up once you&apos;ve played a week — they&apos;re destinations, not
-            homework on day one.
-          </p>
-        )}
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           <Link
             href="/standings"
