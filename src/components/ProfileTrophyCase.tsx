@@ -15,7 +15,7 @@ import {
   EVENT_EASTER_EGG,
   recordTrophyTap,
 } from "@/lib/easter-eggs";
-import SportChampionshipTrophy from "@/components/SportChampionshipTrophy";
+import HardwareTrophyIcon from "@/components/HardwareTrophyIcon";
 
 function Plaque({
   item,
@@ -59,15 +59,12 @@ function Plaque({
             if (item.kind === "championship") onTrophyTap?.();
           }}
         >
-          {item.kind === "championship" ? (
-            <SportChampionshipTrophy
-              sport={sportId}
-              size={48}
-              animate={false}
-            />
-          ) : (
-            <span className="text-2xl">{meta.emoji}</span>
-          )}
+          <HardwareTrophyIcon
+            kind={item.kind}
+            sportId={sportId}
+            size={item.kind === "championship" ? 52 : 48}
+            animate={false}
+          />
         </button>
         {canShare && <TrophyShareButton compact trophy={sharePayload} />}
       </div>
@@ -130,15 +127,13 @@ function EmptySlot({
           if (kind === "championship") onTrophyTap?.();
         }}
       >
-        {kind === "championship" ? (
-          <SportChampionshipTrophy
-            sport={sportId}
-            size={40}
-            animate={false}
-          />
-        ) : (
-          <span className="text-2xl">{meta.emoji}</span>
-        )}
+        <HardwareTrophyIcon
+          kind={kind}
+          sportId={sportId}
+          size={40}
+          empty
+          animate={false}
+        />
       </button>
       <div className="text-[10px] uppercase tracking-wide text-muted">
         {kind === "championship"

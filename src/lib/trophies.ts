@@ -48,8 +48,9 @@ export const TROPHY_META: Record<
   crystal_ball: {
     title: "Village Nerd Award",
     short: "Nerd",
-    emoji: "🔮",
-    blurb: "Crystal Ball national champ pick. Zero points. Infinite smug.",
+    emoji: "🧠",
+    blurb:
+      "Big Brain Nerd Cup — crystal ball, textbooks, glasses. Zero points. Infinite smug.",
     accent: "text-sky-300",
     border: "border-sky-400/40",
     glow: "shadow-[0_0_40px_rgba(56,189,248,0.1)]",

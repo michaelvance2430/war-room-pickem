@@ -17,7 +17,7 @@ import {
   type FinaleSlide,
 } from "@/lib/season-finale";
 import TrophyShareButton from "@/components/TrophyShareButton";
-import SportChampionshipTrophy from "@/components/SportChampionshipTrophy";
+import HardwareTrophyIcon from "@/components/HardwareTrophyIcon";
 import type { ProfileTrophyKind } from "@/lib/profile-hardware";
 import { isGuestMode } from "@/lib/guest-mode";
 import { isOpeningWeekLive } from "@/components/RingCeremonyModal";
@@ -172,11 +172,14 @@ export default function SeasonFinaleModal() {
 
         <div className="px-5 pb-5 space-y-4">
           <div className="text-center pt-2">
-            {slide.kind === "championship" ? (
+            {slide.kind === "championship" ||
+            slide.kind === "toilet_bowl" ||
+            slide.kind === "crystal_ball" ? (
               <div className="flex justify-center mb-2">
-                <SportChampionshipTrophy
-                  sport={getLeague()?.sportId}
-                  size={140}
+                <HardwareTrophyIcon
+                  kind={slide.kind}
+                  sportId={getLeague()?.sportId}
+                  size={slide.kind === "championship" ? 140 : 128}
                   animate
                 />
               </div>

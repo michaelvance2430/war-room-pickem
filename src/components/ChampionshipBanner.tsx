@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { buildChampionshipBanner } from "@/lib/player-history";
 import type { LeagueTrophy } from "@/lib/trophies";
-import SportChampionshipTrophy from "@/components/SportChampionshipTrophy";
+import HardwareTrophyIcon from "@/components/HardwareTrophyIcon";
 
 type Props = {
   trophies: LeagueTrophy[];
@@ -43,8 +43,9 @@ export default function ChampionshipBanner({
       <div className="relative">
         <div className="flex items-start gap-4 mb-4">
           <div className="shrink-0 hidden sm:block">
-            <SportChampionshipTrophy
-              sport={sportId}
+            <HardwareTrophyIcon
+              kind="championship"
+              sportId={sportId}
               size={72}
               animate={rows.length > 0}
             />
@@ -94,8 +95,9 @@ export default function ChampionshipBanner({
                 }`}
               >
                 <span className="shrink-0 w-9 h-9 flex items-center justify-center">
-                  <SportChampionshipTrophy
-                    sport={sportId}
+                  <HardwareTrophyIcon
+                    kind="championship"
+                    sportId={sportId}
                     size={36}
                     animate={false}
                   />
