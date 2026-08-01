@@ -96,6 +96,11 @@ export type GazetteEdition = {
    * Rendered as a subtle highlight — never explained in UI chrome.
    */
   secretLetter?: string | null;
+  /**
+   * Cut-lock week only: conference / division champions (SEC, AFC East, …).
+   * Auto-engraved to Trophy Room the same night.
+   */
+  conferenceChampions?: GazetteStory[] | null;
 };
 
 /** Sidebar / “also in this paper” bit */
@@ -921,6 +926,34 @@ export async function buildGazetteEdition(
     chaosDetonation = null;
   }
 
+  // Cut-lock week: conference / division champs — Gazette splash + Trophy Room
+  let conferenceChampions: GazetteStory[] | null = null;
+  try {
+    const {
+      shouldSplashConferenceChamps,
+      computeDivisionChampions,
+      buildConferenceChampionStories,
+      engraveDivisionChampions,
+    } = await import("./division-champions");
+    const sportNow = getLeague()?.sportId || "cfb";
+    if (shouldSplashConferenceChamps(weekIndex, sportNow)) {
+      const champs = computeDivisionChampions(players, sportNow);
+      if (champs.length) {
+        conferenceChampions = buildConferenceChampionStories(champs, {
+          sportId: sportNow,
+          weekIndex,
+          seasonYear: defaultSeasonYear(),
+        });
+        // Auto-engrave (ops / host scoring path)
+        await engraveDivisionChampions(players, {
+          weekNumber: weekIndex,
+        });
+      }
+    }
+  } catch {
+    conferenceChampions = null;
+  }
+
   // Biggest climber / freefall for the paper's "Movers" box
   let swing: GazetteStory | null = null;
   try {
@@ -1144,9 +1177,14 @@ export async function buildGazetteEdition(
       crystalBallMiss: null, // no Crystal Ball in NFL packs by default
       swing: nflSwing,
       chaosDetonation,
+      conferenceChampions,
       sportId: "nfl",
-      stampLine: "Extra · Extra",
-      eventLine: "Pro football · primetime desk · not college",
+      stampLine: conferenceChampions?.length
+        ? "DIVISION CLINCH · EXTRA"
+        : "Extra · Extra",
+      eventLine: conferenceChampions?.length
+        ? "Division titles locked · engraved in the Trophy Room"
+        : "Pro football · primetime desk · not college",
       rareEgg: eggs.rareEgg,
       secretLetter: eggs.secretLetter,
     };
@@ -1222,6 +1260,7 @@ export async function buildGazetteEdition(
       crystalBallMiss,
       swing,
       chaosDetonation,
+      conferenceChampions: null,
       sportId: "soccer_wwc",
       stampLine: "EXTRA!",
       eventLine: "FIFA Women's World Cup Brazil 2027™ · War Room desk",
@@ -1270,11 +1309,17 @@ export async function buildGazetteEdition(
   return {
     weekIndex,
     weekLabel,
-    volumeLabel: `${ritualName} · Vol. ${weekIndex + 1} · ${weekLabel} · ${year}`,
+    volumeLabel: conferenceChampions?.length
+      ? `CONFERENCE CHAMPS EXTRA · Vol. ${weekIndex + 1} · ${weekLabel} · ${year}`
+      : `${ritualName} · Vol. ${weekIndex + 1} · ${weekLabel} · ${year}`,
     masthead: "THE WAR ROOM GAZETTE",
     ritualName,
-    tagline,
-    printedLine,
+    tagline: conferenceChampions?.length
+      ? "CONFERENCE TITLE NIGHT · the paper that yells in all caps (affectionately)"
+      : tagline,
+    printedLine: conferenceChampions?.length
+      ? `CONFERENCE CHAMPS · ${weekLabel.toUpperCase()} · ${year} · ${leagueName.toUpperCase()} · ENGRAVED IN THE TROPHY ROOM`
+      : printedLine,
     weather,
     classifieds,
     pullQuote,
@@ -1287,9 +1332,14 @@ export async function buildGazetteEdition(
     crystalBallMiss,
     swing,
     chaosDetonation,
+    conferenceChampions,
     sportId: "cfb",
-    stampLine: "Extra · Extra",
-    eventLine: undefined,
+    stampLine: conferenceChampions?.length
+      ? "CONFERENCE CHAMPS · EXTRA"
+      : "Extra · Extra",
+    eventLine: conferenceChampions?.length
+      ? "Titles locked · auto-engraved in the Trophy Room"
+      : undefined,
     rareEgg: eggs.rareEgg,
     secretLetter: eggs.secretLetter,
   };
@@ -1297,6 +1347,12 @@ export async function buildGazetteEdition(
 
 /** One-tap share / paste into the group chat. */
 export function formatGazetteShareText(edition: GazetteEdition): string {
+  const confLines =
+    edition.conferenceChampions?.flatMap((c) => [
+      `🛡️ ${c.headline}`,
+      c.deck,
+      "",
+    ]) || [];
   const lines = [
     `📰 ${edition.masthead}`,
     edition.ritualName
@@ -1304,6 +1360,7 @@ export function formatGazetteShareText(edition: GazetteEdition): string {
       : edition.volumeLabel,
     edition.tagline,
     "",
+    ...confLines,
     `★ ${edition.crown.headline}`,
     edition.crown.deck,
     "",

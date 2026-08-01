@@ -99,15 +99,20 @@ const LEGACY_NAME_ALIASES: { pattern: RegExp; legacyId: string }[] = [
 
 function leagueToProfile(t: LeagueTrophy): ProfileTrophy {
   const meta = TROPHY_META[t.trophyType];
+  const isDiv =
+    typeof t.trophyType === "string" && t.trophyType.startsWith("division_");
   return {
     id: t.id,
-    kind: t.trophyType,
+    kind: isDiv ? "division" : (t.trophyType as ProfileTrophyKind),
     seasonYear: t.seasonYear,
-    title: meta?.title || t.trophyType,
+    title: isDiv
+      ? t.subtitle || meta?.title || "Conference Champions"
+      : meta?.title || t.trophyType,
     subtitle: t.subtitle,
     notes: t.notes,
     winnerName: t.winnerName,
     source: "league",
+    division: isDiv ? t.subtitle : null,
   };
 }
 
@@ -130,8 +135,8 @@ export function getProfileHardware(opts: {
     const byName = namesMatch(t.winnerName, playerName);
     if (!byId && !byName) continue;
     const row = leagueToProfile(t);
-    // Dedupe kind+year
-    const key = `${row.kind}:${row.seasonYear}`;
+    // Dedupe kind+year (+ subtitle for multi division titles)
+    const key = `${row.kind}:${row.seasonYear}:${row.subtitle || row.title}`;
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(row);
