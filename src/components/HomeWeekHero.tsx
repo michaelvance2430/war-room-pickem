@@ -31,6 +31,8 @@ type HeroState = {
   iLocked: boolean;
   rosterCount: number;
   scoredWeeks: number;
+  /** Active week already scored? */
+  weekScored: boolean;
   isCommish: boolean;
   isOps: boolean;
   leagueCode: string | null;
@@ -110,6 +112,7 @@ export default function HomeWeekHero() {
           iLocked,
           rosterCount: humans.length,
           scoredWeeks: scored.length,
+          weekScored: scored.includes(week),
           isCommish: isCommissioner(),
           isOps: isOps(),
           leagueCode: getLeague()?.code || null,
@@ -238,6 +241,28 @@ export default function HomeWeekHero() {
       : "bg-primary text-black hover:opacity-90 shadow-[0_0_24px_rgba(34,197,94,0.25)]";
     secondaryHref = "/locker-room";
     secondaryLabel = "Locker";
+  }
+
+  // Later weeks only (first score lives on CommishSetupBanner — no twin green buttons).
+  // Host: after the room has scored at least once, push score when this week is still open.
+  if (
+    state.isOps &&
+    state.hasCard &&
+    !state.weekScored &&
+    state.scoredWeeks > 0 &&
+    (state.frozen || state.iLocked)
+  ) {
+    eyebrow = "Host · your one job";
+    title = `Score ${weekLabel} when the games die`;
+    body =
+      "Card’s in. One tap grades the room and drops the paper. Don’t leave them hanging.";
+    primaryHref = "/commissioner?tab=results";
+    primaryLabel = `Score ${weekLabel} →`;
+    primaryClass = isNfl
+      ? "bg-primary text-black hover:opacity-90 shadow-[0_0_24px_rgba(193,18,31,0.35)]"
+      : "bg-primary text-black hover:opacity-90 shadow-[0_0_24px_rgba(34,197,94,0.25)]";
+    secondaryHref = "/board";
+    secondaryLabel = "The Board";
   }
 
   const glow = isNfl

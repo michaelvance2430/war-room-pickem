@@ -38,7 +38,7 @@ import LeagueMembershipCard from "@/components/LeagueMembershipCard";
 import OpenRoomLeaveNudge from "@/components/OpenRoomLeaveNudge";
 import MultiLeagueHomeHub from "@/components/MultiLeagueHomeHub";
 import HomeRoomContext from "@/components/HomeRoomContext";
-import HomeHostScoreStrip from "@/components/HomeHostScoreStrip";
+
 import SoftUnlockBanner from "@/components/SoftUnlockBanner";
 import BoredLameSandboxCta from "@/components/BoredLameSandboxCta";
 import SandboxSimBanner from "@/components/SandboxSimBanner";
@@ -362,14 +362,11 @@ export default function Home() {
         {/* Pre–Week 0: sarcastic practice escape when nothing real is up */}
         <BoredLameSandboxCta />
 
-        {/* Host first-hour spine (invite → card → FIRST score). One green score CTA. */}
+        {/* Host first-hour spine (invite → card → FIRST score). Single score CTA — no strip twin. */}
         <CommishSetupBanner />
 
         {/* One-time: first lock opened the full room */}
         <SoftUnlockBanner />
-
-        {/* Later weeks only — never shows while league has 0 scored weeks */}
-        <HomeHostScoreStrip />
 
         {firstWeekChrome && (
           <p className="text-xs text-muted mb-4 leading-relaxed max-w-xl -mt-1">
