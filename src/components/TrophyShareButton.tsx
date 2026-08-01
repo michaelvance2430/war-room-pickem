@@ -53,7 +53,13 @@ export default function TrophyShareButton({
   }, [open, trophy]);
 
   async function run(
-    mode: "native" | "download" | "copy_caption" | "facebook" | "instagram"
+    mode:
+      | "native"
+      | "download"
+      | "copy_caption"
+      | "copy_image"
+      | "facebook"
+      | "instagram"
   ) {
     setBusy(true);
     setStatus(null);
@@ -61,10 +67,16 @@ export default function TrophyShareButton({
       const result = await shareTrophyToSocial(trophy, mode);
       if (result === "shared") {
         setStatus("Shared — go flex 🔥");
+      } else if (result === "image_copied") {
+        setStatus("Image copied — paste into Texts / Messages");
       } else if (result === "copied") {
         setStatus("Caption copied — paste under your post");
       } else if (result === "downloaded") {
-        if (mode === "instagram") {
+        if (mode === "copy_image") {
+          setStatus(
+            "Clipboard blocked — image downloaded. Attach it in your text thread."
+          );
+        } else if (mode === "instagram") {
           setStatus(
             "Image saved + caption copied — open IG → New post / Story → paste caption"
           );
@@ -78,13 +90,13 @@ export default function TrophyShareButton({
       } else if (result === "cancelled") {
         setStatus(null);
       } else {
-        setStatus("Couldn’t share — try Download or Copy caption");
+        setStatus("Couldn’t share — try Copy image or Download");
       }
     } catch {
-      setStatus("Something went wrong — try Download image");
+      setStatus("Something went wrong — try Copy image or Download");
     }
     setBusy(false);
-    if (mode !== "copy_caption") {
+    if (mode !== "copy_caption" && mode !== "copy_image") {
       setTimeout(() => setStatus(null), 5000);
     }
   }
@@ -158,7 +170,9 @@ export default function TrophyShareButton({
               <p className="text-center text-xs text-muted leading-relaxed px-2">
                 Unique picture + write-up for{" "}
                 <strong className="text-foreground">{pack.shortLabel}</strong>.
-                On phones, Share opens IG / FB / Messages with the image.
+                On phones, Share opens IG / FB / Messages.{" "}
+                <strong className="text-foreground">Copy image</strong> pastes
+                straight into a text thread.
               </p>
 
               {/* Primary actions */}
@@ -189,6 +203,14 @@ export default function TrophyShareButton({
                     Facebook
                   </button>
                 </div>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void run("copy_image")}
+                  className="w-full py-3 rounded-xl border-2 border-primary/50 bg-primary/10 text-primary font-bold text-sm disabled:opacity-50 min-h-[48px]"
+                >
+                  {busy ? "Working…" : "Copy image (for text)"}
+                </button>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"

@@ -18,9 +18,19 @@ export type GazetteSharePack = {
 export type GazetteShareResult =
   | "shared"
   | "copied"
+  | "image_copied"
   | "downloaded"
   | "failed"
   | "cancelled";
+
+export type GazetteShareMode =
+  | "native"
+  | "download"
+  | "copy_caption"
+  | "copy_text"
+  | "copy_image"
+  | "facebook"
+  | "instagram";
 
 function appOrigin(): string {
   if (typeof window !== "undefined" && window.location?.origin) {
@@ -379,13 +389,39 @@ function downloadBlob(blob: Blob, filename: string) {
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
+/** Copy PNG for paste into Texts / Messages (Safari needs Promise form often). */
+async function copyPngBlobToClipboard(blob: Blob): Promise<boolean> {
+  if (typeof navigator === "undefined" || !navigator.clipboard?.write) {
+    return false;
+  }
+  if (typeof ClipboardItem === "undefined") return false;
+  try {
+    await navigator.clipboard.write([
+      new ClipboardItem({ "image/png": blob }),
+    ]);
+    return true;
+  } catch {
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          "image/png": Promise.resolve(blob),
+        } as Record<string, ClipboardItemData>),
+      ]);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
 /**
  * Prefer native share with image (IG/FB/Messages on phone).
  * FB/IG web buttons: download image + caption, open app.
+ * copy_image: plain PNG on clipboard for texting.
  */
 export async function shareGazetteToSocial(
   edition: GazetteEdition,
-  mode: "native" | "download" | "copy_caption" | "facebook" | "instagram" | "copy_text"
+  mode: GazetteShareMode
 ): Promise<GazetteShareResult> {
   const pack = buildGazetteSharePack(edition);
 
@@ -401,6 +437,13 @@ export async function shareGazetteToSocial(
   const canvas = renderGazetteShareCanvas(edition);
   const blob = await canvasToPngBlob(canvas);
   const file = new File([blob], pack.filename, { type: "image/png" });
+
+  if (mode === "copy_image") {
+    const ok = await copyPngBlobToClipboard(blob);
+    if (ok) return "image_copied";
+    downloadBlob(blob, pack.filename);
+    return "downloaded";
+  }
 
   if (mode === "download") {
     downloadBlob(blob, pack.filename);
