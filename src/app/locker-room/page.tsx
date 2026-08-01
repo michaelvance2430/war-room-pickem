@@ -22,7 +22,6 @@ import {
   amILockerMuted,
   deleteLockerMessage,
   formatLockerTime,
-  isLockerReactionsReady,
   loadLockerMessages,
   postLockerMessage,
   toggleLockerReaction,
@@ -59,8 +58,6 @@ export default function LockerRoomPage() {
   /** Which message has the reaction picker open */
   const [reactPickerFor, setReactPickerFor] = useState<string | null>(null);
   const [reactBusyId, setReactBusyId] = useState<string | null>(null);
-  /** DB table locker_message_reactions missing on this project */
-  const [reactionsNeedSetup, setReactionsNeedSetup] = useState(false);
   const [reactError, setReactError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const lastPostAt = useRef(0);
@@ -94,9 +91,6 @@ export default function LockerRoomPage() {
     markLockerSeen();
     void refreshStaffSessionFlags().then(() => setStaff(isStaff()));
     void amILockerMuted().then(setMuted);
-    void isLockerReactionsReady().then((ready) => {
-      if (!ready) setReactionsNeedSetup(true);
-    });
     reload().finally(() => setLoading(false));
     void loadLeagueRoster().then((rows) => {
       setRoster(
@@ -263,22 +257,41 @@ export default function LockerRoomPage() {
       setPostError("You’re muted — reactions are off too.");
       return;
     }
-    if (reactionsNeedSetup) {
-      setReactError(
-        "Reactions aren’t live yet — the buttons show, but the DB table is missing. Founder: run supabase/locker-reactions.sql in Supabase SQL Editor."
-      );
-      return;
-    }
     setReactBusyId(messageId);
     setReactError(null);
     setPostError(null);
+    // Optimistic: show the emoji immediately so taps feel real
+    setMessages((prev) =>
+      prev.map((m) => {
+        if (m.id !== messageId) return m;
+        const list = [...(m.reactions || [])];
+        const i = list.findIndex((r) => r.emoji === emoji);
+        if (i >= 0) {
+          const cur = list[i]!;
+          if (cur.mine) {
+            if (cur.count <= 1) list.splice(i, 1);
+            else list[i] = { ...cur, count: cur.count - 1, mine: false };
+          } else {
+            list[i] = { ...cur, count: cur.count + 1, mine: true };
+          }
+        } else {
+          list.push({ emoji, count: 1, mine: true });
+        }
+        list.sort(
+          (a, b) => b.count - a.count || a.emoji.localeCompare(b.emoji)
+        );
+        return { ...m, reactions: list };
+      })
+    );
+    setReactPickerFor(null);
     const res = await toggleLockerReaction(messageId, emoji);
     setReactBusyId(null);
     if (!res.ok) {
-      if (res.needsSetup) setReactionsNeedSetup(true);
       const msg = res.error || "Could not react";
       setReactError(msg);
       setPostError(msg);
+      // Roll back by reloading
+      await reload({ quiet: true });
       return;
     }
     setMessages((prev) =>
@@ -286,7 +299,6 @@ export default function LockerRoomPage() {
         m.id === messageId ? { ...m, reactions: res.reactions || [] } : m
       )
     );
-    setReactPickerFor(null);
   }
 
   const remaining = LOCKER_MAX_CHARS - body.length;
@@ -348,24 +360,7 @@ export default function LockerRoomPage() {
           </div>
         )}
 
-        {reactionsNeedSetup && (
-          <div className="rounded-xl border border-warning/50 bg-warning/10 px-4 py-3 text-sm mb-4 shrink-0">
-            <p className="font-semibold text-warning mb-1">
-              Emoji reactions aren’t wired up yet
-            </p>
-            <p className="text-xs text-muted leading-relaxed">
-              The reaction buttons show on messages, but they can’t save until
-              the{" "}
-              <code className="text-foreground">locker_message_reactions</code>{" "}
-              table exists. Founder: open Supabase → SQL Editor → paste and run{" "}
-              <code className="text-foreground">supabase/locker-reactions.sql</code>
-              , then hard-refresh. Composer emojis (above the text box) still
-              work for writing into your post.
-            </p>
-          </div>
-        )}
-
-        {reactError && !reactionsNeedSetup && (
+        {reactError && (
           <div className="rounded-xl border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger mb-4 shrink-0">
             {reactError}
           </div>
