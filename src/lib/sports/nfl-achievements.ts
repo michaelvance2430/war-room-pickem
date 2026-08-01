@@ -301,9 +301,9 @@ export function nflDisplayOverlay(def: BadgeDef): BadgeDef {
     six_seven: {
       name: "Sixxxxx Seveennnn",
       description:
-        "A primetime (or any window) final went 6–7. The timeline is already saying it. You were on the card.",
+        "A primetime (or any window) final went 6–7. The timeline is already saying it. You were on the card — result doesn't matter.",
       howToEarn:
-        "Lock an NFL card the week any slate game ends 6–7 or 7–6.",
+        "Lock an NFL card the week any slate game ends 6–7 or 7–6. Everyone who locked gets it; picking the winner is irrelevant.",
     },
     saturday_starter: {
       name: "Sunday Starter",
