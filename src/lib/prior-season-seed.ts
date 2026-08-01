@@ -1,7 +1,7 @@
 /**
  * Seed last Excel / friend-group season into THIS league's Trophy Room.
  *
- * 2025 (prior to 2026 app season):
+ * Full 2025–26 season (fall 2025 → winter 2026; stored as season_year 2025):
  *  - Championship → Kahmann
  *  - Toilet Bowl → Justin Strayer
  *  - Village Nerd (Crystal Ball) → Big Ball Ben / Bill ball Ben
@@ -14,7 +14,9 @@ import { awardTrophy, loadLeagueTrophies, type TrophyType } from "@/lib/trophies
 import { loadLeagueRoster } from "@/lib/cloud";
 import { getSession } from "@/lib/league";
 
+/** CFB campaign year (2025–26 season → 2025 in Trophy Room). */
 export const PRIOR_SEASON_YEAR = 2025;
+export const PRIOR_SEASON_LABEL = "2025–26";
 
 type SeedRow = {
   trophyType: TrophyType;
@@ -24,21 +26,21 @@ type SeedRow = {
   notes: string;
 };
 
-/** Confirmed 2025 Excel season hardware for this friend group. */
+/** Confirmed 2025–26 Excel season hardware for this friend group. */
 export const PRIOR_SEASON_2025_SEEDS: SeedRow[] = [
   {
     trophyType: "championship",
     winnerName: "Kahmann",
     namePatterns: [/\bkahmann\b/i],
-    subtitle: "War Room Champion · 2025",
-    notes: "Reigning champ from last season (Excel era). The board still remembers.",
+    subtitle: `War Room Champion · ${PRIOR_SEASON_LABEL}`,
+    notes: `Reigning champ — full ${PRIOR_SEASON_LABEL} season (Excel era). The board still remembers.`,
   },
   {
     trophyType: "toilet_bowl",
     winnerName: "Justin Strayer",
     namePatterns: [/\bjustin\s+strayer\b/i, /\bstrayer\b/i],
-    subtitle: "Toilet Bowl · 2025",
-    notes: "Bottom-half crown. Still hardware. Wear it proudly.",
+    subtitle: `Toilet Bowl · ${PRIOR_SEASON_LABEL}`,
+    notes: `Bottom-half crown · ${PRIOR_SEASON_LABEL}. Still hardware. Wear it proudly.`,
   },
   {
     trophyType: "crystal_ball",
@@ -48,8 +50,8 @@ export const PRIOR_SEASON_2025_SEEDS: SeedRow[] = [
       /\bbill\s*ball\s*ben\b/i,
       /\bbillballben\b/i,
     ],
-    subtitle: "Village Nerd · Crystal Ball 2025",
-    notes: "Called the national champ. Zero standings points. Infinite smug.",
+    subtitle: `Village Nerd · Crystal Ball · ${PRIOR_SEASON_LABEL}`,
+    notes: `Called the national champ · ${PRIOR_SEASON_LABEL}. Zero standings points. Infinite smug.`,
   },
 ];
 
@@ -141,7 +143,7 @@ export async function seedPriorSeason2025Trophies(): Promise<{
 
   return {
     ok: true,
-    message: `2025 hardware locked in: ${awarded.join(" · ")}. Opening-week ring ceremony can crown Kahmann. Refresh Trophy Room.`,
+    message: `${PRIOR_SEASON_LABEL} hardware locked in: ${awarded.join(" · ")}. Opening-week ring ceremony can crown Kahmann. Refresh Trophy Room.`,
     awarded,
     errors,
   };

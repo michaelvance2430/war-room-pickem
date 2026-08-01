@@ -103,7 +103,7 @@ export default function TrophyRoomPage() {
   async function onImport2025() {
     if (
       !confirm(
-        "Engrave 2025 Excel season into this Trophy Room?\n\n" +
+        "Engrave full 2025–26 Excel season into this Trophy Room?\n\n" +
           "· Championship → Kahmann\n" +
           "· Toilet Bowl → Justin Strayer\n" +
           "· Village Nerd → Big Ball Ben\n\n" +
@@ -306,10 +306,11 @@ export default function TrophyRoomPage() {
                   onClick={() => void onImport2025()}
                   className="min-h-[44px] px-4 rounded-xl border-2 border-amber-400/50 bg-amber-500/15 text-amber-100 text-sm font-bold disabled:opacity-50"
                 >
-                  {busy ? "Engraving…" : "Import 2025 season (Excel)"}
+                  {busy ? "Engraving…" : "Import 2025–26 season (Excel)"}
                 </button>
                 <p className="text-[11px] text-muted">
-                  Kahmann · Champ · Justin Strayer · Toilet · Big Ball Ben · Nerd
+                  Full 2025–26 · Kahmann Champ · Strayer Toilet · Big Ball Ben
+                  Nerd
                 </p>
               </div>
             </div>

@@ -57,11 +57,11 @@ function namesMatch(a: string, b: string) {
 /**
  * Legacy / prior-season hardware for this friend group.
  * Matched by display name so it shows even before engraver links a user id.
- * Last CFB season relative to mid-2026 = 2025.
+ * Full 2025–26 CFB campaign (stored as seasonYear 2025).
  */
 /**
- * Confirmed prior-season hardware only.
- * Kahmann = 2025 champ. Bill ball Ben = Village Nerd.
+ * Confirmed prior-season hardware only (2025–26 Excel season).
+ * Kahmann = champ. Justin Strayer = Toilet. Big Ball Ben = Village Nerd.
  * Visconti/Andy is NOT a champ (mistaken swap — revoked).
  */
 export const LEGACY_PROFILE_HARDWARE: Omit<ProfileTrophy, "source">[] = [
@@ -70,8 +70,8 @@ export const LEGACY_PROFILE_HARDWARE: Omit<ProfileTrophy, "source">[] = [
     kind: "championship",
     seasonYear: 2025,
     title: "Championship",
-    subtitle: "War Room Champion",
-    notes: "Last season's big one. The board still remembers.",
+    subtitle: "War Room Champion · 2025–26",
+    notes: "Full 2025–26 season. The board still remembers.",
     winnerName: "Kahmann",
   },
   {
@@ -79,8 +79,8 @@ export const LEGACY_PROFILE_HARDWARE: Omit<ProfileTrophy, "source">[] = [
     kind: "toilet_bowl",
     seasonYear: 2025,
     title: "Toilet Bowl",
-    subtitle: "Bottom-half crown",
-    notes: "Still a crown. Wear it proudly.",
+    subtitle: "Bottom-half crown · 2025–26",
+    notes: "2025–26 Toilet Bowl. Still a crown. Wear it proudly.",
     winnerName: "Justin Strayer",
   },
   {
@@ -88,8 +88,8 @@ export const LEGACY_PROFILE_HARDWARE: Omit<ProfileTrophy, "source">[] = [
     kind: "crystal_ball",
     seasonYear: 2025,
     title: "Village Nerd Award",
-    subtitle: "Crystal Ball prophet",
-    notes: "Called the national champ. Zero standings points. Infinite smug.",
+    subtitle: "Crystal Ball prophet · 2025–26",
+    notes: "2025–26 Crystal Ball. Zero standings points. Infinite smug.",
     winnerName: "Big Ball Ben",
   },
 ];
