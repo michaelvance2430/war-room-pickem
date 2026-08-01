@@ -1,6 +1,6 @@
 -- ============================================================
--- Reset season (keep members, wipe scores/picks/cards)
--- Run once in Supabase → SQL Editor → Run
+-- Reset season (keep members, wipe scores/picks/cards + pride picks)
+-- Run once in Supabase → SQL Editor → Run (re-run after this update)
 -- ============================================================
 
 create or replace function public.reset_league_season(p_league_id uuid)
@@ -15,6 +15,8 @@ declare
   v_cards int := 0;
   v_results int := 0;
   v_members int := 0;
+  v_cb int := 0;
+  v_ach int := 0;
 begin
   if v_uid is null then
     raise exception 'Not authenticated';
@@ -44,11 +46,42 @@ begin
   where league_id = p_league_id;
   get diagnostics v_cards = row_count;
 
-  -- Season chatter (optional clean slate; members stay)
-  delete from public.announcements
-  where league_id = p_league_id;
+  -- Season chatter
+  begin
+    delete from public.announcements where league_id = p_league_id;
+  exception when undefined_table then null;
+  end;
+
+  -- Gazette archive for this season
+  begin
+    delete from public.gazette_editions where league_id = p_league_id;
+  exception when undefined_table then null;
+  end;
+
+  -- Crystal Ball / Super Bowl pride picks + crown + league achievements
+  begin
+    delete from public.crystal_ball_picks where league_id = p_league_id;
+    get diagnostics v_cb = row_count;
+  exception when undefined_table then null;
+  end;
+  begin
+    delete from public.crystal_ball_result where league_id = p_league_id;
+  exception when undefined_table then null;
+  end;
+  begin
+    delete from public.achievements where league_id = p_league_id;
+    get diagnostics v_ach = row_count;
+  exception when undefined_table then null;
+  end;
+
+  -- Locker board for this league (trial noise)
+  begin
+    delete from public.locker_messages where league_id = p_league_id;
+  exception when undefined_table then null;
+  end;
 
   -- Zero every member's season stats — keep membership / division / role
+  -- These feed profile "deep stats" (ATS, weeks played, streaks, legacy math).
   update public.memberships
   set
     total_points = 0,
@@ -67,7 +100,7 @@ begin
   where league_id = p_league_id;
   get diagnostics v_members = row_count;
 
-  -- Ready for Week 0 openers
+  -- Ready for first week (CFB 0 / app may bump NFL to 1 on client)
   update public.leagues
   set current_week = 0
   where id = p_league_id;
@@ -77,10 +110,14 @@ begin
     'membersKept', v_members,
     'picksDeleted', v_picks,
     'cardsDeleted', v_cards,
-    'resultsDeleted', v_results
+    'resultsDeleted', v_results,
+    'crystalPicksDeleted', v_cb,
+    'achievementsDeleted', v_ach
   );
 end;
 $$;
 
 revoke all on function public.reset_league_season(uuid) from public;
 grant execute on function public.reset_league_season(uuid) to authenticated;
+
+notify pgrst, 'reload schema';

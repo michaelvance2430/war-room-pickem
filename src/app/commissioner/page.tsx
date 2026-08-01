@@ -1840,24 +1840,26 @@ function CommissionerPageInner() {
       "RESET SEASON?\n\n" +
         "This will DELETE:\n" +
         "• All week cards & games\n" +
-        "• All player picks\n" +
-        "• All results & season scores/stats\n" +
-        "• League announcements\n" +
+        "• All player picks (including bot trial picks)\n" +
+        "• All results & season scores/stats (ATS, weeks, streaks, props)\n" +
+        "• Crystal Ball / Super Bowl pride picks + crown\n" +
+        "• League achievements from this season\n" +
+        "• League announcements + Gazette archive + locker board\n" +
         (sandbox
           ? "• Sandbox Trophy Room engravings (dry-run rings)\n" +
             "• Sim achievement points / First & Final / Elite Commish on this device\n"
           : "") +
         "\nThis will KEEP:\n" +
-        "• Every player who joined\n" +
+        "• Every player who joined (including bots until you Clear bots)\n" +
         "• Divisions, roles, league code & settings\n" +
         "• Profile photos\n" +
         (sandbox
           ? "• Real prior-season Legends only (Kahmann / Bill ball Ben / creator)\n"
-          : "• Trophy Room history + career cheevos (real season)\n") +
-        "\nAlso clears Gazette Archive headlines for this season.\n\n" +
+          : "• Trophy Room history + career cheevos (real season only)\n") +
+        "\n" +
         (sandbox
-          ? "SANDBOX MODE: fake weeks do not stick after reset.\n\n"
-          : "REAL SEASON: career cheevos stay after reset.\n\n") +
+          ? "SANDBOX: trial/bot stats must not stick — profile deep stats go to zero.\n\n"
+          : "REAL SEASON: career cheevos stay after reset; season board zeros.\n\n") +
         "Continue?"
     );
     if (!ok1) return;

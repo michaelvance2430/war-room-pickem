@@ -2877,25 +2877,67 @@ export async function resetSeasonInCloud(): Promise<ResetSeasonResult> {
     /* ignore */
   }
 
-  // Clear local week caches so this device matches cloud
+  // Always wipe pride picks + league achievements + re-zero memberships.
+  // RPC may be an older version that only deleted picks/cards — profile stats
+  // (ATS, weeks played, streaks) must not survive trial runs.
   try {
-    for (let w = 0; w <= 18; w++) {
+    const wipeExtras = await resetSeasonClientFallback(leagueId);
+    if (wipeExtras.ok) {
+      result = {
+        ...result,
+        membersKept: wipeExtras.membersKept ?? result.membersKept,
+        picksDeleted: Math.max(
+          result.picksDeleted || 0,
+          wipeExtras.picksDeleted || 0
+        ),
+        cardsDeleted: Math.max(
+          result.cardsDeleted || 0,
+          wipeExtras.cardsDeleted || 0
+        ),
+        resultsDeleted: Math.max(
+          result.resultsDeleted || 0,
+          wipeExtras.resultsDeleted || 0
+        ),
+      };
+    }
+  } catch {
+    /* best-effort */
+  }
+
+  // Clear local week caches so this device matches cloud (NFL through week 22)
+  try {
+    for (let w = 0; w <= 22; w++) {
       localStorage.removeItem(`warroom-card-week-${w}`);
       localStorage.removeItem(`warroom-results-week-${w}`);
       localStorage.removeItem(`warroom-picks-week-${w}`);
     }
     localStorage.setItem("warroom-active-week", "0");
-    const prefix = "warroom-gazette-seen-v1:";
+    // Crystal Ball / Super Bowl pride picks (device fallback board)
+    localStorage.removeItem(`warroom-crystal-ball-${leagueId}`);
+    // Stale local roster stats (guest/demo residue)
+    try {
+      const { savePlayers } = await import("./store");
+      savePlayers([]);
+    } catch {
+      /* ignore */
+    }
+    const prefixes = [
+      "warroom-gazette-seen-v1:",
+      "warroom-ring-ceremony-seen",
+      "warroom-badge-celebrated",
+      "warroom-first-final",
+    ];
     for (let i = localStorage.length - 1; i >= 0; i--) {
       const k = localStorage.key(i);
-      if (k && k.startsWith(prefix)) localStorage.removeItem(k);
+      if (!k) continue;
+      if (prefixes.some((p) => k.startsWith(p))) localStorage.removeItem(k);
     }
   } catch {
     /* ignore */
   }
 
   // Sandbox: wipe sim trophies + local cheevo banks that should not stick.
-  // Real season: career permanent cheevos stay.
+  // Real season: career permanent cheevos stay (Legend / creator only protected in sandbox).
   try {
     const { afterSeasonResetLocalCleanup } = await import("./sandbox-wipe");
     const roster = await loadLeagueRoster();
