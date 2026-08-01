@@ -67,7 +67,7 @@ const PACKS: SportPack[] = [
   },
   {
     id: "nhl",
-    label: "NHL Hockey",
+    label: "NHL",
     shortLabel: "NHL",
     emoji: "🏒",
     blurb:
