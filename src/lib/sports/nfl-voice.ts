@@ -512,7 +512,7 @@ export function nflSwingText(
 }
 
 export const NFL_HOME_TAGLINE_DEFAULT =
-  "Sundays. Spreads. No campus. Just the room and the late window.";
+  "Sundays. Spreads. Tailgates. Just the room and the late window.";
 
 /** Commissioner presets when the league sport is NFL */
 export const NFL_HOME_TAGLINE_PRESETS: {

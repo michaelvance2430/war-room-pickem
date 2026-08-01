@@ -30,7 +30,7 @@ const PACKS: SportPack[] = [
     shortLabel: "NFL",
     emoji: "🏈",
     blurb:
-      "Sundays. Primetime. Late windows. Same War Room soul — navy, crimson, no campus filler.",
+      "Sundays. Primetime. Late windows. Same War Room soul — navy, crimson, tailgate energy.",
     sortOrder: 2,
     status: "live",
     defaultSeasonWeeks: 18,
