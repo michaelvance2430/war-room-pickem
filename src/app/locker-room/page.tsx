@@ -22,6 +22,7 @@ import {
   amILockerMuted,
   deleteLockerMessage,
   formatLockerTime,
+  isLockerReactionsReady,
   loadLockerMessages,
   postLockerMessage,
   toggleLockerReaction,
@@ -58,6 +59,9 @@ export default function LockerRoomPage() {
   /** Which message has the reaction picker open */
   const [reactPickerFor, setReactPickerFor] = useState<string | null>(null);
   const [reactBusyId, setReactBusyId] = useState<string | null>(null);
+  /** DB table locker_message_reactions missing on this project */
+  const [reactionsNeedSetup, setReactionsNeedSetup] = useState(false);
+  const [reactError, setReactError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const lastPostAt = useRef(0);
   const listTopRef = useRef<HTMLDivElement>(null);
@@ -90,6 +94,9 @@ export default function LockerRoomPage() {
     markLockerSeen();
     void refreshStaffSessionFlags().then(() => setStaff(isStaff()));
     void amILockerMuted().then(setMuted);
+    void isLockerReactionsReady().then((ready) => {
+      if (!ready) setReactionsNeedSetup(true);
+    });
     reload().finally(() => setLoading(false));
     void loadLeagueRoster().then((rows) => {
       setRoster(
@@ -140,10 +147,24 @@ export default function LockerRoomPage() {
   }
 
   function insertEmoji(emoji: string) {
+    const el = textareaRef.current;
+    const start = el?.selectionStart ?? caretRef.current ?? body.length;
+    const end = el?.selectionEnd ?? start;
     setBody((prev) => {
       if (prev.length >= LOCKER_MAX_CHARS) return prev;
-      const next = prev + emoji;
-      return next.slice(0, LOCKER_MAX_CHARS);
+      const next = (prev.slice(0, start) + emoji + prev.slice(end)).slice(
+        0,
+        LOCKER_MAX_CHARS
+      );
+      const pos = Math.min(start + emoji.length, next.length);
+      caretRef.current = pos;
+      requestAnimationFrame(() => {
+        const ta = textareaRef.current;
+        if (!ta) return;
+        ta.focus();
+        ta.setSelectionRange(pos, pos);
+      });
+      return next;
     });
   }
 
@@ -238,15 +259,26 @@ export default function LockerRoomPage() {
 
   async function onReact(messageId: string, emoji: string) {
     if (muted) {
+      setReactError("You’re muted — reactions are off too.");
       setPostError("You’re muted — reactions are off too.");
       return;
     }
+    if (reactionsNeedSetup) {
+      setReactError(
+        "Reactions aren’t live yet — the buttons show, but the DB table is missing. Founder: run supabase/locker-reactions.sql in Supabase SQL Editor."
+      );
+      return;
+    }
     setReactBusyId(messageId);
+    setReactError(null);
     setPostError(null);
     const res = await toggleLockerReaction(messageId, emoji);
     setReactBusyId(null);
     if (!res.ok) {
-      setPostError(res.error || "Could not react");
+      if (res.needsSetup) setReactionsNeedSetup(true);
+      const msg = res.error || "Could not react";
+      setReactError(msg);
+      setPostError(msg);
       return;
     }
     setMessages((prev) =>
@@ -313,6 +345,29 @@ export default function LockerRoomPage() {
         {error && (
           <div className="rounded-xl border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger mb-4 shrink-0">
             {error}
+          </div>
+        )}
+
+        {reactionsNeedSetup && (
+          <div className="rounded-xl border border-warning/50 bg-warning/10 px-4 py-3 text-sm mb-4 shrink-0">
+            <p className="font-semibold text-warning mb-1">
+              Emoji reactions aren’t wired up yet
+            </p>
+            <p className="text-xs text-muted leading-relaxed">
+              The reaction buttons show on messages, but they can’t save until
+              the{" "}
+              <code className="text-foreground">locker_message_reactions</code>{" "}
+              table exists. Founder: open Supabase → SQL Editor → paste and run{" "}
+              <code className="text-foreground">supabase/locker-reactions.sql</code>
+              , then hard-refresh. Composer emojis (above the text box) still
+              work for writing into your post.
+            </p>
+          </div>
+        )}
+
+        {reactError && !reactionsNeedSetup && (
+          <div className="rounded-xl border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger mb-4 shrink-0">
+            {reactError}
           </div>
         )}
 
@@ -472,9 +527,13 @@ export default function LockerRoomPage() {
                 <button
                   key={em}
                   type="button"
+                  onMouseDown={(e) => {
+                    // Keep caret in the textarea so emoji actually inserts
+                    e.preventDefault();
+                  }}
                   onClick={() => insertEmoji(em)}
                   className="w-9 h-9 sm:w-8 sm:h-8 rounded-lg bg-background border border-border hover:border-primary/50 hover:bg-primary/10 text-base leading-none"
-                  title="Add emoji"
+                  title="Add emoji to your message"
                 >
                   {em}
                 </button>

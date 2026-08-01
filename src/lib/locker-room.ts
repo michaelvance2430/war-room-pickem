@@ -325,6 +325,32 @@ async function attachReactions(
   }
 }
 
+const REACTIONS_SETUP_ERROR =
+  "Reactions aren't live yet — the emoji buttons show, but the database table is missing. Founder: run supabase/locker-reactions.sql once in the Supabase SQL Editor, then hard-refresh.";
+
+function isMissingReactionsTable(message?: string | null): boolean {
+  return /does not exist|schema cache|PGRST205|locker_message_reactions/i.test(
+    message || ""
+  );
+}
+
+/** True when locker_message_reactions exists (and is queryable). */
+export async function isLockerReactionsReady(): Promise<boolean> {
+  try {
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("locker_message_reactions")
+      .select("id")
+      .limit(1);
+    if (!error) return true;
+    if (isMissingReactionsTable(error.message)) return false;
+    // Other errors (RLS/network) still mean the table is there
+    return true;
+  } catch {
+    return true;
+  }
+}
+
 /**
  * Toggle a reaction on a locker message (tap again to remove).
  * No full reply required — pure room energy.
@@ -336,22 +362,29 @@ export async function toggleLockerReaction(
   ok: boolean;
   reactions?: LockerReactionSummary[];
   error?: string;
+  /** Table missing — UI can show setup banner */
+  needsSetup?: boolean;
 }> {
   const session = getSession();
   if (!session?.leagueId || !session.playerId) {
     return { ok: false, error: "Not signed in" };
   }
   const em = (emoji || "").trim();
-  if (!em || em.length > 16) {
+  // Use code-point length — emoji are usually 1–2 JS UTF-16 units each
+  if (!em || [...em].length > 8) {
     return { ok: false, error: "Pick a reaction emoji." };
   }
 
   const supabase = createClient();
   const { data: auth } = await supabase.auth.getUser();
-  const uid = auth.user?.id || session.playerId;
+  // RLS requires user_id = auth.uid() — never invent a uid without a real session
+  const uid = auth.user?.id;
+  if (!uid) {
+    return { ok: false, error: "Session expired — sign in again to react." };
+  }
 
   // Already mine? → remove
-  const { data: existing } = await supabase
+  const { data: existing, error: existingErr } = await supabase
     .from("locker_message_reactions")
     .select("id")
     .eq("message_id", messageId)
@@ -359,18 +392,18 @@ export async function toggleLockerReaction(
     .eq("emoji", em)
     .maybeSingle();
 
+  if (existingErr && isMissingReactionsTable(existingErr.message)) {
+    return { ok: false, error: REACTIONS_SETUP_ERROR, needsSetup: true };
+  }
+
   if (existing?.id) {
     const { error } = await supabase
       .from("locker_message_reactions")
       .delete()
       .eq("id", existing.id as string);
     if (error) {
-      if (/does not exist|schema cache/i.test(error.message || "")) {
-        return {
-          ok: false,
-          error:
-            "Reactions aren’t set up yet. Run supabase/locker-reactions.sql in Supabase.",
-        };
+      if (isMissingReactionsTable(error.message)) {
+        return { ok: false, error: REACTIONS_SETUP_ERROR, needsSetup: true };
       }
       return { ok: false, error: error.message };
     }
@@ -381,17 +414,14 @@ export async function toggleLockerReaction(
       emoji: em,
     });
     if (error) {
-      if (/does not exist|schema cache/i.test(error.message || "")) {
+      if (isMissingReactionsTable(error.message)) {
+        return { ok: false, error: REACTIONS_SETUP_ERROR, needsSetup: true };
+      }
+      if (/policy|row-level|muted|violates|42501/i.test(error.message || "")) {
         return {
           ok: false,
           error:
-            "Reactions aren’t set up yet. Run supabase/locker-reactions.sql in Supabase.",
-        };
-      }
-      if (/policy|row-level|muted|violates/i.test(error.message || "")) {
-        return {
-          ok: false,
-          error: "Can’t react right now — you may be muted.",
+            "Can't react right now — you may be muted, or not in this league.",
         };
       }
       // Unique race — treat as ok and reload
@@ -402,10 +432,14 @@ export async function toggleLockerReaction(
   }
 
   // Return fresh summary for this message
-  const { data: all } = await supabase
+  const { data: all, error: allErr } = await supabase
     .from("locker_message_reactions")
     .select("user_id, emoji")
     .eq("message_id", messageId);
+
+  if (allErr && isMissingReactionsTable(allErr.message)) {
+    return { ok: false, error: REACTIONS_SETUP_ERROR, needsSetup: true };
+  }
 
   const tally = new Map<string, { count: number; mine: boolean }>();
   for (const r of all || []) {
