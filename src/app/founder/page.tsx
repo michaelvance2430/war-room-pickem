@@ -20,6 +20,12 @@ import {
   setCreatorEyesMode,
   type CreatorEyesMode,
 } from "@/lib/creator-eyes";
+import {
+  founderEnsureFullBotRoster,
+  founderPostAndScoreWeek,
+  founderPostWeek,
+  founderScoreWeek,
+} from "@/lib/founder-one-click";
 import { useRouter } from "next/navigation";
 
 type Light = "green" | "yellow" | "red";
@@ -61,6 +67,11 @@ export default function FounderDashboardPage() {
   const [eyes, setEyes] = useState<CreatorEyesMode>("off");
   /** Week to live as when entering eyes (progressive + local demo card) */
   const [eyesWeek, setEyesWeek] = useState(1);
+  /** One-click heaven week (real league cloud ops) */
+  const [labWeek, setLabWeek] = useState(1);
+  const [labBusy, setLabBusy] = useState(false);
+  const [labLog, setLabLog] = useState<string | null>(null);
+  const [labSteps, setLabSteps] = useState<string[]>([]);
 
   const refresh = useCallback(async () => {
     const session = getSession();
@@ -141,6 +152,30 @@ export default function FounderDashboardPage() {
     }
   }
 
+  async function runLab(
+    kind: "roster" | "post" | "score" | "both"
+  ) {
+    setLabBusy(true);
+    setLabLog(null);
+    setLabSteps([]);
+    try {
+      const res =
+        kind === "roster"
+          ? await founderEnsureFullBotRoster()
+          : kind === "post"
+            ? await founderPostWeek(labWeek)
+            : kind === "score"
+              ? await founderScoreWeek(labWeek)
+              : await founderPostAndScoreWeek(labWeek);
+      setLabSteps(res.steps);
+      setLabLog(res.ok ? `✅ ${res.message}` : `❌ ${res.message}`);
+      void refresh();
+    } catch (e) {
+      setLabLog(e instanceof Error ? e.message : "Lab action failed");
+    }
+    setLabBusy(false);
+  }
+
   async function toggleIncident(active: boolean) {
     setBusy(true);
     setSaveNote(null);
@@ -218,6 +253,101 @@ export default function FounderDashboardPage() {
             Refresh
           </button>
         </div>
+
+        {/* One-click heaven — real league, full bots, stay on this page */}
+        <section className="rounded-xl border-2 border-amber-400/60 bg-amber-500/10 p-4 space-y-3">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-300">
+            One-click heaven
+          </p>
+          <h2 className="text-sm font-semibold text-foreground">
+            Drive the room without leaving Founder
+          </h2>
+          <p className="text-xs text-muted leading-relaxed">
+            Operates your <strong className="text-foreground">real active league</strong>
+            {" "}(cloud). Always pads bots toward 16, locks bot picks, locker
+            noise, Chaos spice. No Commissioner tab required.
+            {leagueName ? (
+              <>
+                {" "}
+                Room: <strong className="text-foreground">{leagueName}</strong>
+                {activeWeek != null ? ` · cloud week ${activeWeek}` : ""}
+              </>
+            ) : (
+              " Join/create a league as commish first."
+            )}
+          </p>
+
+          <label className="block text-xs text-muted">
+            Week
+            <input
+              type="number"
+              min={0}
+              max={22}
+              value={labWeek}
+              disabled={labBusy}
+              onChange={(e) =>
+                setLabWeek(
+                  Math.max(0, Math.min(22, parseInt(e.target.value, 10) || 0))
+                )
+              }
+              className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm font-mono text-foreground"
+            />
+          </label>
+
+          <div className="grid grid-cols-1 gap-2">
+            <button
+              type="button"
+              disabled={labBusy}
+              onClick={() => void runLab("roster")}
+              className="w-full py-3.5 min-h-[52px] rounded-xl border border-amber-400/50 bg-background/80 text-sm font-bold text-foreground hover:bg-amber-500/15 disabled:opacity-50"
+            >
+              {labBusy ? "Working…" : "① Full bot roster + spice"}
+            </button>
+            <button
+              type="button"
+              disabled={labBusy}
+              onClick={() => void runLab("post")}
+              className="w-full py-3.5 min-h-[52px] rounded-xl bg-primary text-black text-sm font-extrabold disabled:opacity-50"
+            >
+              {labBusy ? "Working…" : `② Post week ${labWeek}`}
+            </button>
+            <button
+              type="button"
+              disabled={labBusy}
+              onClick={() => void runLab("score")}
+              className="w-full py-3.5 min-h-[52px] rounded-xl border border-primary/50 text-primary text-sm font-extrabold hover:bg-primary/10 disabled:opacity-50"
+            >
+              {labBusy ? "Working…" : `③ Score week ${labWeek}`}
+            </button>
+            <button
+              type="button"
+              disabled={labBusy}
+              onClick={() => void runLab("both")}
+              className="w-full py-4 min-h-[56px] rounded-xl bg-amber-400 text-black text-base font-black disabled:opacity-50 shadow-[0_0_24px_rgba(251,191,36,0.35)]"
+            >
+              {labBusy
+                ? "Working…"
+                : `⚡ Post + score week ${labWeek}`}
+            </button>
+          </div>
+
+          {labLog && (
+            <p
+              className={`text-xs font-semibold leading-relaxed ${
+                labLog.startsWith("✅") ? "text-primary" : "text-danger"
+              }`}
+            >
+              {labLog}
+            </p>
+          )}
+          {labSteps.length > 0 && (
+            <ul className="text-[11px] text-muted space-y-0.5 max-h-36 overflow-y-auto border border-border/50 rounded-lg px-3 py-2 bg-background/50">
+              {labSteps.map((s, i) => (
+                <li key={`${i}-${s.slice(0, 24)}`}>· {s}</li>
+              ))}
+            </ul>
+          )}
+        </section>
 
         {/* Everyone’s eyes — brand-new player / commissioner previews */}
         <section className="rounded-xl border-2 border-sky-400/50 bg-sky-500/10 p-4 space-y-3">
