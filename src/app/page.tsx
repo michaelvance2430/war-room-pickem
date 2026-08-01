@@ -39,6 +39,8 @@ import OpenRoomLeaveNudge from "@/components/OpenRoomLeaveNudge";
 import MultiLeagueHomeHub from "@/components/MultiLeagueHomeHub";
 import HomeRoomContext from "@/components/HomeRoomContext";
 import HomeHostScoreStrip from "@/components/HomeHostScoreStrip";
+import SoftUnlockBanner from "@/components/SoftUnlockBanner";
+import SandboxSimBanner from "@/components/SandboxSimBanner";
 
 export default function Home() {
   const router = useRouter();
@@ -352,7 +354,12 @@ export default function Home() {
           }}
         />
 
+        <SandboxSimBanner />
+
         <HomeWeekHero />
+
+        {/* One-time: first lock opened the full room */}
+        <SoftUnlockBanner />
 
         {/* Host score path only when not in quiet first hour (or always for ops after card) */}
         {!firstWeekChrome && <HomeHostScoreStrip />}

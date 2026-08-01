@@ -39,10 +39,10 @@ export function packProgressiveConfig(
     };
   }
 
-  // Full football seasons
+  // Full football seasons — paper shelf after first scored week (was 2)
   return {
-    gazetteMinWeek: 3,
-    gazetteMinScored: 2,
+    gazetteMinWeek: 2,
+    gazetteMinScored: 1,
     cutApproachLead: 2,
     shortSeason: false,
   };

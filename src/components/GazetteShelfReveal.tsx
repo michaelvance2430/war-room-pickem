@@ -69,13 +69,13 @@ export default function GazetteShelfReveal() {
       <div className="w-full max-w-md rounded-2xl border border-red-700/50 bg-card shadow-[0_0_60px_rgba(185,28,28,0.25)] overflow-hidden">
         <div className="bg-red-950/80 border-b border-red-800/50 px-5 py-3">
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-red-300/90">
-            Unlocked · week 3
+            Unlocked · the paper
           </p>
           <h2
             id="gazette-shelf-title"
             className="text-lg font-extrabold text-white mt-0.5"
           >
-            The paper has a shelf now
+            Every week has a paper now
           </h2>
         </div>
         <div className="px-5 py-4 space-y-3 text-sm text-muted leading-relaxed">

@@ -951,6 +951,84 @@ export default function PicksPage() {
           </div>
         )}
 
+        {/* Progress strip — always show when editing a live card */}
+        {hasCard && weekEditable && !cardFrozen && games.length > 0 && (
+          <div className="mb-4 rounded-xl border border-border bg-card/80 px-3 py-2.5">
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted mb-1.5">
+              This card
+            </p>
+            <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs sm:text-sm">
+              <span
+                className={
+                  games.filter((g) => picks[g.id]?.pick).length >= games.length
+                    ? "text-primary font-semibold"
+                    : "text-foreground"
+                }
+              >
+                {games.filter((g) => picks[g.id]?.pick).length}/{games.length}{" "}
+                sides
+              </span>
+              <span className="text-border">·</span>
+              <span
+                className={
+                  games.filter((g) => (picks[g.id]?.confidence ?? 0) > 0)
+                    .length >= games.length
+                    ? "text-primary font-semibold"
+                    : "text-foreground"
+                }
+              >
+                {
+                  games.filter((g) => (picks[g.id]?.confidence ?? 0) > 0)
+                    .length
+                }
+                /{games.length} confidence
+              </span>
+              <span className="text-border">·</span>
+              <span
+                className={
+                  bestBetId
+                    ? "text-primary font-semibold"
+                    : "text-muted"
+                }
+              >
+                Best Bet {bestBetId ? "✓" : "—"}
+              </span>
+              {prop.question ? (
+                <>
+                  <span className="text-border">·</span>
+                  <span
+                    className={
+                      propChoice
+                        ? "text-primary font-semibold"
+                        : "text-muted"
+                    }
+                  >
+                    Prop {propChoice ? "✓" : "—"}
+                  </span>
+                </>
+              ) : null}
+            </div>
+            {(() => {
+              const used = usedConfidence.filter((c) => c >= 1 && c <= 5);
+              const left = [1, 2, 3, 4, 5].filter((c) => !used.includes(c));
+              if (left.length === 0 || left.length === 5) return null;
+              return (
+                <p className="text-[11px] text-muted mt-1.5">
+                  Confidence left:{" "}
+                  <span className="text-foreground font-semibold tabular-nums">
+                    {left.join(", ")}
+                  </span>
+                </p>
+              );
+            })()}
+            {allGamesPicked && (
+              <p className="text-[11px] text-primary font-semibold mt-1.5">
+                Card full — hit Save / Lock at the bottom.
+              </p>
+            )}
+          </div>
+        )}
+
         {/* Chaos Mode — mid-season spice (week 2+); hide on quiet first path */}
         {weekEditable &&
           hasCard &&

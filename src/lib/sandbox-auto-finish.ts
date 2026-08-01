@@ -194,18 +194,20 @@ export async function autoFinishRemainingWeeks(opts?: {
       opts?.onProgress?.({
         week,
         label,
-        step: "Bot picks + your sim slip…",
+        step: `Week ${week}: locking bots + your sim slip…`,
       });
       const bots = await seedBotPicksForWeekInCloud(week);
       if (!bots.ok) {
         errors.push(
           `${label}: bot picks warning — ${bots.error || "failed"} (scoring anyway)`
         );
-      } else if (bots.selfFilled) {
+      } else {
         opts?.onProgress?.({
           week,
           label,
-          step: `Bots locked (${bots.botsFilled ?? 0}) · your slip locked too`,
+          step: `Week ${week}: bots ${bots.botsFilled ?? 0} · your picks ${
+            bots.selfFilled ? "locked" : "already set"
+          }`,
         });
       }
 
@@ -251,7 +253,7 @@ export async function autoFinishRemainingWeeks(opts?: {
       opts?.onProgress?.({
         week,
         label,
-        step: `Done · ${scoredRes.scoredCount} player(s)  (${finished.length} new week(s) this run)`,
+        step: `Week ${week} scored · ${scoredRes.scoredCount} player(s) · ${finished.length} done this run (sandbox)`,
       });
 
       // Yield so React can paint progress between weeks

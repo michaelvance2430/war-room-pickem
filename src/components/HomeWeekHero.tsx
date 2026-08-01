@@ -6,8 +6,9 @@ import {
   loadWeekCard,
   loadMyPicks,
   loadLeagueRoster,
+  loadLeaguePlayers,
 } from "@/lib/cloud";
-import { getLeague, isOps, isCommissioner } from "@/lib/league";
+import { getLeague, isOps, isCommissioner, getSession } from "@/lib/league";
 import {
   formatCardLockDeadline,
   isCardLockDeadlinePassed,
@@ -19,6 +20,7 @@ import {
   weekProgressLabel,
 } from "@/lib/active-week";
 import { SEASON_MAX_WEEK } from "@/lib/season-calendar";
+import { rankPlayersWithSwings } from "@/lib/fun-board";
 
 type HeroState = {
   week: number;
@@ -33,6 +35,13 @@ type HeroState = {
   isOps: boolean;
   leagueCode: string | null;
   advancedFromScored: boolean;
+  /** Last scored week recap for this player */
+  lastWeekRecap: {
+    week: number;
+    pts: number;
+    rank: number;
+    field: number;
+  } | null;
 };
 
 /**
@@ -64,6 +73,33 @@ export default function HomeWeekHero() {
         );
         const roster = await loadLeagueRoster();
         const humans = roster.filter((m) => !m.isBot);
+
+        // Last scored week: rank + pts for "you finished #X" beat
+        let lastWeekRecap: HeroState["lastWeekRecap"] = null;
+        try {
+          const selfId = getSession()?.playerId;
+          const scoredSorted = [...scored].sort((a, b) => b - a);
+          const lastScoredWeek = scoredSorted[0];
+          if (selfId && lastScoredWeek != null) {
+            const players = await loadLeaguePlayers();
+            const ranked = rankPlayersWithSwings(
+              players,
+              getLeague()?.sportId
+            ).filter((p) => !p.isMock);
+            const me = ranked.find((p) => p.id === selfId);
+            if (me && me.lastWeekPts != null && Number.isFinite(me.lastWeekPts)) {
+              lastWeekRecap = {
+                week: lastScoredWeek,
+                pts: Number(me.lastWeekPts),
+                rank: me.rank,
+                field: ranked.length,
+              };
+            }
+          }
+        } catch {
+          lastWeekRecap = null;
+        }
+
         if (cancelled) return;
         setState({
           week,
@@ -78,6 +114,7 @@ export default function HomeWeekHero() {
           isOps: isOps(),
           leagueCode: getLeague()?.code || null,
           advancedFromScored: advanced,
+          lastWeekRecap,
         });
       } catch {
         if (!cancelled) setState(null);
@@ -261,7 +298,27 @@ export default function HomeWeekHero() {
         <h2 className="text-xl sm:text-3xl font-bold text-white mb-2 leading-tight">
           {title}
         </h2>
-        {state.advancedFromScored && (
+        {state.lastWeekRecap && (
+          <div className="mb-3 rounded-xl border border-primary/25 bg-black/35 px-3 py-2.5">
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary mb-0.5">
+              Last week · {weekTitle(state.lastWeekRecap.week, sportId)}
+            </p>
+            <p className="text-sm text-white font-semibold leading-snug">
+              You finished{" "}
+              <span className="text-primary">
+                #{state.lastWeekRecap.rank}
+              </span>{" "}
+              of {state.lastWeekRecap.field}
+              {" · "}
+              <span className="text-primary">
+                {state.lastWeekRecap.pts >= 0 ? "+" : ""}
+                {state.lastWeekRecap.pts}
+              </span>{" "}
+              pts that card
+            </p>
+          </div>
+        )}
+        {state.advancedFromScored && !state.lastWeekRecap && (
           <p className="text-[11px] text-primary/90 mb-2 font-medium">
             Last week is scored — you&apos;re on the next card ({progress}).
           </p>
