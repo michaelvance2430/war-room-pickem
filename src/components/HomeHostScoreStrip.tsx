@@ -2,7 +2,8 @@
 
 /**
  * Ops-only Home strip: one primary path to score the week.
- * Does not run scoring on Home — lands on Results with the host primary.
+ * Hidden while first-hour CommishSetupBanner still owns the host spine
+ * (invite → card → first score) so we never double the green score button.
  */
 
 import { useEffect, useState } from "react";
@@ -11,14 +12,14 @@ import {
   loadWeekCard,
   listScoredWeekNumbers,
 } from "@/lib/cloud";
-import { isOps } from "@/lib/league";
+import { getLeague, isOps } from "@/lib/league";
 import { resolvePlayerActiveWeek } from "@/lib/active-week";
 import { weekTitle } from "@/lib/dates";
 import { isViewAsPlayer } from "@/lib/view-as-player";
+import { isFirstTimeCommish } from "@/lib/commish-onboarding";
 
 export default function HomeHostScoreStrip() {
   const [show, setShow] = useState(false);
-  const [week, setWeek] = useState(1);
   const [label, setLabel] = useState("");
 
   useEffect(() => {
@@ -30,19 +31,32 @@ export default function HomeHostScoreStrip() {
       }
       try {
         const { week: w, scored } = await resolvePlayerActiveWeek();
+        const scoredList =
+          scored.length > 0 ? scored : await listScoredWeekNumbers();
+
+        // First-hour setup banner already has the score CTA — don’t stack
+        const league = getLeague();
+        if (
+          league?.id &&
+          isFirstTimeCommish({
+            leagueId: league.id,
+            scoredWeekCount: scoredList.length,
+          })
+        ) {
+          if (!cancelled) setShow(false);
+          return;
+        }
+
         const card = await loadWeekCard(w);
         if (cancelled) return;
         if (!card?.games?.length) {
           setShow(false);
           return;
         }
-        const scoredList =
-          scored.length > 0 ? scored : await listScoredWeekNumbers();
         if (scoredList.includes(w)) {
           setShow(false);
           return;
         }
-        setWeek(w);
         setLabel(weekTitle(w));
         setShow(true);
       } catch {
@@ -58,20 +72,23 @@ export default function HomeHostScoreStrip() {
   if (!show) return null;
 
   return (
-    <div className="mb-5 rounded-xl border-2 border-primary/45 bg-primary/10 px-4 py-3.5 space-y-2">
-      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">
-        Host · score when games are done
-      </p>
-      <p className="text-xs text-muted leading-relaxed">
-        {label} has a card and isn&apos;t scored yet. One job when the games
-        finish:
-      </p>
-      <Link
-        href="/commissioner?tab=results"
-        className="flex items-center justify-center w-full py-3.5 min-h-[52px] rounded-xl bg-primary text-black text-sm font-extrabold hover:opacity-90"
-      >
-        Score {label} →
-      </Link>
+    <div className="mb-5 rounded-xl border border-primary/35 bg-primary/8 px-4 py-3">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">
+            Host
+          </p>
+          <p className="text-sm text-foreground font-semibold leading-snug mt-0.5">
+            {label} is live — score when games finish
+          </p>
+        </div>
+        <Link
+          href="/commissioner?tab=results"
+          className="shrink-0 flex items-center justify-center px-5 py-3 min-h-[48px] rounded-xl bg-primary text-black text-sm font-extrabold hover:opacity-90 touch-manipulation"
+        >
+          Score {label} →
+        </Link>
+      </div>
     </div>
   );
 }

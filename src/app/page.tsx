@@ -368,9 +368,8 @@ export default function Home() {
         {/* One-time: first lock opened the full room */}
         <SoftUnlockBanner />
 
-        {/* Host score path only when not in quiet first hour (or always for ops after card) */}
-        {!firstWeekChrome && <HomeHostScoreStrip />}
-        {firstWeekChrome && isCommish && <HomeHostScoreStrip />}
+        {/* Later weeks only — self-hides while first-hour setup still owns score CTA */}
+        <HomeHostScoreStrip />
 
         {firstWeekChrome && (
           <p className="text-xs text-muted mb-4 leading-relaxed max-w-xl -mt-1">
