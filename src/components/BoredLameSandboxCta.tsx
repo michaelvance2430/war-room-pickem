@@ -11,7 +11,6 @@ import { getLeague, isOps } from "@/lib/league";
 import { hasOpeningWeekStarted } from "@/lib/ring-ceremony";
 import { firstSeasonWeek } from "@/lib/season-calendar";
 import { weekTitle } from "@/lib/dates";
-import { isPreLockCalm } from "@/lib/first-week";
 import { getSession } from "@/lib/league";
 import { isGuestMode } from "@/lib/guest-mode";
 import {
