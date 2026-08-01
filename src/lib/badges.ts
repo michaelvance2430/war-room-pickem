@@ -695,7 +695,8 @@ export const BADGE_CATALOG: BadgeDef[] = [
     howToEarn:
       "Be on the card the week any War Room slate game ends 6–7 or 7–6. Anyone who locked that week gets it — you do NOT need to pick the winner. Either score order. CFB + NFL.",
     tier: "epic",
-    points: 50,
+    /** Rarer than a normal epic (50) — 6–7 finals almost never hit. Still under legendary. */
+    points: 75,
     icon: "6️⃣",
   },
 
