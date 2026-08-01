@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * Permanent record — demoted under identity / hardware / season plot.
+ * Legacy + OVR live behind a fold. Hardware years stay visible.
+ */
+
 import Link from "next/link";
 import type { FootballResume as Resume } from "@/lib/player-history";
 import { LEGACY_SCORE_VERSION } from "@/lib/player-history";
@@ -7,73 +12,40 @@ import { LEGACY_SCORE_VERSION } from "@/lib/player-history";
 type Props = {
   resume: Resume;
   playerId: string;
+  /** Start collapsed so the profile leads with story, not spreadsheet */
+  defaultOpen?: boolean;
 };
 
-export default function FootballResume({ resume, playerId }: Props) {
+export default function FootballResume({
+  resume,
+  playerId,
+  defaultOpen = false,
+}: Props) {
   return (
-    <section className="rounded-2xl border border-amber-400/30 bg-gradient-to-b from-amber-400/10 to-card p-5 sm:p-6 mb-6 space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <section className="rounded-2xl border border-border bg-card p-5 sm:p-6 mb-6">
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-amber-300">
-            Football resume
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted">
+            Permanent record
           </p>
           <h2 className="text-lg font-bold text-foreground mt-0.5">
-            Permanent record
+            Football resume
           </h2>
           <p className="text-xs text-muted mt-1 max-w-md leading-relaxed">
-            Titles stick. Season stats update live. Multi-year ATS deepens as
-            seasons freeze into history.
+            Hardware years and titles stick. Spreadsheet lives under the fold.
           </p>
         </div>
         <Link
           href={`/museum?player=${encodeURIComponent(playerId)}`}
-          className="text-xs font-semibold text-amber-300 hover:text-amber-200 border border-amber-400/40 rounded-lg px-3 py-2"
+          className="text-xs font-semibold text-primary hover:underline"
         >
-          Open Museum →
+          Museum →
         </Link>
       </div>
 
-      {/* Legacy score hero */}
-      <div className="rounded-xl border border-amber-400/40 bg-background/80 px-4 py-4 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-[10px] uppercase tracking-wider text-muted font-bold">
-            Legacy score · {LEGACY_SCORE_VERSION}
-          </p>
-          <p className="text-4xl font-black text-amber-300 tabular-nums tracking-tight">
-            {resume.legacy.total.toLocaleString()}
-          </p>
-        </div>
-        <div className="text-right">
-          <p className="text-[10px] uppercase tracking-wider text-muted font-bold">
-            Season card rating
-          </p>
-          <p className="text-3xl font-black text-foreground tabular-nums">
-            {resume.overallRating}
-          </p>
-        </div>
-      </div>
-
-      {resume.legacy.parts.length > 0 && (
-        <details className="text-xs text-muted">
-          <summary className="cursor-pointer font-semibold text-foreground/90">
-            How legacy is calculated
-          </summary>
-          <ul className="mt-2 space-y-1 border border-border rounded-lg bg-background/60 px-3 py-2">
-            {resume.legacy.parts.map((part) => (
-              <li key={part.key} className="flex justify-between gap-3">
-                <span>{part.label}</span>
-                <span className="font-mono text-amber-200/90">
-                  +{part.points.toLocaleString()}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
-
-      {/* Titles */}
+      {/* Titles — identity, keep up top */}
       {resume.titles.length > 0 && (
-        <div>
+        <div className="mb-4">
           <p className="text-[10px] uppercase tracking-wider text-muted font-bold mb-2">
             Earned titles
           </p>
@@ -91,84 +63,121 @@ export default function FootballResume({ resume, playerId }: Props) {
         </div>
       )}
 
-      {/* Resume grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-        <Stat label="Member since" value={resume.memberSinceLabel} />
+      {/* Hardware counts with years when we have them */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
         <Stat
           label="Championships"
-          value={String(resume.championships)}
+          value={
+            resume.championships > 0
+              ? resume.champYears.length
+                ? `${resume.championships} · ${resume.champYears.join(", ")}`
+                : String(resume.championships)
+              : "0"
+          }
           accent={resume.championships > 0}
         />
-        <Stat label="Toilet titles" value={String(resume.toiletTitles)} />
-        <Stat label="Village Nerd" value={String(resume.crystalBalls)} />
-        <Stat label="Season record" value={resume.seasonRecordLabel} />
         <Stat
-          label="Season ATS"
+          label="Toilet titles"
           value={
-            resume.seasonAtsPct != null ? `${resume.seasonAtsPct}%` : "—"
+            resume.toiletTitles > 0
+              ? resume.toiletYears.length
+                ? `${resume.toiletTitles} · ${resume.toiletYears.join(", ")}`
+                : String(resume.toiletTitles)
+              : "0"
           }
         />
-        <Stat label="Perfect weeks" value={String(resume.perfectWeeks)} />
-        <Stat label="Current streak" value={resume.currentStreakLabel} />
         <Stat
-          label="Achievements"
-          value={`${resume.badgesEarned} / ${resume.badgesTotal || "?"}`}
+          label="Village Nerd"
+          value={
+            resume.crystalBalls > 0
+              ? resume.nerdYears.length
+                ? `${resume.crystalBalls} · ${resume.nerdYears.join(", ")}`
+                : String(resume.crystalBalls)
+              : "0"
+          }
         />
-        <Stat
-          label="Career cheevo"
-          value={String(resume.careerCheevoPoints)}
-        />
-        <Stat
-          label="Pick’em pts"
-          value={String(resume.seasonPickemPoints)}
-        />
-        {resume.dynastyYears.length > 0 && (
-          <Stat
-            label="Dynasty years"
-            value={resume.dynastyYears.join(" · ")}
-            accent
-          />
-        )}
+        <Stat label="Member since" value={resume.memberSinceLabel} />
       </div>
 
-      {resume.rival && (
-        <div className="rounded-lg border border-border bg-background/70 px-3 py-2.5">
-          <p className="text-[10px] uppercase tracking-wider text-muted font-bold">
-            Season rival
-          </p>
-          <p className="text-sm font-semibold mt-0.5">
-            <Link
-              href={`/profile/${resume.rival.userId}`}
-              className="text-primary hover:underline"
-            >
-              {resume.rival.name}
-            </Link>
-          </p>
-          <p className="text-xs text-muted mt-0.5">{resume.rival.blurb}</p>
-        </div>
+      {resume.dynastyYears.length > 1 && (
+        <p className="text-xs text-amber-200/90 mb-3 font-medium">
+          Dynasty years · {resume.dynastyYears.join(" · ")}
+        </p>
       )}
 
-      {/* Mini player card */}
-      <div className="rounded-xl border-2 border-amber-400/50 bg-background p-4 flex items-center justify-between gap-3">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-amber-300">
-            Season card
-          </p>
-          <p className="text-lg font-black">{resume.name}</p>
-          <p className="text-xs text-muted">
-            {resume.seasonAtsPct != null
-              ? `${resume.seasonAtsPct}% ATS`
-              : "No ATS yet"}
-            {resume.championships > 0 ? " · Champion hardware" : ""}
+      {/* Spreadsheet fold — legacy, OVR, raw counters */}
+      <details
+        className="rounded-xl border border-border/80 bg-background/40"
+        open={defaultOpen}
+      >
+        <summary className="cursor-pointer px-3 py-2.5 text-xs font-semibold text-muted hover:text-foreground list-none flex items-center justify-between gap-2">
+          <span>Deep stats &amp; legacy math</span>
+          <span className="text-[10px] uppercase tracking-wide opacity-70">
+            optional
+          </span>
+        </summary>
+        <div className="px-3 pb-3 space-y-3 border-t border-border/60 pt-3">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-muted font-bold">
+                Legacy score · {LEGACY_SCORE_VERSION}
+              </p>
+              <p className="text-2xl font-black text-amber-300/90 tabular-nums">
+                {resume.legacy.total.toLocaleString()}
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-[10px] uppercase tracking-wider text-muted font-bold">
+                Season card OVR
+              </p>
+              <p className="text-xl font-black text-foreground/80 tabular-nums">
+                {resume.overallRating}
+              </p>
+            </div>
+          </div>
+
+          {resume.legacy.parts.length > 0 && (
+            <ul className="text-[11px] text-muted space-y-1 rounded-lg border border-border px-3 py-2">
+              {resume.legacy.parts.map((part) => (
+                <li key={part.key} className="flex justify-between gap-3">
+                  <span>{part.label}</span>
+                  <span className="font-mono text-amber-200/80">
+                    +{part.points.toLocaleString()}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <Stat label="Season record" value={resume.seasonRecordLabel} />
+            <Stat
+              label="Season ATS"
+              value={
+                resume.seasonAtsPct != null ? `${resume.seasonAtsPct}%` : "—"
+              }
+            />
+            <Stat label="Perfect weeks" value={String(resume.perfectWeeks)} />
+            <Stat label="Current streak" value={resume.currentStreakLabel} />
+            <Stat
+              label="Achievements"
+              value={`${resume.badgesEarned} / ${resume.badgesTotal || "?"}`}
+            />
+            <Stat
+              label="Career cheevo"
+              value={String(resume.careerCheevoPoints)}
+            />
+            <Stat
+              label="Pick’em pts"
+              value={String(resume.seasonPickemPoints)}
+            />
+          </div>
+          <p className="text-[10px] text-muted leading-relaxed">
+            These numbers feed standings and cheevos. They live here so the top
+            of the profile can stay about who you are in the room.
           </p>
         </div>
-        <div className="text-center shrink-0">
-          <p className="text-[10px] text-muted uppercase">OVR</p>
-          <p className="text-3xl font-black text-amber-300 tabular-nums">
-            {resume.overallRating}
-          </p>
-        </div>
-      </div>
+      </details>
     </section>
   );
 }
