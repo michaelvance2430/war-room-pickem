@@ -11,6 +11,7 @@ import {
 import Link from "next/link";
 import {
   markHostScreenSeen,
+  markInviteCopied,
   stashPendingJoinCode,
   takePendingJoinCode,
 } from "@/lib/commish-onboarding";
@@ -544,27 +545,29 @@ function JoinPageInner() {
             {createdCode}
           </div>
 
-          <InviteFriends
-            leagueName={leagueLabel}
-            code={createdCode}
-            leagueId={leagueId}
-            sportId={
-              // Prefer what we just wrote to session storage
-              (() => {
-                try {
-                  const raw = localStorage.getItem("warroom-league");
-                  if (raw) {
-                    const j = JSON.parse(raw) as { sportId?: string };
-                    if (j.sportId) return j.sportId;
+          <div id="invite-friends-root">
+            <InviteFriends
+              leagueName={leagueLabel}
+              code={createdCode}
+              leagueId={leagueId}
+              sportId={
+                // Prefer what we just wrote to session storage
+                (() => {
+                  try {
+                    const raw = localStorage.getItem("warroom-league");
+                    if (raw) {
+                      const j = JSON.parse(raw) as { sportId?: string };
+                      if (j.sportId) return j.sportId;
+                    }
+                  } catch {
+                    /* ignore */
                   }
-                } catch {
-                  /* ignore */
-                }
-                return undefined;
-              })()
-            }
-            className="mb-4 !border-primary/30"
-          />
+                  return undefined;
+                })()
+              }
+              className="mb-4 !border-primary/30"
+            />
+          </div>
 
           {hostCopied && (
             <p className="text-xs text-primary text-center mb-3">{hostCopied}</p>
@@ -582,19 +585,34 @@ function JoinPageInner() {
 
           <ol className="text-left text-sm space-y-2 mb-6 rounded-lg border border-border bg-background/50 px-4 py-3">
             <li>
-              <span className="font-semibold text-primary">1.</span> Share invite
-              (one tap above)
+              <span className="font-semibold text-primary">1.</span> Share the
+              invite (empty room is the #1 fail)
             </li>
             <li>
-              <span className="font-semibold text-primary">2.</span> Build &amp;
-              publish a card (demo slate is fine first time)
+              <span className="font-semibold text-primary">2.</span> Publish a
+              card (demo slate is fine first time)
             </li>
             <li>
-              <span className="font-semibold text-primary">3.</span> After games,
-              score the week
+              <span className="font-semibold text-primary">3.</span> Score the
+              week (practice is fine)
             </li>
           </ol>
 
+          <p className="text-[11px] text-muted text-center mb-3 leading-relaxed">
+            Share first — then build the card. Friends can&apos;t join a secret.
+          </p>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (leagueId) markInviteCopied(leagueId);
+              const el = document.getElementById("invite-friends-root");
+              el?.scrollIntoView({ behavior: "smooth", block: "center" });
+            }}
+            className="w-full py-4 min-h-[56px] rounded-xl bg-primary text-black text-base font-extrabold mb-2 touch-manipulation"
+          >
+            Share invite first ↑
+          </button>
           <button
             type="button"
             onClick={() => {
@@ -602,9 +620,9 @@ function JoinPageInner() {
               router.push("/commissioner?tab=card&first=1");
               router.refresh();
             }}
-            className="w-full py-4 min-h-[56px] rounded-xl bg-primary text-black text-base font-extrabold mb-2 touch-manipulation"
+            className="w-full py-3.5 min-h-[52px] rounded-xl border-2 border-primary/40 bg-primary/10 text-primary text-sm font-bold mb-2 touch-manipulation"
           >
-            Publish first card (one tap) →
+            Then publish first card →
           </button>
           <button
             type="button"
@@ -668,17 +686,20 @@ function JoinPageInner() {
           <div className="rounded-xl border border-border bg-card p-5 space-y-4">
             <h2 className="font-semibold">Create league</h2>
             <p className="text-xs text-muted">
-              Pick a sport, then name the room. Up to {MAX_LEAGUE_PLAYERS}{" "}
-              players. Same War Room soul — different field.
+              Pick CFB or NFL, then name the room. Best with{" "}
+              <strong className="text-foreground">8–16 friends</strong> (bots
+              can fill empty seats later). Cap {MAX_LEAGUE_PLAYERS}.
             </p>
 
             <div>
               <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-2">
                 Sport
               </p>
-              <div className="space-y-2 max-h-[min(50vh,22rem)] overflow-y-auto pr-0.5">
-                {listSportPickerOptions().map((s) => {
-                  const live = s.status === "live";
+              <div className="space-y-2 pr-0.5">
+                {listSportPickerOptions()
+                  .filter((s) => s.status === "live")
+                  .map((s) => {
+                  const live = true;
                   const selected = sportId === s.id;
                   const isWwc = s.id === "soccer_wwc";
                   const isNfl = s.id === "nfl";
@@ -767,10 +788,8 @@ function JoinPageInner() {
                 })}
               </div>
               <p className="text-[11px] text-muted mt-2 leading-relaxed">
-                <span className="text-foreground font-medium">CFB</span> and{" "}
-                <span className="text-foreground font-medium">NFL</span> are
-                live. World Cup and others ship next — same clubhouse, different
-                desk.
+                More sports (WWC and friends) ship next — same clubhouse,
+                different desk.
               </p>
             </div>
 

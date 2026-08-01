@@ -3425,6 +3425,23 @@ function CommissionerPageInner() {
                   onDismiss={() => setShowFirstWizard(false)}
                 />
               )}
+            {/* First hour: wizard only — full Build Card after publish or “Use full tools” */}
+            {showFirstWizard &&
+              publishedGames.length === 0 &&
+              (firstTime || searchParams.get("first") === "1") && (
+                <p className="text-xs text-muted mb-6 leading-relaxed text-center">
+                  Full odds tools stay hidden until you publish a card or tap{" "}
+                  <strong className="text-foreground">Use full tools</strong>{" "}
+                  above. Keep the first hour simple.
+                </p>
+              )}
+            {!(
+              showFirstWizard &&
+              publishedGames.length === 0 &&
+              (firstTime || searchParams.get("first") === "1")
+            ) && (
+            <>
+            {!(firstTime && publishedGames.length === 0) && (
             <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 mb-4 text-xs text-foreground leading-relaxed">
               <p className="font-bold text-amber-200">
                 Lazy commissioner protection
@@ -3437,6 +3454,7 @@ function CommissionerPageInner() {
                 Publishing yourself clears the strike count.
               </p>
             </div>
+            )}
             <div className="rounded-xl border border-border bg-card p-5 mb-6">
               <h2 className="font-semibold mb-1">Pick&apos;em week</h2>
               <p className="text-xs text-muted mb-3">
@@ -4136,6 +4154,8 @@ function CommissionerPageInner() {
                 ). Everyone&apos;s My Picks refreshes automatically when you
                 publish or change games — no need to tell them to reload.
               </div>
+            )}
+            </>
             )}
           </div>
         )}

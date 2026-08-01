@@ -99,8 +99,13 @@ export default function TrophyRoomPage() {
         if (isCommissioner() || isOps()) {
           try {
             await autoEngraveAllTrophies({});
-            // Re-link Excel winners (e.g. Jstray → Toilet Bowl) + profile ids
-            await seedPriorSeason2025Trophies();
+            // Re-link Excel only if this league already has prior-season plaques
+            // (founder rooms). Never auto-seed stranger leagues with friend-group lore.
+            const list = await loadLeagueTrophies();
+            const hasExcel = list.some((t) => t.seasonYear === 2025);
+            if (hasExcel) {
+              await seedPriorSeason2025Trophies();
+            }
             await reload();
             await loadRosterAvatars();
           } catch {
@@ -116,12 +121,14 @@ export default function TrophyRoomPage() {
     setSyncMsg(null);
     try {
       const res = await autoEngraveAllTrophies({});
-      const relink = await seedPriorSeason2025Trophies();
-      setSyncMsg(
-        [res.message, relink.ok ? "Excel holders re-linked to live profiles." : null]
-          .filter(Boolean)
-          .join(" · ")
-      );
+      const list = await loadLeagueTrophies();
+      const hasExcel = list.some((t) => t.seasonYear === 2025);
+      let relinkMsg: string | null = null;
+      if (hasExcel) {
+        const relink = await seedPriorSeason2025Trophies();
+        if (relink.ok) relinkMsg = "Excel holders re-linked to live profiles.";
+      }
+      setSyncMsg([res.message, relinkMsg].filter(Boolean).join(" · "));
       await reload();
       await loadRosterAvatars();
     } catch (e) {

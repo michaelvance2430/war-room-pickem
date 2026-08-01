@@ -7,10 +7,12 @@ import {
   markPicksTipNeverAgain,
   PICKS_HOW_TO_STEPS,
 } from "@/lib/picks-tip";
+import { hasSeenRules } from "@/lib/rules";
+import { isQuietPicksPath } from "@/lib/picks-progressive";
 
 /**
- * Shows every time you open My Picks, unless they checked
- * “Never show me this again.”
+ * Picks cheat sheet — skipped on quiet first-card path (inline banner
+ * covers it) and until Rules has fired so we don't stack briefings.
  */
 export default function PicksHowToModal() {
   const [open, setOpen] = useState(false);
@@ -18,6 +20,10 @@ export default function PicksHowToModal() {
 
   useEffect(() => {
     if (hasDismissedPicksTip()) return;
+    // First lock path already has quiet intro on the page
+    if (isQuietPicksPath()) return;
+    // Don't stack on top of first-session rules modal
+    if (!hasSeenRules()) return;
     const t = setTimeout(() => setOpen(true), 250);
     return () => clearTimeout(t);
   }, []);

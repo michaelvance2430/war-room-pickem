@@ -54,6 +54,7 @@ import { canSurfaceChaosMode } from "@/lib/first-week";
 import {
   isQuietPicksPath,
   quietPicksBonusHint,
+  quietPicksBonusStartsOpen,
   quietPicksIntro,
 } from "@/lib/picks-progressive";
 import { isEyesLocalPlayActive } from "@/lib/creator-eyes";
@@ -125,7 +126,8 @@ export default function PicksPage() {
     useState<PicksSavedModalDetail | null>(null);
   /** First-time path: quieter chrome until first lock */
   const [quietPicks, setQuietPicks] = useState(true);
-  const [bonusOpen, setBonusOpen] = useState(false);
+  /** Quiet first card: prop open by default so lock isn't blocked by a hidden control */
+  const [bonusOpen, setBonusOpen] = useState(() => quietPicksBonusStartsOpen());
   const [eyesPreview, setEyesPreview] = useState(false);
 
   const revisionRef = useRef<string>("");

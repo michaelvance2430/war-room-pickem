@@ -244,7 +244,6 @@ export default function HomeWeekHero() {
     ? "rgba(193,18,31,0.22)"
     : "rgba(34,197,94,0.12)";
 
-  const roomName = getLeague()?.name?.trim() || null;
   const sportShort = isNfl ? "NFL" : sportId === "soccer_wwc" ? "WWC" : "CFB";
 
   return (
@@ -255,16 +254,12 @@ export default function HomeWeekHero() {
       >
         <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
           <div className="min-w-0">
-            {roomName && (
-              <p className="text-sm sm:text-base font-black text-white truncate leading-tight mb-0.5">
-                {roomName}
-                <span className="text-muted font-semibold text-[11px] sm:text-xs ml-1.5">
-                  {sportShort}
-                </span>
-              </p>
-            )}
+            {/* Room name lives on HomeSportHeader / HomeRoomContext — avoid double h1 */}
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">
               {eyebrow}
+              <span className="text-muted font-semibold tracking-normal normal-case ml-1.5">
+                · {sportShort}
+              </span>
             </p>
           </div>
           <span className="text-[11px] font-mono font-bold tabular-nums text-primary/90 border border-primary/35 rounded-full px-2.5 py-0.5 bg-primary/10 shrink-0">

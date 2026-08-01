@@ -9,6 +9,7 @@
 import { useEffect, useState } from "react";
 import { getSession } from "@/lib/league";
 import { isGuestMode } from "@/lib/guest-mode";
+import { hasSeenRules } from "@/lib/rules";
 import BrandMark from "@/components/BrandMark";
 
 const FOREVER_KEY = "warroom-login-welcome-v1-dismissed";
@@ -62,11 +63,14 @@ export default function LoginWelcomeModal() {
     if (!session?.playerId) return;
     if (isDismissedForever()) return;
     if (wasShownThisSession()) return;
+    // First session: Rules briefing wins. Welcome only after they've seen rules
+    // (or on a later login) so we never stack two full-screen modals.
+    if (!hasSeenRules()) return;
 
     const t = window.setTimeout(() => {
       markShownThisSession();
       setOpen(true);
-    }, 350);
+    }, 600);
     return () => window.clearTimeout(t);
   }, []);
 
@@ -112,34 +116,26 @@ export default function LoginWelcomeModal() {
 
         <div className="px-5 py-4 overflow-y-auto flex-1 min-h-0 space-y-3 text-sm text-muted leading-relaxed">
           <p className="text-foreground">
-            Honestly? We&apos;re a little surprised you figured out how to get
-            in. Like… genuinely. There was a betting pool.
+            You&apos;re in. Welcome to the room — lock a card, talk in the
+            locker, and let the standings do the roasting.
           </p>
           <p>
-            I guess the rumors are true —{" "}
-            <span className="text-primary font-semibold">you CAN read</span>.
-            Bold of you. Rare talent these days. Don&apos;t let it go to your
-            head.
+            We ship improvements constantly (messy on purpose). Check back
+            when you can; new stuff keeps landing.
           </p>
           <div className="rounded-xl border border-primary/35 bg-primary/10 px-3.5 py-3 space-y-2">
             <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-primary">
-              Heads up from the shop
-            </p>
-            <p className="text-foreground text-sm leading-relaxed">
-              Improvements are being made around the clock (well, around{" "}
-              <em>our</em> clock — it&apos;s messy). Check back daily if you
-              can; new stuff will keep landing.
+              One job this week
             </p>
             <p className="text-foreground text-sm leading-relaxed font-medium">
-              Things will be slow until{" "}
-              <span className="text-primary">Sunday, Aug 23</span>. After that,
-              we stop pretending this is a calm construction zone.
+              Open <span className="text-primary">My Picks</span>, fill the
+              card, and lock before first kickoff. Everything else opens after
+              that.
             </p>
           </div>
           <p className="text-xs text-muted">
-            In the meantime: make picks, roast your friends, and try not to
-            confuse the save button with the back button. We believe in you.
-            Mostly.
+            Humor stays. Homework later. You already passed the hard part —
+            getting in.
           </p>
         </div>
 

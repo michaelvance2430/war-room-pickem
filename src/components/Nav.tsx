@@ -362,10 +362,9 @@ export default function Nav() {
           : []),
       ];
 
-  // More: first hour = Board + rules + account. Depth after first lock.
+  // More: first hour = rules + account only (Board waits until first lock).
   const moreLinks: NavLink[] = earlyNav
     ? [
-        { href: "/board", label: "The Board" },
         { href: "/rules", label: "How to play" },
         { href: "/account", label: "Account" },
       ]

@@ -22,10 +22,15 @@ export function isQuietPicksPath(playerId?: string | null): boolean {
 export function quietPicksIntro(): string {
   return (
     "One job: pick each side, set confidence 1–5 (each once), mark a Best Bet, " +
-    "answer the bonus, then Lock it in before first kickoff."
+    "answer the bonus below, then Lock it in before first kickoff."
   );
 }
 
 export function quietPicksBonusHint(): string {
-  return "Bonus still counts for points — open it, pick one side, then lock.";
+  return "Bonus is required — pick one side, then lock. Same rules as every week.";
+}
+
+/** Quiet path: prop starts open so “needed” isn’t hidden. */
+export function quietPicksBonusStartsOpen(): boolean {
+  return true;
 }

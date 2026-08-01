@@ -163,6 +163,19 @@ export default function StandingsPage() {
           </div>
         )}
 
+        <p className="text-[11px] text-muted mb-3 leading-relaxed flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span className="font-semibold text-foreground/80">Last in</span>
+          <span className="inline-flex items-center gap-1">
+            <span className="text-emerald-400 font-bold">●</span> ≤6h
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="text-amber-400 font-bold">●</span> 6–18h
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="text-red-400 font-bold">●</span> 18h+
+          </span>
+        </p>
+
         <div className="phone-h-scroll sm:flex-wrap sm:overflow-visible mb-5">
           {divisions.map((d) => (
             <button

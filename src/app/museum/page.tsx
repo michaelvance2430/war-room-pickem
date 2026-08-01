@@ -48,10 +48,11 @@ function MuseumInner() {
           loadLeagueTrophies(),
         ]);
 
-        // Host: permanently engrave Excel-era hardware if missing
-        // (Kahmann champ · Strayer toilet · Big Ball Ben nerd)
+        // Host: re-link Excel winners only if this league already has 2025 plaques.
+        // Never auto-seed friend-group lore into brand-new stranger leagues.
         if (
           (isCommissioner() || isOps()) &&
+          tlist.some((t) => t.seasonYear === 2025) &&
           !hasPriorSeasonBigHardware(tlist)
         ) {
           try {
@@ -60,26 +61,28 @@ function MuseumInner() {
               tlist = await loadLeagueTrophies();
               if (!cancelled) {
                 setExcelNote(
-                  `${PRIOR_SEASON_LABEL} Excel season locked into the archives.`
+                  `${PRIOR_SEASON_LABEL} hardware re-linked to live profiles.`
                 );
               }
             }
           } catch {
-            /* display merge still fills the gap */
+            /* ignore */
           }
         }
 
         if (cancelled) return;
-        // Always merge so Museum shows Excel winners even before DB seed
-        const withExcel = mergePriorSeasonTrophies(tlist, { players: plist });
+        // Merge Excel display only when this room already has 2025 engravings
+        // (or synthetic prior plaques from a prior import).
+        const hasExcel = tlist.some((t) => t.seasonYear === 2025);
+        const withExcel = hasExcel
+          ? mergePriorSeasonTrophies(tlist, { players: plist })
+          : tlist;
         setPlayers(plist);
         setTrophies(withExcel);
       } catch {
         if (!cancelled) {
           setPlayers([]);
-          setTrophies(
-            mergePriorSeasonTrophies([], undefined)
-          );
+          setTrophies([]);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -135,11 +138,8 @@ function MuseumInner() {
           <p className="text-sm text-muted mt-2 leading-relaxed max-w-xl">
             Not just stats — the story of this room. Trophies, streaks, and
             milestones that make next August feel continuous with this one.
-            Includes the full {PRIOR_SEASON_LABEL} Excel season:{" "}
-            <strong className="text-foreground">Kahmann</strong> champion,{" "}
-            <strong className="text-foreground">Justin Strayer</strong> Toilet
-            Bowl, <strong className="text-foreground">Big Ball Ben</strong>{" "}
-            Village Nerd.
+            Prior-season hardware appears when the host engraves it (Trophy
+            Room import). Names and photos follow live profiles.
           </p>
           {excelNote && (
             <p className="mt-2 text-xs text-primary font-medium">{excelNote}</p>
@@ -286,10 +286,8 @@ function MuseumInner() {
         )}
 
         <p className="text-[11px] text-muted mt-10 text-center leading-relaxed">
-          Museum v1 · Excel {PRIOR_SEASON_LABEL} hardware is part of the
-          permanent record (Kahmann / Jstray · Toilet / Big Ball Ben). Names
-          and photos follow live profiles. Live season + deeper archives still
-          fill in as you play.
+          Museum v1 · feeds trophies + live season. Hosts can import prior
+          seasons from Trophy Room. Deeper multi-year archives still fill in.
         </p>
       </main>
     </div>

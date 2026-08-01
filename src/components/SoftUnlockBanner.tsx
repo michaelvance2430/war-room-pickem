@@ -80,11 +80,12 @@ export default function SoftUnlockBanner() {
           Room unlocked
         </p>
         <p className="text-sm text-foreground font-semibold leading-snug">
-          You locked a card — the full room is open.
+          You locked a card — more of the room just opened.
         </p>
         <p className="text-xs text-muted mt-1 leading-relaxed">
-          Board, standings, and locker are live. The paper still pops when the
-          host scores — that&apos;s the weekly appointment.
+          The Board is in the main nav now. Home will get louder (checklist,
+          takes, crowns). The Gazette paper still pops when the host scores —
+          that&apos;s the weekly appointment.
         </p>
       </div>
       <div className="flex flex-wrap gap-2 shrink-0">

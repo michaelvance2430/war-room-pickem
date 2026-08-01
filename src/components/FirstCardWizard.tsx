@@ -74,8 +74,8 @@ export default function FirstCardWizard({
       </button>
       <p className="text-[11px] text-muted text-center leading-relaxed">
         Then open <strong className="text-foreground">Enter Results</strong> →{" "}
-        <strong className="text-foreground">Randomize &amp; score</strong>{" "}
-        (also one tap).
+        <strong className="text-foreground">Score (practice)</strong> — one
+        tap. Advanced tools unlock after that.
       </p>
 
       {(onDemo || onPublish) && (
