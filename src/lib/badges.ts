@@ -8,8 +8,12 @@ import {
   syncCommissionerTenureFromSession,
 } from "./commish-tenure";
 import {
+  dualDeskFinishProgress,
   getSportsPlayedCount,
+  hasFinishedNflAndCfb,
   recordSportPlayed,
+  recordSportWeeks,
+  SPORT_FINISH_WEEKS,
 } from "./sports-played";
 import {
   FIRST_FINAL_BADGE_ID,
@@ -672,6 +676,16 @@ export const BADGE_CATALOG: BadgeDef[] = [
     tier: "legendary",
     points: 200,
     icon: "🛡️",
+  },
+  {
+    id: "dual_desk_legend",
+    name: "Saturday & Sunday",
+    description:
+      "You finished real seasons on both desks — CFB and NFL. Not a tourist who joined once. Both calendars. Both brains. Absolute dual-sport.",
+    howToEarn: `Play at least ${SPORT_FINISH_WEEKS} weeks in a CFB league AND ${SPORT_FINISH_WEEKS} weeks in an NFL league (career high-water on each desk). Join alone is common; finish both is legendary.`,
+    tier: "legendary",
+    points: 200,
+    icon: "🏈",
   },
   {
     id: "six_seven",
@@ -1366,6 +1380,40 @@ function evaluateBadge(
           hasPermanentBadge(player, "six_seven") ||
           hasEngagement(player.id, "six_seven_final"),
       };
+
+    case "dual_desk_legend": {
+      if (hasPermanentBadge(player, "dual_desk_legend")) {
+        return { earned: true };
+      }
+      // Stamp current desk weeks so dual finish is detectable this session
+      try {
+        const { getLeague, getSession } =
+          require("./league") as typeof import("./league");
+        const sid = getSession()?.playerId;
+        if (sid === player.id || !sid) {
+          const sport = getLeague()?.sportId;
+          const w =
+            player.weeksPlayed ||
+            (Array.isArray(player.weeklyPoints)
+              ? player.weeklyPoints.filter((x) => (x || 0) > 0).length
+              : 0);
+          recordSportPlayed(player.id, sport);
+          recordSportWeeks(player.id, sport, w);
+        }
+      } catch {
+        /* ignore */
+      }
+      const prog = dualDeskFinishProgress(player.id, SPORT_FINISH_WEEKS);
+      if (hasFinishedNflAndCfb(player.id, SPORT_FINISH_WEEKS)) {
+        try {
+          grantPermanentBadgeId(player.id, "dual_desk_legend");
+        } catch {
+          /* ignore */
+        }
+        return { earned: true, progress: { current: 2, target: 2 } };
+      }
+      return progress(prog.current, prog.target);
+    }
 
     case "the_closer":
       // CFP weeks 15–18: any solid score on late weeks

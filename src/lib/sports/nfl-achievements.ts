@@ -305,6 +305,13 @@ export function nflDisplayOverlay(def: BadgeDef): BadgeDef {
       howToEarn:
         "Lock an NFL card the week any slate game ends 6–7 or 7–6. Everyone who locked gets it; picking the winner is irrelevant.",
     },
+    dual_desk_legend: {
+      name: "Saturday & Sunday",
+      description:
+        "Finished real seasons on campus and on Sunday. Dual-sport, not dual-join.",
+      howToEarn:
+        "Play 10+ weeks in CFB and 10+ weeks in NFL (career). Legendary dual-desk.",
+    },
     saturday_starter: {
       name: "Sunday Starter",
       description: "First Sunday in the War Room.",
