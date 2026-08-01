@@ -59,6 +59,8 @@ export default function FounderDashboardPage() {
   const [saveNote, setSaveNote] = useState<string | null>(null);
   const [clientMs, setClientMs] = useState<number | null>(null);
   const [eyes, setEyes] = useState<CreatorEyesMode>("off");
+  /** Week to live as when entering eyes (progressive + local demo card) */
+  const [eyesWeek, setEyesWeek] = useState(1);
 
   const refresh = useCallback(async () => {
     const session = getSession();
@@ -118,7 +120,7 @@ export default function FounderDashboardPage() {
   }, [refresh]);
 
   function enterEyes(mode: CreatorEyesMode, href: string) {
-    setCreatorEyesMode(mode);
+    setCreatorEyesMode(mode, { weekNumber: eyesWeek });
     setEyes(mode);
     router.push(href);
   }
@@ -126,6 +128,17 @@ export default function FounderDashboardPage() {
   function exitEyes() {
     setCreatorEyesMode("off");
     setEyes("off");
+  }
+
+  function changeEyesWeek(w: number) {
+    const n = Math.max(0, Math.min(22, w));
+    setEyesWeek(n);
+    if (eyes !== "off") {
+      void import("@/lib/creator-eyes").then((m) => {
+        m.applyEyesWeek(n);
+        setEyes(m.getCreatorEyesMode());
+      });
+    }
   }
 
   async function toggleIncident(active: boolean) {
@@ -215,15 +228,52 @@ export default function FounderDashboardPage() {
             See what they see
           </h2>
           <p className="text-xs text-muted leading-relaxed">
-            One click. Your browser only. Server powers unchanged — this only
-            changes chrome (nav, Home, Run the Room). Exit when you&apos;re done
-            testing.
+            Pick a week, then step into their shoes. You get a{" "}
+            <strong className="text-foreground">local demo card</strong> for
+            that week — lock picks, Locker, Board, progressive chrome — without
+            changing your real league standings.
           </p>
+
+          <label className="block text-xs text-muted">
+            Live as week
+            <input
+              type="number"
+              min={0}
+              max={22}
+              value={eyesWeek}
+              onChange={(e) =>
+                changeEyesWeek(parseInt(e.target.value, 10) || 0)
+              }
+              className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground font-mono"
+            />
+            <span className="block mt-1 text-[11px] text-muted">
+              Week 1 = quiet start · Week 3+ = Gazette shelf unlocked · change
+              anytime while eyes are on
+            </span>
+          </label>
 
           {eyes !== "off" && (
             <div className="rounded-lg border border-sky-400/40 bg-sky-950/40 px-3 py-2.5 text-xs text-sky-100 leading-relaxed">
-              <p className="font-bold">{creatorEyesLabel(eyes)} ON</p>
+              <p className="font-bold">
+                {creatorEyesLabel(eyes)} · WEEK {eyesWeek}
+              </p>
               <p className="mt-0.5 text-sky-200/80">{creatorEyesBlurb(eyes)}</p>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => router.push("/picks")}
+                  className="py-2 min-h-[40px] rounded-lg bg-primary text-black text-xs font-bold"
+                >
+                  Make picks →
+                </button>
+                <button
+                  type="button"
+                  onClick={() => router.push("/")}
+                  className="py-2 min-h-[40px] rounded-lg border border-sky-400/50 text-sky-100 text-xs font-bold"
+                >
+                  Home
+                </button>
+              </div>
               <button
                 type="button"
                 onClick={exitEyes}
@@ -241,11 +291,11 @@ export default function FounderDashboardPage() {
               className="w-full text-left rounded-xl border border-sky-400/40 bg-background/80 hover:bg-sky-500/15 px-3 py-3 min-h-[56px] transition"
             >
               <span className="block text-sm font-bold text-foreground">
-                Brand-new player
+                Brand-new player · week {eyesWeek}
               </span>
               <span className="block text-[11px] text-muted mt-0.5">
-                Opens Home · quiet nav · Picks · Board · Locker · no Gazette
-                shelf · no Run the Room
+                Full player path: Home · Lock it in · Locker · Board. Progressive
+                chrome for that week. Local demo card.
               </span>
             </button>
             <button
@@ -254,11 +304,11 @@ export default function FounderDashboardPage() {
               className="w-full text-left rounded-xl border border-primary/40 bg-background/80 hover:bg-primary/10 px-3 py-3 min-h-[56px] transition"
             >
               <span className="block text-sm font-bold text-foreground">
-                Brand-new commissioner
+                Brand-new commissioner · week {eyesWeek}
               </span>
               <span className="block text-[11px] text-muted mt-0.5">
-                Opens Run the Room · simple host banner · fill seats yes/no ·
-                deep bot tools hidden
+                Simple Run the Room · fill seats yes/no · no deep bot lab. Same
+                week progressive context.
               </span>
             </button>
           </div>

@@ -114,6 +114,17 @@ export async function loadLeagueActiveWeek(): Promise<number> {
   } catch {
     /* ignore */
   }
+  // Creator eyes / test sandbox: stay on the week you're previewing
+  try {
+    const eyes = await import("./creator-eyes");
+    if (eyes.isEyesLocalPlayActive()) {
+      const { loadCreatorSandbox } = await import("./creator-sandbox");
+      const s = loadCreatorSandbox();
+      if (s.enabled) return s.weekNumber;
+    }
+  } catch {
+    /* ignore */
+  }
   const session = getSession();
   let week = 1;
   try {
@@ -384,6 +395,26 @@ export async function loadWeekCard(weekNumber = 1): Promise<CloudCard | null> {
       };
     }
   } catch {
+    /* fall through */
+  }
+
+  // Creator eyes: local playable demo card for the preview week (no cloud write)
+  try {
+    const eyes = await import("./creator-eyes");
+    if (eyes.isEyesLocalPlayActive()) {
+      await eyes.ensureEyesWeekCard(weekNumber);
+      const local = eyes.loadEyesLocalCard(weekNumber);
+      if (local?.games?.length) {
+        return {
+          weekCardId: `eyes-card-w${weekNumber}`,
+          weekNumber,
+          publishedAt: new Date().toISOString(),
+          games: local.games,
+          prop: local.prop,
+        };
+      }
+    }
+  } catch {
     /* fall through to cloud */
   }
 
@@ -479,10 +510,12 @@ export async function savePicksToCloud(opts: {
     return { ok: false, error: "Not signed into a league" };
   }
 
-  // Guest demo: save picks locally so the player tutorial can complete
+  // Guest demo / creator eyes: local picks only (never write real league board)
   try {
     const { isGuestMode } = await import("./guest-mode");
-    if (isGuestMode()) {
+    const eyes = await import("./creator-eyes");
+    const localPlay = isGuestMode() || eyes.isEyesLocalPlayActive();
+    if (localPlay) {
       const pickList = Object.values(opts.picks);
       if (!pickList.length) return { ok: false, error: "No picks to save" };
       const payload = {
@@ -492,10 +525,10 @@ export async function savePicksToCloud(opts: {
         lockedAt: new Date().toISOString(),
         isChaos: !!opts.isChaos,
       };
-      localStorage.setItem(
-        `warroom-picks-week-${opts.weekNumber}`,
-        JSON.stringify(payload)
-      );
+      const key = eyes.isEyesLocalPlayActive()
+        ? eyes.eyesPicksStorageKey(opts.weekNumber)
+        : `warroom-picks-week-${opts.weekNumber}`;
+      localStorage.setItem(key, JSON.stringify(payload));
       if (opts.isChaos) {
         try {
           const { spendChaosUse, CHAOS_BADGE_ID } = await import("./chaos-mode");
@@ -505,6 +538,12 @@ export async function savePicksToCloud(opts: {
         } catch {
           /* ignore */
         }
+      }
+      try {
+        const { markHasLockedPicksOnce } = await import("./first-week");
+        markHasLockedPicksOnce(session.playerId);
+      } catch {
+        /* ignore */
       }
       try {
         const { markEngagement } = await import("./engagement");
@@ -742,8 +781,12 @@ export async function loadMyPicks(weekNumber = 1) {
 
   try {
     const { isGuestMode } = await import("./guest-mode");
-    if (isGuestMode()) {
-      const raw = localStorage.getItem(`warroom-picks-week-${weekNumber}`);
+    const eyes = await import("./creator-eyes");
+    if (isGuestMode() || eyes.isEyesLocalPlayActive()) {
+      const key = eyes.isEyesLocalPlayActive()
+        ? eyes.eyesPicksStorageKey(weekNumber)
+        : `warroom-picks-week-${weekNumber}`;
+      const raw = localStorage.getItem(key);
       if (!raw) return null;
       const data = JSON.parse(raw) as {
         picks?: Record<string, UserPick>;
