@@ -28,6 +28,24 @@ export default function SportPoolPollBanner() {
       return;
     }
     const { poll: p } = await loadOpenPollForLeague(league.id);
+    // Hide "start another sport" if they already play that sport elsewhere
+    if (p?.targetSportId) {
+      try {
+        const { fetchMyMemberships } = await import("@/lib/session-restore");
+        const ms = await fetchMyMemberships();
+        const already = ms.some(
+          (m) =>
+            (m.sportId || "cfb").toLowerCase() ===
+            (p.targetSportId || "").toLowerCase()
+        );
+        if (already) {
+          setPoll(null);
+          return;
+        }
+      } catch {
+        /* show poll if memberships fail */
+      }
+    }
     setPoll(p);
     if (p) {
       const v = await myVoteForPoll(p.id);

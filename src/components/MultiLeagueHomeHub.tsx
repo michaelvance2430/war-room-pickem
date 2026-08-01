@@ -1,12 +1,13 @@
 "use client";
 
 /**
- * Account-level strip on Home when you're in 2+ leagues.
- * Home stays the active-league room; this reminds you other rooms exist
- * and lets you switch or jump straight to picks for another card.
+ * Slim multi-league switcher on Home (2+ leagues only).
+ * Collapsed by default: "Your rooms · sport You're here · N need you"
+ * Expand for one-line rooms + one primary CTA each.
+ * Active-league cockpit stays below — this is not a second homepage.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -20,14 +21,14 @@ import { createClient } from "@/lib/supabase/client";
 
 type LeaguePulse = {
   leagueId: string;
-  /** Latest week we found a picks row for this user */
-  lastPickWeek: number | null;
+  /** Published week that needs a lock (null = no card yet) */
+  openWeek: number | null;
+  needsPicks: boolean;
   locked: boolean;
-  hasRow: boolean;
+  isHost: boolean;
 };
 
 type Props = {
-  /** After switch — parent reloads league chrome */
   onSwitched?: () => void;
 };
 
@@ -37,8 +38,10 @@ export default function MultiLeagueHomeHub({ onSwitched }: Props) {
   const [pulse, setPulse] = useState<Record<string, LeaguePulse>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
 
   const activeId = getSession()?.leagueId || getLeague()?.id || "";
+  const me = getSession()?.playerId;
 
   const load = useCallback(async () => {
     try {
@@ -48,51 +51,69 @@ export default function MultiLeagueHomeHub({ onSwitched }: Props) {
         setPulse({});
         return;
       }
-      // Lightweight: latest pick row per league for THIS user (no sides)
-      const session = getSession();
-      const uid = session?.playerId;
+      const uid = getSession()?.playerId;
       if (!uid) return;
       const supabase = createClient();
       const next: Record<string, LeaguePulse> = {};
+
       await Promise.all(
         ms.map(async (m) => {
+          const isHost =
+            m.role === "commissioner" || m.commissionerId === uid;
           try {
-            const { data } = await supabase
-              .from("picks")
-              .select("week_number, locked_at")
+            // Latest published card week for this room
+            const { data: card } = await supabase
+              .from("week_cards")
+              .select("week_number")
               .eq("league_id", m.leagueId)
-              .eq("user_id", uid)
               .order("week_number", { ascending: false })
               .limit(1)
               .maybeSingle();
-            if (!data) {
+            const openWeek =
+              card?.week_number != null ? Number(card.week_number) : null;
+
+            if (openWeek == null || Number.isNaN(openWeek)) {
               next[m.leagueId] = {
                 leagueId: m.leagueId,
-                lastPickWeek: null,
+                openWeek: null,
+                needsPicks: false,
                 locked: false,
-                hasRow: false,
+                isHost,
               };
               return;
             }
+
+            const { data: pick } = await supabase
+              .from("picks")
+              .select("locked_at")
+              .eq("league_id", m.leagueId)
+              .eq("user_id", uid)
+              .eq("week_number", openWeek)
+              .maybeSingle();
+
+            const locked = !!(pick as { locked_at?: string | null } | null)
+              ?.locked_at;
             next[m.leagueId] = {
               leagueId: m.leagueId,
-              lastPickWeek: Number(data.week_number),
-              locked: !!(data as { locked_at?: string | null }).locked_at,
-              hasRow: true,
+              openWeek,
+              needsPicks: !locked,
+              locked,
+              isHost,
             };
           } catch {
             next[m.leagueId] = {
               leagueId: m.leagueId,
-              lastPickWeek: null,
+              openWeek: null,
+              needsPicks: false,
               locked: false,
-              hasRow: false,
+              isHost,
             };
           }
         })
       );
       setPulse(next);
     } catch {
-      /* ignore — hub is optional */
+      /* optional hub */
     }
   }, []);
 
@@ -100,7 +121,24 @@ export default function MultiLeagueHomeHub({ onSwitched }: Props) {
     void load();
   }, [load, activeId]);
 
-  if (list.length < 2) return null;
+  const active = useMemo(
+    () => list.find((m) => m.leagueId === activeId) || list[0],
+    [list, activeId]
+  );
+
+  const needsYou = useMemo(() => {
+    return list.filter((m) => {
+      const p = pulse[m.leagueId];
+      if (!p) return false;
+      // Active room already has the big hero for picks
+      if (m.leagueId === activeId) return false;
+      return p.needsPicks;
+    });
+  }, [list, pulse, activeId]);
+
+  if (list.length < 2 || !active) return null;
+
+  const activePack = getSportPack(active.sportId || "cfb");
 
   async function enterRoom(leagueId: string, goPicks: boolean) {
     if (busyId) return;
@@ -121,132 +159,187 @@ export default function MultiLeagueHomeHub({ onSwitched }: Props) {
       router.refresh();
       return;
     }
-    if (onSwitched) {
-      onSwitched();
-    } else {
-      window.location.href = "/";
-    }
+    if (onSwitched) onSwitched();
+    else window.location.href = "/";
   }
 
-  // Active first, then alpha by name
   const ordered = [...list].sort((a, b) => {
     if (a.leagueId === activeId) return -1;
     if (b.leagueId === activeId) return 1;
+    // Needs picks first among the rest
+    const an = pulse[a.leagueId]?.needsPicks ? 0 : 1;
+    const bn = pulse[b.leagueId]?.needsPicks ? 0 : 1;
+    if (an !== bn) return an - bn;
     return (a.leagueName || "").localeCompare(b.leagueName || "");
   });
 
   return (
     <section
-      className="mb-5 rounded-xl border border-primary/35 bg-black/50 backdrop-blur-sm p-3 sm:p-4 shadow-[0_0_40px_rgba(0,0,0,0.35)]"
+      className="mb-4 rounded-xl border border-primary/30 bg-black/45 backdrop-blur-sm overflow-hidden"
       aria-label="Your leagues"
     >
-      <div className="flex items-start justify-between gap-2 mb-2">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">
-            Account · {list.length} leagues
+      {/* Collapsed bar — one line */}
+      <button
+        type="button"
+        onClick={() => setExpanded((e) => !e)}
+        className="w-full text-left px-3 py-2.5 flex items-center gap-2 min-h-[48px] touch-manipulation hover:bg-white/5"
+        aria-expanded={expanded}
+      >
+        <div className="flex-1 min-w-0">
+          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-primary">
+            Your rooms · {list.length}
           </p>
-          <h2 className="text-sm font-bold text-foreground">
-            Your rooms
-          </h2>
-          <p className="text-[11px] text-muted leading-relaxed mt-0.5 max-w-xl">
-            Home is{" "}
-            <strong className="text-foreground">this week&apos;s room</strong>
-            {" "}below. Jump to another league anytime — picks and invites stay
-            with each room.
+          <p className="text-xs text-foreground font-medium truncate mt-0.5">
+            <span className="text-primary">
+              {activePack.emoji} {activePack.shortLabel}
+            </span>
+            <span className="text-muted"> · </span>
+            <span className="truncate">{active.leagueName}</span>
+            <span className="text-primary font-bold"> · here</span>
+            {needsYou.length > 0 && (
+              <>
+                <span className="text-muted"> · </span>
+                <span className="text-amber-300 font-semibold">
+                  {needsYou.length === 1
+                    ? `${getSportPack(needsYou[0].sportId || "cfb").shortLabel} needs picks`
+                    : `${needsYou.length} need picks`}
+                </span>
+              </>
+            )}
           </p>
         </div>
-        <Link
-          href="/account"
-          className="shrink-0 text-[11px] font-semibold text-primary min-h-[36px] inline-flex items-center px-2"
-        >
-          Account →
-        </Link>
-      </div>
+        <span className="shrink-0 text-muted text-xs font-bold px-1">
+          {expanded ? "▴" : "▾"}
+        </span>
+      </button>
 
-      <ul className="space-y-2">
-        {ordered.map((m) => {
-          const pack = getSportPack(m.sportId || "cfb");
-          const active = m.leagueId === activeId;
-          const p = pulse[m.leagueId];
-          const busy = busyId === m.leagueId;
-          let statusLine = "Open room · switch anytime";
-          if (p?.hasRow && p.locked) {
-            statusLine = `Picks locked · Week ${p.lastPickWeek}`;
-          } else if (p?.hasRow && !p.locked) {
-            statusLine = `Slip started · Week ${p.lastPickWeek} — finish & lock`;
-          } else if (p && !p.hasRow) {
-            statusLine = "No picks yet this season";
-          }
+      {/* Needs-you chips (other rooms only) — visible even when collapsed */}
+      {!expanded && needsYou.length > 0 && (
+        <div className="px-3 pb-2.5 flex flex-wrap gap-1.5">
+          {needsYou.slice(0, 3).map((m) => {
+            const pack = getSportPack(m.sportId || "cfb");
+            const p = pulse[m.leagueId];
+            const week =
+              p?.openWeek != null ? `W${p.openWeek}` : "picks";
+            return (
+              <button
+                key={m.leagueId}
+                type="button"
+                disabled={!!busyId}
+                onClick={() => void enterRoom(m.leagueId, true)}
+                className="inline-flex items-center gap-1 min-h-[36px] px-2.5 rounded-full border border-amber-400/40 bg-amber-500/15 text-amber-100 text-[11px] font-bold touch-manipulation disabled:opacity-50"
+              >
+                {pack.emoji} {pack.shortLabel} · lock {week}
+                {busyId === m.leagueId ? "…" : " →"}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
-          return (
-            <li
-              key={m.leagueId}
-              className={`rounded-lg border px-3 py-2.5 ${
-                active
-                  ? "border-primary/50 bg-primary/10"
-                  : "border-border/70 bg-background/40"
-              }`}
-            >
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+      {expanded && (
+        <div className="border-t border-border/50 px-3 py-2 space-y-1.5">
+          {ordered.map((m) => {
+            const pack = getSportPack(m.sportId || "cfb");
+            const isActive = m.leagueId === activeId;
+            const p = pulse[m.leagueId];
+            const busy = busyId === m.leagueId;
+            const isHost =
+              p?.isHost ||
+              m.role === "commissioner" ||
+              m.commissionerId === me;
+
+            let need = "";
+            if (isActive) need = "You're here";
+            else if (p?.needsPicks && p.openWeek != null)
+              need = `Needs picks · Week ${p.openWeek}`;
+            else if (p?.needsPicks) need = "Needs picks";
+            else if (p?.locked) need = "Picks locked";
+            else if (isHost) need = "Host room";
+            else need = "Switch anytime";
+
+            return (
+              <div
+                key={m.leagueId}
+                className={`flex items-center gap-2 rounded-lg px-2 py-2 min-h-[44px] ${
+                  isActive ? "bg-primary/10" : "bg-background/30"
+                }`}
+              >
                 <div className="flex-1 min-w-0">
-                  <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
-                    <span className="text-[10px] font-bold uppercase tracking-wide text-primary/90">
+                  <p className="text-xs font-semibold text-foreground truncate">
+                    <span className="text-primary mr-1">
                       {pack.emoji} {pack.shortLabel}
                     </span>
-                    {active && (
-                      <span className="text-[9px] font-extrabold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-primary text-black">
-                        You&apos;re here
-                      </span>
-                    )}
-                    {(m.role === "commissioner" ||
-                      m.commissionerId === getSession()?.playerId) && (
-                      <span className="text-[9px] font-bold uppercase text-amber-200/90">
-                        Host
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-sm font-semibold text-foreground truncate">
                     {m.leagueName}
+                    {isHost && !isActive && (
+                      <span className="ml-1 text-[9px] uppercase text-amber-200/80">
+                        host
+                      </span>
+                    )}
                   </p>
-                  <p className="text-[11px] text-muted mt-0.5">{statusLine}</p>
+                  <p
+                    className={`text-[10px] mt-0.5 ${
+                      p?.needsPicks && !isActive
+                        ? "text-amber-200 font-medium"
+                        : "text-muted"
+                    }`}
+                  >
+                    {need}
+                  </p>
                 </div>
-                <div className="flex flex-wrap gap-2 shrink-0">
-                  {!active && (
+                <div className="flex gap-1.5 shrink-0">
+                  {isActive ? (
+                    <button
+                      type="button"
+                      disabled={!!busyId}
+                      onClick={() => void enterRoom(m.leagueId, true)}
+                      className="min-h-[36px] px-2.5 rounded-lg bg-primary text-black text-[11px] font-bold disabled:opacity-50"
+                    >
+                      Picks
+                    </button>
+                  ) : p?.needsPicks ? (
+                    <button
+                      type="button"
+                      disabled={!!busyId}
+                      onClick={() => void enterRoom(m.leagueId, true)}
+                      className="min-h-[36px] px-2.5 rounded-lg border border-amber-400/50 text-amber-100 text-[11px] font-bold disabled:opacity-50"
+                    >
+                      {busy ? "…" : "Lock picks"}
+                    </button>
+                  ) : (
                     <button
                       type="button"
                       disabled={!!busyId}
                       onClick={() => void enterRoom(m.leagueId, false)}
-                      className="min-h-[40px] px-3 rounded-lg border border-border text-xs font-bold text-foreground hover:border-primary/50 disabled:opacity-50 touch-manipulation"
+                      className="min-h-[36px] px-2.5 rounded-lg border border-border text-[11px] font-bold text-muted hover:text-foreground disabled:opacity-50"
                     >
-                      {busy ? "…" : "Enter room"}
+                      {busy ? "…" : "Enter"}
                     </button>
                   )}
-                  <button
-                    type="button"
-                    disabled={!!busyId}
-                    onClick={() => void enterRoom(m.leagueId, true)}
-                    className={`min-h-[40px] px-3 rounded-lg text-xs font-bold disabled:opacity-50 touch-manipulation ${
-                      active
-                        ? "bg-primary text-black"
-                        : "border border-primary/40 text-primary hover:bg-primary/10"
-                    }`}
-                  >
-                    {busy ? "…" : active ? "Make picks" : "Picks for this room"}
-                  </button>
                 </div>
               </div>
-            </li>
-          );
-        })}
-      </ul>
-
-      {error && (
-        <p className="text-xs text-danger mt-2 font-medium">{error}</p>
+            );
+          })}
+          <div className="flex items-center justify-between pt-1 pb-0.5">
+            <Link
+              href="/account"
+              className="text-[11px] font-semibold text-primary min-h-[32px] inline-flex items-center"
+            >
+              Manage leagues →
+            </Link>
+            <button
+              type="button"
+              onClick={() => setExpanded(false)}
+              className="text-[11px] text-muted font-medium min-h-[32px] px-2"
+            >
+              Collapse
+            </button>
+          </div>
+          {error && (
+            <p className="text-xs text-danger font-medium pb-1">{error}</p>
+          )}
+        </div>
       )}
-      <p className="text-[10px] text-muted mt-2 leading-relaxed">
-        Tip: wrong sport on an invite? Check which room is{" "}
-        <strong className="text-foreground">You&apos;re here</strong> first.
-      </p>
     </section>
   );
 }
