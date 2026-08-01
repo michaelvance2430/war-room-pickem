@@ -271,22 +271,60 @@ export default function AccountPage() {
     router.refresh();
   }
 
-  async function onLeave(leagueId: string, leagueName: string) {
-    if (
-      !confirm(
-        `Leave "${leagueName}"?\n\n` +
-          "If the season is still running, you FORFEIT every cheevo, title, and hardware badge you earned in this league. " +
-          "Fun stuff only sticks if you finish the season (getting knocked out of brackets is fine — quitting the room is not).\n\n" +
-          "You can rejoin later with the code if someone still has it — but forfeited rewards do not come back."
-      )
-    )
-      return;
-    setBusyId(leagueId);
+  const [leaveModal, setLeaveModal] = useState<{
+    leagueId: string;
+    leagueName: string;
+    sportId?: string | null;
+    busy: boolean;
+    /** When true, season is over — rewards may stick */
+    seasonFinished: boolean | null;
+  } | null>(null);
+
+  async function onLeave(
+    leagueId: string,
+    leagueName: string,
+    sportId?: string | null
+  ) {
     setMessage(null);
-    const result = await leaveLeague(leagueId);
+    setLeaveModal({
+      leagueId,
+      leagueName,
+      sportId,
+      busy: false,
+      seasonFinished: null,
+    });
+    // Best-effort: soften copy if championship already engraved / calendar past final
+    try {
+      const { isLeagueSeasonFinishedForRewards } = await import(
+        "@/lib/league-earned-ledger"
+      );
+      const finished = await isLeagueSeasonFinishedForRewards(
+        leagueId,
+        sportId
+      );
+      setLeaveModal((prev) =>
+        prev && prev.leagueId === leagueId
+          ? { ...prev, seasonFinished: finished }
+          : prev
+      );
+    } catch {
+      setLeaveModal((prev) =>
+        prev && prev.leagueId === leagueId
+          ? { ...prev, seasonFinished: false }
+          : prev
+      );
+    }
+  }
+
+  async function confirmLeave() {
+    if (!leaveModal) return;
+    setLeaveModal({ ...leaveModal, busy: true });
+    setBusyId(leaveModal.leagueId);
+    const result = await leaveLeague(leaveModal.leagueId);
     setBusyId(null);
     if (!result.ok) {
       setMessage(result.error || "Could not leave");
+      setLeaveModal(null);
       return;
     }
     setMessage(
@@ -295,6 +333,7 @@ export default function AccountPage() {
           ? `Left league — forfeited ${result.forfeitedCount} unlock(s).`
           : "Left league")
     );
+    setLeaveModal(null);
     await reload();
     if (getSession() === null) {
       const list = await fetchMyMemberships();
@@ -931,7 +970,9 @@ export default function AccountPage() {
                     )}
                     <button
                       type="button"
-                      onClick={() => onLeave(m.leagueId, m.leagueName)}
+                      onClick={() =>
+                        void onLeave(m.leagueId, m.leagueName, m.sportId)
+                      }
                       disabled={busy}
                       title="Leave mid-season forfeits cheevos earned in this league"
                       className="text-xs px-3 py-1.5 rounded-lg border border-border text-muted hover:text-foreground disabled:opacity-50"
@@ -986,6 +1027,91 @@ export default function AccountPage() {
 
         <OwnershipNotice variant="full" className="mt-8 mb-4 px-2" />
       </main>
+
+      {/* Leave league — forfeit warning popup */}
+      {leaveModal && (
+        <div
+          className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-sm"
+          role="dialog"
+          aria-modal
+          aria-labelledby="leave-league-title"
+        >
+          <div className="w-full sm:max-w-md max-h-[92vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl border-2 border-danger/50 bg-card shadow-2xl p-5 space-y-4">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-danger mb-1">
+                Warning · can&apos;t undo
+              </p>
+              <h2 id="leave-league-title" className="text-lg font-bold text-foreground">
+                Leave {leaveModal.leagueName}?
+              </h2>
+            </div>
+
+            {leaveModal.seasonFinished === true ? (
+              <p className="text-sm text-muted leading-relaxed">
+                This season looks finished. Your cheevos and hardware from this
+                league should stay. You&apos;ll still leave the room and drop off
+                the roster.
+              </p>
+            ) : (
+              <>
+                <div className="rounded-xl border border-danger/40 bg-danger/10 px-4 py-3 space-y-2">
+                  <p className="text-sm font-bold text-danger">
+                    If you continue, you lose everything from this league:
+                  </p>
+                  <ul className="text-sm text-foreground/90 leading-relaxed list-disc pl-5 space-y-1">
+                    <li>
+                      <strong>Cheevos</strong> earned while you were here
+                    </li>
+                    <li>
+                      <strong>Trophies / hardware badges</strong> from this room
+                    </li>
+                    <li>
+                      <strong>Titles</strong> unlocked in this league
+                    </li>
+                    <li>
+                      Season <strong>data</strong> on the board (you leave the
+                      roster)
+                    </li>
+                  </ul>
+                  <p className="text-xs text-muted leading-relaxed pt-1">
+                    Forfeited rewards do <strong className="text-foreground">not</strong> come
+                    back if you rejoin later.
+                  </p>
+                </div>
+                <p className="text-sm text-muted leading-relaxed">
+                  Fun stuff only sticks if you{" "}
+                  <strong className="text-foreground">finish the season</strong>
+                  . Getting knocked out of brackets is fine — quitting the room
+                  is not.
+                </p>
+              </>
+            )}
+
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                disabled={leaveModal.busy}
+                onClick={() => void confirmLeave()}
+                className="w-full min-h-[52px] rounded-xl border-2 border-danger bg-danger/15 text-danger font-bold text-sm hover:bg-danger/25 disabled:opacity-50"
+              >
+                {leaveModal.busy
+                  ? "Leaving…"
+                  : leaveModal.seasonFinished
+                    ? "Yes, leave this league"
+                    : "I understand — leave and forfeit"}
+              </button>
+              <button
+                type="button"
+                disabled={leaveModal.busy}
+                onClick={() => setLeaveModal(null)}
+                className="w-full min-h-[48px] rounded-xl bg-primary text-black font-bold text-sm disabled:opacity-50"
+              >
+                Stay in the league
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Mid-season delete blocked — keep team; voluntary pass only */}
       {deleteModal && (
