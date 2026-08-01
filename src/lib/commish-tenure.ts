@@ -2,11 +2,16 @@
  * League commissioner tenure — "Elite Commish" badge.
  * Counts weeks you held the gavel for a league (not game creator).
  * Target: 14 of 18 season weeks in a single league run.
+ *
+ * IDENTITY: runs are keyed by league UUID + season year only.
+ * Never by display name — rename the room and tenure still counts.
+ * Invite code is not used (codes can recycle; UUID does not).
  */
 
 import { defaultSeasonYear } from "./trophies";
 import { getSession } from "./league";
 import { grantPermanentBadgeId } from "./permanent-badges";
+import { roomSeasonKey } from "./league-room-identity";
 
 export const IRON_COMMISH_BADGE_ID = "elite_commish";
 export const IRON_COMMISH_TARGET = 14;
@@ -50,7 +55,8 @@ function writeAll(map: TenureMap) {
 }
 
 function runKey(leagueId: string, seasonYear: number) {
-  return `${leagueId}:${seasonYear}`;
+  // UUID + year only — never league name or invite code
+  return roomSeasonKey(leagueId, seasonYear);
 }
 
 /** Best week-count as commissioner in any single league season. */
