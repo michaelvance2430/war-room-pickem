@@ -67,6 +67,11 @@ import {
 import { transferCommissioner } from "@/lib/trophies";
 import { recordCommissionerWeek } from "@/lib/commish-tenure";
 import { seedBotLockerTalk } from "@/lib/bot-locker-talk";
+import {
+  getCommishPreviewOpt,
+  setCommishPreviewOpt,
+  requestRingCeremonyPreview,
+} from "@/lib/ring-ceremony";
 import CommishWeekChecklist from "@/components/CommishWeekChecklist";
 import SportPoolCommishPanel from "@/components/SportPoolCommishPanel";
 import { setViewAsPlayer } from "@/lib/view-as-player";
@@ -270,6 +275,8 @@ function CommissionerPageInner() {
   const [deputyReport, setDeputyReport] = useState<string | null>(null);
   const [autoSeasonBusy, setAutoSeasonBusy] = useState(false);
   const [autoSeasonReport, setAutoSeasonReport] = useState<string | null>(null);
+  /** Commish-only: personal ring ceremony preview (never league-wide) */
+  const [ringPreviewOpt, setRingPreviewOpt] = useState(false);
   /** Inclusive range for sandbox auto-score (one week … full season) */
   const [autoFromWeek, setAutoFromWeek] = useState(0);
   const [autoToWeek, setAutoToWeek] = useState(SEASON_MAX_WEEK);
@@ -321,6 +328,11 @@ function CommissionerPageInner() {
         setLeagueNameEdit(lg.name);
         setCutPercent(lg.settings?.cutPercent ?? 50);
         setCrystalBallEnabled(lg.settings?.crystalBallEnabled !== false);
+        try {
+          setRingPreviewOpt(getCommishPreviewOpt());
+        } catch {
+          setRingPreviewOpt(false);
+        }
         // Open-room listing (cloud column; optional until SQL runs)
         try {
           const { createClient, hasSupabaseConfig } = await import(
@@ -2324,6 +2336,58 @@ function CommissionerPageInner() {
                 <p className="w-full text-xs font-medium text-muted">
                   {crystalBallEnabled ? "On — tab visible" : "Off — tab hidden"}
                 </p>
+              </div>
+
+              <div className="rounded-xl border border-amber-400/30 bg-amber-400/5 p-4 space-y-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-amber-200">
+                      Ring ceremony
+                    </p>
+                    <p className="text-xs text-muted mt-1 leading-relaxed">
+                      Sport-specific opening ritual (NFL stage / CFB campus /
+                      WWC pitch).{" "}
+                      <strong className="text-foreground">
+                        Preview is you only
+                      </strong>{" "}
+                      — never launches a test to the whole league. Real
+                      ceremony still fires for everyone only in the opening
+                      week window.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={ringPreviewOpt}
+                    onClick={() => {
+                      const next = !ringPreviewOpt;
+                      setRingPreviewOpt(next);
+                      setCommishPreviewOpt(next);
+                    }}
+                    className={`relative shrink-0 w-12 h-7 rounded-full transition ${
+                      ringPreviewOpt ? "bg-amber-400" : "bg-border"
+                    }`}
+                    title="Personal preview only"
+                  >
+                    <span
+                      className={`absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-black transition ${
+                        ringPreviewOpt ? "translate-x-5" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                </div>
+                <p className="text-xs font-medium text-muted">
+                  {ringPreviewOpt
+                    ? "On — show me a personal preview once per browser session"
+                    : "Off — only real opening-week ceremony for the room"}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => requestRingCeremonyPreview({ force: true })}
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-amber-400/50 bg-amber-400/15 text-amber-100 text-sm font-bold min-h-[44px] hover:bg-amber-400/25"
+                >
+                  Play ring ceremony now (preview · you only)
+                </button>
               </div>
 
               <div className="rounded-xl border border-border bg-background p-4 flex flex-wrap items-start justify-between gap-3">

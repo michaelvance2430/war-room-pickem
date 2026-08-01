@@ -1422,6 +1422,32 @@ html[data-season-theme="newyear"] body::before {
   }
 }
 
+/* Ring ceremony confetti */
+@keyframes ring-confetti-fall {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 0;
+  }
+  8% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateY(110vh) rotate(720deg);
+    opacity: 0.15;
+  }
+}
+.ring-confetti-bit {
+  animation-name: ring-confetti-fall;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ring-confetti-bit {
+    animation: none !important;
+    opacity: 0 !important;
+  }
+}
+
 /* Hot take ticker — seamless horizontal scroll */
 @keyframes hot-take-scroll {
   0% {
