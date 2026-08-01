@@ -44,6 +44,13 @@ export default function SeasonFinaleModal() {
         if (isGuestMode()) return;
         // Don't steal Opening Day ring ceremony
         if (isOpeningWeekLive()) return;
+        // First 10 minutes: no multi-slide hardware until they locked once
+        try {
+          const { isPreLockCalm } = await import("@/lib/first-week");
+          if (isPreLockCalm(getSession()?.playerId)) return;
+        } catch {
+          /* ok */
+        }
         // Don't stack multi-slide finale on first-login walkthrough
         try {
           const { isPlayerTutorialActive, needsPlayerTutorial } =

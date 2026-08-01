@@ -155,6 +155,14 @@ export default function RingCeremonyModal() {
     const sid = league.sportId || "cfb";
     if (!isOpeningCeremonyLive(sid)) return false;
 
+    // First 10 minutes: lame and easy — lock a card before museum champ flex
+    try {
+      const { isPreLockCalm } = await import("@/lib/first-week");
+      if (isPreLockCalm(sess.playerId)) return false;
+    } catch {
+      /* ok */
+    }
+
     const activeWeek = await loadLeagueActiveWeek();
     if (!isOpeningActiveWeek(activeWeek, sid)) return false;
 

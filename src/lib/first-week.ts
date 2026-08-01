@@ -156,6 +156,16 @@ export function isFirstWeekChrome(playerId?: string | null): boolean {
   return !isCoreLoopUnlocked(playerId);
 }
 
+/**
+ * First ~10 minutes: lame and easy.
+ * No ceremony / welcome / paper / lore popups until THIS player has locked once.
+ * Walkthrough coach + quiet picks banner only.
+ * (Season-alive late joiners still get calm until their own first lock.)
+ */
+export function isPreLockCalm(playerId?: string | null): boolean {
+  return !hasLockedPicksOnce(playerId);
+}
+
 /** Achievement modals allowed (after first lock or first scores). */
 export function canShowBadgeCelebrations(playerId?: string | null): boolean {
   return isCoreLoopUnlocked(playerId);

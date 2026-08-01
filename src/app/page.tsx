@@ -369,20 +369,20 @@ export default function Home() {
           <p className="text-xs text-muted mb-4 leading-relaxed max-w-xl -mt-1">
             {isCommish ? (
               <>
-                Host spine:{" "}
+                Keep it boring:{" "}
                 <strong className="text-foreground">
                   share invite → publish card → lock your picks
                 </strong>
-                . Score once later to unlock advanced tools.
+                . No trophies, papers, or fireworks until you lock once.
               </>
             ) : (
               <>
-                One job:{" "}
+                Keep it boring:{" "}
                 <strong className="text-foreground">
-                  lock your picks before kickoff
+                  open My Picks and lock before kickoff
                 </strong>
-                . Locker is optional trash talk. Everything else opens after
-                you lock.
+                . That&apos;s the whole first ten minutes. Everything flashy
+                waits.
               </>
             )}
           </p>

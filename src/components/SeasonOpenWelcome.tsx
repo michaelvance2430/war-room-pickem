@@ -10,6 +10,7 @@ import {
   SEASON_DISPLAY_YEAR,
   getSeasonOpenLabel,
 } from "@/lib/season-countdown";
+import { isPreLockCalm } from "@/lib/first-week";
 
 /**
  * First login after countdown expires: huge welcome splash once per league.
@@ -27,6 +28,8 @@ export default function SeasonOpenWelcome() {
     const session = getSession();
     if (!session?.playerId || !session.leagueId) return;
     if (hasSeenSeasonOpenWelcome(session.leagueId)) return;
+    // First 10 minutes: lock a card first — huge splash after
+    if (isPreLockCalm(session.playerId)) return;
 
     const name = league?.name?.trim() || "the War Room";
     setLeagueName(name);

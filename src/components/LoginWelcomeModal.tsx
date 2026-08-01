@@ -14,6 +14,7 @@ import {
   isPlayerTutorialActive,
   needsPlayerTutorial,
 } from "@/lib/player-tutorial";
+import { isPreLockCalm } from "@/lib/first-week";
 
 const FOREVER_KEY = "warroom-login-welcome-v1-dismissed";
 const SESSION_KEY = "warroom-login-welcome-v1-session";
@@ -66,7 +67,9 @@ export default function LoginWelcomeModal() {
     if (!session?.playerId) return;
     if (isDismissedForever()) return;
     if (wasShownThisSession()) return;
-    // Never stack on the player walkthrough (first lock coach)
+    // First 10 minutes: lame and easy — no shop splash until after first lock
+    if (isPreLockCalm(session.playerId)) return;
+    // Never stack on the player walkthrough
     if (needsPlayerTutorial() || isPlayerTutorialActive()) return;
     // Opening week: ring ceremony owns the moment
     try {

@@ -7,7 +7,6 @@ import {
   findNewBadgeUnlocksForSession,
   markBadgesCelebrated,
 } from "@/lib/badge-celebration";
-import { hasSeenRules } from "@/lib/rules";
 import { isStackableBadge, TIER_LABEL } from "@/lib/badges";
 import { stackCelebrationKey } from "@/lib/badge-stacks";
 import type { BadgeStatus, BadgeTier } from "@/lib/types";
@@ -33,15 +32,17 @@ export default function BadgeUnlockModal() {
 
   const tryCelebrate = useCallback(async () => {
     if (checked) return;
-    if (!hasSeenRules()) return;
     if (!getSession()?.playerId) return;
 
-    // After first lock / scores only — don't compete with "make picks"
+    // After first lock only for calm first 10 minutes; season-alive still ok later
     try {
-      const { canShowBadgeCelebrations, syncFirstWeekFromCloud } = await import(
-        "@/lib/first-week"
-      );
+      const {
+        canShowBadgeCelebrations,
+        isPreLockCalm,
+        syncFirstWeekFromCloud,
+      } = await import("@/lib/first-week");
       await syncFirstWeekFromCloud(getSession()?.playerId);
+      if (isPreLockCalm(getSession()?.playerId)) return;
       if (!canShowBadgeCelebrations(getSession()?.playerId)) {
         // Stay unchecked so we re-try after they lock
         return;

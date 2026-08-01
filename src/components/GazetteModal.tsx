@@ -9,7 +9,6 @@ import {
   type GazetteEdition,
 } from "@/lib/gazette";
 import { notifyGazetteDone } from "@/lib/badge-celebration";
-import { hasSeenRules } from "@/lib/rules";
 import GazettePaper from "@/components/GazettePaper";
 
 /**
@@ -27,7 +26,17 @@ export default function GazetteModal() {
     let cancelled = false;
 
     async function tryShow() {
-      if (!hasSeenRules()) return;
+      // First 10 minutes: paper waits until after first lock
+      try {
+        const { isPreLockCalm } = await import("@/lib/first-week");
+        const { getSession } = await import("@/lib/league");
+        if (isPreLockCalm(getSession()?.playerId)) {
+          notifyGazetteDone();
+          return;
+        }
+      } catch {
+        /* ok */
+      }
 
       try {
         const players = await loadLeaguePlayers();
@@ -68,9 +77,11 @@ export default function GazetteModal() {
   useEffect(() => {
     if (!GAZETTE_ENABLED || open) return;
     const id = setInterval(() => {
-      if (!hasSeenRules()) return;
       void (async () => {
         try {
+          const { isPreLockCalm } = await import("@/lib/first-week");
+          const { getSession } = await import("@/lib/league");
+          if (isPreLockCalm(getSession()?.playerId)) return;
           const players = await loadLeaguePlayers();
           const offer = await shouldOfferGazette(players);
           if (offer.show) {
