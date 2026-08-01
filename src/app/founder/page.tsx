@@ -65,10 +65,8 @@ export default function FounderDashboardPage() {
   const [saveNote, setSaveNote] = useState<string | null>(null);
   const [clientMs, setClientMs] = useState<number | null>(null);
   const [eyes, setEyes] = useState<CreatorEyesMode>("off");
-  /** Week to live as when entering eyes (progressive + local demo card) */
-  const [eyesWeek, setEyesWeek] = useState(1);
-  /** One-click heaven week (real league cloud ops) */
-  const [labWeek, setLabWeek] = useState(1);
+  /** One week knob for the whole playground */
+  const [week, setWeek] = useState(1);
   const [labBusy, setLabBusy] = useState(false);
   const [labLog, setLabLog] = useState<string | null>(null);
   const [labSteps, setLabSteps] = useState<string[]>([]);
@@ -130,8 +128,19 @@ export default function FounderDashboardPage() {
     return () => window.removeEventListener(EVENT_CREATOR_EYES, onEyes);
   }, [refresh]);
 
+  function setPlayWeek(w: number) {
+    const n = Math.max(0, Math.min(22, Math.floor(w)));
+    setWeek(n);
+    if (eyes !== "off") {
+      void import("@/lib/creator-eyes").then((m) => {
+        m.applyEyesWeek(n);
+        setEyes(m.getCreatorEyesMode());
+      });
+    }
+  }
+
   function enterEyes(mode: CreatorEyesMode, href: string) {
-    setCreatorEyesMode(mode, { weekNumber: eyesWeek });
+    setCreatorEyesMode(mode, { weekNumber: week });
     setEyes(mode);
     router.push(href);
   }
@@ -141,20 +150,7 @@ export default function FounderDashboardPage() {
     setEyes("off");
   }
 
-  function changeEyesWeek(w: number) {
-    const n = Math.max(0, Math.min(22, w));
-    setEyesWeek(n);
-    if (eyes !== "off") {
-      void import("@/lib/creator-eyes").then((m) => {
-        m.applyEyesWeek(n);
-        setEyes(m.getCreatorEyesMode());
-      });
-    }
-  }
-
-  async function runLab(
-    kind: "roster" | "post" | "score" | "both"
-  ) {
+  async function runLab(kind: "roster" | "post" | "score" | "both") {
     setLabBusy(true);
     setLabLog(null);
     setLabSteps([]);
@@ -163,10 +159,10 @@ export default function FounderDashboardPage() {
         kind === "roster"
           ? await founderEnsureFullBotRoster()
           : kind === "post"
-            ? await founderPostWeek(labWeek)
+            ? await founderPostWeek(week)
             : kind === "score"
-              ? await founderScoreWeek(labWeek)
-              : await founderPostAndScoreWeek(labWeek);
+              ? await founderScoreWeek(week)
+              : await founderPostAndScoreWeek(week);
       setLabSteps(res.steps);
       setLabLog(res.ok ? `✅ ${res.message}` : `❌ ${res.message}`);
       void refresh();
@@ -174,6 +170,23 @@ export default function FounderDashboardPage() {
       setLabLog(e instanceof Error ? e.message : "Lab action failed");
     }
     setLabBusy(false);
+  }
+
+  function jumpPopup(kind: "ring" | "card" | "gazette") {
+    void import("@/lib/creator-sandbox").then(async (sb) => {
+      if (kind === "ring") {
+        await sb.jumpRingCeremony();
+        router.push("/");
+        return;
+      }
+      if (kind === "card") {
+        await sb.jumpCardPublished(week);
+        router.push("/");
+        return;
+      }
+      sb.jumpGazetteShelfReveal();
+      router.push("/");
+    });
   }
 
   async function toggleIncident(active: boolean) {
@@ -241,8 +254,8 @@ export default function FounderDashboardPage() {
             </p>
             <h1 className="text-xl font-bold mt-0.5">Founder Dashboard</h1>
             <p className="text-xs text-muted mt-1 leading-relaxed">
-              Not for users. Morning health. Controlled opening. No silence when
-              things break.
+              Your playground. One week. Run the room. Walk the app. Wear their
+              eyes.
             </p>
           </div>
           <button
@@ -254,212 +267,213 @@ export default function FounderDashboardPage() {
           </button>
         </div>
 
-        {/* One-click heaven — real league, full bots, stay on this page */}
-        <section className="rounded-xl border-2 border-amber-400/60 bg-amber-500/10 p-4 space-y-3">
-          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-300">
-            One-click heaven
-          </p>
-          <h2 className="text-sm font-semibold text-foreground">
-            Drive the room without leaving Founder
-          </h2>
-          <p className="text-xs text-muted leading-relaxed">
-            Operates your <strong className="text-foreground">real active league</strong>
-            {" "}(cloud). Always pads bots toward 16, locks bot picks, locker
-            noise, Chaos spice. No Commissioner tab required.
-            {leagueName ? (
-              <>
-                {" "}
-                Room: <strong className="text-foreground">{leagueName}</strong>
-                {activeWeek != null ? ` · cloud week ${activeWeek}` : ""}
-              </>
-            ) : (
-              " Join/create a league as commish first."
-            )}
-          </p>
+        {/* ========== THE PLAYGROUND (everything simple) ========== */}
+        <section className="rounded-2xl border-2 border-primary/40 bg-card p-4 space-y-5 shadow-[0_0_40px_rgba(34,197,94,0.08)]">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">
+              Playground
+            </p>
+            <h2 className="text-base font-bold text-foreground mt-0.5">
+              Play the whole product
+            </h2>
+            <p className="text-xs text-muted mt-1 leading-relaxed">
+              {leagueName ? (
+                <>
+                  Room: <strong className="text-foreground">{leagueName}</strong>
+                  {roomPlayers != null ? ` · ${roomPlayers} players` : ""}
+                  {activeWeek != null ? ` · cloud week ${activeWeek}` : ""}
+                </>
+              ) : (
+                "Be commissioner of a league first, then use these buttons."
+              )}
+            </p>
+          </div>
 
+          {/* Shared week */}
           <label className="block text-xs text-muted">
-            Week
+            Week (everything below uses this)
             <input
               type="number"
               min={0}
               max={22}
-              value={labWeek}
+              value={week}
               disabled={labBusy}
               onChange={(e) =>
-                setLabWeek(
-                  Math.max(0, Math.min(22, parseInt(e.target.value, 10) || 0))
-                )
+                setPlayWeek(parseInt(e.target.value, 10) || 0)
               }
-              className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm font-mono text-foreground"
+              className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-base font-mono font-bold text-foreground"
             />
           </label>
 
-          <div className="grid grid-cols-1 gap-2">
+          {/* A — Make the room real */}
+          <div className="space-y-2">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-muted">
+              1 · Make the room
+            </p>
             <button
               type="button"
               disabled={labBusy}
               onClick={() => void runLab("roster")}
-              className="w-full py-3.5 min-h-[52px] rounded-xl border border-amber-400/50 bg-background/80 text-sm font-bold text-foreground hover:bg-amber-500/15 disabled:opacity-50"
+              className="w-full py-3 min-h-[48px] rounded-xl border border-border bg-background text-sm font-bold disabled:opacity-50"
             >
-              {labBusy ? "Working…" : "① Full bot roster + spice"}
+              {labBusy ? "Working…" : "Fill bots + locker + crystal ball"}
             </button>
-            <button
-              type="button"
-              disabled={labBusy}
-              onClick={() => void runLab("post")}
-              className="w-full py-3.5 min-h-[52px] rounded-xl bg-primary text-black text-sm font-extrabold disabled:opacity-50"
-            >
-              {labBusy ? "Working…" : `② Post week ${labWeek}`}
-            </button>
-            <button
-              type="button"
-              disabled={labBusy}
-              onClick={() => void runLab("score")}
-              className="w-full py-3.5 min-h-[52px] rounded-xl border border-primary/50 text-primary text-sm font-extrabold hover:bg-primary/10 disabled:opacity-50"
-            >
-              {labBusy ? "Working…" : `③ Score week ${labWeek}`}
-            </button>
+          </div>
+
+          {/* B — Run a week */}
+          <div className="space-y-2">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-muted">
+              2 · Run week {week} (real league)
+            </p>
             <button
               type="button"
               disabled={labBusy}
               onClick={() => void runLab("both")}
-              className="w-full py-4 min-h-[56px] rounded-xl bg-amber-400 text-black text-base font-black disabled:opacity-50 shadow-[0_0_24px_rgba(251,191,36,0.35)]"
+              className="w-full py-4 min-h-[56px] rounded-xl bg-amber-400 text-black text-base font-black disabled:opacity-50"
             >
-              {labBusy
-                ? "Working…"
-                : `⚡ Post + score week ${labWeek}`}
+              {labBusy ? "Working…" : `⚡ Post + score week ${week}`}
             </button>
-          </div>
-
-          {labLog && (
-            <p
-              className={`text-xs font-semibold leading-relaxed ${
-                labLog.startsWith("✅") ? "text-primary" : "text-danger"
-              }`}
-            >
-              {labLog}
-            </p>
-          )}
-          {labSteps.length > 0 && (
-            <ul className="text-[11px] text-muted space-y-0.5 max-h-36 overflow-y-auto border border-border/50 rounded-lg px-3 py-2 bg-background/50">
-              {labSteps.map((s, i) => (
-                <li key={`${i}-${s.slice(0, 24)}`}>· {s}</li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        {/* Everyone’s eyes — brand-new player / commissioner previews */}
-        <section className="rounded-xl border-2 border-sky-400/50 bg-sky-500/10 p-4 space-y-3">
-          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-sky-300">
-            Everyone&apos;s eyes
-          </p>
-          <h2 className="text-sm font-semibold text-foreground">
-            See what they see
-          </h2>
-          <p className="text-xs text-muted leading-relaxed">
-            Pick a week, then step into their shoes. You get a{" "}
-            <strong className="text-foreground">local demo card</strong> for
-            that week — lock picks, Locker, Board, progressive chrome — without
-            changing your real league standings.
-          </p>
-
-          <label className="block text-xs text-muted">
-            Live as week
-            <input
-              type="number"
-              min={0}
-              max={22}
-              value={eyesWeek}
-              onChange={(e) =>
-                changeEyesWeek(parseInt(e.target.value, 10) || 0)
-              }
-              className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground font-mono"
-            />
-            <span className="block mt-1 text-[11px] text-muted">
-              Week 1 = quiet start · Week 3+ = Gazette shelf unlocked · change
-              anytime while eyes are on
-            </span>
-          </label>
-
-          {eyes !== "off" && (
-            <div className="rounded-lg border border-sky-400/40 bg-sky-950/40 px-3 py-2.5 text-xs text-sky-100 leading-relaxed">
-              <p className="font-bold">
-                {creatorEyesLabel(eyes)} · WEEK {eyesWeek}
-              </p>
-              <p className="mt-0.5 text-sky-200/80">{creatorEyesBlurb(eyes)}</p>
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => router.push("/picks")}
-                  className="py-2 min-h-[40px] rounded-lg bg-primary text-black text-xs font-bold"
-                >
-                  Make picks →
-                </button>
-                <button
-                  type="button"
-                  onClick={() => router.push("/")}
-                  className="py-2 min-h-[40px] rounded-lg border border-sky-400/50 text-sky-100 text-xs font-bold"
-                >
-                  Home
-                </button>
-              </div>
+            <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={exitEyes}
-                className="mt-2 w-full py-2 min-h-[40px] rounded-lg bg-sky-400 text-black text-xs font-bold"
+                disabled={labBusy}
+                onClick={() => void runLab("post")}
+                className="py-3 min-h-[48px] rounded-xl bg-primary text-black text-sm font-bold disabled:opacity-50"
               >
-                Exit eyes · back to creator view
+                Post only
+              </button>
+              <button
+                type="button"
+                disabled={labBusy}
+                onClick={() => void runLab("score")}
+                className="py-3 min-h-[48px] rounded-xl border border-primary/50 text-primary text-sm font-bold disabled:opacity-50"
+              >
+                Score only
               </button>
             </div>
-          )}
-
-          <div className="grid grid-cols-1 gap-2">
-            <button
-              type="button"
-              onClick={() => enterEyes("new_player", "/")}
-              className="w-full text-left rounded-xl border border-sky-400/40 bg-background/80 hover:bg-sky-500/15 px-3 py-3 min-h-[56px] transition"
-            >
-              <span className="block text-sm font-bold text-foreground">
-                Brand-new player · week {eyesWeek}
-              </span>
-              <span className="block text-[11px] text-muted mt-0.5">
-                Full player path: Home · Lock it in · Locker · Board. Progressive
-                chrome for that week. Local demo card.
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => enterEyes("new_commissioner", "/commissioner")}
-              className="w-full text-left rounded-xl border border-primary/40 bg-background/80 hover:bg-primary/10 px-3 py-3 min-h-[56px] transition"
-            >
-              <span className="block text-sm font-bold text-foreground">
-                Brand-new commissioner · week {eyesWeek}
-              </span>
-              <span className="block text-[11px] text-muted mt-0.5">
-                Simple Run the Room · fill seats yes/no · no deep bot lab. Same
-                week progressive context.
-              </span>
-            </button>
+            {labLog && (
+              <p
+                className={`text-xs font-semibold ${
+                  labLog.startsWith("✅") ? "text-primary" : "text-danger"
+                }`}
+              >
+                {labLog}
+              </p>
+            )}
+            {labSteps.length > 0 && (
+              <ul className="text-[10px] text-muted max-h-24 overflow-y-auto space-y-0.5 px-1">
+                {labSteps.slice(-8).map((s, i) => (
+                  <li key={`${i}-${s.slice(0, 20)}`}>· {s}</li>
+                ))}
+              </ul>
+            )}
           </div>
-        </section>
 
-        {/* Test Mode — creator flight simulator */}
-        <section className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 space-y-2">
-          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-300">
-            Lab
+          {/* C — Go look */}
+          <div className="space-y-2">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-muted">
+              3 · Go look (after post/score)
+            </p>
+            <div className="grid grid-cols-3 gap-2">
+              {(
+                [
+                  ["/", "Home"],
+                  ["/picks", "Picks"],
+                  ["/board", "Board"],
+                  ["/standings", "Standings"],
+                  ["/gazette", "Gazette"],
+                  ["/locker-room", "Locker"],
+                ] as const
+              ).map(([href, label]) => (
+                <Link
+                  key={href}
+                  href={href}
+                  className="py-2.5 min-h-[44px] rounded-lg border border-border bg-background text-center text-xs font-bold text-foreground hover:border-primary/40"
+                >
+                  {label}
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          {/* D — Eyes */}
+          <div className="space-y-2">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-muted">
+              4 · Wear their eyes (week {week})
+            </p>
+            {eyes !== "off" && (
+              <div className="rounded-lg border border-sky-400/40 bg-sky-500/10 px-3 py-2 text-xs">
+                <p className="font-bold text-sky-100">
+                  {creatorEyesLabel(eyes)} ON
+                </p>
+                <p className="text-muted mt-0.5">{creatorEyesBlurb(eyes)}</p>
+                <button
+                  type="button"
+                  onClick={exitEyes}
+                  className="mt-2 w-full py-2 rounded-lg bg-sky-400 text-black text-xs font-bold"
+                >
+                  Exit eyes
+                </button>
+              </div>
+            )}
+            <div className="grid grid-cols-1 gap-2">
+              <button
+                type="button"
+                onClick={() => enterEyes("new_player", "/")}
+                className="w-full py-3 min-h-[48px] rounded-xl border border-sky-400/40 text-sm font-bold text-left px-3 hover:bg-sky-500/10"
+              >
+                As new player →
+                <span className="block text-[11px] font-normal text-muted">
+                  Quiet chrome · lock picks on a local card for week {week}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => enterEyes("new_commissioner", "/commissioner")}
+                className="w-full py-3 min-h-[48px] rounded-xl border border-primary/40 text-sm font-bold text-left px-3 hover:bg-primary/10"
+              >
+                As new commissioner →
+                <span className="block text-[11px] font-normal text-muted">
+                  Simple host · fill seats yes/no only
+                </span>
+              </button>
+            </div>
+          </div>
+
+          {/* E — Popups */}
+          <div className="space-y-2">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-muted">
+              5 · Flash a moment
+            </p>
+            <div className="grid grid-cols-1 gap-2">
+              <button
+                type="button"
+                onClick={() => jumpPopup("ring")}
+                className="py-2.5 rounded-lg border border-border text-xs font-semibold hover:bg-background"
+              >
+                Ring ceremony
+              </button>
+              <button
+                type="button"
+                onClick={() => jumpPopup("card")}
+                className="py-2.5 rounded-lg border border-border text-xs font-semibold hover:bg-background"
+              >
+                Card just published
+              </button>
+              <button
+                type="button"
+                onClick={() => jumpPopup("gazette")}
+                className="py-2.5 rounded-lg border border-border text-xs font-semibold hover:bg-background"
+              >
+                Week-3 Gazette shelf unlock
+              </button>
+            </div>
+          </div>
+
+          <p className="text-[10px] text-muted leading-relaxed border-t border-border pt-3">
+            Tip: ⚡ Post + score → open Gazette & Board. Then “As new player” on
+            week 1 vs week 3 to feel progressive unlock. Exit eyes when done.
           </p>
-          <h2 className="text-sm font-semibold text-foreground">Test Mode</h2>
-          <p className="text-xs text-muted leading-relaxed">
-            Fake week + progressive phase. Jump buttons for ring ceremony, card
-            published, Gazette shelf unlock — no bots, no delete league.
-          </p>
-          <Link
-            href="/founder/test-mode"
-            className="inline-flex items-center justify-center w-full min-h-[48px] rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-50 text-sm font-bold px-4 hover:bg-amber-500/30"
-          >
-            Open Test Mode →
-          </Link>
         </section>
 
         {/* Founder Binder — product law (not a user feature list) */}
