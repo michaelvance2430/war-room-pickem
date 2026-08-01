@@ -2,37 +2,71 @@
 
 import { useEffect, useState } from "react";
 import { loadLeaguePlayers } from "@/lib/cloud";
-import { buildHotTakes } from "@/lib/fun-board";
+import { getLeague } from "@/lib/league";
+import {
+  buildHotTakes,
+  hotTakeTickerLabel,
+  resolveVoiceSport,
+} from "@/lib/fun-board";
 
 type Props = {
   /** Dark war-room strip (home) vs standard card strip */
   variant?: "warroom" | "default";
   className?: string;
+  /** Optional explicit sport — otherwise uses league sportId */
+  sportId?: string | null;
 };
 
 export default function HotTakeTicker({
   variant = "default",
   className = "",
+  sportId: sportIdProp,
 }: Props) {
   const [takes, setTakes] = useState<string[]>([]);
+  const [label, setLabel] = useState("Hot takes");
 
   useEffect(() => {
     let cancelled = false;
-    loadLeaguePlayers()
-      .then((players) => {
-        if (!cancelled) setTakes(buildHotTakes(players));
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setTakes([
-            "Hot take wire temporarily offline. Blame the goats, not the code.",
-          ]);
+
+    async function load() {
+      try {
+        // Prefer live league sport so dual-sport rooms don't get the wrong wire
+        let sport = sportIdProp ?? getLeague()?.sportId ?? null;
+        try {
+          const { syncLeagueFromCloud } = await import("@/lib/league-sync");
+          const fresh = await syncLeagueFromCloud();
+          if (fresh?.sportId && sportIdProp == null) sport = fresh.sportId;
+        } catch {
+          /* offline / guest — local league is fine */
         }
-      });
+
+        const voice = resolveVoiceSport(sport);
+        const players = await loadLeaguePlayers();
+        if (cancelled) return;
+        setLabel(hotTakeTickerLabel(voice));
+        setTakes(buildHotTakes(players, voice));
+      } catch {
+        if (!cancelled) {
+          const voice = resolveVoiceSport(sportIdProp ?? getLeague()?.sportId);
+          setLabel(hotTakeTickerLabel(voice));
+          setTakes(
+            voice === "nfl"
+              ? [
+                  "Primetime wire temporarily offline. Blame the refs, not the code.",
+                ]
+              : [
+                  "Campus wire temporarily offline. Blame the goats, not the code.",
+                ]
+          );
+        }
+      }
+    }
+
+    void load();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [sportIdProp]);
 
   if (!takes.length) return null;
 
@@ -48,18 +82,18 @@ export default function HotTakeTicker({
           : "border-border bg-card"
       } rounded-xl ${className}`}
       role="region"
-      aria-label="Hot takes ticker"
+      aria-label={`${label} ticker`}
     >
       <div className="flex items-stretch">
         <div
-          className={`shrink-0 px-3 py-2 text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.18em] flex items-center gap-1.5 border-r ${
+          className={`shrink-0 px-3 py-2 text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.14em] flex items-center gap-1.5 border-r ${
             war
               ? "bg-primary text-black border-primary/40"
               : "bg-primary/15 text-primary border-border"
           }`}
         >
           <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
-          Hot takes
+          {label}
         </div>
         <div className="relative flex-1 overflow-hidden py-2 min-w-0">
           <div className="hot-take-track flex w-max gap-0 whitespace-nowrap">

@@ -17,6 +17,7 @@ import {
   type FinaleSlide,
 } from "@/lib/season-finale";
 import TrophyShareButton from "@/components/TrophyShareButton";
+import HardwareTrophyIcon from "@/components/HardwareTrophyIcon";
 import type { ProfileTrophyKind } from "@/lib/profile-hardware";
 import { isGuestMode } from "@/lib/guest-mode";
 import { isOpeningWeekLive } from "@/components/RingCeremonyModal";
@@ -171,13 +172,26 @@ export default function SeasonFinaleModal() {
 
         <div className="px-5 pb-5 space-y-4">
           <div className="text-center pt-2">
-            <div
-              className="text-6xl sm:text-7xl mb-3 animate-bounce"
-              style={{ animationDuration: "1.6s" }}
-              aria-hidden
-            >
-              {slide.emoji}
-            </div>
+            {slide.kind === "championship" ||
+            slide.kind === "toilet_bowl" ||
+            slide.kind === "crystal_ball" ? (
+              <div className="flex justify-center mb-2">
+                <HardwareTrophyIcon
+                  kind={slide.kind}
+                  sportId={getLeague()?.sportId}
+                  size={slide.kind === "championship" ? 140 : 128}
+                  animate
+                />
+              </div>
+            ) : (
+              <div
+                className="text-6xl sm:text-7xl mb-3 animate-bounce"
+                style={{ animationDuration: "1.6s" }}
+                aria-hidden
+              >
+                {slide.emoji}
+              </div>
+            )}
             <p
               className={`text-[11px] font-bold uppercase tracking-[0.16em] ${slide.accent}`}
             >
@@ -191,7 +205,7 @@ export default function SeasonFinaleModal() {
             </h2>
             {slide.isYou && (
               <p className="mt-2 inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-primary/20 text-primary border border-primary/40">
-                That&apos;s you, legend
+                That&apos;s you
               </p>
             )}
           </div>
@@ -224,17 +238,26 @@ export default function SeasonFinaleModal() {
           </p>
 
           {shareKind && slide.winnerName && (
-            <div className="flex justify-center">
-              <TrophyShareButton
-                trophy={{
-                  kind: shareKind,
-                  seasonYear: year,
-                  winnerName: slide.winnerName,
-                  leagueName,
-                  subtitle: slide.kicker,
-                }}
-                label={slide.isYou ? "Share my win" : "Share this win"}
-              />
+            <div className="rounded-xl border border-border bg-black/25 px-3 py-3 space-y-2">
+              <p className="text-[11px] text-center text-muted leading-snug">
+                {slide.isYou
+                  ? "Flex it. Group chat. Stories. Make it permanent."
+                  : "Send it to the room. Tag the champ. Start the noise."}
+              </p>
+              <div className="flex justify-center">
+                <TrophyShareButton
+                  trophy={{
+                    kind: shareKind,
+                    seasonYear: year,
+                    winnerName: slide.winnerName,
+                    leagueName,
+                    subtitle: slide.kicker,
+                    sportId: getLeague()?.sportId,
+                  }}
+                  label={slide.isYou ? "Share my win" : "Share this win"}
+                  className="min-h-[48px] px-5 font-bold"
+                />
+              </div>
             </div>
           )}
 

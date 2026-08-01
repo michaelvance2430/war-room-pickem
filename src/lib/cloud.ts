@@ -2181,6 +2181,8 @@ export async function fillLeagueWithBotsToCap(opts?: {
   added?: number;
   totalBots?: number;
   botsFilled?: number;
+  /** Crystal Ball / Super Bowl pride picks written for bots */
+  crystalFilled?: number;
   seatsBefore?: number;
   rosterBefore?: number;
   rosterAfter?: number;
@@ -2202,15 +2204,29 @@ export async function fillLeagueWithBotsToCap(opts?: {
   } catch {
     /* fall through */
   }
+
+  async function seedCrystalBallForBots(): Promise<number> {
+    try {
+      const { seedBotCrystalBallPicks } = await import("./crystal-ball");
+      const cb = await seedBotCrystalBallPicks();
+      if (cb.ok) return cb.inserted ?? 0;
+    } catch {
+      /* optional */
+    }
+    return 0;
+  }
+
   const roster = await loadLeagueRoster();
   const rosterBefore = roster.length;
   const seatsBefore = seatsRemaining(rosterBefore);
   if (seatsBefore <= 0) {
+    const crystalFilled = await seedCrystalBallForBots();
     return {
       ok: true,
       added: 0,
       totalBots: roster.filter((m) => m.isBot).length,
       botsFilled: 0,
+      crystalFilled,
       seatsBefore: 0,
       rosterBefore,
       rosterAfter: rosterBefore,
@@ -2230,11 +2246,13 @@ export async function fillLeagueWithBotsToCap(opts?: {
   want = Math.min(want, seatsBefore);
 
   if (want <= 0) {
+    const crystalFilled = await seedCrystalBallForBots();
     return {
       ok: true,
       added: 0,
       totalBots: roster.filter((m) => m.isBot).length,
       botsFilled: 0,
+      crystalFilled,
       seatsBefore,
       rosterBefore,
       rosterAfter: rosterBefore,
@@ -2258,12 +2276,16 @@ export async function fillLeagueWithBotsToCap(opts?: {
     }
   }
 
+  // Every trial bot gets a Crystal Ball / Super Bowl pride pick (if feature on)
+  const crystalFilled = await seedCrystalBallForBots();
+
   const added = seed.added ?? 0;
   return {
     ok: true,
     added,
     totalBots: seed.totalBots ?? 0,
     botsFilled,
+    crystalFilled,
     seatsBefore,
     rosterBefore,
     rosterAfter: rosterBefore + added,
@@ -2414,8 +2436,15 @@ export async function clearTrialBotsInCloud(): Promise<{
 
 /** Auto-lock valid pick slips for every bot for a published week. */
 export async function seedBotPicksForWeekInCloud(
-  weekNumber: number
-): Promise<{ ok: boolean; botsFilled?: number; error?: string }> {
+  weekNumber: number,
+  opts?: { chaosChance?: number; skipChaos?: boolean }
+): Promise<{
+  ok: boolean;
+  botsFilled?: number;
+  chaosCount?: number;
+  chaosNames?: string[];
+  error?: string;
+}> {
   const session = getSession();
   if (!session?.leagueId || !session.isCommissioner) {
     return { ok: false, error: "Commissioner only" };
@@ -2436,7 +2465,73 @@ export async function seedBotPicksForWeekInCloud(
   if (row.ok === false) {
     return { ok: false, error: row.error || "Failed to fill bot picks" };
   }
-  return { ok: true, botsFilled: row.botsFilled ?? 0 };
+
+  const botsFilled = row.botsFilled ?? 0;
+  if (opts?.skipChaos || botsFilled === 0) {
+    return { ok: true, botsFilled, chaosCount: 0 };
+  }
+
+  // ~1 in 5 bots go Chaos so you can see 2× impact + Gazette detonation
+  const chaos = await applyRandomBotChaosForWeek(weekNumber, {
+    chance: opts?.chaosChance ?? 22,
+  });
+  return {
+    ok: true,
+    botsFilled,
+    chaosCount: chaos.ok ? chaos.chaosCount ?? 0 : 0,
+    chaosNames: chaos.names,
+    error: chaos.ok ? undefined : chaos.error,
+  };
+}
+
+/**
+ * Sandbox: randomly arm Chaos Mode on trial bots that already locked this week.
+ * Needs supabase/bot-chaos-sim.sql once. Scoring multiplies those weeks by 2×.
+ */
+export async function applyRandomBotChaosForWeek(
+  weekNumber: number,
+  opts?: { chance?: number }
+): Promise<{
+  ok: boolean;
+  chaosCount?: number;
+  names?: string[];
+  error?: string;
+}> {
+  const session = getSession();
+  if (!session?.leagueId || !session.isCommissioner) {
+    return { ok: false, error: "Commissioner only" };
+  }
+  const chance = Math.max(0, Math.min(100, opts?.chance ?? 22));
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("apply_random_bot_chaos", {
+    p_league_id: session.leagueId,
+    p_week_number: weekNumber,
+    p_chance: chance,
+  });
+  if (error) {
+    if (/apply_random_bot_chaos|function|schema cache|does not exist/i.test(error.message || "")) {
+      return {
+        ok: false,
+        error:
+          "Bot Chaos sim needs supabase/bot-chaos-sim.sql run once in Supabase SQL Editor.",
+      };
+    }
+    return { ok: false, error: error.message };
+  }
+  const row = (data || {}) as {
+    ok?: boolean;
+    chaosCount?: number;
+    names?: string[];
+    error?: string;
+  };
+  if (row.ok === false) {
+    return { ok: false, error: row.error || "Failed to arm bot chaos" };
+  }
+  return {
+    ok: true,
+    chaosCount: row.chaosCount ?? 0,
+    names: Array.isArray(row.names) ? row.names : [],
+  };
 }
 
 export async function updateMemberDivision(
@@ -2782,25 +2877,67 @@ export async function resetSeasonInCloud(): Promise<ResetSeasonResult> {
     /* ignore */
   }
 
-  // Clear local week caches so this device matches cloud
+  // Always wipe pride picks + league achievements + re-zero memberships.
+  // RPC may be an older version that only deleted picks/cards — profile stats
+  // (ATS, weeks played, streaks) must not survive trial runs.
   try {
-    for (let w = 0; w <= 18; w++) {
+    const wipeExtras = await resetSeasonClientFallback(leagueId);
+    if (wipeExtras.ok) {
+      result = {
+        ...result,
+        membersKept: wipeExtras.membersKept ?? result.membersKept,
+        picksDeleted: Math.max(
+          result.picksDeleted || 0,
+          wipeExtras.picksDeleted || 0
+        ),
+        cardsDeleted: Math.max(
+          result.cardsDeleted || 0,
+          wipeExtras.cardsDeleted || 0
+        ),
+        resultsDeleted: Math.max(
+          result.resultsDeleted || 0,
+          wipeExtras.resultsDeleted || 0
+        ),
+      };
+    }
+  } catch {
+    /* best-effort */
+  }
+
+  // Clear local week caches so this device matches cloud (NFL through week 22)
+  try {
+    for (let w = 0; w <= 22; w++) {
       localStorage.removeItem(`warroom-card-week-${w}`);
       localStorage.removeItem(`warroom-results-week-${w}`);
       localStorage.removeItem(`warroom-picks-week-${w}`);
     }
     localStorage.setItem("warroom-active-week", "0");
-    const prefix = "warroom-gazette-seen-v1:";
+    // Crystal Ball / Super Bowl pride picks (device fallback board)
+    localStorage.removeItem(`warroom-crystal-ball-${leagueId}`);
+    // Stale local roster stats (guest/demo residue)
+    try {
+      const { savePlayers } = await import("./store");
+      savePlayers([]);
+    } catch {
+      /* ignore */
+    }
+    const prefixes = [
+      "warroom-gazette-seen-v1:",
+      "warroom-ring-ceremony-seen",
+      "warroom-badge-celebrated",
+      "warroom-first-final",
+    ];
     for (let i = localStorage.length - 1; i >= 0; i--) {
       const k = localStorage.key(i);
-      if (k && k.startsWith(prefix)) localStorage.removeItem(k);
+      if (!k) continue;
+      if (prefixes.some((p) => k.startsWith(p))) localStorage.removeItem(k);
     }
   } catch {
     /* ignore */
   }
 
   // Sandbox: wipe sim trophies + local cheevo banks that should not stick.
-  // Real season: career permanent cheevos stay.
+  // Real season: career permanent cheevos stay (Legend / creator only protected in sandbox).
   try {
     const { afterSeasonResetLocalCleanup } = await import("./sandbox-wipe");
     const roster = await loadLeagueRoster();

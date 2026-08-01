@@ -2,10 +2,15 @@ import { BadgeDef, BadgeStatus, BadgeTier, Player } from "./types";
 import { isAppCreator, withCreatorFlag } from "./creator";
 import {
   getBestCommishWeeks,
+  getQualifyingCommishSeasons,
   IRON_COMMISH_BADGE_ID,
   IRON_COMMISH_TARGET,
   syncCommissionerTenureFromSession,
 } from "./commish-tenure";
+import {
+  getSportsPlayedCount,
+  recordSportPlayed,
+} from "./sports-played";
 import {
   FIRST_FINAL_BADGE_ID,
   firstFinalEarned,
@@ -944,14 +949,44 @@ export const BADGE_CATALOG: BadgeDef[] = [
     points: 10,
     icon: "🔁",
   },
+  {
+    id: "bare_minimum_dual",
+    name: "Bare Minimum Dual",
+    description:
+      "Two sports. Two leagues. Absolute floor of multi-sport effort. Congrats on clearing the bar we set on the ground.",
+    howToEarn:
+      "Join (or play in) leagues for 2 different sports — e.g. CFB + NFL. More sports unlock more cheevos later.",
+    tier: "common",
+    points: 10,
+    icon: "🥈",
+  },
 ];
 
+function ladderDefs(): BadgeDef[] {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { commishLadderBadgeDefs } = require("./commish-ladder") as typeof import("./commish-ladder");
+    return commishLadderBadgeDefs();
+  } catch {
+    return [];
+  }
+}
+
 const CATALOG_BY_ID = Object.fromEntries(
-  BADGE_CATALOG.map((b) => [b.id, b])
+  [...BADGE_CATALOG, ...ladderDefs()].map((b) => [b.id, b])
 ) as Record<string, BadgeDef>;
 
 export function getBadgeDef(id: string): BadgeDef | undefined {
-  return CATALOG_BY_ID[id];
+  if (CATALOG_BY_ID[id]) return CATALOG_BY_ID[id];
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getNflBadgeDef } = require("./sports/nfl-achievements") as typeof import("./sports/nfl-achievements");
+    const nfl = getNflBadgeDef(id);
+    if (nfl) return nfl;
+  } catch {
+    /* ignore */
+  }
+  return ladderDefs().find((b) => b.id === id);
 }
 
 type EvalResult = {
@@ -1083,6 +1118,29 @@ function evaluateBadge(
         return { earned: true };
       }
       return progress(getBestCommishWeeks(player.id), IRON_COMMISH_TARGET);
+    }
+    case "commish_ladder_1":
+    case "commish_ladder_2":
+    case "commish_ladder_3":
+    case "commish_ladder_5":
+    case "commish_ladder_7":
+    case "commish_ladder_10": {
+      if (hasPermanentBadge(player, badgeId)) {
+        return { earned: true };
+      }
+      const need =
+        badgeId === "commish_ladder_10"
+          ? 10
+          : badgeId === "commish_ladder_7"
+            ? 7
+            : badgeId === "commish_ladder_5"
+              ? 5
+              : badgeId === "commish_ladder_3"
+                ? 3
+                : badgeId === "commish_ladder_2"
+                  ? 2
+                  : 1;
+      return progress(getQualifyingCommishSeasons(player.id), need);
     }
 
     case "war_room_legend":
@@ -1316,6 +1374,20 @@ function evaluateBadge(
     case "rematch_ready":
       return progress(weeks, 2);
 
+    case "bare_minimum_dual": {
+      // Stamp current league sport so dual-sport is detectable this session
+      try {
+        const { getLeague, getSession } = require("./league") as typeof import("./league");
+        const sid = getSession()?.playerId;
+        if (sid === player.id || !sid) {
+          recordSportPlayed(player.id, getLeague()?.sportId);
+        }
+      } catch {
+        /* ignore */
+      }
+      return progress(getSportsPlayedCount(player.id), 2);
+    }
+
     case "war_room_recruit":
       return progress(player.name?.trim() ? 1 : 0, 1);
 
@@ -1465,7 +1537,37 @@ export function getPlayerBadges(
   }
 
   const sandbox = isSandboxMode();
-  const statuses: BadgeStatus[] = BADGE_CATALOG.map((def) => {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { syncCommishLadderGrants } = require("./commish-ladder") as typeof import("./commish-ladder");
+    syncCommishLadderGrants(p.id);
+  } catch {
+    /* ignore */
+  }
+
+  let sportIsNfl = false;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getLeague } = require("./league") as typeof import("./league");
+    sportIsNfl = getLeague()?.sportId === "nfl";
+  } catch {
+    sportIsNfl = false;
+  }
+
+  let catalog = [...BADGE_CATALOG, ...ladderDefs()];
+  if (sportIsNfl) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const nflMod = require("./sports/nfl-achievements") as typeof import("./sports/nfl-achievements");
+      catalog = catalog
+        .filter((d) => !nflMod.CFB_ONLY_BADGE_IDS.has(d.id))
+        .map((d) => nflMod.nflDisplayOverlay(d));
+    } catch {
+      /* keep catalog */
+    }
+  }
+
+  const statuses: BadgeStatus[] = catalog.map((def) => {
     try {
       const result = evaluateBadge(def.id, p, peers);
       const permanent = hasPermanentBadge(p, def.id);
@@ -1552,6 +1654,19 @@ export function getPlayerBadges(
       };
     }
   });
+
+  // NFL-only cheevos (primetime bank) — appended when in an NFL room
+  if (sportIsNfl) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { getNflPlayerBadges } = require("./sports/nfl-badge-eval") as typeof import("./sports/nfl-badge-eval");
+      const nflStatuses = getNflPlayerBadges(p, peers);
+      statuses.push(...nflStatuses);
+    } catch {
+      /* ignore */
+    }
+  }
+
   return sortBadges(statuses);
 }
 

@@ -8,7 +8,7 @@ import {
   loadMyPicks,
   listScoredWeekNumbers,
 } from "@/lib/cloud";
-import { getSession } from "@/lib/league";
+import { getSession, getLeague } from "@/lib/league";
 import { loadMyProfile } from "@/lib/profile";
 import {
   formatCardLockDeadline,
@@ -135,7 +135,9 @@ export default function PlayerWeekChecklist() {
                         ? crystalLocked
                           ? `Locked${crystalTeam ? `: ${crystalTeam}` : ""}`
                           : `In${crystalTeam ? `: ${crystalTeam}` : ""} — change until ${crystalLockLabel || "lock"}`
-                        : `National champ pick. Free. Locks ${crystalLockLabel || "Week 0"}.`,
+                        : getLeague()?.sportId === "nfl"
+                          ? `Super Bowl pick. Free. Locks ${crystalLockLabel || "Kickoff week"}.`
+                          : `National champ pick. Free. Locks ${crystalLockLabel || "Week 0"}.`,
                       done: crystalDone,
                       href: "/crystal-ball",
                       hrefLabel: crystalDone ? "View" : "Crystal Ball",

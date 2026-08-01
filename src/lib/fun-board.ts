@@ -1,6 +1,38 @@
 import type { Player } from "./types";
 import { isAppCreator } from "./creator";
 import { getLeague } from "./league";
+import {
+  buildNflHotTakes,
+  nflSwingText,
+  NFL_TICKER_LABEL,
+} from "./sports/nfl-voice";
+import {
+  buildCfbHotTakes,
+  cfbSwingText,
+  CFB_TICKER_LABEL,
+} from "./sports/cfb-voice";
+
+/** Resolve football voice pack for dual-sport rooms. */
+export function resolveVoiceSport(
+  sportId?: string | null
+): "cfb" | "nfl" {
+  if (sportId === "nfl") return "nfl";
+  if (sportId == null) {
+    try {
+      if (getLeague()?.sportId === "nfl") return "nfl";
+    } catch {
+      /* ignore */
+    }
+  }
+  return "cfb";
+}
+
+/** Chrome label on the scrolling ticker */
+export function hotTakeTickerLabel(sportId?: string | null): string {
+  return resolveVoiceSport(sportId) === "nfl"
+    ? NFL_TICKER_LABEL
+    : CFB_TICKER_LABEL;
+}
 
 /** Humorous rank-movement label from standings rank change (positive = climbed). */
 export type SwingLabel = {
@@ -85,38 +117,78 @@ export function preseasonSwingForPlayer(player: Player): SwingLabel {
 
 export function swingLabelFromDelta(
   delta: number | null,
-  opts?: { preseason?: boolean; player?: Player }
+  opts?: { preseason?: boolean; player?: Player; sportId?: string | null }
 ): SwingLabel {
-  // No scored weeks yet — don't fake "MID AS HELL" for everyone
+  const nfl = resolveVoiceSport(opts?.sportId) === "nfl";
+  // No scored weeks yet — don't fake mid-card labels for everyone
   if (opts?.preseason || delta === null) {
     if (opts?.player) return preseasonSwingForPlayer(opts.player);
     return { key: "preseason", text: "WAITING", tone: "flat", delta: 0 };
   }
   if (delta === 0) {
-    return { key: "mid", text: "MID AS HELL", tone: "flat", delta: 0 };
+    return {
+      key: "mid",
+      text: nfl ? nflSwingText("mid") : cfbSwingText("mid"),
+      tone: "flat",
+      delta: 0,
+    };
   }
   if (delta >= 5) {
-    return { key: "rocket", text: "ROCKET SHIP", tone: "hero", delta };
+    return {
+      key: "rocket",
+      text: nfl ? nflSwingText("rocket") : cfbSwingText("rocket"),
+      tone: "hero",
+      delta,
+    };
   }
   if (delta >= 3) {
-    return { key: "heater", text: "ON A HEATER", tone: "up", delta };
+    return {
+      key: "heater",
+      text: nfl ? nflSwingText("heater") : cfbSwingText("heater"),
+      tone: "up",
+      delta,
+    };
   }
   if (delta >= 1) {
-    return { key: "climb", text: "CLIMBING", tone: "up", delta };
+    return {
+      key: "climb",
+      text: nfl ? nflSwingText("climb") : cfbSwingText("climb"),
+      tone: "up",
+      delta,
+    };
   }
   if (delta <= -5) {
-    return { key: "trapdoor", text: "TRAPDOOR", tone: "shame", delta };
+    return {
+      key: "trapdoor",
+      text: nfl ? nflSwingText("trapdoor") : cfbSwingText("trapdoor"),
+      tone: "shame",
+      delta,
+    };
   }
   if (delta <= -3) {
-    return { key: "dropped", text: "DROPPED THE BALL", tone: "down", delta };
+    return {
+      key: "dropped",
+      text: nfl ? nflSwingText("dropped") : cfbSwingText("dropped"),
+      tone: "down",
+      delta,
+    };
   }
-  return { key: "slip", text: "SLIPPING", tone: "down", delta };
+  return {
+    key: "slip",
+    text: nfl ? nflSwingText("slip") : cfbSwingText("slip"),
+    tone: "down",
+    delta,
+  };
 }
 
 /** Players with current rank, previous rank (pre-last week), and swing label. */
-export function rankPlayersWithSwings(players: Player[]): RankedPlayer[] {
+export function rankPlayersWithSwings(
+  players: Player[],
+  sportId?: string | null
+): RankedPlayer[] {
   if (!players.length) return [];
 
+  const sport = resolveVoiceSport(sportId);
   const anyWeek = players.some((p) => (p.weeklyPoints?.length || 0) > 0);
   const currentRanks = rankByPoints(players, (p) => p.totalPoints);
   const prevRanks = anyWeek
@@ -164,7 +236,11 @@ export function rankPlayersWithSwings(players: Player[]): RankedPlayer[] {
         ...p,
         rank,
         prevRank,
-        swing: swingLabelFromDelta(delta, { preseason, player: p }),
+        swing: swingLabelFromDelta(delta, {
+          preseason,
+          player: p,
+          sportId: sport,
+        }),
         lastWeekPts: lastWeekPts(p),
       };
     });
@@ -175,7 +251,7 @@ export function powerBoardWithLabels(
   players: Player[],
   powerOf: (p: Player) => number
 ): (RankedPlayer & { power: number })[] {
-  const withSwing = rankPlayersWithSwings(players);
+  const withSwing = rankPlayersWithSwings(players, resolveVoiceSport());
   const byId = new Map(withSwing.map((p) => [p.id, p]));
 
   return [...players]
@@ -241,126 +317,69 @@ export function weekCrownAndShame(players: Player[]): CrownShame | null {
   };
 }
 
-/** Build scrolling hot takes from live league stats. */
-export function buildHotTakes(players: Player[]): string[] {
-  if (!players.length) {
-    return [
-      "War Room is quiet… too quiet. Invite the chaos.",
-      "No standings yet — confidence still undefeated in theory only.",
-    ];
-  }
-
-  const takes: string[] = [];
-  const ranked = rankPlayersWithSwings(players);
+/**
+ * Build scrolling hot takes from live league stats.
+ * Pass sportId when you have it — dual-sport players should never hear
+ * the same jokes on campus Saturday and pro Sunday.
+ */
+export function buildHotTakes(
+  players: Player[],
+  sportId?: string | null
+): string[] {
+  const sport = resolveVoiceSport(sportId);
   const crownShame = weekCrownAndShame(players);
+  const bank =
+    sport === "nfl" ? buildNflHotTakes(players) : buildCfbHotTakes(players);
 
-  // Generic always-on
-  takes.push("Hot takes are free. Points are not.");
-  takes.push("Best Bet bravely or Best Bet fraudulently — history will decide.");
-
-  if (crownShame && !crownShame.samePerson) {
-    takes.push(
-      `👑 Crown: ${crownShame.crown.player.name} dropped ${crownShame.crown.pts} pts last card. Tip the cap.`
-    );
-    takes.push(
+  if (sport === "nfl") {
+    if (crownShame && !crownShame.samePerson) {
+      bank.unshift(
+        `👑 Late window: ${crownShame.crown.player.name} stacked ${crownShame.crown.pts}. Film don't lie.`,
+        `📉 Three-and-out: ${crownShame.shame.player.name} at ${crownShame.shame.pts}. Red-zone dignity: missing.`
+      );
+    } else if (crownShame?.samePerson) {
+      bank.unshift(
+        `${crownShame.crown.player.name} is both the highlight and the lowlight package at ${crownShame.crown.pts}. Lonely at the top (and bottom).`
+      );
+    }
+  } else if (crownShame && !crownShame.samePerson) {
+    bank.unshift(
+      `👑 Crown: ${crownShame.crown.player.name} dropped ${crownShame.crown.pts} pts last card. Tip the cap.`,
       `🛍️ Wall of Shame: ${crownShame.shame.player.name} scraped ${crownShame.shame.pts} pts. Brown paper bag season.`
     );
   } else if (crownShame?.samePerson) {
-    takes.push(
+    bank.unshift(
       `${crownShame.crown.player.name} is both the story and the subplot at ${crownShame.crown.pts} pts. Lonely at the top (and bottom).`
     );
   }
 
-  const leader = ranked[0];
-  const trailer = ranked[ranked.length - 1];
-  if (leader && trailer && leader.id !== trailer.id) {
-    takes.push(
-      `${leader.name} runs the board at ${leader.totalPoints} pts. ${trailer.name} is staring up from ${trailer.totalPoints}.`
-    );
-    const gap = leader.totalPoints - trailer.totalPoints;
-    if (gap >= 20) {
-      takes.push(
-        `Gap alert: ${gap} pts from 1st to last. Someone bring a ladder. Or a plunger.`
-      );
-    }
-  }
-
+  // Live swing callouts (sport-flavored badge text already applied)
+  const ranked = rankPlayersWithSwings(players, sport);
   for (const p of ranked) {
     if (p.swing.delta >= 3) {
-      takes.push(
-        `${p.name} ${p.swing.text} — jumped ${p.swing.delta} spot${p.swing.delta === 1 ? "" : "s"} after the last card.`
+      bank.push(
+        sport === "nfl"
+          ? `${p.name} ${p.swing.text} — jumped ${p.swing.delta} spot${p.swing.delta === 1 ? "" : "s"} after the late window.`
+          : `${p.name} ${p.swing.text} — jumped ${p.swing.delta} spot${p.swing.delta === 1 ? "" : "s"} after the last Saturday card.`
       );
     }
     if (p.swing.delta <= -3) {
-      takes.push(
-        `${p.name} ${p.swing.text} — fell ${Math.abs(p.swing.delta)} spots. The rank graph looks like a ski jump.`
-      );
-    }
-    if (p.currentStreak >= 3) {
-      takes.push(
-        `${p.name} is on a W${p.currentStreak} streak. Do not feed after midnight.`
-      );
-    }
-    if (p.currentStreak <= -3) {
-      takes.push(
-        `${p.name} is on an L${Math.abs(p.currentStreak)} skid. Send snacks and better dogs.`
-      );
-    }
-    if (p.perfectWeeks >= 1) {
-      takes.push(
-        `${p.name} has ${p.perfectWeeks} perfect-ish week${p.perfectWeeks > 1 ? "s" : ""} on the résumé. Show-off energy.`
-      );
-    }
-    if (p.bestBetTotal >= 3) {
-      const pct = Math.round((p.bestBetHits / p.bestBetTotal) * 100);
-      if (pct >= 60) {
-        takes.push(
-          `${p.name} is a Best Bet assassin (${p.bestBetHits}/${p.bestBetTotal}, ${pct}%).`
-        );
-      } else if (pct <= 30 && p.bestBetTotal >= 3) {
-        takes.push(
-          `${p.name}'s Best Bet is on a fraud watch (${p.bestBetHits}/${p.bestBetTotal}).`
-        );
-      }
-    }
-    if (p.propTotal >= 3) {
-      const pp = Math.round((p.propHits / p.propTotal) * 100);
-      if (pp >= 70) {
-        takes.push(
-          `${p.name} is a prop merchant (${p.propHits}/${p.propTotal}). Crystal ball unclear, ledger clear.`
-        );
-      }
-    }
-    if (p.lastWeekPts === 0) {
-      takes.push(
-        `${p.name} put up a zero last week. That is not a strategy. That is a cry for help.`
-      );
-    }
-    if (p.lastWeekPts != null && p.lastWeekPts >= 18) {
-      takes.push(
-        `${p.name} cooked for ${p.lastWeekPts} last week. Someone check the smoke alarms.`
+      bank.push(
+        sport === "nfl"
+          ? `${p.name} ${p.swing.text} — fell ${Math.abs(p.swing.delta)} spots. Tape don't care about excuses.`
+          : `${p.name} ${p.swing.text} — fell ${Math.abs(p.swing.delta)} spots. The rank graph looks like a ski jump.`
       );
     }
   }
 
-  // Dedupe while preserving order
   const seen = new Set<string>();
-  const unique = takes.filter((t) => {
-    if (seen.has(t)) return false;
-    seen.add(t);
-    return true;
-  });
-
-  // Keep ticker dense but not endless
-  if (unique.length < 4) {
-    unique.push(
-      "Lock picks before kickoff or the ticker will remember.",
-      "Toilet Bowl scouting report: always accepting applications.",
-      "Confidence 5 is a love language. Also a crime scene."
-    );
-  }
-
-  return unique.slice(0, 24);
+  return bank
+    .filter((t) => {
+      if (seen.has(t)) return false;
+      seen.add(t);
+      return true;
+    })
+    .slice(0, 24);
 }
 
 export function swingBadgeClass(tone: SwingLabel["tone"]): string {

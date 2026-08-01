@@ -77,6 +77,7 @@ export default function InviteFriends({
       code,
       inviterName,
       flavor,
+      sportId: getLeague()?.sportId,
     });
     setBusy(false);
     if (leagueId) markInviteCopied(leagueId);
@@ -117,6 +118,7 @@ export default function InviteFriends({
           code,
           inviterName,
           flavor,
+          sportId: getLeague()?.sportId,
         })
       );
       if (leagueId) markInviteCopied(leagueId);
@@ -171,6 +173,7 @@ export default function InviteFriends({
           code,
           inviterName,
           flavor,
+          sportId: getLeague()?.sportId,
         });
 
   // Collapsed strip on phone until they expand (desktop always full)

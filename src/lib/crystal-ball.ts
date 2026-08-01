@@ -6,6 +6,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { getSession, getLeague } from "@/lib/league";
 import { listFbsTeams } from "@/lib/fbs-teams";
+import { listNflPrideTeams } from "@/lib/nfl-teams";
 
 export type CrystalBallPick = {
   userId: string;
@@ -32,20 +33,42 @@ export type CrystalBallState = {
   cloud: boolean;
 };
 
-/** Locks at noon ET on Week 0 Saturday (Aug 29, 2026) — before typical kickoffs. */
-export function crystalBallLockMs(): number {
-  let t = Date.parse("2026-08-29T12:00:00-04:00");
-  if (Number.isNaN(t)) t = Date.parse("2026-08-29T16:00:00Z");
+function resolveCbSport(sportId?: string | null): "cfb" | "nfl" {
+  if (sportId === "nfl") return "nfl";
+  if (sportId === "cfb") return "cfb";
+  try {
+    return getLeague()?.sportId === "nfl" ? "nfl" : "cfb";
+  } catch {
+    return "cfb";
+  }
+}
+
+/**
+ * Calendar pride-pick freeze:
+ * CFB — noon ET Week 0 Sat Aug 29, 2026
+ * NFL — noon ET Kickoff Thu Sep 10, 2026 (Week 1)
+ */
+export function crystalBallLockMs(sportId?: string | null): number {
+  const nfl = resolveCbSport(sportId) === "nfl";
+  let t = Date.parse(
+    nfl ? "2026-09-10T12:00:00-04:00" : "2026-08-29T12:00:00-04:00"
+  );
+  if (Number.isNaN(t)) {
+    t = Date.parse(nfl ? "2026-09-10T16:00:00Z" : "2026-08-29T16:00:00Z");
+  }
   return t;
 }
 
 /** Calendar deadline only (sync). Prefer resolveCrystalBallLock for real gates. */
-export function isCrystalBallLocked(now = Date.now()): boolean {
-  return now >= crystalBallLockMs();
+export function isCrystalBallLocked(
+  now = Date.now(),
+  sportId?: string | null
+): boolean {
+  return now >= crystalBallLockMs(sportId);
 }
 
-export function crystalBallLockLabel(): string {
-  const t = crystalBallLockMs();
+export function crystalBallLockLabel(sportId?: string | null): string {
+  const t = crystalBallLockMs(sportId);
   return new Date(t).toLocaleString("en-US", {
     weekday: "short",
     month: "short",
@@ -66,16 +89,18 @@ export type CrystalBallLockInfo = {
 };
 
 /**
- * Crystal Ball freezes if:
- * - Calendar: noon ET Sat Aug 29, 2026, OR
- * - Week 0 pick'em card already locked (first kickoff), OR
- * - Week 0 has been scored (sandbox / late sim still freezes forever)
+ * Pride-pick freezes if:
+ * - Calendar deadline (CFB Week 0 / NFL Kickoff week), OR
+ * - Opening week card already locked (first kickoff), OR
+ * - Opening week has been scored
  */
 export async function resolveCrystalBallLock(
-  now = Date.now()
+  now = Date.now(),
+  sportId?: string | null
 ): Promise<CrystalBallLockInfo> {
-  const calendarLabel = crystalBallLockLabel();
-  if (now >= crystalBallLockMs()) {
+  const sport = resolveCbSport(sportId);
+  const calendarLabel = crystalBallLockLabel(sport);
+  if (now >= crystalBallLockMs(sport)) {
     return {
       locked: true,
       reason: "calendar",
@@ -83,18 +108,22 @@ export async function resolveCrystalBallLock(
     };
   }
 
+  const openWeek = sport === "nfl" ? 1 : 0;
+
   try {
     const { listScoredWeekNumbers, loadWeekCard } = await import("./cloud");
     const scored = await listScoredWeekNumbers();
-    if (scored.includes(0)) {
+    if (scored.includes(openWeek)) {
       return {
         locked: true,
         reason: "week0_scored",
         lockLabel:
-          "Week 0 scored — Crystal Ball is closed. No late prophecies.",
+          sport === "nfl"
+            ? "Week 1 scored — Super Bowl pick is closed. No late prophecies."
+            : "Week 0 scored — Crystal Ball is closed. No late prophecies.",
       };
     }
-    const card = await loadWeekCard(0);
+    const card = await loadWeekCard(openWeek);
     if (card?.games?.length) {
       const { isCardLockDeadlinePassed } = await import("./dates");
       if (isCardLockDeadlinePassed(card.games, now)) {
@@ -102,7 +131,9 @@ export async function resolveCrystalBallLock(
           locked: true,
           reason: "week0_frozen",
           lockLabel:
-            "Week 0 locked — Crystal Ball closed with first kickoff. No take-backs.",
+            sport === "nfl"
+              ? "Week 1 locked — Super Bowl pick closed with first kickoff. No take-backs."
+              : "Week 0 locked — Crystal Ball closed with first kickoff. No take-backs.",
         };
       }
     }
@@ -117,7 +148,24 @@ export async function resolveCrystalBallLock(
   };
 }
 
-export function crystalBallTeams() {
+/**
+ * Pride-pick roster for Crystal Ball / Super Bowl flex.
+ * NFL leagues get 32 pro teams — never the FBS list.
+ */
+export function crystalBallTeams(sportId?: string | null): {
+  name: string;
+  conference: string;
+}[] {
+  const sid =
+    sportId ??
+    (() => {
+      try {
+        return getLeague()?.sportId;
+      } catch {
+        return null;
+      }
+    })();
+  if (sid === "nfl") return listNflPrideTeams();
   return listFbsTeams();
 }
 
@@ -444,4 +492,120 @@ export async function crownNationalChampion(
   }
   writeLocal(session.leagueId, local);
   return { ok: true, winners: winners.length };
+}
+
+/**
+ * Pre-season / sandbox: every trial bot gets a Crystal Ball (or Super Bowl) pick
+ * so the board fills and crown/display can be smoke-tested.
+ * Needs supabase/bot-crystal-ball.sql once.
+ */
+export async function seedBotCrystalBallPicks(opts?: {
+  sportId?: string | null;
+}): Promise<{
+  ok: boolean;
+  inserted?: number;
+  skipped?: number;
+  error?: string;
+}> {
+  const session = getSession();
+  const league = getLeague();
+  if (!session?.leagueId || !session.isCommissioner) {
+    return { ok: false, error: "Commissioner only" };
+  }
+
+  // Skip if pride pick is off for this league
+  if (league?.settings?.crystalBallEnabled === false) {
+    return { ok: true, inserted: 0, skipped: 0 };
+  }
+
+  const sport =
+    opts?.sportId ?? league?.sportId ?? "cfb";
+  const teams = crystalBallTeams(sport);
+  if (!teams.length) {
+    return { ok: false, error: "No teams available for pride pick" };
+  }
+
+  let bots: { userId: string; name: string }[] = [];
+  try {
+    const { loadLeagueRoster } = await import("./cloud");
+    const roster = await loadLeagueRoster();
+    bots = roster
+      .filter((m) => m.isBot)
+      .map((m) => ({ userId: m.userId, name: m.name }));
+  } catch {
+    return { ok: false, error: "Could not load roster" };
+  }
+
+  if (!bots.length) {
+    return {
+      ok: false,
+      error: "No trial bots yet — pad bots first.",
+    };
+  }
+
+  // Deterministic spread of popular + random teams so the board isn't all chalk
+  const picks = bots.map((b, i) => {
+    const idx =
+      (b.userId.charCodeAt(0) + b.userId.charCodeAt(1) * 17 + i * 3) %
+      teams.length;
+    return {
+      user_id: b.userId,
+      team_name: teams[idx].name,
+    };
+  });
+
+  try {
+    const supabase = createClient();
+    const { data, error } = await supabase.rpc("seed_bot_crystal_ball_picks", {
+      p_league_id: session.leagueId,
+      p_picks: picks,
+    });
+    if (error) {
+      const msg = error.message || "RPC failed";
+      if (/does not exist|schema cache|seed_bot_crystal/i.test(msg)) {
+        return {
+          ok: false,
+          error:
+            "Run supabase/bot-crystal-ball.sql in Supabase SQL Editor once.",
+        };
+      }
+      // Fallback: local picks for bots (device-only board)
+      const local = readLocal(session.leagueId);
+      for (let i = 0; i < bots.length; i++) {
+        const b = bots[i];
+        const team = picks[i].team_name;
+        local.picks[b.userId] = {
+          teamName: team,
+          pickedAt: new Date().toISOString(),
+          name: b.name,
+        };
+      }
+      writeLocal(session.leagueId, local);
+      return {
+        ok: true,
+        inserted: bots.length,
+        skipped: 0,
+        error: "Cloud RPC missing — bot picks saved on this device only.",
+      };
+    }
+    const row = (data || {}) as {
+      ok?: boolean;
+      inserted?: number;
+      skipped?: number;
+      error?: string;
+    };
+    if (row.ok === false) {
+      return { ok: false, error: row.error || "seed failed" };
+    }
+    return {
+      ok: true,
+      inserted: row.inserted ?? picks.length,
+      skipped: row.skipped ?? 0,
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "Failed to seed bot crystal ball",
+    };
+  }
 }

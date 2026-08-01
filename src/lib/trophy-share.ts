@@ -12,7 +12,22 @@ export type ShareableTrophy = {
   leagueName?: string;
   division?: string | null;
   subtitle?: string | null;
+  /** cfb | nfl — dual-sport hashtags / day-of-week energy */
+  sportId?: string | null;
 };
+
+function resolveShareSport(sportId?: string | null): "cfb" | "nfl" {
+  if (sportId === "nfl") return "nfl";
+  if (sportId === "cfb") return "cfb";
+  try {
+    // Lazy — avoid circular imports at module init
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getLeague } = require("./league") as typeof import("./league");
+    return getLeague()?.sportId === "nfl" ? "nfl" : "cfb";
+  } catch {
+    return "cfb";
+  }
+}
 
 export type TrophySharePack = {
   kind: ProfileTrophyKind;
@@ -44,8 +59,16 @@ function firstName(full: string) {
 }
 
 function divisionLabel(div?: string | null) {
-  const d = (div || "").trim();
-  return d ? `${d} Division` : "Division";
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { divisionFullLabel } = require("./divisions") as typeof import("./divisions");
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getLeague } = require("./league") as typeof import("./league");
+    return divisionFullLabel(div, getLeague()?.sportId) || "Division";
+  } catch {
+    const d = (div || "").trim();
+    return d ? `${d} Division` : "Division";
+  }
 }
 
 /** Hilarious, distinct write-ups — different personality per hardware type. */
@@ -55,38 +78,56 @@ export function buildTrophySharePack(t: ShareableTrophy): TrophySharePack {
   const first = firstName(name);
   const league = (t.leagueName || "War Room").trim();
   const div = divisionLabel(t.division);
+  const nfl = resolveShareSport(t.sportId) === "nfl";
+  const sportTag = nfl ? "#NFL" : "#CFB";
+  const dayWord = nfl ? "Sundays" : "Saturdays";
+  const champHero = nfl ? "WAR ROOM CHAMPION" : "NATIONAL CHAMPION";
+  const champLabel = nfl ? "Champion" : "National title";
 
   const packs: Record<ProfileTrophyKind, TrophySharePack> = {
     championship: {
       kind: "championship",
-      shortLabel: "National title",
+      shortLabel: champLabel,
       shareTitle: `${year} War Room Champion — ${name}`,
       emoji: "🏆",
-      heroLine: "NATIONAL CHAMPION",
+      heroLine: champHero,
       subLine: `${year} · ${league}`,
-      footerRoast: "They said it was a long season. They were right. And wrong.",
+      footerRoast: nfl
+        ? "Sunday after Sunday. They closed it out."
+        : "Saturday after Saturday. They closed it out.",
       caption: [
-        `🏆 ${name} is your ${year} ${league} NATIONAL CHAMPION.`,
+        `🏆 ${name}. ${year}. ${league}.`,
+        nfl ? `WAR ROOM CHAMPION.` : `NATIONAL CHAMPION of the room.`,
         ``,
-        `Not "pretty good." Not "top of the chat." The big one.`,
-        `Confidence picks. Best Bets. Props. Saturdays that aged like fine trash talk.`,
+        `Not a participation trophy. The actual hardware.`,
+        `Every confidence rank. Every Best Bet. Every dumb prop that somehow hit.`,
+        `${dayWord} that built a season — and ${first} finished on top.`,
         ``,
-        `If you doubted ${first} all year: this post is your apology form.`,
-        `If you rode with them: cash the clout, buy the pizza.`,
+        `If you faded them all year… this is your receipt.`,
+        `If you rode with them… you're allowed to be insufferable for 48 hours.`,
         ``,
-        `Hardware is permanent. Group-chat amnesia is not.`,
+        `Share it. Tag the room. Let the chat do the rest.`,
         ``,
-        `#WarRoomPickEm #CFB #Champion #${year}`,
+        `#WarRoomPickEm ${sportTag} #Champion #${year}`,
       ].join("\n"),
-      hashtags: "#WarRoomPickEm #CFB #Champion",
-      colors: {
-        bg0: "#0c0a06",
-        bg1: "#1a1408",
-        accent: "#fbbf24",
-        accent2: "#f59e0b",
-        text: "#fffbeb",
-        muted: "#d6d3d1",
-      },
+      hashtags: `#WarRoomPickEm ${sportTag} #Champion`,
+      colors: nfl
+        ? {
+            bg0: "#070b14",
+            bg1: "#0B1426",
+            accent: "#C1121F",
+            accent2: "#C5CCD3",
+            text: "#F8FAFC",
+            muted: "#C5CCD3",
+          }
+        : {
+            bg0: "#0c0a06",
+            bg1: "#1a1408",
+            accent: "#fbbf24",
+            accent2: "#f59e0b",
+            text: "#fffbeb",
+            muted: "#d6d3d1",
+          },
     },
     toilet_bowl: {
       kind: "toilet_bowl",
@@ -111,9 +152,9 @@ export function buildTrophySharePack(t: ShareableTrophy): TrophySharePack {
         ``,
         `Proudly engraved. Loudly shared. Zero shame. Maximum content.`,
         ``,
-        `#ToiletBowl #WarRoomPickEm #CFB #StillATrophy #${year}`,
+        `#ToiletBowl #WarRoomPickEm ${sportTag} #StillATrophy #${year}`,
       ].join("\n"),
-      hashtags: "#ToiletBowl #WarRoomPickEm #CFB #StillATrophy",
+      hashtags: `#ToiletBowl #WarRoomPickEm ${sportTag} #StillATrophy`,
       colors: {
         bg0: "#0a0612",
         bg1: "#1a0b2e",
@@ -127,30 +168,36 @@ export function buildTrophySharePack(t: ShareableTrophy): TrophySharePack {
       kind: "crystal_ball",
       shortLabel: "Nerd King",
       shareTitle: `${year} Village Nerd — ${name}`,
-      emoji: "🔮",
-      heroLine: "VILLAGE NERD KING",
-      subLine: `${year} · Crystal Ball national champ`,
+      emoji: "🧠",
+      heroLine: "BIG BRAIN NERD CUP",
+      subLine: nfl
+        ? `${year} · Pride pick · Super Bowl flex`
+        : `${year} · Crystal Ball national champ`,
       footerRoast: "Zero standings points. Infinite smug. Correct once.",
       caption: [
-        `🔮 ANNOUNCING YOUR ${year} VILLAGE NERD / NERD KING: ${name}`,
+        `🧠 ANNOUNCING YOUR ${year} VILLAGE NERD: ${name}`,
         ``,
-        `While y'all were sweating spreads, ${first} was out here calling the NATIONAL CHAMPION in the Crystal Ball.`,
+        `They win the Big Brain Nerd Cup.`,
+        `Crystal ball. Textbooks. Thick glasses. Pocket protector energy.`,
+        ``,
+        nfl
+          ? `While y'all were sweating spreads, ${first} called the Super Bowl champ as a pride pick.`
+          : `While y'all were sweating spreads, ${first} called the national champ in the Crystal Ball.`,
         ``,
         `Prize pool: $0`,
         `Standings impact: also $0`,
         `Smugness: federally unregulated`,
         ``,
-        `They get a plaque. You get the "I told you so" for free.`,
-        `This is pure prophecy energy. Nerd hardware. Absolute cinema.`,
+        `Hardware is permanent. Your hot take is not.`,
         ``,
-        `#VillageNerd #NerdKing #CrystalBall #WarRoomPickEm #CFB #${year}`,
+        `#VillageNerd #BigBrain #NerdKing #CrystalBall #WarRoomPickEm ${sportTag} #${year}`,
       ].join("\n"),
-      hashtags: "#VillageNerd #NerdKing #CrystalBall #WarRoomPickEm",
+      hashtags: `#VillageNerd #BigBrain #NerdKing #CrystalBall #WarRoomPickEm ${sportTag}`,
       colors: {
         bg0: "#020617",
         bg1: "#0c1929",
         accent: "#38bdf8",
-        accent2: "#0ea5e9",
+        accent2: "#a855f7",
         text: "#f0f9ff",
         muted: "#7dd3fc",
       },
@@ -174,9 +221,9 @@ export function buildTrophySharePack(t: ShareableTrophy): TrophySharePack {
         `National title is another conversation.`,
         `This post is about LOCAL DOMINANCE and making three other divisions slightly mad.`,
         ``,
-        `#DivisionChamp #WarRoomPickEm #CFB #${year}`,
+        `#DivisionChamp #WarRoomPickEm ${sportTag} #${year}`,
       ].join("\n"),
-      hashtags: "#DivisionChamp #WarRoomPickEm #CFB",
+      hashtags: `#DivisionChamp #WarRoomPickEm ${sportTag}`,
       colors: {
         bg0: "#04140f",
         bg1: "#0a2e22",
@@ -281,10 +328,18 @@ export function renderTrophyShareCanvas(
   ctx.textBaseline = "middle";
   ctx.fillText("WAR ROOM PICK'EM", size / 2, 128 * s);
 
-  // Emoji / hero glyph
-  ctx.font = `${160 * s}px "Segoe UI Emoji", "Apple Color Emoji", sans-serif`;
-  ctx.textBaseline = "middle";
-  ctx.fillText(pack.emoji, size / 2, 300 * s);
+  // Hardware art matching Trophy Room icons
+  if (t.kind === "championship") {
+    drawChampionshipTrophyArt(ctx, size / 2, 300 * s, 200 * s, t.sportId);
+  } else if (t.kind === "toilet_bowl") {
+    drawToiletTrophyArt(ctx, size / 2, 300 * s, 190 * s);
+  } else if (t.kind === "crystal_ball") {
+    drawNerdTrophyArt(ctx, size / 2, 300 * s, 200 * s);
+  } else {
+    ctx.font = `${160 * s}px "Segoe UI Emoji", "Apple Color Emoji", sans-serif`;
+    ctx.textBaseline = "middle";
+    ctx.fillText(pack.emoji, size / 2, 300 * s);
+  }
 
   // Hero line
   ctx.font = `800 ${Math.min(64, 56) * s}px system-ui, -apple-system, Segoe UI, sans-serif`;
@@ -332,6 +387,208 @@ export function renderTrophyShareCanvas(
   ctx.fillText("Share the hardware · Tag the haters", size / 2, 980 * s);
 
   return canvas;
+}
+
+/**
+ * Canvas trophy silhouettes for share graphics — matches in-app SportChampionshipTrophy vibe.
+ */
+function drawChampionshipTrophyArt(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  h: number,
+  sportId?: string | null
+) {
+  const sport = resolveShareSport(sportId);
+  const scale = h / 200;
+  ctx.save();
+  ctx.translate(cx, cy);
+
+  if (sport === "nfl") {
+    // Silver football + stand
+    const g = ctx.createLinearGradient(-40 * scale, -50 * scale, 40 * scale, 20 * scale);
+    g.addColorStop(0, "#f8fafc");
+    g.addColorStop(0.5, "#C5CCD3");
+    g.addColorStop(1, "#64748b");
+    ctx.save();
+    ctx.rotate(-0.28);
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.ellipse(0, -20 * scale, 48 * scale, 30 * scale, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(15,23,42,0.45)";
+    ctx.lineWidth = 2 * scale;
+    ctx.beginPath();
+    ctx.moveTo(-22 * scale, -28 * scale);
+    ctx.quadraticCurveTo(0, -38 * scale, 22 * scale, -12 * scale);
+    ctx.stroke();
+    ctx.restore();
+    // stem
+    ctx.fillStyle = "#1e293b";
+    ctx.fillRect(-10 * scale, 8 * scale, 20 * scale, 48 * scale);
+    ctx.fillStyle = "#C5CCD3";
+    ctx.fillRect(-36 * scale, 56 * scale, 72 * scale, 14 * scale);
+    ctx.fillStyle = "#C1121F";
+    ctx.fillRect(-40 * scale, 70 * scale, 80 * scale, 6 * scale);
+  } else {
+    // CFB crystal tower + gold base
+    const crystal = ctx.createLinearGradient(-20 * scale, -80 * scale, 20 * scale, 40 * scale);
+    crystal.addColorStop(0, "#f8fafc");
+    crystal.addColorStop(0.4, "#e2e8f0");
+    crystal.addColorStop(1, "#64748b");
+    ctx.fillStyle = crystal;
+    ctx.beginPath();
+    ctx.moveTo(0, -78 * scale);
+    ctx.lineTo(28 * scale, -48 * scale);
+    ctx.lineTo(22 * scale, 28 * scale);
+    ctx.lineTo(-22 * scale, 28 * scale);
+    ctx.lineTo(-28 * scale, -48 * scale);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.35)";
+    ctx.beginPath();
+    ctx.moveTo(0, -78 * scale);
+    ctx.lineTo(28 * scale, -48 * scale);
+    ctx.lineTo(0, -38 * scale);
+    ctx.lineTo(-28 * scale, -48 * scale);
+    ctx.closePath();
+    ctx.fill();
+    // gold bases
+    const gold = ctx.createLinearGradient(-40 * scale, 30 * scale, 40 * scale, 80 * scale);
+    gold.addColorStop(0, "#fde68a");
+    gold.addColorStop(0.5, "#fbbf24");
+    gold.addColorStop(1, "#b45309");
+    ctx.fillStyle = gold;
+    ctx.fillRect(-30 * scale, 28 * scale, 60 * scale, 12 * scale);
+    ctx.fillRect(-40 * scale, 42 * scale, 80 * scale, 12 * scale);
+    ctx.fillRect(-48 * scale, 56 * scale, 96 * scale, 16 * scale);
+  }
+  ctx.restore();
+}
+
+function drawToiletTrophyArt(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  h: number
+) {
+  const scale = h / 200;
+  ctx.save();
+  ctx.translate(cx, cy);
+  // Glow
+  const glow = ctx.createRadialGradient(0, -10 * scale, 5 * scale, 0, 0, 90 * scale);
+  glow.addColorStop(0, "rgba(192,132,252,0.35)");
+  glow.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.arc(0, 0, 90 * scale, 0, Math.PI * 2);
+  ctx.fill();
+  // Bowl
+  const porc = ctx.createLinearGradient(-40 * scale, -40 * scale, 40 * scale, 40 * scale);
+  porc.addColorStop(0, "#ffffff");
+  porc.addColorStop(1, "#94a3b8");
+  ctx.fillStyle = porc;
+  ctx.beginPath();
+  ctx.ellipse(0, -20 * scale, 42 * scale, 36 * scale, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "rgba(125,211,252,0.45)";
+  ctx.beginPath();
+  ctx.ellipse(0, -24 * scale, 22 * scale, 10 * scale, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Lid
+  ctx.fillStyle = "#f1f5f9";
+  ctx.beginPath();
+  ctx.ellipse(0, -48 * scale, 36 * scale, 12 * scale, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Tank
+  ctx.fillStyle = porc;
+  ctx.fillRect(22 * scale, -50 * scale, 22 * scale, 40 * scale);
+  // Base purple
+  const purp = ctx.createLinearGradient(-50 * scale, 40 * scale, 50 * scale, 80 * scale);
+  purp.addColorStop(0, "#e9d5ff");
+  purp.addColorStop(0.5, "#c084fc");
+  purp.addColorStop(1, "#7c3aed");
+  ctx.fillStyle = purp;
+  ctx.fillRect(-40 * scale, 40 * scale, 80 * scale, 14 * scale);
+  ctx.fillRect(-50 * scale, 56 * scale, 100 * scale, 18 * scale);
+  ctx.restore();
+}
+
+function drawNerdTrophyArt(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  h: number
+) {
+  const scale = h / 200;
+  ctx.save();
+  ctx.translate(cx, cy);
+  // Glow
+  const glow = ctx.createRadialGradient(0, -10 * scale, 5 * scale, 0, 0, 95 * scale);
+  glow.addColorStop(0, "rgba(56,189,248,0.4)");
+  glow.addColorStop(0.5, "rgba(168,85,247,0.15)");
+  glow.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.arc(0, 0, 95 * scale, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Brain
+  const brain = ctx.createLinearGradient(-20 * scale, -80 * scale, 20 * scale, -50 * scale);
+  brain.addColorStop(0, "#fbcfe8");
+  brain.addColorStop(1, "#db2777");
+  ctx.fillStyle = brain;
+  ctx.beginPath();
+  ctx.ellipse(0, -68 * scale, 22 * scale, 16 * scale, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Crystal ball
+  const ball = ctx.createLinearGradient(-30 * scale, -40 * scale, 30 * scale, 30 * scale);
+  ball.addColorStop(0, "#e0f2fe");
+  ball.addColorStop(0.45, "#38bdf8");
+  ball.addColorStop(1, "#0369a1");
+  ctx.fillStyle = ball;
+  ctx.beginPath();
+  ctx.arc(0, -8 * scale, 36 * scale, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "#7dd3fc";
+  ctx.lineWidth = 2 * scale;
+  ctx.stroke();
+  // Glasses
+  ctx.strokeStyle = "#0f172a";
+  ctx.lineWidth = 3.5 * scale;
+  ctx.beginPath();
+  ctx.arc(-14 * scale, -10 * scale, 12 * scale, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(14 * scale, -10 * scale, 12 * scale, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(-2 * scale, -10 * scale);
+  ctx.lineTo(2 * scale, -10 * scale);
+  ctx.stroke();
+
+  // Books
+  ctx.fillStyle = "#0c4a6e";
+  ctx.fillRect(-48 * scale, 32 * scale, 96 * scale, 16 * scale);
+  ctx.fillStyle = "#166534";
+  ctx.fillRect(-52 * scale, 50 * scale, 104 * scale, 16 * scale);
+  ctx.fillStyle = "#9a3412";
+  ctx.fillRect(-56 * scale, 68 * scale, 112 * scale, 18 * scale);
+
+  ctx.fillStyle = "#7dd3fc";
+  ctx.font = `700 ${11 * scale}px ui-monospace, monospace`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("100% CORRECT ONCE", 0, 77 * scale);
+
+  // Floating π
+  ctx.fillStyle = "rgba(125,211,252,0.85)";
+  ctx.font = `${18 * scale}px Georgia, serif`;
+  ctx.fillText("π", -70 * scale, -30 * scale);
+  ctx.fillText("Σ", 70 * scale, -20 * scale);
+
+  ctx.restore();
 }
 
 function wrapCenter(

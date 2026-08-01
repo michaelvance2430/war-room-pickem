@@ -174,22 +174,21 @@ export function buildFinaleSlides(opts: {
 
     if (t.trophyType === "championship") {
       const bodiesYou = [
-        `You did it. National champion. ${year}. The rest of the league is drafting apology texts and rewriting history in their heads.`,
-        `Confetti is imaginary. The plaque is not. You ran the table when it counted. Try not to make this your entire personality… actually, go ahead.`,
-        `Champ. Ring energy. Permanent bragging rights. Everyone who said you got lucky can file a formal complaint with the void.`,
+        `You won the whole damn thing. ${year}. Share the graphic before the group chat rewrites history.`,
+        `That's your name on the hardware. Not "pretty good." Champion. Be loud for a minute — you earned it.`,
+        `Season over. You're the one holding the trophy. The rest of the room can start practicing their excuses for next year.`,
       ];
       const bodiesThem = [
-        `${name} is your ${year} National Champion. Yes, that ${first}. Yes, the board still remembers. No, your "I was close" speech will not be televised.`,
-        `While you were "waiting for a better spot," ${first} was collecting confidence points like they were free samples. Champion. Period.`,
-        `${name} took the big one. The top half had a path. Only one walked off with the hardware. Spoilers: it wasn't a committee.`,
-        `National title: ${name}. If you need a moment, take it. If you need a scapegoat, try the spread. If you need respect… earn it next year.`,
+        `${name} just took the ${year} title. ${first} finished first. Everyone else finished… not first. That's the whole story.`,
+        `Hardware goes to ${name}. If you faded them all year, this is the receipt. If you rode with them, you're allowed one smug text.`,
+        `${first} won it. Not a committee vote. Not a vibe check. The board. Take a screenshot, tag them, start the roast cycle.`,
       ];
       slides.push({
         kind: "championship",
         year,
         emoji: meta.emoji,
-        kicker: "National title · the big one",
-        title: you ? "YOU ARE THE CHAMPION" : `${name.toUpperCase()} WINS IT ALL`,
+        kicker: "The big one · championship hardware",
+        title: you ? "YOU WON IT ALL" : `${name.toUpperCase()} IS CHAMP`,
         body: you
           ? pick(bodiesYou, `${name}-${year}-c-you`)
           : pick(bodiesThem, `${name}-${year}-c-them`),

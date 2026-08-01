@@ -163,10 +163,20 @@ export async function afterSeasonResetLocalCleanup(opts?: {
       if (!k) continue;
       if (
         k.startsWith("warroom-gazette-seen") ||
-        k.startsWith("warroom-commish-setup")
+        k.startsWith("warroom-commish-setup") ||
+        k.startsWith("warroom-crystal-ball-") ||
+        k.startsWith("warroom-badge-earn-meta") ||
+        k.startsWith("warroom-badge-celebrated") ||
+        k.startsWith("warroom-ring-ceremony")
       ) {
         localStorage.removeItem(k);
       }
+    }
+    // Drop stale local player roster so profile can't show old trial ATS/weeks
+    try {
+      localStorage.removeItem("warroom-players");
+    } catch {
+      /* ignore */
     }
   } catch {
     /* ignore */

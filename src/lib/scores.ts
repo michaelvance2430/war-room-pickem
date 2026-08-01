@@ -173,14 +173,18 @@ export function buildResultsFromScores(
   return { results, boxes, filled, pending, details };
 }
 
-/** Client fetch of our scores API. */
-export async function fetchNcaafScores(daysFrom = 3): Promise<{
+/** Client fetch of scores API — CFB or NFL. */
+export async function fetchFootballScores(
+  sport: "cfb" | "nfl" = "cfb",
+  daysFrom = 3
+): Promise<{
   events: OddsScoreEvent[];
   remaining?: string | null;
   used?: string | null;
   last?: string | null;
 }> {
-  const res = await fetch(`/api/scores/ncaaf?daysFrom=${daysFrom}`, {
+  const path = sport === "nfl" ? "/api/scores/nfl" : "/api/scores/ncaaf";
+  const res = await fetch(`${path}?daysFrom=${daysFrom}`, {
     cache: "no-store",
   });
   const body = await res.json().catch(() => ({}));
@@ -199,4 +203,13 @@ export async function fetchNcaafScores(daysFrom = 3): Promise<{
     used: (body as { used?: string | null }).used,
     last: (body as { last?: string | null }).last,
   };
+}
+
+/** @deprecated prefer fetchFootballScores("cfb", …) */
+export async function fetchNcaafScores(daysFrom = 3) {
+  return fetchFootballScores("cfb", daysFrom);
+}
+
+export async function fetchNflScores(daysFrom = 3) {
+  return fetchFootballScores("nfl", daysFrom);
 }

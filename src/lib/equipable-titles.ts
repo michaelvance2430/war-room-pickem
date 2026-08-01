@@ -87,6 +87,43 @@ export const EQUIPABLE_TITLE_CATALOG: EquipableTitleDef[] = [
     vibe: "brag",
     blurb: "Actually ran the league. Real work.",
   },
+  // —— Commissioner career ladder (14+/18 seasons stacked) ——
+  {
+    badgeId: "commish_ladder_1",
+    title: "First Gavel",
+    vibe: "brag",
+    blurb: "One qualifying season as commissioner.",
+  },
+  {
+    badgeId: "commish_ladder_2",
+    title: "Double Host",
+    vibe: "brag",
+    blurb: "Two full-ish seasons with the gavel.",
+  },
+  {
+    badgeId: "commish_ladder_3",
+    title: "Season Architect",
+    vibe: "brag",
+    blurb: "Three qualifying seasons. Trust earned.",
+  },
+  {
+    badgeId: "commish_ladder_5",
+    title: "Multi-Room Operator",
+    vibe: "brag",
+    blurb: "Five seasons. Cross-sport welcome.",
+  },
+  {
+    badgeId: "commish_ladder_7",
+    title: "Regional Manager",
+    vibe: "brag",
+    blurb: "Seven seasons. The region reports to you.",
+  },
+  {
+    badgeId: "commish_ladder_10",
+    title: "Assistant to the Regional Manager",
+    vibe: "brag",
+    blurb: "Ten qualifying seasons. Peak commissioner. Respect the stapler.",
+  },
 
   // —— Lethal form (brag) ——
   {
@@ -142,6 +179,49 @@ export const EQUIPABLE_TITLE_CATALOG: EquipableTitleDef[] = [
     title: "Six-Pack Saturday",
     vibe: "brag",
     blurb: "Full card green.",
+  },
+  // —— NFL primetime titles ——
+  {
+    badgeId: "nfl_perfect_sunday",
+    title: "Perfect Sunday",
+    vibe: "brag",
+    blurb: "Clean sheet on a primetime card.",
+  },
+  {
+    badgeId: "nfl_primetime_general",
+    title: "Primetime General",
+    vibe: "brag",
+    blurb: "Owned a Sunday. Throne temporary or not.",
+  },
+  {
+    badgeId: "nfl_red_zone_assassin",
+    title: "Red Zone Assassin",
+    vibe: "brag",
+    blurb: "Best Bets stacking. Witnesses present.",
+  },
+  {
+    badgeId: "nfl_film_dont_lie",
+    title: "Film Don't Lie",
+    vibe: "brag",
+    blurb: "Ten-straight. Unholy.",
+  },
+  {
+    badgeId: "nfl_immortal_sunday",
+    title: "Immortal Sunday",
+    vibe: "brag",
+    blurb: "Thirty straight. Close the film room.",
+  },
+  {
+    badgeId: "nfl_super_bowl_desk",
+    title: "Super Bowl Desk",
+    vibe: "brag",
+    blurb: "Title weekend cashed.",
+  },
+  {
+    badgeId: "nfl_late_window_legend",
+    title: "Late Window Legend",
+    vibe: "brag",
+    blurb: "Owned a week when it got loud.",
   },
   {
     badgeId: "best_bet_assassin",

@@ -18,6 +18,7 @@ import {
 } from "@/lib/trophies";
 import ChampionshipBanner from "@/components/ChampionshipBanner";
 import TrophyShareButton from "@/components/TrophyShareButton";
+import HardwareTrophyIcon from "@/components/HardwareTrophyIcon";
 import Link from "next/link";
 import { isSelfPlayer, selfNameClass } from "@/lib/self-highlight";
 import type { ProfileTrophyKind } from "@/lib/profile-hardware";
@@ -30,6 +31,7 @@ export default function TrophyRoomPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [leagueName, setLeagueName] = useState("");
+  const [sportId, setSportId] = useState<string>("cfb");
   const [selfId, setSelfId] = useState<string | null>(null);
   const [commish, setCommish] = useState(false);
 
@@ -59,9 +61,11 @@ export default function TrophyRoomPage() {
 
   useEffect(() => {
     const session = getSession();
+    const league = getLeague();
     setSelfId(session?.playerId || null);
     setCommish(isCommissioner());
-    setLeagueName(getLeague()?.name || "");
+    setLeagueName(league?.name || "");
+    setSportId(league?.sportId || "cfb");
     reload().finally(() => setLoading(false));
   }, []);
 
@@ -195,9 +199,13 @@ export default function TrophyRoomPage() {
           )}
         </div>
 
-        <ChampionshipBanner trophies={trophies} leagueName={leagueName} />
+        <ChampionshipBanner
+          trophies={trophies}
+          leagueName={leagueName}
+          sportId={sportId}
+        />
 
-        {/* Legend pedestals */}
+        {/* Legend pedestals — championship uses sport hardware art */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-10">
           {TYPES.map((t) => {
             const m = TROPHY_META[t];
@@ -206,12 +214,25 @@ export default function TrophyRoomPage() {
                 key={t}
                 className={`rounded-xl border ${m.border} bg-card/80 p-4 ${m.glow}`}
               >
-                <div className="text-3xl mb-2" aria-hidden>
-                  {m.emoji}
+                <div className="mb-2 flex items-center min-h-[72px]">
+                  <HardwareTrophyIcon
+                    kind={t}
+                    sportId={sportId}
+                    size={68}
+                    animate
+                  />
                 </div>
                 <div className={`font-semibold ${m.accent}`}>{m.title}</div>
                 <p className="text-xs text-muted mt-1 leading-relaxed">
-                  {m.blurb}
+                  {t === "championship"
+                    ? sportId === "nfl"
+                      ? "Top half. One path. Silver football energy — the big one."
+                      : sportId === "soccer_wwc"
+                        ? "Top half. One path. Cup hardware — the big one."
+                        : "Top half. One path. National crystal — the big one."
+                    : t === "crystal_ball"
+                      ? "Big Brain Nerd Cup. Zero points. Infinite smug. Correct once."
+                      : m.blurb}
                 </p>
               </div>
             );
@@ -228,8 +249,13 @@ export default function TrophyRoomPage() {
 
         {!loading && seasons.length === 0 && (
           <div className="rounded-xl border border-dashed border-border bg-card/50 px-6 py-12 text-center mb-10">
-            <div className="text-4xl mb-3" aria-hidden>
-              🏆
+            <div className="flex justify-center mb-3 opacity-70">
+              <HardwareTrophyIcon
+                kind="championship"
+                sportId={sportId}
+                size={88}
+                animate={false}
+              />
             </div>
             <p className="font-medium mb-1">Empty shelves — for now</p>
             <p className="text-sm text-muted max-w-md mx-auto">
@@ -254,9 +280,16 @@ export default function TrophyRoomPage() {
                     return (
                       <div
                         key={t}
-                        className="rounded-xl border border-border/60 border-dashed bg-card/30 p-5 min-h-[140px] flex flex-col justify-center opacity-50"
+                        className="rounded-xl border border-border/60 border-dashed bg-card/30 p-5 min-h-[160px] flex flex-col justify-center opacity-50"
                       >
-                        <div className="text-2xl mb-2 grayscale">{m.emoji}</div>
+                        <div className="mb-2">
+                          <HardwareTrophyIcon
+                            kind={t}
+                            sportId={sportId}
+                            size={52}
+                            empty
+                          />
+                        </div>
                         <div className="text-xs uppercase tracking-wide text-muted">
                           {m.short}
                         </div>
@@ -266,23 +299,30 @@ export default function TrophyRoomPage() {
                   }
                   const mine = isSelfPlayer(item.winnerUserId, selfId);
                   const shareKind = item.trophyType as ProfileTrophyKind;
+                  const sharePayload = {
+                    kind: shareKind,
+                    seasonYear: item.seasonYear,
+                    winnerName: item.winnerName,
+                    leagueName,
+                    subtitle: item.subtitle,
+                    sportId,
+                  };
                   return (
                     <div
                       key={item.id}
-                      className={`rounded-xl border ${m.border} bg-gradient-to-b from-card to-black/40 p-5 min-h-[140px] ${m.glow} relative`}
+                      className={`rounded-xl border ${m.border} bg-gradient-to-b from-card to-black/40 p-5 min-h-[160px] ${m.glow} relative`}
                     >
                       <div className="flex items-start justify-between gap-2 mb-2">
-                        <div className="text-3xl">{m.emoji}</div>
+                        <HardwareTrophyIcon
+                          kind={t}
+                          sportId={sportId}
+                          size={76}
+                          animate
+                        />
                         <div className="flex items-center gap-1.5">
                           <TrophyShareButton
                             compact
-                            trophy={{
-                              kind: shareKind,
-                              seasonYear: item.seasonYear,
-                              winnerName: item.winnerName,
-                              leagueName,
-                              subtitle: item.subtitle,
-                            }}
+                            trophy={sharePayload}
                           />
                           {commish && (
                             <button
@@ -325,13 +365,7 @@ export default function TrophyRoomPage() {
                       )}
                       <div className="mt-3">
                         <TrophyShareButton
-                          trophy={{
-                            kind: shareKind,
-                            seasonYear: item.seasonYear,
-                            winnerName: item.winnerName,
-                            leagueName,
-                            subtitle: item.subtitle,
-                          }}
+                          trophy={sharePayload}
                           label={mine ? "Share my win" : "Share this win"}
                           className="w-full justify-center"
                         />
@@ -377,7 +411,7 @@ export default function TrophyRoomPage() {
                   >
                     {TYPES.map((t) => (
                       <option key={t} value={t}>
-                        {TROPHY_META[t].emoji} {TROPHY_META[t].title}
+                        {TROPHY_META[t].title}
                       </option>
                     ))}
                   </select>

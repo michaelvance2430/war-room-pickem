@@ -8,6 +8,10 @@ import { getSession, getLeague } from "./league";
 import { hasSeenRules } from "./rules";
 import { createClient } from "@/lib/supabase/client";
 import { defaultSeasonYear } from "./trophies";
+import {
+  gazetteSecretLetterForWeek,
+  pickRareGazetteLine,
+} from "./easter-eggs";
 
 const SEEN_PREFIX = "warroom-gazette-seen-v1";
 
@@ -49,6 +53,11 @@ export type GazetteEdition = {
   crystalBallMiss: GazetteStory | null;
   /** Biggest standings mover this week (climb or freefall). */
   swing: GazetteStory | null;
+  /**
+   * Someone confirmed Chaos lock this week — one headline (multi-name if several).
+   * Trigger is lock-in, not final score. All sports.
+   */
+  chaosDetonation: GazetteStory | null;
   samePerson: boolean;
   masthead: string;
   /** Under the masthead — one-line sizzle */
@@ -71,6 +80,22 @@ export type GazetteEdition = {
    * This is the weekly appointment product.
    */
   ritualName: string;
+  /** Sport pack — drives World Cup Edition vs classic War Room paper */
+  sportId?: string;
+  /** Top stamp: EXTRA! / EXTRA · EXTRA */
+  stampLine?: string;
+  /** Subline under masthead (e.g. Brazil 2027) */
+  eventLine?: string;
+  /**
+   * Easter egg — rare absurd desk line (~4% of editions). Zero points.
+   * Discoverable; not announced in a secret menu.
+   */
+  rareEgg?: { headline: string; deck: string } | null;
+  /**
+   * Quiet acrostic letter for the week (spells NEVER GIVE UP over time).
+   * Rendered as a subtle highlight — never explained in UI chrome.
+   */
+  secretLetter?: string | null;
 };
 
 /** Sidebar / “also in this paper” bit */
@@ -120,6 +145,43 @@ export function ritualEditionName(when: Date = new Date()): string {
   return "War Room Late Edition";
 }
 
+/** World Cup event paper ritual names */
+export function ritualEditionNameWwc(when: Date = new Date()): string {
+  const day = when.getDay();
+  if (day === 0) return "Sunday World Cup Extra";
+  if (day === 1) return "Monday Matchday Edition";
+  if (day === 2) return "Group Stage Hangover";
+  if (day === 6) return "Knockout Night Extra";
+  return "World Cup Late Edition";
+}
+
+/** NFL primetime paper ritual names */
+export function ritualEditionNameNfl(when: Date = new Date()): string {
+  const day = when.getDay();
+  if (day === 0) return "Sunday Night Extra";
+  if (day === 1) return "Monday Morning Film";
+  if (day === 2) return "Tuesday Tape Review";
+  if (day === 4) return "Thursday Night Hangover";
+  if (day === 6) return "Saturday Primetime Desk";
+  return "War Room Late Edition";
+}
+
+function isWwcLeague(): boolean {
+  try {
+    return (getLeague()?.sportId || "cfb") === "soccer_wwc";
+  } catch {
+    return false;
+  }
+}
+
+function isNflLeague(): boolean {
+  try {
+    return (getLeague()?.sportId || "cfb") === "nfl";
+  } catch {
+    return false;
+  }
+}
+
 /** Short tease while waiting on Commish to score. */
 export function gazetteAnticipationCopy(): {
   title: string;
@@ -127,6 +189,34 @@ export function gazetteAnticipationCopy(): {
   ritualHint: string;
 } {
   const day = new Date().getDay();
+  if (isWwcLeague()) {
+    if (day === 0 || day === 1) {
+      return {
+        title: "WORLD CUP EDITION almost on the stands",
+        body: "When the host scores this matchday, the Extra drops — survivors, collapses, chaos in the group. ESPN energy. War Room sass.",
+        ritualHint: ritualEditionNameWwc(),
+      };
+    }
+    return {
+      title: "Save room for the World Cup paper",
+      body: "After scores post: EXTRA! Crowns, shame, and group-stage nonsense. The weekly appointment, Brazil 2027 edition.",
+      ritualHint: "World Cup Extra",
+    };
+  }
+  if (isNflLeague()) {
+    if (day === 0 || day === 1) {
+      return {
+        title: "Primetime paper almost on the stands",
+        body: "When the host scores this week, the Sunday desk drops — late-window crowns, three-and-outs, Best Bet blood. No campus filler.",
+        ritualHint: ritualEditionNameNfl(),
+      };
+    }
+    return {
+      title: "Save room for the Sunday paper",
+      body: "After scores post: one tight Extra. Who owned the late window, who three-and-out'd, who moved. Film room energy. Not a magazine.",
+      ritualHint: "Sunday Extra",
+    };
+  }
   if (day === 0 || day === 1) {
     return {
       title: "The paper is almost here",
@@ -308,6 +398,151 @@ const SOLO_DECKS: DK[] = [
 ];
 
 /** Format "A & B" or "A, B & C" or "A, B, C +2 more" */
+/**
+ * Chaos lock-in headlines — fires because they *confirmed Chaos*, not the final score.
+ * One story for the week; multi-name if several people went postal.
+ * All sports.
+ */
+const CHAOS_LOCK_HEADLINES: ((label: string) => string)[] = [
+  (label) => `${label.toUpperCase()} HAS GONE POSTAL`,
+  (label) => `${label.toUpperCase()} HAS GONE NUCLEAR`,
+  (label) => `${label.toUpperCase()} JUST HIT THE BIG RED BUTTON`,
+  (label) => `BREAKING: ${label.toUpperCase()} WENT FULL CHAOS`,
+  (label) => `${label.toUpperCase()} HAS LEFT THE BUILDING (CHAOS MODE)`,
+  (label) => `${label.toUpperCase()} CHOSE VIOLENCE — CHAOS LOCKED`,
+  (label) => `EXTRA! ${label.toUpperCase()} DETONATED THEIR OWN CARD`,
+  (label) => `${label.toUpperCase()} WENT THERMONUCLEAR ON PURPOSE`,
+];
+
+const CHAOS_LOCK_MULTI_HEADLINES: ((label: string) => string)[] = [
+  (label) => `MASS CHAOS: ${label.toUpperCase()} HAVE GONE POSTAL`,
+  (label) => `MULTIPLE NUKES ARMED: ${label.toUpperCase()}`,
+  (label) => `THE CHAOS DESK: ${label.toUpperCase()} ALL HIT THE BIG RED BUTTON`,
+  (label) => `${label.toUpperCase()} WENT NUCLEAR. EVACUATE THE LOCKER ROOM.`,
+];
+
+/** Always explain Chaos once — half the room will ask “wtf is that?” */
+const CHAOS_WHAT_IS =
+  "Chaos Mode = one pure-random card, 2× the week points, limited uses. No take-backs. Flames on the name.";
+
+const CHAOS_LOCK_DECKS: ((count: number, pts: number) => string)[] = [
+  (count, pts) =>
+    count > 1
+      ? `${count} humans locked pure random this week. Peak ${pts}. ${CHAOS_WHAT_IS}`
+      : `Confirmed Chaos lock. Finished at ${pts}. ${CHAOS_WHAT_IS}`,
+  (count, pts) =>
+    count > 1
+      ? `Group detonation at lock (${pts} peak). ${CHAOS_WHAT_IS}`
+      : `They pressed the big red button. ${pts} pts when the smoke cleared. ${CHAOS_WHAT_IS}`,
+  (count) =>
+    count > 1
+      ? `Several big red buttons. One paper. Zero chill. ${CHAOS_WHAT_IS}`
+      : `Gone postal at the lock screen. The room saw the flames. ${CHAOS_WHAT_IS}`,
+];
+
+/**
+ * Who confirmed Chaos lock this week (is_chaos on the pick).
+ * Cloud preferred; local chaos-week list is fallback.
+ * Score is for the deck only — trigger is the lock, not a nuke threshold.
+ */
+async function buildChaosDetonationStory(
+  weekIndex: number,
+  players: Player[]
+): Promise<GazetteStory | null> {
+  const leagueId = getLeague()?.id;
+  const nameById = new Map(players.map((p) => [p.id, p.name]));
+  const ptsById = new Map(
+    players.map((p) => {
+      const w = p.weeklyPoints || [];
+      const last = w.length ? w[w.length - 1] : null;
+      const atWeek =
+        w.length > weekIndex && weekIndex >= 0 ? w[weekIndex] : last;
+      return [p.id, atWeek ?? last ?? 0] as const;
+    })
+  );
+
+  type Hit = { name: string; pts: number };
+  const hits: Hit[] = [];
+
+  // Cloud: anyone who locked is_chaos for this week
+  try {
+    const session = getSession();
+    if (session?.leagueId && typeof window !== "undefined") {
+      const supabase = createClient();
+      let rows: {
+        user_id: string;
+        total_points: number | null;
+        is_chaos?: boolean;
+        locked_at?: string | null;
+      }[] = [];
+      const res = await supabase
+        .from("picks")
+        .select("user_id, total_points, is_chaos, locked_at")
+        .eq("league_id", session.leagueId)
+        .eq("week_number", weekIndex);
+      if (res.error && /is_chaos|column/i.test(res.error.message || "")) {
+        rows = [];
+      } else if (!res.error && res.data) {
+        rows = res.data as typeof rows;
+      }
+      for (const r of rows) {
+        if (!r.is_chaos) continue;
+        // Prefer locked chaos cards
+        if (r.locked_at === null || r.locked_at === undefined) {
+          // still count if is_chaos set (some paths lock without timestamp edge cases)
+        }
+        const pts = Number(r.total_points ?? ptsById.get(r.user_id) ?? 0);
+        const name = nameById.get(r.user_id) || "Someone";
+        hits.push({ name, pts });
+      }
+    }
+  } catch {
+    /* fall through */
+  }
+
+  // Local fallback — marked chaos for this week at lock
+  if (!hits.length) {
+    try {
+      const { isWeekChaosForUser } = await import("./chaos-mode");
+      for (const p of players) {
+        if (p.isMock) continue;
+        if (!isWeekChaosForUser(weekIndex, leagueId, p.id)) continue;
+        hits.push({ name: p.name, pts: ptsById.get(p.id) ?? 0 });
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  if (!hits.length) return null;
+
+  hits.sort((a, b) => b.pts - a.pts || a.name.localeCompare(b.name));
+  const seen = new Set<string>();
+  const unique = hits.filter((h) => {
+    const k = h.name.toLowerCase();
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+
+  const names = unique.map((h) => h.name);
+  const topPts = unique[0].pts;
+  const label = formatNameList(names);
+  const multi = names.length > 1;
+  const hn = multi
+    ? byWeek(CHAOS_LOCK_MULTI_HEADLINES, weekIndex)(label)
+    : byWeek(CHAOS_LOCK_HEADLINES, weekIndex)(label);
+  const deck = byWeek(CHAOS_LOCK_DECKS, weekIndex)(names.length, topPts);
+
+  return {
+    names,
+    pts: topPts,
+    kind: multi ? "tie" : "clear",
+    headline: hn,
+    deck,
+  };
+}
+
 export function formatNameList(names: string[], maxShow = 3): string {
   const clean = names.map((n) => n.trim()).filter(Boolean);
   if (clean.length === 0) return "THE FIELD";
@@ -547,6 +782,17 @@ export const GAZETTE_COPY_COUNTS = {
  * 3) Optional: forgot-to-lock milk carton story
  * Weekly multi-way same scores do NOT get special deadlock copy.
  */
+function eggFields(weekIndex: number): {
+  rareEgg: { headline: string; deck: string } | null;
+  secretLetter: string;
+} {
+  const leagueId = getLeague()?.id || "local";
+  return {
+    rareEgg: pickRareGazetteLine(leagueId, weekIndex),
+    secretLetter: gazetteSecretLetterForWeek(weekIndex),
+  };
+}
+
 export async function buildGazetteEdition(
   players: Player[]
 ): Promise<GazetteEdition | null> {
@@ -560,6 +806,7 @@ export async function buildGazetteEdition(
 
   const weekIndex = data.weekIndex;
   const weekLabel = weekTitle(weekIndex);
+  const eggs = eggFields(weekIndex);
 
   const cn = data.crown.player.name;
   const cp = data.crown.pts;
@@ -666,10 +913,21 @@ export async function buildGazetteEdition(
     }
   }
 
+  // Chaos went postal / nuclear — one headline, multi-name if several nuked
+  let chaosDetonation: GazetteStory | null = null;
+  try {
+    chaosDetonation = await buildChaosDetonationStory(weekIndex, players);
+  } catch {
+    chaosDetonation = null;
+  }
+
   // Biggest climber / freefall for the paper's "Movers" box
   let swing: GazetteStory | null = null;
   try {
-    const ranked = rankPlayersWithSwings(players).filter((p) => !p.isMock);
+    const ranked = rankPlayersWithSwings(
+      players,
+      getLeague()?.sportId
+    ).filter((p) => !p.isMock);
     const movers = ranked.filter(
       (p) =>
         p.swing.tone === "hero" ||
@@ -717,10 +975,12 @@ export async function buildGazetteEdition(
 
   const leagueName = getLeague()?.name || "War Room";
   const year = defaultSeasonYear();
-  const tagline = byWeek(EDITION_TAGLINES, weekIndex);
-  const weather = byWeek(WEATHER_BOXES, weekIndex, 2);
+  const sportId = getLeague()?.sportId || "cfb";
+  const wwc = sportId === "soccer_wwc";
+  const nfl = sportId === "nfl";
 
   // Early weeks: one tight page (want next issue, not homework)
+  // WWC: still keep a tight paper early; full desk from matchday 2
   let flavor: "slim" | "full" = "full";
   try {
     const { gazetteFlavorLevel, markSeasonComeAlive } = await import(
@@ -739,6 +999,241 @@ export async function buildGazetteEdition(
     league: leagueName,
     pts: cp,
   };
+
+  // --- NFL Sunday paper — own headlines & sass (not CFB recycled) ---
+  if (nfl) {
+    const {
+      NFL_CROWN_HEADLINES,
+      NFL_CROWN_DECKS,
+      NFL_SHAME_HEADLINES,
+      NFL_SHAME_DECKS,
+      NFL_EDITION_TAGLINES,
+      NFL_WEATHER_BOXES,
+      NFL_CLASSIFIEDS,
+      NFL_PULL_QUOTES,
+      NFL_SIDE_STORIES,
+      NFL_NO_LOCK_HEADLINES,
+      NFL_NO_LOCK_DECKS,
+      NFL_SWING_UP_HEADLINES,
+      NFL_SWING_UP_DECKS,
+      NFL_SWING_DOWN_HEADLINES,
+      NFL_SWING_DOWN_DECKS,
+    } = await import("./sports/nfl-voice");
+
+    const tagline = byWeek(NFL_EDITION_TAGLINES, weekIndex);
+    const weather = byWeek(NFL_WEATHER_BOXES, weekIndex, 1);
+    const classifieds =
+      flavor === "slim"
+        ? [byWeek(NFL_CLASSIFIEDS, weekIndex, 0)(classifiedCtx)]
+        : [
+            byWeek(NFL_CLASSIFIEDS, weekIndex, 0),
+            byWeek(NFL_CLASSIFIEDS, weekIndex, 1),
+            byWeek(NFL_CLASSIFIEDS, weekIndex, 2),
+          ].map((fn) => fn(classifiedCtx));
+    const pullQuote = byWeek(NFL_PULL_QUOTES, weekIndex, 1)({
+      crown: cn,
+      shame: sn,
+      pts: cp,
+    });
+    const sideCtx: SideStoryCtx = {
+      crown: cn,
+      shame: sn,
+      league: leagueName,
+      pts: cp,
+      weekLabel,
+    };
+    const sideStories: GazetteSideStory[] =
+      flavor === "slim"
+        ? [byWeek(NFL_SIDE_STORIES, weekIndex, 0)(sideCtx)]
+        : [
+            byWeek(NFL_SIDE_STORIES, weekIndex, 0)(sideCtx),
+            byWeek(NFL_SIDE_STORIES, weekIndex, 1)(sideCtx),
+          ];
+
+    const nflCrown: GazetteStory = {
+      ...crown,
+      headline: data.samePerson
+        ? byWeek(NFL_CROWN_HEADLINES, weekIndex)(cn, cp)
+        : byWeek(NFL_CROWN_HEADLINES, weekIndex, 0)(cn, cp),
+      deck: byWeek(NFL_CROWN_DECKS, weekIndex, 0)(cp),
+    };
+    let nflShame: GazetteStory | null = shame;
+    if (shame && !data.samePerson) {
+      nflShame = {
+        ...shame,
+        headline: byWeek(NFL_SHAME_HEADLINES, weekIndex, 0)(sn, sp),
+        deck: byWeek(NFL_SHAME_DECKS, weekIndex, 0)(sp),
+      };
+    }
+
+    // Ghosts / movers — re-voice so dual-sport rooms don't hear campus copy twice
+    let nflNoLock: GazetteStory | null = noLock;
+    if (noLock) {
+      const label = formatNameList(noLock.names);
+      nflNoLock = {
+        ...noLock,
+        headline: byWeek(NFL_NO_LOCK_HEADLINES, weekIndex, 3)(label),
+        deck: byWeek(NFL_NO_LOCK_DECKS, weekIndex, 3)(noLock.names.length),
+      };
+    }
+
+    let nflSwing: GazetteStory | null = swing;
+    if (swing) {
+      try {
+        const ranked = rankPlayersWithSwings(
+      players,
+      getLeague()?.sportId
+    ).filter((p) => !p.isMock);
+        const star = ranked.find(
+          (p) => p.name.toLowerCase() === (swing!.names[0] || "").toLowerCase()
+        );
+        if (star) {
+          const up = star.swing.delta > 0;
+          const d = Math.abs(star.swing.delta);
+          nflSwing = {
+            ...swing,
+            headline: up
+              ? byWeek(NFL_SWING_UP_HEADLINES, weekIndex)(
+                  star.name,
+                  d,
+                  star.swing.text
+                )
+              : byWeek(NFL_SWING_DOWN_HEADLINES, weekIndex)(
+                  star.name,
+                  d,
+                  star.swing.text
+                ),
+            deck: up
+              ? byWeek(NFL_SWING_UP_DECKS, weekIndex)(
+                  d,
+                  star.rank,
+                  star.swing.text
+                )
+              : byWeek(NFL_SWING_DOWN_DECKS, weekIndex)(
+                  d,
+                  star.rank,
+                  star.swing.text
+                ),
+          };
+        }
+      } catch {
+        /* keep CFB-built swing as last resort */
+      }
+    }
+
+    const ritualName = ritualEditionNameNfl();
+    const printedLine = `${ritualName.toUpperCase()} · ${weekLabel.toUpperCase()} · ${year} · ${leagueName.toUpperCase()} · PRIMETIME DESK · NOT CAMPUS`;
+
+    return {
+      weekIndex,
+      weekLabel,
+      volumeLabel: `Sunday Edition · Vol. ${weekIndex + 1} · ${weekLabel} · ${year}`,
+      masthead: "THE WAR ROOM · SUNDAY",
+      ritualName,
+      tagline,
+      printedLine,
+      weather,
+      classifieds,
+      pullQuote,
+      sideStories,
+      samePerson: data.samePerson,
+      crown: nflCrown,
+      shame: nflShame,
+      standingsDeadlock,
+      noLock: nflNoLock,
+      crystalBallMiss: null, // no Crystal Ball in NFL packs by default
+      swing: nflSwing,
+      chaosDetonation,
+      sportId: "nfl",
+      stampLine: "Extra · Extra",
+      eventLine: "Pro football · primetime desk · not college",
+      rareEgg: eggs.rareEgg,
+      secretLetter: eggs.secretLetter,
+    };
+  }
+
+  // --- World Cup Edition voice (same engine, different newspaper) ---
+  if (wwc) {
+    const tagline = byWeek(WWC_EDITION_TAGLINES, weekIndex);
+    const weather = byWeek(WWC_WEATHER_BOXES, weekIndex, 1);
+    const classifieds =
+      flavor === "slim"
+        ? [byWeek(WWC_CLASSIFIEDS, weekIndex, 0)(classifiedCtx)]
+        : [
+            byWeek(WWC_CLASSIFIEDS, weekIndex, 0),
+            byWeek(WWC_CLASSIFIEDS, weekIndex, 1),
+            byWeek(WWC_CLASSIFIEDS, weekIndex, 2),
+          ].map((fn) => fn(classifiedCtx));
+    const pullQuote = byWeek(WWC_PULL_QUOTES, weekIndex, 2)({
+      crown: cn,
+      shame: sn,
+      pts: cp,
+    });
+    const sideCtx: SideStoryCtx = {
+      crown: cn,
+      shame: sn,
+      league: leagueName,
+      pts: cp,
+      weekLabel,
+    };
+    const sideStories: GazetteSideStory[] =
+      flavor === "slim"
+        ? [byWeek(WWC_SIDE_STORIES, weekIndex, 0)(sideCtx)]
+        : [
+            byWeek(WWC_SIDE_STORIES, weekIndex, 0)(sideCtx),
+            byWeek(WWC_SIDE_STORIES, weekIndex, 1)(sideCtx),
+          ];
+
+    // Tournament-splash headlines on top of scored results
+    const wwcCrown: GazetteStory = {
+      ...crown,
+      headline: byWeek(WWC_CROWN_HEADLINES, weekIndex)(cn, cp),
+      deck: byWeek(WWC_CROWN_DECKS, weekIndex)(cp),
+    };
+    let wwcShame: GazetteStory | null = shame;
+    if (shame) {
+      wwcShame = {
+        ...shame,
+        headline: byWeek(WWC_SHAME_HEADLINES, weekIndex)(sn, sp),
+        deck: byWeek(WWC_SHAME_DECKS, weekIndex)(sp),
+      };
+    }
+
+    const ritualName = ritualEditionNameWwc();
+    const printedLine = `EXTRA! · ${ritualName.toUpperCase()} · ${weekLabel.toUpperCase()} · FIFA WOMEN'S WORLD CUP BRAZIL 2027™ · ${leagueName.toUpperCase()} · NOT FIT FOR FRAMING`;
+
+    return {
+      weekIndex,
+      weekLabel,
+      volumeLabel: `WORLD CUP EDITION · Matchday ${weekIndex + 1} · ${weekLabel} · Brazil 2027`,
+      masthead: "WORLD CUP EDITION",
+      ritualName,
+      tagline,
+      printedLine,
+      weather,
+      classifieds,
+      pullQuote,
+      sideStories,
+      samePerson: data.samePerson,
+      crown: wwcCrown,
+      shame: wwcShame,
+      standingsDeadlock,
+      noLock,
+      crystalBallMiss,
+      swing,
+      chaosDetonation,
+      sportId: "soccer_wwc",
+      stampLine: "EXTRA!",
+      eventLine: "FIFA Women's World Cup Brazil 2027™ · War Room desk",
+      rareEgg: eggs.rareEgg,
+      secretLetter: eggs.secretLetter,
+    };
+  }
+
+  // --- Classic CFB War Room Gazette ---
+  const tagline = byWeek(EDITION_TAGLINES, weekIndex);
+  const weather = byWeek(WEATHER_BOXES, weekIndex, 2);
+
   const classifieds =
     flavor === "slim"
       ? [byWeek(CLASSIFIEDS_A, weekIndex, 0)(classifiedCtx)]
@@ -791,6 +1286,12 @@ export async function buildGazetteEdition(
     noLock,
     crystalBallMiss,
     swing,
+    chaosDetonation,
+    sportId: "cfb",
+    stampLine: "Extra · Extra",
+    eventLine: undefined,
+    rareEgg: eggs.rareEgg,
+    secretLetter: eggs.secretLetter,
   };
 }
 
@@ -807,6 +1308,14 @@ export function formatGazetteShareText(edition: GazetteEdition): string {
     edition.crown.deck,
     "",
   ];
+  // Chaos lock-in sits high — Monday-morning “first thing” energy in the chat paste too
+  if (edition.chaosDetonation) {
+    lines.push(
+      `💥 ${edition.chaosDetonation.headline}`,
+      edition.chaosDetonation.deck,
+      ""
+    );
+  }
   if (edition.shame) {
     lines.push(`🚽 ${edition.shame.headline}`, edition.shame.deck, "");
   }
@@ -830,7 +1339,11 @@ export function formatGazetteShareText(edition: GazetteEdition): string {
     }
   }
   lines.push(`— ${edition.pullQuote.text}`, `   — ${edition.pullQuote.by}`);
-  lines.push("", "War Room Pick'Em · don't ghost next week");
+  lines.push(
+    "",
+    "War Room Pick'Em · friend leagues · confidence · Best Bet · Toilet Bowl",
+    "Don't ghost next week."
+  );
   return lines.filter((l) => l != null).join("\n");
 }
 
@@ -855,6 +1368,127 @@ const EDITION_TAGLINES: string[] = [
   "Subscription: one lock per week, forever",
   "We report. You cope.",
   "Official publication of the cut line",
+];
+
+// NFL Sunday paper banks live in ./sports/nfl-voice (not duplicated here).
+
+// ——— FIFA WWC Brazil 2027™ paper banks (ESPN-event energy) ———
+
+const WWC_EDITION_TAGLINES: string[] = [
+  "WORLD CUP EDITION · all the news that fits the pitch",
+  "EXTRA! · Brazil 2027 · feelings will be hurt in 90+ stoppage",
+  "From the group stage to your group chat",
+  "Printed in emerald, gold, and pure chaos",
+  "Not FIFA official. Extremely unofficially savage.",
+  "If you locked, you survived the whistle. Maybe.",
+  "Special event desk · War Room press box · Brasil",
+  "Penalties optional. Dignity optional. Locks mandatory.",
+  "Breaking: someone actually read the card",
+  "Subscription: one matchday, infinite opinions",
+  "We report the board. You rewrite history.",
+  "Weather in Rio of emotions: always stormy",
+];
+
+const WWC_WEATHER_BOXES: { kicker: string; body: string }[] = [
+  {
+    kicker: "Brasil forecast",
+    body: "High: emerald heat. Low: royal-blue despair. Chance of gold for the crown. Pack sun and excuses.",
+  },
+  {
+    kicker: "Matchday conditions",
+    body: "Humid opinions. Sudden collapses. Late drama. 100% chance someone says “group of death.”",
+  },
+  {
+    kicker: "Pitch report",
+    body: "Surface: slick. Offside: your confidence. VAR: the standings. Crowd: the Locker Room.",
+  },
+];
+
+const WWC_CROWN_HEADLINES: ((n: string, p: number) => string)[] = [
+  (n, p) => `${n.toUpperCase()} ROLLS — ${p} PTS`,
+  (n, p) => `${n.toUpperCase()} SURVIVES THE CHAOS (${p})`,
+  (n, p) => `GOLD FOR ${n.toUpperCase()} · ${p} ON THE CARD`,
+  (n, p) => `${n.toUpperCase()} RUNS THE TABLE FEEL (${p} PTS)`,
+  (n, p) => `EXTRA! ${n.toUpperCase()} TOPS THE MATCHDAY — ${p}`,
+  (n, p) => `${n.toUpperCase()} LOOKS UNTOUCHABLE (${p})`,
+];
+
+const WWC_CROWN_DECKS: ((p: number) => string)[] = [
+  (p) => `Matchday masterclass. ${p} points. The room is not okay.`,
+  (p) => `That’s a statement card. ${p} on the board. Cue the highlight package.`,
+  (p) => `Clinic. ${p} pts. Someone print a Brazil jersey with their name.`,
+];
+
+const WWC_SHAME_HEADLINES: ((n: string, p: number) => string)[] = [
+  (n, p) => `CHAOS FINDS ${n.toUpperCase()} — ONLY ${p}`,
+  (n, p) => `${n.toUpperCase()} ELIMINATED FROM DIGNITY (${p})`,
+  (n, p) => `GROUP OF DEATH CLAIMS ${n.toUpperCase()} · ${p} PTS`,
+  (n, p) => `${n.toUpperCase()} BOTTLES IT — ${p} ON THE CARD`,
+  (n, p) => `PENALTY ENERGY FOR ${n.toUpperCase()} (${p})`,
+];
+
+const WWC_SHAME_DECKS: ((p: number) => string)[] = [
+  (p) => `${p} points. That’s a red card from the math department.`,
+  (p) => `Rough night in Brasil. ${p} pts. The paper still loves you (meanly).`,
+  (p) => `Not sent off — just sent to the standings basement. ${p}.`,
+];
+
+const WWC_PULL_QUOTES: ((ctx: {
+  crown: string;
+  shame: string;
+  pts: number;
+}) => { text: string; by: string })[] = [
+  (c) => ({
+    text: `"Trust the process."`,
+    by: `${c.crown}, currently the process`,
+  }),
+  (c) => ({
+    text: `"It's coming home."`,
+    by: `Someone who locked ${c.pts} and forgot the rest`,
+  }),
+  (c) => ({
+    text: `"We go again."`,
+    by: c.shame || "The bottom of the table",
+  }),
+];
+
+const WWC_CLASSIFIEDS: ((ctx: {
+  crown: string;
+  shame: string;
+  league: string;
+  pts: number;
+}) => string)[] = [
+  (c) =>
+    `WANTED: one clean sheet of picks. Last seen near ${c.crown}'s card. Reward: respect.`,
+  (c) =>
+    `LOST: group-stage dignity. If found, return to ${c.shame || "the cut line"}. No questions.`,
+  (c) =>
+    `FOR SALE: hot takes, barely used. ${c.league} desk. Pay in Locker Room reactions.`,
+  (c) =>
+    `NOTICE: VAR reviewed ${c.crown}'s week. Decision stands. (${c.pts} pts, deal with it.)`,
+];
+
+const WWC_SIDE_STORIES: ((ctx: SideStoryCtx) => GazetteSideStory)[] = [
+  (ctx) => ({
+    kicker: "Group C desk",
+    headline: "CHAOS IN GROUP C",
+    body: `Sources confirm the only group harder than Group C is ${ctx.league}'s group chat after ${ctx.crown} posted ${ctx.pts}. ${ctx.shame ? `${ctx.shame} declined comment.` : "No one declined comment — everyone yelled."}`,
+  }),
+  (ctx) => ({
+    kicker: "Breaking · pitch-side",
+    headline: "USA SURVIVES PENALTIES (METAPHORICALLY)",
+    body: `Nobody took actual pens. ${ctx.crown} just survived the card while half the room needed a wall. Matchday energy. Zero chill.`,
+  }),
+  (ctx) => ({
+    kicker: "Host nation watch",
+    headline: "BRAZIL ROLLS — IN SPIRIT",
+    body: `The host nation is a vibe. ${ctx.crown} borrowed it for ${ctx.pts} points. Emerald. Gold. Unfair.`,
+  }),
+  (ctx) => ({
+    kicker: "Also true",
+    headline: "LOCKOUTS MORE DRAMATIC THAN EXTRA TIME",
+    body: `First whistle freezes the slate. Miss it and you’re a milk carton, not a knockout hero. ${ctx.weekLabel} will not be taking questions.`,
+  }),
 ];
 
 const WEATHER_BOXES: { kicker: string; body: string }[] = [

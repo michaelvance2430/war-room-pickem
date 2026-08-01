@@ -26,6 +26,11 @@ export interface League {
   commissionerId: string;
   createdAt: string;
   settings: LeagueSettings;
+  /**
+   * Sport pack id (cfb, nfl, …). Default cfb for all existing leagues.
+   * See src/lib/sports/registry.ts
+   */
+  sportId?: string;
 }
 
 export interface Session {
@@ -165,6 +170,7 @@ export function createLeague(leagueName: string, commissionerName: string): {
     commissionerId: playerId,
     createdAt: new Date().toISOString(),
     settings: { ...DEFAULT_SETTINGS },
+    sportId: "cfb",
   };
 
   const session: Session = {

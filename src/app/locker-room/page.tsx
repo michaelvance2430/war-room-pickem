@@ -18,11 +18,13 @@ import {
   LOCKER_COOLDOWN_SEC,
   LOCKER_EMOJIS,
   LOCKER_MAX_CHARS,
+  LOCKER_REACTION_EMOJIS,
   amILockerMuted,
   deleteLockerMessage,
   formatLockerTime,
   loadLockerMessages,
   postLockerMessage,
+  toggleLockerReaction,
   type LockerMessage,
 } from "@/lib/locker-room";
 import { markLockerCaughtUp, markLockerSeen } from "@/lib/room-unseen";
@@ -53,6 +55,9 @@ export default function LockerRoomPage() {
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionQuery, setMentionQuery] = useState("");
   const [mentionIndex, setMentionIndex] = useState(0);
+  /** Which message has the reaction picker open */
+  const [reactPickerFor, setReactPickerFor] = useState<string | null>(null);
+  const [reactBusyId, setReactBusyId] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const lastPostAt = useRef(0);
   const listTopRef = useRef<HTMLDivElement>(null);
@@ -231,6 +236,27 @@ export default function LockerRoomPage() {
     await reload({ quiet: true });
   }
 
+  async function onReact(messageId: string, emoji: string) {
+    if (muted) {
+      setPostError("You’re muted — reactions are off too.");
+      return;
+    }
+    setReactBusyId(messageId);
+    setPostError(null);
+    const res = await toggleLockerReaction(messageId, emoji);
+    setReactBusyId(null);
+    if (!res.ok) {
+      setPostError(res.error || "Could not react");
+      return;
+    }
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === messageId ? { ...m, reactions: res.reactions || [] } : m
+      )
+    );
+    setReactPickerFor(null);
+  }
+
   const remaining = LOCKER_MAX_CHARS - body.length;
   const canPost =
     !muted &&
@@ -258,7 +284,8 @@ export default function LockerRoomPage() {
                 {" · "}
               </>
             ) : null}
-            Drop hot takes ({LOCKER_MAX_CHARS} char max). Type{" "}
+            Drop hot takes ({LOCKER_MAX_CHARS} char max). Tap emoji on a post to
+            react without a full reply. Type{" "}
             <strong className="text-foreground">@name</strong> to tag someone in
             the league.{" "}
             <strong className="text-foreground">This week only</strong>
@@ -350,14 +377,74 @@ export default function LockerRoomPage() {
                       )
                     )}
                   </p>
-                  {(mine || staff) && (
-                    <button
-                      type="button"
-                      onClick={() => void onDelete(m.id)}
-                      className="text-[10px] text-muted hover:text-danger mt-1"
-                    >
-                      Delete
-                    </button>
+
+                  {/* Reactions — no full reply required */}
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                    {(m.reactions || []).map((r) => (
+                      <button
+                        key={`${m.id}-${r.emoji}`}
+                        type="button"
+                        disabled={!!muted || reactBusyId === m.id}
+                        onClick={() => void onReact(m.id, r.emoji)}
+                        className={`inline-flex items-center gap-1 min-h-[32px] px-2 py-1 rounded-full text-sm border touch-manipulation ${
+                          r.mine
+                            ? "border-primary/60 bg-primary/15 text-foreground"
+                            : "border-border bg-background/60 text-foreground/90 hover:border-primary/40"
+                        } disabled:opacity-50`}
+                        title={
+                          r.mine
+                            ? "Tap to remove your reaction"
+                            : "Tap to add this reaction"
+                        }
+                      >
+                        <span aria-hidden>{r.emoji}</span>
+                        <span className="text-[11px] font-bold tabular-nums">
+                          {r.count}
+                        </span>
+                      </button>
+                    ))}
+                    {!muted && (
+                      <button
+                        type="button"
+                        disabled={reactBusyId === m.id}
+                        onClick={() =>
+                          setReactPickerFor((cur) =>
+                            cur === m.id ? null : m.id
+                          )
+                        }
+                        className="inline-flex items-center justify-center min-h-[32px] min-w-[32px] px-2 rounded-full text-xs font-semibold border border-dashed border-border text-muted hover:text-foreground hover:border-primary/40 touch-manipulation"
+                        title="Add reaction"
+                        aria-label="Add reaction"
+                      >
+                        +
+                      </button>
+                    )}
+                    {(mine || staff) && (
+                      <button
+                        type="button"
+                        onClick={() => void onDelete(m.id)}
+                        className="text-[10px] text-muted hover:text-danger ml-1"
+                      >
+                        Delete
+                      </button>
+                    )}
+                  </div>
+
+                  {reactPickerFor === m.id && !muted && (
+                    <div className="mt-2 flex flex-wrap gap-1.5 p-2 rounded-xl border border-border bg-background/80">
+                      {LOCKER_REACTION_EMOJIS.map((em) => (
+                        <button
+                          key={em}
+                          type="button"
+                          disabled={reactBusyId === m.id}
+                          onClick={() => void onReact(m.id, em)}
+                          className="w-10 h-10 sm:w-9 sm:h-9 rounded-lg bg-card border border-border hover:border-primary/50 hover:bg-primary/10 text-lg leading-none touch-manipulation"
+                          title="React"
+                        >
+                          {em}
+                        </button>
+                      ))}
+                    </div>
                   )}
                 </li>
               );

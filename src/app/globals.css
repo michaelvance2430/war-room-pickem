@@ -36,6 +36,104 @@
   --color-foreground: var(--foreground);
 }
 
+/* ============================================================
+   FIFA Women's World Cup Brazil 2027™ — full-app sport skin
+   Emerald #009C3B · Gold #FFDF00 · Royal #002776 · White
+   Active when league.sport_id = soccer_wwc (html[data-sport])
+   ============================================================ */
+html[data-sport="soccer_wwc"] {
+  --background: #040a0c;
+  --foreground: #f7faf8;
+  --card: #0a1612;
+  --card-hover: #0f2218;
+  --border: #1a3d2e;
+  --primary: #009c3b;
+  --primary-dim: #007a2e;
+  --danger: #ef4444;
+  --warning: #ffdf00;
+  --muted: #8fa89a;
+  --toilet: #002776;
+  --badge-common: #009c3b;
+  --badge-rare: #002776;
+  --badge-epic: #1e4d9c;
+  --badge-legendary: #ffdf00;
+  color-scheme: dark;
+}
+
+html[data-sport="soccer_wwc"] body {
+  background:
+    radial-gradient(ellipse 90% 55% at 50% -5%, rgba(0, 156, 59, 0.22), transparent 52%),
+    radial-gradient(ellipse 55% 45% at 100% 90%, rgba(255, 223, 0, 0.08), transparent 50%),
+    radial-gradient(ellipse 50% 55% at 0% 80%, rgba(0, 39, 118, 0.32), transparent 52%),
+    var(--background);
+  background-attachment: fixed;
+}
+
+/* Nav / sticky chrome picks up primary + cards */
+html[data-sport="soccer_wwc"] .crt-frame {
+  box-shadow: inset 0 0 80px rgba(0, 39, 118, 0.15);
+}
+
+/* Soft gold focus rings for form controls */
+html[data-sport="soccer_wwc"] input:focus,
+html[data-sport="soccer_wwc"] textarea:focus,
+html[data-sport="soccer_wwc"] select:focus {
+  outline-color: #ffdf00;
+  border-color: rgba(0, 156, 59, 0.7);
+}
+
+/* Bottom tabs / primary buttons already use bg-primary — emerald now */
+
+/* Warning / gold callouts feel more "Brasil" */
+html[data-sport="soccer_wwc"] .text-warning {
+  color: #ffdf00;
+}
+
+/* ============================================================
+   NFL / pro football Sunday — full-app DEFAULT skin (not CFB green)
+   Midnight navy · signal crimson · steel silver · white
+   Original palette — no official league shield / marks
+   Holidays: html[data-season-theme="…"] rules BELOW still override
+   ============================================================ */
+html[data-sport="nfl"] {
+  --background: #070b14;
+  --foreground: #f8fafc;
+  --card: #0f1724;
+  --card-hover: #162033;
+  --border: #243044;
+  --primary: #c1121f;
+  --primary-dim: #9b0e18;
+  --danger: #ef4444;
+  --warning: #c5ccd3;
+  --muted: #94a3b8;
+  --toilet: #64748b;
+  --badge-common: #c1121f;
+  --badge-rare: #3b82f6;
+  --badge-epic: #a855f7;
+  --badge-legendary: #c5ccd3;
+  color-scheme: dark;
+}
+
+html[data-sport="nfl"] body {
+  background:
+    radial-gradient(ellipse 90% 50% at 50% -5%, rgba(193, 18, 31, 0.2), transparent 50%),
+    radial-gradient(ellipse 50% 45% at 100% 100%, rgba(197, 204, 211, 0.06), transparent 45%),
+    radial-gradient(ellipse 40% 40% at 0% 80%, rgba(11, 20, 38, 0.9), transparent 50%),
+    var(--background);
+  background-attachment: fixed;
+}
+
+html[data-sport="nfl"] .crt-frame {
+  box-shadow: inset 0 0 90px rgba(193, 18, 31, 0.08);
+}
+
+html[data-sport="nfl"] input:focus,
+html[data-sport="nfl"] textarea:focus,
+html[data-sport="nfl"] select:focus {
+  outline-color: #c5ccd3;
+  border-color: rgba(193, 18, 31, 0.65);
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
@@ -1321,6 +1419,58 @@ html[data-season-theme="newyear"] body::before {
 @media (prefers-reduced-motion: reduce) {
   html[data-season-theme] body {
     background-attachment: scroll;
+  }
+}
+
+/* Championship trophy — soft float on ceremony stage */
+@keyframes champ-trophy-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+.champ-trophy-float {
+  animation: champ-trophy-float 3.2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .champ-trophy-float {
+    animation: none !important;
+  }
+}
+
+/* Ring ceremony confetti */
+@keyframes ring-confetti-fall {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 0;
+  }
+  8% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateY(110vh) rotate(720deg);
+    opacity: 0.15;
+  }
+}
+.ring-confetti-bit {
+  animation-name: ring-confetti-fall;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+.egg-confetti-bit {
+  animation-name: ring-confetti-fall;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+  animation-iteration-count: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ring-confetti-bit,
+  .egg-confetti-bit {
+    animation: none !important;
+    opacity: 0 !important;
   }
 }
 

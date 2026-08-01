@@ -5,12 +5,17 @@
  * Phone-first newspaper energy: big A1, weather, movers, classifieds, share.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import type { GazetteEdition } from "@/lib/gazette";
+import GazetteShareSheet from "@/components/GazetteShareSheet";
+import { getSession } from "@/lib/league";
 import {
-  formatGazetteShareText,
-  type GazetteEdition,
-} from "@/lib/gazette";
+  collectGazetteSecretLetter,
+  getPersonalGazetteOverlay,
+  noteRareHeadlineSeen,
+  EVENT_EASTER_EGG,
+} from "@/lib/easter-eggs";
 
 type Props = {
   edition: GazetteEdition;
@@ -22,16 +27,24 @@ type Props = {
 
 /** Backfill older archived payloads missing new fields. */
 export function normalizeEdition(raw: GazetteEdition): GazetteEdition {
+  const wwc = raw.sportId === "soccer_wwc";
   return {
     ...raw,
-    ritualName: raw.ritualName || "War Room Edition",
-    tagline: raw.tagline || "All the news that's fit to roast",
+    ritualName:
+      raw.ritualName || (wwc ? "World Cup Extra" : "War Room Edition"),
+    tagline:
+      raw.tagline ||
+      (wwc
+        ? "WORLD CUP EDITION · all the news that fits the pitch"
+        : "All the news that's fit to roast"),
     printedLine:
       raw.printedLine ||
       `${raw.ritualName || "Edition"} · ${raw.weekLabel || "Week"} · War Room`,
     weather: raw.weather || {
-      kicker: "War Room weather",
-      body: "High confidence. Low dignity. Pack a paper bag.",
+      kicker: wwc ? "Brasil forecast" : "War Room weather",
+      body: wwc
+        ? "High: emerald heat. Low: royal-blue despair."
+        : "High confidence. Low dignity. Pack a paper bag.",
     },
     // Empty arrays are intentional (slim early editions) — don't invent filler
     classifieds: Array.isArray(raw.classifieds)
@@ -43,10 +56,16 @@ export function normalizeEdition(raw: GazetteEdition): GazetteEdition {
     },
     sideStories: Array.isArray(raw.sideStories) ? raw.sideStories : [],
     swing: raw.swing ?? null,
+    chaosDetonation: raw.chaosDetonation ?? null,
     crystalBallMiss: raw.crystalBallMiss ?? null,
     standingsDeadlock: raw.standingsDeadlock ?? null,
     noLock: raw.noLock ?? null,
     shame: raw.shame ?? null,
+    sportId: raw.sportId,
+    stampLine: raw.stampLine || (wwc ? "EXTRA!" : "Extra · Extra"),
+    eventLine: raw.eventLine,
+    rareEgg: raw.rareEgg ?? null,
+    secretLetter: raw.secretLetter ?? null,
   };
 }
 
@@ -57,32 +76,30 @@ export default function GazettePaper({
   className = "",
 }: Props) {
   const edition = normalizeEdition(raw);
-  const [shareStatus, setShareStatus] = useState<string | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [personal, setPersonal] = useState<{
+    headline: string;
+    deck: string;
+  } | null>(null);
 
-  async function sharePaper() {
-    const text = formatGazetteShareText(edition);
-    try {
-      if (typeof navigator !== "undefined" && navigator.share) {
-        await navigator.share({
-          title: edition.masthead,
-          text,
-        });
-        setShareStatus("Shared to the chat 🔥");
-        setTimeout(() => setShareStatus(null), 2500);
-        return;
+  useEffect(() => {
+    const pid = getSession()?.playerId;
+    if (!pid) return;
+    setPersonal(getPersonalGazetteOverlay(pid));
+    if (edition.rareEgg) {
+      noteRareHeadlineSeen(pid);
+    }
+    const moment = collectGazetteSecretLetter(pid, edition.weekIndex);
+    if (moment) {
+      try {
+        window.dispatchEvent(
+          new CustomEvent(EVENT_EASTER_EGG, { detail: moment })
+        );
+      } catch {
+        /* ignore */
       }
-    } catch (e: unknown) {
-      if (e instanceof Error && /Abort|cancel/i.test(e.message)) return;
     }
-    try {
-      await navigator.clipboard.writeText(text);
-      setShareStatus("Copied — paste in the group chat");
-      setTimeout(() => setShareStatus(null), 3000);
-    } catch {
-      setShareStatus("Couldn’t share — screenshot it");
-      setTimeout(() => setShareStatus(null), 3000);
-    }
-  }
+  }, [edition.weekIndex, edition.rareEgg]);
 
   return (
     <div
@@ -92,29 +109,107 @@ export default function GazettePaper({
           : "rounded-sm border-2 border-stone-600 shadow-lg"
       } ${className}`}
     >
-      {/* EXTRA stamp strip */}
-      <div className="relative bg-red-700 text-[#f4f0e6] px-3 py-1.5 flex items-center justify-between gap-2">
-        <span className="text-[11px] font-black uppercase tracking-[0.25em]">
-          Extra · Extra
-        </span>
-        <span className="text-[10px] font-bold uppercase tracking-wider opacity-90">
-          {edition.ritualName || "Read all about it"}
-        </span>
-      </div>
+      {/* EXTRA stamp strip — CFB red · NFL navy/crimson · WWC Brazil */}
+      {edition.sportId === "soccer_wwc" ? (
+        <div
+          className="relative px-3 py-1.5 flex items-center justify-between gap-2 text-white"
+          style={{
+            background:
+              "linear-gradient(90deg, #009C3B 0%, #002776 55%, #009C3B 100%)",
+          }}
+        >
+          <span
+            className="text-[12px] font-black uppercase tracking-[0.28em]"
+            style={{ color: "#FFDF00" }}
+          >
+            {edition.stampLine || "EXTRA!"}
+          </span>
+          <span className="text-[10px] font-bold uppercase tracking-wider opacity-95">
+            {edition.ritualName || "World Cup Extra"}
+          </span>
+        </div>
+      ) : edition.sportId === "nfl" ? (
+        <div
+          className="relative px-3 py-1.5 flex items-center justify-between gap-2 text-white"
+          style={{
+            background:
+              "linear-gradient(90deg, #0B1426 0%, #C1121F 55%, #0B1426 100%)",
+          }}
+        >
+          <span
+            className="text-[11px] font-black uppercase tracking-[0.25em]"
+            style={{ color: "#C5CCD3" }}
+          >
+            {edition.stampLine || "Extra · Extra"}
+          </span>
+          <span className="text-[10px] font-bold uppercase tracking-wider opacity-95">
+            {edition.ritualName || "Sunday Night Extra"}
+          </span>
+        </div>
+      ) : (
+        <div className="relative bg-red-700 text-[#f4f0e6] px-3 py-1.5 flex items-center justify-between gap-2">
+          <span className="text-[11px] font-black uppercase tracking-[0.25em]">
+            {edition.stampLine || "Extra · Extra"}
+          </span>
+          <span className="text-[10px] font-bold uppercase tracking-wider opacity-90">
+            {edition.ritualName || "Read all about it"}
+          </span>
+        </div>
+      )}
 
       {/* Masthead */}
-      <div className="border-b-4 border-double border-stone-900 px-4 pt-4 pb-3 text-center">
-        <p className="text-[10px] font-black uppercase tracking-[0.28em] text-red-800 mb-1">
+      <div
+        className={`border-b-4 border-double px-4 pt-4 pb-3 text-center ${
+          edition.sportId === "soccer_wwc"
+            ? "border-[#002776] bg-gradient-to-b from-[#009C3B]/10 to-transparent"
+            : "border-stone-900"
+        }`}
+      >
+        <p
+          className={`text-[10px] font-black uppercase tracking-[0.28em] mb-1 ${
+            edition.sportId === "soccer_wwc" ? "text-[#009C3B]" : "text-red-800"
+          }`}
+        >
           {edition.ritualName}
         </p>
+        {edition.eventLine && (
+          <p
+            className="text-[10px] font-black uppercase tracking-[0.16em] mb-1"
+            style={{ color: "#002776" }}
+          >
+            {edition.eventLine}
+          </p>
+        )}
         <p className="text-[10px] uppercase tracking-[0.2em] text-stone-500 mb-1 leading-snug px-1">
           {edition.printedLine}
         </p>
-        <h2 className="font-serif text-2xl sm:text-3xl font-black tracking-tight text-stone-950 leading-none">
+        <h2
+          className={`font-serif text-2xl sm:text-3xl font-black tracking-tight leading-none ${
+            edition.sportId === "soccer_wwc"
+              ? "text-[#002776]"
+              : "text-stone-950"
+          }`}
+        >
           {edition.masthead || "THE WAR ROOM GAZETTE"}
         </h2>
+        {edition.sportId === "soccer_wwc" && (
+          <p
+            className="text-[11px] font-extrabold uppercase tracking-[0.2em] mt-2"
+            style={{ color: "#009C3B" }}
+          >
+            Women&apos;s World Cup · Brazil 2027
+          </p>
+        )}
         <p className="text-[11px] italic text-stone-600 mt-2">
           {edition.tagline}
+          {edition.secretLetter ? (
+            <span
+              className="ml-1 font-serif font-black text-stone-800 underline decoration-dotted decoration-stone-400"
+              title=""
+            >
+              {edition.secretLetter}
+            </span>
+          ) : null}
         </p>
         <p className="text-[11px] uppercase tracking-widest text-stone-700 mt-2 border-t border-b border-stone-400 py-1.5 font-semibold">
           {edition.volumeLabel}
@@ -122,6 +217,38 @@ export default function GazettePaper({
       </div>
 
       <div className="px-4 py-4 space-y-4">
+        {/* Personal / rare egg lines — zero points, pure desk energy */}
+        {(personal || edition.rareEgg) && (
+          <div className="rounded border border-stone-400 bg-stone-100/80 px-3 py-2">
+            <p className="text-[9px] uppercase tracking-[0.2em] text-stone-500 font-bold mb-1">
+              Desk note
+            </p>
+            {personal && (
+              <>
+                <p className="font-serif font-black text-sm text-stone-900 leading-snug">
+                  {personal.headline}
+                </p>
+                <p className="text-[11px] text-stone-600 mt-0.5">
+                  {personal.deck}
+                </p>
+              </>
+            )}
+            {edition.rareEgg && (
+              <>
+                <p
+                  className={`font-serif font-black text-sm text-stone-900 leading-snug ${
+                    personal ? "mt-2 pt-2 border-t border-stone-300" : ""
+                  }`}
+                >
+                  {edition.rareEgg.headline}
+                </p>
+                <p className="text-[11px] text-stone-600 mt-0.5">
+                  {edition.rareEgg.deck}
+                </p>
+              </>
+            )}
+          </div>
+        )}
         {/* A1 Crown */}
         <article className="relative">
           <div className="flex items-start gap-3">
@@ -150,6 +277,31 @@ export default function GazettePaper({
             {edition.weekLabel}
           </p>
         </article>
+
+        {/* Chaos lock-in — high on the page; Monday Morning Edition energy */}
+        {edition.chaosDetonation && (
+          <div className="space-y-1.5">
+            <StoryBlock
+              kicker="💥 First thing · Chaos desk"
+              kickerClass="text-orange-900"
+              story={edition.chaosDetonation}
+              footer={`${edition.chaosDetonation.names.join(" · ")} · locked Chaos this week${
+                edition.chaosDetonation.pts
+                  ? ` · finished at ${edition.chaosDetonation.pts} pts`
+                  : ""
+              }`}
+              avatar="☢️"
+              avatarClass="border-orange-800 bg-orange-100"
+            />
+            <p className="text-[11px] text-stone-600 leading-snug px-0.5">
+              New here?{" "}
+              <span className="font-semibold text-stone-800">
+                Chaos = random card · 2× week · limited uses · no undo.
+              </span>{" "}
+              That&apos;s why the paper is yelling.
+            </p>
+          </div>
+        )}
 
         {/* Pull quote */}
         <blockquote className="border-l-4 border-stone-900 pl-3 py-1 my-1">
@@ -288,12 +440,6 @@ export default function GazettePaper({
             ? "You only see this splash once per scored week. Archive lives under Gazette anytime."
             : "Filed forever in the archive. Share it. Frame it. Deny it."}
         </p>
-
-        {shareStatus && (
-          <p className="text-xs text-center font-bold text-emerald-800">
-            {shareStatus}
-          </p>
-        )}
       </div>
 
       {/* Actions */}
@@ -306,11 +452,19 @@ export default function GazettePaper({
       >
         <button
           type="button"
-          onClick={() => void sharePaper()}
+          onClick={() => setShareOpen(true)}
           className="w-full py-3.5 min-h-[52px] rounded-xl bg-red-700 text-[#f4f0e6] text-sm font-black uppercase tracking-wide touch-manipulation active:scale-[0.99]"
         >
           Share this edition
         </button>
+        <p className="text-[10px] text-stone-500 text-center leading-snug -mt-0.5">
+          Newspaper graphic · IG / FB / chat · War Room flex
+        </p>
+        <GazetteShareSheet
+          edition={edition}
+          open={shareOpen}
+          onClose={() => setShareOpen(false)}
+        />
         {variant === "modal" && (
           <div className="flex flex-col sm:flex-row gap-2">
             <button

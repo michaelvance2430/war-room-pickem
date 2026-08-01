@@ -14,7 +14,7 @@ import {
   buildInviteShareText,
 } from "@/lib/commish-onboarding";
 import { Game, Prop } from "@/lib/types";
-import { fetchNcaafOdds } from "@/lib/odds";
+import { fetchFootballOdds } from "@/lib/odds";
 import { generateDemoSlate, randomizeDemoResults } from "@/lib/demo-slate";
 import { formatMatchupConferences } from "@/lib/fbs-teams";
 import {
@@ -54,6 +54,7 @@ import {
   seedTrialBotsInCloud,
   clearTrialBotsInCloud,
   seedBotPicksForWeekInCloud,
+  applyRandomBotChaosForWeek,
   fillLeagueWithBotsToCap,
   listScoredWeekNumbers,
   loadWeekResultsFromCloud,
@@ -65,7 +66,15 @@ import {
 } from "@/lib/cloud";
 import { transferCommissioner } from "@/lib/trophies";
 import { recordCommissionerWeek } from "@/lib/commish-tenure";
+import { seedBotLockerTalk } from "@/lib/bot-locker-talk";
+import {
+  getCommishPreviewOpt,
+  setCommishPreviewOpt,
+  requestRingCeremonyPreview,
+} from "@/lib/ring-ceremony";
+import OpenRoomBotsNudge from "@/components/OpenRoomBotsNudge";
 import CommishWeekChecklist from "@/components/CommishWeekChecklist";
+import SportPoolCommishPanel from "@/components/SportPoolCommishPanel";
 import { setViewAsPlayer } from "@/lib/view-as-player";
 import {
   formatKickoff,
@@ -77,6 +86,9 @@ import {
 import {
   SEASON_MAX_WEEK,
   weekDateRangeLabel,
+  listSeasonWeekNumbers,
+  firstSeasonWeek,
+  seasonMaxWeek,
 } from "@/lib/season-calendar";
 import { autoFinishRemainingWeeks } from "@/lib/sandbox-auto-finish";
 import {
@@ -84,10 +96,10 @@ import {
   PRESEASON_COMMISH_TOOLS_TITLE,
   preseasonCommishToolsBody,
 } from "@/lib/season-mode";
-import { SEASON_OPEN_LABEL } from "@/lib/season-countdown";
+import { getSeasonOpenLabel } from "@/lib/season-countdown";
 import { advanceLeagueAfterScore } from "@/lib/active-week";
 import {
-  fetchNcaafScores,
+  fetchFootballScores,
   buildResultsFromScores,
 } from "@/lib/scores";
 import { settlePropFromScores } from "@/lib/prop-settle";
@@ -96,12 +108,18 @@ import {
   CUSTOM_PROP_ID,
   propFromPreset,
   matchPresetId,
+  presetsForCategory,
+  categoryForPresetId,
+  defaultPropPreset,
+  rotatingPropPreset,
+  propCategoriesForSport,
+  type PropCategory,
 } from "@/lib/prop-presets";
 import { MAX_LEAGUE_PLAYERS } from "@/lib/league-limits";
 import {
   HOME_TAGLINE_MAX_CHARS,
-  HOME_TAGLINE_PRESETS,
   DEFAULT_HOME_TAGLINE_ID,
+  homeTaglinePresetsForSport,
   resolveHomeTagline,
 } from "@/lib/home-tagline";
 import {
@@ -167,6 +185,10 @@ function CommissionerPageInner() {
   const [leagueNameEdit, setLeagueNameEdit] = useState("");
   const [cutPercent, setCutPercent] = useState(50);
   const [crystalBallEnabled, setCrystalBallEnabled] = useState(true);
+  /** List league in Join open room lobby */
+  const [isOpenRoom, setIsOpenRoom] = useState(false);
+  const [openRoomBusy, setOpenRoomBusy] = useState(false);
+  const [openRoomNote, setOpenRoomNote] = useState<string | null>(null);
   const [homeTaglineId, setHomeTaglineId] = useState(DEFAULT_HOME_TAGLINE_ID);
   const [homeTaglineCustom, setHomeTaglineCustom] = useState("");
   const [seasonThemeId, setSeasonThemeId] = useState<SeasonThemeId>(
@@ -182,9 +204,14 @@ function CommissionerPageInner() {
   const [publishedGames, setPublishedGames] = useState<Game[]>([]);
   /** Draft prop on Build Card (may differ until you re-publish). */
   const [prop, setProp] = useState<Prop>(() =>
-    propFromPreset(PROP_PRESETS[0], 1)
+    propFromPreset(defaultPropPreset("cfb"), 1)
   );
-  const [propPresetId, setPropPresetId] = useState(PROP_PRESETS[0].id);
+  const [propCategory, setPropCategory] = useState<PropCategory>(
+    () => defaultPropPreset("cfb").category
+  );
+  const [propPresetId, setPropPresetId] = useState(
+    () => defaultPropPreset("cfb").id
+  );
   /**
    * Prop last published for activeWeek — Enter Results + scoring use this only.
    * Never overwritten by Build Card dropdown clicks.
@@ -249,6 +276,10 @@ function CommissionerPageInner() {
   const [deputyReport, setDeputyReport] = useState<string | null>(null);
   const [autoSeasonBusy, setAutoSeasonBusy] = useState(false);
   const [autoSeasonReport, setAutoSeasonReport] = useState<string | null>(null);
+  /** Commish-only: personal ring ceremony preview (never league-wide) */
+  const [ringPreviewOpt, setRingPreviewOpt] = useState(false);
+  /** After listing open room — nudge host to pad bots */
+  const [openRoomBotsNudge, setOpenRoomBotsNudge] = useState(false);
   /** Inclusive range for sandbox auto-score (one week … full season) */
   const [autoFromWeek, setAutoFromWeek] = useState(0);
   const [autoToWeek, setAutoToWeek] = useState(SEASON_MAX_WEEK);
@@ -279,6 +310,8 @@ function CommissionerPageInner() {
       // URL ?tab=card&first=1 or first-time owner → land on Build Card
       const tabParam = searchParams.get("tab");
       const firstParam = searchParams.get("first");
+      const hash =
+        typeof window !== "undefined" ? window.location.hash.replace("#", "") : "";
       if (
         tabParam === "card" ||
         tabParam === "results" ||
@@ -294,12 +327,50 @@ function CommissionerPageInner() {
       } else {
         setTab("card");
       }
+      // Deep link from open-room bots nudge
+      if (owner && (hash === "commish-bots" || tabParam === "settings")) {
+        if (hash === "commish-bots") {
+          setTab("settings");
+          setAdvancedOpen(true);
+          window.setTimeout(() => {
+            try {
+              document
+                .getElementById("commish-bots")
+                ?.scrollIntoView({ behavior: "smooth", block: "start" });
+            } catch {
+              /* ignore */
+            }
+          }, 400);
+        }
+      }
 
       if (lg) {
         setLeague(lg);
         setLeagueNameEdit(lg.name);
         setCutPercent(lg.settings?.cutPercent ?? 50);
         setCrystalBallEnabled(lg.settings?.crystalBallEnabled !== false);
+        try {
+          setRingPreviewOpt(getCommishPreviewOpt());
+        } catch {
+          setRingPreviewOpt(false);
+        }
+        // Open-room listing (cloud column; optional until SQL runs)
+        try {
+          const { createClient, hasSupabaseConfig } = await import(
+            "@/lib/supabase/client"
+          );
+          if (hasSupabaseConfig() && lg.id) {
+            const sb = createClient();
+            const { data: row } = await sb
+              .from("leagues")
+              .select("is_open")
+              .eq("id", lg.id)
+              .maybeSingle();
+            setIsOpenRoom(!!(row as { is_open?: boolean } | null)?.is_open);
+          }
+        } catch {
+          setIsOpenRoom(false);
+        }
         setHomeTaglineId(
           lg.settings?.homeTaglineId || DEFAULT_HOME_TAGLINE_ID
         );
@@ -317,6 +388,9 @@ function CommissionerPageInner() {
       } catch {
         /* ignore */
       }
+      // NFL has no Week 0 — don't land on an empty preseason slot
+      const minW = firstSeasonWeek(lg?.sportId);
+      if (week < minW) week = minW;
       setActiveWeek(week);
       if (owner) {
         const sess = getSession();
@@ -354,6 +428,10 @@ function CommissionerPageInner() {
   /** Sync Build Card draft controls from a known prop (publish / full week load). */
   function applyDraftFromProp(loaded: Prop) {
     setProp(loaded);
+    const pid = matchPresetId(loaded);
+    if (pid !== CUSTOM_PROP_ID) {
+      setPropCategory(categoryForPresetId(pid));
+    }
     const presetId = matchPresetId(loaded);
     setPropPresetId(presetId);
     if (presetId === CUSTOM_PROP_ID) {
@@ -399,8 +477,12 @@ function CommissionerPageInner() {
     setResultsLocked(false);
     setScoredAtLabel(null);
     // Draft default only until we know this week's published card
-    setProp(propFromPreset(PROP_PRESETS[0], week));
-    setPropPresetId(PROP_PRESETS[0].id);
+    {
+      const def = defaultPropPreset(leagueFootballSport());
+      setProp(propFromPreset(def, week));
+      setPropPresetId(def.id);
+      setPropCategory(def.category);
+    }
 
     const keys = storageKeys(week);
     let loadedProp: Prop | null = null;
@@ -648,9 +730,23 @@ function CommissionerPageInner() {
     if (q.last != null) setOddsCreditsLast(q.last);
   }
 
+  function leagueFootballSport(): "cfb" | "nfl" {
+    return getLeague()?.sportId === "nfl" ? "nfl" : "cfb";
+  }
+
+  /** Sport-aware season ends (NFL Super Bowl = 22, CFB CFP = 18). */
+  function leagueSeasonMax(): number {
+    return seasonMaxWeek(getLeague()?.sportId);
+  }
+
+  function leagueSeasonMin(): number {
+    return firstSeasonWeek(getLeague()?.sportId);
+  }
+
   async function pullOdds() {
     setLoadingOdds(true);
     setOddsError(null);
+    const sport = leagueFootballSport();
     try {
       const {
         games,
@@ -661,19 +757,20 @@ function CommissionerPageInner() {
         remaining,
         used,
         last,
-      } = await fetchNcaafOdds(activeWeek, { dryRun: dryRunOdds });
+      } = await fetchFootballOdds(sport, activeWeek, { dryRun: dryRunOdds });
       applyOddsQuota({ remaining, used, last });
       setRankLabel(pollLabel || null);
       if (!games.length) {
         setAvailableGames([]);
         setSelectedIds(new Set());
         const range = weekFilter || weekTitle(activeWeek);
+        const label = sport === "nfl" ? "NFL" : "NCAA FBS";
         setOddsError(
           dryRun
-            ? "No open NCAA FBS games with spreads right now (dry run). Use Generate demo slate instead."
+            ? `No open ${label} games with spreads right now (dry run). Use Generate demo slate instead.`
             : unfilteredCount && unfilteredCount > 0
-              ? `No FBS games with spreads in the ${weekTitle(activeWeek)} window (${range}). Use Generate demo slate for a full fake season.`
-              : `No real lines for ${weekTitle(activeWeek)}. Use Generate demo slate to simulate.`
+              ? `No ${label} games with spreads in the ${weekTitle(activeWeek)} window (${range}). Use Generate demo slate for a full fake season.`
+              : `No real ${label} lines for ${weekTitle(activeWeek)}. Use Generate demo slate to simulate.`
         );
         return;
       }
@@ -707,13 +804,16 @@ function CommissionerPageInner() {
   function generateDemoCard() {
     if (!requirePreseasonTools()) return;
     setOddsError(null);
-    setRankLabel("demo-sim");
-    const games = generateDemoSlate(activeWeek, 5);
+    const sport = leagueFootballSport();
+    setRankLabel(sport === "nfl" ? "demo-nfl-sim" : "demo-sim");
+    const games = generateDemoSlate(activeWeek, 5, sport);
     setAvailableGames(games);
     setSelectedIds(new Set(games.map((g) => g.id)));
+    // Demo / NFL games have no AP ranks — "Good teams" bucket is empty by design
+    setRankHeatFilter("all");
     setCardSaved(false);
     setBotReport(
-      `Demo slate ready for ${weekTitle(activeWeek)} (5 fake games). Or use “Publish demo week” for one tap.`
+      `Demo slate ready for ${weekTitle(activeWeek)} (5 fake ${sport === "nfl" ? "NFL" : "CFB"} games, all selected). Scroll down to see them, or use “Publish demo week” for one tap.`
     );
   }
 
@@ -727,19 +827,22 @@ function CommissionerPageInner() {
     setDemoBusy(true);
     setOddsError(null);
     setBotReport(null);
-    setRankLabel("demo-sim");
+    const sport = leagueFootballSport();
+    setRankLabel(sport === "nfl" ? "demo-nfl-sim" : "demo-sim");
 
-    const games = generateDemoSlate(activeWeek, 5);
+    const games = generateDemoSlate(activeWeek, 5, sport);
     setAvailableGames(games);
     setSelectedIds(new Set(games.map((g) => g.id)));
+    // Unranked demo slate — show All games, not empty "Good teams"
+    setRankHeatFilter("all");
     setCardSaved(false);
 
-    // Prefer the draft prop on the form; fall back to a rotating preset.
+    // Prefer the draft prop on the form; fall back to a rotating sport preset.
     let propToPublish = prop;
     if (propPresetId === CUSTOM_PROP_ID) {
       if (!customQuestion.trim()) {
         propToPublish = propFromPreset(
-          PROP_PRESETS[activeWeek % PROP_PRESETS.length],
+          rotatingPropPreset(activeWeek, sport),
           activeWeek
         );
       } else {
@@ -757,10 +860,7 @@ function CommissionerPageInner() {
       const preset = PROP_PRESETS.find((p) => p.id === propPresetId);
       propToPublish = preset
         ? propFromPreset(preset, activeWeek)
-        : propFromPreset(
-            PROP_PRESETS[activeWeek % PROP_PRESETS.length],
-            activeWeek
-          );
+        : propFromPreset(rotatingPropPreset(activeWeek, sport), activeWeek);
     }
     applyDraftFromProp(propToPublish);
 
@@ -827,15 +927,36 @@ function CommissionerPageInner() {
     void setLeagueActiveWeek(activeWeek);
 
     const botFill = await seedBotPicksForWeekInCloud(activeWeek);
+    // Pre-season only: bots talk trash so Locker badges / unseen work
+    let lockerBit = "";
+    try {
+      const talk = await seedBotLockerTalk({
+        weekNumber: activeWeek,
+        weekLabel: weekTitle(activeWeek),
+        sportId: sport,
+        count: 8,
+      });
+      if (talk.ok && (talk.inserted || 0) > 0) {
+        lockerBit = ` · 💬 ${talk.inserted} locker posts`;
+      } else if (talk.error && /bot-locker-sim/i.test(talk.error)) {
+        lockerBit = " · (run bot-locker-sim.sql for locker talk)";
+      }
+    } catch {
+      /* optional */
+    }
     setDemoBusy(false);
     if (botFill.ok && (botFill.botsFilled || 0) > 0) {
+      const chaos =
+        (botFill.chaosCount ?? 0) > 0
+          ? ` · 💥 ${botFill.chaosCount} Chaos`
+          : "";
       setBotReport(
-        `Demo week published · ${botFill.botsFilled} bot(s) locked picks. Enter Results → Randomize & score.`
+        `Demo week published · ${botFill.botsFilled} bot(s) locked picks${chaos}${lockerBit}. Enter Results → Randomize & score. Check Locker for unread.`
       );
       void refreshPickStatus(activeWeek);
     } else {
       setBotReport(
-        `Demo week published for ${weekTitle(activeWeek)}. Bots will pick if seats exist — then Randomize & score.`
+        `Demo week published for ${weekTitle(activeWeek)}${lockerBit}. Bots will pick if seats exist — then Randomize & score.`
       );
     }
     try {
@@ -930,7 +1051,17 @@ function CommissionerPageInner() {
       return;
     }
     const preset = PROP_PRESETS.find((p) => p.id === id);
-    if (preset) setProp(propFromPreset(preset, activeWeek));
+    if (preset) {
+      setPropCategory(preset.category);
+      setProp(propFromPreset(preset, activeWeek));
+    }
+  }
+
+  function applyPropCategory(cat: PropCategory) {
+    setPropCategory(cat);
+    const list = presetsForCategory(cat, leagueFootballSport());
+    const first = list[0];
+    if (first) applyPropPreset(first.id);
   }
 
   function syncCustomProp() {
@@ -1034,8 +1165,12 @@ function CommissionerPageInner() {
     // Trial bots auto-fill valid slips for this card (no-op if no bots / SQL missing)
     const botFill = await seedBotPicksForWeekInCloud(activeWeek);
     if (botFill.ok && (botFill.botsFilled || 0) > 0) {
+      const chaos =
+        (botFill.chaosCount ?? 0) > 0
+          ? ` · 💥 ${botFill.chaosCount} Chaos`
+          : "";
       setBotReport(
-        `Published ${weekTitle(activeWeek)}. ${botFill.botsFilled} trial bot(s) locked fake picks.`
+        `Published ${weekTitle(activeWeek)}. ${botFill.botsFilled} trial bot(s) locked fake picks${chaos}.`
       );
       void refreshPickStatus(activeWeek);
     }
@@ -1115,7 +1250,71 @@ function CommissionerPageInner() {
     } else if (!hasCard) {
       parts.push("publish a week so bots get picks (or Fill bot picks)");
     }
+    if ((res.crystalFilled ?? 0) > 0) {
+      parts.push(
+        `🔮 ${res.crystalFilled} bot Crystal Ball / Super Bowl picks`
+      );
+    }
+    try {
+      const talk = await seedBotLockerTalk({
+        weekNumber: activeWeek,
+        weekLabel: weekTitle(activeWeek),
+        sportId: leagueFootballSport(),
+        count: 6,
+      });
+      if (talk.ok && (talk.inserted || 0) > 0) {
+        parts.push(`💬 ${talk.inserted} locker shit-talk posts`);
+      }
+    } catch {
+      /* optional */
+    }
     setBotReport(parts.join(" · ") + ".");
+  }
+
+  async function handleSeedBotCrystalBall() {
+    if (!requirePreseasonTools()) return;
+    setBotReport(null);
+    setBotBusy(true);
+    try {
+      const { seedBotCrystalBallPicks } = await import("@/lib/crystal-ball");
+      const res = await seedBotCrystalBallPicks({
+        sportId: leagueFootballSport(),
+      });
+      setBotBusy(false);
+      if (!res.ok) {
+        setBotReport(res.error || "Failed to seed bot Crystal Ball picks");
+        return;
+      }
+      setBotReport(
+        (res.inserted ?? 0) > 0
+          ? `🔮 ${res.inserted} bot(s) locked Crystal Ball / Super Bowl picks. Open Crystal Ball to see the board.`
+          : res.error ||
+              "No bot Crystal Ball picks written (pride pick off, or no bots)."
+      );
+    } catch (e) {
+      setBotBusy(false);
+      setBotReport(e instanceof Error ? e.message : "Failed");
+    }
+  }
+
+  async function handleSeedBotLockerTalk() {
+    if (!requirePreseasonTools()) return;
+    setBotReport(null);
+    setBotBusy(true);
+    const res = await seedBotLockerTalk({
+      weekNumber: activeWeek,
+      weekLabel: weekTitle(activeWeek),
+      sportId: leagueFootballSport(),
+      count: 10,
+    });
+    setBotBusy(false);
+    if (!res.ok) {
+      setBotReport(res.error || "Failed to seed locker talk");
+      return;
+    }
+    setBotReport(
+      `💬 ${res.inserted ?? 0} bot locker posts for ${weekTitle(activeWeek)} (demo only). Open Locker — nav badge should light up if you haven't been there.`
+    );
   }
 
   async function handleFillBotPicks() {
@@ -1128,8 +1327,43 @@ function CommissionerPageInner() {
       setBotReport(res.error || "Failed to fill bot picks");
       return;
     }
+    const chaosBit =
+      (res.chaosCount ?? 0) > 0
+        ? ` · 💥 ${res.chaosCount} went Chaos${
+            res.chaosNames?.length
+              ? ` (${res.chaosNames.slice(0, 4).join(", ")}${
+                  (res.chaosNames.length || 0) > 4 ? "…" : ""
+                })`
+              : ""
+          } — 2× week when scored`
+        : res.error
+          ? ` · Chaos sim: ${res.error}`
+          : "";
     setBotReport(
-      `Filled ${res.botsFilled ?? 0} bot pick slip(s) for ${weekTitle(activeWeek)}.`
+      `Filled ${res.botsFilled ?? 0} bot pick slip(s) for ${weekTitle(activeWeek)}.${chaosBit}`
+    );
+    void refreshPickStatus(activeWeek);
+  }
+
+  /** Re-roll who goes nuclear without re-seeding all picks */
+  async function handleBotChaosReroll() {
+    if (!requirePreseasonTools()) return;
+    setBotReport(null);
+    setBotBusy(true);
+    const res = await applyRandomBotChaosForWeek(activeWeek, { chance: 22 });
+    setBotBusy(false);
+    if (!res.ok) {
+      setBotReport(res.error || "Bot Chaos failed");
+      return;
+    }
+    setBotReport(
+      (res.chaosCount ?? 0) > 0
+        ? `💥 ${res.chaosCount} bot(s) went Chaos for ${weekTitle(activeWeek)}${
+            res.names?.length
+              ? `: ${res.names.slice(0, 6).join(", ")}`
+              : ""
+          }. Randomize & score to see 2× impact + Gazette.`
+        : `No bots armed Chaos this roll (chance ~22%). Try again or Fill bot picks first.`
     );
     void refreshPickStatus(activeWeek);
   }
@@ -1182,7 +1416,7 @@ function CommissionerPageInner() {
     setSyncingScores(true);
     setSyncReport(null);
     try {
-      const scoreRes = await fetchNcaafScores(3);
+      const scoreRes = await fetchFootballScores(leagueFootballSport(), 3);
       applyOddsQuota({
         remaining: scoreRes.remaining,
         used: scoreRes.used,
@@ -1393,7 +1627,7 @@ function CommissionerPageInner() {
 
   /**
    * Sandbox auto-run: demo card → bots → random results → score
-   * for a chosen inclusive week range (one week up to full 0–18).
+   * for a chosen inclusive week range (CFB 0–18, NFL 1–22).
    */
   async function handleAutoFinishRange(opts?: {
     from?: number;
@@ -1401,10 +1635,12 @@ function CommissionerPageInner() {
     skipConfirm?: boolean;
   }) {
     if (!requirePreseasonTools()) return;
+    const minW = leagueSeasonMin();
+    const maxW = leagueSeasonMax();
     let from = opts?.from ?? autoFromWeek;
     let to = opts?.to ?? autoToWeek;
-    from = Math.max(0, Math.min(SEASON_MAX_WEEK, from));
-    to = Math.max(0, Math.min(SEASON_MAX_WEEK, to));
+    from = Math.max(minW, Math.min(maxW, from));
+    to = Math.max(minW, Math.min(maxW, to));
     if (to < from) {
       setAutoSeasonReport("End week must be ≥ start week.");
       return;
@@ -1424,7 +1660,7 @@ function CommissionerPageInner() {
     }
 
     const one = from === to;
-    const full = from === 0 && to === SEASON_MAX_WEEK;
+    const full = from === minW && to === maxW;
     if (
       !opts?.skipConfirm &&
       !confirm(
@@ -1433,12 +1669,19 @@ function CommissionerPageInner() {
               "Demo card → bot picks → random results → score.\n" +
               "Sandbox / dry-run."
           : full
-            ? `Run ENTIRE season (Week 0 → CFP Final)?\n\n` +
-              `• ${inRange.length} unscored week(s)\n` +
-              "• Pads bots toward 16 if thin\n" +
-              "• Demo card → bots → random results → score each week\n" +
-              "• Leave this tab open until finished\n\n" +
-              "Sandbox / dry-run only."
+            ? leagueFootballSport() === "nfl"
+              ? `Run ENTIRE NFL season (Week 1 → Super Bowl)?\n\n` +
+                `• ${inRange.length} unscored week(s)\n` +
+                "• Pads bots toward 16 if thin\n" +
+                "• Demo card → bots → random results → score each week\n" +
+                "• Leave this tab open until finished\n\n" +
+                "Sandbox / dry-run only."
+              : `Run ENTIRE season (Week 0 → CFP Final)?\n\n` +
+                `• ${inRange.length} unscored week(s)\n` +
+                "• Pads bots toward 16 if thin\n" +
+                "• Demo card → bots → random results → score each week\n" +
+                "• Leave this tab open until finished\n\n" +
+                "Sandbox / dry-run only."
             : `Auto-score ${weekTitle(from)} → ${weekTitle(to)}?\n\n` +
               `• ${inRange.length} unscored week(s) in range\n` +
               "• Already-scored weeks skipped\n" +
@@ -1480,23 +1723,27 @@ function CommissionerPageInner() {
 
   /** Back-compat: full remaining season */
   async function handleAutoFinishSeason() {
+    const minW = leagueSeasonMin();
+    const maxW = leagueSeasonMax();
     const firstUnscored = (() => {
-      for (let w = 0; w <= SEASON_MAX_WEEK; w++) {
+      for (let w = minW; w <= maxW; w++) {
         if (!scoredWeeks.includes(w)) return w;
       }
       return null;
     })();
     if (firstUnscored == null) {
       setAutoSeasonReport(
-        "All weeks 0–18 are already scored. Season complete — open Champ / Toilet / Trophies."
+        leagueFootballSport() === "nfl"
+          ? "All NFL weeks (1–22) are already scored. Season complete — open Champ / Toilet / Trophies."
+          : "All weeks 0–18 are already scored. Season complete — open Champ / Toilet / Trophies."
       );
       return;
     }
     setAutoFromWeek(firstUnscored);
-    setAutoToWeek(SEASON_MAX_WEEK);
+    setAutoToWeek(maxW);
     await handleAutoFinishRange({
       from: firstUnscored,
-      to: SEASON_MAX_WEEK,
+      to: maxW,
     });
   }
 
@@ -1593,24 +1840,26 @@ function CommissionerPageInner() {
       "RESET SEASON?\n\n" +
         "This will DELETE:\n" +
         "• All week cards & games\n" +
-        "• All player picks\n" +
-        "• All results & season scores/stats\n" +
-        "• League announcements\n" +
+        "• All player picks (including bot trial picks)\n" +
+        "• All results & season scores/stats (ATS, weeks, streaks, props)\n" +
+        "• Crystal Ball / Super Bowl pride picks + crown\n" +
+        "• League achievements from this season\n" +
+        "• League announcements + Gazette archive + locker board\n" +
         (sandbox
           ? "• Sandbox Trophy Room engravings (dry-run rings)\n" +
             "• Sim achievement points / First & Final / Elite Commish on this device\n"
           : "") +
         "\nThis will KEEP:\n" +
-        "• Every player who joined\n" +
+        "• Every player who joined (including bots until you Clear bots)\n" +
         "• Divisions, roles, league code & settings\n" +
         "• Profile photos\n" +
         (sandbox
           ? "• Real prior-season Legends only (Kahmann / Bill ball Ben / creator)\n"
-          : "• Trophy Room history + career cheevos (real season)\n") +
-        "\nAlso clears Gazette Archive headlines for this season.\n\n" +
+          : "• Trophy Room history + career cheevos (real season only)\n") +
+        "\n" +
         (sandbox
-          ? "SANDBOX MODE: fake weeks do not stick after reset.\n\n"
-          : "REAL SEASON: career cheevos stay after reset.\n\n") +
+          ? "SANDBOX: trial/bot stats must not stick — profile deep stats go to zero.\n\n"
+          : "REAL SEASON: career cheevos stay after reset; season board zeros.\n\n") +
         "Continue?"
     );
     if (!ok1) return;
@@ -1679,7 +1928,9 @@ function CommissionerPageInner() {
     const cards = result.cardsDeleted ?? 0;
     const results = result.resultsDeleted ?? 0;
     setSeasonResetReport(
-      `Season reset complete. Kept ${kept} member(s). Removed ${cards} card(s), ${picks} pick sheet(s), ${results} scored week(s). Scores zeroed. Ready for Week 0 — re-add bots, then Run season.`
+      `Season reset complete. Kept ${kept} member(s). Removed ${cards} card(s), ${picks} pick sheet(s), ${results} scored week(s). Scores zeroed. Ready for ${
+        leagueFootballSport() === "nfl" ? "Week 1" : "Week 0"
+      } — re-add bots, then Run season.`
     );
   }
 
@@ -1815,6 +2066,10 @@ function CommissionerPageInner() {
   return (
     <div className="min-h-screen flex flex-col">
       <Nav />
+      <OpenRoomBotsNudge
+        open={openRoomBotsNudge}
+        onClose={() => setOpenRoomBotsNudge(false)}
+      />
       {preseasonToolsPopup && (
         <div
           className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-4 bg-black/70"
@@ -2012,6 +2267,8 @@ function CommissionerPageInner() {
 
         {tab === "settings" && isOwner && league && (
           <div className="space-y-6">
+            <SportPoolCommishPanel />
+
             <div className="rounded-xl border border-border bg-card p-5 space-y-4">
               <h2 className="font-semibold">League</h2>
               <div>
@@ -2084,12 +2341,26 @@ function CommissionerPageInner() {
                 <div className="rounded-lg border border-border bg-background px-3 py-2">
                   <p className="text-xs text-muted mb-1">Season length</p>
                   <p className="text-sm font-semibold text-foreground">
-                    Always weeks 0–{SEASON_MAX_WEEK}
+                    {league?.sportId === "nfl"
+                      ? "NFL Weeks 1–18 + playoffs (19–22)"
+                      : `Weeks 0–${SEASON_MAX_WEEK}`}
                   </p>
                   <p className="text-[11px] text-muted mt-1 leading-relaxed">
-                    Fixed CFB map: Week 0 openers · 1–13 regular ·{" "}
-                    <span className="text-warning">14 Conf Champ (CUT)</span> ·
-                    15–18 CFP (R1 / QF / SF / Final). Not configurable.
+                    {league?.sportId === "nfl" ? (
+                      <>
+                        Matches the real NFL: Weeks 1–18 regular season
+                        (Thu–Mon) · <span className="text-warning">cut after
+                        Week 18</span> · then Wild Card / Divisional /
+                        Conference / Super Bowl. Same week numbers fans know —
+                        no made-up map.
+                      </>
+                    ) : (
+                      <>
+                        Fixed CFB map: Week 0 openers · 1–13 regular ·{" "}
+                        <span className="text-warning">14 Conf Champ (CUT)</span>{" "}
+                        · 15–18 CFP (R1 / QF / SF / Final). Not configurable.
+                      </>
+                    )}
                   </p>
                 </div>
               </div>
@@ -2100,9 +2371,9 @@ function CommissionerPageInner() {
                     Crystal Ball
                   </p>
                   <p className="text-xs text-muted mt-1 leading-relaxed">
-                    Preseason tab: pick who wins the national title (0 points).
-                    Correct picks earn a sarcastic Witch/Wizard achievement.
-                    Turn off to hide the tab for everyone in this league.
+                    {league?.sportId === "nfl"
+                      ? "Pride pick tab (0 points). Off by default for NFL — turn on only if you want a Super Bowl–style flex pick. Hide anytime."
+                      : "Preseason tab: pick who wins the national title (0 points). Correct picks earn a sarcastic Witch/Wizard achievement. Turn off to hide the tab for everyone in this league."}
                   </p>
                 </div>
                 <button
@@ -2125,16 +2396,143 @@ function CommissionerPageInner() {
                 </p>
               </div>
 
+              <div className="rounded-xl border border-amber-400/30 bg-amber-400/5 p-4 space-y-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-amber-200">
+                      Ring ceremony
+                    </p>
+                    <p className="text-xs text-muted mt-1 leading-relaxed">
+                      Sport-specific opening ritual (NFL stage / CFB campus /
+                      WWC pitch).{" "}
+                      <strong className="text-foreground">
+                        Preview is you only
+                      </strong>{" "}
+                      — never launches a test to the whole league. Real
+                      ceremony still fires for everyone only in the opening
+                      week window.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={ringPreviewOpt}
+                    onClick={() => {
+                      const next = !ringPreviewOpt;
+                      setRingPreviewOpt(next);
+                      setCommishPreviewOpt(next);
+                    }}
+                    className={`relative shrink-0 w-12 h-7 rounded-full transition ${
+                      ringPreviewOpt ? "bg-amber-400" : "bg-border"
+                    }`}
+                    title="Personal preview only"
+                  >
+                    <span
+                      className={`absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-black transition ${
+                        ringPreviewOpt ? "translate-x-5" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                </div>
+                <p className="text-xs font-medium text-muted">
+                  {ringPreviewOpt
+                    ? "On — show me a personal preview once per browser session"
+                    : "Off — only real opening-week ceremony for the room"}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => requestRingCeremonyPreview({ force: true })}
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-amber-400/50 bg-amber-400/15 text-amber-100 text-sm font-bold min-h-[44px] hover:bg-amber-400/25"
+                >
+                  Play ring ceremony now (preview · you only)
+                </button>
+              </div>
+
+              <div className="rounded-xl border border-border bg-background p-4 flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-foreground">
+                    Open room listing
+                  </p>
+                  <p className="text-xs text-muted mt-1 leading-relaxed">
+                    When on, people using{" "}
+                    <strong className="text-foreground">Join open room</strong>{" "}
+                    can land here. We fill this room first (fast team build),
+                    then the next open league. Auto-unlists when full. Run{" "}
+                    <span className="font-mono text-[10px]">
+                      supabase/open-rooms.sql
+                    </span>{" "}
+                    once if the toggle errors.
+                  </p>
+                  {openRoomNote && (
+                    <p className="text-xs text-primary mt-2">{openRoomNote}</p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={isOpenRoom}
+                  disabled={openRoomBusy}
+                  onClick={() => {
+                    void (async () => {
+                      if (!league?.id) return;
+                      setOpenRoomBusy(true);
+                      setOpenRoomNote(null);
+                      const next = !isOpenRoom;
+                      try {
+                        const { setLeagueOpenListing } = await import(
+                          "@/lib/open-room"
+                        );
+                        const res = await setLeagueOpenListing(league.id, next);
+                        if (!res.ok) {
+                          setOpenRoomNote(res.error || "Could not update");
+                          return;
+                        }
+                        setIsOpenRoom(next);
+                        setOpenRoomNote(
+                          next
+                            ? "Listed — open lobby can find you"
+                            : "Unlisted from open lobby"
+                        );
+                        if (next) setOpenRoomBotsNudge(true);
+                      } catch (e: unknown) {
+                        setOpenRoomNote(
+                          e instanceof Error ? e.message : "Could not update"
+                        );
+                      } finally {
+                        setOpenRoomBusy(false);
+                      }
+                    })();
+                  }}
+                  className={`relative shrink-0 w-12 h-7 rounded-full transition ${
+                    isOpenRoom ? "bg-primary" : "bg-border"
+                  } disabled:opacity-50`}
+                >
+                  <span
+                    className={`absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-black transition ${
+                      isOpenRoom ? "translate-x-5" : "translate-x-0"
+                    }`}
+                  />
+                </button>
+                <p className="w-full text-xs font-medium text-muted">
+                  {isOpenRoom
+                    ? "On — open lobby can seat people here"
+                    : "Off — code invite only"}
+                </p>
+              </div>
+
               <div className="rounded-xl border border-border bg-background p-4 space-y-3">
                 <div>
                   <p className="text-sm font-semibold text-foreground">
-                    Season background
+                    Holiday / season background
                   </p>
                   <p className="text-xs text-muted mt-1 leading-relaxed">
-                    Football runs through the holidays — overlay Halloween,
-                    Thanksgiving, Christmas, or New Year on the War Room layout
-                    (Home stays the same structure; theme washes + props sit on
-                    top). Everyone sees it after you save.
+                    Every sport pack includes this.{" "}
+                    <strong className="text-foreground">Sport default</strong>{" "}
+                    = this league&apos;s pack look (CFB green, NFL primetime,
+                    etc.). Holidays (Halloween, Thanksgiving, Christmas, New
+                    Year…) wash <strong className="text-foreground">every
+                    page</strong> for the whole room — same picker for CFB, NFL,
+                    and future packs. We can add more seasons anytime.
                   </p>
                 </div>
                 <label className="block text-xs text-muted">
@@ -2185,7 +2583,7 @@ function CommissionerPageInner() {
                     onChange={(e) => setHomeTaglineId(e.target.value)}
                     className="mt-1 w-full bg-card border border-border rounded-lg px-3 py-2 text-sm text-foreground"
                   >
-                    {HOME_TAGLINE_PRESETS.map((p) => (
+                    {homeTaglinePresetsForSport(league?.sportId).map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.label}
                       </option>
@@ -2220,6 +2618,7 @@ function CommissionerPageInner() {
                     {resolveHomeTagline({
                       homeTaglineId,
                       homeTaglineCustom,
+                      sportId: league?.sportId,
                     })}
                   </p>
                 </div>
@@ -2279,12 +2678,16 @@ function CommissionerPageInner() {
                   <>
                     Full control (one week → full season) lives on{" "}
                     <strong className="text-foreground">Enter Results</strong>.
-                    Shortcut here: finish everything left through CFP Final.
+                    Shortcut here: finish everything left through{" "}
+                    {leagueFootballSport() === "nfl"
+                      ? "Super Bowl"
+                      : "CFP Final"}
+                    .
                   </>
                 ) : (
                   <>
                     Practice auto-run locked after season open (
-                    {SEASON_OPEN_LABEL}). Tap below for why.
+                    {getSeasonOpenLabel(league?.sportId)}). Tap below for why.
                   </>
                 )}
               </p>
@@ -2299,7 +2702,9 @@ function CommissionerPageInner() {
                 {autoSeasonBusy
                   ? "Season running… keep this tab open"
                   : preseasonToolsOk
-                    ? "Finish remaining → CFP Final"
+                    ? leagueFootballSport() === "nfl"
+                      ? "Finish remaining → Super Bowl"
+                      : "Finish remaining → CFP Final"
                     : "Finish remaining (locked)"}
               </button>
               <button
@@ -2324,7 +2729,8 @@ function CommissionerPageInner() {
             </div>
 
             <div
-              className={`rounded-xl border p-5 space-y-3 ${
+              id="commish-bots"
+              className={`rounded-xl border p-5 space-y-3 scroll-mt-24 ${
                 preseasonToolsOk
                   ? "border-primary/40 bg-primary/5"
                   : "border-border bg-card"
@@ -2354,7 +2760,7 @@ function CommissionerPageInner() {
                 ) : (
                   <>
                     Trial bots are a pre-season practice tool (learn the
-                    Commish role before {SEASON_OPEN_LABEL}). Add / fill locked
+                    Commish role before {getSeasonOpenLabel(league?.sportId)}). Add / fill locked
                     now — Clear bots still works if leftovers remain.
                   </>
                 )}
@@ -2481,6 +2887,39 @@ function CommissionerPageInner() {
                 <button
                   type="button"
                   disabled={botBusy}
+                  onClick={() => void handleBotChaosReroll()}
+                  className={`px-3 py-1.5 rounded-lg border border-orange-500/50 text-orange-200 text-xs font-medium hover:bg-orange-500/10 disabled:opacity-50 ${
+                    !preseasonToolsOk ? "opacity-45" : ""
+                  }`}
+                  title="~22% of bots lock Chaos (2× week). Needs bot-chaos-sim.sql once."
+                >
+                  💥 Bot Chaos (~1 in 5)
+                </button>
+                <button
+                  type="button"
+                  disabled={botBusy}
+                  onClick={() => void handleSeedBotLockerTalk()}
+                  className={`px-3 py-1.5 rounded-lg border border-emerald-500/50 text-emerald-200 text-xs font-medium hover:bg-emerald-500/10 disabled:opacity-50 ${
+                    !preseasonToolsOk ? "opacity-45" : ""
+                  }`}
+                  title="Bots drop week-flavored shit-talk in Locker so you can test badges / unread. Needs bot-locker-sim.sql once."
+                >
+                  💬 Bot locker talk
+                </button>
+                <button
+                  type="button"
+                  disabled={botBusy}
+                  onClick={() => void handleSeedBotCrystalBall()}
+                  className={`px-3 py-1.5 rounded-lg border border-violet-500/50 text-violet-200 text-xs font-medium hover:bg-violet-500/10 disabled:opacity-50 ${
+                    !preseasonToolsOk ? "opacity-45" : ""
+                  }`}
+                  title="Every trial bot locks a Crystal Ball / Super Bowl pride pick. Needs bot-crystal-ball.sql once."
+                >
+                  🔮 Bot Crystal Ball picks
+                </button>
+                <button
+                  type="button"
+                  disabled={botBusy}
                   onClick={() => void handleClearBots()}
                   className="px-3 py-1.5 rounded-lg border border-warning text-warning text-xs font-medium hover:bg-warning/10 disabled:opacity-50"
                 >
@@ -2490,11 +2929,17 @@ function CommissionerPageInner() {
               <p className="text-[11px] text-muted">
                 Setup once if buttons fail:{" "}
                 <code className="text-foreground">supabase/trial-bots.sql</code>
-                , then optional{" "}
-                <code className="text-foreground">supabase/bot-picks-smarter.sql</code>{" "}
-                for persona-based leans. Also run{" "}
-                <code className="text-foreground">supabase/league-capacity-32.sql</code>{" "}
-                so bots can&apos;t exceed 32.
+                , optional{" "}
+                <code className="text-foreground">supabase/bot-picks-smarter.sql</code>
+                ,{" "}
+                <code className="text-foreground">supabase/bot-chaos-sim.sql</code>
+                ,{" "}
+                <code className="text-foreground">supabase/bot-locker-sim.sql</code>
+                ,{" "}
+                <code className="text-foreground">supabase/bot-crystal-ball.sql</code>{" "}
+                (bots auto pride-pick for board smoke tests),{" "}
+                <code className="text-foreground">supabase/league-capacity-32.sql</code>
+                . Demo posts are for smoke only — Mon–Sun locker purge still applies.
               </p>
               {botReport && (
                 <p
@@ -2760,11 +3205,23 @@ function CommissionerPageInner() {
                 </span>
               </p>
               <div className="flex flex-wrap gap-2">
-                {Array.from({ length: SEASON_MAX_WEEK + 1 }, (_, i) => i).map(
+                {listSeasonWeekNumbers(league?.sportId).map(
                   (w) => {
                     const scored = scoredWeeks.includes(w);
-                    const hint =
-                      w === 14
+                    const nfl = league?.sportId === "nfl";
+                    const hint = nfl
+                      ? w === 18
+                        ? " · CUT"
+                        : w === 19
+                          ? " · WC"
+                          : w === 20
+                            ? " · Div"
+                            : w === 21
+                              ? " · Conf"
+                              : w === 22
+                                ? " · SB"
+                                : ""
+                      : w === 14
                         ? " · CUT"
                         : w === 0
                           ? " · openers"
@@ -2809,17 +3266,24 @@ function CommissionerPageInner() {
                         <span className="text-warning font-semibold">
                           DRY RUN
                         </span>{" "}
-                        · all open FBS games (no week date filter) · assign any
-                        5 to {weekTitle(activeWeek)} for season testing
+                        · all open{" "}
+                        {leagueFootballSport() === "nfl" ? "NFL" : "FBS"} games
+                        (no week date filter) · assign any 5 to{" "}
+                        {weekTitle(activeWeek)} for season testing
                       </>
                     ) : (
                       <>
-                        FBS only · filtered to{" "}
+                        {leagueFootballSport() === "nfl" ? "NFL" : "FBS only"} ·
+                        filtered to{" "}
                         <span className="text-foreground font-medium">
-                          {weekDateRangeLabel(activeWeek) ||
-                            weekTitle(activeWeek)}
-                        </span>{" "}
-                        (Week 0 ≠ Week 1)
+                          {weekDateRangeLabel(
+                            activeWeek,
+                            leagueFootballSport()
+                          ) || weekTitle(activeWeek)}
+                        </span>
+                        {leagueFootballSport() === "nfl"
+                          ? " (official NFL week window)"
+                          : " (Week 0 ≠ Week 1)"}
                       </>
                     )}
                   </p>
@@ -2884,7 +3348,7 @@ function CommissionerPageInner() {
                 >
                   {preseasonToolsOk
                     ? "Pre-season practice — minimal clicks"
-                    : `Pre-season tools locked · season open ${SEASON_OPEN_LABEL}`}
+                    : `Pre-season tools locked · season open ${getSeasonOpenLabel(league?.sportId)}`}
                 </p>
                 <p className="text-[11px] text-muted leading-relaxed">
                   {preseasonToolsOk ? (
@@ -2936,10 +3400,14 @@ function CommissionerPageInner() {
                 <p className="text-sm text-danger mt-2">{oddsError}</p>
               )}
               {availableGames.length > 0 &&
-                availableGames.every((g) => g.bookmaker === "demo-sim") && (
+                availableGames.every(
+                  (g) =>
+                    g.bookmaker === "demo-sim" || g.bookmaker === "demo-nfl-sim"
+                ) && (
                   <p className="text-xs text-warning mt-2 font-medium">
                     Demo slate loaded ({availableGames.length} fake games,
-                    pre-selected). Hit Publish below.
+                    pre-selected). Scroll down — or hit Publish / Publish demo
+                    week.
                   </p>
                 )}
             </div>
@@ -2951,19 +3419,44 @@ function CommissionerPageInner() {
                   {selectedIds.size}/5)
                 </h2>
                 <p className="text-xs text-muted mb-2">
-                  {availableGames.length} FBS games
+                  {availableGames.length}{" "}
+                  {leagueFootballSport() === "nfl" ? "NFL" : "FBS"} games
                   {rankLabel ? ` • Ranks: ${rankLabel}` : ""}
-                  {" · "}
-                  <span className="text-amber-300/90">Gold</span> both top 10
-                  {" · "}
-                  <span className="text-violet-300/90">Violet</span> both top 25
-                  {" · "}
-                  <span className="text-emerald-300/90">Green</span> one top 25
+                  {leagueFootballSport() === "nfl" ? (
+                    <> · NFL has no AP heat ranks — use All games</>
+                  ) : (
+                    <>
+                      {" · "}
+                      <span className="text-amber-300/90">Gold</span> both top
+                      10{" · "}
+                      <span className="text-violet-300/90">Violet</span> both
+                      top 25{" · "}
+                      <span className="text-emerald-300/90">Green</span> one top
+                      25
+                    </>
+                  )}
                 </p>
                 {(() => {
                   const heatCounts = countRankHeat(availableGames);
+                  const isDemoSlate = availableGames.every(
+                    (g) =>
+                      g.bookmaker === "demo-sim" ||
+                      g.bookmaker === "demo-nfl-sim"
+                  );
+                  const noRankHeat =
+                    isDemoSlate ||
+                    leagueFootballSport() === "nfl" ||
+                    (heatCounts.heat === 0 &&
+                      heatCounts.ranked === 0 &&
+                      heatCounts.top25 === 0 &&
+                      heatCounts.legendary === 0);
+                  // If user is stuck on an empty heat bucket, show all games
+                  const effectiveFilter: RankHeatFilter =
+                    noRankHeat && rankHeatFilter !== "all"
+                      ? "all"
+                      : rankHeatFilter;
                   const filtered = sortGamesRankHeatFirst(
-                    filterGamesByRankHeat(availableGames, rankHeatFilter)
+                    filterGamesByRankHeat(availableGames, effectiveFilter)
                   );
                   const chips: {
                     id: RankHeatFilter;
@@ -3003,22 +3496,22 @@ function CommissionerPageInner() {
                     },
                   ];
                   const dateGroups =
-                    rankHeatFilter === "all"
-                      ? groupGamesByDate(sortGamesRankHeatFirst(availableGames)).map(
-                          (g) => ({
-                            ...g,
-                            games: sortGamesRankHeatFirst(g.games),
-                          })
-                        )
+                    effectiveFilter === "all"
+                      ? groupGamesByDate(
+                          sortGamesRankHeatFirst(availableGames)
+                        ).map((g) => ({
+                          ...g,
+                          games: sortGamesRankHeatFirst(g.games),
+                        }))
                       : [
                           {
                             dateKey: "heat",
                             dateLabel:
-                              rankHeatFilter === "heat"
+                              effectiveFilter === "heat"
                                 ? "Ranked matchups first"
-                                : rankHeatFilter === "legendary"
+                                : effectiveFilter === "legendary"
                                   ? "Both Top 10"
-                                  : rankHeatFilter === "top25"
+                                  : effectiveFilter === "top25"
                                     ? "Both Top 25"
                                     : "One team Top 25",
                             games: filtered,
@@ -3026,30 +3519,41 @@ function CommissionerPageInner() {
                         ];
                   return (
                     <>
-                      <p className="text-[10px] uppercase tracking-wider text-muted font-bold mb-1.5">
-                        Find good games
-                      </p>
-                      <div className="phone-h-scroll sm:flex-wrap sm:overflow-visible gap-1.5 mb-3">
-                        {chips.map((c) => (
-                          <button
-                            key={c.id}
-                            type="button"
-                            disabled={c.count === 0 && c.id !== "all"}
-                            onClick={() => setRankHeatFilter(c.id)}
-                            className={`px-3 py-2 min-h-[40px] rounded-full text-[11px] font-bold border transition touch-manipulation disabled:opacity-40 ${
-                              rankHeatFilter === c.id
-                                ? "bg-primary/15 border-primary text-primary"
-                                : c.accent
-                            }`}
-                          >
-                            {c.label}
-                            <span className="ml-1 opacity-80 tabular-nums">
-                              {c.count}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                      {filtered.length === 0 && rankHeatFilter !== "all" ? (
+                      {!noRankHeat && (
+                        <>
+                          <p className="text-[10px] uppercase tracking-wider text-muted font-bold mb-1.5">
+                            Find good games
+                          </p>
+                          <div className="phone-h-scroll sm:flex-wrap sm:overflow-visible gap-1.5 mb-3">
+                            {chips.map((c) => (
+                              <button
+                                key={c.id}
+                                type="button"
+                                disabled={c.count === 0 && c.id !== "all"}
+                                onClick={() => setRankHeatFilter(c.id)}
+                                className={`px-3 py-2 min-h-[40px] rounded-full text-[11px] font-bold border transition touch-manipulation disabled:opacity-40 ${
+                                  effectiveFilter === c.id
+                                    ? "bg-primary/15 border-primary text-primary"
+                                    : c.accent
+                                }`}
+                              >
+                                {c.label}
+                                <span className="ml-1 opacity-80 tabular-nums">
+                                  {c.count}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                      {noRankHeat && (
+                        <p className="text-[11px] text-warning mb-2">
+                          {isDemoSlate
+                            ? "Demo slate — all 5 fake games listed below (already selected)."
+                            : "No AP ranks on this slate — showing all games."}
+                        </p>
+                      )}
+                      {filtered.length === 0 && effectiveFilter !== "all" ? (
                         <p className="text-sm text-muted py-6 text-center border border-dashed border-border rounded-xl">
                           No games in this bucket. Try{" "}
                           <button
@@ -3073,9 +3577,11 @@ function CommissionerPageInner() {
                         <span className="text-[11px] text-muted ml-2">
                           {group.games.length} game
                           {group.games.length === 1 ? "" : "s"}
-                          {rankHeatFilter !== "all"
+                          {effectiveFilter !== "all"
                             ? " · best first"
-                            : " · ranked first within day"}
+                            : noRankHeat
+                              ? ""
+                              : " · ranked first within day"}
                         </span>
                       </div>
                       <div className="space-y-2">
@@ -3166,14 +3672,17 @@ function CommissionerPageInner() {
               </div>
             )}
 
-            {/* Weekly prop — outside game scroller so phone can edit freely */}
+            {/* Weekly prop — category dropdown → question list */}
             {availableGames.length > 0 && (
               <div className="rounded-xl border border-border bg-card p-5 mb-6 space-y-3">
                 <div>
                   <h3 className="font-semibold text-sm">Weekly prop</h3>
                   <p className="text-xs text-muted mt-0.5">
-                    Tap a preset (or Custom). Worth {prop.points} pts. Publish
-                    to put it on the card.
+                    Category → question
+                    {leagueFootballSport() === "nfl"
+                      ? " (NFL bank)"
+                      : " (college bank)"}
+                    . Worth {prop.points} pts. Publish to put it on the card.
                   </p>
                   {publishedProp?.question &&
                     publishedProp.question !== prop.question && (
@@ -3184,16 +3693,47 @@ function CommissionerPageInner() {
                     )}
                 </div>
 
-                {/* Native select as backup + large font (iOS won&apos;t zoom) */}
                 <label className="block text-xs text-muted">
-                  Quick pick
+                  Prop type
                   <select
-                    value={propPresetId}
+                    value={propCategory}
+                    onChange={(e) =>
+                      applyPropCategory(e.target.value as PropCategory)
+                    }
+                    className="mt-1 w-full min-h-[48px] bg-background border border-border rounded-lg px-3 py-3 text-base focus:outline-none focus:border-primary"
+                  >
+                    {propCategoriesForSport(leagueFootballSport()).map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <p className="text-[11px] text-muted -mt-1">
+                  {
+                    propCategoriesForSport(leagueFootballSport()).find(
+                      (c) => c.id === propCategory
+                    )?.blurb
+                  }
+                </p>
+
+                <label className="block text-xs text-muted">
+                  Question
+                  <select
+                    value={
+                      propPresetId === CUSTOM_PROP_ID
+                        ? CUSTOM_PROP_ID
+                        : propPresetId
+                    }
                     onChange={(e) => applyPropPreset(e.target.value)}
                     className="mt-1 w-full min-h-[48px] bg-background border border-border rounded-lg px-3 py-3 text-base focus:outline-none focus:border-primary"
                   >
-                    {PROP_PRESETS.map((p) => (
+                    {presetsForCategory(
+                      propCategory,
+                      leagueFootballSport()
+                    ).map((p) => (
                       <option key={p.id} value={p.id}>
+                        {p.settle === "manual" ? "📝 " : "⚡ "}
                         {p.label}
                       </option>
                     ))}
@@ -3203,9 +3743,11 @@ function CommissionerPageInner() {
                   </select>
                 </label>
 
-                {/* Big tappable list — primary path on phone */}
                 <div className="max-h-56 overflow-y-auto rounded-lg border border-border divide-y divide-border overscroll-contain">
-                  {PROP_PRESETS.map((p) => {
+                  {presetsForCategory(
+                    propCategory,
+                    leagueFootballSport()
+                  ).map((p) => {
                     const active = propPresetId === p.id;
                     return (
                       <button
@@ -3218,8 +3760,15 @@ function CommissionerPageInner() {
                             : "bg-background text-foreground hover:bg-card-hover"
                         }`}
                       >
-                        {active ? "✓ " : ""}
-                        {p.label}
+                        <span className="block">
+                          {active ? "✓ " : ""}
+                          {p.label}
+                        </span>
+                        <span className="block text-[10px] text-muted font-normal mt-0.5">
+                          {p.settle === "auto"
+                            ? "Auto-scores from finals"
+                            : "You set Yes/No after games (box score)"}
+                        </span>
                       </button>
                     );
                   })}
@@ -3238,8 +3787,8 @@ function CommissionerPageInner() {
                 </div>
 
                 <p className="text-[11px] text-muted">
-                  All presets refer only to the five games on this week&apos;s
-                  card. Worded so finals settle arguments.
+                  ⚡ Teams / most Funny auto-settle from scores. 📝 Players &amp;
+                  Odd need a box-score check (no player-stat feed yet).
                 </p>
 
                 {propPresetId === CUSTOM_PROP_ID ? (
@@ -3402,7 +3951,7 @@ function CommissionerPageInner() {
               )}
 
               <div className="flex flex-wrap gap-2 mb-4">
-                {Array.from({ length: SEASON_MAX_WEEK + 1 }, (_, i) => i).map(
+                {listSeasonWeekNumbers(league?.sportId).map(
                   (w) => {
                     const scored = scoredWeeks.includes(w);
                     return (
@@ -3567,7 +4116,7 @@ function CommissionerPageInner() {
                   </>
                 ) : (
                   <>
-                    Locked after season open ({SEASON_OPEN_LABEL}). This was a
+                    Locked after season open ({getSeasonOpenLabel(league?.sportId)}). This was a
                     pre-season trainer for the Commish role — not for live
                     weeks. Tap Run below for the full note.
                   </>
@@ -3587,7 +4136,7 @@ function CommissionerPageInner() {
                     }}
                     className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground disabled:opacity-50"
                   >
-                    {Array.from({ length: SEASON_MAX_WEEK + 1 }, (_, i) => i).map(
+                    {listSeasonWeekNumbers(league?.sportId).map(
                       (w) => (
                         <option key={w} value={w}>
                           {weekTitle(w)}
@@ -3609,7 +4158,7 @@ function CommissionerPageInner() {
                     }}
                     className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground disabled:opacity-50"
                   >
-                    {Array.from({ length: SEASON_MAX_WEEK + 1 }, (_, i) => i).map(
+                    {listSeasonWeekNumbers(league?.sportId).map(
                       (w) => (
                         <option key={w} value={w}>
                           {weekTitle(w)}
@@ -3639,15 +4188,17 @@ function CommissionerPageInner() {
                   disabled={autoSeasonBusy || !preseasonToolsOk}
                   onClick={() => {
                     if (!requirePreseasonTools()) return;
+                    const minW = leagueSeasonMin();
+                    const maxW = leagueSeasonMax();
                     const start =
                       scoredWeeks.length === 0
-                        ? 0
+                        ? minW
                         : Math.min(
-                            SEASON_MAX_WEEK,
-                            Math.max(...scoredWeeks) + 1
+                            maxW,
+                            Math.max(minW, Math.max(...scoredWeeks) + 1)
                           );
                     setAutoFromWeek(start);
-                    setAutoToWeek(Math.min(SEASON_MAX_WEEK, start));
+                    setAutoToWeek(Math.min(maxW, start));
                   }}
                   className="px-3 py-1.5 rounded-lg border border-border text-xs font-medium hover:bg-card-hover disabled:opacity-50"
                 >
@@ -3658,15 +4209,17 @@ function CommissionerPageInner() {
                   disabled={autoSeasonBusy || !preseasonToolsOk}
                   onClick={() => {
                     if (!requirePreseasonTools()) return;
+                    const minW = leagueSeasonMin();
+                    const maxW = leagueSeasonMax();
                     const start =
                       scoredWeeks.length === 0
-                        ? 0
+                        ? minW
                         : Math.min(
-                            SEASON_MAX_WEEK,
-                            Math.max(...scoredWeeks) + 1
+                            maxW,
+                            Math.max(minW, Math.max(...scoredWeeks) + 1)
                           );
                     setAutoFromWeek(start);
-                    setAutoToWeek(SEASON_MAX_WEEK);
+                    setAutoToWeek(maxW);
                   }}
                   className="px-3 py-1.5 rounded-lg border border-border text-xs font-medium hover:bg-card-hover disabled:opacity-50"
                 >
@@ -3677,12 +4230,14 @@ function CommissionerPageInner() {
                   disabled={autoSeasonBusy || !preseasonToolsOk}
                   onClick={() => {
                     if (!requirePreseasonTools()) return;
-                    setAutoFromWeek(0);
-                    setAutoToWeek(SEASON_MAX_WEEK);
+                    setAutoFromWeek(leagueSeasonMin());
+                    setAutoToWeek(leagueSeasonMax());
                   }}
                   className="px-3 py-1.5 rounded-lg border border-warning/50 text-warning text-xs font-medium hover:bg-warning/10 disabled:opacity-50"
                 >
-                  Full 0 → Final
+                  {leagueFootballSport() === "nfl"
+                    ? "Full 1 → Super Bowl"
+                    : "Full 0 → Final"}
                 </button>
               </div>
 
@@ -3725,7 +4280,7 @@ function CommissionerPageInner() {
                 re-score a dry run.
               </p>
               <div className="flex flex-wrap gap-2">
-                {Array.from({ length: SEASON_MAX_WEEK + 1 }, (_, i) => i).map(
+                {listSeasonWeekNumbers(league?.sportId).map(
                   (w) => {
                     const scored = scoredWeeks.includes(w);
                     return (

@@ -12,6 +12,7 @@ import {
   formatCardLockDeadline,
   isCardLockDeadlinePassed,
   weekTitle,
+  weekDateRangeLabel,
 } from "@/lib/dates";
 import {
   resolvePlayerActiveWeek,
@@ -98,7 +99,9 @@ export default function HomeWeekHero() {
     );
   }
 
-  const weekLabel = weekTitle(state.week);
+  const sportId = getLeague()?.sportId || "cfb";
+  const isNfl = sportId === "nfl";
+  const weekLabel = weekTitle(state.week, sportId);
   const progress = weekProgressLabel(state.week);
 
   // —— Player / everyone: primary job ——
@@ -193,14 +196,23 @@ export default function HomeWeekHero() {
     }. After that the whole card freezes.`;
     primaryHref = "/picks";
     primaryLabel = "Make my picks";
-    primaryClass = "bg-primary text-black hover:opacity-90 shadow-[0_0_24px_rgba(34,197,94,0.25)]";
+    primaryClass = isNfl
+      ? "bg-primary text-black hover:opacity-90 shadow-[0_0_24px_rgba(193,18,31,0.35)]"
+      : "bg-primary text-black hover:opacity-90 shadow-[0_0_24px_rgba(34,197,94,0.25)]";
     secondaryHref = "/rules";
     secondaryLabel = "Quick rules";
   }
 
+  const glow = isNfl
+    ? "rgba(193,18,31,0.22)"
+    : "rgba(34,197,94,0.12)";
+
   return (
     <section className="mb-5 sm:mb-8">
-      <div className="rounded-2xl border-2 border-primary/40 bg-gradient-to-br from-primary/15 via-black/50 to-black/70 p-4 sm:p-6 shadow-[0_0_50px_rgba(34,197,94,0.12)]">
+      <div
+        className="rounded-2xl border-2 border-primary/40 bg-gradient-to-br from-primary/15 via-black/50 to-black/70 p-4 sm:p-6"
+        style={{ boxShadow: `0 0 50px ${glow}` }}
+      >
         <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">
             {eyebrow}
@@ -209,6 +221,30 @@ export default function HomeWeekHero() {
             {progress}
           </span>
         </div>
+
+        {/* NFL: fan-familiar week chrome (sport · week · dates · lock) */}
+        {isNfl && (
+          <div className="mb-3 rounded-xl border border-primary/25 bg-black/40 px-3 py-2.5">
+            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-primary">
+              🏈 NFL
+            </p>
+            <p className="text-lg sm:text-xl font-bold text-white leading-tight mt-0.5">
+              {weekLabel}
+            </p>
+            <p className="text-sm text-muted mt-0.5">
+              {weekDateRangeLabel(state.week, "nfl") || "Dates TBD"}
+            </p>
+            <p className="text-sm text-foreground/90 mt-1.5 font-medium">
+              Lock:{" "}
+              {state.lockLabel
+                ? state.lockLabel
+                : state.week === 1
+                  ? "Thursday · 8:20 PM ET"
+                  : "First kickoff on the card"}
+            </p>
+          </div>
+        )}
+
         <h2 className="text-xl sm:text-3xl font-bold text-white mb-2 leading-tight">
           {title}
         </h2>

@@ -6,15 +6,25 @@ import { useParams } from "next/navigation";
 import Nav from "@/components/Nav";
 import AvatarLightbox from "@/components/AvatarLightbox";
 import BadgeShelf from "@/components/BadgeShelf";
+import WwcPassportShelf from "@/components/WwcPassportShelf";
+import DiscoveryPassportShelf from "@/components/DiscoveryPassportShelf";
 import ProfileTrophyCase from "@/components/ProfileTrophyCase";
 import FootballResume from "@/components/FootballResume";
+import ProfileSeasonPlot from "@/components/ProfileSeasonPlot";
+import CommishCareerCard from "@/components/CommishCareerCard";
 import Avatar from "@/components/Avatar";
+import {
+  buildSeasonPlot,
+  buildSignatureStyle,
+} from "@/lib/profile-signature";
+import { divisionFullLabel } from "@/lib/divisions";
 import {
   formatMemberSince,
   getPlayerBadges,
   syncLeagueCheevoKing,
   withPermanentBadges,
 } from "@/lib/badges";
+import { getPlayerWwcBadges } from "@/lib/sports/wwc-badge-eval";
 import { buildFootballResume } from "@/lib/player-history";
 import { syncCareerWithPlayer } from "@/lib/career-cheevo";
 import { applyLegacyBadgeGrants } from "@/lib/legacy-badge-grants";
@@ -209,12 +219,24 @@ export default function ProfilePage() {
     }
   }, [player, leaguePeers]);
 
-  const { seasonPoints, careerPoints } = useMemo(() => {
-    if (!player) return { seasonPoints: 0, careerPoints: 0 };
+  const isWwcLeague = getLeague()?.sportId === "soccer_wwc";
+
+  const wwcBadges = useMemo(() => {
+    if (!player || !isWwcLeague) return [];
+    try {
+      return getPlayerWwcBadges(withPermanentBadges(player));
+    } catch {
+      return [];
+    }
+  }, [player, isWwcLeague]);
+
+  // Bank career cheevos (side effect) — numbers live under resume fold, not hero
+  useMemo(() => {
+    if (!player) return null;
     try {
       return syncCareerWithPlayer(player, badges);
     } catch {
-      return { seasonPoints: 0, careerPoints: 0 };
+      return null;
     }
   }, [player, badges]);
 
@@ -271,12 +293,14 @@ export default function ProfilePage() {
   const roastNum = mockRoastLabel(player);
   const ini = initials(player.name);
   const earnedCount = badges.filter((b) => b.earned).length;
+  const sportId = getLeague()?.sportId || "cfb";
+  const peers = leaguePeers.length ? leaguePeers : [player];
 
   let resume = null as ReturnType<typeof buildFootballResume> | null;
   try {
     resume = buildFootballResume({
       player,
-      peers: leaguePeers.length ? leaguePeers : [player],
+      peers,
       trophies: leagueTrophies,
       badges,
       memberSinceLabel: mock
@@ -286,6 +310,16 @@ export default function ProfilePage() {
   } catch {
     resume = null;
   }
+
+  const signature = mock
+    ? roast || "Demo NPC. Not a real résumé."
+    : buildSignatureStyle({
+        player,
+        badges,
+        sportId,
+        peers,
+      });
+  const seasonPlot = buildSeasonPlot(player, peers);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -312,6 +346,12 @@ export default function ProfilePage() {
               )}
             </div>
             <p className="text-sm">{roast}</p>
+          </div>
+        )}
+
+        {!mock && (
+          <div className="mb-6">
+            <CommishCareerCard userId={player.id} />
           </div>
         )}
 
@@ -370,8 +410,8 @@ export default function ProfilePage() {
                   </span>
                 )}
               </div>
-              <p className="text-sm text-muted mb-3">
-                {player.division} Division ·{" "}
+              <p className="text-sm text-muted mb-2">
+                {divisionFullLabel(player.division, sportId)} ·{" "}
                 {mock ? (
                   "Lab-grown for your league"
                 ) : joinTitle ? (
@@ -401,92 +441,35 @@ export default function ProfilePage() {
                 )}
               </p>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {/* Signature style — who they are when they play */}
+              <p className="text-sm text-foreground/90 leading-relaxed mb-3 border-l-2 border-primary/50 pl-3 italic">
+                {signature}
+              </p>
+
+              <div className="grid grid-cols-2 gap-2">
                 <Chip
                   label="Member since"
                   value={mock ? "Never" : formatMemberSince(player.memberSince)}
                 />
                 <Chip
                   label="Last in"
-                  value={
-                    mock
-                      ? "NPC"
-                      : formatLastSeen(lastSeenAt)
-                  }
+                  value={mock ? "NPC" : formatLastSeen(lastSeenAt)}
                   accent={isRecentlyActive(lastSeenAt)}
                 />
-                <Chip
-                  label={
-                    isSandboxMode()
-                      ? "Dry-run cheevo pts"
-                      : "Season cheevo pts"
-                  }
-                  value={String(seasonPoints)}
-                  accent
-                />
-                <Chip
-                  label="Career cheevo pts"
-                  value={String(careerPoints)}
-                />
-                <Chip
-                  label="Pick'em season pts"
-                  value={String(player.totalPoints)}
-                />
-                <Chip
-                  label="Badges earned"
-                  value={`${earnedCount}/${badges.length || "?"}`}
-                />
               </div>
-              <p className="text-[10px] text-muted mt-2">
-                {isSandboxMode() ? (
-                  <>
-                    Sandbox: career = real Legends / creator only (sim runs do
-                    not stick). Dry-run cheevo pts clear on season reset.
-                  </>
-                ) : (
-                  <>
-                    Season cheevo = this year&apos;s earnable badges. Career =
-                    all-time (incl. creator legendary if you have it). Creator
-                    crown never pads season totals.
-                  </>
-                )}
-              </p>
+              {isSelfProfile && !mock && (
+                <p className="text-[10px] text-muted mt-2 leading-relaxed">
+                  Standings own season points. Hardware and the plot live here.
+                  {isSandboxMode()
+                    ? " Sandbox: sim cheevos don't stick to career."
+                    : ""}
+                </p>
+              )}
             </div>
           </div>
         </section>
 
-        {resume && <FootballResume resume={resume} playerId={player.id} />}
-
-        <section className="rounded-2xl border border-border bg-card p-5 mb-6">
-          <h2 className="font-semibold mb-3">Season snapshot</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-            <Mini
-              label="ATS"
-              value={
-                player.atsTotal
-                  ? `${player.atsCorrect}-${player.atsTotal - player.atsCorrect}`
-                  : "—"
-              }
-            />
-            <Mini
-              label="Streak"
-              value={
-                player.currentStreak > 0
-                  ? `W${player.currentStreak}`
-                  : player.currentStreak < 0
-                    ? `L${Math.abs(player.currentStreak)}`
-                    : "—"
-              }
-            />
-            <Mini label="Best week" value={String(player.bestWeek || "—")} />
-            <Mini
-              label="Perfect weeks"
-              value={String(player.perfectWeeks || 0)}
-            />
-          </div>
-        </section>
-
-        {/* Career hardware — championship / toilet / nerd + division case */}
+        {/* 1. Hardware — what they own */}
         <ProfileTrophyCase
           items={hardware}
           playerName={player.name}
@@ -494,19 +477,70 @@ export default function ProfilePage() {
           isSelf={isSelfProfile}
         />
 
-        {/* Badges — always mount when we have a player */}
-        <div className="rounded-2xl border border-border bg-card p-5 sm:p-6 mb-6">
-          {badges.length > 0 ? (
-            <BadgeShelf badges={badges} />
-          ) : (
-            <div>
-              <h2 className="font-semibold text-lg mb-2">Badge shelves</h2>
-              <p className="text-sm text-muted">
-                Could not load badges. Try a hard refresh.
-              </p>
+        {/* Passport stamps & zero-point discoveries */}
+        <DiscoveryPassportShelf
+          playerId={player.id}
+          isSelf={isSelfProfile}
+        />
+
+        {/* 2. Season plot — rival, streak, last card */}
+        {!mock && (
+          <ProfileSeasonPlot
+            plot={seasonPlot}
+            rival={resume?.rival ?? null}
+            sportId={sportId}
+          />
+        )}
+
+        {/* 3. Resume — titles + years; spreadsheet folded */}
+        {resume && (
+          <FootballResume resume={resume} playerId={player.id} />
+        )}
+
+        {/* 4. Achievements — shelves, not X/Y hero numbers */}
+        {isWwcLeague && wwcBadges.length > 0 && (
+          <WwcPassportShelf badges={wwcBadges} />
+        )}
+
+        {!isWwcLeague && (
+          <div className="rounded-2xl border border-border bg-card p-5 sm:p-6 mb-6">
+            {badges.length > 0 ? (
+              <>
+                <p className="text-[10px] uppercase tracking-wider text-muted font-bold mb-1">
+                  Achievements
+                </p>
+                <p className="text-xs text-muted mb-4">
+                  {earnedCount > 0
+                    ? `${earnedCount} earned in this catalog — open a badge for the story.`
+                    : "Nothing earned yet. The first card is still destiny."}
+                </p>
+                <BadgeShelf badges={badges} />
+              </>
+            ) : (
+              <div>
+                <h2 className="font-semibold text-lg mb-2">Badge shelves</h2>
+                <p className="text-sm text-muted">
+                  Could not load badges. Try a hard refresh.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {isWwcLeague && (
+          <details className="rounded-2xl border border-border bg-card p-5 sm:p-6 mb-6">
+            <summary className="font-semibold text-sm cursor-pointer text-muted hover:text-foreground">
+              Also show classic War Room badge shelves
+            </summary>
+            <div className="mt-4">
+              {badges.length > 0 ? (
+                <BadgeShelf badges={badges} />
+              ) : (
+                <p className="text-sm text-muted">No football badges loaded.</p>
+              )}
             </div>
-          )}
-        </div>
+          </details>
+        )}
       </main>
 
       <AvatarLightbox
@@ -543,11 +577,4 @@ function Chip({
   );
 }
 
-function Mini({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <div className="text-xs text-muted">{label}</div>
-      <div className="font-semibold">{value}</div>
-    </div>
-  );
-}
+

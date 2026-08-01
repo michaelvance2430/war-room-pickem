@@ -5,7 +5,7 @@ import Nav from "@/components/Nav";
 import SwingBadge from "@/components/SwingBadge";
 import CrownAndShame from "@/components/CrownAndShame";
 import { loadLeaguePlayers } from "@/lib/cloud";
-import { getSession } from "@/lib/league";
+import { getSession, getLeague } from "@/lib/league";
 import { rankPlayersWithSwings } from "@/lib/fun-board";
 import { compareForSeed } from "@/lib/brackets";
 import { isSelfPlayer, selfNameClass, selfRowClass } from "@/lib/self-highlight";
@@ -13,6 +13,7 @@ import YouBadge from "@/components/YouBadge";
 import PlayerLink from "@/components/PlayerLink";
 import { standingsHardwareFlair } from "@/lib/profile-hardware";
 import { Division, Player } from "@/lib/types";
+import { divisionTabLabel } from "@/lib/divisions";
 
 const divisions: (Division | "Overall")[] = [
   "Overall",
@@ -59,7 +60,7 @@ export default function StandingsPage() {
       }
       const list = await loadLeaguePlayers();
       setPlayers(list);
-      const ranked = rankPlayersWithSwings(list);
+      const ranked = rankPlayersWithSwings(list, getLeague()?.sportId);
       const map: Record<string, (typeof ranked)[0]["swing"]> = {};
       for (const r of ranked) map[r.id] = r.swing;
       setSwingById(map);
@@ -167,7 +168,7 @@ export default function StandingsPage() {
                   : "bg-card border border-border text-muted hover:text-foreground"
               }`}
             >
-              {d}
+              {divisionTabLabel(d, getLeague()?.sportId)}
             </button>
           ))}
         </div>
@@ -250,7 +251,10 @@ export default function StandingsPage() {
                     </td>
                     {active === "Overall" && (
                       <td className="px-3 sm:px-4 py-3.5 text-muted align-middle text-xs sm:text-sm">
-                        {player.division}
+                        {divisionTabLabel(
+                          player.division,
+                          getLeague()?.sportId
+                        )}
                       </td>
                     )}
                     <td className="px-3 py-3.5 hidden md:table-cell align-middle">

@@ -27,7 +27,21 @@ function toLocalLeague(row: {
   home_tagline_id?: string | null;
   home_tagline_custom?: string | null;
   season_theme_id?: string | null;
+  sport_id?: string | null;
 }): League {
+  let sportId = "cfb";
+  if (typeof row.sport_id === "string" && row.sport_id.trim()) {
+    sportId = row.sport_id.trim();
+  } else if (canUseStorage()) {
+    try {
+      const prev = JSON.parse(
+        localStorage.getItem(LEAGUE_KEY) || "null"
+      ) as League | null;
+      if (prev?.sportId) sportId = prev.sportId;
+    } catch {
+      /* default cfb */
+    }
+  }
   // Prefer cloud flag; if column missing from select, keep prior local value
   let crystalBallEnabled = true;
   let homeTaglineId = "good-teams";
@@ -84,6 +98,7 @@ function toLocalLeague(row: {
     code: row.code,
     commissionerId: row.commissioner_id,
     createdAt: row.created_at,
+    sportId,
     settings: {
       cutPercent: row.cut_percent ?? 50,
       // Fixed CFB calendar — never trust a short value from the DB

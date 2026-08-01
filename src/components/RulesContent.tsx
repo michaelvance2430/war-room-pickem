@@ -1,8 +1,14 @@
-import { RULES_INTRO, RULE_SECTIONS, type RuleLine } from "@/lib/rules";
+"use client";
+
+import { useMemo } from "react";
+import { getRulesForSport, type RuleLine } from "@/lib/rules";
+import { getLeague } from "@/lib/league";
 
 type Props = {
   /** Compact spacing for the onboarding modal */
   compact?: boolean;
+  /** Override sport (defaults to active league) */
+  sportId?: string | null;
 };
 
 function lineText(line: RuleLine): string {
@@ -13,7 +19,18 @@ function lineBold(line: RuleLine): boolean {
   return typeof line === "object" && !!line.bold;
 }
 
-export default function RulesContent({ compact = false }: Props) {
+export default function RulesContent({
+  compact = false,
+  sportId,
+}: Props) {
+  const { intro, sections } = useMemo(() => {
+    const sid =
+      sportId ??
+      (typeof window !== "undefined" ? getLeague()?.sportId : null) ??
+      "cfb";
+    return getRulesForSport(sid);
+  }, [sportId]);
+
   return (
     <div className={compact ? "space-y-4" : "space-y-6"}>
       <p
@@ -23,11 +40,11 @@ export default function RulesContent({ compact = false }: Props) {
             : "text-base text-muted leading-relaxed"
         }
       >
-        {RULES_INTRO}
+        {intro}
       </p>
 
       <ol className="space-y-4">
-        {RULE_SECTIONS.map((section) => (
+        {sections.map((section) => (
           <li
             key={section.title}
             className={
@@ -61,16 +78,10 @@ export default function RulesContent({ compact = false }: Props) {
                 const bold = lineBold(line);
                 return (
                   <li
-                    key={text}
-                    className={
-                      bold
-                        ? compact
-                          ? "text-foreground font-bold text-xs leading-snug list-none -ml-4 pl-0 border-l-2 border-primary pl-3 my-2"
-                          : "text-foreground font-bold text-sm leading-snug list-none -ml-5 pl-0 border-l-2 border-primary pl-3 my-2"
-                        : undefined
-                    }
+                    key={text.slice(0, 48)}
+                    className={bold ? "font-semibold text-foreground" : undefined}
                   >
-                    {bold ? text : text}
+                    {text}
                   </li>
                 );
               })}

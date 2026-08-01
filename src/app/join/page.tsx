@@ -15,7 +15,16 @@ import {
   takePendingJoinCode,
 } from "@/lib/commish-onboarding";
 import InviteFriends from "@/components/InviteFriends";
+import {
+  getSportPack,
+  isLiveSport,
+  listSportPickerOptions,
+} from "@/lib/sports/registry";
+import { DEFAULT_SPORT_ID, type SportId } from "@/lib/sports/types";
 import OwnershipNotice from "@/components/OwnershipNotice";
+import WwcTrophyLogo from "@/components/WwcTrophyLogo";
+import NflBrandMark from "@/components/NflBrandMark";
+import OpenRoomBotsNudge from "@/components/OpenRoomBotsNudge";
 
 function generateCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -31,6 +40,10 @@ function JoinPageInner() {
   const [displayName, setDisplayName] = useState("");
   const [mode, setMode] = useState<"choose" | "create" | "join">("choose");
   const [leagueName, setLeagueName] = useState("War Room");
+  /** Multi-sport: CFB + NFL live; others coming soon */
+  const [sportId, setSportId] = useState<SportId>(DEFAULT_SPORT_ID);
+  /** List new league in open-room lobby for strangers to fill seats */
+  const [listAsOpen, setListAsOpen] = useState(false);
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -38,6 +51,8 @@ function JoinPageInner() {
   const [checking, setChecking] = useState(true);
   const [hostCopied, setHostCopied] = useState<string | null>(null);
   const [deepLinkCode, setDeepLinkCode] = useState<string | null>(null);
+  /** Host created as open room — offer bot pad deep link */
+  const [showOpenRoomBotsNudge, setShowOpenRoomBotsNudge] = useState(false);
 
   useEffect(() => {
     // Deep link: /join?code=ABC123 (or stashed from login)
@@ -49,6 +64,14 @@ function JoinPageInner() {
       setDeepLinkCode(c);
       setMode("join");
       stashPendingJoinCode(c); // keep if we bounce to login
+      return;
+    }
+    const m = (searchParams.get("mode") || "").toLowerCase();
+    if (m === "create") setMode("create");
+    if (m === "join") setMode("join");
+    if (searchParams.get("open") === "1") {
+      setMode("create");
+      setListAsOpen(true);
     }
   }, [searchParams]);
 
@@ -86,26 +109,91 @@ function JoinPageInner() {
   async function handleCreate() {
     if (!userId) return;
     setError(null);
+    if (!isLiveSport(sportId)) {
+      setError(
+        `${getSportPack(sportId).label} is coming soon. Pick CFB or NFL for now.`
+      );
+      return;
+    }
     setLoading(true);
     const supabase = createClient();
     const newCode = generateCode();
+    const pack = getSportPack(sportId);
     try {
       await supabase.from("profiles").upsert({
         id: userId,
         display_name: displayName.trim() || "Commissioner",
       });
-      const { data: league, error: leagueError } = await supabase
-        .from("leagues")
-        .insert({
-          name: leagueName.trim() || "War Room",
-          code: newCode,
-          commissioner_id: userId,
-        })
-        .select()
-        .single();
-      if (leagueError) throw leagueError;
+
+      const baseRow: Record<string, unknown> = {
+        name: leagueName.trim() || "War Room",
+        code: newCode,
+        commissioner_id: userId,
+      };
+      // Include sport when column exists (run supabase/sport-id.sql on dev DB)
+      // Crystal Ball is CFB pride pick — default off for NFL
+      const withSport: Record<string, unknown> = {
+        ...baseRow,
+        sport_id: sportId,
+        sport_settings: {},
+        crystal_ball_enabled: sportId === "cfb",
+      };
+      if (listAsOpen) {
+        withSport.is_open = true;
+        withSport.open_listed_at = new Date().toISOString();
+      }
+
+      let league: Record<string, unknown> | null = null;
+      let leagueError: { message?: string } | null = null;
+
+      {
+        const res = await supabase
+          .from("leagues")
+          .insert(withSport)
+          .select()
+          .single();
+        league = res.data as Record<string, unknown> | null;
+        leagueError = res.error;
+      }
+
+      // Column missing — strip open-room and/or sport fields and retry
+      if (
+        leagueError &&
+        /is_open|open_listed|sport_id|sport_settings|column|schema cache|PGRST/i.test(
+          leagueError.message || ""
+        )
+      ) {
+        const stripped = { ...withSport };
+        delete stripped.is_open;
+        delete stripped.open_listed_at;
+        let res = await supabase.from("leagues").insert(stripped).select().single();
+        if (
+          res.error &&
+          /sport_id|sport_settings|column|schema cache|PGRST/i.test(
+            res.error.message || ""
+          )
+        ) {
+          res = await supabase.from("leagues").insert(baseRow).select().single();
+        }
+        league = res.data as Record<string, unknown> | null;
+        leagueError = res.error;
+        if (listAsOpen && league?.id && !leagueError) {
+          try {
+            const { setLeagueOpenListing } = await import("@/lib/open-room");
+            await setLeagueOpenListing(league.id as string, true);
+          } catch {
+            /* SQL not run yet */
+          }
+        }
+      }
+
+      if (leagueError || !league) {
+        throw new Error(leagueError?.message || "Could not create league");
+      }
+
+      const leagueId = league.id as string;
       const { error: memError } = await supabase.from("memberships").insert({
-        league_id: league.id,
+        league_id: leagueId,
         user_id: userId,
         role: "commissioner",
         division: "North",
@@ -113,7 +201,7 @@ function JoinPageInner() {
       if (memError) throw memError;
       try {
         const { recordLeagueFirstJoin } = await import("@/lib/cloud");
-        await recordLeagueFirstJoin(league.id);
+        await recordLeagueFirstJoin(leagueId);
       } catch {
         /* optional until join-order.sql is run */
       }
@@ -123,29 +211,52 @@ function JoinPageInner() {
           playerId: userId,
           playerName: displayName.trim() || "Commissioner",
           isCommissioner: true,
-          leagueId: league.id,
+          leagueId,
         })
       );
+      const createdSportId =
+        (league.sport_id as string) || sportId || "cfb";
       localStorage.setItem(
         "warroom-league",
         JSON.stringify({
-          id: league.id,
-          name: league.name,
-          code: league.code,
+          id: leagueId,
+          name: league.name as string,
+          code: league.code as string,
           commissionerId: userId,
-          createdAt: league.created_at,
+          createdAt: league.created_at as string,
+          sportId: createdSportId,
           settings: {
-            cutPercent: league.cut_percent ?? 50,
-            regularSeasonWeeks: 18, // fixed CFB calendar (app weeks 0–18)
-            gamesPerWeek: league.games_per_week ?? 5,
-            crystalBallEnabled: true,
+            cutPercent: (league.cut_percent as number) ?? 50,
+            regularSeasonWeeks: pack.defaultSeasonWeeks,
+            gamesPerWeek:
+              (league.games_per_week as number) ?? pack.defaultGamesPerWeek,
+            // Crystal Ball = CFB national champ pride pick; off for NFL by default
+            crystalBallEnabled: createdSportId === "cfb",
             homeTaglineId: "good-teams",
             homeTaglineCustom: "",
             seasonThemeId: "default",
           },
         })
       );
+      // Persist CB default to cloud when column exists
+      try {
+        if (createdSportId === "nfl") {
+          const { saveLeagueToCloud } = await import("@/lib/league-sync");
+          await saveLeagueToCloud({
+            settings: { crystalBallEnabled: false },
+          });
+        }
+      } catch {
+        /* optional */
+      }
+      try {
+        const { applySportTheme } = await import("@/lib/sports/sport-theme");
+        applySportTheme(createdSportId);
+      } catch {
+        /* ignore */
+      }
       setCreatedCode(newCode);
+      if (listAsOpen) setShowOpenRoomBotsNudge(true);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Could not create league");
     } finally {
@@ -187,6 +298,9 @@ function JoinPageInner() {
           /* optional */
         }
       }
+
+      const joinedSportId =
+        (league as { sport_id?: string }).sport_id || "cfb";
 
       if (!existingMem) {
         const { count, error: countErr } = await supabase
@@ -262,6 +376,7 @@ function JoinPageInner() {
           code: league.code,
           commissionerId: league.commissioner_id,
           createdAt: league.created_at,
+          sportId: joinedSportId,
           settings: {
             cutPercent: league.cut_percent ?? 50,
             regularSeasonWeeks: 18, // fixed CFB calendar (app weeks 0–18)
@@ -276,6 +391,12 @@ function JoinPageInner() {
       try {
         const { applySeasonTheme } = await import("@/lib/season-theme");
         applySeasonTheme(seasonThemeId);
+      } catch {
+        /* ignore */
+      }
+      try {
+        const { applySportTheme } = await import("@/lib/sports/sport-theme");
+        applySportTheme(joinedSportId);
       } catch {
         /* ignore */
       }
@@ -306,6 +427,12 @@ function JoinPageInner() {
 
     return (
       <div className="min-h-screen flex items-center justify-center px-4 py-10">
+        {listAsOpen && (
+          <OpenRoomBotsNudge
+            open={showOpenRoomBotsNudge}
+            onClose={() => setShowOpenRoomBotsNudge(false)}
+          />
+        )}
         <div className="max-w-md w-full rounded-xl border-2 border-primary/40 bg-card p-6">
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary mb-2 text-center">
             You&apos;re the host
@@ -313,6 +440,7 @@ function JoinPageInner() {
           <h1 className="text-2xl font-bold mb-1 text-center">League created</h1>
           <p className="text-sm text-muted mb-4 text-center">
             {leagueLabel} — share the invite link, then build the first card.
+            {listAsOpen ? " Listed in the open room lobby." : ""}
           </p>
           <div className="text-3xl font-bold tracking-[0.3em] text-primary text-center mb-4 font-mono">
             {createdCode}
@@ -327,6 +455,16 @@ function JoinPageInner() {
 
           {hostCopied && (
             <p className="text-xs text-primary text-center mb-3">{hostCopied}</p>
+          )}
+
+          {listAsOpen && (
+            <button
+              type="button"
+              onClick={() => setShowOpenRoomBotsNudge(true)}
+              className="w-full py-3 min-h-[48px] rounded-xl border border-primary/40 bg-primary/10 text-primary text-sm font-bold mb-3 touch-manipulation"
+            >
+              Round out with bots? →
+            </button>
           )}
 
           <ol className="text-left text-sm space-y-2 mb-6 rounded-lg border border-border bg-background/50 px-4 py-3">
@@ -389,7 +527,7 @@ function JoinPageInner() {
               onClick={() => setMode("create")}
               className="w-full py-4 min-h-[56px] rounded-xl bg-primary text-black text-base font-extrabold touch-manipulation"
             >
-              Create league (you&apos;re host)
+              Commissioner — create league
             </button>
             <button
               type="button"
@@ -398,9 +536,15 @@ function JoinPageInner() {
             >
               Join with code
             </button>
-            <p className="text-center text-[11px] text-muted pt-1">
-              Leagues cap at {MAX_LEAGUE_PLAYERS} players so Championship + Toilet
-              Bowl both finish in the CFP weeks.
+            <Link
+              href="/open-room"
+              className="w-full py-4 min-h-[56px] rounded-xl border-2 border-primary/40 bg-primary/10 text-base font-bold touch-manipulation flex items-center justify-center text-foreground"
+            >
+              Join open room
+            </Link>
+            <p className="text-center text-[11px] text-muted pt-1 leading-relaxed">
+              Open lobby fills one room at a time (max {MAX_LEAGUE_PLAYERS}).
+              Full rooms get a friendly “no seats” message — not a scolding.
             </p>
             <Link href="/login" className="block text-center text-xs text-muted mt-4">Switch account</Link>
             <OwnershipNotice className="mt-6" />
@@ -411,16 +555,153 @@ function JoinPageInner() {
           <div className="rounded-xl border border-border bg-card p-5 space-y-4">
             <h2 className="font-semibold">Create league</h2>
             <p className="text-xs text-muted">
-              Up to {MAX_LEAGUE_PLAYERS} players. Top half → Championship, bottom
-              half → Toilet Bowl.
+              Pick a sport, then name the room. Up to {MAX_LEAGUE_PLAYERS}{" "}
+              players. Same War Room soul — different field.
             </p>
-            <input value={leagueName} onChange={(e) => setLeagueName(e.target.value)} placeholder="League name" className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm" />
-            <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Your name" className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm" />
+
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-2">
+                Sport
+              </p>
+              <div className="space-y-2 max-h-[min(50vh,22rem)] overflow-y-auto pr-0.5">
+                {listSportPickerOptions().map((s) => {
+                  const live = s.status === "live";
+                  const selected = sportId === s.id;
+                  const isWwc = s.id === "soccer_wwc";
+                  const isNfl = s.id === "nfl";
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      disabled={!live}
+                      onClick={() => {
+                        if (live) setSportId(s.id as SportId);
+                      }}
+                      className={`w-full text-left rounded-xl border px-3 py-3 transition touch-manipulation ${
+                        selected && isWwc
+                          ? "border-[#FFDF00]/60 bg-[#009C3B]/15 shadow-[0_0_22px_rgba(0,156,59,0.2)]"
+                          : selected && isNfl
+                            ? "border-[#C1121F]/70 bg-[#0B1426] shadow-[0_0_22px_rgba(193,18,31,0.25)]"
+                            : selected
+                              ? "border-primary bg-primary/15 shadow-[0_0_20px_rgba(34,197,94,0.12)]"
+                              : live
+                                ? "border-border bg-background hover:border-primary/40"
+                                : "border-border/50 bg-background/40 opacity-55 cursor-not-allowed"
+                      }`}
+                    >
+                      <div className="flex items-start gap-2.5">
+                        {isWwc ? (
+                          <WwcTrophyLogo size={36} className="shrink-0 mt-0.5" />
+                        ) : isNfl ? (
+                          <NflBrandMark size={36} className="shrink-0 mt-0.5" />
+                        ) : (
+                          <span className="text-xl shrink-0" aria-hidden>
+                            {s.emoji}
+                          </span>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-sm font-bold text-foreground">
+                              {s.label}
+                            </span>
+                            {live ? (
+                              <span
+                                className={`text-[10px] font-bold uppercase tracking-wide ${
+                                  isWwc
+                                    ? "text-[#FFDF00]"
+                                    : isNfl
+                                      ? "text-[#C5CCD3]"
+                                      : "text-primary"
+                                }`}
+                              >
+                                Live
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-bold uppercase tracking-wide text-muted">
+                                Coming soon
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-muted mt-0.5 leading-snug">
+                            {s.blurb}
+                          </p>
+                        </div>
+                        {selected && live && (
+                          <span
+                            className={`text-sm font-black shrink-0 ${
+                              isWwc
+                                ? "text-[#FFDF00]"
+                                : isNfl
+                                  ? "text-[#C1121F]"
+                                  : "text-primary"
+                            }`}
+                          >
+                            ✓
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-muted mt-2 leading-relaxed">
+                <span className="text-foreground font-medium">CFB</span> and{" "}
+                <span className="text-foreground font-medium">NFL</span> are
+                live. World Cup and others ship next — same clubhouse, different
+                desk.
+              </p>
+            </div>
+
+            <input
+              value={leagueName}
+              onChange={(e) => setLeagueName(e.target.value)}
+              placeholder="League name"
+              className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm"
+            />
+            <input
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              placeholder="Your name"
+              className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm"
+            />
+            <label className="flex items-start gap-3 rounded-xl border border-border bg-background/50 px-3 py-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={listAsOpen}
+                onChange={(e) => setListAsOpen(e.target.checked)}
+                className="mt-1 w-5 h-5 rounded border-border shrink-0"
+              />
+              <span>
+                <span className="text-sm font-semibold text-foreground block">
+                  List as open room
+                </span>
+                <span className="text-xs text-muted leading-relaxed">
+                  Strangers can find you in the open lobby. We fill this room
+                  first before seating people elsewhere. Turn off anytime in
+                  Settings.
+                </span>
+              </span>
+            </label>
             {error && <p className="text-sm text-danger">{error}</p>}
-            <button onClick={handleCreate} disabled={loading} className="w-full py-3 rounded-xl bg-primary text-black font-semibold disabled:opacity-50">
-              {loading ? "Creating…" : "Create & get code"}
+            <button
+              onClick={() => void handleCreate()}
+              disabled={loading || !isLiveSport(sportId)}
+              className="w-full py-3 min-h-[48px] rounded-xl bg-primary text-black font-semibold disabled:opacity-50"
+            >
+              {loading
+                ? "Creating…"
+                : sportId === "soccer_wwc"
+                  ? "Create FIFA WWC Brazil 2027™ league"
+                  : sportId === "nfl"
+                    ? "Create NFL league"
+                    : `Create ${getSportPack(sportId).shortLabel} league`}
             </button>
-            <button onClick={() => setMode("choose")} className="w-full text-sm text-muted">Back</button>
+            <button
+              onClick={() => setMode("choose")}
+              className="w-full text-sm text-muted"
+            >
+              Back
+            </button>
           </div>
         )}
 
