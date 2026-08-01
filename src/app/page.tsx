@@ -362,13 +362,13 @@ export default function Home() {
         {/* Pre–Week 0: sarcastic practice escape when nothing real is up */}
         <BoredLameSandboxCta />
 
-        {/* Host first-hour spine — under the job hero, not buried at the footer */}
+        {/* Host first-hour spine (invite → card → FIRST score). One green score CTA. */}
         <CommishSetupBanner />
 
         {/* One-time: first lock opened the full room */}
         <SoftUnlockBanner />
 
-        {/* Later weeks only — self-hides while first-hour setup still owns score CTA */}
+        {/* Later weeks only — never shows while league has 0 scored weeks */}
         <HomeHostScoreStrip />
 
         {firstWeekChrome && (

@@ -1,9 +1,11 @@
 "use client";
 
 /**
- * Ops-only Home strip: one primary path to score the week.
- * Hidden while first-hour CommishSetupBanner still owns the host spine
- * (invite → card → first score) so we never double the green score button.
+ * Ops-only Home strip: score CTA for later weeks.
+ *
+ * HARD RULE — never stack with CommishSetupBanner step 3:
+ * If the league has zero scored weeks yet, this strip stays hidden.
+ * First score belongs entirely to the first-hour host spine.
  */
 
 import { useEffect, useState } from "react";
@@ -12,11 +14,10 @@ import {
   loadWeekCard,
   listScoredWeekNumbers,
 } from "@/lib/cloud";
-import { getLeague, isOps } from "@/lib/league";
+import { isOps } from "@/lib/league";
 import { resolvePlayerActiveWeek } from "@/lib/active-week";
 import { weekTitle } from "@/lib/dates";
 import { isViewAsPlayer } from "@/lib/view-as-player";
-import { isFirstTimeCommish } from "@/lib/commish-onboarding";
 
 export default function HomeHostScoreStrip() {
   const [show, setShow] = useState(false);
@@ -34,15 +35,8 @@ export default function HomeHostScoreStrip() {
         const scoredList =
           scored.length > 0 ? scored : await listScoredWeekNumbers();
 
-        // First-hour setup banner already has the score CTA — don’t stack
-        const league = getLeague();
-        if (
-          league?.id &&
-          isFirstTimeCommish({
-            leagueId: league.id,
-            scoredWeekCount: scoredList.length,
-          })
-        ) {
+        // First score of the season → CommishSetupBanner owns that CTA alone
+        if (scoredList.length === 0) {
           if (!cancelled) setShow(false);
           return;
         }
