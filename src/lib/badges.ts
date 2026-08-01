@@ -346,6 +346,17 @@ export const BADGE_CATALOG: BadgeDef[] = [
     points: 25,
     icon: "🤖",
   },
+  {
+    id: "neighborhood_creeper",
+    name: "Neighborhood Creeper",
+    description:
+      "You opened Deep stats & legacy math. Most people walk past the fold. You went in. Curtains twitching. Spreadsheet energy.",
+    howToEarn:
+      "Open Deep stats & legacy math on your own profile. One-time permanent. Equip the title if you want the room to know.",
+    tier: "rare",
+    points: 25,
+    icon: "🪟",
+  },
 
   // —— Common ——
   {
@@ -1362,6 +1373,11 @@ function evaluateBadge(
     case "let_them_cook":
       return {
         earned: hasPermanentBadge(player, "let_them_cook"),
+      };
+
+    case "neighborhood_creeper":
+      return {
+        earned: hasPermanentBadge(player, "neighborhood_creeper"),
       };
 
     case "first_blood":
