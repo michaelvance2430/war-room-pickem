@@ -6,6 +6,7 @@ import { syncLeagueFromCloud } from "@/lib/league-sync";
 import {
   applySeasonTheme,
   DEFAULT_SEASON_THEME_ID,
+  isHolidayThemeId,
   reapplySeasonThemeFromLocal,
   SEASON_THEME_EVENT,
   resolveSeasonThemeId,
@@ -98,13 +99,16 @@ export default function SeasonThemeApplier() {
 
   if (theme === "default") return null;
 
+  // CFB room skins + holidays both use the wash overlay; only holidays get props
   return (
     <>
       <div className="season-theme-overlay" data-theme={theme} aria-hidden />
-      {theme === "christmas" && <ChristmasLights />}
-      {theme === "halloween" && <HalloweenDecor />}
-      {theme === "thanksgiving" && <ThanksgivingDecor />}
-      {theme === "newyear" && <NewYearDecor />}
+      {isHolidayThemeId(theme) && theme === "christmas" && <ChristmasLights />}
+      {isHolidayThemeId(theme) && theme === "halloween" && <HalloweenDecor />}
+      {isHolidayThemeId(theme) && theme === "thanksgiving" && (
+        <ThanksgivingDecor />
+      )}
+      {isHolidayThemeId(theme) && theme === "newyear" && <NewYearDecor />}
     </>
   );
 }

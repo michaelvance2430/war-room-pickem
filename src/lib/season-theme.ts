@@ -1,16 +1,19 @@
 /**
- * League-wide holiday / season backgrounds (commissioner sets for everyone).
+ * League-wide room skins + holiday backgrounds (commissioner sets for everyone).
  *
- * PRODUCT RULE — every sport pack always has this:
- * - Sport pack owns the DEFAULT skin (CFB green, NFL primetime, WWC Brazil, …)
- * - Commissioner can always pick a holiday overlay for the whole room
- * - Holidays apply app-wide (every page), all sports — add more seasons anytime
+ * PRODUCT RULE:
+ * - Sport pack owns the DEFAULT skin via data-sport (CFB War Room Colors, NFL primetime, …)
+ * - Commissioner can pick extra skins (CFB campus looks) or holiday overlays
+ * - Holidays apply app-wide for every sport; CFB skins only offered in CFB rooms
  *
- * Tech: `data-sport` = pack default · `data-season-theme` = holiday (overrides when not default)
+ * Tech: `data-sport` = pack default · `data-season-theme` = room skin / holiday
  */
 
 export type SeasonThemeId =
   | "default"
+  | "cfb_saturday"
+  | "cfb_night_lights"
+  | "cfb_rivalry"
   | "halloween"
   | "thanksgiving"
   | "christmas"
@@ -21,46 +24,90 @@ export type SeasonThemePreset = {
   label: string;
   /** Short blurb for Commish settings */
   blurb: string;
+  /** If set, only show in that sport’s settings */
+  sportOnly?: "cfb" | "nfl" | "soccer_wwc";
+  /** Holiday props / border unlocks */
+  holiday?: boolean;
 };
 
 export const DEFAULT_SEASON_THEME_ID: SeasonThemeId = "default";
 
 /**
- * Shared holiday catalog — available to CFB, NFL, WWC, and every future pack.
- * Append new seasons here (e.g. easter, july4); CSS + optional decor components follow.
+ * Full catalog. Use seasonThemePresetsForSport() in Commish UI.
  */
 export const SEASON_THEME_PRESETS: SeasonThemePreset[] = [
   {
     id: "default",
-    label: "Sport default",
+    label: "War Room Colors",
     blurb:
-      "This league’s pack skin only (CFB green · NFL navy/crimson · etc.). No holiday overlay.",
+      "Classic clubhouse: black field + signal green (CFB). NFL rooms use navy/crimson primetime instead. No holiday wash.",
+  },
+  {
+    id: "cfb_saturday",
+    label: "CFB · Saturday Turf",
+    blurb:
+      "College Saturday energy — deep turf green, stadium lights, black edges. CFB rooms only.",
+    sportOnly: "cfb",
+  },
+  {
+    id: "cfb_night_lights",
+    label: "CFB · Night Game",
+    blurb:
+      "Friday night lights feel — cooler greens, floodlight white, darker pitch. CFB rooms only.",
+    sportOnly: "cfb",
+  },
+  {
+    id: "cfb_rivalry",
+    label: "CFB · Rivalry Week",
+    blurb:
+      "Campus heat — green with crimson rivalry edges. Loud week energy. CFB rooms only.",
+    sportOnly: "cfb",
   },
   {
     id: "halloween",
     label: "Halloween 🎃",
     blurb:
       "Orange & purple wash on every page + props. Works for every sport.",
+    holiday: true,
   },
   {
     id: "thanksgiving",
     label: "Thanksgiving 🦃",
     blurb:
       "Harvest wash on every page + props. Works for every sport.",
+    holiday: true,
   },
   {
     id: "christmas",
     label: "Christmas 🎄",
     blurb:
       "Red/green wash on every page + lights/props. Works for every sport.",
+    holiday: true,
   },
   {
     id: "newyear",
     label: "New Year ✨",
     blurb:
       "Sparkle wash on every page + NY props. Works for every sport.",
+    holiday: true,
   },
 ];
+
+const HOLIDAY_IDS = new Set(
+  SEASON_THEME_PRESETS.filter((p) => p.holiday).map((p) => p.id)
+);
+
+const CFB_SKIN_IDS = new Set(
+  SEASON_THEME_PRESETS.filter((p) => p.sportOnly === "cfb").map((p) => p.id)
+);
+
+export function isHolidayThemeId(id: string | null | undefined): boolean {
+  return !!id && HOLIDAY_IDS.has(id as SeasonThemeId);
+}
+
+export function isCfbRoomSkinId(id: string | null | undefined): boolean {
+  return !!id && CFB_SKIN_IDS.has(id as SeasonThemeId);
+}
 
 export function isSeasonThemeId(v: unknown): v is SeasonThemeId {
   return (
@@ -73,6 +120,31 @@ export function resolveSeasonThemeId(
   raw: string | null | undefined
 ): SeasonThemeId {
   return isSeasonThemeId(raw) ? raw : DEFAULT_SEASON_THEME_ID;
+}
+
+/** Presets shown in Commish settings for this sport. */
+export function seasonThemePresetsForSport(
+  sportId?: string | null
+): SeasonThemePreset[] {
+  const sid = (sportId || "cfb").trim() || "cfb";
+  return SEASON_THEME_PRESETS.filter((p) => {
+    if (!p.sportOnly) return true;
+    return p.sportOnly === sid;
+  });
+}
+
+/**
+ * If an NFL (etc.) room somehow has a CFB-only skin stored, fall back to War Room Colors.
+ */
+export function resolveSeasonThemeIdForSport(
+  raw: string | null | undefined,
+  sportId?: string | null
+): SeasonThemeId {
+  const id = resolveSeasonThemeId(raw);
+  if (isCfbRoomSkinId(id) && (sportId || "cfb") !== "cfb") {
+    return DEFAULT_SEASON_THEME_ID;
+  }
+  return id;
 }
 
 export const SEASON_THEME_EVENT = "warroom-season-theme";

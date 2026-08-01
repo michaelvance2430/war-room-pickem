@@ -250,6 +250,7 @@ export default function Home() {
     setReady(true);
   }
 
+  // CFB room skins read seasonThemeId from local league cache
   const homeChrome = resolveHomeChrome(sportId);
 
   if (bootError) {
