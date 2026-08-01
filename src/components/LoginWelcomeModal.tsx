@@ -9,8 +9,11 @@
 import { useEffect, useState } from "react";
 import { getSession } from "@/lib/league";
 import { isGuestMode } from "@/lib/guest-mode";
-import { hasSeenRules } from "@/lib/rules";
 import BrandMark from "@/components/BrandMark";
+import {
+  isPlayerTutorialActive,
+  needsPlayerTutorial,
+} from "@/lib/player-tutorial";
 
 const FOREVER_KEY = "warroom-login-welcome-v1-dismissed";
 const SESSION_KEY = "warroom-login-welcome-v1-session";
@@ -63,14 +66,22 @@ export default function LoginWelcomeModal() {
     if (!session?.playerId) return;
     if (isDismissedForever()) return;
     if (wasShownThisSession()) return;
-    // First session: Rules briefing wins. Welcome only after they've seen rules
-    // (or on a later login) so we never stack two full-screen modals.
-    if (!hasSeenRules()) return;
+    // Never stack on the player walkthrough (first lock coach)
+    if (needsPlayerTutorial() || isPlayerTutorialActive()) return;
+    // Opening week: ring ceremony owns the moment
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { isOpeningWeekLive } =
+        require("@/components/RingCeremonyModal") as typeof import("@/components/RingCeremonyModal");
+      if (isOpeningWeekLive()) return;
+    } catch {
+      /* ok */
+    }
 
     const t = window.setTimeout(() => {
       markShownThisSession();
       setOpen(true);
-    }, 600);
+    }, 1200);
     return () => window.clearTimeout(t);
   }, []);
 

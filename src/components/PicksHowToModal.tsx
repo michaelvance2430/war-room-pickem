@@ -7,12 +7,15 @@ import {
   markPicksTipNeverAgain,
   PICKS_HOW_TO_STEPS,
 } from "@/lib/picks-tip";
-import { hasSeenRules } from "@/lib/rules";
 import { isQuietPicksPath } from "@/lib/picks-progressive";
+import {
+  isPlayerTutorialActive,
+  needsPlayerTutorial,
+} from "@/lib/player-tutorial";
 
 /**
- * Picks cheat sheet — skipped on quiet first-card path (inline banner
- * covers it) and until Rules has fired so we don't stack briefings.
+ * Picks cheat sheet — never on first-card quiet path or while the
+ * walkthrough coach is running (coach + quiet banner are enough).
  */
 export default function PicksHowToModal() {
   const [open, setOpen] = useState(false);
@@ -22,8 +25,7 @@ export default function PicksHowToModal() {
     if (hasDismissedPicksTip()) return;
     // First lock path already has quiet intro on the page
     if (isQuietPicksPath()) return;
-    // Don't stack on top of first-session rules modal
-    if (!hasSeenRules()) return;
+    if (needsPlayerTutorial() || isPlayerTutorialActive()) return;
     const t = setTimeout(() => setOpen(true), 250);
     return () => clearTimeout(t);
   }, []);

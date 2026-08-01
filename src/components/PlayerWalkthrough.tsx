@@ -26,7 +26,7 @@ import {
   startPicksOnlyTutorial,
   type PlayerTutorialStep,
 } from "@/lib/player-tutorial";
-import { hasSeenRules } from "@/lib/rules";
+import { markRulesSeen } from "@/lib/rules";
 import { loadCrystalBall } from "@/lib/crystal-ball";
 import { leagueHasLiveCard } from "@/lib/first-session";
 
@@ -71,13 +71,15 @@ export default function PlayerWalkthrough() {
     async function maybeStart() {
       if (isGuestMode()) return;
       if (!getSession()?.playerId) return;
-      if (!hasSeenRules()) return;
       // KISS: no coach until there's a live card to pick
       if (!(await leagueHasLiveCard())) {
         syncFromStorage();
         return;
       }
       if (needsPlayerTutorial() && !isPlayerTutorialActive()) {
+        // Walkthrough owns first login — no rules modal. Mark rules "seen"
+        // so other systems don't wait on a retired popup.
+        markRulesSeen();
         // First week: picks only — Crystal Ball is optional power
         startPicksOnlyTutorial(getSession()?.playerId || undefined);
       }

@@ -41,6 +41,14 @@ export default function SeasonFinaleModal() {
         if (isGuestMode()) return;
         // Don't steal Opening Day ring ceremony
         if (isOpeningWeekLive()) return;
+        // Don't stack multi-slide finale on first-login walkthrough
+        try {
+          const { isPlayerTutorialActive, needsPlayerTutorial } =
+            await import("@/lib/player-tutorial");
+          if (isPlayerTutorialActive() || needsPlayerTutorial()) return;
+        } catch {
+          /* ok */
+        }
 
         const league = getLeague();
         const session = getSession();
