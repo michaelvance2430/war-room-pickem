@@ -367,10 +367,12 @@ export async function leaveLeague(leagueId: string): Promise<{
   /** Early leave forfeit summary (when season still open) */
   forfeitMessage?: string;
   forfeitedCount?: number;
-  /** Early leave only — new Blue Falcon Count after this quit */
+  /** Only when penalties apply — new Blue Falcon Count after this quit */
   blueFalconCount?: number;
   /** Season already finished — no Blue Falcon / forfeit */
   seasonFinished?: boolean;
+  /** After opening week + not finished */
+  penaltiesApplied?: boolean;
 }> {
   const supabase = createClient();
   const { data: auth } = await supabase.auth.getUser();
@@ -392,19 +394,28 @@ export async function leaveLeague(leagueId: string): Promise<{
 
   const sportId = (league as { sport_id?: string | null } | null)?.sport_id;
 
-  // PRODUCT: leave before season ends → forfeit league-earned cheevos / hardware.
-  // Knocked out of brackets but still in the room keeps everything.
+  // PRODUCT: Blue Falcon + forfeit ONLY after opening week has started
+  // and before the season is finished. Preseason leave is clean.
   let forfeitMessage: string | undefined;
   let forfeitedCount = 0;
   let seasonFinished = false;
   let blueFalconCount: number | undefined;
+  /** True when leave should hit Blue Falcon + reward forfeit */
+  let penaltiesApply = false;
 
   try {
-    const { isLeagueSeasonFinishedForRewards, forfeitRewardsOnEarlyLeave } =
-      await import("./league-earned-ledger");
+    const {
+      isLeagueSeasonFinishedForRewards,
+      forfeitRewardsOnEarlyLeave,
+      leaveAppliesPenalties,
+    } = await import("./league-earned-ledger");
     seasonFinished = await isLeagueSeasonFinishedForRewards(leagueId, sportId);
+    penaltiesApply = leaveAppliesPenalties({
+      sportId,
+      seasonFinished,
+    });
 
-    if (!seasonFinished) {
+    if (penaltiesApply) {
       const result = await forfeitRewardsOnEarlyLeave({
         playerId: auth.user.id,
         leagueId,
@@ -418,7 +429,6 @@ export async function leaveLeague(leagueId: string): Promise<{
         const { incrementBlueFalconCount, getBlueFalconCount } = await import(
           "./blue-falcon"
         );
-        // Prefer RPC that bumps cloud + flags league
         const { data: authProf } = await supabase
           .from("profiles")
           .select("display_name")
@@ -468,13 +478,35 @@ export async function leaveLeague(leagueId: string): Promise<{
         }
       }
     } else {
-      // Still clear ledger if any; no forfeit
+      // Preseason or finished: clear ledger, no Blue Falcon
       const result = await forfeitRewardsOnEarlyLeave({
         playerId: auth.user.id,
         leagueId,
         sportId,
       });
       forfeitMessage = result.message;
+      // Still nudge host if someone left after open… only when penalties;
+      // preseason leave: optional open-room flag if mid-season style needed later
+      if (!seasonFinished) {
+        try {
+          const { data: authProf } = await supabase
+            .from("profiles")
+            .select("display_name")
+            .eq("id", auth.user.id)
+            .maybeSingle();
+          const { flagOpenRoomNudgeAfterLeave } = await import(
+            "./open-room-nudge"
+          );
+          await flagOpenRoomNudgeAfterLeave({
+            leagueId,
+            leftName:
+              (authProf as { display_name?: string } | null)?.display_name ||
+              "A player",
+          });
+        } catch {
+          /* ignore */
+        }
+      }
     }
   } catch {
     /* don't block leave if forfeit fails */
@@ -502,6 +534,7 @@ export async function leaveLeague(leagueId: string): Promise<{
     forfeitedCount,
     blueFalconCount,
     seasonFinished,
+    penaltiesApplied: penaltiesApply,
   };
 }
 
