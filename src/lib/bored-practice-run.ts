@@ -14,7 +14,6 @@ import {
 } from "@/lib/cloud";
 import { generateDemoSlate, randomizeDemoResults } from "@/lib/demo-slate";
 import { propFromPreset, rotatingPropPreset } from "@/lib/prop-presets";
-import { isPreseasonCommishToolsAllowed } from "@/lib/season-mode";
 import {
   getBoredPracticeState,
   isBoredPracticeScoringAllowed,
@@ -58,11 +57,13 @@ export async function startBoredPracticeWeek(): Promise<{
     };
   }
 
-  if (!isOps() || !isPreseasonCommishToolsAllowed()) {
+  // Host can always stand up a practice card until Week 0 kickoff
+  // (even after "doors open" Aug 23 — Week 0 is still Aug 29).
+  if (!isOps()) {
     return {
       ok: false,
       message:
-        "No card yet. Ask your host to tap I’m bored (or publish a demo week). You can re-do as many times as you want after that.",
+        "No practice card yet. Ask your host to tap “I’m bored. Fake week.” once — then the whole room can pick and re-do until Week 0.",
     };
   }
 
@@ -72,7 +73,12 @@ export async function startBoredPracticeWeek(): Promise<{
   const prop = propFromPreset(rotatingPropPreset(week, sid), week);
   const pub = await publishWeekCard({ weekNumber: week, games, prop });
   if (!pub.ok) {
-    return { ok: false, message: pub.error || "Couldn’t publish fake week." };
+    return {
+      ok: false,
+      message:
+        pub.error ||
+        "Couldn’t publish fake week. Open Host → Build Card → Publish demo week.",
+    };
   }
   await seedBotPicksForWeekInCloud(week).catch(() => undefined);
   await setLeagueActiveWeek(week).catch(() => undefined);
@@ -82,7 +88,7 @@ export async function startBoredPracticeWeek(): Promise<{
     ok: true,
     weekNumber: week,
     goToPicks: true,
-    message: "Fake week is live. Lock a card. Bots already did.",
+    message: "Fake week is live. Lock your card — bots already did. After you lock, we auto-score and say thanks.",
   };
 }
 

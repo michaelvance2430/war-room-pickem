@@ -56,9 +56,10 @@ export default function BoredLameSandboxCta() {
     try {
       const res = await startBoredPracticeWeek();
       setNote(res.message);
-      setAgain(true);
+      if (res.ok) setAgain(true);
       if (res.goToPicks) {
-        router.push("/picks");
+        // Brief beat so they see the status line
+        window.setTimeout(() => router.push("/picks"), 400);
       }
     } catch (e) {
       setNote(e instanceof Error ? e.message : "Couldn’t start practice.");

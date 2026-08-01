@@ -92,8 +92,8 @@ export function isBoredPracticeScoringAllowed(): boolean {
   if (!isBoredPracticeActive()) return false;
   if (!isBoredPracticeWindowOpen()) return false;
   if (!getSession()?.leagueId) return false;
-  // Preseason dry-run tools OR calendar still before Week 0
-  return isSandboxMode() || isPreseasonCommishToolsAllowed() || isOps();
+  // Until Week 0 kickoff — host always; sandbox too
+  return isOps() || isSandboxMode() || isPreseasonCommishToolsAllowed();
 }
 
 export function queueBoredPracticeDoneModal(runId?: number) {
