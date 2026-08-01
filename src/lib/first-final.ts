@@ -110,6 +110,21 @@ export function clearFirstFinalForLeague(leagueId: string): void {
   if (changed) writeAll(map);
 }
 
+/** One player left a league early — drop only their claims in that room. */
+export function clearFirstFinalForUserInLeague(
+  userId: string,
+  leagueId: string
+): void {
+  if (!userId || !leagueId) return;
+  const map = readAll();
+  const prev = map[userId] || [];
+  const next = prev.filter((c) => c.leagueId !== leagueId);
+  if (next.length === prev.length) return;
+  map[userId] = next;
+  writeAll(map);
+  syncPermanent(userId);
+}
+
 function syncPermanent(userId: string) {
   if (hasCleanFirstFinal(userId)) {
     grantPermanentBadgeId(userId, FIRST_FINAL_BADGE_ID);

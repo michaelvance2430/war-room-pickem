@@ -100,3 +100,31 @@ export function recordBadgeStackEvent(
 export function stackCelebrationKey(badgeId: string, count: number): string {
   return `${badgeId}#${count}`;
 }
+
+/**
+ * Drop stack events for a season year (early leave forfeit).
+ * Event keys are typically `2026:w3` or `2026:championship`.
+ */
+export function clearBadgeStackSeasonEvents(
+  playerId: string,
+  badgeId: string,
+  seasonYear: number
+): number {
+  if (!playerId || !badgeId || !canUse()) return 0;
+  const all = readAll();
+  const row = all[playerId]?.[badgeId];
+  if (!row?.events?.length) return 0;
+  const prefix = `${seasonYear}:`;
+  const kept = row.events.filter((e) => !e.startsWith(prefix));
+  const removed = row.events.length - kept.length;
+  if (!removed) return 0;
+  row.events = kept;
+  row.count = kept.length;
+  if (kept.length === 0) {
+    row.lastSeasonYear = null;
+    row.lastWeek = null;
+  }
+  all[playerId][badgeId] = row;
+  writeAll(all);
+  return removed;
+}

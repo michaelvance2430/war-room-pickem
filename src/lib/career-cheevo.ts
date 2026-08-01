@@ -93,6 +93,21 @@ export function bankCareerCheevos(
   if (newlyBanked.length) {
     map[playerId] = row;
     writeAll(map);
+    // Stamp league ledger so early leave can forfeit
+    try {
+      const {
+        activeLeagueIdForEarn,
+        recordLeagueEarnedBadge,
+      } = require("./league-earned-ledger") as typeof import("./league-earned-ledger");
+      const lid = activeLeagueIdForEarn();
+      if (lid) {
+        for (const id of newlyBanked) {
+          recordLeagueEarnedBadge(playerId, lid, id);
+        }
+      }
+    } catch {
+      /* ignore */
+    }
   }
 
   return { points: row.points, newlyBanked };
@@ -119,6 +134,16 @@ export function bankCareerBadgeId(
   row.points += pts;
   map[playerId] = row;
   writeAll(map);
+  try {
+    const {
+      activeLeagueIdForEarn,
+      recordLeagueEarnedBadge,
+    } = require("./league-earned-ledger") as typeof import("./league-earned-ledger");
+    const lid = activeLeagueIdForEarn();
+    if (lid) recordLeagueEarnedBadge(playerId, lid, badgeId);
+  } catch {
+    /* ignore */
+  }
   return { banked: true, careerPoints: row.points };
 }
 
