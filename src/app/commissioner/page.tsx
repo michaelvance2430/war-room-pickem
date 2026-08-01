@@ -4194,27 +4194,83 @@ function CommissionerPageInner() {
 
         {tab === "results" && (
           <div>
+            {/* Ship A: one primary host action */}
+            <div className="rounded-xl border-2 border-primary/50 bg-primary/10 p-4 mb-6 space-y-3">
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
+                Score this week
+              </p>
+              <p className="text-xs text-muted leading-relaxed">
+                {preseasonToolsOk
+                  ? "Practice: one tap randomizes covers + prop and scores the room."
+                  : "Live: pull finals from the score feed, settle what we can, then score the league. Fix any gaps below if needed."}
+              </p>
+              <button
+                type="button"
+                disabled={
+                  scoring ||
+                  syncingScores ||
+                  !publishedGames.length ||
+                  resultsLocked
+                }
+                onClick={() => {
+                  if (!publishedGames.length) {
+                    setScoreReport(
+                      "Publish a card first (Build Card), then come back here."
+                    );
+                    return;
+                  }
+                  if (resultsLocked) {
+                    setScoreReport(
+                      "This week is already scored. Unlock only for dry runs."
+                    );
+                    return;
+                  }
+                  if (preseasonToolsOk) {
+                    if (!requirePreseasonTools()) return;
+                    void randomizeAndScoreWeek();
+                    return;
+                  }
+                  // Live: sync + score when complete
+                  void syncFinalScores(true);
+                }}
+                className="w-full py-4 min-h-[56px] rounded-xl bg-primary text-black text-base font-extrabold disabled:opacity-50 shadow-[0_0_24px_rgba(34,197,94,0.2)]"
+              >
+                {scoring || syncingScores
+                  ? "Working…"
+                  : resultsLocked
+                    ? `${weekTitle(activeWeek)} already scored ✓`
+                    : preseasonToolsOk
+                      ? `Score ${weekTitle(activeWeek)} (practice)`
+                      : `Score ${weekTitle(activeWeek)}`}
+              </button>
+              {(scoreReport || syncReport) && (
+                <p className="text-xs text-muted whitespace-pre-wrap max-h-28 overflow-y-auto">
+                  {scoreReport || syncReport}
+                </p>
+              )}
+            </div>
+
             {firstTime && (
-              <div className="rounded-xl border-2 border-primary/45 bg-primary/10 p-4 mb-6 space-y-2">
-                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
-                  Practice path
-                </p>
-                <p className="text-sm text-foreground leading-relaxed">
-                  Demo card? Enter winners (or Sync if you used real odds), set
-                  the prop result, then{" "}
-                  <strong className="text-primary">
-                    Save Results &amp; Score League
-                  </strong>
-                  . That one click wakes standings and unlocks Advanced tools.
-                </p>
+              <div className="rounded-xl border border-primary/30 bg-primary/5 p-3 mb-6 text-xs text-muted leading-relaxed">
+                Use the green button above. That&apos;s the whole host job after
+                games finish.
               </div>
             )}
-            {/* Sandbox auto-score: one week … full season (pre-season only) */}
-            <div
-              className={`rounded-xl border p-5 mb-6 space-y-3 ${
+
+            {/* Advanced: sandbox auto-score + manual tools */}
+            <details
+              className={`rounded-xl border p-4 mb-6 ${
                 preseasonToolsOk
-                  ? "border-warning/50 bg-warning/10"
+                  ? "border-warning/50 bg-warning/5"
                   : "border-border bg-card"
+              }`}
+            >
+              <summary className="text-sm font-semibold cursor-pointer text-muted">
+                Advanced scoring tools
+              </summary>
+            <div
+              className={`mt-3 space-y-3 ${
+                preseasonToolsOk ? "" : ""
               }`}
             >
               <h2
@@ -4391,6 +4447,7 @@ function CommissionerPageInner() {
                 </p>
               )}
             </div>
+            </details>
 
             {/* Week picker for scoring */}
             <div className="rounded-xl border border-border bg-card p-5 mb-6">
