@@ -67,11 +67,24 @@ export default function BadgeUnlockModal() {
     function onFirstWeek() {
       void tryCelebrate();
     }
+    function onForce(e: Event) {
+      const ce = e as CustomEvent<{ badges?: BadgeStatus[] }>;
+      const badges = ce.detail?.badges;
+      if (!badges?.length) return;
+      setQueue((q) => {
+        const ids = new Set(q.map((b) => b.def.id));
+        const next = badges.filter((b) => !ids.has(b.def.id));
+        return next.length ? [...q, ...next] : q;
+      });
+      setChecked(true);
+    }
     window.addEventListener(EVENT_GAZETTE_DONE, onGazetteDone);
     window.addEventListener("warroom-first-week-progress", onFirstWeek);
+    window.addEventListener("warroom-badge-force-celebrate", onForce);
     return () => {
       window.removeEventListener(EVENT_GAZETTE_DONE, onGazetteDone);
       window.removeEventListener("warroom-first-week-progress", onFirstWeek);
+      window.removeEventListener("warroom-badge-force-celebrate", onForce);
     };
   }, [tryCelebrate]);
 

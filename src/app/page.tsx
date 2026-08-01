@@ -35,6 +35,7 @@ import { syncLeagueFromCloud } from "@/lib/league-sync";
 import { resolveHomeChrome } from "@/lib/sports/home-chrome";
 import HomeSportAtmosphere from "@/components/HomeSportAtmosphere";
 import HomeSportHeader from "@/components/HomeSportHeader";
+import LeagueMembershipCard from "@/components/LeagueMembershipCard";
 
 export default function Home() {
   const router = useRouter();
@@ -235,22 +236,18 @@ export default function Home() {
       <div className="min-h-screen flex items-center justify-center px-4 bg-background">
         <div className="max-w-md w-full rounded-xl border border-border bg-card p-6">
           <h1 className="text-xl font-bold mb-2">Choose a league</h1>
-          <p className="text-sm text-muted mb-4">
-            You belong to more than one. Pick which War Room to open.
+          <p className="text-sm text-muted mb-4 leading-relaxed">
+            You belong to more than one. Sport, your seat, open vs private, and
+            bots — pick the room you want.
           </p>
           <div className="space-y-2">
             {pickList.map((m) => (
-              <button
+              <LeagueMembershipCard
                 key={m.leagueId}
-                onClick={() => chooseLeague(m.leagueId)}
-                className="w-full text-left px-4 py-3 rounded-lg border border-border hover:border-primary transition"
-              >
-                <div className="font-medium">{m.leagueName}</div>
-                <div className="text-xs text-muted">
-                  Code {m.code}
-                  {m.role === "commissioner" ? " · Commissioner" : ""}
-                </div>
-              </button>
+                membership={m}
+                userId={getSession()?.playerId}
+                onSelect={() => void chooseLeague(m.leagueId)}
+              />
             ))}
           </div>
           <Link

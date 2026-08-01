@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 import { League, Session } from "@/lib/league";
+import { getSportPack } from "@/lib/sports/registry";
 
 const LEAGUE_KEY = "warroom-league";
 const SESSION_KEY = "warroom-session";
@@ -33,6 +34,12 @@ export interface LeagueMembership {
   seasonThemeId?: string;
   /** Sport pack id (cfb, soccer_wwc, …) */
   sportId?: string;
+  /** Open room lobby listing (public matchmaking) */
+  isOpen?: boolean;
+  /** Humans in the room (non-bot memberships) */
+  humanCount?: number;
+  /** Trial / padding bots in the room */
+  botCount?: number;
 }
 
 function canUseStorage() {
@@ -129,24 +136,34 @@ export async function fetchMyMemberships(): Promise<LeagueMembership[]> {
     const res = await supabase
       .from("memberships")
       .select(
-        "role, is_moderator, is_deputy, league_id, leagues(id, name, code, commissioner_id, created_at, cut_percent, regular_season_weeks, games_per_week, crystal_ball_enabled, home_tagline_id, home_tagline_custom, season_theme_id, sport_id)"
+        "role, is_moderator, is_deputy, league_id, leagues(id, name, code, commissioner_id, created_at, cut_percent, regular_season_weeks, games_per_week, crystal_ball_enabled, home_tagline_id, home_tagline_custom, season_theme_id, sport_id, is_open)"
       )
       .eq("user_id", userId);
-    if (res.error && /is_moderator|is_deputy|schema cache|column|season_theme|home_tagline|crystal_ball|sport_id/i.test(res.error.message || "")) {
+    if (res.error && /is_moderator|is_deputy|schema cache|column|season_theme|home_tagline|crystal_ball|sport_id|is_open/i.test(res.error.message || "")) {
       const res2 = await supabase
         .from("memberships")
         .select(
-          "role, league_id, leagues(id, name, code, commissioner_id, created_at, cut_percent, regular_season_weeks, games_per_week, sport_id)"
+          "role, is_moderator, is_deputy, league_id, leagues(id, name, code, commissioner_id, created_at, cut_percent, regular_season_weeks, games_per_week, crystal_ball_enabled, home_tagline_id, home_tagline_custom, season_theme_id, sport_id)"
         )
         .eq("user_id", userId);
-      if (res2.error && /sport_id/i.test(res2.error.message || "")) {
+      if (res2.error && /is_moderator|is_deputy|schema cache|column|season_theme|home_tagline|crystal_ball|sport_id/i.test(res2.error.message || "")) {
         const res3 = await supabase
           .from("memberships")
           .select(
-            "role, league_id, leagues(id, name, code, commissioner_id, created_at, cut_percent, regular_season_weeks, games_per_week)"
+            "role, league_id, leagues(id, name, code, commissioner_id, created_at, cut_percent, regular_season_weeks, games_per_week, sport_id)"
           )
           .eq("user_id", userId);
-        rows = (res3.data as Record<string, unknown>[] | null) || null;
+        if (res3.error && /sport_id/i.test(res3.error.message || "")) {
+          const res4 = await supabase
+            .from("memberships")
+            .select(
+              "role, league_id, leagues(id, name, code, commissioner_id, created_at, cut_percent, regular_season_weeks, games_per_week)"
+            )
+            .eq("user_id", userId);
+          rows = (res4.data as Record<string, unknown>[] | null) || null;
+        } else {
+          rows = (res3.data as Record<string, unknown>[] | null) || null;
+        }
       } else {
         rows = (res2.data as Record<string, unknown>[] | null) || null;
       }
@@ -180,8 +197,40 @@ export async function fetchMyMemberships(): Promise<LeagueMembership[]> {
       homeTaglineCustom: (L.home_tagline_custom as string) || "",
       seasonThemeId: (L.season_theme_id as string) || "default",
       sportId: (L.sport_id as string) || "cfb",
+      isOpen: L.is_open === true,
     });
   }
+
+  // Roster counts (humans vs bots) for clear multi-league scan
+  if (list.length) {
+    try {
+      const ids = list.map((m) => m.leagueId);
+      const { data: rosterRows, error: rosterErr } = await supabase
+        .from("memberships")
+        .select("league_id, is_bot")
+        .in("league_id", ids);
+      if (!rosterErr && rosterRows?.length) {
+        const tallies = new Map<string, { humans: number; bots: number }>();
+        for (const r of rosterRows as { league_id: string; is_bot?: boolean }[]) {
+          const lid = r.league_id;
+          const t = tallies.get(lid) || { humans: 0, bots: 0 };
+          if (r.is_bot) t.bots += 1;
+          else t.humans += 1;
+          tallies.set(lid, t);
+        }
+        for (const m of list) {
+          const t = tallies.get(m.leagueId);
+          if (t) {
+            m.humanCount = t.humans;
+            m.botCount = t.bots;
+          }
+        }
+      }
+    } catch {
+      /* counts optional */
+    }
+  }
+
   try {
     const { mergeSportsFromMemberships } = require("./sports-played") as typeof import("./sports-played");
     mergeSportsFromMemberships(userId, list);
@@ -189,6 +238,44 @@ export async function fetchMyMemberships(): Promise<LeagueMembership[]> {
     /* ignore */
   }
   return list;
+}
+
+/** Role label for multi-league UI */
+export function membershipRoleLabel(
+  m: LeagueMembership,
+  userId?: string | null
+): string {
+  const isCommish =
+    m.role === "commissioner" ||
+    (!!userId && m.commissionerId === userId);
+  if (isCommish) return "Commissioner";
+  if (m.isDeputy) return "Deputy";
+  if (m.isModerator) return "Moderator";
+  return "Player";
+}
+
+/** One-line scan summary under a league name */
+export function membershipScanLine(
+  m: LeagueMembership,
+  userId?: string | null
+): string {
+  const pack = getSportPack(m.sportId || "cfb");
+  const role = membershipRoleLabel(m, userId);
+  const room = m.isOpen ? "Open room" : "Private";
+  const bots =
+    typeof m.botCount === "number"
+      ? m.botCount > 0
+        ? `${m.botCount} bot${m.botCount === 1 ? "" : "s"}`
+        : "No bots"
+      : null;
+  const humans =
+    typeof m.humanCount === "number"
+      ? `${m.humanCount} player${m.humanCount === 1 ? "" : "s"}`
+      : null;
+  const seats = [humans, bots].filter(Boolean).join(" · ");
+  return [`${pack.emoji} ${pack.shortLabel}`, role, room, seats || null, m.code]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 export type RestoreResult =

@@ -62,6 +62,7 @@ import {
   getPlayerBirthday,
   setPlayerBirthday,
 } from "@/lib/easter-eggs";
+import LeagueMembershipCard from "@/components/LeagueMembershipCard";
 
 export default function AccountPage() {
   const router = useRouter();
@@ -765,7 +766,11 @@ export default function AccountPage() {
         </section>
 
         <section className="rounded-xl border border-border bg-card p-5 mb-6">
-          <h2 className="font-semibold mb-3">Your leagues</h2>
+          <h2 className="font-semibold mb-1">Your leagues</h2>
+          <p className="text-xs text-muted mb-3 leading-relaxed">
+            Sport, your seat (Commissioner / Player), open vs private, and
+            whether the room has bots — so multi-league switching is obvious.
+          </p>
           {loading && <p className="text-sm text-muted">Loading…</p>}
           {!loading && memberships.length === 0 && (
             <p className="text-sm text-muted mb-3">No leagues yet.</p>
@@ -777,23 +782,16 @@ export default function AccountPage() {
                 m.role === "commissioner" || m.commissionerId === userId;
               const busy = busyId === m.leagueId;
               return (
-                <div
+                <LeagueMembershipCard
                   key={m.leagueId}
-                  className={`rounded-lg border px-3 py-3 ${
-                    active ? "border-primary bg-primary/10" : "border-border"
-                  }`}
+                  membership={m}
+                  userId={userId}
+                  active={active}
                 >
-                  <div className="flex items-start justify-between gap-3 mb-2">
-                    <div>
-                      <div className="font-medium text-sm">{m.leagueName}</div>
-                      <div className="text-xs text-muted">
-                        {m.code}
-                        {isCommish ? " · Commissioner" : ""}
-                        {active ? " · Active" : ""}
-                      </div>
-                    </div>
+                  <div className="flex flex-wrap gap-2 mt-1">
                     {!active && (
                       <button
+                        type="button"
                         onClick={() => onSwitch(m.leagueId)}
                         disabled={busy}
                         className="text-xs px-3 py-1.5 rounded-lg bg-primary text-black font-medium disabled:opacity-50"
@@ -801,9 +799,8 @@ export default function AccountPage() {
                         Switch
                       </button>
                     )}
-                  </div>
-                  <div className="flex flex-wrap gap-2">
                     <button
+                      type="button"
                       onClick={() => onLeave(m.leagueId, m.leagueName)}
                       disabled={busy}
                       className="text-xs px-3 py-1.5 rounded-lg border border-border text-muted hover:text-foreground disabled:opacity-50"
@@ -812,6 +809,7 @@ export default function AccountPage() {
                     </button>
                     {isCommish && (
                       <button
+                        type="button"
                         onClick={() => onDelete(m.leagueId, m.leagueName)}
                         disabled={busy}
                         className="text-xs px-3 py-1.5 rounded-lg border border-danger text-danger hover:bg-danger/10 disabled:opacity-50"
@@ -820,7 +818,7 @@ export default function AccountPage() {
                       </button>
                     )}
                   </div>
-                </div>
+                </LeagueMembershipCard>
               );
             })}
           </div>

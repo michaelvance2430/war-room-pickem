@@ -64,6 +64,13 @@ export const EQUIPABLE_TITLE_CATALOG: EquipableTitleDef[] = [
     forceOnly: true,
   },
   {
+    badgeId: "neighborhood_creeper",
+    title: "Neighborhood Creeper",
+    vibe: "chaos",
+    blurb:
+      "Opened Deep stats & legacy math. Curtains twitching. Spreadsheet in the window.",
+  },
+  {
     badgeId: "championship_ring",
     title: "Ring Bearer",
     vibe: "brag",

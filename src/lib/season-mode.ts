@@ -21,6 +21,7 @@ import {
 export const SANDBOX_PROTECTED_BADGE_IDS = new Set([
   "the_commissioner", // app creator legendary
   "war_room_legend", // Kahmann / Bill ball Ben prior-season
+  "neighborhood_creeper", // discovery flex — stick in dry-run too
 ]);
 
 function currentSportId(): string | null {

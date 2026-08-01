@@ -494,7 +494,11 @@ export default function ProfilePage() {
 
         {/* 3. Resume — titles + years; spreadsheet folded */}
         {resume && (
-          <FootballResume resume={resume} playerId={player.id} />
+          <FootballResume
+            resume={resume}
+            playerId={player.id}
+            isSelf={isSelfProfile}
+          />
         )}
 
         {/* 4. Achievements — shelves, not X/Y hero numbers */}
