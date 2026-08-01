@@ -2181,6 +2181,8 @@ export async function fillLeagueWithBotsToCap(opts?: {
   added?: number;
   totalBots?: number;
   botsFilled?: number;
+  /** Crystal Ball / Super Bowl pride picks written for bots */
+  crystalFilled?: number;
   seatsBefore?: number;
   rosterBefore?: number;
   rosterAfter?: number;
@@ -2202,15 +2204,29 @@ export async function fillLeagueWithBotsToCap(opts?: {
   } catch {
     /* fall through */
   }
+
+  async function seedCrystalBallForBots(): Promise<number> {
+    try {
+      const { seedBotCrystalBallPicks } = await import("./crystal-ball");
+      const cb = await seedBotCrystalBallPicks();
+      if (cb.ok) return cb.inserted ?? 0;
+    } catch {
+      /* optional */
+    }
+    return 0;
+  }
+
   const roster = await loadLeagueRoster();
   const rosterBefore = roster.length;
   const seatsBefore = seatsRemaining(rosterBefore);
   if (seatsBefore <= 0) {
+    const crystalFilled = await seedCrystalBallForBots();
     return {
       ok: true,
       added: 0,
       totalBots: roster.filter((m) => m.isBot).length,
       botsFilled: 0,
+      crystalFilled,
       seatsBefore: 0,
       rosterBefore,
       rosterAfter: rosterBefore,
@@ -2230,11 +2246,13 @@ export async function fillLeagueWithBotsToCap(opts?: {
   want = Math.min(want, seatsBefore);
 
   if (want <= 0) {
+    const crystalFilled = await seedCrystalBallForBots();
     return {
       ok: true,
       added: 0,
       totalBots: roster.filter((m) => m.isBot).length,
       botsFilled: 0,
+      crystalFilled,
       seatsBefore,
       rosterBefore,
       rosterAfter: rosterBefore,
@@ -2258,12 +2276,16 @@ export async function fillLeagueWithBotsToCap(opts?: {
     }
   }
 
+  // Every trial bot gets a Crystal Ball / Super Bowl pride pick (if feature on)
+  const crystalFilled = await seedCrystalBallForBots();
+
   const added = seed.added ?? 0;
   return {
     ok: true,
     added,
     totalBots: seed.totalBots ?? 0,
     botsFilled,
+    crystalFilled,
     seatsBefore,
     rosterBefore,
     rosterAfter: rosterBefore + added,

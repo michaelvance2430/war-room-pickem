@@ -1250,6 +1250,11 @@ function CommissionerPageInner() {
     } else if (!hasCard) {
       parts.push("publish a week so bots get picks (or Fill bot picks)");
     }
+    if ((res.crystalFilled ?? 0) > 0) {
+      parts.push(
+        `🔮 ${res.crystalFilled} bot Crystal Ball / Super Bowl picks`
+      );
+    }
     try {
       const talk = await seedBotLockerTalk({
         weekNumber: activeWeek,
@@ -1264,6 +1269,32 @@ function CommissionerPageInner() {
       /* optional */
     }
     setBotReport(parts.join(" · ") + ".");
+  }
+
+  async function handleSeedBotCrystalBall() {
+    if (!requirePreseasonTools()) return;
+    setBotReport(null);
+    setBotBusy(true);
+    try {
+      const { seedBotCrystalBallPicks } = await import("@/lib/crystal-ball");
+      const res = await seedBotCrystalBallPicks({
+        sportId: leagueFootballSport(),
+      });
+      setBotBusy(false);
+      if (!res.ok) {
+        setBotReport(res.error || "Failed to seed bot Crystal Ball picks");
+        return;
+      }
+      setBotReport(
+        (res.inserted ?? 0) > 0
+          ? `🔮 ${res.inserted} bot(s) locked Crystal Ball / Super Bowl picks. Open Crystal Ball to see the board.`
+          : res.error ||
+              "No bot Crystal Ball picks written (pride pick off, or no bots)."
+      );
+    } catch (e) {
+      setBotBusy(false);
+      setBotReport(e instanceof Error ? e.message : "Failed");
+    }
   }
 
   async function handleSeedBotLockerTalk() {
@@ -2876,6 +2907,17 @@ function CommissionerPageInner() {
                 <button
                   type="button"
                   disabled={botBusy}
+                  onClick={() => void handleSeedBotCrystalBall()}
+                  className={`px-3 py-1.5 rounded-lg border border-violet-500/50 text-violet-200 text-xs font-medium hover:bg-violet-500/10 disabled:opacity-50 ${
+                    !preseasonToolsOk ? "opacity-45" : ""
+                  }`}
+                  title="Every trial bot locks a Crystal Ball / Super Bowl pride pick. Needs bot-crystal-ball.sql once."
+                >
+                  🔮 Bot Crystal Ball picks
+                </button>
+                <button
+                  type="button"
+                  disabled={botBusy}
                   onClick={() => void handleClearBots()}
                   className="px-3 py-1.5 rounded-lg border border-warning text-warning text-xs font-medium hover:bg-warning/10 disabled:opacity-50"
                 >
@@ -2890,8 +2932,10 @@ function CommissionerPageInner() {
                 ,{" "}
                 <code className="text-foreground">supabase/bot-chaos-sim.sql</code>
                 ,{" "}
-                <code className="text-foreground">supabase/bot-locker-sim.sql</code>{" "}
-                (locker shit-talk for badge tests),{" "}
+                <code className="text-foreground">supabase/bot-locker-sim.sql</code>
+                ,{" "}
+                <code className="text-foreground">supabase/bot-crystal-ball.sql</code>{" "}
+                (bots auto pride-pick for board smoke tests),{" "}
                 <code className="text-foreground">supabase/league-capacity-32.sql</code>
                 . Demo posts are for smoke only — Mon–Sun locker purge still applies.
               </p>

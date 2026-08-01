@@ -493,3 +493,119 @@ export async function crownNationalChampion(
   writeLocal(session.leagueId, local);
   return { ok: true, winners: winners.length };
 }
+
+/**
+ * Pre-season / sandbox: every trial bot gets a Crystal Ball (or Super Bowl) pick
+ * so the board fills and crown/display can be smoke-tested.
+ * Needs supabase/bot-crystal-ball.sql once.
+ */
+export async function seedBotCrystalBallPicks(opts?: {
+  sportId?: string | null;
+}): Promise<{
+  ok: boolean;
+  inserted?: number;
+  skipped?: number;
+  error?: string;
+}> {
+  const session = getSession();
+  const league = getLeague();
+  if (!session?.leagueId || !session.isCommissioner) {
+    return { ok: false, error: "Commissioner only" };
+  }
+
+  // Skip if pride pick is off for this league
+  if (league?.settings?.crystalBallEnabled === false) {
+    return { ok: true, inserted: 0, skipped: 0 };
+  }
+
+  const sport =
+    opts?.sportId ?? league?.sportId ?? "cfb";
+  const teams = crystalBallTeams(sport);
+  if (!teams.length) {
+    return { ok: false, error: "No teams available for pride pick" };
+  }
+
+  let bots: { userId: string; name: string }[] = [];
+  try {
+    const { loadLeagueRoster } = await import("./cloud");
+    const roster = await loadLeagueRoster();
+    bots = roster
+      .filter((m) => m.isBot)
+      .map((m) => ({ userId: m.userId, name: m.name }));
+  } catch {
+    return { ok: false, error: "Could not load roster" };
+  }
+
+  if (!bots.length) {
+    return {
+      ok: false,
+      error: "No trial bots yet — pad bots first.",
+    };
+  }
+
+  // Deterministic spread of popular + random teams so the board isn't all chalk
+  const picks = bots.map((b, i) => {
+    const idx =
+      (b.userId.charCodeAt(0) + b.userId.charCodeAt(1) * 17 + i * 3) %
+      teams.length;
+    return {
+      user_id: b.userId,
+      team_name: teams[idx].name,
+    };
+  });
+
+  try {
+    const supabase = createClient();
+    const { data, error } = await supabase.rpc("seed_bot_crystal_ball_picks", {
+      p_league_id: session.leagueId,
+      p_picks: picks,
+    });
+    if (error) {
+      const msg = error.message || "RPC failed";
+      if (/does not exist|schema cache|seed_bot_crystal/i.test(msg)) {
+        return {
+          ok: false,
+          error:
+            "Run supabase/bot-crystal-ball.sql in Supabase SQL Editor once.",
+        };
+      }
+      // Fallback: local picks for bots (device-only board)
+      const local = readLocal(session.leagueId);
+      for (let i = 0; i < bots.length; i++) {
+        const b = bots[i];
+        const team = picks[i].team_name;
+        local.picks[b.userId] = {
+          teamName: team,
+          pickedAt: new Date().toISOString(),
+          name: b.name,
+        };
+      }
+      writeLocal(session.leagueId, local);
+      return {
+        ok: true,
+        inserted: bots.length,
+        skipped: 0,
+        error: "Cloud RPC missing — bot picks saved on this device only.",
+      };
+    }
+    const row = (data || {}) as {
+      ok?: boolean;
+      inserted?: number;
+      skipped?: number;
+      error?: string;
+    };
+    if (row.ok === false) {
+      return { ok: false, error: row.error || "seed failed" };
+    }
+    return {
+      ok: true,
+      inserted: row.inserted ?? picks.length,
+      skipped: row.skipped ?? 0,
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "Failed to seed bot crystal ball",
+    };
+  }
+}
