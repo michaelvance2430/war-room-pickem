@@ -113,13 +113,71 @@ export type InviteFlavor =
   | "genx"
   | "xennial"
   | "millennial"
-  | "chaos";
+  | "chaos"
+  | "primetime"
+  | "tailgate"
+  | "redzone";
+
+/**
+ * Resolve CFB vs NFL for invites — never guess wrong.
+ * Prefer explicit sportId → active league → localStorage league row.
+ * Defaults to cfb only as last resort.
+ */
+export function resolveInviteSportId(
+  explicit?: string | null
+): "cfb" | "nfl" {
+  const norm = (s: string | null | undefined): "cfb" | "nfl" | null => {
+    const x = (s || "").toLowerCase().trim();
+    if (!x) return null;
+    if (x === "nfl" || x === "pro" || x === "pro_football") return "nfl";
+    if (
+      x === "cfb" ||
+      x === "ncaaf" ||
+      x === "college" ||
+      x === "college_football"
+    )
+      return "cfb";
+    // Other packs (wwc, etc.) fall through — treat as non-NFL
+    if (x.includes("nfl")) return "nfl";
+    if (x.includes("cfb") || x.includes("ncaa")) return "cfb";
+    return null;
+  };
+
+  const fromArg = norm(explicit);
+  if (fromArg) return fromArg;
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getLeague } = require("./league") as typeof import("./league");
+    const fromLeague = norm(getLeague()?.sportId);
+    if (fromLeague) return fromLeague;
+  } catch {
+    /* ignore */
+  }
+
+  if (typeof window !== "undefined") {
+    try {
+      const raw = localStorage.getItem("warroom-league");
+      if (raw) {
+        const j = JSON.parse(raw) as { sportId?: string };
+        const fromLs = norm(j?.sportId);
+        if (fromLs) return fromLs;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  return "cfb";
+}
 
 /**
  * Entertaining invite copy for texts/iMessage/Discord — every generation in 2026.
  * Deep link first so one tap opens join with code filled in.
  * Random flavor when flavor is omitted or "random" (fresh every share).
  * ANY league member can send these — not just the commissioner.
+ *
+ * CRITICAL: sportId must match the room. NFL never gets CFB copy (and reverse).
  */
 export function buildInviteShareText(opts: {
   leagueName: string;
@@ -137,23 +195,9 @@ export function buildInviteShareText(opts: {
   const joinUrl = buildInviteJoinUrl({ code, appUrl: opts.appUrl });
   const linkBlock = joinUrl ? `👉 ${joinUrl}` : code ? `Code: ${code}` : "";
   const codeLine = code ? `(Code if needed: ${code})` : "";
-  let sportId = opts.sportId;
-  if (!sportId) {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { getLeague } = require("./league") as typeof import("./league");
-      sportId = getLeague()?.sportId;
-    } catch {
-      sportId = "cfb";
-    }
-  }
+  const sportId = resolveInviteSportId(opts.sportId);
   const nfl = sportId === "nfl";
   // Always explicit — dual-sport invites must not be ambiguous
-  const sportLabel = nfl ? "NFL" : "CFB";
-  const sportFull = nfl
-    ? "NFL (pro football)"
-    : "CFB (college football)";
-  const sportDay = nfl ? "Sundays" : "Saturdays";
   const sportBanner = nfl
     ? "🏈 LEAGUE TYPE: NFL — pro football pick'em"
     : "🏟️ LEAGUE TYPE: CFB — college football pick'em";
@@ -167,11 +211,28 @@ export function buildInviteShareText(opts: {
     "xennial",
     "millennial",
     "chaos",
+    "primetime",
+    "tailgate",
+    "redzone",
   ];
   let flavor: InviteFlavor =
     opts.flavor && opts.flavor !== "random" ? opts.flavor : "warroom";
   if (!opts.flavor || opts.flavor === "random") {
-    flavor = flavors[Math.floor(Math.random() * flavors.length)];
+    // NFL: weight the new Sunday-flavored templates a bit more often
+    if (nfl) {
+      const nflWeighted: InviteFlavor[] = [
+        ...flavors,
+        "primetime",
+        "tailgate",
+        "redzone",
+        "chaos",
+        "groupchat",
+      ];
+      flavor =
+        nflWeighted[Math.floor(Math.random() * nflWeighted.length)];
+    } else {
+      flavor = flavors[Math.floor(Math.random() * flavors.length)];
+    }
   }
 
   // Keep blank lines (""): they make SMS/iMessage readable. Only drop null.
@@ -322,6 +383,52 @@ export function buildInviteShareText(opts: {
       "If you don't join we're putting you on the milk carton in next week's headlines.",
       "THIS IS NOT A DRILL. (ok it is a little bit of a drill. still join.)",
     ],
+    primetime: [
+      sportBanner,
+      "📺 PRIMETIME PICK'EM (still CFB)",
+      "",
+      who
+        ? `${who} wants you in ${name} for college Saturdays.`
+        : `${name} is live — college Saturdays only.`,
+      "",
+      "CFB (college football) — not the NFL. Night games. Big brands. Bigger regrets.",
+      "5 confidence picks · Best Bet · prop · Gazette headlines.",
+      "",
+      linkBlock,
+      codeLine,
+      "",
+      "Tap in before kickoff. Campus energy only.",
+    ],
+    tailgate: [
+      sportBanner,
+      "🌭 TAILGATE ENERGY — CFB ONLY",
+      "",
+      who
+        ? `${who} is grilling spots in ${name}.`
+        : `There's a seat in ${name}. Bring opinions.`,
+      "",
+      "College football pick'em (CFB, not NFL). Confidence ranks. Toilet Bowl for the cursed half.",
+      "No fantasy draft. Just Saturdays and the group chat.",
+      "",
+      linkBlock,
+      codeLine,
+      "",
+      "Join. Trash talk. Repeat every Saturday.",
+    ],
+    redzone: [
+      sportBanner,
+      "🚨 RED ZONE ALERT — CFB ROOM",
+      "",
+      `${name} is taking college football seriously (well… sort of).`,
+      who ? `From: ${who}` : null,
+      "",
+      "This is CFB pick'em — campus, not the NFL. One card a week. Standings that keep receipts.",
+      "",
+      linkBlock,
+      codeLine,
+      "",
+      "You're either in or you're in the milk carton. CFB only.",
+    ],
   };
 
   const byNfl: Record<InviteFlavor, (string | null)[]> = {
@@ -470,17 +577,82 @@ export function buildInviteShareText(opts: {
       "If you don't join we're putting you on the inactive list in next week's headlines.",
       "THIS IS NOT A DRILL. (ok it is a little bit of a drill. still join.)",
     ],
+    primetime: [
+      sportBanner,
+      "📺 SUNDAY / MNF / TNF ENERGY",
+      "",
+      who
+        ? `${who} locked you into ${name} for the NFL season.`
+        : `${name} is an NFL pick'em. Pro football only.`,
+      "",
+      "NFL — not college. Late windows. Flex scheduling. Zero campus.",
+      "5 confidence picks · Best Bet · prop · standings that live in the chat all week.",
+      "",
+      linkBlock,
+      codeLine,
+      "",
+      "Tap in. Don't ghost Thursday Night. Don't ghost Sunday. Don't ghost MNF.",
+    ],
+    tailgate: [
+      sportBanner,
+      "🌭 NFL TAILGATE — PRO FOOTBALL ONLY",
+      "",
+      who
+        ? `${who} saved you a spot in ${name}.`
+        : `Open seat in ${name}. NFL only.`,
+      "",
+      "Pro football pick'em (NFL, not CFB). Confidence ranks. Toilet Bowl for the cursed half.",
+      "No fantasy draft. Just Sundays, late games, and the group chat.",
+      "",
+      linkBlock,
+      codeLine,
+      "",
+      "Join once. Show up every Sunday. Roast responsibly.",
+    ],
+    redzone: [
+      sportBanner,
+      "🚨 RED ZONE ALERT — NFL ROOM",
+      "",
+      `${name} needs one more body in the NFL War Room.`,
+      who ? `Commissioner / blame: ${who}` : null,
+      "",
+      "This is NFL pick'em — pro football, NOT college. One card a week. Real standings. Real receipts.",
+      "Championship or Toilet Bowl. Both are content.",
+      "",
+      linkBlock,
+      codeLine,
+      "",
+      "You're either in or you're on the inactive list. NFL only.",
+    ],
   };
 
   const by = nfl ? byNfl : byCfb;
+  const lines = by[flavor] || by.warroom;
+  let text = lines.filter((line) => line != null).join("\n");
 
-  void sportLabel;
-  void sportFull;
-  void sportDay;
+  // Belt-and-suspenders: never ship the wrong sport banner / copy
+  if (nfl) {
+    if (!/LEAGUE TYPE:\s*NFL/i.test(text)) {
+      text = `${sportBanner}\n\n${text}`;
+    }
+    // If CFB leaked into an NFL message, rebuild with warroom NFL
+    if (/\bCFB\b|college football|Saturdays only/i.test(text) && !/not CFB|not college|NOT the CFB|not campus/i.test(text)) {
+      text = (byNfl.warroom || lines)
+        .filter((line) => line != null)
+        .join("\n");
+    }
+  } else {
+    if (!/LEAGUE TYPE:\s*CFB/i.test(text)) {
+      text = `${sportBanner}\n\n${text}`;
+    }
+  }
 
-  return by[flavor]
-    .filter((line) => line != null)
-    .join("\n");
+  // Always append join URL once more if somehow missing (iMessage truncations)
+  if (joinUrl && !text.includes(joinUrl)) {
+    text = `${text}\n\n${joinUrl}`;
+  }
+
+  return text;
 }
 
 /** Share-sheet title — always names the sport. */
@@ -488,16 +660,7 @@ export function buildInviteShareTitle(opts: {
   leagueName: string;
   sportId?: string | null;
 }): string {
-  let sportId = opts.sportId;
-  if (!sportId) {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { getLeague } = require("./league") as typeof import("./league");
-      sportId = getLeague()?.sportId;
-    } catch {
-      sportId = "cfb";
-    }
-  }
+  const sportId = resolveInviteSportId(opts.sportId);
   const sport = sportId === "nfl" ? "NFL" : "CFB";
   const name = (opts.leagueName || "War Room").trim();
   return `War Room ${sport}: ${name}`;
@@ -549,8 +712,10 @@ export async function shareLeagueInvite(opts: {
   flavor?: InviteFlavor | "random";
   sportId?: string | null;
 }): Promise<"shared" | "copied" | "failed"> {
+  const sportId = resolveInviteSportId(opts.sportId);
   const text = buildInviteShareText({
     ...opts,
+    sportId,
     flavor: opts.flavor ?? "random",
   });
   const url = buildInviteJoinUrl(opts);
@@ -559,7 +724,7 @@ export async function shareLeagueInvite(opts: {
       await navigator.share({
         title: buildInviteShareTitle({
           leagueName: opts.leagueName,
-          sportId: opts.sportId,
+          sportId,
         }),
         text,
         url: url || undefined,

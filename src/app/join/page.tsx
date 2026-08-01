@@ -511,6 +511,21 @@ function JoinPageInner() {
             leagueName={leagueLabel}
             code={createdCode}
             leagueId={leagueId}
+            sportId={
+              // Prefer what we just wrote to session storage
+              (() => {
+                try {
+                  const raw = localStorage.getItem("warroom-league");
+                  if (raw) {
+                    const j = JSON.parse(raw) as { sportId?: string };
+                    if (j.sportId) return j.sportId;
+                  }
+                } catch {
+                  /* ignore */
+                }
+                return undefined;
+              })()
+            }
             className="mb-4 !border-primary/30"
           />
 
