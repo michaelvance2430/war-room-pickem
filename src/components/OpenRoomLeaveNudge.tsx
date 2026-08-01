@@ -92,8 +92,9 @@ export default function OpenRoomLeaveNudge() {
         Want to set the league to{" "}
         <strong className="text-foreground">open</strong> so new players can
         find you? Late joiners start at{" "}
-        <strong className="text-foreground">0 points</strong> and still enjoy
-        the ride — empty seats only, nobody loses standings.
+        <strong className="text-foreground">0 season points</strong> (no
+        catch-up) but can still earn cheevos and trophies going forward — empty
+        seats only, nobody loses standings.
       </p>
       <div className="flex flex-col sm:flex-row gap-2">
         <button
