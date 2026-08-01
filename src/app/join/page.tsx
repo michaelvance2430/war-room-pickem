@@ -119,6 +119,8 @@ function JoinPageInner() {
     const supabase = createClient();
     const newCode = generateCode();
     const pack = getSportPack(sportId);
+    // UI selection is source of truth — never let a DB default flip NFL → CFB
+    const selectedSportId = sportId;
     try {
       await supabase.from("profiles").upsert({
         id: userId,
@@ -130,13 +132,12 @@ function JoinPageInner() {
         code: newCode,
         commissioner_id: userId,
       };
-      // Include sport when column exists (run supabase/sport-id.sql on dev DB)
       // Crystal Ball is CFB pride pick — default off for NFL
       const withSport: Record<string, unknown> = {
         ...baseRow,
-        sport_id: sportId,
+        sport_id: selectedSportId,
         sport_settings: {},
-        crystal_ball_enabled: sportId === "cfb",
+        crystal_ball_enabled: selectedSportId === "cfb",
       };
       if (listAsOpen) {
         withSport.is_open = true;
@@ -156,25 +157,21 @@ function JoinPageInner() {
         leagueError = res.error;
       }
 
-      // Column missing — strip open-room and/or sport fields and retry
+      // Retry without open-room columns if those fail (keep sport_id)
       if (
         leagueError &&
-        /is_open|open_listed|sport_id|sport_settings|column|schema cache|PGRST/i.test(
+        /is_open|open_listed|column|schema cache|PGRST/i.test(
           leagueError.message || ""
         )
       ) {
-        const stripped = { ...withSport };
-        delete stripped.is_open;
-        delete stripped.open_listed_at;
-        let res = await supabase.from("leagues").insert(stripped).select().single();
-        if (
-          res.error &&
-          /sport_id|sport_settings|column|schema cache|PGRST/i.test(
-            res.error.message || ""
-          )
-        ) {
-          res = await supabase.from("leagues").insert(baseRow).select().single();
-        }
+        const noOpen = { ...withSport };
+        delete noOpen.is_open;
+        delete noOpen.open_listed_at;
+        const res = await supabase
+          .from("leagues")
+          .insert(noOpen)
+          .select()
+          .single();
         league = res.data as Record<string, unknown> | null;
         leagueError = res.error;
         if (listAsOpen && league?.id && !leagueError) {
@@ -187,11 +184,66 @@ function JoinPageInner() {
         }
       }
 
+      // Last resort: insert bare row, then force sport_id update
+      if (
+        leagueError &&
+        /sport_id|sport_settings|column|schema cache|PGRST/i.test(
+          leagueError.message || ""
+        )
+      ) {
+        const res = await supabase
+          .from("leagues")
+          .insert(baseRow)
+          .select()
+          .single();
+        league = res.data as Record<string, unknown> | null;
+        leagueError = res.error;
+        if (league?.id && !leagueError) {
+          const { error: sportUpErr } = await supabase
+            .from("leagues")
+            .update({
+              sport_id: selectedSportId,
+              sport_settings: {},
+              crystal_ball_enabled: selectedSportId === "cfb",
+            })
+            .eq("id", league.id as string);
+          if (!sportUpErr) {
+            league = {
+              ...league,
+              sport_id: selectedSportId,
+              crystal_ball_enabled: selectedSportId === "cfb",
+            };
+          }
+          if (listAsOpen) {
+            try {
+              const { setLeagueOpenListing } = await import("@/lib/open-room");
+              await setLeagueOpenListing(league.id as string, true);
+            } catch {
+              /* optional */
+            }
+          }
+        }
+      }
+
       if (leagueError || !league) {
         throw new Error(leagueError?.message || "Could not create league");
       }
 
       const leagueId = league.id as string;
+
+      // Always re-assert sport on the row (covers silent defaults / partial inserts)
+      try {
+        await supabase
+          .from("leagues")
+          .update({
+            sport_id: selectedSportId,
+            crystal_ball_enabled: selectedSportId === "cfb",
+          })
+          .eq("id", leagueId);
+      } catch {
+        /* column may not exist on ancient DBs */
+      }
+
       const { error: memError } = await supabase.from("memberships").insert({
         league_id: leagueId,
         user_id: userId,
@@ -214,8 +266,8 @@ function JoinPageInner() {
           leagueId,
         })
       );
-      const createdSportId =
-        (league.sport_id as string) || sportId || "cfb";
+      // Prefer the sport the host picked — not a CFB DB default
+      const createdSportId = selectedSportId;
       localStorage.setItem(
         "warroom-league",
         JSON.stringify({
@@ -230,7 +282,6 @@ function JoinPageInner() {
             regularSeasonWeeks: pack.defaultSeasonWeeks,
             gamesPerWeek:
               (league.games_per_week as number) ?? pack.defaultGamesPerWeek,
-            // Crystal Ball = CFB national champ pride pick; off for NFL by default
             crystalBallEnabled: createdSportId === "cfb",
             homeTaglineId: "good-teams",
             homeTaglineCustom: "",
@@ -238,7 +289,6 @@ function JoinPageInner() {
           },
         })
       );
-      // Persist CB default to cloud when column exists
       try {
         if (createdSportId === "nfl") {
           const { saveLeagueToCloud } = await import("@/lib/league-sync");
@@ -300,7 +350,10 @@ function JoinPageInner() {
       }
 
       const joinedSportId =
-        (league as { sport_id?: string }).sport_id || "cfb";
+        (league as { sport_id?: string }).sport_id ||
+        (league as { sportId?: string }).sportId ||
+        "cfb";
+      const joinPack = getSportPack(joinedSportId);
 
       if (!existingMem) {
         const { count, error: countErr } = await supabase
@@ -379,9 +432,14 @@ function JoinPageInner() {
           sportId: joinedSportId,
           settings: {
             cutPercent: league.cut_percent ?? 50,
-            regularSeasonWeeks: 18, // fixed CFB calendar (app weeks 0–18)
-            gamesPerWeek: league.games_per_week ?? 5,
-            crystalBallEnabled: league.crystal_ball_enabled !== false,
+            regularSeasonWeeks:
+              league.regular_season_weeks ?? joinPack.defaultSeasonWeeks,
+            gamesPerWeek:
+              league.games_per_week ?? joinPack.defaultGamesPerWeek,
+            crystalBallEnabled:
+              joinedSportId === "nfl"
+                ? false
+                : league.crystal_ball_enabled !== false,
             homeTaglineId: league.home_tagline_id || "good-teams",
             homeTaglineCustom: league.home_tagline_custom || "",
             seasonThemeId,
@@ -575,7 +633,13 @@ function JoinPageInner() {
                       type="button"
                       disabled={!live}
                       onClick={() => {
-                        if (live) setSportId(s.id as SportId);
+                        if (!live) return;
+                        const next = s.id as SportId;
+                        setSportId(next);
+                        // Paint NFL/CFB skin immediately so create flow feels right
+                        void import("@/lib/sports/sport-theme").then(
+                          ({ applySportTheme }) => applySportTheme(next)
+                        );
                       }}
                       className={`w-full text-left rounded-xl border px-3 py-3 transition touch-manipulation ${
                         selected && isWwc
