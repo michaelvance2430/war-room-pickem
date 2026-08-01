@@ -864,12 +864,10 @@ function JoinPageInner() {
               <p className="font-semibold text-foreground text-xs mb-0.5">
                 Season already rolling?
               </p>
-              You can still join. You start at{" "}
-              <strong className="text-foreground">0 season points</strong> — no
-              catch-up for weeks you missed. From here on you still pick, chase{" "}
-              <strong className="text-foreground">cheevos</strong>, and can win{" "}
-              <strong className="text-foreground">trophies</strong> like anyone
-              else. Empty seats only.
+              You start at{" "}
+              <strong className="text-foreground">0 points</strong> for weeks
+              you missed — still pick, earn cheevos, and chase hardware from
+              here on.
             </div>
             <input
               value={code}

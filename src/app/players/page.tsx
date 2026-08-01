@@ -396,7 +396,7 @@ export default function PlayersPage() {
                                 title={
                                   p.lastSeenAt
                                     ? `Last in: ${new Date(p.lastSeenAt).toLocaleString()}`
-                                    : "No last-seen yet (open app after SQL)"
+                                    : "Not seen in the app yet"
                                 }
                               >
                                 {formatLastSeen(p.lastSeenAt)}

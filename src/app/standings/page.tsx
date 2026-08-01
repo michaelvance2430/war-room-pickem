@@ -271,7 +271,7 @@ export default function StandingsPage() {
                           title={
                             player.lastSeenAt
                               ? `Last in: ${new Date(player.lastSeenAt).toLocaleString()}`
-                              : "No last-seen yet"
+                              : "Not seen in the app yet"
                           }
                         >
                           {formatLastSeen(player.lastSeenAt)}
@@ -303,7 +303,7 @@ export default function StandingsPage() {
                       title={
                         player.lastSeenAt
                           ? `Last in: ${new Date(player.lastSeenAt).toLocaleString()}`
-                          : "No last-seen yet — open app after last_seen SQL"
+                          : "Not seen in the app yet"
                       }
                     >
                       {formatLastSeen(player.lastSeenAt)}

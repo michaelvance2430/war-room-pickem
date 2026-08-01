@@ -330,19 +330,14 @@ export default function LockerRoomPage() {
                 {" · "}
               </>
             ) : null}
-            Drop hot takes ({LOCKER_MAX_CHARS} char max). Hit{" "}
-            <strong className="text-foreground">+</strong> on a post to react —
-            stamps stack bottom-left. Type{" "}
-            <strong className="text-foreground">@name</strong> to tag someone in
-            the league.{" "}
-            <strong className="text-foreground">This week only</strong>
+            Talk shit
             {weekLabel ? (
               <>
                 {" "}
-                <span className="text-foreground/80">({weekLabel})</span>
+                · <span className="text-foreground/80">{weekLabel}</span>
               </>
             ) : null}
-            — board clears every Monday ET. Staff can delete posts and mute.
+            . Board clears Monday ET.
             {staff && (
               <>
                 {" "}
@@ -355,6 +350,18 @@ export default function LockerRoomPage() {
               </>
             )}
           </p>
+          <details className="mt-2 text-xs text-muted">
+            <summary className="cursor-pointer select-none text-primary/90 font-semibold hover:text-primary">
+              How it works
+            </summary>
+            <p className="mt-1.5 leading-relaxed">
+              {LOCKER_MAX_CHARS} char max ·{" "}
+              <strong className="text-foreground">+</strong> on a post to react
+              (stamps stack bottom-left) · type{" "}
+              <strong className="text-foreground">@name</strong> to tag ·{" "}
+              this week only · staff can delete or mute.
+            </p>
+          </details>
         </div>
 
         {error && (

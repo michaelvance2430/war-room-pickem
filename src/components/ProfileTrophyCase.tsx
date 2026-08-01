@@ -182,7 +182,6 @@ export default function ProfileTrophyCase({
   // Anyone can flex hardware (yours or a buddy's roast share)
   const canShare = true;
   void isSelf;
-  void hasAny;
   const sportId = getLeague()?.sportId || null;
 
   function handleTrophyTap(itemId: string) {
@@ -209,8 +208,15 @@ export default function ProfileTrophyCase({
         <p className="text-xs text-muted mt-0.5">
           Championship &amp; Toilet hardware, Village Nerd, and division titles —
           career flex for {playerName.split(/\s+/)[0] || "this player"}.
-          Won something? Hit <strong className="text-foreground">Share</strong>{" "}
-          for a custom IG/FB graphic.
+          {hasAny ? (
+            <>
+              {" "}
+              Hit <strong className="text-foreground">Share</strong> on a
+              plaque for a custom IG/FB graphic.
+            </>
+          ) : (
+            <> Empty shelves fill when they win hardware.</>
+          )}
         </p>
       </div>
 

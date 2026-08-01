@@ -355,7 +355,7 @@ export default function Nav() {
           ? [
               {
                 href: "/commissioner",
-                label: isCommish ? "Run the Room" : "Ops",
+                label: isCommish ? "Host" : "Ops",
                 className: "text-primary",
               } as NavLink,
             ]

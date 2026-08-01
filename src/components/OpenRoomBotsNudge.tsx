@@ -48,13 +48,11 @@ export default function OpenRoomBotsNudge({ open, onClose }: Props) {
               Round out your numbers with bots?
             </h2>
             <p className="text-sm text-muted mt-2 leading-relaxed">
-              Real people join first. If you want a fuller room, one question
-              on Run the Room:{" "}
-              <strong className="text-foreground">
-                Fill empty seats with bots?
-              </strong>{" "}
-              Empty seats only — never replaces humans. Once the season starts,
-              bots stay (fairness).
+              Real people join first. Want a fuller room? In{" "}
+              <strong className="text-foreground">Host</strong> settings: fill
+              empty seats with bots. They take real standings seats until you
+              remove them (pre-lock only). Once the season starts, bots stay
+              (fairness). Never replaces humans.
             </p>
           </div>
 

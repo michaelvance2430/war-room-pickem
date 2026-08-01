@@ -193,6 +193,8 @@ function CommissionerPageInner() {
   const [firstTime, setFirstTime] = useState(false);
   const [showFirstWizard, setShowFirstWizard] = useState(true);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  /** Full week chip strip is dense — collapsed by default */
+  const [showAllWeekChips, setShowAllWeekChips] = useState(false);
   const [league, setLeague] = useState<League | null>(null);
   const [leagueNameEdit, setLeagueNameEdit] = useState("");
   const [cutPercent, setCutPercent] = useState(50);
@@ -2289,21 +2291,21 @@ function CommissionerPageInner() {
           <h1 className="text-2xl font-bold">
             {isOwner
               ? firstTime
-                ? "Your first week as host"
-                : "Commissioner Tools"
+                ? "Host · first hour"
+                : "Host"
               : "Deputy Ops"}
           </h1>
           <p className="text-sm text-muted">
             {isOwner
               ? firstTime
                 ? "Invite → publish a card (demo is fine) → score once. Advanced tools unlock after."
-                : "Settings • Build card • Who\u2019s in • Results"
-              : "Build card • Who\u2019s in • Results (settings stay with the commissioner)"}
+                : "Settings · Build card · Who\u2019s in · Results"
+              : "Build card · Who\u2019s in · Results (settings stay with the host)"}
           </p>
           {(firstTime || simpleHost) && isOwner && (
             <div className="mt-3 rounded-xl border-2 border-primary/50 bg-primary/10 px-4 py-3">
               <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-1">
-                Simple host
+                Host · first hour
               </p>
               <p className="text-sm text-foreground leading-relaxed">
                 Three jobs:{" "}
@@ -3013,8 +3015,9 @@ function CommissionerPageInner() {
                     </button>
                   )}
                   <p className="text-[11px] text-muted leading-relaxed">
-                    Before the season starts you can change your mind. After
-                    kickoff (or the first scored week), filler bots stay.
+                    Bots take real standings seats until you remove them
+                    (pre-lock only). After kickoff or the first scored week,
+                    filler bots stay for fairness.
                   </p>
                 </div>
               )}
@@ -3466,8 +3469,19 @@ function CommissionerPageInner() {
                 </span>
               </p>
               <div className="flex flex-wrap gap-2">
-                {listSeasonWeekNumbers(league?.sportId).map(
-                  (w) => {
+                {(showAllWeekChips
+                  ? listSeasonWeekNumbers(league?.sportId)
+                  : [
+                      ...new Set(
+                        listSeasonWeekNumbers(league?.sportId).filter(
+                          (w) =>
+                            w === activeWeek ||
+                            w === activeWeek - 1 ||
+                            w === activeWeek + 1
+                        )
+                      ),
+                    ].sort((a, b) => a - b)
+                ).map((w) => {
                     const scored = scoredWeeks.includes(w);
                     const nfl = league?.sportId === "nfl";
                     const hint = nfl
@@ -3510,8 +3524,14 @@ function CommissionerPageInner() {
                         {scored ? " · done" : ""}
                       </button>
                     );
-                  }
-                )}
+                  })}
+                <button
+                  type="button"
+                  onClick={() => setShowAllWeekChips((v) => !v)}
+                  className="px-3 py-1.5 rounded-full text-xs font-semibold border border-border text-muted hover:text-foreground"
+                >
+                  {showAllWeekChips ? "Fewer weeks" : "All weeks"}
+                </button>
               </div>
             </div>
 
