@@ -1422,6 +1422,25 @@ html[data-season-theme="newyear"] body::before {
   }
 }
 
+/* Championship trophy — soft float on ceremony stage */
+@keyframes champ-trophy-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+.champ-trophy-float {
+  animation: champ-trophy-float 3.2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .champ-trophy-float {
+    animation: none !important;
+  }
+}
+
 /* Ring ceremony confetti */
 @keyframes ring-confetti-fall {
   0% {

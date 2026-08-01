@@ -19,22 +19,28 @@ export type RingCeremonySport = "cfb" | "nfl" | "soccer_wwc" | "other";
 
 export type RingCeremonyPack = {
   sport: RingCeremonySport;
-  /** Top stamp */
+  /** Top stamp — short, human */
   stamp: string;
   /** Main title under stamp */
   title: string;
-  /** One-line stage energy */
+  /** One-line stage energy — talk like a friend in the group chat */
   stageLine: string;
   /** Defending champ kicker */
   champKicker: string;
-  /** Body under champ name */
+  /** Body under champ name — flex energy, not corporate */
   ringLease: string;
+  /** When the viewer IS the defending champ */
+  youWonLine: string;
+  /** When someone else won — roast-adjacent respect */
+  theyWonLine: string;
   /** Blurry stage figure caption (never a real-person photo) */
   stageFigureLabel: string;
   /** Hardware name on the prop */
   hardwareName: string;
-  /** CTA primary */
+  /** CTA primary — trophy room */
   ctaHardware: string;
+  /** Share CTA */
+  ctaShare: string;
   /** CTA dismiss */
   ctaEnter: string;
   /** Confetti palette */
@@ -44,7 +50,7 @@ export type RingCeremonyPack = {
   accentSoft: string;
   /** Stage floor gradient */
   stageGradient: string;
-  /** Trophy / ring emoji cluster */
+  /** @deprecated emoji fallback — UI uses SportChampionshipTrophy */
   heroGlyph: string;
   /** Preview banner text */
   previewNote: string;
@@ -57,7 +63,7 @@ export function resolveRingSport(sportId?: string | null): RingCeremonySport {
   return "other";
 }
 
-/** Sport-specific ceremony voice + palette — not a generic trophy pop. */
+/** Sport-specific ceremony voice + palette — friend-group energy, not a press release. */
 export function getRingCeremonyPack(
   sportId?: string | null,
   opts?: { threePeat?: boolean }
@@ -68,23 +74,28 @@ export function getRingCeremonyPack(
   if (sport === "nfl") {
     return {
       sport,
-      stamp: threePeat
-        ? "Opening night · Dynasty edition"
-        : "Opening night · Super Bowl energy",
-      title: threePeat ? "The three-peat ceremony" : "The ring ceremony",
+      stamp: threePeat ? "Opening night · dynasty" : "Opening night",
+      title: threePeat ? "Still their house" : "Last year's champ walks first",
       stageLine: threePeat
-        ? "Three straight years. The lights got hotter. The ring animation changed. People notice."
-        : "Lights. Confetti. A blurry league-office silhouette at the mic. This is how Sundays begin.",
+        ? "Three years in a row. The trophy is basically renting a locker with their name on it."
+        : "Lights up. Phones out. This is the flex that starts every Sunday season.",
       champKicker: threePeat
-        ? "Defending three-peat champion"
-        : "Defending War Room champion",
+        ? "Three-peat champ — still wearing it"
+        : "Defending champion",
       ringLease: threePeat
-        ? "Dynasty lease. The silver doesn't want to leave. Someone still has to take it on the field."
-        : "One-year lease. The late window is open. The silver stays with them until someone takes it on the field.",
-      stageFigureLabel: "League office · stage mic",
-      hardwareName: threePeat ? "Dynasty ring" : "Championship ring",
-      ctaHardware: "View championship hardware",
-      ctaEnter: "Hit the locker room",
+        ? "Nobody's taking this without a knife fight on the card. Until then? It's theirs. Loudly."
+        : "They own the hardware until someone rips it off them. Late windows. No mercy. Take a picture.",
+      youWonLine:
+        "That's YOU on the hardware. Screenshot this. Text the group chat. Make them mad before kickoff.",
+      theyWonLine:
+        "This is the person everyone's hunting. Bow once, then try to steal it all year.",
+      stageFigureLabel: "Stage lights · big moment",
+      hardwareName: threePeat
+        ? "Dynasty championship trophy"
+        : "Championship trophy",
+      ctaHardware: "See the trophy room",
+      ctaShare: "Share this flex",
+      ctaEnter: "Alright, let's play",
       confetti: threePeat
         ? ["#fbbf24", "#C1121F", "#F8FAFC", "#f59e0b", "#C5CCD3", "#0B1426"]
         : ["#C1121F", "#C5CCD3", "#F8FAFC", "#fbbf24", "#0B1426"],
@@ -94,57 +105,65 @@ export function getRingCeremonyPack(
         : "rgba(193, 18, 31, 0.2)",
       stageGradient:
         "linear-gradient(180deg, #0B1426 0%, #151d2e 45%, #1a1020 100%)",
-      heroGlyph: threePeat ? "💍💍💍" : "💍🏈",
-      previewNote:
-        "Preview · you only (commissioner). League does not see this test.",
+      heroGlyph: "🏈",
+      previewNote: "Preview only — your roommates don't see this test.",
     };
   }
 
   if (sport === "soccer_wwc") {
     return {
       sport,
-      stamp: "World Cup Extra · opening matchday",
-      title: "The ceremony",
+      stamp: "Opening matchday",
+      title: "Last champ gets the walk-out",
       stageLine:
-        "Emerald heat. Gold confetti. Passport-stamp energy. The room opens with hardware.",
-      champKicker: "Defending champion of the room",
+        "Gold confetti. Big cup energy. This is how the room remembers who finished on top.",
+      champKicker: "Defending champion",
       ringLease:
-        "The cup energy stays with them until a new name is engraved. Short tournament. Long memory.",
-      stageFigureLabel: "Pitch-side podium",
-      hardwareName: "Room championship",
+        "Their name's on the hardware. Short tournament. Long bragging rights. Steal it or watch them celebrate again.",
+      youWonLine:
+        "That's your name on the cup. Share it. Frame it. Let the group chat cope.",
+      theyWonLine:
+        "That's the target on their back. Respect the hardware — then try to take it.",
+      stageFigureLabel: "Pitch lights · ceremony",
+      hardwareName: "Championship cup",
       ctaHardware: "Open the trophy case",
-      ctaEnter: "Enter the clubhouse",
+      ctaShare: "Share this flex",
+      ctaEnter: "Let's go",
       confetti: ["#009C3B", "#FFDF00", "#002776", "#FFFFFF", "#34d399"],
       accent: "#FFDF00",
       accentSoft: "rgba(255, 223, 0, 0.18)",
       stageGradient:
         "linear-gradient(180deg, #002776 0%, #041a12 50%, #009C3B33 100%)",
-      heroGlyph: "🏆💍",
-      previewNote:
-        "Preview · you only (commissioner). Not a league-wide launch.",
+      heroGlyph: "🏆",
+      previewNote: "Preview only — not a league-wide drop.",
     };
   }
 
-  // CFB / default — campus opening day
+  // CFB / default
   return {
     sport: sport === "other" ? "other" : "cfb",
-    stamp: threePeat
-      ? "Opening day · Dynasty campus night"
-      : "Opening day · campus night",
-    title: threePeat ? "The three-peat ceremony" : "The ring ceremony",
+    stamp: threePeat ? "Opening day · dynasty" : "Opening day",
+    title: threePeat ? "Three-peat. Still their crystal." : "Raise the crystal",
     stageLine: threePeat
-      ? "Three straight years. The band got louder. The ring animation changed. People notice."
-      : "Night lights. Student-section volume. The defending champ walks the paper-bag red carpet.",
+      ? "Three straight titles. The band's tired of playing their walk-up song. Everyone else is tired of hearing it."
+      : "Night game energy. Whole room watching. This is the moment before someone tries to knock them off.",
     champKicker: threePeat
-      ? "Defending three-peat champ of this room"
-      : "Defending national champ of this room",
+      ? "Three-peat national champ of this room"
+      : "Defending national champ",
     ringLease: threePeat
-      ? "Dynasty lease. The ring is getting heavy. Saturdays still decide who takes it."
-      : "Week 0 / openers energy. The ring is theirs until someone takes it — Saturdays will decide.",
-    stageFigureLabel: "Campus stage · band energy",
-    hardwareName: threePeat ? "Dynasty ring" : "Championship ring",
-    ctaHardware: "View championship banner",
-    ctaEnter: "Enter the War Room",
+      ? "They're not giving that crystal back politely. Saturdays decide. Until then — make 'em eat it."
+      : "That's the big hardware. Theirs until the board says otherwise. Screenshot. Roast. Repeat.",
+    youWonLine:
+      "That's YOUR crystal. Share it before someone pretends they never saw it.",
+    theyWonLine:
+      "Remember the face. All year long, you're trying to take that crystal home.",
+    stageFigureLabel: "Campus night · big stage",
+    hardwareName: threePeat
+      ? "Dynasty national championship crystal"
+      : "National championship crystal",
+    ctaHardware: "See the trophy room",
+    ctaShare: "Share this flex",
+    ctaEnter: "Let's go Saturdays",
     confetti: threePeat
       ? ["#fbbf24", "#22c55e", "#f4f0e6", "#f59e0b", "#991b1b", "#a3e635"]
       : ["#22c55e", "#fbbf24", "#f4f0e6", "#991b1b", "#a3e635"],
@@ -152,9 +171,8 @@ export function getRingCeremonyPack(
     accentSoft: "rgba(251, 191, 36, 0.18)",
     stageGradient:
       "linear-gradient(180deg, #050805 0%, #0a1a0c 50%, #1a1208 100%)",
-    heroGlyph: threePeat ? "💍💍💍" : "💍🏆",
-    previewNote:
-      "Preview · you only (commissioner). Real ceremony still waits for opening week.",
+    heroGlyph: "🏆",
+    previewNote: "Preview only — real night still waits for opening week.",
   };
 }
 

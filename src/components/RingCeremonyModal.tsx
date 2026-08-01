@@ -1,9 +1,11 @@
 "use client";
 
 /**
- * Ring Ceremony — sport-specific opening ritual.
+ * Ring Ceremony — sport-specific opening flex.
  * Real launch: opening week only, once per player · champ year.
  * Preview: commissioner only, never forces the whole league.
+ *
+ * Huge moment: real trophy art, human copy, share the hardware.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -24,13 +26,16 @@ import {
   isOpeningWeekLive,
   ringCeremonySeenKey,
   RING_CEREMONY_SESSION_PREVIEW,
-  type RingCeremonyPack,
 } from "@/lib/ring-ceremony";
 import {
   consecutiveChampionshipStreak,
   hasThreePeat,
   noteChampionshipYears,
 } from "@/lib/easter-eggs";
+import SportChampionshipTrophy, {
+  trophyHardwareLabel,
+} from "@/components/SportChampionshipTrophy";
+import TrophyShareButton from "@/components/TrophyShareButton";
 
 export { isOpeningWeekLive, isOpeningCeremonyLive };
 
@@ -42,10 +47,10 @@ type Champ = {
 
 function ConfettiField({ colors }: { colors: string[] }) {
   const bits = useMemo(() => {
-    return Array.from({ length: 48 }, (_, i) => ({
+    return Array.from({ length: 56 }, (_, i) => ({
       id: i,
       left: `${(i * 17 + 3) % 100}%`,
-      delay: `${(i % 12) * 0.12}s`,
+      delay: `${(i % 12) * 0.1}s`,
       duration: `${2.4 + (i % 5) * 0.35}s`,
       size: 6 + (i % 5) * 2,
       color: colors[i % colors.length],
@@ -71,62 +76,10 @@ function ConfettiField({ colors }: { colors: string[] }) {
             animationDuration: b.duration,
             transform: `rotate(${b.rot}deg)`,
             borderRadius: b.id % 3 === 0 ? "50%" : "2px",
-            opacity: 0.85,
+            opacity: 0.9,
           }}
         />
       ))}
-    </div>
-  );
-}
-
-/** Stylized blurry stage figure — not a real-person likeness. */
-function StageFigure({
-  pack,
-  label,
-}: {
-  pack: RingCeremonyPack;
-  label: string;
-}) {
-  return (
-    <div className="relative mx-auto w-full max-w-[200px] h-28 flex items-end justify-center">
-      {/* Spotlights */}
-      <div
-        className="absolute -top-6 left-1/2 -translate-x-1/2 w-40 h-24 opacity-40"
-        style={{
-          background: `radial-gradient(ellipse at center, ${pack.accent}66 0%, transparent 70%)`,
-        }}
-      />
-      {/* Podium */}
-      <div
-        className="absolute bottom-0 w-28 h-6 rounded-sm border border-white/10"
-        style={{ background: "rgba(255,255,255,0.08)" }}
-      />
-      {/* Blurry suited silhouette */}
-      <div className="relative z-[1] mb-4 flex flex-col items-center">
-        <div
-          className="w-14 h-14 rounded-full border border-white/20"
-          style={{
-            background:
-              "linear-gradient(160deg, #4a5568 0%, #1a202c 55%, #0f1419 100%)",
-            filter: "blur(2.5px)",
-            boxShadow: `0 0 24px ${pack.accentSoft}`,
-          }}
-        />
-        <div
-          className="w-16 h-12 -mt-1 rounded-t-lg border border-white/10"
-          style={{
-            background:
-              "linear-gradient(180deg, #2d3748 0%, #1a202c 100%)",
-            filter: "blur(3px)",
-          }}
-        />
-        {/* Mic stand */}
-        <div className="absolute bottom-2 left-1/2 w-0.5 h-10 bg-white/30 -translate-x-1/2" />
-        <div className="absolute bottom-11 left-1/2 w-3 h-3 rounded-full bg-white/40 -translate-x-1/2 blur-[1px]" />
-      </div>
-      <p className="absolute -bottom-5 left-0 right-0 text-center text-[9px] uppercase tracking-[0.14em] text-white/50 font-bold">
-        {label}
-      </p>
     </div>
   );
 }
@@ -143,6 +96,15 @@ export default function RingCeremonyModal() {
     () => getRingCeremonyPack(sportId, { threePeat }),
     [sportId, threePeat]
   );
+
+  const session = typeof window !== "undefined" ? getSession() : null;
+  const isYou =
+    !!champ &&
+    !!session?.playerId &&
+    ((champ.userId && champ.userId === session.playerId) ||
+      (!!session.playerName &&
+        session.playerName.toLowerCase().trim() ===
+          champ.name.toLowerCase().trim()));
 
   const openWith = useCallback(
     (
@@ -164,8 +126,8 @@ export default function RingCeremonyModal() {
 
   const tryRealCeremony = useCallback(async () => {
     const league = getLeague();
-    const session = getSession();
-    if (!session?.playerId || !league?.id) return false;
+    const sess = getSession();
+    if (!sess?.playerId || !league?.id) return false;
 
     const sid = league.sportId || "cfb";
     if (!isOpeningCeremonyLive(sid)) return false;
@@ -185,10 +147,9 @@ export default function RingCeremonyModal() {
     const d = getDefendingChampion(trophies);
     if (!d) return false;
 
-    const key = ringCeremonySeenKey(league.id, session.playerId, d.year);
+    const key = ringCeremonySeenKey(league.id, sess.playerId, d.year);
     if (localStorage.getItem(key) === "1") return false;
 
-    // Dynasty flair: three consecutive champ years for defending champ
     let isThree = false;
     try {
       const champYears = trophies
@@ -216,8 +177,8 @@ export default function RingCeremonyModal() {
     async (force: boolean) => {
       if (!isActuallyCommissioner()) return false;
       const league = getLeague();
-      const session = getSession();
-      if (!session?.playerId || !league?.id) return false;
+      const sess = getSession();
+      if (!sess?.playerId || !league?.id) return false;
 
       if (!force && !getCommishPreviewOpt()) return false;
 
@@ -234,7 +195,7 @@ export default function RingCeremonyModal() {
       const sid = league.sportId || "cfb";
       const trophies = await loadLeagueTrophies();
       const d = getDefendingChampion(trophies);
-      const champ: Champ = d || {
+      const champRow: Champ = d || {
         year: new Date().getFullYear() - 1,
         name: "Last Season's Champ",
         userId: null,
@@ -246,7 +207,20 @@ export default function RingCeremonyModal() {
         /* ignore */
       }
 
-      openWith(champ, league.name || "War Room", sid, true);
+      let isThree = false;
+      if (d) {
+        const champYears = trophies
+          .filter(
+            (t) =>
+              t.trophyType === "championship" &&
+              ((d.userId && t.winnerUserId === d.userId) ||
+                t.winnerName === d.name)
+          )
+          .map((t) => t.seasonYear);
+        isThree = consecutiveChampionshipStreak(champYears) >= 3;
+      }
+
+      openWith(champRow, league.name || "War Room", sid, true, isThree);
       return true;
     },
     [openWith]
@@ -257,11 +231,8 @@ export default function RingCeremonyModal() {
 
     async function boot() {
       try {
-        // Real ceremony first (all members when window is live)
         const real = await tryRealCeremony();
         if (cancelled || real) return;
-
-        // Commish opt-in preview — personal only
         await tryCommishPreview(false);
       } catch {
         /* ignore */
@@ -288,10 +259,10 @@ export default function RingCeremonyModal() {
   function dismiss() {
     try {
       const league = getLeague();
-      const session = getSession();
-      if (!preview && league?.id && session?.playerId && champ) {
+      const sess = getSession();
+      if (!preview && league?.id && sess?.playerId && champ) {
         localStorage.setItem(
-          ringCeremonySeenKey(league.id, session.playerId, champ.year),
+          ringCeremonySeenKey(league.id, sess.playerId, champ.year),
           "1"
         );
       }
@@ -303,25 +274,29 @@ export default function RingCeremonyModal() {
 
   if (!open || !champ) return null;
 
+  const flexLine = isYou ? pack.youWonLine : pack.theyWonLine;
+  const hardware = trophyHardwareLabel(sportId, threePeat);
+
   return (
     <div
-      className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/85 backdrop-blur-sm"
+      className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/88 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-labelledby="ring-ceremony-title"
       onClick={dismiss}
     >
       <div
-        className="relative w-full sm:max-w-md max-h-[92vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl border-2 shadow-2xl"
+        className="relative w-full sm:max-w-md max-h-[94vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl border-2 shadow-2xl"
         style={{
-          borderColor: `${pack.accent}88`,
+          borderColor: `${pack.accent}99`,
           background: pack.stageGradient,
+          boxShadow: `0 0 80px ${pack.accentSoft}, 0 25px 50px rgba(0,0,0,0.55)`,
         }}
         onClick={(e) => e.stopPropagation()}
       >
         <ConfettiField colors={pack.confetti} />
 
-        {/* Stage lights bar */}
+        {/* Stage lights */}
         <div
           className="h-1.5 w-full"
           style={{
@@ -329,52 +304,67 @@ export default function RingCeremonyModal() {
           }}
         />
 
-        <div className="relative z-[2] p-5 sm:p-6 space-y-4 text-white">
+        <div className="relative z-[2] p-5 sm:p-6 space-y-3 text-white">
           {preview && (
-            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-center text-amber-200/90 bg-amber-500/15 border border-amber-400/30 rounded-lg px-2 py-1.5">
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-center text-amber-200/90 bg-amber-500/15 border border-amber-400/30 rounded-lg px-2 py-1.5">
               {pack.previewNote}
             </p>
           )}
 
           <p
-            className="text-[10px] font-bold uppercase tracking-[0.2em] text-center"
+            className="text-[10px] font-bold uppercase tracking-[0.22em] text-center"
             style={{ color: pack.accent }}
           >
             {pack.stamp}
           </p>
 
-          <div className="text-center pt-1">
-            <div className="text-4xl sm:text-5xl mb-1" aria-hidden>
-              {pack.heroGlyph}
-            </div>
+          {/* THE HARDWARE */}
+          <div className="flex flex-col items-center pt-1 pb-1">
+            <SportChampionshipTrophy
+              sport={sportId}
+              size={168}
+              threePeat={threePeat}
+              animate
+            />
+            <p className="text-[10px] uppercase tracking-[0.16em] text-white/45 font-semibold mt-1">
+              {hardware}
+            </p>
+          </div>
+
+          <div className="text-center">
             <h2
               id="ring-ceremony-title"
-              className="text-2xl font-black tracking-tight"
+              className="text-2xl sm:text-[1.65rem] font-black tracking-tight leading-tight"
             >
               {pack.title}
             </h2>
-            <p className="text-sm text-white/60 mt-1">{leagueName}</p>
-            <p className="text-xs text-white/50 mt-2 leading-relaxed max-w-sm mx-auto">
+            <p className="text-sm text-white/55 mt-1 font-medium">{leagueName}</p>
+            <p className="text-[13px] text-white/70 mt-2.5 leading-relaxed max-w-sm mx-auto">
               {pack.stageLine}
             </p>
           </div>
 
-          <StageFigure pack={pack} label={pack.stageFigureLabel} />
-
+          {/* Champ plaque — the flex */}
           <div
-            className="rounded-xl border px-4 py-4 text-center mt-6"
+            className="rounded-2xl border-2 px-4 py-5 text-center relative overflow-hidden"
             style={{
-              borderColor: `${pack.accent}66`,
-              background: pack.accentSoft,
+              borderColor: `${pack.accent}88`,
+              background: `linear-gradient(165deg, ${pack.accentSoft}, rgba(0,0,0,0.35))`,
             }}
           >
-            <p className="text-[10px] uppercase tracking-wider text-white/55 font-bold">
+            <div
+              className="pointer-events-none absolute inset-0 opacity-30"
+              style={{
+                background: `radial-gradient(ellipse at 50% 0%, ${pack.accent}55, transparent 60%)`,
+              }}
+            />
+            <p className="relative text-[10px] uppercase tracking-[0.18em] text-white/60 font-bold">
               {pack.champKicker} · {champ.year}
             </p>
             {champ.userId ? (
               <Link
                 href={`/profile/${champ.userId}`}
-                className="text-2xl font-black block mt-1 hover:underline"
+                className="relative text-3xl sm:text-4xl font-black block mt-1.5 hover:underline leading-none"
                 style={{ color: pack.accent }}
                 onClick={dismiss}
               >
@@ -382,21 +372,56 @@ export default function RingCeremonyModal() {
               </Link>
             ) : (
               <p
-                className="text-2xl font-black mt-1"
+                className="relative text-3xl sm:text-4xl font-black mt-1.5 leading-none"
                 style={{ color: pack.accent }}
               >
                 {champ.name}
               </p>
             )}
-            <p className="text-xs text-white/65 mt-2 leading-relaxed">
-              {pack.ringLease}
+            {isYou && (
+              <p
+                className="relative mt-2 inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider border"
+                style={{
+                  color: pack.accent,
+                  borderColor: `${pack.accent}66`,
+                  background: "rgba(0,0,0,0.35)",
+                }}
+              >
+                That&apos;s you
+              </p>
+            )}
+            <p className="relative text-[13px] text-white/80 mt-3 leading-relaxed font-medium">
+              {flexLine}
             </p>
-            <p className="text-[10px] text-white/40 mt-2 uppercase tracking-wide">
-              {pack.hardwareName}
+            <p className="relative text-xs text-white/55 mt-2 leading-relaxed">
+              {pack.ringLease}
             </p>
           </div>
 
-          <div className="flex flex-col gap-2 pt-1 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+          {/* Share is the moment */}
+          <div className="rounded-xl border border-white/15 bg-black/25 px-3 py-3 space-y-2">
+            <p className="text-[11px] text-center text-white/60 leading-snug">
+              {isYou
+                ? "Drop this in the group chat before anyone pretends they never saw it."
+                : "Send it. Tag them. Start the season loud."}
+            </p>
+            <div className="flex justify-center">
+              <TrophyShareButton
+                trophy={{
+                  kind: "championship",
+                  seasonYear: champ.year,
+                  winnerName: champ.name,
+                  leagueName,
+                  subtitle: pack.champKicker,
+                  sportId: sportId || undefined,
+                }}
+                label={pack.ctaShare}
+                className="!bg-white !text-black !border-0 !font-extrabold min-h-[48px] px-6 w-full sm:w-auto justify-center"
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2 pt-0.5 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
             <Link
               href="/trophy-room"
               onClick={dismiss}
@@ -415,7 +440,6 @@ export default function RingCeremonyModal() {
           </div>
         </div>
       </div>
-
     </div>
   );
 }
