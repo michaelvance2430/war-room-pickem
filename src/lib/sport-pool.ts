@@ -37,21 +37,98 @@ export function sportPoolSqlHint(): string {
   );
 }
 
-/** Humans in the source room who should answer (non-bots). */
-export async function countSourceLeagueHumans(
+/** Who should answer the pool poll (humans + trial bots). */
+export async function countSourceLeagueVoters(
   leagueId: string
-): Promise<number> {
-  if (!hasSupabaseConfig() || !leagueId) return 0;
+): Promise<{ total: number; humans: number; bots: number }> {
+  if (!hasSupabaseConfig() || !leagueId) {
+    return { total: 0, humans: 0, bots: 0 };
+  }
   const supabase = createClient();
   try {
     const { data, error } = await supabase
       .from("memberships")
       .select("user_id, is_bot")
       .eq("league_id", leagueId);
-    if (error || !data) return 0;
-    return data.filter((r) => !(r as { is_bot?: boolean }).is_bot).length;
+    if (error || !data) return { total: 0, humans: 0, bots: 0 };
+    let humans = 0;
+    let bots = 0;
+    for (const r of data) {
+      if ((r as { is_bot?: boolean }).is_bot) bots += 1;
+      else humans += 1;
+    }
+    return { total: humans + bots, humans, bots };
   } catch {
-    return 0;
+    return { total: 0, humans: 0, bots: 0 };
+  }
+}
+
+/** @deprecated use countSourceLeagueVoters — kept for any external callers */
+export async function countSourceLeagueHumans(
+  leagueId: string
+): Promise<number> {
+  const c = await countSourceLeagueVoters(leagueId);
+  return c.humans;
+}
+
+/**
+ * Trial bots cast yes/no on an open poll (security-definer RPC).
+ * ~80% yes / 20% no so you can practice one-click create with a padded room.
+ */
+export async function seedBotSportPoolVotes(
+  pollId: string
+): Promise<
+  | { ok: true; yes: number; no: number; bots: number }
+  | { ok: false; error: string }
+> {
+  if (!hasSupabaseConfig() || !pollId) {
+    return { ok: false, error: "Supabase is not configured." };
+  }
+  const session = getSession();
+  if (!session?.playerId || !session.isCommissioner) {
+    return { ok: false, error: "Only the commissioner can seed bot votes." };
+  }
+  const supabase = createClient();
+  try {
+    const { data, error } = await supabase.rpc("seed_bot_sport_pool_votes", {
+      p_poll_id: pollId,
+    });
+    if (error) {
+      const msg = error.message || "";
+      if (
+        sqlMissing(msg) ||
+        /seed_bot_sport_pool|does not exist|schema cache/i.test(msg)
+      ) {
+        return {
+          ok: false,
+          error:
+            "Bot poll votes need a quick SQL update: re-run " +
+            "supabase/sport-pool-polls.sql in Supabase SQL Editor (adds seed_bot_sport_pool_votes).",
+        };
+      }
+      return { ok: false, error: msg };
+    }
+    const row = data as {
+      ok?: boolean;
+      error?: string;
+      yes?: number;
+      no?: number;
+      bots?: number;
+    } | null;
+    if (!row || row.ok === false) {
+      return { ok: false, error: row?.error || "Bot vote seed failed" };
+    }
+    return {
+      ok: true,
+      yes: Number(row.yes) || 0,
+      no: Number(row.no) || 0,
+      bots: Number(row.bots) || 0,
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "Bot vote seed failed",
+    };
   }
 }
 
@@ -124,6 +201,13 @@ export async function createSportPoolPoll(opts: {
     );
   } catch {
     /* vote table may still be missing if partial SQL */
+  }
+
+  // Trial bots auto-answer so padded rooms can practice one-click create
+  try {
+    await seedBotSportPoolVotes(poll.id);
+  } catch {
+    /* RPC may not be installed yet — UI can re-try */
   }
 
   return { ok: true, poll };
