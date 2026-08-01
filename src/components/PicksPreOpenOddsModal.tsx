@@ -83,33 +83,38 @@ export default function PicksPreOpenOddsModal() {
           <BrandMark size={48} variant="force" className="rounded-lg" />
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
-              Before {weekLabel}
+              Legal-ish disclaimer · {weekLabel}
             </p>
             <h2
               id="picks-preopen-title"
               className="text-lg font-extrabold text-foreground leading-snug"
             >
-              Picks now — odds may move
+              Cool your jets, line shopper
             </h2>
           </div>
         </div>
 
         <div className="px-5 py-4 space-y-3 text-sm text-muted leading-relaxed">
           <p className="text-foreground text-base font-medium leading-relaxed">
-            You can make and save your picks now.
+            Yes — you can mash buttons, fill the card, and lock it{" "}
+            <em>right now</em>. We&apos;re not stopping you. Frankly we&apos;re
+            impressed you found the page.
           </p>
           <p className="text-foreground leading-relaxed">
-            But the{" "}
-            <strong className="text-primary">odds might change</strong> when{" "}
+            Just know: these spreads are on a{" "}
+            <strong className="text-primary">vibes-and-hope schedule</strong>{" "}
+            until{" "}
             <strong className="text-foreground">{weekLabel}</strong>{" "}
             <span className="uppercase tracking-wide font-extrabold text-foreground">
               officially opens
             </span>
-            .
+            . Then the real lines show up and your early masterpiece might look…
+            different. Cute, even. In a tragic way.
           </p>
           <p className="text-xs text-muted leading-relaxed">
-            Early cards are real. Lines can still shift before the official open
-            — don&apos;t be shocked if a spread moves after you lock.
+            Lock anyway if you want. Or wait. Or lock, screenshot it, and blame
+            the shop when a −3 becomes a −7. We&apos;ll be here either way —
+            mostly laughing.
           </p>
         </div>
 
@@ -119,7 +124,7 @@ export default function PicksPreOpenOddsModal() {
             onClick={dismiss}
             className="w-full py-3.5 min-h-[52px] rounded-xl bg-primary text-black font-bold text-sm"
           >
-            Got it — show me the card
+            Fine. Let me cook (at my own risk)
           </button>
         </div>
       </div>
