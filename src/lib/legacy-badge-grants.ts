@@ -1,9 +1,10 @@
 /**
  * Prior-season trophy → permanent War Room Legend + career cheevo bank.
  *
- * Confirmed 2025:
+ * Confirmed 2025–26 season:
  *  - Kahmann → Championship → War Room Legend (+200 career)
- *  - Bill ball Ben → Village Nerd (Crystal Ball) → War Room Legend (+200 career)
+ *  - Big Ball Ben / Bill ball Ben → Village Nerd (Crystal Ball) → War Room Legend (+200 career)
+ *  - Justin Strayer → Toilet Bowl (profile hardware; toilet crown if linked in Trophy Room)
  *
  * Mistaken (hard-revoked whenever we see the name / on every app boot):
  *  - Andrew Visconti / Andy — was incorrectly given Kahmann’s champ seed
@@ -31,12 +32,12 @@ export const LEGACY_BADGE_GRANTS: LegacyBadgeGrant[] = [
   {
     pattern: /\bkahmann\b/i,
     badgeId: WAR_ROOM_LEGEND_ID,
-    reason: "2025 Championship — War Room Legend",
+    reason: "2025–26 Championship — War Room Legend",
   },
   {
     pattern: /\bbig\s*ball\s*ben\b|\bbill\s*ball\s*ben\b|\bbillballben\b/i,
     badgeId: WAR_ROOM_LEGEND_ID,
-    reason: "2025 Village Nerd — War Room Legend",
+    reason: "2025–26 Village Nerd — War Room Legend",
   },
 ];
 
