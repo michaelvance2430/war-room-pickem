@@ -276,8 +276,10 @@ export default function AccountPage() {
     leagueName: string;
     sportId?: string | null;
     busy: boolean;
-    /** When true, season is over — rewards may stick */
+    /** Season over — keep rewards */
     seasonFinished: boolean | null;
+    /** After opening week + not finished → Blue Falcon + forfeit */
+    penaltiesApply: boolean | null;
     /** Current Blue Falcon Count before this leave */
     blueFalconCount: number;
   } | null>(null);
@@ -307,26 +309,35 @@ export default function AccountPage() {
       sportId,
       busy: false,
       seasonFinished: null,
+      penaltiesApply: null,
       blueFalconCount: bf,
     });
-    // Best-effort: soften copy if championship already engraved / calendar past final
     try {
-      const { isLeagueSeasonFinishedForRewards } = await import(
-        "@/lib/league-earned-ledger"
-      );
+      const {
+        isLeagueSeasonFinishedForRewards,
+        leaveAppliesPenalties,
+      } = await import("@/lib/league-earned-ledger");
       const finished = await isLeagueSeasonFinishedForRewards(
         leagueId,
         sportId
       );
+      const penalties = leaveAppliesPenalties({
+        sportId,
+        seasonFinished: finished,
+      });
       setLeaveModal((prev) =>
         prev && prev.leagueId === leagueId
-          ? { ...prev, seasonFinished: finished }
+          ? {
+              ...prev,
+              seasonFinished: finished,
+              penaltiesApply: penalties,
+            }
           : prev
       );
     } catch {
       setLeaveModal((prev) =>
         prev && prev.leagueId === leagueId
-          ? { ...prev, seasonFinished: false }
+          ? { ...prev, seasonFinished: false, penaltiesApply: false }
           : prev
       );
     }
@@ -1073,30 +1084,34 @@ export default function AccountPage() {
 
             {leaveModal.seasonFinished === true ? (
               <p className="text-sm text-muted leading-relaxed">
-                This season looks finished. Your cheevos and hardware from this
-                league should stay. You&apos;ll still leave the room and drop off
-                the roster. Blue Falcon Count does not go up after a finished
-                season.
+                This season looks finished. Your cheevos and hardware stay. You
+                drop off the roster. Blue Falcon does not go up.
+              </p>
+            ) : leaveModal.penaltiesApply === false ? (
+              <p className="text-sm text-muted leading-relaxed">
+                <strong className="text-foreground">Opening week hasn&apos;t started yet</strong>
+                {" — "}
+                clean leave. No Blue Falcon. No forfeit. You can rejoin later
+                with the code if a seat is open.
               </p>
             ) : (
               <>
                 <div className="rounded-xl border border-danger/40 bg-danger/10 px-4 py-3 space-y-2">
                   <p className="text-sm font-bold text-danger">
-                    If you continue, you lose everything from this league:
+                    Season is live (opening week has started). If you leave now:
                   </p>
                   <ul className="text-sm text-foreground/90 leading-relaxed list-disc pl-5 space-y-1">
                     <li>
-                      <strong>Cheevos</strong> earned while you were here
+                      <strong>Cheevos</strong> earned in this league
                     </li>
                     <li>
-                      <strong>Trophies / hardware badges</strong> from this room
+                      <strong>Trophies / hardware</strong> from this room
                     </li>
                     <li>
-                      <strong>Titles</strong> unlocked in this league
+                      <strong>Titles</strong> unlocked here
                     </li>
                     <li>
-                      Season <strong>data</strong> on the board (you leave the
-                      roster)
+                      You leave the <strong>roster</strong>
                     </li>
                   </ul>
                   <p className="text-xs text-muted leading-relaxed pt-1">
@@ -1106,7 +1121,6 @@ export default function AccountPage() {
                   </p>
                 </div>
 
-                {/* Blue Falcon Count — call out hard so people feel the heat */}
                 <div className="rounded-xl border-2 border-amber-500/50 bg-amber-500/10 px-4 py-3 space-y-1.5">
                   <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-amber-300">
                     Your Blue Falcon Count
@@ -1118,28 +1132,22 @@ export default function AccountPage() {
                     </span>
                   </p>
                   <p className="text-xs text-muted leading-relaxed">
-                    <strong className="text-foreground">Blue Falcon</strong>{" "}
-                    = quitting the unit mid-season and screwing the rest of the
-                    room. This number is{" "}
-                    <strong className="text-foreground">
-                      public on your profile
-                    </strong>
-                    . Commissioners check it before kickoff when they kick high
-                    risk. Don&apos;t be that guy.
+                    <strong className="text-foreground">Blue Falcon</strong> =
+                    quitting after opening week has started — screwing the unit
+                    mid-season. Public on your profile. Preseason leave does{" "}
+                    <strong className="text-foreground">not</strong> count.
                   </p>
                   {leaveModal.blueFalconCount === 0 && (
                     <p className="text-xs text-amber-100/90 font-medium leading-relaxed">
-                      First time? This leave makes your Blue Falcon Count{" "}
-                      <strong>1</strong>. The room will see it.
+                      First time after doors open? This leave makes your count{" "}
+                      <strong>1</strong>.
                     </p>
                   )}
                 </div>
 
                 <p className="text-sm text-muted leading-relaxed">
-                  Fun stuff only sticks if you{" "}
-                  <strong className="text-foreground">finish the season</strong>
-                  . Getting knocked out of brackets is fine — quitting the room
-                  is not.
+                  Stay through the season to keep the fun stuff. Getting knocked
+                  out of brackets is fine — walking out of the room is not.
                 </p>
               </>
             )}
@@ -1153,9 +1161,9 @@ export default function AccountPage() {
               >
                 {leaveModal.busy
                   ? "Leaving…"
-                  : leaveModal.seasonFinished
-                    ? "Yes, leave this league"
-                    : "I understand — leave and forfeit"}
+                  : leaveModal.penaltiesApply
+                    ? "I understand — leave and forfeit"
+                    : "Yes, leave this league"}
               </button>
               <button
                 type="button"

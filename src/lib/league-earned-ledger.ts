@@ -128,6 +128,41 @@ export function clearLeagueEarnedLedger(
 }
 
 /**
+ * Opening week / doors open for this sport (CFB Aug 23 · NFL Kickoff).
+ */
+export function isOpeningWeekStarted(
+  sportId?: string | null,
+  now = Date.now()
+): boolean {
+  try {
+    const { isSeasonOpen } =
+      require("./season-countdown") as typeof import("./season-countdown");
+    return isSeasonOpen(now, sportId);
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Blue Falcon + cheevo forfeit when leaving a live season early:
+ * - Season doors / opening week have STARTED, AND
+ * - Season is not finished yet
+ *
+ * Before opening week (preseason practice): clean leave — no Blue Falcon.
+ * After the season ends: keep cheevos / hardware.
+ * Knocked out of brackets but still in the room: never a leave forfeit.
+ */
+export function leaveAppliesPenalties(opts: {
+  sportId?: string | null;
+  seasonFinished: boolean;
+  now?: number;
+}): boolean {
+  if (opts.seasonFinished) return false;
+  // Only after opening week has begun — not for preseason ghosting out of dry-runs
+  return isOpeningWeekStarted(opts.sportId, opts.now ?? Date.now());
+}
+
+/**
  * Season is "finished" for keep-rewards purposes when:
  * - Championship hardware is engraved for the current season year, OR
  * - Calendar is past the final week window (CFP / Super Bowl slate end).
@@ -208,6 +243,17 @@ export async function forfeitRewardsOnEarlyLeave(opts: {
       forfeitedBadgeIds: [],
       message:
         "Season finished — your cheevos and hardware from this league stay.",
+    };
+  }
+
+  // Before opening week: free leave — no forfeit / no Blue Falcon
+  if (!leaveAppliesPenalties({ sportId, seasonFinished: false })) {
+    clearLeagueEarnedLedger(playerId, leagueId);
+    return {
+      kept: true,
+      forfeitedBadgeIds: [],
+      message:
+        "Left before opening week — clean exit. No Blue Falcon. Cheevos stay.",
     };
   }
 
