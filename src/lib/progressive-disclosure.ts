@@ -175,7 +175,36 @@ export async function loadProgressiveSnapshot(playerId?: string | null): Promise
   showDeepTiles: boolean;
   offerGazetteReveal: boolean;
   fullRoom: boolean;
+  /** Creator test-mode override active */
+  sandbox?: boolean;
+  sandboxPhase?: string;
 }> {
+  // Creator flight simulator wins over real league progress
+  try {
+    const { sandboxProgressiveOverrides } = await import(
+      "@/lib/creator-sandbox"
+    );
+    const sb = sandboxProgressiveOverrides();
+    if (sb) {
+      return {
+        playerId: pid(playerId),
+        firstWeekChrome: sb.firstWeekChrome,
+        coreUnlocked: !sb.firstWeekChrome,
+        activeWeek: sb.activeWeek,
+        scoredCount: sb.scoredCount,
+        showGazetteShelf: sb.showGazetteShelf,
+        showNewsShelf: sb.showNewsShelf,
+        showDeepTiles: sb.showDeepTiles,
+        offerGazetteReveal: sb.offerGazetteReveal,
+        fullRoom: sb.fullRoom,
+        sandbox: true,
+        sandboxPhase: sb.phase,
+      };
+    }
+  } catch {
+    /* ignore */
+  }
+
   const id = pid(playerId);
   let activeWeek = 1;
   let scoredCount = 0;
