@@ -207,6 +207,9 @@ export default function HomeWeekHero() {
     ? "rgba(193,18,31,0.22)"
     : "rgba(34,197,94,0.12)";
 
+  const roomName = getLeague()?.name?.trim() || null;
+  const sportShort = isNfl ? "NFL" : sportId === "soccer_wwc" ? "WWC" : "CFB";
+
   return (
     <section className="mb-5 sm:mb-8">
       <div
@@ -216,6 +219,11 @@ export default function HomeWeekHero() {
         <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">
             {eyebrow}
+            {roomName && (
+              <span className="text-muted font-semibold normal-case tracking-normal ml-1.5">
+                · {sportShort} · {roomName}
+              </span>
+            )}
           </p>
           <span className="text-[11px] font-mono font-bold tabular-nums text-primary/90 border border-primary/35 rounded-full px-2.5 py-0.5 bg-primary/10">
             {progress}
