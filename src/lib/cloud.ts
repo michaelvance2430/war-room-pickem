@@ -1733,7 +1733,7 @@ export async function saveResultsAndScoreWeek(opts: {
       }
     }
 
-    // Legendary: any slate final is 6–7 / 7–6 (sixxxxx seveennnn).
+    // Epic: any slate final is 6–7 / 7–6 (sixxxxx seveennnn).
     // Anyone with a locked card this week — correct or not, ATS irrelevant.
     if (sixSevenWeek) {
       try {

@@ -680,8 +680,8 @@ export const BADGE_CATALOG: BadgeDef[] = [
       "A game finished 6–7 (or 7–6) on your slate. Your brain typed it before the box score did. Sixxxxx. Seveennnnn. Sixxx sevennnnn. You were there. Win, lose, push — doesn't matter.",
     howToEarn:
       "Be on the card the week any War Room slate game ends 6–7 or 7–6. Anyone who locked that week gets it — you do NOT need to pick the winner. Either score order. CFB + NFL.",
-    tier: "legendary",
-    points: 200,
+    tier: "epic",
+    points: 50,
     icon: "6️⃣",
   },
 
