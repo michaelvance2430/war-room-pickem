@@ -667,8 +667,18 @@ export default function AccountPage() {
             />
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-72 overflow-y-auto">
-            {PROFILE_BORDER_CATALOG.map((b: ProfileBorderDef) => {
+            {PROFILE_BORDER_CATALOG.filter((b: ProfileBorderDef) => {
               void themeTick;
+              // Holiday borders only appear while that theme is live — never greyed out
+              if (b.unlock.kind === "holiday") {
+                return isBorderUnlocked(b, {
+                  userId: userId || "",
+                  earnedBadgeIds,
+                  seasonThemeId: getActiveSeasonThemeId(),
+                });
+              }
+              return true;
+            }).map((b: ProfileBorderDef) => {
               const seasonThemeId = getActiveSeasonThemeId();
               const unlocked =
                 !!userId &&
