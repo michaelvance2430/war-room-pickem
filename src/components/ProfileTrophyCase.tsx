@@ -24,6 +24,7 @@ function Plaque({
   spinny,
   onTrophyTap,
   sportId,
+  winnerAvatarUrl,
 }: {
   item: ProfileTrophy;
   leagueName?: string;
@@ -31,6 +32,8 @@ function Plaque({
   spinny?: boolean;
   onTrophyTap?: () => void;
   sportId?: string | null;
+  /** Profile photo of this trophy-case owner (NFL + CFB holders) */
+  winnerAvatarUrl?: string | null;
 }) {
   const meta = HARDWARE_KIND_META[item.kind];
   const sharePayload = {
@@ -41,6 +44,7 @@ function Plaque({
     division: item.division,
     subtitle: item.subtitle,
     sportId: sportId || undefined,
+    winnerAvatarUrl: winnerAvatarUrl || undefined,
   };
 
   return (
@@ -155,11 +159,14 @@ export default function ProfileTrophyCase({
   leagueName,
   /** When true (viewing your own profile), show share on every plaque */
   isSelf = false,
+  /** Owner profile photo — goes on every share graphic for their hardware */
+  winnerAvatarUrl,
 }: {
   items: ProfileTrophy[];
   playerName: string;
   leagueName?: string;
   isSelf?: boolean;
+  winnerAvatarUrl?: string | null;
 }) {
   const { bigGame, division } = splitHardwareCases(items);
   const [spinId, setSpinId] = useState<string | null>(null);
@@ -234,6 +241,7 @@ export default function ProfileTrophyCase({
                     leagueName={leagueName}
                     canShare={canShare}
                     sportId={sportId}
+                    winnerAvatarUrl={winnerAvatarUrl}
                     spinny={spinId === item.id}
                     onTrophyTap={() => handleTrophyTap(item.id)}
                   />
@@ -271,6 +279,8 @@ export default function ProfileTrophyCase({
                 item={item}
                 leagueName={leagueName}
                 canShare={canShare}
+                sportId={sportId}
+                winnerAvatarUrl={winnerAvatarUrl}
               />
             ))}
           </div>

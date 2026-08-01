@@ -14,9 +14,12 @@ import { getLeague, getSession, isActuallyCommissioner } from "@/lib/league";
 import {
   loadLeagueActiveWeek,
   listScoredWeekNumbers,
+  loadLeagueRoster,
+  type LeagueRosterMember,
 } from "@/lib/cloud";
 import { loadLeagueTrophies } from "@/lib/trophies";
 import { getDefendingChampion } from "@/lib/player-history";
+import { resolveWinnerAvatarFromRoster } from "@/lib/trophy-share";
 import {
   EVENT_RING_CEREMONY_PREVIEW,
   getCommishPreviewOpt,
@@ -91,6 +94,7 @@ export default function RingCeremonyModal() {
   const [leagueName, setLeagueName] = useState("");
   const [sportId, setSportId] = useState<string | null>(null);
   const [threePeat, setThreePeat] = useState(false);
+  const [roster, setRoster] = useState<LeagueRosterMember[]>([]);
 
   const pack = useMemo(
     () => getRingCeremonyPack(sportId, { threePeat }),
@@ -107,7 +111,7 @@ export default function RingCeremonyModal() {
           champ.name.toLowerCase().trim()));
 
   const openWith = useCallback(
-    (
+    async (
       c: Champ,
       lgName: string,
       sid: string | null | undefined,
@@ -119,10 +123,21 @@ export default function RingCeremonyModal() {
       setSportId(sid || null);
       setPreview(isPrev);
       setThreePeat(isThreePeat);
+      try {
+        const rows = await loadLeagueRoster();
+        setRoster(rows);
+      } catch {
+        setRoster([]);
+      }
       setOpen(true);
     },
     []
   );
+
+  const champAvatar = useMemo(() => {
+    if (!champ) return undefined;
+    return resolveWinnerAvatarFromRoster(roster, champ.userId, champ.name);
+  }, [roster, champ]);
 
   const tryRealCeremony = useCallback(async () => {
     const league = getLeague();
@@ -414,6 +429,8 @@ export default function RingCeremonyModal() {
                   leagueName,
                   subtitle: pack.champKicker,
                   sportId: sportId || undefined,
+                  winnerUserId: champ.userId || undefined,
+                  winnerAvatarUrl: champAvatar,
                 }}
                 label={pack.ctaShare}
                 className="!bg-white !text-black !border-0 !font-extrabold min-h-[48px] px-6 w-full sm:w-auto justify-center"

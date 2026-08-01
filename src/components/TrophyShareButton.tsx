@@ -38,16 +38,19 @@ export default function TrophyShareButton({
 
   useEffect(() => {
     if (!open) return;
-    let url: string | null = null;
-    try {
-      const canvas = renderTrophyShareCanvas(trophy);
-      url = canvas.toDataURL("image/png");
-      setPreviewUrl(url);
-    } catch {
-      setPreviewUrl(null);
-    }
+    let cancelled = false;
+    setPreviewUrl(null);
+    void (async () => {
+      try {
+        const canvas = await renderTrophyShareCanvas(trophy);
+        if (cancelled) return;
+        setPreviewUrl(canvas.toDataURL("image/png"));
+      } catch {
+        if (!cancelled) setPreviewUrl(null);
+      }
+    })();
     return () => {
-      // data URLs don't need revoke; clear for GC
+      cancelled = true;
       setPreviewUrl(null);
     };
   }, [open, trophy]);
@@ -161,8 +164,11 @@ export default function TrophyShareButton({
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-4xl">
-                    {pack.emoji}
+                  <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-muted">
+                    <span className="text-4xl">{pack.emoji}</span>
+                    <span className="text-[11px] font-medium">
+                      Loading face + hardware…
+                    </span>
                   </div>
                 )}
               </div>

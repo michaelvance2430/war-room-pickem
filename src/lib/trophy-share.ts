@@ -14,7 +14,63 @@ export type ShareableTrophy = {
   subtitle?: string | null;
   /** cfb | nfl — dual-sport hashtags / day-of-week energy */
   sportId?: string | null;
+  /** Winner profile photo — drawn on share canvas (NFL + CFB holders) */
+  winnerAvatarUrl?: string | null;
+  /** Optional user id for roster lookup by callers */
+  winnerUserId?: string | null;
 };
+
+type RosterAvatarHit = {
+  userId: string;
+  name: string;
+  avatarUrl?: string | null;
+  isBot?: boolean;
+};
+
+function normShareName(s: string) {
+  return (s || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function shareNamesMatch(a: string, b: string) {
+  const na = normShareName(a);
+  const nb = normShareName(b);
+  if (!na || !nb) return false;
+  if (na === nb) return true;
+  if (na.includes(nb) || nb.includes(na)) return true;
+  const ta = na.split(" ");
+  const tb = nb.split(" ");
+  const lastA = ta[ta.length - 1];
+  const lastB = tb[tb.length - 1];
+  if (lastA && lastA === lastB && lastA.length >= 4) return true;
+  return false;
+}
+
+/**
+ * Resolve a trophy holder's face from the league roster.
+ * Prefer user id; fall back to display-name match so legacy engravings
+ * (Kahmann, Justin Strayer, Big Ball Ben, …) still get their photo.
+ */
+export function resolveWinnerAvatarFromRoster(
+  roster: RosterAvatarHit[],
+  winnerUserId?: string | null,
+  winnerName?: string | null
+): string | undefined {
+  if (!roster?.length) return undefined;
+  if (winnerUserId) {
+    const byId = roster.find((m) => m.userId === winnerUserId && m.avatarUrl);
+    if (byId?.avatarUrl) return byId.avatarUrl;
+  }
+  const name = (winnerName || "").trim();
+  if (!name) return undefined;
+  const byName = roster.find(
+    (m) => !m.isBot && m.avatarUrl && shareNamesMatch(m.name, name)
+  );
+  return byName?.avatarUrl || undefined;
+}
 
 function resolveShareSport(sportId?: string | null): "cfb" | "nfl" {
   if (sportId === "nfl") return "nfl";
@@ -256,11 +312,118 @@ function roundRect(
   ctx.closePath();
 }
 
-/** Draw a 1080×1080 IG/FB-ready trophy graphic. */
-export function renderTrophyShareCanvas(
+/** Load a remote image for canvas (CORS). Returns null on failure. */
+function loadShareImage(url: string): Promise<HTMLImageElement | null> {
+  return new Promise((resolve) => {
+    if (!url || typeof Image === "undefined") {
+      resolve(null);
+      return;
+    }
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    try {
+      img.src = url;
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
+function initialsFromShareName(name: string): string {
+  const parts = (name || "").trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+/**
+ * Circular winner portrait — photo when available, monogram fallback.
+ * Gold/accent ring so it reads as hardware, not a plain avatar.
+ */
+function drawWinnerPortrait(
+  ctx: CanvasRenderingContext2D,
+  opts: {
+    cx: number;
+    cy: number;
+    r: number;
+    name: string;
+    img: HTMLImageElement | null;
+    accent: string;
+    accent2: string;
+    bg: string;
+  }
+) {
+  const { cx, cy, r, name, img, accent, accent2, bg } = opts;
+
+  // Soft drop shadow
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy + 4, r + 2, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(0,0,0,0.35)";
+  ctx.fill();
+  ctx.restore();
+
+  // Outer ring (hardware)
+  const ring = ctx.createLinearGradient(cx - r, cy - r, cx + r, cy + r);
+  ring.addColorStop(0, accent);
+  ring.addColorStop(0.5, accent2);
+  ring.addColorStop(1, accent);
+  ctx.beginPath();
+  ctx.arc(cx, cy, r + 8, 0, Math.PI * 2);
+  ctx.fillStyle = ring;
+  ctx.fill();
+
+  // Inner dark ring
+  ctx.beginPath();
+  ctx.arc(cx, cy, r + 3, 0, Math.PI * 2);
+  ctx.fillStyle = bg;
+  ctx.fill();
+
+  // Clip circle for face / monogram
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.closePath();
+  ctx.clip();
+
+  if (img && img.naturalWidth > 0) {
+    // Cover-fit crop
+    const iw = img.naturalWidth;
+    const ih = img.naturalHeight;
+    const side = Math.min(iw, ih);
+    const sx = (iw - side) / 2;
+    const sy = (ih - side) / 2;
+    ctx.drawImage(img, sx, sy, side, side, cx - r, cy - r, r * 2, r * 2);
+  } else {
+    // Monogram disc
+    const g = ctx.createLinearGradient(cx - r, cy - r, cx + r, cy + r);
+    g.addColorStop(0, hexAlpha(accent, 0.45));
+    g.addColorStop(1, hexAlpha(accent2, 0.25));
+    ctx.fillStyle = g;
+    ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+    ctx.fillStyle = "#F8FAFC";
+    ctx.font = `800 ${r * 0.72}px system-ui, -apple-system, Segoe UI, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(initialsFromShareName(name), cx, cy + r * 0.04);
+  }
+  ctx.restore();
+
+  // Subtle inner highlight
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.strokeStyle = "rgba(255,255,255,0.2)";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+}
+
+/** Draw a 1080×1080 IG/FB-ready trophy graphic (async — loads winner photo). */
+export async function renderTrophyShareCanvas(
   t: ShareableTrophy,
   opts?: { size?: number }
-): HTMLCanvasElement {
+): Promise<HTMLCanvasElement> {
   const size = opts?.size ?? 1080;
   const pack = buildTrophySharePack(t);
   const canvas = document.createElement("canvas");
@@ -271,6 +434,14 @@ export function renderTrophyShareCanvas(
 
   const { colors } = pack;
   const s = size / 1080;
+  const name = (t.winnerName || "Champion").trim();
+
+  // Prefetch face so layout can reserve the portrait block
+  let face: HTMLImageElement | null = null;
+  const avatarUrl = (t.winnerAvatarUrl || "").trim();
+  if (avatarUrl) {
+    face = await loadShareImage(avatarUrl);
+  }
 
   // Background gradient
   const g = ctx.createLinearGradient(0, 0, size, size);
@@ -328,58 +499,71 @@ export function renderTrophyShareCanvas(
   ctx.textBaseline = "middle";
   ctx.fillText("WAR ROOM PICK'EM", size / 2, 128 * s);
 
-  // Hardware art matching Trophy Room icons
+  // Hardware art — slightly smaller so the face owns the center
   if (t.kind === "championship") {
-    drawChampionshipTrophyArt(ctx, size / 2, 300 * s, 200 * s, t.sportId);
+    drawChampionshipTrophyArt(ctx, size / 2, 250 * s, 150 * s, t.sportId);
   } else if (t.kind === "toilet_bowl") {
-    drawToiletTrophyArt(ctx, size / 2, 300 * s, 190 * s);
+    drawToiletTrophyArt(ctx, size / 2, 250 * s, 140 * s);
   } else if (t.kind === "crystal_ball") {
-    drawNerdTrophyArt(ctx, size / 2, 300 * s, 200 * s);
+    drawNerdTrophyArt(ctx, size / 2, 250 * s, 150 * s);
   } else {
-    ctx.font = `${160 * s}px "Segoe UI Emoji", "Apple Color Emoji", sans-serif`;
+    ctx.font = `${120 * s}px "Segoe UI Emoji", "Apple Color Emoji", sans-serif`;
     ctx.textBaseline = "middle";
-    ctx.fillText(pack.emoji, size / 2, 300 * s);
+    ctx.fillText(pack.emoji, size / 2, 250 * s);
   }
 
+  // Winner face (always — monogram if no photo / CORS fail)
+  drawWinnerPortrait(ctx, {
+    cx: size / 2,
+    cy: 400 * s,
+    r: 88 * s,
+    name,
+    img: face,
+    accent: colors.accent,
+    accent2: colors.accent2,
+    bg: colors.bg0,
+  });
+
   // Hero line
-  ctx.font = `800 ${Math.min(64, 56) * s}px system-ui, -apple-system, Segoe UI, sans-serif`;
+  ctx.font = `800 ${Math.min(64, 52) * s}px system-ui, -apple-system, Segoe UI, sans-serif`;
   ctx.fillStyle = colors.accent;
-  ctx.fillText(pack.heroLine, size / 2, 430 * s);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(pack.heroLine, size / 2, 530 * s);
 
   // Winner name
-  const name = (t.winnerName || "Champion").trim();
-  let nameSize = 72 * s;
+  let nameSize = 68 * s;
   ctx.font = `800 ${nameSize}px system-ui, -apple-system, Segoe UI, sans-serif`;
-  while (ctx.measureText(name).width > size - 160 * s && nameSize > 36 * s) {
+  while (ctx.measureText(name).width > size - 160 * s && nameSize > 34 * s) {
     nameSize -= 2 * s;
     ctx.font = `800 ${nameSize}px system-ui, -apple-system, Segoe UI, sans-serif`;
   }
   ctx.fillStyle = colors.text;
-  ctx.fillText(name, size / 2, 520 * s);
+  ctx.fillText(name, size / 2, 595 * s);
 
   // Sub line
-  ctx.font = `600 ${28 * s}px system-ui, -apple-system, Segoe UI, sans-serif`;
+  ctx.font = `600 ${26 * s}px system-ui, -apple-system, Segoe UI, sans-serif`;
   ctx.fillStyle = colors.muted;
-  ctx.fillText(pack.subLine, size / 2, 580 * s);
+  ctx.fillText(pack.subLine, size / 2, 650 * s);
 
   if (t.subtitle) {
-    ctx.font = `500 ${24 * s}px system-ui, -apple-system, Segoe UI, sans-serif`;
+    ctx.font = `500 ${22 * s}px system-ui, -apple-system, Segoe UI, sans-serif`;
     ctx.fillStyle = hexAlpha(colors.text, 0.85);
-    ctx.fillText(t.subtitle.slice(0, 48), size / 2, 625 * s);
+    ctx.fillText(t.subtitle.slice(0, 48), size / 2, 690 * s);
   }
 
   // Divider
   ctx.strokeStyle = hexAlpha(colors.accent, 0.4);
   ctx.lineWidth = 2 * s;
   ctx.beginPath();
-  ctx.moveTo(200 * s, 680 * s);
-  ctx.lineTo(size - 200 * s, 680 * s);
+  ctx.moveTo(200 * s, 730 * s);
+  ctx.lineTo(size - 200 * s, 730 * s);
   ctx.stroke();
 
   // Footer roast (wrap)
-  ctx.font = `500 ${26 * s}px system-ui, -apple-system, Segoe UI, sans-serif`;
+  ctx.font = `500 ${24 * s}px system-ui, -apple-system, Segoe UI, sans-serif`;
   ctx.fillStyle = colors.text;
-  wrapCenter(ctx, pack.footerRoast, size / 2, 740 * s, size - 180 * s, 36 * s);
+  wrapCenter(ctx, pack.footerRoast, size / 2, 780 * s, size - 180 * s, 34 * s);
 
   // Bottom brand
   ctx.font = `700 ${20 * s}px system-ui, -apple-system, Segoe UI, sans-serif`;
@@ -703,7 +887,7 @@ export async function shareTrophyToSocial(
   mode: TrophyShareMode
 ): Promise<TrophyShareResult> {
   const pack = buildTrophySharePack(t);
-  const canvas = renderTrophyShareCanvas(t);
+  const canvas = await renderTrophyShareCanvas(t);
   const blob = await canvasToPngBlob(canvas);
   const filename = `war-room-${t.kind}-${t.seasonYear}.png`;
   const file = new File([blob], filename, { type: "image/png" });

@@ -534,6 +534,7 @@ export default function ProfilePage() {
           playerName={player.name}
           leagueName={leagueName}
           isSelf={isSelfProfile}
+          winnerAvatarUrl={player.avatarUrl}
         />
 
         {/* Passport stamps & zero-point discoveries */}

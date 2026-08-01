@@ -6,10 +6,11 @@
  * Once per player per newly-awarded hardware.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { getLeague, getSession } from "@/lib/league";
 import { loadLeagueTrophies, type LeagueTrophy } from "@/lib/trophies";
+import { loadLeagueRoster, type LeagueRosterMember } from "@/lib/cloud";
 import {
   buildFinaleSlides,
   getUnseenFinaleTrophies,
@@ -21,6 +22,7 @@ import HardwareTrophyIcon from "@/components/HardwareTrophyIcon";
 import type { ProfileTrophyKind } from "@/lib/profile-hardware";
 import { isGuestMode } from "@/lib/guest-mode";
 import { isOpeningWeekLive } from "@/components/RingCeremonyModal";
+import { resolveWinnerAvatarFromRoster } from "@/lib/trophy-share";
 
 export default function SeasonFinaleModal() {
   const [open, setOpen] = useState(false);
@@ -29,6 +31,7 @@ export default function SeasonFinaleModal() {
   const [yearItems, setYearItems] = useState<LeagueTrophy[]>([]);
   const [leagueName, setLeagueName] = useState("War Room");
   const [year, setYear] = useState(0);
+  const [roster, setRoster] = useState<LeagueRosterMember[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -43,7 +46,10 @@ export default function SeasonFinaleModal() {
         const session = getSession();
         if (!session?.playerId || !league?.id) return;
 
-        const trophies = await loadLeagueTrophies();
+        const [trophies, rosterRows] = await Promise.all([
+          loadLeagueTrophies(),
+          loadLeagueRoster().catch(() => [] as LeagueRosterMember[]),
+        ]);
         if (cancelled || !trophies.length) return;
 
         const pack = getUnseenFinaleTrophies(
@@ -66,6 +72,7 @@ export default function SeasonFinaleModal() {
         await new Promise((r) => setTimeout(r, 900));
         if (cancelled) return;
 
+        setRoster(rosterRows);
         setYearItems(pack.items);
         setLeagueName(league.name || "War Room");
         setYear(pack.year);
@@ -112,19 +119,29 @@ export default function SeasonFinaleModal() {
     setIndex((i) => Math.max(0, i - 1));
   }
 
-  if (!open || !slides.length) return null;
+  const slide = slides[index] as FinaleSlide | undefined;
 
-  const slide = slides[index];
+  const shareKind: ProfileTrophyKind | null =
+    slide?.kind === "championship" ||
+    slide?.kind === "toilet_bowl" ||
+    slide?.kind === "crystal_ball"
+      ? slide.kind
+      : null;
+
+  const slideAvatar = useMemo(() => {
+    if (!slide?.winnerName && !slide?.winnerUserId) return undefined;
+    return resolveWinnerAvatarFromRoster(
+      roster,
+      slide?.winnerUserId,
+      slide?.winnerName
+    );
+  }, [roster, slide]);
+
+  if (!open || !slides.length || !slide) return null;
+
   const isLast = index === slides.length - 1;
   const isFirst = index === 0;
   const progress = `${index + 1} / ${slides.length}`;
-
-  const shareKind: ProfileTrophyKind | null =
-    slide.kind === "championship" ||
-    slide.kind === "toilet_bowl" ||
-    slide.kind === "crystal_ball"
-      ? slide.kind
-      : null;
 
   return (
     <div
@@ -253,6 +270,8 @@ export default function SeasonFinaleModal() {
                     leagueName,
                     subtitle: slide.kicker,
                     sportId: getLeague()?.sportId,
+                    winnerUserId: slide.winnerUserId || undefined,
+                    winnerAvatarUrl: slideAvatar,
                   }}
                   label={slide.isYou ? "Share my win" : "Share this win"}
                   className="min-h-[48px] px-5 font-bold"

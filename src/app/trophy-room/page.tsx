@@ -30,6 +30,7 @@ import { autoEngraveAllTrophies } from "@/lib/auto-trophies";
 import { divisionFromTrophyType } from "@/lib/division-champions";
 import { divisionDisplayLabel } from "@/lib/divisions";
 import { seedPriorSeason2025Trophies } from "@/lib/prior-season-seed";
+import { resolveWinnerAvatarFromRoster } from "@/lib/trophy-share";
 
 const BIG_TYPES: TrophyType[] = [
   "championship",
@@ -54,6 +55,8 @@ export default function TrophyRoomPage() {
   const [canSync, setCanSync] = useState(false);
   const [busy, setBusy] = useState(false);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
+  /** Full roster so every current trophy holder can resolve a face */
+  const [roster, setRoster] = useState<LeagueRosterMember[]>([]);
 
   async function reload() {
     setLoadError(null);
@@ -65,6 +68,23 @@ export default function TrophyRoomPage() {
     }
   }
 
+  async function loadRosterAvatars() {
+    try {
+      const rows = await loadLeagueRoster();
+      setRoster(rows);
+    } catch {
+      setRoster([]);
+    }
+  }
+
+  /** Resolve face for any engraved holder (user id or display-name match). */
+  function resolveWinnerAvatar(
+    winnerUserId: string | null | undefined,
+    winnerName: string
+  ): string | undefined {
+    return resolveWinnerAvatarFromRoster(roster, winnerUserId, winnerName);
+  }
+
   useEffect(() => {
     const session = getSession();
     const league = getLeague();
@@ -72,6 +92,7 @@ export default function TrophyRoomPage() {
     setCanSync(isCommissioner() || isOps());
     setLeagueName(league?.name || "");
     setSportId(league?.sportId || "cfb");
+    void loadRosterAvatars();
     reload()
       .then(async () => {
         // Quiet auto-sync when host opens the room
@@ -79,6 +100,7 @@ export default function TrophyRoomPage() {
           try {
             await autoEngraveAllTrophies({});
             await reload();
+            await loadRosterAvatars();
           } catch {
             /* ignore */
           }
@@ -180,6 +202,7 @@ export default function TrophyRoomPage() {
     const shareKind = (
       t.startsWith("division_") ? "division" : t
     ) as ProfileTrophyKind;
+    const divKey = divisionFromTrophyType(t);
     const sharePayload = {
       kind: shareKind,
       seasonYear: item.seasonYear,
@@ -187,6 +210,9 @@ export default function TrophyRoomPage() {
       leagueName,
       subtitle: item.subtitle,
       sportId,
+      division: divKey || undefined,
+      winnerUserId: item.winnerUserId || undefined,
+      winnerAvatarUrl: resolveWinnerAvatar(item.winnerUserId, item.winnerName),
     };
     const title = item.subtitle || m.title;
     return (
