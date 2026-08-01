@@ -202,8 +202,16 @@ export async function findNewBadgeUnlocksForSession(): Promise<{
       syncFirstWeekFromCloud,
     } = await import("./first-week");
     // First week: earn quietly — no popup stack until first lock / scores
+    // Foundry testing can celebrate so the shop can see cheevo UX
     await syncFirstWeekFromCloud(session.playerId);
-    if (!canShowBadgeCelebrations(session.playerId)) {
+    let foundry = false;
+    try {
+      const { allowFoundryCeremonies } = await import("./foundry-preview");
+      foundry = allowFoundryCeremonies();
+    } catch {
+      foundry = false;
+    }
+    if (!canShowBadgeCelebrations(session.playerId) && !foundry) {
       return null;
     }
 

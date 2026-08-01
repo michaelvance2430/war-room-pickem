@@ -162,6 +162,19 @@ export function markGazetteSeen(leagueId: string, weekIndex: number): void {
   }
 }
 
+/** Foundry / re-score: allow the paper to pop again for this week. */
+export function clearGazetteSeenForWeek(
+  leagueId: string,
+  weekIndex: number
+): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(storageKey(leagueId, weekIndex));
+  } catch {
+    /* ignore */
+  }
+}
+
 /**
  * Sunday / Monday ritual naming — what people look forward to.
  * Scored weekend → Sunday Paper; Monday → Monday Morning Edition; else special.

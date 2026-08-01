@@ -260,6 +260,16 @@ export default function FounderDashboardPage() {
       if (kind === "board" && res.ok) {
         router.push(`/board?week=${week}`);
       }
+      // After score: go Home so Gazette + cheevo modals (mounted in Nav) can fire
+      if (
+        res.ok &&
+        (kind === "score" || kind === "both") &&
+        typeof window !== "undefined"
+      ) {
+        window.setTimeout(() => {
+          router.push("/");
+        }, 400);
+      }
     } catch (e) {
       setLabLog(e instanceof Error ? e.message : "Lab action failed");
     }
@@ -267,7 +277,7 @@ export default function FounderDashboardPage() {
   }
 
   function jumpPopup(
-    kind: "ring" | "card" | "gazette" | "cut" | "trophy"
+    kind: "ring" | "card" | "gazette" | "paper" | "cut" | "trophy"
   ) {
     void import("@/lib/creator-sandbox").then(async (sb) => {
       if (kind === "ring") {
@@ -287,6 +297,12 @@ export default function FounderDashboardPage() {
       }
       if (kind === "trophy") {
         sb.jumpTrophyStoryDoor();
+        router.push("/");
+        return;
+      }
+      if (kind === "paper") {
+        // Real paper + cheevo path after a scored week (Foundry drama unlock)
+        await sb.jumpGazettePaperAndCheevos();
         router.push("/");
         return;
       }
@@ -734,10 +750,17 @@ export default function FounderDashboardPage() {
               </button>
               <button
                 type="button"
+                onClick={() => jumpPopup("paper")}
+                className="py-2.5 rounded-lg border border-primary/40 bg-primary/10 text-xs font-semibold hover:bg-primary/15"
+              >
+                Gazette paper + cheevos (after score)
+              </button>
+              <button
+                type="button"
                 onClick={() => jumpPopup("gazette")}
                 className="py-2.5 rounded-lg border border-border text-xs font-semibold hover:bg-background"
               >
-                Week-3 Gazette shelf unlock
+                Week-3 Gazette shelf unlock only
               </button>
               <button
                 type="button"
@@ -760,8 +783,9 @@ export default function FounderDashboardPage() {
             <strong className="text-foreground">REAL ROOM</strong> = amber
             buttons (cloud standings).{" "}
             <strong className="text-foreground">PREVIEW</strong> = eyes mode
-            (local picks only). Tip: ⚡ Post + score → Gazette & Board → then
-            wear player eyes on week 1 vs 3.
+            (local picks only — stays quiet on purpose). Tip: ⚡ Post + score
+            → auto-opens drama (Gazette + cheevos on Home). First-hour eyes
+            still suppress popups so you can test the calm path.
           </p>
         </section>
 

@@ -199,6 +199,19 @@ export function jumpGazetteShelfReveal(): void {
   }
 }
 
+/** Force the actual Gazette paper + cheevo path (Foundry drama, not just shelf). */
+export async function jumpGazettePaperAndCheevos(): Promise<void> {
+  const s = loadCreatorSandbox();
+  saveCreatorSandbox({
+    enabled: true,
+    weekNumber: Math.max(s.weekNumber, 1),
+    scoredCount: Math.max(s.scoredCount, 1),
+    phase: s.weekNumber >= 3 ? "deepening" : "core",
+  });
+  const { forceFoundryGazetteAndCheevos } = await import("./foundry-preview");
+  await forceFoundryGazetteAndCheevos();
+}
+
 export function jumpCutStoryDoor(): void {
   // Approaching cut (CFB ~12–14)
   saveCreatorSandbox({

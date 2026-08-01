@@ -30,20 +30,23 @@ export default function BadgeUnlockModal() {
   const current = queue[0] ?? null;
   const remaining = Math.max(0, queue.length - 1);
 
-  const tryCelebrate = useCallback(async () => {
-    if (checked) return;
+  const tryCelebrate = useCallback(async (opts?: { force?: boolean }) => {
+    if (checked && !opts?.force) return;
     if (!getSession()?.playerId) return;
 
     // After first lock only for calm first 10 minutes; season-alive still ok later
+    // Foundry testing (not quiet eyes) can celebrate so you can see cheevo UX
     try {
       const {
         canShowBadgeCelebrations,
         isPreLockCalm,
         syncFirstWeekFromCloud,
       } = await import("@/lib/first-week");
+      const { allowFoundryCeremonies } = await import("@/lib/foundry-preview");
       await syncFirstWeekFromCloud(getSession()?.playerId);
-      if (isPreLockCalm(getSession()?.playerId)) return;
-      if (!canShowBadgeCelebrations(getSession()?.playerId)) {
+      const foundry = allowFoundryCeremonies() || !!opts?.force;
+      if (isPreLockCalm(getSession()?.playerId) && !foundry) return;
+      if (!canShowBadgeCelebrations(getSession()?.playerId) && !foundry) {
         // Stay unchecked so we re-try after they lock
         return;
       }
@@ -63,7 +66,7 @@ export default function BadgeUnlockModal() {
 
   useEffect(() => {
     function onGazetteDone() {
-      void tryCelebrate();
+      void tryCelebrate({ force: true });
     }
     function onFirstWeek() {
       void tryCelebrate();
@@ -79,13 +82,19 @@ export default function BadgeUnlockModal() {
       });
       setChecked(true);
     }
+    function onForceCheck() {
+      setChecked(false);
+      void tryCelebrate({ force: true });
+    }
     window.addEventListener(EVENT_GAZETTE_DONE, onGazetteDone);
     window.addEventListener("warroom-first-week-progress", onFirstWeek);
     window.addEventListener("warroom-badge-force-celebrate", onForce);
+    window.addEventListener("warroom-force-badge-check", onForceCheck);
     return () => {
       window.removeEventListener(EVENT_GAZETTE_DONE, onGazetteDone);
       window.removeEventListener("warroom-first-week-progress", onFirstWeek);
       window.removeEventListener("warroom-badge-force-celebrate", onForce);
+      window.removeEventListener("warroom-force-badge-check", onForceCheck);
     };
   }, [tryCelebrate]);
 
@@ -94,8 +103,18 @@ export default function BadgeUnlockModal() {
     if (checked) return;
     const timers = [3000, 6000, 10000].map((ms) =>
       setTimeout(() => {
-        if (!hasSeenRules()) return;
-        void tryCelebrate();
+        void (async () => {
+          try {
+            const { hasSeenRules } = await import("@/lib/rules");
+            const { allowFoundryCeremonies } = await import(
+              "@/lib/foundry-preview"
+            );
+            if (!hasSeenRules() && !allowFoundryCeremonies()) return;
+          } catch {
+            /* ok */
+          }
+          void tryCelebrate();
+        })();
       }, ms)
     );
     return () => timers.forEach(clearTimeout);

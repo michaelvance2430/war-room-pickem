@@ -274,9 +274,23 @@ export async function founderScoreWeek(weekNumber: number): Promise<OneClickLog>
     steps.push(`Scored ${scored.scoredCount ?? 0} player(s)`);
     await setLeagueActiveWeek(weekNumber);
 
+    // Foundry: unlock Gazette + cheevo path (not stuck in pre-lock calm)
+    try {
+      const { prepareFoundryDramaAfterScore } = await import(
+        "./foundry-preview"
+      );
+      const drama = await prepareFoundryDramaAfterScore(weekNumber);
+      if (drama.ok) steps.push(drama.message);
+      else steps.push(`Drama prep: ${drama.message}`);
+    } catch (e) {
+      steps.push(
+        `Drama prep skip: ${e instanceof Error ? e.message : "failed"}`
+      );
+    }
+
     return {
       ok: true,
-      message: `${label} scored · ${scored.scoredCount ?? 0} on the board · check Gazette`,
+      message: `${label} scored · ${scored.scoredCount ?? 0} on the board · open Home for Gazette`,
       steps,
     };
   } catch (e) {

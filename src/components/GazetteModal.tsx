@@ -25,12 +25,15 @@ export default function GazetteModal() {
 
     let cancelled = false;
 
-    async function tryShow() {
+    async function tryShow(opts?: { force?: boolean }) {
       // First 10 minutes: paper waits until after first lock
+      // Foundry testing (not quiet eyes) bypasses calm so you can see the paper
       try {
         const { isPreLockCalm } = await import("@/lib/first-week");
         const { getSession } = await import("@/lib/league");
-        if (isPreLockCalm(getSession()?.playerId)) {
+        const { allowFoundryCeremonies } = await import("@/lib/foundry-preview");
+        const calm = isPreLockCalm(getSession()?.playerId);
+        if (calm && !opts?.force && !allowFoundryCeremonies()) {
           notifyGazetteDone();
           return;
         }
@@ -43,14 +46,14 @@ export default function GazetteModal() {
         if (cancelled) return;
         const offer = await shouldOfferGazette(players);
         if (!offer.show) {
-          notifyGazetteDone();
+          if (!opts?.force) notifyGazetteDone();
           return;
         }
         setEdition(offer.edition);
         setLeagueId(offer.leagueId);
         setOpen(true);
       } catch {
-        notifyGazetteDone();
+        if (!opts?.force) notifyGazetteDone();
       }
     }
 
@@ -63,7 +66,11 @@ export default function GazetteModal() {
         void tryShow();
       }
     }
+    function onForce() {
+      void tryShow({ force: true });
+    }
     window.addEventListener("storage", onStorage);
+    window.addEventListener("warroom-force-gazette-paper", onForce);
 
     return () => {
       cancelled = true;
@@ -71,6 +78,7 @@ export default function GazetteModal() {
       clearTimeout(t2);
       clearTimeout(t3);
       window.removeEventListener("storage", onStorage);
+      window.removeEventListener("warroom-force-gazette-paper", onForce);
     };
   }, []);
 
@@ -81,7 +89,15 @@ export default function GazetteModal() {
         try {
           const { isPreLockCalm } = await import("@/lib/first-week");
           const { getSession } = await import("@/lib/league");
-          if (isPreLockCalm(getSession()?.playerId)) return;
+          const { allowFoundryCeremonies } = await import(
+            "@/lib/foundry-preview"
+          );
+          if (
+            isPreLockCalm(getSession()?.playerId) &&
+            !allowFoundryCeremonies()
+          ) {
+            return;
+          }
           const players = await loadLeaguePlayers();
           const offer = await shouldOfferGazette(players);
           if (offer.show) {
