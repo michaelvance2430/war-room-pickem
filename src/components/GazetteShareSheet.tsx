@@ -39,7 +39,13 @@ export default function GazetteShareSheet({ edition, open, onClose }: Props) {
   if (!open) return null;
 
   async function run(
-    mode: "native" | "download" | "copy_caption" | "facebook" | "instagram"
+    mode:
+      | "native"
+      | "download"
+      | "copy_caption"
+      | "copy_image"
+      | "facebook"
+      | "instagram"
   ) {
     setBusy(true);
     setStatus(null);
@@ -47,10 +53,16 @@ export default function GazetteShareSheet({ edition, open, onClose }: Props) {
       const result = await shareGazetteToSocial(edition, mode);
       if (result === "shared") {
         setStatus("Shared — go flex the paper 📰");
+      } else if (result === "image_copied") {
+        setStatus("Image copied — paste into Texts / Messages");
       } else if (result === "copied") {
         setStatus("Caption copied — paste under your post");
       } else if (result === "downloaded") {
-        if (mode === "instagram") {
+        if (mode === "copy_image") {
+          setStatus(
+            "Clipboard blocked — image downloaded. Attach it in your text thread."
+          );
+        } else if (mode === "instagram") {
           setStatus(
             "Image saved + caption copied — IG → New post / Story → add photo → paste caption"
           );
@@ -64,13 +76,13 @@ export default function GazetteShareSheet({ edition, open, onClose }: Props) {
       } else if (result === "cancelled") {
         setStatus(null);
       } else {
-        setStatus("Couldn’t share — try Download or Copy caption");
+        setStatus("Couldn’t share — try Copy image or Download");
       }
     } catch {
-      setStatus("Something went wrong — try Download image");
+      setStatus("Something went wrong — try Copy image or Download");
     }
     setBusy(false);
-    if (mode !== "copy_caption") {
+    if (mode !== "copy_caption" && mode !== "copy_image") {
       setTimeout(() => setStatus(null), 6000);
     }
   }
@@ -126,7 +138,9 @@ export default function GazetteShareSheet({ edition, open, onClose }: Props) {
           <p className="text-center text-xs text-stone-400 leading-relaxed px-1">
             Newspaper card + caption. Flex the crown, shame the room, and stamp{" "}
             <strong className="text-[#f4f0e6]">War Room Pick&apos;Em</strong> on
-            the post. Phones: Share opens IG / FB / Messages with the image.
+            the post. Phones: Share opens IG / FB / Messages.{" "}
+            <strong className="text-[#f4f0e6]">Copy image</strong> pastes
+            straight into a text thread.
           </p>
 
           <div className="grid grid-cols-1 gap-2">
@@ -156,6 +170,14 @@ export default function GazetteShareSheet({ edition, open, onClose }: Props) {
                 Facebook
               </button>
             </div>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void run("copy_image")}
+              className="w-full py-3 rounded-xl border-2 border-amber-500/50 bg-amber-500/15 text-amber-100 font-bold text-sm disabled:opacity-50 min-h-[48px]"
+            >
+              {busy ? "Working…" : "Copy image (for text)"}
+            </button>
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"

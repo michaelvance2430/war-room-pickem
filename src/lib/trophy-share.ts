@@ -648,20 +648,59 @@ export function downloadBlob(blob: Blob, filename: string) {
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
+/**
+ * Copy PNG to clipboard so users can paste into Texts / Messages / Notes.
+ * Chrome wants Blob; Safari often wants Promise&lt;Blob&gt;.
+ */
+export async function copyPngBlobToClipboard(blob: Blob): Promise<boolean> {
+  if (typeof navigator === "undefined" || !navigator.clipboard?.write) {
+    return false;
+  }
+  if (typeof ClipboardItem === "undefined") return false;
+
+  try {
+    await navigator.clipboard.write([
+      new ClipboardItem({ "image/png": blob }),
+    ]);
+    return true;
+  } catch {
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          "image/png": Promise.resolve(blob),
+        } as Record<string, ClipboardItemData>),
+      ]);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
 export type TrophyShareResult =
   | "shared"
   | "copied"
+  | "image_copied"
   | "downloaded"
   | "failed"
   | "cancelled";
 
+export type TrophyShareMode =
+  | "native"
+  | "download"
+  | "copy_caption"
+  | "copy_image"
+  | "facebook"
+  | "instagram";
+
 /**
  * Prefer native share sheet with image file (IG / FB / Messages on mobile).
  * Falls back to download + copy caption.
+ * copy_image: plain PNG on clipboard for texting.
  */
 export async function shareTrophyToSocial(
   t: ShareableTrophy,
-  mode: "native" | "download" | "copy_caption" | "facebook" | "instagram"
+  mode: TrophyShareMode
 ): Promise<TrophyShareResult> {
   const pack = buildTrophySharePack(t);
   const canvas = renderTrophyShareCanvas(t);
@@ -676,6 +715,14 @@ export async function shareTrophyToSocial(
     } catch {
       return "failed";
     }
+  }
+
+  if (mode === "copy_image") {
+    const ok = await copyPngBlobToClipboard(blob);
+    if (ok) return "image_copied";
+    // Fallback: download so they can still attach in Messages
+    downloadBlob(blob, filename);
+    return "downloaded";
   }
 
   if (mode === "download") {
