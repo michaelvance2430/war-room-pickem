@@ -135,10 +135,10 @@ import {
   resolveHomeTagline,
 } from "@/lib/home-tagline";
 import {
-  SEASON_THEME_PRESETS,
   DEFAULT_SEASON_THEME_ID,
   applySeasonTheme,
   resolveSeasonThemeId,
+  seasonThemePresetsForSport,
   type SeasonThemeId,
 } from "@/lib/season-theme";
 
@@ -2689,16 +2689,14 @@ function CommissionerPageInner() {
               <div className="rounded-xl border border-border bg-background p-4 space-y-3">
                 <div>
                   <p className="text-sm font-semibold text-foreground">
-                    Holiday / season background
+                    Room skin / background
                   </p>
                   <p className="text-xs text-muted mt-1 leading-relaxed">
-                    Every sport pack includes this.{" "}
-                    <strong className="text-foreground">Sport default</strong>{" "}
-                    = this league&apos;s pack look (CFB green, NFL primetime,
-                    etc.). Holidays (Halloween, Thanksgiving, Christmas, New
-                    Year…) wash <strong className="text-foreground">every
-                    page</strong> for the whole room — same picker for CFB, NFL,
-                    and future packs. We can add more seasons anytime.
+                    <strong className="text-foreground">War Room Colors</strong>{" "}
+                    is the classic black + green clubhouse (NFL rooms keep
+                    navy/crimson as their pack default). CFB hosts can also
+                    pick campus skins. Holidays wash every page for the whole
+                    room.
                   </p>
                 </div>
                 <label className="block text-xs text-muted">
@@ -2714,7 +2712,7 @@ function CommissionerPageInner() {
                     }}
                     className="mt-1 w-full bg-card border border-border rounded-lg px-3 py-2 text-sm text-foreground"
                   >
-                    {SEASON_THEME_PRESETS.map((p) => (
+                    {seasonThemePresetsForSport(league?.sportId).map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.label}
                       </option>
@@ -2722,8 +2720,9 @@ function CommissionerPageInner() {
                   </select>
                 </label>
                 <p className="text-[11px] text-muted leading-relaxed">
-                  {SEASON_THEME_PRESETS.find((p) => p.id === seasonThemeId)
-                    ?.blurb || ""}{" "}
+                  {seasonThemePresetsForSport(league?.sportId).find(
+                    (p) => p.id === seasonThemeId
+                  )?.blurb || ""}{" "}
                   Preview applies immediately (and sticks if you{" "}
                   <strong className="text-foreground">View as player</strong>
                   ). Hit{" "}

@@ -33,6 +33,7 @@ export type SportHomeChrome = {
   atmosphere: SportAtmosphere;
 };
 
+/** War Room Colors — classic black + signal green (default CFB clubhouse) */
 const CFB_ATMO: SportAtmosphere = {
   baseGradient:
     "radial-gradient(ellipse 80% 60% at 50% 0%, rgba(34, 197, 94, 0.12), transparent 55%), radial-gradient(ellipse 70% 50% at 100% 100%, rgba(120, 40, 40, 0.18), transparent 50%), radial-gradient(ellipse 50% 40% at 0% 80%, rgba(20, 40, 30, 0.5), transparent 45%), #050805",
@@ -44,6 +45,66 @@ const CFB_ATMO: SportAtmosphere = {
   titleGlow: "drop-shadow-[0_0_30px_rgba(34,197,94,0.15)]",
   accentHex: "#22c55e",
 };
+
+/** CFB · Saturday Turf — brighter campus Saturday */
+const CFB_SATURDAY_ATMO: SportAtmosphere = {
+  baseGradient: `radial-gradient(ellipse 90% 55% at 50% -5%, rgba(34, 197, 94, 0.28), transparent 52%),
+     radial-gradient(ellipse 60% 45% at 100% 80%, rgba(22, 163, 74, 0.14), transparent 50%),
+     radial-gradient(ellipse 55% 50% at 0% 90%, rgba(10, 40, 20, 0.85), transparent 48%),
+     #030a05`,
+  gridLine: "rgba(34,197,94,0.07)",
+  vignette:
+    "radial-gradient(ellipse at center, transparent 38%, rgba(0,0,0,0.78) 100%)",
+  scanline:
+    "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.3) 3px)",
+  titleGlow: "drop-shadow-[0_0_32px_rgba(34,197,94,0.28)]",
+  accentHex: "#22c55e",
+};
+
+/** CFB · Night Game — cooler floodlights */
+const CFB_NIGHT_ATMO: SportAtmosphere = {
+  baseGradient: `radial-gradient(ellipse 70% 40% at 50% 0%, rgba(226, 232, 240, 0.08), transparent 50%),
+     radial-gradient(ellipse 85% 55% at 50% 100%, rgba(16, 185, 129, 0.12), transparent 55%),
+     radial-gradient(ellipse 50% 50% at 0% 50%, rgba(6, 78, 59, 0.35), transparent 50%),
+     #020806`,
+  gridLine: "rgba(52,211,153,0.05)",
+  vignette:
+    "radial-gradient(ellipse at center, transparent 42%, rgba(0,0,0,0.88) 100%)",
+  scanline:
+    "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.42) 3px)",
+  titleGlow: "drop-shadow-[0_0_26px_rgba(52,211,153,0.22)]",
+  accentHex: "#34d399",
+};
+
+/** CFB · Rivalry Week — green with crimson heat */
+const CFB_RIVALRY_ATMO: SportAtmosphere = {
+  baseGradient: `radial-gradient(ellipse 80% 50% at 50% 0%, rgba(34, 197, 94, 0.18), transparent 52%),
+     radial-gradient(ellipse 55% 45% at 100% 70%, rgba(185, 28, 28, 0.2), transparent 50%),
+     radial-gradient(ellipse 50% 45% at 0% 85%, rgba(20, 40, 20, 0.7), transparent 48%),
+     #060805`,
+  gridLine: "rgba(34,197,94,0.05)",
+  vignette:
+    "radial-gradient(ellipse at center, transparent 36%, rgba(0,0,0,0.8) 100%)",
+  scanline:
+    "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.36) 3px)",
+  titleGlow: "drop-shadow-[0_0_28px_rgba(34,197,94,0.2)] drop-shadow-[0_0_16px_rgba(185,28,28,0.15)]",
+  accentHex: "#22c55e",
+};
+
+function cfbAtmosphereForTheme(
+  seasonThemeId?: string | null
+): SportAtmosphere {
+  switch (seasonThemeId) {
+    case "cfb_saturday":
+      return CFB_SATURDAY_ATMO;
+    case "cfb_night_lights":
+      return CFB_NIGHT_ATMO;
+    case "cfb_rivalry":
+      return CFB_RIVALRY_ATMO;
+    default:
+      return CFB_ATMO;
+  }
+}
 
 /**
  * Pro football Sunday palette — original War Room skin, not any league shield.
@@ -136,7 +197,7 @@ function chromeForPack(pack: SportPack): SportHomeChrome {
     };
   }
 
-  // Default / CFB gold standard (green War Room)
+  // Default / CFB — War Room Colors (+ optional CFB room skins)
   return {
     sportId,
     pack,
@@ -155,16 +216,29 @@ function chromeForPack(pack: SportPack): SportHomeChrome {
   };
 }
 
-/** Resolve chrome from active league (local cache). */
+/** Resolve chrome from active league (local cache + CFB room skin). */
 export function resolveHomeChrome(
-  sportId?: string | null
+  sportId?: string | null,
+  seasonThemeId?: string | null
 ): SportHomeChrome {
   const id =
     sportId ||
     getLeague()?.sportId ||
     undefined;
   const pack = getSportPack(normalizeSportId(id));
-  return chromeForPack(pack);
+  const chrome = chromeForPack(pack);
+  const theme =
+    seasonThemeId ??
+    (typeof window !== "undefined"
+      ? getLeague()?.settings?.seasonThemeId
+      : null);
+  if (pack.id === "cfb") {
+    return {
+      ...chrome,
+      atmosphere: cfbAtmosphereForTheme(theme),
+    };
+  }
+  return chrome;
 }
 
 export function isWwcLeague(sportId?: string | null): boolean {
