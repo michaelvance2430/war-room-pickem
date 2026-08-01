@@ -130,26 +130,34 @@ export default function LoginWelcomeModal() {
 
         <div className="px-5 py-4 overflow-y-auto flex-1 min-h-0 space-y-3 text-sm text-muted leading-relaxed">
           <p className="text-foreground">
-            You&apos;re in. Welcome to the room — lock a card, talk in the
-            locker, and let the standings do the roasting.
+            Honestly? We&apos;re a little surprised you figured out how to get
+            in. Like… genuinely. There was a betting pool.
           </p>
           <p>
-            We ship improvements constantly (messy on purpose). Check back
-            when you can; new stuff keeps landing.
+            I guess the rumors are true —{" "}
+            <span className="text-primary font-semibold">you CAN read</span>.
+            Bold of you. Rare talent these days. Don&apos;t let it go to your
+            head.
           </p>
           <div className="rounded-xl border border-primary/35 bg-primary/10 px-3.5 py-3 space-y-2">
             <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-primary">
-              One job this week
+              Heads up from the shop
+            </p>
+            <p className="text-foreground text-sm leading-relaxed">
+              Improvements are being made around the clock (well, around{" "}
+              <em>our</em> clock — it&apos;s messy). Check back when you can;
+              new stuff will keep landing.
             </p>
             <p className="text-foreground text-sm leading-relaxed font-medium">
-              Open <span className="text-primary">My Picks</span>, fill the
-              card, and lock before first kickoff. Everything else opens after
-              that.
+              One real job this week: open{" "}
+              <span className="text-primary">My Picks</span>, fill the card,
+              and lock before first kickoff.
             </p>
           </div>
-          <p className="text-xs text-muted">
-            Humor stays. Homework later. You already passed the hard part —
-            getting in.
+          <p className="text-xs text-muted leading-relaxed">
+            In the meantime, search around, mash some buttons, and see what you
+            can discover… sorta like your first… well. Never mind. We believe
+            in you. Mostly.
           </p>
         </div>
 
