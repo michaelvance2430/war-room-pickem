@@ -2856,13 +2856,100 @@ export async function clearTrialBotsInCloud(): Promise<{
   return { ok: true, removed };
 }
 
+/**
+ * Sandbox / season sim: if YOU have no locked slip for the week, lock a
+ * random full card (same idea as bot slips). Without this, bot-only fills
+ * score everyone but the host — you always finish last with 0 pts.
+ *
+ * Never overwrites an already-locked human slip.
+ */
+export async function seedSelfSimPicksIfEmpty(
+  weekNumber: number
+): Promise<{ ok: boolean; filled: boolean; error?: string }> {
+  const session = getSession();
+  if (!session?.leagueId || !session.playerId) {
+    return { ok: false, filled: false, error: "Not signed into a league" };
+  }
+
+  try {
+    const card = await loadWeekCard(weekNumber);
+    if (!card?.games?.length || !card.prop?.options?.length) {
+      return { ok: false, filled: false, error: "No published card" };
+    }
+
+    const supabase = createClient();
+    const { data: auth } = await supabase.auth.getUser();
+    const uid = auth.user?.id || session.playerId;
+    const { data: existing } = await supabase
+      .from("picks")
+      .select("id, locked_at")
+      .eq("league_id", session.leagueId)
+      .eq("user_id", uid)
+      .eq("week_number", weekNumber)
+      .maybeSingle();
+    if (existing?.locked_at) {
+      return { ok: true, filled: false };
+    }
+
+    const games = card.games;
+    const n = games.length;
+    const confs = Array.from({ length: n }, (_, i) => i + 1);
+    for (let i = n - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const t = confs[i];
+      confs[i] = confs[j];
+      confs[j] = t;
+    }
+    const bestIdx = Math.floor(Math.random() * n);
+    const picks: Record<string, UserPick> = {};
+    games.forEach((g, i) => {
+      const side: "home" | "away" = Math.random() < 0.5 ? "home" : "away";
+      const fav =
+        g.favorite === "away" || g.favorite === "home" ? g.favorite : "home";
+      picks[g.id] = {
+        gameId: g.id,
+        pick: side,
+        confidence: confs[i],
+        isBestBet: i === bestIdx,
+        lockedSpread: Number(g.spread ?? 0),
+        lockedFavorite: fav,
+      };
+    });
+    const opts = card.prop.options;
+    const propChoice =
+      opts[Math.random() < 0.5 ? 0 : Math.min(1, opts.length - 1)] || opts[0];
+
+    const saved = await savePicksToCloud({
+      weekNumber,
+      picks,
+      bestBetId: games[bestIdx]?.id || null,
+      propChoice,
+    });
+    if (!saved.ok) {
+      return {
+        ok: false,
+        filled: false,
+        error: saved.error || "Could not lock your sim slip",
+      };
+    }
+    return { ok: true, filled: true };
+  } catch (e) {
+    return {
+      ok: false,
+      filled: false,
+      error: e instanceof Error ? e.message : "Self sim picks failed",
+    };
+  }
+}
+
 /** Auto-lock valid pick slips for every bot for a published week. */
 export async function seedBotPicksForWeekInCloud(
   weekNumber: number,
-  opts?: { chaosChance?: number; skipChaos?: boolean }
+  opts?: { chaosChance?: number; skipChaos?: boolean; skipSelf?: boolean }
 ): Promise<{
   ok: boolean;
   botsFilled?: number;
+  selfFilled?: boolean;
   chaosCount?: number;
   chaosNames?: string[];
   error?: string;
@@ -2889,8 +2976,16 @@ export async function seedBotPicksForWeekInCloud(
   }
 
   const botsFilled = row.botsFilled ?? 0;
+
+  // You are not a bot — RPC skips humans. Lock a sim slip so you aren't 0 pts.
+  let selfFilled = false;
+  if (!opts?.skipSelf) {
+    const self = await seedSelfSimPicksIfEmpty(weekNumber);
+    selfFilled = !!self.filled;
+  }
+
   if (opts?.skipChaos || botsFilled === 0) {
-    return { ok: true, botsFilled, chaosCount: 0 };
+    return { ok: true, botsFilled, selfFilled, chaosCount: 0 };
   }
 
   // ~1 in 5 bots go Chaos so you can see 2× impact + Gazette detonation
@@ -2900,6 +2995,7 @@ export async function seedBotPicksForWeekInCloud(
   return {
     ok: true,
     botsFilled,
+    selfFilled,
     chaosCount: chaos.ok ? chaos.chaosCount ?? 0 : 0,
     chaosNames: chaos.names,
     error: chaos.ok ? undefined : chaos.error,

@@ -191,12 +191,22 @@ export async function autoFinishRemainingWeeks(opts?: {
       }
       const games = pub.games;
 
-      opts?.onProgress?.({ week, label, step: "Bot picks…" });
+      opts?.onProgress?.({
+        week,
+        label,
+        step: "Bot picks + your sim slip…",
+      });
       const bots = await seedBotPicksForWeekInCloud(week);
       if (!bots.ok) {
         errors.push(
           `${label}: bot picks warning — ${bots.error || "failed"} (scoring anyway)`
         );
+      } else if (bots.selfFilled) {
+        opts?.onProgress?.({
+          week,
+          label,
+          step: `Bots locked (${bots.botsFilled ?? 0}) · your slip locked too`,
+        });
       }
 
       try {
