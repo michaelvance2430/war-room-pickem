@@ -2,25 +2,26 @@
 
 /**
  * Sticky hop bar for hosts in season SANDBOX (pre-doors dry-run).
- * Same job as Foundry’s bottom chrome — navigate the room without hunting menus.
- * Amber = sandbox. Sky = Foundry (creator). Don’t stack both.
+ * Hop chips = navigate the room (Host = commissioner sim tools).
+ * Exit Host = leave the bar + wipe this dry-run board so they can start clean.
  */
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { isOps, getSession } from "@/lib/league";
+import { isOps, getSession, getLeague } from "@/lib/league";
 import { isSandboxMode } from "@/lib/season-mode";
 import { isGuestMode } from "@/lib/guest-mode";
 import { isAppCreator } from "@/lib/creator";
 import { getSeasonOpenLabel } from "@/lib/season-countdown";
-import { getLeague } from "@/lib/league";
 import {
   EVENT_CREATOR_EYES,
   isCreatorEyesActive,
 } from "@/lib/creator-eyes";
 
 const EVENT_FOUNDRY_SESSION = "warroom-foundry-session";
+/** Session dismiss — bar returns when you open Host tools again */
+const DISMISS_KEY = "warroom-sandbox-chrome-dismissed-v1";
 
 function isFoundryChromeActive(): boolean {
   if (typeof window === "undefined") return false;
@@ -45,6 +46,8 @@ export default function SandboxSessionChrome() {
   const pathname = usePathname();
   const [show, setShow] = useState(false);
   const [openLabel, setOpenLabel] = useState("doors open");
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
 
   useEffect(() => {
     function refresh() {
@@ -60,11 +63,27 @@ export default function SandboxSessionChrome() {
         setShow(false);
         return;
       }
-      // Creator Foundry bar wins when active — one sticky only
       if (isAppCreator(getSession()?.playerId) && isFoundryChromeActive()) {
         setShow(false);
         return;
       }
+
+      // On Host tools again → re-arm the hop bar
+      const onHost =
+        pathname === "/commissioner" ||
+        pathname?.startsWith("/commissioner/");
+      try {
+        if (onHost) {
+          sessionStorage.removeItem(DISMISS_KEY);
+        }
+        if (!onHost && sessionStorage.getItem(DISMISS_KEY) === "1") {
+          setShow(false);
+          return;
+        }
+      } catch {
+        /* ok */
+      }
+
       try {
         setOpenLabel(getSeasonOpenLabel(getLeague()?.sportId));
       } catch {
@@ -85,6 +104,54 @@ export default function SandboxSessionChrome() {
     };
   }, [pathname]);
 
+  async function exitHostAndWipe() {
+    if (busy) return;
+    const ok = confirm(
+      "Exit Host sandbox hop?\n\n" +
+        "This wipes this dry-run board:\n" +
+        "• Week cards & games\n" +
+        "• All picks (humans + bots)\n" +
+        "• Sim results & scores\n\n" +
+        "Members stay. League code stays.\n" +
+        "Prior-season trophies (Excel / Super Bowl wall) stay.\n\n" +
+        "Continue?"
+    );
+    if (!ok) return;
+
+    setBusy(true);
+    setNote(null);
+    try {
+      const { resetSeasonInCloud } = await import("@/lib/cloud");
+      const res = await resetSeasonInCloud();
+      if (!res.ok) {
+        setNote(res.error || "Could not wipe dry-run board.");
+        setBusy(false);
+        return;
+      }
+      // Local sim cheevo residue only — do NOT wipe Trophy Room / last-season wall
+      try {
+        if (isSandboxMode()) {
+          const { scrubSandboxProgressOnThisDevice } = await import(
+            "@/lib/sandbox-wipe"
+          );
+          scrubSandboxProgressOnThisDevice();
+        }
+      } catch {
+        /* best-effort */
+      }
+      try {
+        sessionStorage.setItem(DISMISS_KEY, "1");
+      } catch {
+        /* ok */
+      }
+      setShow(false);
+      window.location.href = "/";
+    } catch (e) {
+      setNote(e instanceof Error ? e.message : "Exit failed");
+      setBusy(false);
+    }
+  }
+
   if (!show) return null;
 
   return (
@@ -103,12 +170,15 @@ export default function SandboxSessionChrome() {
                 Dry-run until {openLabel} · sim scores, no career bank
               </p>
             </div>
-            <Link
-              href="/commissioner?tab=card"
-              className="shrink-0 min-h-[44px] px-3.5 rounded-xl bg-amber-400 text-black text-xs font-extrabold inline-flex items-center touch-manipulation"
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void exitHostAndWipe()}
+              className="shrink-0 min-h-[44px] px-3.5 rounded-xl bg-amber-400 text-black text-xs font-extrabold inline-flex items-center touch-manipulation disabled:opacity-50"
+              title="Wipe this dry-run board and leave the hop bar"
             >
-              ← Host desk
-            </Link>
+              {busy ? "Wiping…" : "Exit Host"}
+            </button>
           </div>
           <div className="flex gap-1.5 overflow-x-auto phone-h-scroll pb-0.5 -mx-0.5 px-0.5">
             {HOPS.map((h) => {
@@ -131,6 +201,16 @@ export default function SandboxSessionChrome() {
               );
             })}
           </div>
+          {note && (
+            <p className="text-[10px] text-red-300 font-medium leading-snug">
+              {note}
+            </p>
+          )}
+          <p className="text-[9px] text-amber-200/60 leading-snug">
+            <strong className="text-amber-200/90">Host</strong> = sim tools.{" "}
+            <strong className="text-amber-200/90">Exit Host</strong> = wipe this
+            dry-run board and dismiss the bar (reopen Host tools to hop again).
+          </p>
         </div>
       </div>
     </div>
