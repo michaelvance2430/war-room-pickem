@@ -199,6 +199,32 @@ export default function Home() {
   }, [ready]);
 
   useEffect(() => {
+    let cancelled = false;
+    // Never leave Home on "Loading…" forever — phone open must fail open
+    const bootWatch = window.setTimeout(() => {
+      if (cancelled) return;
+      try {
+        const shell = readLocalHomeShell();
+        if (shell) {
+          setLeagueCode(shell.leagueCode);
+          setLeagueName(shell.leagueName);
+          setSportId(shell.sportId);
+          setHomeTagline(shell.homeTagline);
+          setIsCommish(shell.isCommish);
+          setActuallyCommish(shell.actuallyCommish);
+          setFirstWeekChrome(shell.firstWeekChrome);
+          setShowGazetteShelf(shell.showGazetteShelf);
+          setReady(true);
+          return;
+        }
+      } catch {
+        /* fall through */
+      }
+      setBootError(
+        "App took too long to open. Check your connection, then try again."
+      );
+    }, 10_000);
+
     async function boot() {
       try {
         if (isGuestMode()) {
@@ -268,6 +294,7 @@ export default function Home() {
               } catch {
                 /* ignore */
               }
+              if (cancelled) return;
               setLeagueCode(fresh.code);
               setLeagueName(fresh.name);
               setSportId(sport);
@@ -285,6 +312,7 @@ export default function Home() {
                 const snap = await pd.loadProgressiveSnapshot(
                   getSession()?.playerId
                 );
+                if (cancelled) return;
                 setFirstWeekChrome(snap.firstWeekChrome);
                 setShowGazetteShelf(snap.showGazetteShelf);
               } catch {
@@ -310,8 +338,15 @@ export default function Home() {
 
         if (!session || !league) {
           const restored = await restoreSessionFromCloud();
+          if (cancelled) return;
           if (restored.status === "no_auth") {
             router.replace("/login");
+            return;
+          }
+          if (restored.status === "network_error") {
+            setBootError(
+              "Couldn’t load your room (slow connection). Tap Try again — don’t create a new league."
+            );
             return;
           }
           if (restored.status === "no_leagues") {
@@ -327,6 +362,7 @@ export default function Home() {
         }
 
         const fresh = (await syncLeagueFromCloud()) || league;
+        if (cancelled) return;
         let sport = fresh.sportId || league?.sportId || "cfb";
         try {
           const { forcedSportForLeague, applySportTheme, pinLeagueSport } =
@@ -385,7 +421,11 @@ export default function Home() {
         }
         setReady(true);
       } catch (e: unknown) {
-        setBootError(e instanceof Error ? e.message : "Failed to start");
+        if (!cancelled) {
+          setBootError(e instanceof Error ? e.message : "Failed to start");
+        }
+      } finally {
+        window.clearTimeout(bootWatch);
       }
     }
     void boot();
@@ -404,6 +444,8 @@ export default function Home() {
     window.addEventListener("warroom-first-week-progress", onFirstWeek);
     window.addEventListener("warroom-progressive-disclosure", onFirstWeek);
     return () => {
+      cancelled = true;
+      window.clearTimeout(bootWatch);
       window.removeEventListener("warroom-view-as-player", onPreview);
       window.removeEventListener("warroom-first-week-progress", onFirstWeek);
       window.removeEventListener("warroom-progressive-disclosure", onFirstWeek);
@@ -453,7 +495,31 @@ export default function Home() {
   if (bootError) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4 bg-background">
-      <div className="max-w-md text-center text-sm text-danger">{bootError}</div>
+        <div className="max-w-md w-full text-center space-y-4">
+          <p className="text-sm text-danger leading-relaxed">{bootError}</p>
+          <div className="flex flex-col sm:flex-row gap-2 justify-center">
+            <button
+              type="button"
+              onClick={() => {
+                setBootError(null);
+                try {
+                  window.location.assign("/");
+                } catch {
+                  window.location.href = "/";
+                }
+              }}
+              className="min-h-[48px] px-5 rounded-xl bg-primary text-black text-sm font-extrabold touch-manipulation"
+            >
+              Try again
+            </button>
+            <Link
+              href="/login"
+              className="min-h-[48px] px-5 rounded-xl border border-border text-sm font-semibold flex items-center justify-center touch-manipulation"
+            >
+              Sign in
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }

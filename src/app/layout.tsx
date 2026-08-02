@@ -8,6 +8,7 @@ import SandboxSessionChrome from "@/components/SandboxSessionChrome";
 import LeagueBuildGate from "@/components/LeagueBuildGate";
 import PullToRefresh from "@/components/PullToRefresh";
 import RouteHardSwitch from "@/components/RouteHardSwitch";
+import BootWatchdog from "@/components/BootWatchdog";
 import AppShell from "@/components/AppShell";
 
 const geistSans = Geist({
@@ -47,7 +48,8 @@ export const metadata: Metadata = {
   },
   manifest: "/manifest.webmanifest",
   other: {
-    "copyright": "© 2026 Mike Vance. War Room Pick'Em. All rights reserved. Owned by Mike Vance.",
+    copyright:
+      "© 2026 Mike Vance. War Room Pick'Em. All rights reserved. Owned by Mike Vance.",
   },
 };
 
@@ -75,15 +77,16 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-background text-foreground phone-shell">
         <RouteHardSwitch />
-      <SportThemeApplier />
+        <BootWatchdog />
+        <SportThemeApplier />
         <SeasonThemeApplier />
-      <FoundrySessionChrome />
+        <FoundrySessionChrome />
         <SandboxSessionChrome />
-      <LeagueBuildGate />
+        <LeagueBuildGate />
         <PullToRefresh>
-      <AppShell>{children}</AppShell>
-      </PullToRefresh>
+          <AppShell>{children}</AppShell>
+        </PullToRefresh>
       </body>
-      </html>
+    </html>
   );
 }

@@ -929,19 +929,18 @@ export default function Nav() {
                   prefetch={false}
                   onClick={(e) => {
                     closeChrome();
-                    // Phone: Standings → Picks soft-nav left a half-dead shell.
-                    // Hard open My Picks so card load always boots clean.
-                    if (
-                      tab.href === "/picks" &&
-                      pathname !== "/picks" &&
-                      !pathname?.startsWith("/picks/")
-                    ) {
+                    hardNavPrepare();
+                    // Phone: soft SPA tab hops left half-dead shells (scroll
+                    // locks, stuck Loading). Full open = clean boot every tab.
+                    const same =
+                      pathname === tab.href ||
+                      (tab.href !== "/" && pathname?.startsWith(tab.href + "/"));
+                    if (!same) {
                       e.preventDefault();
-                      hardNavPrepare();
                       try {
-                        window.location.assign("/picks");
+                        window.location.assign(tab.href);
                       } catch {
-                        window.location.href = "/picks";
+                        window.location.href = tab.href;
                       }
                     }
                   }}

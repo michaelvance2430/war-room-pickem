@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   loadWeekCard,
+  loadBestAvailableWeekCard,
   loadMyPicks,
   loadLeagueRoster,
   loadLeaguePlayers,
@@ -79,12 +80,23 @@ export default function HomeWeekHero() {
         if (cancelled) return;
 
         // Parallel: card + roster + picks (all hot-path cached)
-        const [card, roster, mine] = await Promise.all([
+        let [card, roster, mine] = await Promise.all([
           loadWeekCard(week),
           loadLeagueRoster().catch(() => []),
           loadMyPicks(week).catch(() => null),
         ]);
         if (cancelled) return;
+
+        // Wrong active-week stamp? Find any published card so Home isn't "empty"
+        let liveWeek = week;
+        if (!card?.games?.length) {
+          const best = await loadBestAvailableWeekCard(week).catch(() => null);
+          if (best?.card?.games?.length) {
+            card = best.card;
+            liveWeek = best.week;
+            mine = await loadMyPicks(liveWeek).catch(() => null);
+          }
+        }
 
         const games = card?.games || [];
         const hasCard = games.length > 0;
@@ -98,7 +110,7 @@ export default function HomeWeekHero() {
 
         // Paint hero immediately — last-week recap can fill in after
         const next: HeroState = {
-          week,
+          week: liveWeek,
           hasCard,
           gameCount: games.length,
           lockLabel: hasCard ? formatCardLockDeadline(games) : null,

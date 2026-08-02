@@ -1854,27 +1854,36 @@ export async function listScoredWeekNumbers(): Promise<number[]> {
   const session = getSession();
   if (!session?.leagueId) return [];
   const hit = cacheGet(scoredCache, session.leagueId, LIST_TTL_MS);
-  if (hit) return hit;
+  if (hit !== undefined) return hit;
   try {
     const supabase = createClient();
-    const data = await withTimeout(
+    type ScoredRows = { id: string; week_number: number }[] | null;
+    const data = await withTimeout<
+      | { kind: "ok"; rows: ScoredRows }
+      | { kind: "fail" }
+    >(
       (async () => {
         const { data: rows, error } = await supabase
           .from("week_results")
           .select("id, week_number")
           .eq("league_id", session.leagueId);
-        if (error || !rows?.length) return null;
-        return rows;
+        if (error) return { kind: "fail" as const };
+        return {
+          kind: "ok" as const,
+          rows: (rows as ScoredRows) || [],
+        };
       })(),
       8_000,
-      null
+      { kind: "fail" }
     );
-    if (!data?.length) {
+    // Timeout / error: do not poison-cache empty scored list
+    if (data.kind === "fail") return [];
+    if (!data.rows?.length) {
       cacheSet(scoredCache, session.leagueId, []);
       return [];
     }
 
-    const ids = data.map((r) => r.id as string).filter(Boolean);
+    const ids = data.rows.map((r) => r.id as string).filter(Boolean);
     if (!ids.length) {
       cacheSet(scoredCache, session.leagueId, []);
       return [];
@@ -1895,7 +1904,7 @@ export async function listScoredWeekNumbers(): Promise<number[]> {
 
     // If game_results query fails (table missing), fall back to any week_results
     if (!gr) {
-      const fallback = data
+      const fallback = data.rows
         .map((r) => Number(r.week_number))
         .filter((n) => !Number.isNaN(n))
         .sort((a, b) => a - b);
@@ -1907,7 +1916,7 @@ export async function listScoredWeekNumbers(): Promise<number[]> {
       (gr || []).map((g) => g.week_result_id as string)
     );
     // Only weeks that actually have ATS winners recorded
-    const out = data
+    const out = data.rows
       .filter((r) => withGames.has(r.id as string))
       .map((r) => Number(r.week_number))
       .filter((n) => !Number.isNaN(n))

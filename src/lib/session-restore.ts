@@ -377,21 +377,63 @@ export function membershipScanLine(
 export type RestoreResult =
   | { status: "no_auth" }
   | { status: "no_leagues" }
+  /** Auth ok but memberships fetch timed out / failed — do not bounce to /join */
+  | { status: "network_error" }
   | { status: "restored"; session: Session; league: League }
   | { status: "pick_league"; memberships: LeagueMembership[] };
 
 /**
  * If local session missing, restore from Supabase memberships.
  * Prefer last active league, else single membership, else ask user to pick.
+ *
+ * Uses auth.getSession() (local JWT) — NOT getUser() which network-validates
+ * and hangs forever on flaky mobile, freezing Home on "Loading…".
  */
 export async function restoreSessionFromCloud(): Promise<RestoreResult> {
   const supabase = createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth.user) return { status: "no_auth" };
+  let userId: string | null = null;
+  {
+    const { data } = await supabase.auth.getSession();
+    userId = data.session?.user?.id || null;
+  }
+  if (!userId) {
+    // One short hydrate wait — iOS Safari sometimes lags localStorage → GoTrue
+    await new Promise((r) => setTimeout(r, 250));
+    const { data } = await supabase.auth.getSession();
+    userId = data.session?.user?.id || null;
+  }
+  if (!userId) return { status: "no_auth" };
 
-  const userId = auth.user.id;
-  const memberships = await fetchMyMemberships();
-  if (!memberships.length) return { status: "no_leagues" };
+  // Cap membership fetch — never block app open on a stuck PostgREST call
+  let membershipsTimedOut = false;
+  const memberships = await new Promise<LeagueMembership[]>((resolve) => {
+    let done = false;
+    const t = setTimeout(() => {
+      if (done) return;
+      done = true;
+      membershipsTimedOut = true;
+      resolve([]);
+    }, 8_000);
+    fetchMyMemberships()
+      .then((list) => {
+        if (done) return;
+        done = true;
+        clearTimeout(t);
+        resolve(list);
+      })
+      .catch(() => {
+        if (done) return;
+        done = true;
+        membershipsTimedOut = true;
+        clearTimeout(t);
+        resolve([]);
+      });
+  });
+  if (!memberships.length) {
+    // Flaky phone radio: empty after timeout ≠ "create a league"
+    if (membershipsTimedOut) return { status: "network_error" };
+    return { status: "no_leagues" };
+  }
 
   // Prefer the league this browser is already pointed at (create / join / switch)
   // over a stale warroom-active-league-id from an older CFB room.
@@ -428,12 +470,13 @@ export async function restoreSessionFromCloud(): Promise<RestoreResult> {
 
 export async function switchToLeague(leagueId: string): Promise<boolean> {
   const supabase = createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth.user) return false;
+  const { data } = await supabase.auth.getSession();
+  const userId = data.session?.user?.id;
+  if (!userId) return false;
   const memberships = await fetchMyMemberships();
   const m = memberships.find((x) => x.leagueId === leagueId);
   if (!m) return false;
-  writeSessionAndLeague(m, auth.user.id);
+  writeSessionAndLeague(m, userId);
   // Sandbox host hop bar is per-room — never carry into another league
   try {
     const { clearSandboxHostHopOnLeagueSwitch } = await import(
