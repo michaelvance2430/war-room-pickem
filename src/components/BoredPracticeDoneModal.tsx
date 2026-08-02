@@ -166,7 +166,7 @@ export default function BoredPracticeDoneModal() {
             </p>
             <p className="text-xs text-foreground/85 leading-relaxed">
               {recap.gazetteDeck ||
-                "After a real week, the host scores and this paper hits Home."}
+                "After a real week, the commish scores and this paper hits Home."}
             </p>
             <p className="text-[11px] text-muted border-t border-amber-500/20 pt-2">
               Real Gazette = crown, shame, freefalls, milk-carton no-locks.

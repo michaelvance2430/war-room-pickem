@@ -246,7 +246,7 @@ function buildGazetteTease(
   if (totalPoints >= 12) {
     return {
       gazetteHeadline: `SOLID CARD: ${name} IN THE MIX (BARELY FAMOUS)`,
-      gazetteDeck: `${totalPoints} pts · ${correctCount}/${games}. Real Gazette drops after the host scores — same vibe, meaner nicknames.`,
+      gazetteDeck: `${totalPoints} pts · ${correctCount}/${games}. Real Gazette drops after the commish scores — same vibe, meaner nicknames.`,
       boardTease: `Roughly #${botRank} of ${botField} on a fake field. Live Board updates when results post.`,
     };
   }

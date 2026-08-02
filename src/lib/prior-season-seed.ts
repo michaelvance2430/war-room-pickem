@@ -327,7 +327,7 @@ export async function seedPriorSeason2025Trophies(): Promise<{
   if (!session?.leagueId || !(session.isCommissioner || isOps())) {
     return {
       ok: false,
-      message: "Commissioner or ops only — open the league as host first.",
+      message: "Commissioner or ops only — open the league as commish first.",
       awarded: [],
       errors: ["Not commissioner"],
     };

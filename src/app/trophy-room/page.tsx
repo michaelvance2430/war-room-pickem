@@ -461,7 +461,7 @@ export default function TrophyRoomPage() {
                   {busy ? "Syncing…" : "Sync trophies now"}
                 </button>
                 <p className="text-[11px] text-muted">
-                  Host only · re-runs auto-engrave for {year}
+                  Commish only · re-runs auto-engrave for {year}
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-2 sm:items-center">

@@ -49,7 +49,7 @@ export default function OpenRoomBotsNudge({ open, onClose }: Props) {
             </h2>
             <p className="text-sm text-muted mt-2 leading-relaxed">
               Real people join first. Want a fuller room? In{" "}
-              <strong className="text-foreground">Host</strong> settings: fill
+              <strong className="text-foreground">Commish</strong> settings: fill
               empty seats with bots. They take real standings seats until you
               remove them (pre-lock only). Once the season starts, bots stay
               (fairness). Never replaces humans.

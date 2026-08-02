@@ -88,7 +88,7 @@ function MuseumInner() {
           } else if (!cancelled && !seeded.ok) {
             // Display merge already forced plaques; cloud engrave may need Trophy Room
             setExcelNote(
-              "Showing last season on the wall (local). Host can sync Trophy Room to engrave cloud."
+              "Showing last season on the wall (local). Commish can sync Trophy Room to engrave cloud."
             );
           }
         } catch {

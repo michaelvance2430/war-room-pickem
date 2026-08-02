@@ -41,8 +41,8 @@ export const COMMISH_LADDER: CommishLadderRung[] = [
   {
     seasons: 2,
     badgeId: "commish_ladder_2",
-    name: "Double Host",
-    title: "Double Host",
+    name: "Double Commish",
+    title: "Double Commish",
     description: "Came back and ran the board again. The group chat noticed.",
     howToEarn: "Complete 2 qualifying commissioner seasons.",
     tier: "common",

@@ -423,7 +423,7 @@ export default function Home() {
                 My Picks
               </div>
               <p className="text-xs text-muted mt-1">
-                If a card is live, lock it. If not — your host hasn&apos;t
+                If a card is live, lock it. If not — your commish hasn&apos;t
                 published yet. Chill in the Locker until they do.
               </p>
             </Link>
@@ -444,7 +444,7 @@ export default function Home() {
                 className="group rounded-xl border border-primary/40 bg-primary/10 p-5 hover:border-primary transition"
               >
                 <div className="text-xs uppercase tracking-wider text-primary mb-1">
-                  Host
+                  Commish
                 </div>
                 <div className="text-lg font-semibold text-white">
                   Publish card
@@ -608,7 +608,7 @@ export default function Home() {
                     League notes
                   </div>
                   <p className="text-sm text-muted mt-2">
-                    Host posts · milk cartons · room updates
+                    Commish posts · milk cartons · room updates
                   </p>
                 </Link>
               )}
@@ -635,7 +635,7 @@ export default function Home() {
                   className="group rounded-xl border border-border/80 bg-black/40 backdrop-blur-sm p-6 hover:border-primary/50 hover:bg-primary/5 transition"
                 >
                   <div className="text-xs uppercase tracking-wider text-muted mb-2">
-                    Host
+                    Commish
                   </div>
                   <div className="text-lg font-semibold text-white group-hover:text-primary transition">
                     Run the Room

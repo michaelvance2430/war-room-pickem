@@ -332,7 +332,7 @@ export default function Nav() {
           ? [
               {
                 href: "/commissioner",
-                label: isCommish ? "Host" : "Ops",
+                label: isCommish ? "Commish" : "Ops",
                 className: "text-primary",
               } as NavLink,
             ]
@@ -357,7 +357,7 @@ export default function Nav() {
           ? [
               {
                 href: "/commissioner",
-                label: isCommish ? "Host" : "Ops",
+                label: isCommish ? "Commish" : "Ops",
                 className: "text-primary",
               } as NavLink,
             ]

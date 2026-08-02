@@ -415,7 +415,7 @@ const EDITION_BANK: ((c: CopyCtx) => string)[] = [
 ];
 
 const FOOT_BANK = [
-  "One-time preseason drop — the week before kickoff. When the host scores a week, the full Gazette still drops with crowns, shame, and the works.",
+  "One-time preseason drop — the week before kickoff. When the commish scores a week, the full Gazette still drops with crowns, shame, and the works.",
   "This carton airs once. Ring ceremony still walks opening week. Paper still drops after score. The roast economy is diversified.",
   "Preseason only. No weekly reruns. Different room, different year, different mix — Gazette Network does not do syndication of the same roast.",
   "You get one look. Then it’s hardware, locks, and the board. The Gazette will be back with receipts.",
@@ -494,7 +494,7 @@ function buildCfbInauguralLockedCopy(ctx: CopyCtx): WeeklyColdOpenCopy {
     ctaGazette: "Open the Gazette",
     hardwareLabel: `${ctx.year} War Room champion`,
     foot:
-      "One-time preseason drop — the week before kickoff. When the host scores a week, the full Gazette still drops with crowns, shame, and the works.",
+      "One-time preseason drop — the week before kickoff. When the commish scores a week, the full Gazette still drops with crowns, shame, and the works.",
     packId: CFB_INAUGURAL_COLD_OPEN_PACK_ID,
     editionLine: `Once per season · week before open · ${ctx.year} champ package · ${ctx.room} · inaugural CFB (locked)`,
   };

@@ -32,7 +32,7 @@ export const OPEN_ROOM_WAIT_OFFER_MS = 40_000;
 export const OPEN_ROOM_POLL_MS = 4_000;
 
 export function openRoomsSqlMissingMessage(): string {
-  return "Open rooms aren’t set up on this database yet. Host: run supabase/open-rooms.sql once in Supabase, then list your league as open under Settings.";
+  return "Open rooms aren’t set up on this database yet. Commish: run supabase/open-rooms.sql once in Supabase, then list your league as open under Settings.";
 }
 
 /**

@@ -150,7 +150,7 @@ export default function SportPoolCommishPanel() {
   async function createFromYeses() {
     if (!poll) return;
     if (yeses.length < 1) {
-      setErr("Need at least one yes (you’re auto-yes as host).");
+      setErr("Need at least one yes (you’re auto-yes as commish).");
       return;
     }
     if (

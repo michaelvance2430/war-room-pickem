@@ -258,7 +258,7 @@ export default function FounderTestModePage() {
             />
             <JumpBtn
               label="Card published"
-              detail="Host just posted the slate"
+              detail="Commish just posted the slate"
               onClick={() => {
                 void jumpCardPublished().then(() => {
                   setNote("Card published modal fired");

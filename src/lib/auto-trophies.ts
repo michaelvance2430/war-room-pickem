@@ -208,7 +208,7 @@ export async function autoEngraveAllTrophies(opts?: {
     return {
       ok: false,
       results: [],
-      message: "Host or ops only can sync trophies",
+      message: "Commish or ops only can sync trophies",
     };
   }
 

@@ -2294,8 +2294,8 @@ function CommissionerPageInner() {
           <h1 className="text-2xl font-bold">
             {isOwner
               ? firstTime
-                ? "Host · first hour"
-                : "Host"
+                ? "Commish · first hour"
+                : "Commish"
               : "Deputy Ops"}
           </h1>
           <p className="text-sm text-muted">
@@ -2303,12 +2303,12 @@ function CommissionerPageInner() {
               ? firstTime
                 ? "Invite → publish a card (demo is fine) → score once. Advanced tools unlock after."
                 : "Settings · Build card · Who\u2019s in · Results"
-              : "Build card · Who\u2019s in · Results (settings stay with the host)"}
+              : "Build card · Who\u2019s in · Results (settings stay with the commish)"}
           </p>
           {(firstTime || simpleHost) && isOwner && (
             <div className="mt-3 rounded-xl border-2 border-primary/50 bg-primary/10 px-4 py-3">
               <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-1">
-                Host · first hour
+                Commish · first hour
               </p>
               <p className="text-sm text-foreground leading-relaxed">
                 Three jobs:{" "}

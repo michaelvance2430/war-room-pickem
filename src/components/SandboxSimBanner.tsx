@@ -39,7 +39,7 @@ export default function SandboxSimBanner() {
           href="/commissioner?tab=card"
           className="text-[11px] font-bold text-amber-200 underline shrink-0"
         >
-          Host tools
+          Commish tools
         </Link>
       )}
     </div>

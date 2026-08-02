@@ -174,7 +174,7 @@ export default function HomeWeekHero() {
 
   if (!state.hasCard) {
     if (state.isCommish && state.scoredWeeks === 0) {
-      eyebrow = "You’re the host";
+      eyebrow = "You’re the commish";
       title =
         state.rosterCount < 2
           ? "Share your code — fill the room"
@@ -208,7 +208,7 @@ export default function HomeWeekHero() {
         : "You're in — waiting on the card";
       body = state.isOps
         ? `One job: publish ${weekLabel} (demo week is fine). Then text the crew.`
-        : `You're seated. Your host hasn't published ${weekLabel} yet — there's nothing to pick. Hang in the Locker, poke Standings if you want, or check back when they drop a card. First ten minutes = chill.`;
+        : `You're seated. Your commish hasn't published ${weekLabel} yet — there's nothing to pick. Hang in the Locker, poke Standings if you want, or check back when they drop a card. First ten minutes = chill.`;
       primaryHref = state.isOps
         ? "/commissioner?tab=card&first=1"
         : "/locker-room";
@@ -269,7 +269,7 @@ export default function HomeWeekHero() {
     state.scoredWeeks > 0 &&
     (state.frozen || state.iLocked)
   ) {
-    eyebrow = "Host · your one job";
+    eyebrow = "Commish · your one job";
     title = `Score ${weekLabel} when the games die`;
     body =
       "Card’s in. One tap grades the room and drops the paper. Don’t leave them hanging.";

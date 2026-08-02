@@ -91,7 +91,7 @@ export default function GazetteArchivePage() {
             </p>
             <p className="font-bold text-lg mb-1">No paper yet</p>
             <p className="text-sm text-muted max-w-sm mx-auto leading-relaxed">
-              When the host scores a week, the Gazette drops here — the Sunday /
+              When the commish scores a week, the Gazette drops here — the Sunday /
               Monday appointment the room waits for. Lock picks. Wait for blood.
               Come back.
             </p>

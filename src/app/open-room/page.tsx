@@ -275,7 +275,7 @@ export default function OpenRoomPage() {
               href="/join?mode=create&open=1"
               className="w-full py-3 min-h-[48px] rounded-xl border border-primary/30 text-center text-sm font-medium text-primary touch-manipulation flex items-center justify-center"
             >
-              Host an open room
+              Commish an open room
             </Link>
             <Link
               href="/login"

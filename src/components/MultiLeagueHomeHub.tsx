@@ -271,7 +271,7 @@ export default function MultiLeagueHomeHub({ onSwitched }: Props) {
       return `Needs picks · Week ${p.openWeek}`;
     if (p?.needsPicks) return "Needs picks";
     if (p?.locked) return "Picks locked";
-    if (isHost) return "Host room";
+    if (isHost) return "Commish room";
     return "Switch anytime";
   }
 

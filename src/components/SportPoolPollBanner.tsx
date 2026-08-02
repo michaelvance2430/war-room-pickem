@@ -97,7 +97,7 @@ export default function SportPoolPollBanner() {
         </p>
       ) : (
         <p className="text-sm text-muted mt-1.5 leading-relaxed">
-          Your host is building a new room from this league&apos;s player pool.
+          Your commish is building a new room from this league&apos;s player pool.
           Say yes and you&apos;re on the spin-up list.
         </p>
       )}

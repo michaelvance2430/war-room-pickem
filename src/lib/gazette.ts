@@ -236,7 +236,7 @@ export function gazetteAnticipationCopy(): {
     if (day === 0 || day === 1) {
       return {
         title: "WORLD CUP EDITION almost on the stands",
-        body: "When the host scores this matchday, the Extra drops — survivors, collapses, chaos in the group. ESPN energy. War Room sass.",
+        body: "When the commish scores this matchday, the Extra drops — survivors, collapses, chaos in the group. ESPN energy. War Room sass.",
         ritualHint: ritualEditionNameWwc(),
       };
     }
@@ -250,7 +250,7 @@ export function gazetteAnticipationCopy(): {
     if (day === 0 || day === 1) {
       return {
         title: "Primetime paper almost on the stands",
-        body: "When the host scores this week, the Sunday desk drops — late-window crowns, three-and-outs, Best Bet blood. No campus filler.",
+        body: "When the commish scores this week, the Sunday desk drops — late-window crowns, three-and-outs, Best Bet blood. No campus filler.",
         ritualHint: ritualEditionNameNfl(),
       };
     }
@@ -263,7 +263,7 @@ export function gazetteAnticipationCopy(): {
   if (day === 0 || day === 1) {
     return {
       title: "The paper is almost here",
-      body: "When the host scores this week, the Sunday / Monday Gazette drops — crowns, shame, fake news, the works.",
+      body: "When the commish scores this week, the Sunday / Monday Gazette drops — crowns, shame, fake news, the works.",
       ritualHint: ritualEditionName(),
     };
   }

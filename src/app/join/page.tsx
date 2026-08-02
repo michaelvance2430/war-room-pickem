@@ -534,7 +534,7 @@ function JoinPageInner() {
             <BrandMark size={72} variant="force" />
           </div>
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary mb-2 text-center">
-            You&apos;re the host
+            You&apos;re the commish
           </p>
           <h1 className="text-2xl font-bold mb-1 text-center">League created</h1>
           <p className="text-sm text-muted mb-4 text-center">

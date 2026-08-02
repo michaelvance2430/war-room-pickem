@@ -62,10 +62,10 @@ export default function SandboxHopOptIn() {
         Dry-run hop bar
       </p>
       <p className="text-xs text-muted leading-relaxed">
-        Sticky Home · Picks · Board · Gazette · Host jumps until {label}.{" "}
+        Sticky Home · Picks · Board · Gazette · Commish jumps until {label}.{" "}
         <strong className="text-foreground">Off by default</strong> — building
-        the next card or opening Host tools does <em>not</em> turn this on (NFL
-        + CFB). Only this switch does.
+        the next card or opening Commish tools does <em>not</em> turn this on
+        (NFL + CFB). Only this switch does.
       </p>
       <button
         type="button"
@@ -84,8 +84,8 @@ export default function SandboxHopOptIn() {
       </button>
       {on && (
         <p className="text-[10px] text-amber-200/75 leading-snug">
-          Use <strong>Exit Host</strong> on the bar to close it and wipe the
-          dry-run board. Switching leagues always clears it.
+          Use <strong>Close bar</strong> / <strong>Wipe board</strong> on the
+          hop bar to exit. Switching leagues always clears it.
         </p>
       )}
     </div>

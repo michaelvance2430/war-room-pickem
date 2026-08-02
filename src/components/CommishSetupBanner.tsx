@@ -96,7 +96,7 @@ export default function CommishSetupBanner() {
     <section className="mb-5 rounded-2xl border-2 border-primary/50 bg-primary/10 p-4 sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
         <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">
-          Host · don&apos;t overthink it
+          Commish · don&apos;t overthink it
         </p>
         <p className="text-[10px] font-semibold tabular-nums text-muted">
           Step {step === "invite" ? 1 : step === "card" ? 2 : 3} of 3

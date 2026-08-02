@@ -117,7 +117,7 @@ export const EQUIPABLE_TITLE_CATALOG: EquipableTitleDef[] = [
   },
   {
     badgeId: "commish_ladder_2",
-    title: "Double Host",
+    title: "Double Commish",
     vibe: "brag",
     blurb: "Two full-ish seasons with the gavel.",
   },

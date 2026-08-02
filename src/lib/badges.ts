@@ -124,7 +124,7 @@ export const BADGE_CATALOG: BadgeDef[] = [
     // Equipable nameplate title for Mike V. (id kept for career bank / permanent grants)
     name: "The Creator",
     description:
-      "Built War Room Pick'Em. Not a league host. Not a peasant. Career points only — never pads season cheevos or Cheevo King.",
+      "Built War Room Pick'Em. Not a league commish. Not a peasant. Career points only — never pads season cheevos or Cheevo King.",
     howToEarn:
       "You can't. Opening a league makes you commissioner of that room — cute. This crown is for the person who built the app. Peasants stay grey.",
     lockedLabel: "Hard locked — peasants don't get this one",

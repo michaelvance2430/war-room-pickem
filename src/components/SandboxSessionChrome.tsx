@@ -58,7 +58,7 @@ const HOPS: { href: string; label: string }[] = [
   { href: "/board", label: "Board" },
   { href: "/gazette", label: "Gazette" },
   { href: "/locker-room", label: "Locker" },
-  { href: "/commissioner", label: "Host" },
+  { href: "/commissioner", label: "Commish" },
 ];
 
 export default function SandboxSessionChrome() {

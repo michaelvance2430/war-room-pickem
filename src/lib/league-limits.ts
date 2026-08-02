@@ -24,7 +24,7 @@ export function leagueFullMessage(memberCount = MAX_LEAGUE_PLAYERS): string {
     `This room is full (${memberCount}/${MAX_LEAGUE_PLAYERS}) — every seat’s taken, ` +
     `including the good ones by the snacks. ` +
     `We cap at ${MAX_LEAGUE_PLAYERS} so Championship + Toilet Bowl both finish clean. ` +
-    `Ask the host for a second league code, free a seat, or hop into another open room.`
+    `Ask the commish for a second league code, free a seat, or hop into another open room.`
   );
 }
 

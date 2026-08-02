@@ -108,7 +108,7 @@ export default function PlayerWeekChecklist() {
           ? [
               {
                 id: "wait",
-                label: "1. Waiting on the host",
+                label: "1. Waiting on the commish",
                 detail: `${weekTitle(w)} isn't published yet. You're in — hang tight.`,
                 done: false,
                 href: "/locker-room",

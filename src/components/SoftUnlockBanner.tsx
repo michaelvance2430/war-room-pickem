@@ -107,7 +107,7 @@ export default function SoftUnlockBanner() {
         </p>
         <p className="text-xs text-muted mt-1 leading-relaxed">
           The Board just appeared in the nav. Home gets louder (takes, crowns,
-          chaos). Gazette still drops when the host scores — that&apos;s the
+          chaos). Gazette still drops when the commish scores — that&apos;s the
           Sunday/Monday paper the room actually waits for.
         </p>
       </div>
