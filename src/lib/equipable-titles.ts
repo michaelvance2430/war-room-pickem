@@ -57,6 +57,13 @@ export const EQUIPABLE_TITLE_CATALOG: EquipableTitleDef[] = [
       "World Greatest. Maps optional. Eggplant on wood is not a suggestion.",
   },
   {
+    badgeId: "the_dr",
+    title: "The Dr.",
+    vibe: "roast",
+    blurb:
+      "PhD energy. Spreadsheet inferiority complex. Call her Doctor — then beat her ATS.",
+  },
+  {
     badgeId: "sad_little_brains",
     title: "Sad Little Brain",
     vibe: "roast",

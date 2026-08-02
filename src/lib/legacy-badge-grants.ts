@@ -9,6 +9,7 @@
  * Named lore:
  *  - Tbone Soulstache Rockstar / Football Guru → World Greatest Cavalry Scout
  *    (eggplant on a wooden base · +200 career)
+ *  - Maria → The Dr. (doctorate at ~24 · legendary nerd flex · +200 career)
  *
  * Mistaken (hard-revoked whenever we see the name / on every app boot):
  *  - Andrew Visconti / Andy — was incorrectly given Kahmann’s champ seed
@@ -26,6 +27,7 @@ import { getSession } from "./league";
 
 export const WAR_ROOM_LEGEND_ID = "war_room_legend";
 export const CAVALRY_SCOUT_BADGE_ID = "worlds_greatest_cavalry_scout";
+export const THE_DR_BADGE_ID = "the_dr";
 
 type LegacyBadgeGrant = {
   pattern: RegExp;
@@ -50,6 +52,13 @@ export const LEGACY_BADGE_GRANTS: LegacyBadgeGrant[] = [
       /\bt-?\s*bone\b|\bsoulstache\b|\bfootball\s*guru\b|\brockstar\b.*\bguru\b|\bguru\b.*\brockstar\b/i,
     badgeId: CAVALRY_SCOUT_BADGE_ID,
     reason: "World Greatest Cavalry Scout — eggplant on wood, no refunds",
+  },
+  {
+    // Maria (defending Super Bowl / Vonnagio gold energy) — PhD at ~24
+    // Avoid matching middle names; \bMaria\b covers "Maria", "Maria V.", etc.
+    pattern: /\bmaria\b/i,
+    badgeId: THE_DR_BADGE_ID,
+    reason: "The Dr. — doctorate at 24, War Room still a nerd cage match",
   },
 ];
 

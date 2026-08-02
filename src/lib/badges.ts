@@ -158,6 +158,19 @@ export const BADGE_CATALOG: BadgeDef[] = [
     icon: "🍆",
   },
   {
+    id: "the_dr",
+    name: "The Dr.",
+    description:
+      "Doctorate at 24. Walks into the War Room like the rest of us forgot how to read. Spoiler: she's not better than you at spreads — she's just a highly decorated nerd with a framed piece of paper that took longer than a fantasy season. Career points only — never pads season cheevos or Cheevo King.",
+    howToEarn:
+      "You don't grind this. You survive graduate school while the rest of the Crew argues about Sunday. Seeded for Maria. Peasants: genuflect, then fade the favorite.",
+    lockedLabel: "Hard locked — PhDs only, no undergrads",
+    tier: "legendary",
+    points: 200,
+    careerOnly: true,
+    icon: "🎓",
+  },
+  {
     id: CAREER_CELLAR_ID,
     name: "Sad Little Brains Forever",
     description:
@@ -1394,6 +1407,11 @@ function evaluateBadge(
     case "worlds_greatest_cavalry_scout":
       return {
         earned: hasPermanentBadge(player, "worlds_greatest_cavalry_scout"),
+      };
+
+    case "the_dr":
+      return {
+        earned: hasPermanentBadge(player, "the_dr"),
       };
 
     case "immortal_streak":
