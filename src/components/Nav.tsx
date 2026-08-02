@@ -944,7 +944,7 @@ export default function Nav() {
       {!isGuestMode() && <EquippedTitleHydrator />}
       {!isGuestMode() && <ProfileBorderHydrator />}
       {!isGuestMode() && <WeeklyColdOpenModal />}
-      {/* 1st of month · locked birthdays in this room → roast paper for everyone */}
+      {/* One Year Older · 1st of month · locked birthdays → roast paper for the room */}
       {!isGuestMode() && <BirthdayGazetteModal />}
       {!isGuestMode() && <LoginWelcomeModal />}
       {!isGuestMode() && <RulesOnboardingModal />}

@@ -1,14 +1,15 @@
 "use client";
 
 /**
- * Monthly birthday Gazette — opens for the room on the 1st (ET)
- * when anyone in the league has a locked birthday that month.
+ * “One Year Older” — monthly birthday Gazette.
+ * Opens for the room on the 1st (ET) when anyone has a locked bday that month.
  */
 
 import { useCallback, useEffect, useState } from "react";
 import { getSession } from "@/lib/league";
 import { isGuestMode } from "@/lib/guest-mode";
 import {
+  BIRTHDAY_GAZETTE_RITUAL,
   EVENT_FORCE_BIRTHDAY_GAZETTE,
   markBirthdayGazetteSeen,
   shouldOfferBirthdayGazette,
@@ -93,7 +94,7 @@ export default function BirthdayGazetteModal() {
       >
         <div className="bg-stone-900 text-[#f4f0e6] px-4 py-2 flex items-center justify-between gap-2">
           <span className="text-[11px] font-black uppercase tracking-[0.28em]">
-            {edition.stamp}
+            {edition.ritualName || BIRTHDAY_GAZETTE_RITUAL}
           </span>
           <span className="text-[10px] font-bold uppercase tracking-wider opacity-90">
             Monthly · Zero points
@@ -105,7 +106,7 @@ export default function BirthdayGazetteModal() {
             <BrandMark size={40} variant="force" className="rounded-md" />
           </div>
           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-red-800 mb-1">
-            The War Room Gazette · Birthday desk
+            The War Room Gazette · {edition.ritualName || BIRTHDAY_GAZETTE_RITUAL}
           </p>
           <p className="text-[11px] uppercase tracking-widest text-stone-600 mb-2">
             {edition.monthLabel} {edition.year} · {edition.leagueName}

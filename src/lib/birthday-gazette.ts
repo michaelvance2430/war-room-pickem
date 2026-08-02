@@ -1,7 +1,11 @@
 /**
- * Monthly birthday Gazette — day 1 of the month, for any league with
- * locked birthdays that month. Witty, zero points, once per league·month.
+ * “One Year Older” — monthly birthday Gazette.
+ * Day 1 of the month, for any league with locked birthdays that month.
+ * Witty, zero points, once per league·month.
  */
+
+/** Ritual name — product stamp for this drop */
+export const BIRTHDAY_GAZETTE_RITUAL = "One Year Older";
 
 import { createClient } from "@/lib/supabase/client";
 import { getLeague, getSession } from "@/lib/league";
@@ -27,6 +31,8 @@ export type BirthdayGazetteEdition = {
   leagueName: string;
   honorees: BirthdayHonoree[];
   packId: string;
+  /** Always “One Year Older” */
+  ritualName: string;
   stamp: string;
   headline: string;
   deck: string;
@@ -76,254 +82,254 @@ type PackCtx = {
 const PACKS: PaperPack[] = [
   {
     id: "candles",
-    stamp: "EXTRA · OLDER",
+    stamp: "ONE YEAR OLDER",
     headline: (c) =>
       c.plural
-        ? `${c.monthLabel.toUpperCase()} CLAIMS ANOTHER BATCH OF VICTIMS`
-        : `${c.names.toUpperCase()} TURNS ONE YEAR MORE UNHIRABLE`,
+        ? `ONE YEAR OLDER: ${c.monthLabel.toUpperCase()} CLAIMS ANOTHER BATCH`
+        : `ONE YEAR OLDER: ${c.names.toUpperCase()}`,
     deck: (c) =>
       c.plural
-        ? `${c.count} members of ${c.leagueName} will get older this month whether they like it or not.`
-        : `The paper noticed. The cake is a lie. The standings are not.`,
+        ? `${c.count} in ${c.leagueName} will be one year older this month. Nobody asked. The paper printed it anyway.`
+        : `${c.names} is one year older sometime this month. The cake is a lie. The standings are not.`,
     body: (c) =>
-      `Official census: ${c.names}. ${c.plural ? "They" : "They"} will add a candle, lose a step, and still text “who locked?” at 11:58. The room is required to pretend this matters for approximately four minutes.`,
+      `Official One Year Older census: ${c.names}. ${c.plural ? "They" : "They"} add a candle, lose a step, and still text “who locked?” at 11:58. The room pretends this matters for four minutes, then goes back to picking dogs.`,
     spankLine: (c) =>
       c.plural
-        ? `Traditional spanking will be administered in the Locker. Form a line. Bring your own shame.`
-        : `Somebody spank ${c.names}. Not hard. Hard enough that next year’s paper still hurts.`,
+        ? `Traditional One Year Older spanking in the Locker. Form a line. Bring shame.`
+        : `Somebody spank ${c.names}. One year older. Not hard — hard enough that next ${c.monthLabel} still stings.`,
     classified: (c) =>
-      `WANTED: dignity for ${c.names}. Last seen near a birthday candle. Reward: zero points.`,
+      `ONE YEAR OLDER · WANTED: dignity for ${c.names}. Reward: zero points.`,
     pullQuote: () =>
-      `"I'm not getting older. My confidence numbers just got shorter." — Anonymous, definitely lying`,
+      `"I'm not one year older. My confidence numbers just got shorter." — Liar`,
     foot: () =>
-      `No gifts. No points. No excuses. Happy (alleged) birthday from the Gazette Network.`,
+      `One Year Older · No gifts. No points. Happy (alleged) birthday — Gazette Network.`,
   },
   {
     id: "obituary",
-    stamp: "OBITUARY DESK",
-    headline: () => `HERE LIES YOUTH — DIED OF EXPOSURE TO PICK’EM`,
+    stamp: "ONE YEAR OLDER",
+    headline: () => `ONE YEAR OLDER · HERE LIES YOUTH`,
     deck: (c) =>
-      `${c.monthLabel} takes no prisoners. ${c.names} ${c.plural ? "are" : "is"} on the list.`,
+      `${c.monthLabel} takes no prisoners. ${c.names} ${c.plural ? "are" : "is"} one year older on the list.`,
     body: (c) =>
-      `Survived by unfinished props, a Best Bet that should’ve stayed home, and a group chat that will forget this paper by Tuesday. ${c.names}: rest in pace (you’re slower now).`,
-    spankLine: (c) =>
-      `Ritual complete only after the Locker posts “happy bday” with the energy of a hostage note.`,
+      `Survived by unfinished props, a Best Bet that should’ve stayed home, and a chat that forgets this by Tuesday. ${c.names}: one year older, rest in pace.`,
+    spankLine: () =>
+      `One Year Older ritual: Locker “hbd” with hostage-note energy. Then spank.`,
     classified: (c) =>
-      `LOST: one year of ${c.names}’s life. If found, do not return. It was spent arguing spreads.`,
+      `LOST: one year of ${c.names}. Spent arguing spreads. Do not return.`,
     pullQuote: () =>
-      `"Age is just a number. So is your weekly point total. Both are tragic."`,
+      `"Age is just a number. So is your weekly total. Both tragic."`,
     foot: () =>
-      `In lieu of flowers, lock your card on time. The Gazette sends thoughts and low-effort prayers.`,
+      `One Year Older · In lieu of flowers, lock on time.`,
   },
   {
     id: "weather",
-    stamp: "WEATHER DESK",
+    stamp: "ONE YEAR OLDER",
     headline: (c) =>
-      `FORECAST: ${c.monthLabel.toUpperCase()} BRINGS FOG, REGRET, AND CAKE`,
+      `ONE YEAR OLDER FORECAST: FOG, REGRET, CAKE`,
     deck: (c) =>
-      `High pressure system named ${c.names} moving through ${c.leagueName}.`,
+      `High pressure named ${c.names} over ${c.leagueName}.`,
     body: (c) =>
-      `Expect scattered congratulations, isolated eye-rolls, and a 100% chance someone says “you don’t look a day over… fine.” ${c.plural ? "These people" : "This person"} will still miss a kickoff lock. Science is undefeated.`,
+      `Scattered congrats, isolated eye-rolls, 100% chance of “you don’t look a day over… fine.” ${c.plural ? "These people" : "This person"} will still miss a lock. One year older. Science undefeated.`,
     spankLine: () =>
-      `Meteorology confirms: birthday weather requires one public roast and optional cake emoji spam.`,
+      `One Year Older weather: public roast required. Cake emoji optional.`,
     classified: (c) =>
-      `FREE: leftover candles from last year. Slightly used. Apply to ${c.names}.`,
+      `FREE candles · slightly used · apply to ${c.names} · One Year Older edition`,
     pullQuote: () =>
-      `"I asked for no fuss. The Gazette printed a fuss." — Local coward`,
+      `"I asked for no fuss. They printed One Year Older." — Coward`,
     foot: () =>
-      `Umbrellas useless. Sarcasm recommended. Points unchanged.`,
+      `One Year Older · Umbrellas useless. Sarcasm recommended.`,
   },
   {
     id: "crime",
-    stamp: "CRIME BLOTTER",
-    headline: () => `TIME THEFT REPORTED — SUSPECTS NAMED BELOW`,
+    stamp: "ONE YEAR OLDER",
+    headline: () => `ONE YEAR OLDER · TIME THEFT BLOTTER`,
     deck: (c) =>
-      `${c.names} ${c.plural ? "have" : "has"} stolen another year. Authorities are not impressed.`,
+      `${c.names} ${c.plural ? "have" : "has"} stolen another year. Cops unimpressed.`,
     body: (c) =>
-      `Motive: survival. Method: calendar. Accomplices: every bad pick since last ${c.monthLabel}. ${c.leagueName} demands justice in the form of mild public embarrassment.`,
-    spankLine: (c) =>
-      `Sentence: one (1) digital spanking, delivered asynchronously in the Locker by whoever remembers first.`,
+      `Motive: survival. Method: calendar. ${c.leagueName} wants justice: mild public embarrassment. Charge: One Year Older without a permit.`,
+    spankLine: () =>
+      `Sentence: one digital spank, async, Locker, first person who remembers.`,
     classified: () =>
-      `REWARD: bragging rights if you roast them harder than this paper. No cash. No dignity either.`,
+      `REWARD: roast harder than this paper. No cash. One Year Older only.`,
     pullQuote: () =>
-      `"I didn’t choose the year. The year chose me. Then it left."`,
+      `"I didn’t choose One Year Older. It chose me. Then left."`,
     foot: () =>
-      `Bail is set at one perfect week. Good luck with that.`,
+      `One Year Older · Bail set at one perfect week. Good luck.`,
   },
   {
     id: "sports",
-    stamp: "SPORTS EXTRA",
+    stamp: "ONE YEAR OLDER",
     headline: (c) =>
       c.plural
-        ? `BIRTHDAY CLUSTER FORCES LEAGUE INTO INJURY REPORT`
-        : `${c.names.toUpperCase()} ADDED TO THE INJURY REPORT: AGE`,
+        ? `ONE YEAR OLDER CLUSTER · INJURY REPORT`
+        : `ONE YEAR OLDER: ${c.names.toUpperCase()} · OUT (AGE)`,
     deck: () =>
       `Questionable for youth. Probable for trash talk. Out for cardio.`,
     body: (c) =>
-      `The training staff lists ${c.names} as day-to-day with acute birthday. Expected return: never. Fantasy implications: none, which is somehow worse.`,
+      `Training staff: ${c.names} day-to-day with acute One Year Older. Return: never. Fantasy impact: none — somehow worse.`,
     spankLine: () =>
-      `Postgame spanking is league-mandated. Replay officials will review for excess celebration.`,
+      `League-mandated postgame spank. Review for excess celebration.`,
     classified: (c) =>
-      `TRADE BAIT: one slightly used competitor (${c.names}). Needs cake. Avoids responsibility.`,
+      `TRADE BAIT: ${c.names} · one year older · needs cake · dodges responsibility`,
     pullQuote: () =>
-      `"We’re focusing on the next snap." — Person who just became older mid-sentence`,
+      `"Focusing on the next snap." — Person who just got One Year Older mid-sentence`,
     foot: () =>
-      `Box score of life: years +, points = still mid. Happy birthday, athlete.`,
+      `One Year Older · Box score: years +, points = mid.`,
   },
   {
     id: "society",
-    stamp: "SOCIETY PAGE",
-    headline: () => `GALA SEASON OPENS WITH FORCED CHEER AND FAKE SURPRISE`,
+    stamp: "ONE YEAR OLDER",
+    headline: () => `ONE YEAR OLDER GALA · FORCED CHEER`,
     deck: (c) =>
-      `${c.leagueName} high society gathers to ignore ${c.names}’s age… loudly.`,
+      `${c.leagueName} society ignores ${c.names}’s age… loudly.`,
     body: (c) =>
-      `Dress code: whatever you wore for Week 1. Gift table: empty on purpose. Speeches: three words max (“happy birthday, loser”). ${c.plural ? "Honorees" : "Honoree"} will pretend not to care while screenshotting this paper.`,
+      `Dress: Week 1 fits. Gifts: none on purpose. Speeches: “happy birthday, loser.” ${c.plural ? "Honorees" : "Honoree"} screenshot the One Year Older paper while pretending not to care.`,
     spankLine: () =>
-      `Etiquette tip: the spank is metaphorical unless the Locker decides otherwise.`,
+      `Etiquette: spank is metaphorical unless Locker votes otherwise.`,
     classified: () =>
-      `RSVP: no. Attendance: mandatory via notification. Champagne: imaginary.`,
+      `RSVP no · attendance via push · champagne imaginary · One Year Older`,
     pullQuote: () =>
-      `"I asked for nothing. They gave me a newspaper. Perfect."`,
+      `"I asked for nothing. They gave me One Year Older. Perfect."`,
     foot: () =>
-      `Society desk out. Real drama resumes when someone locks late.`,
+      `One Year Older · Society desk out. Late locks resume shortly.`,
   },
   {
     id: "horoscope",
-    stamp: "HOROSCOPE DESK",
+    stamp: "ONE YEAR OLDER",
     headline: (c) =>
-      `STARS SAY ${c.monthLabel.toUpperCase()} BIRTHDAYS SHOULD LOWER EXPECTATIONS`,
+      `ONE YEAR OLDER HOROSCOPE: LOWER EXPECTATIONS`,
     deck: (c) =>
-      `Mercury is in free-fall. So is ${c.names}.`,
+      `Mercury free-falling. So is ${c.names}.`,
     body: (c) =>
-      `Your sign this month: the Goat (as in get). Lucky number: whatever confidence you still have left. Lucky move: not texting the room about your birthday first. The Gazette did it for you. You’re welcome. Or sorry.`,
-    spankLine: (c) =>
-      `Cosmic spanking inbound. Align your chakras with the Locker reaction emojis.`,
+      `Sign: the Goat (as in get). Lucky move: don’t announce your own birthday. One Year Older did it for you. You’re welcome. Or sorry.`,
+    spankLine: () =>
+      `Cosmic One Year Older spank. Align with Locker emojis.`,
     classified: () =>
-      `PSYCHIC READING: you will age. You will pick dogs. You will deny both.`,
+      `PSYCHIC: you will age. You will pick dogs. One Year Older confirms.`,
     pullQuote: () =>
-      `"The universe is vast. Your window to lock is not."`,
+      `"The universe is vast. Your lock window is not."`,
     foot: () =>
-      `Horoscopes not financial advice. Or emotional support. Happy orbit day.`,
+      `One Year Older · Not financial advice. Happy orbit.`,
   },
   {
     id: "classified-only",
-    stamp: "CLASSIFIEDS",
-    headline: () => `ROOM FOR RENT: INSIDE SOMEBODY’S MIDLIFE`,
+    stamp: "ONE YEAR OLDER",
+    headline: () => `ONE YEAR OLDER · ROOM FOR RENT IN A MIDLIFE`,
     deck: (c) =>
-      `Available ${c.monthLabel}. Current tenants: ${c.names}.`,
+      `${c.monthLabel} · tenants: ${c.names}`,
     body: (c) =>
-      `Utilities included: Wi‑Fi, insecurity, and a push notification from War Room. ${c.plural ? "Tenants" : "Tenant"} responsible for own cake and for not finishing last three weeks in a row. References: the Board, which never forgets.`,
+      `Utilities: Wi‑Fi, insecurity, War Room push. ${c.plural ? "Tenants" : "Tenant"} supply cake and must not finish last three weeks running. Board never forgets. One Year Older lease: auto-renew forever.`,
     spankLine: () =>
-      `Security deposit: one public spank and a half-hearted “hbd”.`,
+      `Deposit: one spank + half-hearted “hbd”.`,
     classified: (c) =>
-      `FOR SALE: youth of ${c.names}. Buyer beware — high mileage, low ATS.`,
+      `FOR SALE: youth of ${c.names} · high mileage · One Year Older`,
     pullQuote: () =>
-      `"Location, location, location — I’m still in last."`,
+      `"Location, location — still last on the Board."`,
     foot: () =>
-      `All sales final. No refunds on birthdays. Gazette Network Realty.`,
+      `One Year Older Realty · No refunds on birthdays.`,
   },
   {
     id: "editorial",
-    stamp: "EDITORIAL",
-    headline: () => `IN OUR OPINION: GETTING OLDER IS A CHOICE (A BAD ONE)`,
+    stamp: "ONE YEAR OLDER",
+    headline: () => `EDITORIAL: ONE YEAR OLDER IS A BAD CHOICE`,
     deck: (c) =>
-      `The board of editors names ${c.names} in this month’s scolding.`,
+      `Editors scold ${c.names} this month.`,
     body: (c) =>
-      `We do not condone aging without written consent from the commissioner. Nevertheless, ${c.names} proceeded. The Gazette recommends light roasting, heavy denial, and zero participation trophies — those are for the Toilet Bowl.`,
+      `Aging without commish consent is frowned upon. ${c.names} did it anyway. One Year Older recommends light roasting, heavy denial, zero participation trophies.`,
     spankLine: () =>
-      `Editorial board votes 12–0 in favor of ceremonial spanking.`,
+      `Board votes 14–0 for ceremonial spanking.`,
     classified: () =>
-      `OP-ED REBUTTAL wanted from birthday people. Max 12 words. No “blessed.”`,
+      `REBUTTAL from birthday people · max 12 words · no “blessed” · One Year Older`,
     pullQuote: () =>
-      `"Age is wisdom." — Person about to lock the favorite at the worst number`,
+      `"Age is wisdom." — About to lock the worst number`,
     foot: () =>
-      `Unsigned because cowards. Love, the Gazette.`,
+      `One Year Older · Unsigned. Love, the Gazette.`,
   },
   {
     id: "police",
-    stamp: "POLICE BEAT",
-    headline: () => `NO ARRESTS IN ANNUAL “GETTING OLDER” INCIDENT`,
+    stamp: "ONE YEAR OLDER",
+    headline: () => `ONE YEAR OLDER · NO ARRESTS IN AGING INCIDENT`,
     deck: (c) =>
-      `Suspects ${c.names} released on their own recognizance (and weak ankles).`,
+      `${c.names} released on weak ankles.`,
     body: (c) =>
-      `Officers arrived to find candles already lit and alibis already mid. ${c.leagueName} reports no injuries except pride. The investigation continues every year forever.`,
-    spankLine: (c) =>
-      `Community service: accept Locker spam without arguing. Spanking optional but encouraged.`,
+      `Candles lit, alibis mid. ${c.leagueName}: injuries limited to pride. One Year Older investigation renews annually forever.`,
+    spankLine: () =>
+      `Community service: take Locker spam. Spank encouraged.`,
     classified: () =>
-      `TIP LINE: report unauthorized aging. We already know. Call anyway.`,
+      `TIP LINE: unauthorized aging. We know. Call anyway. One Year Older.`,
     pullQuote: () =>
-      `"I was framed by the Gregorian calendar." — Every birthday, ever`,
+      `"Framed by the Gregorian calendar." — Every One Year Older`,
     foot: () =>
-      `Case file remains open. Cake is not evidence. Happy (probationary) birthday.`,
+      `One Year Older · Case open. Cake not evidence.`,
   },
   {
     id: "finance",
-    stamp: "MARKETS",
-    headline: () => `CANDLE FUTURES SPIKE AS LOCALS AGE ON SCHEDULE`,
+    stamp: "ONE YEAR OLDER",
+    headline: () => `ONE YEAR OLDER MARKETS: CANDLE FUTURES SPIKE`,
     deck: (c) =>
-      `Investors short youth. Long ${c.names}.`,
+      `Short youth. Long ${c.names}.`,
     body: (c) =>
-      `Analysts project ${c.count} forced smile${c.plural ? "s" : ""} and zero ROI. ${c.leagueName} remains a volatile market for feelings. Birthday equity diluted by everyone else’s indifference — the purest free market.`,
+      `${c.count} forced smile${c.plural ? "s" : ""}, zero ROI. ${c.leagueName} remains volatile. One Year Older equity diluted by collective indifference — pure free market.`,
     spankLine: () =>
-      `Transaction fee: one spank, payable in the Locker before close of business.`,
+      `Fee: one spank in the Locker before close.`,
     classified: (c) =>
-      `IPO: ${c.names} Year N+1. Overvalued. Still trading.`,
+      `IPO: ${c.names} N+1 · overvalued · One Year Older`,
     pullQuote: () =>
-      `"Past performance does not guarantee future locks." — SEC (Sarcasm Enforcement Commission)`,
+      `"Past performance ≠ future locks." — Sarcasm Enforcement Commission`,
     foot: () =>
-      `Not investment advice. Definitely birthday advice: lower the bar.`,
+      `One Year Older · Not investment advice. Lower the bar.`,
   },
   {
     id: "arts",
-    stamp: "ARTS & LEISURE",
-    headline: () => `LOCAL ONE-PERSON SHOW EXTENDED FOR ANOTHER YEAR`,
+    stamp: "ONE YEAR OLDER",
+    headline: () => `ONE YEAR OLDER · SHOW EXTENDED ANOTHER SEASON`,
     deck: (c) =>
-      `Starring ${c.names}. Genre: tragicomedy. Runtime: forever.`,
+      `Starring ${c.names}. Tragicomedy. Runtime: forever.`,
     body: (c) =>
-      `Critics call the performance “committed,” “loud,” and “still picking unders.” ${c.monthLabel}’s revival features the same plot: cake, denial, a late prop. Standing ovation optional. Boos welcome.`,
+      `Critics: “committed,” “loud,” “still picking unders.” ${c.monthLabel} plot: cake, denial, late prop. One Year Older revival. Boos welcome.`,
     spankLine: () =>
-      `Intermission spanking in Act II. Do not leave your seats.`,
+      `Intermission spank · Act II · stay seated.`,
     classified: () =>
-      `UNDERSTUDY needed for next year. Must accept aging on short notice.`,
+      `UNDERSTUDY for next One Year Older · accept aging on short notice`,
     pullQuote: () =>
-      `"Break a leg. Preferably not mine. I’m delicate now."`,
+      `"Break a leg. Not mine. One Year Older made me delicate."`,
     foot: () =>
-      `Tickets free. Dignity sold out. Happy birthday from the culture desk.`,
+      `One Year Older · Tickets free. Dignity sold out.`,
   },
   {
     id: "tech",
-    stamp: "TECH DESK",
-    headline: () => `UPDATE AVAILABLE: HUMAN.VERSION++ // BREAKING CHANGES`,
+    stamp: "ONE YEAR OLDER",
+    headline: () => `ONE YEAR OLDER · HUMAN.VERSION++ SHIPPED`,
     deck: (c) =>
-      `Changelog for ${c.names}: older, same bugs, worse documentation.`,
+      `Changelog: ${c.names} · older · same bugs · worse docs.`,
     body: (c) =>
-      `Patch notes: decreased night vision, increased salt, deprecated “I’ll lock later.” Known issues: still thinks this year is their year. ${c.leagueName} servers will mock on sight.`,
+      `Patch: less night vision, more salt, deprecated “I’ll lock later.” Known issue: still thinks this is their year. ${c.leagueName} mocks on sight. One Year Older cannot be rolled back.`,
     spankLine: () =>
-      `QA requires physical spank testing. File tickets in the Locker.`,
+      `QA: physical spank testing. File in Locker.`,
     classified: () =>
-      `DEPRECATED: youth API. Migration guide: accept it.`,
+      `DEPRECATED: youth API · migrate to One Year Older`,
     pullQuote: () =>
-      `"It’s not a bug, it’s a feature: I’ve been 29 for six years."`,
+      `"Not a bug: I’ve been 29 for six One Year Olders."`,
     foot: () =>
-      `Shipped with love and sarcasm. Rollback not supported.`,
+      `One Year Older · Shipped with sarcasm. No rollback.`,
   },
   {
     id: "travel",
-    stamp: "TRAVEL",
+    stamp: "ONE YEAR OLDER",
     headline: (c) =>
-      `${c.monthLabel.toUpperCase()} DESTINATIONS: DENIAL, CAKE, AND THE LOCKER`,
+      `ONE YEAR OLDER TRAVEL: DENIAL, CAKE, LOCKER`,
     deck: (c) =>
-      `Pack light. ${c.names} already brought the baggage.`,
+      `Pack light. ${c.names} brought the baggage.`,
     body: (c) =>
-      `Itinerary: morning denial, afternoon group-chat shrug, evening “happy birthday” from someone who Googled the date wrong. ${c.plural ? "Travelers" : "Traveler"} warned: no upgrades to first class youth.`,
+      `Itinerary: denial, shrug, wrong-date “hbd.” No upgrade to first-class youth. One Year Older passport stamp is permanent.`,
     spankLine: () =>
-      `Customs will search for contraband pride and administer one spank.`,
+      `Customs: search pride, administer one spank.`,
     classified: () =>
-      `TIMESHARE: one week of feeling special. Deposit nonrefundable.`,
+      `TIMESHARE: one week of feeling special · One Year Older · nonrefundable`,
     pullQuote: () =>
-      `"I need a vacation from this birthday." — Person who will not get one`,
+      `"I need a vacation from One Year Older." — Will not get one`,
     foot: () =>
-      `Bon voyage to another lap around the sun. Try not to lock late en route.`,
+      `One Year Older · Bon voyage. Don’t lock late en route.`,
   },
 ];
 
@@ -418,7 +424,8 @@ function buildEdition(
     leagueName,
     honorees,
     packId: pack.id,
-    stamp: pack.stamp,
+    ritualName: BIRTHDAY_GAZETTE_RITUAL,
+    stamp: pack.stamp || BIRTHDAY_GAZETTE_RITUAL.toUpperCase(),
     headline: pack.headline(ctx),
     deck: pack.deck(ctx),
     body: pack.body(ctx),
