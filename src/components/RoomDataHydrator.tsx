@@ -113,15 +113,15 @@ export default function RoomDataHydrator() {
       }
     }
 
-    // Paint first, then self, then roster
+    // Paint first, then self, then roster — never on the critical path
     const start = window.setTimeout(() => {
       void (async () => {
         await syncSelfOnce();
         if (!cancelled) await loadRoster(true);
       })();
-    }, 600);
+    }, 1_400);
 
-    // Warm active week card while user is on Standings/Home — My Picks opens instantly
+    // Warm picks card late so Home/Standings first paint wins
     const warmPicks = window.setTimeout(() => {
       if (cancelled || isGuestMode()) return;
       void (async () => {
@@ -131,14 +131,15 @@ export default function RoomDataHydrator() {
           const { loadLeagueActiveWeek, loadWeekCard } = await import(
             "@/lib/cloud"
           );
-          const week = await loadLeagueActiveWeek();
+          const { raceTimeout } = await import("@/lib/smooth");
+          const week = await raceTimeout(loadLeagueActiveWeek(), 4_000, 1);
           if (cancelled) return;
-          await loadWeekCard(week);
+          await raceTimeout(loadWeekCard(week), 4_000, null);
         } catch {
           /* offline / no card yet */
         }
       })();
-    }, 900);
+    }, 2_800);
 
     const timer = window.setInterval(() => {
       void loadRoster(false);

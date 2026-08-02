@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   getSession,
@@ -34,7 +34,7 @@ import {
   EVENT_PROGRESSIVE,
   loadProgressiveSnapshot,
 } from "@/lib/progressive-disclosure";
-import { hardNavPrepare } from "@/components/RouteHardSwitch";
+import { prepareNavigation, PRIMARY_ROUTES } from "@/lib/smooth";
 
 /** Heavy chrome — not in first JS parse of every tab. */
 const RoomDeferredChrome = dynamic(
@@ -59,7 +59,6 @@ type NavLink = {
  */
 export default function Nav() {
   const pathname = usePathname();
-  const router = useRouter();
   const [isCommish, setIsCommish] = useState(false);
   const [ops, setOps] = useState(false);
   const [staff, setStaff] = useState(false);
@@ -119,10 +118,11 @@ export default function Nav() {
     };
     let idleId: number | undefined;
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    // Longer idle so first route (Home/Picks/Commish) wins the main thread
     if (typeof w.requestIdleCallback === "function") {
-      idleId = w.requestIdleCallback(arm, { timeout: 1500 });
+      idleId = w.requestIdleCallback(arm, { timeout: 2_800 });
     } else {
-      timeoutId = setTimeout(arm, 800);
+      timeoutId = setTimeout(arm, 2_000);
     }
     return () => {
       cancelled = true;
@@ -132,44 +132,6 @@ export default function Nav() {
       if (timeoutId != null) clearTimeout(timeoutId);
     };
   }, [deferredReady]);
-
-  /**
-   * Desktop: Commish is a huge client chunk. prefetch=false everywhere meant
-   * Gazette → Commish cold-downloaded ~5k lines and froze the main thread.
-   * Warm the route for ops after first paint so the hop is not a compile storm.
-   */
-  useEffect(() => {
-    if (isGuestMode()) return;
-    if (!ops && !isCommish) return;
-    const w = window as Window & {
-      requestIdleCallback?: (
-        cb: () => void,
-        opts?: { timeout: number }
-      ) => number;
-      cancelIdleCallback?: (id: number) => void;
-    };
-    const warm = () => {
-      try {
-        router.prefetch("/");
-        router.prefetch("/commissioner");
-        router.prefetch("/picks");
-        router.prefetch("/standings");
-      } catch {
-        /* ok */
-      }
-    };
-    let idleId: number | undefined;
-    let t: ReturnType<typeof setTimeout> | undefined;
-    if (typeof w.requestIdleCallback === "function") {
-      idleId = w.requestIdleCallback(warm, { timeout: 4_000 });
-    } else {
-      t = setTimeout(warm, 2_000);
-    }
-    return () => {
-      if (idleId != null && w.cancelIdleCallback) w.cancelIdleCallback(idleId);
-      if (t) clearTimeout(t);
-    };
-  }, [ops, isCommish, router]);
 
   // Progressive chrome — ONCE on mount + events. NOT on every pathname change
   // (that re-fired syncFirstWeek + active week + scored weeks on every tab).
@@ -368,17 +330,24 @@ export default function Nav() {
 
   useEffect(() => {
     if (!menuOpen) {
-      try {
-        document.body.style.overflow = "";
-      } catch {
-        /* ignore */
-      }
+      prepareNavigation();
       return;
     }
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = "";
-    };
+    try {
+      const { lockBodyScroll } =
+        require("@/lib/smooth") as typeof import("@/lib/smooth");
+      lockBodyScroll();
+      return () => {
+        const { unlockBodyScroll } =
+          require("@/lib/smooth") as typeof import("@/lib/smooth");
+        unlockBodyScroll();
+      };
+    } catch {
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = "";
+      };
+    }
   }, [menuOpen]);
 
   useEffect(() => {
@@ -530,22 +499,13 @@ export default function Nav() {
   function closeChrome() {
     setMenuOpen(false);
     setMoreOpen(false);
-    try {
-      document.body.style.overflow = "";
-    } catch {
-      /* ignore */
-    }
+    prepareNavigation();
   }
 
-  /** Warm heavy desktop hops (Home remount + Commish chunk) */
+  /** Prefetch primary desks; leave deep/rare routes cold */
   function shouldPrefetch(href: string) {
-    return (
-      href === "/" ||
-      href === "/commissioner" ||
-      href.startsWith("/commissioner?") ||
-      href === "/picks" ||
-      href === "/standings"
-    );
+    const path = href.split("?")[0] || href;
+    return (PRIMARY_ROUTES as readonly string[]).includes(path);
   }
 
   function NavItem({ link }: { link: NavLink }) {
@@ -557,7 +517,6 @@ export default function Nav() {
         prefetch={shouldPrefetch(link.href)}
         onClick={() => {
           closeChrome();
-          hardNavPrepare();
         }}
         className={`transition relative whitespace-nowrap shrink-0 ${
           isHome
@@ -622,10 +581,7 @@ export default function Nav() {
           <Link
             href="/"
             prefetch
-            onClick={() => {
-              closeChrome();
-              hardNavPrepare();
-            }}
+            onClick={() => closeChrome()}
             className="flex items-center gap-2 shrink-0 min-w-0 max-w-[11rem] sm:max-w-[14rem] rounded-md hover:opacity-90 transition"
             title="Back to Home"
             aria-label="Home"
@@ -888,10 +844,7 @@ export default function Nav() {
                     <Link
                       href={link.href}
                       prefetch={shouldPrefetch(link.href)}
-                      onClick={() => {
-                        closeChrome();
-                        hardNavPrepare();
-                      }}
+                      onClick={() => closeChrome()}
                       className={`flex items-center justify-between gap-3 px-4 min-h-[48px] transition touch-manipulation ${
                         isHome
                           ? `text-lg font-extrabold ${
@@ -928,11 +881,8 @@ export default function Nav() {
                   <li key={link.href}>
                     <Link
                       href={link.href}
-                      prefetch={false}
-                      onClick={() => {
-                        closeChrome();
-                        hardNavPrepare();
-                      }}
+                      prefetch={shouldPrefetch(link.href)}
+                      onClick={() => closeChrome()}
                       className={`flex items-center justify-between gap-3 px-4 min-h-[48px] text-base transition touch-manipulation ${
                         isAccount
                           ? active
@@ -982,14 +932,8 @@ export default function Nav() {
               <li key={tab.href} className="min-w-0">
                 <Link
                   href={tab.href}
-                  prefetch={false}
-                  onClick={() => {
-                    // Soft SPA — full reload every tab rebooted the whole app
-                    // (auth + hydrators + modal waves) and felt like freezes.
-                    // hardNavPrepare clears scroll locks so soft hops stay clean.
-                    closeChrome();
-                    hardNavPrepare();
-                  }}
+                  prefetch={shouldPrefetch(tab.href)}
+                  onClick={() => closeChrome()}
                   className={`relative flex flex-col items-center justify-center h-full gap-0.5 text-[10px] font-semibold touch-manipulation transition ${
                     active ? "text-primary" : "text-muted"
                   }`}

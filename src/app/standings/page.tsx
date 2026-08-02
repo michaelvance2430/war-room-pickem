@@ -1,9 +1,14 @@
 "use client";
 
 import { useState, useEffect, Fragment } from "react";
+import dynamic from "next/dynamic";
 import SwingBadge from "@/components/SwingBadge";
-import CrownAndShame from "@/components/CrownAndShame";
 import { loadLeaguePlayers } from "@/lib/cloud";
+import { pageLoad } from "@/lib/smooth";
+
+const CrownAndShame = dynamic(() => import("@/components/CrownAndShame"), {
+  ssr: false,
+});
 import { getSession, getLeague } from "@/lib/league";
 import { rankPlayersWithSwings } from "@/lib/fun-board";
 import { compareForSeed } from "@/lib/brackets";
@@ -63,9 +68,9 @@ export default function StandingsPage() {
       // Fail-safe: never leave standings stuck on spinner if cloud hangs
       const failSafe = window.setTimeout(() => {
         if (!cancelled) setLoading(false);
-      }, 4_000);
+      }, 3_500);
       try {
-        const list = await loadLeaguePlayers();
+        const list = await pageLoad(loadLeaguePlayers(), []);
         if (cancelled) return;
         setPlayers(list);
         const ranked = rankPlayersWithSwings(list, getLeague()?.sportId);

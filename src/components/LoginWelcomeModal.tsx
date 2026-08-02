@@ -20,6 +20,7 @@ import {
 } from "@/lib/session-drama";
 import { firstSeasonWeek, weekWindowMs } from "@/lib/season-calendar";
 import { weekTitle } from "@/lib/dates";
+import { lockBodyScroll, unlockBodyScroll } from "@/lib/smooth";
 
 /** Days until the sport’s first official pick’em week (CFB Week 0 / NFL Week 1). */
 function getOfficialOpenTease(): {
@@ -102,11 +103,7 @@ export default function LoginWelcomeModal() {
     markDismissedForever();
     clearSessionDrama("welcome");
     setOpen(false);
-    try {
-      document.body.style.overflow = "";
-    } catch {
-      /* ok */
-    }
+    unlockBodyScroll();
   }
 
   useEffect(() => {
@@ -147,11 +144,7 @@ export default function LoginWelcomeModal() {
       setOpenTease(getOfficialOpenTease());
       openRef.current = true;
       setOpen(true);
-      try {
-        document.body.style.overflow = "hidden";
-      } catch {
-        /* ok */
-      }
+      lockBodyScroll();
     }
 
     tryOpen();
@@ -179,11 +172,7 @@ export default function LoginWelcomeModal() {
       window.removeEventListener("warroom-first-week-progress", onProgress);
       window.removeEventListener("warroom-progressive-disclosure", onProgress);
       window.removeEventListener("keydown", onKey);
-      try {
-        document.body.style.overflow = "";
-      } catch {
-        /* ok */
-      }
+      unlockBodyScroll();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- dismiss is stable enough via refs
   }, []);

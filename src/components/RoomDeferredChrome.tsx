@@ -1,16 +1,22 @@
 "use client";
 
 /**
- * Staged heavy chrome — never mount 15+ modals in one tick.
- * Wave 0: roster hydrator only (titles/borders).
- * Wave 1: interactive room modals (badges, gazette, story).
- * Wave 2: rare ceremonies / eggs.
+ * Deferred room chrome — STRICT budget.
+ *
+ * Freezes came from mounting 15+ dynamic modal chunks while the user was still
+ * trying to click Home. Rules:
+ * - Wave 0 only: roster hydrator (nameplates). Always, after Nav defers.
+ * - Wave 1 (job-adjacent): only after 12s idle OR user has changed routes twice.
+ * - Wave 2 (ceremonies/eggs/video): only after 25s, and only ONE slot group.
+ * Never mount wave 2 if a wave-1 dialog is open.
  */
 
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
+import { usePathname } from "next/navigation";
 import RoomDataHydrator from "@/components/RoomDataHydrator";
 import { isGuestMode } from "@/lib/guest-mode";
+import { hasVisibleModal } from "@/lib/smooth";
 
 const LoginWelcomeModal = dynamic(
   () => import("@/components/LoginWelcomeModal"),
@@ -91,25 +97,59 @@ const MascotSighting = dynamic(() => import("@/components/MascotSighting"), {
 
 export default function RoomDeferredChrome() {
   const guest = isGuestMode();
+  const pathname = usePathname();
   const [wave, setWave] = useState(0);
+  const [routeHops, setRouteHops] = useState(0);
+  const [ceremonyOk, setCeremonyOk] = useState(false);
+
+  // Count real navigation so look-around happens before popups
+  useEffect(() => {
+    setRouteHops((n) => n + 1);
+  }, [pathname]);
 
   useEffect(() => {
-    // Critical path = hydrator only. Popups/ceremonies wait until look-around
-    // works. Jul 31–Aug 2 freezes were this stack racing the user on open.
-    const t1 = window.setTimeout(() => setWave(1), 8_000);
-    const t2 = window.setTimeout(() => setWave(2), 20_000);
-    return () => {
-      window.clearTimeout(t1);
-      window.clearTimeout(t2);
-    };
+    // Wave 1: user has poked around OR sat still long enough
+    const armWave1 = () => setWave((w) => Math.max(w, 1));
+    const t1 = window.setTimeout(armWave1, 12_000);
+    return () => window.clearTimeout(t1);
   }, []);
+
+  useEffect(() => {
+    if (routeHops >= 2) setWave((w) => Math.max(w, 1));
+  }, [routeHops]);
+
+  useEffect(() => {
+    // Wave 2: ceremonies only after the room is boring-stable
+    if (wave < 1) return;
+    let retry: number | undefined;
+    const t2 = window.setTimeout(() => {
+      if (hasVisibleModal()) {
+        retry = window.setTimeout(() => setWave(2), 8_000);
+        return;
+      }
+      setWave(2);
+    }, 14_000);
+    return () => {
+      window.clearTimeout(t2);
+      if (retry != null) window.clearTimeout(retry);
+    };
+  }, [wave]);
+
+  // Stagger wave-2 children so cold-open video isn't competing with ring modal JS
+  useEffect(() => {
+    if (wave < 2) {
+      setCeremonyOk(false);
+      return;
+    }
+    const t = window.setTimeout(() => setCeremonyOk(true), 600);
+    return () => window.clearTimeout(t);
+  }, [wave]);
 
   return (
     <>
-      {/* Always: one roster hydrate for nameplates */}
+      {/* Wave 0: nameplates only — never blocks taps */}
       {!guest && <RoomDataHydrator />}
 
-      {/* Wave 1: room signals after tabs are already usable */}
       {wave >= 1 && (
         <>
           {!guest && <LoginWelcomeModal />}
@@ -124,12 +164,11 @@ export default function RoomDeferredChrome() {
         </>
       )}
 
-      {/* Wave 2: rare ceremonies — long after first paint is boring */}
-      {wave >= 2 && (
+      {wave >= 2 && ceremonyOk && (
         <>
-          {!guest && <CrewRevealModal />}
           {!guest && <SeasonCountdownTicker />}
           {!guest && <SeasonOpenWelcome />}
+          {!guest && <CrewRevealModal />}
           {!guest && <RingCeremonyModal />}
           {!guest && <SeasonFinaleModal />}
           {!guest && <WeeklyColdOpenModal />}

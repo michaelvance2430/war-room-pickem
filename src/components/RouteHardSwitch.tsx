@@ -86,4 +86,12 @@ export default function RouteHardSwitch() {
 /** Call on link click before navigation for instant cleanup. */
 export function hardNavPrepare() {
   unlockDocument();
+  try {
+    // Prefer the global smooth contract when available
+    const { prepareNavigation } =
+      require("@/lib/smooth") as typeof import("@/lib/smooth");
+    prepareNavigation();
+  } catch {
+    /* ok */
+  }
 }
