@@ -505,7 +505,10 @@ export default function Nav() {
       <Link
         href={link.href}
         prefetch={false}
-        onClick={closeChrome}
+        onClick={() => {
+          closeChrome();
+          hardNavPrepare();
+        }}
         className={`transition relative whitespace-nowrap shrink-0 ${
           isHome
             ? `text-[15px] sm:text-base font-extrabold tracking-tight ${
@@ -830,7 +833,10 @@ export default function Nav() {
                     <Link
                       href={link.href}
                       prefetch={false}
-                      onClick={() => setMenuOpen(false)}
+                      onClick={() => {
+                        closeChrome();
+                        hardNavPrepare();
+                      }}
                       className={`flex items-center justify-between gap-3 px-4 min-h-[48px] transition touch-manipulation ${
                         isHome
                           ? `text-lg font-extrabold ${
@@ -868,7 +874,10 @@ export default function Nav() {
                     <Link
                       href={link.href}
                       prefetch={false}
-                      onClick={() => setMenuOpen(false)}
+                      onClick={() => {
+                        closeChrome();
+                        hardNavPrepare();
+                      }}
                       className={`flex items-center justify-between gap-3 px-4 min-h-[48px] text-base transition touch-manipulation ${
                         isAccount
                           ? active

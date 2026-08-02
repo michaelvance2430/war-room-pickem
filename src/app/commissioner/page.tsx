@@ -187,16 +187,43 @@ function weekChipClass(opts: {
 function CommissionerPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [allowed, setAllowed] = useState<boolean | null>(null);
+  /**
+   * Paint from local session immediately — never full-page "Loading…" while
+   * refreshStaffSessionFlags / syncLeague / roster chain runs (Gazette → Commish stick).
+   */
+  const [allowed, setAllowed] = useState<boolean | null>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      return isOps();
+    } catch {
+      return null;
+    }
+  });
   /** True only for league owner — settings, bots, reset, pass, deputies */
-  const [isOwner, setIsOwner] = useState(false);
+  const [isOwner, setIsOwner] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return isCommissioner();
+    } catch {
+      return false;
+    }
+  });
   const [tab, setTab] = useState<"card" | "results" | "settings" | "picks">("card");
   const [firstTime, setFirstTime] = useState(false);
   const [showFirstWizard, setShowFirstWizard] = useState(true);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   /** Full week chip strip is dense — collapsed by default */
   const [showAllWeekChips, setShowAllWeekChips] = useState(false);
-  const [league, setLeague] = useState<League | null>(null);
+  const [league, setLeague] = useState<League | null>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      return getLeague();
+    } catch {
+      return null;
+    }
+  });
+  /** Soft boot spinner for week card only — shell always usable */
+  const [weekBootBusy, setWeekBootBusy] = useState(true);
   const [leagueNameEdit, setLeagueNameEdit] = useState("");
   const [cutPercent, setCutPercent] = useState(50);
   const [crystalBallEnabled, setCrystalBallEnabled] = useState(true);
@@ -312,127 +339,72 @@ function CommissionerPageInner() {
   const [autoToWeek, setAutoToWeek] = useState(SEASON_MAX_WEEK);
 
   useEffect(() => {
+    let cancelled = false;
+    // Never leave Gazette → Commish on full-page Loading
+    const failSafe = window.setTimeout(() => {
+      if (cancelled) return;
+      try {
+        setAllowed(isOps());
+        setIsOwner(isCommissioner());
+        setWeekBootBusy(false);
+      } catch {
+        setAllowed(false);
+        setWeekBootBusy(false);
+      }
+    }, 4_000);
+
     async function load() {
-      await refreshStaffSessionFlags();
-      const owner = isCommissioner();
-      const ops = isOps();
-      setIsOwner(owner);
-      setAllowed(ops);
+      // 1) Instant local gate — unlock shell before any network
+      try {
+        document.body.style.overflow = "";
+        document.documentElement.style.overflow = "";
+      } catch {
+        /* ok */
+      }
+      const ownerNow = isCommissioner();
+      const opsNow = isOps();
+      setIsOwner(ownerNow);
+      setAllowed(opsNow);
       try {
         setLabTools(showCommishLabTools());
       } catch {
         setLabTools(false);
       }
-      if (!ops) return;
 
-      const lg = (await syncLeagueFromCloud()) || getLeague();
-      let scoredCount = 0;
-      try {
-        scoredCount = (await listScoredWeekNumbers()).length;
-      } catch {
-        scoredCount = 0;
-      }
-      let eyesNewCommish = false;
-      try {
-        const { getCreatorEyesMode } = await import("@/lib/creator-eyes");
-        eyesNewCommish = getCreatorEyesMode() === "new_commissioner";
-      } catch {
-        eyesNewCommish = false;
-      }
-      const ft =
-        eyesNewCommish ||
-        (!!owner &&
-          !!lg?.id &&
-          isFirstTimeCommish({ leagueId: lg.id, scoredWeekCount: scoredCount }));
-      setFirstTime(ft);
-      const deep = canShowDeepHostTools(getSession()?.playerId);
-      setDeepHostTools(deep);
-      setSimpleHost(
-        eyesNewCommish ||
-          (!!lg?.id &&
-            isSimpleHostSurface({
-              leagueId: lg.id,
-              scoredWeekCount: scoredCount,
-              userId: getSession()?.playerId,
-            }))
-      );
-      // New hosts / eyes: stay simple. Creators normal: advanced open.
-      setAdvancedOpen(deep && !eyesNewCommish && !ft);
-      try {
-        setBotsLocked(await areBotsRosterLocked());
-      } catch {
-        setBotsLocked(false);
+      // 2) Staff flags in background (deputies) — do not block paint
+      void refreshStaffSessionFlags()
+        .then(() => {
+          if (cancelled) return;
+          setIsOwner(isCommissioner());
+          setAllowed(isOps());
+        })
+        .catch(() => {});
+
+      if (!opsNow && !ownerNow) {
+        // Might still become ops after staff refresh
+        window.setTimeout(() => {
+          if (cancelled) return;
+          if (isOps()) setAllowed(true);
+          else setWeekBootBusy(false);
+        }, 2_500);
+        return;
       }
 
-      // URL ?tab=card&first=1 or first-time owner → land on Build Card
-      const tabParam = searchParams.get("tab");
-      const firstParam = searchParams.get("first");
-      const hash =
-        typeof window !== "undefined" ? window.location.hash.replace("#", "") : "";
-      if (
-        tabParam === "card" ||
-        tabParam === "results" ||
-        tabParam === "settings" ||
-        tabParam === "picks"
-      ) {
-        if (tabParam === "settings" && !owner) setTab("card");
-        else setTab(tabParam);
-      } else if (ft || firstParam === "1" || eyesNewCommish) {
-        // Simple host / first hour: always land on Build Card
-        setTab("card");
-      } else if (owner) {
-        setTab("settings");
-      } else {
-        setTab("card");
-      }
-      // Deep link from open-room bots nudge
-      if (owner && (hash === "commish-bots" || tabParam === "settings")) {
-        if (hash === "commish-bots") {
-          setTab("settings");
-          setAdvancedOpen(true);
-          window.setTimeout(() => {
-            try {
-              document
-                .getElementById("commish-bots")
-                ?.scrollIntoView({ behavior: "smooth", block: "start" });
-            } catch {
-              /* ignore */
-            }
-          }, 400);
-        }
-      }
-
+      // 3) Local league shell first
+      let lg = getLeague();
       if (lg) {
         setLeague(lg);
         setLeagueNameEdit(lg.name);
         setCutPercent(lg.settings?.cutPercent ?? 50);
         setCrystalBallEnabled(lg.settings?.crystalBallEnabled !== false);
-        // Open-room listing (cloud column; optional until SQL runs)
-        try {
-          const { createClient, hasSupabaseConfig } = await import(
-            "@/lib/supabase/client"
-          );
-          if (hasSupabaseConfig() && lg.id) {
-            const sb = createClient();
-            const { data: row } = await sb
-              .from("leagues")
-              .select("is_open")
-              .eq("id", lg.id)
-              .maybeSingle();
-            setIsOpenRoom(!!(row as { is_open?: boolean } | null)?.is_open);
-          }
-        } catch {
-          setIsOpenRoom(false);
-        }
         setHomeTaglineId(
           lg.settings?.homeTaglineId || DEFAULT_HOME_TAGLINE_ID
         );
         setHomeTaglineCustom(lg.settings?.homeTaglineCustom || "");
-        setSeasonThemeId(
-          resolveSeasonThemeId(lg.settings?.seasonThemeId)
-        );
+        setSeasonThemeId(resolveSeasonThemeId(lg.settings?.seasonThemeId));
         applySeasonTheme(lg.settings?.seasonThemeId);
       }
+
       let week = 1;
       try {
         const saved = localStorage.getItem(ACTIVE_WEEK_KEY);
@@ -441,11 +413,174 @@ function CommissionerPageInner() {
       } catch {
         /* ignore */
       }
-      // NFL has no Week 0 — don't land on an empty preseason slot
       const minW = firstSeasonWeek(lg?.sportId);
       if (week < minW) week = minW;
       setActiveWeek(week);
-      if (owner) {
+
+      // URL tab landing — sync, no cloud
+      const tabParam = searchParams.get("tab");
+      const firstParam = searchParams.get("first");
+      const hash =
+        typeof window !== "undefined"
+          ? window.location.hash.replace("#", "")
+          : "";
+      if (
+        tabParam === "card" ||
+        tabParam === "results" ||
+        tabParam === "settings" ||
+        tabParam === "picks"
+      ) {
+        if (tabParam === "settings" && !ownerNow) setTab("card");
+        else setTab(tabParam);
+      } else if (firstParam === "1") {
+        setTab("card");
+      } else if (ownerNow) {
+        setTab("settings");
+      } else {
+        setTab("card");
+      }
+      if (ownerNow && hash === "commish-bots") {
+        setTab("settings");
+        setAdvancedOpen(true);
+        window.setTimeout(() => {
+          try {
+            document
+              .getElementById("commish-bots")
+              ?.scrollIntoView({ behavior: "smooth", block: "start" });
+          } catch {
+            /* ignore */
+          }
+        }, 400);
+      }
+
+      // 4) Week card — soft, hard ceiling so tab never feels stuck
+      setWeekBootBusy(true);
+      try {
+        await Promise.race([
+          loadWeekState(week),
+          new Promise<void>((resolve) => {
+            window.setTimeout(resolve, 5_000);
+          }),
+        ]);
+      } catch {
+        /* empty card ok */
+      }
+      if (!cancelled) setWeekBootBusy(false);
+
+      // 5) Cloud league refresh + scored count + first-time chrome (background)
+      void (async () => {
+        try {
+          const fresh = (await syncLeagueFromCloud()) || getLeague();
+          if (cancelled || !fresh) return;
+          lg = fresh;
+          setLeague(fresh);
+          setLeagueNameEdit(fresh.name);
+          setCutPercent(fresh.settings?.cutPercent ?? 50);
+          setCrystalBallEnabled(fresh.settings?.crystalBallEnabled !== false);
+          setHomeTaglineId(
+            fresh.settings?.homeTaglineId || DEFAULT_HOME_TAGLINE_ID
+          );
+          setHomeTaglineCustom(fresh.settings?.homeTaglineCustom || "");
+          setSeasonThemeId(
+            resolveSeasonThemeId(fresh.settings?.seasonThemeId)
+          );
+          applySeasonTheme(fresh.settings?.seasonThemeId);
+
+          let scoredCount = 0;
+          try {
+            scoredCount = (await listScoredWeekNumbers()).length;
+          } catch {
+            scoredCount = 0;
+          }
+          let eyesNewCommish = false;
+          try {
+            const { getCreatorEyesMode } = await import("@/lib/creator-eyes");
+            eyesNewCommish = getCreatorEyesMode() === "new_commissioner";
+          } catch {
+            eyesNewCommish = false;
+          }
+          const owner = isCommissioner();
+          const ft =
+            eyesNewCommish ||
+            (!!owner &&
+              !!fresh.id &&
+              isFirstTimeCommish({
+                leagueId: fresh.id,
+                scoredWeekCount: scoredCount,
+              }));
+          if (cancelled) return;
+          setFirstTime(ft);
+          const deep = canShowDeepHostTools(getSession()?.playerId);
+          setDeepHostTools(deep);
+          setSimpleHost(
+            eyesNewCommish ||
+              (!!fresh.id &&
+                isSimpleHostSurface({
+                  leagueId: fresh.id,
+                  scoredWeekCount: scoredCount,
+                  userId: getSession()?.playerId,
+                }))
+          );
+          setAdvancedOpen(deep && !eyesNewCommish && !ft);
+          if (
+            !tabParam &&
+            (ft || firstParam === "1" || eyesNewCommish)
+          ) {
+            setTab("card");
+          }
+
+          // Open-room flag (optional column)
+          try {
+            const { createClient, hasSupabaseConfig } = await import(
+              "@/lib/supabase/client"
+            );
+            if (hasSupabaseConfig() && fresh.id) {
+              const sb = createClient();
+              const { data: row } = await sb
+                .from("leagues")
+                .select("is_open")
+                .eq("id", fresh.id)
+                .maybeSingle();
+              if (!cancelled) {
+                setIsOpenRoom(
+                  !!(row as { is_open?: boolean } | null)?.is_open
+                );
+              }
+            }
+          } catch {
+            /* ok */
+          }
+          try {
+            setBotsLocked(await areBotsRosterLocked());
+          } catch {
+            if (!cancelled) setBotsLocked(false);
+          }
+        } catch {
+          /* keep local league */
+        }
+      })();
+
+      // 6) Roster for pass/bots — never block shell
+      void (async () => {
+        try {
+          const session = getSession();
+          const roster = await loadLeagueRoster();
+          if (cancelled) return;
+          setRosterCount(roster.length);
+          setBotCount(roster.filter((m) => m.isBot).length);
+          setPassRoster(
+            roster.filter((m) => !m.isBot && m.userId !== session?.playerId)
+          );
+          const open = Math.max(0, MAX_LEAGUE_PLAYERS - roster.length);
+          const toIdeal = Math.max(0, SIMPLE_BOT_FILL_TARGET - roster.length);
+          if (toIdeal > 0 && toIdeal <= open) setBotAddCount(toIdeal);
+          else if (open > 0) setBotAddCount(Math.min(6, open));
+        } catch {
+          /* ignore */
+        }
+      })();
+
+      if (ownerNow) {
         const sess = getSession();
         if (sess?.playerId && sess.leagueId) {
           recordCommissionerWeek({
@@ -455,27 +590,12 @@ function CommissionerPageInner() {
           });
         }
       }
-      await loadWeekState(week);
-      try {
-        const session = getSession();
-        const roster = await loadLeagueRoster();
-        setRosterCount(roster.length);
-        setBotCount(roster.filter((m) => m.isBot).length);
-        setPassRoster(
-          roster.filter(
-            (m) => !m.isBot && m.userId !== session?.playerId
-          )
-        );
-        // Sensible default: add enough to reach ideal 16 if under; else a few
-        const open = Math.max(0, MAX_LEAGUE_PLAYERS - roster.length);
-        const toIdeal = Math.max(0, SIMPLE_BOT_FILL_TARGET - roster.length);
-        if (toIdeal > 0 && toIdeal <= open) setBotAddCount(toIdeal);
-        else if (open > 0) setBotAddCount(Math.min(6, open));
-      } catch {
-        /* ignore */
-      }
     }
     void load();
+    return () => {
+      cancelled = true;
+      window.clearTimeout(failSafe);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- boot + URL tab/first
   }, [searchParams]);
 
@@ -2254,6 +2374,14 @@ function CommissionerPageInner() {
 
   return (
     <div className="min-h-screen flex flex-col">
+      {weekBootBusy && (
+        <div
+          className="sticky top-14 z-40 border-b border-border bg-card/95 px-3 py-1.5 text-center text-[11px] text-muted"
+          role="status"
+        >
+          Loading this week&apos;s card…
+        </div>
+      )}
       <OpenRoomLeaveNudge />
       <OpenRoomBotsNudge
         open={openRoomBotsNudge}
