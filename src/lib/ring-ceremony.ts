@@ -1,6 +1,14 @@
 /**
  * Ring Ceremony — living-history foundation for every sport pack.
- * Real opening window for the room; commissioner preview is personal only.
+ *
+ * Automatic drama calendar (every league, no commish switch required):
+ *  1) End of season — Season Finale modal fires on next login after hardware
+ *     is engraved (champ / toilet / nerd). Day-after-final energy.
+ *  2) Week before opening week — Weekly Cold Open (“wanted” package) builds heat.
+ *  3) Opening week only — this Ring Ceremony walk-out for the defending champ
+ *     (CFB Week 0 / NFL Week 1 window). Once per player · champ year.
+ *
+ * Commish “preview” is personal only — never required for the room calendar.
  */
 
 import { weekWindowMs, firstSeasonWeek } from "@/lib/season-calendar";
@@ -332,4 +340,28 @@ export function requestRingCeremonyPreview(opts?: { force?: boolean }) {
   } catch {
     /* ignore */
   }
+}
+
+/** Plain-language schedule for Commish settings (no toggle required). */
+export function ringCeremonyCalendarBlurb(sportId?: string | null): {
+  headline: string;
+  steps: string[];
+  note: string;
+} {
+  const sid = sportId ?? getLeague()?.sportId;
+  const openLabel =
+    sid === "nfl"
+      ? "NFL Week 1"
+      : sid === "soccer_wwc"
+        ? "first matchday"
+        : "CFB Week 0";
+  return {
+    headline: "Automatic for every league — no switch to flip",
+    steps: [
+      "After final scores + hardware engraved → Season Finale ceremony (champ / toilet / nerd) on next login.",
+      "The week before the season opens → Cold open package (wanted poster / heat on last year’s champ).",
+      `Opening week (${openLabel}) → full Ring Ceremony walk-out for the defending champ. Once per player.`,
+    ],
+    note: "Preview button below is you only — never required for the room to see the real ceremonies.",
+  };
 }

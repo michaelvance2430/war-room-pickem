@@ -2,10 +2,13 @@
 
 /**
  * Ring Ceremony — sport-specific opening flex.
- * Real launch: opening week only, once per player · champ year.
- * Preview: commissioner only, never forces the whole league.
+ * Real launch: automatic during opening week only, once per player · champ year.
+ *   (No commish toggle — every league gets it.)
+ * Preview: commissioner force-play only, never forces the whole league.
  *
- * Huge moment: real trophy art, human copy, share the hardware.
+ * Drama calendar also includes:
+ *  - Season Finale after hardware engraved (end of season)
+ *  - Weekly Cold Open the week before doors open
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";

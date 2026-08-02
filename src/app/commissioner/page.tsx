@@ -71,9 +71,8 @@ import { transferCommissioner } from "@/lib/trophies";
 import { recordCommissionerWeek } from "@/lib/commish-tenure";
 import { seedBotLockerTalk } from "@/lib/bot-locker-talk";
 import {
-  getCommishPreviewOpt,
-  setCommishPreviewOpt,
   requestRingCeremonyPreview,
+  ringCeremonyCalendarBlurb,
 } from "@/lib/ring-ceremony";
 import OpenRoomBotsNudge from "@/components/OpenRoomBotsNudge";
 import OpenRoomLeaveNudge from "@/components/OpenRoomLeaveNudge";
@@ -306,8 +305,7 @@ function CommissionerPageInner() {
   const [deputyReport, setDeputyReport] = useState<string | null>(null);
   const [autoSeasonBusy, setAutoSeasonBusy] = useState(false);
   const [autoSeasonReport, setAutoSeasonReport] = useState<string | null>(null);
-  /** Commish-only: personal ring ceremony preview (never league-wide) */
-  const [ringPreviewOpt, setRingPreviewOpt] = useState(false);
+
   /** After listing open room — nudge host to pad bots */
   const [openRoomBotsNudge, setOpenRoomBotsNudge] = useState(false);
   /** Inclusive range for sandbox auto-score (one week … full season) */
@@ -410,11 +408,6 @@ function CommissionerPageInner() {
         setLeagueNameEdit(lg.name);
         setCutPercent(lg.settings?.cutPercent ?? 50);
         setCrystalBallEnabled(lg.settings?.crystalBallEnabled !== false);
-        try {
-          setRingPreviewOpt(getCommishPreviewOpt());
-        } catch {
-          setRingPreviewOpt(false);
-        }
         // Open-room listing (cloud column; optional until SQL runs)
         try {
           const { createClient, hasSupabaseConfig } = await import(
@@ -2631,54 +2624,39 @@ function CommissionerPageInner() {
               </div>
 
               <div className="rounded-xl border border-amber-400/30 bg-amber-400/5 p-4 space-y-3">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-amber-200">
-                      Ring ceremony
-                    </p>
-                    <p className="text-xs text-muted mt-1 leading-relaxed">
-                      Sport-specific opening ritual (NFL stage / CFB campus /
-                      WWC pitch).{" "}
-                      <strong className="text-foreground">
-                        Preview is you only
-                      </strong>{" "}
-                      — never launches a test to the whole league. Real
-                      ceremony still fires for everyone only in the opening
-                      week window.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={ringPreviewOpt}
-                    onClick={() => {
-                      const next = !ringPreviewOpt;
-                      setRingPreviewOpt(next);
-                      setCommishPreviewOpt(next);
-                    }}
-                    className={`relative shrink-0 w-12 h-7 rounded-full transition ${
-                      ringPreviewOpt ? "bg-amber-400" : "bg-border"
-                    }`}
-                    title="Personal preview only"
-                  >
-                    <span
-                      className={`absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-black transition ${
-                        ringPreviewOpt ? "translate-x-5" : "translate-x-0"
-                      }`}
-                    />
-                  </button>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-amber-200">
+                    Drama calendar · automatic
+                  </p>
+                  <p className="text-xs text-muted mt-1 leading-relaxed">
+                    <strong className="text-foreground">
+                      You do not turn this on.
+                    </strong>{" "}
+                    Every league runs the same script — no toggle, no invite
+                    blast. Preview button is optional and only for you.
+                  </p>
                 </div>
-                <p className="text-xs font-medium text-muted">
-                  {ringPreviewOpt
-                    ? "On — show me a personal preview once per browser session"
-                    : "Off — only real opening-week ceremony for the room"}
+                {(() => {
+                  const cal = ringCeremonyCalendarBlurb(league?.sportId);
+                  return (
+                    <ol className="text-xs text-foreground/90 space-y-2 list-decimal list-inside leading-relaxed">
+                      {cal.steps.map((s) => (
+                        <li key={s.slice(0, 24)}>{s}</li>
+                      ))}
+                    </ol>
+                  );
+                })()}
+                <p className="text-[11px] text-muted leading-relaxed border-t border-amber-400/20 pt-2">
+                  Opening walk-out uses last season&apos;s championship plaque
+                  (Trophy Room). Keep prior-year hardware engraved so the room
+                  has a face to chase.
                 </p>
                 <button
                   type="button"
                   onClick={() => requestRingCeremonyPreview({ force: true })}
                   className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-amber-400/50 bg-amber-400/15 text-amber-100 text-sm font-bold min-h-[44px] hover:bg-amber-400/25"
                 >
-                  Play ring ceremony now (preview · you only)
+                  Test walk-out now (preview · you only)
                 </button>
               </div>
 
