@@ -196,7 +196,7 @@ function BadgeDetailModal({
                 <span className="text-muted">Points</span>
                 <span className="font-semibold" style={{ color: hex }}>
                   +{rewards.points}
-                  {def.creatorOnly ? (
+                  {def.creatorOnly || def.careerOnly ? (
                     <span className="text-muted font-normal text-xs">
                       {" "}
                       · career only

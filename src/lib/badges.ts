@@ -148,12 +148,13 @@ export const BADGE_CATALOG: BadgeDef[] = [
     id: "worlds_greatest_cavalry_scout",
     name: "World Greatest Cavalry Scout",
     description:
-      "Recon so elite he finds the underdog, the fridge, and your confidence before kickoff. Official hardware: an eggplant welded to a wooden plinth. Not a vegetable. A doctrine. Do not salute it. It will not salute back.",
+      "Recon so elite he finds the underdog, the fridge, and your confidence before kickoff. Official hardware: an eggplant welded to a wooden plinth. Not a vegetable. A doctrine. Do not salute it. It will not salute back. Career points only — never pads season cheevos or Cheevo King.",
     howToEarn:
       "You don't earn this. The cavalry either is you — or it isn't. Seeded for Tbone Soulstache Rockstar / Football Guru. Peasants: admire the wood grain and move along.",
     lockedLabel: "Hard locked — scouts only, no infantry",
     tier: "legendary",
     points: 200,
+    careerOnly: true,
     icon: "🍆",
   },
   {
@@ -2029,8 +2030,8 @@ export function getPlayerBadges(
 
 /**
  * Sum of points from earned badges.
- * forRanking: exclude Cheevo King (can't pad its own race) and creator-only
- * badges (career flex only — not the season cheevo race).
+ * forRanking: exclude Cheevo King (can't pad its own race) and career-only /
+ * creator-only badges (career flex only — not the season cheevo race).
  */
 export function getAchievementPoints(
   player: Player,
@@ -2042,9 +2043,16 @@ export function getAchievementPoints(
       if (!opts?.forRanking) return true;
       if (b.def.id === CHEEVO_KING_ID) return false;
       if (b.def.creatorOnly) return false;
+      if (b.def.careerOnly) return false;
       return true;
     })
     .reduce((sum, b) => sum + b.def.points, 0);
+}
+
+/** True if badge points bank career-only (never season race). */
+export function isCareerOnlyBadge(badgeId: string): boolean {
+  const def = getBadgeDef(badgeId);
+  return !!(def?.creatorOnly || def?.careerOnly);
 }
 
 /**

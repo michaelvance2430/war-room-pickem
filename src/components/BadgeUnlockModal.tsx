@@ -232,7 +232,9 @@ export default function BadgeUnlockModal() {
             className="text-sm font-bold mt-3"
             style={{ color: hex }}
           >
-            +{current.def.points} achievement pts
+            {current.def.careerOnly || current.def.creatorOnly
+              ? `+${current.def.points} career pts · career only`
+              : `+${current.def.points} achievement pts`}
             {current.def.stackable && current.earnCount
               ? ` · lifetime ×${current.earnCount}`
               : ""}

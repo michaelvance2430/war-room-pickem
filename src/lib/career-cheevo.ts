@@ -178,11 +178,14 @@ export function unbankCareerBadgeId(
 
 /**
  * Season total from live badge list (may drop after season reset).
- * Creator-only legendaries (The Creator) are career-only — not season race.
+ * Creator-only + careerOnly legendaries (The Creator, Cavalry Scout, …)
+ * bank all-time only — not the season cheevo race / Cheevo King.
  */
 export function seasonCheevoFromBadges(earnedOrAll: BadgeStatus[]): number {
   return earnedOrAll
-    .filter((b) => b.earned && !b.def.creatorOnly)
+    .filter(
+      (b) => b.earned && !b.def.creatorOnly && !b.def.careerOnly
+    )
     .reduce((sum, b) => sum + b.def.points, 0);
 }
 

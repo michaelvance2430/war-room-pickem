@@ -42,6 +42,11 @@ export interface BadgeDef {
   points: number;
   lockedLabel?: string;
   creatorOnly?: boolean;
+  /**
+   * Career (all-time) points only — never pads season cheevo totals or Cheevo King.
+   * Same race rules as creatorOnly for season scoring; not app-creator-gated.
+   */
+  careerOnly?: boolean;
   icon: string;
   /**
    * Can be earned more than once (weekly last, perfect week, etc.).

@@ -33,11 +33,17 @@ export function getBadgeRewards(def: BadgeDef): BadgeRewardSummary {
       : null;
   const border = borderDef?.name ?? creatorBorder?.name ?? null;
 
-  const chips: string[] = [`+${def.points} pts`];
+  const careerOnly = !!(def.creatorOnly || def.careerOnly);
+  const chips: string[] = [
+    careerOnly ? `+${def.points} career pts` : `+${def.points} pts`,
+  ];
+  if (careerOnly) chips.push("Career only");
   if (title) chips.push(`Title: ${title}`);
   if (border) chips.push(`Border: ${border}`);
 
-  let line = `+${def.points} pts`;
+  let line = careerOnly
+    ? `+${def.points} career pts · Career only`
+    : `+${def.points} pts`;
   if (title && border) line += ` · Title + Border`;
   else if (title) line += ` · Title`;
   else if (border) line += ` · Border`;
