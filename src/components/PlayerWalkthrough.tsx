@@ -19,11 +19,13 @@ import {
   clearTutorialHold,
   coachCopyForStep,
   completePlayerTutorial,
+  ensureTutorialPicksHref,
   getPlayerTutorialState,
   goBackPlayerTutorial,
   isPlayerTutorialActive,
   isTutorialHeldOn,
   needsPlayerTutorial,
+  padawanOutroLines,
   playerTutorialStepIndex,
   skipPlayerTutorial,
   startPicksOnlyTutorial,
@@ -31,8 +33,8 @@ import {
 } from "@/lib/player-tutorial";
 import { markRulesSeen } from "@/lib/rules";
 import { peekLocalCrystalBall } from "@/lib/crystal-ball";
-import { leagueHasLiveCard } from "@/lib/first-session";
 import { hardNavPrepare } from "@/components/RouteHardSwitch";
+import { getLeague } from "@/lib/league";
 
 const FULL_ORDER: PlayerTutorialStep[] = [
   "open_crystal",
@@ -68,6 +70,8 @@ export default function PlayerWalkthrough() {
   const router = useRouter();
   const [active, setActive] = useState(false);
   const [step, setStep] = useState<PlayerTutorialStep>("open_picks");
+  const [picksHref, setPicksHref] = useState("/picks");
+  const [padawanOutro, setPadawanOutro] = useState(false);
   const startingRef = useRef(false);
   const lastPathRef = useRef<string | null>(null);
 
@@ -111,11 +115,9 @@ export default function PlayerWalkthrough() {
 
       startingRef.current = true;
       try {
-        // KISS: no coach until there's a live card to pick
-        if (!(await leagueHasLiveCard())) {
-          syncFromStorage();
-          return;
-        }
+        // Always coach — trial sandbox if no live card so they can practice
+        const dest = await ensureTutorialPicksHref();
+        setPicksHref(dest.href);
         if (needsPlayerTutorial() && !isPlayerTutorialActive()) {
           markRulesSeen();
           startPicksOnlyTutorial(getSession()?.playerId || undefined);
@@ -286,6 +288,7 @@ export default function PlayerWalkthrough() {
             } catch {
               /* ignore */
             }
+            setPadawanOutro(true);
             syncFromStorage();
           }
         } catch {
@@ -296,11 +299,63 @@ export default function PlayerWalkthrough() {
     return () => clearInterval(id);
   }, [active, pathname, advanceAndPaint, syncFromStorage]);
 
-  if (!active || isGuestMode()) return null;
+  if (isGuestMode()) return null;
+
+  if (padawanOutro) {
+    const lines = padawanOutroLines(getLeague()?.sportId);
+    return (
+      <div
+        className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center p-0 sm:p-4"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="padawan-outro-title"
+      >
+        <button
+          type="button"
+          className="absolute inset-0 bg-black/85 backdrop-blur-sm"
+          aria-label="Close"
+          onClick={() => setPadawanOutro(false)}
+        />
+        <div className="relative w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl border-2 border-primary/50 bg-card shadow-[0_0_60px_rgba(34,197,94,0.15)] p-5 sm:p-6 space-y-4">
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">
+            Training complete
+          </p>
+          <h2
+            id="padawan-outro-title"
+            className="text-xl font-black text-foreground leading-snug"
+          >
+            {lines.title}
+          </h2>
+          <p className="text-sm text-muted leading-relaxed">{lines.body}</p>
+          {!lines.open && lines.days > 0 && (
+            <p className="text-center text-3xl font-black tabular-nums text-primary">
+              {lines.days}
+              <span className="text-base font-bold text-muted ml-1">
+                {lines.days === 1 ? "day" : "days"}
+              </span>
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={() => setPadawanOutro(false)}
+            className="w-full py-3.5 min-h-[52px] rounded-xl bg-primary text-black font-extrabold text-sm"
+          >
+            {lines.open ? "Go win the week" : "I will be patient"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!active) return null;
 
   const copy = coachCopyForStep(step);
   const stepIdx = playerTutorialStepIndex(step);
   const canGoBack = stepIdx > 0;
+  const resolvedCtaHref =
+    copy.ctaHref === "/picks" || copy.ctaHref?.startsWith("/picks")
+      ? picksHref
+      : copy.ctaHref;
 
   function manualNext() {
     clearTutorialHold();
@@ -310,6 +365,7 @@ export default function PlayerWalkthrough() {
     const next = order[i + 1] || "done";
     if (next === "done") {
       completePlayerTutorial();
+      setPadawanOutro(true);
       syncFromStorage();
     } else {
       advanceAndPaint(next);
@@ -382,19 +438,28 @@ export default function PlayerWalkthrough() {
               ← Back
             </button>
           )}
-          {copy.ctaHref && (
+          {resolvedCtaHref && (
             <Link
-              href={copy.ctaHref}
+              href={resolvedCtaHref}
               prefetch
-              onClick={() => {
+              onClick={(e) => {
                 hardNavPrepare();
                 clearTutorialHold();
-                // Paint next frame before the route swap so the coach doesn't stall
                 if (step === "open_crystal") {
                   advanceAndPaint("search_team");
                 }
                 if (step === "open_picks") {
                   advanceAndPaint("fill_picks");
+                  // Always resolve live vs trial sandbox so empty room still has a card
+                  e.preventDefault();
+                  void ensureTutorialPicksHref().then((d) => {
+                    setPicksHref(d.href);
+                    try {
+                      router.push(d.href);
+                    } catch {
+                      window.location.href = d.href;
+                    }
+                  });
                 }
               }}
               className="flex-1 min-w-[8rem] text-center py-2.5 rounded-xl bg-primary text-black text-sm font-bold"

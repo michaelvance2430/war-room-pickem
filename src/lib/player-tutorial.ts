@@ -123,6 +123,75 @@ export function startPicksOnlyTutorial(userId?: string) {
   startPlayerTutorial(userId, { mode: "picks", startAt: "open_picks" });
 }
 
+/**
+ * Ensure the walkthrough has a card to practice on.
+ * Live published card → /picks. Otherwise spin up trial sandbox practice.
+ */
+export async function ensureTutorialPicksHref(): Promise<{
+  href: string;
+  practice: boolean;
+}> {
+  try {
+    const { leagueHasLiveCard } = await import("@/lib/first-session");
+    if (await leagueHasLiveCard()) {
+      return { href: "/picks", practice: false };
+    }
+  } catch {
+    /* fall through to practice */
+  }
+  try {
+    const { isBoredPracticeWindowOpen } = await import("@/lib/bored-practice");
+    if (!isBoredPracticeWindowOpen()) {
+      return { href: "/picks", practice: false };
+    }
+    const { startBoredPracticeWeek } = await import("@/lib/bored-practice-run");
+    const res = await startBoredPracticeWeek();
+    if (res.ok && res.picksHref) {
+      return { href: res.picksHref, practice: true };
+    }
+  } catch {
+    /* ok */
+  }
+  return { href: "/picks", practice: false };
+}
+
+/** Fun close after first lock walkthrough. */
+export function padawanOutroLines(sportId?: string | null): {
+  title: string;
+  body: string;
+  days: number;
+  open: boolean;
+} {
+  let days = 0;
+  let open = true;
+  let openLabel = "doors open";
+  try {
+    const { getCountdownParts, getSeasonOpenLabel, isSeasonOpen } =
+      require("@/lib/season-countdown") as typeof import("@/lib/season-countdown");
+    open = isSeasonOpen(Date.now(), sportId);
+    const p = getCountdownParts(Date.now(), sportId);
+    days = p.done ? 0 : Math.max(1, p.days);
+    openLabel = getSeasonOpenLabel(sportId);
+  } catch {
+    days = 0;
+  }
+  if (open) {
+    return {
+      title: "You locked the slip — Padawan no more",
+      body: "Doors are open. Same job every week: lock before kickoff. The rest is just noise and glory.",
+      days: 0,
+      open: true,
+    };
+  }
+  const dayWord = days === 1 ? "day" : "days";
+  return {
+    title: "Be patient, young Padawan",
+    body: `You just practiced the whole weekly job. Trial sandbox — not the live season. Be patient, young Padawan: we still have ${days} ${dayWord} until the week officially starts (${openLabel}). Meditate. Trash-talk in the Locker. Come back hungry.`,
+    days,
+    open: false,
+  };
+}
+
 /** Full coach including Crystal Ball (Account re-run). */
 export function startFullPlayerTutorial(userId?: string) {
   startPlayerTutorial(userId, { mode: "full", startAt: "open_crystal" });
@@ -271,13 +340,13 @@ export function coachCopyForStep(step: PlayerTutorialStep): CoachCopy {
       return picksOnly
         ? {
             title: "Step 1 of 3 · Open My Picks",
-            body: "This is the job every week. Open My Picks and lock this week’s card before first kickoff.",
+            body: "This is the job every week. Open My Picks and lock a card before first kickoff. No live card yet? We spin a trial sandbox so you can feel it.",
             ctaLabel: "Open My Picks →",
             ctaHref: "/picks",
           }
         : {
             title: "Step 4 of 6 · Open My Picks",
-            body: "Crystal Ball’s done for now. Open My Picks — that’s where you lock this week’s card.",
+            body: "Crystal Ball’s done for now. Open My Picks — that’s where you lock this week’s card (trial sandbox if the real card isn’t live).",
             ctaLabel: "Open My Picks →",
             ctaHref: "/picks",
           };
@@ -285,7 +354,7 @@ export function coachCopyForStep(step: PlayerTutorialStep): CoachCopy {
       return picksOnly
         ? {
             title: "Step 2 of 3 · Fill the card",
-            body: "For every game: pick a side, set confidence 1–5 (each number once), set one Best Bet (2×), and answer the prop.",
+            body: "For every game: pick a side, set confidence 1–5 (each number once), set one Best Bet (2×), and answer the prop. Practice cards still count for learning — not the standings.",
             ctaLabel: "Open My Picks",
             ctaHref: "/picks",
             allowManualNext: true,
@@ -301,7 +370,7 @@ export function coachCopyForStep(step: PlayerTutorialStep): CoachCopy {
       return picksOnly
         ? {
             title: "Step 3 of 3 · Save Picks",
-            body: "Hit the big Save Picks button. After first kickoff the whole card freezes — so save before kickoff. That’s the whole weekly job.",
+            body: "Hit the big Save / Lock button. That’s the weekly job. When the real season card drops, you’ll do this for blood.",
             ctaLabel: "Open My Picks",
             ctaHref: "/picks",
           }
