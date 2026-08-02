@@ -57,9 +57,8 @@ export default function GazetteModal() {
       }
     }
 
-    const t1 = setTimeout(() => void tryShow(), 700);
-    const t2 = setTimeout(() => void tryShow(), 2500);
-    const t3 = setTimeout(() => void tryShow(), 5000);
+    // One delayed probe — was 3 timeouts + 1.5s interval hammering standings
+    const t1 = setTimeout(() => void tryShow(), 2200);
 
     function onStorage(e: StorageEvent) {
       if (e.key?.includes("warroom-rules") || e.key?.includes("gazette")) {
@@ -69,55 +68,21 @@ export default function GazetteModal() {
     function onForce() {
       void tryShow({ force: true });
     }
+    function onScored() {
+      void tryShow({ force: true });
+    }
     window.addEventListener("storage", onStorage);
     window.addEventListener("warroom-force-gazette-paper", onForce);
+    window.addEventListener("warroom-week-scored", onScored);
 
     return () => {
       cancelled = true;
       clearTimeout(t1);
-      clearTimeout(t2);
-      clearTimeout(t3);
       window.removeEventListener("storage", onStorage);
       window.removeEventListener("warroom-force-gazette-paper", onForce);
+      window.removeEventListener("warroom-week-scored", onScored);
     };
   }, []);
-
-  useEffect(() => {
-    if (!GAZETTE_ENABLED || open) return;
-    const id = setInterval(() => {
-      void (async () => {
-        try {
-          const { isPreLockCalm } = await import("@/lib/first-week");
-          const { getSession } = await import("@/lib/league");
-          const { allowFoundryCeremonies } = await import(
-            "@/lib/foundry-preview"
-          );
-          if (
-            isPreLockCalm(getSession()?.playerId) &&
-            !allowFoundryCeremonies()
-          ) {
-            return;
-          }
-          const players = await loadLeaguePlayers();
-          const offer = await shouldOfferGazette(players);
-          if (offer.show) {
-            setEdition(offer.edition);
-            setLeagueId(offer.leagueId);
-            setOpen(true);
-          } else {
-            notifyGazetteDone();
-          }
-        } catch {
-          notifyGazetteDone();
-        }
-      })();
-    }, 1500);
-    const stop = setTimeout(() => clearInterval(id), 20000);
-    return () => {
-      clearInterval(id);
-      clearTimeout(stop);
-    };
-  }, [open]);
 
   function dismiss() {
     if (edition && leagueId) {

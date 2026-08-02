@@ -63,8 +63,8 @@ const rosterInflight = new Map<string, Promise<object[]>>();
 const CARD_TTL_MS = 6_000;
 const LIST_TTL_MS = 12_000;
 const ACTIVE_WEEK_TTL_MS = 5_000;
-const PLAYERS_TTL_MS = 10_000;
-const ROSTER_TTL_MS = 12_000;
+const PLAYERS_TTL_MS = 15_000;
+const ROSTER_TTL_MS = 25_000;
 
 function cacheGet<T>(map: Map<string, CacheEntry<T>>, key: string, ttl: number): T | undefined {
   const e = map.get(key);

@@ -1,21 +1,44 @@
 "use client";
 
 /**
- * Heavy room chrome that does NOT need to be in the initial JS parse
- * or first paint of every page. Nav mounts this after idle.
- *
- * Keep first-session coaches (walkthrough / welcome / rules) out of here —
- * those stay eager in Nav.
+ * Staged heavy chrome — never mount 15+ modals in one tick.
+ * Wave 0: roster hydrator only (titles/borders).
+ * Wave 1: interactive room modals (badges, gazette, story).
+ * Wave 2: rare ceremonies / eggs.
  */
 
+import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import RoomDataHydrator from "@/components/RoomDataHydrator";
 import { isGuestMode } from "@/lib/guest-mode";
 
+const BadgeUnlockModal = dynamic(
+  () => import("@/components/BadgeUnlockModal"),
+  { ssr: false }
+);
+const GazetteModal = dynamic(() => import("@/components/GazetteModal"), {
+  ssr: false,
+});
+const GazetteShelfReveal = dynamic(
+  () => import("@/components/GazetteShelfReveal"),
+  { ssr: false }
+);
+const StoryDoorModal = dynamic(() => import("@/components/StoryDoorModal"), {
+  ssr: false,
+});
+const CardPublishedModal = dynamic(
+  () => import("@/components/CardPublishedModal"),
+  { ssr: false }
+);
+const BoredPracticeDoneModal = dynamic(
+  () => import("@/components/BoredPracticeDoneModal"),
+  { ssr: false }
+);
 const LeagueBuildLockReminder = dynamic(
   () => import("@/components/LeagueBuildLockReminder"),
   { ssr: false }
 );
+
 const CrewRevealModal = dynamic(() => import("@/components/CrewRevealModal"), {
   ssr: false,
 });
@@ -35,14 +58,6 @@ const SeasonFinaleModal = dynamic(
   () => import("@/components/SeasonFinaleModal"),
   { ssr: false }
 );
-const CardPublishedModal = dynamic(
-  () => import("@/components/CardPublishedModal"),
-  { ssr: false }
-);
-const BoredPracticeDoneModal = dynamic(
-  () => import("@/components/BoredPracticeDoneModal"),
-  { ssr: false }
-);
 const WeeklyColdOpenModal = dynamic(
   () => import("@/components/WeeklyColdOpenModal"),
   { ssr: false }
@@ -53,20 +68,6 @@ const BirthdayGazetteModal = dynamic(
 );
 const PlatformAnniversaryModal = dynamic(
   () => import("@/components/PlatformAnniversaryModal"),
-  { ssr: false }
-);
-const GazetteModal = dynamic(() => import("@/components/GazetteModal"), {
-  ssr: false,
-});
-const GazetteShelfReveal = dynamic(
-  () => import("@/components/GazetteShelfReveal"),
-  { ssr: false }
-);
-const StoryDoorModal = dynamic(() => import("@/components/StoryDoorModal"), {
-  ssr: false,
-});
-const BadgeUnlockModal = dynamic(
-  () => import("@/components/BadgeUnlockModal"),
   { ssr: false }
 );
 const EasterEggHost = dynamic(() => import("@/components/EasterEggHost"), {
@@ -82,32 +83,52 @@ const MascotSighting = dynamic(() => import("@/components/MascotSighting"), {
 
 export default function RoomDeferredChrome() {
   const guest = isGuestMode();
+  const [wave, setWave] = useState(0);
+
+  useEffect(() => {
+    // Stagger so main-thread isn't crushed by 15 dynamic chunks at once
+    const t1 = window.setTimeout(() => setWave(1), 1800);
+    const t2 = window.setTimeout(() => setWave(2), 4200);
+    return () => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+    };
+  }, []);
 
   return (
     <>
-      {/* Single roster → titles / borders / join badges */}
+      {/* Always: one roster hydrate for nameplates */}
       {!guest && <RoomDataHydrator />}
 
-      {!guest && <LeagueBuildLockReminder />}
-      {!guest && <CrewRevealModal />}
-      {!guest && <SeasonCountdownTicker />}
-      {!guest && <SeasonOpenWelcome />}
-      {!guest && <RingCeremonyModal />}
-      {!guest && <SeasonFinaleModal />}
-      {!guest && <CardPublishedModal />}
-      {!guest && <BoredPracticeDoneModal />}
-      {!guest && <WeeklyColdOpenModal />}
-      {!guest && <BirthdayGazetteModal />}
-      {!guest && <PlatformAnniversaryModal />}
+      {/* Wave 1: things that can matter in the first few minutes */}
+      {wave >= 1 && (
+        <>
+          {!guest && <LeagueBuildLockReminder />}
+          {!guest && <CardPublishedModal />}
+          {!guest && <BoredPracticeDoneModal />}
+          <GazetteModal />
+          <GazetteShelfReveal />
+          <StoryDoorModal />
+          <BadgeUnlockModal />
+        </>
+      )}
 
-      <GazetteModal />
-      <GazetteShelfReveal />
-      <StoryDoorModal />
-      <BadgeUnlockModal />
-
-      {!guest && <EasterEggHost />}
-      {!guest && <EggFlexNewspaper />}
-      {!guest && <MascotSighting />}
+      {/* Wave 2: rare ceremonies / discovery — after the app is usable */}
+      {wave >= 2 && (
+        <>
+          {!guest && <CrewRevealModal />}
+          {!guest && <SeasonCountdownTicker />}
+          {!guest && <SeasonOpenWelcome />}
+          {!guest && <RingCeremonyModal />}
+          {!guest && <SeasonFinaleModal />}
+          {!guest && <WeeklyColdOpenModal />}
+          {!guest && <BirthdayGazetteModal />}
+          {!guest && <PlatformAnniversaryModal />}
+          {!guest && <EasterEggHost />}
+          {!guest && <EggFlexNewspaper />}
+          {!guest && <MascotSighting />}
+        </>
+      )}
     </>
   );
 }

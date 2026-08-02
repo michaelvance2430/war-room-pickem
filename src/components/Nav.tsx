@@ -13,16 +13,11 @@ import {
   isActuallyCommissioner,
 } from "@/lib/league";
 import Avatar from "@/components/Avatar";
-/** First-session only — keep eager so coach isn't delayed. */
-import RulesOnboardingModal from "@/components/RulesOnboardingModal";
-import LoginWelcomeModal from "@/components/LoginWelcomeModal";
 import GuestDemoChrome from "@/components/GuestDemoChrome";
 import GuestOnboarding from "@/components/GuestOnboarding";
-import PlayerWalkthrough from "@/components/PlayerWalkthrough";
 import { touchLastSeen } from "@/lib/last-seen";
 import { loadMyProfile } from "@/lib/profile";
 import { isGuestMode } from "@/lib/guest-mode";
-import { refreshStaffSessionFlags } from "@/lib/cloud";
 import {
   isViewAsPlayer,
   setViewAsPlayer,
@@ -32,8 +27,6 @@ import {
   countUnseenLockerPosts,
   EVENT_LOCKER_SEEN,
 } from "@/lib/room-unseen";
-import { sanitizeLegacyLegendsOnBoot } from "@/lib/legacy-badge-grants";
-import { nukeAccumulatedSandboxCareersOnce } from "@/lib/sandbox-wipe";
 import BrandMark from "@/components/BrandMark";
 import { normalizeSportId } from "@/lib/sports/registry";
 import { SPORT_THEME_EVENT } from "@/lib/sports/sport-theme";
@@ -42,9 +35,21 @@ import {
   loadProgressiveSnapshot,
 } from "@/lib/progressive-disclosure";
 
-/** Ceremonies, eggs, hydrators — load after first paint so routes stay snappy. */
+/** Heavy chrome — not in first JS parse of every tab. */
 const RoomDeferredChrome = dynamic(
   () => import("@/components/RoomDeferredChrome"),
+  { ssr: false }
+);
+const PlayerWalkthrough = dynamic(
+  () => import("@/components/PlayerWalkthrough"),
+  { ssr: false }
+);
+const LoginWelcomeModal = dynamic(
+  () => import("@/components/LoginWelcomeModal"),
+  { ssr: false }
+);
+const RulesOnboardingModal = dynamic(
+  () => import("@/components/RulesOnboardingModal"),
   { ssr: false }
 );
 
@@ -185,10 +190,12 @@ export default function Nav() {
 
     // Staff flags + profile after paint — session local is enough for first frame
     const staffTimer = window.setTimeout(() => {
-      void refreshStaffSessionFlags().then(() => {
-        refreshRoles();
-      });
-    }, 700);
+      void import("@/lib/cloud")
+        .then((m) => m.refreshStaffSessionFlags())
+        .then(() => {
+          refreshRoles();
+        });
+    }, 1200);
 
     function onPreview() {
       refreshRoles();
@@ -207,19 +214,22 @@ export default function Nav() {
         if (p) {
           setName(p.displayName);
           setAvatarUrl(p.avatarUrl);
-          // Hard-scrub mistaken Legend (e.g. Visconti) even if they only open Commish
-          sanitizeLegacyLegendsOnBoot({
-            playerId: p.id || session?.playerId,
-            playerName: p.displayName || session?.playerName,
+          void import("@/lib/legacy-badge-grants").then((m) => {
+            m.sanitizeLegacyLegendsOnBoot({
+              playerId: p.id || session?.playerId,
+              playerName: p.displayName || session?.playerName,
+            });
           });
         } else if (session?.playerId) {
-          sanitizeLegacyLegendsOnBoot({
-            playerId: session.playerId,
-            playerName: session.playerName,
+          void import("@/lib/legacy-badge-grants").then((m) => {
+            m.sanitizeLegacyLegendsOnBoot({
+              playerId: session.playerId,
+              playerName: session.playerName,
+            });
           });
         }
       });
-    }, 400);
+    }, 900);
 
     function onProfileUpdated(e: Event) {
       const detail = (e as CustomEvent<{ displayName?: string }>).detail;
@@ -234,21 +244,16 @@ export default function Nav() {
       }
     }
     window.addEventListener("warroom-profile-updated", onProfileUpdated);
-    // Immediate pass from session (before profile returns)
-    if (session?.playerId) {
-      sanitizeLegacyLegendsOnBoot({
-        playerId: session.playerId,
-        playerName: session.playerName,
-      });
-    }
-    // One-time scrub of sim career points for everyone banked on this browser
-    try {
-      nukeAccumulatedSandboxCareersOnce(
-        session?.playerId ? [session.playerId] : undefined
-      );
-    } catch {
-      /* ignore */
-    }
+    // One-time scrub of sim career points — deferred so first paint wins
+    window.setTimeout(() => {
+      void import("@/lib/sandbox-wipe")
+        .then((m) => {
+          m.nukeAccumulatedSandboxCareersOnce(
+            session?.playerId ? [session.playerId] : undefined
+          );
+        })
+        .catch(() => {});
+    }, 2500);
 
     async function loadUnread() {
       if (!session?.playerId || !league?.id) return;
@@ -271,11 +276,11 @@ export default function Nav() {
       }
     }
 
-    // Let first paint win — badge network after 500ms
-    const unreadTimer = window.setTimeout(() => void loadUnread(), 500);
+    // Let first paint win — badge network after first second
+    const unreadTimer = window.setTimeout(() => void loadUnread(), 1200);
     // Presence: last logged in / last open (throttled write)
     if (!isGuestMode()) {
-      window.setTimeout(() => void touchLastSeen(), 800);
+      window.setTimeout(() => void touchLastSeen(), 2000);
     }
     function onVis() {
       if (document.visibilityState === "visible") {
@@ -506,6 +511,7 @@ export default function Nav() {
     return (
       <Link
         href={link.href}
+        prefetch={false}
         onClick={closeChrome}
         className={`transition relative whitespace-nowrap shrink-0 ${
           isHome
@@ -674,6 +680,7 @@ export default function Nav() {
                         <Link
                           key={link.href}
                           href={link.href}
+                          prefetch={false}
                           onClick={() => setMoreOpen(false)}
                           className={`flex items-center justify-between px-3 py-2 text-sm hover:bg-card-hover transition ${
                             isAccount
@@ -708,6 +715,7 @@ export default function Nav() {
             )}
             <Link
               href="/account"
+              prefetch={false}
               className="flex items-center gap-2 text-sm text-muted hover:text-foreground"
               title="Account — photo, name, leagues, settings"
               aria-label="Account"
@@ -828,6 +836,7 @@ export default function Nav() {
                   <li key={link.href}>
                     <Link
                       href={link.href}
+                      prefetch={false}
                       onClick={() => setMenuOpen(false)}
                       className={`flex items-center justify-between gap-3 px-4 min-h-[48px] transition touch-manipulation ${
                         isHome
@@ -865,6 +874,7 @@ export default function Nav() {
                   <li key={link.href}>
                     <Link
                       href={link.href}
+                      prefetch={false}
                       onClick={() => setMenuOpen(false)}
                       className={`flex items-center justify-between gap-3 px-4 min-h-[48px] text-base transition touch-manipulation ${
                         isAccount
@@ -915,6 +925,7 @@ export default function Nav() {
               <li key={tab.href} className="min-w-0">
                 <Link
                   href={tab.href}
+                  prefetch={false}
                   onClick={closeChrome}
                   className={`relative flex flex-col items-center justify-center h-full gap-0.5 text-[10px] font-semibold touch-manipulation transition ${
                     active ? "text-primary" : "text-muted"

@@ -2,11 +2,11 @@
 
 /**
  * ONE roster fetch → join badges + equipped titles + avatar borders.
- * Replaces three separate hydrators that each called loadLeagueRoster on
- * every page mount (and again on visibility), which made tab switches crawl.
+ * Self profile sync runs once; roster refresh is quiet (5 min + visibility
+ * only if cache cold).
  */
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { getLeague, getSession } from "@/lib/league";
 import { loadLeagueRoster } from "@/lib/cloud";
 import { clearJoinBadges, hydrateJoinBadges } from "@/lib/join-badge-store";
@@ -22,26 +22,24 @@ import {
 } from "@/lib/profile-border-store";
 import { titleLabelForBadgeId } from "@/lib/equipable-titles";
 import { isAppCreator } from "@/lib/creator";
-import { CREATOR_BADGE_ID } from "@/lib/badges";
 import { isGuestMode } from "@/lib/guest-mode";
 
-const REFRESH_MS = 180_000; // 3 min — was 60s × 3 hydrators
+const ROSTER_REFRESH_MS = 300_000; // 5 min
+const VIS_MIN_GAP_MS = 90_000; // don't re-hit on every app switch
 
 export default function RoomDataHydrator() {
+  const lastRosterAt = useRef(0);
+  const selfSynced = useRef(false);
+
   useEffect(() => {
     if (isGuestMode()) return;
     let cancelled = false;
 
-    async function load() {
+    async function syncSelfOnce() {
+      if (selfSynced.current) return;
       const session = getSession();
-      const league = getLeague();
-      const leagueId = league?.id || session?.leagueId || "";
-      if (!session?.playerId) {
-        clearJoinBadges();
-        return;
-      }
-
-      // Self title/border/birthday — light profile reads, not full roster
+      if (!session?.playerId) return;
+      selfSynced.current = true;
       try {
         await Promise.all([
           syncMyEquippedTitleFromCloud(),
@@ -51,7 +49,6 @@ export default function RoomDataHydrator() {
         /* offline */
       }
       if (cancelled) return;
-
       try {
         const { hydrateBirthdayFromCloud } = await import("@/lib/profile");
         await hydrateBirthdayFromCloud(session.playerId);
@@ -59,29 +56,36 @@ export default function RoomDataHydrator() {
         /* ok */
       }
       if (cancelled) return;
-
       if (isAppCreator(session.playerId)) {
-        const current = getLocalEquippedBadgeId(session.playerId);
-        if (!current) {
-          try {
-            await setMyEquippedTitle(CREATOR_BADGE_ID);
-          } catch {
-            /* ok */
-          }
+        try {
+          const { CREATOR_BADGE_ID } = await import("@/lib/badges");
+          const current = getLocalEquippedBadgeId(session.playerId);
+          if (!current) await setMyEquippedTitle(CREATOR_BADGE_ID);
+        } catch {
+          /* ok */
         }
       }
-      if (cancelled) return;
+    }
 
+    async function loadRoster(force = false) {
+      const session = getSession();
+      const league = getLeague();
+      const leagueId = league?.id || session?.leagueId || "";
+      if (!session?.playerId) {
+        clearJoinBadges();
+        return;
+      }
       if (!leagueId) {
         clearJoinBadges();
         return;
       }
+      const now = Date.now();
+      if (!force && now - lastRosterAt.current < VIS_MIN_GAP_MS) return;
 
       try {
-        // Shared TTL cache + inflight dedupe inside loadLeagueRoster
         const roster = await loadLeagueRoster();
         if (cancelled) return;
-
+        lastRosterAt.current = Date.now();
         hydrateJoinBadges(
           leagueId,
           roster.map((m) => ({
@@ -109,12 +113,20 @@ export default function RoomDataHydrator() {
       }
     }
 
-    // Let the page paint first — never block first frame on roster
-    const start = window.setTimeout(() => void load(), 350);
-    const timer = window.setInterval(() => void load(), REFRESH_MS);
+    // Paint first, then self, then roster
+    const start = window.setTimeout(() => {
+      void (async () => {
+        await syncSelfOnce();
+        if (!cancelled) await loadRoster(true);
+      })();
+    }, 600);
+
+    const timer = window.setInterval(() => {
+      void loadRoster(false);
+    }, ROSTER_REFRESH_MS);
 
     function onVis() {
-      if (document.visibilityState === "visible") void load();
+      if (document.visibilityState === "visible") void loadRoster(false);
     }
     document.addEventListener("visibilitychange", onVis);
 
