@@ -4,7 +4,8 @@ import Link from "next/link";
 import { buildChampionshipBanner } from "@/lib/player-history";
 import type { LeagueTrophy } from "@/lib/trophies";
 import HardwareTrophyIcon from "@/components/HardwareTrophyIcon";
-import InspectableTrophy from "@/components/InspectableTrophy";
+import TrophyLightbox from "@/components/TrophyLightbox";
+import { useState } from "react";
 
 type Props = {
   trophies: LeagueTrophy[];
@@ -19,6 +20,10 @@ export default function ChampionshipBanner({
 }: Props) {
   const rows = buildChampionshipBanner(trophies);
   const isNfl = sportId === "nfl";
+  const [inspect, setInspect] = useState<{
+    title: string;
+    subtitle?: string;
+  } | null>(null);
   const isWwc = sportId === "soccer_wwc";
 
   return (
@@ -44,22 +49,23 @@ export default function ChampionshipBanner({
       <div className="relative">
         <div className="flex items-start gap-4 mb-4">
           <div className="shrink-0 hidden sm:block">
-            <InspectableTrophy
+            <HardwareTrophyIcon
               kind="championship"
               sportId={sportId}
-              title="Championship hardware"
-              subtitle={leagueName || undefined}
-              championshipOnly
-            >
-              <HardwareTrophyIcon
-                kind="championship"
-                sportId={sportId}
-                size={72}
-                animate={rows.length > 0}
-              />
-            </InspectableTrophy>
+              size={72}
+              animate={rows.length > 0}
+            />
           </div>
-          <div className="min-w-0 flex-1">
+          <button
+            type="button"
+            onClick={() =>
+              setInspect({
+                title: "Championship hardware",
+                subtitle: leagueName || undefined,
+              })
+            }
+            className="min-w-0 flex-1 text-left touch-manipulation cursor-zoom-in rounded-lg -m-1 p-1 hover:bg-white/5"
+          >
             <p
               className={`text-[10px] font-bold uppercase tracking-[0.2em] ${
                 isNfl
@@ -81,9 +87,10 @@ export default function ChampionshipBanner({
             </h2>
             <p className="text-xs text-muted mt-1 max-w-lg leading-relaxed">
               Every title hangs on the wall. Season reset does not take these
-              down. This is the hardware — not a participation sticker.
+              down. Tap this copy (or a year row) to enlarge the hardware —
+              not the icon.
             </p>
-          </div>
+          </button>
         </div>
 
         {rows.length === 0 ? (
@@ -95,29 +102,30 @@ export default function ChampionshipBanner({
             {rows.map((r) => (
               <li
                 key={`${r.year}-${r.name}`}
-                className={`flex items-center gap-3 rounded-lg border bg-background/70 px-3 py-2.5 ${
+                className={`flex items-center gap-3 rounded-lg border bg-background/70 px-3 py-2.5 cursor-zoom-in touch-manipulation ${
                   isNfl
                     ? "border-red-400/25"
                     : isWwc
                       ? "border-yellow-400/25"
                       : "border-amber-400/25"
                 }`}
+                onClick={() =>
+                  setInspect({
+                    title: `${r.year} Champion`,
+                    subtitle: r.name,
+                  })
+                }
               >
-                <span className="shrink-0 w-9 h-9 flex items-center justify-center">
-                  <InspectableTrophy
+                <span
+                  className="shrink-0 w-9 h-9 flex items-center justify-center"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <HardwareTrophyIcon
                     kind="championship"
                     sportId={sportId}
-                    title={`${r.year} Champion`}
-                    subtitle={r.name}
-                    championshipOnly
-                  >
-                    <HardwareTrophyIcon
-                      kind="championship"
-                      sportId={sportId}
-                      size={36}
-                      animate={false}
-                    />
-                  </InspectableTrophy>
+                    size={36}
+                    animate={false}
+                  />
                 </span>
                 <span
                   className={`font-mono text-sm font-bold w-12 shrink-0 ${
@@ -133,6 +141,7 @@ export default function ChampionshipBanner({
                 {r.userId ? (
                   <Link
                     href={`/profile/${r.userId}`}
+                    onClick={(e) => e.stopPropagation()}
                     className="font-semibold text-foreground hover:text-primary truncate"
                   >
                     {r.name}
@@ -147,6 +156,17 @@ export default function ChampionshipBanner({
           </ul>
         )}
       </div>
+
+      <TrophyLightbox
+        open={!!inspect}
+        onClose={() => setInspect(null)}
+        kind="championship"
+        sportId={sportId}
+        title={inspect?.title}
+        subtitle={inspect?.subtitle}
+        championshipOnly
+        leagueName={leagueName}
+      />
     </section>
   );
 }

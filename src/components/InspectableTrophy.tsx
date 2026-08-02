@@ -1,8 +1,11 @@
 "use client";
 
 /**
- * Wraps trophy art: single tap opens TrophyLightbox for detail.
- * Use everywhere hardware is shown small (wall, case, banner).
+ * Optional wrapper: single tap opens TrophyLightbox.
+ *
+ * Prefer plaque/box-level open (LastSeasonHardwareWall, ProfileTrophyCase):
+ *   icon = easter egg only · rest of card = enlarge
+ * Use this when there is no plaque chrome to attach to.
  */
 
 import { useState, type ReactNode } from "react";

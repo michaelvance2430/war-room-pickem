@@ -17,7 +17,7 @@ import {
   recordTrophyTap,
 } from "@/lib/easter-eggs";
 import HardwareTrophyIcon from "@/components/HardwareTrophyIcon";
-import InspectableTrophy from "@/components/InspectableTrophy";
+import TrophyLightbox from "@/components/TrophyLightbox";
 
 function Plaque({
   item,
@@ -44,6 +44,7 @@ function Plaque({
   leagueId?: string | null;
   leagueCode?: string | null;
 }) {
+  const [inspectOpen, setInspectOpen] = useState(false);
   const meta = HARDWARE_KIND_META[item.kind];
   // Live profile name/photo — not the frozen engraving (Jstray vs Justin Strayer)
   // Vonnagio championship shares must carry league name so gold art loads
@@ -59,26 +60,35 @@ function Plaque({
     sportId: plaqueSport || undefined,
     winnerAvatarUrl: winnerAvatarUrl || undefined,
   };
+  const inspectTitle = `${item.seasonYear} · ${item.title}`;
+  const inspectSub =
+    [item.leagueName || leagueName, item.subtitle, item.notes]
+      .filter(Boolean)
+      .join(" · ") || undefined;
 
   return (
     <div
-      className={`rounded-xl border ${meta.border} bg-gradient-to-b from-card to-black/40 p-4 min-h-[120px] relative`}
+      role="button"
+      tabIndex={0}
+      onClick={() => setInspectOpen(true)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          setInspectOpen(true);
+        }
+      }}
+      className={`rounded-xl border ${meta.border} bg-gradient-to-b from-card to-black/40 p-4 min-h-[120px] relative cursor-zoom-in touch-manipulation text-left`}
     >
       <div className="flex items-start justify-between gap-2 mb-1">
-        <InspectableTrophy
-          kind={item.kind}
-          sportId={plaqueSport}
-          title={`${item.seasonYear} · ${item.title}`}
-          subtitle={
-            [item.leagueName || leagueName, item.subtitle, item.notes]
-              .filter(Boolean)
-              .join(" · ") || undefined
-          }
-          leagueName={plaqueLeague}
-          leagueId={item.leagueId || leagueId}
-          leagueCode={item.leagueCode || leagueCode}
-          className={spinny ? "animate-spin" : ""}
-          onInspect={() => {
+        {/* Icon only: easter egg / spin — does NOT open lightbox */}
+        <button
+          type="button"
+          className={`relative z-[1] select-none touch-manipulation ${
+            spinny ? "animate-spin" : ""
+          } ${item.kind === "championship" ? "cursor-pointer" : "cursor-default"}`}
+          aria-label={`${item.title} icon`}
+          onClick={(e) => {
+            e.stopPropagation();
             if (item.kind === "championship") onTrophyTap?.();
           }}
         >
@@ -91,9 +101,16 @@ function Plaque({
             leagueId={item.leagueId || leagueId}
             leagueCode={item.leagueCode || leagueCode}
           />
-        </InspectableTrophy>
-        {canShare && <TrophyShareButton compact trophy={sharePayload} />}
+        </button>
+        {canShare && (
+          <span onClick={(e) => e.stopPropagation()}>
+            <TrophyShareButton compact trophy={sharePayload} />
+          </span>
+        )}
       </div>
+      <p className="text-[9px] text-muted mb-0.5">
+        Tap card to enlarge · icon is for the curious
+      </p>
       <div className={`text-[10px] uppercase tracking-wide font-semibold ${meta.accent}`}>
         {item.seasonYear} · {item.title}
         {item.sportId === "nfl" ? (
@@ -132,7 +149,7 @@ function Plaque({
         </span>
       )}
       {canShare && (
-        <div className="mt-3">
+        <div className="mt-3" onClick={(e) => e.stopPropagation()}>
           <TrophyShareButton
             trophy={sharePayload}
             label="Share win"
@@ -140,6 +157,17 @@ function Plaque({
           />
         </div>
       )}
+      <TrophyLightbox
+        open={inspectOpen}
+        onClose={() => setInspectOpen(false)}
+        kind={item.kind}
+        sportId={plaqueSport}
+        title={inspectTitle}
+        subtitle={inspectSub}
+        leagueName={plaqueLeague}
+        leagueId={item.leagueId || leagueId}
+        leagueCode={item.leagueCode || leagueCode}
+      />
     </div>
   );
 }

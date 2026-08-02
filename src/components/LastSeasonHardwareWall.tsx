@@ -5,8 +5,9 @@
  * CFB: Kahmann · Strayer · Big Ball Ben (2025–26 Excel).
  * NFL: Maria Super Bowl (2025) — Vonnagio Family Vacay shows gold family hardware.
  *
- * Any hardware is tappable → lightbox enlarge.
- * Championship also counts toward Vonnagio 5-tap easter egg.
+ * Interaction split (do not break the easter egg):
+ *  - Tap the trophy ICON → egg / spin only (5× champ for Vonnagio)
+ *  - Tap the rest of the plaque box → enlarge lightbox
  */
 
 import { useState } from "react";
@@ -19,7 +20,7 @@ import {
 import type { LeagueTrophy } from "@/lib/trophies";
 import { TROPHY_META } from "@/lib/trophies";
 import HardwareTrophyIcon from "@/components/HardwareTrophyIcon";
-import InspectableTrophy from "@/components/InspectableTrophy";
+import TrophyLightbox from "@/components/TrophyLightbox";
 import PlayerLink from "@/components/PlayerLink";
 import { resolveLiveTrophyHolder } from "@/lib/trophy-share";
 import { getLeague, getSession } from "@/lib/league";
@@ -56,6 +57,11 @@ export default function LastSeasonHardwareWall({
     league?.code
   );
   const [spinKey, setSpinKey] = useState<string | null>(null);
+  const [inspect, setInspect] = useState<{
+    kind: "championship" | "toilet_bowl" | "crystal_ball";
+    title: string;
+    subtitle?: string;
+  } | null>(null);
 
   const lastYear = plaques
     .filter((t) => trophySeasonYear(t) === year)
@@ -157,35 +163,57 @@ export default function LastSeasonHardwareWall({
               : "championship";
           const isChamp = kind === "championship";
           const spinning = spinKey === t.id;
+          const subtitle =
+            live.name || t.winnerName
+              ? `${live.name || t.winnerName}${
+                  t.subtitle ? ` · ${t.subtitle}` : ""
+                }`
+              : t.subtitle || undefined;
+
           return (
             <div
               key={t.id}
-              className={`rounded-xl border bg-black/40 px-3.5 py-3.5 min-h-[140px] flex flex-col ${
+              role="button"
+              tabIndex={0}
+              onClick={() =>
+                setInspect({
+                  kind,
+                  title: meta?.title || t.trophyType,
+                  subtitle,
+                })
+              }
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setInspect({
+                    kind,
+                    title: meta?.title || t.trophyType,
+                    subtitle,
+                  });
+                }
+              }}
+              className={`rounded-xl border bg-black/40 px-3.5 py-3.5 min-h-[140px] flex flex-col cursor-zoom-in touch-manipulation text-left ${
                 isNfl && !vonnaggio
                   ? "border-red-400/30"
                   : "border-amber-400/30"
               }`}
             >
               <div className="flex items-start justify-between gap-2 mb-2">
-                <InspectableTrophy
-                  kind={kind}
-                  sportId={sid}
-                  title={meta?.title || t.trophyType}
-                  subtitle={
-                    live.name || t.winnerName
-                      ? `${live.name || t.winnerName}${
-                          t.subtitle ? ` · ${t.subtitle}` : ""
-                        }`
-                      : t.subtitle || undefined
+                {/* Icon only: easter egg / spin — does NOT open lightbox */}
+                <button
+                  type="button"
+                  className={`relative z-[1] select-none touch-manipulation ${
+                    spinning ? "animate-spin" : ""
+                  } ${isChamp ? "cursor-pointer" : "cursor-default"}`}
+                  aria-label={
+                    isChamp
+                      ? "Championship trophy icon"
+                      : `${meta?.title || "Trophy"} icon`
                   }
-                  leagueName={league?.name}
-                  leagueId={league?.id}
-                  leagueCode={league?.code}
-                  className={spinning ? "animate-spin" : ""}
-                  onInspect={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     if (isChamp) onChampTap(t.id);
                   }}
-                  ariaLabel={`Enlarge ${meta?.title || "trophy"}`}
                 >
                   <HardwareTrophyIcon
                     kind={kind}
@@ -196,7 +224,7 @@ export default function LastSeasonHardwareWall({
                     leagueId={league?.id}
                     leagueCode={league?.code}
                   />
-                </InspectableTrophy>
+                </button>
                 <span
                   className={`text-[9px] font-bold uppercase tracking-wider ${
                     isNfl && !vonnaggio
@@ -207,7 +235,9 @@ export default function LastSeasonHardwareWall({
                   {year}
                 </span>
               </div>
-              <p className="text-[9px] text-muted mb-1">Tap trophy to enlarge</p>
+              <p className="text-[9px] text-muted mb-1">
+                Tap the card to enlarge · icon is for the curious
+              </p>
               <p
                 className={`text-[10px] font-bold uppercase tracking-[0.14em] ${
                   meta?.accent || "text-primary"
@@ -215,7 +245,10 @@ export default function LastSeasonHardwareWall({
               >
                 {meta?.title || t.trophyType}
               </p>
-              <p className="text-base font-extrabold text-foreground mt-1 leading-snug">
+              <p
+                className="text-base font-extrabold text-foreground mt-1 leading-snug"
+                onClick={(e) => e.stopPropagation()}
+              >
                 {live.userId ? (
                   <PlayerLink
                     id={live.userId}
@@ -235,6 +268,18 @@ export default function LastSeasonHardwareWall({
           );
         })}
       </div>
+
+      <TrophyLightbox
+        open={!!inspect}
+        onClose={() => setInspect(null)}
+        kind={inspect?.kind || "championship"}
+        sportId={sid}
+        title={inspect?.title}
+        subtitle={inspect?.subtitle}
+        leagueName={league?.name}
+        leagueId={league?.id}
+        leagueCode={league?.code}
+      />
     </section>
   );
 }
