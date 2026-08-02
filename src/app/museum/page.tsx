@@ -49,14 +49,16 @@ function MuseumInner() {
         ]);
 
         const sport = getLeague()?.sportId || "cfb";
-        // Host: NFL always ensures Maria Super Bowl; CFB re-links Excel when already present.
+        // Host: restore prior-season hardware in the cloud when missing / wiped.
+        // CFB always re-engraves Excel big three so Museum never goes blank.
+        // NFL seeds Maria without clobbering a non-Maria champ.
         if (isCommissioner() || isOps()) {
-          const hasPrior = tlist.some((t) => t.seasonYear === 2025);
-          if (
-            sport === "nfl" ||
-            (hasPrior && !hasPriorSeasonBigHardware(tlist, sport))
-          ) {
-            try {
+          try {
+            const needCfb =
+              sport === "cfb" && !hasPriorSeasonBigHardware(tlist, "cfb");
+            const needNfl = sport === "nfl";
+            const hasPrior = tlist.some((t) => t.seasonYear === 2025);
+            if (needCfb || needNfl || (sport === "cfb" && hasPrior)) {
               const seeded = await seedPriorSeason2025Trophies();
               if (seeded.ok) {
                 tlist = await loadLeagueTrophies();
@@ -64,23 +66,23 @@ function MuseumInner() {
                   setExcelNote(
                     sport === "nfl"
                       ? "Maria Super Bowl hardware locked / re-linked."
-                      : `${PRIOR_SEASON_LABEL} hardware re-linked to live profiles.`
+                      : `${PRIOR_SEASON_LABEL} Excel hardware restored / re-linked.`
                   );
                 }
               }
-            } catch {
-              /* ignore */
             }
+          } catch {
+            /* ignore */
           }
         }
 
         if (cancelled) return;
-        // Merge prior display when this room already has prior plaques (or NFL seed path).
-        const hasExcel =
-          tlist.some((t) => t.seasonYear === 2025) || sport === "nfl";
-        const withExcel = hasExcel
-          ? mergePriorSeasonTrophies(tlist, { players: plist, sportId: sport })
-          : tlist;
+        // Always display-merge prior lore so Museum never blanks client-side
+        // even if cloud rows are mid-restore or incomplete.
+        const withExcel = mergePriorSeasonTrophies(tlist, {
+          players: plist,
+          sportId: sport === "nfl" ? "nfl" : "cfb",
+        });
         setPlayers(plist);
         setTrophies(withExcel);
       } catch {

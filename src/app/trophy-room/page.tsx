@@ -102,12 +102,12 @@ export default function TrophyRoomPage() {
         if (isCommissioner() || isOps()) {
           try {
             await autoEngraveAllTrophies({});
-            // Prior-season hardware: NFL always ensures Maria Super Bowl;
-            // CFB re-links Excel only if this room already has 2025 plaques.
+            // Prior-season hardware: CFB restores Excel big three; NFL seeds Maria
+            // (without overwriting a non-Maria champ).
             const list = await loadLeagueTrophies();
             const sid = getLeague()?.sportId || "cfb";
             const hasPrior = list.some((t) => t.seasonYear === 2025);
-            if (sid === "nfl" || hasPrior) {
+            if (sid === "cfb" || sid === "nfl" || hasPrior) {
               await seedPriorSeason2025Trophies();
             }
             await reload();

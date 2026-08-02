@@ -144,13 +144,21 @@ export function hasPriorSeasonBigHardware(
 /**
  * Fill any missing prior plaques for Museum / history display.
  * Does not write to the DB — use seedPriorSeason2025Trophies for that.
+ *
+ * CFB always gets Excel-era big three on the display layer (Kahmann / Strayer / Ben)
+ * so the Museum never blanks when cloud rows were wiped or incomplete.
+ * NFL gets Maria Super Bowl; never strips existing non-NFL plaques from the list.
  */
 export function mergePriorSeasonTrophies(
   trophies: LeagueTrophy[],
   opts?: { players?: { id: string; name: string }[]; sportId?: string | null }
 ): LeagueTrophy[] {
   const sport = resolvePriorSport(opts?.sportId);
-  const seeds = getPriorSeasonSeeds(sport);
+  // CFB lore is the default museum story for this product; NFL adds Maria only.
+  const seeds =
+    sport === "nfl"
+      ? [...NFL_PRIOR_SEASON_SEEDS]
+      : [...PRIOR_SEASON_2025_SEEDS];
   const out = trophies.map((t) => ({ ...t }));
   for (const row of seeds) {
     const idx = out.findIndex(
@@ -158,6 +166,33 @@ export function mergePriorSeasonTrophies(
         t.seasonYear === PRIOR_SEASON_YEAR && t.trophyType === row.trophyType
     );
     if (idx >= 0) {
+      // Don't let a blank/wrong Maria seed blank CFB Excel names on display
+      if (sport === "cfb" || sport !== "nfl") {
+        const seedHit = row.namePatterns.some((p) =>
+          p.test(out[idx].winnerName || "")
+        );
+        // If cloud still has Kahmann etc., keep them; only fill missing link
+        if (!out[idx].winnerUserId) {
+          const uid = matchPlayerId(opts?.players, row.namePatterns);
+          if (uid) out[idx] = { ...out[idx], winnerUserId: uid };
+        }
+        // If someone overwrote CFB champ with Maria while sport is CFB, restore display
+        if (
+          row.trophyType === "championship" &&
+          sport === "cfb" &&
+          !seedHit &&
+          /\bmaria\b/i.test(out[idx].winnerName || "")
+        ) {
+          out[idx] = {
+            ...out[idx],
+            winnerName: row.winnerName,
+            winnerUserId: matchPlayerId(opts?.players, row.namePatterns),
+            subtitle: row.subtitle,
+            notes: row.notes,
+          };
+        }
+        continue;
+      }
       if (!out[idx].winnerUserId) {
         const uid = matchPlayerId(opts?.players, row.namePatterns);
         if (uid) out[idx] = { ...out[idx], winnerUserId: uid };
@@ -254,10 +289,35 @@ export async function seedPriorSeason2025Trophies(): Promise<{
     roster = [];
   }
 
+  let existing: LeagueTrophy[] = [];
+  try {
+    existing = await loadLeagueTrophies();
+  } catch {
+    existing = [];
+  }
+
   const awarded: string[] = [];
   const errors: string[] = [];
 
   for (const row of seeds) {
+    // NFL: never overwrite a non-Maria 2025 championship (e.g. CFB Excel Kahmann)
+    if (sport === "nfl" && row.trophyType === "championship") {
+      const cur = existing.find(
+        (t) =>
+          t.seasonYear === PRIOR_SEASON_YEAR && t.trophyType === "championship"
+      );
+      if (
+        cur?.winnerName &&
+        !/\bmaria\b/i.test(cur.winnerName) &&
+        !row.namePatterns.some((p) => p.test(cur.winnerName))
+      ) {
+        awarded.push(
+          `championship: kept ${cur.winnerName} (not overwritten by Maria)`
+        );
+        continue;
+      }
+    }
+
     const uid = matchUserId(roster, row.namePatterns);
     const res = await awardTrophy({
       seasonYear: PRIOR_SEASON_YEAR,
