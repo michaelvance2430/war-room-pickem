@@ -12,7 +12,7 @@ import { getLeague } from "@/lib/league";
  * Cache-bust query so deploys don't keep serving old Lombardi from CDN/browser.
  */
 export const VONNAGGIO_CHAMPIONSHIP_IMG =
-  "/trophies/vonnaggio-championship.png?v=gold3";
+  "/trophies/vonnaggio-championship.jpg?v=gold4";
 
 export const NFL_LOMBARDI_IMG = "/trophies/nfl-lombardi.jpg";
 
