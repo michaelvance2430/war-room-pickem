@@ -11,8 +11,37 @@ import {
 } from "@/lib/sport-pool";
 
 /**
- * Home banner: “Want to play [sport] in a new room?” for open pool polls.
+ * Soft Home invite: optional next sport chapter. No pressure, no FOMO.
+ * Dismiss forever (per poll) or ignore — all valid.
  */
+
+const DISMISS_KEY = "warroom-sport-pool-dismiss-v1";
+
+function readDismissed(): Record<string, boolean> {
+  try {
+    const raw = localStorage.getItem(DISMISS_KEY);
+    if (!raw) return {};
+    const p = JSON.parse(raw) as Record<string, boolean>;
+    return p && typeof p === "object" ? p : {};
+  } catch {
+    return {};
+  }
+}
+
+function markDismissed(pollId: string) {
+  try {
+    const m = readDismissed();
+    m[pollId] = true;
+    localStorage.setItem(DISMISS_KEY, JSON.stringify(m));
+  } catch {
+    /* ignore */
+  }
+}
+
+function isDismissed(pollId: string): boolean {
+  return !!readDismissed()[pollId];
+}
+
 export default function SportPoolPollBanner() {
   const [poll, setPoll] = useState<SportPoolPoll | null>(null);
   const [myVote, setMyVote] = useState<"yes" | "no" | null>(null);
@@ -28,8 +57,16 @@ export default function SportPoolPollBanner() {
       return;
     }
     const { poll: p } = await loadOpenPollForLeague(league.id);
-    // Hide "start another sport" if they already play that sport elsewhere
-    if (p?.targetSportId) {
+    if (!p) {
+      setPoll(null);
+      return;
+    }
+    if (isDismissed(p.id)) {
+      setPoll(null);
+      return;
+    }
+    // Already play that sport elsewhere — no need to invite again
+    if (p.targetSportId) {
       try {
         const { fetchMyMemberships } = await import("@/lib/session-restore");
         const ms = await fetchMyMemberships();
@@ -43,26 +80,25 @@ export default function SportPoolPollBanner() {
           return;
         }
       } catch {
-        /* show poll if memberships fail */
+        /* show invite if memberships fail */
       }
     }
     setPoll(p);
-    if (p) {
-      const v = await myVoteForPoll(p.id);
-      setMyVote(v);
-    }
+    const v = await myVoteForPoll(p.id);
+    setMyVote(v);
   }, []);
 
   useEffect(() => {
     void refresh();
-    const t = window.setInterval(() => void refresh(), 20_000);
+    // Quiet refresh — not a nag timer
+    const t = window.setInterval(() => void refresh(), 45_000);
     return () => window.clearInterval(t);
   }, [refresh]);
 
   if (hidden || !poll) return null;
 
   const pack = getSportPack(poll.targetSportId);
-  const sportLabel = pack.label;
+  const sportLabel = pack.shortLabel || pack.label;
 
   async function vote(response: "yes" | "no") {
     setBusy(true);
@@ -76,20 +112,36 @@ export default function SportPoolPollBanner() {
     setMyVote(response);
   }
 
+  function dismissForever() {
+    markDismissed(poll.id);
+    setHidden(true);
+  }
+
   return (
-    <div className="mb-5 rounded-xl border-2 border-primary/45 bg-primary/10 px-4 py-3.5">
-      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-1">
-        New sport pool
-      </p>
-      <h2 className="text-base sm:text-lg font-bold text-foreground leading-snug">
-        Want to play {sportLabel}
+    <div className="mb-5 rounded-xl border border-border/70 bg-card/80 px-4 py-3.5">
+      <div className="flex items-start justify-between gap-2 mb-1">
+        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted">
+          Optional · no pressure
+        </p>
+        <button
+          type="button"
+          onClick={dismissForever}
+          className="shrink-0 text-[11px] text-muted hover:text-foreground touch-manipulation px-1"
+          title="Hide this invite for good"
+        >
+          Not interested · hide
+        </button>
+      </div>
+      <h2 className="text-base font-semibold text-foreground leading-snug">
+        Open door: {sportLabel}
         {poll.proposedName ? (
           <>
             {" "}
-            in <span className="text-primary">{poll.proposedName}</span>
+            <span className="text-muted font-medium">
+              ({poll.proposedName})
+            </span>
           </>
         ) : null}
-        ?
       </h2>
       {poll.message ? (
         <p className="text-sm text-muted mt-1.5 leading-relaxed">
@@ -97,20 +149,23 @@ export default function SportPoolPollBanner() {
         </p>
       ) : (
         <p className="text-sm text-muted mt-1.5 leading-relaxed">
-          Your commish is building a new room from this league&apos;s player pool.
-          Say yes and you&apos;re on the spin-up list.
+          A soft invite from your host — same friends, new desk if you want.
+          Saying no or ignoring this is completely fine. This room keeps going
+          either way.
         </p>
       )}
 
       {myVote ? (
-        <p className="text-sm font-semibold text-primary mt-3">
-          You said{" "}
+        <p className="text-sm text-foreground/90 mt-3 leading-relaxed">
           {myVote === "yes"
-            ? "YES — you’re on the list"
-            : "no — you’re sitting this one out"}
-          . Change your mind anytime while the poll is open.
+            ? "You’re interested — if a room opens, you’ll have a seat. Change anytime while this is open."
+            : "Noted — you’re sitting this one out. No hard feelings. Change your mind anytime while open."}
         </p>
-      ) : null}
+      ) : (
+        <p className="text-xs text-muted mt-2 leading-relaxed">
+          Yes / no / hide — all valid. Nobody gets moved against their will.
+        </p>
+      )}
 
       {err && <p className="text-xs text-danger mt-2">{err}</p>}
 
@@ -119,24 +174,25 @@ export default function SportPoolPollBanner() {
           type="button"
           disabled={busy}
           onClick={() => void vote("yes")}
-          className="flex-1 py-3 min-h-[48px] rounded-xl bg-primary text-black font-bold text-sm disabled:opacity-50 touch-manipulation"
+          className={`flex-1 py-2.5 min-h-[44px] rounded-xl text-sm font-semibold disabled:opacity-50 touch-manipulation ${
+            myVote === "yes"
+              ? "bg-primary/20 border border-primary/40 text-primary"
+              : "bg-primary/15 border border-primary/30 text-primary hover:bg-primary/25"
+          }`}
         >
-          Yes — count me in
+          {myVote === "yes" ? "Interested ✓" : "I’m interested"}
         </button>
         <button
           type="button"
           disabled={busy}
           onClick={() => void vote("no")}
-          className="flex-1 py-3 min-h-[48px] rounded-xl border border-border text-sm font-medium disabled:opacity-50 touch-manipulation"
+          className={`flex-1 py-2.5 min-h-[44px] rounded-xl border text-sm font-medium disabled:opacity-50 touch-manipulation ${
+            myVote === "no"
+              ? "border-border bg-background text-muted"
+              : "border-border text-muted hover:text-foreground"
+          }`}
         >
-          Not this time
-        </button>
-        <button
-          type="button"
-          onClick={() => setHidden(true)}
-          className="sm:w-auto px-3 py-2 text-xs text-muted touch-manipulation"
-        >
-          Hide
+          {myVote === "no" ? "Sitting out ✓" : "I’ll pass"}
         </button>
       </div>
     </div>
