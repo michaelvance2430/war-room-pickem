@@ -27,6 +27,7 @@ import RingCeremonyModal from "@/components/RingCeremonyModal";
 import SeasonFinaleModal from "@/components/SeasonFinaleModal";
 import CardPublishedModal from "@/components/CardPublishedModal";
 import BoredPracticeDoneModal from "@/components/BoredPracticeDoneModal";
+import WeeklyColdOpenModal from "@/components/WeeklyColdOpenModal";
 import JoinBadgeHydrator from "@/components/JoinBadgeHydrator";
 import EquippedTitleHydrator from "@/components/EquippedTitleHydrator";
 import ProfileBorderHydrator from "@/components/ProfileBorderHydrator";
@@ -941,6 +942,7 @@ export default function Nav() {
       {!isGuestMode() && <JoinBadgeHydrator />}
       {!isGuestMode() && <EquippedTitleHydrator />}
       {!isGuestMode() && <ProfileBorderHydrator />}
+      {!isGuestMode() && <WeeklyColdOpenModal />}
       {!isGuestMode() && <LoginWelcomeModal />}
       {!isGuestMode() && <RulesOnboardingModal />}
       <GazetteModal />

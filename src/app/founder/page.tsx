@@ -277,8 +277,25 @@ export default function FounderDashboardPage() {
   }
 
   function jumpPopup(
-    kind: "ring" | "card" | "gazette" | "paper" | "cut" | "trophy"
+    kind: "ring" | "card" | "gazette" | "paper" | "cut" | "trophy" | "cold"
   ) {
+    if (kind === "cold") {
+      try {
+        localStorage.setItem("warroom-force-weekly-cold-open", "1");
+        // Clear this week's seen flag so force works
+        const keys: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k?.startsWith("warroom-weekly-cold-open-seen-v1")) keys.push(k);
+        }
+        keys.forEach((k) => localStorage.removeItem(k));
+        sessionStorage.removeItem("warroom-session-drama-v1");
+      } catch {
+        /* ok */
+      }
+      router.push("/");
+      return;
+    }
     void import("@/lib/creator-sandbox").then(async (sb) => {
       if (kind === "ring") {
         await sb.jumpRingCeremony();
@@ -734,6 +751,13 @@ export default function FounderDashboardPage() {
               5 · Flash a moment
             </p>
             <div className="grid grid-cols-1 gap-2">
+              <button
+                type="button"
+                onClick={() => jumpPopup("cold")}
+                className="py-2.5 rounded-lg border border-amber-400/40 bg-amber-500/10 text-xs font-semibold hover:bg-amber-500/15"
+              >
+                Weekly cold open (Kahmann / Kalshi)
+              </button>
               <button
                 type="button"
                 onClick={() => jumpPopup("ring")}

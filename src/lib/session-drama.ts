@@ -10,7 +10,8 @@ export type SessionDramaSlot =
   | "ring"
   | "finale"
   | "season_open"
-  | "soft_unlock";
+  | "soft_unlock"
+  | "weekly_cold_open";
 
 function canUse() {
   return typeof window !== "undefined" && typeof sessionStorage !== "undefined";
