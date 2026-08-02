@@ -47,7 +47,11 @@ export default function LastSeasonHardwareWall({
   const label = getPriorSeasonLabel(sid);
   const year = PRIOR_SEASON_YEAR;
   const league = getLeague();
-  const vonnaggio = isVonnaggioLeague(league?.name, league?.id);
+  const vonnaggio = isVonnaggioLeague(
+    league?.name,
+    league?.id,
+    league?.code
+  );
   const [spinKey, setSpinKey] = useState<string | null>(null);
 
   const lastYear = plaques

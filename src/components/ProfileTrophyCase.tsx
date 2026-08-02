@@ -235,7 +235,12 @@ export default function ProfileTrophyCase({
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { isVonnaggioLeague } =
         require("@/lib/league-trophy-override") as typeof import("@/lib/league-trophy-override");
-      vonnaggio = isVonnaggioLeague(leagueName || getLeague()?.name, getLeague()?.id);
+      const lg = getLeague();
+      vonnaggio = isVonnaggioLeague(
+        leagueName || lg?.name,
+        lg?.id,
+        lg?.code
+      );
     } catch {
       vonnaggio = false;
     }

@@ -93,14 +93,15 @@ export const NFL_PRIOR_SEASON_SEEDS: SeedRow[] = [
 export function decorateNflPriorForLeague(
   trophies: LeagueTrophy[],
   leagueName?: string | null,
-  leagueId?: string | null
+  leagueId?: string | null,
+  leagueCode?: string | null
 ): LeagueTrophy[] {
   let vonnaggio = false;
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { isVonnaggioLeague } =
       require("./league-trophy-override") as typeof import("./league-trophy-override");
-    vonnaggio = isVonnaggioLeague(leagueName, leagueId);
+    vonnaggio = isVonnaggioLeague(leagueName, leagueId, leagueCode);
   } catch {
     vonnaggio = false;
   }
@@ -246,12 +247,12 @@ export function mergePriorSeasonTrophies(
     });
   }
 
-  // Vonnaggio: Maria's plaque uses family-vacation gold hardware copy
+  // Vonnagio: Maria's plaque uses family-vacay gold hardware copy
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { getLeague } = require("./league") as typeof import("./league");
     const lg = getLeague();
-    return decorateNflPriorForLeague(out, lg?.name, lg?.id);
+    return decorateNflPriorForLeague(out, lg?.name, lg?.id, lg?.code);
   } catch {
     return out;
   }

@@ -219,7 +219,11 @@ export default function TrophyRoomPage() {
       (a, b) => b.year - a.year
     );
   })();
-  const vonnaggio = isVonnaggioLeague(leagueName, getLeague()?.id);
+  const vonnaggio = isVonnaggioLeague(
+    leagueName,
+    getLeague()?.id,
+    getLeague()?.code
+  );
 
   function onChampTap(spinKey: string) {
     setSpinKey(spinKey);

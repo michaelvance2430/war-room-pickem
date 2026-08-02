@@ -940,7 +940,8 @@ export function recordTrophyTap(
     const lg = getLeague();
     vonnaggio = isVonnaggioLeague(
       opts?.leagueName ?? lg?.name,
-      opts?.leagueId ?? lg?.id
+      opts?.leagueId ?? lg?.id,
+      lg?.code
     );
   } catch {
     vonnaggio = false;

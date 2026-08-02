@@ -80,7 +80,7 @@ export function getRingCeremonyPack(
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { getLeague } = require("./league") as typeof import("./league");
       const lg = getLeague();
-      if (isVonnaggioLeague(lg?.name, lg?.id)) {
+      if (isVonnaggioLeague(lg?.name, lg?.id, lg?.code)) {
         return {
           sport,
           stamp: threePeat ? "Opening night · dynasty" : "Opening night",
