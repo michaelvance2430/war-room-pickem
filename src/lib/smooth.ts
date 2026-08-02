@@ -12,6 +12,7 @@
  */
 
 import { unlockDocumentChrome, raceTimeout, armLoadingFailSafe } from "@/lib/boot-safety";
+import { wrBodyLock, wrLog } from "@/lib/runtime-iso";
 
 export { unlockDocumentChrome, raceTimeout, armLoadingFailSafe };
 
@@ -41,9 +42,14 @@ export const AUTH_MS = 12_000;
 
 let bodyLockCount = 0;
 
+export function getBodyLockCount(): number {
+  return bodyLockCount;
+}
+
 export function lockBodyScroll(): void {
   if (typeof document === "undefined") return;
   bodyLockCount += 1;
+  wrBodyLock(1, "lockBodyScroll");
   if (bodyLockCount === 1) {
     try {
       document.body.style.overflow = "hidden";
@@ -56,6 +62,7 @@ export function lockBodyScroll(): void {
 export function unlockBodyScroll(): void {
   if (typeof document === "undefined") return;
   bodyLockCount = Math.max(0, bodyLockCount - 1);
+  wrBodyLock(-1, "unlockBodyScroll");
   if (bodyLockCount === 0) {
     unlockDocumentChrome();
   }
@@ -63,6 +70,9 @@ export function unlockBodyScroll(): void {
 
 /** Hard reset — route change, watchdog, nav prepare */
 export function forceUnlockAllChrome(): void {
+  if (bodyLockCount !== 0) {
+    wrBodyLock(-bodyLockCount, "forceUnlockAllChrome");
+  }
   bodyLockCount = 0;
   unlockDocumentChrome();
 }
@@ -72,6 +82,7 @@ export function forceUnlockAllChrome(): void {
  * Clears ghost locks so the next screen is interactive immediately.
  */
 export function prepareNavigation(): void {
+  wrLog("[WR-NAV]", "prepareNavigation()");
   forceUnlockAllChrome();
   try {
     // Close any leftover open sheets by dispatching
@@ -85,6 +96,7 @@ export function prepareNavigation(): void {
 export function prefetchPrimaryRoutes(
   prefetch: (href: string) => void
 ): void {
+  wrLog("[WR-NAV]", `prefetchPrimaryRoutes ×${PRIMARY_ROUTES.length}`);
   for (const href of PRIMARY_ROUTES) {
     try {
       prefetch(href);
@@ -136,10 +148,12 @@ export function unlockIfOrphanedLock(): void {
       document.body.style.position === "fixed" ||
       document.body.style.position === "absolute"
     ) {
+      wrLog("[WR-BODYLOCK]", "orphan: fixed/absolute position → force unlock");
       forceUnlockAllChrome();
       return;
     }
     if (document.body.style.overflow === "hidden" && !hasVisibleModal()) {
+      wrLog("[WR-BODYLOCK]", "orphan: overflow hidden + no modal → force unlock");
       forceUnlockAllChrome();
     }
   } catch {

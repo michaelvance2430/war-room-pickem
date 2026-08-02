@@ -9,6 +9,9 @@
  * - Wave 1 (job-adjacent): only after 12s idle OR user has changed routes twice.
  * - Wave 2 (ceremonies/eggs/video): only after 25s, and only ONE slot group.
  * Never mount wave 2 if a wave-1 dialog is open.
+ *
+ * Isolation (dev): localStorage warroom-iso
+ *   { deferred:false } | { wave1:false } | { wave2:false }
  */
 
 import { useEffect, useState } from "react";
@@ -17,6 +20,12 @@ import { usePathname } from "next/navigation";
 import RoomDataHydrator from "@/components/RoomDataHydrator";
 import { isGuestMode } from "@/lib/guest-mode";
 import { hasVisibleModal } from "@/lib/smooth";
+import {
+  wrMount,
+  wrEffect,
+  wrDeferred,
+  isoEnabled,
+} from "@/lib/runtime-iso";
 
 const LoginWelcomeModal = dynamic(
   () => import("@/components/LoginWelcomeModal"),
@@ -105,39 +114,66 @@ export default function RoomDeferredChrome() {
   const [wave, setWave] = useState(0);
   const [routeHops, setRouteHops] = useState(0);
   const [ceremonyOk, setCeremonyOk] = useState(false);
+  const allowWave1 = isoEnabled("wave1");
+  const allowWave2 = isoEnabled("wave2");
+
+  useEffect(() => {
+    return wrMount("RoomDeferredChrome");
+  }, []);
 
   // Count real navigation so look-around happens before popups
   useEffect(() => {
+    wrEffect("RoomDeferredChrome.routeHops");
     setRouteHops((n) => n + 1);
   }, [pathname]);
 
   useEffect(() => {
-    // Wave 1: user has poked around OR sat still long enough
-    const armWave1 = () => setWave((w) => Math.max(w, 1));
+    if (!allowWave1) {
+      wrDeferred("wave1 disabled by iso");
+      return;
+    }
+    wrEffect("RoomDeferredChrome.armWave1Timer");
+    const armWave1 = () => {
+      wrDeferred("wave → 1 (12s idle)");
+      setWave((w) => Math.max(w, 1));
+    };
     const t1 = window.setTimeout(armWave1, 12_000);
     return () => window.clearTimeout(t1);
-  }, []);
+  }, [allowWave1]);
 
   useEffect(() => {
-    if (routeHops >= 2) setWave((w) => Math.max(w, 1));
-  }, [routeHops]);
+    if (!allowWave1) return;
+    if (routeHops >= 2) {
+      wrDeferred(`wave → 1 (routeHops=${routeHops})`);
+      setWave((w) => Math.max(w, 1));
+    }
+  }, [routeHops, allowWave1]);
 
   useEffect(() => {
-    // Wave 2: ceremonies only after the room is boring-stable
+    if (!allowWave2) {
+      wrDeferred("wave2 disabled by iso");
+      return;
+    }
     if (wave < 1) return;
+    wrEffect("RoomDeferredChrome.armWave2Timer");
     let retry: number | undefined;
     const t2 = window.setTimeout(() => {
       if (hasVisibleModal()) {
-        retry = window.setTimeout(() => setWave(2), 8_000);
+        wrDeferred("wave2 delayed — modal visible");
+        retry = window.setTimeout(() => {
+          wrDeferred("wave → 2 (retry)");
+          setWave(2);
+        }, 8_000);
         return;
       }
+      wrDeferred("wave → 2");
       setWave(2);
     }, 14_000);
     return () => {
       window.clearTimeout(t2);
       if (retry != null) window.clearTimeout(retry);
     };
-  }, [wave]);
+  }, [wave, allowWave2]);
 
   // Stagger wave-2 children so cold-open video isn't competing with ring modal JS
   useEffect(() => {
@@ -145,16 +181,21 @@ export default function RoomDeferredChrome() {
       setCeremonyOk(false);
       return;
     }
+    wrDeferred("ceremonyOk arm +600ms");
     const t = window.setTimeout(() => setCeremonyOk(true), 600);
     return () => window.clearTimeout(t);
   }, [wave]);
+
+  useEffect(() => {
+    wrDeferred(`state wave=${wave} hops=${routeHops} ceremonyOk=${ceremonyOk}`);
+  }, [wave, routeHops, ceremonyOk]);
 
   return (
     <>
       {/* Wave 0: nameplates only — never blocks taps */}
       {!guest && <RoomDataHydrator />}
 
-      {wave >= 1 && (
+      {allowWave1 && wave >= 1 && (
         <>
           {!guest && <LoginWelcomeModal />}
           {!guest && <RulesOnboardingModal />}
@@ -169,7 +210,7 @@ export default function RoomDeferredChrome() {
         </>
       )}
 
-      {wave >= 2 && ceremonyOk && (
+      {allowWave2 && wave >= 2 && ceremonyOk && (
         <>
           {!guest && <SeasonCountdownTicker />}
           {!guest && <SeasonOpenWelcome />}

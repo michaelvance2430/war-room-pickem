@@ -8,6 +8,7 @@ import SandboxSessionChrome from "@/components/SandboxSessionChrome";
 import LeagueBuildGate from "@/components/LeagueBuildGate";
 import SmoothRuntime from "@/components/SmoothRuntime";
 import AppShell from "@/components/AppShell";
+import ThemeDecorGate from "@/components/ThemeDecorGate";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -79,11 +80,13 @@ export default function RootLayout({
           route prefetch. No global PullToRefresh (that froze touch).
         */}
         <SmoothRuntime />
-        <SportThemeApplier />
-        <SeasonThemeApplier />
-        <FoundrySessionChrome />
-        <SandboxSessionChrome />
-        <LeagueBuildGate />
+        <ThemeDecorGate>
+          <SportThemeApplier />
+          <SeasonThemeApplier />
+          <FoundrySessionChrome />
+          <SandboxSessionChrome />
+          <LeagueBuildGate />
+        </ThemeDecorGate>
         <AppShell>{children}</AppShell>
       </body>
     </html>

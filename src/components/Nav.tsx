@@ -35,6 +35,12 @@ import {
   loadProgressiveSnapshot,
 } from "@/lib/progressive-disclosure";
 import { prepareNavigation, PRIMARY_ROUTES } from "@/lib/smooth";
+import {
+  wrMount,
+  wrEffect,
+  wrLog,
+  isoEnabled,
+} from "@/lib/runtime-iso";
 
 /** Heavy chrome — not in first JS parse of every tab. */
 const RoomDeferredChrome = dynamic(
@@ -83,6 +89,13 @@ export default function Nav() {
   const [eyesLabel, setEyesLabel] = useState("");
   /** Heavy chrome (modals/hydrators) after first paint */
   const [deferredReady, setDeferredReady] = useState(false);
+  /** Isolation: A = deferred chrome, B = progressive/unseen */
+  const allowDeferred = isoEnabled("deferred");
+  const allowProgressive = isoEnabled("navProgressive");
+
+  useEffect(() => {
+    return wrMount("Nav");
+  }, []);
 
   function refreshRoles() {
     setIsCommish(isCommissioner());
@@ -103,10 +116,18 @@ export default function Nav() {
   // Deferred chrome once — Nav is layout-persistent so this no longer re-runs
   // on every tab (that remount storm made every screen stick).
   useEffect(() => {
+    if (!allowDeferred) {
+      wrLog("[WR-DEFERRED]", "Nav deferred chrome disabled by iso");
+      return;
+    }
     if (deferredReady) return;
+    wrEffect("Nav.armDeferred");
     let cancelled = false;
     const arm = () => {
-      if (!cancelled) setDeferredReady(true);
+      if (!cancelled) {
+        wrLog("[WR-DEFERRED]", "deferredReady=true");
+        setDeferredReady(true);
+      }
     };
     // Prefer a longer idle timeout so first route paint wins
     const w = window as Window & {
@@ -131,11 +152,16 @@ export default function Nav() {
       }
       if (timeoutId != null) clearTimeout(timeoutId);
     };
-  }, [deferredReady]);
+  }, [deferredReady, allowDeferred]);
 
   // Progressive chrome — ONCE on mount + events. NOT on every pathname change
   // (that re-fired syncFirstWeek + active week + scored weeks on every tab).
   useEffect(() => {
+    if (!allowProgressive) {
+      wrLog("[WR-NAV]", "progressive/unseen disabled by iso");
+      return;
+    }
+    wrEffect("Nav.progressive");
     function syncProgressive() {
       if (isGuestMode()) {
         setShowGazetteNav(true);
@@ -168,7 +194,7 @@ export default function Nav() {
       window.removeEventListener("warroom-creator-sandbox", syncProgressive);
       window.removeEventListener("warroom-creator-eyes", syncProgressive);
     };
-  }, []);
+  }, [allowProgressive]);
 
   useEffect(() => {
     const session = getSession();
@@ -1013,7 +1039,7 @@ export default function Nav() {
       */}
       <PlayerWalkthrough />
       {/* Roster + optional modals — staged late so tabs stay live after login */}
-      {deferredReady && <RoomDeferredChrome />}
+      {allowDeferred && deferredReady && <RoomDeferredChrome />}
     </>
   );
 }

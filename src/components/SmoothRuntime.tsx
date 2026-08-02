@@ -4,18 +4,33 @@
  * Single global runtime: route unlock + orphan body-lock watchdog + primary
  * prefetch. Replaces the split RouteHardSwitch + BootWatchdog dance so one
  * module owns "the app never freezes under chrome."
+ *
+ * Freeze regression notes (Group 1):
+ * - Prefetch must run ONCE per session, not on every pathname change.
+ * - Orphan-lock pulse must not DOM-scan (getComputedStyle) every 1s forever.
  */
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   forceUnlockAllChrome,
   unlockIfOrphanedLock,
   prefetchPrimaryRoutes,
   prepareNavigation,
+  getBodyLockCount,
 } from "@/lib/smooth";
 import { isGuestMode } from "@/lib/guest-mode";
 import { getSession } from "@/lib/league";
+import {
+  wrMount,
+  wrEffect,
+  wrRoute,
+  wrLog,
+  wrSetInterval,
+  wrClearInterval,
+  installRuntimeDebugGlobals,
+  isoEnabled,
+} from "@/lib/runtime-iso";
 
 function scrollTopHard() {
   if (typeof window === "undefined") return;
@@ -32,21 +47,50 @@ function scrollTopHard() {
   }
 }
 
+/** Cheap gate before expensive hasVisibleModal DOM walk */
+function bodyLooksLocked(): boolean {
+  try {
+    const b = document.body.style;
+    return (
+      b.overflow === "hidden" ||
+      b.position === "fixed" ||
+      b.position === "absolute" ||
+      getBodyLockCount() > 0
+    );
+  } catch {
+    return false;
+  }
+}
+
 export default function SmoothRuntime() {
   const pathname = usePathname();
   const router = useRouter();
+  const prefetchedOnce = useRef(false);
+
+  useEffect(() => {
+    return wrMount("SmoothRuntime");
+  }, []);
+
+  useEffect(() => {
+    installRuntimeDebugGlobals();
+  }, []);
 
   // Every route change: hard unlock + top of page
   useEffect(() => {
+    wrRoute(pathname);
+    wrEffect("SmoothRuntime.routeUnlock");
+    if (!isoEnabled("smoothPrep")) {
+      wrLog("[WR-NAV]", "route unlock skipped (smoothPrep=false)");
+      return;
+    }
     forceUnlockAllChrome();
     scrollTopHard();
     const t0 = requestAnimationFrame(() => {
       forceUnlockAllChrome();
       scrollTopHard();
     });
-    const t1 = window.setTimeout(() => forceUnlockAllChrome(), 80);
-    const t2 = window.setTimeout(() => forceUnlockAllChrome(), 400);
-    const t3 = window.setTimeout(() => unlockIfOrphanedLock(), 1_200);
+    // One delayed orphan check is enough — avoid triple forceUnlock storms
+    const t1 = window.setTimeout(() => unlockIfOrphanedLock(), 400);
     try {
       window.dispatchEvent(
         new CustomEvent("warroom-route-change", { detail: { pathname } })
@@ -57,17 +101,25 @@ export default function SmoothRuntime() {
     return () => {
       cancelAnimationFrame(t0);
       window.clearTimeout(t1);
-      window.clearTimeout(t2);
-      window.clearTimeout(t3);
     };
   }, [pathname]);
 
-  // Watchdog: orphan locks, visibility, pointer on chrome
+  // Watchdog: orphan locks on visibility/focus; slow pulse only if locked
   useEffect(() => {
+    wrEffect("SmoothRuntime.watchdog");
+    if (!isoEnabled("smoothPulse") && !isoEnabled("smoothPrep")) {
+      wrLog("[WR-RUNTIME]", "watchdog skipped (smoothPulse/smoothPrep off)");
+      return;
+    }
+
     function onVis() {
-      if (document.visibilityState === "visible") unlockIfOrphanedLock();
+      if (document.visibilityState === "visible" && bodyLooksLocked()) {
+        unlockIfOrphanedLock();
+      }
     }
     function onPointerDown(e: Event) {
+      // Cheap bail: never walk DOM if body is not locked
+      if (!bodyLooksLocked()) return;
       const t = e.target as HTMLElement | null;
       if (
         t?.closest?.(
@@ -77,25 +129,52 @@ export default function SmoothRuntime() {
         unlockIfOrphanedLock();
       }
     }
+
     document.addEventListener("visibilitychange", onVis);
     window.addEventListener("pageshow", onVis);
     window.addEventListener("focus", onVis);
     document.addEventListener("pointerdown", onPointerDown, true);
-    const pulse = window.setInterval(unlockIfOrphanedLock, 1_000);
+
+    // Was 1s forever → getComputedStyle on every dialog. Now: 8s and only
+    // run the expensive walk when the body style still looks locked.
+    let pulse: number | undefined;
+    if (isoEnabled("smoothPulse")) {
+      pulse = wrSetInterval(
+        () => {
+          if (bodyLooksLocked()) unlockIfOrphanedLock();
+        },
+        8_000,
+        "orphan-lock-pulse"
+      );
+    }
+
     return () => {
       document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener("pageshow", onVis);
       window.removeEventListener("focus", onVis);
       document.removeEventListener("pointerdown", onPointerDown, true);
-      window.clearInterval(pulse);
+      if (pulse != null) wrClearInterval(pulse, "orphan-lock-pulse");
     };
   }, []);
 
-  // Warm primary desks once session exists (desktop soft-nav salvation)
+  // Warm primary desks ONCE per session (not every pathname change)
   useEffect(() => {
+    wrEffect("SmoothRuntime.prefetch");
+    if (!isoEnabled("smoothPrefetch")) {
+      wrLog("[WR-NAV]", "prefetch skipped (smoothPrefetch=false)");
+      return;
+    }
     if (isGuestMode()) return;
     if (!getSession()?.playerId) return;
+    if (prefetchedOnce.current) {
+      wrLog("[WR-NAV]", "prefetch already done this session");
+      return;
+    }
+
     const warm = () => {
+      if (prefetchedOnce.current) return;
+      prefetchedOnce.current = true;
+      wrLog("[WR-NAV]", "prefetchPrimaryRoutes once");
       prefetchPrimaryRoutes((href) => {
         try {
           router.prefetch(href);
@@ -104,6 +183,7 @@ export default function SmoothRuntime() {
         }
       });
     };
+
     const w = window as Window & {
       requestIdleCallback?: (
         cb: () => void,
@@ -122,10 +202,13 @@ export default function SmoothRuntime() {
       if (idleId != null && w.cancelIdleCallback) w.cancelIdleCallback(idleId);
       if (t) clearTimeout(t);
     };
-  }, [router, pathname]);
+    // Intentionally NOT on pathname — that re-prefetched ~10 routes every hop
+  }, [router]);
 
   // Capture-phase: any in-app link click prepares nav (covers logo, tiles, etc.)
   useEffect(() => {
+    wrEffect("SmoothRuntime.clickPrep");
+    if (!isoEnabled("smoothPrep")) return;
     function onClick(e: MouseEvent) {
       const t = e.target as HTMLElement | null;
       const a = t?.closest?.("a[href]") as HTMLAnchorElement | null;
@@ -133,6 +216,7 @@ export default function SmoothRuntime() {
       const href = a.getAttribute("href") || "";
       if (!href.startsWith("/") || href.startsWith("//")) return;
       if (a.target === "_blank") return;
+      wrLog("[WR-NAV]", `prepareNavigation → ${href}`);
       prepareNavigation();
     }
     document.addEventListener("click", onClick, true);

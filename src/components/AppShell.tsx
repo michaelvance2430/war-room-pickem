@@ -7,8 +7,10 @@
  * That made every screen feel sticky/slow.
  */
 
+import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import Nav from "@/components/Nav";
+import { wrMount, wrRoute } from "@/lib/runtime-iso";
 
 /** Routes that should not show the app chrome (auth / bare flows). */
 function isBareRoute(pathname: string | null): boolean {
@@ -25,6 +27,14 @@ function isBareRoute(pathname: string | null): boolean {
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const bare = isBareRoute(pathname);
+
+  useEffect(() => {
+    return wrMount("AppShell");
+  }, []);
+
+  useEffect(() => {
+    wrRoute(pathname);
+  }, [pathname]);
 
   return (
     <>

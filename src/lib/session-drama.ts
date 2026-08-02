@@ -3,6 +3,8 @@
  * Prevents welcome + ring + finale stacking on the next login.
  */
 
+import { wrModal } from "@/lib/runtime-iso";
+
 const KEY = "warroom-session-drama-v1";
 
 export type SessionDramaSlot =
@@ -38,8 +40,12 @@ export function claimSessionDrama(slot: SessionDramaSlot): boolean {
   if (!canUse()) return true;
   try {
     const cur = sessionStorage.getItem(KEY);
-    if (cur && cur !== slot) return false;
+    if (cur && cur !== slot) {
+      wrModal(`claim DENIED ${slot} (owner=${cur})`);
+      return false;
+    }
     sessionStorage.setItem(KEY, slot);
+    wrModal(`claim OK ${slot}`);
     return true;
   } catch {
     return true;
@@ -50,6 +56,7 @@ export function clearSessionDrama(slot?: SessionDramaSlot) {
   if (!canUse()) return;
   try {
     if (!slot || sessionStorage.getItem(KEY) === slot) {
+      wrModal(`clear ${slot || "any"}`);
       sessionStorage.removeItem(KEY);
     }
   } catch {
