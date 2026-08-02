@@ -5112,12 +5112,18 @@ export default function CommissionerPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center text-muted">
-          Loading Commish tools…
+        <div className="min-h-screen flex flex-col bg-background">
+          <main className="flex-1 max-w-6xl mx-auto w-full px-3 sm:px-4 py-6">
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
+              Ops desk
+            </p>
+            <h1 className="text-xl font-extrabold mt-0.5 mb-4">Commish tools</h1>
+            <p className="text-sm text-muted">Opening host tools…</p>
+          </main>
         </div>
       }
     >
       <CommissionerPageInner />
-      </Suspense>
+    </Suspense>
   );
 }

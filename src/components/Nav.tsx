@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   getSession,
@@ -59,6 +59,7 @@ type NavLink = {
  */
 export default function Nav() {
   const pathname = usePathname();
+  const router = useRouter();
   const [isCommish, setIsCommish] = useState(false);
   const [ops, setOps] = useState(false);
   const [staff, setStaff] = useState(false);
@@ -131,6 +132,41 @@ export default function Nav() {
       if (timeoutId != null) clearTimeout(timeoutId);
     };
   }, [deferredReady]);
+
+  /**
+   * Desktop: Commish is a huge client chunk. prefetch=false everywhere meant
+   * Gazette → Commish cold-downloaded ~5k lines and froze the main thread.
+   * Warm the route for ops after first paint so the hop is not a compile storm.
+   */
+  useEffect(() => {
+    if (isGuestMode()) return;
+    if (!ops && !isCommish) return;
+    const w = window as Window & {
+      requestIdleCallback?: (
+        cb: () => void,
+        opts?: { timeout: number }
+      ) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+    const warm = () => {
+      try {
+        router.prefetch("/commissioner");
+      } catch {
+        /* ok */
+      }
+    };
+    let idleId: number | undefined;
+    let t: ReturnType<typeof setTimeout> | undefined;
+    if (typeof w.requestIdleCallback === "function") {
+      idleId = w.requestIdleCallback(warm, { timeout: 4_000 });
+    } else {
+      t = setTimeout(warm, 2_000);
+    }
+    return () => {
+      if (idleId != null && w.cancelIdleCallback) w.cancelIdleCallback(idleId);
+      if (t) clearTimeout(t);
+    };
+  }, [ops, isCommish, router]);
 
   // Progressive chrome — ONCE on mount + events. NOT on every pathname change
   // (that re-fired syncFirstWeek + active week + scored weeks on every tab).
@@ -498,13 +534,18 @@ export default function Nav() {
     }
   }
 
+  /** Heavy host desk — allow Next prefetch on desktop so Gazette→Commish is warm */
+  function shouldPrefetch(href: string) {
+    return href === "/commissioner" || href.startsWith("/commissioner?");
+  }
+
   function NavItem({ link }: { link: NavLink }) {
     const isHome = link.href === "/";
     const active = linkActive(link.href);
     return (
       <Link
         href={link.href}
-        prefetch={false}
+        prefetch={shouldPrefetch(link.href)}
         onClick={() => {
           closeChrome();
           hardNavPrepare();
@@ -832,7 +873,7 @@ export default function Nav() {
                   <li key={link.href}>
                     <Link
                       href={link.href}
-                      prefetch={false}
+                      prefetch={shouldPrefetch(link.href)}
                       onClick={() => {
                         closeChrome();
                         hardNavPrepare();
