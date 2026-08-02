@@ -34,6 +34,7 @@ import {
   EVENT_PROGRESSIVE,
   loadProgressiveSnapshot,
 } from "@/lib/progressive-disclosure";
+import { hardNavPrepare } from "@/components/RouteHardSwitch";
 
 /** Heavy chrome — not in first JS parse of every tab. */
 const RoomDeferredChrome = dynamic(
@@ -926,7 +927,24 @@ export default function Nav() {
                 <Link
                   href={tab.href}
                   prefetch={false}
-                  onClick={closeChrome}
+                  onClick={(e) => {
+                    closeChrome();
+                    // Phone: Standings → Picks soft-nav left a half-dead shell.
+                    // Hard open My Picks so card load always boots clean.
+                    if (
+                      tab.href === "/picks" &&
+                      pathname !== "/picks" &&
+                      !pathname?.startsWith("/picks/")
+                    ) {
+                      e.preventDefault();
+                      hardNavPrepare();
+                      try {
+                        window.location.assign("/picks");
+                      } catch {
+                        window.location.href = "/picks";
+                      }
+                    }
+                  }}
                   className={`relative flex flex-col items-center justify-center h-full gap-0.5 text-[10px] font-semibold touch-manipulation transition ${
                     active ? "text-primary" : "text-muted"
                   }`}

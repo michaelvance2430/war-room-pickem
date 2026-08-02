@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useSearchParams } from "next/navigation";
 import PicksHowToModal from "@/components/PicksHowToModal";
 import PicksPreOpenOddsModal from "@/components/PicksPreOpenOddsModal";
 import FirstFinalModal from "@/components/FirstFinalModal";
@@ -13,6 +12,7 @@ import { getSession, getLeague } from "@/lib/league";
 import Link from "next/link";
 import {
   loadWeekCard,
+  loadBestAvailableWeekCard,
   peekCachedWeekCard,
   bustWeekCardCache,
   savePicksToCloud,
@@ -145,11 +145,11 @@ export default function PicksClient() {
   const [practiceMode, setPracticeMode] = useState(false);
   /** True after local practice score — show W/L on the card */
   const [practiceScored, setPracticeScored] = useState(false);
-  const searchParams = useSearchParams();
-  /** URL is the only gate for practice — never latch from localStorage alone */
-  const practiceFromUrl =
-    searchParams.get("practice") === "1" ||
-    searchParams.get("week") === "99";
+  /**
+   * Practice gate from window URL — avoid useSearchParams (Suspense hang on
+   * some mobile Safari / PWA soft navigations from Standings).
+   */
+  const [practiceFromUrl, setPracticeFromUrl] = useState(false);
 
   const revisionRef = useRef<string>("");
   const viewWeekRef = useRef(1);
@@ -159,6 +159,7 @@ export default function PicksClient() {
   const savedRef = useRef(saved);
   /** Mount-once softRefresh must read current practice flag (not a stale false). */
   const practiceModeRef = useRef(false);
+  const hasCardRef = useRef(false);
   const savingRef = useRef(false);
   const lastSoftRefreshAt = useRef(0);
   picksRef.current = picks;
@@ -167,6 +168,7 @@ export default function PicksClient() {
   savedRef.current = saved;
   viewWeekRef.current = viewWeek;
   practiceModeRef.current = practiceMode;
+  hasCardRef.current = hasCard;
   savingRef.current = saving;
 
   /** Hard leave practice — wipe client practice state and go live. */
@@ -400,15 +402,14 @@ export default function PicksClient() {
       }
 
       try {
-        // Parallel: active week + first card + published list (was a serial waterfall)
-        const [resolved, firstCard, published] = await Promise.all([
+        // Parallel: resolve week + published list
+        const [resolved, published] = await Promise.all([
           resolvePlayerActiveWeek({ persistIfOps: false }).catch(() => ({
             week: localWeek,
             leagueWeek: localWeek,
             advanced: false,
             scored: [] as number[],
           })),
-          loadWeekCard(target),
           listPublishedWeekNumbers().catch(() => [] as number[]),
         ]);
 
@@ -416,36 +417,44 @@ export default function PicksClient() {
         if (resolved.scored?.length) setScoredWeeks(resolved.scored);
         if (published.length) setPublishedWeeks(published);
 
-        let cloud = firstCard;
         if (opts.isInitial) {
           target = resolved.week;
-          if (target !== localWeek || !cloud?.games?.length) {
-            // Prefer published live week if resolve points elsewhere
+        }
+
+        let cloud: CloudCard | null = null;
+
+        if (opts.explicit) {
+          // User picked a specific week — load that only
+          cloud = await loadWeekCard(target);
+          if (!cloud?.games?.length) {
+            bustWeekCardCache(target);
             cloud = await loadWeekCard(target);
           }
-        }
-
-        if (!cloud?.games?.length && published.length) {
-          const fallback = published.includes(target)
-            ? target
-            : published[published.length - 1]!;
-          target = fallback;
-          bustWeekCardCache(target);
-          cloud = await loadWeekCard(target);
-        }
-
-        // One quick retry if still empty but we believe a card should exist
-        if (
-          !cloud?.games?.length &&
-          (published.includes(target) || opts.isInitial)
-        ) {
-          bustWeekCardCache(target);
-          await new Promise((r) => window.setTimeout(r, 400));
-          cloud = await loadWeekCard(target);
+        } else {
+          // Initial / soft: shotgun any published card (fixes wrong-week hang)
+          const best = await loadBestAvailableWeekCard(target);
+          if (best?.card?.games?.length) {
+            cloud = best.card;
+            target = best.week;
+          } else {
+            // Bust + one more full search
+            bustWeekCardCache();
+            await new Promise((r) => window.setTimeout(r, 350));
+            const retry = await loadBestAvailableWeekCard(target);
+            if (retry?.card?.games?.length) {
+              cloud = retry.card;
+              target = retry.week;
+            }
+          }
         }
 
         setViewWeek(target);
         viewWeekRef.current = target;
+        try {
+          localStorage.setItem("warroom-active-week", String(target));
+        } catch {
+          /* ok */
+        }
 
         if (!cloud?.games?.length) {
           // Keep any painted cache; only show empty when we never had games
@@ -538,6 +547,18 @@ export default function PicksClient() {
     }
   }
 
+  // Practice flag from real URL (no useSearchParams)
+  useEffect(() => {
+    try {
+      const sp = new URLSearchParams(window.location.search);
+      setPracticeFromUrl(
+        sp.get("practice") === "1" || sp.get("week") === "99"
+      );
+    } catch {
+      setPracticeFromUrl(false);
+    }
+  }, []);
+
   // Client nav from /picks?practice=1 → /picks (Nav "Picks"): drop fake card.
   useEffect(() => {
     if (!practiceModeRef.current) return;
@@ -550,12 +571,30 @@ export default function PicksClient() {
     let channel: ReturnType<ReturnType<typeof createClient>["channel"]> | null =
       null;
 
-    // Fail-safe: never spin forever — bust cache + quiet auto-retry (no pull)
-    const failSafe = window.setTimeout(() => {
+    // Kill leftover scroll locks from Standings modals / sheets
+    try {
+      document.body.style.overflow = "";
+      document.documentElement.style.overflow = "";
+    } catch {
+      /* ok */
+    }
+
+    // Fail-safe: keep retrying a few times — never "pull to reopen"
+    let failSafeAttempts = 0;
+    const failSafe = window.setInterval(() => {
       if (cancelled) return;
-      setCardBusy(false);
+      if (hasCardRef.current) {
+        window.clearInterval(failSafe);
+        return;
+      }
+      failSafeAttempts += 1;
+      if (failSafeAttempts > 4) {
+        window.clearInterval(failSafe);
+        setCardBusy(false);
+        return;
+      }
       try {
-        bustWeekCardCache(viewWeekRef.current);
+        bustWeekCardCache();
       } catch {
         /* ok */
       }
@@ -563,7 +602,7 @@ export default function PicksClient() {
         isInitial: true,
         forceReloadPicks: true,
       });
-    }, 6_000);
+    }, 3_500);
 
     void (async () => {
       // Bored practice: ONLY via explicit URL (?practice=1 or week=99).
@@ -665,7 +704,7 @@ export default function PicksClient() {
                 setSaved(false);
                 setUsedConfidence([]);
               }
-              window.clearTimeout(failSafe);
+              window.clearInterval(failSafe);
               return;
             }
           }
@@ -705,7 +744,8 @@ export default function PicksClient() {
           }, 600);
         }
       } finally {
-        window.clearTimeout(failSafe);
+        // Only stop auto-retry when games are on screen
+        if (hasCardRef.current) window.clearInterval(failSafe);
       }
     })();
 
@@ -763,7 +803,7 @@ export default function PicksClient() {
 
     return () => {
       cancelled = true;
-      window.clearTimeout(failSafe);
+      window.clearInterval(failSafe);
       window.clearTimeout(subTimer);
       clearInterval(poll);
       window.clearInterval(tick);

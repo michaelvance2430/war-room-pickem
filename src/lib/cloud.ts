@@ -835,27 +835,32 @@ export async function listPublishedWeekNumbers(): Promise<number[]> {
   const session = getSession();
   if (!session?.leagueId) return [];
   const hit = cacheGet(publishedCache, session.leagueId, LIST_TTL_MS);
-  if (hit) return hit;
+  // Empty [] is valid — only skip cache when undefined (miss / expired)
+  if (hit !== undefined) return hit;
   try {
     const supabase = createClient();
-    const data = await withTimeout(
+    type PubResult =
+      | { kind: "ok"; rows: { week_number: number }[] }
+      | { kind: "fail" };
+    const data = await withTimeout<PubResult>(
       (async () => {
         const { data: rows, error } = await supabase
           .from("week_cards")
           .select("week_number")
           .eq("league_id", session.leagueId)
           .order("week_number", { ascending: true });
-        if (error || !rows) return null;
-        return rows;
+        if (error) return { kind: "fail" as const };
+        return {
+          kind: "ok" as const,
+          rows: (rows as { week_number: number }[]) || [],
+        };
       })(),
       8_000,
-      null
+      { kind: "fail" }
     );
-    if (!data) {
-      cacheSet(publishedCache, session.leagueId, []);
-      return [];
-    }
-    const nums = data
+    // Timeout / error: do NOT cache empty — that blocked week fallbacks on phone
+    if (data.kind === "fail") return [];
+    const nums = data.rows
       .map((r) => Number(r.week_number))
       .filter((n) => !Number.isNaN(n));
     const out = [...new Set(nums)].sort((a, b) => a - b);
@@ -864,6 +869,58 @@ export async function listPublishedWeekNumbers(): Promise<number[]> {
   } catch {
     return [];
   }
+}
+
+/**
+ * Phone Standings→Picks: find ANY playable card (active week, published, neighbors).
+ * Parallel so one slow week doesn't hide the live card.
+ */
+export async function loadBestAvailableWeekCard(
+  preferredWeek = 1
+): Promise<{ card: CloudCard; week: number } | null> {
+  const preferred = Number.isFinite(preferredWeek) ? preferredWeek : 1;
+  const published = await listPublishedWeekNumbers().catch(() => [] as number[]);
+
+  const candidates: number[] = [];
+  const push = (w: number) => {
+    if (!Number.isFinite(w) || w < 0 || w > 40) return;
+    if (!candidates.includes(w)) candidates.push(w);
+  };
+  push(preferred);
+  // Newest published first (live card is almost always the last one)
+  for (let i = published.length - 1; i >= 0; i--) push(published[i]!);
+  push(preferred - 1);
+  push(preferred + 1);
+  push(1);
+  push(0);
+
+  // Cap parallel fan-out — phone radio hates 10 at once
+  const batch = candidates.slice(0, 6);
+  const results = await Promise.all(
+    batch.map(async (w) => {
+      try {
+        const card = await loadWeekCard(w);
+        return { w, card };
+      } catch {
+        return { w, card: null as CloudCard | null };
+      }
+    })
+  );
+
+  // Prefer preferred week if it has games
+  for (const r of results) {
+    if (r.w === preferred && r.card?.games?.length) {
+      return { card: r.card, week: r.w };
+    }
+  }
+  // Then highest week with games (usually the live one)
+  const withGames = results
+    .filter((r) => r.card?.games?.length)
+    .sort((a, b) => b.w - a.w);
+  if (withGames[0]?.card) {
+    return { card: withGames[0].card, week: withGames[0].w };
+  }
+  return null;
 }
 
 export async function savePicksToCloud(opts: {
