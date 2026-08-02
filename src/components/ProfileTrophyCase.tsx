@@ -227,8 +227,23 @@ export default function ProfileTrophyCase({
     setSpinId(itemId);
     window.setTimeout(() => setSpinId(null), 900);
     const pid = getSession()?.playerId;
-    if (!pid || !isSelf) return;
-    const moment = recordTrophyTap(pid);
+    if (!pid) return;
+    // Vonnaggio: any room member can discover on the gold form.
+    // Global curiosity egg: still yours-only on your own case.
+    let vonnaggio = false;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { isVonnaggioLeague } =
+        require("@/lib/league-trophy-override") as typeof import("@/lib/league-trophy-override");
+      vonnaggio = isVonnaggioLeague(leagueName || getLeague()?.name, getLeague()?.id);
+    } catch {
+      vonnaggio = false;
+    }
+    if (!vonnaggio && !isSelf) return;
+    const moment = recordTrophyTap(pid, {
+      leagueName: leagueName || getLeague()?.name,
+      leagueId: getLeague()?.id,
+    });
     if (moment) {
       try {
         window.dispatchEvent(

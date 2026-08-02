@@ -392,6 +392,15 @@ export const BADGE_CATALOG: BadgeDef[] = [
     icon: "🏆",
   },
   {
+    id: "egg_vonnaggio_gold",
+    name: "Family Vacation Gold",
+    description: "You woke the gold form in Vonnaggio Family Vacation.",
+    howToEarn: "No spoilers. Curiosity only.",
+    tier: "rare",
+    points: 0,
+    icon: "🥇",
+  },
+  {
     id: "egg_hidden_headline",
     name: "Ink Stain",
     description: "You caught a paper that shouldn't exist.",

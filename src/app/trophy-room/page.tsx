@@ -3,6 +3,10 @@
 /**
  * Trophy Room — view engraved hardware.
  * All awards auto-engrave (no manual fill form). Host can Sync anytime.
+ *
+ * Vonnaggio Family Vacation: Maria’s 2025 gold hardware is full color;
+ * current season championship shelf is grey until this year crowns.
+ * Five consecutive taps on championship art → Family Vacation Gold egg.
  */
 
 import { useEffect, useState } from "react";
@@ -40,6 +44,11 @@ import {
 } from "@/lib/prior-season-seed";
 import { resolveLiveTrophyHolder } from "@/lib/trophy-share";
 import LastSeasonHardwareWall from "@/components/LastSeasonHardwareWall";
+import {
+  EVENT_EASTER_EGG,
+  recordTrophyTap,
+} from "@/lib/easter-eggs";
+import { isVonnaggioLeague } from "@/lib/league-trophy-override";
 
 const BIG_TYPES: TrophyType[] = [
   "championship",
@@ -66,6 +75,8 @@ export default function TrophyRoomPage() {
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
   /** Full roster so every current trophy holder can resolve a face */
   const [roster, setRoster] = useState<LeagueRosterMember[]>([]);
+  /** Championship 5-tap egg spin */
+  const [spinKey, setSpinKey] = useState<string | null>(null);
 
   async function reload() {
     setLoadError(null);
@@ -199,8 +210,36 @@ export default function TrophyRoomPage() {
     await reload();
   }
 
-  const seasons = groupTrophiesBySeason(trophies);
+  const seasonsRaw = groupTrophiesBySeason(trophies);
   const year = defaultSeasonYear();
+  // Always show current season shelves (grey empty championship until crowned)
+  const seasons = (() => {
+    if (seasonsRaw.some((s) => s.year === year)) return seasonsRaw;
+    return [{ year, items: [] as LeagueTrophy[] }, ...seasonsRaw].sort(
+      (a, b) => b.year - a.year
+    );
+  })();
+  const vonnaggio = isVonnaggioLeague(leagueName, getLeague()?.id);
+
+  function onChampTap(spinKey: string) {
+    setSpinKey(spinKey);
+    window.setTimeout(() => setSpinKey(null), 900);
+    const pid = selfId || getSession()?.playerId;
+    if (!pid) return;
+    const moment = recordTrophyTap(pid, {
+      leagueName,
+      leagueId: getLeague()?.id,
+    });
+    if (moment) {
+      try {
+        window.dispatchEvent(
+          new CustomEvent(EVENT_EASTER_EGG, { detail: moment })
+        );
+      } catch {
+        /* ignore */
+      }
+    }
+  }
 
   function plaque(
     y: number,
@@ -209,13 +248,30 @@ export default function TrophyRoomPage() {
   ) {
     const m = TROPHY_META[t];
     const item = items.find((i) => i.trophyType === t);
+    const isChamp = t === "championship";
+    const spinId = `${y}-${t}`;
+    const spinning = spinKey === spinId;
     if (!item) {
       return (
         <div
           key={t}
           className="rounded-xl border border-border/60 border-dashed bg-card/30 p-5 min-h-[160px] flex flex-col justify-center opacity-50"
         >
-          <div className="mb-2">
+          <button
+            type="button"
+            className={`mb-2 text-left ${spinning ? "animate-spin" : ""} ${
+              isChamp ? "cursor-pointer" : "cursor-default"
+            }`}
+            aria-label={
+              isChamp
+                ? "Championship hardware — not awarded this season yet"
+                : undefined
+            }
+            tabIndex={isChamp ? 0 : -1}
+            onClick={() => {
+              if (isChamp) onChampTap(spinId);
+            }}
+          >
             <HardwareTrophyIcon
               kind={
                 t.startsWith("division_")
@@ -226,7 +282,7 @@ export default function TrophyRoomPage() {
               size={52}
               empty
             />
-          </div>
+          </button>
           <div className="text-xs uppercase tracking-wide text-muted">
             {t.startsWith("division_")
               ? divisionDisplayLabel(
@@ -235,7 +291,13 @@ export default function TrophyRoomPage() {
                 )
               : m.short}
           </div>
-          <p className="text-sm text-muted mt-1">Not yet · auto when ready</p>
+          <p className="text-sm text-muted mt-1">
+            {y === year && isChamp
+              ? vonnaggio
+                ? "Current season · grey until someone takes the gold"
+                : "Current season · not yet"
+              : "Not yet · auto when ready"}
+          </p>
         </div>
       );
     }
@@ -263,16 +325,28 @@ export default function TrophyRoomPage() {
         className={`rounded-xl border ${m.border} bg-gradient-to-b from-card to-black/40 p-5 min-h-[160px] ${m.glow} relative`}
       >
         <div className="flex items-start justify-between gap-2 mb-2">
-          <HardwareTrophyIcon
-            kind={
-              t.startsWith("division_")
-                ? "championship"
-                : (t as "championship" | "toilet_bowl" | "crystal_ball")
-            }
-            sportId={sportId}
-            size={76}
-            animate
-          />
+          <button
+            type="button"
+            className={`text-left ${spinning ? "animate-spin" : ""} ${
+              isChamp ? "cursor-pointer" : "cursor-default"
+            }`}
+            aria-label={isChamp ? "Championship trophy" : undefined}
+            tabIndex={isChamp ? 0 : -1}
+            onClick={() => {
+              if (isChamp) onChampTap(spinId);
+            }}
+          >
+            <HardwareTrophyIcon
+              kind={
+                t.startsWith("division_")
+                  ? "championship"
+                  : (t as "championship" | "toilet_bowl" | "crystal_ball")
+              }
+              sportId={sportId}
+              size={76}
+              animate={!spinning && isChamp}
+            />
+          </button>
           <div className="flex items-center gap-1.5">
             <TrophyShareButton compact trophy={sharePayload} />
             {canSync && (

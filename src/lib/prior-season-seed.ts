@@ -86,6 +86,43 @@ export const NFL_PRIOR_SEASON_SEEDS: SeedRow[] = [
   },
 ];
 
+/**
+ * Vonnaggio Family Vacation — same Maria 2025 plaque, gold family hardware lore.
+ * (Art is league-overridden separately; copy lives here.)
+ */
+export function decorateNflPriorForLeague(
+  trophies: LeagueTrophy[],
+  leagueName?: string | null,
+  leagueId?: string | null
+): LeagueTrophy[] {
+  let vonnaggio = false;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { isVonnaggioLeague } =
+      require("./league-trophy-override") as typeof import("./league-trophy-override");
+    vonnaggio = isVonnaggioLeague(leagueName, leagueId);
+  } catch {
+    vonnaggio = false;
+  }
+  if (!vonnaggio) return trophies;
+  return trophies.map((t) => {
+    if (
+      t.seasonYear !== PRIOR_SEASON_YEAR ||
+      t.trophyType !== "championship"
+    ) {
+      return t;
+    }
+    return {
+      ...t,
+      subtitle: `Vonnaggio Champion · ${NFL_PRIOR_SEASON_LABEL}`,
+      notes:
+        `Family Vacation gold hardware · ${NFL_PRIOR_SEASON_LABEL}. ` +
+        `Same trophy from last year's fantasy board — Maria holds it until someone rips it off her. ` +
+        `Current season shelf stays empty (grey) until this year's champ is engraved.`,
+    };
+  });
+}
+
 /** @deprecated use getPriorSeasonSeeds — CFB Excel list (back-compat for share resolve) */
 export const ALL_PRIOR_SEASON_SEEDS = PRIOR_SEASON_2025_SEEDS;
 
@@ -209,7 +246,15 @@ export function mergePriorSeasonTrophies(
     });
   }
 
-  return out;
+  // Vonnaggio: Maria's plaque uses family-vacation gold hardware copy
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getLeague } = require("./league") as typeof import("./league");
+    const lg = getLeague();
+    return decorateNflPriorForLeague(out, lg?.name, lg?.id);
+  } catch {
+    return out;
+  }
 }
 
 /**

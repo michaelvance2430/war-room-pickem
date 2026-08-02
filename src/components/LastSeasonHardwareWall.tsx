@@ -3,9 +3,12 @@
 /**
  * Always-on wall for last season’s hardware.
  * CFB: Kahmann · Strayer · Big Ball Ben (2025–26 Excel).
- * NFL: Maria Super Bowl (2025).
+ * NFL: Maria Super Bowl (2025) — Vonnaggio shows gold family hardware.
+ *
+ * Championship art is tappable (5 consecutive taps → easter egg in Vonnaggio).
  */
 
+import { useState } from "react";
 import Link from "next/link";
 import {
   getPriorSeasonLabel,
@@ -16,7 +19,12 @@ import { TROPHY_META } from "@/lib/trophies";
 import HardwareTrophyIcon from "@/components/HardwareTrophyIcon";
 import PlayerLink from "@/components/PlayerLink";
 import { resolveLiveTrophyHolder } from "@/lib/trophy-share";
-import { getLeague } from "@/lib/league";
+import { getLeague, getSession } from "@/lib/league";
+import {
+  EVENT_EASTER_EGG,
+  recordTrophyTap,
+} from "@/lib/easter-eggs";
+import { isVonnaggioLeague } from "@/lib/league-trophy-override";
 
 type RosterHit = {
   userId: string;
@@ -38,6 +46,10 @@ export default function LastSeasonHardwareWall({
   const sid = sportId ?? getLeague()?.sportId ?? "cfb";
   const label = getPriorSeasonLabel(sid);
   const year = PRIOR_SEASON_YEAR;
+  const league = getLeague();
+  const vonnaggio = isVonnaggioLeague(league?.name, league?.id);
+  const [spinKey, setSpinKey] = useState<string | null>(null);
+
   const lastYear = plaques
     .filter((t) => t.seasonYear === year)
     .filter((t) =>
@@ -52,11 +64,33 @@ export default function LastSeasonHardwareWall({
 
   const isNfl = sid === "nfl";
 
+  function onChampTap(key: string) {
+    setSpinKey(key);
+    window.setTimeout(() => setSpinKey(null), 900);
+    const pid = getSession()?.playerId;
+    if (!pid) return;
+    const moment = recordTrophyTap(pid, {
+      leagueName: league?.name,
+      leagueId: league?.id,
+    });
+    if (moment) {
+      try {
+        window.dispatchEvent(
+          new CustomEvent(EVENT_EASTER_EGG, { detail: moment })
+        );
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
   return (
     <section
       className={`mb-8 rounded-2xl border-2 p-4 sm:p-5 ${
         isNfl
-          ? "border-red-500/40 bg-gradient-to-br from-red-950/50 via-black/60 to-card"
+          ? vonnaggio
+            ? "border-amber-400/50 bg-gradient-to-br from-amber-950/50 via-black/60 to-card"
+            : "border-red-500/40 bg-gradient-to-br from-red-950/50 via-black/60 to-card"
           : "border-amber-400/45 bg-gradient-to-br from-amber-500/15 via-black/50 to-card"
       }`}
     >
@@ -64,24 +98,30 @@ export default function LastSeasonHardwareWall({
         <div>
           <p
             className={`text-[10px] font-black uppercase tracking-[0.2em] ${
-              isNfl ? "text-red-300" : "text-amber-300"
+              isNfl && !vonnaggio ? "text-red-300" : "text-amber-300"
             }`}
           >
             Last season · on the wall forever
           </p>
           <h2 className="text-lg sm:text-xl font-extrabold text-foreground mt-0.5">
-            {isNfl ? `${label} Super Bowl hardware` : `${label} Excel season`}
+            {isNfl
+              ? vonnaggio
+                ? `${label} Family Vacation hardware`
+                : `${label} Super Bowl hardware`
+              : `${label} Excel season`}
           </h2>
           <p className="text-xs text-muted mt-1 max-w-lg leading-relaxed">
             {isNfl
-              ? "Defending Super Bowl champ of this room. Season reset does not take this down."
+              ? vonnaggio
+                ? "Maria’s gold form — last year’s fantasy hardware, now on this board. Current season stays grey until a new champ."
+                : "Defending Super Bowl champ of this room. Season reset does not take this down."
               : "Full prior campaign — Champion, Toilet Bowl, Village Nerd. Not optional. Not a sticker."}
           </p>
         </div>
         <Link
           href="/trophy-room"
           className={`text-[11px] font-bold underline shrink-0 ${
-            isNfl ? "text-red-200" : "text-amber-200"
+            isNfl && !vonnaggio ? "text-red-200" : "text-amber-200"
           }`}
         >
           Full Trophy Room →
@@ -108,23 +148,45 @@ export default function LastSeasonHardwareWall({
             t.trophyType === "crystal_ball"
               ? t.trophyType
               : "championship";
+          const isChamp = kind === "championship";
+          const spinning = spinKey === t.id;
           return (
             <div
               key={t.id}
               className={`rounded-xl border bg-black/40 px-3.5 py-3.5 min-h-[140px] flex flex-col ${
-                isNfl ? "border-red-400/30" : "border-amber-400/30"
+                isNfl && !vonnaggio
+                  ? "border-red-400/30"
+                  : "border-amber-400/30"
               }`}
             >
               <div className="flex items-start justify-between gap-2 mb-2">
-                <HardwareTrophyIcon
-                  kind={kind}
-                  sportId={sid}
-                  size={48}
-                  animate={kind === "championship"}
-                />
+                <button
+                  type="button"
+                  className={`text-left ${spinning ? "animate-spin" : ""} ${
+                    isChamp ? "cursor-pointer" : "cursor-default"
+                  }`}
+                  aria-label={
+                    isChamp
+                      ? "Championship trophy — tap five times in a row"
+                      : undefined
+                  }
+                  tabIndex={isChamp ? 0 : -1}
+                  onClick={() => {
+                    if (isChamp) onChampTap(t.id);
+                  }}
+                >
+                  <HardwareTrophyIcon
+                    kind={kind}
+                    sportId={sid}
+                    size={48}
+                    animate={isChamp && !spinning}
+                  />
+                </button>
                 <span
                   className={`text-[9px] font-bold uppercase tracking-wider ${
-                    isNfl ? "text-red-300/80" : "text-amber-300/80"
+                    isNfl && !vonnaggio
+                      ? "text-red-300/80"
+                      : "text-amber-300/80"
                   }`}
                 >
                   {year}

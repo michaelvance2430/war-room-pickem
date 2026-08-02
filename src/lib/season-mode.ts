@@ -26,6 +26,7 @@ export const SANDBOX_PROTECTED_BADGE_IDS = new Set([
   // Easter eggs stick in sandbox (local + cloud when SQL is live)
   "egg_anniversary",
   "egg_curiosity_trophy",
+  "egg_vonnaggio_gold",
   "egg_hidden_headline",
   "egg_leap_day",
   "egg_birthday",

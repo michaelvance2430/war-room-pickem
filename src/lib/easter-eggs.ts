@@ -74,6 +74,16 @@ export const DISCOVERY_CATALOG: DiscoveryDef[] = [
     stampLabel: "Curious hands",
   },
   {
+    id: "egg_vonnaggio_gold",
+    name: "Family Vacation Gold",
+    description: "You woke the gold form in Vonnaggio Family Vacation.",
+    flavor:
+      "Five taps on the family hardware. Same trophy from last year's fantasy board — now it lives here. Zero points. Infinite lore.",
+    kind: "secret_tap",
+    icon: "🥇",
+    stampLabel: "Vonnaggio gold",
+  },
+  {
     id: "egg_hidden_headline",
     name: "Ink Stain",
     description: "You caught a Gazette that shouldn't exist.",
@@ -893,10 +903,16 @@ export function noteAppOpen(opts: {
  * Type 2 — championship trophy multi-tap.
  * Must be 5 *consecutive* taps (within ~1.5s of each other).
  * Pausing resets the streak — not a lifetime “5 clicks ever” log.
+ *
+ * Vonnaggio Family Vacation: grants Family Vacation Gold (league-only lore).
+ * Everywhere else: Curiosity Didn't Kill the Cat.
  */
 const TROPHY_TAP_WINDOW_MS = 1500;
 
-export function recordTrophyTap(playerId: string): EasterEggMoment | null {
+export function recordTrophyTap(
+  playerId: string,
+  opts?: { leagueName?: string | null; leagueId?: string | null }
+): EasterEggMoment | null {
   if (!playerId) return null;
   const state = getEggState(playerId);
   const now = Date.now();
@@ -908,10 +924,41 @@ export function recordTrophyTap(playerId: string): EasterEggMoment | null {
   }
   state.lastTrophyTapAt = now;
   saveEggState(playerId, state);
-  if (state.trophyTaps >= 5 && !hasDiscovery(playerId, "egg_curiosity_trophy")) {
-    state.trophyTaps = 0;
-    state.lastTrophyTapAt = null;
-    saveEggState(playerId, state);
+  if (state.trophyTaps < 5) return null;
+
+  state.trophyTaps = 0;
+  state.lastTrophyTapAt = null;
+  saveEggState(playerId, state);
+
+  let vonnaggio = false;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { isVonnaggioLeague } =
+      require("./league-trophy-override") as typeof import("./league-trophy-override");
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getLeague } = require("./league") as typeof import("./league");
+    const lg = getLeague();
+    vonnaggio = isVonnaggioLeague(
+      opts?.leagueName ?? lg?.name,
+      opts?.leagueId ?? lg?.id
+    );
+  } catch {
+    vonnaggio = false;
+  }
+
+  if (vonnaggio && !hasDiscovery(playerId, "egg_vonnaggio_gold")) {
+    grantDiscovery(playerId, "egg_vonnaggio_gold", { silent: true });
+    return {
+      id: "egg_vonnaggio_gold",
+      title: "Family Vacation Gold",
+      body:
+        "Five taps on the gold form. Same hardware from last year's fantasy board — Maria's shelf, the Museum, the room. Zero points. The family remembers.",
+      icon: "🥇",
+      confetti: true,
+    };
+  }
+
+  if (!hasDiscovery(playerId, "egg_curiosity_trophy")) {
     grantDiscovery(playerId, "egg_curiosity_trophy", { silent: true });
     return {
       id: "egg_curiosity_trophy",
