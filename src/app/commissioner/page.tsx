@@ -3877,10 +3877,19 @@ function CommissionerPageInner() {
                           const kick = formatKickoff(
                             g.commenceTime || g.startTime
                           );
-                          const favLabel = formatRankedTeam(
-                            g.favorite === "home" ? g.homeTeam : g.awayTeam,
-                            g.favorite === "home" ? g.homeRank : g.awayRank
-                          );
+                          const favName =
+                            g.favorite === "home" ? g.homeTeam : g.awayTeam;
+                          const favRank =
+                            g.favorite === "home" ? g.homeRank : g.awayRank;
+                          // Short mascot-ish for spread chip (phone width)
+                          const favShort =
+                            (favName || "")
+                              .replace(/^#\d+\s*/, "")
+                              .trim()
+                              .split(/\s+/)
+                              .slice(-1)[0] || favName;
+                          const spreadNum =
+                            g.spread < 0 ? g.spread : -Math.abs(g.spread);
                           // NFL → AFC/NFC divisions; CFB → NCAA conferences
                           // (never run FBS matcher on NFL — Pittsburgh → ACC, etc.)
                           const confLine =
@@ -3898,6 +3907,14 @@ function CommissionerPageInner() {
                             g.homeRank
                           );
                           const rankBadge = rankedMatchupBadge(rankTier);
+                          const titleTone =
+                            rankTier === "legendary"
+                              ? "text-amber-100"
+                              : rankTier === "top25"
+                                ? "text-violet-100"
+                                : rankTier === "ranked"
+                                  ? "text-emerald-100"
+                                  : "text-foreground";
                           return (
                             <button
                               key={g.id}
@@ -3908,51 +3925,55 @@ function CommissionerPageInner() {
                                 { selected }
                               )}`}
                             >
-                              <div className="flex justify-between items-start gap-2">
-                                <div className="min-w-0">
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    {selected && (
-                                      <span className="text-[10px] font-extrabold uppercase tracking-wide text-black bg-primary px-1.5 py-0.5 rounded shrink-0">
-                                        ✓ On card
-                                      </span>
-                                    )}
-                                    <div
-                                      className={`font-medium truncate ${
-                                        rankTier === "legendary"
-                                          ? "text-amber-100"
-                                          : rankTier === "top25"
-                                            ? "text-violet-100"
-                                            : rankTier === "ranked"
-                                              ? "text-emerald-100"
-                                              : ""
-                                      }`}
-                                    >
-                                      {formatRankedTeam(g.awayTeam, g.awayRank)}{" "}
-                                      @{" "}
-                                      {formatRankedTeam(g.homeTeam, g.homeRank)}
-                                    </div>
-                                    {rankBadge && (
-                                      <span className={rankBadge.className}>
-                                        {rankBadge.label}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="text-xs text-primary mt-0.5">
-                                    {kick.full}
-                                  </div>
-                                  <div className="text-[11px] text-muted mt-0.5">
-                                    {confLine}
-                                    {g.bookmaker
-                                      ? `${confLine ? " • " : ""}${g.bookmaker}`
-                                      : ""}
-                                  </div>
+                              {/* Phone: stack both teams full-width — no single-line truncate */}
+                              <div className="flex items-start justify-between gap-2 mb-1.5">
+                                <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                                  {selected && (
+                                    <span className="text-[10px] font-extrabold uppercase tracking-wide text-black bg-primary px-1.5 py-0.5 rounded shrink-0">
+                                      ✓ On card
+                                    </span>
+                                  )}
+                                  {rankBadge && (
+                                    <span className={rankBadge.className}>
+                                      {rankBadge.label}
+                                    </span>
+                                  )}
                                 </div>
-                                <span className="text-sm text-primary shrink-0 font-semibold">
-                                  {favLabel}{" "}
-                                  {g.spread < 0
-                                    ? g.spread
-                                    : `-${Math.abs(g.spread)}`}
+                                <span
+                                  className="shrink-0 text-xs sm:text-sm font-bold text-primary tabular-nums bg-primary/10 border border-primary/25 rounded-lg px-2 py-1"
+                                  title={formatRankedTeam(favName, favRank)}
+                                >
+                                  <span className="hidden sm:inline">
+                                    {formatRankedTeam(favName, favRank)}{" "}
+                                  </span>
+                                  <span className="sm:hidden">
+                                    {favRank ? `#${favRank} ` : ""}
+                                    {favShort}{" "}
+                                  </span>
+                                  {spreadNum}
                                 </span>
+                              </div>
+                              <div
+                                className={`space-y-0.5 font-semibold leading-snug ${titleTone}`}
+                              >
+                                <p className="text-[13px] sm:text-sm break-words">
+                                  {formatRankedTeam(g.awayTeam, g.awayRank)}
+                                </p>
+                                <p className="text-[13px] sm:text-sm break-words">
+                                  <span className="text-muted font-medium">
+                                    @{" "}
+                                  </span>
+                                  {formatRankedTeam(g.homeTeam, g.homeRank)}
+                                </p>
+                              </div>
+                              <div className="text-xs text-primary mt-1.5">
+                                {kick.full}
+                              </div>
+                              <div className="text-[11px] text-muted mt-0.5">
+                                {confLine}
+                                {g.bookmaker
+                                  ? `${confLine ? " · " : ""}${g.bookmaker}`
+                                  : ""}
                               </div>
                             </button>
                           );
