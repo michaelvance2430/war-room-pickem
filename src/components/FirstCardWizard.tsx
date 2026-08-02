@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * First-time Commish: one-tap demo week, or full tools.
- * Shown when the active week has no published card yet.
+ * First-time Commish: live path only (Pull Odds → pick 5 → publish).
+ * Demo/fake week tools live in Foundry for the shop — not here.
  */
 
 type Props = {
@@ -12,13 +12,14 @@ type Props = {
   busy?: boolean;
   /** True after a successful publish this session for the week */
   cardPublished?: boolean;
-  /** One tap: demo slate + prop + publish + bots */
-  onDemoPublish: () => void;
-  /** Load fake games only (power path) */
-  onDemo?: () => void;
   /** Manual publish after draft selection */
   onPublish?: () => void;
+  /** Jump past wizard to full Build Card tools */
   onDismiss?: () => void;
+  /** Optional Foundry-only demo publish (hidden for real hosts) */
+  showLabDemo?: boolean;
+  onDemoPublish?: () => void;
+  onDemo?: () => void;
 };
 
 export default function FirstCardWizard({
@@ -27,10 +28,11 @@ export default function FirstCardWizard({
   hasProp,
   busy,
   cardPublished,
-  onDemoPublish,
-  onDemo,
   onPublish,
   onDismiss,
+  showLabDemo,
+  onDemoPublish,
+  onDemo,
 }: Props) {
   return (
     <section className="rounded-xl border-2 border-primary/50 bg-primary/10 p-4 sm:p-5 mb-6 space-y-4">
@@ -40,13 +42,16 @@ export default function FirstCardWizard({
             First card wizard
           </p>
           <h2 className="text-lg font-bold text-foreground mt-0.5">
-            Get {weekLabel} live in one tap
+            Get {weekLabel} live
           </h2>
           <p className="text-xs text-muted mt-1 leading-relaxed">
-            First time?{" "}
-            <strong className="text-foreground">Publish demo week</strong>{" "}
-            drops 5 fake games, a prop, and bot picks — zero odds credits. Real
-            lines later when you want them.
+            Three real steps:{" "}
+            <strong className="text-foreground">Pull Odds</strong>
+            {" → "}
+            <strong className="text-foreground">pick 5 games</strong>
+            {" → "}
+            <strong className="text-foreground">Publish</strong>
+            . Friends pick on My Picks. You score when the games die.
           </p>
         </div>
         {onDismiss && (
@@ -55,53 +60,69 @@ export default function FirstCardWizard({
             onClick={onDismiss}
             className="text-[11px] text-muted hover:text-foreground shrink-0"
           >
-            Use full tools
+            Open full tools
           </button>
         )}
       </div>
 
-      <button
-        type="button"
-        disabled={busy || cardPublished}
-        onClick={onDemoPublish}
-        className="w-full py-3.5 rounded-xl bg-primary text-black text-base font-bold disabled:opacity-50 min-h-[48px]"
-      >
-        {busy
-          ? "Publishing demo…"
-          : cardPublished
-            ? `${weekLabel} live ✓`
-            : "Publish demo week"}
-      </button>
+      <ol className="text-sm text-foreground/90 space-y-2 list-decimal list-inside leading-relaxed">
+        <li>
+          Tap <strong className="text-primary">Pull Odds</strong> for this week
+        </li>
+        <li>Select 5 games (and a prop if you want one)</li>
+        <li>
+          Hit <strong className="text-primary">Publish</strong> so the room can
+          lock picks
+        </li>
+      </ol>
+
+      {onPublish && (
+        <button
+          type="button"
+          disabled={busy || cardPublished || !hasDraftGames}
+          onClick={onPublish}
+          className="w-full py-3.5 rounded-xl bg-primary text-black text-base font-bold disabled:opacity-50 min-h-[48px]"
+        >
+          {busy
+            ? "Publishing…"
+            : cardPublished
+              ? `${weekLabel} live ✓`
+              : hasDraftGames
+                ? hasProp
+                  ? `Publish ${weekLabel} card`
+                  : `Publish ${weekLabel} (default prop)`
+                : "Pull Odds & pick 5 first"}
+        </button>
+      )}
       <p className="text-[11px] text-muted text-center leading-relaxed">
-        Then open <strong className="text-foreground">Enter Results</strong> →{" "}
-        <strong className="text-foreground">Score (practice)</strong> — one
-        tap. Advanced tools unlock after that.
+        After kickoffs, open <strong className="text-foreground">Enter Results</strong>{" "}
+        → Sync final scores → Save &amp; Score.
       </p>
 
-      {(onDemo || onPublish) && (
-        <details className="rounded-lg border border-border bg-background/60 px-3 py-2">
-          <summary className="text-[11px] font-semibold text-muted cursor-pointer select-none">
-            Prefer manual steps?
+      {showLabDemo && (onDemoPublish || onDemo) && (
+        <details className="rounded-lg border border-warning/40 bg-warning/5 px-3 py-2">
+          <summary className="text-[11px] font-semibold text-warning cursor-pointer select-none">
+            Foundry lab · fake week tools
           </summary>
           <div className="mt-2 space-y-2">
+            {onDemoPublish && (
+              <button
+                type="button"
+                disabled={busy || cardPublished}
+                onClick={onDemoPublish}
+                className="w-full px-3 py-2 rounded-lg bg-warning text-black text-sm font-bold disabled:opacity-50"
+              >
+                {busy ? "Publishing demo…" : "Publish demo week"}
+              </button>
+            )}
             {onDemo && (
               <button
                 type="button"
                 disabled={busy || hasDraftGames}
                 onClick={onDemo}
-                className="w-full px-3 py-2 rounded-lg border border-border text-sm font-medium disabled:opacity-50"
+                className="w-full px-3 py-2 rounded-lg border border-warning text-warning text-sm font-medium disabled:opacity-50"
               >
-                {hasDraftGames ? "Games loaded ✓" : "1. Generate demo slate only"}
-              </button>
-            )}
-            {onPublish && (
-              <button
-                type="button"
-                disabled={busy || !hasDraftGames}
-                onClick={onPublish}
-                className="w-full px-3 py-2 rounded-lg border border-primary/40 text-sm font-semibold disabled:opacity-50"
-              >
-                {hasProp ? "2. Publish card" : "2. Publish card (default prop)"}
+                {hasDraftGames ? "Games loaded ✓" : "Generate demo slate only"}
               </button>
             )}
           </div>

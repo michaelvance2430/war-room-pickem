@@ -21,6 +21,32 @@ export function isFoundrySessionSticky(): boolean {
 }
 
 /**
+ * Demo slate / randomize & score / auto-score / hop bar — shop tools only.
+ * Regular commiss get Pull Odds → publish → Sync scores (Foundry owns fakes).
+ */
+export function showCommishLabTools(): boolean {
+  if (typeof window === "undefined") return false;
+  const uid = getSession()?.playerId;
+  if (isAppCreator(uid)) return true;
+  if (isFoundrySessionSticky()) return true;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const eyes = require("./creator-eyes") as typeof import("./creator-eyes");
+    if (eyes.isCreatorEyesActive()) return true;
+  } catch {
+    /* ok */
+  }
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const sb = require("./creator-sandbox") as typeof import("./creator-sandbox");
+    if (sb.isCreatorSandboxActive()) return true;
+  } catch {
+    /* ok */
+  }
+  return false;
+}
+
+/**
  * Allow Gazette / cheevo / ceremony popups while testing Foundry.
  * Quiet first-hour eyes (new player / new host) stay calm.
  */

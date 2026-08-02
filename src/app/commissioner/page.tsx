@@ -101,6 +101,7 @@ import {
   PRESEASON_COMMISH_TOOLS_TITLE,
   preseasonCommishToolsBody,
 } from "@/lib/season-mode";
+import { showCommishLabTools } from "@/lib/foundry-preview";
 import { getSeasonOpenLabel } from "@/lib/season-countdown";
 import {
   SIMPLE_BOT_FILL_TARGET,
@@ -281,6 +282,10 @@ function CommissionerPageInner() {
   /** Real season: explain why demo/bot/auto-score tools are locked. */
   const [preseasonToolsPopup, setPreseasonToolsPopup] = useState(false);
   const preseasonToolsOk = isPreseasonCommishToolsAllowed();
+  /** Foundry / app creator only — regular commiss never see fake-week toys */
+  const [labTools, setLabTools] = useState(false);
+  /** Lab + preseason: randomize/demo/auto-score allowed to run */
+  const practiceTools = labTools && preseasonToolsOk;
   /** How many bots to add (not total roster). Default 6 = common “round out to ~16”. */
   const [botAddCount, setBotAddCount] = useState(6);
   const [rosterCount, setRosterCount] = useState<number | null>(null);
@@ -316,6 +321,11 @@ function CommissionerPageInner() {
       const ops = isOps();
       setIsOwner(owner);
       setAllowed(ops);
+      try {
+        setLabTools(showCommishLabTools());
+      } catch {
+        setLabTools(false);
+      }
       if (!ops) return;
 
       const lg = (await syncLeagueFromCloud()) || getLeague();
@@ -810,7 +820,9 @@ function CommissionerPageInner() {
         remaining,
         used,
         last,
-      } = await fetchFootballOdds(sport, activeWeek, { dryRun: dryRunOdds });
+      } = await fetchFootballOdds(sport, activeWeek, {
+        dryRun: labTools && dryRunOdds,
+      });
       applyOddsQuota({ remaining, used, last });
       setRankLabel(pollLabel || null);
       if (!games.length) {
@@ -820,10 +832,10 @@ function CommissionerPageInner() {
         const label = sport === "nfl" ? "NFL" : "NCAA FBS";
         setOddsError(
           dryRun
-            ? `No open ${label} games with spreads right now (dry run). Use Generate demo slate instead.`
+            ? `No open ${label} games with spreads right now (dry-run pull). Try again later or turn off dry run.`
             : unfilteredCount && unfilteredCount > 0
-              ? `No ${label} games with spreads in the ${weekTitle(activeWeek)} window (${range}). Use Generate demo slate for a full fake season.`
-              : `No real ${label} lines for ${weekTitle(activeWeek)}. Use Generate demo slate to simulate.`
+              ? `No ${label} games with spreads in the ${weekTitle(activeWeek)} window (${range}). Try another week or check back closer to kickoff.`
+              : `No real ${label} lines for ${weekTitle(activeWeek)} yet. Odds usually appear closer to the week — try again later.`
         );
         return;
       }
@@ -848,8 +860,12 @@ function CommissionerPageInner() {
     }
   }
 
-  /** Show locked-tool popup when real season has started; returns true if pre-season tools may run. */
+  /**
+   * Lab tools only (Foundry / creator). Regular commiss never reach these buttons.
+   * When lab is open but season is live, explain pre-season lock.
+   */
   function requirePreseasonTools(): boolean {
+    if (!showCommishLabTools()) return false;
     if (isPreseasonCommishToolsAllowed()) return true;
     setPreseasonToolsPopup(true);
     return false;
@@ -2304,7 +2320,7 @@ function CommissionerPageInner() {
           <p className="text-sm text-muted">
             {isOwner
               ? firstTime
-                ? "Invite → publish a card (demo is fine) → score once. Advanced tools unlock after."
+                ? "Invite → Pull Odds → pick 5 → publish → score when games die."
                 : "Settings · Build card · Who\u2019s in · Results"
               : "Build card · Who\u2019s in · Results (settings stay with the commish)"}
           </p>
@@ -2320,8 +2336,8 @@ function CommissionerPageInner() {
                 <strong className="text-primary">Who&apos;s in</strong>
                 {" · "}
                 <strong className="text-primary">Enter Results</strong>
-                . Demo slate costs zero odds credits. Settings stay buried until
-                you score a week.
+                . Live odds only — fake weeks live in Foundry for the shop.
+                Settings stay buried until you score a week.
               </p>
             </div>
           )}
@@ -2482,8 +2498,8 @@ function CommissionerPageInner() {
                 </p>
               </div>
             )}
-            {/* Optional sandbox hop — never auto-on from Build card / Host visit */}
-            <SandboxHopOptIn />
+            {/* Foundry / creator only — not for regular room commiss */}
+            {labTools && <SandboxHopOptIn />}
             {/* Multi-sport pool after first week — not day-one noise */}
             {!simpleHost && <SportPoolCommishPanel />}
 
@@ -3422,31 +3438,40 @@ function CommissionerPageInner() {
                   hasProp={!!(prop?.question?.trim())}
                   busy={demoBusy}
                   cardPublished={cardSaved && publishedGames.length > 0}
-                  onDemoPublish={() => void publishDemoWeek()}
-                  onDemo={() => {
-                    generateDemoCard();
-                    try {
-                      const lid = getSession()?.leagueId || getLeague()?.id;
-                      if (lid) markPracticeWeekDone(lid);
-                    } catch {
-                      /* ignore */
-                    }
-                  }}
+                  showLabDemo={labTools}
+                  onDemoPublish={
+                    labTools ? () => void publishDemoWeek() : undefined
+                  }
+                  onDemo={
+                    labTools
+                      ? () => {
+                          generateDemoCard();
+                          try {
+                            const lid =
+                              getSession()?.leagueId || getLeague()?.id;
+                            if (lid) markPracticeWeekDone(lid);
+                          } catch {
+                            /* ignore */
+                          }
+                        }
+                      : undefined
+                  }
                   onPublish={() => void publishCard()}
                   onDismiss={() => setShowFirstWizard(false)}
                 />
               )}
-            {/* First hour: wizard only — full Build Card after publish or “Use full tools” */}
-            {showFirstWizard &&
+            {/* Lab only: wall off full tools behind demo wizard. Real commiss always see Pull Odds. */}
+            {labTools &&
+              showFirstWizard &&
               publishedGames.length === 0 &&
               (firstTime || searchParams.get("first") === "1") && (
                 <p className="text-xs text-muted mb-6 leading-relaxed text-center">
-                  Full odds tools stay hidden until you publish a card or tap{" "}
-                  <strong className="text-foreground">Use full tools</strong>{" "}
-                  above. Keep the first hour simple.
+                  Lab: full odds tools stay hidden until you publish or tap{" "}
+                  <strong className="text-foreground">Open full tools</strong>.
                 </p>
               )}
             {!(
+              labTools &&
               showFirstWizard &&
               publishedGames.length === 0 &&
               (firstTime || searchParams.get("first") === "1")
@@ -3577,42 +3602,46 @@ function CommissionerPageInner() {
                     )}
                   </p>
                 </div>
-                <div className="flex flex-wrap gap-2 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => void publishDemoWeek()}
-                    disabled={demoBusy}
-                    aria-disabled={!preseasonToolsOk}
-                    className={`px-4 py-2 rounded-lg bg-warning text-black text-sm font-bold hover:bg-warning/90 disabled:opacity-50 ${
-                      !preseasonToolsOk ? "opacity-45" : ""
-                    }`}
-                    title={
-                      preseasonToolsOk
-                        ? "One tap: fake 5 games + prop + publish + bots pick"
-                        : "Pre-season practice only — tap for why"
-                    }
-                  >
-                    {demoBusy
-                      ? "Publishing demo…"
-                      : preseasonToolsOk
-                        ? "Publish demo week"
-                        : "Publish demo week (locked)"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={generateDemoCard}
-                    aria-disabled={!preseasonToolsOk}
-                    className={`px-4 py-2 rounded-lg border border-warning text-warning text-sm font-semibold hover:bg-warning/10 ${
-                      !preseasonToolsOk ? "opacity-45" : ""
-                    }`}
-                    title={
-                      preseasonToolsOk
-                        ? "Load fake games only — then edit / Publish manually"
-                        : "Pre-season practice only — tap for why"
-                    }
-                  >
-                    Generate demo slate
-                  </button>
+                                <div className="flex flex-wrap gap-2 shrink-0">
+                  {labTools && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => void publishDemoWeek()}
+                        disabled={demoBusy}
+                        aria-disabled={!preseasonToolsOk}
+                        className={`px-4 py-2 rounded-lg bg-warning text-black text-sm font-bold hover:bg-warning/90 disabled:opacity-50 ${
+                          !preseasonToolsOk ? "opacity-45" : ""
+                        }`}
+                        title={
+                          preseasonToolsOk
+                            ? "Foundry: fake 5 games + prop + publish + bots"
+                            : "Pre-season lab only — tap for why"
+                        }
+                      >
+                        {demoBusy
+                          ? "Publishing demo…"
+                          : preseasonToolsOk
+                            ? "Publish demo week"
+                            : "Publish demo week (locked)"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={generateDemoCard}
+                        aria-disabled={!preseasonToolsOk}
+                        className={`px-4 py-2 rounded-lg border border-warning text-warning text-sm font-semibold hover:bg-warning/10 ${
+                          !preseasonToolsOk ? "opacity-45" : ""
+                        }`}
+                        title={
+                          preseasonToolsOk
+                            ? "Foundry: load fake games only"
+                            : "Pre-season lab only — tap for why"
+                        }
+                      >
+                        Generate demo slate
+                      </button>
+                    </>
+                  )}
                   <button
                     type="button"
                     onClick={() => void pullOdds()}
@@ -3623,69 +3652,64 @@ function CommissionerPageInner() {
                   </button>
                 </div>
               </div>
-              <div
-                className={`rounded-lg border px-3 py-2.5 mb-2 ${
-                  preseasonToolsOk
-                    ? "border-warning/40 bg-warning/5"
-                    : "border-border bg-background/60"
-                }`}
-              >
-                <p
-                  className={`text-xs font-semibold mb-0.5 ${
-                    preseasonToolsOk ? "text-warning" : "text-muted"
+              {labTools ? (
+                <div
+                  className={`rounded-lg border px-3 py-2.5 mb-2 ${
+                    preseasonToolsOk
+                      ? "border-warning/40 bg-warning/5"
+                      : "border-border bg-background/60"
                   }`}
                 >
-                  {preseasonToolsOk
-                    ? "Pre-season practice — minimal clicks"
-                    : `Pre-season tools locked · season open ${getSeasonOpenLabel(league?.sportId)}`}
-                </p>
-                <p className="text-[11px] text-muted leading-relaxed">
-                  {preseasonToolsOk ? (
-                    <>
-                      <strong className="text-foreground">
-                        Publish demo week
-                      </strong>{" "}
-                      = one tap (5 fake games + prop + bots). Then Enter Results
-                      →{" "}
-                      <strong className="text-foreground">
-                        Randomize &amp; score
-                      </strong>
-                      . Need many weeks? Use Auto-score range under Results.
-                    </>
-                  ) : (
-                    <>
-                      Demo weeks, trial bots, and auto-score were for learning
-                      the Commish role before doors opened. Tap a locked button
-                      for the full note. Live path: Pull Odds → publish → Sync
-                      final scores.
-                    </>
-                  )}
-                </p>
-              </div>
-              <label className="flex items-start gap-3 cursor-pointer rounded-lg border border-border bg-background px-3 py-2.5 mb-2">
-                <input
-                  type="checkbox"
-                  checked={dryRunOdds}
-                  onChange={(e) => {
-                    setDryRunOdds(e.target.checked);
-                    setAvailableGames([]);
-                    setSelectedIds(new Set());
-                    setOddsError(null);
-                  }}
-                  className="mt-0.5 accent-primary"
-                />
-                <span className="text-xs leading-relaxed">
-                  <span className="font-semibold text-foreground">
-                    Dry run: show all open real games
+                  <p
+                    className={`text-xs font-semibold mb-0.5 ${
+                      preseasonToolsOk ? "text-warning" : "text-muted"
+                    }`}
+                  >
+                    {preseasonToolsOk
+                      ? "Foundry lab · fake week tools"
+                      : `Lab fakes locked · season open ${getSeasonOpenLabel(league?.sportId)}`}
+                  </p>
+                  <p className="text-[11px] text-muted leading-relaxed">
+                    Demo / auto-score stay here for the shop. Room commiss only
+                    see Pull Odds → publish → Sync.
+                  </p>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-border bg-background/60 px-3 py-2.5 mb-2">
+                  <p className="text-xs font-semibold text-muted mb-0.5">
+                    Live card path
+                  </p>
+                  <p className="text-[11px] text-muted leading-relaxed">
+                    <strong className="text-foreground">Pull Odds</strong> →
+                    pick 5 → Publish. Later: Enter Results → Sync final scores
+                    → Save &amp; Score.
+                  </p>
+                </div>
+              )}
+              {labTools && (
+                <label className="flex items-start gap-3 cursor-pointer rounded-lg border border-border bg-background px-3 py-2.5 mb-2">
+                  <input
+                    type="checkbox"
+                    checked={dryRunOdds}
+                    onChange={(e) => {
+                      setDryRunOdds(e.target.checked);
+                      setAvailableGames([]);
+                      setSelectedIds(new Set());
+                      setOddsError(null);
+                    }}
+                    className="mt-0.5 accent-primary"
+                  />
+                  <span className="text-xs leading-relaxed">
+                    <span className="font-semibold text-foreground">
+                      Dry run: show all open real games
+                    </span>
+                    <span className="text-muted block mt-0.5">
+                      Foundry only. Pull Odds without week date filter.
+                    </span>
                   </span>
-                  <span className="text-muted block mt-0.5">
-                    Optional. Pull Odds without week date filter. Prefer{" "}
-                    <strong className="text-foreground">Generate demo slate</strong>{" "}
-                    if you just want fake games for testing.
-                  </span>
-                </span>
-              </label>
-              {oddsError && (
+                </label>
+              )}
+{oddsError && (
                 <p className="text-sm text-danger mt-2">{oddsError}</p>
               )}
               {availableGames.length > 0 &&
@@ -4398,8 +4422,8 @@ function CommissionerPageInner() {
                 Score this week
               </p>
               <p className="text-xs text-muted leading-relaxed">
-                {preseasonToolsOk
-                  ? "Practice: one tap randomizes covers + prop and scores the room."
+                {practiceTools
+                  ? "Foundry lab: one tap can randomize covers + prop and score."
                   : "Live: pull finals from the score feed, settle what we can, then score the league. Fix any gaps below if needed."}
               </p>
               <button
@@ -4423,12 +4447,12 @@ function CommissionerPageInner() {
                     );
                     return;
                   }
-                  if (preseasonToolsOk) {
+                  // Live path for everyone; Foundry lab may still use randomize
+                  if (practiceTools) {
                     if (!requirePreseasonTools()) return;
                     void randomizeAndScoreWeek();
                     return;
                   }
-                  // Live: sync + score when complete
                   void syncFinalScores(true);
                 }}
                 className="w-full py-4 min-h-[56px] rounded-xl bg-primary text-black text-base font-extrabold disabled:opacity-50 shadow-[0_0_24px_rgba(34,197,94,0.2)]"
@@ -4437,8 +4461,8 @@ function CommissionerPageInner() {
                   ? "Working…"
                   : resultsLocked
                     ? `${weekTitle(activeWeek)} already scored ✓`
-                    : preseasonToolsOk
-                      ? `Score ${weekTitle(activeWeek)} (practice)`
+                    : practiceTools
+                      ? `Score ${weekTitle(activeWeek)} (lab)`
                       : `Score ${weekTitle(activeWeek)}`}
               </button>
               {(scoreReport || syncReport) && (
@@ -4455,7 +4479,8 @@ function CommissionerPageInner() {
               </div>
             )}
 
-            {/* Advanced: sandbox auto-score + manual tools */}
+            {/* Foundry only: sandbox auto-score + manual lab tools */}
+            {labTools && (
             <details
               className={`rounded-xl border p-4 mb-6 ${
                 preseasonToolsOk
@@ -4464,7 +4489,7 @@ function CommissionerPageInner() {
               }`}
             >
               <summary className="text-sm font-semibold cursor-pointer text-muted">
-                Advanced scoring tools
+                Foundry · advanced scoring lab
               </summary>
             <div
               className={`mt-3 space-y-3 ${
@@ -4646,6 +4671,7 @@ function CommissionerPageInner() {
               )}
             </div>
             </details>
+            )}
 
             {/* Week picker for scoring */}
             <div className="rounded-xl border border-border bg-card p-5 mb-6">
@@ -4685,8 +4711,8 @@ function CommissionerPageInner() {
               </div>
               <p className="text-[11px] text-muted mt-3">
                 <span className="text-stone-400">Muted + diagonal</span> = week
-                already scored (still open to view; unlock to re-score). Dry-run:
-                publish → bot picks → results → score → next week.
+                already scored (still open to view; unlock only if you must
+                re-score).
               </p>
             </div>
 
@@ -4718,48 +4744,52 @@ function CommissionerPageInner() {
                   </p>
                 </div>
                 <div className="flex flex-col gap-2 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => void randomizeAndScoreWeek()}
-                    disabled={
-                      preseasonToolsOk &&
-                      (!publishedGames.length || resultsLocked || scoring)
-                    }
-                    className={`px-4 py-2 rounded-lg bg-warning text-black text-sm font-bold hover:bg-warning/90 disabled:opacity-50 ${
-                      !preseasonToolsOk ? "opacity-45" : ""
-                    }`}
-                    title={
-                      preseasonToolsOk
-                        ? "One tap: random covers + prop + score the league"
-                        : "Pre-season practice only — tap for why"
-                    }
-                  >
-                    {scoring
-                      ? "Scoring…"
-                      : !preseasonToolsOk
-                        ? "Randomize & score (locked)"
-                        : resultsLocked
-                          ? "Week scored ✓"
-                          : "Randomize & score"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={randomizeResultsForDryRun}
-                    disabled={
-                      preseasonToolsOk &&
-                      (!publishedGames.length || resultsLocked)
-                    }
-                    className={`px-4 py-2 rounded-lg border border-warning text-warning text-sm font-semibold hover:bg-warning/10 disabled:opacity-50 ${
-                      !preseasonToolsOk ? "opacity-45" : ""
-                    }`}
-                    title={
-                      preseasonToolsOk
-                        ? "Fill random covers only — then Save & Score yourself"
-                        : "Pre-season practice only — tap for why"
-                    }
-                  >
-                    Randomize results
-                  </button>
+                  {labTools && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => void randomizeAndScoreWeek()}
+                        disabled={
+                          preseasonToolsOk &&
+                          (!publishedGames.length || resultsLocked || scoring)
+                        }
+                        className={`px-4 py-2 rounded-lg bg-warning text-black text-sm font-bold hover:bg-warning/90 disabled:opacity-50 ${
+                          !preseasonToolsOk ? "opacity-45" : ""
+                        }`}
+                        title={
+                          preseasonToolsOk
+                            ? "Foundry: random covers + prop + score"
+                            : "Pre-season lab only — tap for why"
+                        }
+                      >
+                        {scoring
+                          ? "Scoring…"
+                          : !preseasonToolsOk
+                            ? "Randomize & score (locked)"
+                            : resultsLocked
+                              ? "Week scored ✓"
+                              : "Randomize & score"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={randomizeResultsForDryRun}
+                        disabled={
+                          preseasonToolsOk &&
+                          (!publishedGames.length || resultsLocked)
+                        }
+                        className={`px-4 py-2 rounded-lg border border-warning text-warning text-sm font-semibold hover:bg-warning/10 disabled:opacity-50 ${
+                          !preseasonToolsOk ? "opacity-45" : ""
+                        }`}
+                        title={
+                          preseasonToolsOk
+                            ? "Foundry: random covers only"
+                            : "Pre-season lab only — tap for why"
+                        }
+                      >
+                        Randomize results
+                      </button>
+                    </>
+                  )}
                   <button
                     type="button"
                     onClick={() => syncFinalScores(false)}
