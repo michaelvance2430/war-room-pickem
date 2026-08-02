@@ -12,6 +12,7 @@ import CrownAndShame from "@/components/CrownAndShame";
 import HomeWeekHero from "@/components/HomeWeekHero";
 import PlayerWeekChecklist from "@/components/PlayerWeekChecklist";
 import CommishSetupBanner from "@/components/CommishSetupBanner";
+import HomeCrewWhisper from "@/components/HomeCrewWhisper";
 import InviteFriends from "@/components/InviteFriends";
 import HomeUnseenPulse from "@/components/HomeUnseenPulse";
 import HomeGazetteSpotlight from "@/components/HomeGazetteSpotlight";
@@ -416,6 +417,7 @@ export default function Home() {
         <SandboxSimBanner />
 
         <HomeWeekHero />
+        <HomeCrewWhisper />
 
         {/* Pre–Week 0: sarcastic practice escape when nothing real is up */}
         <BoredLameSandboxCta />

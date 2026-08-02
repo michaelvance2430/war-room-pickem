@@ -199,6 +199,9 @@ export function markCrewRevealSeen(
 /**
  * Silent: create Crew + active chapter for a new (or existing) league.
  * Safe to call on create, join, and boot — idempotent.
+ *
+ * preferCrewId: attach this league as another chapter (sport 2) on the same Crew
+ * instead of inventing a second permanent group.
  */
 export function ensureCrewForLeague(opts: {
   leagueId: string;
@@ -206,8 +209,11 @@ export function ensureCrewForLeague(opts: {
   sportId?: string | null;
   createdBy?: string | null;
   foundedAt?: string | null;
+  /** Same friends, next sport — keep one Crew */
+  preferCrewId?: string | null;
 }): { crew: Crew; chapter: CrewChapter; created: boolean } {
   const s = readStore();
+  const sportId = (opts.sportId || "cfb").trim() || "cfb";
   const existingCrewId = s.leagueToCrew[opts.leagueId];
   if (existingCrewId && s.crews[existingCrewId]) {
     let chapter =
@@ -217,7 +223,7 @@ export function ensureCrewForLeague(opts: {
         id: uid("ch"),
         crewId: existingCrewId,
         leagueId: opts.leagueId,
-        sportId: (opts.sportId || "cfb").trim() || "cfb",
+        sportId,
         year: defaultSeasonYear(),
         status: "active",
         leagueName: opts.leagueName || s.crews[existingCrewId].name,
@@ -226,6 +232,27 @@ export function ensureCrewForLeague(opts: {
       writeStore(s);
     }
     return { crew: s.crews[existingCrewId], chapter, created: false };
+  }
+
+  // Sport 2 / spin-up: hang new league on the source Crew
+  const prefer =
+    opts.preferCrewId && s.crews[opts.preferCrewId]
+      ? opts.preferCrewId
+      : null;
+  if (prefer) {
+    const chapter: CrewChapter = {
+      id: uid("ch"),
+      crewId: prefer,
+      leagueId: opts.leagueId,
+      sportId,
+      year: defaultSeasonYear(),
+      status: "active",
+      leagueName: opts.leagueName || s.crews[prefer].name,
+    };
+    s.chapters.push(chapter);
+    s.leagueToCrew[opts.leagueId] = prefer;
+    writeStore(s);
+    return { crew: s.crews[prefer], chapter, created: false };
   }
 
   const crewId = uid("crew");
@@ -241,7 +268,7 @@ export function ensureCrewForLeague(opts: {
     id: uid("ch"),
     crewId,
     leagueId: opts.leagueId,
-    sportId: (opts.sportId || "cfb").trim() || "cfb",
+    sportId,
     year: defaultSeasonYear(),
     status: "active",
     leagueName: crew.name,
@@ -251,6 +278,48 @@ export function ensureCrewForLeague(opts: {
   s.leagueToCrew[opts.leagueId] = crewId;
   writeStore(s);
   return { crew, chapter, created: true };
+}
+
+/** Live sports we care about for dual-desk Crew mentality (now). */
+export const CREW_LIVE_SPORTS = ["cfb", "nfl"] as const;
+
+export type CrewLiveSport = (typeof CREW_LIVE_SPORTS)[number];
+
+/** Sports this Crew already has a chapter for (any status). */
+export function crewSportsPlayed(crewId: string): string[] {
+  const set = new Set(
+    getChaptersForCrew(crewId).map((c) =>
+      (c.sportId || "cfb").toLowerCase()
+    )
+  );
+  return [...set];
+}
+
+/**
+ * Next live sport chapter this Crew doesn't have yet (CFB ↔ NFL).
+ * null if they already have both or crew missing.
+ */
+export function nextLiveSportChapter(
+  crewId: string | null | undefined,
+  currentSportId?: string | null
+): CrewLiveSport | null {
+  if (!crewId) return null;
+  const have = new Set(crewSportsPlayed(crewId));
+  const cur = (currentSportId || "").toLowerCase();
+  // Prefer the "other" desk from where they're standing
+  if (cur === "cfb" && !have.has("nfl")) return "nfl";
+  if (cur === "nfl" && !have.has("cfb")) return "cfb";
+  for (const s of CREW_LIVE_SPORTS) {
+    if (!have.has(s)) return s;
+  }
+  return null;
+}
+
+/** True if this Crew already runs both CFB and NFL chapters. */
+export function crewIsDualSport(crewId: string | null | undefined): boolean {
+  if (!crewId) return false;
+  const have = new Set(crewSportsPlayed(crewId));
+  return have.has("cfb") && have.has("nfl");
 }
 
 /**

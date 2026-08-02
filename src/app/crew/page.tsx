@@ -9,19 +9,22 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Nav from "@/components/Nav";
-import { getLeague, getSession } from "@/lib/league";
+import { getLeague, getSession, isCommissioner } from "@/lib/league";
 import {
   completedChapterCount,
   crewFoundedLabel,
+  crewIsDualSport,
   ensureCrewForLeague,
   EVENT_CREW,
   getChaptersForCrew,
   getCrewForLeague,
   isCrewStoryRevealed,
+  nextLiveSportChapter,
   sportChapterLabel,
   type Crew,
   type CrewChapter,
 } from "@/lib/crew";
+import { getSportPack } from "@/lib/sports/registry";
 
 export default function CrewPage() {
   const [crew, setCrew] = useState<Crew | null>(null);
@@ -188,6 +191,56 @@ export default function CrewPage() {
                 </ul>
               )}
             </section>
+
+            {(() => {
+              if (!crew) return null;
+              const dual = crewIsDualSport(crew.id);
+              const next = nextLiveSportChapter(
+                crew.id,
+                getLeague()?.sportId
+              );
+              if (dual) {
+                return (
+                  <section className="rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 space-y-1">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">
+                      Dual desk
+                    </p>
+                    <p className="text-sm text-foreground/90 leading-relaxed">
+                      This Crew already runs <strong>CFB</strong> and{" "}
+                      <strong>NFL</strong> chapters. Switch rooms from Home —
+                      same friends, two desks.
+                    </p>
+                  </section>
+                );
+              }
+              if (!next) return null;
+              const pack = getSportPack(next);
+              return (
+                <section className="rounded-xl border border-amber-400/35 bg-amber-400/5 px-4 py-4 space-y-2">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-amber-300">
+                    Next chapter · not a new group
+                  </p>
+                  <p className="text-sm text-foreground leading-relaxed">
+                    Same people, different sport. When you&apos;re ready for{" "}
+                    <strong>{pack.shortLabel || pack.label}</strong>, open it
+                    as the next chapter of{" "}
+                    <strong>{crew.name}</strong> — not a brand-new universe.
+                  </p>
+                  {isCommissioner() ? (
+                    <Link
+                      href="/commissioner?tab=settings"
+                      className="inline-flex text-sm font-bold text-amber-200"
+                    >
+                      Commish · ask the room / sport pool →
+                    </Link>
+                  ) : (
+                    <p className="text-xs text-muted">
+                      Nudge your commish when the group wants {pack.shortLabel}.
+                    </p>
+                  )}
+                </section>
+              );
+            })()}
 
             <section className="rounded-xl border border-border bg-card/50 px-4 py-3">
               <p className="text-xs text-muted leading-relaxed">

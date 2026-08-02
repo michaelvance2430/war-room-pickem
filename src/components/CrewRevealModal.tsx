@@ -144,8 +144,8 @@ export default function CrewRevealModal() {
           </div>
 
           <p className="text-[11px] text-amber-100/50 leading-relaxed">
-            Next chapter is the next sport — NFL, CFB, whatever you run. Same
-            people. Same story.
+            Next chapter is the next sport desk — CFB or NFL. Same people. Same
+            story. No global leaderboard required.
           </p>
 
           <div className="flex flex-col gap-2 pt-1">

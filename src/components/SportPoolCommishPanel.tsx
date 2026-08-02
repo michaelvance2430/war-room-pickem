@@ -22,6 +22,7 @@ import { switchToLeague } from "@/lib/session-restore";
 /**
  * Commissioner: poll this room for a different sport, then
  * one-click create a league seating every yes (trial bots auto-vote for practice).
+ * New room = next Crew chapter (same people), not a second permanent group.
  */
 export default function SportPoolCommishPanel() {
   const router = useRouter();
@@ -221,17 +222,17 @@ export default function SportPoolCommishPanel() {
     <div className="rounded-xl border border-primary/30 bg-card p-4 space-y-4">
       <div>
         <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
-          Player pool · new sport
+          Next chapter · same Crew
         </p>
         <h3 className="text-base font-bold text-foreground mt-1">
-          Ask the room, then open a new league
+          Ask the room, then open the next sport
         </h3>
         <p className="text-xs text-muted mt-1 leading-relaxed">
           Poll everyone in <strong className="text-foreground">this</strong>{" "}
-          room. When you&apos;re ready, one tap creates the new sport league and
-          seats every <strong className="text-foreground">yes</strong>{" "}
-          (you&apos;re always included). Trial bots auto-vote so you can practice
-          without waiting on humans.
+          room. One tap creates the other desk (CFB ↔ NFL) and seats every{" "}
+          <strong className="text-foreground">yes</strong> — same friends, new
+          chapter, not a brand-new group. Trial bots auto-vote so you can
+          practice without waiting on humans.
         </p>
       </div>
 

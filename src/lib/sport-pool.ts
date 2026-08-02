@@ -448,7 +448,7 @@ export async function spinUpLeagueFromPoll(opts: {
     commissioner_id: session.playerId,
     sport_id: sportId,
     sport_settings: {},
-    crystal_ball_enabled: sportId === "cfb",
+    crystal_ball_enabled: true,
   };
 
   let { data: league, error: lErr } = await supabase
@@ -550,6 +550,39 @@ export async function spinUpLeagueFromPoll(opts: {
       closed_at: new Date().toISOString(),
     })
     .eq("id", opts.pollId);
+
+  // Same Crew, new chapter (sport 2) — not a second permanent group
+  try {
+    const { ensureCrewForLeague, getCrewIdForLeague } = await import(
+      "./crew"
+    );
+    const sourceLeagueId = poll.sourceLeagueId || session.leagueId;
+    const parentCrewId =
+      getCrewIdForLeague(sourceLeagueId) ||
+      getCrewIdForLeague(session.leagueId);
+    // Ensure source has a crew first
+    if (sourceLeagueId) {
+      ensureCrewForLeague({
+        leagueId: sourceLeagueId,
+        leagueName: getLeague()?.name || name,
+        sportId: getLeague()?.sportId,
+        createdBy: session.playerId,
+      });
+    }
+    const prefer =
+      getCrewIdForLeague(sourceLeagueId) ||
+      getCrewIdForLeague(session.leagueId) ||
+      parentCrewId;
+    ensureCrewForLeague({
+      leagueId,
+      leagueName: name,
+      sportId,
+      createdBy: session.playerId,
+      preferCrewId: prefer,
+    });
+  } catch {
+    /* local-first optional */
+  }
 
   return {
     ok: true,
