@@ -37,6 +37,7 @@ export default function BadgeUnlockModal() {
 
     // After first lock only for calm first 10 minutes; season-alive still ok later
     // Foundry testing (not quiet eyes) can celebrate so you can see cheevo UX
+    // Pending lore (Cavalry Scout) always allowed to pop on login
     try {
       const {
         canShowBadgeCelebrations,
@@ -44,12 +45,19 @@ export default function BadgeUnlockModal() {
         syncFirstWeekFromCloud,
       } = await import("@/lib/first-week");
       const { allowFoundryCeremonies } = await import("@/lib/foundry-preview");
+      const { readPendingBadgeCelebration } = await import(
+        "@/lib/badge-celebration"
+      );
       await syncFirstWeekFromCloud(getSession()?.playerId);
+      const pid = getSession()?.playerId || "";
+      const pendingLore = readPendingBadgeCelebration(pid);
       const foundry = allowFoundryCeremonies() || !!opts?.force;
-      if (isPreLockCalm(getSession()?.playerId) && !foundry) return;
-      if (!canShowBadgeCelebrations(getSession()?.playerId) && !foundry) {
-        // Stay unchecked so we re-try after they lock
-        return;
+      if (pendingLore.length === 0) {
+        if (isPreLockCalm(pid) && !foundry) return;
+        if (!canShowBadgeCelebrations(pid) && !foundry) {
+          // Stay unchecked so we re-try after they lock
+          return;
+        }
       }
     } catch {
       /* proceed best-effort */
@@ -100,12 +108,23 @@ export default function BadgeUnlockModal() {
   }, [tryCelebrate]);
 
   // Fallback if gazette never fires (only after core loop unlock)
+  // Lore grants (Cavalry Scout) also retry early so login popup isn't missed.
   useEffect(() => {
     if (checked) return;
-    const timers = [3000, 6000, 10000].map((ms) =>
+    const timers = [1200, 3000, 6000, 10000].map((ms) =>
       setTimeout(() => {
         void (async () => {
           try {
+            const { readPendingBadgeCelebration } = await import(
+              "@/lib/badge-celebration"
+            );
+            const { getSession } = await import("@/lib/league");
+            const pid = getSession()?.playerId;
+            const pending = pid ? readPendingBadgeCelebration(pid) : [];
+            if (pending.length > 0) {
+              void tryCelebrate({ force: true });
+              return;
+            }
             const { hasSeenRules } = await import("@/lib/rules");
             const { allowFoundryCeremonies } = await import(
               "@/lib/foundry-preview"

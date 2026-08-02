@@ -70,6 +70,70 @@ export function writeCelebratedIds(userId: string, ids: string[]) {
 export function markBadgesCelebrated(userId: string, badgeIds: string[]) {
   const prev = readCelebratedIds(userId);
   writeCelebratedIds(userId, [...prev, ...badgeIds]);
+  clearPendingBadgeCelebration(userId, badgeIds);
+}
+
+/**
+ * Lore grants (Cavalry Scout, etc.) that should popup once on next login
+ * even though they land as permanent badges (which normally skip celebration).
+ */
+const PENDING_PREFIX = "warroom-pending-badge-celebration-v1:";
+
+export function readPendingBadgeCelebration(userId: string): string[] {
+  if (typeof window === "undefined" || !userId) return [];
+  try {
+    const raw = localStorage.getItem(`${PENDING_PREFIX}${userId}`);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as string[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function queuePendingBadgeCelebration(
+  userId: string,
+  badgeIds: string[]
+): void {
+  if (typeof window === "undefined" || !userId || !badgeIds.length) return;
+  try {
+    const next = [
+      ...new Set([...readPendingBadgeCelebration(userId), ...badgeIds]),
+    ];
+    localStorage.setItem(`${PENDING_PREFIX}${userId}`, JSON.stringify(next));
+  } catch {
+    /* ignore */
+  }
+  try {
+    window.dispatchEvent(new CustomEvent("warroom-force-badge-check"));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function clearPendingBadgeCelebration(
+  userId: string,
+  badgeIds?: string[]
+): void {
+  if (typeof window === "undefined" || !userId) return;
+  try {
+    if (!badgeIds?.length) {
+      localStorage.removeItem(`${PENDING_PREFIX}${userId}`);
+      return;
+    }
+    const drop = new Set(badgeIds);
+    const left = readPendingBadgeCelebration(userId).filter((id) => !drop.has(id));
+    if (left.length) {
+      localStorage.setItem(
+        `${PENDING_PREFIX}${userId}`,
+        JSON.stringify(left)
+      );
+    } else {
+      localStorage.removeItem(`${PENDING_PREFIX}${userId}`);
+    }
+  } catch {
+    /* ignore */
+  }
 }
 
 /**
@@ -108,13 +172,20 @@ export function backfillCelebratedFromOwned(
   ]);
   const career = getCareerBadgeIds(playerId);
   const permanent = getPermanentBadgeIds(playerId);
+  // Pending lore popups (e.g. Cavalry Scout first grant) must NOT be backfilled
+  const pending = new Set(readPendingBadgeCelebration(playerId));
 
-  for (const id of career) known.add(id);
-  for (const id of permanent) known.add(id);
+  for (const id of career) {
+    if (!pending.has(id)) known.add(id);
+  }
+  for (const id of permanent) {
+    if (!pending.has(id)) known.add(id);
+  }
 
   for (const b of earned) {
     if (!b.earned) continue;
     const id = b.def.id;
+    if (pending.has(id)) continue; // wait for unlock modal
     // Already owned signals → mark celebrated, no popup
     if (
       career.includes(id) ||
@@ -211,8 +282,25 @@ export async function findNewBadgeUnlocksForSession(): Promise<{
     } catch {
       foundry = false;
     }
-    if (!canShowBadgeCelebrations(session.playerId) && !foundry) {
+    // Lore pending (Cavalry Scout etc.) always allowed to pop on login
+    const pendingLore = readPendingBadgeCelebration(session.playerId);
+    if (
+      !canShowBadgeCelebrations(session.playerId) &&
+      !foundry &&
+      pendingLore.length === 0
+    ) {
       return null;
+    }
+
+    // Ensure name-pinned lore grants land before we scan for uncelebrated
+    try {
+      const { applyLegacyBadgeGrants } = await import("./legacy-badge-grants");
+      applyLegacyBadgeGrants({
+        id: session.playerId,
+        name: session.playerName || "",
+      });
+    } catch {
+      /* ok */
     }
 
     const { loadLeaguePlayers, loadLeagueActiveWeek } = await import("./cloud");
@@ -220,8 +308,16 @@ export async function findNewBadgeUnlocksForSession(): Promise<{
     players = syncLeagueCheevoKing(players.map((p) => withPermanentBadges(p)));
     const me = players.find((p) => p.id === session.playerId);
     if (!me) return null;
+    // Prefer live display name for legacy grants (Tbone / Soulstache match)
+    try {
+      const { applyLegacyBadgeGrants } = await import("./legacy-badge-grants");
+      applyLegacyBadgeGrants({ id: me.id, name: me.name || session.playerName });
+    } catch {
+      /* ok */
+    }
     const tagged = withPermanentBadges(me);
     // Bank first, then backfill celebrated from bank — kills login re-fires
+    // (pending lore ids are excluded from backfill until dismissed)
     bankCareerCheevos(tagged.id, getPlayerBadges(tagged));
     let activeWeek = 0;
     try {

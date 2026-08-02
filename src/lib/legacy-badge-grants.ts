@@ -111,10 +111,32 @@ export function applyLegacyBadgeGrants(player: {
     const pts = getBadgeDef(g.badgeId)?.points ?? legendPts();
     if (known.has(g.badgeId)) {
       bankCareerBadgeId(player.id, g.badgeId, pts);
+      // Already permanent but never saw the unlock modal → still pop once on login
+      try {
+        const {
+          readCelebratedIds,
+          queuePendingBadgeCelebration,
+        } = require("./badge-celebration") as typeof import("./badge-celebration");
+        if (!readCelebratedIds(player.id).includes(g.badgeId)) {
+          queuePendingBadgeCelebration(player.id, [g.badgeId]);
+        }
+      } catch {
+        /* ignore */
+      }
       continue;
     }
     const granted = grantPermanentBadgeId(player.id, g.badgeId);
-    if (granted) newly.push(g.badgeId);
+    if (granted) {
+      newly.push(g.badgeId);
+      // Popup on next login / this session — permanent alone would skip celebration
+      try {
+        const { queuePendingBadgeCelebration } =
+          require("./badge-celebration") as typeof import("./badge-celebration");
+        queuePendingBadgeCelebration(player.id, [g.badgeId]);
+      } catch {
+        /* ignore */
+      }
+    }
     known.add(g.badgeId);
     bankCareerBadgeId(player.id, g.badgeId, pts);
   }
