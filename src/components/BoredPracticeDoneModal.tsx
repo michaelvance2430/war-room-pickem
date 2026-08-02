@@ -68,9 +68,10 @@ export default function BoredPracticeDoneModal() {
       clearBoredPracticeDoneModal();
       const res = await startBoredPracticeWeek();
       setOpen(false);
-      if (res.goToPicks) {
-        router.push("/picks?week=99&practice=1");
-        router.refresh();
+      if (res.goToPicks && res.picksHref) {
+        window.location.assign(res.picksHref);
+      } else if (res.goToPicks) {
+        window.location.assign("/picks?week=99&practice=1&fresh=1");
       }
     } catch {
       setOpen(false);

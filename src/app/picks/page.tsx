@@ -478,27 +478,88 @@ export default function PicksPage() {
               setScoredWeeks([]);
               setLoadError(null);
               setCardNotice(null);
+              // Chaos / live leftovers must never paint on a practice card
+              setChaosArmed(false);
+              setChaosLockedWeek(false);
+              setChaosConfirm(false);
+
               const mine = loadBoredLocalPicks();
-              if (mine?.picks) {
-                setPicks(mine.picks);
-                picksRef.current = mine.picks;
-                setBestBetId(mine.bestBetId);
-                bestBetRef.current = mine.bestBetId;
+              const validIds = new Set(card.games.map((g) => g.id));
+              // Only restore if this run is locked and picks match THIS card’s game ids
+              const locked =
+                !!mine?.lockedAt &&
+                mine.runId === card.runId &&
+                Object.keys(mine.picks || {}).some((id) => validIds.has(id));
+
+              if (locked && mine) {
+                const filtered: Record<string, (typeof mine.picks)[string]> =
+                  {};
+                for (const [id, p] of Object.entries(mine.picks || {})) {
+                  if (validIds.has(id)) filtered[id] = p;
+                }
+                setPicks(filtered);
+                picksRef.current = filtered;
+                setBestBetId(
+                  mine.bestBetId && validIds.has(mine.bestBetId)
+                    ? mine.bestBetId
+                    : null
+                );
+                bestBetRef.current =
+                  mine.bestBetId && validIds.has(mine.bestBetId)
+                    ? mine.bestBetId
+                    : null;
                 setPropChoice(mine.propChoice);
                 propChoiceRef.current = mine.propChoice;
-                setSaved(!!mine.lockedAt);
-                savedRef.current = !!mine.lockedAt;
-                const used = Object.values(mine.picks)
+                setSaved(true);
+                savedRef.current = true;
+                const used = Object.values(filtered)
                   .map((p) => p.confidence)
                   .filter((c) => c > 0);
                 setUsedConfidence(used);
-              }
-              const localRes = loadBoredLocalResults();
-              if (localRes?.results) {
-                setWeekResults(localRes.results);
-                setWeekPropResult(localRes.propResult);
-                setWeekScoredAt(localRes.scoredAt);
-                setPracticeScored(true);
+                const localRes = loadBoredLocalResults();
+                if (localRes?.results && localRes.runId === card.runId) {
+                  setWeekResults(localRes.results);
+                  setWeekPropResult(localRes.propResult);
+                  setWeekScoredAt(localRes.scoredAt);
+                  setPracticeScored(true);
+                } else {
+                  setWeekResults({});
+                  setWeekPropResult(null);
+                  setWeekScoredAt(null);
+                  setPracticeScored(false);
+                }
+              } else {
+                // Blank practice — you make every pick
+                setPicks({});
+                picksRef.current = {};
+                setBestBetId(null);
+                bestBetRef.current = null;
+                setPropChoice(null);
+                propChoiceRef.current = null;
+                setSaved(false);
+                savedRef.current = false;
+                setUsedConfidence([]);
+                setWeekResults({});
+                setWeekPropResult(null);
+                setWeekScoredAt(null);
+                setPracticeScored(false);
+                // Persist blank if we had stale junk under this run
+                try {
+                  const { saveBoredLocalPicks, getBoredPracticeState } =
+                    await import("@/lib/bored-practice");
+                  const st = getBoredPracticeState();
+                  if (st) {
+                    saveBoredLocalPicks({
+                      runId: st.runId,
+                      picks: {},
+                      bestBetId: null,
+                      propChoice: null,
+                      lockedAt: null,
+                    });
+                  }
+                } catch {
+                  /* ok */
+                }
               }
               setLoaded(true);
               return; // never start live poll / realtime for practice

@@ -54,10 +54,15 @@ export default function BoredLameSandboxCta() {
       const res = await startBoredPracticeWeek();
       setNote(res.message);
       if (res.ok) setAgain(true);
-      if (res.goToPicks) {
+      if (res.goToPicks && res.picksHref) {
+        // Hard navigation — remount picks with a blank slate (no stale live picks)
         window.setTimeout(() => {
-          router.push(`/picks?week=${BORED_PRACTICE_WEEK}&practice=1`);
-        }, 350);
+          window.location.assign(res.picksHref!);
+        }, 200);
+      } else if (res.goToPicks) {
+        window.location.assign(
+          `/picks?week=${BORED_PRACTICE_WEEK}&practice=1&fresh=1`
+        );
       }
     } catch (e) {
       setNote(e instanceof Error ? e.message : "Couldn’t start practice.");

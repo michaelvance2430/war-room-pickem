@@ -18,8 +18,11 @@ import {
 export async function startBoredPracticeWeek(): Promise<{
   ok: boolean;
   weekNumber?: number;
+  runId?: number;
   message: string;
   goToPicks?: boolean;
+  /** Always use this — hard nav so picks page cannot keep stale live picks */
+  picksHref?: string;
 }> {
   if (!isBoredPracticeWindowOpen()) {
     return {
@@ -33,14 +36,15 @@ export async function startBoredPracticeWeek(): Promise<{
   const state = markBoredPracticeStarted(sid);
 
   // Fresh demo slate — never loads live season cards / never publishWeekCard
-  const seed = Date.now() % 100000;
+  // Unique seed + runId so game IDs never collide with a prior practice run
+  const seed = (Date.now() % 100000) + state.runId * 9973;
   const games = generateDemoSlate(seed, 5, sid).map((g, i) => {
     // Kickoffs far enough out that lock deadline never freezes the practice card
     const t = new Date(Date.now() + (24 + i) * 3600 * 1000);
     return {
       ...g,
-      id: `bored-local-${state.runId}-${i}`,
-      oddsEventId: `bored-local-${state.runId}-${i}`,
+      id: `bored-local-${state.runId}-${seed}-${i}`,
+      oddsEventId: `bored-local-${state.runId}-${seed}-${i}`,
       commenceTime: t.toISOString(),
       startTime: t.toLocaleString("en-US", {
         weekday: "short",
@@ -54,7 +58,7 @@ export async function startBoredPracticeWeek(): Promise<{
     };
   });
   const prop = propFromPreset(rotatingPropPreset(seed % 20, sid), seed % 20);
-  prop.id = `bored-prop-${state.runId}`;
+  prop.id = `bored-prop-${state.runId}-${seed}`;
 
   const card: BoredLocalCard = {
     weekNumber: BORED_PRACTICE_WEEK,
@@ -64,7 +68,7 @@ export async function startBoredPracticeWeek(): Promise<{
     sportId: sid,
   };
   saveBoredLocalCard(card);
-  // Clear picks for this run
+  // Hard blank card — never carry picks from last practice / live season
   saveBoredLocalPicks({
     runId: state.runId,
     picks: {},
@@ -76,9 +80,11 @@ export async function startBoredPracticeWeek(): Promise<{
   return {
     ok: true,
     weekNumber: BORED_PRACTICE_WEEK,
+    runId: state.runId,
     goToPicks: true,
+    picksHref: `/picks?week=${BORED_PRACTICE_WEEK}&practice=1&run=${state.runId}&fresh=1`,
     message:
-      "Fake week locked and loaded. Not the live season. Fill it, lock it, we grade it, then we show you how the real room gets loud.",
+      "Blank fake week ready. Not the live season. You fill every pick — then we grade it.",
   };
 }
 
