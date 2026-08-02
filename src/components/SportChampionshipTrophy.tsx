@@ -90,15 +90,15 @@ export default function SportChampionshipTrophy({
 }: Props) {
   const sid = resolveTrophySport(sport);
   const id = `champ-t-${sid}-${size}-${threePeat ? "3" : "1"}`;
-  const override =
-    sid === "nfl"
-      ? resolveLeagueChampionshipOverride({
-          sportId: "nfl",
-          leagueName,
-          leagueId,
-        })
-      : null;
-  const useNflPhoto = sid === "nfl" && preferPhoto && size >= 40;
+  const override = resolveLeagueChampionshipOverride({
+    sportId: sport ?? sid,
+    leagueName,
+    leagueId,
+  });
+  // Vonnaggio ALWAYS uses the gold photo — never fall back to Lombardi SVG
+  const forceGoldPhoto = !!override;
+  const useNflPhoto =
+    forceGoldPhoto || (sid === "nfl" && preferPhoto && size >= 40);
   const nflSrc = override?.championshipImg ?? NFL_LOMBARDI_IMG;
   const goldRoom = override?.glow === "gold";
 
@@ -125,7 +125,7 @@ export default function SportChampionshipTrophy({
         className={animate ? "champ-trophy-float" : undefined}
         style={{ width: size, height: size }}
       >
-        {useNflPhoto ? (
+        {useNflPhoto || forceGoldPhoto ? (
           <NflTrophyPhoto
             size={size}
             threePeat={threePeat}
