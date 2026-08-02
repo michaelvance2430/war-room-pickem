@@ -9,17 +9,31 @@ import {
   crystalBallTeams,
   crownNationalChampion,
   loadCrystalBall,
+  peekLocalCrystalBall,
   saveCrystalBallPick,
   type CrystalBallState,
 } from "@/lib/crystal-ball";
 import { getLeague, getSession } from "@/lib/league";
 
 export default function CrystalBallPage() {
-  const [state, setState] = useState<CrystalBallState | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [state, setState] = useState<CrystalBallState | null>(() => {
+    try {
+      return peekLocalCrystalBall();
+    } catch {
+      return null;
+    }
+  });
+  /** Soft refresh only — never block the team list on cloud */
+  const [syncing, setSyncing] = useState(true);
   const [disabled, setDisabled] = useState(false);
   const [query, setQuery] = useState("");
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(() => {
+    try {
+      return peekLocalCrystalBall().myTeam;
+    } catch {
+      return null;
+    }
+  });
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -33,10 +47,14 @@ export default function CrystalBallPage() {
   const teams = useMemo(() => crystalBallTeams(sportId), [sportId]);
 
   async function reload() {
-    const s = await loadCrystalBall();
-    setState(s);
-    setSelected(s.myTeam);
-    setLoading(false);
+    setSyncing(true);
+    try {
+      const s = await loadCrystalBall();
+      setState(s);
+      setSelected(s.myTeam);
+    } finally {
+      setSyncing(false);
+    }
   }
 
   useEffect(() => {
@@ -46,9 +64,10 @@ export default function CrystalBallPage() {
     setSelfId(session?.playerId || null);
     if (league?.settings?.crystalBallEnabled === false) {
       setDisabled(true);
-      setLoading(false);
+      setSyncing(false);
       return;
     }
+    // Local shell already painted — cloud refresh in background
     void reload();
   }, []);
 
@@ -143,7 +162,7 @@ export default function CrystalBallPage() {
     );
   }
 
-  if (loading || !state) {
+  if (!state) {
     return (
       <div className="min-h-screen flex flex-col">
         <Nav />
@@ -173,6 +192,11 @@ export default function CrystalBallPage() {
             ) : (
               <span className="text-xs px-2 py-0.5 rounded-full bg-primary/15 text-primary">
                 Open
+              </span>
+            )}
+            {syncing && (
+              <span className="text-[10px] text-muted font-medium">
+                Syncing room picks…
               </span>
             )}
           </div>
