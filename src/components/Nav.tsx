@@ -319,13 +319,13 @@ export default function Nav() {
     return () => window.removeEventListener("keydown", onKey);
   }, [menuOpen, moreOpen]);
 
-  // Standings always in primary (CFB + NFL) — last-in / login presence lives there.
-  // First hour: Home · Picks · Standings · Locker (+ Host). Then Board + Gazette.
+  // Phone row (locked in): Home · Picks · Table · Locker · More
+  // Desktop primary: same core; Board/Gazette/Host expand after first lock.
   const primaryLinks: NavLink[] = earlyNav
     ? [
         { href: "/", label: "Home" },
         { href: "/picks", label: "Picks" },
-        { href: "/standings", label: "Standings" },
+        { href: "/standings", label: "Table" },
         { href: "/locker-room", label: "Locker", badge: lockerUnseen },
         ...(ops
           ? [
@@ -340,9 +340,9 @@ export default function Nav() {
     : [
         { href: "/", label: "Home" },
         { href: "/picks", label: "Picks" },
-        { href: "/board", label: "The Board" },
-        { href: "/standings", label: "Standings" },
+        { href: "/standings", label: "Table" },
         { href: "/locker-room", label: "Locker", badge: lockerUnseen },
+        { href: "/board", label: "The Board" },
         ...(showGazetteNav
           ? [
               {
@@ -829,29 +829,20 @@ export default function Nav() {
         </>
       )}
 
-      {/* Phone thumb nav — early: 4 tabs; after lock: 5 with More */}
+      {/* Phone thumb nav — always: Home · Picks · Table · Locker · More */}
       <nav
         className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-card/95 backdrop-blur-md"
         style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
         aria-label="Primary"
       >
-        <ul
-          className={`grid h-[3.75rem] ${earlyNav ? "grid-cols-4" : "grid-cols-5"}`}
-        >
+        <ul className="grid h-[3.75rem] grid-cols-5">
           {(
-            earlyNav
-              ? ([
-                  { href: "/", label: "Home", icon: "⌂" },
-                  { href: "/picks", label: "Picks", icon: "✓" },
-                  { href: "/standings", label: "Table", icon: "#" },
-                  { href: "/locker-room", label: "Locker", icon: "💬" },
-                ] as const)
-              : ([
-                  { href: "/", label: "Home", icon: "⌂" },
-                  { href: "/picks", label: "Picks", icon: "✓" },
-                  { href: "/standings", label: "Table", icon: "#" },
-                  { href: "/locker-room", label: "Locker", icon: "💬" },
-                ] as const)
+            [
+              { href: "/", label: "Home", icon: "⌂" },
+              { href: "/picks", label: "Picks", icon: "✓" },
+              { href: "/standings", label: "Table", icon: "#" },
+              { href: "/locker-room", label: "Locker", icon: "💬" },
+            ] as const
           ).map((tab) => {
             const active = linkActive(tab.href);
             const badge =
@@ -883,7 +874,6 @@ export default function Nav() {
               </li>
             );
           })}
-          {!earlyNav && (
           <li className="min-w-0">
             <button
               type="button"
@@ -905,7 +895,6 @@ export default function Nav() {
               )}
             </button>
           </li>
-          )}
         </ul>
       </nav>
 
