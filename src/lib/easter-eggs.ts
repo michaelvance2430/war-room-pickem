@@ -75,13 +75,13 @@ export const DISCOVERY_CATALOG: DiscoveryDef[] = [
   },
   {
     id: "egg_vonnaggio_gold",
-    name: "Family Vacation Gold",
-    description: "You woke the gold form in Vonnaggio Family Vacation.",
+    name: "Family Vacay Gold",
+    description: "You woke the gold form in Vonnagio Family Vacay.",
     flavor:
       "Five taps on the family hardware. Same trophy from last year's fantasy board — now it lives here. Zero points. Infinite lore.",
     kind: "secret_tap",
     icon: "🥇",
-    stampLabel: "Vonnaggio gold",
+    stampLabel: "Vonnagio gold",
   },
   {
     id: "egg_hidden_headline",
@@ -904,7 +904,7 @@ export function noteAppOpen(opts: {
  * Must be 5 *consecutive* taps (within ~1.5s of each other).
  * Pausing resets the streak — not a lifetime “5 clicks ever” log.
  *
- * Vonnaggio Family Vacation: grants Family Vacation Gold (league-only lore).
+ * Vonnagio Family Vacay: grants Family Vacay Gold (league-only lore).
  * Everywhere else: Curiosity Didn't Kill the Cat.
  */
 const TROPHY_TAP_WINDOW_MS = 1500;

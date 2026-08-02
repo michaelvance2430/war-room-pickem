@@ -406,8 +406,8 @@ export const BADGE_CATALOG: BadgeDef[] = [
   },
   {
     id: "egg_vonnaggio_gold",
-    name: "Family Vacation Gold",
-    description: "You woke the gold form in Vonnaggio Family Vacation.",
+    name: "Family Vacay Gold",
+    description: "You woke the gold form in Vonnagio Family Vacay.",
     howToEarn: "No spoilers. Curiosity only.",
     tier: "rare",
     points: 0,

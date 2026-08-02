@@ -355,6 +355,8 @@ export function weekTitle(
 ): string {
   const sport = resolveCalendarSport(sportId);
   if (sport === "nfl") {
+    // NFL has no Week 0 (that's CFB). Stale 0 from shared defaults → preseason label.
+    if (weekNumber <= 0) return "Preseason";
     if (weekNumber >= 1 && weekNumber <= 18) {
       return weekNumber === 18
         ? "Week 18 · Final RS"

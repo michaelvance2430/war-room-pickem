@@ -2,10 +2,8 @@
  * Profile trophy case — career hardware from the league Trophy Room
  * plus legacy engravings (seeded for known winners by display name).
  *
- * Cases:
- *  - Hardware: Championship, Toilet Bowl, Village Nerd
- *  - Division / Conference: compass slots (NFL divisions · CFB conferences)
- *    Same shelf — people can stack multiple years / both flavors.
+ * Legacy seeds are sport-gated so Maria Super Bowl doesn’t show in CFB
+ * rooms and Kahmann Excel hardware doesn’t show as NFL Super Bowl art.
  */
 
 import type { LeagueTrophy, TrophyType } from "./trophies";
@@ -29,6 +27,8 @@ export type ProfileTrophy = {
   division?: string | null;
   winnerName: string;
   source: "league" | "legacy";
+  /** Sport this plaque belongs to (for art / gating) */
+  sportId?: "cfb" | "nfl" | null;
 };
 
 function normName(s: string) {
@@ -44,28 +44,26 @@ function namesMatch(a: string, b: string) {
   const nb = normName(b);
   if (!na || !nb) return false;
   if (na === nb) return true;
-  // "Bill Ball Ben" vs "Bill Ben" / partial
   if (na.includes(nb) || nb.includes(na)) return true;
   const ta = na.split(" ");
   const tb = nb.split(" ");
-  // last token match for "Kahmann" vs "Mike Kahmann"
   if (ta[ta.length - 1] === tb[tb.length - 1] && ta[ta.length - 1].length >= 4) {
     return true;
   }
   return false;
 }
 
+type LegacySeed = Omit<ProfileTrophy, "source"> & {
+  /** Which sport desk this seed belongs on */
+  sport: "cfb" | "nfl";
+};
+
 /**
- * Legacy / prior-season hardware for this friend group.
- * Matched by display name so it shows even before engraver links a user id.
- * Full 2025–26 CFB campaign (stored as seasonYear 2025).
+ * Confirmed prior-season hardware only.
+ * CFB 2025–26 Excel: Kahmann / Strayer / Big Ball Ben.
+ * NFL 2025: Maria Super Bowl (or Vonnagio gold family form).
  */
-/**
- * Confirmed prior-season hardware only (2025–26 Excel season).
- * Kahmann = champ. Justin Strayer = Toilet. Big Ball Ben = Village Nerd.
- * Visconti/Andy is NOT a champ (mistaken swap — revoked).
- */
-export const LEGACY_PROFILE_HARDWARE: Omit<ProfileTrophy, "source">[] = [
+export const LEGACY_PROFILE_HARDWARE: LegacySeed[] = [
   {
     id: "legacy-kahmann-championship-2025",
     kind: "championship",
@@ -74,6 +72,8 @@ export const LEGACY_PROFILE_HARDWARE: Omit<ProfileTrophy, "source">[] = [
     subtitle: "War Room Champion · 2025–26",
     notes: "Full 2025–26 season. The board still remembers.",
     winnerName: "Kahmann",
+    sport: "cfb",
+    sportId: "cfb",
   },
   {
     id: "legacy-justin-strayer-toilet-2025",
@@ -83,6 +83,8 @@ export const LEGACY_PROFILE_HARDWARE: Omit<ProfileTrophy, "source">[] = [
     subtitle: "Bottom-half crown · 2025–26",
     notes: "2025–26 Toilet Bowl. Still a crown. Wear it proudly.",
     winnerName: "Justin Strayer",
+    sport: "cfb",
+    sportId: "cfb",
   },
   {
     id: "legacy-bill-ball-ben-nerd-2025",
@@ -92,6 +94,8 @@ export const LEGACY_PROFILE_HARDWARE: Omit<ProfileTrophy, "source">[] = [
     subtitle: "Crystal Ball prophet · 2025–26",
     notes: "2025–26 Crystal Ball. Zero standings points. Infinite smug.",
     winnerName: "Big Ball Ben",
+    sport: "cfb",
+    sportId: "cfb",
   },
   {
     id: "legacy-maria-super-bowl-2025",
@@ -101,11 +105,9 @@ export const LEGACY_PROFILE_HARDWARE: Omit<ProfileTrophy, "source">[] = [
     subtitle: "Super Bowl Champion · 2025",
     notes: "Defending Super Bowl champ. Announced at the start of Week 1.",
     winnerName: "Maria",
+    sport: "nfl",
+    sportId: "nfl",
   },
-  /**
-   * Vonnagio Family Vacay — same win, gold family hardware (not Lombardi art).
-   * Shown only when active league is Vonnagio (see getProfileHardware).
-   */
   {
     id: "legacy-maria-vonnagio-2025",
     kind: "championship",
@@ -115,6 +117,8 @@ export const LEGACY_PROFILE_HARDWARE: Omit<ProfileTrophy, "source">[] = [
     notes:
       "Family Vacay gold hardware · 2025. Same trophy from last year's fantasy pool. Maria holds it until someone takes it.",
     winnerName: "Maria",
+    sport: "nfl",
+    sportId: "nfl",
   },
 ];
 
@@ -142,7 +146,7 @@ const LEGACY_NAME_ALIASES: { pattern: RegExp; legacyId: string }[] = [
   },
 ];
 
-function leagueToProfile(t: LeagueTrophy): ProfileTrophy {
+function leagueToProfile(t: LeagueTrophy, sportId?: string | null): ProfileTrophy {
   const meta = TROPHY_META[t.trophyType];
   const isDiv =
     typeof t.trophyType === "string" && t.trophyType.startsWith("division_");
@@ -158,25 +162,26 @@ function leagueToProfile(t: LeagueTrophy): ProfileTrophy {
     winnerName: t.winnerName,
     source: "league",
     division: isDiv ? t.subtitle : null,
+    sportId: sportId === "nfl" || sportId === "cfb" ? sportId : null,
   };
 }
 
 /**
  * Hardware for one player's profile: league Trophy Room rows they won
- * + legacy seeds matched by name.
- *
- * Vonnagio Family Vacay: Maria’s 2025 championship uses gold-family copy
- * (art is resolved separately via league-trophy-override).
+ * + legacy seeds matched by name (sport-gated to the active desk).
  */
 export function getProfileHardware(opts: {
   playerId: string;
   playerName: string;
   leagueTrophies: LeagueTrophy[];
+  /** Active league sport — gates Excel vs Super Bowl legacy seeds */
+  sportId?: string | null;
 }): ProfileTrophy[] {
   const { playerId, playerName, leagueTrophies } = opts;
   const out: ProfileTrophy[] = [];
   const seen = new Set<string>();
 
+  let sport: "cfb" | "nfl" = "cfb";
   let vonnagio = false;
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -185,8 +190,13 @@ export function getProfileHardware(opts: {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { getLeague } = require("./league") as typeof import("./league");
     const lg = getLeague();
-    vonnagio = isVonnaggioLeague(lg?.name, lg?.id, lg?.code);
+    const sid = opts.sportId ?? lg?.sportId;
+    sport = sid === "nfl" ? "nfl" : "cfb";
+    vonnagio =
+      sport === "nfl" &&
+      isVonnaggioLeague(lg?.name, lg?.id, lg?.code);
   } catch {
+    sport = opts.sportId === "nfl" ? "nfl" : "cfb";
     vonnagio = false;
   }
 
@@ -195,8 +205,7 @@ export function getProfileHardware(opts: {
     const byId = t.winnerUserId && t.winnerUserId === playerId;
     const byName = namesMatch(t.winnerName, playerName);
     if (!byId && !byName) continue;
-    let row = leagueToProfile(t);
-    // Vonnagio: rebrand Maria’s championship plaque (gold form, not Lombardi label)
+    let row = leagueToProfile(t, sport);
     if (
       vonnagio &&
       row.kind === "championship" &&
@@ -212,18 +221,18 @@ export function getProfileHardware(opts: {
           row.notes?.includes("Family Vacay") || row.notes?.includes("gold")
             ? row.notes
             : "Family Vacay gold hardware — last year's fantasy pool trophy. Not the silver football.",
+        sportId: "nfl",
       };
     }
-    // Dedupe kind+year (+ subtitle for multi division titles)
     const key = `${row.kind}:${row.seasonYear}:${row.subtitle || row.title}`;
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(row);
   }
 
-  // Legacy seeds by name / alias
+  // Legacy seeds — only for the active sport desk
   for (const legacy of LEGACY_PROFILE_HARDWARE) {
-    // Only one Maria championship legacy — pick Vonnagio vs generic Super Bowl
+    if (legacy.sport !== sport) continue;
     if (legacy.id === "legacy-maria-super-bowl-2025" && vonnagio) continue;
     if (legacy.id === "legacy-maria-vonnagio-2025" && !vonnagio) continue;
 
@@ -235,7 +244,8 @@ export function getProfileHardware(opts: {
     );
     if (!direct && !alias) continue;
     seen.add(key);
-    out.push({ ...legacy, source: "legacy" });
+    const { sport: _s, ...rest } = legacy;
+    out.push({ ...rest, source: "legacy", sportId: legacy.sport });
   }
 
   return out.sort((a, b) => {
@@ -246,7 +256,6 @@ export function getProfileHardware(opts: {
 
 export function splitHardwareCases(items: ProfileTrophy[]): {
   bigGame: ProfileTrophy[];
-  /** Division + conference titles — same case; stack all wins here */
   division: ProfileTrophy[];
 } {
   return {
@@ -255,7 +264,6 @@ export function splitHardwareCases(items: ProfileTrophy[]): {
   };
 }
 
-/** Section chrome: Division | Conference side-by-side (same stack of plaques). */
 export const DIVISION_CONFERENCE_SECTION = {
   labelA: "Division",
   labelB: "Conference",
@@ -296,22 +304,30 @@ export const HARDWARE_KIND_META: Record<
   },
 };
 
-/** Kinds shown in the big-game case (ordered). */
 export const BIG_GAME_KINDS: ProfileTrophyKind[] = [
   "championship",
   "toilet_bowl",
   "crystal_ball",
 ];
 
-/** Tiny standings flair for players with career hardware. */
+/** Tiny standings flair — sport-gated via active league. */
 export function standingsHardwareFlair(playerName: string): {
   emoji: string;
   title: string;
 }[] {
+  let sportId: string | null = null;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getLeague } = require("./league") as typeof import("./league");
+    sportId = getLeague()?.sportId || null;
+  } catch {
+    sportId = null;
+  }
   const items = getProfileHardware({
     playerId: "",
     playerName,
     leagueTrophies: [],
+    sportId,
   });
   const flair: { emoji: string; title: string }[] = [];
   const seen = new Set<string>();

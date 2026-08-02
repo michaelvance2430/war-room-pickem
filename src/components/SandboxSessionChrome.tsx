@@ -140,16 +140,25 @@ export default function SandboxSessionChrome() {
     };
   }, [pathname]);
 
+  /** Just put the hop bar away — no board wipe. */
+  function closeHopBarOnly() {
+    const lid = getLeague()?.id || getSession()?.leagueId;
+    setSandboxHostHopActive(false, lid);
+    setShow(false);
+    setNote(null);
+  }
+
+  /** Close hop bar AND wipe dry-run cards/picks/sim scores for this room. */
   async function exitHostAndWipe() {
     if (busy) return;
     const ok = confirm(
-      "Exit Host?\n\n" +
-        "1) Close this sandbox hop bar (stays off until you turn it on)\n" +
-        "2) Wipe this dry-run board (cards, picks, sim scores)\n\n" +
+      "Wipe dry-run board?\n\n" +
+        "This will:\n" +
+        "• Close the sandbox hop bar\n" +
+        "• Wipe cards, picks, and sim scores for THIS room\n\n" +
         "Members & league code stay.\n" +
         "Prior-season trophies stay.\n\n" +
-        "Switching leagues always clears this bar.\n" +
-        "Build next card / normal Host tools do NOT turn this on."
+        "To only hide the bar without wiping, use “Close bar”."
     );
     if (!ok) return;
 
@@ -166,6 +175,7 @@ export default function SandboxSessionChrome() {
         const res = await resetSeasonInCloud();
         if (!res.ok) {
           setNote(res.error || "Board wipe failed — bar still closed.");
+          setShow(true);
         } else {
           try {
             if (isSandboxMode()) {
@@ -205,15 +215,26 @@ export default function SandboxSessionChrome() {
                 Dry-run until {openLabel} · sim scores, no career bank
               </p>
             </div>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void exitHostAndWipe()}
-              className="shrink-0 min-h-[44px] px-3.5 rounded-xl bg-red-500 text-white text-xs font-extrabold inline-flex items-center touch-manipulation disabled:opacity-50 border border-red-300/40"
-              title="Close this bar and wipe the dry-run board"
-            >
-              {busy ? "Exiting…" : "Exit Host"}
-            </button>
+            <div className="flex shrink-0 gap-1.5">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={closeHopBarOnly}
+                className="min-h-[44px] px-3 rounded-xl bg-black/50 text-amber-100 text-xs font-bold inline-flex items-center touch-manipulation disabled:opacity-50 border border-amber-400/40"
+                title="Hide hop bar only — keeps dry-run board"
+              >
+                Close bar
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void exitHostAndWipe()}
+                className="min-h-[44px] px-3 rounded-xl bg-red-500 text-white text-xs font-extrabold inline-flex items-center touch-manipulation disabled:opacity-50 border border-red-300/40"
+                title="Close bar and wipe dry-run cards/picks/scores"
+              >
+                {busy ? "Wiping…" : "Wipe board"}
+              </button>
+            </div>
           </div>
           <div className="flex gap-1.5 overflow-x-auto phone-h-scroll pb-0.5 -mx-0.5 px-0.5">
             {HOPS.map((h) => {
@@ -242,9 +263,10 @@ export default function SandboxSessionChrome() {
             </p>
           )}
           <p className="text-[9px] text-amber-200/60 leading-snug">
-            Opt-in only — normal Host tools (card / score) do not turn this on.{" "}
-            <strong className="text-red-300">Exit Host</strong> closes bar +
-            wipes dry-run.
+            Opt-in only.{" "}
+            <strong className="text-amber-100">Close bar</strong> hides hops.{" "}
+            <strong className="text-red-300">Wipe board</strong> clears dry-run
+            cards/picks for this room.
           </p>
         </div>
       </div>

@@ -284,6 +284,7 @@ export default function ProfilePage() {
         playerId: player.id,
         playerName: player.name,
         leagueTrophies,
+        sportId: getLeague()?.sportId,
       });
     } catch {
       return [];

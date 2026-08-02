@@ -3,9 +3,9 @@
 /**
  * Always-on wall for last season’s hardware.
  * CFB: Kahmann · Strayer · Big Ball Ben (2025–26 Excel).
- * NFL: Maria Super Bowl (2025) — Vonnaggio shows gold family hardware.
+ * NFL: Maria Super Bowl (2025) — Vonnagio Family Vacay shows gold family hardware.
  *
- * Championship art is tappable (5 consecutive taps → easter egg in Vonnaggio).
+ * Championship art is tappable (5 consecutive taps → easter egg in Vonnagio).
  */
 
 import { useState } from "react";

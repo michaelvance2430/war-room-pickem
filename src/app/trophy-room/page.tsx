@@ -4,9 +4,9 @@
  * Trophy Room — view engraved hardware.
  * All awards auto-engrave (no manual fill form). Host can Sync anytime.
  *
- * Vonnaggio Family Vacation: Maria’s 2025 gold hardware is full color;
+ * Vonnagio Family Vacay (HAT42A): Maria’s 2025 gold hardware is full color;
  * current season championship shelf is grey until this year crowns.
- * Five consecutive taps on championship art → Family Vacation Gold egg.
+ * Five consecutive taps on championship art → Family Vacay Gold egg.
  */
 
 import { useEffect, useState } from "react";
@@ -158,7 +158,13 @@ export default function TrophyRoomPage() {
       if (relink.ok) {
         relinkMsg =
           sid === "nfl"
-            ? "Last season Super Bowl on the wall."
+            ? isVonnaggioLeague(
+                getLeague()?.name,
+                getLeague()?.id,
+                getLeague()?.code
+              )
+              ? "Last season Vonnagio gold hardware on the wall."
+              : "Last season Super Bowl on the wall."
             : "Last season Excel hardware on the wall.";
       }
       setSyncMsg([res.message, relinkMsg].filter(Boolean).join(" · "));
@@ -174,9 +180,17 @@ export default function TrophyRoomPage() {
     const sid = sportId || getLeague()?.sportId || "cfb";
     const confirmMsg =
       sid === "nfl"
-        ? "Award last year's Super Bowl trophy in this NFL room?\n\n" +
-          "· Super Bowl Champion → Maria\n\n" +
-          "Announced at the start of Week 1 (ring ceremony). Safe to re-run. Links her profile when “Maria” is on the roster."
+        ? isVonnaggioLeague(
+            getLeague()?.name,
+            getLeague()?.id,
+            getLeague()?.code
+          )
+          ? "Award last year's Vonnagio championship in this room?\n\n" +
+            "· Vonnagio Champion → Maria (gold family hardware)\n\n" +
+            "Same trophy from last year's fantasy pool. Safe to re-run. Links her profile when “Maria” is on the roster."
+          : "Award last year's Super Bowl trophy in this NFL room?\n\n" +
+            "· Super Bowl Champion → Maria\n\n" +
+            "Announced at the start of Week 1 (ring ceremony). Safe to re-run. Links her profile when “Maria” is on the roster."
         : "Engrave full 2025–26 Excel season into this Trophy Room?\n\n" +
           "· Championship → Kahmann\n" +
           "· Toilet Bowl → Justin Strayer\n" +
@@ -458,12 +472,16 @@ export default function TrophyRoomPage() {
                   {busy
                     ? "Engraving…"
                     : sportId === "nfl"
-                      ? "Award Maria Super Bowl (2025)"
+                      ? vonnaggio
+                        ? "Award Maria Vonnagio gold (2025)"
+                        : "Award Maria Super Bowl (2025)"
                       : "Import 2025–26 season (Excel)"}
                 </button>
                 <p className="text-[11px] text-muted">
                   {sportId === "nfl"
-                    ? `NFL ${getPriorSeasonLabel("nfl")} · Maria Super Bowl · ring at Week 1 open`
+                    ? vonnaggio
+                      ? "Vonnagio · Maria 2025 gold family hardware"
+                      : `NFL ${getPriorSeasonLabel("nfl")} · Maria Super Bowl · ring at Week 1 open`
                     : "Full 2025–26 · Kahmann Champ · Strayer Toilet · Big Ball Ben Nerd"}
                 </p>
               </div>

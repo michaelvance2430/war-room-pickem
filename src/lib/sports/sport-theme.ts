@@ -189,7 +189,8 @@ export async function reassertLeagueSportToCloud(
       .from("leagues")
       .update({
         sport_id: sportId,
-        crystal_ball_enabled: sportId === "cfb",
+        // Crystal Ball is CFB pride pick; NFL uses Super Bowl pride (still bool column)
+        crystal_ball_enabled: true,
       })
       .eq("id", leagueId);
     if (!error) {

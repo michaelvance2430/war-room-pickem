@@ -31,9 +31,6 @@ const SEEN_KEY = "warroom-cold-open-seen-v2";
 /** Per-league pack memory — avoid same slots season after season */
 const PACK_MEMORY_KEY = "warroom-cold-open-pack-memory-v1";
 
-/** Optional ambient video (poster-only is fine if missing) */
-export const WEEKLY_COLD_OPEN_VIDEO_SRC = "/videos/kahmann-cold-open.mp4";
-
 /** Shared brand with GazettePaper / buildGazetteEdition */
 export const GAZETTE_STATION = {
   callSign: "WRG",

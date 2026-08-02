@@ -1551,7 +1551,7 @@ export async function saveResultsAndScoreWeek(opts: {
       mayScore = false;
     }
   }
-  if (!mayScore) {
+  if (!mayScore || !session?.leagueId) {
     return { ok: false, scoredCount: 0, error: "Commissioner or deputy only" };
   }
 

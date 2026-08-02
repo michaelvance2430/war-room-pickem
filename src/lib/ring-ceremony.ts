@@ -72,7 +72,7 @@ export function getRingCeremonyPack(
   const threePeat = !!opts?.threePeat;
 
   if (sport === "nfl") {
-    // Vonnaggio Family Vacation → custom gold family hardware (not Lombardi)
+    // Vonnagio Family Vacay → custom gold family hardware (not Lombardi)
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { isVonnaggioLeague } =
@@ -91,19 +91,19 @@ export function getRingCeremonyPack(
             ? "Three years with the family hardware. The gold man is basically on a lease with their name on it."
             : "Lights up. Phones out. That's the gold family hardware — not the silver football. Theirs until someone rips it off them.",
           champKicker: threePeat
-            ? "Three-peat · Vonnaggio hardware"
-            : "Defending Vonnaggio champion",
+            ? "Three-peat · Vonnagio hardware"
+            : "Defending Vonnagio champion",
           ringLease: threePeat
             ? "Nobody's taking this gold form without a knife fight on the card. Until then? It's theirs. Loudly."
-            : "Last year's Family Vacation hardware. Same trophy the room already knows — now it lives on this board.",
+            : "Last year's Family Vacay hardware. Same trophy the room already knows — now it lives on this board.",
           youWonLine:
             "That's YOUR gold hardware. Screenshot this. Text the group chat. Make them mad before kickoff.",
           theyWonLine:
             "This is the champ everyone's hunting. Bow once to the gold form, then try to steal it all year.",
           stageFigureLabel: "Gold form · family hardware",
           hardwareName: threePeat
-            ? "Dynasty Vonnaggio trophy"
-            : "Vonnaggio championship trophy",
+            ? "Dynasty Vonnagio trophy"
+            : "Vonnagio championship trophy",
           ctaHardware: "See the trophy room",
           ctaShare: "Share this flex",
           ctaEnter: "Alright, let's play",

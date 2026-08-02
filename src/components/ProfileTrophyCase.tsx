@@ -75,7 +75,7 @@ function Plaque({
         >
           <HardwareTrophyIcon
             kind={item.kind}
-            sportId={sportId}
+            sportId={item.sportId || sportId}
             size={item.kind === "championship" ? 52 : 48}
             animate={false}
             leagueName={leagueName}

@@ -8,28 +8,55 @@ import {
   listScoredWeekNumbers,
   setLeagueActiveWeek,
 } from "@/lib/cloud";
-import { SEASON_MAX_WEEK } from "@/lib/season-calendar";
-import { isOps } from "@/lib/league";
+import {
+  firstSeasonWeek,
+  seasonMaxWeek,
+  weekTitle,
+} from "@/lib/season-calendar";
+import { getLeague, isOps } from "@/lib/league";
 
-export function weekProgressLabel(week: number): string {
-  const w = Math.max(0, Math.min(SEASON_MAX_WEEK, week));
-  return `Week ${w} / ${SEASON_MAX_WEEK}`;
+function activeSportId(): string | null {
+  try {
+    return getLeague()?.sportId || null;
+  } catch {
+    return null;
+  }
+}
+
+/** Pill label e.g. "Week 3 / 22" (NFL) or "Week 0 / 18" (CFB). */
+export function weekProgressLabel(
+  week: number,
+  sportId?: string | null
+): string {
+  const sid = sportId ?? activeSportId();
+  const max = seasonMaxWeek(sid);
+  const first = firstSeasonWeek(sid);
+  // NFL has no week 0 — show Preseason when stale 0 is stored
+  if (sid === "nfl" && week <= 0) {
+    return `Preseason · / ${max}`;
+  }
+  const w = Math.max(first, Math.min(max, week));
+  return `${weekTitle(w, sid)} · ${w} / ${max}`;
 }
 
 /**
  * If `active` is already scored, return the first unscored week at or after active+1
- * (capped at SEASON_MAX_WEEK). Otherwise return active.
+ * (capped at season max). Otherwise return active.
  */
 export function advancePastScoredWeeks(
   active: number,
-  scored: number[]
+  scored: number[],
+  sportId?: string | null
 ): number {
+  const sid = sportId ?? activeSportId();
+  const max = seasonMaxWeek(sid);
+  const first = firstSeasonWeek(sid);
   const scoredSet = new Set(scored);
-  let w = active;
-  // Cap loops
-  for (let i = 0; i <= SEASON_MAX_WEEK + 1; i++) {
-    if (!scoredSet.has(w) || w >= SEASON_MAX_WEEK) break;
-    w = Math.min(SEASON_MAX_WEEK, w + 1);
+  let w = Math.max(first, active);
+  if (sid === "nfl" && active <= 0) w = first;
+  for (let i = 0; i <= max + 1; i++) {
+    if (!scoredSet.has(w) || w >= max) break;
+    w = Math.min(max, w + 1);
   }
   return w;
 }
@@ -47,8 +74,12 @@ export async function resolvePlayerActiveWeek(opts?: {
   advanced: boolean;
   scored: number[];
 }> {
-  const leagueWeek = await loadLeagueActiveWeek();
-  // Creator eyes: stay on the preview week (don't auto-advance past "scored")
+  const sid = activeSportId();
+  const first = firstSeasonWeek(sid);
+  let leagueWeek = await loadLeagueActiveWeek();
+  // NFL: never treat week 0 as real open week
+  if (sid === "nfl" && leagueWeek <= 0) leagueWeek = first;
+
   try {
     const { isEyesLocalPlayActive } = await import("./creator-eyes");
     if (isEyesLocalPlayActive()) {
@@ -68,12 +99,11 @@ export async function resolvePlayerActiveWeek(opts?: {
   } catch {
     scored = [];
   }
-  const week = advancePastScoredWeeks(leagueWeek, scored);
+  const week = advancePastScoredWeeks(leagueWeek, scored, sid);
   const advanced = week !== leagueWeek;
 
   if (advanced && opts?.persistIfOps && isOps()) {
     try {
-      // setLeagueActiveWeek requires ops session — already checked
       await setLeagueActiveWeek(week);
       try {
         localStorage.setItem("warroom-active-week", String(week));
@@ -84,7 +114,6 @@ export async function resolvePlayerActiveWeek(opts?: {
       /* ignore */
     }
   } else if (advanced) {
-    // Local only so picks/home agree even if cloud still lags
     try {
       localStorage.setItem("warroom-active-week", String(week));
     } catch {
@@ -99,8 +128,9 @@ export async function resolvePlayerActiveWeek(opts?: {
 export async function advanceLeagueAfterScore(
   scoredWeek: number
 ): Promise<{ ok: boolean; next?: number; error?: string }> {
+  const max = seasonMaxWeek(activeSportId());
   const next = scoredWeek + 1;
-  if (next > SEASON_MAX_WEEK) {
+  if (next > max) {
     return { ok: true, next: scoredWeek };
   }
   const res = await setLeagueActiveWeek(next);
