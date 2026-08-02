@@ -396,6 +396,24 @@ export default function FounderDashboardPage() {
           </button>
         </div>
 
+        {/* Quick: weekly cold open formatting preview */}
+        <section className="rounded-2xl border-2 border-amber-400/45 bg-amber-500/10 p-4 space-y-2">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-300">
+            Weekly cold open · formatting check
+          </p>
+          <p className="text-xs text-muted leading-relaxed">
+            Play the Kahmann / Kalshi broadcast here — same layout players get
+            after Aug 16. Preview does not burn the once-per-week flag.
+          </p>
+          <button
+            type="button"
+            onClick={() => jumpPopup("cold")}
+            className="w-full py-3.5 min-h-[52px] rounded-xl bg-amber-400 text-black text-sm font-extrabold touch-manipulation active:scale-[0.99]"
+          >
+            ▶ Watch cold open
+          </button>
+        </section>
+
         {/* ========== CRITICAL: first hour ========== */}
         <section
           id="first-hour"

@@ -71,7 +71,26 @@ export default function WeeklyColdOpenModal() {
   }, []);
 
   useEffect(() => {
-    if (isGuestMode()) return;
+    function onForce(e: Event) {
+      const ce = e as CustomEvent<{ preview?: boolean }>;
+      const isPreview = ce.detail?.preview !== false;
+      // Foundry preview: always open (even guest/demo edge cases for creator)
+      if (!isPreview) {
+        if (!claimSessionDrama("weekly_cold_open")) return;
+      } else {
+        clearSessionDrama("weekly_cold_open");
+      }
+      openBroadcast({ preview: isPreview });
+    }
+
+    // Force listener always on — Foundry “watch” must work for formatting checks
+    window.addEventListener(EVENT_FORCE_WEEKLY_COLD_OPEN, onForce);
+
+    if (isGuestMode()) {
+      return () => {
+        window.removeEventListener(EVENT_FORCE_WEEKLY_COLD_OPEN, onForce);
+      };
+    }
 
     function tryOpen() {
       const session = getSession();
@@ -89,21 +108,8 @@ export default function WeeklyColdOpenModal() {
       openBroadcast({ preview: false });
     }
 
-    function onForce(e: Event) {
-      const ce = e as CustomEvent<{ preview?: boolean }>;
-      const isPreview = ce.detail?.preview !== false;
-      // Preview from Foundry: skip session drama / tutorial gates
-      if (!isPreview) {
-        if (!claimSessionDrama("weekly_cold_open")) return;
-      } else {
-        clearSessionDrama("weekly_cold_open");
-      }
-      openBroadcast({ preview: isPreview });
-    }
-
     const t = window.setTimeout(tryOpen, 900);
     window.addEventListener("warroom-first-week-progress", tryOpen);
-    window.addEventListener(EVENT_FORCE_WEEKLY_COLD_OPEN, onForce);
     return () => {
       window.clearTimeout(t);
       window.removeEventListener("warroom-first-week-progress", tryOpen);

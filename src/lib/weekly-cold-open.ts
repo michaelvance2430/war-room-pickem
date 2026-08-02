@@ -21,15 +21,22 @@ export const EVENT_FORCE_WEEKLY_COLD_OPEN = "warroom-force-weekly-cold-open";
 /** Fire from Foundry — preview only (does not burn the once-per-week flag). */
 export function requestWeeklyColdOpenPreview(): void {
   if (typeof window === "undefined") return;
-  try {
-    window.dispatchEvent(
-      new CustomEvent(EVENT_FORCE_WEEKLY_COLD_OPEN, {
-        detail: { preview: true },
-      })
-    );
-  } catch {
-    /* ignore */
-  }
+  const fire = () => {
+    try {
+      window.dispatchEvent(
+        new CustomEvent(EVENT_FORCE_WEEKLY_COLD_OPEN, {
+          detail: { preview: true },
+        })
+      );
+    } catch {
+      /* ignore */
+    }
+  };
+  // Immediate + retries so Foundry works even if modal just mounted
+  fire();
+  window.setTimeout(fire, 50);
+  window.setTimeout(fire, 200);
+  window.setTimeout(fire, 500);
 }
 
 export type WeeklyColdOpenCopy = {
