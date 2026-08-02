@@ -453,8 +453,62 @@ function champNameCall(name: string): string {
 }
 
 /**
+ * CFB inaugural cold open — LOCKED.
+ *
+ * Foundry-approved first package for the upcoming CFB season
+ * (defending champ year = PRIOR_SEASON_YEAR / 2025 Excel hardware).
+ *
+ * Foundry preview + live players always get this exact copy.
+ * Do NOT rotate, rehash, or rewrite without explicit product sign-off.
+ * Later CFB seasons (champ year > 2025) use the variety banks below.
+ */
+export const CFB_INAUGURAL_COLD_OPEN_PACK_ID = "cfb-inaugural-locked-v1";
+
+export function isCfbInauguralColdOpenLocked(
+  sportId?: string | null,
+  champYear?: number
+): boolean {
+  const sport = resolvePriorSport(sportId);
+  const year = champYear ?? PRIOR_SEASON_YEAR;
+  return sport === "cfb" && year === PRIOR_SEASON_YEAR;
+}
+
+/** Frozen inaugural CFB package — the one locked from Foundry sign-off. */
+function buildCfbInauguralLockedCopy(ctx: CopyCtx): WeeklyColdOpenCopy {
+  const nameCall = isKahmann(ctx.name)
+    ? `${ctx.name} (say it with us — COMMON)`
+    : ctx.nameCall;
+
+  return {
+    stamp: `${GAZETTE_STATION.callSign} · ${GAZETTE_STATION.desk}`,
+    wanted: "Have you seen this man?",
+    headline: `${ctx.name}: known time traveler — some even say a cheat`,
+    phonetic: champPhonetic(ctx.name),
+    body:
+      `Gazette Network has it on the record: ${nameCall} is a known time traveler. ` +
+      `Room veterans have long whispered that the reigning champ (${ctx.year} ${ctx.hardware}) ` +
+      `somehow always knows next week’s scores before the rest of us lock. ` +
+      `Some even say a cheat. Investigative Desk has not recovered a DeLorean — ` +
+      `but the pattern is hard to unsee. This is the week-before package: ` +
+      `face on the carton, name in the paper, target on their back.`,
+    kalshi:
+      `Kalshi odds have ${ctx.name} definitely not winning this year. Markets price the time-travel edge as spent. The board is open — the tape says no.`,
+    cta: "Cool — back to the room",
+    ctaGazette: "Open the Gazette",
+    hardwareLabel: `${ctx.year} War Room champion`,
+    foot:
+      "One-time preseason drop — the week before kickoff. When the host scores a week, the full Gazette still drops with crowns, shame, and the works.",
+    packId: CFB_INAUGURAL_COLD_OPEN_PACK_ID,
+    editionLine: `Once per season · week before open · ${ctx.year} champ package · ${ctx.room} · inaugural CFB (locked)`,
+  };
+}
+
+/**
  * Mix banks with a seed that changes by league, season, sport, and champ.
  * Per-league memory keeps consecutive seasons from replaying the same slots.
+ *
+ * Exception: CFB inaugural (2025 champ year) is hard-locked — see
+ * buildCfbInauguralLockedCopy. Foundry + live always match.
  */
 export function getWeeklyColdOpenCopy(
   subject: { name: string; year?: number; userId?: string | null },
@@ -473,6 +527,24 @@ export function getWeeklyColdOpenCopy(
   const leagueId = o.leagueId || league?.id || "local";
   const room = (o.leagueName || league?.name || "War Room").trim();
   const bits = sportBits(sport, year);
+
+  const ctx: CopyCtx = {
+    name,
+    nameCall: champNameCall(name),
+    year,
+    sport,
+    hardware: bits.hardware,
+    hardwareShort: bits.hardwareShort,
+    room,
+    dayLabel: bits.dayLabel,
+  };
+
+  // ── LOCKED: upcoming CFB season’s first cold open (Foundry-approved) ──
+  // forceSalt must not break the lock — this is the package for this league year.
+  if (isCfbInauguralColdOpenLocked(sport, year)) {
+    return buildCfbInauguralLockedCopy(ctx);
+  }
+
   const champKey = (subject.userId || name).toLowerCase().replace(/\s+/g, "-");
   const seasonKey = `${year}:${sport}:${champKey}`;
   const baseSeed = [
@@ -507,19 +579,8 @@ export function getWeeklyColdOpenCopy(
   // nudge body by league hash (rare; memory usually handles it).
   const bodyIdx =
     bi === 0 && hi === 0 && wi === 0
-      ? (hashStr(baseSeed + "|nudge") % BODY_BANK.length)
+      ? hashStr(baseSeed + "|nudge") % BODY_BANK.length
       : bi;
-
-  const ctx: CopyCtx = {
-    name,
-    nameCall: champNameCall(name),
-    year,
-    sport,
-    hardware: bits.hardware,
-    hardwareShort: bits.hardwareShort,
-    room,
-    dayLabel: bits.dayLabel,
-  };
 
   // Champ-specific spice layered on top of the rotating bank (never the whole package)
   let body = BODY_BANK[bodyIdx]!(ctx);

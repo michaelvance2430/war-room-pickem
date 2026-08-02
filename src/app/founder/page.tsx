@@ -403,9 +403,13 @@ export default function FounderDashboardPage() {
           </p>
           <p className="text-xs text-muted leading-relaxed">
             Week before the season only — once per player. Wanted carton with
-            the defending champ’s profile pic. Copy mixes by league + season +
-            sport + champ (~thousands of combos) so it doesn’t read the same
-            year after year or room after room. Preview does not burn the flag.
+            the defending champ’s profile pic.{" "}
+            <strong className="text-foreground">
+              CFB inaugural (2025 champ) is LOCKED
+            </strong>{" "}
+            — Foundry + live always match that package (no remix). Later seasons
+            / NFL still rotate so it doesn’t go stale. Preview does not burn the
+            flag.
           </p>
           <button
             type="button"
