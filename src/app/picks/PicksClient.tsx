@@ -579,7 +579,12 @@ export default function PicksClient() {
       /* ok */
     }
 
-    // Fail-safe: keep retrying a few times — never "pull to reopen"
+    // Hard ceiling — never leave "Loading the card…" forever
+    const hardBusyOff = window.setTimeout(() => {
+      if (!cancelled) setCardBusy(false);
+    }, 3_000);
+
+    // Fail-safe: retry a few times, then stop spinning
     let failSafeAttempts = 0;
     const failSafe = window.setInterval(() => {
       if (cancelled) return;
@@ -588,7 +593,7 @@ export default function PicksClient() {
         return;
       }
       failSafeAttempts += 1;
-      if (failSafeAttempts > 4) {
+      if (failSafeAttempts > 3) {
         window.clearInterval(failSafe);
         setCardBusy(false);
         return;
@@ -602,114 +607,140 @@ export default function PicksClient() {
         isInitial: true,
         forceReloadPicks: true,
       });
-    }, 3_500);
+    }, 2_500);
+
+    /** Paint local practice card into state (tutorial / trial sandbox). */
+    async function paintPracticeFromLocal(): Promise<boolean> {
+      try {
+        const {
+          BORED_PRACTICE_WEEK,
+          loadBoredLocalCard,
+          loadBoredLocalPicks,
+          loadBoredLocalResults,
+          isBoredPracticeActive,
+        } = await import("@/lib/bored-practice");
+
+        let card = loadBoredLocalCard();
+        // URL said practice but storage empty — re-mint so tutorial never blanks
+        if (!card?.games?.length || !isBoredPracticeActive()) {
+          const { startBoredPracticeWeek } = await import(
+            "@/lib/bored-practice-run"
+          );
+          const { isBoredPracticeWindowOpen } = await import(
+            "@/lib/bored-practice"
+          );
+          if (!isBoredPracticeWindowOpen()) return false;
+          const res = await startBoredPracticeWeek();
+          if (!res.ok) return false;
+          card = loadBoredLocalCard();
+        }
+        if (!card?.games?.length) return false;
+        if (cancelled) return false;
+
+        setPracticeMode(true);
+        practiceModeRef.current = true;
+        setPracticeFromUrl(true);
+        setActiveWeek(BORED_PRACTICE_WEEK);
+        setViewWeek(BORED_PRACTICE_WEEK);
+        viewWeekRef.current = BORED_PRACTICE_WEEK;
+        setGames(card.games);
+        setProp(card.prop);
+        setHasCard(true);
+        hasCardRef.current = true;
+        setLeagueName("Trial sandbox (not live)");
+        setPublishedWeeks([]);
+        setScoredWeeks([]);
+        setLoadError(null);
+        setCardNotice(
+          "Trial card — not the real season. Lock it to learn the job."
+        );
+        setChaosArmed(false);
+        setChaosLockedWeek(false);
+        setChaosConfirm(false);
+        setCardBusy(false);
+        // Keep URL in practice mode so Nav hop can exit cleanly, and so
+        // leavePractice effect does not wipe the card mid-paint.
+        try {
+          const run =
+            card.runId != null ? String(card.runId) : "1";
+          const path = `/picks?week=${BORED_PRACTICE_WEEK}&practice=1&run=${run}`;
+          if (!window.location.search.includes("practice=1")) {
+            window.history.replaceState({}, "", path);
+          }
+        } catch {
+          /* ok */
+        }
+
+        const mine = loadBoredLocalPicks();
+        const validIds = new Set(card.games.map((g) => g.id));
+        const locked =
+          !!mine?.lockedAt &&
+          mine.runId === card.runId &&
+          Object.keys(mine.picks || {}).some((id) => validIds.has(id));
+
+        if (locked && mine) {
+          const filtered: Record<string, (typeof mine.picks)[string]> = {};
+          for (const [id, p] of Object.entries(mine.picks || {})) {
+            if (validIds.has(id)) filtered[id] = p;
+          }
+          setPicks(filtered);
+          picksRef.current = filtered;
+          setBestBetId(
+            mine.bestBetId && validIds.has(mine.bestBetId)
+              ? mine.bestBetId
+              : null
+          );
+          bestBetRef.current =
+            mine.bestBetId && validIds.has(mine.bestBetId)
+              ? mine.bestBetId
+              : null;
+          setPropChoice(mine.propChoice);
+          propChoiceRef.current = mine.propChoice;
+          setSaved(true);
+          savedRef.current = true;
+          const used = Object.values(filtered)
+            .map((p) => p.confidence)
+            .filter((c) => c > 0);
+          setUsedConfidence(used);
+          const localRes = loadBoredLocalResults();
+          if (localRes?.results && localRes.runId === card.runId) {
+            setWeekResults(localRes.results);
+            setWeekPropResult(localRes.propResult);
+            setWeekScoredAt(localRes.scoredAt);
+            setPracticeScored(true);
+          }
+        } else {
+          setPicks({});
+          picksRef.current = {};
+          setBestBetId(null);
+          setPropChoice(null);
+          setSaved(false);
+          setUsedConfidence([]);
+        }
+        return true;
+      } catch {
+        return false;
+      }
+    }
 
     void (async () => {
-      // Bored practice: ONLY via explicit URL (?practice=1 or week=99).
+      // Practice URL or active tutorial sandbox
       let practice = false;
       try {
-        const { isBoredPracticeUrl } = await import("@/lib/bored-practice");
-        practice = isBoredPracticeUrl();
+        const { isBoredPracticeUrl, isBoredPracticeActive } = await import(
+          "@/lib/bored-practice"
+        );
+        practice = isBoredPracticeUrl() || isBoredPracticeActive();
       } catch {
         /* ok */
       }
 
       if (practice) {
-        try {
-          const {
-            BORED_PRACTICE_WEEK,
-            loadBoredLocalCard,
-            loadBoredLocalPicks,
-            loadBoredLocalResults,
-            isBoredPracticeActive,
-            exitBoredPracticeToLive,
-          } = await import("@/lib/bored-practice");
-          if (!isBoredPracticeActive()) {
-            exitBoredPracticeToLive();
-            if (typeof window !== "undefined") {
-              const u = new URL(window.location.href);
-              u.searchParams.delete("practice");
-              u.searchParams.delete("run");
-              u.searchParams.delete("fresh");
-              if (u.searchParams.get("week") === "99") {
-                u.searchParams.delete("week");
-              }
-              window.history.replaceState({}, "", u.pathname + u.search);
-            }
-          } else {
-            const card = loadBoredLocalCard();
-            if (card?.games?.length) {
-              setPracticeMode(true);
-              practiceModeRef.current = true;
-              setActiveWeek(BORED_PRACTICE_WEEK);
-              setViewWeek(BORED_PRACTICE_WEEK);
-              viewWeekRef.current = BORED_PRACTICE_WEEK;
-              setGames(card.games);
-              setProp(card.prop);
-              setHasCard(true);
-              setLeagueName("Practice (not live)");
-              setPublishedWeeks([]);
-              setScoredWeeks([]);
-              setLoadError(null);
-              setCardNotice(null);
-              setChaosArmed(false);
-              setChaosLockedWeek(false);
-              setChaosConfirm(false);
-              setCardBusy(false);
-
-              const mine = loadBoredLocalPicks();
-              const validIds = new Set(card.games.map((g) => g.id));
-              const locked =
-                !!mine?.lockedAt &&
-                mine.runId === card.runId &&
-                Object.keys(mine.picks || {}).some((id) => validIds.has(id));
-
-              if (locked && mine) {
-                const filtered: Record<string, (typeof mine.picks)[string]> =
-                  {};
-                for (const [id, p] of Object.entries(mine.picks || {})) {
-                  if (validIds.has(id)) filtered[id] = p;
-                }
-                setPicks(filtered);
-                picksRef.current = filtered;
-                setBestBetId(
-                  mine.bestBetId && validIds.has(mine.bestBetId)
-                    ? mine.bestBetId
-                    : null
-                );
-                bestBetRef.current =
-                  mine.bestBetId && validIds.has(mine.bestBetId)
-                    ? mine.bestBetId
-                    : null;
-                setPropChoice(mine.propChoice);
-                propChoiceRef.current = mine.propChoice;
-                setSaved(true);
-                savedRef.current = true;
-                const used = Object.values(filtered)
-                  .map((p) => p.confidence)
-                  .filter((c) => c > 0);
-                setUsedConfidence(used);
-                const localRes = loadBoredLocalResults();
-                if (localRes?.results && localRes.runId === card.runId) {
-                  setWeekResults(localRes.results);
-                  setWeekPropResult(localRes.propResult);
-                  setWeekScoredAt(localRes.scoredAt);
-                  setPracticeScored(true);
-                }
-              } else {
-                setPicks({});
-                picksRef.current = {};
-                setBestBetId(null);
-                setPropChoice(null);
-                setSaved(false);
-                setUsedConfidence([]);
-              }
-              window.clearInterval(failSafe);
-              return;
-            }
-          }
-        } catch {
-          /* fall through */
+        const painted = await paintPracticeFromLocal();
+        if (painted) {
+          window.clearInterval(failSafe);
+          window.clearTimeout(hardBusyOff);
+          return;
         }
       }
 
@@ -717,7 +748,6 @@ export default function PicksClient() {
       setPracticeMode(false);
       practiceModeRef.current = false;
       try {
-        // Instant local week label while cloud loads
         try {
           const s = localStorage.getItem("warroom-active-week");
           const n = s != null ? parseInt(s, 10) : 1;
@@ -733,19 +763,30 @@ export default function PicksClient() {
       } catch {
         setLoadError(null);
         setCardBusy(false);
-        // One more silent retry — app recovers itself
-        if (!cancelled) {
-          window.setTimeout(() => {
-            if (cancelled) return;
-            void loadWeek(viewWeekRef.current, {
-              isInitial: true,
-              forceReloadPicks: true,
-            });
-          }, 600);
-        }
       } finally {
-        // Only stop auto-retry when games are on screen
-        if (hasCardRef.current) window.clearInterval(failSafe);
+        setCardBusy(false);
+        if (hasCardRef.current) {
+          window.clearInterval(failSafe);
+          window.clearTimeout(hardBusyOff);
+        }
+      }
+
+      // No live card + preseason window → auto trial so My Picks never blanks
+      if (!cancelled && !hasCardRef.current) {
+        try {
+          const { isBoredPracticeWindowOpen } = await import(
+            "@/lib/bored-practice"
+          );
+          if (isBoredPracticeWindowOpen()) {
+            const painted = await paintPracticeFromLocal();
+            if (painted) {
+              window.clearInterval(failSafe);
+              window.clearTimeout(hardBusyOff);
+            }
+          }
+        } catch {
+          /* leave waiting room */
+        }
       }
     })();
 
@@ -804,6 +845,7 @@ export default function PicksClient() {
     return () => {
       cancelled = true;
       window.clearInterval(failSafe);
+      window.clearTimeout(hardBusyOff);
       window.clearTimeout(subTimer);
       clearInterval(poll);
       window.clearInterval(tick);
