@@ -126,10 +126,24 @@ export default function ProfilePage() {
           }
 
           try {
-            const { loadLeagueTrophies } = await import("@/lib/trophies");
-            trophies = await loadLeagueTrophies();
+            // Multi-league career case: every room this player won that we can read
+            const { loadCareerTrophiesWonByUser, loadLeagueTrophies } =
+              await import("@/lib/trophies");
+            const career = await loadCareerTrophiesWonByUser(id, {
+              playerName: found?.name || undefined,
+            });
+            if (career.length) {
+              trophies = career;
+            } else {
+              trophies = await loadLeagueTrophies();
+            }
           } catch {
-            /* Trophy Room optional */
+            try {
+              const { loadLeagueTrophies } = await import("@/lib/trophies");
+              trophies = await loadLeagueTrophies();
+            } catch {
+              /* Trophy Room optional */
+            }
           }
 
           // Crown Cheevo King among live league (permanent storage by user id)
@@ -280,11 +294,14 @@ export default function ProfilePage() {
   const hardware: ProfileTrophy[] = useMemo(() => {
     if (!player) return [];
     try {
+      const lg = getLeague();
       return getProfileHardware({
         playerId: player.id,
         playerName: player.name,
         leagueTrophies,
-        sportId: getLeague()?.sportId,
+        sportId: lg?.sportId,
+        activeLeagueName: lg?.name,
+        activeLeagueId: lg?.id,
       });
     } catch {
       return [];

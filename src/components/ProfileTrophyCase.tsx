@@ -46,14 +46,16 @@ function Plaque({
   const meta = HARDWARE_KIND_META[item.kind];
   // Live profile name/photo — not the frozen engraving (Jstray vs Justin Strayer)
   // Vonnagio championship shares must carry league name so gold art loads
+  const plaqueLeague = item.leagueName || leagueName;
+  const plaqueSport = item.sportId || sportId;
   const sharePayload = {
     kind: item.kind,
     seasonYear: item.seasonYear,
     winnerName: liveWinnerName || item.winnerName,
-    leagueName,
+    leagueName: plaqueLeague,
     division: item.division,
     subtitle: item.subtitle,
-    sportId: sportId || undefined,
+    sportId: plaqueSport || undefined,
     winnerAvatarUrl: winnerAvatarUrl || undefined,
   };
 
@@ -75,22 +77,38 @@ function Plaque({
         >
           <HardwareTrophyIcon
             kind={item.kind}
-            sportId={item.sportId || sportId}
+            sportId={plaqueSport}
             size={item.kind === "championship" ? 52 : 48}
             animate={false}
-            leagueName={leagueName}
-            leagueId={leagueId}
-            leagueCode={leagueCode}
+            leagueName={plaqueLeague}
+            leagueId={item.leagueId || leagueId}
+            leagueCode={item.leagueCode || leagueCode}
           />
         </button>
         {canShare && <TrophyShareButton compact trophy={sharePayload} />}
       </div>
       <div className={`text-[10px] uppercase tracking-wide font-semibold ${meta.accent}`}>
         {item.seasonYear} · {item.title}
+        {item.sportId === "nfl" ? (
+          <span className="text-muted font-medium normal-case tracking-normal">
+            {" "}
+            · NFL
+          </span>
+        ) : item.sportId === "cfb" ? (
+          <span className="text-muted font-medium normal-case tracking-normal">
+            {" "}
+            · CFB
+          </span>
+        ) : null}
       </div>
+      {(item.leagueName || leagueName) && (
+        <p className="text-sm font-bold text-foreground mt-1 leading-snug">
+          {item.leagueName || leagueName}
+        </p>
+      )}
       {item.division && (
-        <div className="text-sm font-bold mt-1">
-          {divisionFullLabel(item.division, getLeague()?.sportId)}
+        <div className="text-sm font-semibold mt-0.5 text-foreground/90">
+          {divisionFullLabel(item.division, item.sportId || getLeague()?.sportId)}
         </div>
       )}
       {item.subtitle && (
@@ -289,7 +307,12 @@ export default function ProfileTrophyCase({
           Championship &amp; Toilet hardware, Village Nerd, and{" "}
           <strong className="text-foreground">Division / Conference</strong>{" "}
           titles — career flex for{" "}
-          {playerName.split(/\s+/)[0] || "this player"}. Stack every year.
+          {playerName.split(/\s+/)[0] || "this player"}.{" "}
+          <strong className="text-foreground">
+            Every league is its own plaque
+          </strong>{" "}
+          (win 3 CFB rooms in 2025 → three 2025 trophies with the room name
+          under each). Stack years and rooms.
           {hasAny ? (
             <>
               {" "}
@@ -331,13 +354,13 @@ export default function ProfileTrophyCase({
               <div key={kind} className="space-y-2">
                 {won.map((item) => (
                   <Plaque
-                    key={item.id}
+                    key={`${item.id}:${item.leagueId || item.leagueName || ""}`}
                     item={item}
-                    leagueName={leagueName}
-                    leagueId={leagueId}
-                    leagueCode={leagueCode}
+                    leagueName={item.leagueName || leagueName}
+                    leagueId={item.leagueId || leagueId}
+                    leagueCode={item.leagueCode || leagueCode}
                     canShare={canShare}
-                    sportId={sportId}
+                    sportId={item.sportId || sportId}
                     winnerAvatarUrl={winnerAvatarUrl}
                     liveWinnerName={playerName}
                     spinny={spinId === item.id}

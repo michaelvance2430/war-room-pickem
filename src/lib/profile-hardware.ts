@@ -1,6 +1,9 @@
 /**
- * Profile trophy case — career hardware from the league Trophy Room
+ * Profile trophy case — career hardware across every room the player won,
  * plus legacy engravings (seeded for known winners by display name).
+ *
+ * Multi-league: three CFB titles in three rooms → three championship plaques
+ * with the league name under each (not collapsed by year alone).
  *
  * Legacy seeds are sport-gated so Maria Super Bowl doesn’t show in CFB
  * rooms and Kahmann Excel hardware doesn’t show as NFL Super Bowl art.
@@ -29,6 +32,17 @@ export type ProfileTrophy = {
   source: "league" | "legacy";
   /** Sport this plaque belongs to (for art / gating) */
   sportId?: "cfb" | "nfl" | null;
+  /** Room that awarded this hardware — multi-league showcase */
+  leagueName?: string | null;
+  leagueId?: string | null;
+  leagueCode?: string | null;
+};
+
+/** Trophy input may carry room meta from multi-league career load */
+export type LeagueTrophyInput = LeagueTrophy & {
+  leagueName?: string | null;
+  sportId?: string | null;
+  leagueCode?: string | null;
 };
 
 function normName(s: string) {
@@ -146,10 +160,19 @@ const LEGACY_NAME_ALIASES: { pattern: RegExp; legacyId: string }[] = [
   },
 ];
 
-function leagueToProfile(t: LeagueTrophy, sportId?: string | null): ProfileTrophy {
+function leagueToProfile(
+  t: LeagueTrophyInput,
+  fallbackSport?: string | null
+): ProfileTrophy {
   const meta = TROPHY_META[t.trophyType];
   const isDiv =
     typeof t.trophyType === "string" && t.trophyType.startsWith("division_");
+  const rowSport =
+    t.sportId === "nfl" || t.sportId === "cfb"
+      ? t.sportId
+      : fallbackSport === "nfl" || fallbackSport === "cfb"
+        ? fallbackSport
+        : null;
   return {
     id: t.id,
     kind: isDiv ? "division" : (t.trophyType as ProfileTrophyKind),
@@ -162,27 +185,39 @@ function leagueToProfile(t: LeagueTrophy, sportId?: string | null): ProfileTroph
     winnerName: t.winnerName,
     source: "league",
     division: isDiv ? t.subtitle : null,
-    sportId: sportId === "nfl" || sportId === "cfb" ? sportId : null,
+    sportId: rowSport,
+    leagueName: t.leagueName || null,
+    leagueId: t.leagueId || null,
+    leagueCode: t.leagueCode || null,
   };
 }
 
 /**
- * Hardware for one player's profile: league Trophy Room rows they won
- * + legacy seeds matched by name (sport-gated to the active desk).
+ * Hardware for one player's profile: multi-league Trophy Room wins
+ * + legacy seeds matched by name (sport-gated).
+ *
+ * Dedupe: one plaque per kind · year · league (three CFB titles → three plaques).
+ * Same league + same kind + year still collapses Excel seed vs cloud double.
  */
 export function getProfileHardware(opts: {
   playerId: string;
   playerName: string;
-  leagueTrophies: LeagueTrophy[];
+  leagueTrophies: LeagueTrophyInput[];
   /** Active league sport — gates Excel vs Super Bowl legacy seeds */
   sportId?: string | null;
+  /** Active room name for legacy fill-in */
+  activeLeagueName?: string | null;
+  activeLeagueId?: string | null;
 }): ProfileTrophy[] {
   const { playerId, playerName, leagueTrophies } = opts;
   const out: ProfileTrophy[] = [];
   const seen = new Set<string>();
 
-  let sport: "cfb" | "nfl" = "cfb";
-  let vonnagio = false;
+  let activeSport: "cfb" | "nfl" = "cfb";
+  let activeVonnagio = false;
+  let activeLeagueName = opts.activeLeagueName || null;
+  let activeLeagueId = opts.activeLeagueId || null;
+  let activeLeagueCode: string | null = null;
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { isVonnaggioLeague } =
@@ -191,44 +226,63 @@ export function getProfileHardware(opts: {
     const { getLeague } = require("./league") as typeof import("./league");
     const lg = getLeague();
     const sid = opts.sportId ?? lg?.sportId;
-    sport = sid === "nfl" ? "nfl" : "cfb";
-    vonnagio =
-      sport === "nfl" &&
+    activeSport = sid === "nfl" ? "nfl" : "cfb";
+    activeLeagueName = activeLeagueName || lg?.name || null;
+    activeLeagueId = activeLeagueId || lg?.id || null;
+    activeLeagueCode = lg?.code || null;
+    activeVonnagio =
+      activeSport === "nfl" &&
       isVonnaggioLeague(lg?.name, lg?.id, lg?.code);
   } catch {
-    sport = opts.sportId === "nfl" ? "nfl" : "cfb";
-    vonnagio = false;
+    activeSport = opts.sportId === "nfl" ? "nfl" : "cfb";
   }
 
-  /**
-   * One plaque per kind · year (big hardware). Subtitle differences
-   * (Excel seed vs cloud engrave) must not stack two 2025 championships.
-   * Division titles can stack by compass slot in the same year.
-   */
   function hardwareDedupeKey(row: {
     kind: ProfileTrophyKind;
     seasonYear: number;
     subtitle?: string | null;
     division?: string | null;
+    leagueId?: string | null;
+    leagueName?: string | null;
   }): string {
-    if (row.kind === "division") {
-      return `division:${row.seasonYear}:${row.division || row.subtitle || ""}`;
-    }
     const y =
       typeof row.seasonYear === "number"
         ? row.seasonYear
         : Number.parseInt(String(row.seasonYear ?? ""), 10) || 0;
-    return `${row.kind}:${y}`;
+    const room =
+      (row.leagueId || "").trim() ||
+      (row.leagueName || "").toLowerCase().replace(/\s+/g, "-") ||
+      "room";
+    if (row.kind === "division") {
+      return `division:${y}:${room}:${row.division || row.subtitle || ""}`;
+    }
+    return `${row.kind}:${y}:${room}`;
   }
 
-  // From engraved Trophy Room (this league) — wins over legacy for same slot
+  // From engraved Trophy Room(s) — multi-league career stack
   for (const t of leagueTrophies) {
     const byId = t.winnerUserId && t.winnerUserId === playerId;
     const byName = namesMatch(t.winnerName, playerName);
     if (!byId && !byName) continue;
-    let row = leagueToProfile(t, sport);
+    const rowSport =
+      t.sportId === "nfl" || t.sportId === "cfb" ? t.sportId : activeSport;
+    let row = leagueToProfile(t, rowSport);
+    // Vonnagio gold copy when this plaque is from that room (or active desk)
+    let rowVonnagio = false;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { isVonnaggioLeague } =
+        require("./league-trophy-override") as typeof import("./league-trophy-override");
+      rowVonnagio = isVonnaggioLeague(
+        t.leagueName || activeLeagueName,
+        t.leagueId || activeLeagueId,
+        t.leagueCode || activeLeagueCode
+      );
+    } catch {
+      rowVonnagio = activeVonnagio;
+    }
     if (
-      vonnagio &&
+      rowVonnagio &&
       row.kind === "championship" &&
       (namesMatch(row.winnerName, "Maria") || /\bmaria\b/i.test(playerName))
     ) {
@@ -245,33 +299,61 @@ export function getProfileHardware(opts: {
         sportId: "nfl",
       };
     }
+    if (!row.leagueName && activeLeagueName) {
+      row = { ...row, leagueName: activeLeagueName };
+    }
+    if (!row.leagueId && (t.leagueId || activeLeagueId)) {
+      row = { ...row, leagueId: t.leagueId || activeLeagueId };
+    }
     const key = hardwareDedupeKey(row);
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(row);
   }
 
-  // Legacy seeds — only if that kind·year is not already on the case
+  // Legacy seeds — fill only if no room already has that kind·year for this sport
   for (const legacy of LEGACY_PROFILE_HARDWARE) {
-    if (legacy.sport !== sport) continue;
-    if (legacy.id === "legacy-maria-super-bowl-2025" && vonnagio) continue;
-    if (legacy.id === "legacy-maria-vonnagio-2025" && !vonnagio) continue;
+    if (legacy.sport !== activeSport) continue;
+    if (legacy.id === "legacy-maria-super-bowl-2025" && activeVonnagio)
+      continue;
+    if (legacy.id === "legacy-maria-vonnagio-2025" && !activeVonnagio)
+      continue;
 
-    const key = hardwareDedupeKey(legacy);
-    if (seen.has(key)) continue;
+    const alreadyFromAnyRoom = out.some(
+      (p) =>
+        p.kind === legacy.kind &&
+        p.seasonYear === legacy.seasonYear &&
+        (p.sportId || activeSport) === legacy.sport
+    );
+    // Allow multi-room same year; only skip legacy if we already have at least one
+    // real/league plaque for this kind·year (legacy is a single Excel fill-in)
+    if (alreadyFromAnyRoom) continue;
+
     const direct = namesMatch(legacy.winnerName, playerName);
     const alias = LEGACY_NAME_ALIASES.some(
       (a) => a.legacyId === legacy.id && a.pattern.test(playerName)
     );
     if (!direct && !alias) continue;
-    seen.add(key);
     const { sport: _s, ...rest } = legacy;
-    out.push({ ...rest, source: "legacy", sportId: legacy.sport });
+    const leg: ProfileTrophy = {
+      ...rest,
+      source: "legacy",
+      sportId: legacy.sport,
+      leagueName: activeLeagueName || "Prior season",
+      leagueId: activeLeagueId || `legacy-${legacy.id}`,
+      leagueCode: activeLeagueCode,
+    };
+    const key = hardwareDedupeKey(leg);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(leg);
   }
 
   return out.sort((a, b) => {
     if (b.seasonYear !== a.seasonYear) return b.seasonYear - a.seasonYear;
-    return a.kind.localeCompare(b.kind);
+    const kn = a.kind.localeCompare(b.kind);
+    if (kn !== 0) return kn;
+    return (a.leagueName || "").localeCompare(b.leagueName || "");
   });
 }
 

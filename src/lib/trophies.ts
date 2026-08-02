@@ -145,6 +145,158 @@ export async function loadLeagueTrophies(): Promise<LeagueTrophy[]> {
   return (data as Record<string, unknown>[]).map(mapRow);
 }
 
+/** Trophy row with room identity for multi-league career cases */
+export type CareerLeagueTrophy = LeagueTrophy & {
+  leagueName: string;
+  sportId: string | null;
+  leagueCode: string | null;
+};
+
+type LeagueEmbed = {
+  id?: string;
+  name?: string;
+  sport_id?: string;
+  code?: string;
+} | null;
+
+function mapCareerRow(
+  r: Record<string, unknown>,
+  fallback?: {
+    leagueName?: string;
+    sportId?: string | null;
+    leagueCode?: string | null;
+  }
+): CareerLeagueTrophy {
+  const base = mapRow(r);
+  const lg = r.leagues as LeagueEmbed | LeagueEmbed[] | undefined;
+  const embed = Array.isArray(lg) ? lg[0] : lg;
+  return {
+    ...base,
+    leagueId: base.leagueId || (embed?.id as string) || fallback?.leagueName || "",
+    leagueName:
+      (embed?.name as string) ||
+      fallback?.leagueName ||
+      "War Room",
+    sportId:
+      (embed?.sport_id as string) ||
+      fallback?.sportId ||
+      null,
+    leagueCode:
+      (embed?.code as string) ||
+      fallback?.leagueCode ||
+      null,
+  };
+}
+
+/**
+ * Career hardware for a player across every league the *viewer* can read
+ * (membership RLS) — plus name-match engravings in those rooms.
+ * Self profile + multi-league memberships → full showcase.
+ */
+export async function loadCareerTrophiesWonByUser(
+  userId: string,
+  opts?: { playerName?: string | null }
+): Promise<CareerLeagueTrophy[]> {
+  if (!userId) return [];
+  const supabase = createClient();
+  const byId = new Map<string, CareerLeagueTrophy>();
+  const name = (opts?.playerName || "").trim();
+
+  // 1) Direct winner link (works for every league RLS allows the viewer to see)
+  try {
+    const { data, error } = await supabase
+      .from("league_trophies")
+      .select(
+        "id, league_id, season_year, trophy_type, winner_name, winner_user_id, subtitle, notes, awarded_at, leagues(id, name, sport_id, code)"
+      )
+      .eq("winner_user_id", userId)
+      .order("season_year", { ascending: false });
+    if (!error && data) {
+      for (const raw of data as Record<string, unknown>[]) {
+        const row = mapCareerRow(raw);
+        if (row.id) byId.set(row.id, row);
+      }
+    }
+  } catch {
+    /* optional */
+  }
+
+  // 2) Walk viewer's memberships — catch name-only engravings (Excel / unlinked)
+  try {
+    const { fetchMyMemberships } = await import("@/lib/session-restore");
+    const memberships = await fetchMyMemberships();
+    for (const m of memberships) {
+      if (!m.leagueId) continue;
+      try {
+        const { data, error } = await supabase
+          .from("league_trophies")
+          .select(
+            "id, league_id, season_year, trophy_type, winner_name, winner_user_id, subtitle, notes, awarded_at"
+          )
+          .eq("league_id", m.leagueId)
+          .order("season_year", { ascending: false });
+        if (error || !data) continue;
+        for (const raw of data as Record<string, unknown>[]) {
+          const base = mapRow(raw);
+          // Include all plaques from rooms we can read; getProfileHardware
+          // filters to this player (id or name). Keeps Excel name-only wins.
+          if (byId.has(base.id)) continue;
+          byId.set(base.id, {
+            ...base,
+            leagueName: m.leagueName || "War Room",
+            sportId: m.sportId || null,
+            leagueCode: m.code || null,
+          });
+        }
+      } catch {
+        /* next league */
+      }
+    }
+  } catch {
+    /* offline */
+  }
+
+  // 3) Always merge active league (name match for peers in this room)
+  try {
+    const session = getSession();
+    const activeId = session?.leagueId;
+    if (activeId && ![...byId.values()].some((t) => t.leagueId === activeId)) {
+      const list = await loadLeagueTrophies();
+      const { getLeague } = await import("@/lib/league");
+      const lg = getLeague();
+      for (const t of list) {
+        if (byId.has(t.id)) continue;
+        const isId = t.winnerUserId === userId;
+        if (!isId && !name) continue;
+        byId.set(t.id, {
+          ...t,
+          leagueName: lg?.name || "War Room",
+          sportId: lg?.sportId || null,
+          leagueCode: lg?.code || null,
+        });
+      }
+    } else if (activeId) {
+      // Refresh active league name-only rows even if some trophies already loaded
+      const list = await loadLeagueTrophies();
+      const { getLeague } = await import("@/lib/league");
+      const lg = getLeague();
+      for (const t of list) {
+        if (byId.has(t.id)) continue;
+        byId.set(t.id, {
+          ...t,
+          leagueName: lg?.name || "War Room",
+          sportId: lg?.sportId || null,
+          leagueCode: lg?.code || null,
+        });
+      }
+    }
+  } catch {
+    /* ok */
+  }
+
+  return [...byId.values()].sort((a, b) => b.seasonYear - a.seasonYear);
+}
+
 export async function awardTrophy(opts: {
   seasonYear: number;
   trophyType: TrophyType;
