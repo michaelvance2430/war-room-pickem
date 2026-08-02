@@ -1333,81 +1333,120 @@ function PicksInner() {
           </div>
         )}
 
-        {/* Progress strip — always show when editing a live card */}
+        {/* Progress bubble — sticky under nav so it stays visible while picking */}
         {hasCard && weekEditable && !cardFrozen && games.length > 0 && (
-          <div className="mb-4 rounded-xl border border-border bg-card/80 px-3 py-2.5">
-            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted mb-1.5">
-              This card
-            </p>
-            <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs sm:text-sm">
-              <span
-                className={
-                  games.filter((g) => picks[g.id]?.pick).length >= games.length
-                    ? "text-primary font-semibold"
-                    : "text-foreground"
-                }
-              >
-                {games.filter((g) => picks[g.id]?.pick).length}/{games.length}{" "}
-                sides
-              </span>
-              <span className="text-border">·</span>
-              <span
-                className={
-                  games.filter((g) => (picks[g.id]?.confidence ?? 0) > 0)
-                    .length >= games.length
-                    ? "text-primary font-semibold"
-                    : "text-foreground"
-                }
-              >
-                {
-                  games.filter((g) => (picks[g.id]?.confidence ?? 0) > 0)
-                    .length
-                }
-                /{games.length} confidence
-              </span>
-              <span className="text-border">·</span>
-              <span
-                className={
-                  bestBetId
-                    ? "text-primary font-semibold"
-                    : "text-muted"
-                }
-              >
-                Best Bet {bestBetId ? "✓" : "—"}
-              </span>
-              {prop.question ? (
-                <>
-                  <span className="text-border">·</span>
-                  <span
-                    className={
-                      propChoice
-                        ? "text-primary font-semibold"
-                        : "text-muted"
-                    }
-                  >
-                    Prop {propChoice ? "✓" : "—"}
-                  </span>
-                </>
-              ) : null}
-            </div>
-            {(() => {
-              const used = usedConfidence.filter((c) => c >= 1 && c <= 5);
-              const left = [1, 2, 3, 4, 5].filter((c) => !used.includes(c));
-              if (left.length === 0 || left.length === 5) return null;
-              return (
-                <p className="text-[11px] text-muted mt-1.5">
-                  Confidence left:{" "}
-                  <span className="text-foreground font-semibold tabular-nums">
-                    {left.join(", ")}
-                  </span>
+          <div
+            className="sticky z-[45] mb-4 -mx-1 px-1"
+            style={{
+              // Sit just under sticky Nav header (+ safe area)
+              top: "calc(env(safe-area-inset-top, 0px) + 3.35rem)",
+            }}
+          >
+            <div
+              className={`rounded-2xl border px-3 py-2 sm:px-3.5 sm:py-2.5 shadow-[0_8px_28px_rgba(0,0,0,0.35)] backdrop-blur-md ${
+                allGamesPicked
+                  ? "border-primary/45 bg-primary/15"
+                  : "border-border/70 bg-card/75"
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted">
+                  This card
                 </p>
-              );
-            })()}
-            {allGamesPicked && (
-              <p className="text-[11px] text-primary font-semibold mt-1.5">
-                Card full — hit Save / Lock at the bottom.
-              </p>
-            )}
+                {allGamesPicked ? (
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-primary">
+                    Ready to lock ↓
+                  </p>
+                ) : (
+                  <p className="text-[10px] font-medium text-muted/90 truncate">
+                    {(() => {
+                      const need: string[] = [];
+                      if (
+                        games.filter((g) => picks[g.id]?.pick).length <
+                        games.length
+                      )
+                        need.push("sides");
+                      if (
+                        games.filter((g) => (picks[g.id]?.confidence ?? 0) > 0)
+                          .length < games.length
+                      )
+                        need.push("conf");
+                      if (!bestBetId) need.push("Best Bet");
+                      if (prop.question && !propChoice) need.push("prop");
+                      return need.length
+                        ? `Left: ${need.join(" · ")}`
+                        : "Almost";
+                    })()}
+                  </p>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-1.5 sm:gap-2 text-[11px] sm:text-xs">
+                {(
+                  [
+                    {
+                      key: "sides",
+                      done:
+                        games.filter((g) => picks[g.id]?.pick).length >=
+                        games.length,
+                      label: `${games.filter((g) => picks[g.id]?.pick).length}/${games.length} sides`,
+                    },
+                    {
+                      key: "conf",
+                      done:
+                        games.filter((g) => (picks[g.id]?.confidence ?? 0) > 0)
+                          .length >= games.length,
+                      label: `${
+                        games.filter((g) => (picks[g.id]?.confidence ?? 0) > 0)
+                          .length
+                      }/${games.length} conf`,
+                    },
+                    {
+                      key: "bb",
+                      done: !!bestBetId,
+                      label: bestBetId ? "Best Bet ✓" : "Best Bet —",
+                    },
+                    ...(prop.question
+                      ? [
+                          {
+                            key: "prop",
+                            done: !!propChoice,
+                            label: propChoice ? "Prop ✓" : "Prop —",
+                          },
+                        ]
+                      : []),
+                  ] as { key: string; done: boolean; label: string }[]
+                ).map((chip) => (
+                  <span
+                    key={chip.key}
+                    className={`inline-flex items-center rounded-full px-2 py-0.5 font-semibold tabular-nums border ${
+                      chip.done
+                        ? "border-primary/40 bg-primary/15 text-primary"
+                        : "border-border/60 bg-black/30 text-foreground/85"
+                    }`}
+                  >
+                    {chip.label}
+                  </span>
+                ))}
+              </div>
+              {(() => {
+                const used = usedConfidence.filter((c) => c >= 1 && c <= 5);
+                const left = [1, 2, 3, 4, 5].filter((c) => !used.includes(c));
+                if (left.length === 0 || left.length === 5) return null;
+                return (
+                  <p className="text-[11px] text-muted mt-1.5">
+                    Confidence left:{" "}
+                    <span className="text-foreground font-semibold tabular-nums">
+                      {left.join(", ")}
+                    </span>
+                  </p>
+                );
+              })()}
+              {allGamesPicked && (
+                <p className="text-[11px] text-primary font-semibold mt-1.5">
+                  Card full — hit Lock at the bottom.
+                </p>
+              )}
+            </div>
           </div>
         )}
 
