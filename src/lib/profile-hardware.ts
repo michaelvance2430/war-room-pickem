@@ -4,7 +4,8 @@
  *
  * Cases:
  *  - Hardware: Championship, Toilet Bowl, Village Nerd
- *  - Division: division titles (North/South/East/West)
+ *  - Division / Conference: compass slots (NFL divisions · CFB conferences)
+ *    Same shelf — people can stack multiple years / both flavors.
  */
 
 import type { LeagueTrophy, TrophyType } from "./trophies";
@@ -24,7 +25,7 @@ export type ProfileTrophy = {
   title: string;
   subtitle?: string | null;
   notes?: string | null;
-  /** For division titles */
+  /** For division / conference titles (compass slot) */
   division?: string | null;
   winnerName: string;
   source: "league" | "legacy";
@@ -132,7 +133,7 @@ function leagueToProfile(t: LeagueTrophy): ProfileTrophy {
     kind: isDiv ? "division" : (t.trophyType as ProfileTrophyKind),
     seasonYear: t.seasonYear,
     title: isDiv
-      ? t.subtitle || meta?.title || "Conference Champions"
+      ? t.subtitle || meta?.title || "Division / Conference Champions"
       : meta?.title || t.trophyType,
     subtitle: t.subtitle,
     notes: t.notes,
@@ -189,6 +190,7 @@ export function getProfileHardware(opts: {
 
 export function splitHardwareCases(items: ProfileTrophy[]): {
   bigGame: ProfileTrophy[];
+  /** Division + conference titles — same case; stack all wins here */
   division: ProfileTrophy[];
 } {
   return {
@@ -196,6 +198,17 @@ export function splitHardwareCases(items: ProfileTrophy[]): {
     division: items.filter((i) => i.kind === "division"),
   };
 }
+
+/** Section chrome: Division | Conference side-by-side (same stack of plaques). */
+export const DIVISION_CONFERENCE_SECTION = {
+  labelA: "Division",
+  labelB: "Conference",
+  combined: "Division / Conference",
+  emptyA: "No division titles yet",
+  emptyB: "No conference titles yet",
+  blurb:
+    "NFL division crowns and CFB conference titles share this shelf — stack every year you win.",
+} as const;
 
 export const HARDWARE_KIND_META: Record<
   ProfileTrophyKind,
@@ -223,7 +236,7 @@ export const HARDWARE_KIND_META: Record<
     emoji: "🛡️",
     accent: "text-primary",
     border: "border-primary/40",
-    emptyLabel: "No division titles yet",
+    emptyLabel: "No division / conference titles yet",
   },
 };
 

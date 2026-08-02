@@ -461,7 +461,7 @@ export default function TrophyRoomPage() {
               </div>
               <p className="text-[10px] uppercase tracking-wider text-muted font-bold mb-2">
                 {sportId === "nfl"
-                  ? "Division titles"
+                  ? "Division / Conference"
                   : "Conference titles"}
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
