@@ -1,14 +1,10 @@
 "use client";
 
 import { useState, useEffect, Fragment } from "react";
-import dynamic from "next/dynamic";
 import SwingBadge from "@/components/SwingBadge";
+import CrownAndShame from "@/components/CrownAndShame";
 import { loadLeaguePlayers } from "@/lib/cloud";
 import { pageLoad } from "@/lib/smooth";
-
-const CrownAndShame = dynamic(() => import("@/components/CrownAndShame"), {
-  ssr: false,
-});
 import { getSession, getLeague } from "@/lib/league";
 import { rankPlayersWithSwings } from "@/lib/fun-board";
 import { compareForSeed } from "@/lib/brackets";
@@ -72,13 +68,21 @@ export default function StandingsPage() {
       try {
         const list = await pageLoad(loadLeaguePlayers(), []);
         if (cancelled) return;
-        setPlayers(list);
-        const ranked = rankPlayersWithSwings(list, getLeague()?.sportId);
-        const map: Record<string, (typeof ranked)[0]["swing"]> = {};
-        for (const r of ranked) map[r.id] = r.swing;
-        setSwingById(map);
+        setPlayers(Array.isArray(list) ? list : []);
+        try {
+          const ranked = rankPlayersWithSwings(
+            Array.isArray(list) ? list : [],
+            getLeague()?.sportId
+          );
+          const map: Record<string, (typeof ranked)[0]["swing"]> = {};
+          for (const r of ranked) map[r.id] = r.swing;
+          setSwingById(map);
+        } catch {
+          setSwingById({});
+        }
       } catch {
         /* offline / cloud — leave empty after loading clears */
+        if (!cancelled) setPlayers([]);
       } finally {
         window.clearTimeout(failSafe);
         if (!cancelled) setLoading(false);
