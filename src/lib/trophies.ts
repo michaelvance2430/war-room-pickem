@@ -221,37 +221,39 @@ export async function loadCareerTrophiesWonByUser(
     /* optional */
   }
 
-  // 2) Walk viewer's memberships — catch name-only engravings (Excel / unlinked)
+  // 2) Walk viewer's memberships in parallel (was N sequential queries — profile lag)
   try {
     const { fetchMyMemberships } = await import("@/lib/session-restore");
     const memberships = await fetchMyMemberships();
-    for (const m of memberships) {
-      if (!m.leagueId) continue;
-      try {
-        const { data, error } = await supabase
-          .from("league_trophies")
-          .select(
-            "id, league_id, season_year, trophy_type, winner_name, winner_user_id, subtitle, notes, awarded_at"
-          )
-          .eq("league_id", m.leagueId)
-          .order("season_year", { ascending: false });
-        if (error || !data) continue;
-        for (const raw of data as Record<string, unknown>[]) {
-          const base = mapRow(raw);
-          // Include all plaques from rooms we can read; getProfileHardware
-          // filters to this player (id or name). Keeps Excel name-only wins.
-          if (byId.has(base.id)) continue;
-          byId.set(base.id, {
-            ...base,
-            leagueName: m.leagueName || "War Room",
-            sportId: m.sportId || null,
-            leagueCode: m.code || null,
-          });
+    const rooms = memberships.filter((m) => m.leagueId);
+    await Promise.all(
+      rooms.map(async (m) => {
+        try {
+          const { data, error } = await supabase
+            .from("league_trophies")
+            .select(
+              "id, league_id, season_year, trophy_type, winner_name, winner_user_id, subtitle, notes, awarded_at"
+            )
+            .eq("league_id", m.leagueId)
+            .order("season_year", { ascending: false });
+          if (error || !data) return;
+          for (const raw of data as Record<string, unknown>[]) {
+            const base = mapRow(raw);
+            // Include all plaques from rooms we can read; getProfileHardware
+            // filters to this player (id or name). Keeps Excel name-only wins.
+            if (byId.has(base.id)) continue;
+            byId.set(base.id, {
+              ...base,
+              leagueName: m.leagueName || "War Room",
+              sportId: m.sportId || null,
+              leagueCode: m.code || null,
+            });
+          }
+        } catch {
+          /* next league */
         }
-      } catch {
-        /* next league */
-      }
-    }
+      })
+    );
   } catch {
     /* offline */
   }

@@ -93,22 +93,31 @@ export default function ProfilePage() {
       setLeagueTrophies([]);
       setLastSeenAt(null);
       setBlueFalconCount(0);
+      // Fail-safe: never leave full-page Loading forever
+      const failSafe = window.setTimeout(() => {
+        if (!cancelled) setReady(true);
+      }, 5_000);
+
       try {
         let found: Player | null = null;
         let leagueForSync: Player[] = [];
         let title: string | null = null;
-        let trophies: LeagueTrophy[] = [];
         let seen: string | null = null;
 
-        // Live league first (real multiplayer)
+        // Parallel hot path — was sequential (players → roster → N trophy queries)
         try {
           const { loadLeaguePlayers, loadLeagueRoster } = await import(
             "@/lib/cloud"
           );
-          leagueForSync = await loadLeaguePlayers();
+          const [players, roster] = await Promise.all([
+            loadLeaguePlayers().catch(() => [] as Player[]),
+            loadLeagueRoster().catch(() => []),
+          ]);
+          if (cancelled) return;
+          leagueForSync = players;
           found = leagueForSync.find((p) => p.id === id) ?? null;
-          try {
-            const roster = await loadLeagueRoster();
+
+          if (roster.length) {
             const titles = computeJoinTitles(roster);
             title = titles.get(id) || null;
             const row = roster.find((m) => m.userId === id);
@@ -120,39 +129,133 @@ export default function ProfilePage() {
                 name: row.name || found.name,
                 memberSince: row.joinedAt || found.memberSince,
               };
+            } else if (!found && row) {
+              // Roster hit without standings row — still paint a shell
+              found = {
+                id: row.userId,
+                name: row.name || "Player",
+                division: (row.division as Player["division"]) || "North",
+                totalPoints: 0,
+                weeklyPoints: [],
+                atsCorrect: 0,
+                atsTotal: 0,
+                currentStreak: 0,
+                bestWeek: 0,
+                worstWeek: 0,
+                perfectWeeks: 0,
+                bestBetHits: 0,
+                bestBetTotal: 0,
+                propHits: 0,
+                propTotal: 0,
+                weeksPlayed: 0,
+                avatarUrl: row.avatarUrl ?? null,
+                memberSince: row.joinedAt || null,
+              };
             }
+          }
+        } catch {
+          /* no session / offline */
+        }
+
+        if (!found) {
+          found = findPlayer(id);
+        }
+
+        if (found) {
+          try {
+            applyLegacyBadgeGrants(found);
+          } catch {
+            /* ignore */
+          }
+          found = withPermanentBadges(withCreatorFlag(found));
+          try {
+            const me = getSession()?.playerId;
+            if (me && me !== found.id) {
+              void import("@/lib/engagement").then(({ markEngagement }) => {
+                markEngagement(me, "opened_other_profile");
+              });
+            }
+          } catch {
+            /* ignore */
+          }
+        }
+
+        // Paint hero ASAP — trophies / eggs / blue falcon fill in after
+        if (!cancelled) {
+          setPlayer(found);
+          setLeaguePeers(
+            leagueForSync.length ? leagueForSync : found ? [found] : []
+          );
+          setJoinTitle(title);
+          setLastSeenAt(seen);
+          setReady(true);
+          window.clearTimeout(failSafe);
+        }
+
+        if (!found || cancelled) return;
+
+        // Background enrich (never blocks first paint)
+        void (async () => {
+          try {
+            const { loadCareerTrophiesWonByUser, loadLeagueTrophies } =
+              await import("@/lib/trophies");
+            let trophies: LeagueTrophy[] = [];
+            try {
+              const career = await loadCareerTrophiesWonByUser(id, {
+                playerName: found!.name || undefined,
+              });
+              trophies = career.length
+                ? career
+                : await loadLeagueTrophies().catch(() => []);
+            } catch {
+              trophies = await loadLeagueTrophies().catch(() => []);
+            }
+            if (!cancelled) setLeagueTrophies(trophies);
           } catch {
             /* optional */
           }
 
           try {
-            // Multi-league career case: every room this player won that we can read
-            const { loadCareerTrophiesWonByUser, loadLeagueTrophies } =
-              await import("@/lib/trophies");
-            const career = await loadCareerTrophiesWonByUser(id, {
-              playerName: found?.name || undefined,
-            });
-            if (career.length) {
-              trophies = career;
-            } else {
-              trophies = await loadLeagueTrophies();
+            const { loadCloudEggFinds } = await import("@/lib/egg-cloud");
+            const { grantPermanentBadgeId, mergePermanentBadges } =
+              await import("@/lib/permanent-badges");
+            const eggIds = await loadCloudEggFinds(found!.id);
+            for (const eid of eggIds) {
+              grantPermanentBadgeId(found!.id, eid);
+            }
+            if (!cancelled) {
+              setPlayer((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      permanentBadgeIds: mergePermanentBadges(
+                        prev.id,
+                        prev.permanentBadgeIds
+                      ),
+                    }
+                  : prev
+              );
             }
           } catch {
-            try {
-              const { loadLeagueTrophies } = await import("@/lib/trophies");
-              trophies = await loadLeagueTrophies();
-            } catch {
-              /* Trophy Room optional */
-            }
+            /* eggs optional */
           }
 
-          // Crown Cheevo King among live league (permanent storage by user id)
+          try {
+            const { hydrateBlueFalconFromCloud, getBlueFalconCount } =
+              await import("@/lib/blue-falcon");
+            let bf = await hydrateBlueFalconFromCloud(id);
+            if (!bf) bf = getBlueFalconCount(id);
+            if (!cancelled) setBlueFalconCount(bf);
+          } catch {
+            /* optional */
+          }
+
+          // Defer cheevo-king / Visconti scrub — not needed for first paint
           if (leagueForSync.length) {
-            syncLeagueCheevoKing(
-              leagueForSync.map((p) => withPermanentBadges(p))
-            );
-            // Hard-scrub mistaken legends on every roster (Visconti in any league)
             try {
+              syncLeagueCheevoKing(
+                leagueForSync.map((p) => withPermanentBadges(p))
+              );
               const { sanitizeLegacyLegendsOnBoot } = await import(
                 "@/lib/legacy-badge-grants"
               );
@@ -166,90 +269,21 @@ export default function ProfilePage() {
               /* ignore */
             }
           }
-        } catch {
-          /* no session / offline */
-        }
-
-        // Local/mock fallback
-        if (!found) {
-          found = findPlayer(id);
-        }
-
-        if (found) {
-          // Force grant/revoke before painting shelf (Visconti hard update)
-          try {
-            const { applyLegacyBadgeGrants } = await import(
-              "@/lib/legacy-badge-grants"
-            );
-            applyLegacyBadgeGrants(found);
-          } catch {
-            /* ignore */
-          }
-          // Cloud easter eggs → permanent merge so shelf matches for viewers
-          try {
-            const { loadCloudEggFinds } = await import("@/lib/egg-cloud");
-            const { grantPermanentBadgeId, mergePermanentBadges } =
-              await import("@/lib/permanent-badges");
-            const eggIds = await loadCloudEggFinds(found.id);
-            for (const eid of eggIds) {
-              grantPermanentBadgeId(found.id, eid);
-            }
-            found = {
-              ...found,
-              permanentBadgeIds: mergePermanentBadges(
-                found.id,
-                found.permanentBadgeIds
-              ),
-            };
-          } catch {
-            /* SQL not run yet — local eggs still work for self */
-          }
-          found = withPermanentBadges(withCreatorFlag(found));
-          // Profile peeker — viewing someone else
-          try {
-            const { getSession } = await import("@/lib/league");
-            const me = getSession()?.playerId;
-            if (me && me !== found.id) {
-              const { markEngagement } = await import("@/lib/engagement");
-              markEngagement(me, "opened_other_profile");
-            }
-          } catch {
-            /* ignore */
-          }
-        }
-
-        // Blue Falcon Count (leagues quit mid-season)
-        let bf = 0;
-        try {
-          const { hydrateBlueFalconFromCloud, getBlueFalconCount } =
-            await import("@/lib/blue-falcon");
-          if (id) {
-            bf = await hydrateBlueFalconFromCloud(id);
-            if (!bf) bf = getBlueFalconCount(id);
-          }
-        } catch {
-          bf = 0;
-        }
-
-        if (cancelled) return;
-        setPlayer(found);
-        setLeaguePeers(leagueForSync.length ? leagueForSync : found ? [found] : []);
-        setJoinTitle(title);
-        setLeagueTrophies(trophies);
-        setLastSeenAt(seen);
-        setBlueFalconCount(bf);
+        })();
       } catch (e) {
         if (!cancelled) {
           setLoadError(e instanceof Error ? e.message : "Failed to load");
           setPlayer(null);
+          setReady(true);
         }
       } finally {
+        window.clearTimeout(failSafe);
         if (!cancelled) setReady(true);
       }
     }
 
     setReady(false);
-    load();
+    void load();
     return () => {
       cancelled = true;
     };
