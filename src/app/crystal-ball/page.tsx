@@ -15,15 +15,32 @@ import {
 } from "@/lib/crystal-ball";
 import { getLeague, getSession } from "@/lib/league";
 
+function emptyShell(sportId?: string | null): CrystalBallState {
+  return {
+    myTeam: null,
+    picks: [],
+    champion: null,
+    achievements: [],
+    locked: false,
+    lockLabel: crystalBallLockLabel(sportId),
+    cloud: false,
+  };
+}
+
 export default function CrystalBallPage() {
-  const [state, setState] = useState<CrystalBallState | null>(() => {
+  const sportId = getLeague()?.sportId || "cfb";
+  const nfl = sportId === "nfl";
+  const teams = useMemo(() => crystalBallTeams(sportId), [sportId]);
+
+  // Never full-page spin — always have a shell so we don't stare at the orb
+  const [state, setState] = useState<CrystalBallState>(() => {
     try {
       return peekLocalCrystalBall();
     } catch {
-      return null;
+      return emptyShell(sportId);
     }
   });
-  /** Soft refresh only — never block the team list on cloud */
+  /** Soft refresh only — witty line, not a 5s black screen */
   const [syncing, setSyncing] = useState(true);
   const [disabled, setDisabled] = useState(false);
   const [query, setQuery] = useState("");
@@ -41,10 +58,6 @@ export default function CrystalBallPage() {
   const [selfId, setSelfId] = useState<string | null>(null);
   const [crownTeam, setCrownTeam] = useState("");
   const [crowning, setCrowning] = useState(false);
-
-  const sportId = getLeague()?.sportId || "cfb";
-  const nfl = sportId === "nfl";
-  const teams = useMemo(() => crystalBallTeams(sportId), [sportId]);
 
   async function reload() {
     setSyncing(true);
@@ -162,17 +175,6 @@ export default function CrystalBallPage() {
     );
   }
 
-  if (!state) {
-    return (
-      <div className="min-h-screen flex flex-col">
-        <Nav />
-        <main className="flex-1 flex items-center justify-center text-muted">
-          Gazing into the orb…
-        </main>
-      </div>
-    );
-  }
-
   const myAchievements = state.achievements.filter((a) => a.userId === selfId);
 
   return (
@@ -195,8 +197,8 @@ export default function CrystalBallPage() {
               </span>
             )}
             {syncing && (
-              <span className="text-[10px] text-muted font-medium">
-                Syncing room picks…
+              <span className="text-[10px] text-muted font-medium animate-pulse">
+                Gazing into the orb…
               </span>
             )}
           </div>
