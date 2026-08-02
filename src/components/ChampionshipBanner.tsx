@@ -4,6 +4,7 @@ import Link from "next/link";
 import { buildChampionshipBanner } from "@/lib/player-history";
 import type { LeagueTrophy } from "@/lib/trophies";
 import HardwareTrophyIcon from "@/components/HardwareTrophyIcon";
+import InspectableTrophy from "@/components/InspectableTrophy";
 
 type Props = {
   trophies: LeagueTrophy[];
@@ -43,12 +44,20 @@ export default function ChampionshipBanner({
       <div className="relative">
         <div className="flex items-start gap-4 mb-4">
           <div className="shrink-0 hidden sm:block">
-            <HardwareTrophyIcon
+            <InspectableTrophy
               kind="championship"
               sportId={sportId}
-              size={72}
-              animate={rows.length > 0}
-            />
+              title="Championship hardware"
+              subtitle={leagueName || undefined}
+              championshipOnly
+            >
+              <HardwareTrophyIcon
+                kind="championship"
+                sportId={sportId}
+                size={72}
+                animate={rows.length > 0}
+              />
+            </InspectableTrophy>
           </div>
           <div className="min-w-0 flex-1">
             <p
@@ -95,12 +104,20 @@ export default function ChampionshipBanner({
                 }`}
               >
                 <span className="shrink-0 w-9 h-9 flex items-center justify-center">
-                  <HardwareTrophyIcon
+                  <InspectableTrophy
                     kind="championship"
                     sportId={sportId}
-                    size={36}
-                    animate={false}
-                  />
+                    title={`${r.year} Champion`}
+                    subtitle={r.name}
+                    championshipOnly
+                  >
+                    <HardwareTrophyIcon
+                      kind="championship"
+                      sportId={sportId}
+                      size={36}
+                      animate={false}
+                    />
+                  </InspectableTrophy>
                 </span>
                 <span
                   className={`font-mono text-sm font-bold w-12 shrink-0 ${

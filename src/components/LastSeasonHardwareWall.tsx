@@ -5,7 +5,8 @@
  * CFB: Kahmann · Strayer · Big Ball Ben (2025–26 Excel).
  * NFL: Maria Super Bowl (2025) — Vonnagio Family Vacay shows gold family hardware.
  *
- * Championship art is tappable (5 consecutive taps → easter egg in Vonnagio).
+ * Any hardware is tappable → lightbox enlarge.
+ * Championship also counts toward Vonnagio 5-tap easter egg.
  */
 
 import { useState } from "react";
@@ -18,6 +19,7 @@ import {
 import type { LeagueTrophy } from "@/lib/trophies";
 import { TROPHY_META } from "@/lib/trophies";
 import HardwareTrophyIcon from "@/components/HardwareTrophyIcon";
+import InspectableTrophy from "@/components/InspectableTrophy";
 import PlayerLink from "@/components/PlayerLink";
 import { resolveLiveTrophyHolder } from "@/lib/trophy-share";
 import { getLeague, getSession } from "@/lib/league";
@@ -165,28 +167,36 @@ export default function LastSeasonHardwareWall({
               }`}
             >
               <div className="flex items-start justify-between gap-2 mb-2">
-                <button
-                  type="button"
-                  className={`text-left ${spinning ? "animate-spin" : ""} ${
-                    isChamp ? "cursor-pointer" : "cursor-default"
-                  }`}
-                  aria-label={
-                    isChamp
-                      ? "Championship trophy — tap five times in a row"
-                      : undefined
+                <InspectableTrophy
+                  kind={kind}
+                  sportId={sid}
+                  title={meta?.title || t.trophyType}
+                  subtitle={
+                    live.name || t.winnerName
+                      ? `${live.name || t.winnerName}${
+                          t.subtitle ? ` · ${t.subtitle}` : ""
+                        }`
+                      : t.subtitle || undefined
                   }
-                  tabIndex={isChamp ? 0 : -1}
-                  onClick={() => {
+                  leagueName={league?.name}
+                  leagueId={league?.id}
+                  leagueCode={league?.code}
+                  className={spinning ? "animate-spin" : ""}
+                  onInspect={() => {
                     if (isChamp) onChampTap(t.id);
                   }}
+                  ariaLabel={`Enlarge ${meta?.title || "trophy"}`}
                 >
                   <HardwareTrophyIcon
                     kind={kind}
                     sportId={sid}
-                    size={48}
+                    size={56}
                     animate={isChamp && !spinning}
+                    leagueName={league?.name}
+                    leagueId={league?.id}
+                    leagueCode={league?.code}
                   />
-                </button>
+                </InspectableTrophy>
                 <span
                   className={`text-[9px] font-bold uppercase tracking-wider ${
                     isNfl && !vonnaggio
@@ -197,6 +207,7 @@ export default function LastSeasonHardwareWall({
                   {year}
                 </span>
               </div>
+              <p className="text-[9px] text-muted mb-1">Tap trophy to enlarge</p>
               <p
                 className={`text-[10px] font-bold uppercase tracking-[0.14em] ${
                   meta?.accent || "text-primary"

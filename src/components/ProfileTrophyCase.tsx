@@ -17,6 +17,7 @@ import {
   recordTrophyTap,
 } from "@/lib/easter-eggs";
 import HardwareTrophyIcon from "@/components/HardwareTrophyIcon";
+import InspectableTrophy from "@/components/InspectableTrophy";
 
 function Plaque({
   item,
@@ -64,14 +65,20 @@ function Plaque({
       className={`rounded-xl border ${meta.border} bg-gradient-to-b from-card to-black/40 p-4 min-h-[120px] relative`}
     >
       <div className="flex items-start justify-between gap-2 mb-1">
-        <button
-          type="button"
-          className={`select-none ${
-            spinny ? "animate-spin" : ""
-          } ${item.kind === "championship" ? "cursor-pointer" : "cursor-default"}`}
-          aria-hidden
-          tabIndex={item.kind === "championship" ? 0 : -1}
-          onClick={() => {
+        <InspectableTrophy
+          kind={item.kind}
+          sportId={plaqueSport}
+          title={`${item.seasonYear} · ${item.title}`}
+          subtitle={
+            [item.leagueName || leagueName, item.subtitle, item.notes]
+              .filter(Boolean)
+              .join(" · ") || undefined
+          }
+          leagueName={plaqueLeague}
+          leagueId={item.leagueId || leagueId}
+          leagueCode={item.leagueCode || leagueCode}
+          className={spinny ? "animate-spin" : ""}
+          onInspect={() => {
             if (item.kind === "championship") onTrophyTap?.();
           }}
         >
@@ -84,7 +91,7 @@ function Plaque({
             leagueId={item.leagueId || leagueId}
             leagueCode={item.leagueCode || leagueCode}
           />
-        </button>
+        </InspectableTrophy>
         {canShare && <TrophyShareButton compact trophy={sharePayload} />}
       </div>
       <div className={`text-[10px] uppercase tracking-wide font-semibold ${meta.accent}`}>

@@ -191,8 +191,10 @@ function NflTrophyPhoto({
       <img
         src={src}
         alt=""
-        className="w-full h-full object-contain drop-shadow-[0_8px_20px_rgba(0,0,0,0.55)]"
+        className="w-full h-full object-contain drop-shadow-[0_8px_24px_rgba(0,0,0,0.6)]"
         draggable={false}
+        // Sharper on retina when enlarged
+        style={{ imageRendering: "auto" }}
       />
       {threePeat && (
         <span
@@ -215,63 +217,184 @@ function CfbCrystalSvg({
   size: number;
   threePeat: boolean;
 }) {
-  // Tall faceted crystal on gold base — CFP energy, War Room original
+  // CFP-style crystal football on tiered gold base — faceted glass look
   return (
     <svg
       width={size}
       height={size}
-      viewBox="0 0 120 120"
+      viewBox="0 0 120 130"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       role="img"
       aria-label="National championship crystal trophy"
     >
       <defs>
-        <linearGradient id={`${id}-crystal`} x1="40" y1="8" x2="80" y2="78" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#f8fafc" />
-          <stop offset="0.35" stopColor="#e2e8f0" />
-          <stop offset="0.7" stopColor="#94a3b8" />
+        <linearGradient
+          id={`${id}-crystal`}
+          x1="28"
+          y1="8"
+          x2="92"
+          y2="58"
+          gradientUnits="userSpaceOnUse"
+        >
+          <stop stopColor="#ffffff" />
+          <stop offset="0.2" stopColor="#f1f5f9" />
+          <stop offset="0.45" stopColor="#cbd5e1" />
+          <stop offset="0.75" stopColor="#94a3b8" />
           <stop offset="1" stopColor="#64748b" />
         </linearGradient>
-        <linearGradient id={`${id}-facet`} x1="50" y1="12" x2="70" y2="70" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#ffffff" stopOpacity="0.85" />
-          <stop offset="1" stopColor="#cbd5e1" stopOpacity="0.15" />
+        <linearGradient
+          id={`${id}-facet`}
+          x1="40"
+          y1="12"
+          x2="70"
+          y2="48"
+          gradientUnits="userSpaceOnUse"
+        >
+          <stop stopColor="#ffffff" stopOpacity="0.95" />
+          <stop offset="0.5" stopColor="#e2e8f0" stopOpacity="0.35" />
+          <stop offset="1" stopColor="#94a3b8" stopOpacity="0.05" />
         </linearGradient>
-        <linearGradient id={`${id}-gold`} x1="30" y1="78" x2="90" y2="112" gradientUnits="userSpaceOnUse">
+        <linearGradient
+          id={`${id}-gold`}
+          x1="30"
+          y1="72"
+          x2="90"
+          y2="120"
+          gradientUnits="userSpaceOnUse"
+        >
+          <stop stopColor="#fef3c7" />
+          <stop offset="0.35" stopColor="#fbbf24" />
+          <stop offset="0.7" stopColor="#d97706" />
+          <stop offset="1" stopColor="#92400e" />
+        </linearGradient>
+        <linearGradient id={`${id}-stem`} x1="54" y1="58" x2="66" y2="76">
           <stop stopColor="#fde68a" />
-          <stop offset="0.45" stopColor="#fbbf24" />
           <stop offset="1" stopColor="#b45309" />
         </linearGradient>
-        <radialGradient id={`${id}-glow`} cx="50%" cy="35%" r="50%">
-          <stop stopColor="#fbbf24" stopOpacity="0.35" />
+        <radialGradient id={`${id}-glow`} cx="50%" cy="30%" r="48%">
+          <stop stopColor="#fbbf24" stopOpacity="0.4" />
+          <stop offset="0.55" stopColor="#e2e8f0" stopOpacity="0.12" />
           <stop offset="1" stopColor="#22c55e" stopOpacity="0" />
         </radialGradient>
-        <filter id={`${id}-sh`} x="-20%" y="-10%" width="140%" height="140%">
-          <feDropShadow dx="0" dy="4" stdDeviation="3" floodColor="#000" floodOpacity="0.45" />
+        <filter id={`${id}-sh`} x="-25%" y="-15%" width="150%" height="150%">
+          <feDropShadow
+            dx="0"
+            dy="4"
+            stdDeviation="3"
+            floodColor="#000"
+            floodOpacity="0.5"
+          />
         </filter>
       </defs>
-      <circle cx="60" cy="48" r="42" fill={`url(#${id}-glow)`} />
-      {/* Crystal tower */}
+      <circle cx="60" cy="42" r="44" fill={`url(#${id}-glow)`} />
       <g filter={`url(#${id}-sh)`}>
-        <path
-          d="M60 10 L78 28 L74 76 L46 76 L42 28 Z"
+        {/* Crystal football (tilted, faceted) */}
+        <ellipse
+          cx="60"
+          cy="36"
+          rx="32"
+          ry="20"
           fill={`url(#${id}-crystal)`}
           stroke="#e2e8f0"
-          strokeWidth="1"
+          strokeWidth="1.2"
+          transform="rotate(-18 60 36)"
         />
-        <path d="M60 10 L78 28 L60 34 L42 28 Z" fill={`url(#${id}-facet)`} />
-        <path d="M60 34 L74 76 L46 76 Z" fill="#94a3b8" fillOpacity="0.25" />
-        <path d="M50 28 L55 70 L48 70 L46 30 Z" fill="#fff" fillOpacity="0.2" />
-        {/* Small football engraving suggestion */}
-        <ellipse cx="60" cy="48" rx="7" ry="10" stroke="#fbbf24" strokeWidth="1.2" fill="none" opacity="0.7" />
-        <path d="M60 40 V56 M54 48 H66" stroke="#fbbf24" strokeWidth="0.8" opacity="0.5" />
+        {/* Facet highlight */}
+        <ellipse
+          cx="52"
+          cy="30"
+          rx="12"
+          ry="8"
+          fill={`url(#${id}-facet)`}
+          transform="rotate(-18 52 30)"
+        />
+        {/* Lace / seam */}
+        <path
+          d="M42 30 Q60 22 78 42"
+          stroke="#0f172a"
+          strokeWidth="1.15"
+          fill="none"
+          opacity="0.35"
+          transform="rotate(-18 60 36)"
+        />
+        <path
+          d="M50 26 L53 32 M54 24 L57 30 M58 23 L61 29 M62 24 L65 30 M66 26 L69 32"
+          stroke="#0f172a"
+          strokeWidth="0.95"
+          opacity="0.4"
+          transform="rotate(-18 60 36)"
+        />
+        {/* Crystal edge glints */}
+        <path
+          d="M38 40 L44 28"
+          stroke="#fff"
+          strokeWidth="1.2"
+          opacity="0.55"
+          strokeLinecap="round"
+        />
+        <path
+          d="M78 28 L84 38"
+          stroke="#fff"
+          strokeWidth="0.9"
+          opacity="0.35"
+          strokeLinecap="round"
+        />
+        {/* Collar under ball */}
+        <ellipse cx="60" cy="56" rx="10" ry="3.5" fill={`url(#${id}-stem)`} />
+        <rect
+          x="55"
+          y="56"
+          width="10"
+          height="16"
+          rx="1.5"
+          fill={`url(#${id}-stem)`}
+        />
       </g>
-      {/* Gold base plates */}
-      <rect x="38" y="76" width="44" height="8" rx="1.5" fill={`url(#${id}-gold)`} />
-      <rect x="32" y="84" width="56" height="7" rx="1.5" fill={`url(#${id}-gold)`} />
-      <rect x="26" y="91" width="68" height="10" rx="2" fill={`url(#${id}-gold)`} stroke="#b45309" strokeWidth="0.5" />
+      {/* Tiered gold base */}
+      <rect
+        x="40"
+        y="72"
+        width="40"
+        height="7"
+        rx="1.5"
+        fill={`url(#${id}-gold)`}
+      />
+      <rect
+        x="34"
+        y="79"
+        width="52"
+        height="8"
+        rx="1.5"
+        fill={`url(#${id}-gold)`}
+      />
+      <rect
+        x="26"
+        y="87"
+        width="68"
+        height="12"
+        rx="2.5"
+        fill={`url(#${id}-gold)`}
+        stroke="#92400e"
+        strokeWidth="0.6"
+      />
+      {/* Base bevel highlight */}
+      <path
+        d="M30 90 H90"
+        stroke="#fef3c7"
+        strokeWidth="0.6"
+        opacity="0.35"
+      />
       {threePeat && (
-        <text x="60" y="108" textAnchor="middle" fill="#fbbf24" fontSize="8" fontWeight="800" fontFamily="system-ui">
+        <text
+          x="60"
+          y="118"
+          textAnchor="middle"
+          fill="#fbbf24"
+          fontSize="8"
+          fontWeight="800"
+          fontFamily="system-ui"
+        >
           ★ ★ ★
         </text>
       )}
@@ -288,7 +411,7 @@ function NflLombardiSvg({
   size: number;
   threePeat: boolean;
 }) {
-  // Silver football on three-leg tripod — real Super Bowl hardware silhouette
+  // Lombardi silhouette: silver football on three-leg tripod + base
   return (
     <svg
       width={size}
@@ -300,90 +423,135 @@ function NflLombardiSvg({
       aria-label="Super Bowl championship trophy"
     >
       <defs>
-        <linearGradient id={`${id}-silver`} x1="30" y1="8" x2="95" y2="55" gradientUnits="userSpaceOnUse">
+        <linearGradient
+          id={`${id}-silver`}
+          x1="28"
+          y1="6"
+          x2="98"
+          y2="52"
+          gradientUnits="userSpaceOnUse"
+        >
           <stop stopColor="#ffffff" />
-          <stop offset="0.35" stopColor="#e8ecf0" />
-          <stop offset="0.7" stopColor="#C5CCD3" />
-          <stop offset="1" stopColor="#6b7280" />
+          <stop offset="0.25" stopColor="#f8fafc" />
+          <stop offset="0.5" stopColor="#e2e8f0" />
+          <stop offset="0.75" stopColor="#C5CCD3" />
+          <stop offset="1" stopColor="#64748b" />
         </linearGradient>
         <linearGradient id={`${id}-leg`} x1="0" y1="0" x2="0" y2="1">
-          <stop stopColor="#4b5563" />
-          <stop offset="0.5" stopColor="#1f2937" />
+          <stop stopColor="#94a3b8" />
+          <stop offset="0.35" stopColor="#475569" />
           <stop offset="1" stopColor="#0f172a" />
         </linearGradient>
-        <linearGradient id={`${id}-collar`} x1="50" y1="48" x2="70" y2="62" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#f1f5f9" />
-          <stop offset="1" stopColor="#94a3b8" />
+        <linearGradient
+          id={`${id}-collar`}
+          x1="48"
+          y1="50"
+          x2="72"
+          y2="62"
+          gradientUnits="userSpaceOnUse"
+        >
+          <stop stopColor="#f8fafc" />
+          <stop offset="0.5" stopColor="#cbd5e1" />
+          <stop offset="1" stopColor="#64748b" />
         </linearGradient>
-        <radialGradient id={`${id}-glow`} cx="50%" cy="35%" r="50%">
-          <stop stopColor="#C5CCD3" stopOpacity="0.45" />
+        <radialGradient id={`${id}-glow`} cx="50%" cy="32%" r="50%">
+          <stop stopColor="#e2e8f0" stopOpacity="0.5" />
+          <stop offset="0.6" stopColor="#C5CCD3" stopOpacity="0.2" />
           <stop offset="1" stopColor="#0B1426" stopOpacity="0" />
         </radialGradient>
         <filter id={`${id}-sh`} x="-25%" y="-10%" width="150%" height="150%">
-          <feDropShadow dx="0" dy="3" stdDeviation="2.5" floodColor="#000" floodOpacity="0.5" />
+          <feDropShadow
+            dx="0"
+            dy="3"
+            stdDeviation="2.5"
+            floodColor="#000"
+            floodOpacity="0.55"
+          />
         </filter>
       </defs>
-      <circle cx="60" cy="48" r="42" fill={`url(#${id}-glow)`} />
+      <circle cx="60" cy="44" r="44" fill={`url(#${id}-glow)`} />
       <g filter={`url(#${id}-sh)`}>
-        {/* Three tripod legs (front two + rear) */}
+        {/* Tripod legs */}
         <path
-          d="M58 58 L34 112"
-          stroke={`url(#${id}-leg)`}
-          strokeWidth="3.2"
-          strokeLinecap="round"
-        />
-        <path
-          d="M62 58 L86 112"
-          stroke={`url(#${id}-leg)`}
-          strokeWidth="3.2"
-          strokeLinecap="round"
-        />
-        <path
-          d="M60 58 L60 114"
+          d="M57 60 L32 114"
           stroke={`url(#${id}-leg)`}
           strokeWidth="3.4"
           strokeLinecap="round"
-          opacity="0.95"
         />
-        {/* Triangular base plate */}
         <path
-          d="M32 112 L60 118 L88 112 L78 122 L42 122 Z"
+          d="M63 60 L88 114"
+          stroke={`url(#${id}-leg)`}
+          strokeWidth="3.4"
+          strokeLinecap="round"
+        />
+        <path
+          d="M60 60 L60 116"
+          stroke={`url(#${id}-leg)`}
+          strokeWidth="3.6"
+          strokeLinecap="round"
+        />
+        {/* Base feet */}
+        <ellipse cx="32" cy="115" rx="5" ry="2.2" fill="#1e293b" stroke="#94a3b8" strokeWidth="0.5" />
+        <ellipse cx="88" cy="115" rx="5" ry="2.2" fill="#1e293b" stroke="#94a3b8" strokeWidth="0.5" />
+        <ellipse cx="60" cy="117" rx="5.5" ry="2.4" fill="#1e293b" stroke="#94a3b8" strokeWidth="0.5" />
+        {/* Base triangle plate */}
+        <path
+          d="M30 110 L60 118 L90 110 L80 122 L40 122 Z"
           fill="#1e293b"
           stroke="#94a3b8"
-          strokeWidth="0.8"
+          strokeWidth="0.75"
         />
-        {/* Collar under the ball */}
-        <ellipse cx="60" cy="56" rx="11" ry="4.5" fill={`url(#${id}-collar)`} />
-        <ellipse cx="60" cy="54" rx="8" ry="3" fill="#e2e8f0" opacity="0.85" />
-        {/* Silver football (tilted) */}
+        {/* Collar stack under ball */}
+        <ellipse cx="60" cy="58" rx="12" ry="4.8" fill={`url(#${id}-collar)`} />
+        <ellipse cx="60" cy="55.5" rx="9" ry="3.2" fill="#e2e8f0" opacity="0.9" />
+        {/* Silver football */}
         <ellipse
           cx="60"
           cy="34"
-          rx="30"
-          ry="19"
+          rx="31"
+          ry="19.5"
           fill={`url(#${id}-silver)`}
-          stroke="#e2e8f0"
-          strokeWidth="1.1"
+          stroke="#f1f5f9"
+          strokeWidth="1.15"
           transform="rotate(-22 60 34)"
         />
+        {/* Specular highlight */}
+        <ellipse
+          cx="48"
+          cy="28"
+          rx="10"
+          ry="6"
+          fill="#fff"
+          fillOpacity="0.35"
+          transform="rotate(-22 48 28)"
+        />
+        {/* Seam + laces */}
         <path
-          d="M40 30 Q60 22 80 40"
+          d="M38 28 Q60 20 82 42"
           stroke="#0B1426"
-          strokeWidth="1.3"
+          strokeWidth="1.35"
           fill="none"
-          opacity="0.5"
+          opacity="0.45"
           transform="rotate(-22 60 34)"
         />
         <path
-          d="M50 27 L53 32 M54 25 L57 30 M58 24 L61 29 M62 25 L65 30"
+          d="M48 25 L51 31 M52 23 L55 29 M56 22 L59 28 M60 22 L63 28 M64 24 L67 30"
           stroke="#0B1426"
-          strokeWidth="1.05"
-          opacity="0.6"
+          strokeWidth="1.1"
+          opacity="0.55"
           transform="rotate(-22 60 34)"
         />
       </g>
       {threePeat && (
-        <text x="60" y="128" textAnchor="middle" fill="#fbbf24" fontSize="8" fontWeight="800" fontFamily="system-ui">
+        <text
+          x="60"
+          y="128"
+          textAnchor="middle"
+          fill="#fbbf24"
+          fontSize="8"
+          fontWeight="800"
+          fontFamily="system-ui"
+        >
           ★ ★ ★
         </text>
       )}

@@ -19,7 +19,7 @@ import { getLeague } from "@/lib/league";
 export const VONNAGGIO_CHAMPIONSHIP_IMG =
   "/trophies/vonnaggio-championship.jpg?v=gold5";
 
-export const NFL_LOMBARDI_IMG = "/trophies/nfl-lombardi.jpg";
+export const NFL_LOMBARDI_IMG = "/trophies/nfl-lombardi.jpg?v=detail2";
 
 /** Live invite code from the app (screenshot) — never rely on name alone. */
 export const VONNAGIO_INVITE_CODES = new Set(
