@@ -394,11 +394,16 @@ export function buildFootballResume(opts: {
 export function buildChampionshipBanner(
   trophies: LeagueTrophy[]
 ): { year: number; name: string; userId: string | null }[] {
+  const yearOf = (t: LeagueTrophy) => {
+    const y = t.seasonYear;
+    if (typeof y === "number" && Number.isFinite(y)) return y;
+    return Number.parseInt(String(y ?? ""), 10) || 0;
+  };
   return trophies
     .filter((t) => t.trophyType === "championship")
-    .sort((a, b) => b.seasonYear - a.seasonYear)
+    .sort((a, b) => yearOf(b) - yearOf(a))
     .map((t) => ({
-      year: t.seasonYear,
+      year: yearOf(t),
       name: t.winnerName,
       userId: t.winnerUserId,
     }));

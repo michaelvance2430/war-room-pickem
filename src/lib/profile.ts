@@ -8,6 +8,9 @@ export type Profile = {
   id: string;
   displayName: string;
   avatarUrl: string | null;
+  /** Private MM-DD; hard-locked once set (cloud). */
+  birthdayMmdd?: string | null;
+  birthdayLockedAt?: string | null;
 };
 
 export const EVENT_PROFILE_UPDATED = "warroom-profile-updated";
@@ -117,24 +120,52 @@ export async function updateMyDisplayName(
   }
 }
 
+function normalizeBirthdayMmdd(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const s = raw.trim();
+  if (!/^\d{2}-\d{2}$/.test(s)) return null;
+  const [mm, dd] = s.split("-").map(Number);
+  if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return null;
+  return s;
+}
+
 /** Load current user's profile row. */
 export async function loadMyProfile(): Promise<Profile | null> {
   const supabase = createClient();
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return null;
 
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("id, display_name, avatar_url")
-    .eq("id", auth.user.id)
-    .maybeSingle();
+  // Prefer full select; fall back if birthday columns not migrated yet
+  let data: Record<string, unknown> | null = null;
+  {
+    const full = await supabase
+      .from("profiles")
+      .select("id, display_name, avatar_url, birthday_mmdd, birthday_locked_at")
+      .eq("id", auth.user.id)
+      .maybeSingle();
+    if (
+      full.error &&
+      /birthday|column|schema cache/i.test(full.error.message || "")
+    ) {
+      const basic = await supabase
+        .from("profiles")
+        .select("id, display_name, avatar_url")
+        .eq("id", auth.user.id)
+        .maybeSingle();
+      data = (basic.data as Record<string, unknown> | null) || null;
+    } else if (!full.error) {
+      data = (full.data as Record<string, unknown> | null) || null;
+    }
+  }
 
-  if (error || !data) {
+  if (!data) {
     const meta = auth.user.user_metadata?.display_name as string | undefined;
     return {
       id: auth.user.id,
       displayName: meta || auth.user.email?.split("@")[0] || "Player",
       avatarUrl: null,
+      birthdayMmdd: null,
+      birthdayLockedAt: null,
     };
   }
 
@@ -142,7 +173,172 @@ export async function loadMyProfile(): Promise<Profile | null> {
     id: data.id as string,
     displayName: (data.display_name as string) || "Player",
     avatarUrl: (data.avatar_url as string) || null,
+    birthdayMmdd: normalizeBirthdayMmdd(data.birthday_mmdd),
+    birthdayLockedAt: (data.birthday_locked_at as string) || null,
   };
+}
+
+/**
+ * One-time hard lock for private MM-DD birthday.
+ * Rejects if already set (no self-serve edit / no clear).
+ */
+export async function lockMyBirthdayOnce(
+  raw: string
+): Promise<{
+  ok: boolean;
+  birthdayMmdd?: string;
+  error?: string;
+  locked?: boolean;
+}> {
+  const mmdd = normalizeBirthdayMmdd(raw);
+  if (!mmdd) {
+    return { ok: false, error: "Use MM-DD (e.g. 07-31)." };
+  }
+
+  try {
+    const supabase = createClient();
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth.user) {
+      return { ok: false, error: "Not signed in — log in and try again." };
+    }
+    const userId = auth.user.id;
+
+    const existing = await loadMyProfile();
+    if (existing?.birthdayMmdd) {
+      return {
+        ok: false,
+        locked: true,
+        birthdayMmdd: existing.birthdayMmdd,
+        error:
+          "Birthday is locked. Wrong date? Message War Room support — no self-serve edits.",
+      };
+    }
+
+    const lockedAt = new Date().toISOString();
+    const { data: row, error } = await supabase
+      .from("profiles")
+      .update({
+        birthday_mmdd: mmdd,
+        birthday_locked_at: lockedAt,
+      })
+      .eq("id", userId)
+      .is("birthday_mmdd", null)
+      .select("birthday_mmdd, birthday_locked_at")
+      .maybeSingle();
+
+    if (error) {
+      const msg = error.message || "";
+      if (/hard-locked|P0001|birthday is hard-locked/i.test(msg)) {
+        return {
+          ok: false,
+          locked: true,
+          error:
+            "Birthday is locked. Wrong date? Message War Room support — no self-serve edits.",
+        };
+      }
+      if (/birthday|column|schema cache/i.test(msg)) {
+        return {
+          ok: false,
+          error:
+            "Birthday cloud column not live yet. Ask Mike to run profiles-birthday-hard-lock.sql.",
+        };
+      }
+      if (/row-level security|violates|policy/i.test(msg)) {
+        return {
+          ok: false,
+          error: "Could not save birthday (permissions). Ask Mike.",
+        };
+      }
+      return { ok: false, error: msg || "Could not save birthday." };
+    }
+
+    // Race: another tab locked first
+    if (!row?.birthday_mmdd) {
+      const again = await loadMyProfile();
+      if (again?.birthdayMmdd) {
+        return {
+          ok: false,
+          locked: true,
+          birthdayMmdd: again.birthdayMmdd,
+          error:
+            "Birthday is locked. Wrong date? Message War Room support — no self-serve edits.",
+        };
+      }
+      // Profile row may be missing birthday columns still null — try upsert path
+      const { error: upErr } = await supabase.from("profiles").upsert(
+        {
+          id: userId,
+          display_name:
+            existing?.displayName ||
+            (auth.user.user_metadata?.display_name as string) ||
+            "Player",
+          birthday_mmdd: mmdd,
+          birthday_locked_at: lockedAt,
+        },
+        { onConflict: "id" }
+      );
+      if (upErr) {
+        return {
+          ok: false,
+          error: upErr.message || "Could not save birthday.",
+        };
+      }
+    }
+
+    // Mirror into local egg state so Gazette day-of works offline
+    try {
+      const { setPlayerBirthday } = await import("@/lib/easter-eggs");
+      setPlayerBirthday(userId, mmdd);
+    } catch {
+      /* ok */
+    }
+
+    return { ok: true, birthdayMmdd: mmdd };
+  } catch (e: unknown) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "Could not save birthday",
+    };
+  }
+}
+
+/**
+ * Pull cloud birthday into local egg state after login.
+ * Cloud is source of truth once locked — never re-prompt if set.
+ * If only localStorage has a birthday (legacy), one-shot migrate into cloud lock.
+ */
+export async function hydrateBirthdayFromCloud(
+  playerId?: string | null
+): Promise<string | null> {
+  try {
+    const profile = await loadMyProfile();
+    const cloud = profile?.birthdayMmdd || null;
+    const uid = playerId || profile?.id;
+    if (uid && cloud) {
+      const { setPlayerBirthday } = await import("@/lib/easter-eggs");
+      setPlayerBirthday(uid, cloud);
+      return cloud;
+    }
+    // Legacy: was only in localStorage — lock it to cloud so login never re-asks
+    if (uid) {
+      const { getPlayerBirthday, setPlayerBirthday } = await import(
+        "@/lib/easter-eggs"
+      );
+      const local = getPlayerBirthday(uid);
+      if (local) {
+        const locked = await lockMyBirthdayOnce(local);
+        if (locked.ok && locked.birthdayMmdd) {
+          setPlayerBirthday(uid, locked.birthdayMmdd);
+          return locked.birthdayMmdd;
+        }
+        // SQL not applied yet — keep local so Account still shows the date
+        return local;
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 /** Resize image in browser → JPEG blob under size limit. */

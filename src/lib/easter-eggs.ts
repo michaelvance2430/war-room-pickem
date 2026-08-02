@@ -532,10 +532,14 @@ export function grantDiscovery(
   return true;
 }
 
+/**
+ * Local mirror only (egg Gazette day-of). Prefer lockMyBirthdayOnce for
+ * the real hard lock — cloud is source of truth after login hydrate.
+ */
 export function setPlayerBirthday(playerId: string, mmdd: string | null) {
   if (!playerId) return;
   const state = getEggState(playerId);
-  // Accept MM-DD only
+  // Accept MM-DD only; null clears local mirror (cloud lock is separate)
   if (mmdd && !/^\d{2}-\d{2}$/.test(mmdd)) return;
   state.birthdayMmd = mmdd;
   saveEggState(playerId, state);

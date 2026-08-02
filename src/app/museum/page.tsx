@@ -41,49 +41,68 @@ function MuseumInner() {
     let cancelled = false;
     async function load() {
       setLoading(true);
-      try {
-        setLeagueName(getLeague()?.name || "");
-        let [plist, tlist] = await Promise.all([
-          loadLeaguePlayers(),
-          loadLeagueTrophies(),
-        ]);
+      const sport = getLeague()?.sportId === "nfl" ? "nfl" : "cfb";
+      setLeagueName(getLeague()?.name || "");
 
-        const sport = getLeague()?.sportId || "cfb";
-        // Host: always re-engrave last season into the cloud so it sticks.
-        if (isCommissioner() || isOps()) {
-          try {
-            const seeded = await seedPriorSeason2025Trophies();
-            if (seeded.ok) {
-              tlist = await loadLeagueTrophies();
-              if (!cancelled) {
-                setExcelNote(
-                  sport === "nfl"
-                    ? "Last season Super Bowl hardware on the wall."
-                    : `Last season ${PRIOR_SEASON_LABEL} hardware on the wall.`
-                );
-              }
-            }
-          } catch {
-            /* ignore */
-          }
-        }
-
+      // Paint Excel / last-season hardware IMMEDIATELY so Museum never shows
+      // "No championships engraved" + "Opening the archives…" with a blank wall.
+      // Cloud + host seed refine in the background.
+      const paintSeeds = (plist: Player[], tlist: LeagueTrophy[]) => {
         if (cancelled) return;
-        // FORCE last-year plaques on every client (even if seed failed)
-        const withExcel = mergePriorSeasonTrophies(tlist, {
-          players: plist,
-          sportId: sport === "nfl" ? "nfl" : "cfb",
-        });
         setPlayers(plist);
-        setTrophies(withExcel);
+        setTrophies(
+          mergePriorSeasonTrophies(tlist, {
+            players: plist,
+            sportId: sport,
+          })
+        );
+      };
+      paintSeeds([], []);
+
+      let plist: Player[] = [];
+      let tlist: LeagueTrophy[] = [];
+      try {
+        const [p, t] = await Promise.all([
+          loadLeaguePlayers().catch(() => [] as Player[]),
+          loadLeagueTrophies().catch(() => [] as LeagueTrophy[]),
+        ]);
+        plist = p;
+        tlist = t;
+        paintSeeds(plist, tlist);
       } catch {
-        if (!cancelled) {
-          setPlayers([]);
-          setTrophies([]);
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
+        paintSeeds([], []);
       }
+
+      // Host seed never blocks first paint (was hanging archives + empty banner)
+      if (isCommissioner() || isOps()) {
+        try {
+          const seeded = await seedPriorSeason2025Trophies();
+          if (seeded.ok && !cancelled) {
+            tlist = await loadLeagueTrophies().catch(() => tlist);
+            paintSeeds(plist, tlist);
+            setExcelNote(
+              sport === "nfl"
+                ? "Last season Super Bowl hardware on the wall."
+                : `Last season ${PRIOR_SEASON_LABEL} hardware on the wall.`
+            );
+          } else if (!cancelled && !seeded.ok) {
+            // Display merge already forced plaques; cloud engrave may need Trophy Room
+            setExcelNote(
+              "Showing last season on the wall (local). Host can sync Trophy Room to engrave cloud."
+            );
+          }
+        } catch {
+          /* display merge already painted */
+        }
+      } else if (!cancelled) {
+        setExcelNote(
+          sport === "nfl"
+            ? "Last season Super Bowl hardware is always on this wall."
+            : `Last season ${PRIOR_SEASON_LABEL} Excel hardware is always on this wall.`
+        );
+      }
+
+      if (!cancelled) setLoading(false);
     }
     void load();
     return () => {
@@ -135,8 +154,9 @@ function MuseumInner() {
           <p className="text-sm text-muted mt-2 leading-relaxed max-w-xl">
             Not just stats — the story of this room. Trophies, streaks, and
             milestones that make next August feel continuous with this one.
-            Prior-season hardware appears when the host engraves it (Trophy
-            Room import). Names and photos follow live profiles.
+            Last season&apos;s big hardware stays on the wall forever (Excel
+            plaques for CFB · Super Bowl for NFL). Names and photos follow live
+            profiles.
           </p>
           {excelNote && (
             <p className="mt-2 text-xs text-primary font-medium">{excelNote}</p>

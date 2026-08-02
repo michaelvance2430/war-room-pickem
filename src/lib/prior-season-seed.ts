@@ -108,7 +108,7 @@ export function decorateNflPriorForLeague(
   if (!vonnaggio) return trophies;
   return trophies.map((t) => {
     if (
-      t.seasonYear !== PRIOR_SEASON_YEAR ||
+      trophySeasonYear(t) !== PRIOR_SEASON_YEAR ||
       t.trophyType !== "championship"
     ) {
       return t;
@@ -169,13 +169,23 @@ function matchPlayerId(
   return null;
 }
 
+/** Coerce year so "2025" from JSON/DB still matches PRIOR_SEASON_YEAR. */
+export function trophySeasonYear(t: { seasonYear?: unknown }): number {
+  const y = t?.seasonYear;
+  if (typeof y === "number" && Number.isFinite(y)) return y;
+  const n = Number.parseInt(String(y ?? ""), 10);
+  return Number.isFinite(n) ? n : 0;
+}
+
 /** True when this sport's prior-season big hardware is already engraved. */
 export function hasPriorSeasonBigHardware(
   trophies: LeagueTrophy[],
   sportId?: string | null
 ): boolean {
   const seeds = getPriorSeasonSeeds(sportId);
-  const y = trophies.filter((t) => t.seasonYear === PRIOR_SEASON_YEAR);
+  const y = trophies.filter(
+    (t) => trophySeasonYear(t) === PRIOR_SEASON_YEAR
+  );
   return seeds.every((s) => y.some((t) => t.trophyType === s.trophyType));
 }
 
@@ -220,17 +230,18 @@ export function mergePriorSeasonTrophies(
   const out = trophies.filter(
     (t) =>
       !(
-        t.seasonYear === PRIOR_SEASON_YEAR && seedTypes.has(t.trophyType)
+        trophySeasonYear(t) === PRIOR_SEASON_YEAR &&
+        seedTypes.has(t.trophyType)
       )
   );
 
-  // Always inject last season hardware first (on display)
+  // Always inject last season hardware first (on display) — even with zero cloud rows
   for (const row of seeds) {
     const uid = matchPlayerId(opts?.players, row.namePatterns);
     // Prefer cloud user id if engraved under the right name
     const cloud = trophies.find(
       (t) =>
-        t.seasonYear === PRIOR_SEASON_YEAR &&
+        trophySeasonYear(t) === PRIOR_SEASON_YEAR &&
         t.trophyType === row.trophyType &&
         row.namePatterns.some((p) => p.test(t.winnerName || ""))
     );
@@ -348,7 +359,8 @@ export async function seedPriorSeason2025Trophies(): Promise<{
     if (sport === "nfl" && row.trophyType === "championship") {
       const cur = existing.find(
         (t) =>
-          t.seasonYear === PRIOR_SEASON_YEAR && t.trophyType === "championship"
+          trophySeasonYear(t) === PRIOR_SEASON_YEAR &&
+          t.trophyType === "championship"
       );
       if (
         cur?.winnerName &&
@@ -383,7 +395,7 @@ export async function seedPriorSeason2025Trophies(): Promise<{
 
   try {
     const list = await loadLeagueTrophies();
-    const y25 = list.filter((t) => t.seasonYear === PRIOR_SEASON_YEAR);
+    const y25 = list.filter((t) => trophySeasonYear(t) === PRIOR_SEASON_YEAR);
     if (y25.length < 1 && errors.length) {
       return {
         ok: false,

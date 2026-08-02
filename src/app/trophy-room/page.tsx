@@ -80,24 +80,26 @@ export default function TrophyRoomPage() {
 
   async function reload() {
     setLoadError(null);
+    const sid = getLeague()?.sportId || "cfb";
+    let players: { id: string; name: string }[] = [];
+    try {
+      players = (await loadLeaguePlayers()).map((p) => ({
+        id: p.id,
+        name: p.name,
+      }));
+    } catch {
+      players = [];
+    }
     try {
       const list = await loadLeagueTrophies();
       // Force last-year plaques on the wall for everyone (display merge)
-      let players: { id: string; name: string }[] = [];
-      try {
-        players = (await loadLeaguePlayers()).map((p) => ({
-          id: p.id,
-          name: p.name,
-        }));
-      } catch {
-        players = [];
-      }
-      const sid = getLeague()?.sportId || "cfb";
       setTrophies(
         mergePriorSeasonTrophies(list, { players, sportId: sid })
       );
     } catch {
-      setLoadError("Could not load trophy room.");
+      // Never blank the wall — still show Excel / prior Super Bowl plaques
+      setTrophies(mergePriorSeasonTrophies([], { players, sportId: sid }));
+      setLoadError("Cloud trophies slow — showing last season hardware anyway.");
     }
   }
 

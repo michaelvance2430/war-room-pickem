@@ -102,10 +102,17 @@ export const TROPHY_META: Record<
 };
 
 function mapRow(r: Record<string, unknown>): LeagueTrophy {
+  // Coerce season_year — PostgREST can surface numeric as string; strict ===
+  // against PRIOR_SEASON_YEAR (number) then drops prior plaques from the wall.
+  const yearRaw = r.season_year;
+  const seasonYear =
+    typeof yearRaw === "number"
+      ? yearRaw
+      : Number.parseInt(String(yearRaw ?? ""), 10) || 0;
   return {
     id: r.id as string,
     leagueId: r.league_id as string,
-    seasonYear: r.season_year as number,
+    seasonYear,
     trophyType: r.trophy_type as TrophyType,
     winnerName: (r.winner_name as string) || "Unknown",
     winnerUserId: (r.winner_user_id as string) || null,

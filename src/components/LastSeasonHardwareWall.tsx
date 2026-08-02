@@ -13,6 +13,7 @@ import Link from "next/link";
 import {
   getPriorSeasonLabel,
   PRIOR_SEASON_YEAR,
+  trophySeasonYear,
 } from "@/lib/prior-season-seed";
 import type { LeagueTrophy } from "@/lib/trophies";
 import { TROPHY_META } from "@/lib/trophies";
@@ -55,7 +56,7 @@ export default function LastSeasonHardwareWall({
   const [spinKey, setSpinKey] = useState<string | null>(null);
 
   const lastYear = plaques
-    .filter((t) => t.seasonYear === year)
+    .filter((t) => trophySeasonYear(t) === year)
     .filter((t) =>
       ["championship", "toilet_bowl", "crystal_ball"].includes(t.trophyType)
     )

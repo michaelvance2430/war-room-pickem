@@ -28,6 +28,14 @@ export default function EquippedTitleHydrator() {
       if (!session?.playerId) return;
 
       await syncMyEquippedTitleFromCloud();
+      // Birthday hard-lock: rehydrate from profiles so post-login never
+      // re-prompts after a clear localStorage / new device session.
+      try {
+        const { hydrateBirthdayFromCloud } = await import("@/lib/profile");
+        await hydrateBirthdayFromCloud(session.playerId);
+      } catch {
+        /* ok */
+      }
       if (cancelled) return;
 
       // Default nameplate for the person who built the app

@@ -31,6 +31,8 @@ import {
   uploadMyAvatar,
   removeMyAvatar,
   updateMyDisplayName,
+  lockMyBirthdayOnce,
+  hydrateBirthdayFromCloud,
 } from "@/lib/profile";
 import { isAppCreator, withCreatorFlag } from "@/lib/creator";
 import { isViewAsPlayer, setViewAsPlayer } from "@/lib/view-as-player";
@@ -66,11 +68,9 @@ import {
 } from "@/lib/profile-border-store";
 import { loadLeaguePlayers } from "@/lib/cloud";
 import type { Player } from "@/lib/types";
-import {
-  getPlayerBirthday,
-  setPlayerBirthday,
-} from "@/lib/easter-eggs";
+import { getPlayerBirthday } from "@/lib/easter-eggs";
 import LeagueMembershipCard from "@/components/LeagueMembershipCard";
+import { FEEDBACK_TO_EMAIL } from "@/components/FeedbackForm";
 
 export default function AccountPage() {
   const router = useRouter();
@@ -82,6 +82,9 @@ export default function AccountPage() {
   const [nameDraft, setNameDraft] = useState("");
   const [nameBusy, setNameBusy] = useState(false);
   const [birthdayDraft, setBirthdayDraft] = useState("");
+  /** Cloud hard-lock once set — no self-serve edit */
+  const [birthdayLocked, setBirthdayLocked] = useState(false);
+  const [birthdayBusy, setBirthdayBusy] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -138,10 +141,15 @@ export default function AccountPage() {
       })
     );
 
-    // Equipped name title + border (from earned badges)
+    // Birthday: cloud is source of truth (fixes "had to load bday again" after login)
     if (session?.playerId) {
-      const bday = getPlayerBirthday(session.playerId);
-      setBirthdayDraft(bday || "");
+      const cloudBday =
+        profile?.birthdayMmdd ||
+        (await hydrateBirthdayFromCloud(session.playerId));
+      const localBday = getPlayerBirthday(session.playerId);
+      const bday = cloudBday || localBday || "";
+      setBirthdayDraft(bday);
+      setBirthdayLocked(!!cloudBday || !!profile?.birthdayLockedAt);
       await syncMyEquippedTitleFromCloud();
       await syncMyBorderFromCloud();
       setEquippedBadgeId(getLocalEquippedBadgeId(session.playerId));
@@ -611,62 +619,124 @@ export default function AccountPage() {
 
           <div className="mt-5 pt-4 border-t border-border/60">
             <p className="text-xs text-muted mb-2 leading-relaxed">
-              Birthday (optional) — private. Type month and day; the dash fills
-              in for you (e.g. 0731 → 07-31). One quiet Gazette line if you open
-              the app that day. Clear the field to remove.
+              Birthday (optional) — private. One quiet Gazette line if you open
+              the app that day.{" "}
+              <strong className="text-foreground/90">
+                Hard lock after save
+              </strong>
+              : no self-serve edit or clear. Wrong date? Ticket the dev team —
+              that&apos;s intentional so nobody rewrites it once they learn why
+              it exists.
             </p>
-            <label className="block text-xs text-muted mb-2">
-              Birthday
-              <input
-                type="text"
-                inputMode="numeric"
-                autoComplete="bday"
-                value={birthdayDraft}
-                onChange={(e) => {
-                  // Digits only → auto MM-DD (0731 → 07-31)
-                  const digits = e.target.value.replace(/\D/g, "").slice(0, 4);
-                  if (digits.length <= 2) {
-                    setBirthdayDraft(digits);
-                  } else {
-                    setBirthdayDraft(
-                      `${digits.slice(0, 2)}-${digits.slice(2)}`
+            {birthdayLocked && birthdayDraft ? (
+              <div className="rounded-xl border border-primary/30 bg-primary/5 px-3 py-3 space-y-2">
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">
+                  Locked · one-time save
+                </p>
+                <p className="text-lg font-mono font-bold tracking-wide text-foreground">
+                  {birthdayDraft}
+                </p>
+                <p className="text-xs text-muted leading-relaxed">
+                  Cloud remembers this after login. You can&apos;t change it
+                  yourself.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const session = getSession();
+                    const name = (session?.playerName || "Player").slice(0, 80);
+                    const subject = `[War Room] Birthday correction — ${name}`;
+                    const body = [
+                      "Type: Birthday hard-lock correction",
+                      `From: ${name}`,
+                      session?.playerId
+                        ? `User ID: ${session.playerId}`
+                        : null,
+                      `Current locked MM-DD: ${birthdayDraft}`,
+                      "",
+                      "Please change my birthday to: MM-DD (fill in)",
+                      "Reason: typed wrong on first save",
+                    ]
+                      .filter(Boolean)
+                      .join("\n");
+                    const gmail =
+                      `https://mail.google.com/mail/?view=cm&fs=1&tf=1` +
+                      `&to=${encodeURIComponent(FEEDBACK_TO_EMAIL)}` +
+                      `&su=${encodeURIComponent(subject)}` +
+                      `&body=${encodeURIComponent(body)}`;
+                    window.open(gmail, "_blank", "noopener,noreferrer");
+                    setMessage(
+                      "Support draft opened — send it so the dev team can fix your date."
                     );
+                  }}
+                  className="w-full py-2.5 min-h-[44px] rounded-xl border border-amber-500/40 text-amber-100 text-sm font-semibold"
+                >
+                  Wrong date? Message support
+                </button>
+              </div>
+            ) : (
+              <>
+                <label className="block text-xs text-muted mb-2">
+                  Birthday
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="bday"
+                    value={birthdayDraft}
+                    onChange={(e) => {
+                      // Digits only → auto MM-DD (0731 → 07-31)
+                      const digits = e.target.value
+                        .replace(/\D/g, "")
+                        .slice(0, 4);
+                      if (digits.length <= 2) {
+                        setBirthdayDraft(digits);
+                      } else {
+                        setBirthdayDraft(
+                          `${digits.slice(0, 2)}-${digits.slice(2)}`
+                        );
+                      }
+                    }}
+                    maxLength={5}
+                    placeholder="MM-DD"
+                    disabled={isGuestMode() || birthdayBusy}
+                    className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-3 text-base text-foreground font-medium disabled:opacity-50 tracking-wide"
+                  />
+                </label>
+                <button
+                  type="button"
+                  disabled={
+                    isGuestMode() ||
+                    !userId ||
+                    birthdayBusy ||
+                    !/^\d{2}-\d{2}$/.test(birthdayDraft.trim())
                   }
-                }}
-                maxLength={5}
-                placeholder="MM-DD"
-                disabled={isGuestMode()}
-                className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-3 text-base text-foreground font-medium disabled:opacity-50 tracking-wide"
-              />
-            </label>
-            <button
-              type="button"
-              disabled={isGuestMode() || !userId}
-              onClick={() => {
-                if (!userId) return;
-                const raw = birthdayDraft.trim();
-                if (!raw) {
-                  setPlayerBirthday(userId, null);
-                  setBirthdayDraft("");
-                  setMessage("Birthday cleared.");
-                  return;
-                }
-                if (!/^\d{2}-\d{2}$/.test(raw)) {
-                  setMessage("Use MM-DD (e.g. 07-31).");
-                  return;
-                }
-                const [mm, dd] = raw.split("-").map(Number);
-                if (mm < 1 || mm > 12 || dd < 1 || dd > 31) {
-                  setMessage("That date looks off.");
-                  return;
-                }
-                setPlayerBirthday(userId, raw);
-                setMessage("Birthday saved — private, zero points.");
-              }}
-              className="w-full py-2.5 min-h-[44px] rounded-xl border border-border text-sm font-semibold disabled:opacity-40"
-            >
-              Save birthday
-            </button>
+                  onClick={() => {
+                    if (!userId) return;
+                    setBirthdayBusy(true);
+                    void lockMyBirthdayOnce(birthdayDraft.trim())
+                      .then((res) => {
+                        if (res.ok && res.birthdayMmdd) {
+                          setBirthdayDraft(res.birthdayMmdd);
+                          setBirthdayLocked(true);
+                          setMessage(
+                            "Birthday locked forever on your profile — private, zero points."
+                          );
+                          return;
+                        }
+                        if (res.locked && res.birthdayMmdd) {
+                          setBirthdayDraft(res.birthdayMmdd);
+                          setBirthdayLocked(true);
+                        }
+                        setMessage(res.error || "Could not lock birthday.");
+                      })
+                      .finally(() => setBirthdayBusy(false));
+                  }}
+                  className="w-full py-2.5 min-h-[44px] rounded-xl border border-border text-sm font-semibold disabled:opacity-40"
+                >
+                  {birthdayBusy ? "Locking…" : "Save & lock birthday"}
+                </button>
+              </>
+            )}
           </div>
         </section>
 
