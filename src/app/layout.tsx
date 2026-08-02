@@ -4,6 +4,7 @@ import "./globals.css";
 import SeasonThemeApplier from "@/components/SeasonThemeApplier";
 import SportThemeApplier from "@/components/SportThemeApplier";
 import FoundrySessionChrome from "@/components/FoundrySessionChrome";
+import SandboxSessionChrome from "@/components/SandboxSessionChrome";
 import PullToRefresh from "@/components/PullToRefresh";
 import RouteHardSwitch from "@/components/RouteHardSwitch";
 
@@ -75,6 +76,7 @@ export default function RootLayout({
         <SportThemeApplier />
         <SeasonThemeApplier />
         <FoundrySessionChrome />
+        <SandboxSessionChrome />
         <PullToRefresh>{children}</PullToRefresh>
       </body>
     </html>
