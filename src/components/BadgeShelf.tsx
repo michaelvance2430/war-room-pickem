@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { TIER_LABEL, TIER_ORDER } from "@/lib/badges";
 import { getBadgeRewards } from "@/lib/badge-rewards";
 import { BadgeStatus, BadgeTier } from "@/lib/types";
+import CavalryScoutTrophy from "@/components/CavalryScoutTrophy";
 
 /** Hex colors so shelves always show even if Tailwind theme tokens miss */
 const TIER_HEX: Record<BadgeTier, string> = {
@@ -24,6 +25,7 @@ function BadgeTile({
 }) {
   const { def, earned } = status;
   const rewards = getBadgeRewards(def);
+  const cavalry = def.id === "worlds_greatest_cavalry_scout";
 
   return (
     <button
@@ -41,7 +43,11 @@ function BadgeTile({
           boxShadow: earned ? `0 0 12px ${hex}66` : undefined,
         }}
       >
-        <span aria-hidden>{def.icon}</span>
+        {cavalry ? (
+          <CavalryScoutTrophy size={40} muted={!earned} />
+        ) : (
+          <span aria-hidden>{def.icon}</span>
+        )}
         {(rewards.title || rewards.border) && (
           <span
             className="absolute -top-0.5 -right-0.5 min-w-[14px] h-3.5 px-0.5 rounded-full bg-amber-400 text-black text-[8px] font-black flex items-center justify-center"

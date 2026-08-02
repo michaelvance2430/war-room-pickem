@@ -32,6 +32,8 @@ const KEY = "warroom-league-earned-v1";
 /** Never forfeit these — account discoveries / creator / prior-season lore */
 const ALWAYS_KEEP = new Set([
   "the_commissioner",
+  "war_room_legend",
+  "worlds_greatest_cavalry_scout",
   "neighborhood_creeper",
   "calendar_cosplayer",
 ]);

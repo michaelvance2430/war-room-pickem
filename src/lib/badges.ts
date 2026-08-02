@@ -145,6 +145,18 @@ export const BADGE_CATALOG: BadgeDef[] = [
     icon: "🏆",
   },
   {
+    id: "worlds_greatest_cavalry_scout",
+    name: "World Greatest Cavalry Scout",
+    description:
+      "Recon so elite he finds the underdog, the fridge, and your confidence before kickoff. Official hardware: an eggplant welded to a wooden plinth. Not a vegetable. A doctrine. Do not salute it. It will not salute back.",
+    howToEarn:
+      "You don't earn this. The cavalry either is you — or it isn't. Seeded for Tbone Soulstache Rockstar / Football Guru. Peasants: admire the wood grain and move along.",
+    lockedLabel: "Hard locked — scouts only, no infantry",
+    tier: "legendary",
+    points: 200,
+    icon: "🍆",
+  },
+  {
     id: CAREER_CELLAR_ID,
     name: "Sad Little Brains Forever",
     description:
@@ -1376,6 +1388,11 @@ function evaluateBadge(
     case WAR_ROOM_LEGEND_ID:
       return {
         earned: hasPermanentBadge(player, WAR_ROOM_LEGEND_ID),
+      };
+
+    case "worlds_greatest_cavalry_scout":
+      return {
+        earned: hasPermanentBadge(player, "worlds_greatest_cavalry_scout"),
       };
 
     case "immortal_streak":

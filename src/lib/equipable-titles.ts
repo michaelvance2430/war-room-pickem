@@ -50,6 +50,13 @@ export const EQUIPABLE_TITLE_CATALOG: EquipableTitleDef[] = [
     blurb: "Hardware. History. The board remembers.",
   },
   {
+    badgeId: "worlds_greatest_cavalry_scout",
+    title: "Cavalry Scout",
+    vibe: "brag",
+    blurb:
+      "World Greatest. Maps optional. Eggplant on wood is not a suggestion.",
+  },
+  {
     badgeId: "sad_little_brains",
     title: "Sad Little Brain",
     vibe: "roast",

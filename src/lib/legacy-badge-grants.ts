@@ -1,10 +1,14 @@
 /**
- * Prior-season trophy → permanent War Room Legend + career cheevo bank.
+ * Prior-season / lore → permanent legendaries + career cheevo bank.
  *
  * Confirmed 2025–26 season:
  *  - Kahmann → Championship → War Room Legend (+200 career)
  *  - Big Ball Ben / Bill ball Ben → Village Nerd (Crystal Ball) → War Room Legend (+200 career)
  *  - Justin Strayer → Toilet Bowl (profile hardware; toilet crown if linked in Trophy Room)
+ *
+ * Named lore:
+ *  - Tbone Soulstache Rockstar / Football Guru → World Greatest Cavalry Scout
+ *    (eggplant on a wooden base · +200 career)
  *
  * Mistaken (hard-revoked whenever we see the name / on every app boot):
  *  - Andrew Visconti / Andy — was incorrectly given Kahmann’s champ seed
@@ -21,6 +25,7 @@ import { getBadgeDef } from "./badges";
 import { getSession } from "./league";
 
 export const WAR_ROOM_LEGEND_ID = "war_room_legend";
+export const CAVALRY_SCOUT_BADGE_ID = "worlds_greatest_cavalry_scout";
 
 type LegacyBadgeGrant = {
   pattern: RegExp;
@@ -38,6 +43,13 @@ export const LEGACY_BADGE_GRANTS: LegacyBadgeGrant[] = [
     pattern: /\bbig\s*ball\s*ben\b|\bbill\s*ball\s*ben\b|\bbillballben\b/i,
     badgeId: WAR_ROOM_LEGEND_ID,
     reason: "2025–26 Village Nerd — War Room Legend",
+  },
+  {
+    // Tbone / T-Bone Soulstache / Rockstar / Football Guru
+    pattern:
+      /\bt-?\s*bone\b|\bsoulstache\b|\bfootball\s*guru\b|\brockstar\b.*\bguru\b|\bguru\b.*\brockstar\b/i,
+    badgeId: CAVALRY_SCOUT_BADGE_ID,
+    reason: "World Greatest Cavalry Scout — eggplant on wood, no refunds",
   },
 ];
 
@@ -86,7 +98,6 @@ export function applyLegacyBadgeGrants(player: {
   if (!player?.id || !player?.name) return [];
   const newly: string[] = [];
   const known = new Set(getPermanentBadgeIds(player.id));
-  const pts = legendPts();
 
   // Hard revoke mistaken Visconti/Andy legend
   if (isMistakenLegendName(player.name)) {
@@ -97,6 +108,7 @@ export function applyLegacyBadgeGrants(player: {
 
   for (const g of LEGACY_BADGE_GRANTS) {
     if (!g.pattern.test(player.name)) continue;
+    const pts = getBadgeDef(g.badgeId)?.points ?? legendPts();
     if (known.has(g.badgeId)) {
       bankCareerBadgeId(player.id, g.badgeId, pts);
       continue;

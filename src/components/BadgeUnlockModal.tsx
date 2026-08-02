@@ -11,6 +11,7 @@ import { isStackableBadge, TIER_LABEL } from "@/lib/badges";
 import { stackCelebrationKey } from "@/lib/badge-stacks";
 import type { BadgeStatus, BadgeTier } from "@/lib/types";
 import { getSession } from "@/lib/league";
+import CavalryScoutTrophy from "@/components/CavalryScoutTrophy";
 
 const TIER_HEX: Record<BadgeTier, string> = {
   legendary: "#eab308",
@@ -188,7 +189,11 @@ export default function BadgeUnlockModal() {
               boxShadow: `0 0 28px ${hex}88`,
             }}
           >
-            {current.def.icon}
+            {current.def.id === "worlds_greatest_cavalry_scout" ? (
+              <CavalryScoutTrophy size={72} />
+            ) : (
+              current.def.icon
+            )}
           </div>
           <div className="flex items-center justify-center gap-2 flex-wrap mb-1">
             <span className="text-xl font-black text-foreground">
