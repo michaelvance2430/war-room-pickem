@@ -118,8 +118,10 @@ export default function CrystalBallPage() {
     }
     setMsg(
       res.cloud
-        ? `Locked in: ${selected}. Zero points. Maximum smugness potential.`
-        : `Locked in locally: ${selected}. (Run crystal-ball.sql in Supabase so the whole league can see it.)`
+        ? `Sealed: ${selected}. Secret from the room until kickoff freezes Crystal Ball — then it becomes the permanent board. Change it anytime until then.`
+        : `Sealed on this device: ${selected}. Cloud save didn’t stick${
+            res.cloudError ? ` (${res.cloudError.slice(0, 80)})` : ""
+          } — run crystal-ball.sql in Supabase so the league record is shared.`
     );
     await reload();
   }
@@ -203,12 +205,15 @@ export default function CrystalBallPage() {
             )}
           </div>
           <p className="text-sm text-muted leading-relaxed">
-            Before the first kickoff, pick who wins the{" "}
+            Pick who wins the{" "}
             <strong className="text-foreground">
               {nfl ? "Super Bowl" : "national championship"}
             </strong>
-            . No standings points. If you&apos;re right, you get a sarcastic
-            achievement and eternal bragging rights.
+            .{" "}
+            <strong className="text-foreground">Secret until kickoff</strong> —
+            nobody sees your team (or anyone else&apos;s) until Crystal Ball
+            freezes. Then the board is the permanent record. Zero standings
+            points; nail it and you get a sarcastic achievement.
           </p>
         </div>
 
@@ -221,41 +226,29 @@ export default function CrystalBallPage() {
           }`}
         >
           <p className="text-[10px] uppercase tracking-[0.18em] font-bold text-primary mb-1.5">
-            {state.locked ? "Locked — no changes" : "Do not skip"}
+            {state.locked
+              ? "Frozen — board is public record"
+              : "Secret until freeze"}
           </p>
           <p className="text-sm sm:text-base font-bold text-foreground leading-snug">
             {state.locked ? (
               <>
-                {nfl ? "Pride pick" : "Crystal Ball"} is sealed.{" "}
-                <span className="text-primary">{state.lockLabel}</span> You
-                cannot change your{" "}
-                {nfl ? "Super Bowl" : "national champion"} pick. No exceptions.
-              </>
-            ) : nfl ? (
-              <>
-                Your pick locks at the{" "}
-                <span className="text-primary">earlier</span> of{" "}
-                <span className="text-primary">
-                  noon ET Thu Sep 10, 2026
-                </span>{" "}
-                or when{" "}
-                <span className="text-primary">Week 1 freezes / scores</span>.
-                After that you{" "}
-                <span className="underline decoration-2">cannot change it</span>
-                . No take-backs.
+                {nfl ? "Pride picks" : "Crystal Ball"} is sealed.{" "}
+                <span className="text-primary">{state.lockLabel}</span> No
+                changes. Everyone can see who rode which horse.
               </>
             ) : (
               <>
-                Your pick locks at the{" "}
-                <span className="text-primary">earlier</span> of{" "}
+                Lock in your pick anytime.{" "}
+                <span className="text-primary">It stays private</span> until the{" "}
+                <span className="text-primary">earlier</span> of the deadline or
+                when{" "}
                 <span className="text-primary">
-                  noon ET Sat Aug 29, 2026
-                </span>{" "}
-                or when{" "}
-                <span className="text-primary">Week 0 freezes / scores</span>.
-                After that you{" "}
-                <span className="underline decoration-2">cannot change it</span>
-                . No take-backs.
+                  {nfl ? "Week 1" : "Week 0"} freezes / scores
+                </span>
+                . After that:{" "}
+                <span className="underline decoration-2">no take-backs</span>,
+                full room board forever.
               </>
             )}
           </p>
@@ -311,7 +304,7 @@ export default function CrystalBallPage() {
               ? state.myTeam
                 ? `You rode with ${state.myTeam}. The orb is sealed.`
                 : "You never picked. The witches are disappointed."
-              : "Search FBS teams. One pick. Change it until lock."}
+              : "Search teams. One pick. Change anytime until freeze — still secret from the room."}
           </p>
 
           {!state.locked && (
@@ -374,14 +367,45 @@ export default function CrystalBallPage() {
           )}
         </section>
 
-        {/* League board */}
+        {/* League board — secret until freeze, then permanent record */}
         <section className="rounded-xl border border-border bg-card p-5 mb-6">
-          <h2 className="font-semibold mb-3">
-            League board ({state.picks.length})
+          <h2 className="font-semibold mb-1">
+            {state.locked ? "League record" : "League board (sealed)"}
           </h2>
-          {state.picks.length === 0 ? (
+          <p className="text-xs text-muted mb-3 leading-relaxed">
+            {state.locked
+              ? "Crystal Ball is frozen. This is who picked what — permanent room history."
+              : `${state.lockedCount} sealed · names and teams stay hidden until kickoff freezes the orb. You’ll only see your own pick below until then.`}
+          </p>
+          {!state.locked ? (
+            <div className="space-y-3">
+              <p className="text-sm text-foreground">
+                <span className="text-2xl font-black text-primary tabular-nums">
+                  {state.lockedCount}
+                </span>{" "}
+                {state.lockedCount === 1 ? "player has" : "players have"} a
+                secret pick in.
+              </p>
+              {state.myTeam ? (
+                <p className="text-sm rounded-lg border border-primary/30 bg-primary/10 px-3 py-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-primary block mb-0.5">
+                    Your secret
+                  </span>
+                  <span className="font-semibold">{state.myTeam}</span>
+                  <span className="text-muted text-xs block mt-1">
+                    Only you can see this until freeze.
+                  </span>
+                </p>
+              ) : (
+                <p className="text-sm text-muted">
+                  You haven&apos;t sealed a pick yet. The room can&apos;t see
+                  anyone&apos;s team until the deadline.
+                </p>
+              )}
+            </div>
+          ) : state.picks.length === 0 ? (
             <p className="text-sm text-muted">
-              Nobody has peered into the future yet.
+              Board is frozen but empty — nobody locked a prophecy.
             </p>
           ) : (
             <ul className="space-y-2">
@@ -390,7 +414,8 @@ export default function CrystalBallPage() {
                   state.champion &&
                   p.teamName.toLowerCase() === state.champion.toLowerCase();
                 const ach = state.achievements.find(
-                  (a) => a.userId === p.userId && a.code === "crystal_ball_correct"
+                  (a) =>
+                    a.userId === p.userId && a.code === "crystal_ball_correct"
                 );
                 return (
                   <li
@@ -420,10 +445,12 @@ export default function CrystalBallPage() {
             </ul>
           )}
           {!state.cloud && (
-            <p className="text-[11px] text-muted mt-3">
-              Using device storage until{" "}
-              <code className="text-foreground">crystal-ball.sql</code> is run
-              in Supabase (so everyone shares one board).
+            <p className="text-[11px] text-warning mt-3 leading-relaxed">
+              Cloud board offline
+              {state.cloudError ? ` — ${state.cloudError.slice(0, 100)}` : ""}.
+              Your pick is on this device. Run{" "}
+              <code className="text-foreground">crystal-ball.sql</code> in
+              Supabase so the shared secret/record works for everyone.
             </p>
           )}
         </section>

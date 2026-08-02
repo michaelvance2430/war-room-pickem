@@ -25,12 +25,21 @@ export type Achievement = {
 
 export type CrystalBallState = {
   myTeam: string | null;
+  /**
+   * Visible board picks. While open (pre-lock): only you (secret).
+   * After lock / freeze: full room as permanent record.
+   */
   picks: CrystalBallPick[];
+  /** How many humans have a pick sealed (names hidden until reveal) */
+  lockedCount: number;
   champion: string | null;
   achievements: Achievement[];
+  /** True = picks frozen + board revealed */
   locked: boolean;
   lockLabel: string;
   cloud: boolean;
+  /** Last cloud error (debug / soft UI) */
+  cloudError?: string | null;
 };
 
 function resolveCbSport(sportId?: string | null): "cfb" | "nfl" {
@@ -232,6 +241,7 @@ export function peekLocalCrystalBall(): CrystalBallState {
   const empty: CrystalBallState = {
     myTeam: null,
     picks: [],
+    lockedCount: 0,
     champion: null,
     achievements: [],
     locked,
@@ -240,20 +250,25 @@ export function peekLocalCrystalBall(): CrystalBallState {
   };
   if (!session?.leagueId) return empty;
   const local = readLocal(session.leagueId);
-  const picks: CrystalBallPick[] = Object.entries(local.picks).map(
-    ([userId, p]) => ({
-      userId,
-      displayName: p.name,
-      teamName: p.teamName,
-      pickedAt: p.pickedAt,
-    })
-  );
   const mine = local.picks[session.playerId];
+  // Pre-lock: never flash other devices' local picks as a public board
+  const picks: CrystalBallPick[] =
+    mine && session.playerId
+      ? [
+          {
+            userId: session.playerId,
+            displayName: mine.name || session.playerName || "You",
+            teamName: mine.teamName,
+            pickedAt: mine.pickedAt,
+          },
+        ]
+      : [];
   return {
     myTeam: mine?.teamName || null,
-    picks: picks.sort((a, b) => a.displayName.localeCompare(b.displayName)),
-    champion: local.champion,
-    achievements: local.achievements,
+    picks,
+    lockedCount: mine ? 1 : 0,
+    champion: locked ? local.champion : null,
+    achievements: locked ? local.achievements : [],
     locked,
     lockLabel,
     cloud: false,
@@ -263,74 +278,121 @@ export function peekLocalCrystalBall(): CrystalBallState {
 export async function loadCrystalBall(): Promise<CrystalBallState> {
   const session = getSession();
   const emptyBase = peekLocalCrystalBall();
-  if (!session?.leagueId) return emptyBase;
+  if (!session?.leagueId || !session.playerId) return emptyBase;
 
-  // Lock check + picks fetch in parallel (was: lock then picks then result then ach)
   try {
     const supabase = createClient();
-    const [lockInfo, pickRes] = await Promise.all([
-      resolveCrystalBallLock(),
-      supabase
-        .from("crystal_ball_picks")
-        .select("user_id, team_name, picked_at, profiles(display_name)")
-        .eq("league_id", session.leagueId),
-    ]);
+    // Resolve lock first so we know whether the board is secret or public
+    const lockInfo = await resolveCrystalBallLock();
     const locked = lockInfo.locked;
     const lockLabel = lockInfo.lockLabel;
 
-    if (!pickRes.error && pickRes.data) {
-      const picks: CrystalBallPick[] = pickRes.data.map((r) => {
-        const prof = r.profiles as { display_name?: string } | null;
-        return {
-          userId: r.user_id as string,
-          displayName: prof?.display_name || "Player",
-          teamName: r.team_name as string,
-          pickedAt: r.picked_at as string,
-        };
-      });
-      const mine = picks.find((p) => p.userId === session.playerId);
-
-      const [resultRes, achRes] = await Promise.all([
-        supabase
-          .from("crystal_ball_result")
-          .select("champion_team")
+    // Pre-lock: only fetch YOUR pick (+ count). Post-lock: full board.
+    const pickQuery = locked
+      ? supabase
+          .from("crystal_ball_picks")
+          .select("user_id, team_name, picked_at, profiles(display_name)")
           .eq("league_id", session.leagueId)
-          .maybeSingle(),
-        supabase
-          .from("achievements")
-          .select("user_id, code, title, flavor, earned_at")
-          .eq("league_id", session.leagueId),
-      ]);
+      : supabase
+          .from("crystal_ball_picks")
+          .select("user_id, team_name, picked_at, profiles(display_name)")
+          .eq("league_id", session.leagueId)
+          .eq("user_id", session.playerId);
 
+    const [pickRes, countRpc, resultRes, achRes] = await Promise.all([
+      pickQuery,
+      // Security definer count — total sealed without revealing teams
+      supabase.rpc("crystal_ball_lock_count", {
+        p_league_id: session.leagueId,
+      }),
+      locked
+        ? supabase
+            .from("crystal_ball_result")
+            .select("champion_team")
+            .eq("league_id", session.leagueId)
+            .maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+      locked
+        ? supabase
+            .from("achievements")
+            .select("user_id, code, title, flavor, earned_at")
+            .eq("league_id", session.leagueId)
+        : Promise.resolve({ data: [] as unknown[], error: null }),
+    ]);
+
+    if (pickRes.error) {
+      // Table missing / RLS — keep local secret shell
       return {
-        myTeam: mine?.teamName || null,
-        picks: picks.sort((a, b) => a.displayName.localeCompare(b.displayName)),
-        champion: (resultRes.data?.champion_team as string) || null,
-        achievements: (achRes.data || []).map((a) => ({
-          userId: a.user_id as string,
-          code: a.code as string,
-          title: a.title as string,
-          flavor: a.flavor as string,
-          earnedAt: a.earned_at as string,
-        })),
+        ...emptyBase,
         locked,
         lockLabel,
-        cloud: true,
+        cloud: false,
+        cloudError: pickRes.error.message,
       };
     }
 
-    // Picks table missing / error — local with resolved lock
+    const rawPicks = (pickRes.data || []) as Record<string, unknown>[];
+    const allPicks: CrystalBallPick[] = rawPicks.map((r) => {
+      const prof = r.profiles as { display_name?: string } | null;
+      return {
+        userId: r.user_id as string,
+        displayName: prof?.display_name || "Player",
+        teamName: r.team_name as string,
+        pickedAt: r.picked_at as string,
+      };
+    });
+    const mine = allPicks.find((p) => p.userId === session.playerId);
+    let lockedCount = allPicks.length;
+    if (!countRpc.error && typeof countRpc.data === "number") {
+      lockedCount = countRpc.data;
+    } else if (!locked && mine) {
+      lockedCount = Math.max(1, lockedCount);
+    }
+
+    // Secret until lock: board only shows you. After lock: full permanent record.
+    const visiblePicks = locked
+      ? allPicks.sort((a, b) => a.displayName.localeCompare(b.displayName))
+      : mine
+        ? [mine]
+        : [];
+
+    // Cache own pick locally for fast reopen
+    if (mine) {
+      const local = readLocal(session.leagueId);
+      local.picks[session.playerId] = {
+        teamName: mine.teamName,
+        pickedAt: mine.pickedAt,
+        name: mine.displayName,
+      };
+      writeLocal(session.leagueId, local);
+    }
+
     return {
-      ...emptyBase,
+      myTeam: mine?.teamName || emptyBase.myTeam,
+      picks: visiblePicks,
+      lockedCount,
+      champion: locked
+        ? ((resultRes.data as { champion_team?: string } | null)
+            ?.champion_team as string) || null
+        : null,
+      achievements: locked
+        ? ((achRes.data || []) as Record<string, unknown>[]).map((a) => ({
+            userId: a.user_id as string,
+            code: a.code as string,
+            title: a.title as string,
+            flavor: a.flavor as string,
+            earnedAt: a.earned_at as string,
+          }))
+        : [],
       locked,
       lockLabel,
-      cloud: false,
+      cloud: true,
+      cloudError: null,
     };
   } catch {
-    /* fall through to local */
+    /* fall through */
   }
 
-  // Local fallback + best-effort lock
   try {
     const lockInfo = await resolveCrystalBallLock();
     return {
@@ -345,9 +407,8 @@ export async function loadCrystalBall(): Promise<CrystalBallState> {
 
 export async function saveCrystalBallPick(
   teamName: string
-): Promise<{ ok: boolean; error?: string; cloud?: boolean }> {
+): Promise<{ ok: boolean; error?: string; cloud?: boolean; cloudError?: string }> {
   const session = getSession();
-  const league = getLeague();
   if (!session?.leagueId || !session.playerId) {
     return { ok: false, error: "Join a league first." };
   }
@@ -361,6 +422,16 @@ export async function saveCrystalBallPick(
   const team = teamName.trim();
   if (!team) return { ok: false, error: "Pick a team." };
 
+  const pickedAt = new Date().toISOString();
+  // Always cache locally for instant reopen (still secret to this device only)
+  const local = readLocal(session.leagueId);
+  local.picks[session.playerId] = {
+    teamName: team,
+    pickedAt,
+    name: session.playerName || "You",
+  };
+  writeLocal(session.leagueId, local);
+
   try {
     const supabase = createClient();
     const { error } = await supabase.from("crystal_ball_picks").upsert(
@@ -368,7 +439,7 @@ export async function saveCrystalBallPick(
         league_id: session.leagueId,
         user_id: session.playerId,
         team_name: team,
-        picked_at: new Date().toISOString(),
+        picked_at: pickedAt,
       },
       { onConflict: "league_id,user_id" }
     );
@@ -381,25 +452,31 @@ export async function saveCrystalBallPick(
       }
       return { ok: true, cloud: true };
     }
-    // table missing or RLS — local
-  } catch {
-    /* local */
+    // Table/RLS — pick is still on this device until SQL is live
+    try {
+      const { markEngagement } = await import("./engagement");
+      markEngagement(session.playerId, "crystal_ball_picked");
+    } catch {
+      /* ignore */
+    }
+    return {
+      ok: true,
+      cloud: false,
+      cloudError: error.message,
+    };
+  } catch (e: unknown) {
+    try {
+      const { markEngagement } = await import("./engagement");
+      markEngagement(session.playerId, "crystal_ball_picked");
+    } catch {
+      /* ignore */
+    }
+    return {
+      ok: true,
+      cloud: false,
+      cloudError: e instanceof Error ? e.message : "cloud unavailable",
+    };
   }
-
-  const local = readLocal(session.leagueId);
-  local.picks[session.playerId] = {
-    teamName: team,
-    pickedAt: new Date().toISOString(),
-    name: session.playerName || "You",
-  };
-  writeLocal(session.leagueId, local);
-  try {
-    const { markEngagement } = await import("./engagement");
-    markEngagement(session.playerId, "crystal_ball_picked");
-  } catch {
-    /* ignore */
-  }
-  return { ok: true, cloud: false };
 }
 
 /** Humans who never submitted a Crystal Ball pick (excludes bots). */
