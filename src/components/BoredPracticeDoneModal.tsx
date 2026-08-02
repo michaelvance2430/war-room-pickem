@@ -5,8 +5,6 @@
  */
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
 import {
   EVENT_BORED_PRACTICE_DONE,
   clearBoredPracticeDoneModal,
@@ -21,7 +19,6 @@ import { hasLockedPicksOnce } from "@/lib/first-week";
 import { getSession } from "@/lib/league";
 
 export default function BoredPracticeDoneModal() {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [recap, setRecap] = useState<BoredPracticeRecap | null>(null);
   const [busy, setBusy] = useState(false);
@@ -51,15 +48,27 @@ export default function BoredPracticeDoneModal() {
 
   if (!open || !recap) return null;
 
-  function dismiss() {
+  function leavePractice(href: string) {
     clearBoredPracticeDoneModal();
     setOpen(false);
-    router.push("/");
+    // Always wipe practice so Home / Nav Picks cannot re-show the fake card
+    void import("@/lib/bored-practice").then((m) => {
+      m.exitBoredPracticeToLive();
+      window.location.assign(href);
+    });
   }
 
-  function softClose() {
-    clearBoredPracticeDoneModal();
-    setOpen(false);
+  function dismiss() {
+    leavePractice("/");
+  }
+
+  function goRealPicks() {
+    leavePractice("/picks");
+  }
+
+  /** Close only — still leave practice so room links are real season */
+  function softCloseTo(href: string) {
+    leavePractice(href);
   }
 
   async function doItAgain() {
@@ -219,34 +228,41 @@ export default function BoredPracticeDoneModal() {
         <div className="px-5 py-4 border-t border-border flex flex-col gap-2">
           <button
             type="button"
+            onClick={goRealPicks}
+            className="w-full py-3.5 min-h-[48px] rounded-xl bg-primary text-black font-extrabold text-sm"
+          >
+            Open real season picks
+          </button>
+          <button
+            type="button"
             disabled={busy}
             onClick={() => void doItAgain()}
-            className="w-full py-3.5 min-h-[48px] rounded-xl bg-primary text-black font-bold text-sm disabled:opacity-50"
+            className="w-full py-3 min-h-[48px] rounded-xl border border-amber-400/50 text-amber-100 font-bold text-sm disabled:opacity-50"
           >
-            {busy ? "Cooking another fake week…" : "Do it again (we dare you)"}
+            {busy ? "Cooking another fake week…" : "Do it again (fake only)"}
           </button>
           <div className="grid grid-cols-3 gap-2">
-            <Link
-              href="/board"
-              onClick={softClose}
+            <button
+              type="button"
+              onClick={() => softCloseTo("/board")}
               className="py-3 min-h-[44px] rounded-xl border border-border text-center text-[11px] font-bold text-foreground hover:border-primary/50 flex items-center justify-center"
             >
               Board
-            </Link>
-            <Link
-              href="/gazette"
-              onClick={softClose}
+            </button>
+            <button
+              type="button"
+              onClick={() => softCloseTo("/gazette")}
               className="py-3 min-h-[44px] rounded-xl border border-amber-500/40 text-center text-[11px] font-bold text-amber-100 hover:border-amber-400/60 flex items-center justify-center"
             >
               Gazette
-            </Link>
-            <Link
-              href="/locker-room"
-              onClick={softClose}
+            </button>
+            <button
+              type="button"
+              onClick={() => softCloseTo("/locker-room")}
               className="py-3 min-h-[44px] rounded-xl border border-border text-center text-[11px] font-bold text-foreground hover:border-primary/50 flex items-center justify-center"
             >
               Locker
-            </Link>
+            </button>
           </div>
           <button
             type="button"

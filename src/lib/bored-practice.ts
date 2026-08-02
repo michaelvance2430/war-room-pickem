@@ -186,6 +186,39 @@ export function clearBoredPracticeAll() {
   writeJson(CARD_KEY, null);
   writeJson(PICKS_KEY, null);
   writeJson(RESULTS_KEY, null);
+  clearBoredPracticeDoneModal();
+}
+
+/**
+ * Leave practice completely — live season again.
+ * Call before navigating to clean /picks or Home from any exit CTA.
+ * Storage alone must never re-open the fake card on live routes.
+ */
+export function exitBoredPracticeToLive(): void {
+  clearBoredPracticeAll();
+}
+
+/**
+ * True only when URL explicitly opts into practice (?practice=1 or week=99).
+ * Live /picks (no query) must NEVER auto-latch onto leftover practice storage.
+ * That’s what locked users into graded fake weeks after Home showed real Week 1.
+ */
+export function isBoredPracticeUrl(
+  search?: string | null
+): boolean {
+  if (typeof window === "undefined" && search == null) return false;
+  try {
+    const sp = new URLSearchParams(
+      search ??
+        (typeof window !== "undefined" ? window.location.search : "")
+    );
+    if (sp.get("practice") === "1") return true;
+    const w = sp.get("week");
+    if (w === "99" || w === String(BORED_PRACTICE_WEEK)) return true;
+    return false;
+  } catch {
+    return false;
+  }
 }
 
 function buildGazetteTease(

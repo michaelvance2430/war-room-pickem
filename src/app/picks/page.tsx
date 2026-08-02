@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import Nav from "@/components/Nav";
 import PicksHowToModal from "@/components/PicksHowToModal";
 import PicksPreOpenOddsModal from "@/components/PicksPreOpenOddsModal";
@@ -134,6 +135,11 @@ export default function PicksPage() {
   const [practiceMode, setPracticeMode] = useState(false);
   /** True after local practice score — show W/L on the card */
   const [practiceScored, setPracticeScored] = useState(false);
+  const searchParams = useSearchParams();
+  /** URL is the only gate for practice — never latch from localStorage alone */
+  const practiceFromUrl =
+    searchParams.get("practice") === "1" ||
+    searchParams.get("week") === "99";
 
   const revisionRef = useRef<string>("");
   const viewWeekRef = useRef(1);
@@ -149,6 +155,14 @@ export default function PicksPage() {
   savedRef.current = saved;
   viewWeekRef.current = viewWeek;
   practiceModeRef.current = practiceMode;
+
+  /** Hard leave practice — wipe client practice state and go live. */
+  const leavePractice = useCallback((href: string) => {
+    void import("@/lib/bored-practice").then((m) => {
+      m.exitBoredPracticeToLive();
+      window.location.assign(href);
+    });
+  }, []);
 
   const loadPicksIntoState = useCallback(
     async (cloud: CloudCard, week: number) => {
@@ -429,24 +443,23 @@ export default function PicksPage() {
     }
   }
 
+  // Client nav from /picks?practice=1 → /picks (Nav "Picks"): drop fake card.
+  useEffect(() => {
+    if (!practiceModeRef.current) return;
+    if (practiceFromUrl) return;
+    leavePractice("/picks");
+  }, [practiceFromUrl, leavePractice]);
+
   useEffect(() => {
     void (async () => {
-      // Bored practice: fully client-side card (never live season)
+      // Bored practice: ONLY via explicit URL (?practice=1 or week=99).
+      // Never auto-latch from leftover localStorage — that trapped users on
+      // graded fake cards when they wanted real Week 1 picks (Home was live,
+      // My Picks still showed the fake graded week).
       let practice = false;
       try {
-        const sp = new URLSearchParams(window.location.search);
-        practice =
-          sp.get("practice") === "1" ||
-          sp.get("week") === "99" ||
-          sp.get("week") === String(
-            (await import("@/lib/bored-practice")).BORED_PRACTICE_WEEK
-          );
-        if (!practice) {
-          const { isBoredPracticeActive, loadBoredLocalCard } = await import(
-            "@/lib/bored-practice"
-          );
-          practice = isBoredPracticeActive() && !!loadBoredLocalCard();
-        }
+        const { isBoredPracticeUrl } = await import("@/lib/bored-practice");
+        practice = isBoredPracticeUrl();
       } catch {
         /* ok */
       }
@@ -459,9 +472,21 @@ export default function PicksPage() {
             loadBoredLocalPicks,
             loadBoredLocalResults,
             isBoredPracticeActive,
+            exitBoredPracticeToLive,
           } = await import("@/lib/bored-practice");
           if (!isBoredPracticeActive()) {
-            // Stale query — fall through to live
+            // Stale ?practice=1 — wipe junk and fall through to live season
+            exitBoredPracticeToLive();
+            if (typeof window !== "undefined") {
+              const u = new URL(window.location.href);
+              u.searchParams.delete("practice");
+              u.searchParams.delete("run");
+              u.searchParams.delete("fresh");
+              if (u.searchParams.get("week") === "99") {
+                u.searchParams.delete("week");
+              }
+              window.history.replaceState({}, "", u.pathname + u.search);
+            }
           } else {
             const card = loadBoredLocalCard();
             if (card?.games?.length) {
@@ -1269,21 +1294,33 @@ export default function PicksPage() {
         )}
 
         {practiceMode && (
-          <div className="mb-4 rounded-xl border-2 border-dashed border-primary/50 bg-primary/10 px-4 py-3">
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-1">
-              Fake week · standings unharmed
-            </p>
-            <p className="text-xs sm:text-sm text-foreground/90 leading-relaxed">
-              {practiceScored || saved
-                ? "You finished the pretend loop. Ending popup has the Gazette / Board / Locker tour — or go Home and cook another fake week."
-                : "These games are made up. Lock the whole card; we grade it on purpose and show you how a real week ends. Zero live standings. Zero excuses."}
-            </p>
-            <Link
-              href="/"
-              className="inline-block mt-2 text-xs font-bold text-primary hover:underline"
-            >
-              ← Flee to Home
-            </Link>
+          <div className="mb-4 rounded-xl border-2 border-dashed border-amber-400/70 bg-amber-500/10 px-4 py-3.5 space-y-3">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-300 mb-1">
+                I&apos;m bored · fake week · not your real card
+              </p>
+              <p className="text-xs sm:text-sm text-foreground/90 leading-relaxed">
+                {practiceScored || saved
+                  ? "This graded card is practice only. Real Week 1 (or live week) lives behind Exit. Nav “Picks” without practice in the URL also drops you into the real season."
+                  : "These games are made up. Lock the card; we grade it on your phone only. Real week cards and standings stay untouched."}
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <button
+                type="button"
+                onClick={() => leavePractice("/picks")}
+                className="min-h-[48px] px-4 rounded-xl bg-primary text-black text-sm font-extrabold touch-manipulation"
+              >
+                Exit practice → real picks
+              </button>
+              <button
+                type="button"
+                onClick={() => leavePractice("/")}
+                className="min-h-[48px] px-4 rounded-xl border border-amber-400/50 text-amber-100 text-sm font-bold touch-manipulation"
+              >
+                Home (live season)
+              </button>
+            </div>
           </div>
         )}
 
@@ -1498,11 +1535,11 @@ export default function PicksPage() {
           </div>
         )}
 
-        {/* Crystal-clear week banner */}
+        {/* Crystal-clear week banner — practice vs live never share chrome */}
         <div
           className={`rounded-xl border px-4 py-3 mb-4 ${
             practiceMode
-              ? "border-primary/40 bg-black/40"
+              ? "border-2 border-dashed border-amber-400/70 bg-amber-500/10"
               : weekEditable
                 ? chaosArmed || chaosLockedWeek
                   ? "border-orange-500/50 bg-orange-500/10"
@@ -1514,7 +1551,7 @@ export default function PicksPage() {
             <span
               className={`text-[10px] font-bold uppercase tracking-[0.2em] ${
                 practiceMode
-                  ? "text-primary"
+                  ? "text-amber-300"
                   : weekEditable
                     ? "text-primary"
                     : "text-muted"
@@ -1522,19 +1559,19 @@ export default function PicksPage() {
             >
               {practiceMode
                 ? practiceScored || saved
-                  ? "Fake week · finished"
-                  : "Fake week · go cook"
+                  ? "Fake week · finished · not the season"
+                  : "Fake week · go cook · not the season"
                 : weekEditable
                   ? "You are cooking"
                   : "Just looking"}
             </span>
             {practiceMode ? (
-              <span className="text-xs px-2 py-0.5 rounded-full border border-primary/50 text-primary font-semibold">
-                NOT LIVE
+              <span className="text-xs px-2 py-0.5 rounded-full border border-amber-400/60 text-amber-100 font-semibold bg-amber-500/15">
+                FAKE · NOT LIVE
               </span>
             ) : weekEditable ? (
               <span className="text-xs px-2 py-0.5 rounded-full bg-primary text-black font-semibold">
-                LIVE
+                LIVE SEASON
               </span>
             ) : (
               <span className="text-xs px-2 py-0.5 rounded-full border border-border text-muted">
@@ -1552,7 +1589,7 @@ export default function PicksPage() {
           <p className="text-sm text-muted mt-1">
             {practiceMode
               ? practiceScored || saved
-                ? "Graded on your phone only. Real standings never noticed."
+                ? "Graded on your phone only. Real standings never noticed. Exit practice for your real card."
                 : "Private dry-run. Lock when ready — we grade it and show how the room wakes up."
               : `${leagueName ? `${leagueName} · ` : ""}${
                   weekEditable
@@ -2115,7 +2152,7 @@ export default function PicksPage() {
             </div>
 
             {practiceMode && (practiceScored || saved) ? (
-              <div className="rounded-xl border border-primary/40 bg-primary/10 px-4 py-4 space-y-2 text-center">
+              <div className="rounded-xl border-2 border-dashed border-amber-400/60 bg-amber-500/10 px-4 py-4 space-y-2 text-center">
                 <p className="text-sm font-bold text-foreground">
                   Fake week graded
                   {weekScoredAt
@@ -2123,28 +2160,31 @@ export default function PicksPage() {
                     : ""}
                 </p>
                 <p className="text-xs text-muted leading-relaxed">
-                  Ending popup has the Gazette / Board / Locker tour. Or go Home
-                  and do another one for fun.
+                  Practice is over for this run. Leave to open live season picks
+                  — or tour Board / Gazette (still leaves practice).
                 </p>
                 <div className="flex flex-col sm:flex-row gap-2 pt-1">
-                  <Link
-                    href="/"
-                    className="flex-1 py-3 min-h-[48px] rounded-xl bg-primary text-black text-sm font-bold flex items-center justify-center"
+                  <button
+                    type="button"
+                    onClick={() => leavePractice("/picks")}
+                    className="flex-1 py-3 min-h-[48px] rounded-xl bg-primary text-black text-sm font-extrabold flex items-center justify-center touch-manipulation"
+                  >
+                    Real picks
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => leavePractice("/")}
+                    className="flex-1 py-3 min-h-[48px] rounded-xl border border-amber-400/50 text-amber-100 text-sm font-bold flex items-center justify-center touch-manipulation"
                   >
                     Home
-                  </Link>
-                  <Link
-                    href="/board"
-                    className="flex-1 py-3 min-h-[48px] rounded-xl border border-border text-sm font-bold text-foreground flex items-center justify-center"
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => leavePractice("/board")}
+                    className="flex-1 py-3 min-h-[48px] rounded-xl border border-border text-sm font-bold text-foreground flex items-center justify-center touch-manipulation"
                   >
                     Peek Board
-                  </Link>
-                  <Link
-                    href="/gazette"
-                    className="flex-1 py-3 min-h-[48px] rounded-xl border border-amber-500/40 text-sm font-bold text-amber-100 flex items-center justify-center"
-                  >
-                    Gazette
-                  </Link>
+                  </button>
                 </div>
               </div>
             ) : weekEditable || (practiceMode && !saved) ? (
