@@ -132,24 +132,48 @@ function toLocalLeague(row: {
   };
 }
 
+const LEAGUE_FETCH_TTL_MS = 25_000;
+const leagueFetchCache = new Map<
+  string,
+  { at: number; league: League | null }
+>();
+const leagueFetchInflight = new Map<string, Promise<League | null>>();
+
 /** Load league from Supabase by id and cache in localStorage */
 export async function fetchLeagueFromCloud(
   leagueId: string
 ): Promise<League | null> {
-  const supabase = createClient();
-  const { data, error } = await supabase
-    .from("leagues")
-    .select("*")
-    .eq("id", leagueId)
-    .single();
+  const hit = leagueFetchCache.get(leagueId);
+  if (hit && Date.now() - hit.at < LEAGUE_FETCH_TTL_MS) return hit.league;
 
-  if (error || !data) return null;
+  const inflight = leagueFetchInflight.get(leagueId);
+  if (inflight) return inflight;
 
-  const league = toLocalLeague(data);
-  if (canUseStorage()) {
-    localStorage.setItem(LEAGUE_KEY, JSON.stringify(league));
-  }
-  return league;
+  const promise = (async () => {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("leagues")
+      .select("*")
+      .eq("id", leagueId)
+      .single();
+
+    if (error || !data) {
+      leagueFetchCache.set(leagueId, { at: Date.now(), league: null });
+      return null;
+    }
+
+    const league = toLocalLeague(data);
+    if (canUseStorage()) {
+      localStorage.setItem(LEAGUE_KEY, JSON.stringify(league));
+    }
+    leagueFetchCache.set(leagueId, { at: Date.now(), league });
+    return league;
+  })().finally(() => {
+    leagueFetchInflight.delete(leagueId);
+  });
+
+  leagueFetchInflight.set(leagueId, promise);
+  return promise;
 }
 
 /** Refresh current session league from Supabase */
@@ -157,6 +181,17 @@ export async function syncLeagueFromCloud(): Promise<League | null> {
   const session = getSession();
   if (!session?.leagueId) return getLeague();
   return fetchLeagueFromCloud(session.leagueId);
+}
+
+/** Drop league cloud cache (after settings save / switch). */
+export function invalidateLeagueCloudCache(leagueId?: string | null) {
+  if (!leagueId) {
+    leagueFetchCache.clear();
+    leagueFetchInflight.clear();
+    return;
+  }
+  leagueFetchCache.delete(leagueId);
+  leagueFetchInflight.delete(leagueId);
 }
 
 /** Push name + settings to Supabase and update local cache */
@@ -174,6 +209,7 @@ export async function saveLeagueToCloud(opts: {
     return { ok: false, error: "Only the commissioner can change settings" };
   }
 
+  invalidateLeagueCloudCache(session.leagueId);
   const supabase = createClient();
   const patch: Record<string, unknown> = {};
   if (opts.name !== undefined) patch.name = opts.name.trim() || local.name;

@@ -73,9 +73,11 @@ export default function CommishSetupBanner() {
         if (!cancelled) setShow(false);
       }
     }
-    void load();
+    // Don't compete with Home hero for bandwidth on first paint
+    const t = window.setTimeout(() => void load(), 700);
     return () => {
       cancelled = true;
+      window.clearTimeout(t);
     };
   }, []);
 

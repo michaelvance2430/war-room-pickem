@@ -79,7 +79,10 @@ const EMPTY_PROP: Prop = {
   points: 3,
 };
 
-const POLL_MS = 12_000;
+/** Soft card poll — was 12s and felt like the page never settled */
+const POLL_MS = 45_000;
+/** Min gap between soft refreshes (focus/realtime storms) */
+const SOFT_REFRESH_GAP_MS = 12_000;
 
 export default function PicksClient() {
   /** League's official pick week (commissioner-controlled). */
@@ -154,12 +157,15 @@ export default function PicksClient() {
   const savedRef = useRef(saved);
   /** Mount-once softRefresh must read current practice flag (not a stale false). */
   const practiceModeRef = useRef(false);
+  const savingRef = useRef(false);
+  const lastSoftRefreshAt = useRef(0);
   picksRef.current = picks;
   bestBetRef.current = bestBetId;
   propChoiceRef.current = propChoice;
   savedRef.current = saved;
   viewWeekRef.current = viewWeek;
   practiceModeRef.current = practiceMode;
+  savingRef.current = saving;
 
   /** Hard leave practice — wipe client practice state and go live. */
   const leavePractice = useCallback((href: string) => {
@@ -472,8 +478,14 @@ export default function PicksClient() {
 
   /** Poll / realtime: refresh current view week + active week number only. */
   const softRefresh = useCallback(async () => {
-    // Private practice must never pull live cards / active week (stale closure safe via ref)
+    // Private practice must never pull live cards / active week
     if (practiceModeRef.current) return;
+    // Don't yank the card while the user is locking picks
+    if (savingRef.current) return;
+    const now = Date.now();
+    if (now - lastSoftRefreshAt.current < SOFT_REFRESH_GAP_MS) return;
+    lastSoftRefreshAt.current = now;
+
     const active = await loadLeagueActiveWeek();
     setActiveWeek(active);
     void refreshPublishedList();

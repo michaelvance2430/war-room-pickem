@@ -111,7 +111,8 @@ export default function BadgeUnlockModal() {
   // Lore grants (Cavalry Scout) also retry early so login popup isn't missed.
   useEffect(() => {
     if (checked) return;
-    const timers = [1200, 3000, 6000, 10000].map((ms) =>
+    // Was 4 probes (1.2–10s) — too chatty on every app open
+    const timers = [2500, 8000].map((ms) =>
       setTimeout(() => {
         void (async () => {
           try {
