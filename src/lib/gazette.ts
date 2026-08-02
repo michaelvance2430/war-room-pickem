@@ -279,6 +279,20 @@ export const EVENT_GAZETTE_SEEN = "warroom-gazette-seen";
 /**
  * Home / nav: is there a filed edition this player hasn’t opened?
  */
+const gazetteUnreadCache = new Map<
+  string,
+  {
+    at: number;
+    value: {
+      unread: boolean;
+      weekNumber: number | null;
+      ritualName: string | null;
+      weekLabel: string | null;
+    };
+  }
+>();
+const GAZETTE_UNREAD_TTL_MS = 45_000;
+
 export async function getGazetteUnreadState(): Promise<{
   unread: boolean;
   weekNumber: number | null;
@@ -294,9 +308,27 @@ export async function getGazetteUnreadState(): Promise<{
   if (!GAZETTE_ENABLED) return empty;
   const session = getSession();
   if (!session?.leagueId) return empty;
+
+  const cacheKey = `${session.leagueId}:${session.playerId || ""}`;
+  const hit = gazetteUnreadCache.get(cacheKey);
+  if (hit && Date.now() - hit.at < GAZETTE_UNREAD_TTL_MS) return hit.value;
+
   try {
-    const res = await loadGazetteArchive();
-    if (!res.ok || !res.editions?.length) return empty;
+    // Badge only needs the latest week number — not the full archive payloads
+    // (loadGazetteArchive was downloading every edition on every Nav boot).
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("gazette_editions")
+      .select("week_number, week_label, created_at")
+      .eq("league_id", session.leagueId)
+      .order("week_number", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error || !data) {
+      gazetteUnreadCache.set(cacheKey, { at: Date.now(), value: empty });
+      return empty;
+    }
     // Paper exists → season is alive (unlock deep home tiles / cheevo pops)
     try {
       const { markSeasonComeAlive } = await import("./first-week");
@@ -304,20 +336,20 @@ export async function getGazetteUnreadState(): Promise<{
     } catch {
       /* ignore */
     }
-    const latest = res.editions[0];
-    const week = latest.weekNumber;
+    const week = data.week_number as number;
+    const createdAt = (data.created_at as string) || null;
     const unread = !hasSeenGazette(session.leagueId, week);
-    const ritual =
-      latest.edition?.ritualName ||
-      ritualEditionName(
-        latest.createdAt ? new Date(latest.createdAt) : new Date()
-      );
-    return {
+    const ritual = ritualEditionName(
+      createdAt ? new Date(createdAt) : new Date()
+    );
+    const value = {
       unread,
       weekNumber: week,
       ritualName: ritual,
-      weekLabel: latest.weekLabel || latest.edition?.weekLabel || null,
+      weekLabel: (data.week_label as string) || null,
     };
+    gazetteUnreadCache.set(cacheKey, { at: Date.now(), value });
+    return value;
   } catch {
     return empty;
   }

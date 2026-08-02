@@ -51,14 +51,28 @@ type HeroState = {
  * Commish → publish / score / invite.
  * Flavor stays below; this is the runway.
  */
+/** Survive Picks → Home remount so hero isn't a pulse skeleton every tab. */
+const HERO_TTL_MS = 20_000;
+let heroCache: { at: number; leagueId: string; state: HeroState } | null = null;
+
 export default function HomeWeekHero() {
-  const [state, setState] = useState<HeroState | null>(null);
+  const lid = getLeague()?.id || "";
+  const [state, setState] = useState<HeroState | null>(() => {
+    if (
+      heroCache &&
+      heroCache.leagueId === lid &&
+      Date.now() - heroCache.at < HERO_TTL_MS
+    ) {
+      return heroCache.state;
+    }
+    return null;
+  });
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       try {
-        // Active week + scored list first (needed for card)
+        // Active week + scored list (cached loaders)
         const { week, advanced, scored } = await resolvePlayerActiveWeek({
           persistIfOps: true,
         });
@@ -83,7 +97,7 @@ export default function HomeWeekHero() {
         );
 
         // Paint hero immediately — last-week recap can fill in after
-        setState({
+        const next: HeroState = {
           week,
           hasCard,
           gameCount: games.length,
@@ -97,8 +111,14 @@ export default function HomeWeekHero() {
           isOps: isOps(),
           leagueCode: getLeague()?.code || null,
           advancedFromScored: advanced,
-          lastWeekRecap: null,
-        });
+          lastWeekRecap: state?.lastWeekRecap ?? null,
+        };
+        setState(next);
+        heroCache = {
+          at: Date.now(),
+          leagueId: getLeague()?.id || "",
+          state: next,
+        };
 
         // Last scored week recap — only a week *before* the card you're on.
         // Deferred so loadLeaguePlayers doesn't block the hero.
@@ -130,19 +150,22 @@ export default function HomeWeekHero() {
               .sort((a, b) => b.pts - a.pts || a.id.localeCompare(b.id));
             const meIdx = withPts.findIndex((x) => x.id === selfId);
             if (meIdx >= 0) {
-              setState((prev) =>
-                prev
-                  ? {
-                      ...prev,
-                      lastWeekRecap: {
-                        week: lastScoredWeek,
-                        pts: withPts[meIdx]!.pts,
-                        rank: meIdx + 1,
-                        field: withPts.length,
-                      },
-                    }
-                  : prev
-              );
+              const recap = {
+                week: lastScoredWeek,
+                pts: withPts[meIdx]!.pts,
+                rank: meIdx + 1,
+                field: withPts.length,
+              };
+              setState((prev) => {
+                if (!prev) return prev;
+                const merged = { ...prev, lastWeekRecap: recap };
+                heroCache = {
+                  at: Date.now(),
+                  leagueId: getLeague()?.id || "",
+                  state: merged,
+                };
+                return merged;
+              });
             }
           }
         } catch {

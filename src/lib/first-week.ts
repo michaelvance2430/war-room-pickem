@@ -40,6 +40,14 @@ function writeMap(key: string, map: Record<string, boolean>) {
 function notifyProgress() {
   if (typeof window === "undefined") return;
   try {
+    // Drop progressive snapshot so nav re-reads first-week flags
+    void import("./progressive-disclosure").then((m) => {
+      m.invalidateProgressiveSnapshot?.();
+    });
+  } catch {
+    /* ignore */
+  }
+  try {
     window.dispatchEvent(new CustomEvent(EVENT_PROGRESS));
   } catch {
     /* ignore */
@@ -91,10 +99,15 @@ export function markSeasonComeAlive(playerId?: string | null): void {
   notifyProgress();
 }
 
+/** Once per tab session — never re-probe cloud for first-week flags. */
+const firstWeekSyncedThisTab = new Set<string>();
+
 /** Sync check: scored weeks in cloud → season is alive. */
 export async function ensureSeasonAliveFromCloud(
   playerId?: string | null
 ): Promise<boolean> {
+  // Local already knows — skip network (was hit on every route via progressive)
+  if (hasSeasonComeAlive(playerId)) return true;
   try {
     const { listScoredWeekNumbers } = await import("./cloud");
     const scored = await listScoredWeekNumbers();
@@ -111,33 +124,46 @@ export async function ensureSeasonAliveFromCloud(
 /**
  * Returning players: if they already locked (or season has scores), unlock chrome.
  * Call on home boot / badge celebrate.
+ * Cheap after first run: local flags short-circuit all cloud probes.
  */
 export async function syncFirstWeekFromCloud(
   playerId?: string | null
 ): Promise<void> {
   const id = resolvePlayerId(playerId);
-  await ensureSeasonAliveFromCloud(id);
+  if (!id) return;
+
+  // Already unlocked both ways → zero network
+  if (hasLockedPicksOnce(id) && hasSeasonComeAlive(id)) {
+    firstWeekSyncedThisTab.add(id);
+    return;
+  }
+  // Once per browser tab is enough; flags live in localStorage
+  if (firstWeekSyncedThisTab.has(id)) return;
+  firstWeekSyncedThisTab.add(id);
+
+  // Season alive probe only if still unknown
+  if (!hasSeasonComeAlive(id)) {
+    await ensureSeasonAliveFromCloud(id);
+  }
   if (hasLockedPicksOnce(id)) return;
+
   try {
     const { loadLeagueActiveWeek, loadMyPicks, listScoredWeekNumbers } =
       await import("./cloud");
     const week = await loadLeagueActiveWeek();
-    const mine = await loadMyPicks(week);
-    if (mine?.lockedAt) {
+    // Parallel picks peek (active + previous) instead of serial waterfall
+    const [mine, prev] = await Promise.all([
+      loadMyPicks(week),
+      week > 0 ? loadMyPicks(week - 1) : Promise.resolve(null),
+    ]);
+    if (mine?.lockedAt || prev?.lockedAt) {
       markHasLockedPicksOnce(id);
       return;
     }
-    // Any prior scored week with a lock still counts via season-alive;
-    // also peek previous week if active is empty
-    if (week > 0) {
-      const prev = await loadMyPicks(week - 1);
-      if (prev?.lockedAt) {
-        markHasLockedPicksOnce(id);
-        return;
-      }
+    if (!hasSeasonComeAlive(id)) {
+      const scored = await listScoredWeekNumbers();
+      if (scored.length > 0) markSeasonComeAlive(id);
     }
-    const scored = await listScoredWeekNumbers();
-    if (scored.length > 0) markSeasonComeAlive(id);
   } catch {
     /* ignore */
   }

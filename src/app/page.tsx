@@ -1,23 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Nav from "@/components/Nav";
 import Link from "next/link";
-import HotTakeTicker from "@/components/HotTakeTicker";
-import SportPoolPollBanner from "@/components/SportPoolPollBanner";
-import BetaLeagueBanner from "@/components/BetaLeagueBanner";
+import dynamic from "next/dynamic";
 import IncidentBanner from "@/components/IncidentBanner";
-import CrownAndShame from "@/components/CrownAndShame";
 import HomeWeekHero from "@/components/HomeWeekHero";
-import PlayerWeekChecklist from "@/components/PlayerWeekChecklist";
 import CommishSetupBanner from "@/components/CommishSetupBanner";
 import HomeCrewWhisper from "@/components/HomeCrewWhisper";
-import InviteFriends from "@/components/InviteFriends";
-import HomeUnseenPulse from "@/components/HomeUnseenPulse";
-import HomeGazetteSpotlight from "@/components/HomeGazetteSpotlight";
 import HomeTileUnseen from "@/components/HomeTileUnseen";
-import LockPicksRoast from "@/components/LockPicksRoast";
 import {
   getSession,
   getLeague,
@@ -36,22 +28,118 @@ import { resolveHomeChrome } from "@/lib/sports/home-chrome";
 import HomeSportAtmosphere from "@/components/HomeSportAtmosphere";
 import HomeSportHeader from "@/components/HomeSportHeader";
 import LeagueMembershipCard from "@/components/LeagueMembershipCard";
-import OpenRoomLeaveNudge from "@/components/OpenRoomLeaveNudge";
 import MultiLeagueHomeHub from "@/components/MultiLeagueHomeHub";
 import HomeRoomContext from "@/components/HomeRoomContext";
-
 import SoftUnlockBanner from "@/components/SoftUnlockBanner";
 import BoredLameSandboxCta from "@/components/BoredLameSandboxCta";
 import SandboxSimBanner from "@/components/SandboxSimBanner";
+import { isGuestMode } from "@/lib/guest-mode";
+import {
+  wantsFullRoom,
+  hasSeenGazetteShelfReveal,
+} from "@/lib/progressive-disclosure";
+import { isFirstWeekChrome } from "@/lib/first-week";
+
+/** Below-the-job widgets — not needed for Home first paint from Picks. */
+const HotTakeTicker = dynamic(() => import("@/components/HotTakeTicker"), {
+  ssr: false,
+});
+const CrownAndShame = dynamic(() => import("@/components/CrownAndShame"), {
+  ssr: false,
+});
+const PlayerWeekChecklist = dynamic(
+  () => import("@/components/PlayerWeekChecklist"),
+  { ssr: false }
+);
+const HomeUnseenPulse = dynamic(() => import("@/components/HomeUnseenPulse"), {
+  ssr: false,
+});
+const HomeGazetteSpotlight = dynamic(
+  () => import("@/components/HomeGazetteSpotlight"),
+  { ssr: false }
+);
+const LockPicksRoast = dynamic(() => import("@/components/LockPicksRoast"), {
+  ssr: false,
+});
+const SportPoolPollBanner = dynamic(
+  () => import("@/components/SportPoolPollBanner"),
+  { ssr: false }
+);
+const BetaLeagueBanner = dynamic(
+  () => import("@/components/BetaLeagueBanner"),
+  { ssr: false }
+);
+const OpenRoomLeaveNudge = dynamic(
+  () => import("@/components/OpenRoomLeaveNudge"),
+  { ssr: false }
+);
+const InviteFriends = dynamic(() => import("@/components/InviteFriends"), {
+  ssr: false,
+});
+
+/** Sync read of local session → paint Home shell without "Loading…" */
+function readLocalHomeShell(): {
+  leagueCode: string;
+  leagueName: string;
+  sportId: string;
+  homeTagline: string;
+  isCommish: boolean;
+  actuallyCommish: boolean;
+  firstWeekChrome: boolean;
+  showGazetteShelf: boolean;
+} | null {
+  try {
+    if (isGuestMode()) {
+      const session = getSession();
+      const league = getLeague();
+      if (!session || !league) return null;
+      return {
+        leagueCode: league.code,
+        leagueName: league.name,
+        sportId: league.sportId || "cfb",
+        homeTagline: resolveHomeTagline({
+          homeTaglineId: league.settings?.homeTaglineId,
+          homeTaglineCustom: league.settings?.homeTaglineCustom,
+          sportId: league.sportId || "cfb",
+        }),
+        isCommish: isCommissioner(),
+        actuallyCommish: isActuallyCommissioner(),
+        firstWeekChrome: false,
+        showGazetteShelf: true,
+      };
+    }
+    const session = getSession();
+    const league = getLeague();
+    if (!session || !league) return null;
+    const id = session.playerId;
+    const full = wantsFullRoom(id);
+    const early = !full && isFirstWeekChrome(id);
+    return {
+      leagueCode: league.code,
+      leagueName: league.name,
+      sportId: league.sportId || "cfb",
+      homeTagline: resolveHomeTagline({
+        homeTaglineId: league.settings?.homeTaglineId,
+        homeTaglineCustom: league.settings?.homeTaglineCustom,
+        sportId: league.sportId || "cfb",
+      }),
+      isCommish: isCommissioner(),
+      actuallyCommish: isActuallyCommissioner(),
+      firstWeekChrome: early,
+      showGazetteShelf: full || hasSeenGazetteShelfReveal(id) || !early,
+    };
+  } catch {
+    return null;
+  }
+}
 
 export default function Home() {
   const router = useRouter();
+  // Instant paint when returning from Picks (local session already known)
   const [ready, setReady] = useState(false);
   const [leagueCode, setLeagueCode] = useState<string | null>(null);
   const [leagueName, setLeagueName] = useState<string | null>(null);
-  const [homeTagline, setHomeTagline] = useState(
-    resolveHomeTagline({})
-  );
+  const [homeTagline, setHomeTagline] = useState(resolveHomeTagline({}));
   const [sportId, setSportId] = useState<string>("cfb");
   const [isCommish, setIsCommish] = useState(false);
   const [actuallyCommish, setActuallyCommish] = useState(false);
@@ -62,12 +150,58 @@ export default function Home() {
   const [firstWeekChrome, setFirstWeekChrome] = useState(true);
   /** Gazette / News shelf ~week 3 */
   const [showGazetteShelf, setShowGazetteShelf] = useState(false);
+  /** Flavor widgets after hero paints — avoid cloud fan-out on tab return */
+  const [showSecondary, setShowSecondary] = useState(false);
+
+  // Before first paint: local shell so Picks → Home never flashes "Loading…"
+  useLayoutEffect(() => {
+    const shell = readLocalHomeShell();
+    if (!shell) return;
+    setLeagueCode(shell.leagueCode);
+    setLeagueName(shell.leagueName);
+    setSportId(shell.sportId);
+    setHomeTagline(shell.homeTagline);
+    setIsCommish(shell.isCommish);
+    setActuallyCommish(shell.actuallyCommish);
+    setFirstWeekChrome(shell.firstWeekChrome);
+    setShowGazetteShelf(shell.showGazetteShelf);
+    setReady(true);
+    try {
+      const { applySportTheme } = require("@/lib/sports/sport-theme") as typeof import("@/lib/sports/sport-theme");
+      applySportTheme(shell.sportId);
+    } catch {
+      /* ok */
+    }
+  }, []);
+
+  // Secondary home chrome after paint (checklist, crown, ticker, …)
+  useEffect(() => {
+    if (!ready) return;
+    let cancelled = false;
+    const arm = () => {
+      if (!cancelled) setShowSecondary(true);
+    };
+    const w = window as Window & {
+      requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+    let idleId: number | undefined;
+    let t: ReturnType<typeof setTimeout> | undefined;
+    if (typeof w.requestIdleCallback === "function") {
+      idleId = w.requestIdleCallback(arm, { timeout: 700 });
+    } else {
+      t = setTimeout(arm, 350);
+    }
+    return () => {
+      cancelled = true;
+      if (idleId != null && w.cancelIdleCallback) w.cancelIdleCallback(idleId);
+      if (t) clearTimeout(t);
+    };
+  }, [ready]);
 
   useEffect(() => {
     async function boot() {
       try {
-        // Guest demo — local world, no Supabase account
-        const { isGuestMode } = await import("@/lib/guest-mode");
         if (isGuestMode()) {
           const session = getSession();
           const league = getLeague();
@@ -75,21 +209,7 @@ export default function Home() {
             router.replace("/login");
             return;
           }
-          setLeagueCode(league.code);
-          setLeagueName(league.name);
-          setSportId(league.sportId || "cfb");
-          setHomeTagline(
-            resolveHomeTagline({
-              homeTaglineId: league.settings?.homeTaglineId,
-              homeTaglineCustom: league.settings?.homeTaglineCustom,
-              sportId: league.sportId || "cfb",
-            })
-          );
-          setIsCommish(isCommissioner());
-          setActuallyCommish(isActuallyCommissioner());
-          // Guest demo: show the full room (sandbox playground)
-          setFirstWeekChrome(false);
-          setShowGazetteShelf(true);
+          // Layout effect usually already painted guest shell
           setReady(true);
           return;
         }
@@ -99,75 +219,95 @@ export default function Home() {
           return;
         }
 
-        // —— Fast path: paint from localStorage first (return-to-home felt stuck on Loading…) ——
-        // Cloud refresh continues below without blocking the shell.
-        let session = getSession();
-        let league = getLeague();
-        if (session && league) {
-          let sport = league.sportId || "cfb";
-          try {
-            const { forcedSportForLeague, applySportTheme } = await import(
-              "@/lib/sports/sport-theme"
-            );
-            const forced = forcedSportForLeague(league.id);
-            if (forced) sport = forced;
-            applySportTheme(sport);
-          } catch {
-            /* ignore */
-          }
-          setLeagueCode(league.code);
-          setLeagueName(league.name);
-          setSportId(sport);
-          setHomeTagline(
-            resolveHomeTagline({
-              homeTaglineId: league.settings?.homeTaglineId,
-              homeTaglineCustom: league.settings?.homeTaglineCustom,
-              sportId: sport,
-            })
-          );
-          setIsCommish(isCommissioner());
-          setActuallyCommish(isActuallyCommissioner());
-          // Progressive flags from local only — don't wait on scored-weeks cloud
-          try {
-            const pd = await import("@/lib/progressive-disclosure");
-            const { isFirstWeekChrome } = await import("@/lib/first-week");
-            const id = session.playerId;
-            const full = pd.wantsFullRoom(id);
-            const early = !full && isFirstWeekChrome(id);
-            setFirstWeekChrome(early);
-            setShowGazetteShelf(
-              full || pd.hasSeenGazetteShelfReveal(id) || !early
-            );
-          } catch {
-            setFirstWeekChrome(false);
-            setShowGazetteShelf(true);
-          }
-          setReady(true);
-          // Silent Crew ensure (no UI lecture)
-          try {
-            const { ensureCrewForLeague } = await import("@/lib/crew");
-            ensureCrewForLeague({
-              leagueId: league.id,
-              leagueName: league.name || "War Room",
-              sportId: sport,
-              createdBy: session.playerId,
-              foundedAt: league.createdAt,
-            });
-          } catch {
-            /* ignore */
-          }
+        // Already painted from localStorage (typical Picks → Home) — only soft refresh
+        const hadLocal = !!(getSession() && getLeague());
+
+        if (hadLocal) {
+          // Background only — do not clear ready / flash Loading
+          void (async () => {
+            try {
+              const league = getLeague();
+              if (!league) return;
+              try {
+                const { ensureCrewForLeague } = await import("@/lib/crew");
+                const session = getSession();
+                if (session) {
+                  ensureCrewForLeague({
+                    leagueId: league.id,
+                    leagueName: league.name || "War Room",
+                    sportId: league.sportId || "cfb",
+                    createdBy: session.playerId,
+                    foundedAt: league.createdAt,
+                  });
+                }
+              } catch {
+                /* ignore */
+              }
+              // Auth check without getUser() hang
+              const supabase = createClient();
+              const { data: sessionData } = await supabase.auth.getSession();
+              if (!sessionData.session?.user) {
+                router.replace("/login");
+                return;
+              }
+              // Soft league settings refresh (cached-friendly)
+              const fresh = (await syncLeagueFromCloud()) || getLeague();
+              if (!fresh) return;
+              let sport = fresh.sportId || "cfb";
+              try {
+                const {
+                  forcedSportForLeague,
+                  applySportTheme,
+                  pinLeagueSport,
+                } = await import("@/lib/sports/sport-theme");
+                const forced = forcedSportForLeague(fresh.id);
+                if (forced) {
+                  sport = forced;
+                  if (fresh.sportId !== forced) pinLeagueSport(fresh.id, forced);
+                }
+                applySportTheme(sport);
+              } catch {
+                /* ignore */
+              }
+              setLeagueCode(fresh.code);
+              setLeagueName(fresh.name);
+              setSportId(sport);
+              setHomeTagline(
+                resolveHomeTagline({
+                  homeTaglineId: fresh.settings?.homeTaglineId,
+                  homeTaglineCustom: fresh.settings?.homeTaglineCustom,
+                  sportId: sport,
+                })
+              );
+              setIsCommish(isCommissioner());
+              setActuallyCommish(isActuallyCommissioner());
+              try {
+                const pd = await import("@/lib/progressive-disclosure");
+                const snap = await pd.loadProgressiveSnapshot(
+                  getSession()?.playerId
+                );
+                setFirstWeekChrome(snap.firstWeekChrome);
+                setShowGazetteShelf(snap.showGazetteShelf);
+              } catch {
+                /* keep local flags */
+              }
+            } catch {
+              /* keep painted shell */
+            }
+          })();
+          return;
         }
 
+        // Cold boot — no local session
         const supabase = createClient();
-        // getSession does not throw when logged out (getUser can show "Auth session missing!")
         const { data: sessionData } = await supabase.auth.getSession();
         if (!sessionData.session?.user) {
           router.replace("/login");
           return;
         }
 
-        session = getSession();
-        league = getLeague();
+        let session = getSession();
+        let league = getLeague();
 
         if (!session || !league) {
           const restored = await restoreSessionFromCloud();
@@ -187,9 +327,7 @@ export default function Home() {
           league = restored.league;
         }
 
-        // Refresh settings (tagline) from cloud — non-blocking for shell when already ready
         const fresh = (await syncLeagueFromCloud()) || league;
-        // Create pin: cloud default cfb must not repaint NFL as green
         let sport = fresh.sportId || league?.sportId || "cfb";
         try {
           const { forcedSportForLeague, applySportTheme, pinLeagueSport } =
@@ -212,12 +350,11 @@ export default function Home() {
           resolveHomeTagline({
             homeTaglineId: fresh.settings?.homeTaglineId,
             homeTaglineCustom: fresh.settings?.homeTaglineCustom,
-            sportId: fresh.sportId || "cfb",
+            sportId: sport,
           })
         );
         setIsCommish(isCommissioner());
         setActuallyCommish(isActuallyCommissioner());
-        // Hard-scrub mistaken War Room Legend (Visconti etc.) for this browser
         try {
           const { sanitizeLegacyLegendsOnBoot } = await import(
             "@/lib/legacy-badge-grants"
@@ -230,7 +367,6 @@ export default function Home() {
         } catch {
           /* ignore */
         }
-        // Sandbox: one-time nuke of sim career banks from dry-run seasons
         try {
           const { nukeAccumulatedSandboxCareersOnce } = await import(
             "@/lib/sandbox-wipe"
@@ -253,7 +389,7 @@ export default function Home() {
         setBootError(e instanceof Error ? e.message : "Failed to start");
       }
     }
-    boot();
+    void boot();
     function onPreview() {
       setIsCommish(isCommissioner());
       setActuallyCommish(isActuallyCommissioner());
@@ -368,16 +504,10 @@ export default function Home() {
       <Nav />
       {/* Phone-first: less chrome padding, job-first stack (most users are on phones) */}
       <main className="flex-1 max-w-6xl mx-auto w-full px-3 sm:px-4 py-5 sm:py-10 relative z-10">
-        {/* Platform incident always wins; beta + open-room noise after first lock */}
+        {/* Platform incident always wins */}
         <IncidentBanner />
-        {!firstWeekChrome && (
-          <>
-            <OpenRoomLeaveNudge />
-            <BetaLeagueBanner />
-          </>
-        )}
 
-        {/* ── Room name once, then slim switcher, then the job ── */}
+        {/* ── Room name once, then job (hero) first — switcher/flavor after ── */}
         {!firstWeekChrome ? (
           <HomeSportHeader
             chrome={homeChrome}
@@ -407,22 +537,16 @@ export default function Home() {
           />
         )}
 
-        {/* Switcher sits under the name — never above it, never repeats the title */}
-        <MultiLeagueHomeHub
-          onSwitched={() => {
-            window.location.href = "/";
-          }}
-        />
-
         <SandboxSimBanner />
 
+        {/* Primary job — always paint first on return from Picks */}
         <HomeWeekHero />
         <HomeCrewWhisper />
 
         {/* Pre–Week 0: sarcastic practice escape when nothing real is up */}
         <BoredLameSandboxCta />
 
-        {/* Host first-hour spine (invite → card → FIRST score). Single score CTA — no strip twin. */}
+        {/* Host first-hour spine */}
         <CommishSetupBanner />
 
         {/* One-time: first lock opened the full room */}
@@ -452,20 +576,35 @@ export default function Home() {
           </p>
         )}
 
-        {/* Secondary room life — after first lock only (same order as before) */}
-        {!firstWeekChrome && (
+        {/* Deferred: multi-league + flavor — was competing with hero for bandwidth */}
+        {showSecondary && (
           <>
-            <SportPoolPollBanner />
-            <HomeGazetteSpotlight />
-            <LockPicksRoast />
-            <PlayerWeekChecklist />
-            <HomeUnseenPulse />
-            <section className="mb-6">
-              <HotTakeTicker variant="warroom" />
-            </section>
-            <section className="mb-8 sm:mb-10">
-              <CrownAndShame />
-            </section>
+            {!firstWeekChrome && (
+              <>
+                <OpenRoomLeaveNudge />
+                <BetaLeagueBanner />
+              </>
+            )}
+            <MultiLeagueHomeHub
+              onSwitched={() => {
+                window.location.href = "/";
+              }}
+            />
+            {!firstWeekChrome && (
+              <>
+                <SportPoolPollBanner />
+                <HomeGazetteSpotlight />
+                <LockPicksRoast />
+                <PlayerWeekChecklist />
+                <HomeUnseenPulse />
+                <section className="mb-6">
+                  <HotTakeTicker variant="warroom" />
+                </section>
+                <section className="mb-8 sm:mb-10">
+                  <CrownAndShame />
+                </section>
+              </>
+            )}
           </>
         )}
 
@@ -533,17 +672,32 @@ export default function Home() {
             </p>
             <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
               <Link
-                href="/board"
+                href="/standings"
                 className="group rounded-xl border border-border/80 bg-black/40 backdrop-blur-sm p-6 hover:border-primary/50 hover:bg-primary/5 transition shadow-[0_0_40px_rgba(0,0,0,0.35)]"
               >
                 <div className="text-xs uppercase tracking-wider text-muted mb-2">
                   Who&apos;s winning
                 </div>
                 <div className="text-lg font-semibold text-white group-hover:text-primary transition">
+                  Standings
+                </div>
+                <p className="text-sm text-muted mt-2">
+                  Season points · divisions · cut line · last in
+                </p>
+              </Link>
+
+              <Link
+                href="/board"
+                className="group rounded-xl border border-border/80 bg-black/40 backdrop-blur-sm p-6 hover:border-primary/50 hover:bg-primary/5 transition shadow-[0_0_40px_rgba(0,0,0,0.35)]"
+              >
+                <div className="text-xs uppercase tracking-wider text-muted mb-2">
+                  Card reveal
+                </div>
+                <div className="text-lg font-semibold text-white group-hover:text-primary transition">
                   The Board
                 </div>
                 <p className="text-sm text-muted mt-2">
-                  Season points · divisions · cut line
+                  Everyone&apos;s picks · game by game after kickoff
                 </p>
               </Link>
 
@@ -725,7 +879,7 @@ export default function Home() {
         )}
 
         {/* ── BOTTOM: recruiting (after the job + room) ── */}
-        {!firstWeekChrome && (
+        {showSecondary && !firstWeekChrome && (
           <div className="mt-5 mb-2">
             <InviteFriends />
           </div>

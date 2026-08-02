@@ -145,17 +145,55 @@ export function writeSessionAndLeague(
   return { session, league };
 }
 
+const membershipsCache = new Map<
+  string,
+  { at: number; list: LeagueMembership[] }
+>();
+const membershipsInflight = new Map<string, Promise<LeagueMembership[]>>();
+const MEMBERSHIPS_TTL_MS = 20_000;
+
 /** Load all leagues this user belongs to */
 export async function fetchMyMemberships(): Promise<LeagueMembership[]> {
   const supabase = createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth.user) return [];
+  // Prefer local session id — auth.getUser() is a network hop and freezes Home hub
+  let userId: string | null = null;
+  let metaName = "Player";
+  try {
+    const { getSession } = await import("@/lib/league");
+    userId = getSession()?.playerId || null;
+    metaName = getSession()?.playerName || "Player";
+  } catch {
+    userId = null;
+  }
+  if (!userId) {
+    const { data: auth } = await supabase.auth.getSession();
+    userId = auth.session?.user?.id || null;
+    if (auth.session?.user) {
+      metaName =
+        (auth.session.user.user_metadata?.display_name as string | undefined) ||
+        auth.session.user.email?.split("@")[0] ||
+        "Player";
+    }
+  }
+  if (!userId) return [];
 
-  const userId = auth.user.id;
-  const metaName =
-    (auth.user.user_metadata?.display_name as string | undefined) ||
-    auth.user.email?.split("@")[0] ||
-    "Player";
+  const hit = membershipsCache.get(userId);
+  if (hit && Date.now() - hit.at < MEMBERSHIPS_TTL_MS) return hit.list;
+  const inflight = membershipsInflight.get(userId);
+  if (inflight) return inflight;
+
+  const promise = fetchMyMembershipsFresh(userId, metaName).finally(() => {
+    membershipsInflight.delete(userId!);
+  });
+  membershipsInflight.set(userId, promise);
+  return promise;
+}
+
+async function fetchMyMembershipsFresh(
+  userId: string,
+  metaName: string
+): Promise<LeagueMembership[]> {
+  const supabase = createClient();
 
   let rows: Record<string, unknown>[] | null = null;
   {
@@ -294,6 +332,7 @@ export async function fetchMyMemberships(): Promise<LeagueMembership[]> {
   } catch {
     /* ignore */
   }
+  membershipsCache.set(userId, { at: Date.now(), list });
   return list;
 }
 

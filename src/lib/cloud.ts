@@ -47,10 +47,24 @@ const cardCache = new Map<string, CacheEntry<CloudCard | null>>();
 const publishedCache = new Map<string, CacheEntry<number[]>>();
 const scoredCache = new Map<string, CacheEntry<number[]>>();
 const activeWeekCache = new Map<string, CacheEntry<number>>();
+const playersCache = new Map<
+  string,
+  CacheEntry<import("./types").Player[]>
+>();
+/** In-flight loadLeaguePlayers — standings + CrownAndShame share one round-trip. */
+const playersInflight = new Map<
+  string,
+  Promise<import("./types").Player[]>
+>();
+// Typed as object[] here — LeagueRosterMember is declared later in this file
+const rosterCache = new Map<string, CacheEntry<object[]>>();
+const rosterInflight = new Map<string, Promise<object[]>>();
 
 const CARD_TTL_MS = 6_000;
 const LIST_TTL_MS = 12_000;
 const ACTIVE_WEEK_TTL_MS = 5_000;
+const PLAYERS_TTL_MS = 10_000;
+const ROSTER_TTL_MS = 12_000;
 
 function cacheGet<T>(map: Map<string, CacheEntry<T>>, key: string, ttl: number): T | undefined {
   const e = map.get(key);
@@ -73,6 +87,10 @@ export function invalidateCloudWeekCaches(leagueId?: string | null) {
     publishedCache.clear();
     scoredCache.clear();
     activeWeekCache.clear();
+    playersCache.clear();
+    playersInflight.clear();
+    rosterCache.clear();
+    rosterInflight.clear();
     return;
   }
   for (const k of [...cardCache.keys()]) {
@@ -81,6 +99,10 @@ export function invalidateCloudWeekCaches(leagueId?: string | null) {
   publishedCache.delete(leagueId);
   scoredCache.delete(leagueId);
   activeWeekCache.delete(leagueId);
+  playersCache.delete(leagueId);
+  playersInflight.delete(leagueId);
+  rosterCache.delete(leagueId);
+  rosterInflight.delete(leagueId);
 }
 
 /** weekly_points from Postgres may be int[] or a JSON object map. */
@@ -2019,6 +2041,13 @@ export async function saveResultsAndScoreWeek(opts: {
     );
   } catch {}
 
+  // Points just changed — drop standings / week list caches before refresh reads
+  try {
+    invalidateCloudWeekCaches(getSession()?.leagueId);
+  } catch {
+    /* ignore */
+  }
+
   // Snapshot Gazette edition for the archive (survives until season reset)
   try {
     const { snapshotGazetteAfterScore } = await import("@/lib/gazette");
@@ -2040,18 +2069,33 @@ export async function saveResultsAndScoreWeek(opts: {
   return { ok: true, scoredCount, details };
 }
 
-export async function loadLeagueStandings() {
-  const session = getSession();
-  if (!session?.leagueId) return [];
-  const supabase = createClient();
-  const { data: rows } = await supabase
-    .from("memberships")
-    .select("*, profiles(display_name)")
-    .eq("league_id", session.leagueId);
-  if (!rows) return [];
+type StandingsCloudRow = {
+  userId: string;
+  name: string;
+  division: string;
+  totalPoints: number;
+  weeklyPoints: number[];
+  atsCorrect: number;
+  atsTotal: number;
+  currentStreak: number;
+  bestWeek: number;
+  worstWeek: number;
+  perfectWeeks: number;
+  bestBetHits: number;
+  bestBetTotal: number;
+  propHits: number;
+  propTotal: number;
+  weeksPlayed: number;
+  lastSeenAt: string | null;
+};
+
+function mapStandingsRows(rows: Record<string, unknown>[]): StandingsCloudRow[] {
   return rows
     .map((m: Record<string, unknown>) => {
-      const profile = m.profiles as { display_name?: string } | null;
+      const profile = m.profiles as {
+        display_name?: string;
+        last_seen_at?: string | null;
+      } | null;
       return {
         userId: m.user_id as string,
         name: profile?.display_name || "Player",
@@ -2069,9 +2113,58 @@ export async function loadLeagueStandings() {
         propHits: (m.prop_hits as number) || 0,
         propTotal: (m.prop_total as number) || 0,
         weeksPlayed: (m.weeks_played as number) || 0,
+        lastSeenAt: (profile?.last_seen_at as string | null) || null,
       };
     })
     .sort((a, b) => b.totalPoints - a.totalPoints);
+}
+
+export async function loadLeagueStandings(): Promise<StandingsCloudRow[]> {
+  const session = getSession();
+  if (!session?.leagueId) return [];
+  const supabase = createClient();
+
+  // One trip: membership stats + display name + last_seen (no second profiles query)
+  const primary = await withTimeout(
+    Promise.resolve(
+      supabase
+        .from("memberships")
+        .select("*, profiles(display_name, last_seen_at)")
+        .eq("league_id", session.leagueId)
+    ).then((r) => ({
+      data: (r.data as Record<string, unknown>[] | null) ?? null,
+      error: r.error as { message?: string } | null,
+    })),
+    8_000,
+    {
+      data: null as Record<string, unknown>[] | null,
+      error: { message: "timeout" } as { message?: string } | null,
+    }
+  );
+
+  if (!primary.error && primary.data) {
+    return mapStandingsRows(primary.data);
+  }
+
+  // Older schema / embed fail: name only
+  const fallback = await withTimeout(
+    Promise.resolve(
+      supabase
+        .from("memberships")
+        .select("*, profiles(display_name)")
+        .eq("league_id", session.leagueId)
+    ).then((r) => ({
+      data: (r.data as Record<string, unknown>[] | null) ?? null,
+      error: r.error as { message?: string } | null,
+    })),
+    6_000,
+    {
+      data: null as Record<string, unknown>[] | null,
+      error: { message: "timeout" } as { message?: string } | null,
+    }
+  );
+  if (!fallback.data?.length) return [];
+  return mapStandingsRows(fallback.data);
 }
 
 /** Cloud standings mapped to Player shape for Standings / Power Rankings / Stats. */
@@ -2087,50 +2180,47 @@ export async function loadLeaguePlayers(): Promise<
   } catch {
     /* fall through */
   }
-  const cloud = await loadLeagueStandings();
-  const players: import("./types").Player[] = cloud.map((c) => ({
-    id: c.userId,
-    name: c.name,
-    division: (c.division as import("./types").Player["division"]) || "North",
-    totalPoints: c.totalPoints,
-    weeklyPoints: c.weeklyPoints || [],
-    atsCorrect: c.atsCorrect,
-    atsTotal: c.atsTotal,
-    currentStreak: c.currentStreak,
-    bestWeek: c.bestWeek,
-    worstWeek: c.worstWeek,
-    perfectWeeks: c.perfectWeeks,
-    bestBetHits: c.bestBetHits,
-    bestBetTotal: c.bestBetTotal,
-    propHits: c.propHits,
-    propTotal: c.propTotal,
-    weeksPlayed: c.weeksPlayed,
-  }));
 
-  // Attach last_seen_at so Standings / Stats can show "last in"
-  try {
-    const ids = [...new Set(players.map((p) => p.id).filter(Boolean))];
-    if (!ids.length) return players;
-    const supabase = createClient();
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("id, last_seen_at")
-      .in("id", ids);
-    if (error || !data?.length) return players;
-    const seen = new Map<string, string | null>();
-    for (const row of data) {
-      seen.set(
-        row.id as string,
-        (row.last_seen_at as string | null) || null
-      );
-    }
-    return players.map((p) => ({
-      ...p,
-      lastSeenAt: seen.get(p.id) ?? null,
+  const session = getSession();
+  if (!session?.leagueId) return [];
+  const key = session.leagueId;
+
+  const hit = cacheGet(playersCache, key, PLAYERS_TTL_MS);
+  if (hit) return hit;
+
+  const inflight = playersInflight.get(key);
+  if (inflight) return inflight;
+
+  const promise = (async () => {
+    const cloud = await loadLeagueStandings();
+    const players: import("./types").Player[] = cloud.map((c) => ({
+      id: c.userId,
+      name: c.name,
+      division: (c.division as import("./types").Player["division"]) || "North",
+      totalPoints: c.totalPoints,
+      weeklyPoints: c.weeklyPoints || [],
+      atsCorrect: c.atsCorrect,
+      atsTotal: c.atsTotal,
+      currentStreak: c.currentStreak,
+      bestWeek: c.bestWeek,
+      worstWeek: c.worstWeek,
+      perfectWeeks: c.perfectWeeks,
+      bestBetHits: c.bestBetHits,
+      bestBetTotal: c.bestBetTotal,
+      propHits: c.propHits,
+      propTotal: c.propTotal,
+      weeksPlayed: c.weeksPlayed,
+      // Folded into memberships→profiles embed (single round-trip)
+      lastSeenAt: c.lastSeenAt ?? null,
     }));
-  } catch {
+    cacheSet(playersCache, key, players);
     return players;
-  }
+  })().finally(() => {
+    playersInflight.delete(key);
+  });
+
+  playersInflight.set(key, promise);
+  return promise;
 }
 
 export type LeagueRosterMember = {
@@ -2335,16 +2425,35 @@ export async function recordLeagueFirstJoin(
 export async function loadLeagueRoster(): Promise<LeagueRosterMember[]> {
   const session = getSession();
   if (!session?.leagueId) return [];
+  const key = session.leagueId;
+
+  const hit = cacheGet(rosterCache, key, ROSTER_TTL_MS);
+  if (hit) return hit as LeagueRosterMember[];
+
+  const inflight = rosterInflight.get(key);
+  if (inflight) return inflight as Promise<LeagueRosterMember[]>;
+
+  const promise = loadLeagueRosterFresh(key).finally(() => {
+    rosterInflight.delete(key);
+  });
+  rosterInflight.set(key, promise as Promise<object[]>);
+  return promise;
+}
+
+async function loadLeagueRosterFresh(
+  leagueId: string
+): Promise<LeagueRosterMember[]> {
   const supabase = createClient();
-  const joinedMap = await loadJoinedAtByUser(session.leagueId);
 
   // Preferred: security-definer roster (includes bots reliably)
+  // Do NOT await league_first_joins first — that was a 2-query waterfall before
+  // the roster RPC even started (every hydrator paid for it).
   {
     const { data, error } = await supabase.rpc("get_league_roster", {
-      p_league_id: session.leagueId,
+      p_league_id: leagueId,
     });
     if (!error && Array.isArray(data) && data.length) {
-      const mapped = (data as Record<string, unknown>[])
+      let mapped: LeagueRosterMember[] = (data as Record<string, unknown>[])
         .map((m) => {
           const role = m.role === "commissioner" ? "commissioner" : "player";
           const division =
@@ -2362,20 +2471,34 @@ export async function loadLeagueRoster(): Promise<LeagueRosterMember[]> {
             isModerator: !!m.is_moderator,
             lockerMuted: !!m.locker_muted,
             isDeputy: !!m.is_deputy,
-            joinedAt:
-              (m.joined_at as string | null) ||
-              joinedMap.get(userId) ||
-              null,
+            joinedAt: (m.joined_at as string | null) || null,
             equippedTitleId:
               (m.equipped_title_id as string | null) || null,
-          };
+          } satisfies LeagueRosterMember;
         })
         .sort((a, b) => {
           // Humans first, then bots; alpha within each
           if (!!a.isBot !== !!b.isBot) return a.isBot ? 1 : -1;
           return a.name.localeCompare(b.name);
         });
-      return attachEquippedTitles(mapped);
+
+      // Fill missing join times + titles/borders in parallel (not serial)
+      const needsJoin = mapped.some((m) => !m.joinedAt);
+      const [joinedMap, withTitles] = await Promise.all([
+        needsJoin
+          ? loadJoinedAtByUser(leagueId)
+          : Promise.resolve(new Map<string, string>()),
+        attachEquippedTitles(mapped),
+      ]);
+      mapped = withTitles;
+      if (needsJoin && joinedMap.size) {
+        mapped = mapped.map((m) => ({
+          ...m,
+          joinedAt: m.joinedAt || joinedMap.get(m.userId) || null,
+        }));
+      }
+      cacheSet(rosterCache, leagueId, mapped);
+      return mapped;
     }
   }
 
@@ -2387,14 +2510,14 @@ export async function loadLeagueRoster(): Promise<LeagueRosterMember[]> {
       .select(
         "id, user_id, role, division, total_points, joined_at, is_bot, is_moderator, locker_muted, is_deputy, profiles(display_name, avatar_url)"
       )
-      .eq("league_id", session.leagueId);
+      .eq("league_id", leagueId);
     if (res.error && /is_bot|schema cache|column/i.test(res.error.message)) {
       const res2 = await supabase
         .from("memberships")
         .select(
           "id, user_id, role, division, total_points, joined_at, profiles(display_name, avatar_url)"
         )
-        .eq("league_id", session.leagueId);
+        .eq("league_id", leagueId);
       if (res2.error) {
         console.error("loadLeagueRoster fallback failed", res2.error);
       }
@@ -2405,14 +2528,17 @@ export async function loadLeagueRoster(): Promise<LeagueRosterMember[]> {
       const res3 = await supabase
         .from("memberships")
         .select("id, user_id, role, division, total_points, joined_at")
-        .eq("league_id", session.leagueId);
+        .eq("league_id", leagueId);
       rows = (res3.data as Record<string, unknown>[] | null) || null;
     } else {
       rows = (res.data as Record<string, unknown>[] | null) || null;
     }
   }
 
-  if (!rows?.length) return [];
+  if (!rows?.length) {
+    cacheSet(rosterCache, leagueId, []);
+    return [];
+  }
 
   // Resolve names if embed missing
   const needsNames = rows.some((m) => !m.profiles);
@@ -2428,7 +2554,7 @@ export async function loadLeagueRoster(): Promise<LeagueRosterMember[]> {
     }
   }
 
-  const mapped = rows
+  let mapped: LeagueRosterMember[] = rows
     .map((m: Record<string, unknown>) => {
       const profile = m.profiles as {
         display_name?: string;
@@ -2454,16 +2580,31 @@ export async function loadLeagueRoster(): Promise<LeagueRosterMember[]> {
         isModerator: !!m.is_moderator,
         lockerMuted: !!m.locker_muted,
         isDeputy: !!m.is_deputy,
-        joinedAt:
-          (m.joined_at as string | null) || joinedMap.get(uid) || null,
+        joinedAt: (m.joined_at as string | null) || null,
         equippedTitleId: profile?.equipped_title_id ?? null,
-      };
+      } satisfies LeagueRosterMember;
     })
     .sort((a, b) => {
       if (!!a.isBot !== !!b.isBot) return a.isBot ? 1 : -1;
       return a.name.localeCompare(b.name);
     });
-  return attachEquippedTitles(mapped);
+
+  const needsJoin = mapped.some((m) => !m.joinedAt);
+  const [joinedMap, withTitles] = await Promise.all([
+    needsJoin
+      ? loadJoinedAtByUser(leagueId)
+      : Promise.resolve(new Map<string, string>()),
+    attachEquippedTitles(mapped),
+  ]);
+  mapped = withTitles;
+  if (needsJoin && joinedMap.size) {
+    mapped = mapped.map((m) => ({
+      ...m,
+      joinedAt: m.joinedAt || joinedMap.get(m.userId) || null,
+    }));
+  }
+  cacheSet(rosterCache, leagueId, mapped);
+  return mapped;
 }
 
 /** Commissioner appoints mods/deputies; staff can mute for Locker Room. */

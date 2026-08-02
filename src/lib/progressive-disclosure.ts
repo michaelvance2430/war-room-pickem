@@ -174,10 +174,7 @@ export {
   hasSeasonComeAlive,
 };
 
-/**
- * Async snapshot for nav / home (cloud week + local flags).
- */
-export async function loadProgressiveSnapshot(playerId?: string | null): Promise<{
+type ProgressiveSnapshot = {
   playerId: string | null;
   firstWeekChrome: boolean;
   coreUnlocked: boolean;
@@ -191,7 +188,22 @@ export async function loadProgressiveSnapshot(playerId?: string | null): Promise
   /** Creator test-mode override active */
   sandbox?: boolean;
   sandboxPhase?: string;
-}> {
+};
+
+const SNAP_TTL_MS = 25_000;
+let snapCache: { at: number; key: string; value: ProgressiveSnapshot } | null =
+  null;
+let snapInflight: Promise<ProgressiveSnapshot> | null = null;
+let snapInflightKey: string | null = null;
+
+/**
+ * Async snapshot for nav / home (cloud week + local flags).
+ * Cached + inflight-deduped — Nav used to call this on EVERY route change
+ * and each call serial-probed week + scored list + first-week picks.
+ */
+export async function loadProgressiveSnapshot(
+  playerId?: string | null
+): Promise<ProgressiveSnapshot> {
   // Creator flight simulator wins over real league progress
   try {
     const { sandboxProgressiveOverrides } = await import(
@@ -219,33 +231,61 @@ export async function loadProgressiveSnapshot(playerId?: string | null): Promise
   }
 
   const id = pid(playerId);
-  let activeWeek = 1;
-  let scoredCount = 0;
-  try {
-    const { loadLeagueActiveWeek, listScoredWeekNumbers } = await import(
-      "@/lib/cloud"
-    );
-    const { syncFirstWeekFromCloud } = await import("@/lib/first-week");
-    await syncFirstWeekFromCloud(id);
-    activeWeek = await loadLeagueActiveWeek();
-    scoredCount = (await listScoredWeekNumbers()).length;
-  } catch {
-    /* local flags only */
+  const key = id || "_anon";
+  if (snapCache && snapCache.key === key && Date.now() - snapCache.at < SNAP_TTL_MS) {
+    return snapCache.value;
   }
+  if (snapInflight && snapInflightKey === key) return snapInflight;
 
-  const opts = { activeWeek, scoredCount, playerId: id };
-  const fullRoom = wantsFullRoom(id);
+  snapInflightKey = key;
+  snapInflight = (async () => {
+    let activeWeek = 1;
+    let scoredCount = 0;
+    try {
+      const { loadLeagueActiveWeek, listScoredWeekNumbers } = await import(
+        "@/lib/cloud"
+      );
+      const { syncFirstWeekFromCloud } = await import("@/lib/first-week");
+      // Parallel: first-week probe + week numbers (first-week short-circuits when unlocked)
+      const [, week, scored] = await Promise.all([
+        syncFirstWeekFromCloud(id),
+        loadLeagueActiveWeek(),
+        listScoredWeekNumbers(),
+      ]);
+      activeWeek = week;
+      scoredCount = scored.length;
+    } catch {
+      /* local flags only */
+    }
 
-  return {
-    playerId: id,
-    firstWeekChrome: fullRoom ? false : isFirstWeekChrome(id),
-    coreUnlocked: fullRoom || isCoreLoopUnlocked(id),
-    activeWeek,
-    scoredCount,
-    showGazetteShelf: canShowGazetteShelf(opts),
-    showNewsShelf: canShowNewsShelf(opts),
-    showDeepTiles: canShowDeepHomeTiles(id),
-    offerGazetteReveal: shouldShowGazetteShelfReveal(opts),
-    fullRoom,
-  };
+    const opts = { activeWeek, scoredCount, playerId: id };
+    const fullRoom = wantsFullRoom(id);
+
+    const value: ProgressiveSnapshot = {
+      playerId: id,
+      firstWeekChrome: fullRoom ? false : isFirstWeekChrome(id),
+      coreUnlocked: fullRoom || isCoreLoopUnlocked(id),
+      activeWeek,
+      scoredCount,
+      showGazetteShelf: canShowGazetteShelf(opts),
+      showNewsShelf: canShowNewsShelf(opts),
+      showDeepTiles: canShowDeepHomeTiles(id),
+      offerGazetteReveal: shouldShowGazetteShelfReveal(opts),
+      fullRoom,
+    };
+    snapCache = { at: Date.now(), key, value };
+    return value;
+  })().finally(() => {
+    snapInflight = null;
+    snapInflightKey = null;
+  });
+
+  return snapInflight;
+}
+
+/** Drop snapshot cache (after lock / score / league switch). */
+export function invalidateProgressiveSnapshot() {
+  snapCache = null;
+  snapInflight = null;
+  snapInflightKey = null;
 }

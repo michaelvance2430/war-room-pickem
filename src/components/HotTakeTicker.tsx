@@ -30,16 +30,9 @@ export default function HotTakeTicker({
 
     async function load() {
       try {
-        // Prefer live league sport so dual-sport rooms don't get the wrong wire
-        let sport = sportIdProp ?? getLeague()?.sportId ?? null;
-        try {
-          const { syncLeagueFromCloud } = await import("@/lib/league-sync");
-          const fresh = await syncLeagueFromCloud();
-          if (fresh?.sportId && sportIdProp == null) sport = fresh.sportId;
-        } catch {
-          /* offline / guest — local league is fine */
-        }
-
+        // Local league only — never re-sync league settings from Home ticker
+        // (was an extra cloud RTT every Home visit from Picks).
+        const sport = sportIdProp ?? getLeague()?.sportId ?? null;
         const voice = resolveVoiceSport(sport);
         const players = await loadLeaguePlayers();
         if (cancelled) return;

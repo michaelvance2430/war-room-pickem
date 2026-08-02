@@ -40,6 +40,7 @@ const TIP_KEY = "warroom-tip-tap-names-v1";
 
 export default function StandingsPage() {
   const [players, setPlayers] = useState<Player[]>([]);
+  const [loading, setLoading] = useState(true);
   const [swingById, setSwingById] = useState<
     Record<string, ReturnType<typeof rankPlayersWithSwings>[0]["swing"]>
   >({});
@@ -48,6 +49,7 @@ export default function StandingsPage() {
   const [showNameTip, setShowNameTip] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     async function load() {
       const sid = getSession()?.playerId || null;
       setSelfId(sid);
@@ -59,12 +61,24 @@ export default function StandingsPage() {
           /* ignore */
         }
       }
-      const list = await loadLeaguePlayers();
-      setPlayers(list);
-      const ranked = rankPlayersWithSwings(list, getLeague()?.sportId);
-      const map: Record<string, (typeof ranked)[0]["swing"]> = {};
-      for (const r of ranked) map[r.id] = r.swing;
-      setSwingById(map);
+      // Fail-safe: never leave standings stuck on spinner if cloud hangs
+      const failSafe = window.setTimeout(() => {
+        if (!cancelled) setLoading(false);
+      }, 4_000);
+      try {
+        const list = await loadLeaguePlayers();
+        if (cancelled) return;
+        setPlayers(list);
+        const ranked = rankPlayersWithSwings(list, getLeague()?.sportId);
+        const map: Record<string, (typeof ranked)[0]["swing"]> = {};
+        for (const r of ranked) map[r.id] = r.swing;
+        setSwingById(map);
+      } catch {
+        /* offline / cloud — leave empty after loading clears */
+      } finally {
+        window.clearTimeout(failSafe);
+        if (!cancelled) setLoading(false);
+      }
     }
     load();
     try {
@@ -72,6 +86,9 @@ export default function StandingsPage() {
     } catch {
       setShowNameTip(true);
     }
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const filtered =
@@ -151,9 +168,18 @@ export default function StandingsPage() {
           </div>
         )}
 
-        {!preseason && <CrownAndShame className="mb-6" />}
+        {!loading && !preseason && (
+          <CrownAndShame className="mb-6" players={players} />
+        )}
 
-        {players.length === 0 && (
+        {loading && (
+          <div className="mb-6 rounded-xl border border-border bg-card/50 px-4 py-8 text-center">
+            <p className="font-medium mb-1 text-muted">Loading the board…</p>
+            <p className="text-sm text-muted">Pulling live standings.</p>
+          </div>
+        )}
+
+        {!loading && players.length === 0 && (
           <div className="mb-6 rounded-xl border border-dashed border-border bg-card/50 px-4 py-8 text-center">
             <p className="font-medium mb-1">Nobody on the board yet</p>
             <p className="text-sm text-muted">

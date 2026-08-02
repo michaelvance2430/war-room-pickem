@@ -445,12 +445,32 @@ export default function ProfilePage() {
       <Nav />
 
       <main className="flex-1 max-w-3xl mx-auto w-full px-4 py-8">
-        <Link
-          href="/standings"
-          className="text-xs text-muted hover:text-foreground mb-4 inline-block"
-        >
-          ← Standings
-        </Link>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-4 text-xs">
+          <Link
+            href="/"
+            className="text-muted hover:text-foreground"
+          >
+            ← Home
+          </Link>
+          <span className="text-border" aria-hidden>
+            ·
+          </span>
+          <Link
+            href="/standings"
+            className="text-muted hover:text-foreground"
+          >
+            Standings
+          </Link>
+          <span className="text-border" aria-hidden>
+            ·
+          </span>
+          <Link
+            href="/account"
+            className="text-primary font-semibold hover:underline"
+          >
+            Account
+          </Link>
+        </div>
 
         {mock && roast && (
           <div className="mb-4 rounded-xl border border-warning/40 bg-warning/10 px-4 py-3">

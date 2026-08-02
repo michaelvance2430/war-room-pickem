@@ -566,11 +566,19 @@ export default function AccountPage() {
             height={48}
             className="rounded-lg shrink-0 object-contain"
           />
-          <div>
+          <div className="min-w-0 flex-1">
             <h1 className="text-2xl font-bold mb-0.5">Account</h1>
             <p className="text-sm text-muted">
               {name ? `Signed in as ${name}` : "Manage profile, leagues, and sign out"}
             </p>
+            {userId && (
+              <Link
+                href={`/profile/${userId}`}
+                className="inline-block mt-1 text-xs font-semibold text-primary hover:underline"
+              >
+                View public profile →
+              </Link>
+            )}
           </div>
         </div>
 

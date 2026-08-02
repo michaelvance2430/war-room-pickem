@@ -76,13 +76,11 @@ export async function resolvePlayerActiveWeek(opts?: {
 }> {
   const sid = activeSportId();
   const first = firstSeasonWeek(sid);
-  let leagueWeek = await loadLeagueActiveWeek();
-  // NFL: never treat week 0 as real open week
-  if (sid === "nfl" && leagueWeek <= 0) leagueWeek = first;
 
   try {
     const { isEyesLocalPlayActive } = await import("./creator-eyes");
     if (isEyesLocalPlayActive()) {
+      const leagueWeek = await loadLeagueActiveWeek();
       return {
         week: leagueWeek,
         leagueWeek,
@@ -93,12 +91,16 @@ export async function resolvePlayerActiveWeek(opts?: {
   } catch {
     /* continue */
   }
-  let scored: number[] = [];
-  try {
-    scored = await listScoredWeekNumbers();
-  } catch {
-    scored = [];
-  }
+
+  // Parallel — was serial week-then-scored (extra RTT on every Home open)
+  const [leagueWeekRaw, scoredRaw] = await Promise.all([
+    loadLeagueActiveWeek(),
+    listScoredWeekNumbers().catch(() => [] as number[]),
+  ]);
+  let leagueWeek = leagueWeekRaw;
+  // NFL: never treat week 0 as real open week
+  if (sid === "nfl" && leagueWeek <= 0) leagueWeek = first;
+  const scored = scoredRaw;
   const week = advancePastScoredWeeks(leagueWeek, scored, sid);
   const advanced = week !== leagueWeek;
 

@@ -15,6 +15,16 @@ const LOCKER_SEEN_KEY = "warroom-locker-seen-v1";
 /** Fired after markLockerSeen so Nav / Home can drop badges without a full reload. */
 export const EVENT_LOCKER_SEEN = "warroom-locker-seen";
 
+const UNSEEN_TTL_MS = 30_000;
+const annCache = new Map<string, { at: number; n: number }>();
+const lockerCache = new Map<string, { at: number; n: number }>();
+
+/** Call after posting / opening locker so badge can refresh immediately. */
+export function invalidateRoomUnseenCaches() {
+  annCache.clear();
+  lockerCache.clear();
+}
+
 type LockerSeenStore = Record<string, string>; // `${leagueId}:${userId}` → ISO timestamp
 
 function canUse() {
@@ -101,6 +111,12 @@ export function markLockerSeen(opts?: {
   }
   all[key] = at;
   writeLockerSeen(all);
+  try {
+    // Force next badge count to re-hit network after a visit
+    lockerCache.delete(key);
+  } catch {
+    /* ok */
+  }
   if (!opts?.silent) emitLockerSeen();
 }
 
@@ -128,14 +144,24 @@ export async function countUnreadAnnouncements(): Promise<number> {
   const session = getSession();
   const league = getLeague();
   if (!session?.playerId || !league?.id) return 0;
+  const key = `${league.id}:${session.playerId}`;
+  const hit = annCache.get(key);
+  if (hit && Date.now() - hit.at < UNSEEN_TTL_MS) return hit.n;
+
   try {
     const supabase = createClient();
+    // One query for ids is enough — avoid loading full rows then a second round-trip
+    // when leagues are small; still two-step for read marks but short-circuit empty.
     const { data: announcements } = await supabase
       .from("announcements")
       .select("id")
-      .eq("league_id", league.id);
+      .eq("league_id", league.id)
+      .limit(40);
 
-    if (!announcements?.length) return 0;
+    if (!announcements?.length) {
+      annCache.set(key, { at: Date.now(), n: 0 });
+      return 0;
+    }
 
     const ids = announcements.map((a) => a.id as string);
     const { data: reads } = await supabase
@@ -147,7 +173,9 @@ export async function countUnreadAnnouncements(): Promise<number> {
     const readIds = new Set(
       (reads || []).map((r) => r.announcement_id as string)
     );
-    return ids.filter((id) => !readIds.has(id)).length;
+    const n = ids.filter((id) => !readIds.has(id)).length;
+    annCache.set(key, { at: Date.now(), n });
+    return n;
   } catch {
     return 0;
   }
@@ -161,14 +189,19 @@ export async function countUnseenLockerPosts(): Promise<number> {
   const session = getSession();
   const league = getLeague();
   if (!session?.playerId || !league?.id) return 0;
+  const key = `${league.id}:${session.playerId}`;
+  const hit = lockerCache.get(key);
+  if (hit && Date.now() - hit.at < UNSEEN_TTL_MS) return hit.n;
+
   try {
     const { startIso } = getLockerWeekBounds();
     const lastSeen = getLockerLastSeenIso(league.id, session.playerId);
     const supabase = createClient();
 
+    // Head count only — don't download up to 100 message rows for a badge
     let q = supabase
       .from("locker_messages")
-      .select("id, user_id, created_at", { count: "exact", head: false })
+      .select("id", { count: "exact", head: true })
       .eq("league_id", league.id)
       .gte("created_at", startIso)
       .neq("user_id", session.playerId);
@@ -177,9 +210,11 @@ export async function countUnseenLockerPosts(): Promise<number> {
       q = q.gt("created_at", lastSeen);
     }
 
-    const { data, error } = await q.limit(100);
+    const { count, error } = await q;
     if (error) return 0;
-    return (data || []).length;
+    const n = count ?? 0;
+    lockerCache.set(key, { at: Date.now(), n });
+    return n;
   } catch {
     return 0;
   }

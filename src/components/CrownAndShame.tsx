@@ -5,16 +5,28 @@ import Link from "next/link";
 import PlayerLink from "@/components/PlayerLink";
 import { loadLeaguePlayers } from "@/lib/cloud";
 import { weekCrownAndShame, type CrownShame } from "@/lib/fun-board";
+import type { Player } from "@/lib/types";
 
 type Props = {
   className?: string;
+  /** When parent already loaded standings, skip a second cloud round-trip. */
+  players?: Player[];
 };
 
-export default function CrownAndShame({ className = "" }: Props) {
+export default function CrownAndShame({
+  className = "",
+  players: playersProp,
+}: Props) {
   const [data, setData] = useState<CrownShame | null | undefined>(undefined);
 
   useEffect(() => {
     let cancelled = false;
+    if (playersProp && playersProp.length > 0) {
+      setData(weekCrownAndShame(playersProp));
+      return () => {
+        cancelled = true;
+      };
+    }
     loadLeaguePlayers()
       .then((players) => {
         if (!cancelled) setData(weekCrownAndShame(players));
@@ -25,7 +37,7 @@ export default function CrownAndShame({ className = "" }: Props) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [playersProp]);
 
   if (data === undefined) {
     return (

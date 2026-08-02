@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
@@ -12,32 +13,12 @@ import {
   isActuallyCommissioner,
 } from "@/lib/league";
 import Avatar from "@/components/Avatar";
+/** First-session only — keep eager so coach isn't delayed. */
 import RulesOnboardingModal from "@/components/RulesOnboardingModal";
 import LoginWelcomeModal from "@/components/LoginWelcomeModal";
-import GazetteModal from "@/components/GazetteModal";
-import GazetteShelfReveal from "@/components/GazetteShelfReveal";
-import StoryDoorModal from "@/components/StoryDoorModal";
-import BadgeUnlockModal from "@/components/BadgeUnlockModal";
-import SeasonCountdownTicker from "@/components/SeasonCountdownTicker";
-import SeasonOpenWelcome from "@/components/SeasonOpenWelcome";
 import GuestDemoChrome from "@/components/GuestDemoChrome";
 import GuestOnboarding from "@/components/GuestOnboarding";
 import PlayerWalkthrough from "@/components/PlayerWalkthrough";
-import RingCeremonyModal from "@/components/RingCeremonyModal";
-import SeasonFinaleModal from "@/components/SeasonFinaleModal";
-import CardPublishedModal from "@/components/CardPublishedModal";
-import BoredPracticeDoneModal from "@/components/BoredPracticeDoneModal";
-import WeeklyColdOpenModal from "@/components/WeeklyColdOpenModal";
-import BirthdayGazetteModal from "@/components/BirthdayGazetteModal";
-import PlatformAnniversaryModal from "@/components/PlatformAnniversaryModal";
-import JoinBadgeHydrator from "@/components/JoinBadgeHydrator";
-import EquippedTitleHydrator from "@/components/EquippedTitleHydrator";
-import ProfileBorderHydrator from "@/components/ProfileBorderHydrator";
-import EasterEggHost from "@/components/EasterEggHost";
-import EggFlexNewspaper from "@/components/EggFlexNewspaper";
-import MascotSighting from "@/components/MascotSighting";
-import LeagueBuildLockReminder from "@/components/LeagueBuildLockReminder";
-import CrewRevealModal from "@/components/CrewRevealModal";
 import { touchLastSeen } from "@/lib/last-seen";
 import { loadMyProfile } from "@/lib/profile";
 import { isGuestMode } from "@/lib/guest-mode";
@@ -60,6 +41,12 @@ import {
   EVENT_PROGRESSIVE,
   loadProgressiveSnapshot,
 } from "@/lib/progressive-disclosure";
+
+/** Ceremonies, eggs, hydrators — load after first paint so routes stay snappy. */
+const RoomDeferredChrome = dynamic(
+  () => import("@/components/RoomDeferredChrome"),
+  { ssr: false }
+);
 
 type NavLink = {
   href: string;
@@ -96,6 +83,8 @@ export default function Nav() {
   const [earlyNav, setEarlyNav] = useState(false);
   const [sandboxOn, setSandboxOn] = useState(false);
   const [eyesLabel, setEyesLabel] = useState("");
+  /** Heavy chrome (modals/hydrators) after first paint */
+  const [deferredReady, setDeferredReady] = useState(false);
 
   function refreshRoles() {
     setIsCommish(isCommissioner());
@@ -113,6 +102,37 @@ export default function Nav() {
     window.location.href = "/";
   }
 
+  // Mount deferred chrome after paint (idle if available) — once per session
+  useEffect(() => {
+    let cancelled = false;
+    const arm = () => {
+      if (!cancelled) setDeferredReady(true);
+    };
+    const w = window as Window & {
+      requestIdleCallback?: (
+        cb: () => void,
+        opts?: { timeout: number }
+      ) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+    let idleId: number | undefined;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    if (typeof w.requestIdleCallback === "function") {
+      idleId = w.requestIdleCallback(arm, { timeout: 900 });
+    } else {
+      timeoutId = setTimeout(arm, 400);
+    }
+    return () => {
+      cancelled = true;
+      if (idleId != null && typeof w.cancelIdleCallback === "function") {
+        w.cancelIdleCallback(idleId);
+      }
+      if (timeoutId != null) clearTimeout(timeoutId);
+    };
+  }, []);
+
+  // Progressive chrome — ONCE on mount + events. NOT on every pathname change
+  // (that re-fired syncFirstWeek + active week + scored weeks on every tab).
   useEffect(() => {
     function syncProgressive() {
       if (isGuestMode()) {
@@ -146,7 +166,7 @@ export default function Nav() {
       window.removeEventListener("warroom-creator-sandbox", syncProgressive);
       window.removeEventListener("warroom-creator-eyes", syncProgressive);
     };
-  }, [pathname]);
+  }, []);
 
   useEffect(() => {
     const session = getSession();
@@ -160,9 +180,12 @@ export default function Nav() {
     setSportIsNfl(sid === "nfl");
     setCrystalBallOn(league?.settings?.crystalBallEnabled !== false);
 
-    void refreshStaffSessionFlags().then(() => {
-      refreshRoles();
-    });
+    // Staff flags + profile after paint — session local is enough for first frame
+    const staffTimer = window.setTimeout(() => {
+      void refreshStaffSessionFlags().then(() => {
+        refreshRoles();
+      });
+    }, 700);
 
     function onPreview() {
       refreshRoles();
@@ -176,22 +199,24 @@ export default function Nav() {
     window.addEventListener(SPORT_THEME_EVENT, onSportTheme);
     // cleanup below after unread load setup
 
-    loadMyProfile().then((p) => {
-      if (p) {
-        setName(p.displayName);
-        setAvatarUrl(p.avatarUrl);
-        // Hard-scrub mistaken Legend (e.g. Visconti) even if they only open Commish
-        sanitizeLegacyLegendsOnBoot({
-          playerId: p.id || session?.playerId,
-          playerName: p.displayName || session?.playerName,
-        });
-      } else if (session?.playerId) {
-        sanitizeLegacyLegendsOnBoot({
-          playerId: session.playerId,
-          playerName: session.playerName,
-        });
-      }
-    });
+    const profileTimer = window.setTimeout(() => {
+      loadMyProfile().then((p) => {
+        if (p) {
+          setName(p.displayName);
+          setAvatarUrl(p.avatarUrl);
+          // Hard-scrub mistaken Legend (e.g. Visconti) even if they only open Commish
+          sanitizeLegacyLegendsOnBoot({
+            playerId: p.id || session?.playerId,
+            playerName: p.displayName || session?.playerName,
+          });
+        } else if (session?.playerId) {
+          sanitizeLegacyLegendsOnBoot({
+            playerId: session.playerId,
+            playerName: session.playerName,
+          });
+        }
+      });
+    }, 400);
 
     function onProfileUpdated(e: Event) {
       const detail = (e as CustomEvent<{ displayName?: string }>).detail;
@@ -225,14 +250,17 @@ export default function Nav() {
     async function loadUnread() {
       if (!session?.playerId || !league?.id) return;
       try {
-        const [ann, lock, gaz] = await Promise.all([
+        // Defer gazette archive (heavy) slightly so ann/locker badge paint first
+        const [ann, lock] = await Promise.all([
           countUnreadAnnouncements(),
           countUnseenLockerPosts(),
-          import("@/lib/gazette").then((m) => m.getGazetteUnreadState()),
         ]);
         setUnreadCount(ann);
         setLockerUnseen(lock);
-        setGazetteUnseen(gaz.unread ? 1 : 0);
+        void import("@/lib/gazette")
+          .then((m) => m.getGazetteUnreadState())
+          .then((gaz) => setGazetteUnseen(gaz.unread ? 1 : 0))
+          .catch(() => setGazetteUnseen(0));
       } catch {
         setUnreadCount(0);
         setLockerUnseen(0);
@@ -240,10 +268,11 @@ export default function Nav() {
       }
     }
 
-    void loadUnread();
+    // Let first paint win — badge network after 500ms
+    const unreadTimer = window.setTimeout(() => void loadUnread(), 500);
     // Presence: last logged in / last open (throttled write)
     if (!isGuestMode()) {
-      void touchLastSeen();
+      window.setTimeout(() => void touchLastSeen(), 800);
     }
     function onVis() {
       if (document.visibilityState === "visible") {
@@ -262,6 +291,9 @@ export default function Nav() {
     document.addEventListener("visibilitychange", onVis);
     window.addEventListener(EVENT_LOCKER_SEEN, onLockerSeen);
     return () => {
+      window.clearTimeout(unreadTimer);
+      window.clearTimeout(staffTimer);
+      window.clearTimeout(profileTimer);
       window.removeEventListener("warroom-view-as-player", onPreview);
       window.removeEventListener(SPORT_THEME_EVENT, onSportTheme);
       document.removeEventListener("visibilitychange", onVis);
@@ -290,19 +322,8 @@ export default function Nav() {
       setGazetteUnseen(0);
       return;
     }
-    // Throttle badge refreshes — every route used to fire 3 network calls
-    // and made tab switches feel laggy on phone.
-    const now = Date.now();
-    const last = (window as unknown as { __wrNavUnreadAt?: number })
-      .__wrNavUnreadAt;
-    if (last != null && now - last < 8_000) return;
-    (window as unknown as { __wrNavUnreadAt?: number }).__wrNavUnreadAt = now;
-    void countUnseenLockerPosts().then(setLockerUnseen).catch(() => {});
-    void countUnreadAnnouncements().then(setUnreadCount).catch(() => {});
-    void import("@/lib/gazette")
-      .then((m) => m.getGazetteUnreadState())
-      .then((g) => setGazetteUnseen(g.unread ? 1 : 0))
-      .catch(() => {});
+    // Do NOT re-fetch badges on every route — caches cover 30s; visibility
+    // change still refreshes. Route-hop network storms were a main lag source.
   }, [pathname]);
 
   useEffect(() => {
@@ -376,18 +397,20 @@ export default function Nav() {
           : []),
       ];
 
-  // More: first hour = rules + account only (Board waits until first lock).
+  // More: Account first (settings hub) so it never hides under Standings thumb zone.
+  // First hour = account + rules + crew only (Board waits until first lock).
   const moreLinks: NavLink[] = earlyNav
     ? [
+        { href: "/account", label: "Account" },
         { href: "/rules", label: "How to play" },
         {
           href: "/crew",
           label: "Crew",
           className: "text-amber-300/80 hover:text-amber-200",
         },
-        { href: "/account", label: "Account" },
       ]
     : [
+        { href: "/account", label: "Account" },
         ...(crystalBallOn
           ? [{ href: "/crystal-ball", label: "Crystal Ball" }]
           : []),
@@ -433,7 +456,6 @@ export default function Nav() {
               } as NavLink,
             ]
           : []),
-        { href: "/account", label: "Account" },
       ];
 
   const allMobileLinks = [...primaryLinks, ...moreLinks];
@@ -643,23 +665,28 @@ export default function Nav() {
                     onClick={() => setMoreOpen(false)}
                   />
                   <div className="absolute right-0 top-full mt-2 z-50 w-48 rounded-xl border border-border bg-card shadow-xl py-1">
-                    {moreLinks.map((link) => (
-                      <Link
-                        key={link.href}
-                        href={link.href}
-                        onClick={() => setMoreOpen(false)}
-                        className={`flex items-center justify-between px-3 py-2 text-sm hover:bg-card-hover transition ${
-                          linkActive(link.href)
-                            ? "text-foreground font-medium"
-                            : "text-muted"
-                        } ${link.className || ""}`}
-                      >
-                        <span>{link.label}</span>
-                        {link.badge != null && link.badge > 0 && (
-                          <UnreadBadge count={link.badge} />
-                        )}
-                      </Link>
-                    ))}
+                    {moreLinks.map((link) => {
+                      const isAccount = link.href === "/account";
+                      return (
+                        <Link
+                          key={link.href}
+                          href={link.href}
+                          onClick={() => setMoreOpen(false)}
+                          className={`flex items-center justify-between px-3 py-2 text-sm hover:bg-card-hover transition ${
+                            isAccount
+                              ? "text-sky-200 font-semibold"
+                              : linkActive(link.href)
+                                ? "text-foreground font-medium"
+                                : "text-muted"
+                          } ${!isAccount ? link.className || "" : ""}`}
+                        >
+                          <span>{isAccount ? "⚙ Account" : link.label}</span>
+                          {link.badge != null && link.badge > 0 && (
+                            <UnreadBadge count={link.badge} />
+                          )}
+                        </Link>
+                      );
+                    })}
                   </div>
                 </>
               )}
@@ -677,9 +704,11 @@ export default function Nav() {
               </button>
             )}
             <Link
-              href={playerId ? `/profile/${playerId}` : "/account"}
+              href="/account"
               className="flex items-center gap-2 text-sm text-muted hover:text-foreground"
-              title="Your profile & badges"
+              title="Account — photo, name, leagues, settings"
+              aria-label="Account"
+              onClick={closeChrome}
             >
               <Avatar
                 name={name}
@@ -688,7 +717,7 @@ export default function Nav() {
                 userId={playerId}
               />
               <span className="hidden sm:inline">
-                {name}
+                {name || "Account"}
                 {playerPreview && (
                   <span className="ml-1 text-xs text-warning">(Player view)</span>
                 )}
@@ -759,7 +788,7 @@ export default function Nav() {
           />
           <nav
             id="mobile-nav-menu"
-            className="md:hidden fixed left-0 right-0 bottom-0 z-[60] rounded-t-2xl border-t border-border bg-card shadow-[0_-12px_40px_rgba(0,0,0,0.5)] max-h-[min(78dvh,640px)] overflow-y-auto overscroll-contain pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))]"
+            className="md:hidden fixed left-0 right-0 bottom-0 z-[60] rounded-t-2xl border-t border-border bg-card shadow-[0_-12px_40px_rgba(0,0,0,0.5)] max-h-[min(78dvh,640px)] overflow-y-auto overscroll-contain pb-[calc(4.25rem+env(safe-area-inset-bottom,0px))]"
           >
             <div className="sticky top-0 bg-card/95 backdrop-blur pt-2 pb-1 border-b border-border z-10">
               <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-border" />
@@ -828,18 +857,25 @@ export default function Nav() {
             <ul className="py-1 pb-3">
               {moreLinks.map((link) => {
                 const active = linkActive(link.href);
+                const isAccount = link.href === "/account";
                 return (
                   <li key={link.href}>
                     <Link
                       href={link.href}
                       onClick={() => setMenuOpen(false)}
                       className={`flex items-center justify-between gap-3 px-4 min-h-[48px] text-base transition touch-manipulation ${
-                        active
-                          ? "bg-card-hover text-foreground"
-                          : "text-muted hover:bg-card-hover hover:text-foreground"
-                      } ${link.className || ""}`}
+                        isAccount
+                          ? active
+                            ? "bg-sky-500/15 text-sky-200 font-semibold"
+                            : "text-sky-200/90 hover:bg-sky-500/10 font-semibold"
+                          : active
+                            ? "bg-card-hover text-foreground"
+                            : "text-muted hover:bg-card-hover hover:text-foreground"
+                      } ${!isAccount ? link.className || "" : ""}`}
                     >
-                      <span className="font-medium">{link.label}</span>
+                      <span className={isAccount ? "font-semibold" : "font-medium"}>
+                        {isAccount ? "⚙ Account" : link.label}
+                      </span>
                       {link.badge != null && link.badge > 0 && (
                         <UnreadBadge count={link.badge} />
                       )}
@@ -950,39 +986,12 @@ export default function Nav() {
       {/* Guest demo: sticky DEMO bar + welcome / role / tutorial */}
       <GuestDemoChrome />
       <GuestOnboarding />
-      {/* Day before open: last chance to edit League Build */}
-      {!isGuestMode() && <LeagueBuildLockReminder />}
-      {/* After first finale: one-time Crew story reveal (not Gazette) */}
-      {!isGuestMode() && <CrewRevealModal />}
-      {/* Real account: Crystal Ball + picks walk-the-dog coach */}
+      {/* Real account first-hour coach — keep eager */}
       <PlayerWalkthrough />
-      {/* Until Aug 23 00:01 ET: countdown. After: ticker gone; one-time welcome splash */}
-      {!isGuestMode() && <SeasonCountdownTicker />}
-      {!isGuestMode() && <SeasonOpenWelcome />}
-      {!isGuestMode() && <RingCeremonyModal />}
-      {/* End-of-season: who won champ / toilet / nerd — once per player when engraved */}
-      {!isGuestMode() && <SeasonFinaleModal />}
-      {/* After host publishes a card — celebrate + share + player view */}
-      {!isGuestMode() && <CardPublishedModal />}
-      {!isGuestMode() && <BoredPracticeDoneModal />}
-      {!isGuestMode() && <JoinBadgeHydrator />}
-      {!isGuestMode() && <EquippedTitleHydrator />}
-      {!isGuestMode() && <ProfileBorderHydrator />}
-      {!isGuestMode() && <WeeklyColdOpenModal />}
-      {/* One Year Older · 1st of month · locked birthdays → roast paper for the room */}
-      {!isGuestMode() && <BirthdayGazetteModal />}
-      {/* War Room Anniversary · July 25 founding day · every league */}
-      {!isGuestMode() && <PlatformAnniversaryModal />}
       {!isGuestMode() && <LoginWelcomeModal />}
       {!isGuestMode() && <RulesOnboardingModal />}
-      <GazetteModal />
-      <GazetteShelfReveal />
-      <StoryDoorModal />
-      <BadgeUnlockModal />
-      {/* Easter eggs — discoverable, zero points, never a secret menu */}
-      {!isGuestMode() && <EasterEggHost />}
-      {!isGuestMode() && <EggFlexNewspaper />}
-      {!isGuestMode() && <MascotSighting />}
+      {/* Ceremonies, eggs, roster hydrators — after first paint */}
+      {deferredReady && <RoomDeferredChrome />}
     </>
   );
 }

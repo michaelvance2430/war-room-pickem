@@ -77,8 +77,12 @@ export default function EasterEggHost() {
 
       let memberSince: string | null = null;
       try {
+        // Defer egg network until UI is quiet (uses players TTL cache too)
+        await new Promise((r) => setTimeout(r, 1200));
+        if (cancelled) return;
         const { loadLeaguePlayers } = await import("@/lib/cloud");
         const players = await loadLeaguePlayers();
+        if (cancelled) return;
         const me = players.find((p) => p.id === playerId);
         memberSince = me?.memberSince || null;
 
