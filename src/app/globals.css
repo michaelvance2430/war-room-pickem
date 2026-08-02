@@ -139,12 +139,19 @@ body {
   color: var(--foreground);
   min-height: 100%;
   min-height: 100dvh;
-  background-attachment: fixed;
+  /* Never background-attachment: fixed on phones — freezes iOS scroll hard */
+  background-attachment: scroll;
   /* Phone: avoid text size adjust / accidental highlight */
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
+}
+
+@media (min-width: 768px) {
+  body {
+    background-attachment: fixed;
+  }
 }
 
 /*

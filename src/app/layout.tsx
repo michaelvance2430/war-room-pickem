@@ -6,7 +6,6 @@ import SportThemeApplier from "@/components/SportThemeApplier";
 import FoundrySessionChrome from "@/components/FoundrySessionChrome";
 import SandboxSessionChrome from "@/components/SandboxSessionChrome";
 import LeagueBuildGate from "@/components/LeagueBuildGate";
-import PullToRefresh from "@/components/PullToRefresh";
 import RouteHardSwitch from "@/components/RouteHardSwitch";
 import BootWatchdog from "@/components/BootWatchdog";
 import AppShell from "@/components/AppShell";
@@ -76,6 +75,11 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-background text-foreground phone-shell">
+        {/*
+          Keep the shell thin. Jul 31–Aug 2 freezes came from wrapping the whole
+          app in PullToRefresh (document touchmove + preventDefault) and stacking
+          global chrome that fought scroll/taps. PTR is gone on purpose.
+        */}
         <RouteHardSwitch />
         <BootWatchdog />
         <SportThemeApplier />
@@ -83,9 +87,7 @@ export default function RootLayout({
         <FoundrySessionChrome />
         <SandboxSessionChrome />
         <LeagueBuildGate />
-        <PullToRefresh>
-          <AppShell>{children}</AppShell>
-        </PullToRefresh>
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );

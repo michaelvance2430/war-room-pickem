@@ -45,14 +45,6 @@ const PlayerWalkthrough = dynamic(
   () => import("@/components/PlayerWalkthrough"),
   { ssr: false }
 );
-const LoginWelcomeModal = dynamic(
-  () => import("@/components/LoginWelcomeModal"),
-  { ssr: false }
-);
-const RulesOnboardingModal = dynamic(
-  () => import("@/components/RulesOnboardingModal"),
-  { ssr: false }
-);
 
 type NavLink = {
   href: string;
@@ -1007,11 +999,12 @@ export default function Nav() {
       {/* Guest demo: sticky DEMO bar + welcome / role / tutorial */}
       <GuestDemoChrome />
       <GuestOnboarding />
-      {/* Real account first-hour coach — keep eager */}
+      {/*
+        First-hour coach only — no welcome/rules/ceremonies on the critical path.
+        Those used to mount with every Nav paint, body-lock, and freeze look-around.
+      */}
       <PlayerWalkthrough />
-      {!isGuestMode() && <LoginWelcomeModal />}
-      {!isGuestMode() && <RulesOnboardingModal />}
-      {/* Ceremonies, eggs, roster hydrators — after first paint */}
+      {/* Roster + optional modals — staged late so tabs stay live after login */}
       {deferredReady && <RoomDeferredChrome />}
     </>
   );

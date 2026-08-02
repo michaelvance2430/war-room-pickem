@@ -12,6 +12,14 @@ import dynamic from "next/dynamic";
 import RoomDataHydrator from "@/components/RoomDataHydrator";
 import { isGuestMode } from "@/lib/guest-mode";
 
+const LoginWelcomeModal = dynamic(
+  () => import("@/components/LoginWelcomeModal"),
+  { ssr: false }
+);
+const RulesOnboardingModal = dynamic(
+  () => import("@/components/RulesOnboardingModal"),
+  { ssr: false }
+);
 const BadgeUnlockModal = dynamic(
   () => import("@/components/BadgeUnlockModal"),
   { ssr: false }
@@ -86,10 +94,10 @@ export default function RoomDeferredChrome() {
   const [wave, setWave] = useState(0);
 
   useEffect(() => {
-    // Look-around first: only roster hydrator for several seconds.
-    // Ceremonies / eggs used to pile on right after login and trap the shell.
-    const t1 = window.setTimeout(() => setWave(1), 5_000);
-    const t2 = window.setTimeout(() => setWave(2), 14_000);
+    // Critical path = hydrator only. Popups/ceremonies wait until look-around
+    // works. Jul 31–Aug 2 freezes were this stack racing the user on open.
+    const t1 = window.setTimeout(() => setWave(1), 8_000);
+    const t2 = window.setTimeout(() => setWave(2), 20_000);
     return () => {
       window.clearTimeout(t1);
       window.clearTimeout(t2);
@@ -101,9 +109,11 @@ export default function RoomDeferredChrome() {
       {/* Always: one roster hydrate for nameplates */}
       {!guest && <RoomDataHydrator />}
 
-      {/* Wave 1: room signals after user can already navigate */}
+      {/* Wave 1: room signals after tabs are already usable */}
       {wave >= 1 && (
         <>
+          {!guest && <LoginWelcomeModal />}
+          {!guest && <RulesOnboardingModal />}
           {!guest && <LeagueBuildLockReminder />}
           {!guest && <CardPublishedModal />}
           {!guest && <BoredPracticeDoneModal />}
