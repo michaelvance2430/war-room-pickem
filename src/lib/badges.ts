@@ -39,6 +39,22 @@ import {
   syncCareerLastPlacesFromLeague,
   syncStackableWeekCheevosFromLeague,
 } from "./last-place-career";
+import {
+  completedChapterCount,
+  crewIsDualSport,
+  getCrewForLeague,
+  getCrewIdForLeague,
+} from "./crew";
+import { readLocalActiveWeek } from "./crew-week8";
+import { getLeague } from "./league";
+
+function getLeagueSafe() {
+  try {
+    return getLeague();
+  } catch {
+    return null;
+  }
+}
 
 /** Permanent rare: most achievement points in the league */
 export const CHEEVO_KING_ID = "cheevo_king";
@@ -269,6 +285,27 @@ export const BADGE_CATALOG: BadgeDef[] = [
     points: 50,
     icon: "😈",
   },
+  {
+    id: "crew_points_furnace",
+    name: "Points Furnace",
+    description:
+      "Crew scorcher — top of the room in season points. Burning the board while the unit stays together.",
+    howToEarn:
+      "Lead your league in total season points (or share the lead). Shows on profile as Crew commitment.",
+    tier: "epic",
+    points: 50,
+    icon: "🔥",
+  },
+  {
+    id: "crew_multi_chapter",
+    name: "Multi-Chapter",
+    description:
+      "Finished more than one Crew chapter. Leagues end; you kept the group.",
+    howToEarn: "Complete 2+ Crew chapters (season finales) with the same Crew.",
+    tier: "epic",
+    points: 50,
+    icon: "📖",
+  },
 
   // —— Rare ——
   {
@@ -326,6 +363,37 @@ export const BADGE_CATALOG: BadgeDef[] = [
     tier: "rare",
     points: 25,
     icon: "📊",
+  },
+  {
+    id: "crew_midseason_loyal",
+    name: "Midseason Loyal",
+    description:
+      "Still here at Week 8. Crew briefing unlocked. Not a tourist.",
+    howToEarn:
+      "Be in the room when the league hits Week 8 (or later). The Crew mid-season education is for you.",
+    tier: "rare",
+    points: 25,
+    icon: "⚓",
+  },
+  {
+    id: "crew_dual_desk",
+    name: "Crew Dual Desk",
+    description:
+      "Same Crew, two live desks (CFB + NFL). Permanent group energy.",
+    howToEarn: "Your Crew has chapters in both CFB and NFL.",
+    tier: "rare",
+    points: 25,
+    icon: "🏈",
+  },
+  {
+    id: "crew_card_grinder",
+    name: "Card Grinder",
+    description:
+      "Locked enough weeks to prove commitment. Points optional. Showing up is not.",
+    howToEarn: "Post 6+ weeks played on the season card board.",
+    tier: "rare",
+    points: 25,
+    icon: "🧾",
   },
   {
     id: "iron_lungs",
@@ -1722,6 +1790,49 @@ function evaluateBadge(
 
     case "rematch_ready":
       return progress(weeks, 2);
+
+    case "crew_midseason_loyal": {
+      // In-room at week 8+ with a real seat
+      const week = readLocalActiveWeek();
+      const inRoom = !!player.id;
+      if (week >= 8 && inRoom && !!getLeagueSafe()) {
+        return { earned: true };
+      }
+      return progress(Math.max(0, week), 8);
+    }
+
+    case "crew_dual_desk": {
+      const crewId =
+        getCrewIdForLeague(getLeagueSafe()?.id) ||
+        getCrewForLeague(getLeagueSafe()?.id)?.id;
+      if (crewId && crewIsDualSport(crewId)) {
+        return { earned: true };
+      }
+      // Fallback: personal dual sport finish path
+      return {
+        earned:
+          hasFinishedNflAndCfb(player.id) ||
+          getSportsPlayedCount(player.id) >= 2,
+      };
+    }
+
+    case "crew_multi_chapter": {
+      const crewId =
+        getCrewIdForLeague(getLeagueSafe()?.id) ||
+        getCrewForLeague(getLeagueSafe()?.id)?.id;
+      const n = crewId ? completedChapterCount(crewId) : 0;
+      return progress(n, 2);
+    }
+
+    case "crew_points_furnace": {
+      if (n < 2) return { earned: false };
+      const maxPts = Math.max(...league.map((p) => p.totalPoints || 0));
+      if (maxPts <= 0) return { earned: false };
+      return { earned: (player.totalPoints || 0) >= maxPts };
+    }
+
+    case "crew_card_grinder":
+      return progress(weeks, 6);
 
     case "bare_minimum_dual": {
       // Stamp current league sport so dual-sport is detectable this session

@@ -30,6 +30,10 @@ const BadgeUnlockModal = dynamic(
   () => import("@/components/BadgeUnlockModal"),
   { ssr: false }
 );
+const CrewWeekEightModal = dynamic(
+  () => import("@/components/CrewWeekEightModal"),
+  { ssr: false }
+);
 const GazetteModal = dynamic(() => import("@/components/GazetteModal"), {
   ssr: false,
 });
@@ -154,6 +158,7 @@ export default function RoomDeferredChrome() {
         <>
           {!guest && <LoginWelcomeModal />}
           {!guest && <RulesOnboardingModal />}
+          {!guest && <CrewWeekEightModal />}
           {!guest && <LeagueBuildLockReminder />}
           {!guest && <CardPublishedModal />}
           {!guest && <BoredPracticeDoneModal />}

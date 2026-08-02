@@ -66,13 +66,13 @@ function CrewMuseumStrip() {
         </p>
       <p className="text-sm text-muted mt-1 leading-relaxed">
           Shared marks and the full Crew timeline open after your first season
-          finale. Until then — keep playing.
+          finale. Until then — keep playing. Week 8 briefing explains multi-sport Crew loyalty.
         </p>
       <Link
           href="/crew"
           className="inline-block mt-2 text-xs font-bold text-primary"
         >
-          Crew page →
+          Live foxhole + Crew page →
         </Link>
       </div>
     );

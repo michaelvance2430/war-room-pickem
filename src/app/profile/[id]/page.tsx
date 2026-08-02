@@ -39,6 +39,8 @@ import {
 } from "@/lib/join-titles";
 import { getEquippedTitleLabel } from "@/lib/equipped-title-store";
 import { formatLastSeen, lastSeenToneClass } from "@/lib/last-seen";
+import CreatorLiveStamp from "@/components/CreatorLiveStamp";
+import { filterCrewCheevos } from "@/lib/crew-cheevos";
 import {
   getProfileHardware,
   type ProfileTrophy,
@@ -538,6 +540,13 @@ export default function ProfilePage() {
                     The Creator
                   </span>
                 )}
+                {player.isCreator && (
+                  <CreatorLiveStamp
+                    userId={player.id}
+                    lastSeenAt={lastSeenAt}
+                    variant="chip"
+                  />
+                )}
                 {mock && (
                   <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border border-warning/60 text-warning">
                     NPC
@@ -668,6 +677,33 @@ export default function ProfilePage() {
         {/* 4. Achievements — shelves, not X/Y hero numbers */}
         {isWwcLeague && wwcBadges.length > 0 && (
           <WwcPassportShelf badges={wwcBadges} />
+        )}
+
+        {!isWwcLeague && badges.length > 0 && (
+          <div className="rounded-2xl border border-amber-400/30 bg-amber-400/5 p-5 sm:p-6 mb-6">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <p className="text-[10px] uppercase tracking-wider text-amber-300 font-bold">
+                Crew marks
+              </p>
+              <Link href="/crew" className="text-[11px] font-bold text-primary">
+                Live foxhole →
+              </Link>
+            </div>
+            <p className="text-xs text-muted mb-3 leading-relaxed">
+              Commitment, dual-desk, multi-chapter, and who&apos;s burning the
+              most points. Full live board is on Crew.
+            </p>
+            {player.isCreator && (
+              <div className="mb-3">
+                <CreatorLiveStamp
+                  userId={player.id}
+                  lastSeenAt={lastSeenAt}
+                  variant="banner"
+                />
+              </div>
+            )}
+            <BadgeShelf badges={filterCrewCheevos(badges)} />
+          </div>
         )}
 
         {!isWwcLeague && (

@@ -24,12 +24,21 @@ import {
   type CrewChapter,
 } from "@/lib/crew";
 import { getSportPack } from "@/lib/sports/registry";
+import CrewLiveBoard from "@/components/CrewLiveBoard";
+import { filterCrewCheevos } from "@/lib/crew-cheevos";
+import { getPlayerBadges, withPermanentBadges } from "@/lib/badges";
+import { withCreatorFlag } from "@/lib/creator";
+import type { Player } from "@/lib/types";
+import BadgeShelf from "@/components/BadgeShelf";
 
 export default function CrewPage() {
   const [crew, setCrew] = useState<Crew | null>(null);
   const [chapters, setChapters] = useState<CrewChapter[]>([]);
   const [revealed, setRevealed] = useState(false);
   const [leagueName, setLeagueName] = useState("");
+  const [crewBadges, setCrewBadges] = useState<
+    ReturnType<typeof getPlayerBadges>
+  >([]);
 
   function refresh() {
     const league = getLeague();
@@ -49,6 +58,34 @@ export default function CrewPage() {
     setCrew(ensured.crew);
     setChapters(getChaptersForCrew(ensured.crew.id));
     setRevealed(isCrewStoryRevealed(league.id, session?.playerId));
+    // Self crew cheevos for shelf
+    try {
+      if (session?.playerId) {
+        const me = withPermanentBadges(
+          withCreatorFlag({
+            id: session.playerId,
+            name: session.playerName || "You",
+            division: "North",
+            totalPoints: 0,
+            weeklyPoints: [],
+            atsCorrect: 0,
+            atsTotal: 0,
+            currentStreak: 0,
+            bestWeek: 0,
+            worstWeek: 0,
+            perfectWeeks: 0,
+            bestBetHits: 0,
+            bestBetTotal: 0,
+            propHits: 0,
+            propTotal: 0,
+            weeksPlayed: 0,
+          } as Player)
+        );
+        setCrewBadges(filterCrewCheevos(getPlayerBadges(me)));
+      }
+    } catch {
+      setCrewBadges([]);
+    }
   }
 
   useEffect(() => {
@@ -91,6 +128,17 @@ export default function CrewPage() {
             </p>
           )}
         </div>
+
+        <CrewLiveBoard />
+
+        {crewBadges.length > 0 && (
+          <section className="rounded-2xl border border-border bg-card p-4">
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-amber-300 mb-2">
+              Your Crew marks
+            </p>
+            <BadgeShelf badges={crewBadges} />
+          </section>
+        )}
 
         {!revealed ? (
           <section className="rounded-2xl border border-border bg-card p-5 space-y-3">

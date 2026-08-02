@@ -11,7 +11,8 @@ export type SessionDramaSlot =
   | "finale"
   | "season_open"
   | "soft_unlock"
-  | "weekly_cold_open";
+  | "weekly_cold_open"
+  | "crew_week8";
 
 function canUse() {
   return typeof window !== "undefined" && typeof sessionStorage !== "undefined";
