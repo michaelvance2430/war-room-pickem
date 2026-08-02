@@ -668,6 +668,17 @@ export const BADGE_CATALOG: BadgeDef[] = [
     icon: "🪖",
   },
   {
+    id: "creator_checked_in",
+    name: "Better Than Christmas",
+    description:
+      "The Creator checked in on this room. Better than Christmas. Maybe better than Santa. Your mom already tried to kiss the Creator — he was busy locking a Best Bet.",
+    howToEarn:
+      "Be in a league that includes the app Creator, and he has to actually show up (last seen in the app). Everyone in that room gets this common flex — not a personal visit from Santa.",
+    tier: "common",
+    points: 10,
+    icon: "🎁",
+  },
+  {
     id: "lock_it_in",
     name: "Lock It In",
     description: "Card submitted. No take-backs after kickoff.",
@@ -1850,6 +1861,48 @@ function evaluateBadge(
 
     case "war_room_recruit":
       return progress(player.name?.trim() ? 1 : 0, 1);
+
+    case "creator_checked_in": {
+      // Common room flex: app Creator is in this league and has checked in
+      // (last_seen). Everyone in the room earns it — not a personal autograph.
+      const ID = "creator_checked_in";
+      if (hasPermanentBadge(player, ID)) {
+        return { earned: true };
+      }
+      const field = league.length ? league : [player];
+      const creator = field.find((p) => isAppCreator(p.id));
+      if (!creator) return { earned: false };
+      // Creator is on the roster — "checked in" if we have last_seen OR
+      // the Creator is evaluating themselves (they're here now).
+      const checkedIn =
+        !!creator.lastSeenAt ||
+        isAppCreator(player.id) ||
+        (typeof window !== "undefined" &&
+          (() => {
+            try {
+              const lid = getLeagueSafe()?.id;
+              if (!lid) return false;
+              return (
+                localStorage.getItem(`warroom-creator-checkin:${lid}`) === "1"
+              );
+            } catch {
+              return false;
+            }
+          })());
+      if (!checkedIn) return { earned: false };
+      try {
+        if (creator.lastSeenAt && getLeagueSafe()?.id) {
+          localStorage.setItem(
+            `warroom-creator-checkin:${getLeagueSafe()!.id}`,
+            "1"
+          );
+        }
+      } catch {
+        /* ok */
+      }
+      grantPermanentBadgeId(player.id, ID);
+      return { earned: true };
+    }
 
     case "division_dweller":
       return progress(player.division ? 1 : 0, 1);

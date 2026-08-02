@@ -108,6 +108,18 @@ export default function RoomDataHydrator() {
             borderId: m.equippedBorderId ?? null,
           }))
         );
+        // If Creator is on this roster and has last_seen, unlock room cheevo flag
+        try {
+          const { isAppCreator } = await import("@/lib/creator");
+          const creator = roster.find(
+            (m) => m.userId && isAppCreator(m.userId) && m.lastSeenAt
+          );
+          if (creator && leagueId) {
+            localStorage.setItem(`warroom-creator-checkin:${leagueId}`, "1");
+          }
+        } catch {
+          /* ok */
+        }
       } catch {
         if (!cancelled) clearJoinBadges();
       }

@@ -4,7 +4,8 @@
  */
 
 import { createClient } from "@/lib/supabase/client";
-import { getSession } from "@/lib/league";
+import { getSession, getLeague } from "@/lib/league";
+import { isAppCreator } from "@/lib/creator";
 
 const LOCAL_TOUCH_KEY = "warroom-last-seen-touch-v1";
 /** Don't write more often than this (ms) */
@@ -44,6 +45,19 @@ export async function touchLastSeen(): Promise<void> {
     void supabase.from("profiles").update({ last_seen_at: iso }).eq("id", uid);
   } catch {
     /* column missing / offline — ignore */
+  }
+
+  // Creator check-in: stamp this room so peers can earn "Better Than Christmas"
+  // (no public Creator stamp — just the common room cheevo flag)
+  if (isAppCreator(session.playerId)) {
+    try {
+      const lid = getLeague()?.id || session.leagueId;
+      if (lid) {
+        localStorage.setItem(`warroom-creator-checkin:${lid}`, "1");
+      }
+    } catch {
+      /* ok */
+    }
   }
 }
 
