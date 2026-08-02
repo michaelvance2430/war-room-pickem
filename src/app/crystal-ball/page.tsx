@@ -19,6 +19,7 @@ function emptyShell(sportId?: string | null): CrystalBallState {
   return {
     myTeam: null,
     picks: [],
+    lockedCount: 0,
     champion: null,
     achievements: [],
     locked: false,
