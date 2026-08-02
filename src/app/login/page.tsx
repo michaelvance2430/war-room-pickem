@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, FormEvent, Suspense, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { enterGuestDemo } from "@/lib/guest-mode";
 import Link from "next/link";
@@ -13,7 +13,6 @@ import OwnershipNotice from "@/components/OwnershipNotice";
 import BrandMark from "@/components/BrandMark";
 
 function LoginPageInner() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState("");
@@ -57,6 +56,41 @@ function LoginPageInner() {
     setMessage(null);
     setLoading(true);
 
+    /** Never leave the Log in button spinning forever on flaky auth. */
+    const AUTH_MS = 12_000;
+    function withAuthTimeout<T>(p: PromiseLike<T>): Promise<T> {
+      return new Promise((resolve, reject) => {
+        const t = window.setTimeout(() => {
+          reject(
+            new Error(
+              "Login is taking too long. Check connection and try again."
+            )
+          );
+        }, AUTH_MS);
+        Promise.resolve(p).then(
+          (v) => {
+            window.clearTimeout(t);
+            resolve(v);
+          },
+          (err) => {
+            window.clearTimeout(t);
+            reject(err);
+          }
+        );
+      });
+    }
+
+    /** One hard open after auth so session storage is fully settled. */
+    function landAfterAuth() {
+      const path = afterAuthPath();
+      try {
+        window.location.assign(path);
+      } catch {
+        window.location.href = path;
+      }
+    }
+
+    let navigating = false;
     try {
       if (!hasSupabaseConfig()) {
         throw new Error("Supabase is not configured on this deployment.");
@@ -64,25 +98,31 @@ function LoginPageInner() {
       const supabase = createClient();
 
       if (mode === "signup") {
-        const { data, error: signError } = await supabase.auth.signUp({
-          email: email.trim(),
-          password,
-          options: {
-            data: { display_name: displayName.trim() || email.split("@")[0] },
-          },
-        });
+        const { data, error: signError } = await withAuthTimeout(
+          supabase.auth.signUp({
+            email: email.trim(),
+            password,
+            options: {
+              data: {
+                display_name: displayName.trim() || email.split("@")[0],
+              },
+            },
+          })
+        );
         if (signError) throw signError;
         if (data.session) {
-          router.push(afterAuthPath());
-          router.refresh();
-        } else {
-          setMessage("Check your email to confirm, then log in.");
+          navigating = true;
+          landAfterAuth();
+          return; // keep spinner until hard nav
         }
+        setMessage("Check your email to confirm, then log in.");
       } else {
-        const { error: loginError } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password,
-        });
+        const { error: loginError } = await withAuthTimeout(
+          supabase.auth.signInWithPassword({
+            email: email.trim(),
+            password,
+          })
+        );
         if (loginError) throw loginError;
 
         if (rememberMe) {
@@ -91,13 +131,14 @@ function LoginPageInner() {
           localStorage.removeItem("warroom-remember");
         }
 
-        router.push(afterAuthPath());
-        router.refresh();
+        navigating = true;
+        landAfterAuth();
+        return; // keep spinner until hard nav
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
-      setLoading(false);
+      if (!navigating) setLoading(false);
     }
   }
 
@@ -167,13 +208,16 @@ function LoginPageInner() {
                 setError(null);
                 setGuestLoading(true);
                 const res = enterGuestDemo();
-                setGuestLoading(false);
                 if (!res.ok) {
+                  setGuestLoading(false);
                   setError(res.error || "Could not start guest demo");
                   return;
                 }
-                router.push("/");
-                router.refresh();
+                try {
+                  window.location.assign("/");
+                } catch {
+                  window.location.href = "/";
+                }
               }}
               className="w-full py-3.5 min-h-[52px] rounded-xl border border-border text-sm font-medium text-muted touch-manipulation disabled:opacity-50"
             >

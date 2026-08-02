@@ -19,8 +19,19 @@ export default function GazetteArchivePage() {
 
   useEffect(() => {
     setLeagueName(getLeague()?.name || "");
+    let cancelled = false;
+    const disarm = (() => {
+      try {
+        const { armLoadingFailSafe } =
+          require("@/lib/boot-safety") as typeof import("@/lib/boot-safety");
+        return armLoadingFailSafe(setLoading, 5_000);
+      } catch {
+        return () => {};
+      }
+    })();
     loadGazetteArchive()
       .then((res) => {
+        if (cancelled) return;
         if (!res.ok) {
           setError(res.error || "Could not load archive");
           setEditions([]);
@@ -36,10 +47,17 @@ export default function GazetteArchivePage() {
         }
       })
       .catch(() => {
+        if (cancelled) return;
         setError("Could not load archive");
         setEditions([]);
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+      disarm();
+    };
   }, []);
 
   const latest = editions[0] || null;

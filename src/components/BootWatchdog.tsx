@@ -9,6 +9,30 @@ import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { unlockDocumentChrome } from "@/lib/boot-safety";
 
+/** True only when a visible, interactive full-screen sheet is open. */
+function hasLiveModal(): boolean {
+  try {
+    const nodes = document.querySelectorAll(
+      '[aria-modal="true"], [role="dialog"]'
+    );
+    for (const el of Array.from(nodes)) {
+      const node = el as HTMLElement;
+      // Hidden / unmounted-looking nodes shouldn't trap the whole app
+      if (node.getAttribute("aria-hidden") === "true") continue;
+      const style = window.getComputedStyle(node);
+      if (style.display === "none" || style.visibility === "hidden") continue;
+      if (style.pointerEvents === "none") continue;
+      // Must cover a real chunk of the viewport (not a zero-size ghost)
+      const r = node.getBoundingClientRect();
+      if (r.width < 40 || r.height < 40) continue;
+      return true;
+    }
+  } catch {
+    /* ok */
+  }
+  return false;
+}
+
 export default function BootWatchdog() {
   const pathname = usePathname();
 
@@ -17,10 +41,15 @@ export default function BootWatchdog() {
     const t0 = requestAnimationFrame(() => unlockDocumentChrome());
     const t1 = window.setTimeout(() => unlockDocumentChrome(), 80);
     const t2 = window.setTimeout(() => unlockDocumentChrome(), 400);
+    // Late modal unmounts sometimes re-lock after paint
+    const t3 = window.setTimeout(() => {
+      if (!hasLiveModal()) unlockDocumentChrome();
+    }, 1_200);
     return () => {
       cancelAnimationFrame(t0);
       window.clearTimeout(t1);
       window.clearTimeout(t2);
+      window.clearTimeout(t3);
     };
   }, [pathname]);
 
@@ -31,15 +60,8 @@ export default function BootWatchdog() {
     function onPageShow() {
       unlockDocumentChrome();
     }
-    document.addEventListener("visibilitychange", onVis);
-    window.addEventListener("pageshow", onPageShow);
-    window.addEventListener("focus", onVis);
-    // Slow drip — catch locks that mount late (welcome modal, sheets)
-    const pulse = window.setInterval(() => {
+    function forceUnlockIfSafe() {
       try {
-        const overflow = document.body.style.overflow;
-        // Only clear if hidden but no open dialog/menu marker we care about
-        // Always clear fixed position traps (those freeze iOS hard)
         if (
           document.body.style.position === "fixed" ||
           document.body.style.position === "absolute"
@@ -47,22 +69,37 @@ export default function BootWatchdog() {
           unlockDocumentChrome();
           return;
         }
-        // If overflow hidden with no [aria-modal=true] in DOM, unlock
-        if (overflow === "hidden") {
-          const modal = document.querySelector(
-            '[aria-modal="true"], [role="dialog"]'
-          );
-          if (!modal) unlockDocumentChrome();
+        if (document.body.style.overflow === "hidden" && !hasLiveModal()) {
+          unlockDocumentChrome();
         }
       } catch {
         /* ok */
       }
-    }, 2_500);
+    }
+    // Thumb nav / More button taps should never die under a ghost lock
+    function onPointerDown(e: Event) {
+      const t = e.target as HTMLElement | null;
+      if (
+        t?.closest?.(
+          'nav[aria-label="Primary"], #mobile-nav-menu, a[href], button'
+        )
+      ) {
+        forceUnlockIfSafe();
+      }
+    }
+
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("pageshow", onPageShow);
+    window.addEventListener("focus", onVis);
+    document.addEventListener("pointerdown", onPointerDown, true);
+    // Faster drip — 1.2s was too slow when a sheet half-died mid-tap
+    const pulse = window.setInterval(forceUnlockIfSafe, 1_200);
 
     return () => {
       document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener("pageshow", onPageShow);
       window.removeEventListener("focus", onVis);
+      document.removeEventListener("pointerdown", onPointerDown, true);
       window.clearInterval(pulse);
     };
   }, []);

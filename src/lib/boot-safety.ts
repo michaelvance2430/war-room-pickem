@@ -56,3 +56,22 @@ export function raceTimeout<T>(
     );
   });
 }
+
+/**
+ * Page-level "never spin forever" arm. Call on mount; clear on unmount or when
+ * load finishes. Default 5s is enough for look-around; cloud can fill in later.
+ */
+export function armLoadingFailSafe(
+  setLoading: (v: boolean) => void,
+  ms = 5_000
+): () => void {
+  if (typeof window === "undefined") return () => {};
+  const t = window.setTimeout(() => {
+    try {
+      setLoading(false);
+    } catch {
+      /* ok */
+    }
+  }, ms);
+  return () => window.clearTimeout(t);
+}

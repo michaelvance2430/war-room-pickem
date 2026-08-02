@@ -126,7 +126,17 @@ function BoardInner() {
       weekParam != null && weekParam !== ""
         ? parseInt(weekParam, 10)
         : NaN;
-    void load(Number.isNaN(w) ? -1 : w);
+    const disarm = (() => {
+      try {
+        const { armLoadingFailSafe } =
+          require("@/lib/boot-safety") as typeof import("@/lib/boot-safety");
+        return armLoadingFailSafe(setLoading, 6_000);
+      } catch {
+        return () => {};
+      }
+    })();
+    void load(Number.isNaN(w) ? -1 : w).finally(() => disarm());
+    return () => disarm();
   }, [weekParam, load]);
 
   function goWeek(w: number) {

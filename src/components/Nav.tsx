@@ -927,22 +927,12 @@ export default function Nav() {
                 <Link
                   href={tab.href}
                   prefetch={false}
-                  onClick={(e) => {
+                  onClick={() => {
+                    // Soft SPA — full reload every tab rebooted the whole app
+                    // (auth + hydrators + modal waves) and felt like freezes.
+                    // hardNavPrepare clears scroll locks so soft hops stay clean.
                     closeChrome();
                     hardNavPrepare();
-                    // Phone: soft SPA tab hops left half-dead shells (scroll
-                    // locks, stuck Loading). Full open = clean boot every tab.
-                    const same =
-                      pathname === tab.href ||
-                      (tab.href !== "/" && pathname?.startsWith(tab.href + "/"));
-                    if (!same) {
-                      e.preventDefault();
-                      try {
-                        window.location.assign(tab.href);
-                      } catch {
-                        window.location.href = tab.href;
-                      }
-                    }
                   }}
                   className={`relative flex flex-col items-center justify-center h-full gap-0.5 text-[10px] font-semibold touch-manipulation transition ${
                     active ? "text-primary" : "text-muted"

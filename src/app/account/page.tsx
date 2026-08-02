@@ -209,7 +209,23 @@ export default function AccountPage() {
   }
 
   useEffect(() => {
-    reload();
+    let cancelled = false;
+    const disarm = (() => {
+      try {
+        const { armLoadingFailSafe } =
+          require("@/lib/boot-safety") as typeof import("@/lib/boot-safety");
+        return armLoadingFailSafe(setLoading, 6_000);
+      } catch {
+        return () => {};
+      }
+    })();
+    void reload().finally(() => {
+      if (!cancelled) setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+      disarm();
+    };
   }, []);
 
   // Holiday borders appear/disappear with Commish season theme

@@ -102,18 +102,38 @@ export default function StatsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
+    const disarm = (() => {
+      try {
+        const { armLoadingFailSafe } =
+          require("@/lib/boot-safety") as typeof import("@/lib/boot-safety");
+        return armLoadingFailSafe(setLoading, 5_000);
+      } catch {
+        return () => {};
+      }
+    })();
     async function load() {
       setSelfId(getSession()?.playerId || null);
-      const [list, trophies] = await Promise.all([
-        loadLeaguePlayers(),
-        loadLeagueTrophies(),
-      ]);
-      setPlayers(list);
-      setRanked(powerBoardWithLabels(list, computePowerScore));
-      setLoreCards(buildLeagueLoreCards(list, trophies));
-      setLoading(false);
+      try {
+        const [list, trophies] = await Promise.all([
+          loadLeaguePlayers(),
+          loadLeagueTrophies(),
+        ]);
+        if (cancelled) return;
+        setPlayers(list);
+        setRanked(powerBoardWithLabels(list, computePowerScore));
+        setLoreCards(buildLeagueLoreCards(list, trophies));
+      } catch {
+        /* empty board — still leave spinner */
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     }
-    load();
+    void load();
+    return () => {
+      cancelled = true;
+      disarm();
+    };
   }, []);
 
   const sorted = [...players].sort((a, b) => {

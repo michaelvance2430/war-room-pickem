@@ -30,6 +30,16 @@ export default function ToiletBowlPage() {
   const [progressNote, setProgressNote] = useState("");
 
   useEffect(() => {
+    let cancelled = false;
+    const disarm = (() => {
+      try {
+        const { armLoadingFailSafe } =
+          require("@/lib/boot-safety") as typeof import("@/lib/boot-safety");
+        return armLoadingFailSafe(setLoading, 5_000);
+      } catch {
+        return () => {};
+      }
+    })();
     async function load() {
       setSelfId(getSession()?.playerId || null);
       const league = getLeague();
@@ -37,10 +47,18 @@ export default function ToiletBowlPage() {
       const cut = league?.settings?.cutPercent ?? 50;
       setCutPercent(cut);
 
-      const [players, scoredWeeks] = await Promise.all([
-        loadLeaguePlayers(),
-        listScoredWeekNumbers(),
-      ]);
+      let players: Awaited<ReturnType<typeof loadLeaguePlayers>> = [];
+      let scoredWeeks: number[] = [];
+      try {
+        [players, scoredWeeks] = await Promise.all([
+          loadLeaguePlayers(),
+          listScoredWeekNumbers(),
+        ]);
+      } catch {
+        if (!cancelled) setLoading(false);
+        return;
+      }
+      if (cancelled) return;
       setPlayerCount(players.length);
       const locked = scoredWeeks.includes(
         cutLockWeek(getLeague()?.sportId)
@@ -83,9 +101,13 @@ export default function ToiletBowlPage() {
         );
       }
 
-      setLoading(false);
+      if (!cancelled) setLoading(false);
     }
-    load();
+    void load();
+    return () => {
+      cancelled = true;
+      disarm();
+    };
   }, []);
 
   return (

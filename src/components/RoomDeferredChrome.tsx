@@ -86,9 +86,10 @@ export default function RoomDeferredChrome() {
   const [wave, setWave] = useState(0);
 
   useEffect(() => {
-    // Stagger so main-thread isn't crushed by 15 dynamic chunks at once
-    const t1 = window.setTimeout(() => setWave(1), 1800);
-    const t2 = window.setTimeout(() => setWave(2), 4200);
+    // Look-around first: only roster hydrator for several seconds.
+    // Ceremonies / eggs used to pile on right after login and trap the shell.
+    const t1 = window.setTimeout(() => setWave(1), 5_000);
+    const t2 = window.setTimeout(() => setWave(2), 14_000);
     return () => {
       window.clearTimeout(t1);
       window.clearTimeout(t2);
@@ -100,7 +101,7 @@ export default function RoomDeferredChrome() {
       {/* Always: one roster hydrate for nameplates */}
       {!guest && <RoomDataHydrator />}
 
-      {/* Wave 1: things that can matter in the first few minutes */}
+      {/* Wave 1: room signals after user can already navigate */}
       {wave >= 1 && (
         <>
           {!guest && <LeagueBuildLockReminder />}
@@ -113,7 +114,7 @@ export default function RoomDeferredChrome() {
         </>
       )}
 
-      {/* Wave 2: rare ceremonies / discovery — after the app is usable */}
+      {/* Wave 2: rare ceremonies — long after first paint is boring */}
       {wave >= 2 && (
         <>
           {!guest && <CrewRevealModal />}
