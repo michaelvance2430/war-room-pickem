@@ -2,11 +2,12 @@
 
 /**
  * Weekly cold-open “broadcast” — first login each week starting Aug 16 2026.
- * Plays once per player/league/week. Cinematic package + optional MP4.
+ * Plays once per player/league/week. Foundry can force-preview anytime.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  EVENT_FORCE_WEEKLY_COLD_OPEN,
   getWeeklyColdOpenCopy,
   markWeeklyColdOpenSeen,
   shouldShowWeeklyColdOpen,
@@ -18,9 +19,8 @@ import {
   isPlayerTutorialActive,
   needsPlayerTutorial,
 } from "@/lib/player-tutorial";
-import { claimSessionDrama } from "@/lib/session-drama";
+import { claimSessionDrama, clearSessionDrama } from "@/lib/session-drama";
 import BrandMark from "@/components/BrandMark";
-import { isAppCreator } from "@/lib/creator";
 
 const POSTER = "/videos/kahmann-cold-open-poster.jpg";
 
@@ -52,11 +52,23 @@ const RUN_MS = 10_500;
 
 export default function WeeklyColdOpenModal() {
   const [open, setOpen] = useState(false);
+  /** Foundry preview — does not count as “seen this week” */
+  const [preview, setPreview] = useState(false);
   const [beat, setBeat] = useState(0);
   const [progress, setProgress] = useState(0);
   const [videoOk, setVideoOk] = useState(false);
+  const [runId, setRunId] = useState(0);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const copy = getWeeklyColdOpenCopy();
+
+  const openBroadcast = useCallback((opts?: { preview?: boolean }) => {
+    setPreview(!!opts?.preview);
+    setBeat(0);
+    setProgress(0);
+    setVideoOk(false);
+    setRunId((n) => n + 1);
+    setOpen(true);
+  }, []);
 
   useEffect(() => {
     if (isGuestMode()) return;
@@ -64,17 +76,7 @@ export default function WeeklyColdOpenModal() {
     function tryOpen() {
       const session = getSession();
       if (!session?.playerId) return;
-      // Creator can force preview: localStorage warroom-force-weekly-cold-open=1
-      let force = false;
-      try {
-        force =
-          isAppCreator(session.playerId) &&
-          localStorage.getItem("warroom-force-weekly-cold-open") === "1";
-      } catch {
-        force = false;
-      }
-      if (!force && !shouldShowWeeklyColdOpen()) return;
-      // Don't stack under active walkthrough coach
+      if (!shouldShowWeeklyColdOpen()) return;
       if (needsPlayerTutorial() || isPlayerTutorialActive()) return;
       try {
         if (sessionStorage.getItem("warroom-no-welcome-this-session") === "1") {
@@ -84,17 +86,30 @@ export default function WeeklyColdOpenModal() {
         /* ok */
       }
       if (!claimSessionDrama("weekly_cold_open")) return;
+      openBroadcast({ preview: false });
+    }
 
-      setOpen(true);
+    function onForce(e: Event) {
+      const ce = e as CustomEvent<{ preview?: boolean }>;
+      const isPreview = ce.detail?.preview !== false;
+      // Preview from Foundry: skip session drama / tutorial gates
+      if (!isPreview) {
+        if (!claimSessionDrama("weekly_cold_open")) return;
+      } else {
+        clearSessionDrama("weekly_cold_open");
+      }
+      openBroadcast({ preview: isPreview });
     }
 
     const t = window.setTimeout(tryOpen, 900);
     window.addEventListener("warroom-first-week-progress", tryOpen);
+    window.addEventListener(EVENT_FORCE_WEEKLY_COLD_OPEN, onForce);
     return () => {
       window.clearTimeout(t);
       window.removeEventListener("warroom-first-week-progress", tryOpen);
+      window.removeEventListener(EVENT_FORCE_WEEKLY_COLD_OPEN, onForce);
     };
-  }, []);
+  }, [openBroadcast]);
 
   // Progress + beat clock while open
   useEffect(() => {
@@ -113,7 +128,7 @@ export default function WeeklyColdOpenModal() {
       }
     }, 80);
     return () => window.clearInterval(id);
-  }, [open]);
+  }, [open, runId]);
 
   // Probe MP4 — if missing, stay on poster package
   useEffect(() => {
@@ -129,23 +144,24 @@ export default function WeeklyColdOpenModal() {
     return () => {
       cancelled = true;
     };
-  }, [open]);
+  }, [open, runId]);
 
   useEffect(() => {
     if (!open || !videoOk) return;
     const v = videoRef.current;
     if (!v) return;
+    v.currentTime = 0;
     void v.play().catch(() => setVideoOk(false));
-  }, [open, videoOk]);
+  }, [open, videoOk, runId]);
 
   function dismiss() {
-    markWeeklyColdOpenSeen();
-    try {
-      localStorage.removeItem("warroom-force-weekly-cold-open");
-    } catch {
-      /* ok */
+    // Only burn the once-per-week flag for real (non-Foundry) shows
+    if (!preview) {
+      markWeeklyColdOpenSeen();
     }
+    clearSessionDrama("weekly_cold_open");
     setOpen(false);
+    setPreview(false);
   }
 
   if (!open) return null;
@@ -166,12 +182,12 @@ export default function WeeklyColdOpenModal() {
         onClick={dismiss}
       />
       <div className="relative w-full sm:max-w-lg max-h-[94vh] overflow-hidden rounded-t-2xl sm:rounded-2xl border border-amber-400/40 bg-black shadow-[0_0_60px_rgba(251,191,36,0.15)] flex flex-col">
-        {/* Broadcast chrome */}
         <div className="px-4 pt-3 pb-2 border-b border-amber-400/25 bg-amber-500/10 flex items-center gap-3 shrink-0">
           <BrandMark size={40} variant="force" className="rounded-md" />
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-300">
               {copy.stamp}
+              {preview ? " · Foundry preview" : ""}
             </p>
             <p
               id="cold-open-title"
@@ -185,10 +201,10 @@ export default function WeeklyColdOpenModal() {
           </span>
         </div>
 
-        {/* Stage */}
         <div className="relative aspect-video bg-black overflow-hidden shrink-0">
           {videoOk ? (
             <video
+              key={runId}
               ref={videoRef}
               src={WEEKLY_COLD_OPEN_VIDEO_SRC}
               poster={POSTER}
@@ -205,9 +221,8 @@ export default function WeeklyColdOpenModal() {
               <img
                 src={POSTER}
                 alt=""
-                className="absolute inset-0 w-full h-full object-cover scale-105 motion-safe:animate-pulse"
+                className="absolute inset-0 w-full h-full object-cover"
                 style={{
-                  animation: "none",
                   transform: `scale(${1.05 + progress * 0.08})`,
                   transition: "transform 0.2s linear",
                 }}
@@ -217,7 +232,6 @@ export default function WeeklyColdOpenModal() {
             </>
           )}
 
-          {/* Lower-third caption */}
           <div className="absolute bottom-0 inset-x-0 p-3 sm:p-4">
             <div className="rounded-lg border border-amber-400/35 bg-black/80 backdrop-blur-sm px-3 py-2.5">
               <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-amber-300 mb-1">
@@ -229,7 +243,6 @@ export default function WeeklyColdOpenModal() {
             </div>
           </div>
 
-          {/* Progress bar */}
           <div className="absolute top-0 inset-x-0 h-1 bg-white/10">
             <div
               className="h-full bg-amber-400 transition-[width] duration-100 ease-linear"
@@ -238,7 +251,6 @@ export default function WeeklyColdOpenModal() {
           </div>
         </div>
 
-        {/* Full copy after beats */}
         <div className="px-4 py-3 space-y-2 text-sm text-muted leading-relaxed overflow-y-auto">
           <p className="text-foreground font-medium">{copy.body}</p>
           <p className="text-amber-100/90 font-semibold">{copy.kalshi}</p>
@@ -250,14 +262,21 @@ export default function WeeklyColdOpenModal() {
             onClick={dismiss}
             className="w-full py-3.5 min-h-[48px] rounded-xl bg-primary text-black font-bold text-sm"
           >
-            {progress >= 1 ? copy.cta : "Skip broadcast"}
+            {progress >= 1
+              ? preview
+                ? "Close preview"
+                : copy.cta
+              : preview
+                ? "Close preview"
+                : "Skip broadcast"}
           </button>
           <p className="text-[10px] text-muted text-center">
-            Once this week · first login only
+            {preview
+              ? "Foundry preview · does not count as this week’s login play"
+              : "Once this week · first login only"}
           </p>
         </div>
       </div>
-
     </div>
   );
 }

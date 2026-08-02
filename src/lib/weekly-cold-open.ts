@@ -15,6 +15,23 @@ const SEEN_KEY = "warroom-weekly-cold-open-seen-v1";
 export const WEEKLY_COLD_OPEN_VIDEO_SRC =
   "/videos/kahmann-cold-open.mp4";
 
+/** Foundry / creator: open broadcast without leaving the page. */
+export const EVENT_FORCE_WEEKLY_COLD_OPEN = "warroom-force-weekly-cold-open";
+
+/** Fire from Foundry — preview only (does not burn the once-per-week flag). */
+export function requestWeeklyColdOpenPreview(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.dispatchEvent(
+      new CustomEvent(EVENT_FORCE_WEEKLY_COLD_OPEN, {
+        detail: { preview: true },
+      })
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
 export type WeeklyColdOpenCopy = {
   stamp: string;
   headline: string;

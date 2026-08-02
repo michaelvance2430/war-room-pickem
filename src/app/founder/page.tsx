@@ -280,20 +280,10 @@ export default function FounderDashboardPage() {
     kind: "ring" | "card" | "gazette" | "paper" | "cut" | "trophy" | "cold"
   ) {
     if (kind === "cold") {
-      try {
-        localStorage.setItem("warroom-force-weekly-cold-open", "1");
-        // Clear this week's seen flag so force works
-        const keys: string[] = [];
-        for (let i = 0; i < localStorage.length; i++) {
-          const k = localStorage.key(i);
-          if (k?.startsWith("warroom-weekly-cold-open-seen-v1")) keys.push(k);
-        }
-        keys.forEach((k) => localStorage.removeItem(k));
-        sessionStorage.removeItem("warroom-session-drama-v1");
-      } catch {
-        /* ok */
-      }
-      router.push("/");
+      // Stay on Foundry — play broadcast in place (preview, no once-per-week burn)
+      void import("@/lib/weekly-cold-open").then((m) => {
+        m.requestWeeklyColdOpenPreview();
+      });
       return;
     }
     void import("@/lib/creator-sandbox").then(async (sb) => {
@@ -756,7 +746,7 @@ export default function FounderDashboardPage() {
                 onClick={() => jumpPopup("cold")}
                 className="py-2.5 rounded-lg border border-amber-400/40 bg-amber-500/10 text-xs font-semibold hover:bg-amber-500/15"
               >
-                Weekly cold open (Kahmann / Kalshi)
+                ▶ Watch cold open (Kahmann / Kalshi)
               </button>
               <button
                 type="button"
