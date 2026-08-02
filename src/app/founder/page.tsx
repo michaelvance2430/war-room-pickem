@@ -402,9 +402,10 @@ export default function FounderDashboardPage() {
             Preseason cold open · last year’s champ
           </p>
           <p className="text-xs text-muted leading-relaxed">
-            Week before the season only — once per player. “Have you seen this
-            man?” with the defending champ’s profile pic + time-traveler /
-            Kalshi copy. Preview does not burn the once-per-season flag.
+            Week before the season only — once per player. Wanted carton with
+            the defending champ’s profile pic. Copy mixes by league + season +
+            sport + champ (~thousands of combos) so it doesn’t read the same
+            year after year or room after room. Preview does not burn the flag.
           </p>
           <button
             type="button"

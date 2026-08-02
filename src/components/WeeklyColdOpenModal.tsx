@@ -160,7 +160,13 @@ export default function WeeklyColdOpenModal() {
 
   if (!open || !subject) return null;
 
-  const copy = getWeeklyColdOpenCopy(subject, sportId);
+  const league = getLeague();
+  const copy = getWeeklyColdOpenCopy(subject, {
+    sportId: sportId ?? league?.sportId,
+    leagueId: league?.id,
+    leagueName: league?.name || room,
+    preview,
+  });
   const clock = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
     minute: "2-digit",
@@ -284,18 +290,7 @@ export default function WeeklyColdOpenModal() {
           <p className="text-amber-100/95 font-semibold border-l-2 border-amber-400/60 pl-2.5 leading-relaxed">
             {copy.kalshi}
           </p>
-          <p className="text-[11px] text-muted leading-relaxed">
-            One-time preseason drop — the week before kickoff. When the host
-            scores a week, the full{" "}
-            <Link
-              href="/gazette"
-              onClick={dismiss}
-              className="text-amber-300 font-semibold underline"
-            >
-              Gazette
-            </Link>{" "}
-            still drops with crowns, shame, and the works.
-          </p>
+          <p className="text-[11px] text-muted leading-relaxed">{copy.foot}</p>
         </div>
 
         <div className="px-4 py-3 border-t border-amber-400/20 shrink-0 flex flex-col gap-2 bg-black/80">
@@ -317,8 +312,8 @@ export default function WeeklyColdOpenModal() {
           </div>
           <p className="text-[10px] text-muted text-center">
             {preview
-              ? "Foundry preview · does not count as this season’s cold open"
-              : "Once per season · week before open · last year’s champ"}
+              ? `Foundry preview · pack ${copy.packId} · does not burn once-per-season`
+              : copy.editionLine}
           </p>
         </div>
       </div>
