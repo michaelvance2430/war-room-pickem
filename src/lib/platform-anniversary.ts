@@ -141,7 +141,7 @@ const PACKS: PaperPack[] = [
       `DEPRECATED: “we’ll only use this for one season.” Migration: lie harder.`,
     pullQuote: () =>
       `"It’s not tech debt. It’s lore." — Engineering, probably`,
-    foot: () =>
+    foot: (c) =>
       `Shipped ${c.foundedLabel}–present. Happy uptime.`,
     toastLine: (c) =>
       `v${c.yearsAlive}.0 — salt remains a dependency.`,
@@ -243,7 +243,7 @@ const PACKS: PaperPack[] = [
       `TIMESHARE: one week of caring. Auto-renews every kickoff.`,
     pullQuote: () =>
       `"Are we there yet?" — No. It’s July 25 again.`,
-    foot: () =>
+    foot: (c) =>
       `Bon voyage into year ${c.yearsAlive + 1}. Don’t lock late at the airport.`,
     toastLine: (c) =>
       `${c.yearsAlive} years on the road. Still lost. Still fun.`,
