@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import Nav from "@/components/Nav";
@@ -83,9 +83,41 @@ export default function ProfilePage() {
   const [leaguePeers, setLeaguePeers] = useState<Player[]>([]);
   const [lastSeenAt, setLastSeenAt] = useState<string | null>(null);
   const [blueFalconCount, setBlueFalconCount] = useState(0);
+  /** Soft nav: keep shell if we already painted any profile this session */
+  const hadPaintRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
+
+    function rosterToPlayer(row: {
+      userId: string;
+      name: string;
+      division?: string;
+      totalPoints?: number;
+      avatarUrl?: string | null;
+      joinedAt?: string | null;
+    }): Player {
+      return {
+        id: row.userId,
+        name: row.name || "Player",
+        division: (row.division as Player["division"]) || "North",
+        totalPoints: row.totalPoints || 0,
+        weeklyPoints: [],
+        atsCorrect: 0,
+        atsTotal: 0,
+        currentStreak: 0,
+        bestWeek: 0,
+        worstWeek: 0,
+        perfectWeeks: 0,
+        bestBetHits: 0,
+        bestBetTotal: 0,
+        propHits: 0,
+        propTotal: 0,
+        weeksPlayed: 0,
+        avatarUrl: row.avatarUrl || undefined,
+        memberSince: row.joinedAt || undefined,
+      };
+    }
 
     async function load() {
       setLoadError(null);
@@ -93,68 +125,32 @@ export default function ProfilePage() {
       setLeagueTrophies([]);
       setLastSeenAt(null);
       setBlueFalconCount(0);
-      // Fail-safe: never leave full-page Loading forever
+      // Soft transition: keep previous shell if switching people (no full blank)
       const failSafe = window.setTimeout(() => {
         if (!cancelled) setReady(true);
-      }, 5_000);
+      }, 3_500);
 
       try {
         let found: Player | null = null;
-        let leagueForSync: Player[] = [];
         let title: string | null = null;
         let seen: string | null = null;
 
-        // Parallel hot path — was sequential (players → roster → N trophy queries)
+        // 1) ROSTER ONLY first — name/avatar/title; never wait on standings
         try {
-          const { loadLeaguePlayers, loadLeagueRoster } = await import(
-            "@/lib/cloud"
-          );
-          const [players, roster] = await Promise.all([
-            loadLeaguePlayers().catch(() => [] as Player[]),
-            loadLeagueRoster().catch(() => []),
-          ]);
+          const { loadLeagueRoster } = await import("@/lib/cloud");
+          const roster = await loadLeagueRoster();
           if (cancelled) return;
-          leagueForSync = players;
-          found = leagueForSync.find((p) => p.id === id) ?? null;
-
           if (roster.length) {
             const titles = computeJoinTitles(roster);
             title = titles.get(id) || null;
             const row = roster.find((m) => m.userId === id);
-            if (row?.lastSeenAt) seen = row.lastSeenAt;
-            if (found && row) {
-              found = {
-                ...found,
-                avatarUrl: row.avatarUrl ?? found.avatarUrl,
-                name: row.name || found.name,
-                memberSince: row.joinedAt || found.memberSince,
-              };
-            } else if (!found && row) {
-              // Roster hit without standings row — still paint a shell
-              found = {
-                id: row.userId,
-                name: row.name || "Player",
-                division: (row.division as Player["division"]) || "North",
-                totalPoints: 0,
-                weeklyPoints: [],
-                atsCorrect: 0,
-                atsTotal: 0,
-                currentStreak: 0,
-                bestWeek: 0,
-                worstWeek: 0,
-                perfectWeeks: 0,
-                bestBetHits: 0,
-                bestBetTotal: 0,
-                propHits: 0,
-                propTotal: 0,
-                weeksPlayed: 0,
-                avatarUrl: row.avatarUrl || undefined,
-                memberSince: row.joinedAt || undefined,
-              };
+            if (row) {
+              if (row.lastSeenAt) seen = row.lastSeenAt;
+              found = rosterToPlayer(row);
             }
           }
         } catch {
-          /* no session / offline */
+          /* offline */
         }
 
         if (!found) {
@@ -180,21 +176,65 @@ export default function ProfilePage() {
           }
         }
 
-        // Paint hero ASAP — trophies / eggs / blue falcon fill in after
+        // First paint: player + self as only peer (badge eval stays light)
         if (!cancelled) {
           setPlayer(found);
-          setLeaguePeers(
-            leagueForSync.length ? leagueForSync : found ? [found] : []
-          );
+          setLeaguePeers(found ? [found] : []);
           setJoinTitle(title);
           setLastSeenAt(seen);
+          if (found) hadPaintRef.current = true;
           setReady(true);
           window.clearTimeout(failSafe);
         }
 
         if (!found || cancelled) return;
 
-        // Background enrich (never blocks first paint)
+        // 2) Background: standings peers, trophies, eggs, BF — never blocks open
+        void (async () => {
+          try {
+            const { loadLeaguePlayers } = await import("@/lib/cloud");
+            const players = await loadLeaguePlayers().catch(() => [] as Player[]);
+            if (cancelled || !players.length) return;
+            const richer = players.find((p) => p.id === id);
+            if (richer) {
+              try {
+                applyLegacyBadgeGrants(richer);
+              } catch {
+                /* ignore */
+              }
+              const merged = withPermanentBadges(
+                withCreatorFlag({
+                  ...richer,
+                  avatarUrl: found!.avatarUrl || richer.avatarUrl,
+                  memberSince: found!.memberSince || richer.memberSince,
+                  name: found!.name || richer.name,
+                })
+              );
+              if (!cancelled) {
+                setPlayer(merged);
+                setLeaguePeers(players);
+              }
+              try {
+                syncLeagueCheevoKing(
+                  players.map((p) => withPermanentBadges(p))
+                );
+                const { sanitizeLegacyLegendsOnBoot } = await import(
+                  "@/lib/legacy-badge-grants"
+                );
+                sanitizeLegacyLegendsOnBoot({
+                  roster: players.map((p) => ({ id: p.id, name: p.name })),
+                });
+              } catch {
+                /* ignore */
+              }
+            } else if (!cancelled) {
+              setLeaguePeers(players);
+            }
+          } catch {
+            /* optional */
+          }
+        })();
+
         void (async () => {
           try {
             const { loadCareerTrophiesWonByUser, loadLeagueTrophies } =
@@ -214,7 +254,9 @@ export default function ProfilePage() {
           } catch {
             /* optional */
           }
+        })();
 
+        void (async () => {
           try {
             const { loadCloudEggFinds } = await import("@/lib/egg-cloud");
             const { grantPermanentBadgeId, mergePermanentBadges } =
@@ -239,7 +281,9 @@ export default function ProfilePage() {
           } catch {
             /* eggs optional */
           }
+        })();
 
+        void (async () => {
           try {
             const { hydrateBlueFalconFromCloud, getBlueFalconCount } =
               await import("@/lib/blue-falcon");
@@ -248,26 +292,6 @@ export default function ProfilePage() {
             if (!cancelled) setBlueFalconCount(bf);
           } catch {
             /* optional */
-          }
-
-          // Defer cheevo-king / Visconti scrub — not needed for first paint
-          if (leagueForSync.length) {
-            try {
-              syncLeagueCheevoKing(
-                leagueForSync.map((p) => withPermanentBadges(p))
-              );
-              const { sanitizeLegacyLegendsOnBoot } = await import(
-                "@/lib/legacy-badge-grants"
-              );
-              sanitizeLegacyLegendsOnBoot({
-                roster: leagueForSync.map((p) => ({
-                  id: p.id,
-                  name: p.name,
-                })),
-              });
-            } catch {
-              /* ignore */
-            }
           }
         })();
       } catch (e) {
@@ -282,7 +306,8 @@ export default function ProfilePage() {
       }
     }
 
-    setReady(false);
+    // Full-page Loading only on first profile open this mount — not every tap
+    if (!hadPaintRef.current) setReady(false);
     void load();
     return () => {
       cancelled = true;
@@ -295,9 +320,10 @@ export default function ProfilePage() {
       // Scrub sim career before badge/career paint (accurate shelf numbers)
       nukeAccumulatedSandboxCareersOnce([player.id]);
       applyLegacyBadgeGrants({ id: player.id, name: player.name });
+      // Peers optional: full league only after background standings land
       return getPlayerBadges(
         player,
-        leaguePeers.length ? leaguePeers : undefined
+        leaguePeers.length > 1 ? leaguePeers : [player]
       );
     } catch {
       return [];
@@ -348,8 +374,12 @@ export default function ProfilePage() {
 
   if (!ready) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-muted">
-        Loading…
+      <div className="min-h-screen flex flex-col">
+        <Nav />
+        <main className="flex-1 flex flex-col items-center justify-center px-4 gap-2">
+          <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+          <p className="text-sm text-muted">Opening profile…</p>
+        </main>
       </div>
     );
   }
