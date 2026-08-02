@@ -319,13 +319,13 @@ export default function Nav() {
     return () => window.removeEventListener("keydown", onKey);
   }, [menuOpen, moreOpen]);
 
-  // Phone row (locked in): Home · Picks · Table · Locker · More
+  // Phone row (locked in): Home · Picks · Standings · Locker · More
   // Desktop primary: same core; Board/Gazette/Host expand after first lock.
   const primaryLinks: NavLink[] = earlyNav
     ? [
         { href: "/", label: "Home" },
         { href: "/picks", label: "Picks" },
-        { href: "/standings", label: "Table" },
+        { href: "/standings", label: "Standings" },
         { href: "/locker-room", label: "Locker", badge: lockerUnseen },
         ...(ops
           ? [
@@ -340,7 +340,7 @@ export default function Nav() {
     : [
         { href: "/", label: "Home" },
         { href: "/picks", label: "Picks" },
-        { href: "/standings", label: "Table" },
+        { href: "/standings", label: "Standings" },
         { href: "/locker-room", label: "Locker", badge: lockerUnseen },
         { href: "/board", label: "The Board" },
         ...(showGazetteNav
@@ -829,7 +829,7 @@ export default function Nav() {
         </>
       )}
 
-      {/* Phone thumb nav — always: Home · Picks · Table · Locker · More */}
+      {/* Phone thumb nav — always: Home · Picks · Standings · Locker · More */}
       <nav
         className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-card/95 backdrop-blur-md"
         style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
@@ -840,7 +840,7 @@ export default function Nav() {
             [
               { href: "/", label: "Home", icon: "⌂" },
               { href: "/picks", label: "Picks", icon: "✓" },
-              { href: "/standings", label: "Table", icon: "#" },
+              { href: "/standings", label: "Standings", icon: "#" },
               { href: "/locker-room", label: "Locker", icon: "💬" },
             ] as const
           ).map((tab) => {
