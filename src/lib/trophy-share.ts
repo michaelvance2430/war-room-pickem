@@ -775,31 +775,52 @@ function drawChampionshipTrophyArt(
   ctx.translate(cx, cy);
 
   if (sport === "nfl") {
-    // Silver football + stand
-    const g = ctx.createLinearGradient(-40 * scale, -50 * scale, 40 * scale, 20 * scale);
-    g.addColorStop(0, "#f8fafc");
-    g.addColorStop(0.5, "#C5CCD3");
+    // Silver football on three-leg tripod (Super Bowl hardware silhouette)
+    const g = ctx.createLinearGradient(-40 * scale, -70 * scale, 40 * scale, 10 * scale);
+    g.addColorStop(0, "#ffffff");
+    g.addColorStop(0.4, "#C5CCD3");
     g.addColorStop(1, "#64748b");
+    // Legs
+    ctx.strokeStyle = "#1e293b";
+    ctx.lineWidth = 3.5 * scale;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(0, 8 * scale);
+    ctx.lineTo(-28 * scale, 78 * scale);
+    ctx.moveTo(0, 8 * scale);
+    ctx.lineTo(28 * scale, 78 * scale);
+    ctx.moveTo(0, 8 * scale);
+    ctx.lineTo(0, 80 * scale);
+    ctx.stroke();
+    // Base triangle
+    ctx.fillStyle = "#1e293b";
+    ctx.beginPath();
+    ctx.moveTo(-30 * scale, 78 * scale);
+    ctx.lineTo(0, 86 * scale);
+    ctx.lineTo(30 * scale, 78 * scale);
+    ctx.lineTo(20 * scale, 90 * scale);
+    ctx.lineTo(-20 * scale, 90 * scale);
+    ctx.closePath();
+    ctx.fill();
+    // Collar
+    ctx.fillStyle = "#94a3b8";
+    ctx.beginPath();
+    ctx.ellipse(0, 6 * scale, 12 * scale, 5 * scale, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Football
     ctx.save();
-    ctx.rotate(-0.28);
+    ctx.rotate(-0.35);
     ctx.fillStyle = g;
     ctx.beginPath();
-    ctx.ellipse(0, -20 * scale, 48 * scale, 30 * scale, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, -28 * scale, 42 * scale, 26 * scale, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = "rgba(15,23,42,0.45)";
     ctx.lineWidth = 2 * scale;
     ctx.beginPath();
-    ctx.moveTo(-22 * scale, -28 * scale);
-    ctx.quadraticCurveTo(0, -38 * scale, 22 * scale, -12 * scale);
+    ctx.moveTo(-20 * scale, -34 * scale);
+    ctx.quadraticCurveTo(0, -42 * scale, 20 * scale, -20 * scale);
     ctx.stroke();
     ctx.restore();
-    // stem
-    ctx.fillStyle = "#1e293b";
-    ctx.fillRect(-10 * scale, 8 * scale, 20 * scale, 48 * scale);
-    ctx.fillStyle = "#C5CCD3";
-    ctx.fillRect(-36 * scale, 56 * scale, 72 * scale, 14 * scale);
-    ctx.fillStyle = "#C1121F";
-    ctx.fillRect(-40 * scale, 70 * scale, 80 * scale, 6 * scale);
   } else {
     // CFB crystal tower + gold base
     const crystal = ctx.createLinearGradient(-20 * scale, -80 * scale, 20 * scale, 40 * scale);
