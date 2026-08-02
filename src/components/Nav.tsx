@@ -28,6 +28,7 @@ import SeasonFinaleModal from "@/components/SeasonFinaleModal";
 import CardPublishedModal from "@/components/CardPublishedModal";
 import BoredPracticeDoneModal from "@/components/BoredPracticeDoneModal";
 import WeeklyColdOpenModal from "@/components/WeeklyColdOpenModal";
+import BirthdayGazetteModal from "@/components/BirthdayGazetteModal";
 import JoinBadgeHydrator from "@/components/JoinBadgeHydrator";
 import EquippedTitleHydrator from "@/components/EquippedTitleHydrator";
 import ProfileBorderHydrator from "@/components/ProfileBorderHydrator";
@@ -943,6 +944,8 @@ export default function Nav() {
       {!isGuestMode() && <EquippedTitleHydrator />}
       {!isGuestMode() && <ProfileBorderHydrator />}
       {!isGuestMode() && <WeeklyColdOpenModal />}
+      {/* 1st of month · locked birthdays in this room → roast paper for everyone */}
+      {!isGuestMode() && <BirthdayGazetteModal />}
       {!isGuestMode() && <LoginWelcomeModal />}
       {!isGuestMode() && <RulesOnboardingModal />}
       <GazetteModal />
