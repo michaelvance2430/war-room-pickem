@@ -102,6 +102,20 @@ export const LEGACY_PROFILE_HARDWARE: Omit<ProfileTrophy, "source">[] = [
     notes: "Defending Super Bowl champ. Announced at the start of Week 1.",
     winnerName: "Maria",
   },
+  /**
+   * Vonnagio Family Vacay — same win, gold family hardware (not Lombardi art).
+   * Shown only when active league is Vonnagio (see getProfileHardware).
+   */
+  {
+    id: "legacy-maria-vonnagio-2025",
+    kind: "championship",
+    seasonYear: 2025,
+    title: "Championship",
+    subtitle: "Vonnagio Champion · 2025",
+    notes:
+      "Family Vacay gold hardware · 2025. Same trophy from last year's fantasy pool. Maria holds it until someone takes it.",
+    winnerName: "Maria",
+  },
 ];
 
 /** Also match these name aliases → legacy id */
@@ -121,6 +135,10 @@ const LEGACY_NAME_ALIASES: { pattern: RegExp; legacyId: string }[] = [
   {
     pattern: /\bmaria\b/i,
     legacyId: "legacy-maria-super-bowl-2025",
+  },
+  {
+    pattern: /\bmaria\b/i,
+    legacyId: "legacy-maria-vonnagio-2025",
   },
 ];
 
@@ -146,6 +164,9 @@ function leagueToProfile(t: LeagueTrophy): ProfileTrophy {
 /**
  * Hardware for one player's profile: league Trophy Room rows they won
  * + legacy seeds matched by name.
+ *
+ * Vonnagio Family Vacay: Maria’s 2025 championship uses gold-family copy
+ * (art is resolved separately via league-trophy-override).
  */
 export function getProfileHardware(opts: {
   playerId: string;
@@ -156,12 +177,43 @@ export function getProfileHardware(opts: {
   const out: ProfileTrophy[] = [];
   const seen = new Set<string>();
 
+  let vonnagio = false;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { isVonnaggioLeague } =
+      require("./league-trophy-override") as typeof import("./league-trophy-override");
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getLeague } = require("./league") as typeof import("./league");
+    const lg = getLeague();
+    vonnagio = isVonnaggioLeague(lg?.name, lg?.id, lg?.code);
+  } catch {
+    vonnagio = false;
+  }
+
   // From engraved Trophy Room (this league)
   for (const t of leagueTrophies) {
     const byId = t.winnerUserId && t.winnerUserId === playerId;
     const byName = namesMatch(t.winnerName, playerName);
     if (!byId && !byName) continue;
-    const row = leagueToProfile(t);
+    let row = leagueToProfile(t);
+    // Vonnagio: rebrand Maria’s championship plaque (gold form, not Lombardi label)
+    if (
+      vonnagio &&
+      row.kind === "championship" &&
+      (namesMatch(row.winnerName, "Maria") || /\bmaria\b/i.test(playerName))
+    ) {
+      row = {
+        ...row,
+        title: "Championship",
+        subtitle: row.subtitle?.includes("Vonnagio")
+          ? row.subtitle
+          : `Vonnagio Champion · ${row.seasonYear}`,
+        notes:
+          row.notes?.includes("Family Vacay") || row.notes?.includes("gold")
+            ? row.notes
+            : "Family Vacay gold hardware — last year's fantasy pool trophy. Not the silver football.",
+      };
+    }
     // Dedupe kind+year (+ subtitle for multi division titles)
     const key = `${row.kind}:${row.seasonYear}:${row.subtitle || row.title}`;
     if (seen.has(key)) continue;
@@ -171,6 +223,10 @@ export function getProfileHardware(opts: {
 
   // Legacy seeds by name / alias
   for (const legacy of LEGACY_PROFILE_HARDWARE) {
+    // Only one Maria championship legacy — pick Vonnagio vs generic Super Bowl
+    if (legacy.id === "legacy-maria-super-bowl-2025" && vonnagio) continue;
+    if (legacy.id === "legacy-maria-vonnagio-2025" && !vonnagio) continue;
+
     const key = `${legacy.kind}:${legacy.seasonYear}`;
     if (seen.has(key)) continue;
     const direct = namesMatch(legacy.winnerName, playerName);

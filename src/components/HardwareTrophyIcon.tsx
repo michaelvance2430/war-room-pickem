@@ -23,6 +23,10 @@ type Props = {
   /** Dim empty shelf */
   empty?: boolean;
   threePeat?: boolean;
+  /** Pass-through so Vonnagio gold form resolves on profiles */
+  leagueName?: string | null;
+  leagueId?: string | null;
+  leagueCode?: string | null;
 };
 
 export default function HardwareTrophyIcon({
@@ -33,6 +37,9 @@ export default function HardwareTrophyIcon({
   animate = false,
   empty = false,
   threePeat = false,
+  leagueName,
+  leagueId,
+  leagueCode,
 }: Props) {
   const wrap = empty ? "opacity-40 grayscale" : "";
 
@@ -44,6 +51,9 @@ export default function HardwareTrophyIcon({
           size={size}
           animate={animate && !empty}
           threePeat={threePeat}
+          leagueName={leagueName}
+          leagueId={leagueId}
+          leagueCode={leagueCode}
         />
       </div>
     );

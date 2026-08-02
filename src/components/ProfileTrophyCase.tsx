@@ -27,6 +27,8 @@ function Plaque({
   sportId,
   winnerAvatarUrl,
   liveWinnerName,
+  leagueId,
+  leagueCode,
 }: {
   item: ProfileTrophy;
   leagueName?: string;
@@ -38,9 +40,12 @@ function Plaque({
   winnerAvatarUrl?: string | null;
   /** Current display name (updates when they rename) */
   liveWinnerName?: string | null;
+  leagueId?: string | null;
+  leagueCode?: string | null;
 }) {
   const meta = HARDWARE_KIND_META[item.kind];
   // Live profile name/photo — not the frozen engraving (Jstray vs Justin Strayer)
+  // Vonnagio championship shares must carry league name so gold art loads
   const sharePayload = {
     kind: item.kind,
     seasonYear: item.seasonYear,
@@ -73,6 +78,9 @@ function Plaque({
             sportId={sportId}
             size={item.kind === "championship" ? 52 : 48}
             animate={false}
+            leagueName={leagueName}
+            leagueId={leagueId}
+            leagueCode={leagueCode}
           />
         </button>
         {canShare && <TrophyShareButton compact trophy={sharePayload} />}
@@ -116,11 +124,17 @@ function EmptySlot({
   spinny,
   onTrophyTap,
   sportId,
+  leagueName,
+  leagueId,
+  leagueCode,
 }: {
   kind: ProfileTrophyKind;
   spinny?: boolean;
   onTrophyTap?: () => void;
   sportId?: string | null;
+  leagueName?: string | null;
+  leagueId?: string | null;
+  leagueCode?: string | null;
 }) {
   const meta = HARDWARE_KIND_META[kind];
   return (
@@ -142,6 +156,9 @@ function EmptySlot({
           size={40}
           empty
           animate={false}
+          leagueName={leagueName}
+          leagueId={leagueId}
+          leagueCode={leagueCode}
         />
       </button>
       <div className="text-[10px] uppercase tracking-wide text-muted">
@@ -221,33 +238,37 @@ export default function ProfileTrophyCase({
   // Anyone can flex hardware (yours or a buddy's roast share)
   const canShare = true;
   void isSelf;
-  const sportId = getLeague()?.sportId || null;
+  const liveLeague = getLeague();
+  const leagueId = liveLeague?.id ?? null;
+  const leagueCode = liveLeague?.code ?? null;
+  // Vonnagio is NFL — force nfl so championship never renders CFB crystal/Lombardi default path
+  let vonnaggioRoom = false;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { isVonnaggioLeague } =
+      require("@/lib/league-trophy-override") as typeof import("@/lib/league-trophy-override");
+    vonnaggioRoom = isVonnaggioLeague(
+      leagueName || liveLeague?.name,
+      leagueId,
+      leagueCode
+    );
+  } catch {
+    vonnaggioRoom = false;
+  }
+  const sportId =
+    vonnaggioRoom ? "nfl" : liveLeague?.sportId || null;
 
   function handleTrophyTap(itemId: string) {
     setSpinId(itemId);
     window.setTimeout(() => setSpinId(null), 900);
     const pid = getSession()?.playerId;
     if (!pid) return;
-    // Vonnaggio: any room member can discover on the gold form.
+    // Vonnagio: any room member can discover on the gold form.
     // Global curiosity egg: still yours-only on your own case.
-    let vonnaggio = false;
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { isVonnaggioLeague } =
-        require("@/lib/league-trophy-override") as typeof import("@/lib/league-trophy-override");
-      const lg = getLeague();
-      vonnaggio = isVonnaggioLeague(
-        leagueName || lg?.name,
-        lg?.id,
-        lg?.code
-      );
-    } catch {
-      vonnaggio = false;
-    }
-    if (!vonnaggio && !isSelf) return;
+    if (!vonnaggioRoom && !isSelf) return;
     const moment = recordTrophyTap(pid, {
-      leagueName: leagueName || getLeague()?.name,
-      leagueId: getLeague()?.id,
+      leagueName: leagueName || liveLeague?.name,
+      leagueId,
     });
     if (moment) {
       try {
@@ -298,6 +319,9 @@ export default function ProfileTrophyCase({
                   key={kind}
                   kind={kind}
                   sportId={sportId}
+                  leagueName={leagueName}
+                  leagueId={leagueId}
+                  leagueCode={leagueCode}
                   spinny={spinId === `empty-${kind}`}
                   onTrophyTap={() => handleTrophyTap(`empty-${kind}`)}
                 />
@@ -310,6 +334,8 @@ export default function ProfileTrophyCase({
                     key={item.id}
                     item={item}
                     leagueName={leagueName}
+                    leagueId={leagueId}
+                    leagueCode={leagueCode}
                     canShare={canShare}
                     sportId={sportId}
                     winnerAvatarUrl={winnerAvatarUrl}
