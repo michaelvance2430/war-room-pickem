@@ -577,8 +577,14 @@ export async function loadWeekCard(weekNumber = 1): Promise<CloudCard | null> {
   if (hit !== undefined) return hit;
 
   const supabase = createClient();
-  // Timeout so My Picks never stuck on full-page Loading… (mobile hang)
-  const card = await withTimeout(
+  // Short ceiling — long timeouts made My Picks spin then "pull to reopen"
+  type CardRow = Record<string, unknown> | null;
+  type FetchResult =
+    | { kind: "ok"; row: CardRow }
+    | { kind: "timeout" }
+    | { kind: "error" };
+
+  const cardRes = await withTimeout<FetchResult>(
     (async () => {
       const { data, error } = await supabase
         .from("week_cards")
@@ -586,35 +592,52 @@ export async function loadWeekCard(weekNumber = 1): Promise<CloudCard | null> {
         .eq("league_id", session.leagueId)
         .eq("week_number", weekNumber)
         .maybeSingle();
-      if (error || !data) return null;
-      return data;
+      if (error) return { kind: "error" as const };
+      return { kind: "ok" as const, row: (data as CardRow) || null };
     })(),
-    10_000,
-    null
+    3_500,
+    { kind: "timeout" }
   );
 
-  if (!card) {
+  // Timeout / error: do NOT cache null (that poisoned retries for the whole TTL)
+  if (cardRes.kind === "timeout" || cardRes.kind === "error") {
+    return null;
+  }
+  if (!cardRes.row) {
+    // Real empty: no published card for this week
     cacheSet(cardCache, cacheKey, null);
     return null;
   }
+  const card = cardRes.row;
 
-  const games = await withTimeout(
+  type GamesResult =
+    | { kind: "ok"; rows: Record<string, unknown>[] | null }
+    | { kind: "timeout" };
+
+  const gamesRes = await withTimeout<GamesResult>(
     (async () => {
       const { data } = await supabase
         .from("card_games")
         .select("*")
         .eq("week_card_id", card.id)
         .order("sort_order", { ascending: true });
-      return data;
+      return {
+        kind: "ok" as const,
+        rows: (data as Record<string, unknown>[] | null) || null,
+      };
     })(),
-    8_000,
-    null
+    3_500,
+    { kind: "timeout" }
   );
 
-  if (!games?.length) {
+  if (gamesRes.kind === "timeout") {
+    return null; // no null cache — retry can succeed
+  }
+  if (!gamesRes.rows?.length) {
     cacheSet(cardCache, cacheKey, null);
     return null;
   }
+  const games = gamesRes.rows;
 
   const question = ((card.prop_question as string) || "").trim() || "Prop";
   const optionA =
@@ -627,7 +650,9 @@ export async function loadWeekCard(weekNumber = 1): Promise<CloudCard | null> {
     weekCardId: card.id as string,
     weekNumber: card.week_number as number,
     publishedAt: (card.published_at as string) || null,
-    games: games.map(mapCardGame),
+    games: games.map((row) =>
+      mapCardGame(row as Parameters<typeof mapCardGame>[0])
+    ),
     prop: {
       // Week-scoped id; matchPresetId resolves presets by question text
       id: `prop-w${weekNumber}`,

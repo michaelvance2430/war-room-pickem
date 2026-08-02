@@ -336,13 +336,8 @@ export default function PicksClient() {
         setCardBusy(true);
       }
 
-      // Hard ceiling — never leave cardBusy spinning (mobile hang / stuck await)
-      const overall = new Promise<"timeout">((r) =>
-        window.setTimeout(() => r("timeout"), 5_000)
-      );
-
-      const work = (async () => {
-        // Local week first (instant), cloud advance in parallel — no ops write await
+      /** One attempt: local week → card (+ published fallback). */
+      async function attemptLoad(): Promise<CloudCard | null> {
         const localWeek = (() => {
           try {
             const s = localStorage.getItem("warroom-active-week");
@@ -353,7 +348,6 @@ export default function PicksClient() {
           }
         })();
 
-        // Fire resolve without blocking first card paint
         const resolveP = resolvePlayerActiveWeek({
           persistIfOps: false,
         }).catch(() => ({
@@ -370,7 +364,6 @@ export default function PicksClient() {
           viewWeekRef.current = localWeek;
         }
 
-        // First card fetch in parallel with resolve
         let cloud = await loadWeekCard(target);
 
         const resolved = await resolveP;
@@ -408,6 +401,19 @@ export default function PicksClient() {
 
         setViewWeek(target);
         viewWeekRef.current = target;
+        return cloud?.games?.length ? cloud : null;
+      }
+
+      try {
+        // Auto-retry: never leave the user to "pull to reopen"
+        let cloud: CloudCard | null = null;
+        for (let i = 0; i < 3; i++) {
+          cloud = await attemptLoad();
+          if (cloud?.games?.length) break;
+          if (i < 2) {
+            await new Promise((r) => window.setTimeout(r, 350 + i * 250));
+          }
+        }
 
         if (!cloud || !cloud.games.length) {
           setHasCard(false);
@@ -416,6 +422,7 @@ export default function PicksClient() {
           setWeekPropResult(null);
           setWeekScoredAt(null);
           setCardBusy(false);
+          // Empty is fine (no card yet) — only surface error if we know a week is live
           return null;
         }
 
@@ -426,7 +433,7 @@ export default function PicksClient() {
         setLoadError(null);
         setCardBusy(false);
 
-        // Results + picks in background — never block card paint
+        const target = cloud.weekNumber;
         void loadWeekResultsFromCloud(target)
           .then((res) => {
             if (viewWeekRef.current !== target) return;
@@ -448,33 +455,10 @@ export default function PicksClient() {
         }).catch(() => {});
 
         return cloud;
-      })();
-
-      try {
-        const raced = await Promise.race([work, overall]);
-        if (raced === "timeout") {
-          setCardBusy(false);
-          setLoadError((e) =>
-            e ||
-            "Card is slow to load. Pull down to fully reopen, or try again."
-          );
-          // Let work finish in background if it eventually returns
-          void work.then((cloud) => {
-            if (cloud?.games?.length) {
-              setLoadError(null);
-              setHasCard(true);
-              setGames(cloud.games);
-              setProp(cloud.prop);
-              setCardBusy(false);
-            }
-          });
-          return null;
-        }
-        return raced;
       } catch (e: unknown) {
         if (opts.isInitial) {
           setLoadError(
-            e instanceof Error ? e.message : "Failed to load weekly card"
+            e instanceof Error ? e.message : "Couldn’t load this week’s games."
           );
         }
         setCardBusy(false);
@@ -527,15 +511,16 @@ export default function PicksClient() {
     let channel: ReturnType<ReturnType<typeof createClient>["channel"]> | null =
       null;
 
-    // Fail-safe: card skeleton never spins forever
+    // Fail-safe: never spin forever — then auto-retry once (no user homework)
     const failSafe = window.setTimeout(() => {
       if (cancelled) return;
       setCardBusy(false);
-      setLoadError((e) =>
-        e ||
-        "Taking too long to load the card. Pull down to fully reopen, or try again."
-      );
-    }, 6_000);
+      // Quiet auto-retry instead of "pull to reopen"
+      void loadWeek(viewWeekRef.current, {
+        isInitial: true,
+        forceReloadPicks: true,
+      });
+    }, 4_500);
 
     void (async () => {
       // Bored practice: ONLY via explicit URL (?practice=1 or week=99).
@@ -664,10 +649,18 @@ export default function PicksClient() {
         }
         await loadWeek(viewWeekRef.current, { isInitial: true });
       } catch {
-        setLoadError(
-          "Could not load this week’s card. Pull down to fully reopen."
-        );
+        setLoadError(null);
         setCardBusy(false);
+        // One more silent retry — app recovers itself
+        if (!cancelled) {
+          window.setTimeout(() => {
+            if (cancelled) return;
+            void loadWeek(viewWeekRef.current, {
+              isInitial: true,
+              forceReloadPicks: true,
+            });
+          }, 600);
+        }
       } finally {
         window.clearTimeout(failSafe);
       }
@@ -1773,8 +1766,7 @@ export default function PicksClient() {
               Loading {weekTitle(viewWeek)}…
             </p>
       <p className="text-xs text-muted max-w-xs mx-auto leading-relaxed">
-              Pulling games. If this sits more than a few seconds, pull down to
-              fully reopen the app.
+              Pulling the card for you — hang tight.
             </p>
       </div>
         )}
@@ -1782,15 +1774,15 @@ export default function PicksClient() {
         {!loadError && !hasCard && !cardBusy && (
           <div className="rounded-xl border border-border bg-card p-8 text-center">
       <p className="text-[10px] uppercase tracking-wider text-muted font-bold mb-2">
-              Not broken — no card yet
+              No card yet
             </p>
       <p className="font-medium mb-2">
-              No card for {weekTitle(viewWeek)} yet
+              No games for {weekTitle(viewWeek)} yet
             </p>
       <p className="text-sm text-muted mb-4 max-w-md mx-auto leading-relaxed">
               {viewWeek === activeWeek
-                ? "The commissioner has to publish this week’s games before anyone can lock picks. Hang in the Locker or check Standings until the card goes live."
-                : "This week was never published (or was cleared)."}
+                ? "Your commish hasn’t published this week’s card. Nothing for you to fix — when it’s live, open My Picks again."
+                : "This week wasn’t published (or was cleared)."}
             </p>
       <div className="flex flex-wrap justify-center gap-3">
               <button
@@ -1798,14 +1790,14 @@ export default function PicksClient() {
                 onClick={() => {
                   setCardBusy(true);
                   setLoadError(null);
-                  void loadWeek(activeWeek, {
-                    isInitial: true,
+                  void loadWeek(viewWeek, {
                     forceReloadPicks: true,
+                    explicit: true,
                   });
                 }}
-                className="text-sm text-primary hover:underline font-medium"
+                className="px-4 py-2.5 min-h-[44px] rounded-xl bg-primary text-black text-sm font-bold"
               >
-                Try again
+                Check again
               </button>
               {viewWeek !== activeWeek && (
                 <button
