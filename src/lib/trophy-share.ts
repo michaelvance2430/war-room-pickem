@@ -530,26 +530,31 @@ export async function renderTrophyShareCanvas(
       : "/brand/war-room-crest.png";
   const crest = await loadShareImage(crestSrc);
 
-  // Vonnaggio Family Vacation (and other league overrides) — custom hardware art
+  // Vonnagio Family Vacay (HAT42A) — custom gold hardware; never Lombardi for that room
   let champTrophyImg: HTMLImageElement | null = null;
   if (t.kind === "championship" && (t.sportId === "nfl" || !t.sportId)) {
     try {
       const { resolveLeagueChampionshipOverride } = await import(
         "./league-trophy-override"
       );
+      const { getLeague } = await import("./league");
+      const live = getLeague();
       const ov = resolveLeagueChampionshipOverride({
         sportId: t.sportId || "nfl",
-        leagueName: t.leagueName,
+        leagueName: t.leagueName || live?.name,
+        leagueId: live?.id,
+        leagueCode: live?.code,
       });
       if (ov?.championshipImg) {
-        const src =
-          typeof window !== "undefined"
-            ? `${window.location.origin}${ov.championshipImg}`
+        const path = ov.championshipImg.startsWith("http")
+          ? ov.championshipImg
+          : typeof window !== "undefined"
+            ? `${window.location.origin}${ov.championshipImg.split("?")[0]}?v=gold5`
             : ov.championshipImg;
-        champTrophyImg = await loadShareImage(src);
+        champTrophyImg = await loadShareImage(path);
       }
     } catch {
-      /* fallback silhouette */
+      /* fallback silhouette only for non-Vonnagio */
     }
   }
 

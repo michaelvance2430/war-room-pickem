@@ -10,6 +10,7 @@
  * Vonnaggio Family Vacation only → custom gold family hardware.
  */
 
+import { getLeague } from "@/lib/league";
 import {
   NFL_LOMBARDI_IMG,
   resolveLeagueChampionshipOverride,
@@ -35,6 +36,7 @@ type Props = {
   /** Override active league (share cards / off-session). */
   leagueName?: string | null;
   leagueId?: string | null;
+  leagueCode?: string | null;
 };
 
 export function resolveTrophySport(sportId?: string | null): TrophySport {
@@ -87,25 +89,39 @@ export default function SportChampionshipTrophy({
   preferPhoto = true,
   leagueName,
   leagueId,
+  leagueCode,
 }: Props) {
-  const sid = resolveTrophySport(sport);
-  const id = `champ-t-${sid}-${size}-${threePeat ? "3" : "1"}`;
+  const live = typeof window !== "undefined" ? getLeague() : null;
+  // Prefer explicit props, else active room (name + code so HAT42A always hits)
+  const resolvedName = leagueName ?? live?.name ?? null;
+  const resolvedId = leagueId ?? live?.id ?? null;
+  const resolvedCode = leagueCode ?? live?.code ?? null;
+  // Sport: explicit prop wins; else live league — do NOT invent "cfb" for override checks
+  const sportHint = sport ?? live?.sportId ?? null;
+  const sid = resolveTrophySport(sportHint);
+
   const override = resolveLeagueChampionshipOverride({
-    sportId: sport ?? sid,
-    leagueName,
-    leagueId,
+    sportId: sportHint,
+    leagueName: resolvedName,
+    leagueId: resolvedId,
+    leagueCode: resolvedCode,
   });
-  // Vonnaggio ALWAYS uses the gold photo — never fall back to Lombardi SVG
+
+  // Vonnagio ALWAYS uses the gold photo — never Lombardi SVG/photo
   const forceGoldPhoto = !!override;
   const useNflPhoto =
     forceGoldPhoto || (sid === "nfl" && preferPhoto && size >= 40);
   const nflSrc = override?.championshipImg ?? NFL_LOMBARDI_IMG;
   const goldRoom = override?.glow === "gold";
+  const id = `champ-t-${sid}-${size}-${threePeat ? "3" : "1"}-${
+    forceGoldPhoto ? "gold" : "std"
+  }`;
 
   return (
     <div
       className={`relative inline-flex items-center justify-center ${className}`}
       style={{ width: size, height: size * 1.15 }}
+      data-trophy={forceGoldPhoto ? "vonnagio-gold" : sid}
     >
       {/* Floor glow */}
       <div
@@ -125,16 +141,19 @@ export default function SportChampionshipTrophy({
         className={animate ? "champ-trophy-float" : undefined}
         style={{ width: size, height: size }}
       >
-        {useNflPhoto || forceGoldPhoto ? (
+        {forceGoldPhoto ? (
+          <NflTrophyPhoto
+            size={size}
+            threePeat={threePeat}
+            src={override!.championshipImg}
+            label="Vonnagio championship trophy"
+          />
+        ) : useNflPhoto && sid === "nfl" ? (
           <NflTrophyPhoto
             size={size}
             threePeat={threePeat}
             src={nflSrc}
-            label={
-              override
-                ? "Vonnaggio championship trophy"
-                : "Super Bowl championship trophy"
-            }
+            label="Super Bowl championship trophy"
           />
         ) : sid === "nfl" ? (
           <NflLombardiSvg id={id} size={size} threePeat={threePeat} />
