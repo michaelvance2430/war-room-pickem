@@ -58,27 +58,53 @@ export default function HomeWeekHero() {
     let cancelled = false;
     async function load() {
       try {
-        const {
-          week,
-          advanced,
-          scored,
-        } = await resolvePlayerActiveWeek({ persistIfOps: true });
-        const card = await loadWeekCard(week);
+        // Active week + scored list first (needed for card)
+        const { week, advanced, scored } = await resolvePlayerActiveWeek({
+          persistIfOps: true,
+        });
+        if (cancelled) return;
+
+        // Parallel: card, roster, picks (was sequential → slow return-to-home)
+        const [card, roster] = await Promise.all([
+          loadWeekCard(week),
+          loadLeagueRoster().catch(() => []),
+        ]);
+        if (cancelled) return;
+
         const games = card?.games || [];
         const hasCard = games.length > 0;
         const now = Date.now();
         const frozen = hasCard && isCardLockDeadlinePassed(games, now);
-        const mine = hasCard ? await loadMyPicks(week) : null;
+        const humans = roster.filter((m) => !m.isBot);
+
+        const mine = hasCard
+          ? await loadMyPicks(week).catch(() => null)
+          : null;
+        if (cancelled) return;
         const iLocked = !!(
           mine?.lockedAt && Object.keys(mine.picks || {}).length
         );
-        const roster = await loadLeagueRoster();
-        const humans = roster.filter((m) => !m.isBot);
+
+        // Paint hero immediately — last-week recap can fill in after
+        setState({
+          week,
+          hasCard,
+          gameCount: games.length,
+          lockLabel: hasCard ? formatCardLockDeadline(games) : null,
+          frozen,
+          iLocked,
+          rosterCount: humans.length,
+          scoredWeeks: scored.length,
+          weekScored: scored.includes(week),
+          isCommish: isCommissioner(),
+          isOps: isOps(),
+          leagueCode: getLeague()?.code || null,
+          advancedFromScored: advanced,
+          lastWeekRecap: null,
+        });
 
         // Last scored week recap — only a week *before* the card you're on.
-        // Never max(scored) alone: leftover sandbox/old-season week 5 would
-        // show under "Lock in Week 1" (seen live on Home).
-        let lastWeekRecap: HeroState["lastWeekRecap"] = null;
+        // Deferred so loadLeaguePlayers doesn't block the hero.
         try {
           const selfId = getSession()?.playerId;
           const priorScored = scored
@@ -87,8 +113,8 @@ export default function HomeWeekHero() {
           const lastScoredWeek = priorScored[0];
           if (selfId != null && lastScoredWeek != null) {
             const players = await loadLeaguePlayers();
+            if (cancelled) return;
             const field = players.filter((p) => !p.isMock);
-            // Rank this card by last weekly points (not season standings)
             const withPts = field
               .map((p) => {
                 const pts =
@@ -107,35 +133,24 @@ export default function HomeWeekHero() {
               .sort((a, b) => b.pts - a.pts || a.id.localeCompare(b.id));
             const meIdx = withPts.findIndex((x) => x.id === selfId);
             if (meIdx >= 0) {
-              lastWeekRecap = {
-                week: lastScoredWeek,
-                pts: withPts[meIdx]!.pts,
-                rank: meIdx + 1,
-                field: withPts.length,
-              };
+              setState((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      lastWeekRecap: {
+                        week: lastScoredWeek,
+                        pts: withPts[meIdx]!.pts,
+                        rank: meIdx + 1,
+                        field: withPts.length,
+                      },
+                    }
+                  : prev
+              );
             }
           }
         } catch {
-          lastWeekRecap = null;
+          /* recap optional */
         }
-
-        if (cancelled) return;
-        setState({
-          week,
-          hasCard,
-          gameCount: games.length,
-          lockLabel: hasCard ? formatCardLockDeadline(games) : null,
-          frozen,
-          iLocked,
-          rosterCount: humans.length,
-          scoredWeeks: scored.length,
-          weekScored: scored.includes(week),
-          isCommish: isCommissioner(),
-          isOps: isOps(),
-          leagueCode: getLeague()?.code || null,
-          advancedFromScored: advanced,
-          lastWeekRecap,
-        });
       } catch {
         if (!cancelled) setState(null);
       }

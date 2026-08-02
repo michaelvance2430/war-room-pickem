@@ -98,6 +98,52 @@ export default function Home() {
           return;
         }
 
+        // —— Fast path: paint from localStorage first (return-to-home felt stuck on Loading…) ——
+        // Cloud refresh continues below without blocking the shell.
+        let session = getSession();
+        let league = getLeague();
+        if (session && league) {
+          let sport = league.sportId || "cfb";
+          try {
+            const { forcedSportForLeague, applySportTheme } = await import(
+              "@/lib/sports/sport-theme"
+            );
+            const forced = forcedSportForLeague(league.id);
+            if (forced) sport = forced;
+            applySportTheme(sport);
+          } catch {
+            /* ignore */
+          }
+          setLeagueCode(league.code);
+          setLeagueName(league.name);
+          setSportId(sport);
+          setHomeTagline(
+            resolveHomeTagline({
+              homeTaglineId: league.settings?.homeTaglineId,
+              homeTaglineCustom: league.settings?.homeTaglineCustom,
+              sportId: sport,
+            })
+          );
+          setIsCommish(isCommissioner());
+          setActuallyCommish(isActuallyCommissioner());
+          // Progressive flags from local only — don't wait on scored-weeks cloud
+          try {
+            const pd = await import("@/lib/progressive-disclosure");
+            const { isFirstWeekChrome } = await import("@/lib/first-week");
+            const id = session.playerId;
+            const full = pd.wantsFullRoom(id);
+            const early = !full && isFirstWeekChrome(id);
+            setFirstWeekChrome(early);
+            setShowGazetteShelf(
+              full || pd.hasSeenGazetteShelfReveal(id) || !early
+            );
+          } catch {
+            setFirstWeekChrome(false);
+            setShowGazetteShelf(true);
+          }
+          setReady(true);
+        }
+
         const supabase = createClient();
         // getSession does not throw when logged out (getUser can show "Auth session missing!")
         const { data: sessionData } = await supabase.auth.getSession();
@@ -105,10 +151,9 @@ export default function Home() {
           router.replace("/login");
           return;
         }
-        const data = { user: sessionData.session.user };
 
-        let session = getSession();
-        let league = getLeague();
+        session = getSession();
+        league = getLeague();
 
         if (!session || !league) {
           const restored = await restoreSessionFromCloud();
@@ -128,7 +173,7 @@ export default function Home() {
           league = restored.league;
         }
 
-        // Refresh settings (tagline) from cloud when possible
+        // Refresh settings (tagline) from cloud — non-blocking for shell when already ready
         const fresh = (await syncLeagueFromCloud()) || league;
         // Create pin: cloud default cfb must not repaint NFL as green
         let sport = fresh.sportId || league?.sportId || "cfb";
