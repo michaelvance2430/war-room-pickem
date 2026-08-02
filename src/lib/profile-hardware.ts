@@ -200,7 +200,28 @@ export function getProfileHardware(opts: {
     vonnagio = false;
   }
 
-  // From engraved Trophy Room (this league)
+  /**
+   * One plaque per kind · year (big hardware). Subtitle differences
+   * (Excel seed vs cloud engrave) must not stack two 2025 championships.
+   * Division titles can stack by compass slot in the same year.
+   */
+  function hardwareDedupeKey(row: {
+    kind: ProfileTrophyKind;
+    seasonYear: number;
+    subtitle?: string | null;
+    division?: string | null;
+  }): string {
+    if (row.kind === "division") {
+      return `division:${row.seasonYear}:${row.division || row.subtitle || ""}`;
+    }
+    const y =
+      typeof row.seasonYear === "number"
+        ? row.seasonYear
+        : Number.parseInt(String(row.seasonYear ?? ""), 10) || 0;
+    return `${row.kind}:${y}`;
+  }
+
+  // From engraved Trophy Room (this league) — wins over legacy for same slot
   for (const t of leagueTrophies) {
     const byId = t.winnerUserId && t.winnerUserId === playerId;
     const byName = namesMatch(t.winnerName, playerName);
@@ -224,19 +245,19 @@ export function getProfileHardware(opts: {
         sportId: "nfl",
       };
     }
-    const key = `${row.kind}:${row.seasonYear}:${row.subtitle || row.title}`;
+    const key = hardwareDedupeKey(row);
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(row);
   }
 
-  // Legacy seeds — only for the active sport desk
+  // Legacy seeds — only if that kind·year is not already on the case
   for (const legacy of LEGACY_PROFILE_HARDWARE) {
     if (legacy.sport !== sport) continue;
     if (legacy.id === "legacy-maria-super-bowl-2025" && vonnagio) continue;
     if (legacy.id === "legacy-maria-vonnagio-2025" && !vonnagio) continue;
 
-    const key = `${legacy.kind}:${legacy.seasonYear}`;
+    const key = hardwareDedupeKey(legacy);
     if (seen.has(key)) continue;
     const direct = namesMatch(legacy.winnerName, playerName);
     const alias = LEGACY_NAME_ALIASES.some(
