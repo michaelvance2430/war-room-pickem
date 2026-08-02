@@ -29,6 +29,7 @@ import CardPublishedModal from "@/components/CardPublishedModal";
 import BoredPracticeDoneModal from "@/components/BoredPracticeDoneModal";
 import WeeklyColdOpenModal from "@/components/WeeklyColdOpenModal";
 import BirthdayGazetteModal from "@/components/BirthdayGazetteModal";
+import PlatformAnniversaryModal from "@/components/PlatformAnniversaryModal";
 import JoinBadgeHydrator from "@/components/JoinBadgeHydrator";
 import EquippedTitleHydrator from "@/components/EquippedTitleHydrator";
 import ProfileBorderHydrator from "@/components/ProfileBorderHydrator";
@@ -946,6 +947,8 @@ export default function Nav() {
       {!isGuestMode() && <WeeklyColdOpenModal />}
       {/* One Year Older · 1st of month · locked birthdays → roast paper for the room */}
       {!isGuestMode() && <BirthdayGazetteModal />}
+      {/* War Room Anniversary · July 25 founding day · every league */}
+      {!isGuestMode() && <PlatformAnniversaryModal />}
       {!isGuestMode() && <LoginWelcomeModal />}
       {!isGuestMode() && <RulesOnboardingModal />}
       <GazetteModal />
