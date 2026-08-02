@@ -20,7 +20,6 @@ import {
   weekProgressLabel,
 } from "@/lib/active-week";
 import { SEASON_MAX_WEEK } from "@/lib/season-calendar";
-import { rankPlayersWithSwings } from "@/lib/fun-board";
 
 type HeroState = {
   week: number;
@@ -76,25 +75,43 @@ export default function HomeWeekHero() {
         const roster = await loadLeagueRoster();
         const humans = roster.filter((m) => !m.isBot);
 
-        // Last scored week: rank + pts for "you finished #X" beat
+        // Last scored week recap — only a week *before* the card you're on.
+        // Never max(scored) alone: leftover sandbox/old-season week 5 would
+        // show under "Lock in Week 1" (seen live on Home).
         let lastWeekRecap: HeroState["lastWeekRecap"] = null;
         try {
           const selfId = getSession()?.playerId;
-          const scoredSorted = [...scored].sort((a, b) => b - a);
-          const lastScoredWeek = scoredSorted[0];
-          if (selfId && lastScoredWeek != null) {
+          const priorScored = scored
+            .filter((w) => Number.isFinite(w) && w < week)
+            .sort((a, b) => b - a);
+          const lastScoredWeek = priorScored[0];
+          if (selfId != null && lastScoredWeek != null) {
             const players = await loadLeaguePlayers();
-            const ranked = rankPlayersWithSwings(
-              players,
-              getLeague()?.sportId
-            ).filter((p) => !p.isMock);
-            const me = ranked.find((p) => p.id === selfId);
-            if (me && me.lastWeekPts != null && Number.isFinite(me.lastWeekPts)) {
+            const field = players.filter((p) => !p.isMock);
+            // Rank this card by last weekly points (not season standings)
+            const withPts = field
+              .map((p) => {
+                const pts =
+                  p.weeklyPoints?.length
+                    ? p.weeklyPoints[p.weeklyPoints.length - 1]
+                    : null;
+                return {
+                  id: p.id,
+                  pts:
+                    pts != null && Number.isFinite(pts) ? Number(pts) : null,
+                };
+              })
+              .filter(
+                (x): x is { id: string; pts: number } => x.pts != null
+              )
+              .sort((a, b) => b.pts - a.pts || a.id.localeCompare(b.id));
+            const meIdx = withPts.findIndex((x) => x.id === selfId);
+            if (meIdx >= 0) {
               lastWeekRecap = {
                 week: lastScoredWeek,
-                pts: Number(me.lastWeekPts),
-                rank: me.rank,
-                field: ranked.length,
+                pts: withPts[meIdx]!.pts,
+                rank: meIdx + 1,
+                field: withPts.length,
               };
             }
           }
