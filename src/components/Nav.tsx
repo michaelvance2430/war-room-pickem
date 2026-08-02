@@ -150,7 +150,10 @@ export default function Nav() {
     };
     const warm = () => {
       try {
+        router.prefetch("/");
         router.prefetch("/commissioner");
+        router.prefetch("/picks");
+        router.prefetch("/standings");
       } catch {
         /* ok */
       }
@@ -534,9 +537,15 @@ export default function Nav() {
     }
   }
 
-  /** Heavy host desk — allow Next prefetch on desktop so Gazette→Commish is warm */
+  /** Warm heavy desktop hops (Home remount + Commish chunk) */
   function shouldPrefetch(href: string) {
-    return href === "/commissioner" || href.startsWith("/commissioner?");
+    return (
+      href === "/" ||
+      href === "/commissioner" ||
+      href.startsWith("/commissioner?") ||
+      href === "/picks" ||
+      href === "/standings"
+    );
   }
 
   function NavItem({ link }: { link: NavLink }) {
@@ -612,6 +621,11 @@ export default function Nav() {
         <div className="max-w-6xl mx-auto px-3 sm:px-4 h-14 flex items-center gap-2 min-w-0">
           <Link
             href="/"
+            prefetch
+            onClick={() => {
+              closeChrome();
+              hardNavPrepare();
+            }}
             className="flex items-center gap-2 shrink-0 min-w-0 max-w-[11rem] sm:max-w-[14rem] rounded-md hover:opacity-90 transition"
             title="Back to Home"
             aria-label="Home"

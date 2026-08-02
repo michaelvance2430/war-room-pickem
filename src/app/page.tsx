@@ -132,28 +132,59 @@ function readLocalHomeShell(): {
   }
 }
 
+function readShellOnce(): ReturnType<typeof readLocalHomeShell> {
+  if (typeof window === "undefined") return null;
+  return readLocalHomeShell();
+}
+
 export default function Home() {
   const router = useRouter();
-  // Instant paint when returning from Picks (local session already known)
-  const [ready, setReady] = useState(false);
-  const [leagueCode, setLeagueCode] = useState<string | null>(null);
-  const [leagueName, setLeagueName] = useState<string | null>(null);
-  const [homeTagline, setHomeTagline] = useState(resolveHomeTagline({}));
-  const [sportId, setSportId] = useState<string>("cfb");
-  const [isCommish, setIsCommish] = useState(false);
-  const [actuallyCommish, setActuallyCommish] = useState(false);
+  /**
+   * First render from local session — never remount to full-page "Loading…"
+   * (Commish → Home on desktop was freezing on ready=false every soft nav).
+   */
+  const [ready, setReady] = useState(() => !!readShellOnce());
+  const [leagueCode, setLeagueCode] = useState<string | null>(
+    () => readShellOnce()?.leagueCode ?? null
+  );
+  const [leagueName, setLeagueName] = useState<string | null>(
+    () => readShellOnce()?.leagueName ?? null
+  );
+  const [homeTagline, setHomeTagline] = useState(() => {
+    const s = readShellOnce();
+    return s?.homeTagline || resolveHomeTagline({});
+  });
+  const [sportId, setSportId] = useState(
+    () => readShellOnce()?.sportId || "cfb"
+  );
+  const [isCommish, setIsCommish] = useState(
+    () => !!readShellOnce()?.isCommish
+  );
+  const [actuallyCommish, setActuallyCommish] = useState(
+    () => !!readShellOnce()?.actuallyCommish
+  );
   const [bootError, setBootError] = useState<string | null>(null);
   const [pickList, setPickList] = useState<LeagueMembership[] | null>(null);
   const [codeCopied, setCodeCopied] = useState(false);
   /** Demote museum/lore/brackets until first lock or first scores */
-  const [firstWeekChrome, setFirstWeekChrome] = useState(true);
+  const [firstWeekChrome, setFirstWeekChrome] = useState(
+    () => readShellOnce()?.firstWeekChrome ?? true
+  );
   /** Gazette / News shelf ~week 3 */
-  const [showGazetteShelf, setShowGazetteShelf] = useState(false);
+  const [showGazetteShelf, setShowGazetteShelf] = useState(
+    () => !!readShellOnce()?.showGazetteShelf
+  );
   /** Flavor widgets after hero paints — avoid cloud fan-out on tab return */
   const [showSecondary, setShowSecondary] = useState(false);
 
-  // Before first paint: local shell so Picks → Home never flashes "Loading…"
+  // Sync theme + unlock chrome on enter (SPA remount from Commish/Gazette)
   useLayoutEffect(() => {
+    try {
+      document.body.style.overflow = "";
+      document.documentElement.style.overflow = "";
+    } catch {
+      /* ok */
+    }
     const shell = readLocalHomeShell();
     if (!shell) return;
     setLeagueCode(shell.leagueCode);
@@ -166,14 +197,16 @@ export default function Home() {
     setShowGazetteShelf(shell.showGazetteShelf);
     setReady(true);
     try {
-      const { applySportTheme } = require("@/lib/sports/sport-theme") as typeof import("@/lib/sports/sport-theme");
+      const { applySportTheme } =
+        require("@/lib/sports/sport-theme") as typeof import("@/lib/sports/sport-theme");
       applySportTheme(shell.sportId);
     } catch {
       /* ok */
     }
   }, []);
 
-  // Secondary home chrome after paint (checklist, crown, ticker, …)
+  // Secondary home chrome LATE — Commish already burned main thread; don't
+  // mount MultiLeague + Crown + checklist in the same tick as Home paint.
   useEffect(() => {
     if (!ready) return;
     let cancelled = false;
@@ -187,9 +220,9 @@ export default function Home() {
     let idleId: number | undefined;
     let t: ReturnType<typeof setTimeout> | undefined;
     if (typeof w.requestIdleCallback === "function") {
-      idleId = w.requestIdleCallback(arm, { timeout: 700 });
+      idleId = w.requestIdleCallback(arm, { timeout: 2_500 });
     } else {
-      t = setTimeout(arm, 350);
+      t = setTimeout(arm, 1_800);
     }
     return () => {
       cancelled = true;
@@ -200,7 +233,7 @@ export default function Home() {
 
   useEffect(() => {
     let cancelled = false;
-    // Never leave Home on "Loading…" forever — phone open must fail open
+    // Never leave Home on "Loading…" forever
     const bootWatch = window.setTimeout(() => {
       if (cancelled) return;
       try {
@@ -220,10 +253,12 @@ export default function Home() {
       } catch {
         /* fall through */
       }
+      // Still no local shell — fail open with error, not infinite spinner
       setBootError(
         "App took too long to open. Check your connection, then try again."
       );
-    }, 10_000);
+      setReady(false);
+    }, 4_000);
 
     async function boot() {
       try {
@@ -556,8 +591,34 @@ export default function Home() {
 
   if (!ready) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-muted bg-background">
-        Loading…
+      <div className="min-h-screen flex flex-col bg-background">
+        <main className="flex-1 flex flex-col items-center justify-center px-4 gap-3">
+          <p className="text-sm text-muted">Opening Home…</p>
+          <p className="text-xs text-muted max-w-sm text-center leading-relaxed">
+            If this hangs, your room cache is empty — try Sign in or refresh.
+          </p>
+          <div className="flex gap-2 mt-2">
+            <button
+              type="button"
+              onClick={() => {
+                try {
+                  window.location.assign("/");
+                } catch {
+                  window.location.href = "/";
+                }
+              }}
+              className="min-h-[44px] px-4 rounded-xl bg-primary text-black text-sm font-bold"
+            >
+              Refresh
+            </button>
+            <Link
+              href="/login"
+              className="min-h-[44px] px-4 rounded-xl border border-border text-sm font-semibold flex items-center"
+            >
+              Sign in
+            </Link>
+          </div>
+        </main>
       </div>
     );
   }

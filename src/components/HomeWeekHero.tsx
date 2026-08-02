@@ -101,15 +101,9 @@ export default function HomeWeekHero() {
       setState(degraded);
     }
 
-    // Never leave Home hero as pulse forever
+    // Never leave Home hero as pulse forever (desktop Commish→Home return)
     const failSafe = window.setTimeout(() => {
       if (cancelled) return;
-      setState((prev) => {
-        if (prev) return prev;
-        paintDegraded();
-        return prev;
-      });
-      // paintDegraded already setState — also force if still null
       setState((prev) => {
         if (prev) return prev;
         try {
@@ -151,7 +145,7 @@ export default function HomeWeekHero() {
           };
         }
       });
-    }, 4_000);
+    }, 2_000);
 
     async function load() {
       try {
