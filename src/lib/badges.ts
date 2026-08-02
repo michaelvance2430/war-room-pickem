@@ -1647,6 +1647,7 @@ function evaluateBadge(
     // Easter eggs — permanent local + cloud cache (no spoilers in howToEarn)
     case "egg_anniversary":
     case "egg_curiosity_trophy":
+    case "egg_vonnaggio_gold":
     case "egg_hidden_headline":
     case "egg_leap_day":
     case "egg_birthday":
