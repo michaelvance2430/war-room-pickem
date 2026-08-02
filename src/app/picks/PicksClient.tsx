@@ -13,6 +13,8 @@ import { getSession, getLeague } from "@/lib/league";
 import Link from "next/link";
 import {
   loadWeekCard,
+  peekCachedWeekCard,
+  bustWeekCardCache,
   savePicksToCloud,
   loadMyPicks,
   loadLeagueActiveWeek,
@@ -324,8 +326,30 @@ export default function PicksClient() {
         explicit?: boolean;
       } = {}
     ) => {
-      const session = getSession();
-      const league = getLeague();
+      let session = getSession();
+      let league = getLeague();
+
+      // Phone: Standings works but Picks can race before local session is readable
+      if (!session?.leagueId && opts.isInitial) {
+        try {
+          const { restoreSessionFromCloud } = await import(
+            "@/lib/session-restore"
+          );
+          const restored = await Promise.race([
+            restoreSessionFromCloud(),
+            new Promise<{ status: "no_auth" }>((r) =>
+              window.setTimeout(() => r({ status: "no_auth" }), 3_500)
+            ),
+          ]);
+          if (restored.status === "restored") {
+            session = getSession();
+            league = getLeague();
+          }
+        } catch {
+          /* keep null */
+        }
+      }
+
       if (!session?.leagueId) {
         if (opts.isInitial) {
           setLoadError(
@@ -336,110 +360,113 @@ export default function PicksClient() {
         return null;
       }
 
+      const localWeek = (() => {
+        try {
+          const s = localStorage.getItem("warroom-active-week");
+          const n = s != null ? parseInt(s, 10) : week;
+          return Number.isFinite(n) ? n : week;
+        } catch {
+          return week;
+        }
+      })();
+
+      let target = opts.explicit ? week : opts.isInitial ? localWeek : week;
+
       if (opts.isInitial) {
         setLeagueName(league?.name || "");
         setLoadError(null);
+        setActiveWeek(localWeek);
+        setViewWeek(localWeek);
+        viewWeekRef.current = localWeek;
+      }
+
+      // Instant paint from warm cache / sessionStorage (Standings → Picks)
+      const cached = peekCachedWeekCard(target);
+      if (cached?.games?.length) {
+        setHasCard(true);
+        setGames(cached.games);
+        setProp(cached.prop);
+        setViewWeek(cached.weekNumber);
+        viewWeekRef.current = cached.weekNumber;
+        setCardBusy(false);
+        setLoadError(null);
+        // Background refresh picks — don't block games
+        void applyCard(cached, {
+          isInitial: !!opts.isInitial,
+          forceReloadPicks: true,
+        }).catch(() => {});
+      } else if (opts.isInitial || opts.explicit) {
         setCardBusy(true);
       }
 
-      /** One attempt: local week → card (+ published fallback). */
-      async function attemptLoad(): Promise<CloudCard | null> {
-        const localWeek = (() => {
-          try {
-            const s = localStorage.getItem("warroom-active-week");
-            const n = s != null ? parseInt(s, 10) : week;
-            return Number.isFinite(n) ? n : week;
-          } catch {
-            return week;
-          }
-        })();
+      try {
+        // Parallel: active week + first card + published list (was a serial waterfall)
+        const [resolved, firstCard, published] = await Promise.all([
+          resolvePlayerActiveWeek({ persistIfOps: false }).catch(() => ({
+            week: localWeek,
+            leagueWeek: localWeek,
+            advanced: false,
+            scored: [] as number[],
+          })),
+          loadWeekCard(target),
+          listPublishedWeekNumbers().catch(() => [] as number[]),
+        ]);
 
-        const resolveP = resolvePlayerActiveWeek({
-          persistIfOps: false,
-        }).catch(() => ({
-          week: localWeek,
-          leagueWeek: localWeek,
-          advanced: false,
-          scored: [] as number[],
-        }));
+        setActiveWeek(resolved.week);
+        if (resolved.scored?.length) setScoredWeeks(resolved.scored);
+        if (published.length) setPublishedWeeks(published);
 
-        let target = opts.isInitial ? localWeek : week;
-        setActiveWeek(localWeek);
+        let cloud = firstCard;
         if (opts.isInitial) {
-          setViewWeek(localWeek);
-          viewWeekRef.current = localWeek;
+          target = resolved.week;
+          if (target !== localWeek || !cloud?.games?.length) {
+            // Prefer published live week if resolve points elsewhere
+            cloud = await loadWeekCard(target);
+          }
         }
 
-        let cloud = await loadWeekCard(target);
-
-        const resolved = await resolveP;
-        const active = resolved.week;
-        setActiveWeek(active);
-        if (resolved.scored?.length) setScoredWeeks(resolved.scored);
-
-        if (opts.isInitial) {
-          target = active;
-          if (target !== localWeek || !cloud?.games?.length) {
-            cloud = await loadWeekCard(target);
-          }
-          if (!cloud?.games?.length) {
-            const published = await refreshPublishedList();
-            const fallback = published.includes(active)
-              ? active
-              : published[published.length - 1] ?? active;
-            target = fallback;
-            cloud = await loadWeekCard(target);
-          } else {
-            void refreshPublishedList();
-          }
-        } else if (opts.explicit) {
-          void refreshPublishedList();
-        } else if (!cloud?.games?.length) {
-          const published = await refreshPublishedList();
-          const fallback = published.includes(active)
-            ? active
-            : published[published.length - 1] ?? active;
+        if (!cloud?.games?.length && published.length) {
+          const fallback = published.includes(target)
+            ? target
+            : published[published.length - 1]!;
           target = fallback;
+          bustWeekCardCache(target);
           cloud = await loadWeekCard(target);
-        } else {
-          void refreshPublishedList();
+        }
+
+        // One quick retry if still empty but we believe a card should exist
+        if (
+          !cloud?.games?.length &&
+          (published.includes(target) || opts.isInitial)
+        ) {
+          bustWeekCardCache(target);
+          await new Promise((r) => window.setTimeout(r, 400));
+          cloud = await loadWeekCard(target);
         }
 
         setViewWeek(target);
         viewWeekRef.current = target;
-        return cloud?.games?.length ? cloud : null;
-      }
 
-      try {
-        // Auto-retry: never leave the user to "pull to reopen"
-        let cloud: CloudCard | null = null;
-        for (let i = 0; i < 3; i++) {
-          cloud = await attemptLoad();
-          if (cloud?.games?.length) break;
-          if (i < 2) {
-            await new Promise((r) => window.setTimeout(r, 350 + i * 250));
+        if (!cloud?.games?.length) {
+          // Keep any painted cache; only show empty when we never had games
+          if (!cached?.games?.length) {
+            setHasCard(false);
+            setGames([]);
+            setWeekResults({});
+            setWeekPropResult(null);
+            setWeekScoredAt(null);
           }
-        }
-
-        if (!cloud || !cloud.games.length) {
-          setHasCard(false);
-          setGames([]);
-          setWeekResults({});
-          setWeekPropResult(null);
-          setWeekScoredAt(null);
           setCardBusy(false);
-          // Empty is fine (no card yet) — only surface error if we know a week is live
           return null;
         }
 
-        // Paint games NOW
+        // Paint games NOW — never wait on picks/results
         setHasCard(true);
         setGames(cloud.games);
         setProp(cloud.prop);
         setLoadError(null);
         setCardBusy(false);
 
-        const target = cloud.weekNumber;
         void loadWeekResultsFromCloud(target)
           .then((res) => {
             if (viewWeekRef.current !== target) return;
@@ -462,7 +489,7 @@ export default function PicksClient() {
 
         return cloud;
       } catch (e: unknown) {
-        if (opts.isInitial) {
+        if (opts.isInitial && !cached?.games?.length) {
           setLoadError(
             e instanceof Error ? e.message : "Couldn’t load this week’s games."
           );
@@ -473,7 +500,7 @@ export default function PicksClient() {
         setCardBusy(false);
       }
     },
-    [applyCard, refreshPublishedList]
+    [applyCard]
   );
 
   /** Poll / realtime: refresh current view week + active week number only. */
@@ -523,16 +550,20 @@ export default function PicksClient() {
     let channel: ReturnType<ReturnType<typeof createClient>["channel"]> | null =
       null;
 
-    // Fail-safe: never spin forever — then auto-retry once (no user homework)
+    // Fail-safe: never spin forever — bust cache + quiet auto-retry (no pull)
     const failSafe = window.setTimeout(() => {
       if (cancelled) return;
       setCardBusy(false);
-      // Quiet auto-retry instead of "pull to reopen"
+      try {
+        bustWeekCardCache(viewWeekRef.current);
+      } catch {
+        /* ok */
+      }
       void loadWeek(viewWeekRef.current, {
         isInitial: true,
         forceReloadPicks: true,
       });
-    }, 4_500);
+    }, 6_000);
 
     void (async () => {
       // Bored practice: ONLY via explicit URL (?practice=1 or week=99).

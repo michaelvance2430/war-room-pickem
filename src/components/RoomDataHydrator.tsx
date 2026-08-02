@@ -121,6 +121,25 @@ export default function RoomDataHydrator() {
       })();
     }, 600);
 
+    // Warm active week card while user is on Standings/Home — My Picks opens instantly
+    const warmPicks = window.setTimeout(() => {
+      if (cancelled || isGuestMode()) return;
+      void (async () => {
+        try {
+          const session = getSession();
+          if (!session?.leagueId) return;
+          const { loadLeagueActiveWeek, loadWeekCard } = await import(
+            "@/lib/cloud"
+          );
+          const week = await loadLeagueActiveWeek();
+          if (cancelled) return;
+          await loadWeekCard(week);
+        } catch {
+          /* offline / no card yet */
+        }
+      })();
+    }, 900);
+
     const timer = window.setInterval(() => {
       void loadRoster(false);
     }, ROSTER_REFRESH_MS);
@@ -133,6 +152,7 @@ export default function RoomDataHydrator() {
     return () => {
       cancelled = true;
       window.clearTimeout(start);
+      window.clearTimeout(warmPicks);
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", onVis);
     };

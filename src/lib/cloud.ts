@@ -44,6 +44,8 @@ export function withTimeout<T>(
 
 type CacheEntry<T> = { at: number; value: T };
 const cardCache = new Map<string, CacheEntry<CloudCard | null>>();
+/** In-flight loadWeekCard — Standings→Picks + retries share one network hop. */
+const cardInflight = new Map<string, Promise<CloudCard | null>>();
 const publishedCache = new Map<string, CacheEntry<number[]>>();
 const scoredCache = new Map<string, CacheEntry<number[]>>();
 const activeWeekCache = new Map<string, CacheEntry<number>>();
@@ -60,11 +62,75 @@ const playersInflight = new Map<
 const rosterCache = new Map<string, CacheEntry<object[]>>();
 const rosterInflight = new Map<string, Promise<object[]>>();
 
-const CARD_TTL_MS = 6_000;
+const CARD_TTL_MS = 12_000;
 const LIST_TTL_MS = 12_000;
 const ACTIVE_WEEK_TTL_MS = 5_000;
 const PLAYERS_TTL_MS = 15_000;
 const ROSTER_TTL_MS = 25_000;
+/** Last good card survives SPA remounts so My Picks paints from Standings. */
+const PEEK_CARD_SS_PREFIX = "warroom-peek-card:";
+const PEEK_CARD_SS_MAX_MS = 45 * 60_000;
+
+function peekCardStorageKey(leagueId: string, weekNumber: number) {
+  return `${PEEK_CARD_SS_PREFIX}${leagueId}:${weekNumber}`;
+}
+
+function readPersistedWeekCard(
+  leagueId: string,
+  weekNumber: number
+): CloudCard | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(
+      peekCardStorageKey(leagueId, weekNumber)
+    );
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { at?: number; card?: CloudCard };
+    if (!parsed?.card?.games?.length) return null;
+    if (
+      typeof parsed.at === "number" &&
+      Date.now() - parsed.at > PEEK_CARD_SS_MAX_MS
+    ) {
+      return null;
+    }
+    return parsed.card;
+  } catch {
+    return null;
+  }
+}
+
+function writePersistedWeekCard(
+  leagueId: string,
+  weekNumber: number,
+  card: CloudCard
+) {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(
+      peekCardStorageKey(leagueId, weekNumber),
+      JSON.stringify({ at: Date.now(), card })
+    );
+  } catch {
+    /* quota / private mode */
+  }
+}
+
+function clearPersistedWeekCard(leagueId: string, weekNumber?: number) {
+  if (typeof window === "undefined") return;
+  try {
+    if (weekNumber != null) {
+      sessionStorage.removeItem(peekCardStorageKey(leagueId, weekNumber));
+      return;
+    }
+    const prefix = `${PEEK_CARD_SS_PREFIX}${leagueId}:`;
+    for (let i = sessionStorage.length - 1; i >= 0; i--) {
+      const k = sessionStorage.key(i);
+      if (k?.startsWith(prefix)) sessionStorage.removeItem(k);
+    }
+  } catch {
+    /* ignore */
+  }
+}
 
 function cacheGet<T>(map: Map<string, CacheEntry<T>>, key: string, ttl: number): T | undefined {
   const e = map.get(key);
@@ -84,6 +150,7 @@ function cacheSet<T>(map: Map<string, CacheEntry<T>>, key: string, value: T) {
 export function invalidateCloudWeekCaches(leagueId?: string | null) {
   if (!leagueId) {
     cardCache.clear();
+    cardInflight.clear();
     publishedCache.clear();
     scoredCache.clear();
     activeWeekCache.clear();
@@ -96,6 +163,10 @@ export function invalidateCloudWeekCaches(leagueId?: string | null) {
   for (const k of [...cardCache.keys()]) {
     if (k.startsWith(`${leagueId}:`)) cardCache.delete(k);
   }
+  for (const k of [...cardInflight.keys()]) {
+    if (k.startsWith(`${leagueId}:`)) cardInflight.delete(k);
+  }
+  clearPersistedWeekCard(leagueId);
   publishedCache.delete(leagueId);
   scoredCache.delete(leagueId);
   activeWeekCache.delete(leagueId);
@@ -519,6 +590,76 @@ export async function publishWeekCard(opts: {
   return { ok: true, weekCardId, games: gamesWithIds };
 }
 
+/** Sync peek of memory + sessionStorage — paints My Picks from Standings. */
+export function peekCachedWeekCard(
+  weekNumber = 1
+): CloudCard | null | undefined {
+  const session = getSession();
+  if (!session?.leagueId) return undefined;
+  const key = `${session.leagueId}:${weekNumber}`;
+  const mem = cacheGet(cardCache, key, CARD_TTL_MS);
+  if (mem !== undefined) return mem;
+  const persisted = readPersistedWeekCard(session.leagueId, weekNumber);
+  if (persisted?.games?.length) {
+    // Re-warm memory so subsequent peeks are free
+    cacheSet(cardCache, key, persisted);
+    return persisted;
+  }
+  return undefined;
+}
+
+/** Drop one card so the next load hits the network (after timeout / bad null). */
+export function bustWeekCardCache(weekNumber?: number, leagueId?: string | null) {
+  const lid = leagueId || getSession()?.leagueId;
+  if (!lid) {
+    cardCache.clear();
+    cardInflight.clear();
+    return;
+  }
+  if (weekNumber != null) {
+    const k = `${lid}:${weekNumber}`;
+    cardCache.delete(k);
+    cardInflight.delete(k);
+    clearPersistedWeekCard(lid, weekNumber);
+    return;
+  }
+  for (const k of [...cardCache.keys()]) {
+    if (k.startsWith(`${lid}:`)) cardCache.delete(k);
+  }
+  for (const k of [...cardInflight.keys()]) {
+    if (k.startsWith(`${lid}:`)) cardInflight.delete(k);
+  }
+  clearPersistedWeekCard(lid);
+}
+
+function buildCloudCardFromRow(
+  card: Record<string, unknown>,
+  games: Record<string, unknown>[],
+  weekNumber: number
+): CloudCard {
+  const question = ((card.prop_question as string) || "").trim() || "Prop";
+  const optionA = ((card.prop_option_a as string) || "").trim() || "Yes";
+  const optionB = ((card.prop_option_b as string) || "").trim() || "No";
+  const points = (card.prop_points as number) ?? 3;
+  const sorted = [...games].sort(
+    (a, b) => Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0)
+  );
+  return {
+    weekCardId: card.id as string,
+    weekNumber: (card.week_number as number) ?? weekNumber,
+    publishedAt: (card.published_at as string) || null,
+    games: sorted.map((row) =>
+      mapCardGame(row as Parameters<typeof mapCardGame>[0])
+    ),
+    prop: {
+      id: `prop-w${weekNumber}`,
+      question,
+      options: [optionA, optionB] as [string, string],
+      points,
+    },
+  };
+}
+
 export async function loadWeekCard(weekNumber = 1): Promise<CloudCard | null> {
   const session = getSession();
   if (!session?.leagueId) return null;
@@ -576,93 +717,106 @@ export async function loadWeekCard(weekNumber = 1): Promise<CloudCard | null> {
   const hit = cacheGet(cardCache, cacheKey, CARD_TTL_MS);
   if (hit !== undefined) return hit;
 
-  const supabase = createClient();
-  // Short ceiling — long timeouts made My Picks spin then "pull to reopen"
-  type CardRow = Record<string, unknown> | null;
-  type FetchResult =
-    | { kind: "ok"; row: CardRow }
-    | { kind: "timeout" }
-    | { kind: "error" };
+  const inflight = cardInflight.get(cacheKey);
+  if (inflight) return inflight;
 
-  const cardRes = await withTimeout<FetchResult>(
-    (async () => {
-      const { data, error } = await supabase
-        .from("week_cards")
-        .select("*")
-        .eq("league_id", session.leagueId)
-        .eq("week_number", weekNumber)
-        .maybeSingle();
-      if (error) return { kind: "error" as const };
-      return { kind: "ok" as const, row: (data as CardRow) || null };
-    })(),
-    3_500,
-    { kind: "timeout" }
-  );
+  const work = (async (): Promise<CloudCard | null> => {
+    const supabase = createClient();
+    type CardRow = Record<string, unknown> | null;
+    type FetchResult =
+      | { kind: "ok"; row: CardRow }
+      | { kind: "timeout" }
+      | { kind: "error" };
 
-  // Timeout / error: do NOT cache null (that poisoned retries for the whole TTL)
-  if (cardRes.kind === "timeout" || cardRes.kind === "error") {
-    return null;
-  }
-  if (!cardRes.row) {
-    // Real empty: no published card for this week
-    cacheSet(cardCache, cacheKey, null);
-    return null;
-  }
-  const card = cardRes.row;
+    // One RTT: card + games (halves mobile Standings→Picks latency)
+    const cardRes = await withTimeout<FetchResult>(
+      (async () => {
+        const { data, error } = await supabase
+          .from("week_cards")
+          .select("*, card_games(*)")
+          .eq("league_id", session.leagueId)
+          .eq("week_number", weekNumber)
+          .maybeSingle();
+        if (error) {
+          // Embed may fail on older schemas — fall back to bare card
+          const bare = await supabase
+            .from("week_cards")
+            .select("*")
+            .eq("league_id", session.leagueId)
+            .eq("week_number", weekNumber)
+            .maybeSingle();
+          if (bare.error) return { kind: "error" as const };
+          return { kind: "ok" as const, row: (bare.data as CardRow) || null };
+        }
+        return { kind: "ok" as const, row: (data as CardRow) || null };
+      })(),
+      8_000,
+      { kind: "timeout" }
+    );
 
-  type GamesResult =
-    | { kind: "ok"; rows: Record<string, unknown>[] | null }
-    | { kind: "timeout" };
+    // Timeout / error: never poison-cache null. Serve last-good card if any.
+    if (cardRes.kind === "timeout" || cardRes.kind === "error") {
+      const stale = readPersistedWeekCard(session.leagueId, weekNumber);
+      return stale;
+    }
+    if (!cardRes.row) {
+      // Real empty: no published card for this week
+      cacheSet(cardCache, cacheKey, null);
+      return null;
+    }
+    const card = cardRes.row;
 
-  const gamesRes = await withTimeout<GamesResult>(
-    (async () => {
-      const { data } = await supabase
-        .from("card_games")
-        .select("*")
-        .eq("week_card_id", card.id)
-        .order("sort_order", { ascending: true });
-      return {
-        kind: "ok" as const,
-        rows: (data as Record<string, unknown>[] | null) || null,
-      };
-    })(),
-    3_500,
-    { kind: "timeout" }
-  );
+    let gameRows =
+      (card.card_games as Record<string, unknown>[] | null | undefined) ||
+      null;
 
-  if (gamesRes.kind === "timeout") {
-    return null; // no null cache — retry can succeed
-  }
-  if (!gamesRes.rows?.length) {
-    cacheSet(cardCache, cacheKey, null);
-    return null;
-  }
-  const games = gamesRes.rows;
+    // Nested embed empty/missing — second hop only when needed
+    if (!gameRows?.length) {
+      type GamesResult =
+        | { kind: "ok"; rows: Record<string, unknown>[] | null }
+        | { kind: "timeout" }
+        | { kind: "error" };
 
-  const question = ((card.prop_question as string) || "").trim() || "Prop";
-  const optionA =
-    ((card.prop_option_a as string) || "").trim() || "Yes";
-  const optionB =
-    ((card.prop_option_b as string) || "").trim() || "No";
-  const points = (card.prop_points as number) ?? 3;
+      const gamesRes = await withTimeout<GamesResult>(
+        (async () => {
+          const { data, error } = await supabase
+            .from("card_games")
+            .select("*")
+            .eq("week_card_id", card.id)
+            .order("sort_order", { ascending: true });
+          if (error) return { kind: "error" as const };
+          return {
+            kind: "ok" as const,
+            rows: (data as Record<string, unknown>[] | null) || null,
+          };
+        })(),
+        8_000,
+        { kind: "timeout" }
+      );
 
-  const result: CloudCard = {
-    weekCardId: card.id as string,
-    weekNumber: card.week_number as number,
-    publishedAt: (card.published_at as string) || null,
-    games: games.map((row) =>
-      mapCardGame(row as Parameters<typeof mapCardGame>[0])
-    ),
-    prop: {
-      // Week-scoped id; matchPresetId resolves presets by question text
-      id: `prop-w${weekNumber}`,
-      question,
-      options: [optionA, optionB] as [string, string],
-      points,
-    },
-  };
-  cacheSet(cardCache, cacheKey, result);
-  return result;
+      if (gamesRes.kind === "timeout" || gamesRes.kind === "error") {
+        const stale = readPersistedWeekCard(session.leagueId, weekNumber);
+        return stale;
+      }
+      gameRows = gamesRes.rows;
+    }
+
+    if (!gameRows?.length) {
+      // Card exists but no games yet — don't cache null (commish mid-publish)
+      const stale = readPersistedWeekCard(session.leagueId, weekNumber);
+      return stale;
+    }
+
+    const result = buildCloudCardFromRow(card, gameRows, weekNumber);
+    cacheSet(cardCache, cacheKey, result);
+    writePersistedWeekCard(session.leagueId, weekNumber, result);
+    return result;
+  })().finally(() => {
+    cardInflight.delete(cacheKey);
+  });
+
+  cardInflight.set(cacheKey, work);
+  return work;
 }
 
 /** Weeks that have a published card (for My Picks week browser). */
