@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Nav from "@/components/Nav";
 import Avatar from "@/components/Avatar";
 import PlayerLink from "@/components/PlayerLink";
 import { getSession, getLeague, isOps, isCommissioner } from "@/lib/league";
@@ -190,19 +189,17 @@ export default function PlayersPage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Nav />
-
       <main className="flex-1 max-w-4xl mx-auto w-full px-4 py-8">
         <div className="mb-6 flex items-start justify-between gap-4">
-          <div>
+      <div>
             <h1 className="text-2xl font-bold">Players & Divisions</h1>
-            <p className="text-sm text-muted">
+      <p className="text-sm text-muted">
               {loading
                 ? "Loading…"
                 : `${capacityLabel(players.length)} · ${humans.length} real · ${bots.length} bot${bots.length === 1 ? "" : "s"} · ${openSeats} open`}
               {leagueName ? ` • ${leagueName}` : ""}
             </p>
-          </div>
+      </div>
           {saved && <span className="text-sm text-primary">Saved</span>}
         </div>
 
@@ -214,17 +211,17 @@ export default function PlayersPage() {
 
         {isCommish && preseasonKickOk && !loading && (
           <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 mb-4">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-amber-300 mb-1">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-amber-300 mb-1">
               Preseason · high-risk kick window
             </p>
-            <p className="text-xs text-muted leading-relaxed">
+      <p className="text-xs text-muted leading-relaxed">
               Before kickoff you can remove anyone who looks like a{" "}
               <strong className="text-foreground">Blue Falcon</strong> (quit
               other leagues mid-season). Check their count on their profile or
               next to their name. Protect the room — once the season is live,
               kicks should be rare.
             </p>
-          </div>
+      </div>
         )}
 
         {!loading && isLeagueFull(players.length) && (
@@ -247,22 +244,22 @@ export default function PlayersPage() {
         {/* Commissioner: kick bots one-by-one to free seats */}
         {isCommish && !loading && bots.length > 0 && (
           <div className="rounded-xl border border-primary/30 bg-primary/5 p-5 mb-6">
-            <div className="flex flex-wrap items-start justify-between gap-2 mb-2">
+      <div className="flex flex-wrap items-start justify-between gap-2 mb-2">
               <div>
-                <h2 className="font-semibold text-primary">
+      <h2 className="font-semibold text-primary">
                   Bots — free a seat for a friend
                 </h2>
-                <p className="text-xs text-muted mt-1 max-w-xl">
+      <p className="text-xs text-muted mt-1 max-w-xl">
                   Tap <strong className="text-foreground">Remove bot</strong> on
                   anyone you don&apos;t need. That opens 1 of {MAX_LEAGUE_PLAYERS}{" "}
                   seats. Friend joins with the code. Real players are listed in
                   divisions below — only bots appear here.
                 </p>
-              </div>
+      </div>
               <span className="text-xs text-muted shrink-0">
                 {bots.length} bot{bots.length === 1 ? "" : "s"} · {openSeats} open
               </span>
-            </div>
+      </div>
             <ul className="divide-y divide-border/80 rounded-lg border border-border bg-card overflow-hidden">
               {bots
                 .slice()
@@ -272,14 +269,14 @@ export default function PlayersPage() {
                     key={b.userId}
                     className="flex items-center gap-3 px-3 py-2.5"
                   >
-                    <Avatar name={b.name} avatarUrl={b.avatarUrl} size="sm" />
+      <Avatar name={b.name} avatarUrl={b.avatarUrl} size="sm" />
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium truncate">
+      <div className="text-sm font-medium truncate">
                         <PlayerLink id={b.userId} name={b.name} />
-                        <span className="ml-2 text-[10px] uppercase text-muted border border-border px-1 rounded">
+      <span className="ml-2 text-[10px] uppercase text-muted border border-border px-1 rounded">
                           Bot
                         </span>
-                      </div>
+      </div>
                       <div className="text-xs text-muted">
                         {divisionDisplayLabel(
                           b.division,
@@ -287,7 +284,7 @@ export default function PlayersPage() {
                         )}{" "}
                         · {b.totalPoints} pts
                       </div>
-                    </div>
+      </div>
                     <button
                       type="button"
                       disabled={busy}
@@ -296,19 +293,19 @@ export default function PlayersPage() {
                     >
                       {removingId === b.userId ? "…" : "Remove bot"}
                     </button>
-                  </li>
+      </li>
                 ))}
             </ul>
-          </div>
+      </div>
         )}
 
         {canManageDivs && (
           <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-            <p className="text-xs text-muted max-w-md">
+      <p className="text-xs text-muted max-w-md">
               New joiners land in the least-full division automatically. You
               (commish/deputy) can move anyone or rebalance the whole room.
             </p>
-            <button
+      <button
               type="button"
               onClick={() => void handleAutoBalance()}
               disabled={busy || players.length === 0}
@@ -316,7 +313,7 @@ export default function PlayersPage() {
             >
               Auto-balance divisions
             </button>
-          </div>
+      </div>
         )}
 
         {!canManageDivs && !loading && (
@@ -335,12 +332,12 @@ export default function PlayersPage() {
                 key={division}
                 className="rounded-xl border border-border bg-card overflow-hidden"
               >
-                <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+      <div className="px-4 py-3 border-b border-border flex items-center justify-between">
                   <span className="font-semibold">
                     {divisionFullLabel(division, getLeague()?.sportId)}
                   </span>
-                  <span className="text-xs text-muted">{list.length}</span>
-                </div>
+      <span className="text-xs text-muted">{list.length}</span>
+      </div>
                 <div className="p-2 space-y-1 min-h-[120px]">
                   {list.length === 0 && (
                     <p className="text-xs text-muted px-2 py-3">Empty</p>
@@ -352,14 +349,14 @@ export default function PlayersPage() {
                         p.isBot ? "opacity-90" : ""
                       }`}
                     >
-                      <Avatar
+      <Avatar
                         name={p.name}
                         avatarUrl={p.avatarUrl}
                         size="sm"
                         userId={p.userId}
                       />
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium truncate">
+      <div className="text-sm font-medium truncate">
                           <PlayerLink id={p.userId} name={p.name} />
                           {!p.isBot &&
                             (falconByUser[p.userId] ?? 0) > 0 && (
@@ -386,12 +383,12 @@ export default function PlayersPage() {
                             </span>
                           )}
                         </div>
-                        <div className="text-xs text-muted flex flex-wrap items-center gap-x-1.5">
+      <div className="text-xs text-muted flex flex-wrap items-center gap-x-1.5">
                           <span>{p.totalPoints} pts</span>
                           {!p.isBot && (
                             <>
                               <span className="text-border">·</span>
-                              <span
+      <span
                                 className={lastSeenToneClass(p.lastSeenAt)}
                                 title={
                                   p.lastSeenAt
@@ -404,7 +401,7 @@ export default function PlayersPage() {
                             </>
                           )}
                         </div>
-                      </div>
+      </div>
                       {canManageDivs ? (
                         <select
                           value={p.division}
@@ -464,11 +461,11 @@ export default function PlayersPage() {
                     </div>
                   ))}
                 </div>
-              </div>
+      </div>
             ))}
           </div>
         )}
       </main>
-    </div>
+      </div>
   );
 }

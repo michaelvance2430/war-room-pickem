@@ -292,7 +292,7 @@ export default function PlayerWalkthrough() {
           /* ignore */
         }
       }
-    }, 400);
+    }, 1200);
     return () => clearInterval(id);
   }, [active, pathname, advanceAndPaint, syncFromStorage]);
 

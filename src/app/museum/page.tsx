@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import Nav from "@/components/Nav";
 import PlayerLink from "@/components/PlayerLink";
 import ChampionshipBanner from "@/components/ChampionshipBanner";
 import {
@@ -62,14 +61,14 @@ function CrewMuseumStrip() {
   if (!revealed) {
     return (
       <div className="mb-6 rounded-xl border border-border bg-card/60 px-4 py-3">
-        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted">
+      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted">
           Crew wing
         </p>
-        <p className="text-sm text-muted mt-1 leading-relaxed">
+      <p className="text-sm text-muted mt-1 leading-relaxed">
           Shared marks and the full Crew timeline open after your first season
           finale. Until then — keep playing.
         </p>
-        <Link
+      <Link
           href="/crew"
           className="inline-block mt-2 text-xs font-bold text-primary"
         >
@@ -105,7 +104,7 @@ function CrewMuseumStrip() {
       <Link href="/crew" className="inline-block text-sm font-bold text-amber-200">
         Open Crew timeline →
       </Link>
-    </div>
+      </div>
   );
 }
 
@@ -229,14 +228,13 @@ function MuseumInner() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Nav />
       <main className="flex-1 max-w-3xl mx-auto w-full px-4 py-8">
         <div className="mb-6">
-          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-amber-300">
+      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-amber-300">
             Living history
           </p>
-          <h1 className="text-2xl font-black mt-1">War Room Museum</h1>
-          <p className="text-sm text-muted mt-2 leading-relaxed max-w-xl">
+      <h1 className="text-2xl font-black mt-1">War Room Museum</h1>
+      <p className="text-sm text-muted mt-2 leading-relaxed max-w-xl">
             Not just stats — the story of this room. Trophies, streaks, and
             milestones that make next August feel continuous with this one.
             Last season&apos;s big hardware stays on the wall forever (Excel
@@ -252,11 +250,10 @@ function MuseumInner() {
               <Link href="/museum" className="underline">
                 Show full room
               </Link>
-            </p>
+      </p>
           )}
         </div>
-
-        <LastSeasonHardwareWall
+      <LastSeasonHardwareWall
           plaques={trophies}
           rosterHits={rosterHits}
           sportId={getLeague()?.sportId}
@@ -264,8 +261,7 @@ function MuseumInner() {
 
         {/* Crew story — full wall after first finale; quiet teaser before */}
         <CrewMuseumStrip />
-
-        <ChampionshipBanner
+      <ChampionshipBanner
           trophies={trophies}
           leagueName={leagueName}
           sportId={getLeague()?.sportId}
@@ -317,14 +313,14 @@ function MuseumInner() {
                   key={r.id}
                   className="rounded-xl border border-border bg-card p-4 flex gap-3"
                 >
-                  <span className="text-2xl shrink-0" aria-hidden>
+      <span className="text-2xl shrink-0" aria-hidden>
                     {r.emoji}
                   </span>
-                  <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1">
                     <p className="text-[10px] uppercase tracking-wider text-muted font-bold">
                       {r.label}
                     </p>
-                    <p className="font-semibold">
+      <p className="font-semibold">
                       {r.userId ? (
                         <PlayerLink
                           id={r.userId}
@@ -335,11 +331,11 @@ function MuseumInner() {
                         r.name
                       )}
                     </p>
-                    <p className="text-amber-300 font-mono text-sm font-bold">
+      <p className="text-amber-300 font-mono text-sm font-bold">
                       {r.stat}
                     </p>
-                    <p className="text-xs text-muted mt-0.5">{r.blurb}</p>
-                  </div>
+      <p className="text-xs text-muted mt-0.5">{r.blurb}</p>
+      </div>
                 </div>
               ))
             )}
@@ -359,10 +355,10 @@ function MuseumInner() {
                   key={h.year}
                   className="rounded-xl border border-border bg-card p-4"
                 >
-                  <h2 className="font-bold text-lg mb-3">
+      <h2 className="font-bold text-lg mb-3">
                     {h.year === 2025 ? `${h.year} · ${PRIOR_SEASON_LABEL} Excel` : h.year}
                   </h2>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
                     {(() => {
                       const c = liveHolder(
                         h.champion?.userId,
@@ -378,7 +374,7 @@ function MuseumInner() {
                             name={h.champion ? c.name : null}
                             userId={c.userId || h.champion?.userId}
                           />
-                          <HistCell
+      <HistCell
                             label="Toilet Bowl"
                             emoji="🚽"
                             name={h.toilet ? t.name : null}
@@ -394,7 +390,7 @@ function MuseumInner() {
                       );
                     })()}
                   </div>
-                </section>
+      </section>
               ))
             )}
           </div>
@@ -441,14 +437,14 @@ function Timeline({
         const showId = live.userId || e.userId;
         return (
         <li key={e.id} className="ml-4 pb-8 relative">
-          <span className="absolute -left-[1.4rem] top-1 w-6 h-6 rounded-full bg-card border border-amber-400/50 flex items-center justify-center text-xs">
+      <span className="absolute -left-[1.4rem] top-1 w-6 h-6 rounded-full bg-card border border-amber-400/50 flex items-center justify-center text-xs">
             {e.emoji}
           </span>
-          <p className="text-[10px] font-mono text-amber-300/90 font-bold">
+      <p className="text-[10px] font-mono text-amber-300/90 font-bold">
             {e.year}
           </p>
-          <p className="font-semibold text-foreground">{e.title}</p>
-          <p className="text-sm text-muted">
+      <p className="font-semibold text-foreground">{e.title}</p>
+      <p className="text-sm text-muted">
             {showId ? (
               <PlayerLink
                 id={showId}
@@ -459,7 +455,7 @@ function Timeline({
               showName
             )}
           </p>
-        </li>
+      </li>
         );
       })}
     </ol>
@@ -504,7 +500,7 @@ function Empty({ title, body }: { title: string; body: string }) {
     <div className="rounded-xl border border-dashed border-border bg-card/50 px-6 py-12 text-center">
       <p className="font-medium mb-1">{title}</p>
       <p className="text-sm text-muted max-w-md mx-auto">{body}</p>
-    </div>
+      </div>
   );
 }
 
@@ -518,6 +514,6 @@ export default function MuseumPage() {
       }
     >
       <MuseumInner />
-    </Suspense>
+      </Suspense>
   );
 }

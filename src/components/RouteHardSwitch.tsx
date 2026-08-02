@@ -11,13 +11,22 @@ import { usePathname } from "next/navigation";
 function unlockDocument() {
   if (typeof document === "undefined") return;
   try {
+    // Full reset — stuck overflow/position made every screen feel frozen
     document.body.style.overflow = "";
     document.body.style.position = "";
     document.body.style.top = "";
+    document.body.style.left = "";
+    document.body.style.right = "";
     document.body.style.width = "";
+    document.body.style.height = "";
+    document.body.style.touchAction = "";
     document.documentElement.style.overflow = "";
-    // Remove inert scroll locks some modals leave behind
-    document.body.classList.remove("overflow-hidden", "modal-open");
+    document.documentElement.style.touchAction = "";
+    document.body.classList.remove(
+      "overflow-hidden",
+      "modal-open",
+      "ReactModal__Body--open"
+    );
   } catch {
     /* ignore */
   }

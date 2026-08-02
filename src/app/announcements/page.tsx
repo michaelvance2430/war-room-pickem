@@ -2,7 +2,6 @@
 
 import { useEffect, useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import Nav from "@/components/Nav";
 import { getSession, getLeague } from "@/lib/league";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { markEngagement } from "@/lib/engagement";
@@ -187,23 +186,21 @@ export default function AnnouncementsPage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Nav />
-
       <main className="flex-1 max-w-3xl mx-auto w-full px-4 py-8">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold">Announcements</h1>
-          <p className="text-sm text-muted">
+      <h1 className="text-2xl font-bold">Announcements</h1>
+      <p className="text-sm text-muted">
             League news from the commissioner. Opening this page marks them as read.
           </p>
-        </div>
+      </div>
 
         {isCommish && (
           <form
             onSubmit={handlePost}
             className="rounded-xl border border-border bg-card p-5 mb-6 space-y-3"
           >
-            <h2 className="font-semibold">Post announcement</h2>
-            <input
+      <h2 className="font-semibold">Post announcement</h2>
+      <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -220,7 +217,7 @@ export default function AnnouncementsPage() {
               className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary resize-y"
             />
             <div className="flex items-center gap-3">
-              <button
+      <button
                 type="submit"
                 disabled={posting}
                 className="px-4 py-2 rounded-lg bg-primary text-black text-sm font-medium hover:bg-primary-dim disabled:opacity-50"
@@ -232,7 +229,7 @@ export default function AnnouncementsPage() {
                 <span className="text-sm text-danger">{postError}</span>
               )}
             </div>
-          </form>
+      </form>
         )}
 
         {loading && (
@@ -247,7 +244,7 @@ export default function AnnouncementsPage() {
 
         {!loading && !error && items.length === 0 && (
           <div className="rounded-xl border border-border bg-card px-4 py-10 text-center">
-            <p className="text-sm text-muted">No announcements yet.</p>
+      <p className="text-sm text-muted">No announcements yet.</p>
             {isCommish && (
               <p className="text-xs text-muted mt-1">
                 Use the form above to post the first one.
@@ -267,17 +264,17 @@ export default function AnnouncementsPage() {
                     : "border-border"
                 }`}
               >
-                <div className="flex items-start justify-between gap-3 mb-2">
+      <div className="flex items-start justify-between gap-3 mb-2">
                   <div className="flex items-center gap-2 min-w-0">
                     {a.is_unread && (
                       <span className="shrink-0 w-2 h-2 rounded-full bg-primary" />
                     )}
                     <h2 className="font-semibold truncate">{a.title}</h2>
-                  </div>
+      </div>
                   <time className="shrink-0 text-xs text-muted">
                     {formatWhen(a.created_at)}
                   </time>
-                </div>
+      </div>
                 <p className="text-sm text-muted mb-3">
                   {a.author_name}
                   {a.is_unread && (
@@ -286,14 +283,14 @@ export default function AnnouncementsPage() {
                     </span>
                   )}
                 </p>
-                <p className="text-sm whitespace-pre-wrap leading-relaxed">
+      <p className="text-sm whitespace-pre-wrap leading-relaxed">
                   {a.body}
                 </p>
-              </li>
+      </li>
             ))}
           </ul>
         )}
       </main>
-    </div>
+      </div>
   );
 }

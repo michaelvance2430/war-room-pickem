@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, Fragment } from "react";
-import Nav from "@/components/Nav";
 import SwingBadge from "@/components/SwingBadge";
 import CrownAndShame from "@/components/CrownAndShame";
 import { loadLeaguePlayers } from "@/lib/cloud";
@@ -106,35 +105,33 @@ export default function StandingsPage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Nav />
-
       <main className="flex-1 max-w-5xl mx-auto w-full px-3 sm:px-4 py-5 sm:py-8">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold">Standings</h1>
-          <p className="text-sm text-muted">
+      <h1 className="text-2xl font-bold">Standings</h1>
+      <p className="text-sm text-muted">
             {preseason
               ? "No weeks scored yet — everyone is tied at zero until the first card is locked and scored."
               : "Live points · Bottom 50% of each division gets flushed · Swing labels after each scored week"}
           </p>
-          <p className="text-xs text-muted mt-1.5 leading-relaxed">
+      <p className="text-xs text-muted mt-1.5 leading-relaxed">
             <span className="text-primary font-medium">Last in</span> = how
             recently they opened the app (same on CFB and NFL rooms). Works on
             phone via the <strong className="text-foreground">Table</strong>{" "}
             tab.
           </p>
-          <p className="text-xs text-primary/90 mt-1 font-medium">
+      <p className="text-xs text-primary/90 mt-1 font-medium">
             Tap a green name → open their profile (badges &amp; trophies).
           </p>
           {showNameTip && (
             <div className="mt-3 rounded-xl border border-primary/40 bg-primary/10 px-3 py-2.5 flex items-start justify-between gap-2">
-              <p className="text-xs text-foreground leading-relaxed">
+      <p className="text-xs text-foreground leading-relaxed">
                 <strong className="text-primary">Tip:</strong> Names in{" "}
                 <span className="font-semibold text-primary underline decoration-2">
                   green
                 </span>{" "}
                 are links. Tap anyone to roast their trophy case.
               </p>
-              <button
+      <button
                 type="button"
                 onClick={() => {
                   setShowNameTip(false);
@@ -148,23 +145,23 @@ export default function StandingsPage() {
               >
                 Got it
               </button>
-            </div>
+      </div>
           )}
         </div>
 
         {preseason && (
           <div className="mb-6 rounded-xl border border-primary/30 bg-primary/10 px-4 py-3">
-            <p className="text-xs font-bold uppercase tracking-wider text-primary mb-1">
+      <p className="text-xs font-bold uppercase tracking-wider text-primary mb-1">
               Preseason board
             </p>
-            <p className="text-sm text-foreground leading-relaxed">
+      <p className="text-sm text-foreground leading-relaxed">
               This isn&apos;t broken — the season hasn&apos;t posted points yet.
               Names, divisions, and hardware flair are live. Points and swing
               labels light up after the commissioner scores week one.{" "}
               <span className="text-muted">
                 Go lock picks when the card is published.
               </span>
-            </p>
+      </p>
           </div>
         )}
 
@@ -174,33 +171,33 @@ export default function StandingsPage() {
 
         {loading && (
           <div className="mb-6 rounded-xl border border-border bg-card/50 px-4 py-8 text-center">
-            <p className="font-medium mb-1 text-muted">Loading the board…</p>
-            <p className="text-sm text-muted">Pulling live standings.</p>
-          </div>
+      <p className="font-medium mb-1 text-muted">Loading the board…</p>
+      <p className="text-sm text-muted">Pulling live standings.</p>
+      </div>
         )}
 
         {!loading && players.length === 0 && (
           <div className="mb-6 rounded-xl border border-dashed border-border bg-card/50 px-4 py-8 text-center">
-            <p className="font-medium mb-1">Nobody on the board yet</p>
-            <p className="text-sm text-muted">
+      <p className="font-medium mb-1">Nobody on the board yet</p>
+      <p className="text-sm text-muted">
               Share the league invite code. When friends join, they show up
               here.
             </p>
-          </div>
+      </div>
         )}
 
         <p className="text-[11px] text-muted mb-3 leading-relaxed flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span className="font-semibold text-foreground/80">Last in</span>
-          <span className="inline-flex items-center gap-1">
+      <span className="font-semibold text-foreground/80">Last in</span>
+      <span className="inline-flex items-center gap-1">
             <span className="text-emerald-400 font-bold">●</span> ≤6h
           </span>
-          <span className="inline-flex items-center gap-1">
+      <span className="inline-flex items-center gap-1">
             <span className="text-amber-400 font-bold">●</span> 6–18h
           </span>
-          <span className="inline-flex items-center gap-1">
+      <span className="inline-flex items-center gap-1">
             <span className="text-red-400 font-bold">●</span> 18h+
           </span>
-        </p>
+      </p>
 
         <div className="phone-h-scroll sm:flex-wrap sm:overflow-visible mb-5">
           {divisions.map((d) => (
@@ -218,13 +215,12 @@ export default function StandingsPage() {
             </button>
           ))}
         </div>
-
-        <div className="rounded-xl border border-border overflow-hidden overflow-x-auto">
+      <div className="rounded-xl border border-border overflow-hidden overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-card text-muted text-xs uppercase tracking-wide">
+      <thead className="bg-card text-muted text-xs uppercase tracking-wide">
               <tr>
-                <th className="text-left px-3 sm:px-4 py-3 font-medium">#</th>
-                <th className="text-left px-3 sm:px-4 py-3 font-medium">
+      <th className="text-left px-3 sm:px-4 py-3 font-medium">#</th>
+      <th className="text-left px-3 sm:px-4 py-3 font-medium">
                   Player
                 </th>
                 {active === "Overall" && (
@@ -233,28 +229,28 @@ export default function StandingsPage() {
                 <th className="text-left px-3 py-3 font-medium hidden md:table-cell">
                   Swing
                 </th>
-                <th className="text-right px-3 sm:px-4 py-3 font-medium hidden sm:table-cell">
+      <th className="text-right px-3 sm:px-4 py-3 font-medium hidden sm:table-cell">
                   Last in
                 </th>
-                <th className="text-right px-4 py-3 font-medium">Pts</th>
-                <th className="text-right px-4 py-3 font-medium hidden sm:table-cell">
+      <th className="text-right px-4 py-3 font-medium">Pts</th>
+      <th className="text-right px-4 py-3 font-medium hidden sm:table-cell">
                   ATS%
                 </th>
-                <th className="text-right px-4 py-3 font-medium">Streak</th>
-              </tr>
+      <th className="text-right px-4 py-3 font-medium">Streak</th>
+      </tr>
             </thead>
-            <tbody>
+      <tbody>
               {filtered.map((player, idx) => (
                 <Fragment key={player.id}>
                   {idx === cutIndex && (
                     <tr className="bg-danger/10">
-                      <td
+      <td
                         colSpan={active === "Overall" ? 8 : 7}
                         className="px-4 py-1.5 text-center text-xs text-danger font-medium"
                       >
                         — Cut Line (bottom 50% → Toilet Bowl) —
                       </td>
-                    </tr>
+      </tr>
                   )}
                   <tr
                     className={selfRowClass(
@@ -271,9 +267,9 @@ export default function StandingsPage() {
                     <td className="px-3 sm:px-4 py-3.5 text-muted align-middle">
                       {idx + 1}
                     </td>
-                    <td className="px-3 sm:px-4 py-3.5 font-medium align-middle">
+      <td className="px-3 sm:px-4 py-3.5 font-medium align-middle">
                       <div className="flex flex-col gap-1 min-w-0">
-                        <span
+      <span
                           className={selfNameClass(
                             isSelfPlayer(player.id, selfId)
                           )}
@@ -304,11 +300,11 @@ export default function StandingsPage() {
                         </span>
                         {swingById[player.id] && (
                           <span className="md:hidden">
-                            <SwingBadge swing={swingById[player.id]} />
+      <SwingBadge swing={swingById[player.id]} />
                           </span>
                         )}
                       </div>
-                    </td>
+      </td>
                     {active === "Overall" && (
                       <td className="px-3 sm:px-4 py-3.5 text-muted align-middle text-xs sm:text-sm">
                         {divisionTabLabel(
@@ -324,7 +320,7 @@ export default function StandingsPage() {
                         <span className="text-muted">—</span>
                       )}
                     </td>
-                    <td
+      <td
                       className={`px-3 sm:px-4 py-3.5 text-right align-middle text-xs hidden sm:table-cell ${lastSeenToneClass(player.lastSeenAt)}`}
                       title={
                         player.lastSeenAt
@@ -334,20 +330,20 @@ export default function StandingsPage() {
                     >
                       {formatLastSeen(player.lastSeenAt)}
                     </td>
-                    <td className="px-3 sm:px-4 py-3.5 text-right font-semibold align-middle text-base">
+      <td className="px-3 sm:px-4 py-3.5 text-right font-semibold align-middle text-base">
                       {player.totalPoints}
                     </td>
-                    <td className="px-4 py-3.5 text-right text-muted hidden sm:table-cell align-middle">
+      <td className="px-4 py-3.5 text-right text-muted hidden sm:table-cell align-middle">
                       {atsPct(player)}
                     </td>
-                    <td className="px-3 sm:px-4 py-3.5 text-right align-middle">
+      <td className="px-3 sm:px-4 py-3.5 text-right align-middle">
                       {streakDisplay(player.currentStreak)}
                     </td>
-                  </tr>
+      </tr>
                 </Fragment>
               ))}
             </tbody>
-          </table>
+      </table>
         </div>
       </main>
     </div>

@@ -255,13 +255,13 @@ function LeagueBuildInner() {
     <div className="min-h-screen flex items-center justify-center px-4 py-10">
       <div className="max-w-md w-full rounded-2xl border-2 border-primary/40 bg-card p-5 sm:p-6 space-y-4">
         <div className="flex justify-center">
-          <BrandMark size={64} variant="force" />
+      <BrandMark size={64} variant="force" />
         </div>
-        <div className="text-center">
+      <div className="text-center">
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">
             {isEyes ? "Foundry · new commish eyes" : "League build"}
           </p>
-          <h1 className="text-xl sm:text-2xl font-bold text-foreground mt-1">
+      <h1 className="text-xl sm:text-2xl font-bold text-foreground mt-1">
             {isReview
               ? "Review your room"
               : step === "welcome"
@@ -289,7 +289,7 @@ function LeagueBuildInner() {
                 />
               ))}
             </div>
-            <p className="text-xs font-semibold text-muted text-center tabular-nums">
+      <p className="text-xs font-semibold text-muted text-center tabular-nums">
               Step {progressIndex + 1} of {progressSteps.length}
               {skipName || skipOpen ? (
                 <span className="font-normal">
@@ -315,7 +315,7 @@ function LeagueBuildInner() {
         {/* ── Welcome: hero Use recommended ───────────────────────── */}
         {step === "welcome" && (
           <div className="space-y-4">
-            <p className="text-sm text-muted leading-relaxed text-center">
+      <p className="text-sm text-muted leading-relaxed text-center">
               Pick how <strong className="text-foreground">{name}</strong> works
               — pride pick, Toilet Bowl split, seats. Takes about a minute. You
               can change it until{" "}
@@ -347,7 +347,7 @@ function LeagueBuildInner() {
             >
               Use recommended defaults →
             </button>
-            <p className="text-xs text-muted text-center leading-relaxed">
+      <p className="text-xs text-muted text-center leading-relaxed">
               Pride pick on · 50% Toilet Bowl cut ·{" "}
               {skipOpen
                 ? openRoom
@@ -356,22 +356,22 @@ function LeagueBuildInner() {
                 : "private"}{" "}
               · no bots
             </p>
-            <button
+      <button
               type="button"
               onClick={next}
               className="w-full py-3.5 min-h-[52px] rounded-xl border-2 border-primary/40 bg-primary/10 text-primary text-sm font-bold touch-manipulation"
             >
               Customize step by step
             </button>
-          </div>
+      </div>
         )}
 
         {step === "name" && (
           <div className="space-y-3">
-            <label className="block text-sm font-semibold text-foreground">
+      <label className="block text-sm font-semibold text-foreground">
               League name
             </label>
-            <input
+      <input
               value={name}
               onChange={(e) => setName(e.target.value)}
               disabled={locked && !isEyes}
@@ -382,17 +382,17 @@ function LeagueBuildInner() {
             <p className="text-sm text-muted">
               What the group chat will call this room.
             </p>
-          </div>
+      </div>
         )}
 
         {step === "crystal" && (
           <div className="space-y-3">
-            <h2 className="text-base font-bold text-foreground">{pride.title}</h2>
-            <p className="text-sm font-semibold text-foreground leading-snug">
+      <h2 className="text-base font-bold text-foreground">{pride.title}</h2>
+      <p className="text-sm font-semibold text-foreground leading-snug">
               {pride.oneLiner}
             </p>
-            <p className="text-sm text-muted leading-relaxed">{pride.body}</p>
-            <div className="grid grid-cols-1 gap-2">
+      <p className="text-sm text-muted leading-relaxed">{pride.body}</p>
+      <div className="grid grid-cols-1 gap-2">
               <button
                 type="button"
                 disabled={locked && !isEyes}
@@ -404,10 +404,10 @@ function LeagueBuildInner() {
                 }`}
               >
                 <span className="font-bold block">{pride.onLabel}</span>
-                <span className="text-xs opacity-80">
+      <span className="text-xs opacity-80">
                   Recommended — tab shows for everyone
                 </span>
-              </button>
+      </button>
               <button
                 type="button"
                 disabled={locked && !isEyes}
@@ -419,30 +419,30 @@ function LeagueBuildInner() {
                 }`}
               >
                 <span className="font-bold block">Off — hide the tab</span>
-                <span className="text-xs opacity-80">
+      <span className="text-xs opacity-80">
                   Just weekly picks for this room
                 </span>
-              </button>
+      </button>
             </div>
-          </div>
+      </div>
         )}
 
         {step === "cut" && (
           <div className="space-y-3">
-            <h2 className="text-base font-bold text-foreground">
+      <h2 className="text-base font-bold text-foreground">
               Toilet Bowl cut line
             </h2>
-            <p className="text-sm font-semibold text-foreground leading-snug">
+      <p className="text-sm font-semibold text-foreground leading-snug">
               Bottom half of the standings play for the Toilet Bowl trophy
               (still a trophy). 50% is normal.
             </p>
-            <p className="text-sm text-muted leading-relaxed">
+      <p className="text-sm text-muted leading-relaxed">
               Bottom{" "}
               <strong className="text-foreground">{cutPercent}%</strong> of the
               standings go to the Toilet Bowl bracket. Everyone else chases the
               championship.
             </p>
-            <input
+      <input
               type="range"
               min={25}
               max={60}
@@ -453,10 +453,10 @@ function LeagueBuildInner() {
               className="w-full accent-[var(--primary,#ef4444)]"
             />
             <div className="flex justify-between text-xs text-muted">
-              <span>25%</span>
-              <span className="font-bold text-foreground">{cutPercent}%</span>
-              <span>60%</span>
-            </div>
+      <span>25%</span>
+      <span className="font-bold text-foreground">{cutPercent}%</span>
+      <span>60%</span>
+      </div>
             <button
               type="button"
               onClick={() => setCutPercent(50)}
@@ -464,19 +464,19 @@ function LeagueBuildInner() {
             >
               Reset to 50% (recommended)
             </button>
-          </div>
+      </div>
         )}
 
         {step === "open" && (
           <div className="space-y-3">
-            <h2 className="text-base font-bold text-foreground">
+      <h2 className="text-base font-bold text-foreground">
               Private or open room?
             </h2>
-            <p className="text-sm text-muted leading-relaxed">
+      <p className="text-sm text-muted leading-relaxed">
               Private = invite code only. Open = people using Join open room can
               land here until full.
             </p>
-            <div className="grid grid-cols-1 gap-2">
+      <div className="grid grid-cols-1 gap-2">
               <button
                 type="button"
                 disabled={locked && !isEyes}
@@ -488,10 +488,10 @@ function LeagueBuildInner() {
                 }`}
               >
                 <span className="font-bold block">Private (recommended)</span>
-                <span className="text-xs opacity-80">
+      <span className="text-xs opacity-80">
                   Your group only — share the code
                 </span>
-              </button>
+      </button>
               <button
                 type="button"
                 disabled={locked && !isEyes}
@@ -503,28 +503,28 @@ function LeagueBuildInner() {
                 }`}
               >
                 <span className="font-bold block">Open lobby</span>
-                <span className="text-xs opacity-80">
+      <span className="text-xs opacity-80">
                   Strangers can fill empty seats
                 </span>
-              </button>
+      </button>
             </div>
-          </div>
+      </div>
         )}
 
         {step === "bots" && (
           <div className="space-y-3">
-            <h2 className="text-base font-bold text-foreground">
+      <h2 className="text-base font-bold text-foreground">
               Fill empty seats with bots?
             </h2>
-            <p className="text-sm font-semibold text-foreground leading-snug">
+      <p className="text-sm font-semibold text-foreground leading-snug">
               Fake players for practice. Friends replace them. You can delete
               anytime before kickoff.
             </p>
-            <p className="text-sm text-muted leading-relaxed">
+      <p className="text-sm text-muted leading-relaxed">
               Optional so the room doesn&apos;t feel empty while you wait on the
               group chat. Real people always take priority.
             </p>
-            <div className="grid grid-cols-1 gap-2">
+      <div className="grid grid-cols-1 gap-2">
               <button
                 type="button"
                 disabled={locked && !isEyes}
@@ -536,10 +536,10 @@ function LeagueBuildInner() {
                 }`}
               >
                 <span className="font-bold block">No bots (recommended)</span>
-                <span className="text-xs opacity-80">
+      <span className="text-xs opacity-80">
                   Wait for real humans
                 </span>
-              </button>
+      </button>
               <button
                 type="button"
                 disabled={locked && !isEyes}
@@ -551,49 +551,49 @@ function LeagueBuildInner() {
                 }`}
               >
                 <span className="font-bold block">Yes — pad empty seats</span>
-                <span className="text-xs opacity-80">
+      <span className="text-xs opacity-80">
                   Toward ~16 seats for practice energy
                 </span>
-              </button>
+      </button>
             </div>
-          </div>
+      </div>
         )}
 
         {step === "confirm" && (
           <div className="space-y-3">
-            <h2 className="text-base font-bold text-foreground">
+      <h2 className="text-base font-bold text-foreground">
               Your room is set
             </h2>
-            <ul className="rounded-xl border border-border bg-background px-4 py-3 text-sm space-y-2">
+      <ul className="rounded-xl border border-border bg-background px-4 py-3 text-sm space-y-2">
               <li>
-                <span className="text-muted">Name · </span>
-                <strong>{name.trim() || "War Room"}</strong>
-              </li>
+      <span className="text-muted">Name · </span>
+      <strong>{name.trim() || "War Room"}</strong>
+      </li>
               <li>
-                <span className="text-muted">
+      <span className="text-muted">
                   {sportId === "nfl" ? "Super Bowl pick" : "Crystal Ball"} ·{" "}
                 </span>
-                <strong>{crystalBall ? "On" : "Off"}</strong>
-              </li>
+      <strong>{crystalBall ? "On" : "Off"}</strong>
+      </li>
               <li>
-                <span className="text-muted">Toilet Bowl cut · </span>
-                <strong>{cutPercent}%</strong>
-              </li>
+      <span className="text-muted">Toilet Bowl cut · </span>
+      <strong>{cutPercent}%</strong>
+      </li>
               <li>
-                <span className="text-muted">Listing · </span>
-                <strong>{openRoom ? "Open lobby" : "Private"}</strong>
-              </li>
+      <span className="text-muted">Listing · </span>
+      <strong>{openRoom ? "Open lobby" : "Private"}</strong>
+      </li>
               <li>
-                <span className="text-muted">Bots · </span>
-                <strong>{fillBots ? "Pad empty seats" : "None"}</strong>
-              </li>
+      <span className="text-muted">Bots · </span>
+      <strong>{fillBots ? "Pad empty seats" : "None"}</strong>
+      </li>
             </ul>
-            <p className="text-sm text-muted leading-relaxed">
+      <p className="text-sm text-muted leading-relaxed">
               You can change this until{" "}
               <strong className="text-foreground">{lockLabel}</strong>. Next:
               invite friends so they can join.
             </p>
-          </div>
+      </div>
         )}
 
         {/* Actions (welcome has its own CTAs) */}
@@ -638,10 +638,10 @@ function LeagueBuildInner() {
                 </button>
               )}
             </div>
-          </div>
+      </div>
         )}
       </div>
-    </div>
+      </div>
   );
 }
 
@@ -655,6 +655,6 @@ export default function LeagueBuildPage() {
       }
     >
       <LeagueBuildInner />
-    </Suspense>
+      </Suspense>
   );
 }

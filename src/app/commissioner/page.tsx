@@ -2,7 +2,6 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import Nav from "@/components/Nav";
 import PlayerLink from "@/components/PlayerLink";
 import FirstCardWizard from "@/components/FirstCardWizard";
 import {
@@ -2166,8 +2165,7 @@ function CommissionerPageInner() {
   if (allowed === null) {
     return (
       <div className="min-h-screen flex flex-col">
-        <Nav />
-        <main className="flex-1 flex items-center justify-center text-muted">
+      <main className="flex-1 flex items-center justify-center text-muted">
           Loading…
         </main>
       </div>
@@ -2177,24 +2175,23 @@ function CommissionerPageInner() {
   if (!allowed) {
     return (
       <div className="min-h-screen flex flex-col">
-        <Nav />
-        <main className="flex-1 flex items-center justify-center px-4">
+      <main className="flex-1 flex items-center justify-center px-4">
           <div className="max-w-md text-center rounded-xl border border-border bg-card p-6">
-            <h1 className="text-xl font-bold mb-2">Ops only</h1>
-            <p className="text-sm text-muted mb-3">
+      <h1 className="text-xl font-bold mb-2">Ops only</h1>
+      <p className="text-sm text-muted mb-3">
               Only the league commissioner or an appointed deputy can open these
               tools. If you turned on{" "}
               <span className="text-foreground font-medium">View as player</span>
               , exit that mode on Account (or the yellow bar) to use Commish
               again.
             </p>
-            <a
+      <a
               href="/account"
               className="text-sm text-primary font-semibold hover:underline"
             >
               Account → View as player
             </a>
-          </div>
+      </div>
         </main>
       </div>
     );
@@ -2257,7 +2254,6 @@ function CommissionerPageInner() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Nav />
       <OpenRoomLeaveNudge />
       <OpenRoomBotsNudge
         open={openRoomBotsNudge}
@@ -2278,31 +2274,31 @@ function CommissionerPageInner() {
             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-warning">
               Real season live
             </p>
-            <h2
+      <h2
               id="preseason-tools-title"
               className="text-lg font-bold text-foreground"
             >
               {PRESEASON_COMMISH_TOOLS_TITLE}
             </h2>
-            <p className="text-sm text-muted leading-relaxed whitespace-pre-line">
+      <p className="text-sm text-muted leading-relaxed whitespace-pre-line">
               {preseasonCommishToolsBody()}
             </p>
-            <p className="text-xs text-muted leading-relaxed">
+      <p className="text-xs text-muted leading-relaxed">
               Live path: Pull Odds → publish → friends pick → Sync final scores
               → Save &amp; Score.
             </p>
-            <button
+      <button
               type="button"
               onClick={() => setPreseasonToolsPopup(false)}
               className="w-full py-3 rounded-xl font-bold bg-primary text-black min-h-[48px]"
             >
               Got it
             </button>
-          </div>
+      </div>
         </div>
       )}
       <main className="flex-1 max-w-3xl mx-auto w-full px-4 py-8">
-        <div className="mb-6">
+      <div className="mb-6">
           <h1 className="text-2xl font-bold">
             {isOwner
               ? firstTime
@@ -2310,7 +2306,7 @@ function CommissionerPageInner() {
                 : "Commish"
               : "Deputy Ops"}
           </h1>
-          <p className="text-sm text-muted">
+      <p className="text-sm text-muted">
             {isOwner
               ? firstTime
                 ? "Invite → Pull Odds → pick 5 → publish → score when games die."
@@ -2319,10 +2315,10 @@ function CommissionerPageInner() {
           </p>
           {(firstTime || simpleHost) && isOwner && (
             <div className="mt-3 rounded-xl border-2 border-primary/50 bg-primary/10 px-4 py-3">
-              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-1">
+      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-1">
                 Commish · first hour
               </p>
-              <p className="text-sm text-foreground leading-relaxed">
+      <p className="text-sm text-foreground leading-relaxed">
                 Three jobs:{" "}
                 <strong className="text-primary">Build Card</strong>
                 {" · "}
@@ -2332,20 +2328,20 @@ function CommissionerPageInner() {
                 . Live odds only — fake weeks live in Foundry for the shop.
                 Settings stay buried until you score a week.
               </p>
-            </div>
+      </div>
           )}
           {/* Player view + odds: not day-one noise */}
           {!(firstTime || simpleHost) && (
             <>
               <div className="mt-3 rounded-xl border-2 border-warning bg-warning/15 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                <div>
+      <div>
                   <p className="text-sm font-bold text-warning">
                     View as player
                   </p>
-                  <p className="text-xs text-muted">
+      <p className="text-xs text-muted">
                     Hide Commish tools and see the app like your league mates.
                   </p>
-                </div>
+      </div>
                 <button
                   type="button"
                   onClick={() => {
@@ -2356,7 +2352,7 @@ function CommissionerPageInner() {
                 >
                   Enter player view →
                 </button>
-              </div>
+      </div>
               {oddsCreditsRemaining != null && (
                 <div
                   className={`mt-3 rounded-xl border px-4 py-3 text-sm ${
@@ -2367,7 +2363,7 @@ function CommissionerPageInner() {
                         : "border-primary/30 bg-primary/5 text-foreground"
                   }`}
                 >
-                  <p className="font-semibold">
+      <p className="font-semibold">
                     Odds API credits left:{" "}
                     <span className="font-mono text-lg">
                       {oddsCreditsRemaining}
@@ -2382,11 +2378,11 @@ function CommissionerPageInner() {
                       </span>
                     )}
                   </p>
-                  <p className="text-[11px] text-muted mt-1 leading-relaxed">
+      <p className="text-[11px] text-muted mt-1 leading-relaxed">
                     Free plan is usually 500 credits/month (Pull Odds ≈ 1, Sync
                     scores ≈ 2). Demo slate uses zero credits.
                   </p>
-                </div>
+      </div>
               )}
             </>
           )}
@@ -2403,7 +2399,7 @@ function CommissionerPageInner() {
         )}
 
         <div id="commish-tab-panel" className="scroll-mt-20">
-        <div className="flex flex-wrap gap-2 mb-6">
+      <div className="flex flex-wrap gap-2 mb-6">
           {/* Simple host: Card · Who's in · Results only. Settings buried. */}
           {isOwner && !(firstTime || simpleHost) && (
             <button
@@ -2429,7 +2425,7 @@ function CommissionerPageInner() {
           >
             Build Card
           </button>
-          <button
+      <button
             type="button"
             onClick={() => {
               setTab("picks");
@@ -2443,7 +2439,7 @@ function CommissionerPageInner() {
           >
             Who&apos;s in
           </button>
-          <button
+      <button
             type="button"
             onClick={() => {
               setTab("results");
@@ -2458,7 +2454,7 @@ function CommissionerPageInner() {
           >
             Enter Results
           </button>
-        </div>
+      </div>
         {isOwner && (firstTime || simpleHost) && (
           <p className="text-[11px] text-muted mb-4 -mt-2">
             Need bots, open room, or advanced tools?{" "}
@@ -2472,24 +2468,24 @@ function CommissionerPageInner() {
             >
               League settings
             </button>
-          </p>
+      </p>
         )}
 
         {tab === "settings" && isOwner && league && (
           <div className="space-y-6">
             {simpleHost && (
               <div className="rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-xs text-muted leading-relaxed">
-                <p className="font-bold text-primary text-sm">
+      <p className="font-bold text-primary text-sm">
                   Simple host mode
                 </p>
-                <p className="mt-1">
+      <p className="mt-1">
                   Your jobs: <strong className="text-foreground">invite</strong>
                   , <strong className="text-foreground">post the card</strong>,{" "}
                   <strong className="text-foreground">fill seats?</strong>,{" "}
                   <strong className="text-foreground">score the week</strong>.
                   Extra tools open after you score your first week.
                 </p>
-              </div>
+      </div>
             )}
             {/* Foundry / creator only — not for regular room commiss */}
             {labTools && <SandboxHopOptIn />}
@@ -2497,43 +2493,43 @@ function CommissionerPageInner() {
             {!simpleHost && <SportPoolCommishPanel />}
 
             <div className="rounded-xl border border-border bg-card p-5 space-y-4">
-              <h2 className="font-semibold">League</h2>
-              <div>
+      <h2 className="font-semibold">League</h2>
+      <div>
                 <label className="text-xs text-muted block mb-1">League name</label>
-                <input
+      <input
                   value={leagueNameEdit}
                   onChange={(e) => setLeagueNameEdit(e.target.value)}
                   className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm"
                 />
               </div>
-              <div>
+      <div>
                 <label className="text-xs text-muted block mb-1">Invite code</label>
-                <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
                   <div className="flex-1 min-w-[8rem] font-mono text-2xl tracking-[0.25em] text-primary font-bold">
                     {league.code}
                   </div>
-                  <button
+      <button
                     type="button"
                     onClick={copyCode}
                     className="px-3 py-2 text-xs rounded-lg border border-border"
                   >
                     {copied ? "Copied!" : "Copy code"}
                   </button>
-                  <button
+      <button
                     type="button"
                     onClick={() => void copyInviteText()}
                     className="px-3 py-2 text-xs rounded-lg border border-primary/40 text-primary font-semibold"
                   >
                     Copy invite text
                   </button>
-                  <button
+      <button
                     type="button"
                     onClick={handleRegenCode}
                     className="px-3 py-2 text-xs rounded-lg border border-border"
                   >
                     New code
                   </button>
-                </div>
+      </div>
                 {firstTime && (
                   <p className="text-[11px] text-muted mt-2 leading-relaxed">
                     Text the invite to the group chat first — empty room is the
@@ -2541,22 +2537,21 @@ function CommissionerPageInner() {
                   </p>
                 )}
               </div>
-              <div className="text-sm text-muted">
+      <div className="text-sm text-muted">
                 Commissioner:{" "}
                 <span className="text-foreground font-medium">
                   {session?.playerName || "You"}
                 </span>
-              </div>
+      </div>
             </div>
-
-            <div className="rounded-xl border border-border bg-card p-5 space-y-4">
+      <div className="rounded-xl border border-border bg-card p-5 space-y-4">
               <h2 className="font-semibold">Season rules</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs text-muted block mb-1">
+      <label className="text-xs text-muted block mb-1">
                     Cut line (% to Toilet Bowl)
                   </label>
-                  <input
+      <input
                     type="number"
                     min={10}
                     max={75}
@@ -2565,14 +2560,14 @@ function CommissionerPageInner() {
                     className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm"
                   />
                 </div>
-                <div className="rounded-lg border border-border bg-background px-3 py-2">
+      <div className="rounded-lg border border-border bg-background px-3 py-2">
                   <p className="text-xs text-muted mb-1">Season length</p>
-                  <p className="text-sm font-semibold text-foreground">
+      <p className="text-sm font-semibold text-foreground">
                     {league?.sportId === "nfl"
                       ? "NFL Weeks 1–18 + playoffs (19–22)"
                       : `Weeks 0–${SEASON_MAX_WEEK}`}
                   </p>
-                  <p className="text-[11px] text-muted mt-1 leading-relaxed">
+      <p className="text-[11px] text-muted mt-1 leading-relaxed">
                     {league?.sportId === "nfl" ? (
                       <>
                         Matches the real NFL: Weeks 1–18 regular season
@@ -2589,36 +2584,35 @@ function CommissionerPageInner() {
                       </>
                     )}
                   </p>
-                </div>
+      </div>
               </div>
-
-              <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-2">
+      <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-2">
                 <p className="text-sm font-semibold text-foreground">
                   League Build
                 </p>
-                <p className="text-xs text-muted leading-relaxed">
+      <p className="text-xs text-muted leading-relaxed">
                   Name, Crystal Ball / Super Bowl pride pick, cut line, open
                   room, bots. Editable until opening week locks the rules.
                 </p>
-                <a
+      <a
                   href="/league-build?review=1"
                   className="inline-flex items-center justify-center w-full sm:w-auto px-4 py-2.5 min-h-[44px] rounded-xl border border-primary/40 bg-primary/15 text-primary text-sm font-bold"
                 >
                   Open League Build →
                 </a>
-              </div>
+      </div>
 
               <div className="rounded-xl border border-border bg-background p-4 flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-foreground">
                     Crystal Ball
                   </p>
-                  <p className="text-xs text-muted mt-1 leading-relaxed">
+      <p className="text-xs text-muted mt-1 leading-relaxed">
                     {league?.sportId === "nfl"
                       ? "Super Bowl pride pick tab (0 points). On by default — turn off to hide the tab. Same control as League Build."
                       : "Preseason tab: pick who wins the national title (0 points). Correct picks earn a sarcastic Witch/Wizard achievement. Turn off to hide the tab for everyone in this league."}
                   </p>
-                </div>
+      </div>
                 <button
                   type="button"
                   role="switch"
@@ -2633,25 +2627,25 @@ function CommissionerPageInner() {
                       crystalBallEnabled ? "translate-x-5" : "translate-x-0"
                     }`}
                   />
-                </button>
+      </button>
                 <p className="w-full text-xs font-medium text-muted">
                   {crystalBallEnabled ? "On — tab visible" : "Off — tab hidden"}
                 </p>
-              </div>
+      </div>
 
               <div className="rounded-xl border border-amber-400/30 bg-amber-400/5 p-4 space-y-3">
-                <div className="min-w-0">
+      <div className="min-w-0">
                   <p className="text-sm font-semibold text-amber-200">
                     Drama calendar · automatic
                   </p>
-                  <p className="text-xs text-muted mt-1 leading-relaxed">
+      <p className="text-xs text-muted mt-1 leading-relaxed">
                     <strong className="text-foreground">
                       You do not turn this on.
                     </strong>{" "}
                     Every league runs the same script — no toggle, no invite
                     blast. Preview button is optional and only for you.
                   </p>
-                </div>
+      </div>
                 {(() => {
                   const cal = ringCeremonyCalendarBlurb(league?.sportId);
                   return (
@@ -2667,21 +2661,21 @@ function CommissionerPageInner() {
                   (Trophy Room). Keep prior-year hardware engraved so the room
                   has a face to chase.
                 </p>
-                <button
+      <button
                   type="button"
                   onClick={() => requestRingCeremonyPreview({ force: true })}
                   className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-amber-400/50 bg-amber-400/15 text-amber-100 text-sm font-bold min-h-[44px] hover:bg-amber-400/25"
                 >
                   Test walk-out now (preview · you only)
                 </button>
-              </div>
+      </div>
 
               <div className="rounded-xl border border-border bg-background p-4 flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-foreground">
                     Open room listing
                   </p>
-                  <p className="text-xs text-muted mt-1 leading-relaxed">
+      <p className="text-xs text-muted mt-1 leading-relaxed">
                     When on, people using{" "}
                     <strong className="text-foreground">Join open room</strong>{" "}
                     can land here. We fill this room first (fast team build),
@@ -2695,7 +2689,7 @@ function CommissionerPageInner() {
                     <p className="text-xs text-primary mt-2">{openRoomNote}</p>
                   )}
                 </div>
-                <button
+      <button
                   type="button"
                   role="switch"
                   aria-checked={isOpenRoom}
@@ -2740,27 +2734,27 @@ function CommissionerPageInner() {
                       isOpenRoom ? "translate-x-5" : "translate-x-0"
                     }`}
                   />
-                </button>
+      </button>
                 <p className="w-full text-xs font-medium text-muted">
                   {isOpenRoom
                     ? "On — open lobby can seat people here"
                     : "Off — code invite only"}
                 </p>
-              </div>
+      </div>
 
               <div className="rounded-xl border border-border bg-background p-4 space-y-3">
-                <div>
+      <div>
                   <p className="text-sm font-semibold text-foreground">
                     Room skin / background
                   </p>
-                  <p className="text-xs text-muted mt-1 leading-relaxed">
+      <p className="text-xs text-muted mt-1 leading-relaxed">
                     <strong className="text-foreground">War Room Colors</strong>{" "}
                     is the classic black + green clubhouse (NFL rooms keep
                     navy/crimson as their pack default). CFB hosts can also
                     pick campus skins. Holidays wash every page for the whole
                     room.
                   </p>
-                </div>
+      </div>
                 <label className="block text-xs text-muted">
                   Theme
                   <select
@@ -2780,7 +2774,7 @@ function CommissionerPageInner() {
                       </option>
                     ))}
                   </select>
-                </label>
+      </label>
                 <p className="text-[11px] text-muted leading-relaxed">
                   {seasonThemePresetsForSport(league?.sportId).find(
                     (p) => p.id === seasonThemeId
@@ -2791,18 +2785,18 @@ function CommissionerPageInner() {
                   <strong className="text-foreground">Save settings</strong> so
                   the rest of the league gets it.
                 </p>
-              </div>
+      </div>
 
               <div className="rounded-xl border border-border bg-background p-4 space-y-3">
-                <div>
+      <div>
                   <p className="text-sm font-semibold text-foreground">
                     Home page tagline
                   </p>
-                  <p className="text-xs text-muted mt-1 leading-relaxed">
+      <p className="text-xs text-muted mt-1 leading-relaxed">
                     Line under &quot;Welcome to the War Room&quot; for everyone
                     in this league. Change anytime and Save settings.
                   </p>
-                </div>
+      </div>
                 <label className="block text-xs text-muted">
                   Preset
                   <select
@@ -2816,7 +2810,7 @@ function CommissionerPageInner() {
                       </option>
                     ))}
                   </select>
-                </label>
+      </label>
                 {homeTaglineId === "custom" && (
                   <label className="block text-xs text-muted">
                     Your line ({HOME_TAGLINE_MAX_CHARS} characters max)
@@ -2835,23 +2829,22 @@ function CommissionerPageInner() {
                     <span className="text-[11px] text-muted mt-1 block">
                       {HOME_TAGLINE_MAX_CHARS - homeTaglineCustom.length} left
                     </span>
-                  </label>
+      </label>
                 )}
                 <div className="rounded-lg border border-border/80 bg-card px-3 py-2">
-                  <p className="text-[10px] uppercase tracking-wide text-muted mb-1">
+      <p className="text-[10px] uppercase tracking-wide text-muted mb-1">
                     Preview
                   </p>
-                  <p className="text-sm text-foreground/90 leading-relaxed">
+      <p className="text-sm text-foreground/90 leading-relaxed">
                     {resolveHomeTagline({
                       homeTaglineId,
                       homeTaglineCustom,
                       sportId: league?.sportId,
                     })}
                   </p>
-                </div>
+      </div>
               </div>
-
-              <button
+      <button
                 onClick={() => void saveSettings()}
                 className={
                   settingsSaved
@@ -2873,10 +2866,10 @@ function CommissionerPageInner() {
                 className="w-full text-left rounded-xl border border-border bg-card px-4 py-3 text-sm font-semibold flex justify-between items-center"
               >
                 <span>Advanced (bots, reset, pass commissioner…)</span>
-                <span className="text-xs text-muted">
+      <span className="text-xs text-muted">
                   {advancedOpen ? "Hide" : "Show"}
                 </span>
-              </button>
+      </button>
             )}
 
             {(advancedOpen || !firstTime) && (
@@ -2888,7 +2881,7 @@ function CommissionerPageInner() {
                   : "border-border bg-card opacity-90"
               }`}
             >
-              <h2
+      <h2
                 className={`font-semibold ${
                   preseasonToolsOk ? "text-warning" : "text-muted"
                 }`}
@@ -2900,7 +2893,7 @@ function CommissionerPageInner() {
                   </span>
                 )}
               </h2>
-              <p className="text-xs text-muted leading-relaxed">
+      <p className="text-xs text-muted leading-relaxed">
                 {preseasonToolsOk ? (
                   <>
                     Full control (one week → full season) lives on{" "}
@@ -2918,7 +2911,7 @@ function CommissionerPageInner() {
                   </>
                 )}
               </p>
-              <button
+      <button
                 type="button"
                 disabled={autoSeasonBusy}
                 onClick={() => void handleAutoFinishSeason()}
@@ -2934,7 +2927,7 @@ function CommissionerPageInner() {
                       : "Finish remaining → CFP Final"
                     : "Finish remaining (locked)"}
               </button>
-              <button
+      <button
                 type="button"
                 disabled={autoSeasonBusy}
                 onClick={() => setTab("results")}
@@ -2954,13 +2947,12 @@ function CommissionerPageInner() {
                 </p>
               )}
             </div>
-
-            <div
+      <div
               id="commish-bots"
               className="rounded-xl border border-primary/40 bg-primary/5 p-5 space-y-3 scroll-mt-24"
             >
               <h2 className="font-semibold text-primary">Fill empty seats?</h2>
-              <p className="text-xs text-muted leading-relaxed">
+      <p className="text-xs text-muted leading-relaxed">
                 Optional. Add filler bots so the room feels full (empty seats
                 only — real friends stay).{" "}
                 <strong className="text-foreground">
@@ -2985,10 +2977,10 @@ function CommissionerPageInner() {
 
               {botsLocked ? (
                 <div className="rounded-lg border border-border bg-background/60 px-3 py-2.5 text-xs text-muted leading-relaxed">
-                  <p className="font-semibold text-foreground">
+      <p className="font-semibold text-foreground">
                     Bots locked for fairness
                   </p>
-                  <p className="mt-1">{botsLockedMessage()}</p>
+      <p className="mt-1">{botsLockedMessage()}</p>
                   {botCount > 0 && (
                     <p className="mt-1 text-foreground">
                       {botCount} bot{botCount === 1 ? "" : "s"} still on the
@@ -3010,7 +3002,7 @@ function CommissionerPageInner() {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <button
+      <button
                     type="button"
                     disabled={botBusy}
                     onClick={() => void handleSimpleFillBots()}
@@ -3037,7 +3029,7 @@ function CommissionerPageInner() {
                     (pre-lock only). After kickoff or the first scored week,
                     filler bots stay for fairness.
                   </p>
-                </div>
+      </div>
               )}
 
               {botReport && (
@@ -3058,12 +3050,12 @@ function CommissionerPageInner() {
               {/* Creator-only deep bot lab (not for normal hosts) */}
               {deepHostTools && (
                 <details className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2">
-                  <summary className="text-xs font-bold text-amber-200 cursor-pointer">
+      <summary className="text-xs font-bold text-amber-200 cursor-pointer">
                     Creator advanced bot tools
                   </summary>
-                  <div className="mt-3 space-y-2">
+      <div className="mt-3 space-y-2">
                     <div className="flex flex-wrap items-end gap-2">
-                      <label className="block text-[11px] text-muted">
+      <label className="block text-[11px] text-muted">
                         Add N bots
                         <input
                           type="number"
@@ -3084,7 +3076,7 @@ function CommissionerPageInner() {
                           className="mt-1 w-20 bg-background border border-border rounded-lg px-2 py-1.5 text-sm font-mono"
                         />
                       </label>
-                      <button
+      <button
                         type="button"
                         disabled={botBusy}
                         onClick={() =>
@@ -3097,7 +3089,7 @@ function CommissionerPageInner() {
                       >
                         Add {botAddCount}
                       </button>
-                      <button
+      <button
                         type="button"
                         disabled={botBusy}
                         onClick={() =>
@@ -3110,7 +3102,7 @@ function CommissionerPageInner() {
                       >
                         Fill 32
                       </button>
-                      <button
+      <button
                         type="button"
                         disabled={botBusy}
                         onClick={() => void handleFillBotPicks()}
@@ -3118,7 +3110,7 @@ function CommissionerPageInner() {
                       >
                         Fill picks
                       </button>
-                      <button
+      <button
                         type="button"
                         disabled={botBusy || botsLocked}
                         onClick={() => void handleClearBots()}
@@ -3126,9 +3118,9 @@ function CommissionerPageInner() {
                       >
                         Clear bots
                       </button>
-                    </div>
+      </div>
                     <div className="flex flex-wrap gap-2">
-                      <button
+      <button
                         type="button"
                         disabled={botBusy}
                         onClick={() => void handleBotChaosReroll()}
@@ -3136,7 +3128,7 @@ function CommissionerPageInner() {
                       >
                         Bot Chaos
                       </button>
-                      <button
+      <button
                         type="button"
                         disabled={botBusy}
                         onClick={() => void handleSeedBotLockerTalk()}
@@ -3144,7 +3136,7 @@ function CommissionerPageInner() {
                       >
                         Bot locker
                       </button>
-                      <button
+      <button
                         type="button"
                         disabled={botBusy}
                         onClick={() => void handleSeedBotCrystalBall()}
@@ -3152,35 +3144,34 @@ function CommissionerPageInner() {
                       >
                         Bot Crystal Ball
                       </button>
-                    </div>
+      </div>
                     <p className="text-[10px] text-muted">
                       Prefer Founder → Test Mode for UI jumps without a real
                       roster.
                     </p>
-                  </div>
+      </div>
                 </details>
               )}
             </div>
-
-            <div className="rounded-xl border border-amber-400/30 bg-card p-5 space-y-3">
+      <div className="rounded-xl border border-amber-400/30 bg-card p-5 space-y-3">
               <h2 className="font-semibold text-amber-300">Trophy Room</h2>
-              <p className="text-xs text-muted leading-relaxed">
+      <p className="text-xs text-muted leading-relaxed">
                 Auto-engraves Championship, Toilet Bowl, conference titles, and Village Nerd (Crystal
                 Ball) winners by season year. History lives on this league —
                 season reset does not wipe it, and it stays when you pass
                 commissioner.
               </p>
-              <a
+      <a
                 href="/trophy-room"
                 className="inline-block px-4 py-2 rounded-lg bg-amber-400/15 border border-amber-400/40 text-amber-200 text-sm font-medium hover:bg-amber-400/25"
               >
                 Open Trophy Room →
               </a>
-            </div>
+      </div>
 
             <div className="rounded-xl border border-primary/40 bg-card p-5 space-y-3">
-              <h2 className="font-semibold text-primary">Deputy commissioners</h2>
-              <p className="text-xs text-muted leading-relaxed">
+      <h2 className="font-semibold text-primary">Deputy commissioners</h2>
+      <p className="text-xs text-muted leading-relaxed">
                 When you&apos;re unavailable, a deputy can{" "}
                 <strong className="text-foreground">build the card</strong>,{" "}
                 <strong className="text-foreground">enter results</strong>,{" "}
@@ -3206,9 +3197,9 @@ function CommissionerPageInner() {
                         m.isDeputy ? "bg-primary/5 -mx-2 px-2 rounded-lg" : ""
                       }`}
                     >
-                      <div className="min-w-0">
+      <div className="min-w-0">
                         <span className="text-sm font-medium">
-                          <PlayerLink id={m.userId} name={m.name} />
+      <PlayerLink id={m.userId} name={m.name} />
                         </span>
                         {m.isDeputy && (
                           <span className="ml-1.5 text-[10px] uppercase text-primary border border-primary/40 px-1 rounded">
@@ -3221,7 +3212,7 @@ function CommissionerPageInner() {
                           </span>
                         )}
                       </div>
-                      <button
+      <button
                         type="button"
                         disabled={deputyBusyId === m.userId}
                         onClick={() => void toggleDeputy(m)}
@@ -3233,7 +3224,7 @@ function CommissionerPageInner() {
                       >
                         {m.isDeputy ? "Remove deputy" : "Make deputy"}
                       </button>
-                    </li>
+      </li>
                   ))}
                 </ul>
               )}
@@ -3256,11 +3247,11 @@ function CommissionerPageInner() {
                 <code className="text-foreground">supabase/staff-roles-setup.sql</code>
                 .
               </p>
-            </div>
+      </div>
 
             <div className="rounded-xl border border-primary/30 bg-card p-5 space-y-3">
-              <h2 className="font-semibold text-primary">Pass commissioner</h2>
-              <p className="text-xs text-muted leading-relaxed">
+      <h2 className="font-semibold text-primary">Pass commissioner</h2>
+      <p className="text-xs text-muted leading-relaxed">
                 Stepping down?{" "}
                 <span className="text-foreground font-medium">
                   Nobody is forced
@@ -3281,7 +3272,7 @@ function CommissionerPageInner() {
                 </p>
               ) : (
                 <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
-                  <label className="block text-xs text-muted flex-1">
+      <label className="block text-xs text-muted flex-1">
                     New commissioner
                     <select
                       value={passToUserId}
@@ -3295,7 +3286,7 @@ function CommissionerPageInner() {
                         </option>
                       ))}
                     </select>
-                  </label>
+      </label>
                   <button
                     type="button"
                     disabled={passBusy || !passToUserId}
@@ -3304,7 +3295,7 @@ function CommissionerPageInner() {
                   >
                     {passBusy ? "Passing…" : "Pass commissioner"}
                   </button>
-                </div>
+      </div>
               )}
               {passReport && (
                 <p
@@ -3322,16 +3313,16 @@ function CommissionerPageInner() {
                 <code className="text-foreground">supabase/trophy-room.sql</code>{" "}
                 in Supabase SQL Editor if pass fails.
               </p>
-            </div>
+      </div>
 
             <div className="rounded-xl border-2 border-primary/45 bg-primary/10 p-5 space-y-3">
-              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
+      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
                 Decade room
               </p>
-              <h2 className="font-semibold text-foreground text-lg">
+      <h2 className="font-semibold text-foreground text-lg">
                 Start next season
               </h2>
-              <p className="text-xs text-muted leading-relaxed">
+      <p className="text-xs text-muted leading-relaxed">
                 Same league, same code, same friends — new year on the board.
                 Use this after a season ends (or when trial runs are done) so the
                 crew comes back to{" "}
@@ -3340,20 +3331,20 @@ function CommissionerPageInner() {
                 </span>
                 , not a brand-new room.
               </p>
-              <ul className="text-[11px] text-muted space-y-1 leading-relaxed list-disc pl-4">
+      <ul className="text-[11px] text-muted space-y-1 leading-relaxed list-disc pl-4">
                 <li>
-                  <span className="text-foreground font-medium">Keeps:</span>{" "}
+      <span className="text-foreground font-medium">Keeps:</span>{" "}
                   members, invite code, commissioner, divisions,{" "}
                   <span className="text-foreground font-medium">
                     Trophy Room / Museum years
                   </span>
-                </li>
+      </li>
                 <li>
-                  <span className="text-foreground font-medium">Clears:</span>{" "}
+      <span className="text-foreground font-medium">Clears:</span>{" "}
                   cards, picks, standings, this season&apos;s Gazette / Crystal
                   Ball / locker noise
                 </li>
-              </ul>
+      </ul>
               <button
                 type="button"
                 disabled={resettingSeason}
@@ -3364,7 +3355,7 @@ function CommissionerPageInner() {
                   ? "Opening next season…"
                   : "Start next season (same room)"}
               </button>
-              <p className="text-[10px] text-muted">
+      <p className="text-[10px] text-muted">
                 Confirm by typing{" "}
                 <span className="font-mono text-foreground">NEXT</span> — hard
                 to do by accident mid-season.
@@ -3381,18 +3372,17 @@ function CommissionerPageInner() {
                 </p>
               )}
             </div>
-
-            <div className="rounded-xl border border-warning/35 bg-card p-4 space-y-2">
+      <div className="rounded-xl border border-warning/35 bg-card p-4 space-y-2">
               <h3 className="text-sm font-semibold text-warning">
                 Advanced · same wipe
               </h3>
-              <p className="text-[11px] text-muted leading-relaxed">
+      <p className="text-[11px] text-muted leading-relaxed">
                 Identical board clear (type{" "}
                 <span className="font-mono text-foreground">RESET</span>). Prefer{" "}
                 <strong className="text-foreground">Start next season</strong>{" "}
                 above — same room, clearer story.
               </p>
-              <button
+      <button
                 type="button"
                 disabled={resettingSeason}
                 onClick={() => void handleResetSeason()}
@@ -3400,22 +3390,22 @@ function CommissionerPageInner() {
               >
                 {resettingSeason ? "Working…" : "Reset season (keep players)"}
               </button>
-            </div>
+      </div>
 
             <div className="rounded-xl border border-danger/40 bg-card p-5 space-y-3">
-              <h2 className="font-semibold text-danger">Danger zone</h2>
-              <p className="text-xs text-muted">
+      <h2 className="font-semibold text-danger">Danger zone</h2>
+      <p className="text-xs text-muted">
                 Permanently deletes the whole league for everyone — kills the
                 decade room. Not the same as starting next season.
               </p>
-              <button
+      <button
                 type="button"
                 onClick={handleReset}
                 className="px-4 py-2 rounded-lg border border-danger text-danger text-sm"
               >
                 Delete league and reset app
               </button>
-            </div>
+      </div>
             </>
             )}
           </div>
@@ -3473,28 +3463,28 @@ function CommissionerPageInner() {
             <>
             {!(firstTime && publishedGames.length === 0) && (
             <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 mb-4 text-xs text-foreground leading-relaxed">
-              <p className="font-bold text-amber-200">
+      <p className="font-bold text-amber-200">
                 Lazy commissioner protection
               </p>
-              <p className="mt-1 text-muted">
+      <p className="mt-1 text-muted">
                 Post the card by <strong className="text-foreground">48 hours before first kickoff</strong>.
                 Miss it and War Room auto-selects 5 games + a prop so the room can still pick.
                 Miss <strong className="text-foreground">two weeks in a row</strong> and the gavel
                 goes to whoever is in <strong className="text-foreground">1st place</strong>.
                 Publishing yourself clears the strike count.
               </p>
-            </div>
+      </div>
             )}
             <div className="rounded-xl border border-border bg-card p-5 mb-6">
-              <h2 className="font-semibold mb-1">Pick&apos;em week</h2>
-              <p className="text-xs text-muted mb-3">
+      <h2 className="font-semibold mb-1">Pick&apos;em week</h2>
+      <p className="text-xs text-muted mb-3">
                 {weekSubtitle(activeWeek)}. Games on different dates are fine —
                 each shows its own kickoff below the matchup.{" "}
                 <span className="text-stone-400">
                   Scored weeks look muted with a diagonal strike — still
                   viewable, locked for edits until unlock.
                 </span>
-              </p>
+      </p>
               <div className="flex flex-wrap gap-2">
                 {(showAllWeekChips
                   ? listSeasonWeekNumbers(league?.sportId)
@@ -3559,16 +3549,15 @@ function CommissionerPageInner() {
                 >
                   {showAllWeekChips ? "Fewer weeks" : "All weeks"}
                 </button>
-              </div>
+      </div>
             </div>
-
-            <div className="rounded-xl border border-border bg-card p-5 mb-6">
+      <div className="rounded-xl border border-border bg-card p-5 mb-6">
               <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-3">
-                <div>
+      <div>
                   <h2 className="font-semibold">
                     Pull Live Odds — {weekTitle(activeWeek)}
                   </h2>
-                  <p className="text-xs text-muted">
+      <p className="text-xs text-muted">
                     {dryRunOdds ? (
                       <>
                         <span className="text-warning font-semibold">
@@ -3595,7 +3584,7 @@ function CommissionerPageInner() {
                       </>
                     )}
                   </p>
-                </div>
+      </div>
                                 <div className="flex flex-wrap gap-2 shrink-0">
                   {labTools && (
                     <>
@@ -3619,7 +3608,7 @@ function CommissionerPageInner() {
                             ? "Publish demo week"
                             : "Publish demo week (locked)"}
                       </button>
-                      <button
+      <button
                         type="button"
                         onClick={generateDemoCard}
                         aria-disabled={!preseasonToolsOk}
@@ -3644,7 +3633,7 @@ function CommissionerPageInner() {
                   >
                     {loadingOdds ? "Pulling..." : "Pull Odds"}
                   </button>
-                </div>
+      </div>
               </div>
               {labTools ? (
                 <div
@@ -3654,7 +3643,7 @@ function CommissionerPageInner() {
                       : "border-border bg-background/60"
                   }`}
                 >
-                  <p
+      <p
                     className={`text-xs font-semibold mb-0.5 ${
                       preseasonToolsOk ? "text-warning" : "text-muted"
                     }`}
@@ -3663,26 +3652,26 @@ function CommissionerPageInner() {
                       ? "Foundry lab · fake week tools"
                       : `Lab fakes locked · season open ${getSeasonOpenLabel(league?.sportId)}`}
                   </p>
-                  <p className="text-[11px] text-muted leading-relaxed">
+      <p className="text-[11px] text-muted leading-relaxed">
                     Demo / auto-score stay here for the shop. Room commiss only
                     see Pull Odds → publish → Sync.
                   </p>
-                </div>
+      </div>
               ) : (
                 <div className="rounded-lg border border-border bg-background/60 px-3 py-2.5 mb-2">
-                  <p className="text-xs font-semibold text-muted mb-0.5">
+      <p className="text-xs font-semibold text-muted mb-0.5">
                     Live card path
                   </p>
-                  <p className="text-[11px] text-muted leading-relaxed">
+      <p className="text-[11px] text-muted leading-relaxed">
                     <strong className="text-foreground">Pull Odds</strong> →
                     pick 5 → Publish. Later: Enter Results → Sync final scores
                     → Save &amp; Score.
                   </p>
-                </div>
+      </div>
               )}
               {labTools && (
                 <label className="flex items-start gap-3 cursor-pointer rounded-lg border border-border bg-background px-3 py-2.5 mb-2">
-                  <input
+      <input
                     type="checkbox"
                     checked={dryRunOdds}
                     onChange={(e) => {
@@ -3694,13 +3683,13 @@ function CommissionerPageInner() {
                     className="mt-0.5 accent-primary"
                   />
                   <span className="text-xs leading-relaxed">
-                    <span className="font-semibold text-foreground">
+      <span className="font-semibold text-foreground">
                       Dry run: show all open real games
                     </span>
-                    <span className="text-muted block mt-0.5">
+      <span className="text-muted block mt-0.5">
                       Foundry only. Pull Odds without week date filter.
                     </span>
-                  </span>
+      </span>
                 </label>
               )}
 {oddsError && (
@@ -3721,11 +3710,11 @@ function CommissionerPageInner() {
 
             {availableGames.length > 0 && (
               <div className="rounded-xl border border-border bg-card p-5 mb-6">
-                <h2 className="font-semibold mb-1">
+      <h2 className="font-semibold mb-1">
                   Select 5 Games for {weekTitle(activeWeek)} (
                   {selectedIds.size}/5)
                 </h2>
-                <p className="text-xs text-muted mb-2">
+      <p className="text-xs text-muted mb-2">
                   {availableGames.length}{" "}
                   {leagueFootballSport() === "nfl" ? "NFL" : "FBS"} games
                   {rankLabel ? ` • Ranks: ${rankLabel}` : ""}
@@ -3831,7 +3820,7 @@ function CommissionerPageInner() {
                           <p className="text-[10px] uppercase tracking-wider text-muted font-bold mb-1.5">
                             Filter slate · default is All games
                           </p>
-                          <div className="phone-h-scroll sm:flex-wrap sm:overflow-visible gap-1.5 mb-3">
+      <div className="phone-h-scroll sm:flex-wrap sm:overflow-visible gap-1.5 mb-3">
                             {chips.map((c) => (
                               <button
                                 key={c.id}
@@ -3848,7 +3837,7 @@ function CommissionerPageInner() {
                                 <span className="ml-1 opacity-80 tabular-nums">
                                   {c.count}
                                 </span>
-                              </button>
+      </button>
                             ))}
                           </div>
                         </>
@@ -3877,11 +3866,11 @@ function CommissionerPageInner() {
                 <div className="space-y-4 max-h-[28rem] overflow-y-auto mt-2 overscroll-contain">
                   {dateGroups.map((group) => (
                     <div key={group.dateKey}>
-                      <div className="sticky top-0 bg-card/95 backdrop-blur py-1.5 mb-2 border-b border-border z-10">
+      <div className="sticky top-0 bg-card/95 backdrop-blur py-1.5 mb-2 border-b border-border z-10">
                         <span className="text-xs font-semibold text-primary">
                           {group.dateLabel}
                         </span>
-                        <span className="text-[11px] text-muted ml-2">
+      <span className="text-[11px] text-muted ml-2">
                           {group.games.length} game
                           {group.games.length === 1 ? "" : "s"}
                           {effectiveFilter !== "all"
@@ -3890,7 +3879,7 @@ function CommissionerPageInner() {
                               ? ""
                               : " · ranked first within day"}
                         </span>
-                      </div>
+      </div>
                       <div className="space-y-2">
                         {group.games.map((g) => {
                           const selected = selectedIds.has(g.id);
@@ -3947,7 +3936,7 @@ function CommissionerPageInner() {
                             >
                               {/* Phone: stack both teams full-width — no single-line truncate */}
                               <div className="flex items-start justify-between gap-2 mb-1.5">
-                                <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+      <div className="flex flex-wrap items-center gap-1.5 min-w-0">
                                   {selected && (
                                     <span className="text-[10px] font-extrabold uppercase tracking-wide text-black bg-primary px-1.5 py-0.5 rounded shrink-0">
                                       ✓ On card
@@ -3959,47 +3948,47 @@ function CommissionerPageInner() {
                                     </span>
                                   )}
                                 </div>
-                                <span
+      <span
                                   className="shrink-0 text-xs sm:text-sm font-bold text-primary tabular-nums bg-primary/10 border border-primary/25 rounded-lg px-2 py-1"
                                   title={formatRankedTeam(favName, favRank)}
                                 >
                                   <span className="hidden sm:inline">
                                     {formatRankedTeam(favName, favRank)}{" "}
                                   </span>
-                                  <span className="sm:hidden">
+      <span className="sm:hidden">
                                     {favRank ? `#${favRank} ` : ""}
                                     {favShort}{" "}
                                   </span>
                                   {spreadNum}
                                 </span>
-                              </div>
+      </div>
                               <div
                                 className={`space-y-0.5 font-semibold leading-snug ${titleTone}`}
                               >
-                                <p className="text-[13px] sm:text-sm break-words">
+      <p className="text-[13px] sm:text-sm break-words">
                                   {formatRankedTeam(g.awayTeam, g.awayRank)}
                                 </p>
-                                <p className="text-[13px] sm:text-sm break-words">
+      <p className="text-[13px] sm:text-sm break-words">
                                   <span className="text-muted font-medium">
                                     @{" "}
                                   </span>
                                   {formatRankedTeam(g.homeTeam, g.homeRank)}
                                 </p>
-                              </div>
+      </div>
                               <div className="text-xs text-primary mt-1.5">
                                 {kick.full}
                               </div>
-                              <div className="text-[11px] text-muted mt-0.5">
+      <div className="text-[11px] text-muted mt-0.5">
                                 {confLine}
                                 {g.bookmaker
                                   ? `${confLine ? " · " : ""}${g.bookmaker}`
                                   : ""}
                               </div>
-                            </button>
+      </button>
                           );
                         })}
                       </div>
-                    </div>
+      </div>
                   ))}
                 </div>
                     </>
@@ -4011,9 +4000,9 @@ function CommissionerPageInner() {
             {/* Weekly prop — category dropdown → question list */}
             {availableGames.length > 0 && (
               <div className="rounded-xl border border-border bg-card p-5 mb-6 space-y-3">
-                <div>
+      <div>
                   <h3 className="font-semibold text-sm">Weekly prop</h3>
-                  <p className="text-xs text-muted mt-0.5">
+      <p className="text-xs text-muted mt-0.5">
                     Category → question
                     {leagueFootballSport() === "nfl"
                       ? " (NFL bank)"
@@ -4028,8 +4017,7 @@ function CommissionerPageInner() {
                       </p>
                     )}
                 </div>
-
-                <label className="block text-xs text-muted">
+      <label className="block text-xs text-muted">
                   Prop type
                   <select
                     value={propCategory}
@@ -4044,7 +4032,7 @@ function CommissionerPageInner() {
                       </option>
                     ))}
                   </select>
-                </label>
+      </label>
                 <p className="text-[11px] text-muted -mt-1">
                   {
                     propCategoriesForSport(leagueFootballSport()).find(
@@ -4052,8 +4040,7 @@ function CommissionerPageInner() {
                     )?.blurb
                   }
                 </p>
-
-                <label className="block text-xs text-muted">
+      <label className="block text-xs text-muted">
                   Question
                   <select
                     value={
@@ -4076,10 +4063,9 @@ function CommissionerPageInner() {
                     <option value={CUSTOM_PROP_ID}>
                       Custom prop (write your own)…
                     </option>
-                  </select>
+      </select>
                 </label>
-
-                <div className="max-h-56 overflow-y-auto rounded-lg border border-border divide-y divide-border overscroll-contain">
+      <div className="max-h-56 overflow-y-auto rounded-lg border border-border divide-y divide-border overscroll-contain">
                   {presetsForCategory(
                     propCategory,
                     leagueFootballSport()
@@ -4100,12 +4086,12 @@ function CommissionerPageInner() {
                           {active ? "✓ " : ""}
                           {p.label}
                         </span>
-                        <span className="block text-[10px] text-muted font-normal mt-0.5">
+      <span className="block text-[10px] text-muted font-normal mt-0.5">
                           {p.settle === "auto"
                             ? "Auto-scores from finals"
                             : "You set Yes/No after games (box score)"}
                         </span>
-                      </button>
+      </button>
                     );
                   })}
                   <button
@@ -4120,7 +4106,7 @@ function CommissionerPageInner() {
                     {propPresetId === CUSTOM_PROP_ID ? "✓ " : ""}
                     Custom prop (write your own)…
                   </button>
-                </div>
+      </div>
 
                 <p className="text-[11px] text-muted">
                   ⚡ Teams / most Funny auto-settle from scores. 📝 Players &amp;
@@ -4129,7 +4115,7 @@ function CommissionerPageInner() {
 
                 {propPresetId === CUSTOM_PROP_ID ? (
                   <div className="space-y-2 rounded-lg border border-border bg-background p-3">
-                    <input
+      <input
                       type="text"
                       value={customQuestion}
                       onChange={(e) => {
@@ -4151,7 +4137,7 @@ function CommissionerPageInner() {
                       className="w-full min-h-[48px] bg-card border border-border rounded-lg px-3 py-3 text-base"
                     />
                     <div className="grid grid-cols-2 gap-2">
-                      <input
+      <input
                         type="text"
                         value={customOptA}
                         onChange={(e) => {
@@ -4192,16 +4178,16 @@ function CommissionerPageInner() {
                         className="min-h-[48px] bg-card border border-border rounded-lg px-3 py-3 text-base"
                       />
                     </div>
-                  </div>
+      </div>
                 ) : (
                   <div className="rounded-lg border border-border bg-background px-3 py-3 text-sm">
-                    <p className="text-foreground leading-snug">
+      <p className="text-foreground leading-snug">
                       {prop.question}
                     </p>
-                    <p className="text-xs text-muted mt-1.5">
+      <p className="text-xs text-muted mt-1.5">
                       Choices: {prop.options[0]} · {prop.options[1]}
                     </p>
-                  </div>
+      </div>
                 )}
 
                 <button
@@ -4216,7 +4202,7 @@ function CommissionerPageInner() {
                 >
                   Publish / Update {weekTitle(activeWeek)} Card
                 </button>
-              </div>
+      </div>
             )}
 
             {cardSaved && (
@@ -4237,20 +4223,20 @@ function CommissionerPageInner() {
 
         {tab === "picks" && (
           <div className="space-y-4">
-            <div className="rounded-xl border border-border bg-card p-5">
+      <div className="rounded-xl border border-border bg-card p-5">
               <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-3">
-                <div>
+      <div>
                   <h2 className="font-semibold">
                     Who&apos;s in — {weekTitle(activeWeek)}
                   </h2>
-                  <p className="text-xs text-muted mt-1">
+      <p className="text-xs text-muted mt-1">
                     Shows who submitted a full card. You never see their
                     sides, confidence, or prop choice here — only status.
                     Post an announcement any day/time you want.
                   </p>
-                </div>
+      </div>
                 <div className="flex flex-wrap gap-2 shrink-0">
-                  <button
+      <button
                     type="button"
                     onClick={() => refreshPickStatus()}
                     disabled={pickStatusLoading || postingNudge}
@@ -4258,7 +4244,7 @@ function CommissionerPageInner() {
                   >
                     {pickStatusLoading ? "Refreshing…" : "Refresh"}
                   </button>
-                  <button
+      <button
                     type="button"
                     onClick={() => announceMissingPicks()}
                     disabled={
@@ -4272,7 +4258,7 @@ function CommissionerPageInner() {
                       ? "Posting…"
                       : "Announce who hasn't picked"}
                   </button>
-                </div>
+      </div>
               </div>
 
               {nudgeMessage && (
@@ -4331,23 +4317,23 @@ function CommissionerPageInner() {
 
               {!pickStatusLoading && pickStatus.length > 0 && (
                 <div className="flex flex-wrap gap-3 text-xs mb-4">
-                  <span className="text-primary">
+      <span className="text-primary">
                     Complete: {pickStatus.filter((r) => r.complete).length}
                   </span>
-                  <span className="text-warning">
+      <span className="text-warning">
                     Partial:{" "}
                     {
                       pickStatus.filter((r) => r.submitted && !r.complete)
                         .length
                     }
                   </span>
-                  <span className="text-danger">
+      <span className="text-danger">
                     Missing: {pickStatus.filter((r) => !r.submitted).length}
                   </span>
-                  <span className="text-muted">
+      <span className="text-muted">
                     of {pickStatus.length} players
                   </span>
-                </div>
+      </div>
               )}
 
               {pickStatusLoading && (
@@ -4369,16 +4355,16 @@ function CommissionerPageInner() {
                       key={r.userId}
                       className="flex items-center gap-3 px-3 py-2.5 bg-card hover:bg-card-hover"
                     >
-                      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium truncate">
-                          <PlayerLink id={r.userId} name={r.name} />
+      <PlayerLink id={r.userId} name={r.name} />
                           {r.role === "commissioner" && (
                             <span className="text-primary text-xs ml-1">
                               Commish
                             </span>
                           )}
                         </div>
-                        <div className="text-[11px] text-muted">
+      <div className="text-[11px] text-muted">
                           {r.division}
                           {r.submitted
                             ? ` · ${r.gamePickCount} game picks`
@@ -4386,7 +4372,7 @@ function CommissionerPageInner() {
                           {r.submitted && !r.hasProp ? " · no prop" : ""}
                           {r.submitted && !r.hasBestBet ? " · no best bet" : ""}
                         </div>
-                      </div>
+      </div>
                       {r.complete ? (
                         <span className="text-xs font-medium text-primary shrink-0">
                           ✓ In
@@ -4405,22 +4391,22 @@ function CommissionerPageInner() {
                 </ul>
               )}
             </div>
-          </div>
+      </div>
         )}
 
         {tab === "results" && (
           <div>
             {/* Ship A: one primary host action */}
             <div className="rounded-xl border-2 border-primary/50 bg-primary/10 p-4 mb-6 space-y-3">
-              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
+      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
                 Score this week
               </p>
-              <p className="text-xs text-muted leading-relaxed">
+      <p className="text-xs text-muted leading-relaxed">
                 {practiceTools
                   ? "Foundry lab: one tap can randomize covers + prop and score."
                   : "Live: pull finals from the score feed, settle what we can, then score the league. Fix any gaps below if needed."}
               </p>
-              <button
+      <button
                 type="button"
                 disabled={
                   scoring ||
@@ -4482,10 +4468,10 @@ function CommissionerPageInner() {
                   : "border-border bg-card"
               }`}
             >
-              <summary className="text-sm font-semibold cursor-pointer text-muted">
+      <summary className="text-sm font-semibold cursor-pointer text-muted">
                 Foundry · advanced scoring lab
               </summary>
-            <div
+      <div
               className={`mt-3 space-y-3 ${
                 preseasonToolsOk ? "" : ""
               }`}
@@ -4502,7 +4488,7 @@ function CommissionerPageInner() {
                   </span>
                 )}
               </h2>
-              <p className="text-xs text-muted leading-relaxed">
+      <p className="text-xs text-muted leading-relaxed">
                 {preseasonToolsOk ? (
                   <>
                     Pick a range. Each unscored week gets: demo card → bot picks
@@ -4517,8 +4503,7 @@ function CommissionerPageInner() {
                   </>
                 )}
               </p>
-
-              <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3">
                 <label className="block text-xs text-muted">
                   From
                   <select
@@ -4540,7 +4525,7 @@ function CommissionerPageInner() {
                       )
                     )}
                   </select>
-                </label>
+      </label>
                 <label className="block text-xs text-muted">
                   Through
                   <select
@@ -4562,10 +4547,9 @@ function CommissionerPageInner() {
                       )
                     )}
                   </select>
-                </label>
+      </label>
               </div>
-
-              <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
                   disabled={autoSeasonBusy || !preseasonToolsOk}
@@ -4578,7 +4562,7 @@ function CommissionerPageInner() {
                 >
                   This week only
                 </button>
-                <button
+      <button
                   type="button"
                   disabled={autoSeasonBusy || !preseasonToolsOk}
                   onClick={() => {
@@ -4599,7 +4583,7 @@ function CommissionerPageInner() {
                 >
                   Next unscored
                 </button>
-                <button
+      <button
                   type="button"
                   disabled={autoSeasonBusy || !preseasonToolsOk}
                   onClick={() => {
@@ -4620,7 +4604,7 @@ function CommissionerPageInner() {
                 >
                   Rest of season
                 </button>
-                <button
+      <button
                   type="button"
                   disabled={autoSeasonBusy || !preseasonToolsOk}
                   onClick={() => {
@@ -4634,7 +4618,7 @@ function CommissionerPageInner() {
                     ? "Full 1 → Super Bowl"
                     : "Full 0 → Final"}
                 </button>
-              </div>
+      </div>
 
               <button
                 type="button"
@@ -4664,19 +4648,19 @@ function CommissionerPageInner() {
                 </p>
               )}
             </div>
-            </details>
+      </details>
             )}
 
             {/* Week picker for scoring */}
             <div className="rounded-xl border border-border bg-card p-5 mb-6">
-              <h2 className="font-semibold mb-1">Score which week?</h2>
-              <p className="text-xs text-muted mb-3">
+      <h2 className="font-semibold mb-1">Score which week?</h2>
+      <p className="text-xs text-muted mb-3">
                 Select a week with a published card.{" "}
                 <strong className="text-foreground">Scored weeks lock</strong>{" "}
                 so you don&apos;t overwrite them by accident. Unlock only to
                 re-score a dry run.
               </p>
-              <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2">
                 {listSeasonWeekNumbers(league?.sportId).map(
                   (w) => {
                     const scored = scoredWeeks.includes(w);
@@ -4703,17 +4687,17 @@ function CommissionerPageInner() {
                   }
                 )}
               </div>
-              <p className="text-[11px] text-muted mt-3">
+      <p className="text-[11px] text-muted mt-3">
                 <span className="text-stone-400">Muted + diagonal</span> = week
                 already scored (still open to view; unlock only if you must
                 re-score).
               </p>
-            </div>
+      </div>
 
             <div className="rounded-xl border border-border bg-card p-5 mb-6">
-              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
                 <div>
-                  <h2 className="font-semibold mb-1">
+      <h2 className="font-semibold mb-1">
                     Enter Results — {weekTitle(activeWeek)}
                     {resultsLocked && (
                       <span className="ml-2 text-xs font-bold uppercase tracking-wide text-ok border border-ok/40 px-2 py-0.5 rounded-full">
@@ -4721,7 +4705,7 @@ function CommissionerPageInner() {
                       </span>
                     )}
                   </h2>
-                  <p className="text-xs text-muted">
+      <p className="text-xs text-muted">
                     {weekSubtitle(activeWeek)}
                     {formatCardDateRange(publishedGames)
                       ? ` · ${formatCardDateRange(publishedGames)}`
@@ -4736,7 +4720,7 @@ function CommissionerPageInner() {
                     Auto-sync uses The Odds API finals (last 3 days) + your
                     locked spreads for ATS. Prop still needs a manual pick.
                   </p>
-                </div>
+      </div>
                 <div className="flex flex-col gap-2 shrink-0">
                   {labTools && (
                     <>
@@ -4764,7 +4748,7 @@ function CommissionerPageInner() {
                               ? "Week scored ✓"
                               : "Randomize & score"}
                       </button>
-                      <button
+      <button
                         type="button"
                         onClick={randomizeResultsForDryRun}
                         disabled={
@@ -4835,7 +4819,7 @@ function CommissionerPageInner() {
                     </button>
                   )}
                 </div>
-              </div>
+      </div>
               {syncReport && (
                 <pre className="text-xs text-muted whitespace-pre-wrap mb-4 rounded-lg border border-border bg-background p-3 max-h-40 overflow-y-auto">
                   {syncReport}
@@ -4856,11 +4840,11 @@ function CommissionerPageInner() {
                   );
                   return (
                     <div key={game.id} className="border border-border rounded-lg p-4">
-                      <div className="font-medium">
+      <div className="font-medium">
                         {game.awayTeam} @ {game.homeTeam}
                       </div>
-                      <div className="text-xs text-primary mb-3">{kick.full}</div>
-                      <div className="grid grid-cols-3 gap-2">
+      <div className="text-xs text-primary mb-3">{kick.full}</div>
+      <div className="grid grid-cols-3 gap-2">
                         <button
                           type="button"
                           disabled={resultsLocked}
@@ -4873,7 +4857,7 @@ function CommissionerPageInner() {
                         >
                           {game.awayTeam}
                         </button>
-                        <button
+      <button
                           type="button"
                           disabled={resultsLocked}
                           onClick={() => setGameWinner(game.id, "push")}
@@ -4885,7 +4869,7 @@ function CommissionerPageInner() {
                         >
                           Push
                         </button>
-                        <button
+      <button
                           type="button"
                           disabled={resultsLocked}
                           onClick={() => setGameWinner(game.id, "home")}
@@ -4897,17 +4881,16 @@ function CommissionerPageInner() {
                         >
                           {game.homeTeam}
                         </button>
-                      </div>
+      </div>
                     </div>
                   );
                 })}
               </div>
               )}
             </div>
-
-            <div className="rounded-xl border border-border bg-card p-5 mb-6">
+      <div className="rounded-xl border border-border bg-card p-5 mb-6">
               <h2 className="font-semibold mb-2">Prop Result</h2>
-              <p className="text-xs text-muted mb-1">
+      <p className="text-xs text-muted mb-1">
                 Locked from the published {weekTitle(activeWeek)} card. Most
                 presets auto-fill when you Sync final scores (custom + OT are
                 manual).
@@ -4919,7 +4902,7 @@ function CommissionerPageInner() {
                   <p className="text-sm text-foreground mb-3">
                     {publishedProp.question}
                   </p>
-                  <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3">
                     {publishedProp.options.map((opt) => (
                       <button
                         key={opt}
@@ -4953,8 +4936,7 @@ function CommissionerPageInner() {
                 </p>
               )}
             </div>
-
-            <button
+      <button
               disabled={!allResultsIn || resultsLocked || scoring}
               onClick={() => void handleSaveResults()}
               className={
@@ -4979,11 +4961,11 @@ function CommissionerPageInner() {
             )}
             {demoScore && (
               <div className="rounded-xl border border-border bg-card p-5">
-                <h3 className="font-semibold mb-3">Your Picks Scored</h3>
-                <div className="text-2xl font-bold text-primary">
+      <h3 className="font-semibold mb-3">Your Picks Scored</h3>
+      <div className="text-2xl font-bold text-primary">
                   {demoScore.totalPoints} pts
                 </div>
-              </div>
+      </div>
             )}
             {resultsSaved && !hasPlayerPicks && (
               <p className="text-sm text-muted mt-3">
@@ -5008,6 +4990,6 @@ export default function CommissionerPage() {
       }
     >
       <CommissionerPageInner />
-    </Suspense>
+      </Suspense>
   );
 }

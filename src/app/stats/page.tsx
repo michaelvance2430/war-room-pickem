@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Nav from "@/components/Nav";
 import SwingBadge from "@/components/SwingBadge";
 import HotTakeTicker from "@/components/HotTakeTicker";
 import { loadLeaguePlayers } from "@/lib/cloud";
@@ -151,15 +150,13 @@ export default function StatsPage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Nav />
-
       <main className="flex-1 max-w-4xl mx-auto w-full px-4 py-8">
         <div className="mb-4">
-          <h1 className="text-2xl font-bold">Stats</h1>
-          <p className="text-sm text-muted">
+      <h1 className="text-2xl font-bold">Stats</h1>
+      <p className="text-sm text-muted">
             Power rankings, season table, and league lore
           </p>
-        </div>
+      </div>
 
         <div className="flex flex-wrap gap-2 mb-6">
           {(
@@ -190,21 +187,21 @@ export default function StatsPage() {
 
         {!loading && players.length === 0 && (
           <div className="rounded-xl border border-border bg-card px-4 py-10 text-center">
-            <p className="text-sm text-muted">
+      <p className="text-sm text-muted">
               No players in this league yet. Invite friends from Players.
             </p>
-          </div>
+      </div>
         )}
 
         {/* —— Power Rankings tab —— */}
         {mainTab === "power" && !loading && players.length > 0 && (
           <>
             <HotTakeTicker className="mb-6" />
-            <p className="text-xs text-muted mb-4">
+      <p className="text-xs text-muted mb-4">
               Who is playing the best right now? Swing labels from the last
               scored week.
             </p>
-            <div className="space-y-2 max-w-3xl">
+      <div className="space-y-2 max-w-3xl">
               {ranked.map((player, idx) => {
                 const last4 = player.weeklyPoints.slice(-4);
                 const last4Total = last4.reduce((a, b) => a + b, 0);
@@ -218,7 +215,7 @@ export default function StatsPage() {
                       "rounded-xl border border-border bg-card p-4 flex items-center gap-3 sm:gap-4 hover:bg-card-hover transition"
                     )}
                   >
-                    <div
+      <div
                       className={`w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-sm font-bold ${
                         idx < 3
                           ? "bg-primary text-black"
@@ -227,18 +224,17 @@ export default function StatsPage() {
                     >
                       {idx + 1}
                     </div>
-
-                    <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0">
                       <div
                         className={`${selfNameClass(mine)} truncate flex items-center gap-2 flex-wrap`}
                       >
-                        <span>
+      <span>
                           <PlayerLink id={player.id} name={player.name} />
                           {mine && <YouBadge />}
                         </span>
-                        <SwingBadge swing={player.swing} />
+      <SwingBadge swing={player.swing} />
                       </div>
-                      <div className="text-xs text-muted mt-0.5">
+      <div className="text-xs text-muted mt-0.5">
                         {player.division} • Last 4: {last4Total} pts • ATS{" "}
                         {player.atsTotal
                           ? Math.round(
@@ -250,25 +246,25 @@ export default function StatsPage() {
                           <> • Last card: {player.lastWeekPts}</>
                         )}
                       </div>
-                    </div>
+      </div>
 
                     <div className="text-right shrink-0">
-                      <div className="text-sm font-semibold">
+      <div className="text-sm font-semibold">
                         {player.power.toFixed(1)}
                       </div>
-                      <div className="text-xs text-muted">
+      <div className="text-xs text-muted">
                         {player.currentStreak > 0
                           ? `W${player.currentStreak}`
                           : player.currentStreak < 0
                             ? `L${Math.abs(player.currentStreak)}`
                             : "—"}
                       </div>
-                    </div>
+      </div>
                   </div>
                 );
               })}
             </div>
-            <p className="text-[11px] text-muted mt-6 leading-relaxed">
+      <p className="text-[11px] text-muted mt-6 leading-relaxed">
               Labels (ON A HEATER, etc.) track movement in season standings
               after the latest scored week. Power score ranks recent form.
             </p>
@@ -294,29 +290,28 @@ export default function StatsPage() {
                 </button>
               ))}
             </div>
-
-            <div className="rounded-xl border border-border overflow-hidden">
+      <div className="rounded-xl border border-border overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+      <table className="w-full text-sm">
                   <thead className="bg-card text-muted text-xs uppercase tracking-wide">
-                    <tr>
+      <tr>
                       <th className="text-left px-3 py-3 font-medium">#</th>
-                      <th className="text-left px-3 py-3 font-medium">
+      <th className="text-left px-3 py-3 font-medium">
                         Player
                       </th>
-                      <th className="text-right px-3 py-3 font-medium">Pts</th>
-                      <th className="text-right px-3 py-3 font-medium">Avg</th>
-                      <th className="text-right px-3 py-3 font-medium">Best</th>
-                      <th className="text-right px-3 py-3 font-medium">ATS</th>
-                      <th className="text-right px-3 py-3 font-medium">BB%</th>
-                      <th className="text-right px-3 py-3 font-medium">Prop</th>
-                      <th className="text-right px-3 py-3 font-medium">Perf</th>
-                      <th className="text-right px-3 py-3 font-medium">
+      <th className="text-right px-3 py-3 font-medium">Pts</th>
+      <th className="text-right px-3 py-3 font-medium">Avg</th>
+      <th className="text-right px-3 py-3 font-medium">Best</th>
+      <th className="text-right px-3 py-3 font-medium">ATS</th>
+      <th className="text-right px-3 py-3 font-medium">BB%</th>
+      <th className="text-right px-3 py-3 font-medium">Prop</th>
+      <th className="text-right px-3 py-3 font-medium">Perf</th>
+      <th className="text-right px-3 py-3 font-medium">
                         Streak
                       </th>
-                    </tr>
+      </tr>
                   </thead>
-                  <tbody>
+      <tbody>
                     {sorted.map((p, idx) => {
                       const mine = isSelfPlayer(p.id, selfId);
                       return (
@@ -327,37 +322,37 @@ export default function StatsPage() {
                             "border-t border-border hover:bg-card-hover transition"
                           )}
                         >
-                          <td className="px-3 py-2.5 text-muted">
+      <td className="px-3 py-2.5 text-muted">
                             {idx + 1}
                           </td>
-                          <td
+      <td
                             className={`px-3 py-2.5 ${selfNameClass(mine)}`}
                           >
                             <PlayerLink id={p.id} name={p.name} />
                             {mine && <YouBadge />}
                           </td>
-                          <td className="px-3 py-2.5 text-right font-semibold">
+      <td className="px-3 py-2.5 text-right font-semibold">
                             {p.totalPoints}
                           </td>
-                          <td className="px-3 py-2.5 text-right text-muted">
+      <td className="px-3 py-2.5 text-right text-muted">
                             {avg(p).toFixed(1)}
                           </td>
-                          <td className="px-3 py-2.5 text-right">
+      <td className="px-3 py-2.5 text-right">
                             {p.bestWeek || "—"}
                           </td>
-                          <td className="px-3 py-2.5 text-right text-muted">
+      <td className="px-3 py-2.5 text-right text-muted">
                             {atsPct(p)}%
                           </td>
-                          <td className="px-3 py-2.5 text-right text-muted">
+      <td className="px-3 py-2.5 text-right text-muted">
                             {bestBetPct(p)}%
                           </td>
-                          <td className="px-3 py-2.5 text-right text-muted">
+      <td className="px-3 py-2.5 text-right text-muted">
                             {propPct(p)}%
                           </td>
-                          <td className="px-3 py-2.5 text-right">
+      <td className="px-3 py-2.5 text-right">
                             {p.perfectWeeks || 0}
                           </td>
-                          <td className="px-3 py-2.5 text-right">
+      <td className="px-3 py-2.5 text-right">
                             {p.currentStreak > 0 ? (
                               <span className="text-primary">
                                 W{p.currentStreak}
@@ -370,13 +365,13 @@ export default function StatsPage() {
                               "—"
                             )}
                           </td>
-                        </tr>
+      </tr>
                       );
                     })}
                   </tbody>
-                </table>
+      </table>
               </div>
-            </div>
+      </div>
             <p className="text-xs text-muted mt-4 text-center">
               BB% = Best Bet hit rate • Perf = weeks scoring 18+ • Updates when
               results are scored
@@ -393,16 +388,16 @@ export default function StatsPage() {
             </p>
             {loreCards.length === 0 ? (
               <div className="rounded-xl border border-dashed border-border bg-card/50 px-4 py-12 text-center">
-                <div className="text-3xl mb-2" aria-hidden>
+      <div className="text-3xl mb-2" aria-hidden>
                   🏆🔥
                 </div>
-                <p className="text-sm font-medium">No lore yet</p>
-                <p className="text-xs text-muted mt-1 max-w-sm mx-auto">
+      <p className="text-sm font-medium">No lore yet</p>
+      <p className="text-xs text-muted mt-1 max-w-sm mx-auto">
                   Score a couple weeks for streaks and jumps. Engrave a
                   Championship in the Trophy Room for rings and a defending
                   champ.
                 </p>
-              </div>
+      </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {loreCards.map((card) => {
@@ -415,27 +410,27 @@ export default function StatsPage() {
                         mine ? "ring-1 ring-inset ring-primary/30" : ""
                       }`}
                     >
-                      <div className="flex items-start justify-between gap-2 mb-2">
+      <div className="flex items-start justify-between gap-2 mb-2">
                         <div className="text-2xl" aria-hidden>
                           {card.emoji}
                         </div>
-                        <div
+      <div
                           className={`text-lg font-bold font-mono ${tone.stat}`}
                         >
                           {card.stat}
                         </div>
-                      </div>
+      </div>
                       <p className="text-[10px] uppercase tracking-[0.14em] text-muted font-semibold mb-1">
                         {card.title}
                       </p>
-                      <p className={selfNameClass(mine, "text-base font-bold")}>
+      <p className={selfNameClass(mine, "text-base font-bold")}>
                         <PlayerLink id={card.userId} name={card.name} />
                         {mine && <YouBadge />}
                       </p>
-                      <p className="text-xs text-muted mt-1.5 leading-relaxed">
+      <p className="text-xs text-muted mt-1.5 leading-relaxed">
                         {card.blurb}
                       </p>
-                    </div>
+      </div>
                   );
                 })}
               </div>
@@ -447,6 +442,6 @@ export default function StatsPage() {
           </>
         )}
       </main>
-    </div>
+      </div>
   );
 }

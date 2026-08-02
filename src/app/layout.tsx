@@ -8,6 +8,7 @@ import SandboxSessionChrome from "@/components/SandboxSessionChrome";
 import LeagueBuildGate from "@/components/LeagueBuildGate";
 import PullToRefresh from "@/components/PullToRefresh";
 import RouteHardSwitch from "@/components/RouteHardSwitch";
+import AppShell from "@/components/AppShell";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -74,13 +75,15 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-background text-foreground phone-shell">
         <RouteHardSwitch />
-        <SportThemeApplier />
+      <SportThemeApplier />
         <SeasonThemeApplier />
-        <FoundrySessionChrome />
+      <FoundrySessionChrome />
         <SandboxSessionChrome />
-        <LeagueBuildGate />
-        <PullToRefresh>{children}</PullToRefresh>
+      <LeagueBuildGate />
+        <PullToRefresh>
+      <AppShell>{children}</AppShell>
+      </PullToRefresh>
       </body>
-    </html>
+      </html>
   );
 }

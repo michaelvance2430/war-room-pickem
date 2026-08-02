@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
-import Nav from "@/components/Nav";
 import PicksHowToModal from "@/components/PicksHowToModal";
 import PicksPreOpenOddsModal from "@/components/PicksPreOpenOddsModal";
 import FirstFinalModal from "@/components/FirstFinalModal";
@@ -1297,7 +1296,6 @@ export default function PicksClient() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Nav />
       {!practiceMode && <PicksPreOpenOddsModal />}
       <PicksHowToModal />
       <PicksSavedModal
@@ -1316,11 +1314,11 @@ export default function PicksClient() {
       <main className="flex-1 max-w-3xl mx-auto w-full px-3 sm:px-4 py-5 sm:py-8 phone-picks-main">
         {eyesPreview && (
           <div className="mb-4 rounded-lg border border-sky-400/50 bg-sky-500/15 px-3 py-2 text-xs font-bold text-sky-100 flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span>PREVIEW · local card · not your real standings</span>
-            <Link href="/founder#eyes" className="underline">
+      <span>PREVIEW · local card · not your real standings</span>
+      <Link href="/founder#eyes" className="underline">
               Foundry eyes
             </Link>
-            <button
+      <button
               type="button"
               className="underline font-extrabold"
               onClick={() => {
@@ -1332,47 +1330,47 @@ export default function PicksClient() {
             >
               Exit → Foundry
             </button>
-          </div>
+      </div>
         )}
 
         {practiceMode && (
           <div className="mb-4 rounded-xl border-2 border-dashed border-amber-400/70 bg-amber-500/10 px-4 py-3.5 space-y-3">
-            <div>
+      <div>
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-300 mb-1">
                 I&apos;m bored · fake week · not your real card
               </p>
-              <p className="text-xs sm:text-sm text-foreground/90 leading-relaxed">
+      <p className="text-xs sm:text-sm text-foreground/90 leading-relaxed">
                 {practiceScored || saved
                   ? "This graded card is practice only. Real Week 1 (or live week) lives behind Exit. Nav “Picks” without practice in the URL also drops you into the real season."
                   : "These games are made up. Lock the card; we grade it on your phone only. Real week cards and standings stay untouched."}
               </p>
-            </div>
+      </div>
             <div className="flex flex-col sm:flex-row gap-2">
-              <button
+      <button
                 type="button"
                 onClick={() => leavePractice("/picks")}
                 className="min-h-[48px] px-4 rounded-xl bg-primary text-black text-sm font-extrabold touch-manipulation"
               >
                 Exit practice → real picks
               </button>
-              <button
+      <button
                 type="button"
                 onClick={() => leavePractice("/")}
                 className="min-h-[48px] px-4 rounded-xl border border-amber-400/50 text-amber-100 text-sm font-bold touch-manipulation"
               >
                 Home (live season)
               </button>
-            </div>
+      </div>
           </div>
         )}
 
         {quietPicks && !practiceMode && weekEditable && hasCard && !cardFrozen && (
           <div className="mb-4 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-xs text-muted leading-relaxed">
-            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary mb-1">
+      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary mb-1">
               First lock · don&apos;t overthink it
             </p>
-            <p className="text-foreground/90">{quietPicksIntro()}</p>
-          </div>
+      <p className="text-foreground/90">{quietPicksIntro()}</p>
+      </div>
         )}
 
         {/* Progress bubble — sticky under nav so it stays visible while picking */}
@@ -1384,7 +1382,7 @@ export default function PicksClient() {
               top: "calc(env(safe-area-inset-top, 0px) + 3.35rem)",
             }}
           >
-            <div
+      <div
               className={`rounded-2xl border px-3 py-2 sm:px-3.5 sm:py-2.5 shadow-[0_8px_28px_rgba(0,0,0,0.35)] backdrop-blur-md ${
                 allGamesPicked
                   ? "border-primary/45 bg-primary/15"
@@ -1392,7 +1390,7 @@ export default function PicksClient() {
               }`}
             >
               <div className="flex items-center justify-between gap-2 mb-1">
-                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted">
+      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted">
                   This card
                 </p>
                 {allGamesPicked ? (
@@ -1422,7 +1420,7 @@ export default function PicksClient() {
                   </p>
                 )}
               </div>
-              <div className="flex flex-wrap gap-1.5 sm:gap-2 text-[11px] sm:text-xs">
+      <div className="flex flex-wrap gap-1.5 sm:gap-2 text-[11px] sm:text-xs">
                 {(
                   [
                     {
@@ -1480,7 +1478,7 @@ export default function PicksClient() {
                     <span className="text-foreground font-semibold tabular-nums">
                       {left.join(", ")}
                     </span>
-                  </p>
+      </p>
                 );
               })()}
               {allGamesPicked && (
@@ -1489,7 +1487,7 @@ export default function PicksClient() {
                 </p>
               )}
             </div>
-          </div>
+      </div>
         )}
 
         {/* Chaos Mode — mid-season spice (week 2+); hide on quiet first path + practice */}
@@ -1503,10 +1501,10 @@ export default function PicksClient() {
             alreadyChaosThisWeek: chaosArmed || chaosLockedWeek,
           }) && (
           <div className="rounded-xl border-2 border-orange-500/50 bg-gradient-to-br from-orange-950/50 via-red-950/30 to-black/40 px-4 py-3 mb-4">
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-orange-300 mb-1">
+      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-orange-300 mb-1">
               🤖 Chaos Mode · pure RNG
             </p>
-            <p className="text-sm text-foreground/90 leading-snug">
+      <p className="text-sm text-foreground/90 leading-snug">
               Tired of thinking? Let the machines cook. Completely random sides,
               confidence, Best Bet, and prop —{" "}
               <strong className="text-orange-200">no edge</strong>. Correct week{" "}
@@ -1516,7 +1514,7 @@ export default function PicksClient() {
               <span className="text-muted">
                 {chaosRemaining}/{CHAOS_USES_PER_SEASON} left this season.
               </span>
-            </p>
+      </p>
             {(chaosArmed || chaosLockedWeek) && (
               <p className="text-xs font-bold text-orange-300 mt-2">
                 🔥 Chaos is live — no undo. Card frozen to the robots. Title
@@ -1546,37 +1544,37 @@ export default function PicksClient() {
 
         {chaosConfirm && (
           <div className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center p-0 sm:p-4">
-            <button
+      <button
               type="button"
               className="absolute inset-0 bg-black/75"
               aria-label="Close"
               onClick={() => setChaosConfirm(false)}
             />
             <div className="relative w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl border-2 border-orange-500/60 bg-card p-5 space-y-3 max-h-[90vh] overflow-y-auto">
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-orange-300">
+      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-orange-300">
                 Chaos Mode · no take-backs
               </p>
-              <h2 className="text-xl font-black">Are you sure?</h2>
-              <p className="text-sm text-orange-200/90 font-semibold leading-snug">
+      <h2 className="text-xl font-black">Are you sure?</h2>
+      <p className="text-sm text-orange-200/90 font-semibold leading-snug">
                 Once you go Chaos, it is out of your hands. No undo. No edits.
                 The room will see the flames.
               </p>
-              <ul className="text-sm text-muted space-y-1.5 list-disc pl-4">
+      <ul className="text-sm text-muted space-y-1.5 list-disc pl-4">
                 <li>Pure random — coin flips only (no AI edge)</li>
-                <li>Legal card filled for you — you cannot change it</li>
-                <li>
+      <li>Legal card filled for you — you cannot change it</li>
+      <li>
                   Title forced to{" "}
                   <strong className="text-orange-200">Chaos Agent</strong> —
                   you can&apos;t pick or swap it off this week
                 </li>
-                <li>
+      <li>
                   <strong className="text-foreground">2× week points</strong>{" "}
                   when scored · uses{" "}
                   <strong className="text-foreground">1 of 2</strong> season
                   charges now
                 </li>
-                <li>🔥 CHAOS on your name everywhere until the week is done</li>
-              </ul>
+      <li>🔥 CHAOS on your name everywhere until the week is done</li>
+      </ul>
               <button
                 type="button"
                 onClick={() => {
@@ -1605,14 +1603,14 @@ export default function PicksClient() {
               >
                 Yes — go Chaos, no undo
               </button>
-              <button
+      <button
                 type="button"
                 onClick={() => setChaosConfirm(false)}
                 className="w-full py-3 min-h-[48px] rounded-xl border border-border text-muted font-semibold"
               >
                 Cancel — keep control
               </button>
-            </div>
+      </div>
           </div>
         )}
 
@@ -1628,7 +1626,7 @@ export default function PicksClient() {
                 : "border-border bg-card"
           }`}
         >
-          <div className="flex flex-wrap items-center gap-2 mb-1">
+      <div className="flex flex-wrap items-center gap-2 mb-1">
             <span
               className={`text-[10px] font-bold uppercase tracking-[0.2em] ${
                 practiceMode
@@ -1660,14 +1658,14 @@ export default function PicksClient() {
               </span>
             )}
           </div>
-          <h1 className="text-2xl font-bold">
+      <h1 className="text-2xl font-bold">
             {practiceMode
               ? practiceScored || saved
                 ? "Practice week — you survived"
                 : "Practice week picks"
               : `${weekTitle(viewWeek)}${weekEditable ? " Picks" : " — your card"}`}
           </h1>
-          <p className="text-sm text-muted mt-1">
+      <p className="text-sm text-muted mt-1">
             {practiceMode
               ? practiceScored || saved
                 ? "Graded on your phone only. Real standings never noticed. Exit practice for your real card."
@@ -1700,10 +1698,10 @@ export default function PicksClient() {
         {/* Week browser — never show live weeks during private practice */}
         {!practiceMode && weekPills.length > 0 && (
           <div className="rounded-xl border border-border bg-card p-3 mb-6">
-            <p className="text-[10px] uppercase tracking-wider text-muted mb-2 font-semibold">
+      <p className="text-[10px] uppercase tracking-wider text-muted mb-2 font-semibold">
               Jump to week
             </p>
-            <div className="phone-h-scroll sm:flex-wrap sm:overflow-visible">
+      <div className="phone-h-scroll sm:flex-wrap sm:overflow-visible">
               {weekPills.map((w) => {
                 const isView = w === viewWeek;
                 const isActive = w === activeWeek;
@@ -1732,7 +1730,7 @@ export default function PicksClient() {
                 );
               })}
             </div>
-            <p className="text-[11px] text-muted mt-2">
+      <p className="text-[11px] text-muted mt-2">
               Tap any week to review.{" "}
               <span className="text-primary font-medium">Live</span> accepts
               new picks.{" "}
@@ -1746,7 +1744,7 @@ export default function PicksClient() {
               </Link>{" "}
               shows everyone&apos;s cards after first kickoff locks the week.
             </p>
-          </div>
+      </div>
         )}
 
         {loadError && (
@@ -1757,44 +1755,44 @@ export default function PicksClient() {
 
         {cardNotice && weekEditable && (
           <div className="mb-4 rounded-lg border border-primary/40 bg-primary/10 px-4 py-2 text-sm text-primary flex items-start justify-between gap-3">
-            <span>{cardNotice}</span>
-            <button
+      <span>{cardNotice}</span>
+      <button
               type="button"
               className="text-xs shrink-0 underline"
               onClick={() => setCardNotice(null)}
             >
               Dismiss
             </button>
-          </div>
+      </div>
         )}
 
         {!loadError && !hasCard && cardBusy && (
           <div className="rounded-xl border border-border bg-card p-8 text-center space-y-3">
-            <div className="mx-auto w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+      <div className="mx-auto w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
             <p className="text-sm font-semibold text-foreground">
               Loading {weekTitle(viewWeek)}…
             </p>
-            <p className="text-xs text-muted max-w-xs mx-auto leading-relaxed">
+      <p className="text-xs text-muted max-w-xs mx-auto leading-relaxed">
               Pulling games. If this sits more than a few seconds, pull down to
               fully reopen the app.
             </p>
-          </div>
+      </div>
         )}
 
         {!loadError && !hasCard && !cardBusy && (
           <div className="rounded-xl border border-border bg-card p-8 text-center">
-            <p className="text-[10px] uppercase tracking-wider text-muted font-bold mb-2">
+      <p className="text-[10px] uppercase tracking-wider text-muted font-bold mb-2">
               Not broken — no card yet
             </p>
-            <p className="font-medium mb-2">
+      <p className="font-medium mb-2">
               No card for {weekTitle(viewWeek)} yet
             </p>
-            <p className="text-sm text-muted mb-4 max-w-md mx-auto leading-relaxed">
+      <p className="text-sm text-muted mb-4 max-w-md mx-auto leading-relaxed">
               {viewWeek === activeWeek
                 ? "The commissioner has to publish this week’s games before anyone can lock picks. Hang in the Locker or check Standings until the card goes live."
                 : "This week was never published (or was cleared)."}
             </p>
-            <div className="flex flex-wrap justify-center gap-3">
+      <div className="flex flex-wrap justify-center gap-3">
               <button
                 type="button"
                 onClick={() => {
@@ -1824,13 +1822,13 @@ export default function PicksClient() {
               >
                 Locker Room
               </a>
-              <a
+      <a
                 href="/"
                 className="text-sm text-muted hover:text-foreground underline-offset-2 hover:underline"
               >
                 Home
               </a>
-            </div>
+      </div>
           </div>
         )}
 
@@ -1838,7 +1836,7 @@ export default function PicksClient() {
           <>
             {isPastOrOtherWeek && (
               <div className="mb-4 rounded-lg border border-border bg-card-hover px-4 py-3 text-sm text-muted space-y-2">
-                <p>
+      <p>
                   🔒 Read-only archive of {weekTitle(viewWeek)}. Switch to{" "}
                   <button
                     type="button"
@@ -1852,14 +1850,14 @@ export default function PicksClient() {
                 {(viewIsScored ||
                   (hasCard && isCardLockDeadlinePassed(games, now))) && (
                   <p>
-                    <Link
+      <Link
                       href={`/board?week=${viewWeek}`}
                       className="text-primary font-semibold hover:underline"
                     >
                       Open The Board → see everyone&apos;s picks for{" "}
                       {weekTitle(viewWeek)}
                     </Link>
-                  </p>
+      </p>
                 )}
                 {myWeekScore && (
                   <p className="text-foreground font-medium">
@@ -1884,40 +1882,40 @@ export default function PicksClient() {
               hasCard &&
               isCardLockDeadlinePassed(games, now) && (
                 <div className="mb-4 rounded-lg border border-primary/30 bg-primary/5 px-4 py-2 text-sm">
-                  <Link
+      <Link
                     href={`/board?week=${viewWeek}`}
                     className="text-primary font-semibold hover:underline"
                   >
                     First kickoff hit — The Board is open (everyone&apos;s picks) →
                   </Link>
-                </div>
+      </div>
               )}
             {weekEditable &&
               !isCardLockDeadlinePassed(games, now) &&
               scoredWeeks.length > 0 && (
                 <div className="mb-4 rounded-lg border border-border bg-card-hover px-4 py-2 text-sm">
-                  <Link
+      <Link
                     href={`/board?week=${scoredWeeks[scoredWeeks.length - 1]}`}
                     className="text-primary font-semibold hover:underline"
                   >
                     See last week&apos;s Board →
                   </Link>
-                </div>
+      </div>
               )}
 
             {missedLockWindow && (
               <div className="mb-4 rounded-xl border-2 border-danger/60 bg-danger/15 px-4 py-3">
-                <p className="text-sm font-bold text-danger">
+      <p className="text-sm font-bold text-danger">
                   🥛 Too late — first kickoff already hit
                 </p>
-                <p className="text-xs text-danger/90 mt-1.5 leading-relaxed">
+      <p className="text-xs text-danger/90 mt-1.5 leading-relaxed">
                   All picks must be locked before{" "}
                   <strong>{formatCardLockDeadline(games)}</strong>. You never
                   locked. After first kickoff you <strong>cannot</strong> lock.
                   You score <strong>0</strong> this week. No makeups. Gazette
                   may put you on the milk carton.
                 </p>
-              </div>
+      </div>
             )}
 
             {weekEditable && cardFrozen && !missedLockWindow && (
@@ -1973,9 +1971,9 @@ export default function PicksClient() {
                           : ""
                     }`}
                   >
-                    <div className="mb-3">
+      <div className="mb-3">
                       <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 flex-wrap min-w-0">
+      <div className="flex items-center gap-2 flex-wrap min-w-0">
                           <div
                             className={`font-medium text-sm ${
                               rankTier === "legendary"
@@ -1996,7 +1994,7 @@ export default function PicksClient() {
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
+      <div className="flex items-center gap-1.5 shrink-0">
                           {cover?.winner && (
                             <span className="text-[10px] font-bold uppercase tracking-wide text-primary border border-primary/40 px-1.5 py-0.5 rounded">
                               {cover.winner === "push"
@@ -2034,7 +2032,7 @@ export default function PicksClient() {
                             </span>
                           )}
                         </div>
-                      </div>
+      </div>
                       <div
                         className={`text-xs mt-1 ${
                           kick.locked ? "text-muted" : "text-primary"
@@ -2042,10 +2040,10 @@ export default function PicksClient() {
                       >
                         {kick.label}
                       </div>
-                    </div>
+      </div>
 
                     <div className="grid grid-cols-2 gap-2 sm:gap-3 mb-4">
-                      <button
+      <button
                         type="button"
                         disabled={locked}
                         onClick={() => selectSide(game.id, "away")}
@@ -2058,13 +2056,13 @@ export default function PicksClient() {
                         <div className="text-[10px] uppercase tracking-wider text-muted mb-1">
                           Away
                         </div>
-                        <div className="font-semibold text-[15px] sm:text-base leading-snug">
+      <div className="font-semibold text-[15px] sm:text-base leading-snug">
                           {formatRankedTeam(game.awayTeam, game.awayRank)}
                         </div>
-                        <div className="text-sm text-muted mt-1 font-medium">
+      <div className="text-sm text-muted mt-1 font-medium">
                           {formatSpread(displaySpread, displayFavorite, "away")}
                         </div>
-                      </button>
+      </button>
 
                       <button
                         type="button"
@@ -2079,21 +2077,20 @@ export default function PicksClient() {
                         <div className="text-[10px] uppercase tracking-wider text-muted mb-1">
                           Home
                         </div>
-                        <div className="font-semibold text-[15px] sm:text-base leading-snug">
+      <div className="font-semibold text-[15px] sm:text-base leading-snug">
                           {formatRankedTeam(game.homeTeam, game.homeRank)}
                         </div>
-                        <div className="text-sm text-muted mt-1 font-medium">
+      <div className="text-sm text-muted mt-1 font-medium">
                           {formatSpread(displaySpread, displayFavorite, "home")}
                         </div>
-                      </button>
+      </button>
                     </div>
-
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div className="flex flex-col gap-1.5">
-                        <span className="text-[10px] uppercase tracking-wider text-muted font-semibold">
+      <span className="text-[10px] uppercase tracking-wider text-muted font-semibold">
                           Confidence
                         </span>
-                        <div className="flex gap-2 items-center">
+      <div className="flex gap-2 items-center">
                           {confidenceOptions.map((c) => {
                             const usedElsewhere = Object.entries(picks).some(
                               ([id, p]) => id !== game.id && p.confidence === c
@@ -2147,7 +2144,7 @@ export default function PicksClient() {
                           </p>
                         )}
                       </div>
-                      <button
+      <button
                         type="button"
                         disabled={locked}
                         onClick={() => toggleBestBet(game.id)}
@@ -2159,7 +2156,7 @@ export default function PicksClient() {
                       >
                         {isBest ? "★ Best Bet" : "Set Best Bet"}
                       </button>
-                    </div>
+      </div>
 
                     {saved && pick && weekEditable && (
                       <div className="text-xs text-muted mt-2">
@@ -2175,8 +2172,7 @@ export default function PicksClient() {
                 );
               })}
             </div>
-
-            <div
+      <div
               id="weekly-prop-card"
               className={`rounded-xl border bg-card p-4 mb-8 ${
                 !canEditProp ? "border-border opacity-95" : "border-border"
@@ -2189,7 +2185,7 @@ export default function PicksClient() {
                 disabled={!quietPicks}
               >
                 <div>
-                  <div className="text-xs text-muted">
+      <div className="text-xs text-muted">
                     {quietPicks ? "Bonus" : "Weekly Prop"} · {prop.points} pts
                     {propChoice ? (
                       <span className="text-primary font-semibold"> · set</span>
@@ -2261,17 +2257,17 @@ export default function PicksClient() {
 
             {practiceMode && (practiceScored || saved) ? (
               <div className="rounded-xl border-2 border-dashed border-amber-400/60 bg-amber-500/10 px-4 py-4 space-y-2 text-center">
-                <p className="text-sm font-bold text-foreground">
+      <p className="text-sm font-bold text-foreground">
                   Fake week graded
                   {weekScoredAt
                     ? ` · ${Object.keys(weekResults).length} games roasted`
                     : ""}
                 </p>
-                <p className="text-xs text-muted leading-relaxed">
+      <p className="text-xs text-muted leading-relaxed">
                   Practice is over for this run. Leave to open live season picks
                   — or tour Board / Gazette (still leaves practice).
                 </p>
-                <div className="flex flex-col sm:flex-row gap-2 pt-1">
+      <div className="flex flex-col sm:flex-row gap-2 pt-1">
                   <button
                     type="button"
                     onClick={() => leavePractice("/picks")}
@@ -2279,25 +2275,25 @@ export default function PicksClient() {
                   >
                     Real picks
                   </button>
-                  <button
+      <button
                     type="button"
                     onClick={() => leavePractice("/")}
                     className="flex-1 py-3 min-h-[48px] rounded-xl border border-amber-400/50 text-amber-100 text-sm font-bold flex items-center justify-center touch-manipulation"
                   >
                     Home
                   </button>
-                  <button
+      <button
                     type="button"
                     onClick={() => leavePractice("/board")}
                     className="flex-1 py-3 min-h-[48px] rounded-xl border border-border text-sm font-bold text-foreground flex items-center justify-center touch-manipulation"
                   >
                     Peek Board
                   </button>
-                </div>
+      </div>
               </div>
             ) : weekEditable || (practiceMode && !saved) ? (
               <div className="phone-sticky-action">
-                <button
+      <button
                   type="button"
                   onClick={() => void savePicks()}
                   disabled={!allGamesPicked || saving || fullyLocked}
@@ -2341,12 +2337,12 @@ export default function PicksClient() {
                 >
                   Open {weekTitle(activeWeek)} live picks
                 </button>
-              </p>
+      </p>
             )}
           </>
         )}
       </main>
-    </div>
+      </div>
   );
 }
 

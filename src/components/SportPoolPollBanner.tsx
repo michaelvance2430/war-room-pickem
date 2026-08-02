@@ -113,7 +113,7 @@ export default function SportPoolPollBanner() {
   }
 
   function dismissForever() {
-    markDismissed(poll.id);
+    if (poll?.id) markDismissed(poll.id);
     setHidden(true);
   }
 

@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import Nav from "@/components/Nav";
 import PlayerLink from "@/components/PlayerLink";
 import {
   crystalBallLockLabel,
@@ -155,10 +154,9 @@ export default function CrystalBallPage() {
   if (disabled) {
     return (
       <div className="min-h-screen flex flex-col">
-        <Nav />
-        <main className="flex-1 max-w-md mx-auto px-4 py-16 text-center">
+      <main className="flex-1 max-w-md mx-auto px-4 py-16 text-center">
           <h1 className="text-xl font-bold mb-2">Crystal Ball is off</h1>
-          <p className="text-sm text-muted mb-6">
+      <p className="text-sm text-muted mb-6">
             Your commissioner disabled this feature for the league.
           </p>
           {isCommish ? (
@@ -182,12 +180,11 @@ export default function CrystalBallPage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Nav />
       <main className="flex-1 max-w-3xl mx-auto w-full px-4 py-8">
         <div className="mb-6">
-          <div className="flex flex-wrap items-center gap-2 mb-1">
+      <div className="flex flex-wrap items-center gap-2 mb-1">
             <h1 className="text-2xl font-bold">Crystal Ball</h1>
-            <span className="text-xs px-2 py-0.5 rounded-full border border-primary/40 text-primary">
+      <span className="text-xs px-2 py-0.5 rounded-full border border-primary/40 text-primary">
               0 pts
             </span>
             {state.locked ? (
@@ -205,7 +202,7 @@ export default function CrystalBallPage() {
               </span>
             )}
           </div>
-          <p className="text-sm text-muted leading-relaxed">
+      <p className="text-sm text-muted leading-relaxed">
             Pick who wins the{" "}
             <strong className="text-foreground">
               {nfl ? "Super Bowl" : "national championship"}
@@ -216,7 +213,7 @@ export default function CrystalBallPage() {
             freezes. Then the board is the permanent record. Zero standings
             points; nail it and you get a sarcastic achievement.
           </p>
-        </div>
+      </div>
 
         {/* Must-read lock notice */}
         <div
@@ -226,12 +223,12 @@ export default function CrystalBallPage() {
               : "border-primary bg-primary/15"
           }`}
         >
-          <p className="text-[10px] uppercase tracking-[0.18em] font-bold text-primary mb-1.5">
+      <p className="text-[10px] uppercase tracking-[0.18em] font-bold text-primary mb-1.5">
             {state.locked
               ? "Frozen — board is public record"
               : "Secret until freeze"}
           </p>
-          <p className="text-sm sm:text-base font-bold text-foreground leading-snug">
+      <p className="text-sm sm:text-base font-bold text-foreground leading-snug">
             {state.locked ? (
               <>
                 {nfl ? "Pride picks" : "Crystal Ball"} is sealed.{" "}
@@ -253,12 +250,12 @@ export default function CrystalBallPage() {
               </>
             )}
           </p>
-          <p className="text-xs text-muted mt-2 font-medium">
+      <p className="text-xs text-muted mt-2 font-medium">
             Deadline: {state.lockLabel}.{" "}
             <Link href="/rules" className="text-primary hover:underline">
               Full rules
             </Link>
-          </p>
+      </p>
         </div>
 
         {err && (
@@ -274,33 +271,33 @@ export default function CrystalBallPage() {
 
         {myAchievements.length > 0 && (
           <div className="mb-6 rounded-xl border border-primary/40 bg-primary/5 p-4">
-            <p className="text-xs uppercase tracking-wider text-primary font-bold mb-2">
+      <p className="text-xs uppercase tracking-wider text-primary font-bold mb-2">
               Your artifact
             </p>
             {myAchievements.map((a) => (
               <div key={a.code}>
-                <p className="font-semibold text-foreground">🧙 {a.title}</p>
-                <p className="text-sm text-muted mt-1">{a.flavor}</p>
-              </div>
+      <p className="font-semibold text-foreground">🧙 {a.title}</p>
+      <p className="text-sm text-muted mt-1">{a.flavor}</p>
+      </div>
             ))}
           </div>
         )}
 
         {state.champion && (
           <div className="mb-6 rounded-xl border border-border bg-card p-4">
-            <p className="text-xs text-muted uppercase tracking-wider mb-1">
+      <p className="text-xs text-muted uppercase tracking-wider mb-1">
               Crowned champion
             </p>
-            <p className="text-lg font-bold text-primary">{state.champion}</p>
-          </div>
+      <p className="text-lg font-bold text-primary">{state.champion}</p>
+      </div>
         )}
 
         {/* Your pick */}
         <section className="rounded-xl border border-border bg-card p-5 mb-6">
-          <h2 className="font-semibold mb-1">
+      <h2 className="font-semibold mb-1">
             {nfl ? "Your Super Bowl pick" : "Your national champ"}
           </h2>
-          <p className="text-xs text-muted mb-3">
+      <p className="text-xs text-muted mb-3">
             {state.locked
               ? state.myTeam
                 ? `You rode with ${state.myTeam}. The orb is sealed.`
@@ -337,16 +334,16 @@ export default function CrystalBallPage() {
                     }`}
                   >
                     <span className="font-medium">{t.name}</span>
-                    <span className="text-xs text-muted shrink-0">
+      <span className="text-xs text-muted shrink-0">
                       {t.conference}
                     </span>
-                  </button>
+      </button>
                 ))}
                 {filtered.length === 0 && (
                   <p className="text-xs text-muted p-2">No teams match.</p>
                 )}
               </div>
-              <button
+      <button
                 type="button"
                 disabled={!selected || saving}
                 onClick={() => void lockPick()}
@@ -370,17 +367,17 @@ export default function CrystalBallPage() {
 
         {/* League board — secret until freeze, then permanent record */}
         <section className="rounded-xl border border-border bg-card p-5 mb-6">
-          <h2 className="font-semibold mb-1">
+      <h2 className="font-semibold mb-1">
             {state.locked ? "League record" : "League board (sealed)"}
           </h2>
-          <p className="text-xs text-muted mb-3 leading-relaxed">
+      <p className="text-xs text-muted mb-3 leading-relaxed">
             {state.locked
               ? "Crystal Ball is frozen. This is who picked what — permanent room history."
               : `${state.lockedCount} sealed · names and teams stay hidden until kickoff freezes the orb. You’ll only see your own pick below until then.`}
           </p>
           {!state.locked ? (
             <div className="space-y-3">
-              <p className="text-sm text-foreground">
+      <p className="text-sm text-foreground">
                 <span className="text-2xl font-black text-primary tabular-nums">
                   {state.lockedCount}
                 </span>{" "}
@@ -389,14 +386,14 @@ export default function CrystalBallPage() {
               </p>
               {state.myTeam ? (
                 <p className="text-sm rounded-lg border border-primary/30 bg-primary/10 px-3 py-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-primary block mb-0.5">
+      <span className="text-xs font-bold uppercase tracking-wider text-primary block mb-0.5">
                     Your secret
                   </span>
-                  <span className="font-semibold">{state.myTeam}</span>
-                  <span className="text-muted text-xs block mt-1">
+      <span className="font-semibold">{state.myTeam}</span>
+      <span className="text-muted text-xs block mt-1">
                     Only you can see this until freeze.
                   </span>
-                </p>
+      </p>
               ) : (
                 <p className="text-sm text-muted">
                   You haven&apos;t sealed a pick yet. The room can&apos;t see
@@ -425,13 +422,13 @@ export default function CrystalBallPage() {
                       hit ? "text-primary" : ""
                     }`}
                   >
-                    <span className="font-medium">
+      <span className="font-medium">
                       <PlayerLink id={p.userId} name={p.displayName} />
                       {p.userId === selfId && (
                         <span className="text-xs text-muted ml-1">(you)</span>
                       )}
                     </span>
-                    <span className="text-muted">
+      <span className="text-muted">
                       {p.teamName}
                       {hit && " · 🧙"}
                       {ach && (
@@ -440,7 +437,7 @@ export default function CrystalBallPage() {
                         </span>
                       )}
                     </span>
-                  </li>
+      </li>
                 );
               })}
             </ul>
@@ -459,10 +456,10 @@ export default function CrystalBallPage() {
         {/* Commissioner crown */}
         {isCommish && (
           <section className="rounded-xl border border-primary/30 bg-primary/5 p-5">
-            <h2 className="font-semibold text-primary mb-1">
+      <h2 className="font-semibold text-primary mb-1">
               Commissioner · Crown champion
             </h2>
-            <p className="text-xs text-muted mb-3">
+      <p className="text-xs text-muted mb-3">
               After the title game, set the real{" "}
               {nfl ? "Super Bowl champion" : "national champion"}. Correct
               Crystal Ball picks get{" "}
@@ -471,7 +468,7 @@ export default function CrystalBallPage() {
               </strong>{" "}
               — still zero points.
             </p>
-            <select
+      <select
               value={crownTeam}
               onChange={(e) => setCrownTeam(e.target.value)}
               className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm mb-3"
@@ -485,7 +482,7 @@ export default function CrystalBallPage() {
                 </option>
               ))}
             </select>
-            <button
+      <button
               type="button"
               disabled={!crownTeam || crowning}
               onClick={() => void crown()}
@@ -493,12 +490,12 @@ export default function CrystalBallPage() {
             >
               {crowning ? "Crowning…" : "Crown & grant achievements"}
             </button>
-            <p className="text-[11px] text-muted mt-2">
+      <p className="text-[11px] text-muted mt-2">
               Lock time reference: {crystalBallLockLabel()}
             </p>
-          </section>
+      </section>
         )}
       </main>
-    </div>
+      </div>
   );
 }

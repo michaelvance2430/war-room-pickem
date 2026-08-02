@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import Nav from "@/components/Nav";
 import AvatarLightbox from "@/components/AvatarLightbox";
 import BadgeShelf from "@/components/BadgeShelf";
 import WwcPassportShelf from "@/components/WwcPassportShelf";
@@ -375,11 +374,10 @@ export default function ProfilePage() {
   if (!ready) {
     return (
       <div className="min-h-screen flex flex-col">
-        <Nav />
-        <main className="flex-1 flex flex-col items-center justify-center px-4 gap-2">
+      <main className="flex-1 flex flex-col items-center justify-center px-4 gap-2">
           <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-          <p className="text-sm text-muted">Opening profile…</p>
-        </main>
+      <p className="text-sm text-muted">Opening profile…</p>
+      </main>
       </div>
     );
   }
@@ -387,10 +385,9 @@ export default function ProfilePage() {
   if (!player) {
     return (
       <div className="min-h-screen flex flex-col">
-        <Nav />
-        <main className="flex-1 max-w-lg mx-auto px-4 py-16 text-center">
+      <main className="flex-1 max-w-lg mx-auto px-4 py-16 text-center">
           <h1 className="text-xl font-bold mb-2">Player not found</h1>
-          <p className="text-sm text-muted mb-2">
+      <p className="text-sm text-muted mb-2">
             Open a profile from Standings (click a name).
           </p>
           {id && (
@@ -402,7 +399,7 @@ export default function ProfilePage() {
           <Link href="/standings" className="text-primary text-sm hover:underline">
             ← Standings
           </Link>
-        </main>
+      </main>
       </div>
     );
   }
@@ -442,39 +439,37 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Nav />
-
       <main className="flex-1 max-w-3xl mx-auto w-full px-4 py-8">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-4 text-xs">
-          <Link
+      <Link
             href="/"
             className="text-muted hover:text-foreground"
           >
             ← Home
           </Link>
-          <span className="text-border" aria-hidden>
+      <span className="text-border" aria-hidden>
             ·
           </span>
-          <Link
+      <Link
             href="/standings"
             className="text-muted hover:text-foreground"
           >
             Standings
           </Link>
-          <span className="text-border" aria-hidden>
+      <span className="text-border" aria-hidden>
             ·
           </span>
-          <Link
+      <Link
             href="/account"
             className="text-primary font-semibold hover:underline"
           >
             Account
           </Link>
-        </div>
+      </div>
 
         {mock && roast && (
           <div className="mb-4 rounded-xl border border-warning/40 bg-warning/10 px-4 py-3">
-            <div className="flex justify-between gap-2 mb-1">
+      <div className="flex justify-between gap-2 mb-1">
               <span className="text-[10px] font-bold uppercase tracking-wider text-warning">
                 Demo NPC · Not a real person
               </span>
@@ -484,18 +479,18 @@ export default function ProfilePage() {
                 </span>
               )}
             </div>
-            <p className="text-sm">{roast}</p>
-          </div>
+      <p className="text-sm">{roast}</p>
+      </div>
         )}
 
         {!mock && (
           <div className="mb-6">
-            <CommishCareerCard userId={player.id} />
+      <CommishCareerCard userId={player.id} />
           </div>
         )}
 
         <section className="rounded-2xl border border-border bg-card p-5 sm:p-6 mb-6">
-          <div className="flex flex-col sm:flex-row gap-5 items-start">
+      <div className="flex flex-col sm:flex-row gap-5 items-start">
             <button
               type="button"
               onClick={() => setLightbox(true)}
@@ -513,10 +508,10 @@ export default function ProfilePage() {
                     : undefined
                 }
               />
-            </button>
+      </button>
 
             <div className="flex-1 min-w-0">
-              <div className="flex flex-wrap items-center gap-2 mb-1">
+      <div className="flex flex-wrap items-center gap-2 mb-1">
                 {getEquippedTitleLabel(player.id) && (
                   <span
                     className="text-xs sm:text-sm font-black uppercase tracking-wide text-amber-300 shrink-0"
@@ -549,7 +544,7 @@ export default function ProfilePage() {
                   </span>
                 )}
               </div>
-              <p className="text-sm text-muted mb-2">
+      <p className="text-sm text-muted mb-2">
                 {divisionFullLabel(player.division, sportId)} ·{" "}
                 {mock ? (
                   "Lab-grown for your league"
@@ -584,13 +579,12 @@ export default function ProfilePage() {
               <p className="text-sm text-foreground/90 leading-relaxed mb-3 border-l-2 border-primary/50 pl-3 italic">
                 {signature}
               </p>
-
-              <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-2">
                 <Chip
                   label="Member since"
                   value={mock ? "Never" : formatMemberSince(player.memberSince)}
                 />
-                <Chip
+      <Chip
                   label="Last in"
                   value={mock ? "NPC" : formatLastSeen(lastSeenAt)}
                   valueClassName={
@@ -606,16 +600,16 @@ export default function ProfilePage() {
                 )}
                 {!mock && blueFalconCount > 0 && (
                   <div className="col-span-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-amber-300 mb-0.5">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-amber-300 mb-0.5">
                       Quit mid-season
                     </p>
-                    <p className="text-[11px] text-muted leading-relaxed">
+      <p className="text-[11px] text-muted leading-relaxed">
                       Left {blueFalconCount} league
                       {blueFalconCount === 1 ? "" : "s"} before finishing —
                       not bracket knockout, walking out of the room. Commish
                       may kick high Blue Falcons before kickoff.
                     </p>
-                  </div>
+      </div>
                 )}
               </div>
               {isSelfProfile && !mock && (
@@ -629,7 +623,7 @@ export default function ProfilePage() {
                 </p>
               )}
             </div>
-          </div>
+      </div>
         </section>
 
         {/* 1. Hardware — what they own */}
@@ -683,40 +677,39 @@ export default function ProfilePage() {
                 <p className="text-[10px] uppercase tracking-wider text-muted font-bold mb-1">
                   Achievements
                 </p>
-                <p className="text-xs text-muted mb-4">
+      <p className="text-xs text-muted mb-4">
                   {earnedCount > 0
                     ? `${earnedCount} earned in this catalog — open a badge for the story.`
                     : "Nothing earned yet. The first card is still destiny."}
                 </p>
-                <BadgeShelf badges={badges} />
+      <BadgeShelf badges={badges} />
               </>
             ) : (
               <div>
-                <h2 className="font-semibold text-lg mb-2">Badge shelves</h2>
-                <p className="text-sm text-muted">
+      <h2 className="font-semibold text-lg mb-2">Badge shelves</h2>
+      <p className="text-sm text-muted">
                   Could not load badges. Try a hard refresh.
                 </p>
-              </div>
+      </div>
             )}
           </div>
         )}
 
         {isWwcLeague && (
           <details className="rounded-2xl border border-border bg-card p-5 sm:p-6 mb-6">
-            <summary className="font-semibold text-sm cursor-pointer text-muted hover:text-foreground">
+      <summary className="font-semibold text-sm cursor-pointer text-muted hover:text-foreground">
               Also show classic War Room badge shelves
             </summary>
-            <div className="mt-4">
+      <div className="mt-4">
               {badges.length > 0 ? (
                 <BadgeShelf badges={badges} />
               ) : (
                 <p className="text-sm text-muted">No football badges loaded.</p>
               )}
             </div>
-          </details>
+      </details>
         )}
       </main>
-
       <AvatarLightbox
         open={lightbox}
         onClose={() => setLightbox(false)}
@@ -752,7 +745,7 @@ function Chip({
       >
         {value}
       </div>
-    </div>
+      </div>
   );
 }
 

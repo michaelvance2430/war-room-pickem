@@ -551,22 +551,21 @@ function JoinPageInner() {
           />
         )}
         <div className="max-w-md w-full rounded-xl border-2 border-primary/40 bg-card p-6">
-          <div className="flex justify-center mb-3">
+      <div className="flex justify-center mb-3">
             <BrandMark size={72} variant="force" />
-          </div>
+      </div>
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary mb-2 text-center">
             You&apos;re the commish
           </p>
-          <h1 className="text-2xl font-bold mb-1 text-center">League created</h1>
-          <p className="text-sm text-muted mb-4 text-center">
+      <h1 className="text-2xl font-bold mb-1 text-center">League created</h1>
+      <p className="text-sm text-muted mb-4 text-center">
             {leagueLabel} — share the invite link, then build the first card.
             {listAsOpen ? " Listed in the open room lobby." : ""}
           </p>
-          <div className="text-3xl font-bold tracking-[0.3em] text-primary text-center mb-4 font-mono">
+      <div className="text-3xl font-bold tracking-[0.3em] text-primary text-center mb-4 font-mono">
             {createdCode}
           </div>
-
-          <div id="invite-friends-root">
+      <div id="invite-friends-root">
             <InviteFriends
               leagueName={leagueLabel}
               code={createdCode}
@@ -605,25 +604,24 @@ function JoinPageInner() {
           )}
 
           <ol className="text-left text-sm space-y-2 mb-6 rounded-lg border border-border bg-background/50 px-4 py-3">
-            <li>
+      <li>
               <span className="font-semibold text-primary">1.</span> Share the
               invite (empty room is the #1 fail)
             </li>
-            <li>
+      <li>
               <span className="font-semibold text-primary">2.</span> Publish a
               card (demo slate is fine first time)
             </li>
-            <li>
+      <li>
               <span className="font-semibold text-primary">3.</span> Score the
               week (practice is fine)
             </li>
-          </ol>
+      </ol>
 
           <p className="text-[11px] text-muted text-center mb-3 leading-relaxed">
             Share first — then build the card. Friends can&apos;t join a secret.
           </p>
-
-          <button
+      <button
             type="button"
             onClick={() => {
               if (leagueId) markInviteCopied(leagueId);
@@ -634,7 +632,7 @@ function JoinPageInner() {
           >
             Share invite first ↑
           </button>
-          <button
+      <button
             type="button"
             onClick={() => {
               if (leagueId) markHostScreenSeen(leagueId);
@@ -645,7 +643,7 @@ function JoinPageInner() {
           >
             Then publish first card →
           </button>
-          <button
+      <button
             type="button"
             onClick={() => {
               if (leagueId) markHostScreenSeen(leagueId);
@@ -656,7 +654,7 @@ function JoinPageInner() {
           >
             Home first
           </button>
-        </div>
+      </div>
       </div>
     );
   }
@@ -665,58 +663,57 @@ function JoinPageInner() {
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
-          <div className="flex justify-center mb-3">
+      <div className="flex justify-center mb-3">
             <BrandMark size={80} variant="force" className="rounded-xl" />
-          </div>
+      </div>
           <h1 className="text-2xl font-bold">War Room Pick&apos;Em</h1>
-          <p className="text-sm text-muted mt-1">Signed in as {displayName}</p>
-        </div>
+      <p className="text-sm text-muted mt-1">Signed in as {displayName}</p>
+      </div>
 
         {mode === "choose" && (
           <div className="space-y-3">
-            <button
+      <button
               type="button"
               onClick={() => setMode("create")}
               className="w-full py-4 min-h-[56px] rounded-xl bg-primary text-black text-base font-extrabold touch-manipulation"
             >
               Commissioner — create league
             </button>
-            <button
+      <button
               type="button"
               onClick={() => setMode("join")}
               className="w-full py-4 min-h-[56px] rounded-xl border border-border bg-card text-base font-bold touch-manipulation"
             >
               Join with code
             </button>
-            <Link
+      <Link
               href="/open-room"
               className="w-full py-4 min-h-[56px] rounded-xl border-2 border-primary/40 bg-primary/10 text-base font-bold touch-manipulation flex items-center justify-center text-foreground"
             >
               Join open room
             </Link>
-            <p className="text-center text-[11px] text-muted pt-1 leading-relaxed">
+      <p className="text-center text-[11px] text-muted pt-1 leading-relaxed">
               Open lobby fills one room at a time (max {MAX_LEAGUE_PLAYERS}).
               Full rooms get a friendly “no seats” message — not a scolding.
             </p>
-            <Link href="/login" className="block text-center text-xs text-muted mt-4">Switch account</Link>
-            <OwnershipNotice className="mt-6" />
+      <Link href="/login" className="block text-center text-xs text-muted mt-4">Switch account</Link>
+      <OwnershipNotice className="mt-6" />
           </div>
         )}
 
         {mode === "create" && (
           <div className="rounded-xl border border-border bg-card p-5 space-y-4">
-            <h2 className="font-semibold">Create league</h2>
-            <p className="text-xs text-muted">
+      <h2 className="font-semibold">Create league</h2>
+      <p className="text-xs text-muted">
               Pick CFB or NFL, then name the room. Best with{" "}
               <strong className="text-foreground">8–16 friends</strong> (bots
               can fill empty seats later). Cap {MAX_LEAGUE_PLAYERS}.
             </p>
-
-            <div>
+      <div>
               <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-2">
                 Sport
               </p>
-              <div className="space-y-2 pr-0.5">
+      <div className="space-y-2 pr-0.5">
                 {listSportPickerOptions()
                   .filter((s) => s.status === "live")
                   .map((s) => {
@@ -764,7 +761,7 @@ function JoinPageInner() {
                           </span>
                         )}
                         <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
                             <span className="text-sm font-bold text-foreground">
                               {s.label}
                             </span>
@@ -786,10 +783,10 @@ function JoinPageInner() {
                               </span>
                             )}
                           </div>
-                          <p className="text-[11px] text-muted mt-0.5 leading-snug">
+      <p className="text-[11px] text-muted mt-0.5 leading-snug">
                             {s.blurb}
                           </p>
-                        </div>
+      </div>
                         {selected && live && (
                           <span
                             className={`text-sm font-black shrink-0 ${
@@ -804,15 +801,15 @@ function JoinPageInner() {
                           </span>
                         )}
                       </div>
-                    </button>
+      </button>
                   );
                 })}
               </div>
-              <p className="text-[11px] text-muted mt-2 leading-relaxed">
+      <p className="text-[11px] text-muted mt-2 leading-relaxed">
                 More sports (WWC and friends) ship next — same clubhouse,
                 different desk.
               </p>
-            </div>
+      </div>
 
             <input
               value={leagueName}
@@ -827,22 +824,22 @@ function JoinPageInner() {
               className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm"
             />
             <label className="flex items-start gap-3 rounded-xl border border-border bg-background/50 px-3 py-3 cursor-pointer">
-              <input
+      <input
                 type="checkbox"
                 checked={listAsOpen}
                 onChange={(e) => setListAsOpen(e.target.checked)}
                 className="mt-1 w-5 h-5 rounded border-border shrink-0"
               />
               <span>
-                <span className="text-sm font-semibold text-foreground block">
+      <span className="text-sm font-semibold text-foreground block">
                   List as open room
                 </span>
-                <span className="text-xs text-muted leading-relaxed">
+      <span className="text-xs text-muted leading-relaxed">
                   Strangers can find you in the open lobby. We fill this room
                   first before seating people elsewhere. Turn off anytime in
                   Settings.
                 </span>
-              </span>
+      </span>
             </label>
             {error && <p className="text-sm text-danger">{error}</p>}
             <button
@@ -858,18 +855,18 @@ function JoinPageInner() {
                     ? "Create NFL league"
                     : `Create ${getSportPack(sportId).shortLabel} league`}
             </button>
-            <button
+      <button
               onClick={() => setMode("choose")}
               className="w-full text-sm text-muted"
             >
               Back
             </button>
-          </div>
+      </div>
         )}
 
         {mode === "join" && (
           <div className="rounded-xl border border-border bg-card p-5 space-y-4">
-            <h2 className="font-semibold">Join league</h2>
+      <h2 className="font-semibold">Join league</h2>
             {deepLinkCode ? (
               <p className="text-xs text-primary font-medium leading-relaxed">
                 Invite link detected — code filled in. Confirm your name and
@@ -882,7 +879,7 @@ function JoinPageInner() {
               </p>
             )}
             <div className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-2.5 text-xs text-muted leading-relaxed">
-              <p className="font-semibold text-foreground text-xs mb-0.5">
+      <p className="font-semibold text-foreground text-xs mb-0.5">
                 Season already rolling?
               </p>
               You start at{" "}
@@ -890,7 +887,7 @@ function JoinPageInner() {
               you missed — still pick, earn cheevos, and chase hardware from
               here on.
             </div>
-            <input
+      <input
               value={code}
               onChange={(e) => setCode(e.target.value.toUpperCase())}
               placeholder="CODE"
@@ -909,7 +906,7 @@ function JoinPageInner() {
                 >
                   change name
                 </button>
-              </p>
+      </p>
             ) : (
               <input
                 value={displayName}
@@ -926,13 +923,13 @@ function JoinPageInner() {
             >
               {loading ? "Joining…" : deepLinkCode ? "Join this league" : "Join"}
             </button>
-            <button onClick={() => setMode("choose")} className="w-full text-sm text-muted">
+      <button onClick={() => setMode("choose")} className="w-full text-sm text-muted">
               Back
             </button>
-          </div>
+      </div>
         )}
       </div>
-    </div>
+      </div>
   );
 }
 
@@ -946,6 +943,6 @@ export default function JoinPage() {
       }
     >
       <JoinPageInner />
-    </Suspense>
+      </Suspense>
   );
 }

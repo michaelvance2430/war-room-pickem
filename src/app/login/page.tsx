@@ -108,25 +108,25 @@ function LoginPageInner() {
     <div className="min-h-screen flex items-center justify-center px-4 py-8 pb-[max(2rem,env(safe-area-inset-bottom))]">
       <div className="max-w-md w-full">
         <div className="text-center mb-6">
-          <div className="flex justify-center mb-3">
+      <div className="flex justify-center mb-3">
             <BrandMark size={96} variant="force" className="rounded-2xl shadow-[0_0_40px_rgba(34,197,94,0.2)]" />
-          </div>
+      </div>
           <h1 className="text-2xl font-bold">War Room Pick&apos;Em</h1>
           {inviteHint ? (
             <div className="mt-3 rounded-xl border-2 border-primary/50 bg-primary/10 px-4 py-3">
-              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
+      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
                 You&apos;re invited
               </p>
-              <p className="text-sm text-foreground mt-1 leading-snug">
+      <p className="text-sm text-foreground mt-1 leading-snug">
                 Code{" "}
                 <span className="font-mono font-bold tracking-[0.2em] text-primary text-lg">
                   {inviteHint}
                 </span>
-              </p>
+      </p>
               <p className="text-xs text-muted mt-1">
                 Create an account (or log in) — you&apos;ll land in that league.
               </p>
-            </div>
+      </div>
           ) : (
             <p className="text-sm text-muted mt-2">
               {mode === "login"
@@ -139,28 +139,28 @@ function LoginPageInner() {
         {/* Four doors in — host, code, open lobby, demo */}
         {!inviteHint && (
           <div className="mb-5 grid grid-cols-1 gap-2">
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary text-center mb-1">
+      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary text-center mb-1">
               How do you want in?
             </p>
-            <Link
+      <Link
               href="/join?mode=create"
               className="w-full py-3.5 min-h-[52px] rounded-xl bg-primary text-black text-sm font-extrabold touch-manipulation flex items-center justify-center"
             >
               Commissioner — create league
             </Link>
-            <Link
+      <Link
               href="/join?mode=join"
               className="w-full py-3.5 min-h-[52px] rounded-xl border border-border bg-card text-sm font-bold touch-manipulation flex items-center justify-center"
             >
               Join with code
             </Link>
-            <Link
+      <Link
               href="/open-room"
               className="w-full py-3.5 min-h-[52px] rounded-xl border-2 border-primary/40 bg-primary/10 text-sm font-bold touch-manipulation flex items-center justify-center"
             >
               Join open room
             </Link>
-            <button
+      <button
               type="button"
               disabled={guestLoading || loading}
               onClick={() => {
@@ -179,12 +179,12 @@ function LoginPageInner() {
             >
               {guestLoading ? "Loading demo…" : "Guest demo (bots, no account)"}
             </button>
-            <p className="text-[11px] text-muted text-center leading-relaxed px-1">
+      <p className="text-[11px] text-muted text-center leading-relaxed px-1">
               Open lobby fills one room at a time. Full rooms get a friendly
               “no seats” bounce — not a lecture. Log in below if you need an
               account first.
             </p>
-          </div>
+      </div>
         )}
 
         {/* Auth form FIRST when invited; always big phone fields */}
@@ -194,10 +194,10 @@ function LoginPageInner() {
         >
           {mode === "signup" && (
             <div>
-              <label className="text-xs text-muted block mb-1.5 font-medium">
+      <label className="text-xs text-muted block mb-1.5 font-medium">
                 Your name in the league
               </label>
-              <input
+      <input
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 className={inputClass}
@@ -207,10 +207,10 @@ function LoginPageInner() {
             </div>
           )}
           <div>
-            <label className="text-xs text-muted block mb-1.5 font-medium">
+      <label className="text-xs text-muted block mb-1.5 font-medium">
               Email
             </label>
-            <input
+      <input
               type="email"
               required
               value={email}
@@ -220,14 +220,14 @@ function LoginPageInner() {
               inputMode="email"
             />
           </div>
-          <div>
+      <div>
             <label
               className="text-xs text-muted block mb-1.5 font-medium"
               htmlFor="warroom-password"
             >
               Password
             </label>
-            <div className="relative">
+      <div className="relative">
               <input
                 id="warroom-password"
                 type={showPassword ? "text" : "password"}
@@ -249,7 +249,7 @@ function LoginPageInner() {
               >
                 {showPassword ? "Hide" : "Show"}
               </button>
-            </div>
+      </div>
             {mode === "signup" && (
               <p className="text-[11px] text-muted mt-1">At least 6 characters</p>
             )}
@@ -257,7 +257,7 @@ function LoginPageInner() {
 
           {mode === "login" && (
             <label className="flex items-center gap-3 text-sm text-muted cursor-pointer select-none min-h-[44px]">
-              <input
+      <input
                 type="checkbox"
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
@@ -285,8 +285,7 @@ function LoginPageInner() {
                   ? "Log in"
                   : "Create account"}
           </button>
-
-          <button
+      <button
             type="button"
             onClick={() => {
               setMode(mode === "login" ? "signup" : "login");
@@ -299,7 +298,7 @@ function LoginPageInner() {
               ? "Need an account? Sign up"
               : "Already have an account? Log in"}
           </button>
-        </form>
+      </form>
 
         {inviteHint && (
           <p className="text-center text-[11px] text-muted mt-4 leading-relaxed">
@@ -309,10 +308,10 @@ function LoginPageInner() {
         )}
 
         <p className="text-center text-xs text-muted mt-4">
-          <Link href="/" className="hover:text-foreground min-h-[44px] inline-flex items-center">
+      <Link href="/" className="hover:text-foreground min-h-[44px] inline-flex items-center">
             Back
           </Link>
-        </p>
+      </p>
 
         <OwnershipNotice variant="full" className="mt-8 px-2" />
       </div>
@@ -330,6 +329,6 @@ export default function LoginPage() {
       }
     >
       <LoginPageInner />
-    </Suspense>
+      </Suspense>
   );
 }

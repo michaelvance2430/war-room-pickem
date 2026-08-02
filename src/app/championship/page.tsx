@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import Nav from "@/components/Nav";
 import BracketView from "@/components/BracketView";
 import YouBadge from "@/components/YouBadge";
 import PlayerLink from "@/components/PlayerLink";
@@ -108,18 +107,16 @@ export default function ChampionshipPage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Nav />
-
       <main className="flex-1 max-w-6xl mx-auto w-full px-4 py-8">
         <div className="mb-6">
-          <div className="flex items-center gap-3 mb-1 flex-wrap">
+      <div className="flex items-center gap-3 mb-1 flex-wrap">
             <h1 className="text-2xl font-bold text-primary">
               Championship Bracket
             </h1>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+      <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
               Top {cutPercent === 50 ? "50%" : `${100 - cutPercent}%`}
             </span>
-            <span
+      <span
               className={`text-xs px-2 py-0.5 rounded-full border ${
                 cutLocked
                   ? "bg-primary/15 border-primary/40 text-primary"
@@ -128,28 +125,28 @@ export default function ChampionshipPage() {
             >
               {cutLocked ? "Field locked" : "Projected"}
             </span>
-          </div>
+      </div>
           <p className="text-sm text-muted">
             {leagueName ? `${leagueName} • ` : ""}
             Division leaders preferred as seeds 1–4 • Higher weekly score
             advances each playoff week
           </p>
-        </div>
+      </div>
 
         <div className="rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-sm mb-6 space-y-1">
           {cutLocked ? (
             <p>
-              <span className="font-medium text-primary">Cut locked</span>
-              <span className="text-muted">
+      <span className="font-medium text-primary">Cut locked</span>
+      <span className="text-muted">
                 {" "}
                 after the cut week. Seeds stay put; playoff cards decide who
                 advances.
               </span>
-            </p>
+      </p>
           ) : (
             <p>
-              <span className="font-medium text-primary">Not locked yet.</span>
-              <span className="text-muted">
+      <span className="font-medium text-primary">Not locked yet.</span>
+      <span className="text-muted">
                 {" "}
                 Seeds update with standings until{" "}
                 <strong className="text-foreground">
@@ -157,25 +154,24 @@ export default function ChampionshipPage() {
                 </strong>{" "}
                 is scored.
               </span>
-            </p>
+      </p>
           )}
           {progressNote && (
             <p className="text-muted text-xs">{progressNote}</p>
           )}
         </div>
-
-        <div className="flex flex-wrap gap-4 text-xs text-muted mb-6">
+      <div className="flex flex-wrap gap-4 text-xs text-muted mb-6">
           <span>
-            <span className="inline-block w-3 h-3 rounded-sm bg-primary/20 border border-primary/50 mr-1.5 align-middle" />
+      <span className="inline-block w-3 h-3 rounded-sm bg-primary/20 border border-primary/50 mr-1.5 align-middle" />
             Winner / advanced
           </span>
-          <span>Seeds 1–4 prefer division leaders among the field</span>
-          <span>Byes auto-advance when the field isn&apos;t a power of 2</span>
-          <span>
+      <span>Seeds 1–4 prefer division leaders among the field</span>
+      <span>Byes auto-advance when the field isn&apos;t a power of 2</span>
+      <span>
             Tiebreakers: Pts → H2H → ATS% → Avg → Best week → Streak → Best Bet%
             → Name
           </span>
-        </div>
+      </div>
 
         {loading && (
           <div className="rounded-xl border border-border bg-card p-8 text-center text-muted">
@@ -185,18 +181,18 @@ export default function ChampionshipPage() {
 
         {!loading && playerCount < 2 && (
           <div className="rounded-xl border border-border bg-card p-8 text-center">
-            <p className="font-medium mb-2">Need more players</p>
-            <p className="text-sm text-muted mb-4">
+      <p className="font-medium mb-2">Need more players</p>
+      <p className="text-sm text-muted mb-4">
               Brackets need at least 2 league members with standings data.
               Invite friends from Players.
             </p>
-            <Link
+      <Link
               href="/players"
               className="text-sm text-primary hover:underline"
             >
               Go to Players →
             </Link>
-          </div>
+      </div>
         )}
 
         {!loading && playerCount >= 2 && bracket && (
@@ -205,19 +201,19 @@ export default function ChampionshipPage() {
               {playerCount} in league → {fieldSize} projected in Championship
               field
             </p>
-            <div className="rounded-xl border border-border bg-card p-4 mb-6 overflow-x-auto">
+      <div className="rounded-xl border border-border bg-card p-4 mb-6 overflow-x-auto">
               <BracketView
                 bracket={bracket}
                 accent="primary"
                 selfId={selfId}
               />
-            </div>
+      </div>
 
             <div className="rounded-xl border border-border bg-card p-5">
-              <h2 className="font-semibold mb-3 text-sm">
+      <h2 className="font-semibold mb-3 text-sm">
                 Projected seeding order
               </h2>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {bracket.players.map((p, i) => {
                   const mine = isSelfPlayer(p.id, selfId);
                   return (
@@ -228,24 +224,24 @@ export default function ChampionshipPage() {
                       "flex items-center gap-2 text-sm px-2 py-1.5 rounded-lg bg-card-hover"
                     )}
                   >
-                    <span className="text-xs font-bold text-primary w-5">
+      <span className="text-xs font-bold text-primary w-5">
                       {i + 1}
                     </span>
-                    <span className={`truncate min-w-0 ${selfNameClass(mine, "")}`}>
+      <span className={`truncate min-w-0 ${selfNameClass(mine, "")}`}>
                       <PlayerLink id={p.id} name={p.name} />
                       {mine && <YouBadge />}
                     </span>
-                    <span className="text-xs text-muted ml-auto shrink-0">
+      <span className="text-xs text-muted ml-auto shrink-0">
                       {p.totalPoints}
                     </span>
-                  </div>
+      </div>
                   );
                 })}
               </div>
-            </div>
+      </div>
           </>
         )}
       </main>
-    </div>
+      </div>
   );
 }

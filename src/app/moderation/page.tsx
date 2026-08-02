@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import Nav from "@/components/Nav";
 import Avatar from "@/components/Avatar";
 import PlayerLink from "@/components/PlayerLink";
 import {
@@ -146,8 +145,7 @@ export default function ModerationPage() {
   if (allowed === null || loading) {
     return (
       <div className="min-h-screen flex flex-col">
-        <Nav />
-        <main className="flex-1 flex items-center justify-center text-muted text-sm">
+      <main className="flex-1 flex items-center justify-center text-muted text-sm">
           Loading…
         </main>
       </div>
@@ -157,18 +155,17 @@ export default function ModerationPage() {
   if (!allowed) {
     return (
       <div className="min-h-screen flex flex-col">
-        <Nav />
-        <main className="flex-1 flex items-center justify-center px-4">
+      <main className="flex-1 flex items-center justify-center px-4">
           <div className="max-w-md text-center rounded-xl border border-border bg-card p-6">
-            <h1 className="text-xl font-bold mb-2">Staff only</h1>
-            <p className="text-sm text-muted">
+      <h1 className="text-xl font-bold mb-2">Staff only</h1>
+      <p className="text-sm text-muted">
               Only the commissioner or appointed moderators can open moderation
               tools.
             </p>
-            <Link href="/" className="inline-block mt-4 text-sm text-primary">
+      <Link href="/" className="inline-block mt-4 text-sm text-primary">
               Home →
             </Link>
-          </div>
+      </div>
         </main>
       </div>
     );
@@ -176,17 +173,16 @@ export default function ModerationPage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Nav />
       <main className="flex-1 max-w-3xl mx-auto w-full px-4 py-8">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold">Moderation</h1>
-          <p className="text-sm text-muted leading-relaxed">
+      <h1 className="text-2xl font-bold">Moderation</h1>
+      <p className="text-sm text-muted leading-relaxed">
             Troll control: mute Locker Room, delete posts, remove players.
             {isCommish
               ? " As commissioner you can also appoint moderators."
               : " You can mute and delete; only the commissioner appoints mods."}
           </p>
-        </div>
+      </div>
 
         {msg && (
           <div className="mb-4 rounded-lg border border-primary/40 bg-primary/10 px-3 py-2 text-sm text-primary">
@@ -195,11 +191,11 @@ export default function ModerationPage() {
         )}
 
         <section className="rounded-xl border border-border bg-card p-5 mb-6">
-          <h2 className="font-semibold mb-1">Players</h2>
-          <p className="text-xs text-muted mb-4">
+      <h2 className="font-semibold mb-1">Players</h2>
+      <p className="text-xs text-muted mb-4">
             Mute = no Locker posts (picks still work). Kick = leave the league.
           </p>
-          <ul className="divide-y divide-border">
+      <ul className="divide-y divide-border">
             {roster.map((m) => {
               const isSelf = m.userId === selfId;
               const isComm = m.role === "commissioner";
@@ -209,9 +205,9 @@ export default function ModerationPage() {
                   key={m.userId}
                   className="flex flex-wrap items-center gap-2 py-3"
                 >
-                  <Avatar name={m.name} avatarUrl={m.avatarUrl} size="sm" />
+      <Avatar name={m.name} avatarUrl={m.avatarUrl} size="sm" />
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium truncate">
+      <div className="text-sm font-medium truncate">
                       <PlayerLink id={m.userId} name={m.name} />
                       {isComm && (
                         <span className="ml-1.5 text-[10px] text-primary">
@@ -237,11 +233,11 @@ export default function ModerationPage() {
                         <span className="ml-1.5 text-[10px] text-muted">(you)</span>
                       )}
                     </div>
-                    <div className="text-xs text-muted">{m.division}</div>
-                  </div>
+      <div className="text-xs text-muted">{m.division}</div>
+      </div>
                   {!isComm && !isSelf && (
                     <div className="flex flex-wrap gap-1.5">
-                      <button
+      <button
                         type="button"
                         disabled={busy}
                         onClick={() => void toggleMute(m)}
@@ -267,17 +263,17 @@ export default function ModerationPage() {
                       >
                         Kick
                       </button>
-                    </div>
+      </div>
                   )}
                 </li>
               );
             })}
           </ul>
-        </section>
+      </section>
 
         <section className="rounded-xl border border-border bg-card p-5">
-          <h2 className="font-semibold mb-1">Recent Locker posts</h2>
-          <p className="text-xs text-muted mb-4">
+      <h2 className="font-semibold mb-1">Recent Locker posts</h2>
+      <p className="text-xs text-muted mb-4">
             Delete anything that crosses the line. Full history on{" "}
             <Link href="/locker-room" className="text-primary hover:underline">
               Locker Room
@@ -293,15 +289,15 @@ export default function ModerationPage() {
                   key={post.id}
                   className="rounded-lg border border-border bg-background px-3 py-2"
                 >
-                  <div className="flex items-start justify-between gap-2">
+      <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="text-xs font-semibold text-foreground">
+      <p className="text-xs font-semibold text-foreground">
                         {post.authorName}
                       </p>
-                      <p className="text-sm text-foreground/90 mt-0.5 whitespace-pre-wrap break-words">
+      <p className="text-sm text-foreground/90 mt-0.5 whitespace-pre-wrap break-words">
                         {post.body}
                       </p>
-                    </div>
+      </div>
                     <button
                       type="button"
                       disabled={busyId === post.id}
@@ -312,14 +308,13 @@ export default function ModerationPage() {
                     >
                       Delete
                     </button>
-                  </div>
+      </div>
                 </li>
               ))}
             </ul>
           )}
         </section>
-
-        <p className="text-[11px] text-muted mt-6 leading-relaxed">
+      <p className="text-[11px] text-muted mt-6 leading-relaxed">
           Setup once: run{" "}
           <code className="text-foreground">supabase/moderation.sql</code> in
           Supabase if mute/mod buttons error.

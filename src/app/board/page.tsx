@@ -10,7 +10,6 @@
 import { useCallback, useEffect, useMemo, useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
-import Nav from "@/components/Nav";
 import PlayerLink from "@/components/PlayerLink";
 import {
   loadWeekCard,
@@ -146,21 +145,20 @@ function BoardInner() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Nav />
       <main className="flex-1 max-w-3xl mx-auto w-full px-3 sm:px-4 py-5 sm:py-8">
         <div className="mb-5">
-          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
+      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
             League pick reveal
           </p>
-          <h1 className="text-2xl font-black mt-1">The Board</h1>
-          <p className="text-sm text-muted mt-2 leading-relaxed">
+      <h1 className="text-2xl font-black mt-1">The Board</h1>
+      <p className="text-sm text-muted mt-2 leading-relaxed">
             Like fantasy football: you don&apos;t see who they took until{" "}
             <strong className="text-foreground font-medium">
               that game kicks off
             </strong>
             . Earlier games on the card stay hidden until their own kickoff.
           </p>
-        </div>
+      </div>
 
         {/* Status banner */}
         {!loading && games.length > 0 && (
@@ -178,7 +176,7 @@ function BoardInner() {
                     ? `${weekTitle(week)} scored · full reveal`
                     : `${weekTitle(week)} live · progressive reveal`}
                 </p>
-                <p className="text-xs text-muted mt-1">
+      <p className="text-xs text-muted mt-1">
                   {lockedCount} of {slips.length} locked · each matchup unlocks
                   at its own kickoff (not the whole card at once)
                   {scored ? " · scored weeks show green/red" : ""}
@@ -189,7 +187,7 @@ function BoardInner() {
                 <p className="text-sm font-semibold text-foreground">
                   Picks still secret
                 </p>
-                <p className="text-xs text-muted mt-1">
+      <p className="text-xs text-muted mt-1">
                   Cards freeze at first kickoff
                   {firstKick
                     ? ` (${new Date(firstKick).toLocaleString(undefined, {
@@ -234,7 +232,7 @@ function BoardInner() {
 
         {lockedNow && !error && (
           <div className="flex rounded-xl border border-border p-1 mb-5 bg-card gap-1">
-            <button
+      <button
               type="button"
               onClick={() => setMode("games")}
               className={`flex-1 py-3 min-h-[48px] rounded-lg text-sm font-bold transition touch-manipulation ${
@@ -245,7 +243,7 @@ function BoardInner() {
             >
               By game
             </button>
-            <button
+      <button
               type="button"
               onClick={() => setMode("cards")}
               className={`flex-1 py-3 min-h-[48px] rounded-lg text-sm font-bold transition touch-manipulation ${
@@ -256,24 +254,24 @@ function BoardInner() {
             >
               Full cards
             </button>
-          </div>
+      </div>
         )}
 
         <div className="flex flex-wrap gap-3 mb-6 text-sm">
-          <Link
+      <Link
             href="/picks"
             className="text-primary font-semibold hover:underline min-h-[44px] inline-flex items-center"
           >
             ← My Picks
           </Link>
-          <span className="text-muted">·</span>
-          <Link
+      <span className="text-muted">·</span>
+      <Link
             href="/standings"
             className="text-muted hover:text-foreground hover:underline"
           >
             Standings
           </Link>
-        </div>
+      </div>
 
         {loading && (
           <p className="text-sm text-muted py-12 text-center">
@@ -283,25 +281,25 @@ function BoardInner() {
 
         {!loading && error && (
           <div className="rounded-xl border border-warning/40 bg-warning/10 px-4 py-4 mb-6">
-            <p className="text-sm text-warning font-medium">{error}</p>
-            <p className="text-xs text-muted mt-2 leading-relaxed">
+      <p className="text-sm text-warning font-medium">{error}</p>
+      <p className="text-xs text-muted mt-2 leading-relaxed">
               Until first kickoff, only you see your card (like fantasy before
               lock). Then The Board is the group chat fuel.
             </p>
-            <p className="text-[11px] text-muted mt-2">
+      <p className="text-[11px] text-muted mt-2">
               Commish: if kickoff already hit but this still blocks, run{" "}
               <code className="text-foreground">
                 supabase/picks-reveal-after-lock.sql
               </code>{" "}
               in Supabase.
             </p>
-            <Link
+      <Link
               href="/picks"
               className="inline-block mt-3 text-sm text-primary font-semibold hover:underline"
             >
               Back to your card →
             </Link>
-          </div>
+      </div>
         )}
 
         {!loading && !error && !games.length && (
@@ -334,7 +332,7 @@ function BoardInner() {
           />
         )}
       </main>
-    </div>
+      </div>
   );
 }
 
@@ -381,9 +379,9 @@ function ByGameView({
             key={g.id}
             className="rounded-xl border border-border bg-card overflow-hidden"
           >
-            <div className="px-4 py-3 border-b border-border bg-background/50">
+      <div className="px-4 py-3 border-b border-border bg-background/50">
               <div className="flex flex-wrap items-start justify-between gap-2">
-                <div>
+      <div>
                   <p className="text-[10px] uppercase tracking-wider text-muted font-bold">
                     Game {i + 1}
                     {!revealed
@@ -396,11 +394,11 @@ function ByGameView({
                             : " · Home covers"
                         : " · picks open"}
                   </p>
-                  <h2 className="font-bold text-base mt-0.5">
+      <h2 className="font-bold text-base mt-0.5">
                     {formatRankedTeam(g.awayTeam, g.awayRank)} @{" "}
                     {formatRankedTeam(g.homeTeam, g.homeRank)}
                   </h2>
-                  <p className="text-xs text-muted mt-0.5">
+      <p className="text-xs text-muted mt-0.5">
                     {kick.full}
                     {g.spread != null && (
                       <>
@@ -412,7 +410,7 @@ function ByGameView({
                       </>
                     )}
                   </p>
-                </div>
+      </div>
                 {revealed ? (
                   <div className="text-[11px] text-muted tabular-nums">
                     {awayPicks.length} away · {homePicks.length} home
@@ -423,23 +421,23 @@ function ByGameView({
                   </span>
                 )}
               </div>
-            </div>
+      </div>
 
             {!revealed ? (
               <div className="px-4 py-8 text-center">
-                <p className="text-sm font-semibold text-foreground">
+      <p className="text-sm font-semibold text-foreground">
                   Like fantasy — lineup hidden
                 </p>
-                <p className="text-xs text-muted mt-1 max-w-sm mx-auto leading-relaxed">
+      <p className="text-xs text-muted mt-1 max-w-sm mx-auto leading-relaxed">
                   You don&apos;t see who they took until this game starts.
                   Come back after{" "}
                   {kick.full || "kickoff"}.
                 </p>
-              </div>
+      </div>
             ) : (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-border">
-                  <PickSide
+      <PickSide
                     label={shortTeam(g.awayTeam, g.awayRank)}
                     side="Away"
                     list={awayPicks}
@@ -457,7 +455,7 @@ function ByGameView({
                     selfId={selfId}
                     scored={scored}
                   />
-                </div>
+      </div>
                 {noPick.length > 0 && (
                   <p className="px-4 py-2 text-[11px] text-muted border-t border-border">
                     No pick: {noPick.map((s) => s.name).join(", ")}
@@ -471,11 +469,11 @@ function ByGameView({
 
       {prop?.question && (
         <section className="rounded-xl border border-border bg-card p-4">
-          <p className="text-[10px] uppercase tracking-wider text-muted font-bold">
+      <p className="text-[10px] uppercase tracking-wider text-muted font-bold">
             Prop
             {!propRevealed ? " · locks with first kickoff" : ""}
           </p>
-          <p className="text-sm font-medium mt-1">{prop.question}</p>
+      <p className="text-sm font-medium mt-1">{prop.question}</p>
           {propResult && (
             <p className="text-xs text-primary mt-1">Result: {propResult}</p>
           )}
@@ -500,13 +498,13 @@ function ByGameView({
                         : "border-border"
                     }`}
                   >
-                    <p className="text-xs font-bold">{opt}</p>
-                    <p className="text-[11px] text-muted mt-1">
+      <p className="text-xs font-bold">{opt}</p>
+      <p className="text-[11px] text-muted mt-1">
                       {who.length
                         ? who.map((s) => s.name).join(", ")
                         : "—"}
                     </p>
-                  </div>
+      </div>
                 );
               })}
             </div>
@@ -578,7 +576,7 @@ function PickSide({
                   s.userId === selfId ? "text-primary font-semibold" : ""
                 }`}
               >
-                <PlayerLink
+      <PlayerLink
                   id={s.userId}
                   name={s.name}
                   chaosFlames={!!s.isChaos}
@@ -589,7 +587,7 @@ function PickSide({
                     <span className="text-primary font-bold"> ×2</span>
                   ) : null}
                 </span>
-              </li>
+      </li>
             );
           })}
         </ul>
@@ -660,9 +658,9 @@ function FullCardsView({
                   : "border-border"
             }`}
           >
-            <div className="flex items-center justify-between gap-2 mb-3">
+      <div className="flex items-center justify-between gap-2 mb-3">
               <div>
-                <PlayerLink
+      <PlayerLink
                   id={s.userId}
                   name={s.name}
                   chaosFlames={!!s.isChaos}
@@ -699,7 +697,7 @@ function FullCardsView({
                 </span>
               )}
             </div>
-            <ul className="space-y-1.5 text-sm">
+      <ul className="space-y-1.5 text-sm">
               {games.map((g) => {
                 const revealed =
                   isSelf ||
@@ -714,7 +712,7 @@ function FullCardsView({
                     <li key={g.id} className="text-muted text-xs">
                       {shortTeam(g.awayTeam)} @ {shortTeam(g.homeTeam)} —{" "}
                       <span className="font-semibold">🔒 until kickoff</span>
-                    </li>
+      </li>
                   );
                 }
                 if (!pk) {
@@ -736,7 +734,7 @@ function FullCardsView({
                 }
                 return (
                   <li key={g.id} className={tone}>
-                    <span className="font-mono text-xs">{pk.confidence}</span>
+      <span className="font-mono text-xs">{pk.confidence}</span>
                     {(pk.isBestBet || s.bestBetId === g.id) && (
                       <span className="text-primary text-xs font-bold">
                         {" "}
@@ -768,7 +766,7 @@ function FullCardsView({
                   >
                     {s.propChoice}
                   </span>
-                </p>
+      </p>
               ) : null
             ) : (
               <p className="text-xs mt-2 text-muted">
@@ -792,6 +790,6 @@ export default function BoardPage() {
       }
     >
       <BoardInner />
-    </Suspense>
+      </Suspense>
   );
 }

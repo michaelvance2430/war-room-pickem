@@ -10,7 +10,6 @@
  */
 
 import { useEffect, useState } from "react";
-import Nav from "@/components/Nav";
 import YouBadge from "@/components/YouBadge";
 import PlayerLink from "@/components/PlayerLink";
 import { getSession, getLeague, isCommissioner, isOps } from "@/lib/league";
@@ -277,7 +276,7 @@ export default function TrophyRoomPage() {
           key={t}
           className="rounded-xl border border-border/60 border-dashed bg-card/30 p-5 min-h-[160px] flex flex-col justify-center opacity-50"
         >
-          <button
+      <button
             type="button"
             className={`mb-2 text-left ${spinning ? "animate-spin" : ""} ${
               isChamp ? "cursor-pointer" : "cursor-default"
@@ -302,7 +301,7 @@ export default function TrophyRoomPage() {
               size={52}
               empty
             />
-          </button>
+      </button>
           <div className="text-xs uppercase tracking-wide text-muted">
             {t.startsWith("division_")
               ? divisionDisplayLabel(
@@ -311,14 +310,14 @@ export default function TrophyRoomPage() {
                 )
               : m.short}
           </div>
-          <p className="text-sm text-muted mt-1">
+      <p className="text-sm text-muted mt-1">
             {y === year && isChamp
               ? vonnaggio
                 ? "Current season · grey until someone takes the gold"
                 : "Current season · not yet"
               : "Not yet · auto when ready"}
           </p>
-        </div>
+      </div>
       );
     }
     const live = liveHolder(item.winnerUserId, item.winnerName);
@@ -344,7 +343,7 @@ export default function TrophyRoomPage() {
         key={item.id}
         className={`rounded-xl border ${m.border} bg-gradient-to-b from-card to-black/40 p-5 min-h-[160px] ${m.glow} relative`}
       >
-        <div className="flex items-start justify-between gap-2 mb-2">
+      <div className="flex items-start justify-between gap-2 mb-2">
           <button
             type="button"
             className={`text-left ${spinning ? "animate-spin" : ""} ${
@@ -366,9 +365,9 @@ export default function TrophyRoomPage() {
               size={76}
               animate={!spinning && isChamp}
             />
-          </button>
+      </button>
           <div className="flex items-center gap-1.5">
-            <TrophyShareButton compact trophy={sharePayload} />
+      <TrophyShareButton compact trophy={sharePayload} />
             {canSync && (
               <button
                 type="button"
@@ -385,11 +384,11 @@ export default function TrophyRoomPage() {
               </button>
             )}
           </div>
-        </div>
+      </div>
         <div className={`text-xs uppercase tracking-wide font-semibold ${m.accent}`}>
           {title}
         </div>
-        <div className={`text-lg mt-1 ${selfNameClass(mine, "font-bold")}`}>
+      <div className={`text-lg mt-1 ${selfNameClass(mine, "font-bold")}`}>
           <PlayerLink
             id={live.userId || item.winnerUserId}
             name={live.name}
@@ -400,7 +399,7 @@ export default function TrophyRoomPage() {
           <p className="text-[11px] text-muted/80 mt-2 italic">{item.notes}</p>
         )}
         <div className="mt-3">
-          <TrophyShareButton
+      <TrophyShareButton
             trophy={sharePayload}
             label={mine ? "Share my win" : "Share this win"}
             className="w-full justify-center"
@@ -412,16 +411,14 @@ export default function TrophyRoomPage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Nav />
-
       <main className="flex-1 max-w-4xl mx-auto w-full px-4 py-8">
         <div className="mb-8">
-          <div className="flex items-center gap-3 mb-1 flex-wrap">
+      <div className="flex items-center gap-3 mb-1 flex-wrap">
             <h1 className="text-2xl font-bold">Trophy Room</h1>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-amber-400/10 text-amber-300 border border-amber-400/30">
+      <span className="text-xs px-2 py-0.5 rounded-full bg-amber-400/10 text-amber-300 border border-amber-400/30">
               Auto-engraved
             </span>
-          </div>
+      </div>
           <p className="text-sm text-muted max-w-2xl leading-relaxed">
             {leagueName ? (
               <>
@@ -435,23 +432,23 @@ export default function TrophyRoomPage() {
             <span className="text-foreground font-medium">not</span> clear this
             room.
           </p>
-          <p className="mt-2 text-xs text-muted leading-relaxed max-w-xl">
+      <p className="mt-2 text-xs text-muted leading-relaxed max-w-xl">
             <strong className="text-foreground">How it locks in:</strong>{" "}
             conference titles after cut week · Championship / Toilet when the
             bracket final is decided · Village Nerd when Crystal Ball is crowned.
           </p>
-          <p className="mt-2 text-xs">
+      <p className="mt-2 text-xs">
             <Link
               href="/museum"
               className="text-amber-300 font-semibold hover:underline"
             >
               Open War Room Museum →
             </Link>
-          </p>
+      </p>
 
           {canSync && (
             <div className="mt-4 flex flex-col gap-2">
-              <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+      <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
                 <button
                   type="button"
                   disabled={busy}
@@ -460,12 +457,12 @@ export default function TrophyRoomPage() {
                 >
                   {busy ? "Syncing…" : "Sync trophies now"}
                 </button>
-                <p className="text-[11px] text-muted">
+      <p className="text-[11px] text-muted">
                   Commish only · re-runs auto-engrave for {year}
                 </p>
-              </div>
+      </div>
               <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
-                <button
+      <button
                   type="button"
                   disabled={busy}
                   onClick={() => void onImport2025()}
@@ -479,14 +476,14 @@ export default function TrophyRoomPage() {
                         : "Award Maria Super Bowl (2025)"
                       : "Import 2025–26 season (Excel)"}
                 </button>
-                <p className="text-[11px] text-muted">
+      <p className="text-[11px] text-muted">
                   {sportId === "nfl"
                     ? vonnaggio
                       ? "Vonnagio · Maria 2025 gold family hardware"
                       : `NFL ${getPriorSeasonLabel("nfl")} · Maria Super Bowl · ring at Week 1 open`
                     : "Full 2025–26 · Kahmann Champ · Strayer Toilet · Big Ball Ben Nerd"}
                 </p>
-              </div>
+      </div>
             </div>
           )}
           {syncMsg && (
@@ -495,8 +492,7 @@ export default function TrophyRoomPage() {
             </p>
           )}
         </div>
-
-        <LastSeasonHardwareWall
+      <LastSeasonHardwareWall
           plaques={trophies}
           rosterHits={roster.map((r) => ({
             userId: r.userId,
@@ -512,8 +508,7 @@ export default function TrophyRoomPage() {
           leagueName={leagueName}
           sportId={sportId}
         />
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-10">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-10">
           {BIG_TYPES.map((t) => {
             const m = TROPHY_META[t];
             return (
@@ -521,19 +516,19 @@ export default function TrophyRoomPage() {
                 key={t}
                 className={`rounded-xl border ${m.border} bg-card/80 p-4 ${m.glow}`}
               >
-                <div className="mb-2 flex items-center min-h-[72px]">
+      <div className="mb-2 flex items-center min-h-[72px]">
                   <HardwareTrophyIcon
                     kind={t}
                     sportId={sportId}
                     size={68}
                     animate
                   />
-                </div>
+      </div>
                 <div className={`font-semibold ${m.accent}`}>{m.title}</div>
-                <p className="text-xs text-muted mt-1 leading-relaxed">
+      <p className="text-xs text-muted mt-1 leading-relaxed">
                   {m.blurb}
                 </p>
-              </div>
+      </div>
             );
           })}
         </div>
@@ -550,45 +545,45 @@ export default function TrophyRoomPage() {
 
         {!loading && seasons.length === 0 && (
           <div className="rounded-xl border border-dashed border-border bg-card/50 px-6 py-12 text-center mb-10">
-            <div className="flex justify-center mb-3 opacity-70">
+      <div className="flex justify-center mb-3 opacity-70">
               <HardwareTrophyIcon
                 kind="championship"
                 sportId={sportId}
                 size={88}
                 animate={false}
               />
-            </div>
+      </div>
             <p className="font-medium mb-1">Empty shelves — for now</p>
-            <p className="text-sm text-muted max-w-md mx-auto">
+      <p className="text-sm text-muted max-w-md mx-auto">
               Hardware appears automatically when the season decides it — cut
               week, bracket finals, Crystal Ball crown. Hosts can hit Sync
               anytime.
             </p>
-          </div>
+      </div>
         )}
 
         {!loading &&
           seasons.map(({ year: y, items }) => (
             <section key={y} className="mb-10">
-              <div className="flex items-center gap-3 mb-4">
+      <div className="flex items-center gap-3 mb-4">
                 <h2 className="text-lg font-bold tracking-tight">{y} Season</h2>
-                <div className="flex-1 h-px bg-border" />
+      <div className="flex-1 h-px bg-border" />
               </div>
-              <p className="text-[10px] uppercase tracking-wider text-muted font-bold mb-2">
+      <p className="text-[10px] uppercase tracking-wider text-muted font-bold mb-2">
                 Big hardware
               </p>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
                 {BIG_TYPES.map((t) => plaque(y, t, items))}
               </div>
-              <p className="text-[10px] uppercase tracking-wider text-muted font-bold mb-2">
+      <p className="text-[10px] uppercase tracking-wider text-muted font-bold mb-2">
                 {sportId === "nfl"
                   ? "Division / Conference"
                   : "Conference titles"}
               </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 {DIV_TYPES.map((t) => plaque(y, t, items))}
               </div>
-            </section>
+      </section>
           ))}
 
         {canSync && (
@@ -603,6 +598,6 @@ export default function TrophyRoomPage() {
           </p>
         )}
       </main>
-    </div>
+      </div>
   );
 }

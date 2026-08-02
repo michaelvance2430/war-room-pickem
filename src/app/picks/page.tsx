@@ -15,6 +15,6 @@ export default function PicksPage() {
       }
     >
       <PicksClient />
-    </Suspense>
+      </Suspense>
   );
 }

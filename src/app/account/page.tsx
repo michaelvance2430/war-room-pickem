@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import Nav from "@/components/Nav";
 import Avatar from "@/components/Avatar";
 import {
   getSession,
@@ -554,7 +553,6 @@ export default function AccountPage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Nav />
       <main className="flex-1 max-w-lg mx-auto w-full px-4 py-8">
         <div className="flex items-center gap-3 mb-4">
           {/* brand crest — house identity on account */}
@@ -566,9 +564,9 @@ export default function AccountPage() {
             height={48}
             className="rounded-lg shrink-0 object-contain"
           />
-          <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1">
             <h1 className="text-2xl font-bold mb-0.5">Account</h1>
-            <p className="text-sm text-muted">
+      <p className="text-sm text-muted">
               {name ? `Signed in as ${name}` : "Manage profile, leagues, and sign out"}
             </p>
             {userId && (
@@ -580,7 +578,7 @@ export default function AccountPage() {
               </Link>
             )}
           </div>
-        </div>
+      </div>
 
         {message && (
           <div className="mb-4 text-sm text-primary border border-primary/40 rounded-lg px-3 py-2">
@@ -590,15 +588,15 @@ export default function AccountPage() {
 
         {/* Top of Account — change name (buddy request; don't bury under titles) */}
         <section className="rounded-xl border-2 border-primary/50 bg-primary/10 p-5 mb-6">
-          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-1">
+      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-1">
             Identity
           </p>
-          <h2 className="font-semibold text-lg mb-1">Display name</h2>
-          <p className="text-xs text-muted mb-3 leading-relaxed">
+      <h2 className="font-semibold text-lg mb-1">Display name</h2>
+      <p className="text-xs text-muted mb-3 leading-relaxed">
             What the room sees on standings, the board, and the Gazette. Change
             it anytime.
           </p>
-          <label className="block text-xs text-muted mb-3">
+      <label className="block text-xs text-muted mb-3">
             Your name
             <input
               type="text"
@@ -611,7 +609,7 @@ export default function AccountPage() {
               className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-3 text-base text-foreground font-medium disabled:opacity-50"
             />
           </label>
-          <button
+      <button
             type="button"
             onClick={() => void onSaveName()}
             disabled={
@@ -624,8 +622,7 @@ export default function AccountPage() {
           >
             {nameBusy ? "Saving…" : "Save name"}
           </button>
-
-          <div className="mt-5 pt-4 border-t border-border/60">
+      <div className="mt-5 pt-4 border-t border-border/60">
             <p className="text-xs text-muted mb-2 leading-relaxed">
               Birthday (optional) — private. One quiet Gazette line if you open
               the app that day.{" "}
@@ -638,17 +635,17 @@ export default function AccountPage() {
             </p>
             {birthdayLocked && birthdayDraft ? (
               <div className="rounded-xl border border-primary/30 bg-primary/5 px-3 py-3 space-y-2">
-                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">
+      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">
                   Locked · one-time save
                 </p>
-                <p className="text-lg font-mono font-bold tracking-wide text-foreground">
+      <p className="text-lg font-mono font-bold tracking-wide text-foreground">
                   {birthdayDraft}
                 </p>
-                <p className="text-xs text-muted leading-relaxed">
+      <p className="text-xs text-muted leading-relaxed">
                   Cloud remembers this after login. You can&apos;t change it
                   yourself.
                 </p>
-                <button
+      <button
                   type="button"
                   onClick={() => {
                     const session = getSession();
@@ -681,7 +678,7 @@ export default function AccountPage() {
                 >
                   Wrong date? Message support
                 </button>
-              </div>
+      </div>
             ) : (
               <>
                 <label className="block text-xs text-muted mb-2">
@@ -710,7 +707,7 @@ export default function AccountPage() {
                     className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-3 text-base text-foreground font-medium disabled:opacity-50 tracking-wide"
                   />
                 </label>
-                <button
+      <button
                   type="button"
                   disabled={
                     isGuestMode() ||
@@ -746,22 +743,22 @@ export default function AccountPage() {
               </>
             )}
           </div>
-        </section>
+      </section>
 
         {/* Commish preview next */}
         {canPreviewPlayer && (
           <section className="rounded-xl border-2 border-warning bg-warning/15 p-5 mb-6 shadow-[0_0_24px_rgba(234,179,8,0.12)]">
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-warning mb-1">
+      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-warning mb-1">
               Commish only
             </p>
-            <h2 className="text-lg font-bold mb-1 text-warning">
+      <h2 className="text-lg font-bold mb-1 text-warning">
               View as player
             </h2>
-            <p className="text-sm text-foreground/90 mb-3 leading-relaxed">
+      <p className="text-sm text-foreground/90 mb-3 leading-relaxed">
               See the app like your 20 friends: no Commish button, no ops tools.
               Your real powers stay on — this only changes the UI.
             </p>
-            <button
+      <button
               type="button"
               onClick={() => {
                 const next = !playerView;
@@ -786,19 +783,19 @@ export default function AccountPage() {
             >
               {playerView ? "Exit → Home as Commish" : "Enter player view →"}
             </button>
-          </section>
+      </section>
         )}
 
         <section className="rounded-xl border border-primary/35 bg-primary/10 p-5 mb-6">
-          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-1">
+      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-1">
             First steps
           </p>
-          <h2 className="font-semibold mb-1">Player tutorial</h2>
-          <p className="text-xs text-muted mb-3 leading-relaxed">
+      <h2 className="font-semibold mb-1">Player tutorial</h2>
+      <p className="text-xs text-muted mb-3 leading-relaxed">
             Default path is My Picks only (the weekly job). Crystal Ball is
             optional power — full walkthrough includes it.
           </p>
-          <div className="flex flex-col sm:flex-row gap-2">
+      <div className="flex flex-col sm:flex-row gap-2">
             <button
               type="button"
               onClick={() => {
@@ -818,7 +815,7 @@ export default function AccountPage() {
             >
               Run picks tutorial →
             </button>
-            <button
+      <button
               type="button"
               onClick={() => {
                 if (isGuestMode()) {
@@ -837,15 +834,14 @@ export default function AccountPage() {
             >
               Full walkthrough (+ Crystal Ball)
             </button>
-          </div>
+      </div>
         </section>
-
-        <section className="rounded-xl border border-amber-400/35 bg-amber-400/10 p-5 mb-6">
+      <section className="rounded-xl border border-amber-400/35 bg-amber-400/10 p-5 mb-6">
           <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-amber-300 mb-1">
             Nameplate
           </p>
-          <h2 className="font-semibold mb-1">Equip a title</h2>
-          <p className="text-xs text-muted mb-3 leading-relaxed">
+      <h2 className="font-semibold mb-1">Equip a title</h2>
+      <p className="text-xs text-muted mb-3 leading-relaxed">
             Only some achievements unlock a title.{" "}
             <span className="text-amber-200 font-semibold">Flex</span> ones flex.{" "}
             <span className="text-orange-300 font-semibold">Trash energy</span>{" "}
@@ -863,7 +859,7 @@ export default function AccountPage() {
             </p>
           ) : (
             <div className="space-y-3">
-              <label className="block text-xs text-muted">
+      <label className="block text-xs text-muted">
                 Active title
                 {chaosTitleLock && (
                   <p className="mt-1 text-xs text-orange-300 font-semibold">
@@ -901,7 +897,7 @@ export default function AccountPage() {
                     </option>
                   ))}
                 </select>
-              </label>
+      </label>
               {equippedBadgeId && (
                 <>
                   <p className="text-sm text-foreground">
@@ -913,7 +909,7 @@ export default function AccountPage() {
                     <span className="font-semibold text-primary">
                       {name || "You"}
                     </span>
-                  </p>
+      </p>
                   {titleOptions.find((t) => t.badgeId === equippedBadgeId)
                     ?.blurb && (
                     <p className="text-[11px] text-muted">
@@ -926,42 +922,41 @@ export default function AccountPage() {
                 </>
               )}
               <details className="text-[11px] text-muted">
-                <summary className="cursor-pointer font-semibold text-foreground/80">
+      <summary className="cursor-pointer font-semibold text-foreground/80">
                   Titles you can wear ({titleOptions.length})
                 </summary>
-                <ul className="mt-2 space-y-1.5 border border-border rounded-lg bg-background/60 px-3 py-2 max-h-48 overflow-y-auto">
+      <ul className="mt-2 space-y-1.5 border border-border rounded-lg bg-background/60 px-3 py-2 max-h-48 overflow-y-auto">
                   {titleOptions.map((t) => (
                     <li key={t.badgeId} className="flex flex-col gap-0.5">
-                      <span>
+      <span>
                         <span className="text-amber-200 font-bold">
                           {t.label}
                         </span>
-                        <span className="text-muted">
+      <span className="text-muted">
                           {" "}
                           · {titleVibeLabel(t.vibe)}
                         </span>
-                      </span>
+      </span>
                       <span className="text-[10px] text-muted">{t.blurb}</span>
-                    </li>
+      </li>
                   ))}
                 </ul>
-              </details>
+      </details>
             </div>
           )}
         </section>
-
-        <section className="rounded-xl border border-sky-400/30 bg-sky-400/5 p-5 mb-6">
+      <section className="rounded-xl border border-sky-400/30 bg-sky-400/5 p-5 mb-6">
           <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-sky-300 mb-1">
             Avatar ring
           </p>
-          <h2 className="font-semibold mb-1">Profile border</h2>
-          <p className="text-xs text-muted mb-3 leading-relaxed">
+      <h2 className="font-semibold mb-1">Profile border</h2>
+      <p className="text-xs text-muted mb-3 leading-relaxed">
             Unlock rings with achievements. Seasonal rings sometimes show up
             when the room feels festive — nobody will announce them. They
             vanish when the theme does. Creator-only flame / forge / circuit
             stay Mike-only.
           </p>
-          <div className="flex justify-center mb-4">
+      <div className="flex justify-center mb-4">
             <Avatar
               name={name || "You"}
               avatarUrl={avatarUrl}
@@ -969,7 +964,7 @@ export default function AccountPage() {
               userId={userId}
               borderId={equippedBorderId}
             />
-          </div>
+      </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-72 overflow-y-auto">
             {PROFILE_BORDER_CATALOG.filter((b: ProfileBorderDef) => {
               void themeTick;
@@ -1019,7 +1014,7 @@ export default function AccountPage() {
                   }`}
                 >
                   <div className="flex items-center gap-2 mb-1">
-                    <Avatar
+      <Avatar
                       name={name || "You"}
                       avatarUrl={avatarUrl}
                       size="sm"
@@ -1029,7 +1024,7 @@ export default function AccountPage() {
                     <span className="text-[11px] font-bold leading-tight">
                       {b.name}
                     </span>
-                  </div>
+      </div>
                   <p className="text-[10px] text-muted leading-snug">
                     {unlocked ? (
                       <>
@@ -1042,15 +1037,15 @@ export default function AccountPage() {
                       b.unlockLabel
                     )}
                   </p>
-                </button>
+      </button>
               );
             })}
           </div>
-        </section>
+      </section>
 
         <section className="rounded-xl border border-border bg-card p-5 mb-6">
-          <h2 className="font-semibold mb-3">Profile photo</h2>
-          <div className="flex items-center gap-4">
+      <h2 className="font-semibold mb-3">Profile photo</h2>
+      <div className="flex items-center gap-4">
             <Avatar
               name={name || "You"}
               avatarUrl={avatarUrl}
@@ -1058,7 +1053,7 @@ export default function AccountPage() {
               userId={userId}
               borderId={equippedBorderId}
             />
-            <div className="flex-1 min-w-0 space-y-2">
+      <div className="flex-1 min-w-0 space-y-2">
               <p className="text-sm font-medium truncate">{name || "Player"}</p>
               {userId && (
                 <Link
@@ -1070,27 +1065,27 @@ export default function AccountPage() {
               )}
               {userId && isAppCreator(userId) && (
                 <div className="space-y-2">
-                  <p className="text-xs text-yellow-500 font-medium">
+      <p className="text-xs text-yellow-500 font-medium">
                     👑 The Creator legendary is active — gold on your profile, and
                     your nameplate defaults to{" "}
                     <span className="font-black uppercase">The Creator</span>{" "}
                     {name || "Mike V."}. Friends stay grey (that badge is only for
                     the person who built the app).
                   </p>
-                  <Link
+      <Link
                     href="/founder"
                     className="inline-block text-xs font-semibold text-primary hover:underline"
                   >
                     Founder Dashboard (cockpit) →
                   </Link>
-                </div>
+      </div>
               )}
               <p className="text-xs text-muted">
                 Any player can upload. JPG or PNG works best (max 2 MB after
                 resize). On iPhone, avoid HEIC — use &quot;Most Compatible&quot;
                 or a screenshot.
               </p>
-              <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2">
                 <input
                   ref={fileRef}
                   type="file"
@@ -1117,13 +1112,13 @@ export default function AccountPage() {
                   </button>
                 )}
               </div>
-            </div>
+      </div>
           </div>
-        </section>
+      </section>
 
         <section className="rounded-xl border border-border bg-card p-5 mb-6">
-          <h2 className="font-semibold mb-1">Your leagues</h2>
-          <p className="text-xs text-muted mb-3 leading-relaxed">
+      <h2 className="font-semibold mb-1">Your leagues</h2>
+      <p className="text-xs text-muted mb-3 leading-relaxed">
             Pick a sport desk first — you only see rooms for that sport. When
             baseball or soccer season hits, football stays off this list.
           </p>
@@ -1157,7 +1152,7 @@ export default function AccountPage() {
                     <span className="text-[11px] font-semibold text-muted">
                       ({b.rooms.length})
                     </span>
-                  </button>
+      </button>
                 );
               })}
             </div>
@@ -1186,7 +1181,7 @@ export default function AccountPage() {
                   userId={userId}
                   active={active}
                 >
-                  <div className="flex flex-wrap gap-2 mt-1">
+      <div className="flex flex-wrap gap-2 mt-1">
                     {!active && (
                       <button
                         type="button"
@@ -1219,33 +1214,31 @@ export default function AccountPage() {
                       </button>
                     )}
                   </div>
-                </LeagueMembershipCard>
+      </LeagueMembershipCard>
               );
             })}
           </div>
-
-          <div className="mt-4 flex flex-col gap-2">
+      <div className="mt-4 flex flex-col gap-2">
             <Link
               href="/join"
               className="text-center text-sm py-2.5 rounded-lg bg-primary text-black font-medium"
             >
               Create or join another league
             </Link>
-            <p className="text-xs text-muted text-center">
+      <p className="text-xs text-muted text-center">
               Multi-sport? Use the sport chips above. Switch enters that room as
               your active desk.
             </p>
-          </div>
+      </div>
         </section>
-
-        <section className="rounded-xl border border-border bg-card p-5 space-y-3">
+      <section className="rounded-xl border border-border bg-card p-5 space-y-3">
           <h2 className="font-semibold">Room surface</h2>
-          <p className="text-xs text-muted leading-relaxed">
+      <p className="text-xs text-muted leading-relaxed">
             New seasons start simple (Picks · Board · Locker). Depth opens as
             weeks roll. Turn this on if you already know the room and want
             everything visible now.
           </p>
-          <label className="flex items-start gap-3 cursor-pointer">
+      <label className="flex items-start gap-3 cursor-pointer">
             <input
               type="checkbox"
               className="mt-1 rounded border-border"
@@ -1259,29 +1252,28 @@ export default function AccountPage() {
               }}
             />
             <span className="text-sm text-foreground">
-              <span className="font-semibold">Show full room</span>
-              <span className="block text-xs text-muted mt-0.5">
+      <span className="font-semibold">Show full room</span>
+      <span className="block text-xs text-muted mt-0.5">
                 Gazette, News, trophies, stats — no progressive hide
               </span>
-            </span>
+      </span>
           </label>
-        </section>
+      </section>
 
         <FeedbackForm />
-
-        <section className="rounded-xl border border-border bg-card p-5">
+      <section className="rounded-xl border border-border bg-card p-5">
           <h2 className="font-semibold mb-2">Account</h2>
-          <p className="text-xs text-muted mb-3">
+      <p className="text-xs text-muted mb-3">
             Sign out on this device. Log in again with the same email and your
             remaining leagues will still be there.
           </p>
-          <button
+      <button
             onClick={onSignOut}
             className="w-full py-2.5 rounded-lg border border-danger text-danger text-sm hover:bg-danger/10"
           >
             Sign out / switch account
           </button>
-        </section>
+      </section>
 
         <OwnershipNotice variant="full" className="mt-8 mb-4 px-2" />
       </main>
@@ -1294,15 +1286,15 @@ export default function AccountPage() {
           aria-modal
           aria-labelledby="leave-league-title"
         >
-          <div className="w-full sm:max-w-md max-h-[92vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl border-2 border-danger/50 bg-card shadow-2xl p-5 space-y-4">
+      <div className="w-full sm:max-w-md max-h-[92vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl border-2 border-danger/50 bg-card shadow-2xl p-5 space-y-4">
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-danger mb-1">
+      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-danger mb-1">
                 Warning · can&apos;t undo
               </p>
-              <h2 id="leave-league-title" className="text-lg font-bold text-foreground">
+      <h2 id="leave-league-title" className="text-lg font-bold text-foreground">
                 Leave {leaveModal.leagueName}?
               </h2>
-            </div>
+      </div>
 
             {leaveModal.seasonFinished === true ? (
               <p className="text-sm text-muted leading-relaxed">
@@ -1311,7 +1303,7 @@ export default function AccountPage() {
               </p>
             ) : leaveModal.penaltiesApply === false ? (
               <p className="text-sm text-muted leading-relaxed">
-                <strong className="text-foreground">Opening week hasn&apos;t started yet</strong>
+      <strong className="text-foreground">Opening week hasn&apos;t started yet</strong>
                 {" — "}
                 clean leave. No Blue Falcon. No forfeit. You can rejoin later
                 with the code if a seat is open.
@@ -1319,42 +1311,42 @@ export default function AccountPage() {
             ) : (
               <>
                 <div className="rounded-xl border border-danger/40 bg-danger/10 px-4 py-3 space-y-2">
-                  <p className="text-sm font-bold text-danger">
+      <p className="text-sm font-bold text-danger">
                     Season is live (opening week has started). If you leave now:
                   </p>
-                  <ul className="text-sm text-foreground/90 leading-relaxed list-disc pl-5 space-y-1">
+      <ul className="text-sm text-foreground/90 leading-relaxed list-disc pl-5 space-y-1">
                     <li>
-                      <strong>Cheevos</strong> earned in this league
+      <strong>Cheevos</strong> earned in this league
                     </li>
-                    <li>
+      <li>
                       <strong>Trophies / hardware</strong> from this room
                     </li>
-                    <li>
+      <li>
                       <strong>Titles</strong> unlocked here
                     </li>
-                    <li>
+      <li>
                       You leave the <strong>roster</strong>
-                    </li>
+      </li>
                   </ul>
-                  <p className="text-xs text-muted leading-relaxed pt-1">
+      <p className="text-xs text-muted leading-relaxed pt-1">
                     Forfeited rewards do{" "}
                     <strong className="text-foreground">not</strong> come back
                     if you rejoin later.
                   </p>
-                </div>
+      </div>
 
                 <div className="rounded-xl border-2 border-amber-500/50 bg-amber-500/10 px-4 py-3 space-y-1.5">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-amber-300">
+      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-amber-300">
                     Your Blue Falcon Count
                   </p>
-                  <p className="text-3xl font-black text-amber-200 tabular-nums">
+      <p className="text-3xl font-black text-amber-200 tabular-nums">
                     {leaveModal.blueFalconCount}
                     <span className="text-base font-bold text-amber-200/80 ml-2">
                       → {leaveModal.blueFalconCount + 1}
                     </span>
-                  </p>
+      </p>
                   <p className="text-xs text-muted leading-relaxed">
-                    <strong className="text-foreground">Blue Falcon</strong> =
+      <strong className="text-foreground">Blue Falcon</strong> =
                     quitting after opening week has started — screwing the unit
                     mid-season. Public on your profile. Preseason leave does{" "}
                     <strong className="text-foreground">not</strong> count.
@@ -1366,8 +1358,7 @@ export default function AccountPage() {
                     </p>
                   )}
                 </div>
-
-                <p className="text-sm text-muted leading-relaxed">
+      <p className="text-sm text-muted leading-relaxed">
                   Stay through the season to keep the fun stuff. Getting knocked
                   out of brackets is fine — walking out of the room is not.
                 </p>
@@ -1375,7 +1366,7 @@ export default function AccountPage() {
             )}
 
             <div className="flex flex-col gap-2">
-              <button
+      <button
                 type="button"
                 disabled={leaveModal.busy}
                 onClick={() => void confirmLeave()}
@@ -1387,7 +1378,7 @@ export default function AccountPage() {
                     ? "I understand — leave and forfeit"
                     : "Yes, leave this league"}
               </button>
-              <button
+      <button
                 type="button"
                 disabled={leaveModal.busy}
                 onClick={() => setLeaveModal(null)}
@@ -1395,9 +1386,9 @@ export default function AccountPage() {
               >
                 Stay in the league
               </button>
-            </div>
+      </div>
           </div>
-        </div>
+      </div>
       )}
 
       {/* Mid-season delete blocked — keep team; voluntary pass only */}
@@ -1408,7 +1399,7 @@ export default function AccountPage() {
           aria-modal
           aria-labelledby="delete-league-title"
         >
-          <div className="w-full sm:max-w-md max-h-[92vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl border border-border bg-card shadow-2xl p-5 space-y-4">
+      <div className="w-full sm:max-w-md max-h-[92vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl border border-border bg-card shadow-2xl p-5 space-y-4">
             <h2 id="delete-league-title" className="text-lg font-bold">
               {deleteModal.eval?.canHardDelete
                 ? `Delete ${deleteModal.leagueName}?`
@@ -1422,7 +1413,7 @@ export default function AccountPage() {
                   for everyone — standings, picks, the whole board. Only use this
                   on empty practice rooms or before the season is real.
                 </p>
-                <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2">
                   <button
                     type="button"
                     disabled={deleteModal.busy}
@@ -1431,7 +1422,7 @@ export default function AccountPage() {
                   >
                     {deleteModal.busy ? "Deleting…" : "Yes, delete forever"}
                   </button>
-                  <button
+      <button
                     type="button"
                     disabled={deleteModal.busy}
                     onClick={() => setDeleteModal(null)}
@@ -1439,14 +1430,14 @@ export default function AccountPage() {
                   >
                     Cancel
                   </button>
-                </div>
+      </div>
               </>
             ) : (
               <>
                 <p className="text-sm text-foreground/90 leading-relaxed">
                   {deleteModal.eval?.reason}
                 </p>
-                <p className="text-sm text-muted leading-relaxed">
+      <p className="text-sm text-muted leading-relaxed">
                   Getting crushed is not a delete button.{" "}
                   <strong className="text-foreground">
                     Nobody is forced to be commissioner
@@ -1458,10 +1449,10 @@ export default function AccountPage() {
 
                 {(deleteModal.eval?.candidates?.length ?? 0) > 0 && (
                   <div className="rounded-xl border border-primary/40 bg-primary/10 px-4 py-3 space-y-2">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-primary">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-primary">
                       Voluntary handoff · pick who is ready
                     </p>
-                    <label className="block text-xs text-muted">
+      <label className="block text-xs text-muted">
                       Who jumps in?
                       <select
                         value={deleteModal.passToUserId}
@@ -1483,25 +1474,25 @@ export default function AccountPage() {
                           </option>
                         ))}
                       </select>
-                    </label>
+      </label>
                     <p className="text-[11px] text-muted leading-relaxed">
                       1st place is only a suggestion — pick whoever agreed to
                       host. Or close this and ask the room first.
                     </p>
-                  </div>
+      </div>
                 )}
 
                 <div className="rounded-xl border border-border bg-background/60 px-4 py-3 space-y-2">
-                  <p className="text-xs font-bold text-foreground">
+      <p className="text-xs font-bold text-foreground">
                     Tell the room someone can jump in
                   </p>
-                  <p className="text-xs text-muted leading-relaxed">
+      <p className="text-xs text-muted leading-relaxed">
                     Drop a Locker Room note that the keys are available. When
                     someone says yes, pass them here or in Commissioner tools →{" "}
                     <strong className="text-foreground">Pass commissioner</strong>
                     .
                   </p>
-                  <Link
+      <Link
                     href="/commissioner"
                     onClick={async () => {
                       await switchToLeague(deleteModal.leagueId);
@@ -1512,7 +1503,7 @@ export default function AccountPage() {
                   >
                     Open Commissioner tools →
                   </Link>
-                </div>
+      </div>
 
                 <div className="flex flex-col gap-2">
                   {(deleteModal.eval?.candidates?.length ?? 0) > 0 && (
@@ -1541,11 +1532,11 @@ export default function AccountPage() {
                   >
                     Keep my gavel · cancel
                   </button>
-                </div>
+      </div>
               </>
             )}
           </div>
-        </div>
+      </div>
       )}
     </div>
   );

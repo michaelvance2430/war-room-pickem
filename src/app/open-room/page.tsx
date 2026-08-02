@@ -172,23 +172,23 @@ export default function OpenRoomPage() {
     <div className="min-h-screen flex items-center justify-center px-4 py-10 pb-[max(2rem,env(safe-area-inset-bottom))]">
       <div className="max-w-md w-full">
         <div className="text-center mb-6">
-          <div className="flex justify-center mb-3">
+      <div className="flex justify-center mb-3">
             <BrandMark size={80} variant="force" className="rounded-xl" />
-          </div>
+      </div>
           <h1 className="text-2xl font-bold">Open room lobby</h1>
-          <p className="text-sm text-muted mt-2 leading-relaxed">
+      <p className="text-sm text-muted mt-2 leading-relaxed">
             We fill one room at a time so teams form fast — then seat the next
             person waiting. Cap {MAX_LEAGUE_PLAYERS} per room.
           </p>
-        </div>
+      </div>
 
         <div className="rounded-xl border-2 border-primary/40 bg-card p-5 space-y-4">
-          <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3">
             {phase !== "seated" && phase !== "error" && (
               <span className="w-2.5 h-2.5 rounded-full bg-primary animate-pulse shrink-0" />
             )}
             <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
+      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
                 {phase === "seated"
                   ? "Seated"
                   : phase === "error"
@@ -197,7 +197,7 @@ export default function OpenRoomPage() {
                       ? "Waiting"
                       : "Matching"}
               </p>
-              <p className="text-sm text-foreground mt-0.5 leading-snug">
+      <p className="text-sm text-foreground mt-0.5 leading-snug">
                 {statusLine}
               </p>
               {phase !== "seated" && phase !== "error" && (
@@ -206,20 +206,20 @@ export default function OpenRoomPage() {
                 </p>
               )}
             </div>
-          </div>
+      </div>
 
           {error && (
             <div className="rounded-lg border border-border bg-background/60 px-3 py-2.5">
-              <p className="text-sm text-foreground leading-relaxed">{error}</p>
-            </div>
+      <p className="text-sm text-foreground leading-relaxed">{error}</p>
+      </div>
           )}
 
           {preview.length > 0 && phase !== "seated" && (
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted mb-2">
+      <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted mb-2">
                 Open rooms filling now
               </p>
-              <ul className="space-y-2">
+      <ul className="space-y-2">
                 {preview.map((r, i) => (
                   <li
                     key={r.id}
@@ -229,24 +229,24 @@ export default function OpenRoomPage() {
                         : "border-border bg-background/40"
                     }`}
                   >
-                    <span className="font-medium text-foreground truncate">
+      <span className="font-medium text-foreground truncate">
                       {i === 0 ? "→ " : ""}
                       {r.name}
                     </span>
-                    <span className="text-xs text-muted shrink-0 tabular-nums">
+      <span className="text-xs text-muted shrink-0 tabular-nums">
                       {r.memberCount}/{MAX_LEAGUE_PLAYERS}
                       <span className="text-primary ml-1">
                         · {r.seatsLeft} left
                       </span>
-                    </span>
+      </span>
                   </li>
                 ))}
               </ul>
-              <p className="text-[11px] text-muted mt-2 leading-relaxed">
+      <p className="text-[11px] text-muted mt-2 leading-relaxed">
                 First in line is the fullest open room — we pack that one before
                 starting the next.
               </p>
-            </div>
+      </div>
           )}
 
           {phase === "seated" && seatedName && (
@@ -271,22 +271,21 @@ export default function OpenRoomPage() {
             >
               Join with a code instead
             </Link>
-            <Link
+      <Link
               href="/join?mode=create&open=1"
               className="w-full py-3 min-h-[48px] rounded-xl border border-primary/30 text-center text-sm font-medium text-primary touch-manipulation flex items-center justify-center"
             >
               Commish an open room
             </Link>
-            <Link
+      <Link
               href="/login"
               className="text-center text-xs text-muted py-2"
             >
               Back
             </Link>
-          </div>
+      </div>
         </div>
-
-        <OwnershipNotice className="mt-8" />
+      <OwnershipNotice className="mt-8" />
       </div>
 
       {/* Timed offer: try a different open league */}
@@ -297,21 +296,21 @@ export default function OpenRoomPage() {
           aria-modal="true"
           aria-labelledby="open-room-switch-title"
         >
-          <div className="w-full max-w-md rounded-t-2xl sm:rounded-2xl border border-border bg-card p-5 shadow-2xl">
+      <div className="w-full max-w-md rounded-t-2xl sm:rounded-2xl border border-border bg-card p-5 shadow-2xl">
             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-2">
               Still looking
             </p>
-            <h2
+      <h2
               id="open-room-switch-title"
               className="text-lg font-bold text-foreground mb-2"
             >
               Want to join a different open league?
             </h2>
-            <p className="text-sm text-muted leading-relaxed mb-5">
+      <p className="text-sm text-muted leading-relaxed mb-5">
               You’ve been waiting a bit. We can skip the current fill line and
               try the next open room — or keep holding this seat.
             </p>
-            <div className="flex flex-col sm:flex-row gap-2">
+      <div className="flex flex-col sm:flex-row gap-2">
               <button
                 type="button"
                 onClick={tryDifferentRoom}
@@ -319,16 +318,16 @@ export default function OpenRoomPage() {
               >
                 Yes — different open league
               </button>
-              <button
+      <button
                 type="button"
                 onClick={keepWaiting}
                 className="flex-1 py-3.5 min-h-[52px] rounded-xl border border-border text-sm font-medium touch-manipulation"
               >
                 Keep waiting here
               </button>
-            </div>
+      </div>
           </div>
-        </div>
+      </div>
       )}
     </div>
   );

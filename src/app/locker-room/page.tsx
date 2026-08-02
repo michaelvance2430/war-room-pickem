@@ -9,7 +9,6 @@ import {
   type KeyboardEvent,
 } from "react";
 import Link from "next/link";
-import Nav from "@/components/Nav";
 import YouBadge from "@/components/YouBadge";
 import PlayerLink from "@/components/PlayerLink";
 import { getSession, getLeague, isStaff } from "@/lib/league";
@@ -313,16 +312,14 @@ export default function LockerRoomPage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Nav />
-
       <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-6 flex flex-col min-h-0">
         <div className="mb-4 shrink-0">
-          <div className="flex items-center gap-2 flex-wrap mb-1">
+      <div className="flex items-center gap-2 flex-wrap mb-1">
             <h1 className="text-2xl font-bold">Locker Room</h1>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-300 border border-orange-400/30">
+      <span className="text-xs px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-300 border border-orange-400/30">
               Trash talk
             </span>
-          </div>
+      </div>
           <p className="text-sm text-muted">
             {leagueName ? (
               <>
@@ -350,18 +347,18 @@ export default function LockerRoomPage() {
               </>
             )}
           </p>
-          <details className="mt-2 text-xs text-muted">
+      <details className="mt-2 text-xs text-muted">
             <summary className="cursor-pointer select-none text-primary/90 font-semibold hover:text-primary">
               How it works
             </summary>
-            <p className="mt-1.5 leading-relaxed">
+      <p className="mt-1.5 leading-relaxed">
               {LOCKER_MAX_CHARS} char max ·{" "}
               <strong className="text-foreground">+</strong> on a post to react
               (stamps stack bottom-left) · type{" "}
               <strong className="text-foreground">@name</strong> to tag ·{" "}
               this week only · staff can delete or mute.
             </p>
-          </details>
+      </details>
         </div>
 
         {error && (
@@ -385,14 +382,14 @@ export default function LockerRoomPage() {
           )}
           {!loading && messages.length === 0 && !error && (
             <div className="text-center py-12 px-4">
-              <div className="text-3xl mb-2" aria-hidden>
+      <div className="text-3xl mb-2" aria-hidden>
                 🏈💀
               </div>
-              <p className="text-sm font-medium">Quiet in here</p>
-              <p className="text-xs text-muted mt-1">
+      <p className="text-sm font-medium">Quiet in here</p>
+      <p className="text-xs text-muted mt-1">
                 First take of the week. Don&apos;t waste it. Try @someone.
               </p>
-            </div>
+      </div>
           )}
           <ul className="divide-y divide-border/60">
             {messages.map((m) => {
@@ -405,17 +402,17 @@ export default function LockerRoomPage() {
                   key={m.id}
                   className={`px-3 py-3 ${mine ? "bg-primary/5" : ""}`}
                 >
-                  <div className="flex items-baseline justify-between gap-2 mb-0.5">
+      <div className="flex items-baseline justify-between gap-2 mb-0.5">
                     <span
                       className={selfNameClass(mine, "text-sm font-semibold")}
                     >
-                      <PlayerLink id={m.userId} name={m.authorName} />
+      <PlayerLink id={m.userId} name={m.authorName} />
                       {mine && <YouBadge />}
                     </span>
-                    <span className="text-[11px] text-muted shrink-0">
+      <span className="text-[11px] text-muted shrink-0">
                       {formatLockerTime(m.createdAt)}
                     </span>
-                  </div>
+      </div>
 
                   {/* Chat box: body + stamps bottom-left, stack L→R */}
                   <div
@@ -425,7 +422,7 @@ export default function LockerRoomPage() {
                         : "border-border bg-background/60"
                     }`}
                   >
-                    <p className="text-sm text-foreground/95 whitespace-pre-wrap break-words leading-relaxed">
+      <p className="text-sm text-foreground/95 whitespace-pre-wrap break-words leading-relaxed">
                       {parts.map((p, i) =>
                         p.type === "mention" ? (
                           p.userId ? (
@@ -533,22 +530,22 @@ export default function LockerRoomPage() {
                       </div>
                     )}
                   </div>
-                </li>
+      </li>
               );
             })}
           </ul>
-          <div ref={bottomRef} />
+      <div ref={bottomRef} />
         </div>
 
         {muted ? (
           <div className="shrink-0 rounded-xl border border-danger/40 bg-danger/10 px-4 py-4 text-sm">
-            <p className="font-semibold text-danger mb-1">You’re muted</p>
-            <p className="text-muted text-xs leading-relaxed">
+      <p className="font-semibold text-danger mb-1">You’re muted</p>
+      <p className="text-muted text-xs leading-relaxed">
               A moderator turned off Locker Room posting for you. You can still
               make picks and view standings. If this is a mistake, message the
               commissioner.
             </p>
-          </div>
+      </div>
         ) : (
           <form
             onSubmit={(e) => void onSubmit(e)}
@@ -571,8 +568,7 @@ export default function LockerRoomPage() {
                 </button>
               ))}
             </div>
-
-            <div className="relative">
+      <div className="relative">
               {mentionOpen && mentionSuggestions.length > 0 && (
                 <ul
                   className="absolute bottom-full left-0 right-0 mb-1 max-h-48 overflow-y-auto rounded-lg border border-primary/40 bg-card shadow-xl z-20"
@@ -580,7 +576,7 @@ export default function LockerRoomPage() {
                 >
                   {mentionSuggestions.map((m, i) => (
                     <li key={m.userId}>
-                      <button
+      <button
                         type="button"
                         role="option"
                         aria-selected={i === mentionIndex}
@@ -596,7 +592,7 @@ export default function LockerRoomPage() {
                       >
                         @{m.name}
                       </button>
-                    </li>
+      </li>
                   ))}
                 </ul>
               )}
@@ -631,7 +627,7 @@ export default function LockerRoomPage() {
                 className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground resize-none focus:outline-none focus:ring-1 focus:ring-primary/50"
               />
             </div>
-            <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center justify-between gap-2">
               <span
                 className={`text-xs ${
                   remaining < 30 ? "text-warning" : "text-muted"
@@ -641,18 +637,18 @@ export default function LockerRoomPage() {
                 {cooldownLeft > 0 ? ` · wait ${cooldownLeft}s` : ""}
                 {mentionOpen ? " · ↑↓ Enter to @tag" : ""}
               </span>
-              <button
+      <button
                 type="submit"
                 disabled={!canPost}
                 className="px-4 py-2 rounded-lg bg-primary text-black text-sm font-semibold disabled:opacity-40"
               >
                 {posting ? "Sending…" : "Post"}
               </button>
-            </div>
+      </div>
             {postError && <p className="text-xs text-danger">{postError}</p>}
           </form>
         )}
       </main>
-    </div>
+      </div>
   );
 }

@@ -102,12 +102,15 @@ export default function Nav() {
     window.location.href = "/";
   }
 
-  // Mount deferred chrome after paint (idle if available) — once per session
+  // Deferred chrome once — Nav is layout-persistent so this no longer re-runs
+  // on every tab (that remount storm made every screen stick).
   useEffect(() => {
+    if (deferredReady) return;
     let cancelled = false;
     const arm = () => {
       if (!cancelled) setDeferredReady(true);
     };
+    // Prefer a longer idle timeout so first route paint wins
     const w = window as Window & {
       requestIdleCallback?: (
         cb: () => void,
@@ -118,9 +121,9 @@ export default function Nav() {
     let idleId: number | undefined;
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
     if (typeof w.requestIdleCallback === "function") {
-      idleId = w.requestIdleCallback(arm, { timeout: 900 });
+      idleId = w.requestIdleCallback(arm, { timeout: 1500 });
     } else {
-      timeoutId = setTimeout(arm, 400);
+      timeoutId = setTimeout(arm, 800);
     }
     return () => {
       cancelled = true;
@@ -129,7 +132,7 @@ export default function Nav() {
       }
       if (timeoutId != null) clearTimeout(timeoutId);
     };
-  }, []);
+  }, [deferredReady]);
 
   // Progressive chrome — ONCE on mount + events. NOT on every pathname change
   // (that re-fired syncFirstWeek + active week + scored weeks on every tab).

@@ -8,7 +8,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import Nav from "@/components/Nav";
 import { getLeague, getSession, isCommissioner } from "@/lib/league";
 import {
   completedChapterCount,
@@ -64,10 +63,9 @@ export default function CrewPage() {
   if (!getLeague()?.id) {
     return (
       <div className="min-h-screen flex flex-col">
-        <Nav />
-        <main className="flex-1 flex items-center justify-center px-4">
+      <main className="flex-1 flex items-center justify-center px-4">
           <p className="text-sm text-muted">Join a room first.</p>
-        </main>
+      </main>
       </div>
     );
   }
@@ -76,13 +74,12 @@ export default function CrewPage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Nav />
       <main className="flex-1 max-w-lg mx-auto w-full px-4 py-8 space-y-6">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-amber-400/90">
+      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-amber-400/90">
             Crew
           </p>
-          <h1 className="text-2xl font-black text-foreground mt-1">
+      <h1 className="text-2xl font-black text-foreground mt-1">
             {crew?.name || leagueName || "War Room"}
           </h1>
           {crew && (
@@ -97,42 +94,42 @@ export default function CrewPage() {
 
         {!revealed ? (
           <section className="rounded-2xl border border-border bg-card p-5 space-y-3">
-            <p className="text-sm font-semibold text-foreground">
+      <p className="text-sm font-semibold text-foreground">
               Story unlocks when you finish
             </p>
-            <p className="text-sm text-muted leading-relaxed">
+      <p className="text-sm text-muted leading-relaxed">
               Keep playing. When the season finale fires and hardware is
               engraved, this page becomes your Crew timeline — same people, next
               sport as the next chapter. No homework until then.
             </p>
-            <p className="text-xs text-muted leading-relaxed border-t border-border pt-3">
+      <p className="text-xs text-muted leading-relaxed border-t border-border pt-3">
               Current chapter:{" "}
               <strong className="text-foreground">
                 {sportChapterLabel(getLeague()?.sportId || "cfb")} ·{" "}
                 {leagueName}
               </strong>
-            </p>
+      </p>
             <Link
               href="/"
               className="inline-flex text-sm font-bold text-primary"
             >
               ← Back to Home
             </Link>
-          </section>
+      </section>
         ) : (
           <>
             <section className="rounded-2xl border border-amber-400/30 bg-amber-400/5 p-5 space-y-2">
-              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-amber-300">
+      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-amber-300">
                 Permanent
               </p>
-              <p className="text-sm text-foreground/90 leading-relaxed">
+      <p className="text-sm text-foreground/90 leading-relaxed">
                 Leagues end. Crews don&apos;t. Each sport you finish together is
                 another chapter — CFB, NFL, whatever&apos;s next. Not a restart.
               </p>
-            </section>
+      </section>
 
             <section className="space-y-3">
-              <h2 className="text-sm font-bold text-foreground">Timeline</h2>
+      <h2 className="text-sm font-bold text-foreground">Timeline</h2>
               {chapters.length === 0 ? (
                 <p className="text-sm text-muted">No chapters yet.</p>
               ) : (
@@ -142,9 +139,9 @@ export default function CrewPage() {
                       key={ch.id}
                       className="rounded-xl border border-border bg-card px-4 py-3"
                     >
-                      <div className="flex items-start justify-between gap-2">
+      <div className="flex items-start justify-between gap-2">
                         <div>
-                          <p className="text-[10px] font-bold uppercase tracking-wide text-muted">
+      <p className="text-[10px] font-bold uppercase tracking-wide text-muted">
                             Chapter{" "}
                             {chapters.filter((c) => c.status === "complete")
                               .length > 0 && ch.status === "complete"
@@ -155,7 +152,7 @@ export default function CrewPage() {
                               : "·"}{" "}
                             · {sportChapterLabel(ch.sportId)} {ch.year}
                           </p>
-                          <p className="text-sm font-semibold text-foreground mt-0.5">
+      <p className="text-sm font-semibold text-foreground mt-0.5">
                             {ch.leagueName}
                           </p>
                           {ch.status === "complete" ? (
@@ -176,7 +173,7 @@ export default function CrewPage() {
                             </p>
                           )}
                         </div>
-                        <span
+      <span
                           className={`text-[10px] font-bold uppercase shrink-0 px-2 py-0.5 rounded-full border ${
                             ch.status === "complete"
                               ? "border-amber-400/40 text-amber-200"
@@ -185,7 +182,7 @@ export default function CrewPage() {
                         >
                           {ch.status === "complete" ? "Done" : "Live"}
                         </span>
-                      </div>
+      </div>
                     </li>
                   ))}
                 </ul>
@@ -202,25 +199,25 @@ export default function CrewPage() {
               if (dual) {
                 return (
                   <section className="rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 space-y-1">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">
+      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">
                       Dual desk
                     </p>
-                    <p className="text-sm text-foreground/90 leading-relaxed">
+      <p className="text-sm text-foreground/90 leading-relaxed">
                       This Crew already runs <strong>CFB</strong> and{" "}
                       <strong>NFL</strong> chapters. Switch rooms from Home —
                       same friends, two desks.
                     </p>
-                  </section>
+      </section>
                 );
               }
               if (!next) return null;
               const pack = getSportPack(next);
               return (
                 <section className="rounded-xl border border-amber-400/35 bg-amber-400/5 px-4 py-4 space-y-2">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-amber-300">
+      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-amber-300">
                     Next chapter · not a new group
                   </p>
-                  <p className="text-sm text-foreground leading-relaxed">
+      <p className="text-sm text-foreground leading-relaxed">
                     Same people, different sport. When you&apos;re ready for{" "}
                     <strong>{pack.shortLabel || pack.label}</strong>, open it
                     as the next chapter of{" "}
@@ -243,27 +240,27 @@ export default function CrewPage() {
             })()}
 
             <section className="rounded-xl border border-border bg-card/50 px-4 py-3">
-              <p className="text-xs text-muted leading-relaxed">
+      <p className="text-xs text-muted leading-relaxed">
                 Crew marks (achievements) stay hidden until your Crew earns the
                 first one. No grind list. No nagging. Just receipts when
                 something true happens.
               </p>
-            </section>
+      </section>
 
             <div className="flex flex-wrap gap-3 text-sm">
-              <Link href="/museum" className="font-bold text-primary">
+      <Link href="/museum" className="font-bold text-primary">
                 Museum →
               </Link>
-              <Link href="/trophy-room" className="font-semibold text-muted">
+      <Link href="/trophy-room" className="font-semibold text-muted">
                 Trophy Room
               </Link>
-              <Link href="/" className="font-semibold text-muted">
+      <Link href="/" className="font-semibold text-muted">
                 Home
               </Link>
-            </div>
+      </div>
           </>
         )}
       </main>
-    </div>
+      </div>
   );
 }
