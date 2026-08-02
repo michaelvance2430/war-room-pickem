@@ -286,9 +286,9 @@ function CommissionerPageInner() {
   const [rosterCount, setRosterCount] = useState<number | null>(null);
   /** Skip week date filter on Pull Odds — all open FBS games for season dry-run. */
   const [dryRunOdds, setDryRunOdds] = useState(false);
-  /** Build Card: jump to ranked matchups first */
+  /** Build Card: default All games; ranked buckets are opt-in filters */
   const [rankHeatFilter, setRankHeatFilter] =
-    useState<RankHeatFilter>("heat");
+    useState<RankHeatFilter>("all");
   /** Weeks already scored (locked for results entry unless unlocked). */
   const [scoredWeeks, setScoredWeeks] = useState<number[]>([]);
   const [resultsLocked, setResultsLocked] = useState(false);
@@ -829,6 +829,8 @@ function CommissionerPageInner() {
       }
       setAvailableGames(games);
       setSelectedIds(new Set());
+      // Always land on All games after pull — ranked chips are opt-in
+      setRankHeatFilter("all");
       setOddsError(null);
     } catch (e: unknown) {
       const err = e as Error & {
@@ -3752,6 +3754,12 @@ function CommissionerPageInner() {
                     accent: string;
                   }[] = [
                     {
+                      id: "all",
+                      label: "All games",
+                      count: availableGames.length,
+                      accent: "border-border text-muted",
+                    },
+                    {
                       id: "heat",
                       label: "Good teams",
                       count: heatCounts.heat,
@@ -3774,12 +3782,6 @@ function CommissionerPageInner() {
                       label: "One ranked",
                       count: heatCounts.ranked,
                       accent: "border-emerald-400/50 text-emerald-200",
-                    },
-                    {
-                      id: "all",
-                      label: "All games",
-                      count: availableGames.length,
-                      accent: "border-border text-muted",
                     },
                   ];
                   const dateGroups =
@@ -3809,7 +3811,7 @@ function CommissionerPageInner() {
                       {!noRankHeat && (
                         <>
                           <p className="text-[10px] uppercase tracking-wider text-muted font-bold mb-1.5">
-                            Find good games
+                            Filter slate · default is All games
                           </p>
                           <div className="phone-h-scroll sm:flex-wrap sm:overflow-visible gap-1.5 mb-3">
                             {chips.map((c) => (
