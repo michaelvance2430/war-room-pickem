@@ -2,7 +2,7 @@
 
 /**
  * Weekly cold-open — Gazette Network newsroom package.
- * Same station as The War Room Gazette paper (masthead + tagline).
+ * Static BREAKING NEWS GAZETTE: full article at once, zero caption animation.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -26,41 +26,9 @@ import BrandMark from "@/components/BrandMark";
 
 const POSTER = "/videos/kahmann-cold-open-poster.jpg";
 
-const BEATS: { at: number; line: string; kicker?: string }[] = [
-  {
-    at: 0,
-    kicker: "GAZETTE NETWORK",
-    line: "Live from the newsroom — same desk that prints your paper",
-  },
-  {
-    at: 1800,
-    kicker: "INVESTIGATIVE",
-    line: "Is Kahmann a time traveler…",
-  },
-  {
-    at: 3800,
-    kicker: "BREAKING",
-    line: "…or just a no-good cheat!?!!?",
-  },
-  {
-    at: 5600,
-    kicker: "PRONUNCIATION DESK",
-    line: "Kahmann — pronounced COMMON",
-  },
-  {
-    at: 7600,
-    kicker: "MARKETS · KALSHI",
-    line: "Andy & Definitely — NOT winning it again.",
-  },
-];
-
-const RUN_MS = 11_000;
-
 export default function WeeklyColdOpenModal() {
   const [open, setOpen] = useState(false);
   const [preview, setPreview] = useState(false);
-  const [beat, setBeat] = useState(0);
-  const [progress, setProgress] = useState(0);
   const [videoOk, setVideoOk] = useState(false);
   const [runId, setRunId] = useState(0);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -69,8 +37,6 @@ export default function WeeklyColdOpenModal() {
 
   const openBroadcast = useCallback((opts?: { preview?: boolean }) => {
     setPreview(!!opts?.preview);
-    setBeat(0);
-    setProgress(0);
     setVideoOk(false);
     setRunId((n) => n + 1);
     setOpen(true);
@@ -123,22 +89,6 @@ export default function WeeklyColdOpenModal() {
 
   useEffect(() => {
     if (!open) return;
-    const t0 = Date.now();
-    const id = window.setInterval(() => {
-      const elapsed = Date.now() - t0;
-      setProgress(Math.min(1, elapsed / RUN_MS));
-      let bi = 0;
-      for (let i = 0; i < BEATS.length; i++) {
-        if (elapsed >= BEATS[i].at) bi = i;
-      }
-      setBeat(bi);
-      if (elapsed >= RUN_MS) window.clearInterval(id);
-    }, 80);
-    return () => window.clearInterval(id);
-  }, [open, runId]);
-
-  useEffect(() => {
-    if (!open) return;
     let cancelled = false;
     fetch(WEEKLY_COLD_OPEN_VIDEO_SRC, { method: "HEAD" })
       .then((r) => {
@@ -169,8 +119,6 @@ export default function WeeklyColdOpenModal() {
 
   if (!open) return null;
 
-  const caption = BEATS[beat]?.line || copy.headline;
-  const kicker = BEATS[beat]?.kicker || "BREAKING";
   const clock = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
     minute: "2-digit",
@@ -191,7 +139,7 @@ export default function WeeklyColdOpenModal() {
       />
 
       <div className="relative w-full sm:max-w-lg max-h-[96vh] overflow-hidden rounded-t-2xl sm:rounded-2xl border-2 border-amber-400/50 bg-[#0a0a0a] shadow-[0_0_80px_rgba(251,191,36,0.18)] flex flex-col">
-        {/* —— BREAKING NEWS GAZETTE masthead (gold palette, no ticker) —— */}
+        {/* —— BREAKING NEWS GAZETTE masthead (gold palette) —— */}
         <div className="shrink-0 border-b-2 border-amber-400/50 bg-gradient-to-b from-amber-500/20 via-amber-950/40 to-black">
           <div className="bg-amber-400 text-black px-3 py-1.5 flex items-center justify-between gap-2">
             <span className="text-[11px] sm:text-xs font-black uppercase tracking-[0.22em]">
@@ -233,7 +181,7 @@ export default function WeeklyColdOpenModal() {
           </p>
         </div>
 
-        {/* —— Newsroom stage —— */}
+        {/* —— Static photo (no ken burns / no caption pop-ins) —— */}
         <div className="relative aspect-[16/10] sm:aspect-video bg-black overflow-hidden shrink-0 border-b border-amber-400/20">
           {videoOk ? (
             <video
@@ -245,7 +193,9 @@ export default function WeeklyColdOpenModal() {
               playsInline
               muted
               autoPlay
-              onEnded={dismiss}
+              onEnded={() => {
+                /* stay open — full article is already readable */
+              }}
               onError={() => setVideoOk(false)}
             />
           ) : (
@@ -255,52 +205,38 @@ export default function WeeklyColdOpenModal() {
                 src={POSTER}
                 alt=""
                 className="absolute inset-0 w-full h-full object-cover"
-                style={{
-                  transform: `scale(${1.04 + progress * 0.07})`,
-                  transition: "transform 0.2s linear",
-                }}
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-black/20" />
-              {/* Scanlines */}
-              <div className="absolute inset-0 opacity-[0.14] pointer-events-none bg-[repeating-linear-gradient(0deg,transparent,transparent_2px,rgba(0,0,0,0.45)_2px,rgba(0,0,0,0.45)_4px)]" />
-              {/* Desk frame corners */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-black/15" />
+              <div className="absolute inset-0 opacity-[0.12] pointer-events-none bg-[repeating-linear-gradient(0deg,transparent,transparent_2px,rgba(0,0,0,0.45)_2px,rgba(0,0,0,0.45)_4px)]" />
               <div className="absolute inset-2 border border-amber-400/20 pointer-events-none rounded-sm" />
             </>
           )}
 
-          {/* Progress — gold only, no word crawl */}
-          <div className="absolute top-0 inset-x-0 h-1 bg-black/40">
-            <div
-              className="h-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.6)]"
-              style={{ width: `${progress * 100}%` }}
-            />
-          </div>
-
-          {/* Lower third — BREAKING NEWS GAZETTE (static, gold) */}
+          {/* Static lower third — gold BREAKING NEWS only, no cycling words */}
           <div className="absolute bottom-0 inset-x-0">
-            <div className="bg-amber-400 text-black px-3 py-1.5 flex items-center justify-center gap-2">
+            <div className="bg-amber-400 text-black px-3 py-1.5 flex items-center justify-center">
               <span className="text-[11px] sm:text-xs font-black uppercase tracking-[0.2em]">
                 Breaking news · Gazette
               </span>
             </div>
-            <div className="bg-gradient-to-t from-black via-black/95 to-black/85 border-t border-amber-400/40 px-3 py-3">
-              <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-amber-300 mb-1">
-                {kicker} · {copy.phonetic}
-              </p>
-              <p className="text-sm sm:text-base font-bold text-white leading-snug min-h-[2.5rem]">
-                {caption}
-              </p>
-            </div>
           </div>
         </div>
 
-        {/* —— Copy / credits —— */}
-        <div className="px-4 py-3 space-y-2 text-sm text-muted leading-relaxed overflow-y-auto flex-1 min-h-0">
+        {/* —— Full article — all copy visible immediately, zero animation —— */}
+        <div className="px-4 py-3 space-y-3 text-sm text-muted leading-relaxed overflow-y-auto flex-1 min-h-0">
           <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber-300">
-            From the Gazette newsroom
+            From the Gazette newsroom · {copy.phonetic}
           </p>
-          <p className="text-foreground font-medium">{copy.body}</p>
-          <p className="text-amber-100/90 font-semibold border-l-2 border-amber-400/50 pl-2.5">
+          <h3
+            className="text-base sm:text-lg font-black text-amber-50 leading-snug"
+            style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
+          >
+            {copy.headline}
+          </h3>
+          <p className="text-foreground font-medium leading-relaxed">
+            {copy.body}
+          </p>
+          <p className="text-amber-100/95 font-semibold border-l-2 border-amber-400/60 pl-2.5 leading-relaxed">
             {copy.kalshi}
           </p>
           <p className="text-[11px] text-muted leading-relaxed">
@@ -332,13 +268,7 @@ export default function WeeklyColdOpenModal() {
               onClick={dismiss}
               className="w-full py-3 min-h-[48px] rounded-xl bg-primary text-black font-bold text-sm"
             >
-              {progress >= 1
-                ? preview
-                  ? "Close preview"
-                  : copy.cta
-                : preview
-                  ? "Close preview"
-                  : "Skip broadcast"}
+              {preview ? "Close preview" : copy.cta}
             </button>
           </div>
           <p className="text-[10px] text-muted text-center">
@@ -348,7 +278,6 @@ export default function WeeklyColdOpenModal() {
           </p>
         </div>
       </div>
-
     </div>
   );
 }

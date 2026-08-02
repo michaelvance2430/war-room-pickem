@@ -2,6 +2,7 @@
  * Weekly cold-open broadcast — first login each calendar week, starting Aug 16 2026.
  * Same “station” as The War Room Gazette (TV desk for the paper).
  * One show per player per week (localStorage).
+ * Static BREAKING NEWS GAZETTE article — no ticker, no pop-in captions.
  */
 
 import { getLeague, getSession } from "@/lib/league";
@@ -57,6 +58,7 @@ export type WeeklyColdOpenCopy = {
   stamp: string;
   headline: string;
   phonetic: string;
+  /** Full article — shown all at once, zero animation */
   body: string;
   kalshi: string;
   cta: string;
@@ -67,12 +69,12 @@ export type WeeklyColdOpenCopy = {
 export function getWeeklyColdOpenCopy(): WeeklyColdOpenCopy {
   return {
     stamp: `${GAZETTE_STATION.callSign} · ${GAZETTE_STATION.desk}`,
-    headline: "Is Kahmann a time traveler… or just a no-good cheat?",
+    headline: "Kahmann: known time traveler — some even say a cheat",
     phonetic: "Kahmann — pronounced COMMON",
     body:
-      "Gazette investigative reporters are still looking into whether reigning champ Kahmann (say it with us: COMMON) is truly a time traveler… or just a no-good cheat!?!!?",
+      "Gazette Network has it on the record: Kahmann (say it with us — COMMON) is a known time traveler. Room veterans have long whispered that the reigning champ somehow always knows next week’s scores before the rest of us lock. Some even say he’s a cheat. Investigative Desk has not recovered a DeLorean — but the pattern is hard to unsee.",
     kalshi:
-      "Either way, Kalshi odds have Andy and Definitely — NOT winning it again.",
+      "Kalshi odds have Kahmann definitely not winning this year. Markets price the time-travel edge as spent. The board is open — the tape says no.",
     cta: "Cool — back to the room",
     ctaGazette: "Open the Gazette",
   };
