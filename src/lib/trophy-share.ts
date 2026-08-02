@@ -530,6 +530,29 @@ export async function renderTrophyShareCanvas(
       : "/brand/war-room-crest.png";
   const crest = await loadShareImage(crestSrc);
 
+  // Vonnaggio Family Vacation (and other league overrides) — custom hardware art
+  let champTrophyImg: HTMLImageElement | null = null;
+  if (t.kind === "championship" && (t.sportId === "nfl" || !t.sportId)) {
+    try {
+      const { resolveLeagueChampionshipOverride } = await import(
+        "./league-trophy-override"
+      );
+      const ov = resolveLeagueChampionshipOverride({
+        sportId: t.sportId || "nfl",
+        leagueName: t.leagueName,
+      });
+      if (ov?.championshipImg) {
+        const src =
+          typeof window !== "undefined"
+            ? `${window.location.origin}${ov.championshipImg}`
+            : ov.championshipImg;
+        champTrophyImg = await loadShareImage(src);
+      }
+    } catch {
+      /* fallback silhouette */
+    }
+  }
+
   // Background gradient
   const g = ctx.createLinearGradient(0, 0, size, size);
   g.addColorStop(0, colors.bg0);
@@ -588,7 +611,14 @@ export async function renderTrophyShareCanvas(
 
   // Hardware art — slightly smaller so the face owns the center
   if (t.kind === "championship") {
-    drawChampionshipTrophyArt(ctx, size / 2, 268 * s, 140 * s, t.sportId);
+    drawChampionshipTrophyArt(
+      ctx,
+      size / 2,
+      268 * s,
+      140 * s,
+      t.sportId,
+      champTrophyImg
+    );
   } else if (t.kind === "toilet_bowl") {
     drawToiletTrophyArt(ctx, size / 2, 268 * s, 130 * s);
   } else if (t.kind === "crystal_ball") {
@@ -761,21 +791,36 @@ function drawShareBrandLockup(
 
 /**
  * Canvas trophy silhouettes for share graphics — matches in-app SportChampionshipTrophy vibe.
+ * Optional `photo` = league override (e.g. Vonnaggio gold form).
  */
 function drawChampionshipTrophyArt(
   ctx: CanvasRenderingContext2D,
   cx: number,
   cy: number,
   h: number,
-  sportId?: string | null
+  sportId?: string | null,
+  photo?: HTMLImageElement | null
 ) {
   const sport = resolveShareSport(sportId);
   const scale = h / 200;
   ctx.save();
   ctx.translate(cx, cy);
 
+  if (photo && photo.naturalWidth > 0) {
+    const maxH = h * 1.05;
+    const maxW = h * 0.95;
+    const iw = photo.naturalWidth;
+    const ih = photo.naturalHeight;
+    const fit = Math.min(maxW / iw, maxH / ih);
+    const dw = iw * fit;
+    const dh = ih * fit;
+    ctx.drawImage(photo, -dw / 2, -dh * 0.55, dw, dh);
+    ctx.restore();
+    return;
+  }
+
   if (sport === "nfl") {
-    // Silver football on three-leg tripod (Super Bowl hardware silhouette)
+    // Silver football on three-leg tripod (default Super Bowl hardware)
     const g = ctx.createLinearGradient(-40 * scale, -70 * scale, 40 * scale, 10 * scale);
     g.addColorStop(0, "#ffffff");
     g.addColorStop(0.4, "#C5CCD3");

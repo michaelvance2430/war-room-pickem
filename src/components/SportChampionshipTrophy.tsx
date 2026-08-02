@@ -6,15 +6,18 @@
  * not official marks. CFB crystal tower · NFL silver football on tripod ·
  * WWC cup · generic gold cup fallback.
  *
- * NFL Super Bowl hardware uses a photoreal silver football + three-leg
- * tripod (Lombardi silhouette) so rooms like Vonnaggio Family Vacation
- * match the real hardware shape people hold in victory photos.
+ * Default NFL → standard Super Bowl (Lombardi) art.
+ * Vonnaggio Family Vacation only → custom gold family hardware.
  */
+
+import {
+  NFL_LOMBARDI_IMG,
+  resolveLeagueChampionshipOverride,
+} from "@/lib/league-trophy-override";
 
 export type TrophySport = "cfb" | "nfl" | "soccer_wwc" | "other";
 
-/** Photoreal NFL championship trophy (tripod + silver football). */
-export const NFL_LOMBARDI_IMG = "/trophies/nfl-lombardi.jpg";
+export { NFL_LOMBARDI_IMG };
 
 type Props = {
   sport?: string | null;
@@ -29,6 +32,9 @@ type Props = {
    * Tiny shelf icons can still use SVG if preferPhoto is false.
    */
   preferPhoto?: boolean;
+  /** Override active league (share cards / off-session). */
+  leagueName?: string | null;
+  leagueId?: string | null;
 };
 
 export function resolveTrophySport(sportId?: string | null): TrophySport {
@@ -39,14 +45,34 @@ export function resolveTrophySport(sportId?: string | null): TrophySport {
 }
 
 /** Hardware label under the art */
-export function trophyHardwareLabel(sportId?: string | null, threePeat?: boolean): string {
+export function trophyHardwareLabel(
+  sportId?: string | null,
+  threePeat?: boolean,
+  opts?: { leagueName?: string | null; leagueId?: string | null }
+): string {
   const s = resolveTrophySport(sportId);
   if (threePeat) {
-    if (s === "nfl") return "Dynasty ring · three straight";
+    if (s === "nfl") {
+      const o = resolveLeagueChampionshipOverride({
+        sportId: "nfl",
+        leagueName: opts?.leagueName,
+        leagueId: opts?.leagueId,
+      });
+      if (o) return `Dynasty · ${o.hardwareName}`;
+      return "Dynasty ring · three straight";
+    }
     if (s === "cfb") return "Dynasty crystal · three straight";
     return "Three-peat hardware";
   }
-  if (s === "nfl") return "Super Bowl trophy";
+  if (s === "nfl") {
+    const o = resolveLeagueChampionshipOverride({
+      sportId: "nfl",
+      leagueName: opts?.leagueName,
+      leagueId: opts?.leagueId,
+    });
+    if (o) return o.hardwareLabel;
+    return "Super Bowl trophy";
+  }
   if (s === "cfb") return "National championship crystal";
   if (s === "soccer_wwc") return "World Cup hardware";
   return "Championship trophy";
@@ -59,10 +85,22 @@ export default function SportChampionshipTrophy({
   threePeat = false,
   animate = true,
   preferPhoto = true,
+  leagueName,
+  leagueId,
 }: Props) {
   const sid = resolveTrophySport(sport);
   const id = `champ-t-${sid}-${size}-${threePeat ? "3" : "1"}`;
+  const override =
+    sid === "nfl"
+      ? resolveLeagueChampionshipOverride({
+          sportId: "nfl",
+          leagueName,
+          leagueId,
+        })
+      : null;
   const useNflPhoto = sid === "nfl" && preferPhoto && size >= 40;
+  const nflSrc = override?.championshipImg ?? NFL_LOMBARDI_IMG;
+  const goldRoom = override?.glow === "gold";
 
   return (
     <div
@@ -73,8 +111,9 @@ export default function SportChampionshipTrophy({
       <div
         className="absolute bottom-1 left-1/2 -translate-x-1/2 w-[70%] h-4 rounded-full blur-md opacity-70"
         style={{
-          background:
-            sid === "nfl"
+          background: goldRoom
+            ? "radial-gradient(ellipse, rgba(251,191,36,0.55), transparent 70%)"
+            : sid === "nfl"
               ? "radial-gradient(ellipse, rgba(197,204,211,0.55), transparent 70%)"
               : sid === "soccer_wwc"
                 ? "radial-gradient(ellipse, rgba(255,223,0,0.45), transparent 70%)"
@@ -87,7 +126,16 @@ export default function SportChampionshipTrophy({
         style={{ width: size, height: size }}
       >
         {useNflPhoto ? (
-          <NflLombardiPhoto size={size} threePeat={threePeat} />
+          <NflTrophyPhoto
+            size={size}
+            threePeat={threePeat}
+            src={nflSrc}
+            label={
+              override
+                ? "Vonnaggio championship trophy"
+                : "Super Bowl championship trophy"
+            }
+          />
         ) : sid === "nfl" ? (
           <NflLombardiSvg id={id} size={size} threePeat={threePeat} />
         ) : sid === "soccer_wwc" ? (
@@ -102,23 +150,27 @@ export default function SportChampionshipTrophy({
   );
 }
 
-/** Photoreal silver football on tripod — matches victory-photo hardware. */
-function NflLombardiPhoto({
+/** NFL championship photo — Lombardi default, or league override (Vonnaggio gold). */
+function NflTrophyPhoto({
   size,
   threePeat,
+  src,
+  label,
 }: {
   size: number;
   threePeat: boolean;
+  src: string;
+  label: string;
 }) {
   return (
     <div
       className="relative w-full h-full flex items-end justify-center"
       role="img"
-      aria-label="Super Bowl championship trophy"
+      aria-label={label}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={NFL_LOMBARDI_IMG}
+        src={src}
         alt=""
         className="w-full h-full object-contain drop-shadow-[0_8px_20px_rgba(0,0,0,0.55)]"
         draggable={false}
