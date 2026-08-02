@@ -2,8 +2,11 @@
 
 /**
  * Sticky hop bar for hosts in season SANDBOX (pre-doors dry-run).
- * Host chip → commissioner sim tools.
- * Exit Host → always dismiss the bar; wipe dry-run board when possible.
+ *
+ * OFF by default (including after logout/login).
+ * Turns ON only when you open Host tools (/commissioner).
+ * Exit Host turns it OFF + wipes dry-run board.
+ * I’m bored / My Picks practice never turns it on.
  */
 
 import { useEffect, useState } from "react";
@@ -20,8 +23,8 @@ import {
 } from "@/lib/creator-eyes";
 
 const EVENT_FOUNDRY_SESSION = "warroom-foundry-session";
-/** Persist dismiss across reloads until they open Host tools again */
-const DISMISS_KEY = "warroom-sandbox-chrome-dismissed-v1";
+/** Opt-in hop mode — only after visiting Host tools */
+const HOP_ACTIVE_KEY = "warroom-sandbox-host-hop-active-v1";
 
 function isFoundryChromeActive(): boolean {
   if (typeof window === "undefined") return false;
@@ -33,30 +36,34 @@ function isFoundryChromeActive(): boolean {
   }
 }
 
-function setDismissed(on: boolean) {
+function isHopActive(): boolean {
   try {
-    if (on) {
-      // localStorage so it survives full reloads (sessionStorage was too easy to miss)
-      localStorage.setItem(DISMISS_KEY, "1");
-      sessionStorage.setItem(DISMISS_KEY, "1");
-    } else {
-      localStorage.removeItem(DISMISS_KEY);
-      sessionStorage.removeItem(DISMISS_KEY);
-    }
+    return localStorage.getItem(HOP_ACTIVE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function setHopActive(on: boolean) {
+  try {
+    if (on) localStorage.setItem(HOP_ACTIVE_KEY, "1");
+    else localStorage.removeItem(HOP_ACTIVE_KEY);
   } catch {
     /* ok */
   }
 }
 
-function isDismissed(): boolean {
-  try {
-    return (
-      localStorage.getItem(DISMISS_KEY) === "1" ||
-      sessionStorage.getItem(DISMISS_KEY) === "1"
-    );
-  } catch {
-    return false;
+function isPracticePath(pathname: string | null): boolean {
+  if (!pathname) return false;
+  if (pathname.startsWith("/picks")) {
+    try {
+      const sp = new URLSearchParams(window.location.search);
+      if (sp.get("practice") === "1" || sp.get("week") === "99") return true;
+    } catch {
+      /* ok */
+    }
   }
+  return false;
 }
 
 const HOPS: { href: string; label: string }[] = [
@@ -94,13 +101,23 @@ export default function SandboxSessionChrome() {
         return;
       }
 
+      // Never sit on top of private “I’m bored” practice
+      if (isPracticePath(pathname)) {
+        setShow(false);
+        return;
+      }
+
       const onHost =
         pathname === "/commissioner" ||
         pathname?.startsWith("/commissioner/");
-      // Opening Host tools re-arms the hop bar
+
+      // Visiting Host tools opts INTO hop mode
       if (onHost) {
-        setDismissed(false);
-      } else if (isDismissed()) {
+        setHopActive(true);
+      }
+
+      // Not opted in → no bar (default after login / Exit Host)
+      if (!onHost && !isHopActive()) {
         setShow(false);
         return;
       }
@@ -129,30 +146,28 @@ export default function SandboxSessionChrome() {
     if (busy) return;
     const ok = confirm(
       "Exit Host?\n\n" +
-        "1) Hide this sandbox hop bar\n" +
+        "1) Close this sandbox hop bar (stays off until you open Host tools)\n" +
         "2) Wipe this dry-run board (cards, picks, sim scores)\n\n" +
         "Members & league code stay.\n" +
         "Prior-season trophies stay.\n\n" +
-        "Tap Host chip later to open sim tools and bring the bar back."
+        "I’m bored / practice will NOT bring this bar back."
     );
     if (!ok) return;
 
     setBusy(true);
     setNote(null);
 
-    // Always dismiss the bar first so you can actually exit
-    setDismissed(true);
+    // Opt out immediately — bar gone even if wipe fails
+    setHopActive(false);
     setShow(false);
 
-    let wipeNote = "";
     try {
       if (isCommissioner() || isOps()) {
         const { resetSeasonInCloud } = await import("@/lib/cloud");
         const res = await resetSeasonInCloud();
         if (!res.ok) {
-          wipeNote = res.error || "Board wipe failed — bar still closed.";
+          setNote(res.error || "Board wipe failed — bar still closed.");
         } else {
-          wipeNote = "Dry-run board wiped.";
           try {
             if (isSandboxMode()) {
               const { scrubSandboxProgressOnThisDevice } = await import(
@@ -166,18 +181,9 @@ export default function SandboxSessionChrome() {
         }
       }
     } catch (e) {
-      wipeNote = e instanceof Error ? e.message : "Wipe failed — bar closed.";
+      setNote(e instanceof Error ? e.message : "Wipe failed — bar closed.");
     }
 
-    // Hard leave so UI can't repaint the old bar from cache
-    try {
-      sessionStorage.setItem(
-        "warroom-sandbox-exit-flash",
-        wipeNote || "Host bar closed."
-      );
-    } catch {
-      /* ok */
-    }
     window.location.replace("/");
   }
 
@@ -187,7 +193,7 @@ export default function SandboxSessionChrome() {
     <div
       className="fixed bottom-0 inset-x-0 z-[94] pointer-events-none"
       style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
-      data-sandbox-chrome="exit-host-v2"
+      data-sandbox-chrome="hop-opt-in-v3"
     >
       <div className="pointer-events-auto max-w-lg mx-auto px-3 pb-3">
         <div className="rounded-2xl border-2 border-amber-400/55 bg-amber-950/95 backdrop-blur-md shadow-[0_0_40px_rgba(245,158,11,0.22)] px-3 py-2.5 space-y-2">
@@ -238,8 +244,9 @@ export default function SandboxSessionChrome() {
           )}
           <p className="text-[9px] text-amber-200/60 leading-snug">
             <strong className="text-amber-200/90">Host</strong> = sim tools.{" "}
-            <strong className="text-red-300">Exit Host</strong> = close this bar
-            + wipe dry-run board. Open Host again to hop.
+            <strong className="text-red-300">Exit Host</strong> = close bar +
+            wipe dry-run. Bar only returns when you open Host tools — not after
+            login or I&apos;m bored.
           </p>
         </div>
       </div>
