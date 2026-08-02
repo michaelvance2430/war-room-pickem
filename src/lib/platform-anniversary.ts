@@ -12,6 +12,23 @@ export const WAR_ROOM_FOUNDED_ISO = "2026-07-25";
 export const WAR_ROOM_FOUNDED_LABEL = "July 25, 2026";
 export const PLATFORM_ANNIV_RITUAL = "War Room Anniversary";
 
+/**
+ * ROADMAP — Anniversary participation reward (not shipped yet)
+ * ---------------------------------------------------------
+ * Intent: anyone who plays during the anniversary window (July 25 ET,
+ * possibly ± a few days) earns a room-wide / account-wide flex —
+ * badge, border, title, or hardware stamp — for showing up on founding day.
+ *
+ * Design when we build it:
+ *  - Opt-in by activity (lock a card, open the app in a league, score, etc.)
+ *  - Every participant, not pay-to-win
+ *  - Distinct from the annual paper (this file) and from personal join eggs
+ *  - Career-safe (survives season reset / sandbox wipe rules as appropriate)
+ *
+ * Hook later from: isPlatformAnniversaryDay / participation mark on lock.
+ */
+export const ANNIVERSARY_PLAY_REWARD_PLANNED = true as const;
+
 const SEEN_PREFIX = "warroom-platform-anniv-seen-v1";
 const ET = "America/New_York";
 
