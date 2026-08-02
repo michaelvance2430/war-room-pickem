@@ -176,6 +176,34 @@ export default function Home() {
   );
   /** Flavor widgets after hero paints — avoid cloud fan-out on tab return */
   const [showSecondary, setShowSecondary] = useState(false);
+  /**
+   * null = still checking. Drives first-hour player copy so we never say
+   * "open My Picks and lock" when the commish hasn't published yet.
+   */
+  const [liveCard, setLiveCard] = useState<boolean | null>(null);
+
+  // Soft: is there a card to pick? (new-player waiting room)
+  useEffect(() => {
+    if (!ready) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { leagueHasLiveCard } = await import("@/lib/first-session");
+        const has = await leagueHasLiveCard();
+        if (!cancelled) setLiveCard(has);
+      } catch {
+        if (!cancelled) setLiveCard(null);
+      }
+    })();
+    function onPublished() {
+      setLiveCard(true);
+    }
+    window.addEventListener("warroom-card-published", onPublished);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("warroom-card-published", onPublished);
+    };
+  }, [ready]);
 
   // Sync theme + unlock chrome on enter (SPA remount from Commish/Gazette)
   useLayoutEffect(() => {
@@ -688,6 +716,16 @@ export default function Home() {
                 . No trophies, papers, or fireworks until somebody actually
                 locks. Yes, including you.
               </>
+            ) : liveCard === false ? (
+              <>
+                First ten minutes:{" "}
+                <strong className="text-foreground">
+                  you&apos;re seated — waiting on the card
+                </strong>
+                . Your commish hasn&apos;t published yet. Hang in the Locker;
+                when a card drops, open My Picks and lock before kickoff. That
+                becomes the whole movie.
+              </>
             ) : (
               <>
                 First ten minutes:{" "}
@@ -733,62 +771,110 @@ export default function Home() {
           </>
         )}
 
-        {/* First hour: only Locker (+ Host). Full tile grid after lock. */}
+        {/* First hour: job depends on whether a card exists. */}
         {firstWeekChrome ? (
           <section className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-      <Link
-              href="/picks"
-              className="group rounded-xl border-2 border-primary/50 bg-primary/10 p-5 hover:border-primary transition sm:col-span-2"
-            >
-              <div className="text-xs uppercase tracking-wider text-primary mb-1">
-                Do this
-              </div>
-      <div className="text-lg font-semibold text-white">
-                My Picks
-              </div>
-      <p className="text-xs text-muted mt-1">
-                If a card is live, lock it. If not — your commish hasn&apos;t
-                published yet. Chill in the Locker until they do.
-              </p>
-      </Link>
-            <Link
-              href="/locker-room"
-              className="group rounded-xl border border-orange-400/30 bg-black/40 p-5 hover:border-orange-300/60 transition"
-            >
-      <div className="text-xs uppercase tracking-wider text-orange-300/70 mb-1">
-                While you wait
-              </div>
-      <div className="text-lg font-semibold text-orange-300">
-                Locker Room
-              </div>
-      </Link>
-            {isCommish && (
-              <Link
-                href="/commissioner?tab=card&first=1"
-                className="group rounded-xl border border-primary/40 bg-primary/10 p-5 hover:border-primary transition"
-              >
-      <div className="text-xs uppercase tracking-wider text-primary mb-1">
-                  Commish
-                </div>
-      <div className="text-lg font-semibold text-white">
-                  Publish card
-                </div>
-      </Link>
+            {!isCommish && liveCard === false ? (
+              <>
+                <Link
+                  href="/locker-room"
+                  className="group rounded-xl border-2 border-primary/50 bg-primary/10 p-5 hover:border-primary transition sm:col-span-2"
+                >
+                  <div className="text-xs uppercase tracking-wider text-primary mb-1">
+                    Do this for now
+                  </div>
+                  <div className="text-lg font-semibold text-white">
+                    Locker Room
+                  </div>
+                  <p className="text-xs text-muted mt-1">
+                    No card yet — your commish hasn&apos;t published. Hang here.
+                    When a card drops, My Picks becomes the job.
+                  </p>
+                </Link>
+                <Link
+                  href="/picks"
+                  className="group rounded-xl border border-border/80 bg-black/40 p-5 hover:border-primary/40 transition"
+                >
+                  <div className="text-xs uppercase tracking-wider text-muted mb-1">
+                    Later
+                  </div>
+                  <div className="text-base font-semibold text-white">
+                    My Picks
+                  </div>
+                  <p className="text-xs text-muted mt-1">
+                    Check if a card went live
+                  </p>
+                </Link>
+                <Link
+                  href="/rules"
+                  className="group rounded-xl border border-border/80 bg-black/40 p-5 hover:border-primary/40 transition"
+                >
+                  <div className="text-xs uppercase tracking-wider text-muted mb-1">
+                    Optional
+                  </div>
+                  <div className="text-base font-semibold text-white">
+                    How to play
+                  </div>
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link
+                  href="/picks"
+                  className="group rounded-xl border-2 border-primary/50 bg-primary/10 p-5 hover:border-primary transition sm:col-span-2"
+                >
+                  <div className="text-xs uppercase tracking-wider text-primary mb-1">
+                    Do this
+                  </div>
+                  <div className="text-lg font-semibold text-white">
+                    My Picks
+                  </div>
+                  <p className="text-xs text-muted mt-1">
+                    {liveCard === false && isCommish
+                      ? "No card live yet — publish first (tile below), then lock your own picks."
+                      : "Lock the card before kickoff. That is the weekly job."}
+                  </p>
+                </Link>
+                <Link
+                  href="/locker-room"
+                  className="group rounded-xl border border-orange-400/30 bg-black/40 p-5 hover:border-orange-300/60 transition"
+                >
+                  <div className="text-xs uppercase tracking-wider text-orange-300/70 mb-1">
+                    While you wait
+                  </div>
+                  <div className="text-lg font-semibold text-orange-300">
+                    Locker Room
+                  </div>
+                </Link>
+                {isCommish && (
+                  <Link
+                    href="/commissioner?tab=card&first=1"
+                    className="group rounded-xl border border-primary/40 bg-primary/10 p-5 hover:border-primary transition"
+                  >
+                    <div className="text-xs uppercase tracking-wider text-primary mb-1">
+                      Commish
+                    </div>
+                    <div className="text-lg font-semibold text-white">
+                      Publish card
+                    </div>
+                  </Link>
+                )}
+                <Link
+                  href="/rules"
+                  className="group rounded-xl border border-border/80 bg-black/40 p-5 hover:border-primary/40 transition sm:col-span-2"
+                >
+                  <div className="text-xs uppercase tracking-wider text-muted mb-1">
+                    Optional
+                  </div>
+                  <div className="text-base font-semibold text-white">
+                    How to play
+                  </div>
+                  <p className="text-xs text-muted mt-1">
+                    Spreads · confidence · lock before kickoff
+                  </p>
+                </Link>
+              </>
             )}
-            <Link
-              href="/rules"
-              className="group rounded-xl border border-border/80 bg-black/40 p-5 hover:border-primary/40 transition sm:col-span-2"
-            >
-      <div className="text-xs uppercase tracking-wider text-muted mb-1">
-                Optional
-              </div>
-      <div className="text-base font-semibold text-white">
-                How to play
-              </div>
-      <p className="text-xs text-muted mt-1">
-                Spreads · confidence · lock before kickoff
-              </p>
-      </Link>
           </section>
         ) : (
           <>

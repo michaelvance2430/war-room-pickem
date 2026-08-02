@@ -1854,20 +1854,26 @@ export default function PicksClient() {
       </div>
         )}
 
-        {!loadError && !hasCard && !cardBusy && (
+                {!loadError && !hasCard && !cardBusy && (
           <div className="rounded-xl border border-border bg-card p-8 text-center">
-      <p className="text-[10px] uppercase tracking-wider text-muted font-bold mb-2">
-              No card yet
+            <p className="text-[10px] uppercase tracking-wider text-primary font-bold mb-2">
+              Waiting room
             </p>
-      <p className="font-medium mb-2">
-              No games for {weekTitle(viewWeek)} yet
+            <p className="font-semibold text-lg mb-2">
+              No card for {weekTitle(viewWeek)} yet
             </p>
-      <p className="text-sm text-muted mb-4 max-w-md mx-auto leading-relaxed">
+            <p className="text-sm text-muted mb-5 max-w-md mx-auto leading-relaxed">
               {viewWeek === activeWeek
-                ? "Your commish hasn’t published this week’s card. Nothing for you to fix — when it’s live, open My Picks again."
-                : "This week wasn’t published (or was cleared)."}
+                ? "You are not broken — your commish has not published this week's games. Nothing to pick until they drop a card. Hang in the Locker, then come back here."
+                : "This week was not published (or was cleared). Jump to the live week if one exists."}
             </p>
-      <div className="flex flex-wrap justify-center gap-3">
+            <div className="flex flex-wrap justify-center gap-3">
+              <a
+                href="/locker-room"
+                className="px-4 py-2.5 min-h-[44px] rounded-xl bg-primary text-black text-sm font-bold inline-flex items-center"
+              >
+                Hang in the Locker
+              </a>
               <button
                 type="button"
                 onClick={() => {
@@ -1878,7 +1884,7 @@ export default function PicksClient() {
                     explicit: true,
                   });
                 }}
-                className="px-4 py-2.5 min-h-[44px] rounded-xl bg-primary text-black text-sm font-bold"
+                className="px-4 py-2.5 min-h-[44px] rounded-xl border border-border text-sm font-semibold"
               >
                 Check again
               </button>
@@ -1886,24 +1892,18 @@ export default function PicksClient() {
                 <button
                   type="button"
                   onClick={() => void selectWeek(activeWeek)}
-                  className="text-sm text-primary hover:underline font-medium"
+                  className="text-sm text-primary hover:underline font-medium min-h-[44px] px-2"
                 >
                   Go to live {weekTitle(activeWeek)} →
                 </button>
               )}
               <a
-                href="/locker-room"
-                className="text-sm text-muted hover:text-foreground underline-offset-2 hover:underline"
-              >
-                Locker Room
-              </a>
-      <a
                 href="/"
-                className="text-sm text-muted hover:text-foreground underline-offset-2 hover:underline"
+                className="text-sm text-muted hover:text-foreground underline-offset-2 hover:underline min-h-[44px] inline-flex items-center px-2"
               >
                 Home
               </a>
-      </div>
+            </div>
           </div>
         )}
 
