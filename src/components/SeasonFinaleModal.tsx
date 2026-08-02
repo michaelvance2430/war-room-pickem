@@ -145,7 +145,27 @@ export default function SeasonFinaleModal() {
     }
   }
 
+  /** Finale = chapter complete → Crew story becomes real */
+  function stampCrewChapter() {
+    try {
+      const league = getLeague();
+      if (!league?.id || !yearItems.length) return;
+      void import("@/lib/crew").then((m) => {
+        m.completeCrewChapterFromFinale({
+          leagueId: league.id,
+          year,
+          trophies: yearItems,
+          leagueName: league.name || leagueName,
+          sportId: league.sportId,
+        });
+      });
+    } catch {
+      /* ignore */
+    }
+  }
+
   function dismissAll() {
+    stampCrewChapter();
     persistSeen();
     setOpen(false);
   }
@@ -367,13 +387,19 @@ export default function SeasonFinaleModal() {
           </div>
 
           {isLast && (
-            <Link
-              href="/trophy-room"
-              onClick={dismissAll}
-              className="block w-full py-2.5 rounded-xl border border-amber-400/40 text-amber-200 text-sm font-bold text-center min-h-[44px] flex items-center justify-center"
-            >
-              Open Trophy Room
-            </Link>
+            <div className="flex flex-col gap-2">
+              <Link
+                href="/trophy-room"
+                onClick={dismissAll}
+                className="block w-full py-2.5 rounded-xl border border-amber-400/40 text-amber-200 text-sm font-bold text-center min-h-[44px] flex items-center justify-center"
+              >
+                Open Trophy Room
+              </Link>
+              <p className="text-[10px] text-muted text-center leading-relaxed px-1">
+                After this, your Crew story unlocks — same people, next sport
+                as the next chapter.
+              </p>
+            </div>
           )}
 
           <p className="text-[10px] text-muted text-center leading-relaxed">

@@ -14,7 +14,7 @@ import {
 } from "@/lib/player-history";
 import { loadLeaguePlayers } from "@/lib/cloud";
 import { loadLeagueTrophies, type LeagueTrophy } from "@/lib/trophies";
-import { getLeague, isCommissioner, isOps } from "@/lib/league";
+import { getLeague, getSession, isCommissioner, isOps } from "@/lib/league";
 import type { Player } from "@/lib/types";
 import {
   mergePriorSeasonTrophies,
@@ -23,6 +23,91 @@ import {
 } from "@/lib/prior-season-seed";
 import { resolveLiveTrophyHolder } from "@/lib/trophy-share";
 import LastSeasonHardwareWall from "@/components/LastSeasonHardwareWall";
+import {
+  completedChapterCount,
+  crewFoundedLabel,
+  ensureCrewForLeague,
+  getChaptersForCrew,
+  getCrewForLeague,
+  isCrewStoryRevealed,
+  sportChapterLabel,
+} from "@/lib/crew";
+
+function CrewMuseumStrip() {
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    const league = getLeague();
+    const session = getSession();
+    if (league?.id) {
+      ensureCrewForLeague({
+        leagueId: league.id,
+        leagueName: league.name || "War Room",
+        sportId: league.sportId,
+        createdBy: session?.playerId,
+        foundedAt: league.createdAt,
+      });
+    }
+    setReady(true);
+  }, []);
+  if (!ready) return null;
+  const league = getLeague();
+  if (!league?.id) return null;
+  const session = getSession();
+  const crew = getCrewForLeague(league.id);
+  if (!crew) return null;
+  const revealed = isCrewStoryRevealed(league.id, session?.playerId);
+  const chapters = getChaptersForCrew(crew.id);
+  const done = completedChapterCount(crew.id);
+
+  if (!revealed) {
+    return (
+      <div className="mb-6 rounded-xl border border-border bg-card/60 px-4 py-3">
+        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted">
+          Crew wing
+        </p>
+        <p className="text-sm text-muted mt-1 leading-relaxed">
+          Shared marks and the full Crew timeline open after your first season
+          finale. Until then — keep playing.
+        </p>
+        <Link
+          href="/crew"
+          className="inline-block mt-2 text-xs font-bold text-primary"
+        >
+          Crew page →
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-6 rounded-xl border border-amber-400/35 bg-amber-400/5 px-4 py-4 space-y-2">
+      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-amber-300">
+        Crew wing
+      </p>
+      <p className="text-base font-black text-foreground">{crew.name}</p>
+      <p className="text-xs text-muted">
+        Founded {crewFoundedLabel(crew.foundedAt)} · {done} chapter
+        {done === 1 ? "" : "s"} together
+      </p>
+      {chapters.slice(0, 3).map((ch) => (
+        <p key={ch.id} className="text-xs text-foreground/80">
+          {sportChapterLabel(ch.sportId)} {ch.year}
+          {ch.status === "complete" && ch.championshipName
+            ? ` · Champ ${ch.championshipName}`
+            : ch.status === "active"
+              ? " · live"
+              : " · complete"}
+        </p>
+      ))}
+      <p className="text-[11px] text-muted pt-1">
+        Crew marks stay hidden until your Crew earns the first one.
+      </p>
+      <Link href="/crew" className="inline-block text-sm font-bold text-amber-200">
+        Open Crew timeline →
+      </Link>
+    </div>
+  );
+}
 
 function MuseumInner() {
   const searchParams = useSearchParams();
@@ -176,6 +261,9 @@ function MuseumInner() {
           rosterHits={rosterHits}
           sportId={getLeague()?.sportId}
         />
+
+        {/* Crew story — full wall after first finale; quiet teaser before */}
+        <CrewMuseumStrip />
 
         <ChampionshipBanner
           trophies={trophies}

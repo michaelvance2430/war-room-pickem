@@ -315,6 +315,21 @@ function JoinPageInner() {
       );
       saveActiveLeagueId(leagueId);
       markLeagueBuildNeeded(leagueId);
+      // Silent Crew + first chapter (no day-one lecture — story at finale)
+      try {
+        const { ensureCrewForLeague } = await import("@/lib/crew");
+        ensureCrewForLeague({
+          leagueId,
+          leagueName:
+            (league.name as string) || leagueName.trim() || "War Room",
+          sportId: createdSportId,
+          createdBy: userId,
+          foundedAt:
+            (league.created_at as string) || new Date().toISOString(),
+        });
+      } catch {
+        /* local-first optional */
+      }
 
       // Pin sport BEFORE any cloud rehydrate (mobile race: 1s red then CFB green)
       try {

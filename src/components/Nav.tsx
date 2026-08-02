@@ -37,6 +37,7 @@ import EasterEggHost from "@/components/EasterEggHost";
 import EggFlexNewspaper from "@/components/EggFlexNewspaper";
 import MascotSighting from "@/components/MascotSighting";
 import LeagueBuildLockReminder from "@/components/LeagueBuildLockReminder";
+import CrewRevealModal from "@/components/CrewRevealModal";
 import { touchLastSeen } from "@/lib/last-seen";
 import { loadMyProfile } from "@/lib/profile";
 import { isGuestMode } from "@/lib/guest-mode";
@@ -379,6 +380,11 @@ export default function Nav() {
   const moreLinks: NavLink[] = earlyNav
     ? [
         { href: "/rules", label: "How to play" },
+        {
+          href: "/crew",
+          label: "Crew",
+          className: "text-amber-300/80 hover:text-amber-200",
+        },
         { href: "/account", label: "Account" },
       ]
     : [
@@ -405,6 +411,11 @@ export default function Nav() {
         {
           href: "/trophy-room",
           label: "Trophies",
+          className: "text-amber-300 hover:text-amber-200",
+        },
+        {
+          href: "/crew",
+          label: "Crew",
           className: "text-amber-300 hover:text-amber-200",
         },
         {
@@ -941,6 +952,8 @@ export default function Nav() {
       <GuestOnboarding />
       {/* Day before open: last chance to edit League Build */}
       {!isGuestMode() && <LeagueBuildLockReminder />}
+      {/* After first finale: one-time Crew story reveal (not Gazette) */}
+      {!isGuestMode() && <CrewRevealModal />}
       {/* Real account: Crystal Ball + picks walk-the-dog coach */}
       <PlayerWalkthrough />
       {/* Until Aug 23 00:01 ET: countdown. After: ticker gone; one-time welcome splash */}

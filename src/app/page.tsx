@@ -142,6 +142,19 @@ export default function Home() {
             setShowGazetteShelf(true);
           }
           setReady(true);
+          // Silent Crew ensure (no UI lecture)
+          try {
+            const { ensureCrewForLeague } = await import("@/lib/crew");
+            ensureCrewForLeague({
+              leagueId: league.id,
+              leagueName: league.name || "War Room",
+              sportId: sport,
+              createdBy: session.playerId,
+              foundedAt: league.createdAt,
+            });
+          } catch {
+            /* ignore */
+          }
         }
 
         const supabase = createClient();
