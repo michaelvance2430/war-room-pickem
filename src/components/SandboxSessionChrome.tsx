@@ -3,10 +3,9 @@
 /**
  * Sticky hop bar for hosts in season SANDBOX (pre-doors dry-run).
  *
- * OFF by default (including after logout/login).
- * Turns ON only when you open Host tools (/commissioner).
- * Exit Host turns it OFF + wipes dry-run board.
- * I’m bored / My Picks practice never turns it on.
+ * OFF by default (login / league switch / Exit Host).
+ * ON only after opening Host tools in THIS league.
+ * Never on I’m bored practice. Never carries across leagues.
  */
 
 import { useEffect, useState } from "react";
@@ -21,10 +20,13 @@ import {
   EVENT_CREATOR_EYES,
   isCreatorEyesActive,
 } from "@/lib/creator-eyes";
+import {
+  EVENT_LEAGUE_SWITCHED,
+  isSandboxHostHopActive,
+  setSandboxHostHopActive,
+} from "@/lib/sandbox-host-hop";
 
 const EVENT_FOUNDRY_SESSION = "warroom-foundry-session";
-/** Opt-in hop mode — only after visiting Host tools */
-const HOP_ACTIVE_KEY = "warroom-sandbox-host-hop-active-v1";
 
 function isFoundryChromeActive(): boolean {
   if (typeof window === "undefined") return false;
@@ -33,23 +35,6 @@ function isFoundryChromeActive(): boolean {
     return localStorage.getItem("warroom-foundry-session-v1") === "1";
   } catch {
     return false;
-  }
-}
-
-function isHopActive(): boolean {
-  try {
-    return localStorage.getItem(HOP_ACTIVE_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-
-function setHopActive(on: boolean) {
-  try {
-    if (on) localStorage.setItem(HOP_ACTIVE_KEY, "1");
-    else localStorage.removeItem(HOP_ACTIVE_KEY);
-  } catch {
-    /* ok */
   }
 }
 
@@ -88,7 +73,9 @@ export default function SandboxSessionChrome() {
         setShow(false);
         return;
       }
-      if (!getSession()?.playerId || !isOps()) {
+      const session = getSession();
+      const league = getLeague();
+      if (!session?.playerId || !isOps()) {
         setShow(false);
         return;
       }
@@ -96,12 +83,11 @@ export default function SandboxSessionChrome() {
         setShow(false);
         return;
       }
-      if (isAppCreator(getSession()?.playerId) && isFoundryChromeActive()) {
+      if (isAppCreator(session.playerId) && isFoundryChromeActive()) {
         setShow(false);
         return;
       }
 
-      // Never sit on top of private “I’m bored” practice
       if (isPracticePath(pathname)) {
         setShow(false);
         return;
@@ -110,20 +96,19 @@ export default function SandboxSessionChrome() {
       const onHost =
         pathname === "/commissioner" ||
         pathname?.startsWith("/commissioner/");
+      const lid = league?.id || session.leagueId;
 
-      // Visiting Host tools opts INTO hop mode
       if (onHost) {
-        setHopActive(true);
+        setSandboxHostHopActive(true, lid);
       }
 
-      // Not opted in → no bar (default after login / Exit Host)
-      if (!onHost && !isHopActive()) {
+      if (!onHost && !isSandboxHostHopActive(lid)) {
         setShow(false);
         return;
       }
 
       try {
-        setOpenLabel(getSeasonOpenLabel(getLeague()?.sportId));
+        setOpenLabel(getSeasonOpenLabel(league?.sportId));
       } catch {
         setOpenLabel("doors open");
       }
@@ -132,11 +117,13 @@ export default function SandboxSessionChrome() {
     refresh();
     window.addEventListener(EVENT_FOUNDRY_SESSION, refresh);
     window.addEventListener(EVENT_CREATOR_EYES, refresh);
+    window.addEventListener(EVENT_LEAGUE_SWITCHED, refresh);
     window.addEventListener("storage", refresh);
     window.addEventListener("warroom-progressive-disclosure", refresh);
     return () => {
       window.removeEventListener(EVENT_FOUNDRY_SESSION, refresh);
       window.removeEventListener(EVENT_CREATOR_EYES, refresh);
+      window.removeEventListener(EVENT_LEAGUE_SWITCHED, refresh);
       window.removeEventListener("storage", refresh);
       window.removeEventListener("warroom-progressive-disclosure", refresh);
     };
@@ -146,19 +133,19 @@ export default function SandboxSessionChrome() {
     if (busy) return;
     const ok = confirm(
       "Exit Host?\n\n" +
-        "1) Close this sandbox hop bar (stays off until you open Host tools)\n" +
+        "1) Close this sandbox hop bar (stays off until you open Host tools in this league)\n" +
         "2) Wipe this dry-run board (cards, picks, sim scores)\n\n" +
         "Members & league code stay.\n" +
         "Prior-season trophies stay.\n\n" +
-        "I’m bored / practice will NOT bring this bar back."
+        "Switching leagues always clears this bar."
     );
     if (!ok) return;
 
     setBusy(true);
     setNote(null);
 
-    // Opt out immediately — bar gone even if wipe fails
-    setHopActive(false);
+    const lid = getLeague()?.id || getSession()?.leagueId;
+    setSandboxHostHopActive(false, lid);
     setShow(false);
 
     try {
@@ -193,7 +180,7 @@ export default function SandboxSessionChrome() {
     <div
       className="fixed bottom-0 inset-x-0 z-[94] pointer-events-none"
       style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
-      data-sandbox-chrome="hop-opt-in-v3"
+      data-sandbox-chrome="hop-per-league-v4"
     >
       <div className="pointer-events-auto max-w-lg mx-auto px-3 pb-3">
         <div className="rounded-2xl border-2 border-amber-400/55 bg-amber-950/95 backdrop-blur-md shadow-[0_0_40px_rgba(245,158,11,0.22)] px-3 py-2.5 space-y-2">
@@ -245,8 +232,7 @@ export default function SandboxSessionChrome() {
           <p className="text-[9px] text-amber-200/60 leading-snug">
             <strong className="text-amber-200/90">Host</strong> = sim tools.{" "}
             <strong className="text-red-300">Exit Host</strong> = close bar +
-            wipe dry-run. Bar only returns when you open Host tools — not after
-            login or I&apos;m bored.
+            wipe dry-run. Switching leagues always clears this bar.
           </p>
         </div>
       </div>

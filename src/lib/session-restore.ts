@@ -395,6 +395,15 @@ export async function switchToLeague(leagueId: string): Promise<boolean> {
   const m = memberships.find((x) => x.leagueId === leagueId);
   if (!m) return false;
   writeSessionAndLeague(m, auth.user.id);
+  // Sandbox host hop bar is per-room — never carry into another league
+  try {
+    const { clearSandboxHostHopOnLeagueSwitch } = await import(
+      "./sandbox-host-hop"
+    );
+    clearSandboxHostHopOnLeagueSwitch();
+  } catch {
+    /* ignore */
+  }
   // Keep multi-sport “desk” filter on this room’s sport
   try {
     const { setSportScope } = await import("./sport-room-scope");
