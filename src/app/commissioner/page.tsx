@@ -78,6 +78,7 @@ import OpenRoomBotsNudge from "@/components/OpenRoomBotsNudge";
 import OpenRoomLeaveNudge from "@/components/OpenRoomLeaveNudge";
 import CommishWeekChecklist from "@/components/CommishWeekChecklist";
 import SportPoolCommishPanel from "@/components/SportPoolCommishPanel";
+import SandboxHopOptIn from "@/components/SandboxHopOptIn";
 import { setViewAsPlayer } from "@/lib/view-as-player";
 import {
   formatKickoff,
@@ -2478,6 +2479,8 @@ function CommissionerPageInner() {
                 </p>
               </div>
             )}
+            {/* Optional sandbox hop — never auto-on from Build card / Host visit */}
+            <SandboxHopOptIn />
             {/* Multi-sport pool after first week — not day-one noise */}
             {!simpleHost && <SportPoolCommishPanel />}
 

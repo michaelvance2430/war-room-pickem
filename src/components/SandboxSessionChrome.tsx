@@ -3,8 +3,8 @@
 /**
  * Sticky hop bar for hosts in season SANDBOX (pre-doors dry-run).
  *
- * OFF by default (login / league switch / Exit Host).
- * ON only after opening Host tools in THIS league.
+ * OFF by default. Never turns on just from Build next card / Commish tools.
+ * ON only when the host explicitly enables “Sandbox hop bar” for this league.
  * Never on I’m bored practice. Never carries across leagues.
  */
 
@@ -22,6 +22,7 @@ import {
 } from "@/lib/creator-eyes";
 import {
   EVENT_LEAGUE_SWITCHED,
+  EVENT_SANDBOX_HOST_HOP,
   isSandboxHostHopActive,
   setSandboxHostHopActive,
 } from "@/lib/sandbox-host-hop";
@@ -67,6 +68,20 @@ export default function SandboxSessionChrome() {
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
 
+  // One-time scrub of the old auto-on hop keys (v1 stuck ON after any Host visit)
+  useEffect(() => {
+    try {
+      const kill: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k?.startsWith("warroom-sandbox-host-hop-active-v1")) kill.push(k);
+      }
+      for (const k of kill) localStorage.removeItem(k);
+    } catch {
+      /* ok */
+    }
+  }, []);
+
   useEffect(() => {
     function refresh() {
       if (isGuestMode()) {
@@ -93,16 +108,10 @@ export default function SandboxSessionChrome() {
         return;
       }
 
-      const onHost =
-        pathname === "/commissioner" ||
-        pathname?.startsWith("/commissioner/");
       const lid = league?.id || session.leagueId;
 
-      if (onHost) {
-        setSandboxHostHopActive(true, lid);
-      }
-
-      if (!onHost && !isSandboxHostHopActive(lid)) {
+      // Opt-in only — visiting /commissioner must NOT flip host mode on
+      if (!isSandboxHostHopActive(lid)) {
         setShow(false);
         return;
       }
@@ -118,12 +127,14 @@ export default function SandboxSessionChrome() {
     window.addEventListener(EVENT_FOUNDRY_SESSION, refresh);
     window.addEventListener(EVENT_CREATOR_EYES, refresh);
     window.addEventListener(EVENT_LEAGUE_SWITCHED, refresh);
+    window.addEventListener(EVENT_SANDBOX_HOST_HOP, refresh);
     window.addEventListener("storage", refresh);
     window.addEventListener("warroom-progressive-disclosure", refresh);
     return () => {
       window.removeEventListener(EVENT_FOUNDRY_SESSION, refresh);
       window.removeEventListener(EVENT_CREATOR_EYES, refresh);
       window.removeEventListener(EVENT_LEAGUE_SWITCHED, refresh);
+      window.removeEventListener(EVENT_SANDBOX_HOST_HOP, refresh);
       window.removeEventListener("storage", refresh);
       window.removeEventListener("warroom-progressive-disclosure", refresh);
     };
@@ -133,11 +144,12 @@ export default function SandboxSessionChrome() {
     if (busy) return;
     const ok = confirm(
       "Exit Host?\n\n" +
-        "1) Close this sandbox hop bar (stays off until you open Host tools in this league)\n" +
+        "1) Close this sandbox hop bar (stays off until you turn it on)\n" +
         "2) Wipe this dry-run board (cards, picks, sim scores)\n\n" +
         "Members & league code stay.\n" +
         "Prior-season trophies stay.\n\n" +
-        "Switching leagues always clears this bar."
+        "Switching leagues always clears this bar.\n" +
+        "Build next card / normal Host tools do NOT turn this on."
     );
     if (!ok) return;
 
@@ -180,14 +192,14 @@ export default function SandboxSessionChrome() {
     <div
       className="fixed bottom-0 inset-x-0 z-[94] pointer-events-none"
       style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
-      data-sandbox-chrome="hop-per-league-v4"
+      data-sandbox-chrome="hop-opt-in-v5"
     >
       <div className="pointer-events-auto max-w-lg mx-auto px-3 pb-3">
         <div className="rounded-2xl border-2 border-amber-400/55 bg-amber-950/95 backdrop-blur-md shadow-[0_0_40px_rgba(245,158,11,0.22)] px-3 py-2.5 space-y-2">
           <div className="flex items-center gap-2">
             <div className="flex-1 min-w-0">
               <p className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-300">
-                Sandbox mode
+                Sandbox hop bar
               </p>
               <p className="text-[11px] text-amber-100/85 truncate font-semibold">
                 Dry-run until {openLabel} · sim scores, no career bank
@@ -230,9 +242,9 @@ export default function SandboxSessionChrome() {
             </p>
           )}
           <p className="text-[9px] text-amber-200/60 leading-snug">
-            <strong className="text-amber-200/90">Host</strong> = sim tools.{" "}
-            <strong className="text-red-300">Exit Host</strong> = close bar +
-            wipe dry-run. Switching leagues always clears this bar.
+            Opt-in only — normal Host tools (card / score) do not turn this on.{" "}
+            <strong className="text-red-300">Exit Host</strong> closes bar +
+            wipes dry-run.
           </p>
         </div>
       </div>
