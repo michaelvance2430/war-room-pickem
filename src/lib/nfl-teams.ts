@@ -89,3 +89,78 @@ export function listNflPrideTeams(): NflPrideTeam[] {
     conference: NFL_CONFERENCES[name] || "NFL",
   }));
 }
+
+function normNfl(s: string): string {
+  return (s || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Nicknames / short forms for odds API strings → division lookup */
+const NFL_ALIASES: { keys: string[]; division: string }[] = Object.entries(
+  NFL_CONFERENCES
+).map(([name, division]) => {
+  const n = normNfl(name);
+  const parts = n.split(" ");
+  // Full name + city-ish first word(s) + mascot last word
+  const keys = new Set<string>([n]);
+  if (parts.length >= 2) {
+    keys.add(parts[parts.length - 1]!); // e.g. steelers, falcons
+    // multi-word city: "los angeles rams" → also "rams", "la rams"
+    if (parts.length >= 3) {
+      keys.add(parts.slice(0, -1).join(" "));
+      keys.add(parts.slice(-2).join(" "));
+    }
+  }
+  // Common short forms
+  if (n.includes("san francisco")) keys.add("49ers").add("niners");
+  if (n.includes("new england")) keys.add("patriots").add("pats");
+  if (n.includes("green bay")) keys.add("packers");
+  if (n.includes("tampa bay")) keys.add("buccaneers").add("bucs");
+  if (n.includes("kansas city")) keys.add("chiefs");
+  if (n.includes("las vegas")) keys.add("raiders");
+  if (n.includes("new orleans")) keys.add("saints");
+  if (n.includes("new york giants")) keys.add("giants");
+  if (n.includes("new york jets")) keys.add("jets");
+  if (n.includes("los angeles rams")) keys.add("rams");
+  if (n.includes("los angeles chargers")) keys.add("chargers");
+  if (n.includes("washington")) keys.add("commanders");
+  return { keys: [...keys], division };
+});
+
+/**
+ * NFL division for a team name from odds / slate (e.g. "AFC North").
+ * Never uses NCAA conference matching.
+ */
+export function getNflDivision(teamName: string): string | null {
+  const exact = NFL_CONFERENCES[teamName as keyof typeof NFL_CONFERENCES];
+  if (exact) return exact;
+  const n = normNfl(teamName);
+  if (!n) return null;
+  // Prefer longest key match so "new york jets" beats "jets" ambiguity carefully
+  let best: { division: string; len: number } | null = null;
+  for (const row of NFL_ALIASES) {
+    for (const k of row.keys) {
+      if (!k) continue;
+      if (n === k || n.includes(k) || k.includes(n)) {
+        const len = k.length;
+        if (!best || len > best.len) best = { division: row.division, len };
+      }
+    }
+  }
+  return best?.division ?? null;
+}
+
+/**
+ * Short division labels for NFL slate UI, e.g. "NFC South · AFC North".
+ * Same-division: "AFC North" once.
+ */
+export function formatMatchupNflDivisions(away: string, home: string): string {
+  const ad = getNflDivision(away);
+  const hd = getNflDivision(home);
+  if (!ad && !hd) return "";
+  if (ad && hd) return ad === hd ? ad : `${ad} · ${hd}`;
+  return ad || hd || "";
+}

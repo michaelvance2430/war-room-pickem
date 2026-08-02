@@ -17,6 +17,7 @@ import { Game, Prop } from "@/lib/types";
 import { fetchFootballOdds } from "@/lib/odds";
 import { generateDemoSlate, randomizeDemoResults } from "@/lib/demo-slate";
 import { formatMatchupConferences } from "@/lib/fbs-teams";
+import { formatMatchupNflDivisions } from "@/lib/nfl-teams";
 import {
   formatRankedTeam,
   getRankedMatchupTier,
@@ -3880,10 +3881,18 @@ function CommissionerPageInner() {
                             g.favorite === "home" ? g.homeTeam : g.awayTeam,
                             g.favorite === "home" ? g.homeRank : g.awayRank
                           );
-                          const confLine = formatMatchupConferences(
-                            g.awayTeam,
-                            g.homeTeam
-                          );
+                          // NFL → AFC/NFC divisions; CFB → NCAA conferences
+                          // (never run FBS matcher on NFL — Pittsburgh → ACC, etc.)
+                          const confLine =
+                            leagueFootballSport() === "nfl"
+                              ? formatMatchupNflDivisions(
+                                  g.awayTeam,
+                                  g.homeTeam
+                                )
+                              : formatMatchupConferences(
+                                  g.awayTeam,
+                                  g.homeTeam
+                                );
                           const rankTier = getRankedMatchupTier(
                             g.awayRank,
                             g.homeRank
