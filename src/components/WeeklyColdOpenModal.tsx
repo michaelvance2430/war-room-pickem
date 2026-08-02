@@ -191,42 +191,45 @@ export default function WeeklyColdOpenModal() {
       />
 
       <div className="relative w-full sm:max-w-lg max-h-[96vh] overflow-hidden rounded-t-2xl sm:rounded-2xl border-2 border-amber-400/50 bg-[#0a0a0a] shadow-[0_0_80px_rgba(251,191,36,0.18)] flex flex-col">
-        {/* —— Newspaper masthead (same DNA as Gazette paper) —— */}
-        <div className="shrink-0 border-b-2 border-amber-400/40 bg-gradient-to-b from-amber-500/15 to-black px-3 pt-3 pb-2">
-          <div className="flex items-center justify-between gap-2 mb-1.5">
-            <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-amber-300/90">
-              {GAZETTE_STATION.network}
-              {preview ? " · Foundry preview" : ""}
+        {/* —— BREAKING NEWS GAZETTE masthead (gold palette, no ticker) —— */}
+        <div className="shrink-0 border-b-2 border-amber-400/50 bg-gradient-to-b from-amber-500/20 via-amber-950/40 to-black">
+          <div className="bg-amber-400 text-black px-3 py-1.5 flex items-center justify-between gap-2">
+            <span className="text-[11px] sm:text-xs font-black uppercase tracking-[0.22em]">
+              ● Breaking news
             </span>
-            <span className="text-[9px] font-mono text-muted tabular-nums">
+            <span className="text-[10px] font-bold uppercase tracking-wider opacity-90">
+              Gazette
+              {preview ? " · preview" : ""}
+            </span>
+            <span className="text-[10px] font-mono tabular-nums font-semibold">
               {clock}
             </span>
           </div>
-          <div className="flex items-center gap-2.5">
-            <BrandMark size={36} variant="force" className="rounded shrink-0" />
-            <div className="min-w-0 flex-1 text-center sm:text-left">
+          <div className="px-3 pt-3 pb-2.5 flex items-center gap-2.5">
+            <BrandMark size={40} variant="force" className="rounded shrink-0" />
+            <div className="min-w-0 flex-1 text-center">
               <h2
                 id="cold-open-title"
-                className="text-lg sm:text-xl font-black tracking-tight text-amber-100 leading-none uppercase"
+                className="text-xl sm:text-2xl font-black tracking-tight text-amber-100 leading-none uppercase"
                 style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
               >
                 {GAZETTE_STATION.masthead}
               </h2>
-              <p className="text-[10px] text-amber-200/70 italic mt-0.5">
+              <p className="text-[10px] text-amber-200/75 italic mt-1">
                 {GAZETTE_STATION.tagline}
               </p>
             </div>
             <div className="shrink-0 text-right">
-              <p className="text-[10px] font-black text-amber-300 tracking-widest">
+              <p className="text-[11px] font-black text-amber-300 tracking-widest">
                 {GAZETTE_STATION.callSign}
               </p>
-              <p className="text-[8px] uppercase text-red-400 font-bold animate-pulse">
-                ● ON AIR
+              <p className="text-[8px] uppercase text-amber-400/90 font-bold">
+                LIVE
               </p>
             </div>
           </div>
-          <p className="text-[9px] text-muted text-center mt-2 tracking-wide">
-            {room} edition · {GAZETTE_STATION.desk}
+          <p className="text-[9px] text-amber-200/50 text-center pb-2 tracking-wide uppercase">
+            {room} · {GAZETTE_STATION.desk}
           </p>
         </div>
 
@@ -265,48 +268,27 @@ export default function WeeklyColdOpenModal() {
             </>
           )}
 
-          {/* Channel bug */}
-          <div className="absolute top-2 left-2 flex items-center gap-1.5 rounded bg-black/75 border border-amber-400/40 px-2 py-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-            <span className="text-[9px] font-black tracking-wider text-amber-200">
-              {GAZETTE_STATION.bugLabel}
-            </span>
-          </div>
-          <div className="absolute top-2 right-2 rounded bg-black/70 border border-white/10 px-1.5 py-0.5">
-            <span className="text-[8px] font-bold text-white/80 uppercase tracking-wider">
-              Vol. weekly
-            </span>
-          </div>
-
-          {/* Progress */}
-          <div className="absolute top-0 inset-x-0 h-0.5 bg-white/10">
+          {/* Progress — gold only, no word crawl */}
+          <div className="absolute top-0 inset-x-0 h-1 bg-black/40">
             <div
-              className="h-full bg-amber-400"
+              className="h-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.6)]"
               style={{ width: `${progress * 100}%` }}
             />
           </div>
 
-          {/* Lower third — news chyron */}
+          {/* Lower third — BREAKING NEWS GAZETTE (static, gold) */}
           <div className="absolute bottom-0 inset-x-0">
-            <div className="bg-amber-400 text-black px-2 py-0.5 flex items-center gap-2">
-              <span className="text-[9px] font-black uppercase tracking-[0.16em] shrink-0">
-                {kicker}
-              </span>
-              <span className="text-[9px] font-semibold truncate opacity-80">
-                {copy.phonetic}
+            <div className="bg-amber-400 text-black px-3 py-1.5 flex items-center justify-center gap-2">
+              <span className="text-[11px] sm:text-xs font-black uppercase tracking-[0.2em]">
+                Breaking news · Gazette
               </span>
             </div>
-            <div className="bg-black/90 border-t border-amber-400/30 px-3 py-2.5">
-              <p className="text-sm sm:text-base font-bold text-white leading-snug min-h-[2.6rem]">
-                {caption}
+            <div className="bg-gradient-to-t from-black via-black/95 to-black/85 border-t border-amber-400/40 px-3 py-3">
+              <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-amber-300 mb-1">
+                {kicker} · {copy.phonetic}
               </p>
-            </div>
-            {/* News ticker */}
-            <div className="bg-zinc-900 border-t border-white/10 px-2 py-1 overflow-hidden">
-              <p className="text-[9px] text-amber-100/80 whitespace-nowrap font-medium">
-                {GAZETTE_STATION.masthead} · {GAZETTE_STATION.tagline} · Same
-                network that drops your Sunday / Monday paper · Kalshi desk ·{" "}
-                {copy.kalshi}
+              <p className="text-sm sm:text-base font-bold text-white leading-snug min-h-[2.5rem]">
+                {caption}
               </p>
             </div>
           </div>
