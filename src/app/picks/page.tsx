@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Nav from "@/components/Nav";
 import PicksHowToModal from "@/components/PicksHowToModal";
@@ -82,7 +82,7 @@ const EMPTY_PROP: Prop = {
 
 const POLL_MS = 12_000;
 
-export default function PicksPage() {
+function PicksInner() {
   /** League's official pick week (commissioner-controlled). */
   const [activeWeek, setActiveWeek] = useState(1);
   /** Week the user is viewing (may be past = read-only). */
@@ -2239,5 +2239,19 @@ export default function PicksPage() {
         )}
       </main>
     </div>
+  );
+}
+
+export default function PicksPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center text-sm text-muted">
+          Loading picks…
+        </div>
+      }
+    >
+      <PicksInner />
+    </Suspense>
   );
 }
