@@ -8,7 +8,6 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import PlayerLink from "@/components/PlayerLink";
-import CreatorLiveStamp from "@/components/CreatorLiveStamp";
 import { loadLeaguePlayers, loadLeagueRoster } from "@/lib/cloud";
 import { getSession } from "@/lib/league";
 import {
@@ -16,7 +15,6 @@ import {
   type CrewBoardRow,
 } from "@/lib/crew-cheevos";
 import { formatLastSeen, lastSeenToneClass } from "@/lib/last-seen";
-import { isAppCreator } from "@/lib/creator";
 import type { Player } from "@/lib/types";
 
 const POLL_MS = 25_000;
@@ -42,18 +40,15 @@ export default function CrewLiveBoard({
         loadLeagueRoster().catch(() => []),
       ]);
       const lastSeenById: Record<string, string | null> = {};
-      const creatorIds = new Set<string>();
       for (const m of roster) {
         if (m.userId) {
           lastSeenById[m.userId] = m.lastSeenAt ?? null;
-          if (isAppCreator(m.userId)) creatorIds.add(m.userId);
         }
       }
       for (const p of players) {
         if (p.lastSeenAt && !lastSeenById[p.id]) {
           lastSeenById[p.id] = p.lastSeenAt;
         }
-        if (isAppCreator(p.id)) creatorIds.add(p.id);
       }
       // Prefer full standings players; fall back to roster shells
       let field = players;
@@ -86,7 +81,6 @@ export default function CrewLiveBoard({
       }
       const board = buildCrewCommitmentBoard(field, {
         lastSeenById,
-        creatorIds,
       });
       setRows(board);
       setUpdatedAt(Date.now());
@@ -110,7 +104,6 @@ export default function CrewLiveBoard({
   }, [refresh]);
 
   const selfId = getSession()?.playerId;
-  const creatorRow = rows.find((r) => r.isCreator);
 
   return (
     <section className={`space-y-3 ${className}`}>
@@ -131,14 +124,6 @@ export default function CrewLiveBoard({
           auto every {POLL_MS / 1000}s
         </p>
       </div>
-
-      {creatorRow && (
-        <CreatorLiveStamp
-          userId={creatorRow.playerId}
-          lastSeenAt={creatorRow.lastSeenAt}
-          variant="banner"
-        />
-      )}
 
       {error && (
         <p className="text-xs text-danger">{error}</p>
@@ -165,13 +150,6 @@ export default function CrewLiveBoard({
                     name={r.name}
                     className="text-sm font-semibold text-foreground truncate hover:text-primary"
                   />
-                  {r.isCreator && (
-                    <CreatorLiveStamp
-                      userId={r.playerId}
-                      lastSeenAt={r.lastSeenAt}
-                      variant="chip"
-                    />
-                  )}
                   {r.playerId === selfId && (
                     <span className="text-[10px] font-bold text-primary">
                       YOU

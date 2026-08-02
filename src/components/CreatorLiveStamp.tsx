@@ -1,8 +1,11 @@
 "use client";
 
 /**
- * Shows when the app creator was active in the last 24 hours.
- * Uses profiles.last_seen_at (same as standings presence).
+ * Founder / platform tools ONLY — never mount in league rooms, Crew foxhole,
+ * or player profiles. Mike plays as a normal seat; no "Creator was here" stamp
+ * in leagues he is part of.
+ *
+ * Uses profiles.last_seen_at when needed on Foundry / platform status.
  */
 
 import { formatLastSeen, isRecentlyActive } from "@/lib/last-seen";
