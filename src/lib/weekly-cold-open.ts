@@ -1,5 +1,6 @@
 /**
  * Weekly cold-open broadcast — first login each calendar week, starting Aug 16 2026.
+ * Same “station” as The War Room Gazette (TV desk for the paper).
  * One show per player per week (localStorage).
  */
 
@@ -14,6 +15,20 @@ const SEEN_KEY = "warroom-weekly-cold-open-seen-v1";
 
 export const WEEKLY_COLD_OPEN_VIDEO_SRC =
   "/videos/kahmann-cold-open.mp4";
+
+/** Shared brand with GazettePaper / buildGazetteEdition */
+export const GAZETTE_STATION = {
+  /** On-air bug / channel ID */
+  callSign: "WRG",
+  /** Matches Gazette masthead */
+  masthead: "THE WAR ROOM GAZETTE",
+  /** Matches Gazette tagline */
+  tagline: "All the news that's fit to roast",
+  network: "Gazette Network",
+  desk: "Investigative Desk",
+  /** Short for chyrons */
+  bugLabel: "GAZETTE · LIVE",
+} as const;
 
 /** Foundry / creator: open broadcast without leaving the page. */
 export const EVENT_FORCE_WEEKLY_COLD_OPEN = "warroom-force-weekly-cold-open";
@@ -32,7 +47,6 @@ export function requestWeeklyColdOpenPreview(): void {
       /* ignore */
     }
   };
-  // Immediate + retries so Foundry works even if modal just mounted
   fire();
   window.setTimeout(fire, 50);
   window.setTimeout(fire, 200);
@@ -46,27 +60,29 @@ export type WeeklyColdOpenCopy = {
   body: string;
   kalshi: string;
   cta: string;
+  ctaGazette: string;
 };
 
 /** Kahmann = “COMMON” */
 export function getWeeklyColdOpenCopy(): WeeklyColdOpenCopy {
   return {
-    stamp: "WRN · Investigative desk",
+    stamp: `${GAZETTE_STATION.callSign} · ${GAZETTE_STATION.desk}`,
     headline: "Is Kahmann a time traveler… or just a no-good cheat?",
     phonetic: "Kahmann — pronounced COMMON",
     body:
-      "Investigative reporters are still looking into whether reigning champ Kahmann (say it with us: COMMON) is truly a time traveler… or just a no-good cheat!?!!?",
+      "Gazette investigative reporters are still looking into whether reigning champ Kahmann (say it with us: COMMON) is truly a time traveler… or just a no-good cheat!?!!?",
     kalshi:
       "Either way, Kalshi odds have Andy and Definitely — NOT winning it again.",
     cta: "Cool — back to the room",
+    ctaGazette: "Open the Gazette",
   };
 }
 
 /** Monday 00:00 local as week id (YYYY-MM-DD of that Monday). */
 export function coldOpenWeekId(nowMs = Date.now()): string {
   const d = new Date(nowMs);
-  const day = d.getDay(); // 0 Sun
-  const diff = day === 0 ? -6 : 1 - day; // back to Monday
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
   const mon = new Date(d);
   mon.setHours(0, 0, 0, 0);
   mon.setDate(d.getDate() + diff);
@@ -118,10 +134,6 @@ export function isWeeklyColdOpenWindowOpen(nowMs = Date.now()): boolean {
   return nowMs >= WEEKLY_COLD_OPEN_START_MS;
 }
 
-/**
- * Show once per player/league per week after Aug 16, when logged in.
- * Caller should also respect pre-lock calm / tutorial / session drama.
- */
 export function shouldShowWeeklyColdOpen(nowMs = Date.now()): boolean {
   if (typeof window === "undefined") return false;
   if (!isWeeklyColdOpenWindowOpen(nowMs)) return false;
