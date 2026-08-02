@@ -142,75 +142,73 @@ export function hasPriorSeasonBigHardware(
 }
 
 /**
- * Fill any missing prior plaques for Museum / history display.
- * Does not write to the DB — use seedPriorSeason2025Trophies for that.
- *
- * CFB always gets Excel-era big three on the display layer (Kahmann / Strayer / Ben)
- * so the Museum never blanks when cloud rows were wiped or incomplete.
- * NFL gets Maria Super Bowl; never strips existing non-NFL plaques from the list.
+ * Last season plaques that MUST always be on the wall (display layer).
+ * CFB Excel 2025–26: Kahmann / Strayer / Big Ball Ben.
+ * NFL 2025: Maria Super Bowl.
+ */
+export function listLastSeasonDisplayPlaques(opts?: {
+  players?: { id: string; name: string }[];
+  sportId?: string | null;
+}): LeagueTrophy[] {
+  const sport = resolvePriorSport(opts?.sportId);
+  const seeds = getPriorSeasonSeeds(sport);
+  return seeds.map((row) => ({
+    id: `prior-seed-${sport}-${row.trophyType}`,
+    leagueId: "prior-excel",
+    seasonYear: PRIOR_SEASON_YEAR,
+    trophyType: row.trophyType,
+    winnerName: row.winnerName,
+    winnerUserId: matchPlayerId(opts?.players, row.namePatterns),
+    subtitle: row.subtitle,
+    notes: row.notes,
+    awardedAt: row.awardedAt || "2026-01-20T12:00:00.000Z",
+  }));
+}
+
+/**
+ * Fill prior plaques for Museum / history display.
+ * FORCE last-year seed winners onto the wall for this sport so they always show
+ * (Kahmann / Strayer / Ben on CFB · Maria on NFL). Cloud rows for other years stay.
  */
 export function mergePriorSeasonTrophies(
   trophies: LeagueTrophy[],
   opts?: { players?: { id: string; name: string }[]; sportId?: string | null }
 ): LeagueTrophy[] {
   const sport = resolvePriorSport(opts?.sportId);
-  // CFB lore is the default museum story for this product; NFL adds Maria only.
-  const seeds =
-    sport === "nfl"
-      ? [...NFL_PRIOR_SEASON_SEEDS]
-      : [...PRIOR_SEASON_2025_SEEDS];
-  const out = trophies.map((t) => ({ ...t }));
+  const seeds = getPriorSeasonSeeds(sport);
+  const seedTypes = new Set(seeds.map((s) => s.trophyType));
+
+  // Keep everything except prior-year seed slots (we re-inject those)
+  const out = trophies.filter(
+    (t) =>
+      !(
+        t.seasonYear === PRIOR_SEASON_YEAR && seedTypes.has(t.trophyType)
+      )
+  );
+
+  // Always inject last season hardware first (on display)
   for (const row of seeds) {
-    const idx = out.findIndex(
+    const uid = matchPlayerId(opts?.players, row.namePatterns);
+    // Prefer cloud user id if engraved under the right name
+    const cloud = trophies.find(
       (t) =>
-        t.seasonYear === PRIOR_SEASON_YEAR && t.trophyType === row.trophyType
+        t.seasonYear === PRIOR_SEASON_YEAR &&
+        t.trophyType === row.trophyType &&
+        row.namePatterns.some((p) => p.test(t.winnerName || ""))
     );
-    if (idx >= 0) {
-      // Don't let a blank/wrong Maria seed blank CFB Excel names on display
-      if (sport === "cfb" || sport !== "nfl") {
-        const seedHit = row.namePatterns.some((p) =>
-          p.test(out[idx].winnerName || "")
-        );
-        // If cloud still has Kahmann etc., keep them; only fill missing link
-        if (!out[idx].winnerUserId) {
-          const uid = matchPlayerId(opts?.players, row.namePatterns);
-          if (uid) out[idx] = { ...out[idx], winnerUserId: uid };
-        }
-        // If someone overwrote CFB champ with Maria while sport is CFB, restore display
-        if (
-          row.trophyType === "championship" &&
-          sport === "cfb" &&
-          !seedHit &&
-          /\bmaria\b/i.test(out[idx].winnerName || "")
-        ) {
-          out[idx] = {
-            ...out[idx],
-            winnerName: row.winnerName,
-            winnerUserId: matchPlayerId(opts?.players, row.namePatterns),
-            subtitle: row.subtitle,
-            notes: row.notes,
-          };
-        }
-        continue;
-      }
-      if (!out[idx].winnerUserId) {
-        const uid = matchPlayerId(opts?.players, row.namePatterns);
-        if (uid) out[idx] = { ...out[idx], winnerUserId: uid };
-      }
-      continue;
-    }
     out.push({
-      id: `prior-seed-${sport}-${row.trophyType}`,
-      leagueId: "prior-excel",
+      id: cloud?.id || `prior-seed-${sport}-${row.trophyType}`,
+      leagueId: cloud?.leagueId || "prior-excel",
       seasonYear: PRIOR_SEASON_YEAR,
       trophyType: row.trophyType,
       winnerName: row.winnerName,
-      winnerUserId: matchPlayerId(opts?.players, row.namePatterns),
+      winnerUserId: cloud?.winnerUserId || uid,
       subtitle: row.subtitle,
       notes: row.notes,
-      awardedAt: row.awardedAt || "2026-01-20T12:00:00.000Z",
+      awardedAt: row.awardedAt || cloud?.awardedAt || "2026-01-20T12:00:00.000Z",
     });
   }
+
   return out;
 }
 

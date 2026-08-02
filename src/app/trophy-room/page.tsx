@@ -10,7 +10,11 @@ import Nav from "@/components/Nav";
 import YouBadge from "@/components/YouBadge";
 import PlayerLink from "@/components/PlayerLink";
 import { getSession, getLeague, isCommissioner, isOps } from "@/lib/league";
-import { loadLeagueRoster, type LeagueRosterMember } from "@/lib/cloud";
+import {
+  loadLeagueRoster,
+  loadLeaguePlayers,
+  type LeagueRosterMember,
+} from "@/lib/cloud";
 import {
   TROPHY_META,
   defaultSeasonYear,
@@ -32,8 +36,10 @@ import { divisionDisplayLabel } from "@/lib/divisions";
 import {
   seedPriorSeason2025Trophies,
   getPriorSeasonLabel,
+  mergePriorSeasonTrophies,
 } from "@/lib/prior-season-seed";
 import { resolveLiveTrophyHolder } from "@/lib/trophy-share";
+import LastSeasonHardwareWall from "@/components/LastSeasonHardwareWall";
 
 const BIG_TYPES: TrophyType[] = [
   "championship",
@@ -65,7 +71,20 @@ export default function TrophyRoomPage() {
     setLoadError(null);
     try {
       const list = await loadLeagueTrophies();
-      setTrophies(list);
+      // Force last-year plaques on the wall for everyone (display merge)
+      let players: { id: string; name: string }[] = [];
+      try {
+        players = (await loadLeaguePlayers()).map((p) => ({
+          id: p.id,
+          name: p.name,
+        }));
+      } catch {
+        players = [];
+      }
+      const sid = getLeague()?.sportId || "cfb";
+      setTrophies(
+        mergePriorSeasonTrophies(list, { players, sportId: sid })
+      );
     } catch {
       setLoadError("Could not load trophy room.");
     }
@@ -102,19 +121,16 @@ export default function TrophyRoomPage() {
         if (isCommissioner() || isOps()) {
           try {
             await autoEngraveAllTrophies({});
-            // Prior-season hardware: CFB restores Excel big three; NFL seeds Maria
-            // (without overwriting a non-Maria champ).
-            const list = await loadLeagueTrophies();
-            const sid = getLeague()?.sportId || "cfb";
-            const hasPrior = list.some((t) => t.seasonYear === 2025);
-            if (sid === "cfb" || sid === "nfl" || hasPrior) {
-              await seedPriorSeason2025Trophies();
-            }
+            // Always re-engrave last season for hosts (CFB Excel / NFL Maria)
+            await seedPriorSeason2025Trophies();
             await reload();
             await loadRosterAvatars();
           } catch {
             /* ignore */
           }
+        } else {
+          // Everyone still gets display merge of last year
+          await reload();
         }
       })
       .finally(() => setLoading(false));
@@ -125,18 +141,14 @@ export default function TrophyRoomPage() {
     setSyncMsg(null);
     try {
       const res = await autoEngraveAllTrophies({});
-      const list = await loadLeagueTrophies();
       const sid = getLeague()?.sportId || "cfb";
-      const hasPrior = list.some((t) => t.seasonYear === 2025);
       let relinkMsg: string | null = null;
-      if (sid === "nfl" || hasPrior) {
-        const relink = await seedPriorSeason2025Trophies();
-        if (relink.ok) {
-          relinkMsg =
-            sid === "nfl"
-              ? "Maria Super Bowl linked to live profile."
-              : "Excel holders re-linked to live profiles.";
-        }
+      const relink = await seedPriorSeason2025Trophies();
+      if (relink.ok) {
+        relinkMsg =
+          sid === "nfl"
+            ? "Last season Super Bowl on the wall."
+            : "Last season Excel hardware on the wall.";
       }
       setSyncMsg([res.message, relinkMsg].filter(Boolean).join(" · "));
       await reload();
@@ -385,6 +397,17 @@ export default function TrophyRoomPage() {
             </p>
           )}
         </div>
+
+        <LastSeasonHardwareWall
+          plaques={trophies}
+          rosterHits={roster.map((r) => ({
+            userId: r.userId,
+            name: r.name,
+            avatarUrl: r.avatarUrl,
+            isBot: r.isBot,
+          }))}
+          sportId={sportId}
+        />
 
         <ChampionshipBanner
           trophies={trophies}

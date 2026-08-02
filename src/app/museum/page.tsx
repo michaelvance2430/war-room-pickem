@@ -17,12 +17,12 @@ import { loadLeagueTrophies, type LeagueTrophy } from "@/lib/trophies";
 import { getLeague, isCommissioner, isOps } from "@/lib/league";
 import type { Player } from "@/lib/types";
 import {
-  hasPriorSeasonBigHardware,
   mergePriorSeasonTrophies,
   PRIOR_SEASON_LABEL,
   seedPriorSeason2025Trophies,
 } from "@/lib/prior-season-seed";
 import { resolveLiveTrophyHolder } from "@/lib/trophy-share";
+import LastSeasonHardwareWall from "@/components/LastSeasonHardwareWall";
 
 function MuseumInner() {
   const searchParams = useSearchParams();
@@ -49,26 +49,18 @@ function MuseumInner() {
         ]);
 
         const sport = getLeague()?.sportId || "cfb";
-        // Host: restore prior-season hardware in the cloud when missing / wiped.
-        // CFB always re-engraves Excel big three so Museum never goes blank.
-        // NFL seeds Maria without clobbering a non-Maria champ.
+        // Host: always re-engrave last season into the cloud so it sticks.
         if (isCommissioner() || isOps()) {
           try {
-            const needCfb =
-              sport === "cfb" && !hasPriorSeasonBigHardware(tlist, "cfb");
-            const needNfl = sport === "nfl";
-            const hasPrior = tlist.some((t) => t.seasonYear === 2025);
-            if (needCfb || needNfl || (sport === "cfb" && hasPrior)) {
-              const seeded = await seedPriorSeason2025Trophies();
-              if (seeded.ok) {
-                tlist = await loadLeagueTrophies();
-                if (!cancelled) {
-                  setExcelNote(
-                    sport === "nfl"
-                      ? "Maria Super Bowl hardware locked / re-linked."
-                      : `${PRIOR_SEASON_LABEL} Excel hardware restored / re-linked.`
-                  );
-                }
+            const seeded = await seedPriorSeason2025Trophies();
+            if (seeded.ok) {
+              tlist = await loadLeagueTrophies();
+              if (!cancelled) {
+                setExcelNote(
+                  sport === "nfl"
+                    ? "Last season Super Bowl hardware on the wall."
+                    : `Last season ${PRIOR_SEASON_LABEL} hardware on the wall.`
+                );
               }
             }
           } catch {
@@ -77,8 +69,7 @@ function MuseumInner() {
         }
 
         if (cancelled) return;
-        // Always display-merge prior lore so Museum never blanks client-side
-        // even if cloud rows are mid-restore or incomplete.
+        // FORCE last-year plaques on every client (even if seed failed)
         const withExcel = mergePriorSeasonTrophies(tlist, {
           players: plist,
           sportId: sport === "nfl" ? "nfl" : "cfb",
@@ -160,7 +151,17 @@ function MuseumInner() {
           )}
         </div>
 
-        <ChampionshipBanner trophies={trophies} leagueName={leagueName} />
+        <LastSeasonHardwareWall
+          plaques={trophies}
+          rosterHits={rosterHits}
+          sportId={getLeague()?.sportId}
+        />
+
+        <ChampionshipBanner
+          trophies={trophies}
+          leagueName={leagueName}
+          sportId={getLeague()?.sportId}
+        />
 
         <div className="flex flex-wrap gap-2 mb-6">
           {(
