@@ -132,8 +132,20 @@ function normalizeBirthdayMmdd(raw: unknown): string | null {
 /** Load current user's profile row. */
 export async function loadMyProfile(): Promise<Profile | null> {
   const supabase = createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth.user) return null;
+  // Prefer session id first — auth.getUser() hangs on flaky mobile (Nav freezes)
+  let userId: string | null = null;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getSession } = require("./league") as typeof import("./league");
+    userId = getSession()?.playerId || null;
+  } catch {
+    userId = null;
+  }
+  if (!userId) {
+    const { data: auth } = await supabase.auth.getSession();
+    userId = auth.session?.user?.id || null;
+  }
+  if (!userId) return null;
 
   // Prefer full select; fall back if birthday columns not migrated yet
   let data: Record<string, unknown> | null = null;
@@ -141,7 +153,7 @@ export async function loadMyProfile(): Promise<Profile | null> {
     const full = await supabase
       .from("profiles")
       .select("id, display_name, avatar_url, birthday_mmdd, birthday_locked_at")
-      .eq("id", auth.user.id)
+      .eq("id", userId)
       .maybeSingle();
     if (
       full.error &&
@@ -150,7 +162,7 @@ export async function loadMyProfile(): Promise<Profile | null> {
       const basic = await supabase
         .from("profiles")
         .select("id, display_name, avatar_url")
-        .eq("id", auth.user.id)
+        .eq("id", userId)
         .maybeSingle();
       data = (basic.data as Record<string, unknown> | null) || null;
     } else if (!full.error) {
@@ -159,10 +171,9 @@ export async function loadMyProfile(): Promise<Profile | null> {
   }
 
   if (!data) {
-    const meta = auth.user.user_metadata?.display_name as string | undefined;
     return {
-      id: auth.user.id,
-      displayName: meta || auth.user.email?.split("@")[0] || "Player",
+      id: userId,
+      displayName: "Player",
       avatarUrl: null,
       birthdayMmdd: null,
       birthdayLockedAt: null,

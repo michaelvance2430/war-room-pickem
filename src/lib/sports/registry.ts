@@ -36,7 +36,7 @@ const PACKS: SportPack[] = [
     defaultSeasonWeeks: 18,
     defaultGamesPerWeek: 5,
     pridePickLabel: "Super Bowl champion (pride pick)",
-    rulesOneLiner: "ATS confidence · Best Bet · prop · Sunday Gazette",
+    rulesOneLiner: "ATS confidence · Best Bet · prop · Super Bowl pride pick",
   },
   {
     id: "soccer_wwc",

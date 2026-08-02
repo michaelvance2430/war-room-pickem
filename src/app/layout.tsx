@@ -5,6 +5,7 @@ import SeasonThemeApplier from "@/components/SeasonThemeApplier";
 import SportThemeApplier from "@/components/SportThemeApplier";
 import FoundrySessionChrome from "@/components/FoundrySessionChrome";
 import SandboxSessionChrome from "@/components/SandboxSessionChrome";
+import LeagueBuildGate from "@/components/LeagueBuildGate";
 import PullToRefresh from "@/components/PullToRefresh";
 import RouteHardSwitch from "@/components/RouteHardSwitch";
 
@@ -77,6 +78,7 @@ export default function RootLayout({
         <SeasonThemeApplier />
         <FoundrySessionChrome />
         <SandboxSessionChrome />
+        <LeagueBuildGate />
         <PullToRefresh>{children}</PullToRefresh>
       </body>
     </html>

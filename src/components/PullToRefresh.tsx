@@ -13,11 +13,14 @@ const HOLD_MS = 500;
 type Phase = "idle" | "pulling" | "holding" | "ready" | "refreshing";
 
 /**
- * Mobile pull-to-refresh:
+ * Mobile pull-to-refresh = full app reopen (same as kill + launch):
  * 1) Pull down from top
  * 2) Popup: Hold + countdown
  * 3) When countdown hits 0 → "Release to refresh"
- * 4) Release → reload (early release cancels)
+ * 4) Release → hard reload (early release cancels)
+ *
+ * Not a soft Next.js nav — clears session chrome + reloads the document
+ * so Home/Picks/etc boot like a cold start (localStorage/session auth stay).
  */
 export default function PullToRefresh({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -80,6 +83,33 @@ export default function PullToRefresh({ children }: { children: ReactNode }) {
   const doRefresh = useCallback(() => {
     clearHoldTimers();
     setPhaseBoth("refreshing");
+
+    // Match "close app completely and reopen" as closely as the browser allows:
+    // - sessionStorage dies with a real kill; wipe it so one-shot modals/coaches
+    //   don't stay "already shown this session"
+    // - module caches / React state die on document reload
+    // - localStorage (login, league, picks cache) stays — same as reopen
+    try {
+      sessionStorage.clear();
+    } catch {
+      /* private mode */
+    }
+    try {
+      void import("@/lib/cloud").then((m) => {
+        m.invalidateCloudWeekCaches();
+      });
+    } catch {
+      /* ignore */
+    }
+    try {
+      void import("@/lib/first-session").then((m) => {
+        m.invalidateLiveCardCache?.();
+      });
+    } catch {
+      /* ignore */
+    }
+
+    // Full document reload — not Next soft nav / router.refresh()
     window.location.reload();
   }, [clearHoldTimers, setPhaseBoth]);
 
@@ -300,18 +330,19 @@ export default function PullToRefresh({ children }: { children: ReactNode }) {
               <>
                 <p className="text-2xl font-extrabold mb-1">Release</p>
                 <p className="text-sm font-semibold opacity-90">
-                  to refresh the app
+                  for a full reopen
                 </p>
                 <p className="text-[11px] mt-2 opacity-70">
-                  Let go now · lift finger early cancels
+                  Same as closing the app and opening it again · lift early
+                  cancels
                 </p>
               </>
             )}
 
             {phase === "refreshing" && (
               <>
-                <p className="text-xl font-extrabold mb-1">Refreshing…</p>
-                <p className="text-sm opacity-80">Hang tight</p>
+                <p className="text-xl font-extrabold mb-1">Reopening…</p>
+                <p className="text-sm opacity-80">Full reload · hang tight</p>
               </>
             )}
           </div>

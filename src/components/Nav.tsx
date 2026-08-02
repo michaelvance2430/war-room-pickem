@@ -36,6 +36,7 @@ import ProfileBorderHydrator from "@/components/ProfileBorderHydrator";
 import EasterEggHost from "@/components/EasterEggHost";
 import EggFlexNewspaper from "@/components/EggFlexNewspaper";
 import MascotSighting from "@/components/MascotSighting";
+import LeagueBuildLockReminder from "@/components/LeagueBuildLockReminder";
 import { touchLastSeen } from "@/lib/last-seen";
 import { loadMyProfile } from "@/lib/profile";
 import { isGuestMode } from "@/lib/guest-mode";
@@ -282,17 +283,25 @@ export default function Nav() {
     // On locker route: badge off immediately (mark runs on the page too)
     if (pathname === "/locker-room" || pathname.startsWith("/locker-room/")) {
       setLockerUnseen(0);
-    } else if (pathname === "/gazette" || pathname.startsWith("/gazette/")) {
-      setGazetteUnseen(0);
-    } else {
-      // Leaving locker / navigating elsewhere — refresh counts
-      void countUnseenLockerPosts().then(setLockerUnseen).catch(() => {});
-      void countUnreadAnnouncements().then(setUnreadCount).catch(() => {});
-      void import("@/lib/gazette")
-        .then((m) => m.getGazetteUnreadState())
-        .then((g) => setGazetteUnseen(g.unread ? 1 : 0))
-        .catch(() => {});
+      return;
     }
+    if (pathname === "/gazette" || pathname.startsWith("/gazette/")) {
+      setGazetteUnseen(0);
+      return;
+    }
+    // Throttle badge refreshes — every route used to fire 3 network calls
+    // and made tab switches feel laggy on phone.
+    const now = Date.now();
+    const last = (window as unknown as { __wrNavUnreadAt?: number })
+      .__wrNavUnreadAt;
+    if (last != null && now - last < 8_000) return;
+    (window as unknown as { __wrNavUnreadAt?: number }).__wrNavUnreadAt = now;
+    void countUnseenLockerPosts().then(setLockerUnseen).catch(() => {});
+    void countUnreadAnnouncements().then(setUnreadCount).catch(() => {});
+    void import("@/lib/gazette")
+      .then((m) => m.getGazetteUnreadState())
+      .then((g) => setGazetteUnseen(g.unread ? 1 : 0))
+      .catch(() => {});
   }, [pathname]);
 
   useEffect(() => {
@@ -930,6 +939,8 @@ export default function Nav() {
       {/* Guest demo: sticky DEMO bar + welcome / role / tutorial */}
       <GuestDemoChrome />
       <GuestOnboarding />
+      {/* Day before open: last chance to edit League Build */}
+      {!isGuestMode() && <LeagueBuildLockReminder />}
       {/* Real account: Crystal Ball + picks walk-the-dog coach */}
       <PlayerWalkthrough />
       {/* Until Aug 23 00:01 ET: countdown. After: ticker gone; one-time welcome splash */}

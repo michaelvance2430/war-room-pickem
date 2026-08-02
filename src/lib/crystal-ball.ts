@@ -431,6 +431,13 @@ export async function saveCrystalBallPick(
     name: session.playerName || "You",
   };
   writeLocal(session.leagueId, local);
+  // Walk-the-dog coach: advance without waiting on cloud
+  try {
+    sessionStorage.setItem("warroom-tut-cb-selected", "1");
+    window.dispatchEvent(new CustomEvent("warroom-player-tutorial"));
+  } catch {
+    /* ignore */
+  }
 
   try {
     const supabase = createClient();

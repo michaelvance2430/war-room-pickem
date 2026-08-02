@@ -234,7 +234,8 @@ export default function FounderDashboardPage() {
       sportId: getLeague()?.sportId === "nfl" ? "nfl" : "cfb",
     });
     setEyes("new_commissioner");
-    router.push("/commissioner?tab=card&first=1");
+    // Same as real create: League Build constitution first, then ops
+    router.push("/league-build?eyes=1&new=1");
   }
 
   async function runLab(
@@ -460,8 +461,8 @@ export default function FounderDashboardPage() {
               Join as new commissioner →
             </span>
             <span className="block text-[11px] text-muted mt-0.5 leading-snug">
-              Simple host · first card · the first-hour host path (not deep
-              tools)
+              League Build wizard first (Crystal Ball, cut, open room, bots) →
+              then simple host / first card
             </span>
           </button>
           {eyes !== "off" && (
@@ -748,12 +749,19 @@ export default function FounderDashboardPage() {
               </button>
               <button
                 type="button"
-                onClick={() => enterEyes("new_commissioner", "/commissioner")}
+                onClick={() => {
+                  void import("@/lib/league-build").then((m) => {
+                    m.forceEyesLeagueBuild();
+                    const id = getLeague()?.id;
+                    if (id) m.markLeagueBuildNeeded(id);
+                  });
+                  enterEyes("new_commissioner", "/league-build?eyes=1&new=1");
+                }}
                 className="w-full py-3 min-h-[48px] rounded-xl border border-primary/40 text-sm font-bold text-left px-3 hover:bg-primary/10"
               >
                 As new commissioner →
                 <span className="block text-[11px] font-normal text-muted">
-                  Simple host · fill seats yes/no only
+                  Starts at League Build · then simple host
                 </span>
               </button>
             </div>

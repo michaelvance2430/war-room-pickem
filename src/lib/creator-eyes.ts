@@ -249,6 +249,13 @@ export function setCreatorEyesMode(
   } else {
     clearCreatorSandbox();
     setViewAsPlayer(false);
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const lb = require("./league-build") as typeof import("./league-build");
+      lb.clearEyesLeagueBuildForce();
+    } catch {
+      /* ignore */
+    }
   }
 
   notify(mode);
@@ -271,7 +278,7 @@ export function creatorEyesBlurb(mode: CreatorEyesMode): string {
     case "new_player":
       return `Playing as a new player on week ${w} · local demo card · lock picks for real UX`;
     case "new_commissioner":
-      return `Hosting as a new commissioner on week ${w} · simple Run the Room`;
+      return `Hosting as a new commissioner on week ${w} · League Build first · then simple Run the Room`;
     default:
       return "Normal creator view";
   }
@@ -307,7 +314,7 @@ export function startFirstHourAsNewPlayer(opts?: {
 }
 
 /**
- * First-hour host sim: simple Run the Room, week 0, no deep tools.
+ * First-hour host sim: League Build first, then simple Run the Room, week 0.
  */
 export function startFirstHourAsNewCommissioner(opts?: {
   sportId?: "cfb" | "nfl";
@@ -327,6 +334,16 @@ export function startFirstHourAsNewCommissioner(opts?: {
   });
   try {
     localStorage.setItem("warroom-show-full-room-v1", "{}");
+  } catch {
+    /* ignore */
+  }
+  // Force League Build wizard so Foundry eyes match real create flow
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const lb = require("./league-build") as typeof import("./league-build");
+    lb.forceEyesLeagueBuild();
+    const leagueId = getLeague()?.id;
+    if (leagueId) lb.markLeagueBuildNeeded(leagueId);
   } catch {
     /* ignore */
   }

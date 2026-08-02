@@ -15,6 +15,7 @@ import {
   stashPendingJoinCode,
   takePendingJoinCode,
 } from "@/lib/commish-onboarding";
+import { markLeagueBuildNeeded } from "@/lib/league-build";
 import InviteFriends from "@/components/InviteFriends";
 import {
   getSportPack,
@@ -138,12 +139,12 @@ function JoinPageInner() {
         code: newCode,
         commissioner_id: userId,
       };
-      // Crystal Ball is CFB pride pick — default off for NFL
+      // Crystal Ball / Super Bowl pride pick — default ON; League Build wizard confirms
       const withSport: Record<string, unknown> = {
         ...baseRow,
         sport_id: selectedSportId,
         sport_settings: {},
-        crystal_ball_enabled: selectedSportId === "cfb",
+        crystal_ball_enabled: true,
       };
       if (listAsOpen) {
         withSport.is_open = true;
@@ -210,14 +211,14 @@ function JoinPageInner() {
             .update({
               sport_id: selectedSportId,
               sport_settings: {},
-              crystal_ball_enabled: selectedSportId === "cfb",
+              crystal_ball_enabled: true,
             })
             .eq("id", league.id as string);
           if (!sportUpErr) {
             league = {
               ...league,
               sport_id: selectedSportId,
-              crystal_ball_enabled: selectedSportId === "cfb",
+              crystal_ball_enabled: true,
             };
           }
           if (listAsOpen) {
@@ -245,7 +246,7 @@ function JoinPageInner() {
           .from("leagues")
           .update({
             sport_id: createdSportId,
-            crystal_ball_enabled: createdSportId === "cfb",
+            crystal_ball_enabled: true,
           })
           .eq("id", leagueId)
           .select("sport_id")
@@ -270,7 +271,7 @@ function JoinPageInner() {
         league = {
           ...league,
           sport_id: createdSportId,
-          crystal_ball_enabled: createdSportId === "cfb",
+          crystal_ball_enabled: true,
         };
       }
 
@@ -303,7 +304,7 @@ function JoinPageInner() {
             (league.games_per_week as number) ?? pack.defaultGamesPerWeek,
           role: "commissioner",
           displayName: displayName.trim() || "Commissioner",
-          crystalBallEnabled: createdSportId === "cfb",
+          crystalBallEnabled: true,
           homeTaglineId: "good-teams",
           homeTaglineCustom: "",
           seasonThemeId: "default",
@@ -313,6 +314,7 @@ function JoinPageInner() {
         userId
       );
       saveActiveLeagueId(leagueId);
+      markLeagueBuildNeeded(leagueId);
 
       // Pin sport BEFORE any cloud rehydrate (mobile race: 1s red then CFB green)
       try {
@@ -338,7 +340,7 @@ function JoinPageInner() {
             .from("leagues")
             .update({
               sport_id: "nfl",
-              crystal_ball_enabled: false,
+              crystal_ball_enabled: true,
             })
             .eq("id", leagueId);
           const { pinLeagueSport, applySportTheme } = await import(
@@ -356,8 +358,12 @@ function JoinPageInner() {
       } catch {
         /* ignore */
       }
-      setCreatedCode(newCode);
-      if (listAsOpen) setShowOpenRoomBotsNudge(true);
+      // League Build first — invite / card come after constitution is set
+      router.push(
+        listAsOpen ? "/league-build?new=1&open=1" : "/league-build?new=1"
+      );
+      router.refresh();
+      return;
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Could not create league");
     } finally {

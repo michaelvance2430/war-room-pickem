@@ -64,10 +64,11 @@ export default function HomeWeekHero() {
         });
         if (cancelled) return;
 
-        // Parallel: card, roster, picks (was sequential → slow return-to-home)
-        const [card, roster] = await Promise.all([
+        // Parallel: card + roster + picks (all hot-path cached)
+        const [card, roster, mine] = await Promise.all([
           loadWeekCard(week),
           loadLeagueRoster().catch(() => []),
+          loadMyPicks(week).catch(() => null),
         ]);
         if (cancelled) return;
 
@@ -76,10 +77,6 @@ export default function HomeWeekHero() {
         const now = Date.now();
         const frozen = hasCard && isCardLockDeadlinePassed(games, now);
         const humans = roster.filter((m) => !m.isBot);
-
-        const mine = hasCard
-          ? await loadMyPicks(week).catch(() => null)
-          : null;
         if (cancelled) return;
         const iLocked = !!(
           mine?.lockedAt && Object.keys(mine.picks || {}).length

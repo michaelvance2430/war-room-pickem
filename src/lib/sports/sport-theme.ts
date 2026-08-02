@@ -235,7 +235,10 @@ export function pinLeagueSport(
     if (lg.id === leagueId) {
       lg.sportId = id;
       if (!lg.settings) lg.settings = {};
-      lg.settings.crystalBallEnabled = id === "cfb";
+      // Default pride pick on for every sport; League Build can turn off
+      if (lg.settings.crystalBallEnabled === undefined) {
+        lg.settings.crystalBallEnabled = true;
+      }
       localStorage.setItem(LEAGUE_KEY, JSON.stringify(lg));
     }
   } catch {

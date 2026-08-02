@@ -11,6 +11,78 @@ import { scoreWeek, GameResult } from "@/lib/scoring";
 import { weekTitle } from "@/lib/dates";
 import { MAX_LEAGUE_PLAYERS, seatsRemaining } from "@/lib/league-limits";
 
+// ── Hot-path TTL cache (nav / home / picks hit these constantly) ───────────
+/** Race a promise so mobile never hangs forever on a stuck fetch. */
+export function withTimeout<T>(
+  p: Promise<T>,
+  ms: number,
+  fallback: T
+): Promise<T> {
+  return new Promise((resolve) => {
+    let done = false;
+    const t = setTimeout(() => {
+      if (done) return;
+      done = true;
+      resolve(fallback);
+    }, ms);
+    p.then(
+      (v) => {
+        if (done) return;
+        done = true;
+        clearTimeout(t);
+        resolve(v);
+      },
+      () => {
+        if (done) return;
+        done = true;
+        clearTimeout(t);
+        resolve(fallback);
+      }
+    );
+  });
+}
+
+type CacheEntry<T> = { at: number; value: T };
+const cardCache = new Map<string, CacheEntry<CloudCard | null>>();
+const publishedCache = new Map<string, CacheEntry<number[]>>();
+const scoredCache = new Map<string, CacheEntry<number[]>>();
+const activeWeekCache = new Map<string, CacheEntry<number>>();
+
+const CARD_TTL_MS = 6_000;
+const LIST_TTL_MS = 12_000;
+const ACTIVE_WEEK_TTL_MS = 5_000;
+
+function cacheGet<T>(map: Map<string, CacheEntry<T>>, key: string, ttl: number): T | undefined {
+  const e = map.get(key);
+  if (!e) return undefined;
+  if (Date.now() - e.at > ttl) {
+    map.delete(key);
+    return undefined;
+  }
+  return e.value;
+}
+
+function cacheSet<T>(map: Map<string, CacheEntry<T>>, key: string, value: T) {
+  map.set(key, { at: Date.now(), value });
+}
+
+/** After publish / score / card edit — drop stale reads. */
+export function invalidateCloudWeekCaches(leagueId?: string | null) {
+  if (!leagueId) {
+    cardCache.clear();
+    publishedCache.clear();
+    scoredCache.clear();
+    activeWeekCache.clear();
+    return;
+  }
+  for (const k of [...cardCache.keys()]) {
+    if (k.startsWith(`${leagueId}:`)) cardCache.delete(k);
+  }
+  publishedCache.delete(leagueId);
+  scoredCache.delete(leagueId);
+  activeWeekCache.delete(leagueId);
+}
+
 /** weekly_points from Postgres may be int[] or a JSON object map. */
 function normalizeWeeklyPointsField(raw: unknown): number[] {
   if (Array.isArray(raw)) {
@@ -117,7 +189,7 @@ export async function setLeagueActiveWeek(
   return { ok: true };
 }
 
-/** Active pick'em week for the league (cloud first, then localStorage). */
+/** Active pick'em week for the league (local first, cloud refresh, short TTL). */
 export async function loadLeagueActiveWeek(): Promise<number> {
   try {
     const { isGuestMode } = await import("./guest-mode");
@@ -153,13 +225,23 @@ export async function loadLeagueActiveWeek(): Promise<number> {
   }
   if (!session?.leagueId) return week;
 
+  const cached = cacheGet(activeWeekCache, session.leagueId, ACTIVE_WEEK_TTL_MS);
+  if (cached != null) return cached;
+
   try {
     const supabase = createClient();
-    const { data } = await supabase
-      .from("leagues")
-      .select("current_week")
-      .eq("id", session.leagueId)
-      .maybeSingle();
+    const data = await withTimeout(
+      (async () => {
+        const { data: row } = await supabase
+          .from("leagues")
+          .select("current_week")
+          .eq("id", session.leagueId)
+          .maybeSingle();
+        return row;
+      })(),
+      6_000,
+      null
+    );
     if (data && data.current_week != null) {
       const n = Number(data.current_week);
       if (!Number.isNaN(n)) {
@@ -174,6 +256,7 @@ export async function loadLeagueActiveWeek(): Promise<number> {
   } catch {
     /* ignore */
   }
+  cacheSet(activeWeekCache, session.leagueId, week);
   return week;
 }
 
@@ -467,23 +550,49 @@ export async function loadWeekCard(weekNumber = 1): Promise<CloudCard | null> {
     /* fall through to cloud */
   }
 
+  const cacheKey = `${session.leagueId}:${weekNumber}`;
+  const hit = cacheGet(cardCache, cacheKey, CARD_TTL_MS);
+  if (hit !== undefined) return hit;
+
   const supabase = createClient();
-  const { data: card, error } = await supabase
-    .from("week_cards")
-    .select("*")
-    .eq("league_id", session.leagueId)
-    .eq("week_number", weekNumber)
-    .maybeSingle();
+  // Timeout so My Picks never stuck on full-page Loading… (mobile hang)
+  const card = await withTimeout(
+    (async () => {
+      const { data, error } = await supabase
+        .from("week_cards")
+        .select("*")
+        .eq("league_id", session.leagueId)
+        .eq("week_number", weekNumber)
+        .maybeSingle();
+      if (error || !data) return null;
+      return data;
+    })(),
+    10_000,
+    null
+  );
 
-  if (error || !card) return null;
+  if (!card) {
+    cacheSet(cardCache, cacheKey, null);
+    return null;
+  }
 
-  const { data: games } = await supabase
-    .from("card_games")
-    .select("*")
-    .eq("week_card_id", card.id)
-    .order("sort_order", { ascending: true });
+  const games = await withTimeout(
+    (async () => {
+      const { data } = await supabase
+        .from("card_games")
+        .select("*")
+        .eq("week_card_id", card.id)
+        .order("sort_order", { ascending: true });
+      return data;
+    })(),
+    8_000,
+    null
+  );
 
-  if (!games?.length) return null;
+  if (!games?.length) {
+    cacheSet(cardCache, cacheKey, null);
+    return null;
+  }
 
   const question = ((card.prop_question as string) || "").trim() || "Prop";
   const optionA =
@@ -492,9 +601,9 @@ export async function loadWeekCard(weekNumber = 1): Promise<CloudCard | null> {
     ((card.prop_option_b as string) || "").trim() || "No";
   const points = (card.prop_points as number) ?? 3;
 
-  return {
-    weekCardId: card.id,
-    weekNumber: card.week_number,
+  const result: CloudCard = {
+    weekCardId: card.id as string,
+    weekNumber: card.week_number as number,
     publishedAt: (card.published_at as string) || null,
     games: games.map(mapCardGame),
     prop: {
@@ -505,6 +614,8 @@ export async function loadWeekCard(weekNumber = 1): Promise<CloudCard | null> {
       points,
     },
   };
+  cacheSet(cardCache, cacheKey, result);
+  return result;
 }
 
 /** Weeks that have a published card (for My Picks week browser). */
@@ -522,18 +633,33 @@ export async function listPublishedWeekNumbers(): Promise<number[]> {
   }
   const session = getSession();
   if (!session?.leagueId) return [];
+  const hit = cacheGet(publishedCache, session.leagueId, LIST_TTL_MS);
+  if (hit) return hit;
   try {
     const supabase = createClient();
-    const { data, error } = await supabase
-      .from("week_cards")
-      .select("week_number")
-      .eq("league_id", session.leagueId)
-      .order("week_number", { ascending: true });
-    if (error || !data) return [];
+    const data = await withTimeout(
+      (async () => {
+        const { data: rows, error } = await supabase
+          .from("week_cards")
+          .select("week_number")
+          .eq("league_id", session.leagueId)
+          .order("week_number", { ascending: true });
+        if (error || !rows) return null;
+        return rows;
+      })(),
+      8_000,
+      null
+    );
+    if (!data) {
+      cacheSet(publishedCache, session.leagueId, []);
+      return [];
+    }
     const nums = data
       .map((r) => Number(r.week_number))
       .filter((n) => !Number.isNaN(n));
-    return [...new Set(nums)].sort((a, b) => a - b);
+    const out = [...new Set(nums)].sort((a, b) => a - b);
+    cacheSet(publishedCache, session.leagueId, out);
+    return out;
   } catch {
     return [];
   }
@@ -618,19 +744,26 @@ export async function savePicksToCloud(opts: {
   }
 
   const supabase = createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  const uid = auth.user?.id || session.playerId;
+  // Never await auth.getUser() here — hangs on flaky mobile and freezes lock UX
+  const uid = session.playerId;
   const leagueId = session.leagueId;
   const pickList = Object.values(opts.picks);
   if (!pickList.length) return { ok: false, error: "No picks to save" };
 
-  const { data: existing } = await supabase
-    .from("picks")
-    .select("id, locked_at")
-    .eq("league_id", leagueId)
-    .eq("user_id", uid)
-    .eq("week_number", opts.weekNumber)
-    .maybeSingle();
+  const existing = await withTimeout(
+    (async () => {
+      const { data } = await supabase
+        .from("picks")
+        .select("id, locked_at")
+        .eq("league_id", leagueId)
+        .eq("user_id", uid)
+        .eq("week_number", opts.weekNumber)
+        .maybeSingle();
+      return data;
+    })(),
+    8_000,
+    null
+  );
 
   const isFirstSave = !existing?.id;
   let pickId: string;
@@ -865,27 +998,47 @@ export async function loadMyPicks(weekNumber = 1) {
     /* fall through */
   }
 
-  const supabase = createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  const uid = auth.user?.id || session.playerId;
+  // Prefer session id — auth.getUser() can hang forever on flaky mobile networks
+  // and freezes My Picks on a full-page "Loading…".
+  const uid = session.playerId;
+  if (!uid) return null;
 
-  const { data: pick } = await supabase
-    .from("picks")
-    .select("*")
-    .eq("league_id", session.leagueId)
-    .eq("user_id", uid)
-    .eq("week_number", weekNumber)
-    .maybeSingle();
+  const supabase = createClient();
+
+  const pick = await withTimeout(
+    (async () => {
+      const { data } = await supabase
+        .from("picks")
+        .select("*")
+        .eq("league_id", session.leagueId)
+        .eq("user_id", uid)
+        .eq("week_number", weekNumber)
+        .maybeSingle();
+      return data;
+    })(),
+    8_000,
+    null
+  );
   if (!pick) return null;
 
-  const { data: games } = await supabase.from("pick_games").select("*").eq("pick_id", pick.id);
+  const games = await withTimeout(
+    (async () => {
+      const { data } = await supabase
+        .from("pick_games")
+        .select("*")
+        .eq("pick_id", pick.id);
+      return data;
+    })(),
+    6_000,
+    null
+  );
   const picks: Record<string, UserPick> = {};
   for (const g of games || []) {
-    picks[g.card_game_id] = {
-      gameId: g.card_game_id,
+    picks[g.card_game_id as string] = {
+      gameId: g.card_game_id as string,
       pick: g.side === "away" ? "away" : "home",
-      confidence: g.confidence,
-      isBestBet: g.is_best_bet,
+      confidence: g.confidence as number,
+      isBestBet: !!g.is_best_bet,
       lockedSpread: Number(g.locked_spread ?? 0),
       lockedFavorite: g.locked_favorite === "away" ? "away" : "home",
     };
@@ -1442,39 +1595,67 @@ export async function listScoredWeekNumbers(): Promise<number[]> {
   }
   const session = getSession();
   if (!session?.leagueId) return [];
+  const hit = cacheGet(scoredCache, session.leagueId, LIST_TTL_MS);
+  if (hit) return hit;
   try {
     const supabase = createClient();
-    const { data, error } = await supabase
-      .from("week_results")
-      .select("id, week_number")
-      .eq("league_id", session.leagueId);
-    if (error || !data?.length) return [];
+    const data = await withTimeout(
+      (async () => {
+        const { data: rows, error } = await supabase
+          .from("week_results")
+          .select("id, week_number")
+          .eq("league_id", session.leagueId);
+        if (error || !rows?.length) return null;
+        return rows;
+      })(),
+      8_000,
+      null
+    );
+    if (!data?.length) {
+      cacheSet(scoredCache, session.leagueId, []);
+      return [];
+    }
 
     const ids = data.map((r) => r.id as string).filter(Boolean);
-    if (!ids.length) return [];
+    if (!ids.length) {
+      cacheSet(scoredCache, session.leagueId, []);
+      return [];
+    }
 
-    const { data: gr, error: grErr } = await supabase
-      .from("game_results")
-      .select("week_result_id")
-      .in("week_result_id", ids);
+    const gr = await withTimeout(
+      (async () => {
+        const { data: rows, error: grErr } = await supabase
+          .from("game_results")
+          .select("week_result_id")
+          .in("week_result_id", ids);
+        if (grErr) return null;
+        return rows;
+      })(),
+      6_000,
+      null
+    );
 
     // If game_results query fails (table missing), fall back to any week_results
-    if (grErr) {
-      return data
+    if (!gr) {
+      const fallback = data
         .map((r) => Number(r.week_number))
         .filter((n) => !Number.isNaN(n))
         .sort((a, b) => a - b);
+      cacheSet(scoredCache, session.leagueId, fallback);
+      return fallback;
     }
 
     const withGames = new Set(
       (gr || []).map((g) => g.week_result_id as string)
     );
     // Only weeks that actually have ATS winners recorded
-    return data
+    const out = data
       .filter((r) => withGames.has(r.id as string))
       .map((r) => Number(r.week_number))
       .filter((n) => !Number.isNaN(n))
       .sort((a, b) => a - b);
+    cacheSet(scoredCache, session.leagueId, out);
+    return out;
   } catch {
     return [];
   }

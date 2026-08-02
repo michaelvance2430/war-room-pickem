@@ -96,24 +96,24 @@ export default function CommishSetupBanner() {
     <section className="mb-5 rounded-2xl border-2 border-primary/50 bg-primary/10 p-4 sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
         <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">
-          Commish · don&apos;t overthink it
+          Commish · first jobs
         </p>
         <p className="text-[10px] font-semibold tabular-nums text-muted">
           Step {step === "invite" ? 1 : step === "card" ? 2 : 3} of 3
         </p>
       </div>
       <h2 className="text-lg sm:text-xl font-bold text-foreground mb-1">
-        {step === "invite" && "Text the group chat already"}
-        {step === "card" && "Give them something to pick"}
-        {step === "score" && `Score ${weekLabel} when the chaos ends`}
+        {step === "invite" && "Share your invite so people can join"}
+        {step === "card" && "Publish this week’s card"}
+        {step === "score" && `Score ${weekLabel} when games are done`}
       </h2>
       <p className="text-sm text-muted mb-3 leading-relaxed">
         {step === "invite" &&
-          "Share the link. One tap. If they don’t join, that’s a them problem."}
+          "One tap shares a link with the code already filled in. Friends open it, make an account if they need one, and they’re in the room."}
         {step === "card" &&
-          `${humans} in the room staring at nothing. Hit demo publish for ${weekLabel} — one tap, no odds API required, no excuses.`}
+          `${humans} ${humans === 1 ? "person" : "people"} in the room. Open Commish → Pull Odds for ${weekLabel}, pick 5 games, then Publish so everyone can lock picks.`}
         {step === "score" &&
-          "Card’s live. When games are done: one tap scores the room and drops the paper. That’s the whole host flex."}
+          "Card’s live. When the games finish: open Enter Results, fill winners, and score the week. That updates standings and drops the paper."}
       </p>
 
       {/* Progress dots */}
@@ -154,7 +154,7 @@ export default function CommishSetupBanner() {
           href="/commissioner?tab=card&first=1"
           className="flex items-center justify-center w-full py-4 min-h-[56px] rounded-xl bg-primary text-black text-base font-extrabold touch-manipulation active:scale-[0.99]"
         >
-          Publish {weekLabel} (stop stalling) →
+          Pull Odds & publish {weekLabel} →
         </Link>
       )}
 
@@ -170,14 +170,14 @@ export default function CommishSetupBanner() {
             href="/picks"
             className="flex items-center justify-center w-full py-2.5 min-h-[44px] text-sm font-semibold text-muted hover:text-foreground touch-manipulation"
           >
-            Wait — did I lock my own picks?
+            Did I lock my own picks?
           </Link>
         </div>
       )}
 
       {step !== "score" && (
-        <p className="text-[11px] text-muted mt-3 text-center">
-          Fancy host toys wait until you score once. Keep it dumb for now.
+        <p className="text-xs text-muted mt-3 text-center leading-relaxed">
+          Extra settings stay under League settings until you score a week.
         </p>
       )}
     </section>

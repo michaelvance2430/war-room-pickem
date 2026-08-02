@@ -102,22 +102,15 @@ export async function resolvePlayerActiveWeek(opts?: {
   const week = advancePastScoredWeeks(leagueWeek, scored, sid);
   const advanced = week !== leagueWeek;
 
-  if (advanced && opts?.persistIfOps && isOps()) {
-    try {
-      await setLeagueActiveWeek(week);
-      try {
-        localStorage.setItem("warroom-active-week", String(week));
-      } catch {
-        /* ignore */
-      }
-    } catch {
-      /* ignore */
-    }
-  } else if (advanced) {
+  if (advanced) {
     try {
       localStorage.setItem("warroom-active-week", String(week));
     } catch {
       /* ignore */
+    }
+    // Never await cloud write on the picks hot path — freezes mobile open
+    if (opts?.persistIfOps && isOps()) {
+      void setLeagueActiveWeek(week).catch(() => {});
     }
   }
 

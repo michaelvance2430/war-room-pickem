@@ -15,7 +15,7 @@ import {
   isCardLockDeadlinePassed,
   weekTitle,
 } from "@/lib/dates";
-import { loadCrystalBall } from "@/lib/crystal-ball";
+import { peekLocalCrystalBall } from "@/lib/crystal-ball";
 import { hasEngagement } from "@/lib/engagement";
 
 type Step = {
@@ -48,15 +48,29 @@ export default function PlayerWeekChecklist() {
           return;
         }
 
-        const w = await loadLeagueActiveWeek();
-        const card = await loadWeekCard(w);
+        const league = getLeague();
+        const crystalOn = league?.settings?.crystalBallEnabled !== false;
+
+        // Parallel hot path — sequential chain made Home feel stuck
+        const [w, profile, scoredEarly] = await Promise.all([
+          loadLeagueActiveWeek(),
+          loadMyProfile().catch(() => null),
+          listScoredWeekNumbers().catch(() => [] as number[]),
+        ]);
+        if (cancelled) return;
+
+        const [card, mine] = await Promise.all([
+          loadWeekCard(w),
+          loadMyPicks(w).catch(() => null),
+        ]);
+        if (cancelled) return;
+
         const games = card?.games || [];
         const hasCard = games.length > 0;
         const frozen =
           hasCard && isCardLockDeadlinePassed(games, Date.now());
         const lockLabel = hasCard ? formatCardLockDeadline(games) : null;
 
-        const mine = hasCard ? await loadMyPicks(w) : null;
         const locked = !!(
           mine?.lockedAt && Object.keys(mine.picks || {}).length
         );
@@ -68,39 +82,27 @@ export default function PlayerWeekChecklist() {
           !!mine.bestBetId &&
           !!mine.propChoice;
 
-        const profile = await loadMyProfile();
         const hasPhoto = !!(profile?.avatarUrl);
 
         let crystalDone = false;
         let crystalTeam: string | null = null;
         let crystalLocked = false;
         let crystalLockLabel = "";
-        let crystalOn = true;
-        try {
-          const league = (
-            await import("@/lib/league")
-          ).getLeague();
-          crystalOn = league?.settings?.crystalBallEnabled !== false;
-          if (crystalOn) {
-            // Same source as Crystal Ball page (cloud + localStorage fallback)
-            const cb = await loadCrystalBall();
-            crystalTeam = cb.myTeam;
+        if (crystalOn) {
+          try {
+            const cbLocal = peekLocalCrystalBall();
+            crystalTeam = cbLocal.myTeam;
             crystalDone =
-              !!cb.myTeam ||
+              !!cbLocal.myTeam ||
               hasEngagement(session.playerId, "crystal_ball_picked");
-            crystalLocked = cb.locked;
-            crystalLockLabel = cb.lockLabel;
+            crystalLocked = cbLocal.locked;
+            crystalLockLabel = cbLocal.lockLabel;
+          } catch {
+            /* offline */
           }
-        } catch {
-          /* offline */
         }
 
-        let scored: number[] = [];
-        try {
-          scored = await listScoredWeekNumbers();
-        } catch {
-          scored = [];
-        }
+        const scored = scoredEarly;
         const anyScored = scored.length > 0;
 
         // KISS: no live card → two calm steps only (don't homework the lobby)

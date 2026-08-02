@@ -38,13 +38,10 @@ export async function touchLastSeen(): Promise<void> {
 
   try {
     const supabase = createClient();
-    const { data: auth } = await supabase.auth.getUser();
-    const uid = auth.user?.id || session.playerId;
+    // session.playerId only — getUser() hangs on flaky mobile and blocks boot work
+    const uid = session.playerId;
     const iso = new Date(now).toISOString();
-    await supabase
-      .from("profiles")
-      .update({ last_seen_at: iso })
-      .eq("id", uid);
+    void supabase.from("profiles").update({ last_seen_at: iso }).eq("id", uid);
   } catch {
     /* column missing / offline — ignore */
   }
