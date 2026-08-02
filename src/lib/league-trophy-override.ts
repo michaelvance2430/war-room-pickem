@@ -18,10 +18,11 @@ export const NFL_LOMBARDI_IMG = "/trophies/nfl-lombardi.jpg";
 
 /**
  * Match this room by name (case-insensitive).
- * Covers Vonnaggio / Vonnagio / Family Vacation.
+ * Live room: "Vonnagio Family Vacay" (one g, Vacay).
+ * Also: Vonnaggio / Family Vacation / Family Vacay.
  */
 const VONNAGGIO_NAME_RE =
-  /vonnaggi?o|family\s*vacation|vonnaggi?o\s*family/i;
+  /vonnagg?io|family\s*vac(ay|ation)|vonnagg?io\s*family/i;
 
 /** Optional explicit league ids (fill in if name ever changes). */
 const VONNAGGIO_LEAGUE_IDS = new Set<string>([
