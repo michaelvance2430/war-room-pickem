@@ -1,19 +1,22 @@
 "use client";
 
 /**
- * Weekly cold-open — Gazette Network newsroom package.
- * Static BREAKING NEWS GAZETTE: full article at once, zero caption animation.
+ * Preseason cold-open — Gazette Network “wanted” on last year’s champ.
+ * Static BREAKING NEWS GAZETTE: full article + profile face, zero caption animation.
+ * Once per player · week before season · defending championship trophy only.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   EVENT_FORCE_WEEKLY_COLD_OPEN,
   GAZETTE_STATION,
   getWeeklyColdOpenCopy,
+  hasSeenWeeklyColdOpen,
+  isWeeklyColdOpenWindowOpen,
   markWeeklyColdOpenSeen,
-  shouldShowWeeklyColdOpen,
-  WEEKLY_COLD_OPEN_VIDEO_SRC,
+  resolveColdOpenSubject,
+  type ColdOpenSubject,
 } from "@/lib/weekly-cold-open";
 import { getSession, getLeague } from "@/lib/league";
 import { isGuestMode } from "@/lib/guest-mode";
@@ -23,24 +26,67 @@ import {
 } from "@/lib/player-tutorial";
 import { claimSessionDrama, clearSessionDrama } from "@/lib/session-drama";
 import BrandMark from "@/components/BrandMark";
-
-const POSTER = "/videos/kahmann-cold-open-poster.jpg";
+import Avatar from "@/components/Avatar";
+import { loadLeagueTrophies } from "@/lib/trophies";
+import { loadLeagueRoster } from "@/lib/cloud";
+import {
+  mergePriorSeasonTrophies,
+  PRIOR_SEASON_YEAR,
+} from "@/lib/prior-season-seed";
+import { resolveLiveTrophyHolder } from "@/lib/trophy-share";
 
 export default function WeeklyColdOpenModal() {
   const [open, setOpen] = useState(false);
   const [preview, setPreview] = useState(false);
-  const [videoOk, setVideoOk] = useState(false);
-  const [runId, setRunId] = useState(0);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const copy = getWeeklyColdOpenCopy();
-  const room = getLeague()?.name || "War Room";
+  const [subject, setSubject] = useState<ColdOpenSubject | null>(null);
 
-  const openBroadcast = useCallback((opts?: { preview?: boolean }) => {
-    setPreview(!!opts?.preview);
-    setVideoOk(false);
-    setRunId((n) => n + 1);
-    setOpen(true);
+  const room = getLeague()?.name || "War Room";
+  const sportId = getLeague()?.sportId;
+
+  const loadSubject = useCallback(async (): Promise<ColdOpenSubject | null> => {
+    const league = getLeague();
+    const sid = league?.sportId || "cfb";
+    let trophies = [] as Awaited<ReturnType<typeof loadLeagueTrophies>>;
+    let roster: Awaited<ReturnType<typeof loadLeagueRoster>> = [];
+    try {
+      trophies = await loadLeagueTrophies();
+    } catch {
+      trophies = [];
+    }
+    try {
+      roster = await loadLeagueRoster();
+    } catch {
+      roster = [];
+    }
+    // Always surface last-year hardware so empty rooms still get a face on the carton
+    trophies = mergePriorSeasonTrophies(trophies, {
+      players: roster.map((r) => ({ id: r.userId, name: r.name })),
+      sportId: sid,
+    });
+
+    const base = resolveColdOpenSubject(trophies, sid);
+    if (!base) return null;
+
+    const live = resolveLiveTrophyHolder(roster, base.userId, base.name);
+
+    return {
+      year: base.year || PRIOR_SEASON_YEAR,
+      name: live.name || base.name,
+      userId: live.userId || base.userId,
+      avatarUrl: live.avatarUrl,
+    };
   }, []);
+
+  const openBroadcast = useCallback(
+    async (opts?: { preview?: boolean }) => {
+      const sub = await loadSubject();
+      if (!sub) return;
+      setSubject(sub);
+      setPreview(!!opts?.preview);
+      setOpen(true);
+    },
+    [loadSubject]
+  );
 
   useEffect(() => {
     function onForce(e: Event) {
@@ -51,7 +97,7 @@ export default function WeeklyColdOpenModal() {
       } else {
         clearSessionDrama("weekly_cold_open");
       }
-      openBroadcast({ preview: isPreview });
+      void openBroadcast({ preview: isPreview });
     }
 
     window.addEventListener(EVENT_FORCE_WEEKLY_COLD_OPEN, onForce);
@@ -62,10 +108,11 @@ export default function WeeklyColdOpenModal() {
       };
     }
 
-    function tryOpen() {
+    async function tryOpen() {
       const session = getSession();
-      if (!session?.playerId) return;
-      if (!shouldShowWeeklyColdOpen()) return;
+      const league = getLeague();
+      if (!session?.playerId || !league?.id) return;
+      if (!isWeeklyColdOpenWindowOpen(league.sportId)) return;
       if (needsPlayerTutorial() || isPlayerTutorialActive()) return;
       try {
         if (sessionStorage.getItem("warroom-no-welcome-this-session") === "1") {
@@ -74,51 +121,46 @@ export default function WeeklyColdOpenModal() {
       } catch {
         /* ok */
       }
+
+      const sub = await loadSubject();
+      if (!sub) return;
+      if (hasSeenWeeklyColdOpen(session.playerId, league.id, sub.year)) return;
       if (!claimSessionDrama("weekly_cold_open")) return;
-      openBroadcast({ preview: false });
+
+      setSubject(sub);
+      setPreview(false);
+      setOpen(true);
     }
 
-    const t = window.setTimeout(tryOpen, 900);
-    window.addEventListener("warroom-first-week-progress", tryOpen);
+    function onProgress() {
+      void tryOpen();
+    }
+
+    const t = window.setTimeout(() => {
+      void tryOpen();
+    }, 900);
+    window.addEventListener("warroom-first-week-progress", onProgress);
     return () => {
       window.clearTimeout(t);
-      window.removeEventListener("warroom-first-week-progress", tryOpen);
+      window.removeEventListener("warroom-first-week-progress", onProgress);
       window.removeEventListener(EVENT_FORCE_WEEKLY_COLD_OPEN, onForce);
     };
-  }, [openBroadcast]);
-
-  useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
-    fetch(WEEKLY_COLD_OPEN_VIDEO_SRC, { method: "HEAD" })
-      .then((r) => {
-        if (!cancelled && r.ok) setVideoOk(true);
-      })
-      .catch(() => {
-        if (!cancelled) setVideoOk(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [open, runId]);
-
-  useEffect(() => {
-    if (!open || !videoOk) return;
-    const v = videoRef.current;
-    if (!v) return;
-    v.currentTime = 0;
-    void v.play().catch(() => setVideoOk(false));
-  }, [open, videoOk, runId]);
+  }, [loadSubject]);
 
   function dismiss() {
-    if (!preview) markWeeklyColdOpenSeen();
+    const session = getSession();
+    const league = getLeague();
+    if (!preview && session?.playerId && league?.id && subject) {
+      markWeeklyColdOpenSeen(session.playerId, league.id, subject.year);
+    }
     clearSessionDrama("weekly_cold_open");
     setOpen(false);
     setPreview(false);
   }
 
-  if (!open) return null;
+  if (!open || !subject) return null;
 
+  const copy = getWeeklyColdOpenCopy(subject, sportId);
   const clock = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
     minute: "2-digit",
@@ -177,47 +219,49 @@ export default function WeeklyColdOpenModal() {
             </div>
           </div>
           <p className="text-[9px] text-amber-200/50 text-center pb-2 tracking-wide uppercase">
-            {room} · {GAZETTE_STATION.desk}
+            {room} · {GAZETTE_STATION.desk} · week before season
           </p>
         </div>
 
-        {/* —— Static photo (no ken burns / no caption pop-ins) —— */}
-        <div className="relative aspect-[16/10] sm:aspect-video bg-black overflow-hidden shrink-0 border-b border-amber-400/20">
-          {videoOk ? (
-            <video
-              key={runId}
-              ref={videoRef}
-              src={WEEKLY_COLD_OPEN_VIDEO_SRC}
-              poster={POSTER}
-              className="absolute inset-0 w-full h-full object-cover"
-              playsInline
-              muted
-              autoPlay
-              onEnded={() => {
-                /* stay open — full article is already readable */
-              }}
-              onError={() => setVideoOk(false)}
-            />
-          ) : (
-            <>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={POSTER}
-                alt=""
-                className="absolute inset-0 w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-black/15" />
-              <div className="absolute inset-0 opacity-[0.12] pointer-events-none bg-[repeating-linear-gradient(0deg,transparent,transparent_2px,rgba(0,0,0,0.45)_2px,rgba(0,0,0,0.45)_4px)]" />
-              <div className="absolute inset-2 border border-amber-400/20 pointer-events-none rounded-sm" />
-            </>
-          )}
-
-          {/* Static lower third — gold BREAKING NEWS only, no cycling words */}
-          <div className="absolute bottom-0 inset-x-0">
-            <div className="bg-amber-400 text-black px-3 py-1.5 flex items-center justify-center">
-              <span className="text-[11px] sm:text-xs font-black uppercase tracking-[0.2em]">
-                Breaking news · Gazette
-              </span>
+        {/* —— HAVE YOU SEEN THIS MAN? wanted carton with profile pic —— */}
+        <div className="relative bg-gradient-to-b from-amber-950/50 via-black to-black border-b border-amber-400/25 px-4 pt-5 pb-4 shrink-0">
+          <div className="absolute inset-0 opacity-[0.1] pointer-events-none bg-[repeating-linear-gradient(0deg,transparent,transparent_2px,rgba(0,0,0,0.5)_2px,rgba(0,0,0,0.5)_4px)]" />
+          <div className="relative mx-auto max-w-sm rounded-xl border-2 border-amber-400/55 bg-[#0c0a06] shadow-[0_0_40px_rgba(251,191,36,0.12)] overflow-hidden">
+            <div className="bg-amber-400 text-black px-3 py-2 text-center">
+              <p className="text-[11px] sm:text-xs font-black uppercase tracking-[0.22em]">
+                {copy.wanted}
+              </p>
+            </div>
+            <div className="flex flex-col items-center gap-3 px-4 py-5">
+              <div className="rounded-full ring-4 ring-amber-400/70 ring-offset-4 ring-offset-black shadow-[0_0_28px_rgba(251,191,36,0.35)]">
+                <Avatar
+                  name={subject.name}
+                  avatarUrl={subject.avatarUrl}
+                  userId={subject.userId}
+                  size="xl"
+                />
+              </div>
+              <div className="text-center space-y-1">
+                <p
+                  className="text-xl sm:text-2xl font-black text-amber-50 tracking-tight"
+                  style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
+                >
+                  {subject.name}
+                </p>
+                {copy.phonetic && (
+                  <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-amber-300">
+                    {copy.phonetic}
+                  </p>
+                )}
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-200/70">
+                  {copy.hardwareLabel}
+                </p>
+              </div>
+            </div>
+            <div className="bg-amber-400/15 border-t border-amber-400/30 px-3 py-2 text-center">
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-amber-200">
+                Last year&apos;s championship · target on back
+              </p>
             </div>
           </div>
         </div>
@@ -225,7 +269,8 @@ export default function WeeklyColdOpenModal() {
         {/* —— Full article — all copy visible immediately, zero animation —— */}
         <div className="px-4 py-3 space-y-3 text-sm text-muted leading-relaxed overflow-y-auto flex-1 min-h-0">
           <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber-300">
-            From the Gazette newsroom · {copy.phonetic}
+            From the Gazette newsroom
+            {copy.phonetic ? ` · ${copy.phonetic}` : ""}
           </p>
           <h3
             className="text-base sm:text-lg font-black text-amber-50 leading-snug"
@@ -240,9 +285,8 @@ export default function WeeklyColdOpenModal() {
             {copy.kalshi}
           </p>
           <p className="text-[11px] text-muted leading-relaxed">
-            This is the{" "}
-            <strong className="text-foreground">TV arm</strong> of the paper you
-            already know — when the host scores a week, the full{" "}
+            One-time preseason drop — the week before kickoff. When the host
+            scores a week, the full{" "}
             <Link
               href="/gazette"
               onClick={dismiss}
@@ -250,18 +294,18 @@ export default function WeeklyColdOpenModal() {
             >
               Gazette
             </Link>{" "}
-            drops with crowns, shame, and the works.
+            still drops with crowns, shame, and the works.
           </p>
         </div>
 
         <div className="px-4 py-3 border-t border-amber-400/20 shrink-0 flex flex-col gap-2 bg-black/80">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <Link
-              href="/gazette"
+              href="/trophy-room"
               onClick={dismiss}
               className="w-full py-3 min-h-[48px] rounded-xl border border-amber-400/45 text-amber-100 font-bold text-sm flex items-center justify-center hover:bg-amber-500/10"
             >
-              {copy.ctaGazette}
+              See the hardware
             </Link>
             <button
               type="button"
@@ -273,8 +317,8 @@ export default function WeeklyColdOpenModal() {
           </div>
           <p className="text-[10px] text-muted text-center">
             {preview
-              ? "Foundry preview · does not count as this week’s login play"
-              : "Once this week · first login only · Gazette Network"}
+              ? "Foundry preview · does not count as this season’s cold open"
+              : "Once per season · week before open · last year’s champ"}
           </p>
         </div>
       </div>

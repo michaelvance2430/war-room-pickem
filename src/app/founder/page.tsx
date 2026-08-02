@@ -396,14 +396,15 @@ export default function FounderDashboardPage() {
           </button>
         </div>
 
-        {/* Quick: weekly cold open formatting preview */}
+        {/* Quick: preseason cold open (last year’s champ wanted poster) */}
         <section className="rounded-2xl border-2 border-amber-400/45 bg-amber-500/10 p-4 space-y-2">
           <p className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-300">
-            Weekly cold open · formatting check
+            Preseason cold open · last year’s champ
           </p>
           <p className="text-xs text-muted leading-relaxed">
-            Play the Kahmann / Kalshi broadcast here — same layout players get
-            after Aug 16. Preview does not burn the once-per-week flag.
+            Week before the season only — once per player. “Have you seen this
+            man?” with the defending champ’s profile pic + time-traveler /
+            Kalshi copy. Preview does not burn the once-per-season flag.
           </p>
           <button
             type="button"
@@ -764,7 +765,7 @@ export default function FounderDashboardPage() {
                 onClick={() => jumpPopup("cold")}
                 className="py-2.5 rounded-lg border border-amber-400/40 bg-amber-500/10 text-xs font-semibold hover:bg-amber-500/15"
               >
-                ▶ Watch cold open (Kahmann / Kalshi)
+                ▶ Watch cold open (champ wanted / Kalshi)
               </button>
               <button
                 type="button"
