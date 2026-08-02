@@ -2431,7 +2431,7 @@ export async function loadLeaguePlayers(): Promise<
   const key = session.leagueId;
 
   const hit = cacheGet(playersCache, key, PLAYERS_TTL_MS);
-  if (hit) return hit;
+  if (hit !== undefined) return hit;
 
   const inflight = playersInflight.get(key);
   if (inflight) return inflight;
@@ -2673,12 +2673,18 @@ export async function loadLeagueRoster(): Promise<LeagueRosterMember[]> {
   const key = session.leagueId;
 
   const hit = cacheGet(rosterCache, key, ROSTER_TTL_MS);
-  if (hit) return hit as LeagueRosterMember[];
+  // Empty roster is valid — only miss when undefined
+  if (hit !== undefined) return hit as LeagueRosterMember[];
 
   const inflight = rosterInflight.get(key);
   if (inflight) return inflight as Promise<LeagueRosterMember[]>;
 
-  const promise = loadLeagueRosterFresh(key).finally(() => {
+  // Cap total roster work — stuck RPC froze Home hero + RoomDataHydrator
+  const promise = withTimeout(
+    loadLeagueRosterFresh(key),
+    8_000,
+    [] as LeagueRosterMember[]
+  ).finally(() => {
     rosterInflight.delete(key);
   });
   rosterInflight.set(key, promise as Promise<object[]>);

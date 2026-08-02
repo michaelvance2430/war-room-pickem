@@ -71,6 +71,88 @@ export default function HomeWeekHero() {
 
   useEffect(() => {
     let cancelled = false;
+
+    function paintDegraded(week = 1) {
+      const localWeek = (() => {
+        try {
+          const s = localStorage.getItem("warroom-active-week");
+          const n = s != null ? parseInt(s, 10) : week;
+          return Number.isFinite(n) ? n : week;
+        } catch {
+          return week;
+        }
+      })();
+      const degraded: HeroState = {
+        week: localWeek,
+        hasCard: false,
+        gameCount: 0,
+        lockLabel: null,
+        frozen: false,
+        iLocked: false,
+        rosterCount: 0,
+        scoredWeeks: 0,
+        weekScored: false,
+        isCommish: isCommissioner(),
+        isOps: isOps(),
+        leagueCode: getLeague()?.code || null,
+        advancedFromScored: false,
+        lastWeekRecap: null,
+      };
+      setState(degraded);
+    }
+
+    // Never leave Home hero as pulse forever
+    const failSafe = window.setTimeout(() => {
+      if (cancelled) return;
+      setState((prev) => {
+        if (prev) return prev;
+        paintDegraded();
+        return prev;
+      });
+      // paintDegraded already setState — also force if still null
+      setState((prev) => {
+        if (prev) return prev;
+        try {
+          const s = localStorage.getItem("warroom-active-week");
+          const n = s != null ? parseInt(s, 10) : 1;
+          const w = Number.isFinite(n) ? n : 1;
+          return {
+            week: w,
+            hasCard: false,
+            gameCount: 0,
+            lockLabel: null,
+            frozen: false,
+            iLocked: false,
+            rosterCount: 0,
+            scoredWeeks: 0,
+            weekScored: false,
+            isCommish: isCommissioner(),
+            isOps: isOps(),
+            leagueCode: getLeague()?.code || null,
+            advancedFromScored: false,
+            lastWeekRecap: null,
+          };
+        } catch {
+          return {
+            week: 1,
+            hasCard: false,
+            gameCount: 0,
+            lockLabel: null,
+            frozen: false,
+            iLocked: false,
+            rosterCount: 0,
+            scoredWeeks: 0,
+            weekScored: false,
+            isCommish: isCommissioner(),
+            isOps: isOps(),
+            leagueCode: getLeague()?.code || null,
+            advancedFromScored: false,
+            lastWeekRecap: null,
+          };
+        }
+      });
+    }, 4_000);
+
     async function load() {
       try {
         // Active week + scored list (cached loaders)
@@ -118,7 +200,7 @@ export default function HomeWeekHero() {
           iLocked,
           rosterCount: humans.length,
           scoredWeeks: scored.length,
-          weekScored: scored.includes(week),
+          weekScored: scored.includes(liveWeek),
           isCommish: isCommissioner(),
           isOps: isOps(),
           leagueCode: getLeague()?.code || null,
@@ -126,6 +208,7 @@ export default function HomeWeekHero() {
           lastWeekRecap: state?.lastWeekRecap ?? null,
         };
         setState(next);
+        window.clearTimeout(failSafe);
         heroCache = {
           at: Date.now(),
           leagueId: getLeague()?.id || "",
@@ -184,12 +267,15 @@ export default function HomeWeekHero() {
           /* recap optional */
         }
       } catch {
-        if (!cancelled) setState(null);
+        if (!cancelled) paintDegraded();
+      } finally {
+        window.clearTimeout(failSafe);
       }
     }
     void load();
     return () => {
       cancelled = true;
+      window.clearTimeout(failSafe);
     };
   }, []);
 

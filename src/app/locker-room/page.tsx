@@ -88,9 +88,14 @@ export default function LockerRoomPage() {
     setLeagueName(getLeague()?.name || "");
     // Immediate clear on walk-in — don't wait for network or extra taps
     markLockerSeen();
+    // Never leave Locker on Loading… forever (stuck network)
+    const failSafe = window.setTimeout(() => setLoading(false), 4_000);
     void refreshStaffSessionFlags().then(() => setStaff(isStaff()));
     void amILockerMuted().then(setMuted);
-    reload().finally(() => setLoading(false));
+    reload().finally(() => {
+      window.clearTimeout(failSafe);
+      setLoading(false);
+    });
     void loadLeagueRoster().then((rows) => {
       setRoster(
         rows
@@ -103,6 +108,7 @@ export default function LockerRoomPage() {
         m.markEngagement(session.playerId!, "opened_locker")
       );
     }
+    return () => window.clearTimeout(failSafe);
   }, [reload]);
 
   useEffect(() => {

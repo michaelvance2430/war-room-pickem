@@ -156,10 +156,10 @@ export default function LoginWelcomeModal() {
 
     tryOpen();
     const t = window.setTimeout(tryOpen, 1500);
-    // Fail-safe: if somehow stuck open > 90s, auto-clear forever
+    // Fail-safe: never trap scroll for long — 12s then forever-dismiss
     const failSafe = window.setTimeout(() => {
       if (openRef.current) dismiss();
-    }, 90_000);
+    }, 12_000);
 
     function onProgress() {
       tryOpen();
