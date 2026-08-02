@@ -148,8 +148,8 @@ export default function ProfilePage() {
                 propHits: 0,
                 propTotal: 0,
                 weeksPlayed: 0,
-                avatarUrl: row.avatarUrl ?? null,
-                memberSince: row.joinedAt || null,
+                avatarUrl: row.avatarUrl || undefined,
+                memberSince: row.joinedAt || undefined,
               };
             }
           }
