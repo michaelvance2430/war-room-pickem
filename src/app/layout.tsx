@@ -7,6 +7,7 @@ import FoundrySessionChrome from "@/components/FoundrySessionChrome";
 import SandboxSessionChrome from "@/components/SandboxSessionChrome";
 import PracticeModeChrome from "@/components/PracticeModeChrome";
 import BoredPracticeDoneModal from "@/components/BoredPracticeDoneModal";
+import MomentHost from "@/components/moments/MomentHost";
 import LeagueBuildGate from "@/components/LeagueBuildGate";
 import SmoothRuntime from "@/components/SmoothRuntime";
 import AppShell from "@/components/AppShell";
@@ -92,6 +93,8 @@ export default function RootLayout({
         <PracticeModeChrome />
         {/* Practice completion — not via DeferredChrome (production-safe) */}
         <BoredPracticeDoneModal />
+        {/* War Room Moments — Season Opening first; never DeferredChrome */}
+        <MomentHost />
         <AppShell>{children}</AppShell>
       </body>
     </html>

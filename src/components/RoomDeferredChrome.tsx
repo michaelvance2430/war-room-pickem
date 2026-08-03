@@ -78,10 +78,8 @@ const SeasonCountdownTicker = dynamic(
   () => import("@/components/SeasonCountdownTicker"),
   { ssr: false }
 );
-const SeasonOpenWelcome = dynamic(
-  () => import("@/components/SeasonOpenWelcome"),
-  { ssr: false }
-);
+// Season Opening migrated to MomentHost (layout) — first official Moment.
+// Do not re-mount SeasonOpenWelcome here (duplicate spend / double tradition).
 const RingCeremonyModal = dynamic(
   () => import("@/components/RingCeremonyModal"),
   { ssr: false }
@@ -224,7 +222,7 @@ export default function RoomDeferredChrome() {
       {allowWave2 && wave >= 2 && ceremonyOk && (
         <>
           {!guest && <SeasonCountdownTicker />}
-          {!guest && <SeasonOpenWelcome />}
+          {/* Season Opening → MomentHost (layout), not DeferredChrome */}
           {!guest && <CrewRevealModal />}
           {!guest && <RingCeremonyModal />}
           {!guest && <SeasonFinaleModal />}

@@ -200,18 +200,16 @@ Relationships are the product.
 
 ---
 
-## Implementation phases (only after architecture approval)
+## Implementation phases
 
-| Phase | Work |
-|-------|------|
-| A | Architecture critique + constitution line (this doc) |
-| B | Moment type schema + registry (code, no UI polish) |
-| C | Migrate Season Opening into first Moment definition |
-| D | ExperienceQueue consumes Moment registry |
-| E | Foundry “War Room Moments” studio UI |
-| F | Migrate Ring / Finale / Gazette / Card Live as Moments |
-
-**No implementation of B–F until the long-term direction is approved.**
+| Phase | Work | Status |
+|-------|------|--------|
+| A | Architecture + constitution | ✅ |
+| B | Moment type schema + registry | ✅ `src/lib/moments/*` |
+| C | Season Opening as first Moment | ✅ P0.3 |
+| D | ExperienceQueue (multi-Moment) | Thin / next |
+| E | Foundry War Room Moments studio | ✅ thin preview + reset |
+| F | Migrate Ring / Finale / Gazette / Card Live | Queued |
 
 ---
 

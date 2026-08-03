@@ -148,9 +148,9 @@ The architecture phase is complete.
 | Order | Focus | Status |
 |-------|--------|--------|
 | P0.1 | Trust & Identity (Guest / Practice / Story / Chrome) | ✅ **Accepted** — lessons: `docs/P0-TRUST-AND-IDENTITY-LESSONS.md` |
-| P0.2 | **League (Host) Dashboard** polish | **In progress** — kickoff: `docs/P0-2-LEAGUE-DASHBOARD-KICKOFF.md` |
-| P0.3 | Season Opening Moment | Queued |
-| P0.4 | War Room Moments framework | Queued |
+| P0.2 | **League (Host) Dashboard** polish | Shipped baseline — continue polish as needed |
+| P0.3 | Season Opening Moment (first Moment) | ✅ **Shipped** — tradition not animation; `src/lib/moments/*` + MomentHost |
+| P0.4 | War Room Moments framework (expand catalog) | Foundation live; migrate Ring / Finale next |
 | P0.5 | Personality return (Gazette, cheevos, crews, titles) | Queued |
 
 Do not reopen P0.1 unless a scrub finds a regression.

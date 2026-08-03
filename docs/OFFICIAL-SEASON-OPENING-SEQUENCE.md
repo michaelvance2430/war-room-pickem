@@ -1,8 +1,21 @@
 # Official Season Opening Ceremony + First-Login Sequence Control
 
-**Status:** Design + audit only — **no implementation until Mike + ChatGPT approve**  
+**Status:** ✅ **P0.3 shipped** (first War Room Moment) — 2026-08-03  
 **Date:** 2026-08-03  
 **Intent:** One ~5s “football is finally here” peak per user · league · sport · season — without reviving DeferredChrome freezes or stacking modals.
+
+### Implementation map
+
+| Piece | Where |
+|-------|--------|
+| Moment types / registry | `src/lib/moments/*` |
+| Eligibility + claim + speeches | `src/lib/moments/season-open.ts` |
+| Ceremony UI (4 beats) | `src/components/moments/SeasonOpeningMoment.tsx` |
+| Production mount | `MomentHost` in `layout.tsx` (never DeferredChrome) |
+| Foundry preview / reset | Foundry → War Room Moments |
+| Practice retire line | Beat 3: *Practice is over. The season is here.* |
+
+**Law:** Optimize for emotional memory, not particle count.
 
 ---
 

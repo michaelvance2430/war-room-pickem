@@ -279,8 +279,23 @@ export default function FounderDashboardPage() {
   }
 
   function jumpPopup(
-    kind: "ring" | "card" | "gazette" | "paper" | "cut" | "trophy" | "cold"
+    kind:
+      | "ring"
+      | "card"
+      | "gazette"
+      | "paper"
+      | "cut"
+      | "trophy"
+      | "cold"
+      | "season_open"
   ) {
+    if (kind === "season_open") {
+      // Stay on Foundry — Season Opening Moment preview (no claim burn)
+      void import("@/lib/moments/season-open").then((m) => {
+        m.requestSeasonOpenPreview();
+      });
+      return;
+    }
     if (kind === "cold") {
       // Stay on Foundry — play broadcast in place (preview, no once-per-week burn)
       void import("@/lib/weekly-cold-open").then((m) => {
@@ -783,13 +798,34 @@ export default function FounderDashboardPage() {
             </div>
       </div>
 
-          {/* E — Popups */}
+          {/* E — War Room Moments (thin studio) */}
           <div className="space-y-2">
       <p className="text-[10px] font-bold uppercase tracking-wide text-muted">
-              5 · Flash a moment
+              5 · War Room Moments
             </p>
       <div className="grid grid-cols-1 gap-2">
+                            <button
+                type="button"
+                onClick={() => jumpPopup("season_open")}
+                className="py-2.5 rounded-lg border border-primary/50 bg-primary/15 text-xs font-extrabold hover:bg-primary/20"
+              >
+                ▶ Season Opening (tradition preview)
+              </button>
               <button
+                type="button"
+                onClick={() => {
+                  void import("@/lib/moments/season-open").then((m) => {
+                    const res = m.resetSeasonOpenClaimForFoundry();
+                    setLabLog(
+                      res.ok ? `✅ ${res.message}` : `❌ ${res.message}`
+                    );
+                  });
+                }}
+                className="py-2.5 rounded-lg border border-border text-xs font-semibold hover:bg-background"
+              >
+                Reset Season Opening claim (local)
+              </button>
+<button
                 type="button"
                 onClick={() => jumpPopup("cold")}
                 className="py-2.5 rounded-lg border border-amber-400/40 bg-amber-500/10 text-xs font-semibold hover:bg-amber-500/15"

@@ -181,6 +181,12 @@ They give just enough confidence for the next step, then quietly disappear.
 **Practice’s job is to disappear.**  
 If players stop thinking about Practice and only remember *“War Room was easy to learn,”* it was built correctly.
 
+### Season calendar principle
+
+> **War Room should change with the football calendar.**  
+> Not only its content. Its experience.  
+> Players should feel the season changing.
+
 ### Offseason Practice principle
 
 > **Practice exists until football exists.**  
