@@ -137,9 +137,70 @@ If the underlying data does not exist, the UI **must never invent it**.
 **Empty is allowed. Lying is not.**  
 Empty should still be entertaining and tell the player **when** real data appears.
 
-Gate competitive claims on **official scored weeks** (`listScoredWeekNumbers` + real `weeksPlayed`), not leftover membership fields or demo residue.
-
 Guest Mode is an explicit **tour** (labeled), not a real league. It may use demo history only while clearly DEMO — never as production league truth.
+
+### Official Results are the single source of truth
+
+> **No UI may display standings, points, ATS%, streaks, rank, Crown, Wall of Shame, swing, or recap unless they originate from an officially scored week.**
+
+**Official results** = trusted `week_results` + `game_results` (via LeagueTruth / `listScoredWeekNumbers`).
+
+**Not** sources of competitive truth:
+
+* Membership `weekly_points` / `total_points` alone  
+* Cached ad-hoc arrays  
+* `max(week_cards.week_number)`  
+* Placeholder or demo residue  
+
+Membership stats may **display** points only after the season has official scores and the player has real `weeksPlayed` — they are a **projection** of official results, not an alternate truth.
+
+### Trusted Live Week
+
+> **Never use max week, newest row, latest insert, or highest number as “current week.”**
+
+Everything asks one concept: **Trusted Live Week** (`league-truth.ts`).
+
+Derived from:
+
+1. `leagues.current_week` (sport-safe)  
+2. Advanced past **official** scored weeks  
+3. Never orphan `week_cards` islands  
+
+Hub, Picks, Home, Gazette, Board, Commissioner status — all agree.
+
+### Truth Layer (LeagueTruth)
+
+Production pages should not invent their own “has the season started?” logic.
+
+`src/lib/league-truth.ts` answers:
+
+* Has the season officially scored?  
+* What is the Trusted Live Week?  
+* Which weeks are officially scored?  
+* Which published weeks are player-visible vs orphan?  
+* May we show competitive chrome / player stats?  
+
+If page A and page B disagree, the bug is **not** two UIs — it’s dual business logic. Fix the Truth Layer.
+
+### Traceability rule
+
+> **Every production-facing value must be traceable back to a single authoritative source.**
+
+Example chain for “Mike has 27 points”:
+
+```
+Official Results (week_results)
+        ↓
+Week score applied
+        ↓
+Season score
+        ↓
+Standings
+        ↓
+Home Hero / Profile
+```
+
+No shortcuts. No alternate calculations. No “cached truth” that can diverge.
 
 ### Achievement principle
 

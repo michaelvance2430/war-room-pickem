@@ -92,6 +92,13 @@ Player-facing:
 **Practice Mode product is retired** (no chrome, no dual-reality banners).  
 See Constitution **I’m Bored (not Practice Mode)**.
 
+### Truth Layer
+
+- **North Star:** Never lie to the user—even with placeholder data.  
+- **Official Results** = sole competitive truth.  
+- **Trusted Live Week** = sole “what week is now?” (never max week_cards).  
+- **LeagueTruth** (`src/lib/league-truth.ts`) — one service; pages don’t invent reality.
+
 ### Guest Mode
 
 **Mission:** Convince someone in five minutes that War Room is worth joining.

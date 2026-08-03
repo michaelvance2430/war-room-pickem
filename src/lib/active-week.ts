@@ -92,13 +92,37 @@ export async function resolvePlayerActiveWeek(opts?: {
     /* continue */
   }
 
-  // Parallel — was serial week-then-scored (extra RTT on every Home open)
+  // LeagueTruth: Trusted Live Week + official scored list (never max week_cards)
+  try {
+    const { loadLeagueTruth } = await import("./league-truth");
+    const truth = await loadLeagueTruth({ sportId: sid });
+    const week = truth.trustedLiveWeek;
+    const leagueWeek = truth.leagueWeek;
+    const scored = truth.scoredWeeks;
+    const advanced = week !== leagueWeek;
+
+    if (advanced) {
+      try {
+        localStorage.setItem("warroom-active-week", String(week));
+      } catch {
+        /* ignore */
+      }
+      if (opts?.persistIfOps && isOps()) {
+        void setLeagueActiveWeek(week).catch(() => {});
+      }
+    }
+
+    return { week, leagueWeek, advanced, scored };
+  } catch {
+    /* fall through */
+  }
+
+  // Fallback if Truth layer fails
   const [leagueWeekRaw, scoredRaw] = await Promise.all([
     loadLeagueActiveWeek(),
     listScoredWeekNumbers().catch(() => [] as number[]),
   ]);
   let leagueWeek = leagueWeekRaw;
-  // NFL: never treat week 0 as real open week
   if (sid === "nfl" && leagueWeek <= 0) leagueWeek = first;
   const scored = scoredRaw;
   const week = advancePastScoredWeeks(leagueWeek, scored, sid);
@@ -110,7 +134,6 @@ export async function resolvePlayerActiveWeek(opts?: {
     } catch {
       /* ignore */
     }
-    // Never await cloud write on the picks hot path — freezes mobile open
     if (opts?.persistIfOps && isOps()) {
       void setLeagueActiveWeek(week).catch(() => {});
     }

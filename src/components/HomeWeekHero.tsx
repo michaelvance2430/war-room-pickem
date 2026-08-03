@@ -217,10 +217,13 @@ export default function HomeWeekHero() {
             .filter((w) => Number.isFinite(w) && w < week)
             .sort((a, b) => b - a);
           const lastScoredWeek = priorScored[0];
-          if (selfId != null && lastScoredWeek != null) {
+          // Official results only — never membership residue without weeksPlayed
+          if (selfId != null && lastScoredWeek != null && scored.length > 0) {
             const players = await loadLeaguePlayers();
             if (cancelled) return;
-            const field = players.filter((p) => !p.isMock);
+            const field = players.filter(
+              (p) => !p.isMock && (p.weeksPlayed || 0) > 0
+            );
             const withPts = field
               .map((p) => {
                 const pts =

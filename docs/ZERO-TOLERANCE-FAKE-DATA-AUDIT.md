@@ -116,13 +116,28 @@ Not: “Week X exists with fake data.”
 
 ---
 
-## Recommended fix order (after this audit)
+## Recommended fix order (product priority — source before display)
 
-1. **P0:** Confirm Stats / Power Rankings / hero recap never read residual membership when `!hasOfficialScoredWeek`  
-2. **P1:** MultiLeague pulse → trusted live week, not max week_card  
-3. **P1:** Foundry orphan audit + optional data cleanup (Mike approval)  
-4. **P2:** Unread counts only when store is real  
-5. **System:** Week config open guard (commissioner calendar) — prevents new fake weeks  
+1. **P0 — Orphan week_cards** (source of fake urgency everywhere)  
+   Foundry audit + Mike-approved cleanup. Config guard so new orphans can’t form.  
+2. **P0 — Trusted Live Week + LeagueTruth** everywhere (hub, picks, home, commish)  
+3. **P0 — Competitive UI** only from official results (membership never sole source)  
+4. **P1 — Hero recap / stats residue**  
+5. **P2 — Unread counts only when real**  
+6. **System — Commissioner week-not-open guard**  
+
+---
+
+## Architecture (post-audit)
+
+| Concept | Module |
+|---------|--------|
+| **LeagueTruth / Truth Layer** | `src/lib/league-truth.ts` |
+| **Trusted Live Week** | `computeTrustedLiveWeek` / `loadLeagueTruth` |
+| **Visible weeks** | `week-history-trust.ts` |
+| **Orphan audit (read-only)** | `week-inventory-audit.ts` + Foundry button |
+
+**Rule:** Every production-facing value must be traceable to one authoritative source (official results for competitive stats; Trusted Live Week for “now”).
 
 ---
 

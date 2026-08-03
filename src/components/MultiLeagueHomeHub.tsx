@@ -113,25 +113,53 @@ export default function MultiLeagueHomeHub({ onSwitched }: Props) {
       const supabase = createClient();
       const next: Record<string, LeaguePulse> = {};
 
+      // Never use max(week_cards) — orphan residue invents "Needs picks · Week 7".
+      // Trusted Live Week ≈ leagues.current_week (sport-safe), card only if that week exists.
       await Promise.all(
         ms.map(async (m) => {
           const isHost =
             m.role === "commissioner" || m.commissionerId === uid;
           try {
+            const { data: leagueRow } = await supabase
+              .from("leagues")
+              .select("current_week, sport_id")
+              .eq("id", m.leagueId)
+              .maybeSingle();
+            const sid =
+              (leagueRow as { sport_id?: string } | null)?.sport_id ||
+              m.sportId ||
+              "cfb";
+            let live =
+              (leagueRow as { current_week?: number } | null)?.current_week !=
+              null
+                ? Number(
+                    (leagueRow as { current_week?: number }).current_week
+                  )
+                : null;
+            if (live != null && sid === "nfl" && live <= 0) live = 1;
+            if (live == null || Number.isNaN(live)) {
+              next[m.leagueId] = {
+                leagueId: m.leagueId,
+                openWeek: null,
+                needsPicks: false,
+                locked: false,
+                isHost,
+              };
+              return;
+            }
+
+            // Confirm a real card for the trusted live week (not highest residue)
             const { data: card } = await supabase
               .from("week_cards")
               .select("week_number")
               .eq("league_id", m.leagueId)
-              .order("week_number", { ascending: false })
-              .limit(1)
+              .eq("week_number", live)
               .maybeSingle();
-            const openWeek =
-              card?.week_number != null ? Number(card.week_number) : null;
 
-            if (openWeek == null || Number.isNaN(openWeek)) {
+            if (!card) {
               next[m.leagueId] = {
                 leagueId: m.leagueId,
-                openWeek: null,
+                openWeek: live,
                 needsPicks: false,
                 locked: false,
                 isHost,
@@ -144,14 +172,14 @@ export default function MultiLeagueHomeHub({ onSwitched }: Props) {
               .select("locked_at")
               .eq("league_id", m.leagueId)
               .eq("user_id", uid)
-              .eq("week_number", openWeek)
+              .eq("week_number", live)
               .maybeSingle();
 
             const locked = !!(pick as { locked_at?: string | null } | null)
               ?.locked_at;
             next[m.leagueId] = {
               leagueId: m.leagueId,
-              openWeek,
+              openWeek: live,
               needsPicks: !locked,
               locked,
               isHost,
