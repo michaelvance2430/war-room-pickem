@@ -13,8 +13,7 @@ import LeagueBuildGate from "@/components/LeagueBuildGate";
 import SmoothRuntime from "@/components/SmoothRuntime";
 import AppShell from "@/components/AppShell";
 import ThemeDecorGate from "@/components/ThemeDecorGate";
-import SafeNavBadge from "@/components/SafeNavBadge";
-import NavDiagPanel from "@/components/NavDiagPanel";
+
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -97,14 +96,11 @@ export default function RootLayout({
         {/* Practice completion — not via DeferredChrome (production-safe) */}
         <BoredPracticeDoneModal />
         {/*
-          War Room Moments + badge queue — MomentHost no-ops in SAFE NAV.
-          Badge unlocks still gated inside the component under safe-nav.
+          Moments host no-ops while SAFE NAV protections are on (no UI banner).
+          Recovery logic lives in SmoothRuntime / lib/safe-nav — invisible.
         */}
         <MomentHost />
         <BadgeUnlockModal />
-        {/* Creator-only: SAFE NAV strip + optional nav diag */}
-        <SafeNavBadge />
-        <NavDiagPanel />
         <AppShell>{children}</AppShell>
       </body>
     </html>

@@ -60,8 +60,9 @@ Until plain-app navigation is proven stable:
 3. Every modal/moment must clean up on unmount; body scroll locks must expire.
 4. Escape + route change must call recovery (`recoverNavigation` / `forceUnlockAllChrome`).
 5. Do not re-enable auto Moments / coaching until multi-minute nav regression passes.
+6. **Never show SAFE NAV / Unlock UI / recovery banners in the product.** Recovery is invisible. Console only: `window.__wrRecoverNav()`. Opt-in debug UI: `localStorage warroom-safe-nav-ui=1` or `warroom-nav-diag=1`.
 
-Creator re-enable on one browser only:
+Creator re-enable Moments on one browser only:
 
 ```js
 localStorage.setItem("warroom-safe-nav-off", "1"); location.reload();

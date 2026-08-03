@@ -82,6 +82,21 @@ export default function SmoothRuntime() {
   useEffect(() => {
     installRuntimeDebugGlobals();
     installEventLoopProbe();
+    // Console-only recovery — no product banner
+    try {
+      (window as unknown as { __wrRecoverNav?: () => void }).__wrRecoverNav =
+        () => recoverNavigation("console");
+    } catch {
+      /* ok */
+    }
+    return () => {
+      try {
+        delete (window as unknown as { __wrRecoverNav?: () => void })
+          .__wrRecoverNav;
+      } catch {
+        /* ok */
+      }
+    };
   }, []);
 
   // Every route change: hard unlock + top of page
