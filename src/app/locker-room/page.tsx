@@ -343,7 +343,7 @@ export default function LockerRoomPage() {
       <div className="flex items-center gap-2 flex-wrap mb-1">
             <h1 className="text-2xl font-bold">Locker Room</h1>
       <span className="text-xs px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-300 border border-orange-400/30">
-              Trash talk
+              League chat
             </span>
       </div>
           <p className="text-sm text-muted">
@@ -353,7 +353,7 @@ export default function LockerRoomPage() {
                 {" · "}
               </>
             ) : null}
-            Talk shit
+            This week's trash talk
             {weekLabel ? (
               <>
                 {" "}
