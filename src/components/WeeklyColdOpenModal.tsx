@@ -7,6 +7,11 @@
  * Stays open until the player closes it. Article scrolls; background does not.
  * Sticky ✕ always visible. Preview never burns once-per-season.
  *
+ * Multi-league: always resolves subject + copy from the *active* league
+ * (sport + defending champ year). CFB / NFL / Foundry rooms share this shell;
+ * switch league in Foundry to preview each. Future seasons re-fire when
+ * champ year advances (seen key is player · league · year).
+ *
  * forceOnly: Foundry / War Room Moments Test — no auto-launch.
  */
 
@@ -65,6 +70,12 @@ export default function WeeklyColdOpenModal({ forceOnly = false }: Props) {
 
   const room = getLeague()?.name || "War Room";
   const sportId = getLeague()?.sportId;
+  const sportLabel =
+    sportId === "nfl"
+      ? "NFL"
+      : sportId === "soccer_wwc"
+        ? "WWC"
+        : "CFB";
 
   const lockBackground = useCallback(() => {
     if (typeof document === "undefined" || bodyLocked.current) return;
@@ -459,7 +470,7 @@ export default function WeeklyColdOpenModal({ forceOnly = false }: Props) {
         <header className="shrink-0 flex items-center gap-2 px-3 py-2.5 border-b-2 border-amber-400/40 bg-gradient-to-r from-amber-500 to-amber-400 text-black">
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-black uppercase tracking-[0.18em]">
-              ● Breaking news · Season Cold Open
+              ● Breaking news · Season Cold Open · {sportLabel}
             </p>
             <p
               id={titleId}
@@ -467,6 +478,10 @@ export default function WeeklyColdOpenModal({ forceOnly = false }: Props) {
               style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
             >
               {GAZETTE_STATION.masthead}
+            </p>
+            <p className="text-[10px] font-bold truncate opacity-90">
+              {room}
+              {subject.year ? ` · ${subject.year} champ` : ""}
             </p>
           </div>
           <button

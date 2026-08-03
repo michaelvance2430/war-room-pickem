@@ -1,14 +1,19 @@
 /**
  * Preseason cold-open — Gazette Network “wanted” package on last year’s champ.
  *
- * Window: the calendar week before the season’s opening week starts
- *   (CFB Week 0 / NFL Week 1) through the moment opening week begins.
- * Frequency: once per player · league · champ year (not weekly).
- * Subject: defending championship trophy winner (prior-season seed if needed).
+ * ── Multi-league / multi-season contract (product law) ──────────────────
+ * - Same experience shell for every room: CFB, NFL, Foundry sandboxes, future sports.
+ * - Content is keyed by the *active league’s* sport + defending champ year.
+ * - Once per player · league · champ year — crews returning next year re-qualify
+ *   when the hardware year advances (new champ year = new package, new “seen”).
+ * - Foundry Test Moment always uses getLeague() (switch league to preview CFB vs NFL).
+ * - Never hard-code a single league’s joke into the shared reader chrome.
  *
- * Copy never freezes on one bit: independent banks for wanted / headline /
- * body / markets / CTA, mixed by league + season + sport + champ, with
- * per-league memory so consecutive seasons don’t re-serve the same mix.
+ * Window: calendar week before opening week (CFB Week 0 / NFL Week 1) until open.
+ * Subject: Trophy Room defending championship (else prior-season seed for that sport).
+ *
+ * Copy: CFB inaugural (champ year = PRIOR_SEASON_YEAR) is LOCKED. Later CFB years
+ * and all NFL years mix banks by league + season + sport + champ (with pack memory).
  */
 
 import { getLeague, getSession } from "@/lib/league";
@@ -131,7 +136,11 @@ export function isWeeklyColdOpenWindowOpen(
 
 /**
  * Resolve last year’s championship trophy holder for the cold open.
- * Prefers live Trophy Room championships; falls back to prior-season seed.
+ * Prefers live Trophy Room championships (any sport/league); falls back to
+ * sport-specific prior-season seed so empty rooms still get a face.
+ *
+ * Champ year comes from hardware — returning crews in future seasons re-open
+ * Cold Open when a new championship year is on the wall.
  */
 export function resolveColdOpenSubject(
   trophies: LeagueTrophy[],
@@ -475,6 +484,8 @@ function buildCfbInauguralLockedCopy(ctx: CopyCtx): WeeklyColdOpenCopy {
   const nameCall = isKahmann(ctx.name)
     ? `${ctx.name} (say it with us — COMMON)`
     : ctx.nameCall;
+  // Same label shape as rotating packs / NFL — always year + sport hardware words
+  const bits = sportBits("cfb", ctx.year);
 
   return {
     stamp: `${GAZETTE_STATION.callSign} · ${GAZETTE_STATION.desk}`,
@@ -492,11 +503,11 @@ function buildCfbInauguralLockedCopy(ctx: CopyCtx): WeeklyColdOpenCopy {
       `Kalshi odds have ${ctx.name} definitely not winning this year. Markets price the time-travel edge as spent. The board is open — the tape says no.`,
     cta: "Cool — back to the room",
     ctaGazette: "Open the Gazette",
-    hardwareLabel: `${ctx.year} War Room champion`,
+    hardwareLabel: bits.hardwareLabel,
     foot:
       "One-time preseason drop — the week before kickoff. When the commish scores a week, the full Gazette still drops with crowns, shame, and the works.",
     packId: CFB_INAUGURAL_COLD_OPEN_PACK_ID,
-    editionLine: `Once per season · week before open · ${ctx.year} champ package · ${ctx.room} · inaugural CFB (locked)`,
+    editionLine: `Once per season · week before open · ${ctx.year} champ · ${ctx.room} · CFB inaugural (locked) · every league gets the same shell next year with new hardware`,
   };
 }
 

@@ -892,8 +892,11 @@ export default function FounderDashboardPage() {
                       Season Cold Open
                     </p>
                     <p className="text-[11px] text-muted mt-0.5 leading-snug">
-                      Cinematic heat on last year&apos;s champ. Read the whole
-                      piece — stays open until you close it.
+                      Heat on last year&apos;s champ — same reader shell for CFB,
+                      NFL, and every Foundry room. Uses the{" "}
+                      <strong className="text-foreground">active league</strong>
+                      ; switch leagues to preview each sport. Returning seasons
+                      re-open when championship year advances.
                     </p>
                   </div>
                   <span className="shrink-0 rounded-full bg-amber-400/25 text-amber-200 text-[10px] font-black uppercase tracking-wide px-2 py-0.5">
@@ -905,7 +908,7 @@ export default function FounderDashboardPage() {
                   onClick={() => jumpPopup("cold")}
                   className="w-full py-3 min-h-[48px] rounded-lg bg-amber-400 text-black text-sm font-extrabold touch-manipulation active:scale-[0.99] hover:bg-amber-300"
                 >
-                  Test Moment
+                  Test Moment · current league
                 </button>
               </div>
               {/* forceOnly: present Cold Open without mounting other Moments */}
