@@ -324,34 +324,83 @@ export async function awardTrophy(opts: {
   }
 
   const supabase = createClient();
-  const { error } = await supabase.from("league_trophies").upsert(
-    {
-      league_id: session.leagueId,
-      season_year: opts.seasonYear,
-      trophy_type: opts.trophyType,
-      winner_name: name,
-      winner_user_id: opts.winnerUserId || null,
-      subtitle: opts.subtitle?.trim() || null,
-      notes: opts.notes?.trim() || null,
-      awarded_at: new Date().toISOString(),
-      awarded_by: session.playerId,
-    },
-    { onConflict: "league_id,season_year,trophy_type" }
-  );
+  const payload = {
+    league_id: session.leagueId,
+    season_year: opts.seasonYear,
+    trophy_type: opts.trophyType,
+    winner_name: name,
+    winner_user_id: opts.winnerUserId || null,
+    subtitle: opts.subtitle?.trim() || null,
+    notes: opts.notes?.trim() || null,
+    awarded_at: new Date().toISOString(),
+    awarded_by: session.playerId,
+  };
+  const { error } = await supabase.from("league_trophies").upsert(payload, {
+    onConflict: "league_id,season_year,trophy_type",
+  });
 
   if (error) {
+    // Surface full PostgREST body for ops (not silent) — no retry loop
+    const full = [
+      error.message,
+      error.code ? `code=${error.code}` : null,
+      error.details ? `details=${error.details}` : null,
+      error.hint ? `hint=${error.hint}` : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    try {
+      console.warn("[league_trophies upsert]", full, {
+        trophyType: opts.trophyType,
+        seasonYear: opts.seasonYear,
+        leagueId: session.leagueId,
+      });
+    } catch {
+      /* ok */
+    }
     if (
-      error.message?.includes("league_trophies") ||
       error.code === "42P01" ||
-      error.message?.toLowerCase().includes("does not exist")
+      /does not exist|schema cache|PGRST205/i.test(error.message || "")
     ) {
       return {
         ok: false,
         error:
-          "Trophy Room table missing — run supabase/trophy-room.sql in Supabase SQL Editor once.",
+          "Trophy Room table missing — run supabase/trophy-room.sql (then FIX-LEAGUE-TROPHIES-UPSERT.sql) in Supabase SQL Editor.",
       };
     }
-    return { ok: false, error: error.message };
+    if (
+      error.code === "42P10" ||
+      /no unique or exclusion constraint matching the ON CONFLICT/i.test(
+        error.message || ""
+      )
+    ) {
+      return {
+        ok: false,
+        error:
+          "Trophy upsert needs UNIQUE (league_id, season_year, trophy_type) — run supabase/FIX-LEAGUE-TROPHIES-UPSERT.sql in Supabase.",
+      };
+    }
+    if (
+      error.code === "23514" ||
+      /trophy_type|check constraint/i.test(error.message || "")
+    ) {
+      return {
+        ok: false,
+        error:
+          "Trophy type not allowed on this database (need division types) — run supabase/FIX-LEAGUE-TROPHIES-UPSERT.sql (or division-trophies.sql).",
+      };
+    }
+    if (
+      error.code === "42501" ||
+      /row-level security|violates row-level/i.test(error.message || "")
+    ) {
+      return {
+        ok: false,
+        error:
+          "Not allowed to write trophies (commissioner only per RLS). " + full,
+      };
+    }
+    return { ok: false, error: full || error.message };
   }
 
   // Permanent badge grants for trophy hardware (tagged to this league)
