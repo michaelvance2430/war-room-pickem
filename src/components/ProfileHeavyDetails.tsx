@@ -1,0 +1,374 @@
+"use client";
+
+/**
+ * Deferred profile shelves — dynamically imported AFTER identity paint.
+ * Contains all badge catalog evaluation and heavy trophy/resume work.
+ * Must never be statically imported from profile/page.tsx.
+ */
+
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import BadgeShelf from "@/components/BadgeShelf";
+import WwcPassportShelf from "@/components/WwcPassportShelf";
+import DiscoveryPassportShelf from "@/components/DiscoveryPassportShelf";
+import EasterEggTracker from "@/components/EasterEggTracker";
+import ProfileTrophyCase from "@/components/ProfileTrophyCase";
+import FootballResume from "@/components/FootballResume";
+import ProfileSeasonPlot from "@/components/ProfileSeasonPlot";
+import CommishCareerCard from "@/components/CommishCareerCard";
+import {
+  buildSeasonPlot,
+  buildSignatureStyle,
+} from "@/lib/profile-signature";
+import {
+  formatMemberSince,
+  getPlayerBadges,
+  withPermanentBadges,
+} from "@/lib/badges";
+import { getPlayerWwcBadges } from "@/lib/sports/wwc-badge-eval";
+import { buildFootballResume } from "@/lib/player-history";
+import { syncCareerWithPlayer } from "@/lib/career-cheevo";
+import { applyLegacyBadgeGrants } from "@/lib/legacy-badge-grants";
+import { nukeAccumulatedSandboxCareersOnce } from "@/lib/sandbox-wipe";
+import { withCreatorFlag } from "@/lib/creator";
+import { filterCrewCheevos } from "@/lib/crew-cheevos";
+import {
+  getProfileHardware,
+  type ProfileTrophy,
+} from "@/lib/profile-hardware";
+import { isMockPlayer } from "@/lib/mock-roasts";
+import { getLeague } from "@/lib/league";
+import { Player } from "@/lib/types";
+import type { LeagueTrophy } from "@/lib/trophies";
+import type { BadgeStatus } from "@/lib/types";
+import { wrProfile } from "@/lib/runtime-iso";
+
+type Props = {
+  player: Player;
+  joinTitle: string | null;
+  isSelf: boolean;
+};
+
+const SLOW_MS = 500;
+
+function yieldToBrowser(): Promise<void> {
+  return new Promise((r) => setTimeout(r, 0));
+}
+
+/**
+ * Run sync work off the critical path: yield first, time it, log if >500ms, yield after.
+ * Does not block navigation — only called after identity paint + user opens details.
+ */
+async function runChunked<T>(
+  label: string,
+  fn: () => T
+): Promise<T | null> {
+  await yieldToBrowser();
+  const t0 = performance.now();
+  try {
+    const out = fn();
+    const ms = performance.now() - t0;
+    if (ms > SLOW_MS) wrProfile("SLOW_SECTION", ms, label);
+    else wrProfile(label, ms);
+    await yieldToBrowser();
+    return out;
+  } catch (e) {
+    wrProfile(
+      "SLOW_SECTION",
+      performance.now() - t0,
+      `${label} FAIL ${e instanceof Error ? e.message : ""}`
+    );
+    return null;
+  }
+}
+
+export default function ProfileHeavyDetails({
+  player: seed,
+  isSelf,
+}: Props) {
+  const [player, setPlayer] = useState(seed);
+  const [badges, setBadges] = useState<BadgeStatus[]>([]);
+  const [wwcBadges, setWwcBadges] = useState<BadgeStatus[]>([]);
+  const [hardware, setHardware] = useState<ProfileTrophy[]>([]);
+  const [resume, setResume] = useState<ReturnType<
+    typeof buildFootballResume
+  > | null>(null);
+  const [seasonPlot, setSeasonPlot] = useState<ReturnType<
+    typeof buildSeasonPlot
+  > | null>(null);
+  const [signature, setSignature] = useState<string>("");
+  const [phase, setPhase] = useState<"loading" | "ready">("loading");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      wrProfile("heavy-details-start");
+      const lg = getLeague();
+      const sportId = lg?.sportId || "cfb";
+      const isWwc = sportId === "soccer_wwc";
+      const mock = isMockPlayer(seed);
+
+      // Optional standings peers — NOT required for first identity
+      let leaguePeers: Player[] = [seed];
+      let subject: Player = seed;
+      try {
+        const { loadLeaguePlayers } = await import("@/lib/cloud");
+        const players = await loadLeaguePlayers().catch(() => [] as Player[]);
+        if (cancelled) return;
+        if (players.length) {
+          leaguePeers = players;
+          const richer = players.find((p) => p.id === seed.id);
+          if (richer) {
+            subject = withPermanentBadges(
+              withCreatorFlag({
+                ...richer,
+                avatarUrl: seed.avatarUrl || richer.avatarUrl,
+                memberSince: seed.memberSince || richer.memberSince,
+                name: seed.name || richer.name,
+              })
+            );
+            if (!cancelled) setPlayer(subject);
+          }
+        }
+      } catch {
+        /* ok */
+      }
+
+      await yieldToBrowser();
+      if (cancelled) return;
+
+      // Badge eval only here — never on initial profile render
+      const badgeList = await runChunked("evaluateBadges", () => {
+        try {
+          nukeAccumulatedSandboxCareersOnce([seed.id]);
+          applyLegacyBadgeGrants({ id: seed.id, name: seed.name });
+          return getPlayerBadges(
+            subject,
+            leaguePeers.length > 1 ? leaguePeers : [subject]
+          );
+        } catch {
+          return [] as BadgeStatus[];
+        }
+      });
+      if (cancelled) return;
+      if (badgeList) {
+        setBadges(badgeList);
+        try {
+          syncCareerWithPlayer(subject, badgeList);
+        } catch {
+          /* ok */
+        }
+      }
+
+      if (isWwc) {
+        const wwc = await runChunked("evaluateWwcBadges", () => {
+          try {
+            return getPlayerWwcBadges(withPermanentBadges(seed));
+          } catch {
+            return [] as BadgeStatus[];
+          }
+        });
+        if (!cancelled && wwc) setWwcBadges(wwc);
+      }
+
+      // Single trophy load — reused for hardware + resume (no double network)
+      let trophies: LeagueTrophy[] = [];
+      try {
+        const { loadCareerTrophiesWonByUser, loadLeagueTrophies } =
+          await import("@/lib/trophies");
+        try {
+          const career = await loadCareerTrophiesWonByUser(seed.id, {
+            playerName: seed.name || undefined,
+          });
+          trophies = career.length
+            ? career
+            : await loadLeagueTrophies().catch(() => [] as LeagueTrophy[]);
+        } catch {
+          trophies = await loadLeagueTrophies().catch(() => [] as LeagueTrophy[]);
+        }
+
+        const hw = await runChunked("buildTrophies", () =>
+          getProfileHardware({
+            playerId: seed.id,
+            playerName: seed.name,
+            leagueTrophies: trophies,
+            sportId: lg?.sportId,
+            activeLeagueName: lg?.name,
+            activeLeagueId: lg?.id,
+          })
+        );
+        if (!cancelled && hw) setHardware(hw);
+      } catch {
+        /* ok */
+      }
+
+      if (cancelled) return;
+
+      const peerList = leaguePeers.length ? leaguePeers : [subject];
+      const badgeSnap = badgeList || [];
+
+      const res = await runChunked("buildResume", () =>
+        buildFootballResume({
+          player: subject,
+          peers: peerList,
+          trophies,
+          badges: badgeSnap,
+          memberSinceLabel: mock
+            ? "Never"
+            : formatMemberSince(subject.memberSince),
+        })
+      );
+      if (!cancelled && res) setResume(res);
+
+      const sig = await runChunked("buildSignature", () =>
+        mock
+          ? "Demo NPC. Not a real résumé."
+          : buildSignatureStyle({
+              player: subject,
+              badges: badgeSnap,
+              sportId,
+              peers: peerList,
+            })
+      );
+      if (!cancelled && sig) setSignature(sig);
+
+      if (!mock) {
+        const plot = await runChunked("buildSeasonPlot", () =>
+          buildSeasonPlot(subject, peerList)
+        );
+        if (!cancelled && plot) setSeasonPlot(plot);
+      }
+
+      // Eggs — after shelves, still deferred
+      try {
+        const { loadCloudEggFinds } = await import("@/lib/egg-cloud");
+        const { grantPermanentBadgeId, mergePermanentBadges } =
+          await import("@/lib/permanent-badges");
+        const eggIds = await loadCloudEggFinds(seed.id);
+        for (const eid of eggIds) {
+          grantPermanentBadgeId(seed.id, eid);
+        }
+        if (!cancelled) {
+          setPlayer((prev) => ({
+            ...prev,
+            permanentBadgeIds: mergePermanentBadges(
+              prev.id,
+              prev.permanentBadgeIds
+            ),
+          }));
+        }
+      } catch {
+        /* ok */
+      }
+
+      if (!cancelled) {
+        setPhase("ready");
+        wrProfile("heavy-details-ready");
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // seed.id only — full seed object changes would restart thrash
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seed.id]);
+
+  const lg = getLeague();
+  const sportId = lg?.sportId || "cfb";
+  const isWwcLeague = sportId === "soccer_wwc";
+  const mock = isMockPlayer(player);
+  const earnedCount = badges.filter((b) => b.earned).length;
+  const leagueName = lg?.name || "War Room";
+
+  if (phase === "loading") {
+    return (
+      <div className="rounded-2xl border border-border bg-card/50 px-4 py-8 text-center mb-6">
+        <p className="text-sm text-muted">Loading badges &amp; hardware…</p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {!mock && (
+        <div className="mb-6">
+          <CommishCareerCard userId={player.id} />
+        </div>
+      )}
+
+      {signature ? (
+        <p className="text-sm text-foreground/90 leading-relaxed mb-4 border-l-2 border-primary/50 pl-3 italic">
+          {signature}
+        </p>
+      ) : null}
+
+      <ProfileTrophyCase
+        items={hardware}
+        playerName={player.name}
+        leagueName={leagueName}
+        isSelf={isSelf}
+        winnerAvatarUrl={player.avatarUrl}
+      />
+
+      <DiscoveryPassportShelf playerId={player.id} isSelf={isSelf} />
+
+      <EasterEggTracker playerId={player.id} isSelf={isSelf} />
+
+      {!mock && seasonPlot && (
+        <ProfileSeasonPlot
+          plot={seasonPlot}
+          rival={resume?.rival ?? null}
+          sportId={sportId}
+        />
+      )}
+
+      {resume && (
+        <FootballResume
+          resume={resume}
+          playerId={player.id}
+          isSelf={isSelf}
+        />
+      )}
+
+      {isWwcLeague && wwcBadges.length > 0 && (
+        <WwcPassportShelf badges={wwcBadges} />
+      )}
+
+      {!isWwcLeague && badges.length > 0 && (
+        <div className="rounded-2xl border border-amber-400/30 bg-amber-400/5 p-5 sm:p-6 mb-6">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <p className="text-[10px] uppercase tracking-wider text-amber-300 font-bold">
+              Crew marks
+            </p>
+            <Link href="/crew" className="text-[11px] font-bold text-primary">
+              Live foxhole →
+            </Link>
+          </div>
+          <BadgeShelf badges={filterCrewCheevos(badges)} />
+        </div>
+      )}
+
+      {!isWwcLeague && (
+        <div className="rounded-2xl border border-border bg-card p-5 sm:p-6 mb-6">
+          {badges.length > 0 ? (
+            <>
+              <p className="text-[10px] uppercase tracking-wider text-muted font-bold mb-1">
+                Achievements
+              </p>
+              <p className="text-xs text-muted mb-4">
+                {earnedCount > 0
+                  ? `${earnedCount} earned in this catalog — open a badge for the story.`
+                  : "Nothing earned yet. The first card is still destiny."}
+              </p>
+              <BadgeShelf badges={badges} />
+            </>
+          ) : (
+            <p className="text-sm text-muted">No badges loaded.</p>
+          )}
+        </div>
+      )}
+    </>
+  );
+}

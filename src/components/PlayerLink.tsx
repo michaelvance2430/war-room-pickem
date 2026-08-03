@@ -15,6 +15,33 @@ import { getLeague } from "@/lib/league";
 import { loadLeagueActiveWeek } from "@/lib/cloud";
 import { wrProfile } from "@/lib/runtime-iso";
 
+/** One in-flight profile navigation at a time (P0 freeze: triple click-received). */
+const pendingNav = new Map<string, number>();
+const NAV_GUARD_MS = 2_500;
+
+function armProfileNavGuard(profileId: string): boolean {
+  const now = Date.now();
+  // Drop expired
+  for (const [k, t] of pendingNav) {
+    if (now - t > NAV_GUARD_MS) pendingNav.delete(k);
+  }
+  if (pendingNav.has(profileId)) return false;
+  pendingNav.set(profileId, now);
+  return true;
+}
+
+function clearProfileNavGuard(profileId: string) {
+  pendingNav.delete(profileId);
+}
+
+// Clear when route actually changes away/to profile
+if (typeof window !== "undefined") {
+  window.addEventListener("warroom-route-change", () => {
+    // Soft clear all after hop so next intentional click works
+    window.setTimeout(() => pendingNav.clear(), 400);
+  });
+}
+
 /**
  * Name → /profile/[id].
  * Equipped title + just-joined pill + Chaos flames when dad went Chaos this week.
@@ -40,10 +67,9 @@ export default function PlayerLink({
   const label = name?.trim() || "TBD";
   const [liveWeek, setLiveWeek] = useState(0);
   const [chaosTick, setChaosTick] = useState(0);
+  const [navLocked, setNavLocked] = useState(false);
 
-  // Load week once on mount for Chaos flames. Do NOT re-fetch on every
-  // warroom-route-change — that × roster size caused current_week request storms.
-  // loadLeagueActiveWeek is single-flight + TTL cached in cloud.ts.
+  // Load week once on mount for Chaos flames. Do NOT re-fetch on every route hop.
   useEffect(() => {
     let cancelled = false;
     void loadLeagueActiveWeek().then((w) => {
@@ -52,12 +78,18 @@ export default function PlayerLink({
     function onChaos() {
       setChaosTick((t) => t + 1);
     }
+    function onRoute() {
+      setNavLocked(false);
+      if (id) clearProfileNavGuard(id);
+    }
     window.addEventListener("warroom-chaos-active", onChaos);
+    window.addEventListener("warroom-route-change", onRoute);
     return () => {
       cancelled = true;
       window.removeEventListener("warroom-chaos-active", onChaos);
+      window.removeEventListener("warroom-route-change", onRoute);
     };
-  }, []);
+  }, [id]);
 
   const joinBadge = useSyncExternalStore(
     subscribeJoinBadges,
@@ -80,17 +112,32 @@ export default function PlayerLink({
     return <span className={`text-muted ${className}`.trim()}>{label}</span>;
   }
 
+  function onProfileClick(e: React.MouseEvent) {
+    if (!id) return;
+    if (navLocked || !armProfileNavGuard(id)) {
+      e.preventDefault();
+      e.stopPropagation();
+      wrProfile("click-ignored-duplicate", undefined, id.slice(0, 8));
+      return;
+    }
+    setNavLocked(true);
+    wrProfile("click-received", undefined, `PlayerLink→${id.slice(0, 8)}`);
+    // Safety: unlock if navigation never completes
+    window.setTimeout(() => {
+      clearProfileNavGuard(id);
+      setNavLocked(false);
+    }, NAV_GUARD_MS);
+  }
+
   return (
-    <span className="inline-flex flex-wrap items-center gap-1 max-w-full">
+    <span
+      className={`inline-flex flex-wrap items-center gap-1 max-w-full ${
+        navLocked ? "pointer-events-none opacity-70" : ""
+      }`}
+    >
       <Link
         href={`/profile/${id}`}
-        onClick={() => {
-          try {
-            wrProfile("click-received", undefined, `PlayerLink→${id.slice(0, 8)}`);
-          } catch {
-            /* ok */
-          }
-        }}
+        onClick={onProfileClick}
         title={
           flames
             ? `${label} went CHAOS this week — pure random card, doubles if it hits`
@@ -127,7 +174,7 @@ export default function PlayerLink({
         {equippedTitle && (
           <span
             className="shrink-0 text-[10px] sm:text-[11px] font-black uppercase tracking-wide text-amber-300 no-underline"
-            title="Equipped title from Account"
+            title="Equipped on Account"
           >
             {equippedTitle}
           </span>
