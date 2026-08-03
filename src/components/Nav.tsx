@@ -92,11 +92,16 @@ export default function Nav() {
   const [eyesLabel, setEyesLabel] = useState("");
   /** Heavy chrome (modals/hydrators) after first paint */
   const [deferredReady, setDeferredReady] = useState(false);
-  /** Isolation: A = deferred chrome, B = progressive/unseen */
-  const allowDeferred = isoEnabled("deferred");
-  const allowProgressive = isoEnabled("navProgressive");
+  /**
+   * Isolation flags — DEFAULTS only on first render (SSR + hydrate match).
+   * localStorage warroom-iso applied after mount.
+   */
+  const [allowDeferred, setAllowDeferred] = useState(true);
+  const [allowProgressive, setAllowProgressive] = useState(true);
 
   useEffect(() => {
+    setAllowDeferred(isoEnabled("deferred"));
+    setAllowProgressive(isoEnabled("navProgressive"));
     return wrMount("Nav");
   }, []);
 

@@ -132,48 +132,29 @@ function readLocalHomeShell(): {
   }
 }
 
-function readShellOnce(): ReturnType<typeof readLocalHomeShell> {
-  if (typeof window === "undefined") return null;
-  return readLocalHomeShell();
-}
-
+/**
+ * HYDRATION: never read localStorage/session during useState init.
+ * Server has no window → null; client with session → shell. That mismatch was
+ * React #418 (server "Opening Home…" vs client full room).
+ * Local shell is applied in useLayoutEffect below (before paint).
+ */
 export default function Home() {
   const router = useRouter();
-  /**
-   * First render from local session — never remount to full-page "Loading…"
-   * (Commish → Home on desktop was freezing on ready=false every soft nav).
-   */
-  const [ready, setReady] = useState(() => !!readShellOnce());
-  const [leagueCode, setLeagueCode] = useState<string | null>(
-    () => readShellOnce()?.leagueCode ?? null
-  );
-  const [leagueName, setLeagueName] = useState<string | null>(
-    () => readShellOnce()?.leagueName ?? null
-  );
-  const [homeTagline, setHomeTagline] = useState(() => {
-    const s = readShellOnce();
-    return s?.homeTagline || resolveHomeTagline({});
-  });
-  const [sportId, setSportId] = useState(
-    () => readShellOnce()?.sportId || "cfb"
-  );
-  const [isCommish, setIsCommish] = useState(
-    () => !!readShellOnce()?.isCommish
-  );
-  const [actuallyCommish, setActuallyCommish] = useState(
-    () => !!readShellOnce()?.actuallyCommish
-  );
+  /** Deterministic first paint — same on server and client hydrate */
+  const [ready, setReady] = useState(false);
+  const [leagueCode, setLeagueCode] = useState<string | null>(null);
+  const [leagueName, setLeagueName] = useState<string | null>(null);
+  const [homeTagline, setHomeTagline] = useState(() => resolveHomeTagline({}));
+  const [sportId, setSportId] = useState("cfb");
+  const [isCommish, setIsCommish] = useState(false);
+  const [actuallyCommish, setActuallyCommish] = useState(false);
   const [bootError, setBootError] = useState<string | null>(null);
   const [pickList, setPickList] = useState<LeagueMembership[] | null>(null);
   const [codeCopied, setCodeCopied] = useState(false);
   /** Demote museum/lore/brackets until first lock or first scores */
-  const [firstWeekChrome, setFirstWeekChrome] = useState(
-    () => readShellOnce()?.firstWeekChrome ?? true
-  );
+  const [firstWeekChrome, setFirstWeekChrome] = useState(true);
   /** Gazette / News shelf ~week 3 */
-  const [showGazetteShelf, setShowGazetteShelf] = useState(
-    () => !!readShellOnce()?.showGazetteShelf
-  );
+  const [showGazetteShelf, setShowGazetteShelf] = useState(false);
   /** Flavor widgets after hero paints — avoid cloud fan-out on tab return */
   const [showSecondary, setShowSecondary] = useState(false);
   /**
@@ -205,7 +186,8 @@ export default function Home() {
     };
   }, [ready]);
 
-  // Sync theme + unlock chrome on enter (SPA remount from Commish/Gazette)
+  // After hydrate: paint from local session before browser paint (no #418).
+  // Soft nav re-mounts also re-run this — restores shell without stuck Loading.
   useLayoutEffect(() => {
     try {
       document.body.style.overflow = "";
