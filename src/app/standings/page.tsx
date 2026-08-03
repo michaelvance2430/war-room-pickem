@@ -289,7 +289,8 @@ export default function StandingsPage() {
           </div>
         )}
 
-        {!loading && seasonStarted && (
+        {/* Always mount Crown/Shame: empty state when no official score; never fake pts */}
+        {!loading && (
           <CrownAndShame className="mb-6" players={players} />
         )}
 

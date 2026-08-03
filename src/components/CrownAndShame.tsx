@@ -2,7 +2,7 @@
 
 /**
  * Crown & Wall of Shame — only after an official scored week.
- * Constitution: never invent achievement.
+ * Constitution: never invent achievement. Never show placeholder points.
  */
 
 import { useEffect, useState } from "react";
@@ -18,6 +18,51 @@ type Props = {
   /** When parent already loaded standings, skip a second cloud round-trip for players. */
   players?: Player[];
 };
+
+function EmptyCrownShame({ className = "" }: { className?: string }) {
+  return (
+    <div
+      className={`rounded-xl border-2 border-dashed border-border bg-card/60 overflow-hidden ${className}`}
+    >
+      <div className="px-4 py-2.5 border-b border-border/80 bg-card/80">
+        <h2 className="font-semibold text-sm">Crown &amp; Wall of Shame</h2>
+        <p className="text-[11px] text-muted mt-0.5 leading-relaxed">
+          Season begins after the first scored week. Nobody has earned glory —
+          or embarrassment — yet.
+        </p>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2">
+        <div className="p-4 sm:border-r border-border bg-primary/5">
+          <div className="text-[10px] uppercase tracking-[0.15em] text-primary mb-2 font-bold">
+            👑 This week&apos;s crown
+          </div>
+          <div className="text-lg font-bold text-foreground">No Crown Yet</div>
+          <div className="text-sm text-muted font-semibold mt-0.5">—</div>
+          <p className="text-xs text-muted mt-2 leading-relaxed">
+            Week 1 decides the first Crown. Check back after games are scored.
+          </p>
+        </div>
+        <div className="p-4 bg-toilet/5 border-t sm:border-t-0 border-border">
+          <div className="text-[10px] uppercase tracking-[0.15em] text-toilet mb-2 font-bold">
+            🧻 Wall of shame
+          </div>
+          <div className="text-lg font-bold text-foreground">Nobody… yet</div>
+          <div className="text-sm text-muted font-semibold mt-0.5">—</div>
+          <p className="text-xs text-muted mt-2 leading-relaxed">
+            Someone will be roasted after the first scored week. Don&apos;t
+            volunteer early.
+          </p>
+        </div>
+      </div>
+      <div className="px-4 py-2 border-t border-border bg-card/50 text-[11px] text-muted flex flex-wrap justify-between gap-2">
+        <span>War Room never awards what hasn&apos;t been earned.</span>
+        <Link href="/picks" className="text-primary font-semibold hover:underline">
+          Make picks →
+        </Link>
+      </div>
+    </div>
+  );
+}
 
 export default function CrownAndShame({
   className = "",
@@ -38,13 +83,15 @@ export default function CrownAndShame({
         return;
       }
 
-      if (playersProp && playersProp.length > 0) {
-        setData(weekCrownAndShame(playersProp));
-        return;
-      }
       try {
-        const players = await loadLeaguePlayers();
-        if (!cancelled) setData(weekCrownAndShame(players));
+        const players =
+          playersProp && playersProp.length > 0
+            ? playersProp
+            : await loadLeaguePlayers();
+        if (cancelled) return;
+        // Double gate: cloud scored weeks + real weeksPlayed on memberships
+        const crown = weekCrownAndShame(players);
+        setData(crown);
       } catch {
         if (!cancelled) setData(null);
       }
@@ -66,32 +113,9 @@ export default function CrownAndShame({
     );
   }
 
-  // Zero scored weeks — honest empty (not fake crown names)
+  // Zero official history — entertaining empty, never fake points
   if (!seasonStarted || !data) {
-    return (
-      <div
-        className={`rounded-xl border-2 border-dashed border-border bg-card/60 p-5 ${className}`}
-      >
-        <h2 className="font-semibold text-sm mb-1">Crown &amp; Wall of Shame</h2>
-        <p className="text-sm text-muted leading-relaxed">
-          <span className="text-primary font-semibold">No Crown Yet.</span>{" "}
-          Week 1 decides who gets to wear it.{" "}
-          <span className="text-toilet font-semibold">Wall of Shame</span> is
-          still under construction — somebody will earn it soon enough.
-        </p>
-        <p className="text-xs text-muted mt-2 leading-relaxed">
-          War Room never awards what hasn&apos;t been earned.
-        </p>
-        <div className="mt-3 flex flex-wrap gap-3 text-xs">
-          <Link href="/picks" className="text-primary font-semibold hover:underline">
-            Make picks →
-          </Link>
-          <Link href="/standings" className="text-primary hover:underline">
-            Standings →
-          </Link>
-        </div>
-      </div>
-    );
+    return <EmptyCrownShame className={className} />;
   }
 
   return (
@@ -148,10 +172,10 @@ export default function CrownAndShame({
         <span>Latest scored week · older covers in the archive</span>
         <span className="flex gap-3">
           <Link href="/gazette" className="text-primary hover:underline">
-            Archive →
+            Gazette →
           </Link>
-          <Link href="/standings" className="text-primary hover:underline">
-            Standings →
+          <Link href="/board" className="text-primary hover:underline">
+            Board →
           </Link>
         </span>
       </div>

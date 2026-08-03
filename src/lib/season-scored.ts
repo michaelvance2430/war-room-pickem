@@ -69,12 +69,16 @@ export function achievementEmptyTakeAt(index: number): AchievementEmptyTake {
 /**
  * True only when the league has at least one officially scored week.
  * This is the trust gate for Crown, Shame, competitive standings, power ranks, brackets.
+ *
+ * Trust: week_results path only (listScoredWeekNumbers) — never membership
+ * placeholder points alone.
  */
 export async function hasOfficialScoredWeek(): Promise<boolean> {
   try {
     const { listScoredWeekNumbers } = await import("./cloud");
     const weeks = await listScoredWeekNumbers();
-    return Array.isArray(weeks) && weeks.length > 0;
+    if (!Array.isArray(weeks) || weeks.length === 0) return false;
+    return true;
   } catch {
     return false;
   }

@@ -264,34 +264,36 @@ export function powerBoardWithLabels(
 }
 
 /**
- * True after at least one week has been scored this season
- * (weeks_played > 0 or any positive weekly point entry).
- * Fresh / post-reset leagues stay empty until the first score.
+ * True after at least one player has officially played a scored week.
+ * Trust: weeksPlayed only — never invent from leftover weekly_points arrays
+ * (demo / Foundry residue can leave phantom 5-pt rows without a real season).
  */
 export function leagueHasScoredWeek(players: Player[]): boolean {
-  return players.some(
-    (p) =>
-      (p.weeksPlayed || 0) > 0 ||
-      (p.weeklyPoints || []).some((n) => typeof n === "number" && n > 0)
-  );
+  return players.some((p) => (p.weeksPlayed || 0) > 0);
 }
 
 /**
  * This week's Crown (high score) and Wall of Shame (low score).
  * Uses the last entry in weeklyPoints for each player.
  * Returns null before any week is scored (including after season reset).
+ * Constitution: never invent achievement / placeholder stats.
  */
 export function weekCrownAndShame(players: Player[]): CrownShame | null {
   if (!players.length || !leagueHasScoredWeek(players)) return null;
 
+  // Only players who actually have a scored week count toward crown/shame
   const withLast = players
+    .filter((p) => (p.weeksPlayed || 0) > 0)
     .map((p) => ({ player: p, pts: lastWeekPts(p) }))
     .filter((x): x is { player: Player; pts: number } => x.pts != null);
 
   if (withLast.length < 1) return null;
 
-  // All zeros / empty after a soft reset — still nothing to crown
-  if (withLast.every((r) => r.pts === 0) && players.every((p) => !(p.weeksPlayed || 0))) {
+  // All zeros with no real play history — still nothing to crown
+  if (
+    withLast.every((r) => r.pts === 0) &&
+    players.every((p) => !(p.weeksPlayed || 0))
+  ) {
     return null;
   }
 
@@ -301,8 +303,8 @@ export function weekCrownAndShame(players: Player[]): CrownShame | null {
   );
   const weekLabel = "Latest scored week";
 
-  let crown = withLast[0];
-  let shame = withLast[0];
+  let crown = withLast[0]!;
+  let shame = withLast[0]!;
   for (const row of withLast) {
     if (row.pts > crown.pts) crown = row;
     if (row.pts < shame.pts) shame = row;
