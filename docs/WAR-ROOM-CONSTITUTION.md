@@ -84,6 +84,26 @@ The Board’s promise: *it reveals what happened this season.*
 Zero scored weeks → empty state, not placeholder weeks, not demo cards, not practice artifacts.  
 The first scored week is when The Board comes alive.
 
+### Anticipation principle
+
+> **War Room celebrates anticipation as much as history.**
+
+Before kickoff there is excitement, trash talk, predictions, and nerves.  
+The app should not rush through that phase. It should enjoy it.
+
+Empty is not a hole to fill. Empty is the truthful experience of *not yet*.  
+Curiosity can be rewarded (a second take, a third joke) without inventing a season that hasn’t started.
+
+### Season, not software
+
+> **War Room should feel like football season — not a football app.**
+
+Apps are about information. Season is about anticipation, inside jokes, waiting for Thursday, checking the wall, wondering who forgot picks, celebrating, and giving your buddy grief.
+
+Every destination (League, The Room, Practice Mode, The Board) should answer:  
+*Does this feel like something that happens in a real season with real people?*  
+If it only feels like software, cut or redesign.
+
 ### Reality principle
 
 > **War Room should never make the user question whether their actions are real.**
