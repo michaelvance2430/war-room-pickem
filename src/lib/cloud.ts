@@ -2186,19 +2186,15 @@ export async function listScoredWeekNumbers(): Promise<number[]> {
         ? Math.round(performance.now() - gr0)
         : 0;
 
-    // If game_results query fails (table missing), fall back to any week_results
+    // Trust: never invent scored history from empty week_results shells.
+    // If game_results is unreachable, return [] (not a poisoned "all weeks scored").
     if (!gr) {
       wrBoardP1(
         "game_results.week_result_id",
         "FAIL",
         grMs,
-        "null/timeout→fallback"
+        "null/timeout→empty (no shell fallback)"
       );
-      const fallback = data.rows
-        .map((r) => Number(r.week_number))
-        .filter((n) => !Number.isNaN(n))
-        .sort((a, b) => a - b);
-      cacheSet(scoredCache, session.leagueId, fallback);
       const total =
         typeof performance !== "undefined"
           ? Math.round(performance.now() - fn0)
@@ -2207,9 +2203,10 @@ export async function listScoredWeekNumbers(): Promise<number[]> {
         "listScoredWeekNumbers",
         "DONE",
         total,
-        `fallback n=${fallback.length} (wr=${wrMs}ms + gr=${grMs}ms SERIAL)`
+        `empty-after-gr-fail (wr=${wrMs}ms + gr=${grMs}ms SERIAL)`
       );
-      return fallback;
+      // Do not cache empty on timeout — next call may succeed
+      return [];
     }
     wrBoardP1(
       "game_results.week_result_id",
@@ -2222,11 +2219,26 @@ export async function listScoredWeekNumbers(): Promise<number[]> {
       (gr || []).map((g) => g.week_result_id as string)
     );
     // Only weeks that actually have ATS winners recorded
-    const out = data.rows
+    let out = data.rows
       .filter((r) => withGames.has(r.id as string))
       .map((r) => Number(r.week_number))
-      .filter((n) => !Number.isNaN(n))
+      .filter((n) => !Number.isNaN(n) && n !== 99)
       .sort((a, b) => a - b);
+
+    // Contiguous published prefix only — drop orphan "Week 5 scored" residue
+    try {
+      const { trustOfficialScoredWeeks } = await import(
+        "./week-history-trust"
+      );
+      const published = await listPublishedWeekNumbers().catch(
+        () => [] as number[]
+      );
+      const sid = getLeague()?.sportId;
+      out = trustOfficialScoredWeeks(out, published, sid);
+    } catch {
+      /* keep raw out */
+    }
+
     cacheSet(scoredCache, session.leagueId, out);
     const total =
       typeof performance !== "undefined"

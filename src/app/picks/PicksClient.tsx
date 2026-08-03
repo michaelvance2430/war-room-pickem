@@ -1389,17 +1389,47 @@ export default function PicksClient() {
     }
   }, [allGamesPicked]);
 
-  // Weeks shown: published + scored + active (so past scored weeks stay clickable)
-  const weekPills = [
-    ...new Set(
-      [...publishedWeeks, ...scoredWeeks, activeWeek].filter((w) => w >= 0)
-    ),
-  ].sort((a, b) => a - b);
+  // Trust: published + official scored + live only — never practice / orphan residue
+  // (e.g. "Week 5 · scored" when season is still on Week 0)
+  const weekPills = (() => {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { trustWeekBrowserWeeks } = require("@/lib/week-history-trust") as typeof import("@/lib/week-history-trust");
+      return trustWeekBrowserWeeks({
+        published: publishedWeeks,
+        scored: scoredWeeks,
+        activeWeek,
+        sportId: getLeague()?.sportId,
+      });
+    } catch {
+      return [
+        ...new Set(
+          [...publishedWeeks, ...scoredWeeks, activeWeek].filter(
+            (w) => w >= 0 && w !== 99
+          )
+        ),
+      ].sort((a, b) => a - b);
+    }
+  })();
+
+  const trustedScoredWeeks = (() => {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { trustOfficialScoredWeeks } = require("@/lib/week-history-trust") as typeof import("@/lib/week-history-trust");
+      return trustOfficialScoredWeeks(
+        scoredWeeks,
+        publishedWeeks,
+        getLeague()?.sportId
+      );
+    } catch {
+      return scoredWeeks.filter((w) => w !== 99);
+    }
+  })();
 
   const viewIsScored =
     practiceMode && practiceScored
       ? true
-      : scoredWeeks.includes(viewWeek);
+      : trustedScoredWeeks.includes(viewWeek);
   const myWeekScore =
     hasCard &&
     (viewIsScored || (practiceMode && Object.keys(weekResults).length > 0)) &&
@@ -1789,7 +1819,7 @@ export default function PicksClient() {
               {weekPills.map((w) => {
                 const isView = w === viewWeek;
                 const isActive = w === activeWeek;
-                const isScored = scoredWeeks.includes(w);
+                const isScored = trustedScoredWeeks.includes(w);
                 return (
                   <button
                     key={w}
@@ -1975,10 +2005,10 @@ export default function PicksClient() {
               )}
             {weekEditable &&
               !isCardLockDeadlinePassed(games, now) &&
-              scoredWeeks.length > 0 && (
+              trustedScoredWeeks.length > 0 && (
                 <div className="mb-4 rounded-lg border border-border bg-card-hover px-4 py-2 text-sm">
       <Link
-                    href={`/board?week=${scoredWeeks[scoredWeeks.length - 1]}`}
+                    href={`/board?week=${trustedScoredWeeks[trustedScoredWeeks.length - 1]}`}
                     className="text-primary font-semibold hover:underline"
                   >
                     See last week&apos;s Board →
