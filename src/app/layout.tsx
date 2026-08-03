@@ -13,6 +13,8 @@ import LeagueBuildGate from "@/components/LeagueBuildGate";
 import SmoothRuntime from "@/components/SmoothRuntime";
 import AppShell from "@/components/AppShell";
 import ThemeDecorGate from "@/components/ThemeDecorGate";
+import SafeNavBadge from "@/components/SafeNavBadge";
+import NavDiagPanel from "@/components/NavDiagPanel";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -94,10 +96,15 @@ export default function RootLayout({
         <PracticeModeChrome />
         {/* Practice completion — not via DeferredChrome (production-safe) */}
         <BoredPracticeDoneModal />
-        {/* War Room Moments — Season Opening first; never DeferredChrome */}
+        {/*
+          War Room Moments + badge queue — MomentHost no-ops in SAFE NAV.
+          Badge unlocks still gated inside the component under safe-nav.
+        */}
         <MomentHost />
-        {/* Achievement reveals (lore + cheevos) — never DeferredChrome */}
         <BadgeUnlockModal />
+        {/* Creator-only: SAFE NAV strip + optional nav diag */}
+        <SafeNavBadge />
+        <NavDiagPanel />
         <AppShell>{children}</AppShell>
       </body>
     </html>

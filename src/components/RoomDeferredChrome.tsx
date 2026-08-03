@@ -199,12 +199,22 @@ export default function RoomDeferredChrome() {
     wrDeferred(`state wave=${wave} hops=${routeHops} ceremonyOk=${ceremonyOk}`);
   }, [wave, routeHops, ceremonyOk]);
 
+  // P0 SAFE NAV: wave 1/2 full-screens stay off (hydrator only)
+  let safeNav = false;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const sn = require("@/lib/safe-nav") as typeof import("@/lib/safe-nav");
+    safeNav = sn.isSafeNavMode();
+  } catch {
+    safeNav = false;
+  }
+
   return (
     <>
       {/* Wave 0: nameplates only — never blocks taps */}
       {!guest && <RoomDataHydrator />}
 
-      {allowWave1 && wave >= 1 && (
+      {!safeNav && allowWave1 && wave >= 1 && (
         <>
           {!guest && <LoginWelcomeModal />}
           {!guest && <RulesOnboardingModal />}
@@ -219,7 +229,7 @@ export default function RoomDeferredChrome() {
         </>
       )}
 
-      {allowWave2 && wave >= 2 && ceremonyOk && (
+      {!safeNav && allowWave2 && wave >= 2 && ceremonyOk && (
         <>
           {!guest && <SeasonCountdownTicker />}
           {/* Season Opening → MomentHost (layout), not DeferredChrome */}

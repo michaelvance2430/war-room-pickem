@@ -113,6 +113,14 @@ export default function LoginWelcomeModal() {
       if (dismissedRef.current || openRef.current) return;
       if (isDismissedForever()) return;
 
+      // P0 SAFE NAV: no full-screen welcome trap
+      try {
+        const { isSafeNavMode } = await import("@/lib/safe-nav");
+        if (isSafeNavMode()) return;
+      } catch {
+        /* ok */
+      }
+
       const session = getSession();
       if (!session?.playerId) return;
       if (wasShownThisSession()) return;

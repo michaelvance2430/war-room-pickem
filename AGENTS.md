@@ -50,3 +50,19 @@ If the repo is intentionally detached, push is impossible, or the user forbids p
 ## Why
 
 Local-only commits are not backed up, can be lost, hide what is deployed, and make rollback/compare harder. Remote `main` is the single source of truth for War Room launch work.
+
+## P0 navigation stability (SAFE NAV)
+
+Until plain-app navigation is proven stable:
+
+1. Prefer **`SAFE_NAV_DEFAULT = true`** in `src/lib/safe-nav.ts` (auto Moments, coaching UI, nonessential full-screens off).
+2. Never ship a full-screen layer with `pointer-events: auto` that can linger after dismiss.
+3. Every modal/moment must clean up on unmount; body scroll locks must expire.
+4. Escape + route change must call recovery (`recoverNavigation` / `forceUnlockAllChrome`).
+5. Do not re-enable auto Moments / coaching until multi-minute nav regression passes.
+
+Creator re-enable on one browser only:
+
+```js
+localStorage.setItem("warroom-safe-nav-off", "1"); location.reload();
+```

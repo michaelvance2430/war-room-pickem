@@ -2,38 +2,41 @@
 
 /**
  * Production-safe War Room Moments runtime host.
- * Never goes through RoomDeferredChrome.
  *
- * Mounts real presentation surfaces that were previously trapped in
- * DeferredChrome (Ring, Gazette) so Foundry + production can actually run them.
+ * SAFE NAV MODE (default ON): mounts nothing — auto Moments / cinematics
+ * cannot intercept navigation while we prove base app stability.
+ * Creator override: localStorage warroom-safe-nav-off=1
  */
 
 import dynamic from "next/dynamic";
+import { isSafeNavMode } from "@/lib/safe-nav";
 
 const SeasonOpeningMoment = dynamic(
   () => import("@/components/moments/SeasonOpeningMoment"),
   { ssr: false }
 );
 
-/** Championship / defending-champ ring walk — full ceremony, not a page redirect */
 const RingCeremonyModal = dynamic(
   () => import("@/components/RingCeremonyModal"),
   { ssr: false }
 );
 
-/** Scored-week newspaper — must not silently open Home */
 const GazetteModal = dynamic(
   () => import("@/components/GazetteModal"),
   { ssr: false }
 );
 
-/** Preseason cold open — mount so Foundry preview is not a dead route */
 const WeeklyColdOpenModal = dynamic(
   () => import("@/components/WeeklyColdOpenModal"),
   { ssr: false }
 );
 
 export default function MomentHost() {
+  // P0: no auto moments / full-screen cinematics until nav is proven stable
+  if (isSafeNavMode()) {
+    return null;
+  }
+
   return (
     <>
       <SeasonOpeningMoment />

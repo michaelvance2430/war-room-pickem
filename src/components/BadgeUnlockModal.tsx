@@ -31,9 +31,36 @@ export default function BadgeUnlockModal() {
   const current = queue[0] ?? null;
   const remaining = Math.max(0, queue.length - 1);
 
+  // P0 SAFE NAV: no auto full-screen badge queue (can trap navigation)
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { isSafeNavMode, EVENT_FORCE_DISMISS_OVERLAYS } =
+        require("@/lib/safe-nav") as typeof import("@/lib/safe-nav");
+      if (isSafeNavMode()) {
+        setQueue([]);
+      }
+      function onDismiss() {
+        setQueue([]);
+      }
+      window.addEventListener(EVENT_FORCE_DISMISS_OVERLAYS, onDismiss);
+      return () =>
+        window.removeEventListener(EVENT_FORCE_DISMISS_OVERLAYS, onDismiss);
+    } catch {
+      /* ok */
+    }
+  }, []);
+
   const tryCelebrate = useCallback(async (opts?: { force?: boolean }) => {
     if (checked && !opts?.force) return;
     if (!getSession()?.playerId) return;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { isSafeNavMode } = require("@/lib/safe-nav") as typeof import("@/lib/safe-nav");
+      if (isSafeNavMode() && !opts?.force) return;
+    } catch {
+      /* ok */
+    }
 
     // After first lock only for calm first 10 minutes; season-alive still ok later
     // Foundry testing (not quiet eyes) can celebrate so you can see cheevo UX

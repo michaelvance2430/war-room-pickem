@@ -22,6 +22,12 @@ import {
 import { isGuestMode } from "@/lib/guest-mode";
 import { getSession } from "@/lib/league";
 import {
+  recoverNavigation,
+  shouldReleaseStaleBodyLock,
+  noteNavAttempt,
+  isSafeNavMode,
+} from "@/lib/safe-nav";
+import {
   wrMount,
   wrEffect,
   wrRoute,
@@ -85,11 +91,20 @@ export default function SmoothRuntime() {
     if (pathname?.startsWith("/profile")) {
       wrProfileRoute("SmoothRuntime.route-effect", pathname);
     }
+    noteNavAttempt({
+      source: "SmoothRuntime.route",
+      target: pathname || undefined,
+      blocked: false,
+      reason: "route-change",
+    });
     if (!isoEnabled("smoothPrep")) {
       wrLog("[WR-NAV]", "route unlock skipped (smoothPrep=false)");
+      // Still recover in SAFE NAV — never leave locks across routes
+      if (isSafeNavMode()) recoverNavigation("route-safe-nav");
       return;
     }
     forceUnlockAllChrome();
+    recoverNavigation("route-change");
     scrollTopHard();
     const t0 = requestAnimationFrame(() => {
       forceUnlockAllChrome();
@@ -97,6 +112,10 @@ export default function SmoothRuntime() {
     });
     // One delayed orphan check is enough — avoid triple forceUnlock storms
     const t1 = window.setTimeout(() => unlockIfOrphanedLock(), 400);
+    // Hard fail-safe: never stay locked >4s after a route change
+    const t2 = window.setTimeout(() => {
+      if (bodyLooksLocked()) recoverNavigation("route-failsafe-4s");
+    }, 4_000);
     try {
       if (pathname?.startsWith("/profile")) {
         wrProfileRoute("SmoothRuntime.dispatch-route-change", pathname);
@@ -113,6 +132,7 @@ export default function SmoothRuntime() {
     return () => {
       cancelAnimationFrame(t0);
       window.clearTimeout(t1);
+      window.clearTimeout(t2);
     };
   }, [pathname]);
 
@@ -139,23 +159,39 @@ export default function SmoothRuntime() {
         )
       ) {
         unlockIfOrphanedLock();
+        if (shouldReleaseStaleBodyLock()) {
+          recoverNavigation("stale-body-lock-pointer");
+        }
       }
+    }
+
+    /** Escape always releases nonessential traps */
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== "Escape") return;
+      recoverNavigation("escape");
     }
 
     document.addEventListener("visibilitychange", onVis);
     window.addEventListener("pageshow", onVis);
     window.addEventListener("focus", onVis);
     document.addEventListener("pointerdown", onPointerDown, true);
+    window.addEventListener("keydown", onKey);
 
     // Was 1s forever → getComputedStyle on every dialog. Now: 8s and only
     // run the expensive walk when the body style still looks locked.
+    // SAFE NAV: also pulse recover every 3s if body still locked.
     let pulse: number | undefined;
-    if (isoEnabled("smoothPulse")) {
+    if (isoEnabled("smoothPulse") || isSafeNavMode()) {
       pulse = wrSetInterval(
         () => {
-          if (bodyLooksLocked()) unlockIfOrphanedLock();
+          if (bodyLooksLocked()) {
+            unlockIfOrphanedLock();
+            if (shouldReleaseStaleBodyLock() || isSafeNavMode()) {
+              recoverNavigation("orphan-pulse");
+            }
+          }
         },
-        8_000,
+        isSafeNavMode() ? 3_000 : 8_000,
         "orphan-lock-pulse"
       );
     }
@@ -165,6 +201,7 @@ export default function SmoothRuntime() {
       window.removeEventListener("pageshow", onVis);
       window.removeEventListener("focus", onVis);
       document.removeEventListener("pointerdown", onPointerDown, true);
+      window.removeEventListener("keydown", onKey);
       if (pulse != null) wrClearInterval(pulse, "orphan-lock-pulse");
     };
   }, []);

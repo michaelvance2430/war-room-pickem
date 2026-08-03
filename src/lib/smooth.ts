@@ -50,6 +50,13 @@ export function lockBodyScroll(): void {
   if (typeof document === "undefined") return;
   bodyLockCount += 1;
   wrBodyLock(1, "lockBodyScroll");
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const sn = require("./safe-nav") as typeof import("./safe-nav");
+    sn.markBodyLockStarted();
+  } catch {
+    /* ok */
+  }
   if (bodyLockCount === 1) {
     try {
       document.body.style.overflow = "hidden";
@@ -64,6 +71,13 @@ export function unlockBodyScroll(): void {
   bodyLockCount = Math.max(0, bodyLockCount - 1);
   wrBodyLock(-1, "unlockBodyScroll");
   if (bodyLockCount === 0) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const sn = require("./safe-nav") as typeof import("./safe-nav");
+      sn.clearBodyLockTimer();
+    } catch {
+      /* ok */
+    }
     unlockDocumentChrome();
   }
 }
@@ -74,6 +88,13 @@ export function forceUnlockAllChrome(): void {
     wrBodyLock(-bodyLockCount, "forceUnlockAllChrome");
   }
   bodyLockCount = 0;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const sn = require("./safe-nav") as typeof import("./safe-nav");
+    sn.clearBodyLockTimer();
+  } catch {
+    /* ok */
+  }
   unlockDocumentChrome();
 }
 
