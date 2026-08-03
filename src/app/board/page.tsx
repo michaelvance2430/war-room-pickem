@@ -68,15 +68,38 @@ function BoardInner() {
   }, []);
 
   const load = useCallback(async (w: number) => {
+    const t0 = performance.now();
+    const mark = (label: string, extra?: string) => {
+      try {
+        if (
+          process.env.NODE_ENV === "development" ||
+          localStorage.getItem("warroom-runtime-debug") === "1"
+        ) {
+          console.log(
+            `[WR-PERF][board] ${label} +${Math.round(performance.now() - t0)}ms`,
+            extra || ""
+          );
+        }
+        performance.mark(`wr-board:${label}`);
+      } catch {
+        /* ok */
+      }
+    };
+    mark("load-start", `w=${w}`);
     setLoading(true);
     setError(null);
     setSelfId(getSession()?.playerId || null);
     try {
+      mark("phase1-start");
       const [pub, scoredList, active] = await Promise.all([
         listPublishedWeekNumbers(),
         listScoredWeekNumbers(),
         loadLeagueActiveWeek(),
       ]);
+      mark(
+        "phase1-done",
+        `pub=${pub.length} scored=${scoredList.length} active=${active}`
+      );
       const all = [...new Set([...pub, ...scoredList, active])].sort(
         (a, b) => a - b
       );
@@ -93,12 +116,17 @@ function BoardInner() {
             active;
       }
       setWeek(target);
+      mark("phase2-start", `target=${target}`);
 
       const [c, res, board] = await Promise.all([
         loadWeekCard(target),
         loadWeekResultsFromCloud(target),
         loadLeagueWeekBoard(target),
       ]);
+      mark(
+        "phase2-done",
+        `cardGames=${c?.games?.length ?? 0} slips=${board.slips?.length ?? 0} ok=${board.ok}`
+      );
       setCard(c);
       setResults(res?.results || {});
       setPropResult(res?.propResult ?? null);
@@ -116,8 +144,10 @@ function BoardInner() {
       }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to load board");
+      mark("load-error");
     } finally {
       setLoading(false);
+      mark("loading-false-interactive");
     }
   }, []);
 

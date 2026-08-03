@@ -51,6 +51,24 @@ export default function StandingsPage() {
   useEffect(() => {
     let cancelled = false;
     async function load() {
+      const t0 = performance.now();
+      const mark = (label: string, extra?: string) => {
+        try {
+          if (
+            process.env.NODE_ENV === "development" ||
+            localStorage.getItem("warroom-runtime-debug") === "1"
+          ) {
+            console.log(
+              `[WR-PERF][standings] ${label} +${Math.round(performance.now() - t0)}ms`,
+              extra || ""
+            );
+          }
+          performance.mark(`wr-standings:${label}`);
+        } catch {
+          /* ok */
+        }
+      };
+      mark("effect-start");
       const sid = getSession()?.playerId || null;
       setSelfId(sid);
       if (sid) {
@@ -63,10 +81,18 @@ export default function StandingsPage() {
       }
       // Fail-safe: never leave standings stuck on spinner if cloud hangs
       const failSafe = window.setTimeout(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          mark("failSafe-3.5s-clear-loading");
+          setLoading(false);
+        }
       }, 3_500);
       try {
+        mark("loadLeaguePlayers-start");
         const list = await pageLoad(loadLeaguePlayers(), []);
+        mark(
+          "loadLeaguePlayers-done",
+          `n=${Array.isArray(list) ? list.length : 0}`
+        );
         if (cancelled) return;
         setPlayers(Array.isArray(list) ? list : []);
         try {
@@ -77,15 +103,27 @@ export default function StandingsPage() {
           const map: Record<string, (typeof ranked)[0]["swing"]> = {};
           for (const r of ranked) map[r.id] = r.swing;
           setSwingById(map);
+          mark("swing-calc-done");
         } catch {
           setSwingById({});
         }
       } catch {
         /* offline / cloud — leave empty after loading clears */
         if (!cancelled) setPlayers([]);
+        mark("load-error");
       } finally {
         window.clearTimeout(failSafe);
         if (!cancelled) setLoading(false);
+        mark("loading-false-interactive");
+        try {
+          performance.measure(
+            "wr-standings:total",
+            "wr-standings:effect-start",
+            "wr-standings:loading-false-interactive"
+          );
+        } catch {
+          /* ok */
+        }
       }
     }
     load();

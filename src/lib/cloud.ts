@@ -1476,6 +1476,26 @@ export async function loadLeagueWeekBoard(weekNumber: number): Promise<{
   try {
     const supabase = createClient();
     const leagueId = session.leagueId;
+    const bt0 =
+      typeof performance !== "undefined" ? performance.now() : Date.now();
+    const bperf = (label: string, extra?: string) => {
+      try {
+        const on =
+          (typeof process !== "undefined" &&
+            process.env.NODE_ENV === "development") ||
+          (typeof window !== "undefined" &&
+            localStorage.getItem("warroom-runtime-debug") === "1");
+        if (!on) return;
+        const ms =
+          typeof performance !== "undefined"
+            ? Math.round(performance.now() - bt0)
+            : 0;
+        console.log(`[WR-PERF][board] weekBoard ${label} +${ms}ms`, extra || "");
+      } catch {
+        /* ok */
+      }
+    };
+    bperf("start", `week=${weekNumber}`);
 
     const { data: wr } = await supabase
       .from("week_results")
@@ -1484,11 +1504,14 @@ export async function loadLeagueWeekBoard(weekNumber: number): Promise<{
       .eq("week_number", weekNumber)
       .maybeSingle();
     const scored = !!wr;
+    bperf("week_results-done", `scored=${scored}`);
 
     // Client-side lock check (first kickoff) for messaging + soft gate
+    // NOTE: sequential await after week_results — also often duplicates page-level loadWeekCard
     let lockedOpen = scored;
     try {
       const card = await loadWeekCard(weekNumber);
+      bperf("inner-loadWeekCard-done", `games=${card?.games?.length ?? 0}`);
       if (card?.games?.length) {
         const { isCardLockDeadlinePassed } = await import("./dates");
         if (isCardLockDeadlinePassed(card.games)) lockedOpen = true;
@@ -1501,6 +1524,7 @@ export async function loadLeagueWeekBoard(weekNumber: number): Promise<{
       .from("memberships")
       .select("user_id, is_bot, profiles(display_name)")
       .eq("league_id", leagueId);
+    bperf("memberships-done", `n=${members?.length ?? 0}`);
 
     let pickRows: Record<string, unknown>[] | null = null;
     let pickErr: { message?: string } | null = null;
@@ -1522,13 +1546,16 @@ export async function loadLeagueWeekBoard(weekNumber: number): Promise<{
           .eq("week_number", weekNumber);
         pickRows = (res2.data || null) as Record<string, unknown>[] | null;
         pickErr = res2.error;
+        bperf("picks-fallback-done", pickErr?.message || `n=${pickRows?.length ?? 0}`);
       } else {
         pickRows = (res.data || null) as Record<string, unknown>[] | null;
         pickErr = res.error;
+        bperf("picks-done", pickErr?.message || `n=${pickRows?.length ?? 0}`);
       }
     }
 
     if (pickErr) {
+      bperf("picks-error-return");
       return {
         ok: false,
         slips: [],
@@ -2475,8 +2502,36 @@ export async function loadLeagueStandings(): Promise<StandingsCloudRow[]> {
   const session = getSession();
   if (!session?.leagueId) return [];
   const supabase = createClient();
+  const t0 =
+    typeof performance !== "undefined" ? performance.now() : Date.now();
+  const perf = (label: string, extra?: string) => {
+    try {
+      if (
+        typeof process !== "undefined" &&
+        process.env.NODE_ENV === "development"
+      ) {
+        const ms =
+          typeof performance !== "undefined"
+            ? Math.round(performance.now() - t0)
+            : 0;
+        console.log(`[WR-PERF][standings] standings-query ${label} +${ms}ms`, extra || "");
+      } else if (
+        typeof window !== "undefined" &&
+        localStorage.getItem("warroom-runtime-debug") === "1"
+      ) {
+        const ms =
+          typeof performance !== "undefined"
+            ? Math.round(performance.now() - t0)
+            : 0;
+        console.log(`[WR-PERF][standings] standings-query ${label} +${ms}ms`, extra || "");
+      }
+    } catch {
+      /* ok */
+    }
+  };
 
   // One trip: membership stats + display name + last_seen (no second profiles query)
+  perf("primary-start");
   const primary = await withTimeout(
     Promise.resolve(
       supabase
@@ -2493,12 +2548,19 @@ export async function loadLeagueStandings(): Promise<StandingsCloudRow[]> {
       error: { message: "timeout" } as { message?: string } | null,
     }
   );
+  perf(
+    "primary-done",
+    primary.error
+      ? `err=${primary.error.message}`
+      : `rows=${primary.data?.length ?? 0}`
+  );
 
   if (!primary.error && primary.data) {
     return mapStandingsRows(primary.data);
   }
 
-  // Older schema / embed fail: name only
+  // Older schema / embed fail: name only — WORST CASE +6s after primary 8s
+  perf("fallback-start");
   const fallback = await withTimeout(
     Promise.resolve(
       supabase
@@ -2514,6 +2576,12 @@ export async function loadLeagueStandings(): Promise<StandingsCloudRow[]> {
       data: null as Record<string, unknown>[] | null,
       error: { message: "timeout" } as { message?: string } | null,
     }
+  );
+  perf(
+    "fallback-done",
+    fallback.error
+      ? `err=${fallback.error.message}`
+      : `rows=${fallback.data?.length ?? 0}`
   );
   if (!fallback.data?.length) return [];
   return mapStandingsRows(fallback.data);
