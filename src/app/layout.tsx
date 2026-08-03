@@ -13,6 +13,8 @@ import LeagueBuildGate from "@/components/LeagueBuildGate";
 import SmoothRuntime from "@/components/SmoothRuntime";
 import AppShell from "@/components/AppShell";
 import ThemeDecorGate from "@/components/ThemeDecorGate";
+/** Creator-only client component — no-ops for non-creators */
+import CreatorSkinPreview from "@/components/CreatorSkinPreview";
 
 
 const geistSans = Geist({
@@ -102,6 +104,8 @@ export default function RootLayout({
         <MomentHost />
         <BadgeUnlockModal />
         <AppShell>{children}</AppShell>
+        {/* Mike only — browser skin sim through production resolver */}
+        <CreatorSkinPreview />
       </body>
     </html>
   );

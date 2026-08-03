@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { getLeague, getSession } from "@/lib/league";
 import {
   applySeasonTheme,
+  CREATOR_SKIN_SIM_EVENT,
   DEFAULT_SEASON_THEME_ID,
   isHolidayThemeId,
   paintAutomaticSeasonTheme,
@@ -77,10 +78,15 @@ export default function SeasonThemeApplier() {
       void paintAutomaticSeasonTheme().then((id) => afterPaint(id));
     }
 
+    function onCreatorSim() {
+      void paintAutomaticSeasonTheme().then((id) => afterPaint(id));
+    }
+
     document.addEventListener("visibilitychange", onVis);
     window.addEventListener(SEASON_THEME_EVENT, onThemeEvent);
     window.addEventListener("warroom-view-as-player", onPlayerView);
     window.addEventListener("storage", onLeagueSwitch);
+    window.addEventListener(CREATOR_SKIN_SIM_EVENT, onCreatorSim);
     return () => {
       cancelled = true;
       window.clearInterval(tick);
@@ -88,6 +94,7 @@ export default function SeasonThemeApplier() {
       window.removeEventListener(SEASON_THEME_EVENT, onThemeEvent);
       window.removeEventListener("warroom-view-as-player", onPlayerView);
       window.removeEventListener("storage", onLeagueSwitch);
+      window.removeEventListener(CREATOR_SKIN_SIM_EVENT, onCreatorSim);
     };
   }, []);
 

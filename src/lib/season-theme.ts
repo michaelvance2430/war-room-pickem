@@ -156,13 +156,13 @@ export function resolveSeasonThemeIdForSport(
 }
 
 export const SEASON_THEME_EVENT = "warroom-season-theme";
+/** Fired when creator sim applies or resets (local only). */
+export const CREATOR_SKIN_SIM_EVENT = "warroom-creator-skin-sim";
 
 const ET = "America/New_York";
 
-/** Creator-only local preview — never a product preference. */
-export const CREATOR_SKIN_PREVIEW_KEY = "warroom-creator-skin-preview-v1";
-/** Query param: ?wr_skin_preview=halloween */
-export const CREATOR_SKIN_PREVIEW_QUERY = "wr_skin_preview";
+/** Browser-only sim state (creator). Not a product preference. */
+export const CREATOR_SKIN_SIM_KEY = "warroom-creator-skin-sim-v1";
 
 // ── Eastern Time calendar helpers ──────────────────────────────────────
 
@@ -326,72 +326,240 @@ export function resolveCfbSkin(input: {
   return resolveCfbSeasonSkin(input.trustedWeek);
 }
 
-// ── Creator preview (Mike only) ────────────────────────────────────────
+// ── Creator sim (Mike only) — real resolver, fake clock/week ───────────
 
-function readCreatorPreviewRaw(): string | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const q = new URLSearchParams(window.location.search).get(
-      CREATOR_SKIN_PREVIEW_QUERY
-    );
-    if (q && isSeasonThemeId(q)) return q;
-    if (q === "auto" || q === "automatic" || q === "off") return null;
-  } catch {
-    /* ignore */
-  }
-  try {
-    const raw = localStorage.getItem(CREATOR_SKIN_PREVIEW_KEY);
-    if (raw && isSeasonThemeId(raw)) return raw;
-    if (raw === "auto" || raw === "" || raw === "null") return null;
-  } catch {
-    /* ignore */
-  }
-  return null;
-}
+export type CreatorSkinSimState = {
+  /** When true, production resolver uses simulated ET wall + week */
+  active: boolean;
+  /** YYYY-MM-DD Eastern wall date */
+  etDate: string;
+  /** HH:mm Eastern wall time */
+  etTime: string;
+  /** Simulated trusted CFB week (0–18) */
+  week: number;
+};
 
-/**
- * Creator-only force skin. Returns null if not creator or no preview set.
- * Does not write league configuration.
- */
-export function getCreatorSkinPreview(
-  userId?: string | null
-): SeasonThemeId | null {
+function assertCreator(userId?: string | null): boolean {
   try {
     const { isAppCreator } = require("./creator") as typeof import("./creator");
     const { getSession } = require("./league") as typeof import("./league");
     const uid = userId ?? getSession()?.playerId;
-    if (!isAppCreator(uid)) return null;
+    return isAppCreator(uid);
   } catch {
-    return null;
+    return false;
   }
-  const raw = readCreatorPreviewRaw();
-  return raw && isSeasonThemeId(raw) ? raw : null;
+}
+
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+/** Format a Date as Eastern wall YYYY-MM-DD and HH:mm. */
+export function formatEasternWall(now: Date = new Date()): {
+  etDate: string;
+  etTime: string;
+} {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: ET,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(now);
+  const y = parts.find((p) => p.type === "year")?.value || "2026";
+  const m = parts.find((p) => p.type === "month")?.value || "01";
+  const d = parts.find((p) => p.type === "day")?.value || "01";
+  const h = parts.find((p) => p.type === "hour")?.value || "12";
+  const mi = parts.find((p) => p.type === "minute")?.value || "00";
+  return { etDate: `${y}-${m}-${d}`, etTime: `${pad2(Number(h))}:${pad2(Number(mi))}` };
 }
 
 /**
- * Set or clear creator preview (local only). No-op for non-creators.
- * Pass null / "auto" to return to Automatic.
+ * Build a Date whose America/New_York wall clock matches etDate + etTime.
+ * Used so holiday windows resolve identically for every viewer.
  */
-export function setCreatorSkinPreview(
-  id: SeasonThemeId | "auto" | null
+export function dateFromEasternWallClock(
+  etDate: string,
+  etTime: string
+): Date {
+  const [ys, ms, ds] = etDate.split("-");
+  const [hs, mis] = etTime.split(":");
+  const Y = Number(ys);
+  const M = Number(ms);
+  const D = Number(ds);
+  const h = Number(hs);
+  const mi = Number(mis || "0");
+  if (![Y, M, D, h, mi].every((n) => Number.isFinite(n))) {
+    return new Date();
+  }
+  const target = `${Y}-${pad2(M)}-${pad2(D)} ${pad2(h)}:${pad2(mi)}`;
+  // Search a 48h UTC window around the calendar day
+  let lo = Date.UTC(Y, M - 1, D - 1, 0, 0, 0);
+  let hi = Date.UTC(Y, M - 1, D + 2, 0, 0, 0);
+  const fmt = (ms: number) => {
+    const p = new Intl.DateTimeFormat("en-US", {
+      timeZone: ET,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    }).formatToParts(new Date(ms));
+    const y = p.find((x) => x.type === "year")?.value;
+    const mo = p.find((x) => x.type === "month")?.value;
+    const d = p.find((x) => x.type === "day")?.value;
+    const hr = p.find((x) => x.type === "hour")?.value;
+    const mn = p.find((x) => x.type === "minute")?.value;
+    return `${y}-${mo}-${d} ${pad2(Number(hr))}:${pad2(Number(mn))}`;
+  };
+  while (lo < hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    if (fmt(mid) < target) lo = mid + 1;
+    else hi = mid;
+  }
+  return new Date(lo);
+}
+
+export function getCreatorSkinSim(
+  userId?: string | null
+): CreatorSkinSimState | null {
+  if (typeof window === "undefined") return null;
+  if (!assertCreator(userId)) return null;
+  try {
+    const raw = localStorage.getItem(CREATOR_SKIN_SIM_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as CreatorSkinSimState;
+    if (!parsed || !parsed.active) return null;
+    if (typeof parsed.etDate !== "string" || typeof parsed.etTime !== "string")
+      return null;
+    const week = Number(parsed.week);
+    if (!Number.isFinite(week)) return null;
+    return {
+      active: true,
+      etDate: parsed.etDate,
+      etTime: parsed.etTime,
+      week: Math.max(0, Math.min(18, Math.floor(week))),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function emitSimEvent() {
+  try {
+    window.dispatchEvent(new CustomEvent(CREATOR_SKIN_SIM_EVENT));
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * Apply creator sim (local only). No-op if not creator.
+ * Does not touch DB / league settings / other users.
+ */
+export function setCreatorSkinSim(
+  state: Omit<CreatorSkinSimState, "active"> | null,
+  userId?: string | null
 ): void {
   if (typeof window === "undefined") return;
+  if (!assertCreator(userId)) return;
   try {
-    const { isAppCreator } = require("./creator") as typeof import("./creator");
-    const { getSession } = require("./league") as typeof import("./league");
-    if (!isAppCreator(getSession()?.playerId)) return;
-  } catch {
-    return;
-  }
-  try {
-    if (!id || id === "auto") {
-      localStorage.removeItem(CREATOR_SKIN_PREVIEW_KEY);
-    } else if (isSeasonThemeId(id)) {
-      localStorage.setItem(CREATOR_SKIN_PREVIEW_KEY, id);
+    if (!state) {
+      localStorage.removeItem(CREATOR_SKIN_SIM_KEY);
+    } else {
+      const next: CreatorSkinSimState = {
+        active: true,
+        etDate: state.etDate,
+        etTime: state.etTime,
+        week: Math.max(0, Math.min(18, Math.floor(Number(state.week) || 0))),
+      };
+      localStorage.setItem(CREATOR_SKIN_SIM_KEY, JSON.stringify(next));
     }
   } catch {
     /* ignore */
   }
+  emitSimEvent();
+}
+
+/** Clear sim and repaint from real time + trusted live week. */
+export async function resetCreatorSkinSimToReal(
+  userId?: string | null
+): Promise<SeasonThemeId> {
+  setCreatorSkinSim(null, userId);
+  return paintAutomaticSeasonTheme();
+}
+
+export function seasonThemeDisplayName(id: SeasonThemeId): string {
+  return SEASON_THEME_PRESETS.find((p) => p.id === id)?.label || id;
+}
+
+/** Indicator line for active sim, or null. */
+export function creatorSkinSimIndicatorLine(
+  userId?: string | null
+): string | null {
+  const sim = getCreatorSkinSim(userId);
+  if (!sim) return null;
+  const now = dateFromEasternWallClock(sim.etDate, sim.etTime);
+  const id = resolveCfbSkin({ trustedWeek: sim.week, now });
+  const name = seasonThemeDisplayName(id);
+  // Human date: "Oct 31"
+  const [, m, d] = sim.etDate.split("-").map(Number);
+  const monthNames = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
+  const dateLabel = `${monthNames[(m || 1) - 1]} ${d}`;
+  return `${dateLabel} · CFB Week ${sim.week} · ${name}`;
+}
+
+/**
+ * Peek resolved skin for form controls (no paint).
+ * Uses production resolveCfbSkin path.
+ */
+export function peekResolvedCfbSkin(input: {
+  etDate: string;
+  etTime: string;
+  week: number;
+}): { id: SeasonThemeId; label: string; now: Date } {
+  const now = dateFromEasternWallClock(input.etDate, input.etTime);
+  const id = resolveCfbSkin({
+    trustedWeek: input.week,
+    now,
+  });
+  return { id, label: seasonThemeDisplayName(id), now };
+}
+
+/** Console recovery — wired on client mount. */
+export function installCreatorSkinConsoleRecovery(): void {
+  if (typeof window === "undefined") return;
+  const w = window as Window & {
+    __wrResetSkinPreview?: () => Promise<void>;
+    __wrSkinPreviewHelp?: () => void;
+  };
+  w.__wrResetSkinPreview = async () => {
+    await resetCreatorSkinSimToReal();
+    // eslint-disable-next-line no-console
+    console.info("[War Room] Skin preview reset to real time.");
+  };
+  w.__wrSkinPreviewHelp = () => {
+    // eslint-disable-next-line no-console
+    console.info(
+      "[War Room] Creator skin preview: panel bottom-left when signed in as creator. Recovery: __wrResetSkinPreview()"
+    );
+  };
 }
 
 // ── Production resolve + paint ─────────────────────────────────────────
@@ -399,6 +567,7 @@ export function setCreatorSkinPreview(
 /**
  * Resolve active atmosphere for the current room.
  * Ignores leagues.season_theme_id / settings.seasonThemeId completely.
+ * Creator sim (if active) supplies now + week into the production path.
  */
 export function resolveAutomaticSeasonTheme(input?: {
   sportId?: string | null;
@@ -406,8 +575,16 @@ export function resolveAutomaticSeasonTheme(input?: {
   now?: Date;
   userId?: string | null;
 }): SeasonThemeId {
-  const preview = getCreatorSkinPreview(input?.userId);
-  if (preview) return preview;
+  const sim = getCreatorSkinSim(input?.userId);
+
+  let now = input?.now ?? new Date();
+  let week =
+    input?.trustedWeek !== undefined ? input.trustedWeek : null;
+
+  if (sim?.active) {
+    now = dateFromEasternWallClock(sim.etDate, sim.etTime);
+    week = sim.week;
+  }
 
   const sportId =
     input?.sportId ||
@@ -419,11 +596,11 @@ export function resolveAutomaticSeasonTheme(input?: {
       }
     })();
 
-  const now = input?.now ?? new Date();
-  const week =
-    input?.trustedWeek !== undefined
-      ? input.trustedWeek
-      : null;
+  // When creator is simulating CFB season skins, force CFB phase path
+  // (holiday still wins first via resolveCfbSkin / holiday check)
+  if (sim?.active) {
+    return resolveCfbSkin({ trustedWeek: week, now });
+  }
 
   // Holiday override for every sport (automatic, not a user pick)
   const holiday = resolveHolidaySkinInEasternTime(now);
