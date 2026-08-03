@@ -43,12 +43,32 @@ import {
   PRIOR_SEASON_YEAR,
 } from "@/lib/prior-season-seed";
 import { resolveLiveTrophyHolder } from "@/lib/trophy-share";
+import { acquireBodyLock } from "@/lib/smooth";
+import {
+  claimPresenterWhenIdle,
+  releasePresenter,
+} from "@/lib/moments/presenter";
 
 type Props = {
   /** War Room Moments / Foundry: force event only — never auto-open */
   forceOnly?: boolean;
 };
 
+const COLD_OPEN_OWNER = "season-cold-open";
+
+type CloseReason =
+  | "done"
+  | "x"
+  | "escape"
+  | "route"
+  | "unmount"
+  | "error"
+  | "backdrop";
+
+/**
+ * Single exit path for Done / X / Escape / route / unmount / error / backdrop.
+ * Releases presenter + body lock ownership so the next Moment can open cleanly.
+ */
 export default function WeeklyColdOpenModal({ forceOnly = false }: Props) {
   const pathname = usePathname();
   const titleId = useId();
@@ -62,100 +82,42 @@ export default function WeeklyColdOpenModal({ forceOnly = false }: Props) {
   const previewRef = useRef(false);
   const subjectRef = useRef<ColdOpenSubject | null>(null);
   const pathAtOpen = useRef<string | null>(null);
-  const scrollYRef = useRef(0);
-  const bodyLocked = useRef(false);
   const closeBtnRef = useRef<HTMLButtonElement | null>(null);
   const shellRef = useRef<HTMLDivElement | null>(null);
   const openerRef = useRef<HTMLElement | null>(null);
+  const releaseLockRef = useRef<(() => void) | null>(null);
+  const closingRef = useRef(false);
 
   const room = getLeague()?.name || "War Room";
   const sportId = getLeague()?.sportId;
 
-  const lockBackground = useCallback(() => {
-    if (typeof document === "undefined" || bodyLocked.current) return;
-    bodyLocked.current = true;
-    scrollYRef.current =
-      window.scrollY ||
-      window.pageYOffset ||
-      document.documentElement.scrollTop ||
-      0;
-    const b = document.body;
-    const h = document.documentElement;
-    b.style.overflow = "hidden";
-    b.style.position = "fixed";
-    b.style.top = `-${scrollYRef.current}px`;
-    b.style.left = "0";
-    b.style.right = "0";
-    b.style.width = "100%";
-    b.style.touchAction = "none";
-    h.style.overflow = "hidden";
-    h.style.touchAction = "none";
-  }, []);
-
-  const unlockBackground = useCallback(() => {
-    if (typeof document === "undefined" || !bodyLocked.current) return;
-    bodyLocked.current = false;
-    const y = scrollYRef.current;
-    const b = document.body;
-    const h = document.documentElement;
-    b.style.overflow = "";
-    b.style.position = "";
-    b.style.top = "";
-    b.style.left = "";
-    b.style.right = "";
-    b.style.width = "";
-    b.style.touchAction = "";
-    h.style.overflow = "";
-    h.style.touchAction = "";
-    try {
-      window.scrollTo(0, y);
-    } catch {
+  const releaseBody = useCallback(() => {
+    if (releaseLockRef.current) {
       try {
-        document.documentElement.scrollTop = y;
-        document.body.scrollTop = y;
+        releaseLockRef.current();
       } catch {
         /* ok */
       }
+      releaseLockRef.current = null;
     }
   }, []);
 
-  const hardClose = useCallback(() => {
-    openRef.current = false;
-    clearSessionDrama("weekly_cold_open");
-    setOpen(false);
-    setPreview(false);
-    setSubject(null);
-    setLoading(false);
-    setLoadError(null);
-    pathAtOpen.current = null;
-    unlockBackground();
-    try {
-      const el = openerRef.current;
-      openerRef.current = null;
-      if (el && typeof el.focus === "function") {
-        window.setTimeout(() => el.focus(), 0);
+  const closeColdOpen = useCallback(
+    (opts?: { markSeen?: boolean; reason?: CloseReason }) => {
+      if (closingRef.current && !openRef.current) return;
+      closingRef.current = true;
+      const reason = opts?.reason || "done";
+      try {
+        console.log(`[WR-COLD-OPEN] close reason=${reason}`);
+      } catch {
+        /* ok */
       }
-    } catch {
-      /* ok */
-    }
-    try {
-      if (window.location.pathname.startsWith("/founder")) {
-        document
-          .getElementById("war-room-moments")
-          ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-      }
-    } catch {
-      /* ok */
-    }
-  }, [unlockBackground]);
 
-  const dismiss = useCallback(
-    (opts?: { markSeen?: boolean }) => {
       const session = getSession();
       const league = getLeague();
       const sub = subjectRef.current;
       if (
-        opts?.markSeen !== false &&
+        opts?.markSeen === true &&
         !previewRef.current &&
         session?.playerId &&
         league?.id &&
@@ -167,9 +129,59 @@ export default function WeeklyColdOpenModal({ forceOnly = false }: Props) {
           /* ok */
         }
       }
-      hardClose();
+
+      openRef.current = false;
+      clearSessionDrama("weekly_cold_open");
+      setOpen(false);
+      setPreview(false);
+      setSubject(null);
+      subjectRef.current = null;
+      setLoading(false);
+      setLoadError(null);
+      pathAtOpen.current = null;
+
+      // Ownership release — order: body lock then presenter stage
+      releaseBody();
+      releasePresenter(COLD_OPEN_OWNER);
+
+      try {
+        const el = openerRef.current;
+        openerRef.current = null;
+        if (el && typeof el.focus === "function") {
+          window.setTimeout(() => el.focus(), 0);
+        }
+      } catch {
+        /* ok */
+      }
+      try {
+        if (window.location.pathname.startsWith("/founder")) {
+          document
+            .getElementById("war-room-moments")
+            ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
+      } catch {
+        /* ok */
+      }
+
+      // Allow next Moment after paint confirms unmount path
+      window.setTimeout(() => {
+        closingRef.current = false;
+        try {
+          console.log("[WR-COLD-OPEN] cleanup complete — stage idle");
+        } catch {
+          /* ok */
+        }
+      }, 0);
     },
-    [hardClose]
+    [releaseBody]
+  );
+
+  /** Alias — all UI exits use the same function */
+  const dismiss = useCallback(
+    (opts?: { markSeen?: boolean; reason?: CloseReason }) => {
+      closeColdOpen(opts);
+    },
+    [closeColdOpen]
   );
 
   const loadSubject = useCallback(async (): Promise<ColdOpenSubject | null> => {
@@ -215,12 +227,16 @@ export default function WeeklyColdOpenModal({ forceOnly = false }: Props) {
         openerRef.current = null;
       }
       try {
+        // Wait for prior Moment (e.g. Gazette) to fully release stage + locks
+        await claimPresenterWhenIdle(COLD_OPEN_OWNER, 2500);
+
         const sub = await loadSubject();
         if (!sub) {
           setLoadError(
             "No defending champ on file for this room yet. Seed trophies or wait for last year’s hardware."
           );
           setLoading(false);
+          releasePresenter(COLD_OPEN_OWNER);
           return;
         }
         subjectRef.current = sub;
@@ -229,9 +245,18 @@ export default function WeeklyColdOpenModal({ forceOnly = false }: Props) {
         setPreview(!!opts?.preview);
         setOpen(true);
         openRef.current = true;
+        closingRef.current = false;
         pathAtOpen.current =
           typeof window !== "undefined" ? window.location.pathname : null;
-        lockBackground();
+        // Named body lock — same manager as Gazette (no local position:fixed orphan)
+        if (!releaseLockRef.current) {
+          releaseLockRef.current = acquireBodyLock(COLD_OPEN_OWNER);
+        }
+        try {
+          console.log("[WR-COLD-OPEN] open");
+        } catch {
+          /* ok */
+        }
         setLoading(false);
         window.setTimeout(() => {
           try {
@@ -245,10 +270,10 @@ export default function WeeklyColdOpenModal({ forceOnly = false }: Props) {
           e instanceof Error ? e.message : "Cold Open failed to load"
         );
         setLoading(false);
-        hardClose();
+        closeColdOpen({ reason: "error", markSeen: false });
       }
     },
-    [loadSubject, lockBackground, hardClose]
+    [loadSubject, closeColdOpen]
   );
 
   useEffect(() => {
@@ -308,52 +333,38 @@ export default function WeeklyColdOpenModal({ forceOnly = false }: Props) {
     };
   }, [forceOnly, loadSubject, openBroadcast]);
 
-  // Escape always closes
+  // Escape — same cleanup as Done / X
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key !== "Escape") return;
       if (!openRef.current) return;
       e.preventDefault();
       e.stopPropagation();
-      dismiss({ markSeen: false });
+      closeColdOpen({ markSeen: false, reason: "escape" });
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [dismiss]);
+  }, [closeColdOpen]);
 
   // Route change → full cleanup
   useEffect(() => {
     if (!openRef.current || pathAtOpen.current == null) return;
     if (pathname !== pathAtOpen.current) {
-      dismiss({ markSeen: false });
+      closeColdOpen({ markSeen: false, reason: "route" });
     }
-  }, [pathname, dismiss]);
+  }, [pathname, closeColdOpen]);
 
-  // Unmount → always release background
+  // Unmount → always release ownership (same close path)
   useEffect(() => {
     return () => {
-      openRef.current = false;
-      clearSessionDrama("weekly_cold_open");
-      if (bodyLocked.current) {
-        bodyLocked.current = false;
-        const y = scrollYRef.current;
-        try {
-          document.body.style.overflow = "";
-          document.body.style.position = "";
-          document.body.style.top = "";
-          document.body.style.left = "";
-          document.body.style.right = "";
-          document.body.style.width = "";
-          document.body.style.touchAction = "";
-          document.documentElement.style.overflow = "";
-          document.documentElement.style.touchAction = "";
-          window.scrollTo(0, y);
-        } catch {
-          /* ok */
-        }
+      if (openRef.current || releaseLockRef.current) {
+        openRef.current = false;
+        clearSessionDrama("weekly_cold_open");
+        releaseBody();
+        releasePresenter(COLD_OPEN_OWNER);
       }
     };
-  }, []);
+  }, [releaseBody]);
 
   // Focus trap inside shell
   useEffect(() => {
@@ -449,7 +460,7 @@ export default function WeeklyColdOpenModal({ forceOnly = false }: Props) {
         className="absolute inset-0 bg-black/93 backdrop-blur-sm"
         aria-label="Close Cold Open"
         tabIndex={-1}
-        onClick={() => dismiss({ markSeen: false })}
+        onClick={() => dismiss({ markSeen: false, reason: "backdrop" })}
       />
 
       {/* Shell: fixed height; only article scrolls */}
@@ -482,7 +493,9 @@ export default function WeeklyColdOpenModal({ forceOnly = false }: Props) {
           <button
             ref={closeBtnRef}
             type="button"
-            onClick={() => dismiss({ markSeen: !preview })}
+            onClick={() =>
+              dismiss({ markSeen: !preview, reason: "x" })
+            }
             className="shrink-0 min-w-[44px] min-h-[44px] rounded-lg border-2 border-black/30 bg-black/10 text-black text-xl font-black leading-none flex items-center justify-center hover:bg-black/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-black touch-manipulation"
             aria-label="Close Cold Open"
           >
@@ -602,7 +615,9 @@ export default function WeeklyColdOpenModal({ forceOnly = false }: Props) {
           <div className="px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-1 flex flex-col gap-2 border-t border-amber-400/15 bg-black/60">
             <button
               type="button"
-              onClick={() => dismiss({ markSeen: !preview })}
+              onClick={() =>
+                dismiss({ markSeen: !preview, reason: "done" })
+              }
               className="w-full py-3.5 min-h-[48px] rounded-xl bg-primary text-black font-extrabold text-sm touch-manipulation active:scale-[0.99]"
             >
               {preview || forceOnly
@@ -612,7 +627,9 @@ export default function WeeklyColdOpenModal({ forceOnly = false }: Props) {
             {!preview && !forceOnly && (
               <a
                 href="/trophy-room"
-                onClick={() => dismiss({ markSeen: true })}
+                onClick={() =>
+                  dismiss({ markSeen: true, reason: "done" })
+                }
                 className="w-full py-3 min-h-[48px] rounded-xl border border-amber-400/45 text-amber-100 font-bold text-sm flex items-center justify-center hover:bg-amber-500/10"
               >
                 See the hardware

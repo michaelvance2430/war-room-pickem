@@ -19,6 +19,10 @@ import {
 import { notifyGazetteDone } from "@/lib/badge-celebration";
 import GazettePaper from "@/components/GazettePaper";
 import { acquireBodyLock } from "@/lib/smooth";
+import {
+  claimPresenterWhenIdle,
+  releasePresenter,
+} from "@/lib/moments/presenter";
 
 const GAZETTE_LOCK_OWNER = "gazette-reader";
 
@@ -68,6 +72,7 @@ export default function GazetteModal() {
       setLeagueId(null);
       pathAtOpen.current = null;
       releaseBody();
+      releasePresenter(GAZETTE_LOCK_OWNER);
       try {
         console.log("[WR-GAZETTE] close");
       } catch {
@@ -83,7 +88,10 @@ export default function GazetteModal() {
   );
 
   const openReader = useCallback(
-    (ed: GazetteEdition, lid: string) => {
+    async (ed: GazetteEdition, lid: string) => {
+      // Wait for Cold Open (or any prior Moment) to fully release stage + locks
+      await claimPresenterWhenIdle(GAZETTE_LOCK_OWNER, 2500);
+
       editionRef.current = ed;
       leagueIdRef.current = lid;
       setEdition(ed);
@@ -92,7 +100,6 @@ export default function GazetteModal() {
       openRef.current = true;
       pathAtOpen.current =
         typeof window !== "undefined" ? window.location.pathname : null;
-      // Named ownership — watchdog must not force-unlock
       if (!releaseLockRef.current) {
         releaseLockRef.current = acquireBodyLock(GAZETTE_LOCK_OWNER);
       }
@@ -167,7 +174,7 @@ export default function GazetteModal() {
           if (!opts?.force) notifyGazetteDone();
           return;
         }
-        openReader(offer.edition, offer.leagueId);
+        void openReader(offer.edition, offer.leagueId);
       } catch {
         if (!opts?.force) notifyGazetteDone();
       }
