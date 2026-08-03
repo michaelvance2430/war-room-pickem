@@ -1,13 +1,13 @@
 "use client";
 
 /**
- * Sticky room plaque — league name LOUD, sport as a chip.
+ * Sticky room plaque — league name LOUD + League Hub (NFL/CFB).
  * Multi-league users scan for the room name, not "War Room".
  */
 
 import Link from "next/link";
-import { getSportPack } from "@/lib/sports/registry";
 import { setViewAsPlayer } from "@/lib/view-as-player";
+import HomeSportSwitcher from "@/components/HomeSportSwitcher";
 
 type Props = {
   leagueName: string | null;
@@ -20,32 +20,21 @@ type Props = {
 
 export default function HomeRoomContext({
   leagueName,
-  sportId,
   isCommish,
   actuallyCommish,
-  leagueCode,
 }: Props) {
-  const pack = getSportPack(sportId || "cfb");
   const name = (leagueName || "War Room").trim();
-  const isNfl = pack.id === "nfl";
-  const isWwc = pack.id === "soccer_wwc";
-
-  const chipClass = isNfl
-    ? "border-red-500/45 bg-red-500/15 text-red-100"
-    : isWwc
-      ? "border-yellow-400/50 bg-emerald-600/20 text-yellow-100"
-      : "border-primary/45 bg-primary/15 text-primary";
 
   return (
     <div className="mb-4 rounded-2xl border-2 border-primary/35 bg-black/55 px-3.5 py-3.5 sm:px-4 sm:py-4 flex flex-col sm:flex-row sm:items-center gap-3 shadow-[0_0_28px_rgba(34,197,94,0.08)]">
       <div className="flex-1 min-w-0">
         <div className="flex flex-wrap items-center gap-2 mb-1.5">
-          <span
-            className={`inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-[0.14em] px-2 py-0.5 rounded-full border ${chipClass}`}
-          >
-            <span aria-hidden>{pack.emoji}</span>
-            {pack.shortLabel}
-          </span>
+          {/* League Hub — same primary entry as HomeSportHeader */}
+          <HomeSportSwitcher
+            onSwitched={() => {
+              window.location.assign("/");
+            }}
+          />
           <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted">
             Active room
           </span>

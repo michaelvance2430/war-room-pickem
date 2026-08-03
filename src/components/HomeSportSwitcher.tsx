@@ -1,13 +1,17 @@
 "use client";
 
 /**
- * Sport Hub — primary navigation on Home hero.
- * Shows only sports the user already participates in.
- * Scales to NFL / CFB / NBA / MLB / etc. without redesign.
+ * Home League Hub — primary navigation on Home.
+ *
+ * NFL / CFB open a dropdown of every league the user belongs to for that sport.
+ * Each row: league name · week/status · sequential first-action CTA.
+ * Footer always: Join with Code · Start New League · Browse Open Leagues.
+ *
+ * Not a simple two-button sport switch. Not Account.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   fetchMyMemberships,
   switchToLeague,
@@ -21,15 +25,15 @@ import {
   EVENT_SPORT_ROOM_SCOPE,
   resolveSportScope,
 } from "@/lib/sport-room-scope";
+import {
+  loadLeagueHubPulses,
+  type LeagueHubPulse,
+} from "@/lib/league-hub-actions";
 import NflBrandMark from "@/components/NflBrandMark";
 import BrandMark from "@/components/BrandMark";
 
-type SportOption = {
-  sportId: SportId;
-  roomCount: number;
-  /** Prefer stay in current room if same sport; else first room of that sport */
-  sampleLeagueId: string;
-};
+/** Primary sports always shown on the hub (product decision). */
+const HUB_SPORTS: SportId[] = ["nfl", "cfb"];
 
 function SportIcon({ sportId, size = 18 }: { sportId: string; size?: number }) {
   if (sportId === "nfl") {
@@ -47,7 +51,7 @@ function SportIcon({ sportId, size = 18 }: { sportId: string; size?: number }) {
 
 type Props = {
   className?: string;
-  /** Called after a successful sport/room switch (full remount recommended) */
+  /** Called after a successful room switch when no direct task href */
   onSwitched?: () => void;
 };
 
@@ -55,14 +59,18 @@ export default function HomeSportSwitcher({
   className = "",
   onSwitched,
 }: Props) {
-  const router = useRouter();
   const [memberships, setMemberships] = useState<LeagueMembership[]>([]);
-  const [open, setOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [pulse, setPulse] = useState<Record<string, LeagueHubPulse>>({});
+  /** Which sport dropdown is open (null = closed) */
+  const [openSport, setOpenSport] = useState<SportId | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
   const [scope, setScope] = useState<SportId>(() =>
     normalizeSportId(getLeague()?.sportId || "cfb")
   );
+  const [loaded, setLoaded] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+
+  const activeId = getSession()?.leagueId || getLeague()?.id || "";
 
   const load = useCallback(async () => {
     try {
@@ -74,8 +82,18 @@ export default function HomeSportSwitcher({
         activeSportId: activeSport,
       });
       setScope(next);
+
+      const uid = getSession()?.playerId;
+      if (uid && ms.length > 0) {
+        const p = await loadLeagueHubPulses(ms, uid);
+        setPulse(p);
+      } else {
+        setPulse({});
+      }
     } catch {
       /* optional */
+    } finally {
+      setLoaded(true);
     }
   }, []);
 
@@ -93,135 +111,272 @@ export default function HomeSportSwitcher({
   }, []);
 
   useEffect(() => {
-    if (!open) return;
+    if (!openSport) return;
     function onDoc(e: MouseEvent) {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+      if (!rootRef.current?.contains(e.target as Node)) setOpenSport(null);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpenSport(null);
     }
     document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, [open]);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [openSport]);
 
-  const options: SportOption[] = useMemo(() => {
+  const roomsBySport = useMemo(() => {
     const map = new Map<SportId, LeagueMembership[]>();
+    for (const sid of HUB_SPORTS) map.set(sid, []);
     for (const m of memberships) {
       const sid = normalizeSportId(m.sportId || "cfb");
       const arr = map.get(sid) || [];
       arr.push(m);
       map.set(sid, arr);
     }
-    const activeId = getSession()?.leagueId || getLeague()?.id;
-    return [...map.entries()]
-      .map(([sportId, rooms]) => {
-        const preferred =
-          rooms.find((r) => r.leagueId === activeId) || rooms[0]!;
-        return {
-          sportId,
-          roomCount: rooms.length,
-          sampleLeagueId: preferred.leagueId,
-        };
-      })
-      .sort(
-        (a, b) =>
-          getSportPack(a.sportId).sortOrder - getSportPack(b.sportId).sortOrder
+    for (const [sid, rooms] of map) {
+      rooms.sort((a, b) =>
+        (a.leagueName || "").localeCompare(b.leagueName || "")
       );
+      map.set(sid, rooms);
+    }
+    return map;
   }, [memberships]);
 
-  const current = getSportPack(scope);
-  const multiSport = options.length > 1;
-
-  async function pickSport(sportId: SportId, leagueId: string) {
-    if (busy) return;
-    setOpen(false);
-    const activeId = getSession()?.leagueId || getLeague()?.id;
-    const activeSport = normalizeSportId(getLeague()?.sportId || "cfb");
-
+  function toggleSport(sportId: SportId) {
     setSportScope(sportId);
     setScope(sportId);
+    setOpenSport((cur) => (cur === sportId ? null : sportId));
+  }
 
-    // Already on this sport and room
-    if (sportId === activeSport && leagueId === activeId) return;
+  /**
+   * Switch league if needed, then hard-navigate to the task path.
+   * Hard assign clears stale room data from the previous league.
+   */
+  async function runAction(leagueId: string, href: string) {
+    if (busyId) return;
+    setBusyId(leagueId);
+    try {
+      const target = memberships.find((m) => m.leagueId === leagueId);
+      if (target?.sportId) {
+        setSportScope(target.sportId);
+        setScope(normalizeSportId(target.sportId));
+      }
 
-    // Different sport or room → switch league then hard land Home
-    if (leagueId !== activeId) {
-      setBusy(true);
-      const ok = await switchToLeague(leagueId);
-      setBusy(false);
-      if (!ok) return;
-      if (onSwitched) onSwitched();
-      else window.location.assign("/");
-      return;
+      if (leagueId !== activeId) {
+        const ok = await switchToLeague(leagueId);
+        if (!ok) {
+          setBusyId(null);
+          return;
+        }
+      }
+
+      setOpenSport(null);
+      // Hard land so no previous-league state lingers
+      window.location.assign(href || "/");
+    } catch {
+      setBusyId(null);
     }
-
-    // Same room, scope only (shouldn't happen often)
-    router.refresh();
   }
 
-  // Single sport, no switcher chrome — still show identity chip
-  if (!multiSport) {
-    return (
-      <div
-        className={`inline-flex items-center gap-1.5 min-h-[40px] px-2.5 rounded-full border border-border/60 bg-black/30 text-xs font-bold text-foreground ${className}`}
-        title={current.label}
-      >
-        <SportIcon sportId={scope} size={18} />
-        <span>{current.shortLabel}</span>
-      </div>
-    );
-  }
+  const openRooms = openSport ? roomsBySport.get(openSport) || [] : [];
+  const openPack = openSport ? getSportPack(openSport) : null;
 
   return (
     <div ref={rootRef} className={`relative inline-block ${className}`}>
-      <button
-        type="button"
-        disabled={busy}
-        onClick={() => setOpen((o) => !o)}
-        className="inline-flex items-center gap-1.5 min-h-[40px] px-2.5 rounded-full border border-primary/40 bg-primary/10 text-xs font-extrabold text-primary touch-manipulation hover:bg-primary/15 disabled:opacity-50"
-        aria-expanded={open}
-        aria-haspopup="listbox"
-        title="Switch sport"
+      <div
+        className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-black/30 p-0.5"
+        role="tablist"
+        aria-label="League Hub sports"
       >
-        <SportIcon sportId={scope} size={18} />
-        <span>{current.shortLabel}</span>
-        <span className="opacity-70 text-[10px]">{open ? "▴" : "▾"}</span>
-      </button>
+        {HUB_SPORTS.map((sportId) => {
+          const pack = getSportPack(sportId);
+          const selected = sportId === scope;
+          const open = openSport === sportId;
+          const isNfl = sportId === "nfl";
+          const count = (roomsBySport.get(sportId) || []).length;
+          return (
+            <button
+              key={sportId}
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              aria-expanded={open}
+              aria-haspopup="listbox"
+              onClick={() => toggleSport(sportId)}
+              className={`inline-flex items-center gap-1.5 min-h-[40px] px-2.5 rounded-full text-xs font-extrabold touch-manipulation transition ${
+                selected || open
+                  ? isNfl
+                    ? "bg-red-500/20 text-red-100 border border-red-500/45"
+                    : "bg-primary/20 text-primary border border-primary/45"
+                  : "text-muted hover:text-foreground border border-transparent"
+              }`}
+              title={`${pack.label} leagues`}
+            >
+              <SportIcon sportId={sportId} size={18} />
+              <span>{pack.shortLabel}</span>
+              {loaded && count > 0 ? (
+                <span className="opacity-70 text-[10px] font-semibold tabular-nums">
+                  {count}
+                </span>
+              ) : null}
+              <span className="opacity-60 text-[10px]">{open ? "▴" : "▾"}</span>
+            </button>
+          );
+        })}
+      </div>
 
-      {open && (
+      {openSport && openPack && (
         <div
           role="listbox"
-          className="absolute left-0 top-full z-40 mt-1.5 min-w-[14rem] rounded-xl border border-border bg-card shadow-xl py-1 overflow-hidden"
+          aria-label={`${openPack.shortLabel} leagues`}
+          className="absolute left-0 top-full z-50 mt-1.5 w-[min(22rem,calc(100vw-1.5rem))] rounded-xl border border-border bg-card shadow-2xl overflow-hidden"
         >
-          <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-muted">
-            Sports you play
-          </p>
-          {options.map((opt) => {
-            const pack = getSportPack(opt.sportId);
-            const selected = opt.sportId === scope;
-            return (
-              <button
-                key={opt.sportId}
-                type="button"
-                role="option"
-                aria-selected={selected}
-                onClick={() => void pickSport(opt.sportId, opt.sampleLeagueId)}
-                className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left text-sm min-h-[44px] touch-manipulation ${
-                  selected
-                    ? "bg-primary/15 text-primary font-bold"
-                    : "text-foreground hover:bg-card-hover"
+          {openRooms.length === 0 ? (
+            <div className="px-4 py-5">
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted mb-2">
+                No {openPack.shortLabel} leagues yet
+              </p>
+              <p className="text-sm text-foreground leading-relaxed mb-4">
+                Join friends, start your own league, or find an open one.
+              </p>
+              <div className="flex flex-col gap-2">
+                <Link
+                  href="/join?mode=join"
+                  onClick={() => setOpenSport(null)}
+                  className="min-h-[44px] flex items-center justify-center rounded-lg bg-primary text-black text-xs font-extrabold touch-manipulation"
+                >
+                  JOIN WITH CODE
+                </Link>
+                <Link
+                  href="/join?mode=create"
+                  onClick={() => setOpenSport(null)}
+                  className="min-h-[44px] flex items-center justify-center rounded-lg border border-border text-xs font-bold text-foreground hover:bg-card-hover touch-manipulation"
+                >
+                  START NEW LEAGUE
+                </Link>
+                <Link
+                  href="/open-room"
+                  onClick={() => setOpenSport(null)}
+                  className="min-h-[44px] flex items-center justify-center rounded-lg border border-border text-xs font-bold text-foreground hover:bg-card-hover touch-manipulation"
+                >
+                  BROWSE OPEN LEAGUES
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <>
+              <p className="px-3 pt-2.5 pb-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-muted">
+                {openPack.shortLabel} leagues
+              </p>
+              <div
+                className={`px-2 pb-1 space-y-1 ${
+                  openRooms.length > 6
+                    ? "max-h-[min(50vh,22rem)] overflow-y-auto overscroll-contain"
+                    : ""
                 }`}
               >
-                <SportIcon sportId={opt.sportId} size={20} />
-                <span className="flex-1 min-w-0 truncate">{pack.shortLabel}</span>
-                {opt.roomCount > 1 && (
-                  <span className="text-[10px] text-muted font-semibold tabular-nums">
-                    {opt.roomCount} rooms
-                  </span>
-                )}
-                {selected && (
-                  <span className="text-[10px] font-extrabold">✓</span>
-                )}
-              </button>
-            );
-          })}
+                {openRooms.map((m) => {
+                  const isActive = m.leagueId === activeId;
+                  const p = pulse[m.leagueId];
+                  const busy = busyId === m.leagueId;
+                  const action = p?.action || {
+                    code: "ENTER" as const,
+                    label: "ENTER",
+                    href: "/",
+                  };
+                  const status =
+                    p?.statusLine ||
+                    (isActive ? "You're here" : "Enter league");
+                  const isHost =
+                    p?.isHost ||
+                    m.role === "commissioner" ||
+                    m.commissionerId === getSession()?.playerId;
+
+                  return (
+                    <div
+                      key={m.leagueId}
+                      role="option"
+                      aria-selected={isActive}
+                      className={`flex items-center gap-2 rounded-lg px-2.5 py-2.5 min-h-[52px] ${
+                        isActive
+                          ? "bg-primary/12 border border-primary/35"
+                          : "bg-background/30 border border-transparent"
+                      }`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-white truncate leading-tight">
+                          {m.leagueName || "War Room"}
+                          {isActive && (
+                            <span className="ml-1.5 text-[10px] uppercase text-primary font-extrabold">
+                              active
+                            </span>
+                          )}
+                          {isHost && (
+                            <span className="ml-1.5 text-[9px] uppercase text-amber-200/80">
+                              host
+                            </span>
+                          )}
+                        </p>
+                        <p
+                          className={`text-[11px] mt-0.5 truncate ${
+                            action.code !== "ENTER"
+                              ? "text-amber-200/90 font-medium"
+                              : "text-muted"
+                          }`}
+                        >
+                          {status}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={!!busyId}
+                        onClick={() =>
+                          void runAction(m.leagueId, action.href)
+                        }
+                        className={`shrink-0 min-h-[40px] px-2.5 rounded-lg text-[10px] font-extrabold tracking-wide touch-manipulation disabled:opacity-50 ${
+                          action.code === "ENTER"
+                            ? "border border-border text-muted hover:text-foreground"
+                            : action.code === "SET_WEEK" ||
+                                action.code === "PUBLISH_WEEK" ||
+                                action.code === "REVIEW_RESULTS"
+                              ? "border border-amber-400/50 text-amber-100 bg-amber-500/10"
+                              : "bg-primary text-black"
+                        }`}
+                      >
+                        {busy ? "…" : action.label}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="border-t border-border/50 px-3 py-2.5 space-y-1.5">
+                <Link
+                  href="/join?mode=join"
+                  onClick={() => setOpenSport(null)}
+                  className="block text-[11px] font-bold uppercase tracking-wide text-primary hover:underline py-1"
+                >
+                  Join with Code
+                </Link>
+                <Link
+                  href="/join?mode=create"
+                  onClick={() => setOpenSport(null)}
+                  className="block text-[11px] font-bold uppercase tracking-wide text-primary hover:underline py-1"
+                >
+                  Start New League
+                </Link>
+                <Link
+                  href="/open-room"
+                  onClick={() => setOpenSport(null)}
+                  className="block text-[11px] font-bold uppercase tracking-wide text-primary hover:underline py-1"
+                >
+                  Browse Open Leagues
+                </Link>
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>
