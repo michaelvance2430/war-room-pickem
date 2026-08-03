@@ -216,7 +216,7 @@ function chromeForPack(pack: SportPack): SportHomeChrome {
   };
 }
 
-/** Resolve chrome from active league (local cache + CFB room skin). */
+/** Resolve chrome from active league + automatic CFB atmosphere. */
 export function resolveHomeChrome(
   sportId?: string | null,
   seasonThemeId?: string | null
@@ -227,11 +227,24 @@ export function resolveHomeChrome(
     undefined;
   const pack = getSportPack(normalizeSportId(id));
   const chrome = chromeForPack(pack);
-  const theme =
-    seasonThemeId ??
-    (typeof window !== "undefined"
-      ? getLeague()?.settings?.seasonThemeId
-      : null);
+  // Prefer explicit (tests) → painted DOM → automatic resolve (never stored prefs)
+  let theme = seasonThemeId || null;
+  if (!theme && typeof window !== "undefined") {
+    try {
+      const {
+        getActiveSeasonThemeIdFromDom,
+        resolveAutomaticSeasonTheme,
+      } = require("../season-theme") as typeof import("../season-theme");
+      theme =
+        getActiveSeasonThemeIdFromDom() ||
+        resolveAutomaticSeasonTheme({
+          sportId: pack.id,
+          trustedWeek: null,
+        });
+    } catch {
+      theme = null;
+    }
+  }
   if (pack.id === "cfb") {
     return {
       ...chrome,

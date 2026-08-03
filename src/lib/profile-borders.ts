@@ -431,14 +431,13 @@ export function defaultProfileBorderId(): string {
   return "plain";
 }
 
-/** Active league holiday theme (for unlock + display). */
+/** Active automatic atmosphere (never a stored user skin choice). */
 export function getActiveSeasonThemeId(): SeasonThemeId {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { getLeague } = require("./league") as typeof import("./league");
-    return resolveSeasonThemeId(
-      getLeague()?.settings?.seasonThemeId || DEFAULT_SEASON_THEME_ID
-    );
+    const { getActiveSeasonThemeIdFromDom } =
+      require("./season-theme") as typeof import("./season-theme");
+    return getActiveSeasonThemeIdFromDom();
   } catch {
     return DEFAULT_SEASON_THEME_ID;
   }

@@ -125,8 +125,8 @@ export function writeSessionAndLeague(
       /* ignore */
     }
     try {
-      void import("./season-theme").then(({ applySeasonTheme }) => {
-        applySeasonTheme(league.settings.seasonThemeId);
+      void import("./season-theme").then(({ paintAutomaticSeasonTheme }) => {
+        void paintAutomaticSeasonTheme();
       });
     } catch {
       /* ignore */
@@ -496,7 +496,7 @@ export async function switchToLeague(leagueId: string): Promise<boolean> {
   // Refresh full league (incl. season theme + sport skin) from cloud when possible
   try {
     const { syncLeagueFromCloud } = await import("./league-sync");
-    const { applySeasonTheme } = await import("./season-theme");
+    const { paintAutomaticSeasonTheme } = await import("./season-theme");
     const {
       reapplySportThemeFromLocal,
       getLeagueSportIdFromLocal,
@@ -514,9 +514,8 @@ export async function switchToLeague(leagueId: string): Promise<boolean> {
         /* ignore */
       }
     }
-    if (lg?.settings?.seasonThemeId) {
-      applySeasonTheme(lg.settings.seasonThemeId);
-    }
+    // Atmosphere is automatic — never honor stored season_theme_id
+    void paintAutomaticSeasonTheme();
   } catch {
     /* membership settings already applied */
   }

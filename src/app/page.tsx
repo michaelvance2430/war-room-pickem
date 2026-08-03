@@ -502,7 +502,7 @@ export default function Home() {
     setReady(true);
   }
 
-  // CFB room skins read seasonThemeId from local league cache
+  // CFB atmosphere is automatic (holiday → season phase) — never a stored pick
   const homeChrome = resolveHomeChrome(sportId);
 
   if (bootError) {

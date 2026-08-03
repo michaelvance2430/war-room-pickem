@@ -139,13 +139,7 @@ import {
   homeTaglinePresetsForSport,
   resolveHomeTagline,
 } from "@/lib/home-tagline";
-import {
-  DEFAULT_SEASON_THEME_ID,
-  applySeasonTheme,
-  resolveSeasonThemeId,
-  seasonThemePresetsForSport,
-  type SeasonThemeId,
-} from "@/lib/season-theme";
+import { paintAutomaticSeasonTheme } from "@/lib/season-theme";
 
 const ACTIVE_WEEK_KEY = "warroom-active-week";
 
@@ -237,9 +231,6 @@ function CommissionerPageInner() {
   const [openRoomNote, setOpenRoomNote] = useState<string | null>(null);
   const [homeTaglineId, setHomeTaglineId] = useState(DEFAULT_HOME_TAGLINE_ID);
   const [homeTaglineCustom, setHomeTaglineCustom] = useState("");
-  const [seasonThemeId, setSeasonThemeId] = useState<SeasonThemeId>(
-    DEFAULT_SEASON_THEME_ID
-  );
   /** CFB week number: 0 = openers … 18 = CFP Final (fixed length). */
   const [activeWeek, setActiveWeek] = useState(1);
   const [settingsSaved, setSettingsSaved] = useState(false);
@@ -399,8 +390,7 @@ function CommissionerPageInner() {
           lg.settings?.homeTaglineId || DEFAULT_HOME_TAGLINE_ID
         );
         setHomeTaglineCustom(lg.settings?.homeTaglineCustom || "");
-        setSeasonThemeId(resolveSeasonThemeId(lg.settings?.seasonThemeId));
-        applySeasonTheme(lg.settings?.seasonThemeId);
+        void paintAutomaticSeasonTheme();
       }
 
       let week = 1;
@@ -479,10 +469,7 @@ function CommissionerPageInner() {
             fresh.settings?.homeTaglineId || DEFAULT_HOME_TAGLINE_ID
           );
           setHomeTaglineCustom(fresh.settings?.homeTaglineCustom || "");
-          setSeasonThemeId(
-            resolveSeasonThemeId(fresh.settings?.seasonThemeId)
-          );
-          applySeasonTheme(fresh.settings?.seasonThemeId);
+          void paintAutomaticSeasonTheme();
 
           let scoredCount = 0;
           try {
@@ -2026,13 +2013,12 @@ function CommissionerPageInner() {
         crystalBallEnabled,
         homeTaglineId,
         homeTaglineCustom: homeTaglineCustom.slice(0, HOME_TAGLINE_MAX_CHARS),
-        seasonThemeId,
-        // Season length is fixed at SEASON_MAX_WEEK in the app (not saved to DB)
+        // seasonThemeId is automatic — never saved from product UI
       },
     });
     if (result.ok && result.league) {
       setLeague(result.league);
-      applySeasonTheme(result.league.settings?.seasonThemeId || seasonThemeId);
+      void paintAutomaticSeasonTheme();
       setSettingsSaved(true);
       setSettingsError(null);
       setTimeout(() => setSettingsSaved(false), 1500);
@@ -2802,51 +2788,6 @@ function CommissionerPageInner() {
                   {isOpenRoom
                     ? "On — open lobby can seat people here"
                     : "Off — code invite only"}
-                </p>
-      </div>
-
-              <div className="rounded-xl border border-border bg-background p-4 space-y-3">
-      <div>
-                  <p className="text-sm font-semibold text-foreground">
-                    Room skin / background
-                  </p>
-      <p className="text-xs text-muted mt-1 leading-relaxed">
-                    <strong className="text-foreground">War Room Colors</strong>{" "}
-                    is the classic black + green clubhouse (NFL rooms keep
-                    navy/crimson as their pack default). CFB hosts can also
-                    pick campus skins. Holidays wash every page for the whole
-                    room.
-                  </p>
-      </div>
-                <label className="block text-xs text-muted">
-                  Theme
-                  <select
-                    value={seasonThemeId}
-                    onChange={(e) => {
-                      const id = resolveSeasonThemeId(e.target.value);
-                      setSeasonThemeId(id);
-                      // Paint + stash on local league so View as player still sees it
-                      applySeasonTheme(id);
-                      updateLeagueSettings({ seasonThemeId: id });
-                    }}
-                    className="mt-1 w-full bg-card border border-border rounded-lg px-3 py-2 text-sm text-foreground"
-                  >
-                    {seasonThemePresetsForSport(league?.sportId).map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.label}
-                      </option>
-                    ))}
-                  </select>
-      </label>
-                <p className="text-[11px] text-muted leading-relaxed">
-                  {seasonThemePresetsForSport(league?.sportId).find(
-                    (p) => p.id === seasonThemeId
-                  )?.blurb || ""}{" "}
-                  Preview applies immediately (and sticks if you{" "}
-                  <strong className="text-foreground">View as player</strong>
-                  ). Hit{" "}
-                  <strong className="text-foreground">Save settings</strong> so
-                  the rest of the league gets it.
                 </p>
       </div>
 

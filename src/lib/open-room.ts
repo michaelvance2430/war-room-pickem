@@ -10,7 +10,6 @@ import {
   leagueFullMessage,
   seatsRemaining,
 } from "@/lib/league-limits";
-import { applySeasonTheme } from "@/lib/season-theme";
 import { applySportTheme } from "@/lib/sports/sport-theme";
 
 export type OpenRoomListing = {
@@ -316,7 +315,8 @@ export async function seatPlayerInLeague(opts: {
       })
     );
     try {
-      applySeasonTheme(seasonThemeId);
+      const { paintAutomaticSeasonTheme } = await import("@/lib/season-theme");
+      void paintAutomaticSeasonTheme();
     } catch {
       /* ignore */
     }
