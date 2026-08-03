@@ -37,6 +37,7 @@ import {
   type RoomHealth,
   type RoomLight,
 } from "@/lib/founder-league-health";
+import FoundryPlatformApiUsage from "@/components/FoundryPlatformApiUsage";
 
 type Light = "green" | "yellow" | "red";
 
@@ -392,6 +393,9 @@ export default function FounderDashboardPage() {
             Refresh
           </button>
       </div>
+
+        {/* Platform Odds API ops — creator only (this page is already gated) */}
+        <FoundryPlatformApiUsage />
 
         {/* Quick: preseason cold open (last year’s champ wanted poster) */}
         <section className="rounded-2xl border-2 border-amber-400/45 bg-amber-500/10 p-4 space-y-2">
