@@ -285,7 +285,7 @@ That mindset is correct for living systems. It **erodes** Traditions.
 War Room has **seasons of its own**:
 
 ```
-Offseason → “I’m Bored”
+Offseason → “I’m Bored” (fun lobby)
     ↓
 Season Opening (“The room is open.”)
     ↓
@@ -307,27 +307,23 @@ These lines are brand. Changing them requires Tradition protection law:
 - **Practice is over. The season is here.**  
 - **The room is open.** / **The room is live.** (sport variants)
 
-### Offseason Practice principle
+### I'm Bored (not Practice Mode)
 
-> **Practice exists until football exists.**  
-> **Practice belongs to the offseason.**  
-> **When real football begins, War Room stops pretending.**
+> **Players should never wonder if they're in the real room.**
 
-- **Preseason:** “I’m Bored” is visible — fun, low stakes, confidence only.  
-- **Official kickoff:** gone. Not buried in a menu. Not “advanced.” **Gone.**  
-- **In season:** the season *is* the tutorial. Week 1 teaches confidence, locks, the Board.  
-- **Next August:** “I’m Bored” returns — an offseason ritual, not a permanent mode.
+**Practice Mode as a product is retired.**  
+No practice banners. No "Return to Live League." No dual-reality chrome.
 
-Any need to practice *after* kickoff is Foundry / creator tooling — never normal player chrome.
+**I'm Bored** opens a temporary **fun lobby** (Happy Hour, Trash Talk Arena, etc.) — social only.  
+No picks. No scores. Not weekly league chat.
 
-Season Opening may end with one quiet line, then silence:
+**League chat** stays the weekly Locker trash talk. One place. No warnings.
+
+Season Opening sacred line still holds as season metaphor (Tier I frozen):
 
 > Practice is over. The season is here.
 
-No explanation. No settings dump. The button simply isn’t there anymore.
-
-Guest tour remains a separate reality (conversion before membership).  
-League members live this calendar: offseason practice → live football.
+Guest tour remains a separate reality (conversion before membership).
 
 ### Foundry backstage principle
 

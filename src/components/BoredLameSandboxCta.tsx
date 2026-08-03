@@ -1,109 +1,64 @@
 "use client";
 
 /**
- * Offseason only — “I’m Bored” private practice.
- * Practice exists until football exists. At official kickoff this CTA is gone
- * (not menu-hidden). Returns next preseason as ritual. Foundry owns any
- * post-kickoff drills. Guests may still see it for conversion.
+ * I’m Bored — temporary fun lobby (social).
+ * Not Practice Mode. Not picks. Not a second league.
+ * Opens a random mess-around room with the same friends.
  */
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getLeague, getSession } from "@/lib/league";
-import { hasOpeningWeekStarted } from "@/lib/ring-ceremony";
-import { firstSeasonWeek } from "@/lib/season-calendar";
-import { weekTitle } from "@/lib/dates";
+import { getSession } from "@/lib/league";
 import { isGuestMode } from "@/lib/guest-mode";
-import { BORED_PRACTICE_WEEK, isBoredPracticeActive } from "@/lib/bored-practice";
-import { startBoredPracticeWeek } from "@/lib/bored-practice-run";
+import { pickRandomFunRoom } from "@/lib/fun-lobby";
 
 export default function BoredLameSandboxCta() {
   const router = useRouter();
   const [show, setShow] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [note, setNote] = useState<string | null>(null);
-  const [sportId, setSportId] = useState("cfb");
-  const [again, setAgain] = useState(false);
 
   useEffect(() => {
-    // Guests may practice too — conversion path after practice done
-    const league = getLeague();
-    const sid = league?.sportId || "cfb";
-    setSportId(sid);
-    if (!isGuestMode() && hasOpeningWeekStarted(sid)) {
-      setShow(false);
-      return;
-    }
-    // Guests: always offer practice tour; members: only pre-opening window
+    // Members + guests (guests can peek, post gated on /bored)
     if (isGuestMode()) {
       setShow(true);
-      setAgain(isBoredPracticeActive());
       return;
     }
     setShow(!!getSession()?.playerId);
-    setAgain(isBoredPracticeActive());
+
+    // Retire sticky Practice Mode if anything left over
+    void import("@/lib/bored-practice").then((m) => {
+      try {
+        if (m.isBoredPracticeActive()) m.exitBoredPracticeToLive();
+      } catch {
+        /* ok */
+      }
+    });
   }, []);
 
   if (!show) return null;
 
-  const first = firstSeasonWeek(sportId);
-  const openLabel = weekTitle(first, sportId);
-  const sub =
-    first === 0
-      ? "Available until Week 0 kickoff."
-      : `Available until ${openLabel} kickoff.`;
-
-  async function onBored() {
-    setNote(null);
-    setBusy(true);
-    try {
-      const res = await startBoredPracticeWeek();
-      setNote(res.message);
-      if (res.ok) setAgain(true);
-      if (res.goToPicks && res.picksHref) {
-        // Hard navigation — remount picks with a blank slate (no stale live picks)
-        window.setTimeout(() => {
-          window.location.assign(res.picksHref!);
-        }, 200);
-      } else if (res.goToPicks) {
-        window.location.assign(
-          `/picks?week=${BORED_PRACTICE_WEEK}&practice=1&fresh=1`
-        );
-      }
-    } catch (e) {
-      setNote(e instanceof Error ? e.message : "Couldn’t start practice.");
-    }
-    setBusy(false);
+  function goBored() {
+    const room = pickRandomFunRoom(
+      `${getSession()?.playerId || "x"}:${Date.now()}`
+    );
+    router.push(`/bored?room=${room.id}`);
   }
 
   return (
     <section className="mb-5 rounded-2xl border-2 border-dashed border-muted/40 bg-black/30 px-4 py-5 sm:px-5">
       <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted mb-2 text-center">
-        Nothing to do · make your own fun
+        Nothing on the card · make your own fun
       </p>
       <button
         type="button"
-        disabled={busy}
-        onClick={() => void onBored()}
-        className="w-full py-5 sm:py-6 min-h-[64px] rounded-2xl bg-primary text-black text-lg sm:text-xl font-black tracking-tight disabled:opacity-50 shadow-[0_0_40px_rgba(34,197,94,0.2)] active:scale-[0.99] transition"
+        onClick={goBored}
+        className="w-full py-5 sm:py-6 min-h-[64px] rounded-2xl bg-primary text-black text-lg sm:text-xl font-black tracking-tight shadow-[0_0_40px_rgba(34,197,94,0.2)] active:scale-[0.99] transition"
       >
-        {busy
-          ? "Cooking a practice week…"
-          : again
-            ? "Still bored. Hit me again."
-            : "I’m bored. Practice week."}
+        I&apos;m Bored
       </button>
       <p className="text-[11px] sm:text-xs text-muted text-center mt-2.5 leading-relaxed max-w-md mx-auto">
-        {sub}
+        Random lobby with the room. Trash talk, memes, coffee — leave whenever.
+        Not your weekly league chat.
       </p>
-      <p className="text-[10px] text-muted/80 text-center mt-1.5 leading-relaxed max-w-sm mx-auto">
-        Nothing hits a real league. Lock, grade, see how a week ends.
-      </p>
-      {note && (
-        <p className="text-xs text-primary text-center mt-3 font-medium leading-relaxed">
-          {note}
-        </p>
-      )}
     </section>
   );
 }

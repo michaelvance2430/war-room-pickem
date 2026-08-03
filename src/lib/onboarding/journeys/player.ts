@@ -18,10 +18,10 @@ export const playerJourney: OnboardingJourney = {
         kicker: "Welcome",
         title: "Welcome to War Room.",
         speak:
-          "You're in the room — not a simulator. Before real Week 1, one quick practice run on the real app.",
+          "You're in the room. Before Week 1, one quick spin on the real app so the buttons feel familiar.",
         whyCare:
-          "About 3 minutes. Nothing here affects your league. You can't mess anything up.",
-        practiceBanner: true,
+          "About 3 minutes. You can't mess up the season from here.",
+        practiceBanner: false,
         celebrate: "none",
         pointAt: "home",
       },
@@ -43,8 +43,8 @@ export const playerJourney: OnboardingJourney = {
         title: "This is where every week begins.",
         speak:
           "Tap My Picks. That's where you'll lock a card before kickoff — every week.",
-        whyCare: "Practice card only. Same buttons as the real week.",
-        practiceBanner: true,
+        whyCare: "Same buttons you'll use every week.",
+        practiceBanner: false,
         celebrate: "micro",
         celebrateCopy: "✓ Nice. You're on My Picks.",
         explainAfter: "This is the weekly job. Fill the card — then lock it.",
@@ -69,7 +69,7 @@ export const playerJourney: OnboardingJourney = {
         speak:
           "Pick a side on each game. Rank confidence 1–5 (each once — your 5 is your loudest take). One Best Bet. Answer the prop.",
         whyCare: "You're not watching a tutorial — you're doing the real motion.",
-        practiceBanner: true,
+        practiceBanner: false,
         celebrate: "micro",
         celebrateCopy: "✓ Card looks full. Nice.",
         explainAfter: "One more tap — lock it in.",
@@ -94,7 +94,7 @@ export const playerJourney: OnboardingJourney = {
         speak:
           "That's the weekly finish line. On a live week you can still edit until first kickoff.",
         whyCare: "Same muscle memory for when the season is real.",
-        practiceBanner: true,
+        practiceBanner: false,
         celebrate: "peak",
         celebrateCopy:
           "✅ Nice — you locked your first card.\n\nYou're not just making picks. You're joining a room where every week ends with bragging rights, rivalries, and stories.\n\nNothing here affected your league.",
@@ -120,7 +120,7 @@ export const playerJourney: OnboardingJourney = {
         speak:
           "Open Standings — not a silent scoreboard. The table you trash-talk about all week.",
         whyCare: "Your buddy is going to hate losing to you here.",
-        practiceBanner: true,
+        practiceBanner: false,
         celebrate: "micro",
         celebrateCopy: "✓ That's the board you'll fight over all season.",
         explainAfter: "One more door — where the room talks.",
@@ -145,7 +145,7 @@ export const playerJourney: OnboardingJourney = {
         speak:
           "Every league has personalities. This is where yours comes alive.",
         whyCare: "Spreadsheets don't do this. War Room does.",
-        practiceBanner: true,
+        practiceBanner: false,
         celebrate: "micro",
         celebrateCopy: "✓ You've seen where the stories start.",
         explainAfter: "You're ready for the real week when it opens.",

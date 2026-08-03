@@ -82,22 +82,15 @@ The following are now considered **permanent** unless explicitly changed by Mike
 League replaces Commish.  
 League exists to help someone host an **unforgettable season** — not configure software.
 
-### Practice
+### I’m Bored / chat realities
 
-Only two realities exist:
+Player-facing:
 
-- 🏈 **Live League**  
-- 🎮 **Practice** (isolated **state**, not a major product surface)  
+- 🏈 **Live League** (picks, board, weekly Locker)  
+- 🍻 **I’m Bored** fun lobbies (social only — not picks, not practice mode)
 
-Never blur them.
-
-**Teach once. Then trust the player.**  
-One calm indicator + one Return to Live League. No duplicate Practice chrome.
-
-**Practice exists until football exists.**  
-Member “I’m Bored” is preseason only → **gone** at official kickoff (not hidden).  
-Returns next August as offseason ritual. Post-kickoff practice = Foundry only.  
-See `docs/PRACTICE-MODE-REALITY-SEPARATION.md` + Constitution **Offseason Practice**.
+**Practice Mode product is retired** (no chrome, no dual-reality banners).  
+See Constitution **I’m Bored (not Practice Mode)**.
 
 ### Guest Mode
 

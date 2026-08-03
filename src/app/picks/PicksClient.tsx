@@ -728,24 +728,30 @@ export default function PicksClient() {
     }
 
     void (async () => {
-      // Practice URL or active tutorial sandbox
-      let practice = false;
+      // Practice Mode product retired — clear sticky practice, never paint week 99
       try {
-        const { isBoredPracticeUrl, isBoredPracticeActive } = await import(
-          "@/lib/bored-practice"
-        );
-        practice = isBoredPracticeUrl() || isBoredPracticeActive();
+        const {
+          isBoredPracticeUrl,
+          isBoredPracticeActive,
+          exitBoredPracticeToLive,
+        } = await import("@/lib/bored-practice");
+        if (isBoredPracticeUrl() || isBoredPracticeActive()) {
+          exitBoredPracticeToLive();
+          try {
+            const u = new URL(window.location.href);
+            if (u.searchParams.get("practice") === "1" || u.searchParams.get("week") === "99") {
+              u.searchParams.delete("practice");
+              u.searchParams.delete("week");
+              u.searchParams.delete("run");
+              u.searchParams.delete("fresh");
+              window.history.replaceState({}, "", u.pathname + (u.search || ""));
+            }
+          } catch {
+            /* ok */
+          }
+        }
       } catch {
         /* ok */
-      }
-
-      if (practice) {
-        const painted = await paintPracticeFromLocal();
-        if (painted) {
-          window.clearInterval(failSafe);
-          window.clearTimeout(hardBusyOff);
-          return;
-        }
       }
 
       if (cancelled) return;
@@ -772,24 +778,6 @@ export default function PicksClient() {
         if (hasCardRef.current) {
           window.clearInterval(failSafe);
           window.clearTimeout(hardBusyOff);
-        }
-      }
-
-      // No live card + preseason window → auto trial so My Picks never blanks
-      if (!cancelled && !hasCardRef.current) {
-        try {
-          const { isBoredPracticeWindowOpen } = await import(
-            "@/lib/bored-practice"
-          );
-          if (isBoredPracticeWindowOpen()) {
-            const painted = await paintPracticeFromLocal();
-            if (painted) {
-              window.clearInterval(failSafe);
-              window.clearTimeout(hardBusyOff);
-            }
-          }
-        } catch {
-          /* leave waiting room */
         }
       }
     })();

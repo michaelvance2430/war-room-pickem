@@ -679,7 +679,7 @@ export default function Home() {
         <HomeWeekHero />
       <HomeCrewWhisper />
 
-        {/* Pre–Week 0: sarcastic practice escape when nothing real is up */}
+        {/* I’m Bored — fun lobby (not Practice Mode) */}
         <BoredLameSandboxCta />
 
         {/* Host first-hour spine */}

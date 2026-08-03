@@ -279,6 +279,8 @@ export async function loadLockerMessages(limit = 100): Promise<{
 
   for (const r of rows) {
     const body = String(r.body || "");
+    // I’m Bored fun lobbies — never mix into weekly league chat
+    if (body.startsWith("WR_FUN|")) continue;
     const parsed = parseReactionMarker(body);
     if (parsed) {
       rxRows.push({
