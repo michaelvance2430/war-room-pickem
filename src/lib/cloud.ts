@@ -120,6 +120,15 @@ const playersInflight = new Map<
 // Typed as object[] here — LeagueRosterMember is declared later in this file
 const rosterCache = new Map<string, CacheEntry<object[]>>();
 const rosterInflight = new Map<string, Promise<object[]>>();
+/** Join times for titles — single-flight + short TTL (avoids 404 spam). */
+const joinedAtCache = new Map<string, CacheEntry<Map<string, string>>>();
+const joinedAtInflight = new Map<string, Promise<Map<string, string>>>();
+const JOINED_AT_TTL_MS = 60_000;
+/**
+ * Session capability for optional league_first_joins table.
+ * null = unknown, true = works, false = missing (skip further requests).
+ */
+let leagueFirstJoinsAvailable: boolean | null = null;
 
 const CARD_TTL_MS = 12_000;
 const LIST_TTL_MS = 12_000;
@@ -219,6 +228,9 @@ export function invalidateCloudWeekCaches(leagueId?: string | null) {
     playersInflight.clear();
     rosterCache.clear();
     rosterInflight.clear();
+    joinedAtCache.clear();
+    joinedAtInflight.clear();
+    // Do not reset leagueFirstJoinsAvailable — schema does not change mid-session
     return;
   }
   for (const k of [...cardCache.keys()]) {
@@ -236,6 +248,8 @@ export function invalidateCloudWeekCaches(leagueId?: string | null) {
   playersInflight.delete(leagueId);
   rosterCache.delete(leagueId);
   rosterInflight.delete(leagueId);
+  joinedAtCache.delete(leagueId);
+  joinedAtInflight.delete(leagueId);
 }
 
 /** weekly_points from Postgres may be int[] or a JSON object map. */
@@ -2907,48 +2921,89 @@ async function attachEquippedTitles(
   }
 }
 
+function isMissingTableError(err: {
+  code?: string;
+  message?: string;
+  details?: string;
+  hint?: string;
+} | null | undefined): boolean {
+  if (!err) return false;
+  const code = String(err.code || "");
+  const blob = `${err.message || ""} ${err.details || ""} ${err.hint || ""}`;
+  return (
+    code === "PGRST205" || // table not in schema cache
+    code === "PGRST202" || // function not found (record_league_first_join)
+    code === "42P01" ||
+    /could not find the table|could not find the function|relation .* does not exist|schema cache/i.test(
+      blob
+    )
+  );
+}
+
 /**
  * Load join times for profile titles.
  * Prefer permanent first-join (survives leave/rejoin); fall back to memberships.joined_at.
+ * Never re-queries league_first_joins after a proven missing-table 404.
  */
 async function loadJoinedAtByUser(
   leagueId: string
 ): Promise<Map<string, string>> {
-  const map = new Map<string, string>();
-  try {
-    const supabase = createClient();
+  const cached = cacheGet(joinedAtCache, leagueId, JOINED_AT_TTL_MS);
+  if (cached) return new Map(cached);
 
-    // Permanent first join (leave + rejoin keeps rank)
-    const { data: firsts, error: firstErr } = await supabase
-      .from("league_first_joins")
-      .select("user_id, first_joined_at")
-      .eq("league_id", leagueId);
-    if (!firstErr && firsts?.length) {
-      for (const row of firsts) {
+  const existing = joinedAtInflight.get(leagueId);
+  if (existing) return existing;
+
+  const promise = (async () => {
+    const map = new Map<string, string>();
+    try {
+      const supabase = createClient();
+
+      // Permanent first join — skip entirely if table known missing
+      if (leagueFirstJoinsAvailable !== false) {
+        const { data: firsts, error: firstErr } = await supabase
+          .from("league_first_joins")
+          .select("user_id, first_joined_at")
+          .eq("league_id", leagueId);
+        if (firstErr && isMissingTableError(firstErr)) {
+          leagueFirstJoinsAvailable = false;
+        } else if (!firstErr) {
+          leagueFirstJoinsAvailable = true;
+          if (firsts?.length) {
+            for (const row of firsts) {
+              const uid = row.user_id as string;
+              const at = row.first_joined_at as string | null;
+              if (uid && at) map.set(uid, at);
+            }
+          }
+        }
+      }
+
+      // Memberships: fill gaps + never replace an earlier first-join
+      const { data } = await supabase
+        .from("memberships")
+        .select("user_id, joined_at")
+        .eq("league_id", leagueId);
+      for (const row of data || []) {
         const uid = row.user_id as string;
-        const at = row.first_joined_at as string | null;
-        if (uid && at) map.set(uid, at);
+        const at = row.joined_at as string | null;
+        if (!uid || !at) continue;
+        const prev = map.get(uid);
+        if (!prev || new Date(at).getTime() < new Date(prev).getTime()) {
+          map.set(uid, at);
+        }
       }
+    } catch {
+      /* optional */
     }
+    cacheSet(joinedAtCache, leagueId, map);
+    return map;
+  })().finally(() => {
+    joinedAtInflight.delete(leagueId);
+  });
 
-    // Memberships: fill gaps + never replace an earlier first-join
-    const { data } = await supabase
-      .from("memberships")
-      .select("user_id, joined_at")
-      .eq("league_id", leagueId);
-    for (const row of data || []) {
-      const uid = row.user_id as string;
-      const at = row.joined_at as string | null;
-      if (!uid || !at) continue;
-      const prev = map.get(uid);
-      if (!prev || new Date(at).getTime() < new Date(prev).getTime()) {
-        map.set(uid, at);
-      }
-    }
-  } catch {
-    /* optional */
-  }
-  return map;
+  joinedAtInflight.set(leagueId, promise);
+  return promise;
 }
 
 /**
@@ -2963,6 +3018,9 @@ export async function recordLeagueFirstJoin(
   const lid = leagueId || session?.leagueId;
   if (!lid || !session?.playerId) return { ok: false };
 
+  // Table/RPC not on this project — skip without Network 404 spam
+  if (leagueFirstJoinsAvailable === false) return { ok: false };
+
   try {
     const supabase = createClient();
     const { data: auth } = await supabase.auth.getUser();
@@ -2974,7 +3032,14 @@ export async function recordLeagueFirstJoin(
       { p_league_id: lid, p_user_id: uid }
     );
     if (!rpcErr && rpcAt) {
+      leagueFirstJoinsAvailable = true;
+      joinedAtCache.delete(lid);
       return { ok: true, firstJoinedAt: String(rpcAt) };
+    }
+    if (rpcErr && isMissingTableError(rpcErr)) {
+      // Function missing often co-travels with missing table
+      leagueFirstJoinsAvailable = false;
+      return { ok: false };
     }
 
     // Direct insert if RPC not installed yet
@@ -2984,17 +3049,28 @@ export async function recordLeagueFirstJoin(
       user_id: uid,
       first_joined_at: now,
     });
-    if (insErr && !/duplicate|unique|23505/i.test(insErr.message || "")) {
-      // Table missing or blocked — ignore
-      return { ok: false };
+    if (insErr) {
+      if (isMissingTableError(insErr)) {
+        leagueFirstJoinsAvailable = false;
+        return { ok: false };
+      }
+      if (!/duplicate|unique|23505/i.test(insErr.message || "")) {
+        return { ok: false };
+      }
+    } else {
+      leagueFirstJoinsAvailable = true;
     }
 
-    const { data: row } = await supabase
+    const { data: row, error: selErr } = await supabase
       .from("league_first_joins")
       .select("first_joined_at")
       .eq("league_id", lid)
       .eq("user_id", uid)
       .maybeSingle();
+    if (selErr && isMissingTableError(selErr)) {
+      leagueFirstJoinsAvailable = false;
+      return { ok: false };
+    }
 
     const at = (row?.first_joined_at as string) || now;
     // Best-effort restore membership joined_at
@@ -3004,6 +3080,7 @@ export async function recordLeagueFirstJoin(
       .eq("league_id", lid)
       .eq("user_id", uid);
 
+    joinedAtCache.delete(lid);
     return { ok: true, firstJoinedAt: at };
   } catch {
     return { ok: false };
