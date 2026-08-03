@@ -129,11 +129,27 @@ This P0 improved War Room by **removing friction and confusion**, not by adding 
 
 ---
 
+### 11. Teach once. Then trust the player.
+
+Graduation of Practice (ship `b77407a`): six reminders → one calm promise.
+
+Helpful copy that repeats the same concept becomes noise.  
+Noise is not safety — it is doubt.
+
+**Rule:** Teach the mechanic once. Keep the minimum trust cue. Get out of the way.
+
+Practice is a **state**, not a product whose job is to stay visible.  
+The best outcome is players forgetting Practice existed and remembering War Room was easy to learn.
+
+Constitution: `docs/WAR-ROOM-CONSTITUTION.md` → **Teach-once principle**.
+
+---
+
 ## Three realities (healthy architecture)
 
 The clearest separation we locked:
 
-> **Guest tour · Practice Mode · Live League**
+> **Guest tour · Practice (state) · Live League**
 
 Each has one job. No bleeding.
 

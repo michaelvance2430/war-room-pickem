@@ -82,14 +82,18 @@ The following are now considered **permanent** unless explicitly changed by Mike
 League replaces Commish.  
 League exists to help someone host an **unforgettable season** — not configure software.
 
-### Practice Mode
+### Practice
 
 Only two realities exist:
 
 - 🏈 **Live League**  
-- 🎮 **Practice Mode**  
+- 🎮 **Practice** (isolated **state**, not a major product surface)  
 
 Never blur them.
+
+**Teach once. Then trust the player.**  
+One calm indicator + one Return to Live League. No duplicate Practice chrome.  
+See graduation in `docs/PRACTICE-MODE-REALITY-SEPARATION.md`.
 
 ### Guest Mode
 

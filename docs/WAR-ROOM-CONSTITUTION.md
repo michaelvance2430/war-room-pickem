@@ -39,7 +39,8 @@ If it fails the Founder Rule, **it doesn’t ship** — even if it passes techni
 ## Values
 
 1. **Confidence over complexity.**  
-   People should feel smart. Never overwhelmed.
+   People should feel smart. Never overwhelmed.  
+   Not “don’t confuse people” alone — **don’t insult their intelligence.**
 
 2. **Community over competition.**  
    Competition creates stories. Community keeps people coming back.
@@ -141,7 +142,7 @@ Curiosity can be rewarded (a second take, a third joke) without inventing a seas
 
 Apps are about information. Season is about anticipation, inside jokes, waiting for Thursday, checking the wall, wondering who forgot picks, celebrating, and giving your buddy grief.
 
-Every destination (League, The Room, Practice Mode, The Board) should answer:  
+Every destination (League, The Room, The Board — and Practice when it is a temporary state) should answer:  
 *Does this feel like something that happens in a real season with real people?*  
 If it only feels like software, cut or redesign.
 
@@ -156,9 +157,29 @@ Confidence builds trust. Ambiguity destroys it.
 Either:
 
 - 🏈 **Live League**
-- 🎮 **Practice Mode**
+- 🎮 **Practice** (a *state* — not a product that constantly announces itself)
 
 Never both. Never ambiguous. Never leaking developer concepts.
+
+Trust promise while practicing: *Nothing here affects your real league.*  
+One calm indicator. One obvious way back. No six reminders of the same fact.
+
+### Teach-once principle
+
+> **Teach once. Then trust the player.**
+
+Applies everywhere: onboarding, Practice, Guest, League, future tutorials.
+
+- Teach the mechanic. Hold the hand when it is first needed.
+- After that, get out of the way.
+- Do not re-explain a choice the player already made.
+- Helpful copy that repeats itself becomes noise — and noise destroys confidence.
+
+The best onboarding systems are almost invisible.  
+They give just enough confidence for the next step, then quietly disappear.
+
+**Practice’s job is to disappear.**  
+If players stop thinking about Practice and only remember *“War Room was easy to learn,”* it was built correctly.
 
 ### Foundry backstage principle
 
