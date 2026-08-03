@@ -181,6 +181,28 @@ They give just enough confidence for the next step, then quietly disappear.
 **Practice’s job is to disappear.**  
 If players stop thinking about Practice and only remember *“War Room was easy to learn,”* it was built correctly.
 
+### Offseason Practice principle
+
+> **Practice exists until football exists.**  
+> **Practice belongs to the offseason.**  
+> **When real football begins, War Room stops pretending.**
+
+- **Preseason:** “I’m Bored” is visible — fun, low stakes, confidence only.  
+- **Official kickoff:** gone. Not buried in a menu. Not “advanced.” **Gone.**  
+- **In season:** the season *is* the tutorial. Week 1 teaches confidence, locks, the Board.  
+- **Next August:** “I’m Bored” returns — an offseason ritual, not a permanent mode.
+
+Any need to practice *after* kickoff is Foundry / creator tooling — never normal player chrome.
+
+Season Opening may end with one quiet line, then silence:
+
+> Practice is over. The season is here.
+
+No explanation. No settings dump. The button simply isn’t there anymore.
+
+Guest tour remains a separate reality (conversion before membership).  
+League members live this calendar: offseason practice → live football.
+
 ### Foundry backstage principle
 
 > **Customers should never know Foundry exists.**

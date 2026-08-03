@@ -145,6 +145,19 @@ Constitution: `docs/WAR-ROOM-CONSTITUTION.md` → **Teach-once principle**.
 
 ---
 
+### 12. Practice belongs to the offseason
+
+> **Practice exists until football exists.**  
+> When real football begins, War Room stops pretending.
+
+Member “I’m Bored” is preseason ritual → **gone** at official kickoff → returns next August.  
+In season, Week 1 *is* the tutorial. Post-kickoff drills = Foundry only.
+
+Code already enforces the member window via `hasOpeningWeekStarted` / `isBoredPracticeWindowOpen`.  
+Season Opening design may whisper: *Practice is over. The season is here.*
+
+---
+
 ## Three realities (healthy architecture)
 
 The clearest separation we locked:

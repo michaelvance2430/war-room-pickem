@@ -92,8 +92,12 @@ Only two realities exist:
 Never blur them.
 
 **Teach once. Then trust the player.**  
-One calm indicator + one Return to Live League. No duplicate Practice chrome.  
-See graduation in `docs/PRACTICE-MODE-REALITY-SEPARATION.md`.
+One calm indicator + one Return to Live League. No duplicate Practice chrome.
+
+**Practice exists until football exists.**  
+Member “I’m Bored” is preseason only → **gone** at official kickoff (not hidden).  
+Returns next August as offseason ritual. Post-kickoff practice = Foundry only.  
+See `docs/PRACTICE-MODE-REALITY-SEPARATION.md` + Constitution **Offseason Practice**.
 
 ### Guest Mode
 

@@ -92,6 +92,24 @@ If a player ever says:
 
 …the ritual worked.
 
+### Practice retires with the door
+
+Constitution: **Practice exists until football exists.**
+
+When this ceremony ends, member preseason practice is over for the year:
+
+1. Emotional peak (confetti / GameDay energy / room wakes up).  
+2. One quiet line (optional garnish, not a second modal):  
+
+   > **Practice is over. The season is here.**
+
+3. **“I’m Bored” is gone** — not hidden, not settings. Already enforced by  
+   `hasOpeningWeekStarted` / `isBoredPracticeWindowOpen`.  
+4. No explanation dump. The season teaches itself from here.
+
+Next August the button returns as offseason ritual.  
+Post-kickoff practice tools stay Foundry-only if ever needed.
+
 ---
 
 # PART 1 — Current sequence audit (traced from code)

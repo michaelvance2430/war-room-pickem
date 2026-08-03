@@ -1,7 +1,10 @@
 /**
  * Bored practice — fully isolated from the live season.
  * Client-only fake week (not week 0 / not league active week).
- * Re-do until Week 0 kickoff, then the button dies.
+ *
+ * Product law: Practice exists until football exists.
+ * Members: window open only before official opening kickoff; then gone.
+ * Returns next offseason. Guests: conversion tour may practice anytime.
  */
 
 import { getLeague } from "@/lib/league";
@@ -88,8 +91,8 @@ function lid() {
 }
 
 /**
- * Practice Mode window.
- * Members: only before official opening week kickoff.
+ * Practice window (offseason).
+ * Members: only before official opening week kickoff — then season is the tutorial.
  * Guests: always open (tour only; conversion after practice done).
  */
 export function isBoredPracticeWindowOpen(sportId?: string | null): boolean {

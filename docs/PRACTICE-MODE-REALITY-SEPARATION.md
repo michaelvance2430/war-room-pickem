@@ -29,18 +29,36 @@ Practice is a **state** (data isolation + trust promise), not a product that con
 
 Entry intent (“I’m Bored”) is enough. After guided lesson + one practice run, the player should feel like they are playing War Room—not using a training simulator.
 
+### Offseason lifecycle (product law)
+
+> **Practice exists until football exists.**  
+> **Practice belongs to the offseason.**  
+> **When real football begins, War Room stops pretending.**
+
+| Phase | Member “I’m Bored” | Practice state |
+|-------|--------------------|----------------|
+| Preseason / pre-kickoff | Visible, fun, low stakes | Allowed |
+| Official opening kickoff | **Gone** — not in a menu | Window closes; active practice cleared |
+| Live season | Absent | Season *is* the tutorial |
+| Next August / new offseason | Returns as ritual | Window opens again |
+
+Post-kickoff practice drills = **Foundry only**, never player chrome.
+
+**Code already gates this for members:** `isBoredPracticeWindowOpen` / `hasOpeningWeekStarted` hide CTA, block start, clear sticky practice.
+
+Guest tour may still practice for conversion — separate reality.
+
+Season Opening beat (design): after the ceremony peak, one quiet line — *Practice is over. The season is here.* — then the button is simply gone.
+
 ---
 
-## Constitution addition (proposed)
+## Constitution (locked)
 
 > **War Room should never make the user question whether their actions are real.**
 
-Confidence builds trust. Ambiguity destroys it.
+> **Teach once. Then trust the player.**
 
-Related:
-
-> People return because of the **league**.  
-> Navigation should describe the world they’re entering.
+> **Practice belongs to the offseason.**
 
 ---
 

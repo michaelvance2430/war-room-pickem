@@ -1,7 +1,10 @@
 "use client";
 
 /**
- * Pre–Week 0 escape hatch — private practice, zero live-season data.
+ * Offseason only — “I’m Bored” private practice.
+ * Practice exists until football exists. At official kickoff this CTA is gone
+ * (not menu-hidden). Returns next preseason as ritual. Foundry owns any
+ * post-kickoff drills. Guests may still see it for conversion.
  */
 
 import { useEffect, useState } from "react";
