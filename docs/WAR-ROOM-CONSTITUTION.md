@@ -189,6 +189,19 @@ Bottom nav destination: **League** (not Commish / Host / Admin).
 Labels answer *“Where am I going?”* — not *“What role am I?”*  
 Permissions stay exactly as they are; only the language of the destination changes.
 
+### Consistent chrome
+
+> **Consistency builds confidence. Players should never wonder if they're in a different version of War Room.**
+
+The app shell (nav, header hierarchy, spacing, frame) stays familiar across CFB, NFL, Guest, Practice, player, and host.
+
+- ✅ Different **leagues** may have different personalities (names, taglines).  
+- ✅ Different **roles** may change page *content* (host job vs player job).  
+- ❌ Different **sports** must not feel like different applications.
+
+Switching sports should feel like changing channels — not opening a new product.  
+See `docs/CONSISTENT-CHROME-AUDIT.md`.
+
 ### Onboarding corollary
 
 The coach should **illuminate** War Room — never interrupt it or replace it with a course.

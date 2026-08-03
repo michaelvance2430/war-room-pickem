@@ -90,7 +90,7 @@ export default function HomeRoomContext({
             href="/commissioner"
             className="min-h-[44px] px-3.5 rounded-lg bg-primary/15 border border-primary/40 text-primary text-xs font-bold inline-flex items-center touch-manipulation"
           >
-            Commish tools
+            League →
           </Link>
         )}
       </div>
