@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  exitGuestDemo,
   getGuestState,
   isGuestMode,
   markGuestTutorialDone,
@@ -104,29 +105,55 @@ export default function GuestOnboarding() {
         {phase === "welcome" && (
           <div className="p-5 sm:p-6 space-y-4">
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">
-              Demo mode
+              👋 Welcome to War Room
             </p>
             <h2 className="text-xl sm:text-2xl font-bold text-foreground">
-              Welcome to the Demo War Room
+              You&apos;re checking out as a guest
             </h2>
             <p className="text-sm text-muted leading-relaxed">
-              This is a <strong className="text-foreground">simulated season
-              already through Week 9</strong> — full set of bots, standings,
-              fake locker energy, and gazette-ready drama. Nothing here is your
-              real friend league.
+              Look around. Make some practice picks. See what football season
+              feels like here.
             </p>
-            <ul className="text-sm text-foreground/90 space-y-1.5 list-disc pl-5">
-              <li>Weeks 0–8 scored · you land on Week 9</li>
-              <li>Bots + mock board so the room looks alive</li>
-              <li>Safe to click everything — reset anytime</li>
-            </ul>
-            <button
-              type="button"
-              onClick={() => setPhase("role")}
-              className="w-full py-3 rounded-xl bg-primary text-black font-bold"
-            >
-              Continue →
-            </button>
+            <p className="text-sm text-foreground/90 leading-relaxed">
+              The social side—Locker, rivalries, crews, titles, and everything
+              that makes your league{" "}
+              <em className="text-foreground not-italic font-semibold">yours</em>
+              —unlocks when you join or create a real league.
+            </p>
+            <p className="text-xs text-muted leading-relaxed rounded-lg border border-border bg-background/50 px-3 py-2">
+              This tour uses a <strong className="text-foreground">simulated room
+              through Week 9</strong> with bots so the place feels alive. Nothing
+              here is your friend group yet.
+            </p>
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => setPhase("role")}
+                className="w-full py-3 min-h-[48px] rounded-xl bg-primary text-black font-bold"
+              >
+                Look around →
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  exitGuestDemo();
+                  window.location.assign("/login?mode=join");
+                }}
+                className="w-full py-2.5 min-h-[44px] rounded-xl border border-primary/40 text-primary text-sm font-bold"
+              >
+                Join a League →
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  exitGuestDemo();
+                  window.location.assign("/login?mode=signup");
+                }}
+                className="w-full py-2 text-xs text-muted hover:text-foreground"
+              >
+                Create My League →
+              </button>
+            </div>
           </div>
         )}
 

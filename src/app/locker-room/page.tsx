@@ -36,6 +36,14 @@ import {
   splitMentions,
   type MentionMember,
 } from "@/lib/locker-mentions";
+import { isGuestMode } from "@/lib/guest-mode";
+import {
+  GUEST_LOCKER_POST_CODE,
+  GUEST_LOCKER_POST_INVITE,
+  GUEST_LOCKER_REACT_CODE,
+  GUEST_LOCKER_REACT_INVITE,
+} from "@/lib/guest-copy";
+import GuestBlockInvitePanel from "@/components/GuestBlockInvite";
 
 export default function LockerRoomPage() {
   const [messages, setMessages] = useState<LockerMessage[]>([]);
@@ -44,6 +52,8 @@ export default function LockerRoomPage() {
   const [body, setBody] = useState("");
   const [posting, setPosting] = useState(false);
   const [postError, setPostError] = useState<string | null>(null);
+  const [guest, setGuest] = useState(false);
+  const [showGuestReactInvite, setShowGuestReactInvite] = useState(false);
   const [selfId, setSelfId] = useState<string | null>(null);
   const [staff, setStaff] = useState(false);
   const [muted, setMuted] = useState(false);
@@ -86,6 +96,7 @@ export default function LockerRoomPage() {
     setSelfId(session?.playerId || null);
     setStaff(isStaff());
     setLeagueName(getLeague()?.name || "");
+    setGuest(isGuestMode());
     // Immediate clear on walk-in — don't wait for network or extra taps
     markLockerSeen();
     // Never leave Locker on Loading… forever (stuck network)
@@ -206,6 +217,10 @@ export default function LockerRoomPage() {
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setPostError(null);
+    if (guest || isGuestMode()) {
+      setPostError(GUEST_LOCKER_POST_CODE);
+      return;
+    }
     if (muted) {
       setPostError(
         "You’re muted in Locker Room. Talk to the commissioner if that’s a mistake."
@@ -257,6 +272,11 @@ export default function LockerRoomPage() {
   }
 
   async function onReact(messageId: string, emoji: string) {
+    if (guest || isGuestMode()) {
+      setShowGuestReactInvite(true);
+      setReactError(GUEST_LOCKER_REACT_CODE);
+      return;
+    }
     if (muted) {
       setReactError("You’re muted — reactions are off too.");
       setPostError("You’re muted — reactions are off too.");
@@ -458,7 +478,7 @@ export default function LockerRoomPage() {
                         <button
                           key={`${m.id}-stamp-${r.emoji}`}
                           type="button"
-                          disabled={!!muted || reactBusyId === m.id}
+                          disabled={!!muted || guest || reactBusyId === m.id}
                           onClick={() => {
                             if (muted) return;
                             void onReact(m.id, r.emoji);
@@ -485,7 +505,7 @@ export default function LockerRoomPage() {
                         </button>
                       ))}
 
-                      {!muted && (
+                      {!muted && !guest && (
                         <button
                           type="button"
                           disabled={reactBusyId === m.id}
@@ -543,7 +563,14 @@ export default function LockerRoomPage() {
       <div ref={bottomRef} />
         </div>
 
-        {muted ? (
+        {guest ? (
+          <div className="shrink-0 space-y-3">
+            {showGuestReactInvite && (
+              <GuestBlockInvitePanel invite={GUEST_LOCKER_REACT_INVITE} />
+            )}
+            <GuestBlockInvitePanel invite={GUEST_LOCKER_POST_INVITE} />
+          </div>
+        ) : muted ? (
           <div className="shrink-0 rounded-xl border border-danger/40 bg-danger/10 px-4 py-4 text-sm">
       <p className="font-semibold text-danger mb-1">You’re muted</p>
       <p className="text-muted text-xs leading-relaxed">
@@ -651,7 +678,14 @@ export default function LockerRoomPage() {
                 {posting ? "Sending…" : "Post"}
               </button>
       </div>
-            {postError && <p className="text-xs text-danger">{postError}</p>}
+            {postError &&
+              postError !== GUEST_LOCKER_POST_CODE &&
+              postError !== GUEST_LOCKER_REACT_CODE && (
+                <p className="text-xs text-danger">{postError}</p>
+              )}
+            {postError === GUEST_LOCKER_POST_CODE && (
+              <GuestBlockInvitePanel invite={GUEST_LOCKER_POST_INVITE} />
+            )}
           </form>
         )}
       </main>

@@ -489,6 +489,16 @@ export async function toggleLockerReaction(
   }
 
   try {
+    const { isGuestMode } = await import("./guest-mode");
+    if (isGuestMode()) {
+      const { GUEST_LOCKER_REACT_CODE } = await import("./guest-copy");
+      return { ok: false, error: GUEST_LOCKER_REACT_CODE };
+    }
+  } catch {
+    /* continue */
+  }
+
+  try {
     const eyes = await import("./creator-eyes");
     if (eyes.isEyesLocalPlayActive()) {
       return {
@@ -782,6 +792,17 @@ export async function postLockerMessage(body: string): Promise<{
       ok: false,
       error: `Max ${LOCKER_MAX_CHARS} characters.`,
     };
+  }
+
+  // Guest Mode: observe only — never hit Supabase as a fake member
+  try {
+    const { isGuestMode } = await import("./guest-mode");
+    if (isGuestMode()) {
+      const { GUEST_LOCKER_POST_CODE } = await import("./guest-copy");
+      return { ok: false, error: GUEST_LOCKER_POST_CODE };
+    }
+  } catch {
+    /* continue */
   }
 
   // Creator eyes: never post into the real locker

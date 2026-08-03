@@ -26,8 +26,14 @@ function LoginPageInner() {
   const [guestLoading, setGuestLoading] = useState(false);
   const [inviteHint, setInviteHint] = useState<string | null>(null);
 
-  // Preserve deep-link invite through login/signup
+  // Preserve deep-link invite through login/signup; honor ?mode=
   useEffect(() => {
+    const modeParam = searchParams.get("mode");
+    if (modeParam === "signup" || modeParam === "join") {
+      setMode("signup");
+    } else if (modeParam === "login") {
+      setMode("login");
+    }
     const next = searchParams.get("next") || "";
     const codeMatch = next.match(/[?&]code=([A-Za-z0-9]+)/i);
     const code =
@@ -221,12 +227,14 @@ function LoginPageInner() {
               }}
               className="w-full py-3.5 min-h-[52px] rounded-xl border border-border text-sm font-medium text-muted touch-manipulation disabled:opacity-50"
             >
-              {guestLoading ? "Loading demo…" : "Guest demo (bots, no account)"}
+              {guestLoading
+                ? "Opening the tour…"
+                : "Explore as guest · look around first"}
             </button>
-      <p className="text-[11px] text-muted text-center leading-relaxed px-1">
-              Open lobby fills one room at a time. Full rooms get a friendly
-              “no seats” bounce — not a lecture. Log in below if you need an
-              account first.
+            <p className="text-[11px] text-muted text-center leading-relaxed px-1">
+              Guests observe. Members belong. Try the room free — Locker &amp;
+              real leagues unlock when you join or create. Open lobby fills one
+              room at a time.
             </p>
       </div>
         )}

@@ -32,6 +32,7 @@ import HomeRoomContext from "@/components/HomeRoomContext";
 import SoftUnlockBanner from "@/components/SoftUnlockBanner";
 import BoredLameSandboxCta from "@/components/BoredLameSandboxCta";
 import SandboxSimBanner from "@/components/SandboxSimBanner";
+import GuestConversionClose from "@/components/GuestConversionClose";
 import { isGuestMode } from "@/lib/guest-mode";
 import {
   wantsFullRoom,
@@ -686,6 +687,9 @@ export default function Home() {
 
         {/* One-time: first lock opened the full room */}
         <SoftUnlockBanner />
+
+        {/* Guest: quiet conversion after exploring (not fireworks) */}
+        <GuestConversionClose />
 
         {firstWeekChrome && (
           <p className="text-xs text-muted mb-4 leading-relaxed max-w-xl -mt-1">
