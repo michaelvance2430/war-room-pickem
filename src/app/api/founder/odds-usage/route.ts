@@ -77,54 +77,104 @@ function dayKey(iso: string, tz = "America/New_York"): string {
   }
 }
 
+/** Empty stats — Foundry must not hard-error when telemetry is unconfigured. */
+function emptyUsagePayload(opts?: {
+  reason?: string;
+  migrationRequired?: boolean;
+  serviceRoleMissing?: boolean;
+}) {
+  return {
+    ok: true,
+    migrationRequired: !!opts?.migrationRequired,
+    serviceRoleMissing: !!opts?.serviceRoleMissing,
+    telemetryNote:
+      opts?.reason ||
+      "Platform API usage telemetry is not available yet (empty stats).",
+    trackingSince: null,
+    timezone: "America/New_York",
+    summary: {
+      credits_remaining: null,
+      credits_used: null,
+      last_request_cost: null,
+      total_requests: 0,
+      pull_odds_requests: 0,
+      score_sync_requests: 0,
+      failed_requests: 0,
+      last_success_at: null,
+      last_failure_at: null,
+      usage_today_est: 0,
+      usage_week_est: 0,
+      usage_month_est: 0,
+      estimated_credits_window: 0,
+    },
+    byDay: [] as { date: string; requests: number; estimated: number; failed: number }[],
+    byAction: [] as {
+      action: string;
+      requests: number;
+      failed: number;
+      estimated: number;
+    }[],
+    bySport: [] as {
+      sport: string;
+      requests: number;
+      failed: number;
+      estimated: number;
+    }[],
+    leagues: [] as unknown[],
+    recentFailures: [] as unknown[],
+  };
+}
+
 /**
  * Foundry-only platform Odds API usage aggregates.
  * Requires Bearer token for an app creator. Service role reads usage table.
+ * Missing service role / table → 200 empty stats (never 503 for telemetry).
  */
 export async function GET(req: Request) {
   const gate = await requireCreator(req);
   if (!gate.ok) {
+    // Real auth failures only (401/403) — not telemetry init
     return NextResponse.json({ error: gate.error }, { status: gate.status });
   }
 
-  const sb = serviceClientOrNull();
-  if (!sb) {
-    return NextResponse.json(
-      { error: "Service role not configured" },
-      { status: 503 }
-    );
-  }
+  try {
+    const sb = serviceClientOrNull();
+    if (!sb) {
+      // Production may not set SUPABASE_SERVICE_ROLE_KEY yet
+      return NextResponse.json(
+        emptyUsagePayload({
+          serviceRoleMissing: true,
+          reason:
+            "Service role not configured on this deployment — empty usage stats. Add SUPABASE_SERVICE_ROLE_KEY in Vercel to enable live aggregates.",
+        })
+      );
+    }
 
-  // Pull recent window for trends (90 days) — full table still small at ops scale
-  const since = new Date();
-  since.setUTCDate(since.getUTCDate() - 90);
+    // Pull recent window for trends (90 days) — full table still small at ops scale
+    const since = new Date();
+    since.setUTCDate(since.getUTCDate() - 90);
 
-  const { data: rowsRaw, error } = await sb
-    .from("platform_odds_api_usage")
-    .select(
-      "id, created_at, league_id, user_id, sport, action, endpoint, provider_remaining, provider_used, provider_last_cost, estimated_credit_cost, success, http_status, error_code, duration_ms, dry_run, week_number"
-    )
-    .gte("created_at", since.toISOString())
-    .order("created_at", { ascending: false })
-    .limit(5000);
+    const { data: rowsRaw, error } = await sb
+      .from("platform_odds_api_usage")
+      .select(
+        "id, created_at, league_id, user_id, sport, action, endpoint, provider_remaining, provider_used, provider_last_cost, estimated_credit_cost, success, http_status, error_code, duration_ms, dry_run, week_number"
+      )
+      .gte("created_at", since.toISOString())
+      .order("created_at", { ascending: false })
+      .limit(5000);
 
-  if (error) {
-    // Table missing until migration
-    return NextResponse.json({
-      ok: false,
-      migrationRequired: true,
-      error: error.message,
-      trackingSince: null,
-      summary: null,
-      byDay: [],
-      byAction: [],
-      bySport: [],
-      leagues: [],
-      recentFailures: [],
-    });
-  }
+    if (error) {
+      return NextResponse.json(
+        emptyUsagePayload({
+          migrationRequired: true,
+          reason:
+            error.message ||
+            "platform_odds_api_usage not readable — empty stats until table is available.",
+        })
+      );
+    }
 
-  const rows = (rowsRaw || []) as UsageRow[];
+    const rows = (rowsRaw || []) as UsageRow[];
 
   // Earliest row overall (for honest "Tracking since")
   let trackingSince: string | null = null;
@@ -303,30 +353,42 @@ export async function GET(req: Request) {
       endpoint: r.endpoint,
     }));
 
-  return NextResponse.json({
-    ok: true,
-    migrationRequired: false,
-    trackingSince,
-    timezone: "America/New_York",
-    summary: {
-      credits_remaining: latestRemaining,
-      credits_used: latestUsed,
-      last_request_cost: latestLastCost,
-      total_requests: rows.length,
-      pull_odds_requests: pullOdds,
-      score_sync_requests: scoreSync,
-      failed_requests: failed,
-      last_success_at: lastSuccess,
-      last_failure_at: lastFailure,
-      usage_today_est: usageToday,
-      usage_week_est: usageWeek,
-      usage_month_est: usageMonth,
-      estimated_credits_window: totalEst,
-    },
-    byDay,
-    byAction,
-    bySport,
-    leagues,
-    recentFailures,
-  });
+    return NextResponse.json({
+      ok: true,
+      migrationRequired: false,
+      serviceRoleMissing: false,
+      trackingSince,
+      timezone: "America/New_York",
+      summary: {
+        credits_remaining: latestRemaining,
+        credits_used: latestUsed,
+        last_request_cost: latestLastCost,
+        total_requests: rows.length,
+        pull_odds_requests: pullOdds,
+        score_sync_requests: scoreSync,
+        failed_requests: failed,
+        last_success_at: lastSuccess,
+        last_failure_at: lastFailure,
+        usage_today_est: usageToday,
+        usage_week_est: usageWeek,
+        usage_month_est: usageMonth,
+        estimated_credits_window: totalEst,
+      },
+      byDay,
+      byAction,
+      bySport,
+      leagues,
+      recentFailures,
+    });
+  } catch (e) {
+    // Never 503 Foundry over telemetry crashes
+    return NextResponse.json(
+      emptyUsagePayload({
+        reason:
+          e instanceof Error
+            ? e.message
+            : "Usage aggregate failed — empty stats.",
+      })
+    );
+  }
 }
