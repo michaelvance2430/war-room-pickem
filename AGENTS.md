@@ -67,3 +67,26 @@ Creator re-enable Moments on one browser only:
 ```js
 localStorage.setItem("warroom-safe-nav-off", "1"); location.reload();
 ```
+
+## War Room Moments — stable baseline freeze
+
+**Last known-good Moments interaction baseline**
+
+| Field | Value |
+|--------|--------|
+| Tag | `war-room-moments-stable-baseline` |
+| SHA | `b9989ba29d1d89756a6f29121df4bdffc2f29daa` |
+| Doc | `docs/WAR-ROOM-MOMENTS-STABLE-BASELINE.md` |
+
+**Freeze rules**
+
+1. Do **not** modify shared presenter (`src/lib/moments/presenter.ts`), body-lock ownership (`acquireBodyLock` / `unlockIfOrphanedLock` in `smooth.ts`), or Moment cleanup contracts without **explicit founder approval**.
+2. Future Moments: **one feature → one commit → one production test**.
+3. If navigation/scrolling breaks: restore this baseline first, then re-apply a smaller fix.
+4. Do not stack multiple unverified presenters on this baseline.
+
+```bash
+git checkout war-room-moments-stable-baseline
+# or
+git reset --hard b9989ba29d1d89756a6f29121df4ba...  # use full SHA from tag
+```
