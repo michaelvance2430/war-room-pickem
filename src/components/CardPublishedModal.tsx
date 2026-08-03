@@ -23,7 +23,7 @@ export default function CardPublishedModal() {
 
   useEffect(() => {
     if (isGuestMode()) return;
-    // Creator test-mode jumps + real hosts
+    // Foundry jump previews + real hosts
     if (
       !isActuallyCommissioner() &&
       !isAppCreator(getSession()?.playerId)

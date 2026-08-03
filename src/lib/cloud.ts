@@ -407,7 +407,7 @@ export async function loadLeagueActiveWeek(): Promise<number> {
   } catch {
     /* ignore */
   }
-  // Creator eyes / test sandbox: stay on the week you're previewing
+  // Creator Eyes: stay on the week you're previewing (no standalone Test Mode)
   try {
     const eyes = await import("./creator-eyes");
     if (eyes.isEyesLocalPlayActive()) {

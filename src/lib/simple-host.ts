@@ -2,7 +2,7 @@
  * Simple host mode — Run the Room for normal commissioners.
  *
  * New / normal hosts: invite → card → fill seats? → score.
- * Deep bot/chaos/SQL tools: app creator only (Founder Test Mode + advanced).
+ * Deep bot/chaos/SQL tools: app creator only (Foundry + advanced).
  *
  * Fairness: once the season is live (or any week scored), filler bots stay.
  * No clearing bots to climb the board.

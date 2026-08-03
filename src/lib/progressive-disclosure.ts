@@ -185,7 +185,7 @@ type ProgressiveSnapshot = {
   showDeepTiles: boolean;
   offerGazetteReveal: boolean;
   fullRoom: boolean;
-  /** Creator test-mode override active */
+  /** Creator Eyes progressive override (internal; not a product Test Mode) */
   sandbox?: boolean;
   sandboxPhase?: string;
 };
@@ -204,7 +204,7 @@ let snapInflightKey: string | null = null;
 export async function loadProgressiveSnapshot(
   playerId?: string | null
 ): Promise<ProgressiveSnapshot> {
-  // Creator flight simulator wins over real league progress
+  // Creator Eyes only — standalone Test Mode / progressive knobs retired
   try {
     const { sandboxProgressiveOverrides } = await import(
       "@/lib/creator-sandbox"

@@ -3371,7 +3371,7 @@ function CommissionerPageInner() {
                       </button>
       </div>
                     <p className="text-[10px] text-muted">
-                      Prefer Founder → Test Mode for UI jumps without a real
+                      Prefer Founder → War Room Moments for UI jumps without a real
                       roster.
                     </p>
       </div>

@@ -222,7 +222,7 @@ export async function loadStoryDoorOffer(): Promise<StoryDoorKind | null> {
     await syncFirstWeekFromCloud(id);
     const activeWeek = await loadLeagueActiveWeek();
     const scoredCount = (await listScoredWeekNumbers()).length;
-    // Creator sandbox week override
+    // Creator Eyes week override only (standalone Test Mode retired)
     try {
       const { sandboxProgressiveOverrides } = await import(
         "./creator-sandbox"

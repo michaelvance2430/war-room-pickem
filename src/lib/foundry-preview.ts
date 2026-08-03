@@ -59,17 +59,8 @@ export function allowFoundryCeremonies(): boolean {
     /* ok */
   }
 
-  if (isFoundrySessionSticky()) return true;
-
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const sb = require("./creator-sandbox") as typeof import("./creator-sandbox");
-    if (sb.isCreatorSandboxActive()) return true;
-  } catch {
-    /* ok */
-  }
-
-  return false;
+  // Foundry sticky only — Creator Test Mode / sandbox knobs retired
+  return isFoundrySessionSticky();
 }
 
 /**
@@ -128,15 +119,13 @@ export async function prepareFoundryDramaAfterScore(
       /* paper may still build client-side from weekly points */
     }
 
-    // Progressive: full-ish room so nav/shelf match
+    // Real progressive signals only — no Creator Test Mode knobs
     try {
-      const sb = await import("./creator-sandbox");
-      sb.saveCreatorSandbox({
-        enabled: true,
-        weekNumber: Math.max(weekNumber, 1),
-        scoredCount: Math.max(weekNumber, 1),
-        phase: weekNumber >= 3 ? "deepening" : "core",
-      });
+      const pd = await import("./progressive-disclosure");
+      if (weekNumber >= 3) {
+        pd.markGazetteShelfRevealSeen(session.playerId);
+      }
+      pd.invalidateProgressiveSnapshot();
     } catch {
       /* ok */
     }
@@ -162,16 +151,21 @@ export async function prepareFoundryDramaAfterScore(
 export async function forceFoundryGazetteAndCheevos(): Promise<void> {
   const session = getSession();
   if (!session?.playerId) return;
-  await prepareFoundryDramaAfterScore(
-    // use sandbox week or 1
-    (() => {
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const sb = require("./creator-sandbox") as typeof import("./creator-sandbox");
-        return sb.loadCreatorSandbox().weekNumber || 1;
-      } catch {
-        return 1;
-      }
-    })()
-  );
+  let week = 1;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const eyes = require("./creator-eyes") as typeof import("./creator-eyes");
+    if (eyes.isEyesLocalPlayActive()) {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const sb = require("./creator-sandbox") as typeof import("./creator-sandbox");
+      week = sb.loadCreatorSandbox().weekNumber || 1;
+    } else {
+      const raw = localStorage.getItem("warroom-active-week");
+      const n = raw != null ? parseInt(raw, 10) : 1;
+      if (!Number.isNaN(n)) week = n;
+    }
+  } catch {
+    week = 1;
+  }
+  await prepareFoundryDramaAfterScore(week);
 }

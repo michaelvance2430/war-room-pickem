@@ -37,7 +37,7 @@ Do not conflate systems. Impact differs by layer.
 | **C. Season sandbox mode** | `isSandboxMode()` — room before doors open; demo/sim framing | **Everyone** in the room (`SandboxSimBanner` on Home) | Shared pre-open dry-run for the **real** room |
 | **D. Lab dry-run tools** | Demo publish, randomize score, auto-score weeks, dry-run odds pull | **`labTools` only** (same gate as B) | Founder QA toys on Host page when creator |
 | **E. Practice Mode (“I’m Bored”)** | Client-only week 99 | Players / onboarding | **Not** hop; separate reality (already being isolated) |
-| **F. Foundry** | Creator desk, eyes, test-mode, platform usage | Creator | Intended home for A/B/D |
+| **F. Foundry** | Creator desk, eyes, War Room Moments, platform usage | Creator | Intended home for A/B/D |
 
 **This review’s primary subject:** **A + B** (hop bar + its host-facing toggle), and whether **D** language (“Sandbox / Dry run”) should leave normal Host Dashboard forever.
 
@@ -75,7 +75,7 @@ Do not conflate systems. Impact differs by layer.
 | Demo slate + bots + one-tap publish | Lab tools on Host when `labTools` | Already creator-gated; **home should be Foundry**, not Host Dashboard homepage |
 | Randomize results / auto-score weeks | Lab tools on Host | Same — Foundry or Host **only under creator gate** |
 | Dry-run odds pull (all open games) | Lab checkbox | Same |
-| Progressive / season-sim knobs | Foundry test-mode + creator sandbox | **Yes** |
+| Progressive / season-sim (retired standalone Test Mode) | Creator Eyes only when active | **Yes (Eyes only)** |
 | “See what a new host sees” | Creator eyes | **Yes** |
 | **Real host first card + invite** | Host onboarding / FirstCardWizard / Host Dashboard | **Must stay customer** — not Foundry |
 | **Room-wide pre-open physics** (C) | Season sandbox mode | Product decision separate from hop; may stay as *preseason room*, but **rename away from lab jargon** |

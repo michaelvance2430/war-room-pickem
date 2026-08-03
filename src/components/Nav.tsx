@@ -93,7 +93,6 @@ export default function Nav() {
   const [showGazetteNav, setShowGazetteNav] = useState(true);
   const [showNewsNav, setShowNewsNav] = useState(true);
   const [earlyNav, setEarlyNav] = useState(false);
-  const [sandboxOn, setSandboxOn] = useState(false);
   const [eyesLabel, setEyesLabel] = useState("");
   /** Heavy chrome (modals/hydrators) after first paint */
   const [deferredReady, setDeferredReady] = useState(false);
@@ -185,7 +184,6 @@ export default function Nav() {
         setShowGazetteNav(true);
         setShowNewsNav(true);
         setEarlyNav(false);
-        setSandboxOn(false);
         setEyesLabel("");
         return;
       }
@@ -200,16 +198,17 @@ export default function Nav() {
             const uid = getSession()?.playerId;
             if (!isAppCreator(uid)) {
               setEyesLabel("");
-              setSandboxOn(false);
               return;
             }
             setEyesLabel(mode === "off" ? "" : m.creatorEyesLabel(mode));
-            // Eyes banner wins over creator progressive test strip
-            setSandboxOn(mode === "off" && !!snap.sandbox);
           });
         });
       });
     }
+    // Retire leftover Creator Test Mode knobs (no standalone lab / banner)
+    void import("@/lib/creator-sandbox").then((sb) => {
+      sb.clearOrphanedCreatorTestMode();
+    });
     syncProgressive();
     window.addEventListener(EVENT_PROGRESSIVE, syncProgressive);
     window.addEventListener("warroom-first-week-progress", syncProgressive);
@@ -635,13 +634,6 @@ export default function Nav() {
           >
             exit → Foundry
           </button>
-        </div>
-      ) : sandboxOn ? (
-        <div className="bg-amber-500 text-black text-[11px] font-bold text-center py-1.5 px-3 sticky top-0 z-[60]">
-          CREATOR TEST MODE — progressive knobs active ·{" "}
-          <Link href="/founder/test-mode" className="underline">
-            open lab
-          </Link>
         </div>
       ) : null}
       <header className="border-b border-border bg-card/80 backdrop-blur sticky top-0 z-50">

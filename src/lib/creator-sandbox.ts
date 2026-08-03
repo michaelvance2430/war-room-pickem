@@ -1,6 +1,10 @@
 /**
- * Creator-only flight simulator — test features without spinning real leagues.
- * State is local to this browser. Never visible to players.
+ * Creator internal helpers — progressive week state for “Through Their Eyes”
+ * and Foundry moment jump buttons.
+ *
+ * Creator Test Mode (standalone knobs UI / banner / /founder/test-mode) is gone.
+ * Progressive overrides only apply while Creator Eyes are active.
+ * Jump helpers fire real events; they do not expose a product “lab”.
  */
 
 import { isAppCreator } from "@/lib/creator";
@@ -20,13 +24,11 @@ export type SandboxPhase =
   | "deepening"
   | "full";
 
+/** Internal week/phase bag used by Creator Eyes only (not a user-facing mode). */
 export type CreatorSandboxState = {
   enabled: boolean;
-  /** Fake active week for labels / progressive math */
   weekNumber: number;
-  /** Pretend this many weeks already scored */
   scoredCount: number;
-  /** Override progressive phase (auto = derive from week/scored) */
   phase: SandboxPhase;
   sportId: "cfb" | "nfl";
   updatedAt: string;
@@ -58,6 +60,16 @@ function notify() {
 
 export function isCreatorSession(): boolean {
   return isAppCreator(getSession()?.playerId);
+}
+
+function isCreatorEyesActiveSafe(): boolean {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const eyes = require("./creator-eyes") as typeof import("./creator-eyes");
+    return eyes.isCreatorEyesActive();
+  } catch {
+    return false;
+  }
 }
 
 export function loadCreatorSandbox(): CreatorSandboxState {
@@ -108,10 +120,25 @@ export function clearCreatorSandbox(): void {
   notify();
 }
 
-/** Sandbox knobs only apply when enabled AND current user is creator. */
+/**
+ * Wipe leftover standalone Test Mode knobs when Eyes are off.
+ * Call once on app chrome mount so old browsers don't keep phantom state.
+ */
+export function clearOrphanedCreatorTestMode(): void {
+  if (!canUse() || !isCreatorSession()) return;
+  if (isCreatorEyesActiveSafe()) return;
+  const s = loadCreatorSandbox();
+  if (s.enabled) clearCreatorSandbox();
+}
+
+/**
+ * True only when Creator Eyes are driving progressive chrome.
+ * Standalone “Test Mode” is retired — never active without Eyes.
+ */
 export function isCreatorSandboxActive(): boolean {
   if (!isCreatorSession()) return false;
-  return loadCreatorSandbox().enabled;
+  if (!loadCreatorSandbox().enabled) return false;
+  return isCreatorEyesActiveSafe();
 }
 
 export function derivePhase(
@@ -137,7 +164,7 @@ export function phaseLabel(phase: Exclude<SandboxPhase, "auto">): string {
   }
 }
 
-/** What progressive UI should pretend under sandbox. */
+/** Progressive UI pretends this week only while Creator Eyes are active. */
 export function sandboxProgressiveOverrides(): {
   activeWeek: number;
   scoredCount: number;
@@ -163,13 +190,13 @@ export function sandboxProgressiveOverrides(): {
     showGazetteShelf,
     showNewsShelf: showGazetteShelf,
     showDeepTiles,
-    offerGazetteReveal: false, // jumps force popup separately
+    offerGazetteReveal: false,
     fullRoom,
     phase,
   };
 }
 
-// —— Jump buttons (existing app events) ——
+// —— Foundry / internal jump helpers (no Test Mode UI) ——
 
 export async function jumpRingCeremony(): Promise<void> {
   const { requestRingCeremonyPreview } = await import("./ring-ceremony");
@@ -177,23 +204,27 @@ export async function jumpRingCeremony(): Promise<void> {
 }
 
 export async function jumpCardPublished(weekNumber?: number): Promise<void> {
-  const s = loadCreatorSandbox();
-  const w = weekNumber ?? s.weekNumber;
+  let w = weekNumber ?? 1;
+  let sport: "cfb" | "nfl" = "cfb";
+  try {
+    const { getLeague } = await import("./league");
+    const league = getLeague();
+    if (league?.sportId === "nfl") sport = "nfl";
+    if (weekNumber == null) {
+      const eyes = loadCreatorSandbox();
+      if (isCreatorSandboxActive()) w = eyes.weekNumber;
+    }
+  } catch {
+    /* defaults */
+  }
   const { notifyCardPublished } = await import("./first-session");
   notifyCardPublished({
     weekNumber: w,
-    weekLabel: weekTitle(w, s.sportId),
+    weekLabel: weekTitle(w, sport),
   });
 }
 
 export function jumpGazetteShelfReveal(): void {
-  // Put progressive into deepening so nav would show Gazette after dismiss
-  saveCreatorSandbox({
-    enabled: true,
-    weekNumber: Math.max(loadCreatorSandbox().weekNumber, 3),
-    scoredCount: Math.max(loadCreatorSandbox().scoredCount, 2),
-    phase: "deepening",
-  });
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent(EVENT_FORCE_GAZETTE_SHELF_REVEAL));
   }
@@ -201,35 +232,15 @@ export function jumpGazetteShelfReveal(): void {
 
 /** Force the actual Gazette paper + cheevo path (Foundry drama, not just shelf). */
 export async function jumpGazettePaperAndCheevos(): Promise<void> {
-  const s = loadCreatorSandbox();
-  saveCreatorSandbox({
-    enabled: true,
-    weekNumber: Math.max(s.weekNumber, 1),
-    scoredCount: Math.max(s.scoredCount, 1),
-    phase: s.weekNumber >= 3 ? "deepening" : "core",
-  });
   const { forceFoundryGazetteAndCheevos } = await import("./foundry-preview");
   await forceFoundryGazetteAndCheevos();
 }
 
 export function jumpCutStoryDoor(): void {
-  // Approaching cut (CFB ~12–14)
-  saveCreatorSandbox({
-    enabled: true,
-    weekNumber: 13,
-    scoredCount: 12,
-    phase: "full",
-  });
   void import("./story-doors").then((m) => m.forceStoryDoor("cut"));
 }
 
 export function jumpTrophyStoryDoor(): void {
-  saveCreatorSandbox({
-    enabled: true,
-    weekNumber: 15,
-    scoredCount: 14,
-    phase: "full",
-  });
   void import("./story-doors").then((m) => m.forceStoryDoor("trophy"));
 }
 
