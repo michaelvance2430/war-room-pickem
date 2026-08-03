@@ -109,7 +109,7 @@ export default function LoginWelcomeModal() {
   useEffect(() => {
     if (isGuestMode()) return;
 
-    function tryOpen() {
+    async function tryOpen() {
       if (dismissedRef.current || openRef.current) return;
       if (isDismissedForever()) return;
 
@@ -119,6 +119,12 @@ export default function LoginWelcomeModal() {
       // First 10 minutes: lame and easy — no shop splash until after first lock
       if (isPreLockCalm(session.playerId)) return;
       if (needsPlayerTutorial() || isPlayerTutorialActive()) return;
+      try {
+        const { isOnboardingActive } = await import("@/lib/onboarding");
+        if (isOnboardingActive()) return;
+      } catch {
+        /* ok */
+      }
       try {
         if (sessionStorage.getItem("warroom-no-welcome-this-session") === "1") {
           return;
@@ -130,9 +136,9 @@ export default function LoginWelcomeModal() {
         /* ok */
       }
       try {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const { isOpeningWeekLive } =
-          require("@/components/RingCeremonyModal") as typeof import("@/components/RingCeremonyModal");
+        const { isOpeningWeekLive } = await import(
+          "@/components/RingCeremonyModal"
+        );
         if (isOpeningWeekLive()) return;
       } catch {
         /* ok */
@@ -174,7 +180,6 @@ export default function LoginWelcomeModal() {
       window.removeEventListener("keydown", onKey);
       unlockBodyScroll();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- dismiss is stable enough via refs
   }, []);
 
   if (!open) return null;

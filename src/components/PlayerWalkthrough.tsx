@@ -72,8 +72,29 @@ export default function PlayerWalkthrough() {
   const [step, setStep] = useState<PlayerTutorialStep>("open_picks");
   const [picksHref, setPicksHref] = useState("/picks");
   const [padawanOutro, setPadawanOutro] = useState(false);
+  const [legacyAllowed, setLegacyAllowed] = useState(false);
   const startingRef = useRef(false);
   const lastPathRef = useRef<string | null>(null);
+
+  // New onboarding engine owns first session — legacy coach only for Account re-run
+  useEffect(() => {
+    try {
+      const { isOnboardingActive, needsJourney, hasCompletedJourney } =
+        require("@/lib/onboarding") as typeof import("@/lib/onboarding");
+      if (isOnboardingActive()) {
+        setLegacyAllowed(false);
+        return;
+      }
+      // If player never finished NEW journey, don't auto-start legacy
+      if (needsJourney("player") && !hasCompletedJourney("player")) {
+        setLegacyAllowed(false);
+        return;
+      }
+      setLegacyAllowed(true);
+    } catch {
+      setLegacyAllowed(true);
+    }
+  }, [pathname, active]);
 
   /** Immediate paint from localStorage — no await. */
   const syncFromStorage = useCallback(() => {
@@ -103,12 +124,33 @@ export default function PlayerWalkthrough() {
       if (isGuestMode()) return;
       if (!getSession()?.playerId) return;
 
+      // New onboarding engine — do not auto-start legacy coach
+      try {
+        const ob = await import("@/lib/onboarding");
+        if (ob.isOnboardingActive()) {
+          syncFromStorage();
+          return;
+        }
+        if (ob.needsJourney("player") && !ob.hasCompletedJourney("player")) {
+          syncFromStorage();
+          return;
+        }
+      } catch {
+        /* fall through to legacy */
+      }
+
       // Already mid-walk — just paint, no cloud
       if (isPlayerTutorialActive()) {
         syncFromStorage();
         return;
       }
       if (!needsPlayerTutorial()) {
+        syncFromStorage();
+        return;
+      }
+
+      // Only Account re-run starts legacy (completed new journey but re-ran old)
+      if (!legacyAllowed) {
         syncFromStorage();
         return;
       }
@@ -189,7 +231,7 @@ export default function PlayerWalkthrough() {
       window.removeEventListener("storage", onStorage);
       window.removeEventListener("warroom-card-published", onCardPublished);
     };
-  }, [syncFromStorage, advanceAndPaint]);
+  }, [syncFromStorage, advanceAndPaint, legacyAllowed]);
 
   // Path change: cheap local advances only (no network)
   useEffect(() => {
@@ -300,6 +342,7 @@ export default function PlayerWalkthrough() {
   }, [active, pathname, advanceAndPaint, syncFromStorage]);
 
   if (isGuestMode()) return null;
+  if (!legacyAllowed && !padawanOutro && !active) return null;
 
   if (padawanOutro) {
     const lines = padawanOutroLines(getLeague()?.sportId);

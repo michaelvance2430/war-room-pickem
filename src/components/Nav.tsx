@@ -49,6 +49,10 @@ const PlayerWalkthrough = dynamic(
   () => import("@/components/PlayerWalkthrough"),
   { ssr: false }
 );
+const OnboardingHost = dynamic(
+  () => import("@/components/onboarding/OnboardingHost"),
+  { ssr: false }
+);
 
 /** Production: never arm deferred chrome (no mount, no import of wave tree). */
 const PRODUCTION_DEFERRED_SAFE = process.env.NODE_ENV === "production";
@@ -1064,6 +1068,9 @@ export default function Nav() {
         First-hour coach only — no welcome/rules/ceremonies on the critical path.
         Those used to mount with every Nav paint, body-lock, and freeze look-around.
       */}
+      {/* New constitution-driven onboarding (player + commissioner journeys) */}
+      <OnboardingHost />
+      {/* Legacy coach — Account re-run only; suppressed while new engine owns first session */}
       <PlayerWalkthrough />
       {/* Roster + optional modals — staged late so tabs stay live after login */}
       {/*
