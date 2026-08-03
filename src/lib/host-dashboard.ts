@@ -145,7 +145,7 @@ export function buildThisWeekViewModel(input: HostDashboardInput): ThisWeekViewM
 
   return {
     weekNumber: input.weekNumber,
-    weekLabel: weekTitle(input.weekNumber),
+    weekLabel: weekTitle(input.weekNumber, input.sportId),
     sportId: input.sportId || "cfb",
     status,
     published,
@@ -283,9 +283,9 @@ export function thisWeekStatusLabel(status: ThisWeekStatus): string {
     case "live":
       return "Live";
     case "needs_score":
-      return "Needs score";
+      return "Needs scoring";
     case "scored":
-      return "Scored";
+      return "Archive";
     default:
       return status;
   }

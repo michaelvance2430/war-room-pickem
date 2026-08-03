@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * Host Dashboard shell — Hero → This Week → The Room → League Settings.
- * IA frozen. Not a checklist. Not project management.
+ * League front porch — Hero → This Week → The Room → League Settings.
+ * IA frozen. Not a control panel. Not a checklist.
  */
 
 import type { ReactNode } from "react";
@@ -36,9 +36,9 @@ type Props = {
   settingsOpen: boolean;
   onToggleSettings: () => void;
   actions: HostDashboardActions;
-  /** Workbench panels (card / picks / results tools) */
+  /** Tools for this week (card / locks / score) — not a peer section */
   workbench?: ReactNode;
-  /** Full settings body when expanded */
+  /** Settings body when expanded */
   settingsBody?: ReactNode;
 };
 
@@ -53,7 +53,7 @@ const TONE_LABEL: Record<HostHeroState["tone"], string> = {
   blocked: "Needs you",
   attention: "Attention",
   celebrate: "Looking good",
-  quiet: "Quiet",
+  quiet: "All quiet",
 };
 
 export default function HostDashboardShell({
@@ -104,36 +104,30 @@ export default function HostDashboardShell({
       : thisWeek.status === "live"
         ? "bg-primary/15 text-primary border-primary/40"
         : thisWeek.status === "scored"
-          ? "bg-muted/30 text-muted border-border"
+          ? "bg-muted/40 text-muted border-border"
           : "bg-card-hover text-muted border-border";
 
   return (
-    <div className="space-y-5 mb-8">
-      {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
-            League
-          </p>
-          <h1 className="text-2xl font-bold text-foreground mt-0.5">
-            {leagueName || "Your league"}
-          </h1>
-          <p className="text-sm text-muted mt-0.5">
-            {sportLabel}
-            {thisWeek.weekLabel ? ` · ${thisWeek.weekLabel}` : ""}
-            {!isOwner ? " · Deputy ops" : ""}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={actions.onPreviewPlayer}
-          className="shrink-0 px-3 py-2 rounded-lg border border-warning/50 bg-warning/10 text-warning text-xs font-bold min-h-[44px]"
-        >
-          Preview as player →
-        </button>
+    <div className="space-y-6 mb-6">
+      {/* Header — front porch, not admin software */}
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
+          League
+        </p>
+        <h1 className="text-2xl sm:text-3xl font-black text-foreground mt-0.5 tracking-tight">
+          {leagueName || "Your league"}
+        </h1>
+        <p className="text-sm text-muted mt-1 leading-relaxed">
+          {sportLabel}
+          {thisWeek.weekLabel ? ` · ${thisWeek.weekLabel}` : ""}
+          {!isOwner ? " · Deputy" : ""}
+        </p>
+        <p className="text-xs text-muted mt-1.5 max-w-md leading-relaxed">
+          Open the door to your season — one job at a time.
+        </p>
       </div>
 
-      {/* 1. HERO — one thing only */}
+      {/* 1. HERO — Why did I open League today? */}
       <section
         className={`rounded-2xl border-2 px-4 py-4 sm:px-5 sm:py-5 ${TONE_BORDER[hero.tone]}`}
         aria-label="What needs your attention"
@@ -145,7 +139,9 @@ export default function HostDashboardShell({
           {hero.title}
         </h2>
         {hero.detail && (
-          <p className="text-sm text-muted mt-1.5 leading-relaxed">{hero.detail}</p>
+          <p className="text-sm text-muted mt-1.5 leading-relaxed">
+            {hero.detail}
+          </p>
         )}
         {hero.actionLabel && hero.action !== "none" && (
           <button
@@ -158,11 +154,16 @@ export default function HostDashboardShell({
         )}
       </section>
 
-      {/* 2. THIS WEEK — the product object */}
+      {/* 2. THIS WEEK — sacred object, never disappears */}
       <section aria-label="This week">
-        <h2 className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted mb-2">
-          This week
-        </h2>
+        <div className="flex items-baseline justify-between gap-2 mb-2">
+          <h2 className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted">
+            This week
+          </h2>
+          <p className="text-[10px] text-muted/80">
+            Always lives here
+          </p>
+        </div>
         <div className="rounded-2xl border border-primary/40 bg-card p-4 sm:p-5 space-y-3 shadow-sm">
           <div className="flex flex-wrap items-center gap-2">
             <span
@@ -202,14 +203,20 @@ export default function HostDashboardShell({
                         : ""}
                 </p>
               )}
+              {thisWeek.status === "scored" && (
+                <p className="text-xs text-muted pt-0.5">
+                  Written. Standings and the paper already know.
+                </p>
+              )}
             </div>
           ) : (
             <p className="text-sm text-muted leading-relaxed">
-              No card published yet. This week always lives here — publish a
-              slate and it never disappears.
+              No card yet — but this week always lives here. Publish a slate and
+              the object never disappears; only the status changes.
             </p>
           )}
 
+          {/* Secondary actions — one primary job lives in Hero */}
           <div className="flex flex-wrap gap-2 pt-1">
             {thisWeek.canEdit && (
               <button
@@ -217,16 +224,16 @@ export default function HostDashboardShell({
                 onClick={actions.onEditCard}
                 className="px-3 py-2 rounded-lg bg-primary text-black text-xs font-bold min-h-[44px]"
               >
-                {thisWeek.published ? "Edit card" : "Build card"}
+                {thisWeek.published ? "Edit this week’s card" : "Build this week’s card"}
               </button>
             )}
-            {thisWeek.canPreview && (
+            {thisWeek.canScore && (
               <button
                 type="button"
-                onClick={actions.onPreviewPlayer}
-                className="px-3 py-2 rounded-lg border border-border text-xs font-semibold text-foreground min-h-[44px]"
+                onClick={actions.onScoreWeek}
+                className="px-3 py-2 rounded-lg border border-warning/50 text-warning text-xs font-bold min-h-[44px]"
               >
-                Preview as player
+                Score this week
               </button>
             )}
             <button
@@ -234,22 +241,22 @@ export default function HostDashboardShell({
               onClick={actions.onSeeLocks}
               className="px-3 py-2 rounded-lg border border-border text-xs font-semibold text-foreground min-h-[44px]"
             >
-              Who&apos;s locked
+              Who’s locked
             </button>
-            {thisWeek.canScore && (
+            {thisWeek.canPreview && (
               <button
                 type="button"
-                onClick={actions.onScoreWeek}
-                className="px-3 py-2 rounded-lg border border-warning/50 text-warning text-xs font-bold min-h-[44px]"
+                onClick={actions.onPreviewPlayer}
+                className="px-3 py-2 rounded-lg border border-border text-xs font-semibold text-muted min-h-[44px]"
               >
-                Score week
+                See as player
               </button>
             )}
           </div>
         </div>
       </section>
 
-      {/* 3. THE ROOM — people, not a stats panel */}
+      {/* 3. THE ROOM — people */}
       <section aria-label="The room">
         <h2 className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted mb-2">
           The room
@@ -257,9 +264,9 @@ export default function HostDashboardShell({
         <div className="rounded-2xl border border-border bg-card p-4 sm:p-5 space-y-3">
           <p className="text-sm text-foreground leading-relaxed">
             {humanCount <= 0
-              ? "Empty room — waiting for your people."
+              ? "Empty porch — waiting for your people."
               : humanCount === 1
-                ? "Just you for now. Invite the crew."
+                ? "Just you for now. The season gets fun when the crew shows up."
                 : `${humanCount} people in the circle.`}
             {thisWeek.published && thisWeek.expectedLocks > 0 ? (
               <>
@@ -271,7 +278,7 @@ export default function HostDashboardShell({
           </p>
           {inviteCode && (
             <p className="text-xs text-muted">
-              Invite code{" "}
+              Invite{" "}
               <span className="font-mono text-primary font-bold tracking-widest">
                 {inviteCode}
               </span>
@@ -320,10 +327,10 @@ export default function HostDashboardShell({
                 League settings
               </p>
               <p className="text-sm font-semibold text-foreground">
-                Rules · deputies · bots · season
+                Where you change rules, deputies, and season stuff
               </p>
             </div>
-            <span className="text-muted text-lg leading-none">
+            <span className="text-muted text-lg leading-none shrink-0">
               {settingsOpen ? "▾" : "▸"}
             </span>
           </button>
@@ -335,11 +342,18 @@ export default function HostDashboardShell({
         </section>
       )}
 
-      {/* Workbench for edit card / locks / score tools */}
+      {/* This week's tools — under the hierarchy, not a fifth peer section */}
       {workbench && (
-        <div id="host-workbench" className="scroll-mt-24 pt-2 border-t border-border/60">
-          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted mb-3">
-            Tools
+        <div
+          id="host-workbench"
+          className="scroll-mt-24 pt-4 border-t border-border/50"
+        >
+          <h2 className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted mb-1">
+            This week&apos;s tools
+          </h2>
+          <p className="text-[11px] text-muted mb-3 leading-relaxed">
+            Build the card, see who locked, score the week — same object as
+            above.
           </p>
           {workbench}
         </div>

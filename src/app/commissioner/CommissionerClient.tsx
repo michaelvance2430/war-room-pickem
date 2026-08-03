@@ -2446,8 +2446,12 @@ function CommissionerPageInner() {
               inviteCode={league?.code}
               settingsOpen={tab === "settings"}
               onToggleSettings={() => {
-                if (tab === "settings") setTab("card");
-                else {
+                if (tab === "settings") {
+                  // Return to this week's natural tool
+                  if (thisWeekVm.status === "needs_score") setTab("results");
+                  else if (thisWeekVm.status === "live") setTab("picks");
+                  else setTab("card");
+                } else {
                   setTab("settings");
                   setAdvancedOpen(true);
                 }
@@ -2490,56 +2494,59 @@ function CommissionerPageInner() {
                   setAdvancedOpen(true);
                 },
               }}
+              workbench={
+                tab === "settings" ? null : (
+                  <div className="space-y-4">
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setTab("card")}
+                        className={
+                          tab === "card"
+                            ? "px-3 py-2 rounded-full text-xs font-bold bg-primary text-black min-h-[40px]"
+                            : "px-3 py-2 rounded-full text-xs font-semibold bg-card border border-border text-muted min-h-[40px]"
+                        }
+                      >
+                        Build card
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTab("picks");
+                          void refreshPickStatus();
+                        }}
+                        className={
+                          tab === "picks"
+                            ? "px-3 py-2 rounded-full text-xs font-bold bg-primary text-black min-h-[40px]"
+                            : "px-3 py-2 rounded-full text-xs font-semibold bg-card border border-border text-muted min-h-[40px]"
+                        }
+                      >
+                        Who&apos;s locked
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTab("results");
+                          void refreshPublishedProp(activeWeek);
+                        }}
+                        className={
+                          tab === "results"
+                            ? "px-3 py-2 rounded-full text-xs font-bold bg-primary text-black min-h-[40px]"
+                            : "px-3 py-2 rounded-full text-xs font-semibold bg-card border border-border text-muted min-h-[40px]"
+                        }
+                      >
+                        Score week
+                      </button>
+                    </div>
+                  </div>
+                )
+              }
             />
           );
         })()}
 
-        {/* Workbench — card / locks / score tools (secondary to Host Dashboard) */}
+        {/* Workbench body — card / locks / score (settings stay below when expanded) */}
         <div id="host-workbench" className="scroll-mt-24">
-        {tab !== "settings" && (
-        <div className="flex flex-wrap gap-2 mb-4">
-          <button
-            type="button"
-            onClick={() => setTab("card")}
-            className={
-              tab === "card"
-                ? "px-3 py-1.5 rounded-full text-xs font-medium bg-primary text-black"
-                : "px-3 py-1.5 rounded-full text-xs font-medium bg-card border border-border text-muted"
-            }
-          >
-            Edit card
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setTab("picks");
-              void refreshPickStatus();
-            }}
-            className={
-              tab === "picks"
-                ? "px-3 py-1.5 rounded-full text-xs font-medium bg-primary text-black"
-                : "px-3 py-1.5 rounded-full text-xs font-medium bg-card border border-border text-muted"
-            }
-          >
-            Locks
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setTab("results");
-              void refreshPublishedProp(activeWeek);
-            }}
-            className={
-              tab === "results"
-                ? "px-3 py-1.5 rounded-full text-xs font-medium bg-primary text-black"
-                : "px-3 py-1.5 rounded-full text-xs font-medium bg-card border border-border text-muted"
-            }
-          >
-            Score
-          </button>
-        </div>
-        )}
-
         <div id="commish-tab-panel" className="scroll-mt-20">
         {tab === "settings" && isOwner && league && (
           <div className="space-y-6">
