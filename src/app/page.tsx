@@ -29,7 +29,6 @@ import HomeSportHeader from "@/components/HomeSportHeader";
 import LeagueMembershipCard from "@/components/LeagueMembershipCard";
 import HomeRoomContext from "@/components/HomeRoomContext";
 import SoftUnlockBanner from "@/components/SoftUnlockBanner";
-import BoredLameSandboxCta from "@/components/BoredLameSandboxCta";
 import SandboxSimBanner from "@/components/SandboxSimBanner";
 import GuestConversionClose from "@/components/GuestConversionClose";
 import { isGuestMode } from "@/lib/guest-mode";
@@ -667,9 +666,6 @@ export default function Home() {
         {/* Primary job — always paint first on return from Picks */}
         <HomeWeekHero />
       <HomeCrewWhisper />
-
-        {/* I’m Bored — fun lobby (not Practice Mode) */}
-        <BoredLameSandboxCta />
 
         {/* Host first-hour spine */}
         <CommishSetupBanner />
