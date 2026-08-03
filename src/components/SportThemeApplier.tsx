@@ -48,8 +48,14 @@ export default function SportThemeApplier() {
       }
     }
 
-    function onSportEvent() {
-      reapplySportThemeFromLocal();
+    /**
+     * Theme is already painted by applySportTheme (the emitter).
+     * Must NOT call applySportTheme / reapplySportThemeFromLocal here —
+     * that re-dispatches SPORT_THEME_EVENT and blows the call stack.
+     * Other listeners (Nav, BrandMark) may react to detail only.
+     */
+    function onSportEvent(_e: Event) {
+      /* no-op: observe only; never re-apply */
     }
 
     function onPlayerView() {

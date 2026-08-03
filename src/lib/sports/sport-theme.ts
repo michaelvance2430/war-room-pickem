@@ -296,6 +296,21 @@ export function applySportTheme(sportId: string | null | undefined) {
   }
   const root = document.documentElement;
 
+  // What apply would paint on <html data-sport>
+  const nextAttr =
+    id === "nfl" ? "nfl" : id === "soccer_wwc" ? "soccer_wwc" : null;
+  const currentAttr = root.getAttribute("data-sport");
+  // CFB / default = attribute absent; treat empty/other as not nfl/wwc
+  const alreadyApplied =
+    nextAttr === null
+      ? currentAttr !== "nfl" && currentAttr !== "soccer_wwc"
+      : currentAttr === nextAttr;
+
+  if (alreadyApplied) {
+    // DOM already correct — do not re-dispatch (blocks recursive listeners)
+    return;
+  }
+
   if (id === "nfl") {
     root.setAttribute("data-sport", "nfl");
   } else if (id === "soccer_wwc") {
