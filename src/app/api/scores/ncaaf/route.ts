@@ -1,18 +1,40 @@
 import { NextRequest, NextResponse } from "next/server";
+import { scheduleUsageFromRequest } from "@/lib/platform-odds-usage";
 
 /**
  * NCAAF final / live scores from The Odds API.
  * Uses the same ODDS_API_KEY as the odds pull.
- * Completedscores available for games up to ~3 days ago (API limit).
+ * Completed scores available for games up to ~3 days ago (API limit).
+ * Optional leagueId is attributed only after server-side membership check.
  */
 export async function GET(req: NextRequest) {
+  const startedAt = Date.now();
+  const endpoint = "/api/scores/ncaaf";
   const apiKey = (
     process.env.ODDS_API_KEY ||
     process.env.NEXT_PUBLIC_ODDS_API_KEY ||
     ""
   ).trim();
 
+  const daysFrom = Math.min(
+    3,
+    Math.max(1, Number(req.nextUrl.searchParams.get("daysFrom") || 3))
+  );
+
   if (!apiKey) {
+    scheduleUsageFromRequest({
+      req,
+      action: "score_sync",
+      sport: "cfb",
+      endpoint,
+      startedAt,
+      remaining: null,
+      used: null,
+      last: null,
+      success: false,
+      httpStatus: 503,
+      configMissing: true,
+    });
     return NextResponse.json(
       {
         error:
@@ -21,11 +43,6 @@ export async function GET(req: NextRequest) {
       { status: 503 }
     );
   }
-
-  const daysFrom = Math.min(
-    3,
-    Math.max(1, Number(req.nextUrl.searchParams.get("daysFrom") || 3))
-  );
 
   const url = new URL(
     "https://api.the-odds-api.com/v4/sports/americanfootball_ncaaf/scores"
@@ -42,6 +59,19 @@ export async function GET(req: NextRequest) {
 
     if (!res.ok) {
       const body = await res.text();
+      scheduleUsageFromRequest({
+        req,
+        action: "score_sync",
+        sport: "cfb",
+        endpoint,
+        startedAt,
+        remaining,
+        used,
+        last,
+        success: false,
+        httpStatus: res.status,
+        bodySnippet: body.slice(0, 200),
+      });
       return NextResponse.json(
         {
           error: `Scores API error ${res.status}: ${body.slice(0, 200)}`,
@@ -54,6 +84,18 @@ export async function GET(req: NextRequest) {
     }
 
     const events = await res.json();
+    scheduleUsageFromRequest({
+      req,
+      action: "score_sync",
+      sport: "cfb",
+      endpoint,
+      startedAt,
+      remaining,
+      used,
+      last,
+      success: true,
+      httpStatus: res.status,
+    });
     return NextResponse.json({
       events: Array.isArray(events) ? events : [],
       count: Array.isArray(events) ? events.length : 0,
@@ -63,12 +105,21 @@ export async function GET(req: NextRequest) {
       last,
     });
   } catch (e: unknown) {
-    return NextResponse.json(
-      {
-        error:
-          e instanceof Error ? e.message : "Failed to reach The Odds API scores",
-      },
-      { status: 502 }
-    );
+    const msg =
+      e instanceof Error ? e.message : "Failed to reach The Odds API scores";
+    scheduleUsageFromRequest({
+      req,
+      action: "score_sync",
+      sport: "cfb",
+      endpoint,
+      startedAt,
+      remaining: null,
+      used: null,
+      last: null,
+      success: false,
+      httpStatus: 502,
+      bodySnippet: msg,
+    });
+    return NextResponse.json({ error: msg }, { status: 502 });
   }
 }

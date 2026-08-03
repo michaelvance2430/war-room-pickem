@@ -6,27 +6,21 @@ import {
   weekDateWindow,
 } from "@/lib/season-calendar";
 import type { OddsApiGame } from "@/lib/types";
+import { scheduleUsageFromRequest } from "@/lib/platform-odds-usage";
 
 /**
  * NFL spreads via The Odds API (americanfootball_nfl).
  * Same ODDS_API_KEY as NCAAF. No FBS filter / AP ranks.
+ * Optional leagueId is attributed only after server-side membership check.
  */
 export async function GET(req: Request) {
+  const startedAt = Date.now();
+  const endpoint = "/api/odds/nfl";
   const apiKey = (
     process.env.ODDS_API_KEY ||
     process.env.NEXT_PUBLIC_ODDS_API_KEY ||
     ""
   ).trim();
-
-  if (!apiKey) {
-    return NextResponse.json(
-      {
-        error:
-          "Odds API key not configured. Add ODDS_API_KEY in Vercel → Settings → Environment Variables, then Redeploy.",
-      },
-      { status: 503 }
-    );
-  }
 
   const { searchParams } = new URL(req.url);
   const dryRun =
@@ -38,6 +32,32 @@ export async function GET(req: Request) {
       ? parseInt(weekRaw, 10)
       : Number.NaN;
   const filterByWeek = !dryRun && !Number.isNaN(weekNumber);
+  const weekForLog = filterByWeek ? weekNumber : null;
+
+  if (!apiKey) {
+    scheduleUsageFromRequest({
+      req,
+      action: "pull_odds",
+      sport: "nfl",
+      endpoint,
+      startedAt,
+      remaining: null,
+      used: null,
+      last: null,
+      success: false,
+      httpStatus: 503,
+      configMissing: true,
+      dryRun,
+      weekNumber: weekForLog,
+    });
+    return NextResponse.json(
+      {
+        error:
+          "Odds API key not configured. Add ODDS_API_KEY in Vercel → Settings → Environment Variables, then Redeploy.",
+      },
+      { status: 503 }
+    );
+  }
 
   const url = new URL(
     "https://api.the-odds-api.com/v4/sports/americanfootball_nfl/odds"
@@ -55,6 +75,21 @@ export async function GET(req: Request) {
 
     if (!res.ok) {
       const body = await res.text();
+      scheduleUsageFromRequest({
+        req,
+        action: "pull_odds",
+        sport: "nfl",
+        endpoint,
+        startedAt,
+        remaining,
+        used,
+        last,
+        success: false,
+        httpStatus: res.status,
+        bodySnippet: body.slice(0, 200),
+        dryRun,
+        weekNumber: weekForLog,
+      });
       const quota =
         /quota|credit|usage/i.test(body) || remaining === "0"
           ? " Odds API credits may be exhausted for this month — check the-odds-api.com account or upgrade the plan (swap ODDS_API_KEY on Vercel)."
@@ -87,6 +122,21 @@ export async function GET(req: Request) {
       if (w) window = { startDate: w.startDate, endDate: w.endDate };
     }
 
+    scheduleUsageFromRequest({
+      req,
+      action: "pull_odds",
+      sport: "nfl",
+      endpoint,
+      startedAt,
+      remaining,
+      used,
+      last,
+      success: true,
+      httpStatus: res.status,
+      dryRun,
+      weekNumber: weekForLog,
+    });
+
     return NextResponse.json({
       games,
       count: games.length,
@@ -111,12 +161,23 @@ export async function GET(req: Request) {
             : ""),
     });
   } catch (e: unknown) {
-    return NextResponse.json(
-      {
-        error:
-          e instanceof Error ? e.message : "Failed to reach The Odds API",
-      },
-      { status: 502 }
-    );
+    const msg =
+      e instanceof Error ? e.message : "Failed to reach The Odds API";
+    scheduleUsageFromRequest({
+      req,
+      action: "pull_odds",
+      sport: "nfl",
+      endpoint,
+      startedAt,
+      remaining: null,
+      used: null,
+      last: null,
+      success: false,
+      httpStatus: 502,
+      bodySnippet: msg,
+      dryRun,
+      weekNumber: weekForLog,
+    });
+    return NextResponse.json({ error: msg }, { status: 502 });
   }
 }

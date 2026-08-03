@@ -91,9 +91,26 @@ export async function fetchFootballOdds(
     params.set("week", String(weekNumber));
   }
   if (dryRun) params.set("dryRun", "1");
+  // Attribution only — server validates membership; never trust alone
+  try {
+    const { getSession } = await import("./league");
+    const lid = getSession()?.leagueId;
+    if (lid) params.set("leagueId", lid);
+  } catch {
+    /* ok */
+  }
   const q = params.toString() ? `?${params.toString()}` : "";
   const path = sport === "nfl" ? "/api/odds/nfl" : "/api/odds/ncaaf";
-  const res = await fetch(`${path}${q}`, { cache: "no-store" });
+  const headers: HeadersInit = {};
+  try {
+    const { createClient } = await import("./supabase/client");
+    const { data } = await createClient().auth.getSession();
+    const token = data.session?.access_token;
+    if (token) headers.Authorization = `Bearer ${token}`;
+  } catch {
+    /* ok */
+  }
+  const res = await fetch(`${path}${q}`, { cache: "no-store", headers });
   const body = await res.json().catch(() => ({}));
 
   if (!res.ok) {

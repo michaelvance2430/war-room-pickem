@@ -206,8 +206,27 @@ export async function fetchFootballScores(
   last?: string | null;
 }> {
   const path = sport === "nfl" ? "/api/scores/nfl" : "/api/scores/ncaaf";
-  const res = await fetch(`${path}?daysFrom=${daysFrom}`, {
+  const params = new URLSearchParams();
+  params.set("daysFrom", String(daysFrom));
+  try {
+    const { getSession } = await import("./league");
+    const lid = getSession()?.leagueId;
+    if (lid) params.set("leagueId", lid);
+  } catch {
+    /* ok */
+  }
+  const headers: HeadersInit = {};
+  try {
+    const { createClient } = await import("./supabase/client");
+    const { data } = await createClient().auth.getSession();
+    const token = data.session?.access_token;
+    if (token) headers.Authorization = `Bearer ${token}`;
+  } catch {
+    /* ok */
+  }
+  const res = await fetch(`${path}?${params.toString()}`, {
     cache: "no-store",
+    headers,
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
