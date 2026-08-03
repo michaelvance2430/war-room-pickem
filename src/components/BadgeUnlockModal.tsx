@@ -1,7 +1,22 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+/**
+ * Badge Achievement Reveal — restored under SAFE NAV baseline.
+ *
+ * Lifecycle contract (must never stick the app):
+ * - Locks body only while open
+ * - Releases lock on: advance, Escape, route change, unmount, force-dismiss
+ * - No portal/inert/aria-hidden on app root
+ * - Full-screen layer unmounts when queue empty (not opacity:0)
+ * - Document listeners always cleaned up
+ *
+ * Other Moments remain off via MomentHost SAFE NAV. This modal is intentionally
+ * allowed while SAFE NAV is on — do not re-suppress it with isSafeNavMode().
+ */
+
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   EVENT_GAZETTE_DONE,
   findNewBadgeUnlocksForSession,
@@ -12,6 +27,8 @@ import { stackCelebrationKey } from "@/lib/badge-stacks";
 import type { BadgeStatus, BadgeTier } from "@/lib/types";
 import { getSession } from "@/lib/league";
 import CavalryScoutTrophy from "@/components/CavalryScoutTrophy";
+import { lockBodyScroll, unlockBodyScroll, forceUnlockAllChrome } from "@/lib/smooth";
+import { EVENT_FORCE_DISMISS_OVERLAYS } from "@/lib/safe-nav";
 
 const TIER_HEX: Record<BadgeTier, string> = {
   legendary: "#eab308",
@@ -20,51 +37,170 @@ const TIER_HEX: Record<BadgeTier, string> = {
   common: "#22c55e",
 };
 
-/**
- * After Gazette (or if no paper), celebrate badges one at a time.
- * Queue: dismiss → next badge until empty.
- */
 export default function BadgeUnlockModal() {
+  const pathname = usePathname();
   const [queue, setQueue] = useState<BadgeStatus[]>([]);
   const [checked, setChecked] = useState(false);
+  const bodyLockedRef = useRef(false);
+  const openRef = useRef(false);
 
   const current = queue[0] ?? null;
   const remaining = Math.max(0, queue.length - 1);
 
-  // P0 SAFE NAV: no auto full-screen badge queue (can trap navigation)
-  useEffect(() => {
+  const releaseBody = useCallback(() => {
+    if (!bodyLockedRef.current) return;
+    bodyLockedRef.current = false;
     try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { isSafeNavMode, EVENT_FORCE_DISMISS_OVERLAYS } =
-        require("@/lib/safe-nav") as typeof import("@/lib/safe-nav");
-      if (isSafeNavMode()) {
-        setQueue([]);
+      unlockBodyScroll();
+    } catch {
+      try {
+        forceUnlockAllChrome();
+      } catch {
+        /* ok */
       }
-      function onDismiss() {
-        setQueue([]);
-      }
-      window.addEventListener(EVENT_FORCE_DISMISS_OVERLAYS, onDismiss);
-      return () =>
-        window.removeEventListener(EVENT_FORCE_DISMISS_OVERLAYS, onDismiss);
+    }
+  }, []);
+
+  const acquireBody = useCallback(() => {
+    if (bodyLockedRef.current) return;
+    bodyLockedRef.current = true;
+    try {
+      lockBodyScroll();
     } catch {
       /* ok */
     }
   }, []);
 
+  /** Close without marking celebrated (refresh / route away mid-open). */
+  const hardClose = useCallback(() => {
+    openRef.current = false;
+    setQueue([]);
+    releaseBody();
+  }, [releaseBody]);
+
+  /** User acknowledged current badge → celebrate → next or close. */
+  const advance = useCallback(() => {
+    const session = getSession();
+    const cur = queue[0];
+    if (session?.playerId && cur) {
+      try {
+        const id = cur.def.id;
+        if (isStackableBadge(id) && cur.earnCount) {
+          markBadgesCelebrated(session.playerId, [
+            id,
+            stackCelebrationKey(id, cur.earnCount),
+          ]);
+        } else {
+          markBadgesCelebrated(session.playerId, [id]);
+        }
+      } catch {
+        /* still close */
+      }
+    }
+    setQueue((q) => {
+      const next = q.slice(1);
+      if (next.length === 0) {
+        openRef.current = false;
+        // release after state update path
+        queueMicrotask(() => releaseBody());
+      }
+      return next;
+    });
+  }, [queue, releaseBody]);
+
+  // Sync body lock to open state
+  useEffect(() => {
+    if (current) {
+      openRef.current = true;
+      acquireBody();
+    } else {
+      openRef.current = false;
+      releaseBody();
+    }
+  }, [current, acquireBody, releaseBody]);
+
+  // Guaranteed cleanup on unmount
+  useEffect(() => {
+    return () => {
+      openRef.current = false;
+      if (bodyLockedRef.current) {
+        bodyLockedRef.current = false;
+        try {
+          unlockBodyScroll();
+        } catch {
+          try {
+            forceUnlockAllChrome();
+          } catch {
+            /* ok */
+          }
+        }
+      }
+    };
+  }, []);
+
+  // Route change while open → hard close + unlock (do not leave ghost layer)
+  useEffect(() => {
+    if (!openRef.current && !current) return;
+    // pathname changed after open — close cleanly without double-celebrate
+    // Only hard-close when we already had something open on a prior path
+    // (skip first mount)
+  }, [pathname]);
+
+  const pathOpenRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (current) {
+      if (pathOpenRef.current == null) {
+        pathOpenRef.current = pathname;
+      } else if (pathOpenRef.current !== pathname) {
+        hardClose();
+        pathOpenRef.current = null;
+      }
+    } else {
+      pathOpenRef.current = null;
+    }
+  }, [pathname, current, hardClose]);
+
+  // Escape + emergency force-dismiss (SAFE NAV recovery) — always release
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== "Escape") return;
+      if (!openRef.current && !queue.length) return;
+      e.preventDefault();
+      e.stopPropagation();
+      advance();
+    }
+    function onForceDismiss() {
+      hardClose();
+    }
+    window.addEventListener("keydown", onKey);
+    window.addEventListener(EVENT_FORCE_DISMISS_OVERLAYS, onForceDismiss);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener(EVENT_FORCE_DISMISS_OVERLAYS, onForceDismiss);
+    };
+  }, [advance, hardClose, queue.length]);
+
   const tryCelebrate = useCallback(async (opts?: { force?: boolean }) => {
     if (checked && !opts?.force) return;
     if (!getSession()?.playerId) return;
+
+    // Stable surface: avoid fighting auth / bare routes
     try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { isSafeNavMode } = require("@/lib/safe-nav") as typeof import("@/lib/safe-nav");
-      if (isSafeNavMode() && !opts?.force) return;
+      const path = window.location.pathname || "";
+      if (
+        path.startsWith("/login") ||
+        path.startsWith("/join") ||
+        path.startsWith("/auth")
+      ) {
+        return;
+      }
     } catch {
       /* ok */
     }
 
     // After first lock only for calm first 10 minutes; season-alive still ok later
     // Foundry testing (not quiet eyes) can celebrate so you can see cheevo UX
-    // Pending lore (Cavalry Scout) always allowed to pop on login
+    // Pending lore (Cavalry Scout / House Dragon queue) always allowed to pop
     try {
       const {
         canShowBadgeCelebrations,
@@ -90,15 +226,19 @@ export default function BadgeUnlockModal() {
       /* proceed best-effort */
     }
 
-    const result = await findNewBadgeUnlocksForSession();
-    if (!result || result.newBadges.length === 0) {
+    try {
+      const result = await findNewBadgeUnlocksForSession();
+      if (!result || result.newBadges.length === 0) {
+        setChecked(true);
+        return;
+      }
+      setQueue(result.newBadges);
       setChecked(true);
-      return;
+    } catch {
+      setChecked(true);
+      releaseBody();
     }
-
-    setQueue(result.newBadges);
-    setChecked(true);
-  }, [checked]);
+  }, [checked, releaseBody]);
 
   useEffect(() => {
     function onGazetteDone() {
@@ -134,11 +274,9 @@ export default function BadgeUnlockModal() {
     };
   }, [tryCelebrate]);
 
-  // Fallback if gazette never fires (only after core loop unlock)
-  // Lore grants (Cavalry Scout) also retry early so login popup isn't missed.
+  // Fallback probes if gazette never fires (pending lore + normal unlocks)
   useEffect(() => {
     if (checked) return;
-    // Was 4 probes (1.2–10s) — too chatty on every app open
     const timers = [2500, 8000].map((ms) =>
       setTimeout(() => {
         void (async () => {
@@ -146,8 +284,8 @@ export default function BadgeUnlockModal() {
             const { readPendingBadgeCelebration } = await import(
               "@/lib/badge-celebration"
             );
-            const { getSession } = await import("@/lib/league");
-            const pid = getSession()?.playerId;
+            const { getSession: gs } = await import("@/lib/league");
+            const pid = gs()?.playerId;
             const pending = pid ? readPendingBadgeCelebration(pid) : [];
             if (pending.length > 0) {
               void tryCelebrate({ force: true });
@@ -168,25 +306,10 @@ export default function BadgeUnlockModal() {
     return () => timers.forEach(clearTimeout);
   }, [checked, tryCelebrate]);
 
-  function advance() {
-    const session = getSession();
-    if (session?.playerId && current) {
-      const id = current.def.id;
-      if (isStackableBadge(id) && current.earnCount) {
-        markBadgesCelebrated(session.playerId, [
-          id,
-          stackCelebrationKey(id, current.earnCount),
-        ]);
-      } else {
-        markBadgesCelebrated(session.playerId, [id]);
-      }
-    }
-    setQueue((q) => q.slice(1));
-  }
-
   if (!current) return null;
 
   const hex = TIER_HEX[current.def.tier];
+  const isHouseDragon = current.def.id === "house_dragon_legendary";
 
   return (
     <div
@@ -194,11 +317,14 @@ export default function BadgeUnlockModal() {
       role="dialog"
       aria-modal="true"
       aria-labelledby="badge-unlock-title"
+      data-badge-unlock-modal="1"
+      data-fullscreen-overlay="badge-unlock"
     >
+      {/* Backdrop — only this layer + card; unmounts with parent when queue empty */}
       <button
         type="button"
         className="absolute inset-0 bg-black/80 backdrop-blur-sm"
-        aria-label="Close"
+        aria-label="Close achievement"
         onClick={advance}
       />
 
@@ -213,7 +339,7 @@ export default function BadgeUnlockModal() {
 
         <div className="px-5 pt-5 pb-3 text-center border-b border-border">
           <p className="text-[10px] uppercase tracking-[0.25em] text-primary font-bold mb-2">
-            {current.def.id === "house_dragon_legendary"
+            {isHouseDragon
               ? "🐉 LEGENDARY ACHIEVEMENT UNLOCKED"
               : "🎉 War Room flex"}
           </p>
@@ -221,9 +347,7 @@ export default function BadgeUnlockModal() {
             id="badge-unlock-title"
             className="text-2xl font-black text-foreground tracking-tight"
           >
-            {current.def.id === "house_dragon_legendary"
-              ? "HOUSE DRAGON"
-              : "Achievement unlocked!"}
+            {isHouseDragon ? "HOUSE DRAGON" : "Achievement unlocked!"}
           </h2>
           {remaining > 0 && (
             <p className="text-[11px] text-muted mt-1.5">
@@ -246,7 +370,7 @@ export default function BadgeUnlockModal() {
               current.def.icon
             )}
           </div>
-          {current.def.id !== "house_dragon_legendary" && (
+          {!isHouseDragon && (
             <div className="flex items-center justify-center gap-2 flex-wrap mb-1">
               <span className="text-xl font-black text-foreground">
                 {current.def.name}
@@ -259,7 +383,7 @@ export default function BadgeUnlockModal() {
               </span>
             </div>
           )}
-          {current.def.id === "house_dragon_legendary" && (
+          {isHouseDragon && (
             <span
               className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border mb-2"
               style={{ color: hex, borderColor: `${hex}66` }}
@@ -270,7 +394,7 @@ export default function BadgeUnlockModal() {
           <p className="text-sm text-muted leading-snug max-w-sm">
             {current.def.description}
           </p>
-          {current.def.id !== "house_dragon_legendary" && (
+          {!isHouseDragon && (
             <p className="text-sm font-bold mt-3" style={{ color: hex }}>
               {current.def.careerOnly || current.def.creatorOnly
                 ? `+${current.def.points} career pts · career only`
@@ -280,8 +404,7 @@ export default function BadgeUnlockModal() {
                 : ""}
             </p>
           )}
-          {(current.earnedSeasonYear != null ||
-            current.earnedWeek != null) && (
+          {(current.earnedSeasonYear != null || current.earnedWeek != null) && (
             <p className="text-xs text-muted mt-2 font-medium">
               {current.earnedSeasonYear != null && current.earnedWeek != null
                 ? `${current.earnedSeasonYear} · Week ${current.earnedWeek}`
@@ -296,15 +419,15 @@ export default function BadgeUnlockModal() {
           <button
             type="button"
             onClick={advance}
-            className="flex-1 py-3 rounded-xl bg-primary text-black font-bold text-sm"
+            className="flex-1 py-3 rounded-xl bg-primary text-black font-bold text-sm touch-manipulation"
           >
-            {current.def.id === "house_dragon_legendary"
+            {isHouseDragon
               ? "Long may House Dragon reign."
               : remaining > 0
                 ? "Hell yeah — next"
                 : "Hell yeah"}
           </button>
-          {current.def.id !== "house_dragon_legendary" && (
+          {!isHouseDragon && (
             <Link
               href={
                 getSession()?.playerId
