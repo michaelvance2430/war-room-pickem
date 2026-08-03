@@ -6,6 +6,10 @@
  * - No getPlayerBadges / badge catalog on initial render
  * - Heavy sections deferred until user expands (dynamic import)
  * - No league-wide peer sync before interactive
+ *
+ * NOTE: Still static-imports @/lib/store (findPlayer) and @/lib/league —
+ * both pull store → badges.ts. Pre-render freeze investigation: see
+ * docs/PROFILE_PRE_RENDER_FREEZE.md. Do not restore eager shelves yet.
  */
 
 import { useEffect, useRef, useState, type ComponentType } from "react";
@@ -32,7 +36,10 @@ import {
 import { findPlayer } from "@/lib/store";
 import { getLeague, getSession } from "@/lib/league";
 import { Player } from "@/lib/types";
-import { wrProfile, wrProfileTimed } from "@/lib/runtime-iso";
+import { wrProfile, wrProfileTimed, wrProfileRoute } from "@/lib/runtime-iso";
+
+// Module evaluation boundary — if this never logs, freeze is BEFORE profile chunk runs
+wrProfileRoute("module-top");
 
 /** Local copy — do NOT import from @/lib/badges (pulls full catalog onto route). */
 function formatMemberSince(iso?: string): string {
@@ -113,6 +120,7 @@ const HeavyDetailsPlaceholder = ({
  * Lightweight production profile — identity first, heavy work deferred.
  */
 export default function ProfilePage() {
+  wrProfileRoute("render-enter");
   const params = useParams();
   const id = typeof params.id === "string" ? params.id : "";
 
@@ -133,6 +141,7 @@ export default function ProfilePage() {
   const hadPaintRef = useRef(false);
 
   useEffect(() => {
+    wrProfileRoute("effect-enter", `id=${id.slice(0, 8)}`);
     wrProfile("data-effect-start", undefined, `id=${id.slice(0, 8)}`);
     let cancelled = false;
 

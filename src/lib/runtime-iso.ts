@@ -112,6 +112,24 @@ export function wrProfile(msg: string, ms?: number, extra?: string) {
   console.log(`[WR-PERF][profile] ${msg}${t}${e}`);
 }
 
+/**
+ * Pre-render / route-boundary attribution for profile freezes.
+ * Logs only when warroom-runtime-debug=1 (or development).
+ * Tag: [WR-PERF][profile-route]
+ */
+export function wrProfileRoute(msg: string, extra?: string) {
+  if (!isRuntimeDebug()) return;
+  const e = extra ? ` ${extra}` : "";
+  const now =
+    typeof performance !== "undefined" ? Math.round(performance.now()) : 0;
+  try {
+    performance.mark?.(`wr-profile-route:${msg}`);
+  } catch {
+    /* ok */
+  }
+  console.log(`[WR-PERF][profile-route] ${msg} @${now}${e}`);
+}
+
 export function wrProfileTimed<T>(label: string, fn: () => T): T {
   const t0 =
     typeof performance !== "undefined" ? performance.now() : Date.now();

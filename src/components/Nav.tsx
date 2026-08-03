@@ -40,6 +40,7 @@ import {
   wrEffect,
   wrLog,
   isoEnabled,
+  wrProfileRoute,
 } from "@/lib/runtime-iso";
 
 /** Heavy chrome — not in first JS parse of every tab. */
@@ -65,6 +66,9 @@ type NavLink = {
  */
 export default function Nav() {
   const pathname = usePathname();
+  if (pathname?.startsWith("/profile")) {
+    wrProfileRoute("Nav.render", pathname);
+  }
   const [isCommish, setIsCommish] = useState(false);
   const [ops, setOps] = useState(false);
   const [staff, setStaff] = useState(false);

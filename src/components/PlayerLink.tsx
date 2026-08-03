@@ -13,7 +13,7 @@ import {
 import { isChaosFlamesActive } from "@/lib/chaos-mode";
 import { getLeague } from "@/lib/league";
 import { loadLeagueActiveWeek } from "@/lib/cloud";
-import { wrProfile } from "@/lib/runtime-iso";
+import { wrProfile, wrProfileRoute } from "@/lib/runtime-iso";
 
 /** One in-flight profile navigation at a time (P0 freeze: triple click-received). */
 const pendingNav = new Map<string, number>();
@@ -36,7 +36,11 @@ function clearProfileNavGuard(profileId: string) {
 
 // Clear when route actually changes away/to profile
 if (typeof window !== "undefined") {
-  window.addEventListener("warroom-route-change", () => {
+  window.addEventListener("warroom-route-change", (ev) => {
+    wrProfileRoute(
+      "listener:PlayerLink.pendingNavClear",
+      `path=${(ev as CustomEvent)?.detail?.pathname || "?"}`
+    );
     // Soft clear all after hop so next intentional click works
     window.setTimeout(() => pendingNav.clear(), 400);
   });
@@ -78,7 +82,11 @@ export default function PlayerLink({
     function onChaos() {
       setChaosTick((t) => t + 1);
     }
-    function onRoute() {
+    function onRoute(ev: Event) {
+      wrProfileRoute(
+        "listener:PlayerLink.onRoute",
+        `path=${(ev as CustomEvent)?.detail?.pathname || "?"} id=${id?.slice(0, 8) || "?"}`
+      );
       setNavLocked(false);
       if (id) clearProfileNavGuard(id);
     }
@@ -122,6 +130,12 @@ export default function PlayerLink({
     }
     setNavLocked(true);
     wrProfile("click-received", undefined, `PlayerLink→${id.slice(0, 8)}`);
+    wrProfileRoute("click", `id=${id.slice(0, 8)} href=/profile/${id.slice(0, 8)}`);
+    try {
+      performance.mark?.("wr-profile-route:click");
+    } catch {
+      /* ok */
+    }
     // Safety: unlock if navigation never completes
     window.setTimeout(() => {
       clearProfileNavGuard(id);

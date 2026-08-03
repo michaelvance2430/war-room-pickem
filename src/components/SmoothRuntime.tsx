@@ -30,6 +30,7 @@ import {
   wrClearInterval,
   installRuntimeDebugGlobals,
   isoEnabled,
+  wrProfileRoute,
 } from "@/lib/runtime-iso";
 import { installEventLoopProbe } from "@/lib/event-loop-probe";
 
@@ -81,6 +82,9 @@ export default function SmoothRuntime() {
   useEffect(() => {
     wrRoute(pathname);
     wrEffect("SmoothRuntime.routeUnlock");
+    if (pathname?.startsWith("/profile")) {
+      wrProfileRoute("SmoothRuntime.route-effect", pathname);
+    }
     if (!isoEnabled("smoothPrep")) {
       wrLog("[WR-NAV]", "route unlock skipped (smoothPrep=false)");
       return;
@@ -94,9 +98,15 @@ export default function SmoothRuntime() {
     // One delayed orphan check is enough — avoid triple forceUnlock storms
     const t1 = window.setTimeout(() => unlockIfOrphanedLock(), 400);
     try {
+      if (pathname?.startsWith("/profile")) {
+        wrProfileRoute("SmoothRuntime.dispatch-route-change", pathname);
+      }
       window.dispatchEvent(
         new CustomEvent("warroom-route-change", { detail: { pathname } })
       );
+      if (pathname?.startsWith("/profile")) {
+        wrProfileRoute("SmoothRuntime.dispatch-route-change-done", pathname);
+      }
     } catch {
       /* ok */
     }
@@ -219,7 +229,13 @@ export default function SmoothRuntime() {
       if (!href.startsWith("/") || href.startsWith("//")) return;
       if (a.target === "_blank") return;
       wrLog("[WR-NAV]", `prepareNavigation → ${href}`);
+      if (href.startsWith("/profile")) {
+        wrProfileRoute("Link.nav-prepare", href);
+      }
       prepareNavigation(`SmoothRuntime.click→${href}`);
+      if (href.startsWith("/profile")) {
+        wrProfileRoute("Link.nav-prepare-done", href);
+      }
     }
     document.addEventListener("click", onClick, true);
     return () => document.removeEventListener("click", onClick, true);

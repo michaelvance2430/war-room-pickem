@@ -6,7 +6,8 @@
  */
 
 import { useEffect, useState } from "react";
-import { isoEnabled, wrMount, wrLog } from "@/lib/runtime-iso";
+import { usePathname } from "next/navigation";
+import { isoEnabled, wrMount, wrLog, wrProfileRoute } from "@/lib/runtime-iso";
 
 export default function ThemeDecorGate({
   children,
@@ -15,6 +16,10 @@ export default function ThemeDecorGate({
 }) {
   // SSR + first paint: show (product default). After mount, honor iso flag.
   const [on, setOn] = useState(true);
+  const pathname = usePathname();
+  if (pathname?.startsWith("/profile")) {
+    wrProfileRoute("ThemeDecorGate.render", pathname);
+  }
 
   useEffect(() => {
     const un = wrMount("ThemeDecorGate");

@@ -53,12 +53,38 @@ export function installEventLoopProbe(): void {
         for (const e of list.getEntries()) {
           if (e.duration < 100) continue;
           const any = e as PerformanceEntry & {
-            attribution?: { name?: string; containerType?: string }[];
+            attribution?: {
+              name?: string;
+              containerType?: string;
+              containerSrc?: string;
+              containerId?: string;
+            }[];
           };
           const attr = any.attribution?.[0];
+          const attrBits = [
+            attr?.name,
+            attr?.containerType,
+            attr?.containerSrc,
+            attr?.containerId,
+          ]
+            .filter(Boolean)
+            .join(" ");
+          // Correlate with last profile-route marks (pre-render freeze)
+          let lastMark = "";
+          try {
+            const marks = performance.getEntriesByType("mark");
+            for (let i = marks.length - 1; i >= 0; i--) {
+              if (marks[i].name.startsWith("wr-profile-route:")) {
+                lastMark = marks[i].name.replace("wr-profile-route:", "");
+                break;
+              }
+            }
+          } catch {
+            /* ok */
+          }
           log(
             "longtask",
-            `${Math.round(e.duration)}ms @${Math.round(e.startTime)} ${attr?.name || attr?.containerType || ""}`.trim()
+            `${Math.round(e.duration)}ms @${Math.round(e.startTime)} ${attrBits}${lastMark ? ` after=${lastMark}` : ""}`.trim()
           );
         }
       });
@@ -97,6 +123,31 @@ export function installEventLoopProbe(): void {
       );
     }
   }, 1000) as unknown as number;
+
+  // Observe script/chunk downloads (profile route attribution)
+  try {
+    const resObs = new PerformanceObserver((list) => {
+      if (!enabled()) return;
+      for (const e of list.getEntries()) {
+        const re = e as PerformanceResourceTiming;
+        const name = re.name || "";
+        if (!/chunk|profile|_next\/static/i.test(name)) continue;
+        if (re.duration < 50 && re.transferSize === 0) continue;
+        const isProfile =
+          /profile/i.test(name) ||
+          /\/1522|page-.*profile/i.test(name);
+        if (!isProfile && re.duration < 200) continue;
+        log(
+          "chunk",
+          `${Math.round(re.duration)}ms ${isProfile ? "PROFILE " : ""}${name.split("/").slice(-2).join("/")} transfer=${re.transferSize || 0}`
+        );
+      }
+    });
+    resObs.observe({ type: "resource", buffered: true });
+    log("timeline", "resource/chunk observer ON");
+  } catch {
+    /* ok */
+  }
 
   try {
     (window as unknown as { __WR_EVENT_LOOP__?: unknown }).__WR_EVENT_LOOP__ = {

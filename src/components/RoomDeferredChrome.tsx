@@ -25,6 +25,7 @@ import {
   wrEffect,
   wrDeferred,
   isoEnabled,
+  wrProfileRoute,
 } from "@/lib/runtime-iso";
 
 const LoginWelcomeModal = dynamic(
@@ -111,6 +112,9 @@ const MascotSighting = dynamic(() => import("@/components/MascotSighting"), {
 export default function RoomDeferredChrome() {
   const guest = isGuestMode();
   const pathname = usePathname();
+  if (pathname?.startsWith("/profile")) {
+    wrProfileRoute("RoomDeferredChrome.render", `wave pending path=${pathname}`);
+  }
   const [wave, setWave] = useState(0);
   const [routeHops, setRouteHops] = useState(0);
   const [ceremonyOk, setCeremonyOk] = useState(false);
@@ -124,6 +128,9 @@ export default function RoomDeferredChrome() {
   // Count real navigation so look-around happens before popups
   useEffect(() => {
     wrEffect("RoomDeferredChrome.routeHops");
+    if (pathname?.startsWith("/profile")) {
+      wrProfileRoute("RoomDeferredChrome.routeHop", pathname || "");
+    }
     setRouteHops((n) => n + 1);
   }, [pathname]);
 

@@ -10,7 +10,7 @@
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import Nav from "@/components/Nav";
-import { wrMount, wrRoute } from "@/lib/runtime-iso";
+import { wrMount, wrRoute, wrProfileRoute } from "@/lib/runtime-iso";
 
 /** Routes that should not show the app chrome (auth / bare flows). */
 function isBareRoute(pathname: string | null): boolean {
@@ -27,6 +27,8 @@ function isBareRoute(pathname: string | null): boolean {
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const bare = isBareRoute(pathname);
+  const isProfile = !!pathname?.startsWith("/profile");
+  if (isProfile) wrProfileRoute("AppShell.render-start", pathname || "");
 
   useEffect(() => {
     return wrMount("AppShell");
@@ -34,7 +36,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     wrRoute(pathname);
+    if (pathname?.startsWith("/profile")) {
+      wrProfileRoute("AppShell.route-effect", pathname);
+    }
   }, [pathname]);
+
+  if (isProfile) wrProfileRoute("AppShell.render-end", pathname || "");
 
   return (
     <>
