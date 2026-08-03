@@ -1,9 +1,12 @@
 /**
- * Trust gate for week browsers / scored chips.
+ * Trust gate for week browsers / scored chips / published inventory.
  * Constitution: War Room never invents or implies history that hasn't happened.
  *
- * Phantom pattern we kill: Week 0 live + "Week 5 · scored" with no weeks 0–4 scored.
- * That is residue (Foundry, sandbox, empty week_results shells) — not a season.
+ * Phantom patterns:
+ * - Week 0 live + "Week 5 · scored" with no 0–4 scored (Foundry residue)
+ * - Week 0 live + chips 0,1,5,6,7 (orphan week_cards, non-contiguous)
+ *
+ * Do not silently delete week_cards. Filter player-facing inventory instead.
  */
 
 import { firstSeasonWeek, seasonMaxWeek } from "@/lib/season-calendar";
@@ -11,25 +14,15 @@ import { firstSeasonWeek, seasonMaxWeek } from "@/lib/season-calendar";
 /** Never surface practice week as league history */
 export const PRACTICE_WEEK_INDEX = 99;
 
-/**
- * Official scored weeks only:
- * - Must appear in published cards for this league (when published list known)
- * - Must form a contiguous chain from the first published week of the season
- * - Never week 99 / NaN / out of range
- *
- * Orphan "Week 5 scored" with no prior chain → stripped.
- */
-export function trustOfficialScoredWeeks(
-  scored: number[],
-  published: number[] | null | undefined,
+function cleanWeekList(
+  weeks: number[] | null | undefined,
   sportId?: string | null
 ): number[] {
   const first = firstSeasonWeek(sportId);
   const max = seasonMaxWeek(sportId);
-
-  const scoredClean = [
+  return [
     ...new Set(
-      (scored || [])
+      (weeks || [])
         .map((n) => Number(n))
         .filter(
           (n) =>
@@ -40,33 +33,32 @@ export function trustOfficialScoredWeeks(
         )
     ),
   ].sort((a, b) => a - b);
+}
 
+/**
+ * Official scored weeks only:
+ * Contiguous published prefix from the start of the published season.
+ * Orphan mid-season scores with gaps → stripped.
+ */
+export function trustOfficialScoredWeeks(
+  scored: number[],
+  published: number[] | null | undefined,
+  sportId?: string | null
+): number[] {
+  const scoredClean = cleanWeekList(scored, sportId);
   if (scoredClean.length === 0) return [];
 
-  const pubRaw = (published || [])
-    .map((n) => Number(n))
-    .filter(
-      (n) =>
-        Number.isFinite(n) &&
-        n !== PRACTICE_WEEK_INDEX &&
-        n >= first &&
-        n <= max
-    );
-  const pubSorted = [...new Set(pubRaw)].sort((a, b) => a - b);
-
-  // No published cards → cannot claim official scored history
+  const pubSorted = cleanWeekList(published, sportId);
   if (pubSorted.length === 0) return [];
 
   const scoredSet = new Set(scoredClean);
   const trusted: number[] = [];
 
-  // Walk published season in order. Score only counts on a continuous prefix.
   for (const w of pubSorted) {
     if (scoredSet.has(w)) {
       trusted.push(w);
     } else {
       // First unscored published week ends the official scored prefix.
-      // Later orphan scores (Foundry week 5 while week 0 still open) are dropped.
       break;
     }
   }
@@ -75,8 +67,49 @@ export function trustOfficialScoredWeeks(
 }
 
 /**
- * Weeks the Jump-to-week / Board chips may show.
- * Published cards + trusted scored + live active only. No practice, no phantoms.
+ * Contiguous published run that touches the official live week.
+ *
+ * Walk backward and forward from `activeWeek` only while week_cards exist.
+ * Stops at the first gap — so [0,1,5,6,7] with live=0 → [0,1] only.
+ *
+ * Does not invent weeks that aren't published (except the live week chip itself).
+ */
+export function trustContiguousPublishedAroundLive(
+  published: number[],
+  activeWeek: number,
+  sportId?: string | null
+): number[] {
+  const first = firstSeasonWeek(sportId);
+  const max = seasonMaxWeek(sportId);
+  const set = new Set(cleanWeekList(published, sportId));
+
+  let live = Number(activeWeek);
+  if (!Number.isFinite(live) || live === PRACTICE_WEEK_INDEX) live = first;
+  live = Math.max(first, Math.min(max, live));
+
+  const out = new Set<number>();
+  // Always show the official live week (even if card missing — waiting room)
+  out.add(live);
+
+  // Backward through contiguous published history
+  for (let w = live - 1; w >= first; w--) {
+    if (set.has(w)) out.add(w);
+    else break;
+  }
+
+  // Forward through contiguous prepared future cards only
+  for (let w = live + 1; w <= max; w++) {
+    if (set.has(w)) out.add(w);
+    else break;
+  }
+
+  return [...out].sort((a, b) => a - b);
+}
+
+/**
+ * Player-facing week selector inventory.
+ * Live + contiguous published around live + trusted scored history.
+ * Never practice week. Never orphan islands (5–7 while live is 0).
  */
 export function trustWeekBrowserWeeks(opts: {
   published: number[];
@@ -84,29 +117,39 @@ export function trustWeekBrowserWeeks(opts: {
   activeWeek: number;
   sportId?: string | null;
 }): number[] {
-  const first = firstSeasonWeek(opts.sportId);
-  const max = seasonMaxWeek(opts.sportId);
+  const contiguousPub = trustContiguousPublishedAroundLive(
+    opts.published,
+    opts.activeWeek,
+    opts.sportId
+  );
   const trustedScored = trustOfficialScoredWeeks(
     opts.scored,
+    // Score trust uses full published list so contiguous prefix is correct
     opts.published,
     opts.sportId
   );
 
-  const clean = (n: number) =>
-    Number.isFinite(n) &&
-    n !== PRACTICE_WEEK_INDEX &&
-    n >= first &&
-    n <= max;
-
-  const active = clean(opts.activeWeek) ? opts.activeWeek : first;
-
   return [
-    ...new Set(
-      [
-        ...opts.published.filter(clean),
-        ...trustedScored,
-        active,
-      ].filter(clean)
-    ),
+    ...new Set([...contiguousPub, ...trustedScored]),
   ].sort((a, b) => a - b);
+}
+
+/**
+ * Report non-contiguous published weeks (for Foundry / audit — not player UI).
+ * Orphans = published weeks not reachable by walking from activeWeek.
+ */
+export function findOrphanPublishedWeeks(opts: {
+  published: number[];
+  activeWeek: number;
+  sportId?: string | null;
+}): { visible: number[]; orphans: number[] } {
+  const all = cleanWeekList(opts.published, opts.sportId);
+  const visible = trustContiguousPublishedAroundLive(
+    opts.published,
+    opts.activeWeek,
+    opts.sportId
+  );
+  const vis = new Set(visible);
+  const orphans = all.filter((w) => !vis.has(w));
+  return { visible, orphans };
 }

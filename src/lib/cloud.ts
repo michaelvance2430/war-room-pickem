@@ -1086,8 +1086,8 @@ export async function listPublishedWeekNumbers(): Promise<number[]> {
 }
 
 /**
- * Phone Standings→Picks: find ANY playable card (active week, published, neighbors).
- * Parallel so one slow week doesn't hide the live card.
+ * Phone Standings→Picks: find a playable card near the official live week.
+ * Never prefers orphan high weeks (e.g. week 7 residue while live is week 0).
  */
 export async function loadBestAvailableWeekCard(
   preferredWeek = 1
@@ -1095,18 +1095,30 @@ export async function loadBestAvailableWeekCard(
   const preferred = Number.isFinite(preferredWeek) ? preferredWeek : 1;
   const published = await listPublishedWeekNumbers().catch(() => [] as number[]);
 
+  let trustedPublished = published;
+  try {
+    const { trustContiguousPublishedAroundLive } = await import(
+      "./week-history-trust"
+    );
+    trustedPublished = trustContiguousPublishedAroundLive(
+      published,
+      preferred,
+      getLeague()?.sportId
+    );
+  } catch {
+    /* keep raw */
+  }
+
   const candidates: number[] = [];
   const push = (w: number) => {
-    if (!Number.isFinite(w) || w < 0 || w > 40) return;
+    if (!Number.isFinite(w) || w < 0 || w > 40 || w === 99) return;
     if (!candidates.includes(w)) candidates.push(w);
   };
+  // Official live first, then contiguous trusted published only
   push(preferred);
-  // Newest published first (live card is almost always the last one)
-  for (let i = published.length - 1; i >= 0; i--) push(published[i]!);
+  for (const w of trustedPublished) push(w);
   push(preferred - 1);
   push(preferred + 1);
-  push(1);
-  push(0);
 
   // Cap parallel fan-out — phone radio hates 10 at once
   const batch = candidates.slice(0, 6);
@@ -1127,10 +1139,10 @@ export async function loadBestAvailableWeekCard(
       return { card: r.card, week: r.w };
     }
   }
-  // Then highest week with games (usually the live one)
+  // Closest trusted week with games (not highest absolute — avoids orphan week 7)
   const withGames = results
     .filter((r) => r.card?.games?.length)
-    .sort((a, b) => b.w - a.w);
+    .sort((a, b) => Math.abs(a.w - preferred) - Math.abs(b.w - preferred));
   if (withGames[0]?.card) {
     return { card: withGames[0].card, week: withGames[0].w };
   }

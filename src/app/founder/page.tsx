@@ -825,7 +825,49 @@ export default function FounderDashboardPage() {
               >
                 Reset Season Opening claim (local)
               </button>
-<button
+              <button
+                type="button"
+                onClick={() => {
+                  void import("@/lib/week-inventory-audit").then(async (m) => {
+                    setLabLog("Auditing week inventory…");
+                    const res = await m.auditWeekInventoryForCurrentLeague();
+                    if (!res.ok) {
+                      setLabLog(`❌ ${res.message}`);
+                      return;
+                    }
+                    const orphanCards = res.cards.filter((c) => c.is_orphan);
+                    console.log("[WR week inventory audit]", res);
+                    setLabLog(
+                      [
+                        res.message,
+                        `League: ${res.league_name || res.league_id}`,
+                        `Live week: ${res.current_week}`,
+                        `All published: [${res.all_published_weeks.join(", ")}]`,
+                        `Player-visible: [${res.player_visible_weeks.join(", ")}]`,
+                        `Orphans: [${res.orphan_weeks.join(", ")}]`,
+                        orphanCards.length
+                          ? orphanCards
+                              .map(
+                                (c) =>
+                                  `  W${c.week_number} id=${c.id.slice(0, 8)}… games=${c.game_count} pub=${c.published_at || "—"}`
+                              )
+                              .join("\n")
+                          : "  (no orphan card rows)",
+                        res.likely_creator_paths.length
+                          ? `Likely paths:\n${res.likely_creator_paths.map((p) => `  · ${p}`).join("\n")}`
+                          : "",
+                        "Full report in browser console. No rows deleted.",
+                      ]
+                        .filter(Boolean)
+                        .join("\n")
+                    );
+                  });
+                }}
+                className="py-2.5 rounded-lg border border-warning/40 bg-warning/10 text-xs font-semibold hover:bg-warning/15"
+              >
+                Audit week inventory (orphans · read-only)
+              </button>
+              <button
                 type="button"
                 onClick={() => jumpPopup("cold")}
                 className="py-2.5 rounded-lg border border-amber-400/40 bg-amber-500/10 text-xs font-semibold hover:bg-amber-500/15"
