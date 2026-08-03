@@ -241,7 +241,7 @@ export default function LoginWelcomeModal() {
           </p>
           <div className="rounded-xl border border-primary/35 bg-primary/10 px-3.5 py-3 space-y-2">
             <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-primary">
-              Heads up from the shop
+              Heads up from War Room
             </p>
             <p className="text-foreground text-sm leading-relaxed">
               Improvements are being made around the clock (well, around{" "}

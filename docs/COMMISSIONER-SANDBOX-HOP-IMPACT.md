@@ -1,8 +1,16 @@
 # P0 Impact Assessment — Commissioner Sandbox / Dry-run Hop Bar
 
-**Status:** Impact assessment only — **no removal code until Mike approves**  
+**Status:** ✅ **APPROVED & IMPLEMENTED** (2026-08-03)  
 **Date:** 2026-08-03  
 **Ask:** Remove Sandbox / Dry Run / Hop Bar / internal terminology from the **normal commissioner** experience; keep creator tooling in **Foundry**.
+
+### Implementation notes
+
+- Hop opt-in removed from Host Dashboard → **Foundry only** (`/founder#hop`)
+- `SandboxSessionChrome` hard-gated to `isAppCreator` (clears stale hop keys for customers)
+- `showCommishLabTools()` = app creator only (no sticky bypass for non-creators)
+- Customer copy: Preseason / Practice Mode / Live League — no Sandbox / Dry Run / Shop / Hop
+- Constitution: Foundry backstage + one customer reality
 
 ---
 

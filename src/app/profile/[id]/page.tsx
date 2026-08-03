@@ -496,7 +496,7 @@ export default function ProfilePage() {
                   Standings own season points. Badges and hardware load when you
                   open details below.
                   {isSandboxMode()
-                    ? " Sandbox: sim cheevos don't stick to career."
+                    ? " Preseason: early cheevos don't stick to career yet."
                     : ""}
                 </p>
               )}

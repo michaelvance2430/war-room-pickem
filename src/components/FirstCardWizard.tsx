@@ -114,7 +114,7 @@ export default function FirstCardWizard({
       {showLabDemo && (onDemoPublish || onDemo) && (
         <details className="rounded-lg border border-border bg-muted/10 px-3 py-2">
           <summary className="text-[11px] font-semibold text-muted cursor-pointer select-none">
-            Lab · demo slate (shop only)
+            Foundry · demo slate
           </summary>
           <div className="mt-2 space-y-2">
             {onDemoPublish && (

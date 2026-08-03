@@ -21,29 +21,25 @@ export function isFoundrySessionSticky(): boolean {
 }
 
 /**
- * Demo slate / randomize & score / auto-score / hop bar — shop tools only.
- * Regular commiss get Pull Odds → publish → Sync scores (Foundry owns fakes).
+ * Demo slate / randomize & score / auto-score — creator backstage only.
+ * Regular hosts: Pull Odds → publish → Sync scores. Never lab / hop / shop UI.
+ *
+ * Constitution: customers should never know Foundry exists.
+ * Only the app creator may see these tools (even when sticky/eyes are on).
  */
 export function showCommishLabTools(): boolean {
   if (typeof window === "undefined") return false;
   const uid = getSession()?.playerId;
-  if (isAppCreator(uid)) return true;
-  if (isFoundrySessionSticky()) return true;
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const eyes = require("./creator-eyes") as typeof import("./creator-eyes");
-    if (eyes.isCreatorEyesActive()) return true;
-  } catch {
-    /* ok */
-  }
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const sb = require("./creator-sandbox") as typeof import("./creator-sandbox");
-    if (sb.isCreatorSandboxActive()) return true;
-  } catch {
-    /* ok */
-  }
-  return false;
+  // Hard gate: UUID creator only — no sticky/eyes bypass for non-creators
+  return isAppCreator(uid);
+}
+
+/** True only for the app creator — customer product never treats this as on. */
+export function isFoundryBackstageUser(
+  userId?: string | null
+): boolean {
+  if (typeof window === "undefined") return false;
+  return isAppCreator(userId ?? getSession()?.playerId);
 }
 
 /**

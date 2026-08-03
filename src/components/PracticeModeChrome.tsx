@@ -1,9 +1,9 @@
 "use client";
 
 /**
- * Global Practice Mode identity — unmistakable sandbox chrome.
+ * Global Practice Mode identity — customer-safe training chrome.
  * Only when I'm Bored / onboarding practice (bored-practice) is active.
- * Never confuses with season dry-run "Sandbox" or Foundry hop.
+ * Never Foundry / hop / lab language. Exit: Return to Live League.
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -77,7 +77,7 @@ export default function PracticeModeChrome() {
             onClick={() => exit("/")}
             className="min-h-[40px] px-3 py-1.5 rounded-lg bg-primary text-black text-[11px] font-extrabold"
           >
-            Return to My League
+            Return to Live League
           </button>
           <button
             type="button"

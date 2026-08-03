@@ -1,11 +1,10 @@
 "use client";
 
 /**
- * Sticky hop bar for hosts in season SANDBOX (pre-doors dry-run).
+ * Foundry backstage hop bar — APP CREATOR ONLY.
  *
- * OFF by default. Never turns on just from Build next card / Commish tools.
- * ON only when the host explicitly enables “Sandbox hop bar” for this league.
- * Never on I’m bored practice. Never carries across leagues.
+ * Customers never see this. Constitution: customers should never know Foundry exists.
+ * Opt-in from Foundry desk only. Never for normal hosts. Never Practice Mode.
  */
 
 import { useEffect, useState } from "react";
@@ -90,7 +89,16 @@ export default function SandboxSessionChrome() {
       }
       const session = getSession();
       const league = getLeague();
-      if (!session?.playerId || !isOps()) {
+      // Customer product: never show hop — clear leftover keys from old builds
+      if (!session?.playerId || !isAppCreator(session.playerId)) {
+        const lid = league?.id || session?.leagueId;
+        if (lid && isSandboxHostHopActive(lid)) {
+          setSandboxHostHopActive(false, lid);
+        }
+        setShow(false);
+        return;
+      }
+      if (!isOps()) {
         setShow(false);
         return;
       }
@@ -98,7 +106,8 @@ export default function SandboxSessionChrome() {
         setShow(false);
         return;
       }
-      if (isAppCreator(session.playerId) && isFoundryChromeActive()) {
+      // Foundry sticky chrome already covers creator nav — hide hop under it
+      if (isFoundryChromeActive()) {
         setShow(false);
         return;
       }
@@ -110,7 +119,7 @@ export default function SandboxSessionChrome() {
 
       const lid = league?.id || session.leagueId;
 
-      // Opt-in only — visiting /commissioner must NOT flip host mode on
+      // Opt-in only from Foundry — never auto-on from Host Dashboard
       if (!isSandboxHostHopActive(lid)) {
         setShow(false);
         return;
@@ -152,9 +161,9 @@ export default function SandboxSessionChrome() {
   async function exitHostAndWipe() {
     if (busy) return;
     const ok = confirm(
-      "Wipe dry-run board?\n\n" +
+      "Wipe Foundry preseason board?\n\n" +
         "This will:\n" +
-        "• Close the sandbox hop bar\n" +
+        "• Close the Foundry hop bar\n" +
         "• Wipe cards, picks, and sim scores for THIS room\n\n" +
         "Members & league code stay.\n" +
         "Prior-season trophies stay.\n\n" +
@@ -209,10 +218,10 @@ export default function SandboxSessionChrome() {
           <div className="flex items-center gap-2">
             <div className="flex-1 min-w-0">
               <p className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-300">
-                Sandbox hop bar
+                Foundry hop
               </p>
               <p className="text-[11px] text-amber-100/85 truncate font-semibold">
-                Dry-run until {openLabel} · sim scores, no career bank
+                Creator only · until {openLabel} · sim scores
               </p>
             </div>
             <div className="flex shrink-0 gap-1.5">
@@ -263,9 +272,9 @@ export default function SandboxSessionChrome() {
             </p>
           )}
           <p className="text-[9px] text-amber-200/60 leading-snug">
-            Opt-in only.{" "}
+            Foundry only.{" "}
             <strong className="text-amber-100">Close bar</strong> hides hops.{" "}
-            <strong className="text-red-300">Wipe board</strong> clears dry-run
+            <strong className="text-red-300">Wipe board</strong> clears sim
             cards/picks for this room.
           </p>
         </div>

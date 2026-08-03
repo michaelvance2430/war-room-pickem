@@ -219,9 +219,9 @@ export default function BoredPracticeDoneModal() {
           </div>
 
           <p className="text-[11px] text-muted">
-            Private dry-run only. Live card, real standings, and your friends&apos;
-            pride: untouched. Redo until Week 0 kickoff — then this toy gets
-            confiscated for good.
+            Practice Mode only. Live card, real standings, and your friends&apos;
+            pride: untouched. Redo until Week 0 kickoff — then Practice Mode
+            closes for good.
           </p>
         </div>
 

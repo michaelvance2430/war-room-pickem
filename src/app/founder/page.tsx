@@ -38,6 +38,7 @@ import {
   type RoomLight,
 } from "@/lib/founder-league-health";
 import FoundryPlatformApiUsage from "@/components/FoundryPlatformApiUsage";
+import SandboxHopOptIn from "@/components/SandboxHopOptIn";
 
 type Light = "green" | "yellow" | "red";
 
@@ -396,6 +397,21 @@ export default function FounderDashboardPage() {
 
         {/* Platform Odds API ops — creator only (this page is already gated) */}
         <FoundryPlatformApiUsage />
+
+        {/* Foundry hop — never on customer Host Dashboard */}
+        <section
+          id="hop"
+          className="rounded-2xl border-2 border-amber-400/40 bg-card p-4 space-y-2 scroll-mt-24"
+        >
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-300">
+            Foundry · route hop
+          </p>
+          <p className="text-xs text-muted leading-relaxed">
+            Sticky route bar while you QA a preseason room. Customers never see
+            this control or the bar.
+          </p>
+          <SandboxHopOptIn />
+        </section>
 
         {/* Quick: preseason cold open (last year’s champ wanted poster) */}
         <section className="rounded-2xl border-2 border-amber-400/45 bg-amber-500/10 p-4 space-y-2">

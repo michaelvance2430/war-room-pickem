@@ -1,7 +1,9 @@
 "use client";
 
 /**
- * Loud sandbox / dry-run strip so sim standings never feel like the real season.
+ * Preseason room strip — customer-safe language only.
+ * Never "Sandbox" / "Dry run" / lab terminology.
+ * Sim scores don't bank career cheevos until the season opens.
  */
 
 import { useEffect, useState } from "react";
@@ -15,7 +17,6 @@ export default function SandboxSimBanner() {
 
   useEffect(() => {
     try {
-      // Everyone in sandbox — dry-run truth for the whole room
       setShow(!isGuestMode() && isSandboxMode());
     } catch {
       setShow(false);
@@ -28,18 +29,18 @@ export default function SandboxSimBanner() {
     <div className="mb-4 rounded-xl border border-amber-400/45 bg-amber-500/10 px-3.5 py-2.5 flex flex-wrap items-center justify-between gap-2">
       <p className="text-xs text-amber-100 leading-snug">
         <span className="font-extrabold uppercase tracking-wide text-amber-300">
-          Sandbox
+          Preseason
         </span>
         {" · "}
-        Demo cards / bots / practice scores. Career cheevos don&apos;t bank until
-        the real season opens.
+        The room is open before the real season. Early scores don&apos;t bank
+        to career hardware.
       </p>
       {isOps() && (
         <Link
           href="/commissioner?tab=card"
           className="text-[11px] font-bold text-amber-200 underline shrink-0"
         >
-          Commish tools
+          League tools
         </Link>
       )}
     </div>

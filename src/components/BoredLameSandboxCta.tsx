@@ -44,8 +44,8 @@ export default function BoredLameSandboxCta() {
   const openLabel = weekTitle(first, sportId);
   const sub =
     first === 0
-      ? "Dies at Week 0 kickoff. Enjoy the sandbox while it lasts."
-      : `Dies at ${openLabel} kickoff. Enjoy the sandbox while it lasts.`;
+      ? "Dies at Week 0 kickoff. Practice Mode until then."
+      : `Dies at ${openLabel} kickoff. Practice Mode until then.`;
 
   async function onBored() {
     setNote(null);
@@ -82,10 +82,10 @@ export default function BoredLameSandboxCta() {
         className="w-full py-5 sm:py-6 min-h-[64px] rounded-2xl bg-primary text-black text-lg sm:text-xl font-black tracking-tight disabled:opacity-50 shadow-[0_0_40px_rgba(34,197,94,0.2)] active:scale-[0.99] transition"
       >
         {busy
-          ? "Cooking a fake week…"
+          ? "Cooking a practice week…"
           : again
             ? "Still bored. Hit me again."
-            : "I’m bored. Fake week."}
+            : "I’m bored. Practice week."}
       </button>
       <p className="text-[11px] sm:text-xs text-muted text-center mt-2.5 leading-relaxed max-w-md mx-auto">
         {sub}

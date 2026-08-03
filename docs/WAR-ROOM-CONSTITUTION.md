@@ -77,8 +77,28 @@ Design from **inside the world**, not from outside explaining the world.
 
 > **War Room should never make the user question whether their actions are real.**
 
-Confidence builds trust. Ambiguity destroys it.  
-**Practice Mode** and **Real League** are two realities — never hybrid UI, never leak lab language into a normal host or player session.
+Confidence builds trust. Ambiguity destroys it.
+
+> **There is only one reality visible to customers.**
+
+Either:
+
+- 🏈 **Live League**
+- 🎮 **Practice Mode**
+
+Never both. Never ambiguous. Never leaking developer concepts.
+
+### Foundry backstage principle
+
+> **Customers should never know Foundry exists.**
+
+Foundry is backstage. War Room is the show.
+
+If a customer ever sees Sandbox, Dry Run, Hop, Lab, Shop, Through Their Eyes, or internal state names — the curtain has been pulled back.
+
+Disney doesn’t let guests see maintenance tunnels. War Room doesn’t let players see Foundry.
+
+Keep Foundry ridiculously powerful for the creator. Make every lab tool **impossible for customers to discover** — not hidden, not collapsed, not “advanced.” **Gone** from the customer product.
 
 ### Host Dashboard corollary
 

@@ -560,7 +560,7 @@ export default function PicksClient() {
   }, []);
 
   // Sticky Practice Mode: bare /picks while practice is active restores the
-  // practice URL. Explicit Exit / Return to My League is the only full leave.
+  // practice URL. Explicit Exit / Return to Live League is the only full leave.
   useEffect(() => {
     if (!practiceModeRef.current) return;
     if (practiceFromUrl) return;
@@ -1473,7 +1473,7 @@ export default function PicksClient() {
               </p>
               <p className="text-xs sm:text-sm text-foreground/90 leading-relaxed">
                 {practiceScored || saved
-                  ? "Graded on this device only. Real standings never noticed. Use Return to My League when you're done practicing."
+                  ? "Graded on this device only. Real standings never noticed. Use Return to Live League when you're done practicing."
                   : "Private practice card. Lock it; we grade it on your phone only. Real week cards and standings stay untouched."}
               </p>
             </div>
@@ -1483,7 +1483,7 @@ export default function PicksClient() {
                 onClick={() => leavePractice("/")}
                 className="min-h-[48px] px-4 rounded-xl bg-primary text-black text-sm font-extrabold touch-manipulation"
               >
-                Return to My League
+                Return to Live League
               </button>
               <button
                 type="button"
@@ -1800,7 +1800,7 @@ export default function PicksClient() {
       <p className="text-sm text-muted mt-1">
             {practiceMode
               ? practiceScored || saved
-                ? "Graded on your phone only. Real standings never noticed. Return to My League for your real card."
+                ? "Graded on your phone only. Real standings never noticed. Return to Live League for your real card."
                 : "Private practice. Lock when ready — we grade it and show how the room wakes up."
               : `${leagueName ? `${leagueName} · ` : ""}${
                   weekEditable
@@ -2395,7 +2395,7 @@ export default function PicksClient() {
                     : ""}
                 </p>
                 <p className="text-xs text-muted leading-relaxed">
-                  Practice is over for this run. Return to My League for live
+                  Practice is over for this run. Return to Live League for live
                   picks — or peek the Board (leaves Practice Mode).
                 </p>
                 <div className="flex flex-col sm:flex-row gap-2 pt-1">
@@ -2404,7 +2404,7 @@ export default function PicksClient() {
                     onClick={() => leavePractice("/")}
                     className="flex-1 py-3 min-h-[48px] rounded-xl bg-primary text-black text-sm font-extrabold flex items-center justify-center touch-manipulation"
                   >
-                    Return to My League
+                    Return to Live League
                   </button>
                   <button
                     type="button"

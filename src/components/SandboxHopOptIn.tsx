@@ -1,14 +1,16 @@
 "use client";
 
 /**
- * Explicit opt-in for the sandbox hop bar.
- * Build next card / normal Host tabs never turn hop on by themselves.
+ * Foundry-only hop bar toggle.
+ * Never mounted on the customer Host Dashboard.
+ * Constitution: customers should never know Foundry exists.
  */
 
 import { useEffect, useState } from "react";
 import { getLeague, getSession, isOps } from "@/lib/league";
 import { isSandboxMode } from "@/lib/season-mode";
 import { isGuestMode } from "@/lib/guest-mode";
+import { isAppCreator } from "@/lib/creator";
 import {
   EVENT_SANDBOX_HOST_HOP,
   isSandboxHostHopActive,
@@ -23,7 +25,13 @@ export default function SandboxHopOptIn() {
 
   useEffect(() => {
     function refresh() {
-      if (isGuestMode() || !isOps() || !isSandboxMode()) {
+      if (isGuestMode()) {
+        setShow(false);
+        return;
+      }
+      const uid = getSession()?.playerId;
+      // Hard creator gate — never for normal hosts
+      if (!uid || !isAppCreator(uid) || !isOps() || !isSandboxMode()) {
         setShow(false);
         return;
       }
@@ -56,16 +64,13 @@ export default function SandboxHopOptIn() {
   return (
     <div className="rounded-xl border border-amber-400/35 bg-amber-500/10 px-4 py-3 space-y-2">
       <p className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-300">
-        Sandbox only · optional
+        Foundry · creator only
       </p>
-      <p className="text-sm font-bold text-foreground">
-        Dry-run hop bar
-      </p>
+      <p className="text-sm font-bold text-foreground">Route hop bar</p>
       <p className="text-xs text-muted leading-relaxed">
-        Sticky Home · Picks · Board · Gazette · Commish jumps until {label}.{" "}
-        <strong className="text-foreground">Off by default</strong> — building
-        the next card or opening Commish tools does <em>not</em> turn this on
-        (NFL + CFB). Only this switch does.
+        Sticky Home · Picks · Board · Gazette · League jumps until {label}.{" "}
+        <strong className="text-foreground">Off by default</strong> — customers
+        never see this control or the bar.
       </p>
       <button
         type="button"

@@ -59,7 +59,7 @@ function PracticeStrip() {
     };
   }, []);
 
-  // Global PracticeModeChrome already shows identity + Return to My League
+  // Global PracticeModeChrome already shows identity + Return to Live League
   if (chromeOwns) return null;
 
   return (

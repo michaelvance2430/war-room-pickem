@@ -76,7 +76,7 @@ import {
 import OpenRoomBotsNudge from "@/components/OpenRoomBotsNudge";
 import OpenRoomLeaveNudge from "@/components/OpenRoomLeaveNudge";
 import SportPoolCommishPanel from "@/components/SportPoolCommishPanel";
-import SandboxHopOptIn from "@/components/SandboxHopOptIn";
+
 import HostDashboardShell from "@/components/host-dashboard/HostDashboardShell";
 import {
   buildThisWeekViewModel,
@@ -935,7 +935,7 @@ function CommissionerPageInner() {
         const label = sport === "nfl" ? "NFL" : "NCAA FBS";
         setOddsError(
           dryRun
-            ? `No open ${label} games with spreads right now (dry-run pull). Try again later or turn off dry run.`
+            ? `No open ${label} games with spreads right now (Foundry pull). Try again later or turn off all-games pull.`
             : unfilteredCount && unfilteredCount > 0
               ? `No ${label} games with spreads in the ${weekTitle(activeWeek)} window (${range}). Try another week or check back closer to kickoff.`
               : `No real ${label} lines for ${weekTitle(activeWeek)} yet. Odds usually appear closer to the week — try again later.`
@@ -1755,7 +1755,7 @@ function CommissionerPageInner() {
     if (scoring) return;
     if (resultsLocked) {
       setScoreReport(
-        "This week is locked. Click “Unlock to re-score” first (dry-run)."
+        "This week is locked. Unlock to re-score first if you need to fix results."
       );
       setScoring(false);
       return;
@@ -1936,7 +1936,7 @@ function CommissionerPageInner() {
         one
           ? `Auto-score ${weekTitle(from)} only?\n\n` +
               "Demo card → bot picks → random results → score.\n" +
-              "Sandbox / dry-run."
+              "Foundry only · does not bank career hardware."
           : full
             ? leagueFootballSport() === "nfl"
               ? `Run ENTIRE NFL season (Week 1 → Super Bowl)?\n\n` +
@@ -1944,18 +1944,18 @@ function CommissionerPageInner() {
                 "• Pads bots toward 16 if thin\n" +
                 "• Demo card → bots → random results → score each week\n" +
                 "• Leave this tab open until finished\n\n" +
-                "Sandbox / dry-run only."
+                "Foundry only · does not bank career hardware."
               : `Run ENTIRE season (Week 0 → CFP Final)?\n\n` +
                 `• ${inRange.length} unscored week(s)\n` +
                 "• Pads bots toward 16 if thin\n" +
                 "• Demo card → bots → random results → score each week\n" +
                 "• Leave this tab open until finished\n\n" +
-                "Sandbox / dry-run only."
+                "Foundry only · does not bank career hardware."
             : `Auto-score ${weekTitle(from)} → ${weekTitle(to)}?\n\n` +
               `• ${inRange.length} unscored week(s) in range\n` +
               "• Already-scored weeks skipped\n" +
               "• Leave this tab open until done\n\n" +
-              "Sandbox / dry-run."
+              "Foundry only · does not bank career hardware."
       )
     ) {
       return;
@@ -2119,7 +2119,7 @@ function CommissionerPageInner() {
         "• Crystal Ball / pride picks for this run\n" +
         "• This season’s Gazette, announcements, locker board\n" +
         (sandbox
-          ? "• Sandbox dry-run Trophy engravings on this device\n"
+          ? "• Preseason Trophy engravings on this device\n"
           : "") +
         "\nThis will KEEP (decade room):\n" +
         "• Every member (humans + bots until you clear bots)\n" +
@@ -2544,8 +2544,7 @@ function CommissionerPageInner() {
         {tab === "settings" && isOwner && league && (
           <div className="space-y-6">
 
-            {/* Foundry / creator only — not for regular room commiss */}
-            {labTools && <SandboxHopOptIn />}
+            {/* Hop bar lives in Foundry only — never on customer Host Dashboard */}
             {/* Multi-sport pool after first week — not day-one noise */}
             {!simpleHost && <SportPoolCommishPanel />}
 
@@ -2943,7 +2942,7 @@ function CommissionerPageInner() {
                   preseasonToolsOk ? "text-warning" : "text-muted"
                 }`}
               >
-                Sandbox: auto-score range
+                Foundry: auto-score range
                 {!preseasonToolsOk && (
                   <span className="ml-2 text-[10px] font-bold uppercase tracking-wide text-muted border border-border px-1.5 py-0.5 rounded">
                     Pre-season only
@@ -3741,7 +3740,7 @@ function CommissionerPageInner() {
                   />
                   <span className="text-xs leading-relaxed">
       <span className="font-semibold text-foreground">
-                      Dry run: show all open real games
+                      Foundry: show all open real games
                     </span>
       <span className="text-muted block mt-0.5">
                       Foundry only. Pull Odds without week date filter.
@@ -4480,7 +4479,7 @@ function CommissionerPageInner() {
                   }
                   if (resultsLocked) {
                     setScoreReport(
-                      "This week is already scored. Unlock only for dry runs."
+                      "This week is already scored. Unlock only if you need to fix results."
                     );
                     return;
                   }
@@ -4499,7 +4498,7 @@ function CommissionerPageInner() {
                   : resultsLocked
                     ? `${weekTitle(activeWeek)} already scored ✓`
                     : practiceTools
-                      ? `Score ${weekTitle(activeWeek)} (lab)`
+                      ? `Score ${weekTitle(activeWeek)} (Foundry)`
                       : `Score ${weekTitle(activeWeek)}`}
               </button>
               {(scoreReport || syncReport) && (
@@ -4714,8 +4713,8 @@ function CommissionerPageInner() {
       <p className="text-xs text-muted mb-3">
                 Select a week with a published card.{" "}
                 <strong className="text-foreground">Scored weeks lock</strong>{" "}
-                so you don&apos;t overwrite them by accident. Unlock only to
-                re-score a dry run.
+                so you don&apos;t overwrite them by accident. Unlock only if you
+                need to fix results.
               </p>
       <div className="flex flex-wrap gap-2">
                 {listSeasonWeekNumbers(league?.sportId).map(
@@ -4847,7 +4846,7 @@ function CommissionerPageInner() {
                               `Clear the “done” mark on ${weekTitle(activeWeek)}?\n\n` +
                                 "Removes week results so the pill is not struck through.\n" +
                                 "Does NOT delete the published card or player picks.\n" +
-                                "Use for dry runs / accidental Founder score."
+                                "Use to fix a mistaken score (or Foundry test)."
                             )
                           ) {
                             return;

@@ -247,7 +247,7 @@ function buildGazetteTease(
   if (botRank === 1) {
     return {
       gazetteHeadline: `${name} STOMPS FAKE BOTS, DEMANDS A PARADE`,
-      gazetteDeck: `${totalPoints} pts on a dry-run card. When the real week scores, this is the front-page energy — minus the robots.`,
+      gazetteDeck: `${totalPoints} pts on a practice card. When the real week scores, this is the front-page energy — minus the robots.`,
       boardTease: `Board would put you #1 of ${botField} (practice bots). Real room = real names and real salt.`,
     };
   }

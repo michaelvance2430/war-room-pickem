@@ -195,9 +195,18 @@ export default function Nav() {
         setEarlyNav(snap.firstWeekChrome);
         void import("@/lib/creator-eyes").then((m) => {
           const mode = m.getCreatorEyesMode();
-          setEyesLabel(mode === "off" ? "" : m.creatorEyesLabel(mode));
-          // Eyes banner wins over generic sandbox strip
-          setSandboxOn(mode === "off" && !!snap.sandbox);
+          // Creator backstage only — customers never see Foundry/eyes banners
+          void import("@/lib/creator").then(({ isAppCreator }) => {
+            const uid = getSession()?.playerId;
+            if (!isAppCreator(uid)) {
+              setEyesLabel("");
+              setSandboxOn(false);
+              return;
+            }
+            setEyesLabel(mode === "off" ? "" : m.creatorEyesLabel(mode));
+            // Eyes banner wins over creator progressive test strip
+            setSandboxOn(mode === "off" && !!snap.sandbox);
+          });
         });
       });
     }

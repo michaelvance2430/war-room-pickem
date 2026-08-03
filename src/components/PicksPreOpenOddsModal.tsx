@@ -113,8 +113,8 @@ export default function PicksPreOpenOddsModal() {
           </p>
           <p className="text-xs text-muted leading-relaxed">
             Lock anyway if you want. Or wait. Or lock, screenshot it, and blame
-            the shop when a −3 becomes a −7. We&apos;ll be here either way —
-            mostly laughing.
+            the oddsmakers when a −3 becomes a −7. We&apos;ll be here either way
+            — mostly laughing.
           </p>
         </div>
 

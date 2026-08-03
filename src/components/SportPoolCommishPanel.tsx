@@ -123,7 +123,7 @@ export default function SportPoolCommishPanel() {
     setPoll(res.poll);
     setNote(
       botCount > 0
-        ? "Invite is live (soft). You’re marked interested so you can practice. Bots can answer for dry-runs only."
+        ? "Invite is live (soft). You’re marked interested so you can practice. Bots can answer for preseason tests only."
         : "Invite is live on Home — optional, dismissible. You’re counted as interested as host."
     );
     void refresh();

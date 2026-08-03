@@ -186,7 +186,7 @@ export function padawanOutroLines(sportId?: string | null): {
   const dayWord = days === 1 ? "day" : "days";
   return {
     title: "Be patient, young Padawan",
-    body: `You just practiced the whole weekly job. Trial sandbox — not the live season. Be patient, young Padawan: we still have ${days} ${dayWord} until the week officially starts (${openLabel}). Meditate. Trash-talk in the Locker. Come back hungry.`,
+    body: `You just practiced the whole weekly job. Practice Mode — not the live season. Be patient, young Padawan: we still have ${days} ${dayWord} until the week officially starts (${openLabel}). Meditate. Trash-talk in the Locker. Come back hungry.`,
     days,
     open: false,
   };
