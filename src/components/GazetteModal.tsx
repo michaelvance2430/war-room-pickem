@@ -1,17 +1,10 @@
 "use client";
 
 /**
- * Production Gazette reader — scroll fix only.
+ * Production Gazette reader.
  *
- * Root cause of non-scrolling article:
- *   Outer wrapper used max-h + overflow-y on a flex child without a real height
- *   budget or min-height:0, so the box grew with content and never became a
- *   scrollport; wheel/touch then hit the page behind (no body lock).
- *
- * Fix:
- *   Fixed shell with explicit max-height → flex column → sticky header →
- *   flex-1 min-h-0 overflow-y-auto article body only.
- *   Local body lock preserves scroll Y (does not change global lock API).
+ * Body lock: named owner "gazette-reader" via acquireBodyLock so the global
+ * orphan watchdog never force-unlocks mid-read (position:fixed is intentional).
  */
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
@@ -25,6 +18,9 @@ import {
 } from "@/lib/gazette";
 import { notifyGazetteDone } from "@/lib/badge-celebration";
 import GazettePaper from "@/components/GazettePaper";
+import { acquireBodyLock } from "@/lib/smooth";
+
+const GAZETTE_LOCK_OWNER = "gazette-reader";
 
 export default function GazetteModal() {
   const pathname = usePathname();
@@ -35,59 +31,21 @@ export default function GazetteModal() {
 
   const openRef = useRef(false);
   const pathAtOpen = useRef<string | null>(null);
-  const scrollYRef = useRef(0);
-  const bodyLocked = useRef(false);
   const closeBtnRef = useRef<HTMLButtonElement | null>(null);
   const shellRef = useRef<HTMLDivElement | null>(null);
   const scrollBodyRef = useRef<HTMLDivElement | null>(null);
   const editionRef = useRef<GazetteEdition | null>(null);
   const leagueIdRef = useRef<string | null>(null);
+  const releaseLockRef = useRef<(() => void) | null>(null);
 
-  const lockBackground = useCallback(() => {
-    if (typeof document === "undefined" || bodyLocked.current) return;
-    bodyLocked.current = true;
-    scrollYRef.current =
-      window.scrollY ||
-      window.pageYOffset ||
-      document.documentElement.scrollTop ||
-      0;
-    const b = document.body;
-    const h = document.documentElement;
-    b.style.overflow = "hidden";
-    b.style.position = "fixed";
-    b.style.top = `-${scrollYRef.current}px`;
-    b.style.left = "0";
-    b.style.right = "0";
-    b.style.width = "100%";
-    b.style.touchAction = "none";
-    h.style.overflow = "hidden";
-    h.style.touchAction = "none";
-  }, []);
-
-  const unlockBackground = useCallback(() => {
-    if (typeof document === "undefined" || !bodyLocked.current) return;
-    bodyLocked.current = false;
-    const y = scrollYRef.current;
-    const b = document.body;
-    const h = document.documentElement;
-    b.style.overflow = "";
-    b.style.position = "";
-    b.style.top = "";
-    b.style.left = "";
-    b.style.right = "";
-    b.style.width = "";
-    b.style.touchAction = "";
-    h.style.overflow = "";
-    h.style.touchAction = "";
-    try {
-      window.scrollTo(0, y);
-    } catch {
+  const releaseBody = useCallback(() => {
+    if (releaseLockRef.current) {
       try {
-        document.documentElement.scrollTop = y;
-        document.body.scrollTop = y;
+        releaseLockRef.current();
       } catch {
         /* ok */
       }
+      releaseLockRef.current = null;
     }
   }, []);
 
@@ -109,14 +67,19 @@ export default function GazetteModal() {
       setEdition(null);
       setLeagueId(null);
       pathAtOpen.current = null;
-      unlockBackground();
+      releaseBody();
+      try {
+        console.log("[WR-GAZETTE] close");
+      } catch {
+        /* ok */
+      }
       try {
         notifyGazetteDone();
       } catch {
         /* ok */
       }
     },
-    [unlockBackground]
+    [releaseBody]
   );
 
   const openReader = useCallback(
@@ -129,18 +92,25 @@ export default function GazetteModal() {
       openRef.current = true;
       pathAtOpen.current =
         typeof window !== "undefined" ? window.location.pathname : null;
-      lockBackground();
+      // Named ownership — watchdog must not force-unlock
+      if (!releaseLockRef.current) {
+        releaseLockRef.current = acquireBodyLock(GAZETTE_LOCK_OWNER);
+      }
+      try {
+        console.log("[WR-GAZETTE] open");
+      } catch {
+        /* ok */
+      }
       window.setTimeout(() => {
         try {
           closeBtnRef.current?.focus();
-          // Ensure scroll body starts at top of article
           if (scrollBodyRef.current) scrollBodyRef.current.scrollTop = 0;
         } catch {
           /* ok */
         }
       }, 40);
     },
-    [lockBackground]
+    []
   );
 
   useEffect(() => {
@@ -251,26 +221,9 @@ export default function GazetteModal() {
   useEffect(() => {
     return () => {
       openRef.current = false;
-      if (bodyLocked.current) {
-        bodyLocked.current = false;
-        const y = scrollYRef.current;
-        try {
-          document.body.style.overflow = "";
-          document.body.style.position = "";
-          document.body.style.top = "";
-          document.body.style.left = "";
-          document.body.style.right = "";
-          document.body.style.width = "";
-          document.body.style.touchAction = "";
-          document.documentElement.style.overflow = "";
-          document.documentElement.style.touchAction = "";
-          window.scrollTo(0, y);
-        } catch {
-          /* ok */
-        }
-      }
+      releaseBody();
     };
-  }, []);
+  }, [releaseBody]);
 
   // Focus trap within shell only
   useEffect(() => {

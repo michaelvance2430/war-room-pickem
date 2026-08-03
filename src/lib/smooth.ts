@@ -37,40 +37,128 @@ export const WIDGET_LOAD_MS = 2_500;
 /** Auth calls */
 export const AUTH_MS = 12_000;
 
-// ── Body scroll lock (refcount) ───────────────────────────────────────────
-// Stuck overflow:hidden is the #1 "whole app frozen" bug on phone + desktop.
+// ── Body scroll lock (named ownership + refcount) ─────────────────────────
+// Ghost overlays freeze the app → orphan watchdog must stay.
+// Legitimate modals (e.g. gazette-reader) register a named owner so the
+// watchdog does NOT treat position:fixed as an orphan.
+//
+// Contract:
+//   const release = acquireBodyLock("gazette-reader");
+//   // … open lifecycle …
+//   release();
+//
+// forceUnlockAllChrome is for route changes / real recovery only.
 
 let bodyLockCount = 0;
+/** Named owners currently holding a legitimate lock */
+const bodyLockOwners = new Set<string>();
+/** Document scroll Y when first owner acquired */
+let lockedScrollY = 0;
 
 export function getBodyLockCount(): number {
   return bodyLockCount;
 }
 
-export function lockBodyScroll(): void {
+export function getActiveBodyLockOwners(): string[] {
+  return [...bodyLockOwners];
+}
+
+export function hasActiveBodyLockOwner(): boolean {
+  return bodyLockOwners.size > 0;
+}
+
+function applyDocumentScrollLock(): void {
+  if (typeof document === "undefined" || typeof window === "undefined") return;
+  lockedScrollY =
+    window.scrollY ||
+    window.pageYOffset ||
+    document.documentElement.scrollTop ||
+    0;
+  const b = document.body;
+  const h = document.documentElement;
+  b.style.overflow = "hidden";
+  b.style.position = "fixed";
+  b.style.top = `-${lockedScrollY}px`;
+  b.style.left = "0";
+  b.style.right = "0";
+  b.style.width = "100%";
+  b.style.touchAction = "none";
+  h.style.overflow = "hidden";
+  h.style.touchAction = "none";
+}
+
+function releaseDocumentScrollLock(): void {
   if (typeof document === "undefined") return;
-  bodyLockCount += 1;
-  wrBodyLock(1, "lockBodyScroll");
+  const y = lockedScrollY;
+  unlockDocumentChrome();
+  lockedScrollY = 0;
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const sn = require("./safe-nav") as typeof import("./safe-nav");
-    sn.markBodyLockStarted();
+    window.scrollTo(0, y);
   } catch {
-    /* ok */
-  }
-  if (bodyLockCount === 1) {
     try {
-      document.body.style.overflow = "hidden";
+      document.documentElement.scrollTop = y;
+      document.body.scrollTop = y;
     } catch {
       /* ok */
     }
   }
 }
 
-export function unlockBodyScroll(): void {
+/**
+ * Acquire a named body lock. Returns a release function (idempotent).
+ * Prefer this over lockBodyScroll for modal readers.
+ */
+export function acquireBodyLock(owner: string): () => void {
+  if (typeof document === "undefined") return () => {};
+  const id = (owner || "anonymous").trim() || "anonymous";
+  if (!bodyLockOwners.has(id)) {
+    bodyLockOwners.add(id);
+    bodyLockCount += 1;
+    wrBodyLock(1, `acquire:${id}`);
+    try {
+      console.log(`[WR-BODYLOCK] acquire owner=${id} owners=${[...bodyLockOwners].join(",")}`);
+    } catch {
+      /* ok */
+    }
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const sn = require("./safe-nav") as typeof import("./safe-nav");
+      sn.markBodyLockStarted();
+    } catch {
+      /* ok */
+    }
+    if (bodyLockCount === 1) {
+      try {
+        applyDocumentScrollLock();
+      } catch {
+        /* ok */
+      }
+    }
+  }
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    releaseBodyLockOwner(id);
+  };
+}
+
+function releaseBodyLockOwner(owner: string): void {
   if (typeof document === "undefined") return;
+  if (!bodyLockOwners.has(owner)) return;
+  bodyLockOwners.delete(owner);
   bodyLockCount = Math.max(0, bodyLockCount - 1);
-  wrBodyLock(-1, "unlockBodyScroll");
-  if (bodyLockCount === 0) {
+  wrBodyLock(-1, `release:${owner}`);
+  try {
+    console.log(
+      `[WR-BODYLOCK] release owner=${owner} remaining=${[...bodyLockOwners].join(",") || "none"}`
+    );
+  } catch {
+    /* ok */
+  }
+  if (bodyLockOwners.size === 0 || bodyLockCount === 0) {
+    bodyLockCount = 0;
+    bodyLockOwners.clear();
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const sn = require("./safe-nav") as typeof import("./safe-nav");
@@ -78,16 +166,30 @@ export function unlockBodyScroll(): void {
     } catch {
       /* ok */
     }
-    unlockDocumentChrome();
+    releaseDocumentScrollLock();
   }
 }
 
-/** Hard reset — route change, watchdog, nav prepare */
+/** @deprecated Prefer acquireBodyLock(owner) for modals */
+export function lockBodyScroll(): void {
+  acquireBodyLock("legacy-anonymous");
+}
+
+/** @deprecated Prefer release from acquireBodyLock */
+export function unlockBodyScroll(): void {
+  releaseBodyLockOwner("legacy-anonymous");
+}
+
+/**
+ * Hard reset — route change / real recovery only.
+ * Clears ALL named owners. Do not call from orphan pulse while a modal owns the lock.
+ */
 export function forceUnlockAllChrome(): void {
-  if (bodyLockCount !== 0) {
+  if (bodyLockCount !== 0 || bodyLockOwners.size > 0) {
     wrBodyLock(-bodyLockCount, "forceUnlockAllChrome");
   }
   bodyLockCount = 0;
+  bodyLockOwners.clear();
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const sn = require("./safe-nav") as typeof import("./safe-nav");
@@ -95,7 +197,7 @@ export function forceUnlockAllChrome(): void {
   } catch {
     /* ok */
   }
-  unlockDocumentChrome();
+  releaseDocumentScrollLock();
 }
 
 /**
@@ -211,24 +313,46 @@ export function hasVisibleModal(): boolean {
 }
 
 /**
- * If body is locked but no real modal is up, unlock.
- * Used by the global watchdog pulse.
+ * If body is locked but no registered owner and no real modal, unlock.
+ * Legitimate named owners (gazette-reader, etc.) must NEVER be force-unlocked
+ * just because body.style.position === "fixed" — that is the intentional lock.
  */
 export function unlockIfOrphanedLock(): void {
   if (typeof document === "undefined") return;
   try {
-    if (
-      document.body.style.position === "fixed" ||
-      document.body.style.position === "absolute"
-    ) {
-      wrLog("[WR-BODYLOCK]", "orphan: fixed/absolute position → force unlock");
-      forceUnlockAllChrome();
+    // Named owner present → legitimate lock (e.g. Gazette reader)
+    if (hasActiveBodyLockOwner()) {
+      try {
+        console.log(
+          `[WR-BODYLOCK] watchdog valid owner=${getActiveBodyLockOwners().join(",")}`
+        );
+      } catch {
+        /* ok */
+      }
       return;
     }
-    if (document.body.style.overflow === "hidden" && !hasVisibleModal()) {
-      wrLog("[WR-BODYLOCK]", "orphan: overflow hidden + no modal → force unlock");
-      forceUnlockAllChrome();
+
+    // Visible modal without named owner still counts (legacy modals)
+    if (hasVisibleModal()) {
+      try {
+        console.log("[WR-BODYLOCK] watchdog skip — visible modal present");
+      } catch {
+        /* ok */
+      }
+      return;
     }
+
+    const pos = document.body.style.position;
+    const overflow = document.body.style.overflow;
+    const looksLocked =
+      pos === "fixed" || pos === "absolute" || overflow === "hidden";
+    if (!looksLocked) return;
+
+    wrLog(
+      "[WR-BODYLOCK]",
+      `orphan: locked with no owner/modal (pos=${pos || "default"} overflow=${overflow || "default"}) → force unlock`
+    );
+    forceUnlockAllChrome();
   } catch {
     /* ok */
   }

@@ -199,8 +199,17 @@ export default function SmoothRuntime() {
     if (isoEnabled("smoothPulse") || isSafeNavMode()) {
       pulse = wrSetInterval(
         () => {
+          // Ownership-aware: never recover while a named modal owns the lock
+          unlockIfOrphanedLock();
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            const { hasActiveBodyLockOwner } =
+              require("@/lib/smooth") as typeof import("@/lib/smooth");
+            if (hasActiveBodyLockOwner()) return;
+          } catch {
+            /* ok */
+          }
           if (bodyLooksLocked()) {
-            unlockIfOrphanedLock();
             if (shouldReleaseStaleBodyLock() || isSafeNavMode()) {
               recoverNavigation("orphan-pulse");
             }

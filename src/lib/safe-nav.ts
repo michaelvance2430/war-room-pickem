@@ -74,6 +74,9 @@ export function noteNavAttempt(detail: {
 /**
  * Nuclear recovery: unlock chrome, clear session drama, neuter ghost overlays.
  * Safe to call often. Does not navigate.
+ *
+ * Will NOT force-unlock while a named body-lock owner is active
+ * (e.g. gazette-reader) — that is a legitimate modal lock, not a ghost.
  */
 export function recoverNavigation(reason = "recover"): void {
   if (typeof window === "undefined") return;
@@ -82,6 +85,16 @@ export function recoverNavigation(reason = "recover"): void {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const smooth = require("./smooth") as typeof import("./smooth");
+    if (smooth.hasActiveBodyLockOwner()) {
+      try {
+        console.log(
+          `[WR-BODYLOCK] recoverNavigation skipped — valid owner=${smooth.getActiveBodyLockOwners().join(",")} reason=${reason}`
+        );
+      } catch {
+        /* ok */
+      }
+      return;
+    }
     smooth.forceUnlockAllChrome();
   } catch {
     try {
