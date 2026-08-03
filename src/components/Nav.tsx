@@ -13,6 +13,7 @@ import {
   isActuallyCommissioner,
 } from "@/lib/league";
 import Avatar from "@/components/Avatar";
+import DeferredChromeGate from "@/components/DeferredChromeGate";
 import GuestDemoChrome from "@/components/GuestDemoChrome";
 import GuestOnboarding from "@/components/GuestOnboarding";
 import { touchLastSeen } from "@/lib/last-seen";
@@ -43,15 +44,13 @@ import {
   wrProfileRoute,
 } from "@/lib/runtime-iso";
 
-/** Heavy chrome — not in first JS parse of every tab. */
-const RoomDeferredChrome = dynamic(
-  () => import("@/components/RoomDeferredChrome"),
-  { ssr: false }
-);
 const PlayerWalkthrough = dynamic(
   () => import("@/components/PlayerWalkthrough"),
   { ssr: false }
 );
+
+/** Production: never arm deferred chrome (no mount, no import of wave tree). */
+const PRODUCTION_DEFERRED_SAFE = process.env.NODE_ENV === "production";
 
 type NavLink = {
   href: string;
@@ -119,7 +118,12 @@ export default function Nav() {
 
   // Deferred chrome once — Nav is layout-persistent so this no longer re-runs
   // on every tab (that remount storm made every screen stick).
+  // PRODUCTION SAFE MODE: never arm — DeferredChromeGate stays null / no import.
   useEffect(() => {
+    if (PRODUCTION_DEFERRED_SAFE) {
+      wrLog("[WR-DEFERRED]", "production safe mode — disabled (Nav arm skipped)");
+      return;
+    }
     if (!allowDeferred) {
       wrLog("[WR-DEFERRED]", "Nav deferred chrome disabled by iso");
       return;
@@ -1043,7 +1047,16 @@ export default function Nav() {
       */}
       <PlayerWalkthrough />
       {/* Roster + optional modals — staged late so tabs stay live after login */}
-      {allowDeferred && deferredReady && <RoomDeferredChrome />}
+      {/*
+        EMERGENCY: always mount the gate.
+        Production → null + one log, never imports RoomDeferredChrome.
+        Development → only loads RoomDeferredChrome after idle arm + iso allow.
+      */}
+      {PRODUCTION_DEFERRED_SAFE ? (
+        <DeferredChromeGate />
+      ) : (
+        allowDeferred && deferredReady && <DeferredChromeGate />
+      )}
     </>
   );
 }

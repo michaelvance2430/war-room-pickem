@@ -6,7 +6,11 @@
  *
  * DISABLE SYSTEMS (browser console), then hard refresh:
  *   localStorage.setItem("warroom-iso", JSON.stringify({
- *     deferred: false,   // A RoomDeferredChrome entirely
+ *     deferred: false,   // A RoomDeferredChrome (dev only — prod hard-off)
+ *
+ * PRODUCTION EMERGENCY (2026-08): RoomDeferredChrome is hard-disabled via
+ * DeferredChromeGate (NODE_ENV=production). Do not re-enable until children
+ * are measured offline. Log: [WR-DEFERRED] production safe mode — disabled
  *     navProgressive: false, // B Nav progressive/unseen
  *     wave1: false,      // C
  *     wave2: false,      // D

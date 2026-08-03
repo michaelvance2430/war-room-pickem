@@ -3,6 +3,10 @@
 /**
  * Deferred room chrome — STRICT budget.
  *
+ * EMERGENCY (2026-08): NOT mounted in production. DeferredChromeGate returns
+ * null and never imports this module when NODE_ENV=production. Keep this file
+ * for offline isolation of children after freezes are contained.
+ *
  * Freezes came from mounting 15+ dynamic modal chunks while the user was still
  * trying to click Home. Rules:
  * - Wave 0 only: roster hydrator (nameplates). Always, after Nav defers.
