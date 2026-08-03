@@ -1,10 +1,24 @@
 # New Player Onboarding Redesign
 
-**Phase:** Product Polish — design for approval **before** implementation  
-**Scope:** First-time **player** onboarding only  
+**Phase:** Implemented (engine + immersion P0) — re-verify live before Phase 4  
+**Scope:** First-time **player** onboarding (commissioner journey exists; same immersion rules)  
 **Out of scope:** Through Their Eyes / View as player (host QA tool — do not change)  
-**Out of scope:** Commissioner first-jobs path (separate track later)  
-**Out of scope:** New product features or workflow redesigns beyond guided framing of existing destinations  
+**Out of scope:** Phase 4 copy polish / extra features until immersion Scrub #1 passes  
+
+**Immersion north star (constitution):**
+
+> **They need to feel like they are IN the experience. Not viewing it from above.**
+
+**Scrub #1 FAIL → redesign rules (ship gate):**
+
+1. Practice begins on **Home** — Foundry stays invisible.  
+2. No double confirmations before momentum.  
+3. Slim practice banner — never a tutorial panel that becomes the product.  
+4. Teach by **pointing**; player always drives.  
+5. Every go-here: recognition → confirmation → explanation → next.  
+6. Coach reveals the app — never covers what it teaches.  
+7. One ending. One celebration peak.  
+8. Coach = host beside you. Illuminates War Room; never interrupts it.
 
 **North-star feeling after tutorial (not read — felt):**
 
@@ -115,7 +129,10 @@ The purpose is to **remove fear**, **build confidence**, and **create excitement
 
 Every screen should leave the player feeling **more confident than the previous one**.
 
-If a screen only explains mechanics but does not increase confidence or excitement, **redesign it**.
+> **Every screen should leave the player feeling slightly more invested than when they arrived.**  
+> Not more informed. **More invested.**
+
+If a screen only explains mechanics but does not increase confidence, excitement, or investment, **redesign it**.
 
 We are not creating software documentation.
 

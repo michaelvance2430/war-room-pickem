@@ -1,7 +1,6 @@
 /**
- * Journey B — New Player
- * Goal felt: "I can't wait until Week 1."
- * Blueprint: docs/NEW-PLAYER-ONBOARDING-REDESIGN.md
+ * Journey B — New Player (immersion redesign)
+ * Feel IN War Room — Home is the front door. Coach guides; app is the hero.
  */
 
 import type { OnboardingJourney } from "../types";
@@ -13,65 +12,47 @@ export const playerJourney: OnboardingJourney = {
   steps: [
     {
       id: "welcome",
-      goal: "Welcome safely into the room",
+      goal: "Land inside War Room on Home, safely",
       layout: "fullscreen",
       conversation: {
         kicker: "Welcome",
         title: "Welcome to War Room.",
         speak:
-          "This isn't a public pick'em widget. It's a private room with your people.",
+          "You're in the room — not a simulator. Before real Week 1, one quick practice run on the real app.",
         whyCare:
-          "Before you compete for real, we'll run a quick practice season. About 3 minutes. Nothing here affects your league. You can't mess anything up.",
+          "About 3 minutes. Nothing here affects your league. You can't mess anything up.",
         practiceBanner: true,
         celebrate: "none",
+        pointAt: "home",
       },
       action: {
-        label: "Start practice →",
+        label: "I'm in — show me around →",
+        resolveHref: "home",
         advancesOnClick: true,
       },
       secondaryAction: { label: "Skip for now", skipTo: "complete" },
-      successCondition: { type: "always" },
-      nextStep: "mission",
-    },
-    {
-      id: "mission",
-      goal: "Understand the weekly job",
-      layout: "fullscreen",
-      conversation: {
-        kicker: "The weekly job",
-        title: "This is where every week begins.",
-        speak:
-          "You'll predict winners before kickoff. Beat your friends. Climb the standings. Win the season.",
-        whyCare:
-          "The picks are just the excuse — the room is the product. First, one practice card so Week 1 feels familiar.",
-        practiceBanner: true,
-        celebrate: "none",
-      },
-      action: {
-        label: "Show me the weekly job →",
-        advancesOnClick: true,
-      },
       successCondition: { type: "always" },
       nextStep: "open_picks",
     },
     {
       id: "open_picks",
-      goal: "Open My Picks (practice)",
+      goal: "Drive to My Picks from inside the app",
       layout: "coach",
       conversation: {
-        kicker: "Step 1 · Practice",
-        title: "Open My Picks",
+        kicker: "Nice — you're home",
+        title: "This is where every week begins.",
         speak:
-          "This is where every week begins. Open your practice card — same buttons you'll use when the commissioner opens the real week.",
-        whyCare: "Nothing here is live. Training League only.",
+          "Tap My Picks. That's where you'll lock a card before kickoff — every week.",
+        whyCare: "Practice card only. Same buttons as the real week.",
         practiceBanner: true,
         celebrate: "micro",
-        celebrateCopy: "✓ You're on My Picks. Practice only.",
-        explainAfter: "Next: fill the card — sides, confidence, Best Bet, prop.",
-        nextHint: "Build your practice card",
+        celebrateCopy: "✓ Nice. You're on My Picks.",
+        explainAfter: "This is the weekly job. Fill the card — then lock it.",
+        nextHint: "Pick sides, confidence, Best Bet, prop",
+        pointAt: "picks",
       },
       action: {
-        label: "Open practice card →",
+        label: "Open My Picks →",
         resolveHref: "tutorialPicks",
         advancesOnClick: true,
       },
@@ -83,70 +64,68 @@ export const playerJourney: OnboardingJourney = {
       goal: "Fill the practice card",
       layout: "coach",
       conversation: {
-        kicker: "Step 2 · Build the card",
-        title: "Build your practice card",
+        kicker: "You're driving",
+        title: "Build the card.",
         speak:
-          "For each game: pick a side. Rank confidence 1–5 (each number once — your 5 is your loudest take). Mark one Best Bet. Answer the prop.",
-        whyCare:
-          "That's the whole weekly motion. Practice teaches it without risk.",
+          "Pick a side on each game. Rank confidence 1–5 (each once — your 5 is your loudest take). One Best Bet. Answer the prop.",
+        whyCare: "You're not watching a tutorial — you're doing the real motion.",
         practiceBanner: true,
         celebrate: "micro",
-        celebrateCopy: "✓ Card looks full.",
-        explainAfter: "One more step: lock it in.",
+        celebrateCopy: "✓ Card looks full. Nice.",
+        explainAfter: "One more tap — lock it in.",
         nextHint: "Hit Save / Lock",
+        pointAt: "picks",
       },
       action: {
-        label: "I'm on My Picks",
+        label: "I'm filling the card",
         href: "/picks",
       },
-      // Prefer auto when picks filled; manual backup so they never feel stuck
       successCondition: { type: "sessionFlag", key: "warroom-tut-picks-filled" },
-      secondaryAction: {
-        label: "I've filled the card →",
-      },
+      secondaryAction: { label: "I've filled it →" },
       nextStep: "lock_picks",
     },
     {
       id: "lock_picks",
-      goal: "Save / lock practice picks",
+      goal: "Lock practice picks — earned peak",
       layout: "coach",
       conversation: {
-        kicker: "Step 3 · Lock it in",
-        title: "Hit Save / Lock",
+        kicker: "Finish line",
+        title: "Hit Save / Lock.",
         speak:
-          "That's the finish line for the week. On a live week you can still edit until first kickoff — then the card freezes.",
-        whyCare: "Same muscle memory you'll use for blood when the season opens.",
+          "That's the weekly finish line. On a live week you can still edit until first kickoff.",
+        whyCare: "Same muscle memory for when the season is real.",
         practiceBanner: true,
         celebrate: "peak",
         celebrateCopy:
-          "✅ Nice! You locked in your first picks.\n\nYou're not just making picks. You're joining a room where every week ends with bragging rights, rivalries, and stories.\n\nNothing here affected your league.",
-        explainAfter: "You just did the real weekly job.",
-        nextHint: "Peek the clubhouse",
+          "✅ Nice — you locked your first card.\n\nYou're not just making picks. You're joining a room where every week ends with bragging rights, rivalries, and stories.\n\nNothing here affected your league.",
+        explainAfter: "Let me show you something cool.",
+        nextHint: "Peek Standings",
+        pointAt: "picks",
       },
       action: {
-        label: "Open My Picks",
+        label: "Back to My Picks",
         resolveHref: "tutorialPicks",
       },
       successCondition: { type: "sessionFlag", key: "warroom-tut-picks-saved" },
-      secondaryAction: {
-        label: "I locked my picks →",
-      },
+      secondaryAction: { label: "I locked it →" },
       nextStep: "peek_standings",
     },
     {
       id: "peek_standings",
-      goal: "See Standings with context",
+      goal: "See Standings inside the room",
       layout: "coach",
       conversation: {
-        kicker: "The clubhouse",
-        title: "Next: Standings",
+        kicker: "Something cool",
+        title: "This is where rivalries live.",
         speak:
-          "This isn't a silent scoreboard. It's the table you trash-talk about all week — where you pass your brother or your boss.",
-        whyCare: "Rivalries live here. Correct picks move you closer to owning the room.",
+          "Open Standings — not a silent scoreboard. The table you trash-talk about all week.",
+        whyCare: "Your buddy is going to hate losing to you here.",
         practiceBanner: true,
         celebrate: "micro",
-        celebrateCopy: "✓ You've seen Standings.",
-        nextHint: "Locker Room next",
+        celebrateCopy: "✓ That's the board you'll fight over all season.",
+        explainAfter: "One more door — where the room talks.",
+        nextHint: "Open Locker Room",
+        pointAt: "standings",
       },
       action: {
         label: "Open Standings →",
@@ -158,17 +137,20 @@ export const playerJourney: OnboardingJourney = {
     },
     {
       id: "peek_locker",
-      goal: "See Locker Room with context",
+      goal: "See Locker Room inside the room",
       layout: "coach",
       conversation: {
-        kicker: "The clubhouse",
-        title: "Next: Locker Room",
+        kicker: "The room talks here",
+        title: "Locker Room.",
         speak:
-          "Every league has personalities. This is where yours comes alive — trash talk, alibis, glory.",
+          "Every league has personalities. This is where yours comes alive.",
         whyCare: "Spreadsheets don't do this. War Room does.",
         practiceBanner: true,
         celebrate: "micro",
-        celebrateCopy: "✓ You've seen the Locker.",
+        celebrateCopy: "✓ You've seen where the stories start.",
+        explainAfter: "You're ready for the real week when it opens.",
+        nextHint: "Finish",
+        pointAt: "locker",
       },
       action: {
         label: "Open Locker Room →",
@@ -180,18 +162,17 @@ export const playerJourney: OnboardingJourney = {
     },
     {
       id: "youre_ready",
-      goal: "Finish with confidence for Week 1",
+      goal: "Single emotional finish",
       layout: "fullscreen",
       conversation: {
-        kicker: "You're ready",
+        kicker: "Welcome",
         title: "You're ready.",
         speak:
-          "You know how War Room works. Your commissioner will open the real week when it's time.",
-        whyCare:
-          "When Week 1 arrives — trust yourself. You've already done this once.\n\nWelcome to the War Room.",
-        celebrate: "peak",
-        celebrateCopy:
-          "🏆 You're ready.\n\nWhen Week 1 arrives — trust yourself. You've already done this once.\n\nWelcome to the War Room.",
+          "You know the weekly job. When Week 1 opens — trust yourself. You've already done this once.",
+        whyCare: "Welcome to the War Room.",
+        // Single peak only — no second modal that repeats the same line
+        celebrate: "none",
+        practiceBanner: false,
       },
       action: {
         label: "Take me home →",

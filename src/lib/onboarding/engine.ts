@@ -167,10 +167,11 @@ function beginCelebrate(
   step: OnboardingStep
 ): OnboardingPersistedState {
   const tier = step.conversation.celebrate || "none";
-  if (tier === "none" || tier === "micro") {
-    // micro is inline; advance immediately after brief host paint
+  if (tier === "none") {
     return advanceToNext(s, step);
   }
+  // micro + peak both pause so the user always gets recognition → next
+  // (Host auto-advances micro after a short beat; peak waits for dismiss.)
   const next = { ...s, phase: "celebrate" as OnboardingRuntimePhase };
   write(next);
   return next;

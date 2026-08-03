@@ -49,6 +49,40 @@ If it fails the Founder Rule, **it doesn’t ship** — even if it passes techni
 5. **Football is the excuse. Relationships are the product.**  
    The NFL schedule is not the competitive advantage. **The memories are.**
 
+### Investment principle
+
+> **Every screen should leave the player feeling slightly more invested than when they arrived.**
+
+Not more *informed*.
+
+**More invested.**
+
+That is the magic. Information without investment is documentation. Investment is why people open the league again next August.
+
+---
+
+## Immersion principle
+
+> **They need to feel like they are IN the experience. Not viewing it from above.**
+
+Bigger than onboarding. How **every** future feature should feel.
+
+- The **Gazette** shouldn’t feel like reading a report — it should feel like opening this week’s paper.
+- The **Locker Room** shouldn’t feel like a chat page — it should feel like walking into the room where everyone is talking.
+- The **Board** shouldn’t feel like a leaderboard — it should feel like the wall where everyone checks who’s on top.
+
+Design from **inside the world**, not from outside explaining the world.
+
+### Onboarding corollary
+
+The coach should **illuminate** War Room — never interrupt it or replace it with a course.
+
+- Home is the front door. Foundry stays invisible.
+- Teach by pointing. The player drives. Never only watches.
+- Every requested action produces: recognition → confirmation → explanation → next.
+- One emotional peak. One memorable finish. Never duplicate the ending.
+- Slim guide. App is always center stage. If the tutorial becomes what they’re looking at — we failed.
+
 ---
 
 ## Feature filter

@@ -1,6 +1,5 @@
 /**
- * Journey A — New Commissioner
- * Goal felt: "I can run this league."
+ * Journey A — New Commissioner (immersion: host voice, Home front door)
  */
 
 import type { OnboardingJourney } from "../types";
@@ -12,19 +11,21 @@ export const commissionerJourney: OnboardingJourney = {
   steps: [
     {
       id: "welcome",
-      goal: "Welcome the host",
+      goal: "Welcome host on Home energy",
       layout: "fullscreen",
       conversation: {
         kicker: "You're the host",
         title: "You're running the room.",
         speak:
-          "Friends don't need another spreadsheet. They need a place with bragging rights, rivalries, and a paper when the week dies.",
+          "Friends don't need another spreadsheet. They need bragging rights, rivalries, and a paper when the week dies.",
         whyCare:
-          "We'll walk three jobs: invite the crew, publish a week, know how scoring works. About 3 minutes. You can't break the league from here.",
+          "Three jobs: invite the crew, wake the room with a card, know how scoring works. You can't break the league from here.",
         celebrate: "none",
+        pointAt: "home",
       },
       action: {
-        label: "Let's run the room →",
+        label: "Let's go — Home →",
+        resolveHref: "home",
         advancesOnClick: true,
       },
       secondaryAction: { label: "Skip for now", skipTo: "complete" },
@@ -33,22 +34,22 @@ export const commissionerJourney: OnboardingJourney = {
     },
     {
       id: "invite",
-      goal: "Share the invite",
+      goal: "Share invite from Home",
       layout: "coach",
       conversation: {
-        kicker: "Job 1 of 3 · Invite",
-        title: "Share your invite",
+        kicker: "Every great league starts with one message",
+        title: "Invite your people.",
         speak:
-          "One link with the code filled in. Drop it in the group chat — that's how the room fills.",
-        whyCare:
-          "An empty room isn't a broken app. It's waiting for your people.",
+          "This is the easiest part. Copy the invite. Drop it in the group chat. The fun starts when the first person joins.",
+        whyCare: "An empty room isn't broken — it's waiting for your crew.",
         celebrate: "micro",
-        celebrateCopy: "✓ Invite ready. Send it when you are.",
-        explainAfter: "Next job: publish a week so they have something to pick.",
-        nextHint: "Publish a card",
+        celebrateCopy: "✓ Nice. The room is waiting for friends.",
+        explainAfter: "Next: wake the room — publish a card so they can pick.",
+        nextHint: "Publish the first card",
+        pointAt: "home",
       },
       action: {
-        label: "Open Home to share →",
+        label: "I'm on Home — I'll share →",
         href: "/",
         advancesOnClick: true,
       },
@@ -60,23 +61,24 @@ export const commissionerJourney: OnboardingJourney = {
     },
     {
       id: "publish",
-      goal: "Publish first week card",
+      goal: "Publish first week — room comes alive",
       layout: "coach",
       conversation: {
-        kicker: "Job 2 of 3 · Publish",
-        title: "Publish this week's card",
+        kicker: "The room isn't alive yet",
+        title: "Publish the first card.",
         speak:
-          "Pull Odds → pick 5 games → Publish. Until you publish, My Picks stays empty and they think the room is broken.",
+          "Pull Odds → pick 5 → Publish. That's the moment everyone starts checking their phones.",
         whyCare:
-          "This is the moment the week becomes real — friends can lock, trash talk, and compete.",
+          "Until you publish, My Picks stays empty and they think the room is broken.",
         celebrate: "peak",
         celebrateCopy:
-          "🎉 Your first week is officially LIVE.\n\nPlayers can now begin making picks.\n\nText the crew once more — then check what they see.",
-        explainAfter: "Friends can open My Picks and lock now.",
-        nextHint: "Know how scoring works",
+          "🎉 The room is alive.\n\nYour first week is LIVE. Players can lock picks now.\n\nText the crew once — then see what they see.",
+        explainAfter: "Friends can open My Picks.",
+        nextHint: "Know the host loop",
+        pointAt: "commissioner",
       },
       action: {
-        label: "Pull Odds & publish →",
+        label: "Open Build Card →",
         resolveHref: "commissionerCard",
         advancesOnClick: true,
       },
@@ -88,20 +90,21 @@ export const commissionerJourney: OnboardingJourney = {
     },
     {
       id: "score_hint",
-      goal: "Understand scoring (no full score required)",
+      goal: "Know scoring without forced action",
       layout: "coach",
       conversation: {
-        kicker: "Job 3 of 3 · Score later",
-        title: "When the games die",
+        kicker: "When the games die",
+        title: "You write the ending.",
         speak:
-          "Enter Results → fill winners → Score. Standings update. The paper cooks. That's the host loop every week.",
-        whyCare:
-          "You don't need to score right now — just know the door. The room waits for this moment.",
+          "Enter Results → winners → Score. Standings move. The paper cooks. That's the host loop every week.",
+        whyCare: "You don't need to score right now — just know the door.",
         celebrate: "micro",
         celebrateCopy: "✓ You know the host loop.",
+        explainAfter: "Invite. Publish. Score. You've walked it.",
+        pointAt: "commissioner",
       },
       action: {
-        label: "Peek Results tab →",
+        label: "Peek Results →",
         resolveHref: "commissionerResults",
         advancesOnClick: true,
       },
@@ -113,18 +116,15 @@ export const commissionerJourney: OnboardingJourney = {
     },
     {
       id: "youre_ready",
-      goal: "Host confidence finish",
+      goal: "Single host finish",
       layout: "fullscreen",
       conversation: {
-        kicker: "You're ready",
+        kicker: "Welcome, host",
         title: "You can run this league.",
         speak:
-          "Invite. Publish. Score. That's the job — and you've already walked it.",
-        whyCare:
-          "When friends text 'is the league open?' — you'll know exactly what to do.\n\nWelcome to the War Room, host.",
-        celebrate: "peak",
-        celebrateCopy:
-          "🏆 You can run this league.\n\nInvite. Publish. Score.\n\nWelcome to the War Room.",
+          "Invite. Publish. Score. When friends text “is the league open?” — you’ll know exactly what to do.",
+        whyCare: "Welcome to the War Room.",
+        celebrate: "none",
       },
       action: {
         label: "Take me home →",

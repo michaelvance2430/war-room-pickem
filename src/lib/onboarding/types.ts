@@ -1,16 +1,22 @@
 /**
  * War Room onboarding engine — data-driven journeys.
- * Constitution: Promise, Founder Rule, identity, celebration restraint.
- *
- * Conversation model (game coaching, not docs):
- *   System speaks → User acts → System reacts → Celebrate → Explain → Next
+ * Immersion rule: illuminate War Room; never cover it or replace it.
+ * Conversation: speak → user acts → react → celebrate → next
  */
 
 export type OnboardingJourneyId = "player" | "commissioner";
 
 export type CelebrationTier = "none" | "micro" | "peak";
 
-/** How we know the user completed this beat */
+/** Guide attention inside the app (bottom nav), not outside it */
+export type PointAtTarget =
+  | "home"
+  | "picks"
+  | "standings"
+  | "locker"
+  | "commissioner"
+  | null;
+
 export type SuccessCondition =
   | { type: "manual" }
   | { type: "pathname"; includes: string }
@@ -20,56 +26,44 @@ export type SuccessCondition =
   | { type: "always" };
 
 export type ConversationBeat = {
-  /** Eyebrow / chapter label */
   kicker?: string;
-  /** Main headline — short */
   title: string;
-  /** One or two sentences max — why this exists */
+  /** Host voice — short */
   speak: string;
-  /** Optional: why care (War Room identity, not mechanics dump) */
   whyCare?: string;
-  /** Show practice / sandbox banner */
+  /** Slim top strip only — never a huge practice panel */
   practiceBanner?: boolean;
-  /** After success, before next */
   celebrate?: CelebrationTier;
   celebrateCopy?: string;
-  /** What just happened (trust) */
   explainAfter?: string;
-  /** Point to next action */
   nextHint?: string;
+  /** Point at real nav so user drives the app */
+  pointAt?: PointAtTarget;
 };
 
 export type OnboardingAction = {
   label: string;
   href?: string;
-  /** Resolve live vs practice picks, etc. */
-  resolveHref?: "tutorialPicks" | "commissionerCard" | "commissionerResults";
-  /** Primary continues journey after navigation */
+  resolveHref?: "tutorialPicks" | "commissionerCard" | "commissionerResults" | "home";
   advancesOnClick?: boolean;
 };
 
-/**
- * One step in a journey — configuration only, no app-scattered if/else.
- */
 export type OnboardingStep = {
   id: string;
   goal: string;
   conversation: ConversationBeat;
   action?: OnboardingAction;
-  /** Secondary: skip beat, mark complete, jump */
   secondaryAction?: { label: string; skipTo?: string | "complete" };
   successCondition: SuccessCondition;
   nextStep: string | null;
-  /** Optional preview of upcoming goals (not a dump) */
   futureSteps?: string[];
-  /** Full-screen peak (welcome / you're ready) vs sticky coach */
+  /** fullscreen only for true peaks (welcome once, final once) */
   layout?: "coach" | "fullscreen";
 };
 
 export type OnboardingJourney = {
   id: OnboardingJourneyId;
   name: string;
-  /** Felt end-state for this journey */
   successFeeling: string;
   steps: OnboardingStep[];
 };
@@ -82,14 +76,12 @@ export type OnboardingRuntimePhase =
   | "complete";
 
 export type OnboardingPersistedState = {
-  /** journeyId → finished */
   completed: Partial<Record<OnboardingJourneyId, boolean>>;
   active: boolean;
   journeyId: OnboardingJourneyId | null;
   stepId: string | null;
   phase: OnboardingRuntimePhase;
   userId?: string;
-  /** Practice picks href when resolved */
   practicePicksHref?: string;
 };
 
