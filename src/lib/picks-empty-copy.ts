@@ -1,8 +1,11 @@
 /**
  * Role-aware Picks empty state (no card for the week).
  *
- * Mike picks the active option indices below after reviewing the lists.
- * Copy is personality only — routing stays: Build Card vs Locker.
+ * Commissioner: locked option #0 — "You had one job…"
+ * Player: War Room buddy voice — light roast of the host, never customer-support.
+ *         Rotates daily (ET) and again on hard reset (new browser session).
+ *
+ * Routing stays: Build Card vs Go to Locker.
  */
 
 export type PicksEmptyCopy = {
@@ -15,7 +18,7 @@ export type PicksEmptyCopy = {
 
 /**
  * Host / commissioner / deputy — they can actually build the card.
- * Tone: sarcastic, funny, direct. Never mean for its own sake.
+ * Locked primary: index 0.
  */
 export const COMMISH_PICKS_EMPTY_OPTIONS: PicksEmptyCopy[] = [
   {
@@ -24,6 +27,7 @@ export const COMMISH_PICKS_EMPTY_OPTIONS: PicksEmptyCopy[] = [
     body: "The room is staring at a blank week because the card still lives in your head. Build it. Publish it. Let them pick.",
     cta: "Build Card",
   },
+  // Kept as archive if we ever want variety for hosts later
   {
     eyebrow: "Your move",
     title: "Your league is waiting on you.",
@@ -69,62 +73,122 @@ export const COMMISH_PICKS_EMPTY_OPTIONS: PicksEmptyCopy[] = [
 ];
 
 /**
- * Player (non-ops) — cannot build. Peer pressure + Locker, never “go build the card.”
+ * Player (non-ops) — buddy across the room, not support desk.
+ * Light roast of the commissioner. CTA always Locker (peer pressure).
+ * These rotate (see resolvePlayerPicksEmptyCopy).
  */
 export const PLAYER_PICKS_EMPTY_OPTIONS: PicksEmptyCopy[] = [
   {
-    eyebrow: "Waiting room",
-    title: "No card yet — you’re not broken.",
-    body: "Your commish hasn’t published this week. Lightly poke them in the Locker. Friendly peer pressure is a feature.",
+    eyebrow: "Empty slate",
+    title:
+      "No card yet. Your commissioner appears to be conducting an extensive research project.",
+    body: "You’re fine. The app is fine. The host is somewhere between “almost done” and “forgot football exists.” Hit the Locker and apply friendly pressure.",
     cta: "Go to Locker",
   },
   {
-    eyebrow: "Seated",
-    title: "You’re ready. The slate isn’t.",
-    body: "Nothing to pick until the host drops a card. Hang in the Locker, stir the pot politely, come back when the week goes live.",
+    eyebrow: "Empty slate",
+    title:
+      "No card yet. Apparently your commissioner believes football starts next week.",
+    body: "It doesn’t. Season’s open. Nudge them in the Locker — peer pressure is part of the sport.",
+    cta: "Go to Locker",
+  },
+  {
+    eyebrow: "Empty slate",
+    title:
+      "No card yet. Maybe remind your commissioner the season didn’t get postponed.",
+    body: "Nothing to lock until they publish. Go stir the Locker. Keep it fun. Make them feel the group chat energy.",
+    cta: "Go to Locker",
+  },
+  {
+    eyebrow: "Buddy note",
+    title: "Looks like your commissioner overslept.",
+    body: "Or got lost in odds. Either way: no slate, no picks. The Locker is where the room gently (or not so gently) wakes the host up.",
+    cta: "Go to Locker",
+  },
+  {
+    eyebrow: "Buddy note",
+    title: "Commish is still “finalizing” the card. In theory.",
+    body: "You’re ready. The week isn’t. Drop a “card when?” in the Locker and keep the room warm until the slate lands.",
     cta: "Go to Locker",
   },
   {
     eyebrow: "Group chat energy",
-    title: "Commish is still cooking the card.",
-    body: "Or forgetting. Either way, you can’t invent five games. Remind them in the Locker — then come lock when it’s up.",
+    title: "The host has the keys. The door is still locked.",
+    body: "Not your job to invent five games. It is your job to make sure they know people are waiting. Locker’s open.",
     cta: "Go to Locker",
   },
   {
-    eyebrow: "Patience (sort of)",
-    title: "Picks open when the card exists.",
-    body: "That’s a commissioner job, not yours. Use the Locker to keep the room warm while the host does the host thing.",
+    eyebrow: "Waiting (with swagger)",
+    title: "Picks are closed for renovation. Host contractor: your commissioner.",
+    body: "Hang in the Locker. Roast lightly. Celebrate when the card finally drops like it was always the plan.",
     cta: "Go to Locker",
   },
   {
-    eyebrow: "Not your fault",
-    title: "Empty week. Host’s move.",
-    body: "You’re in the right place. There’s just nothing to lock yet. Tap the Locker, drop a “card when?” and stay human.",
-    cta: "Go to Locker",
-  },
-  {
-    eyebrow: "Community",
-    title: "The room is waiting together.",
-    body: "No published slate for this week. Peer pressure welcome. Mean-spirited pile-ons are not. Locker’s open.",
-    cta: "Go to Locker",
-  },
-  {
-    eyebrow: "Chill path",
-    title: "Nothing to pick. Yet.",
-    body: "Your job starts when the card lands. Until then: Locker banter, standings envy, and gentle reminders for the person with the keys.",
-    cta: "Go to Locker",
-  },
-  {
-    eyebrow: "Live soon",
-    title: "Card still in the oven.",
-    body: "Commish has to publish before My Picks wakes up. You’re fine. The app is fine. The host just needs a nudge.",
+    eyebrow: "Waiting (with swagger)",
+    title: "No slate. Your commissioner is speedrunning the silent treatment.",
+    body: "Don’t invent urgency that isn’t yours — invent a Locker thread. Friendly peer pressure beats staring at an empty week.",
     cta: "Go to Locker",
   },
 ];
 
-/** Mike: change these indices after reading the options. */
+/** Commissioner stays on the winner. */
 export const ACTIVE_COMMISH_PICKS_EMPTY_INDEX = 0;
-export const ACTIVE_PLAYER_PICKS_EMPTY_INDEX = 0;
+
+const PLAYER_EMPTY_SALT_KEY = "warroom-picks-empty-player-salt-v1";
+
+function etDayKey(now = new Date()): string {
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(now);
+    const y = parts.find((p) => p.type === "year")?.value || "0";
+    const m = parts.find((p) => p.type === "month")?.value || "0";
+    const d = parts.find((p) => p.type === "day")?.value || "0";
+    return `${y}-${m}-${d}`;
+  } catch {
+    return now.toISOString().slice(0, 10);
+  }
+}
+
+/** Stable-ish hash → non-negative int */
+function hashStr(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) {
+    h = (h * 31 + s.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h);
+}
+
+/**
+ * Player empty index:
+ * - Changes with Eastern calendar day
+ * - New random salt on hard reset (new sessionStorage session)
+ * Same day + same tab session → same line (no flicker on soft re-render).
+ */
+export function resolvePlayerPicksEmptyIndex(now = new Date()): number {
+  const n = PLAYER_PICKS_EMPTY_OPTIONS.length;
+  if (n <= 1) return 0;
+
+  let salt = "0";
+  if (typeof window !== "undefined") {
+    try {
+      let existing = sessionStorage.getItem(PLAYER_EMPTY_SALT_KEY);
+      if (existing == null || existing === "") {
+        existing = String(Math.floor(Math.random() * 10_000));
+        sessionStorage.setItem(PLAYER_EMPTY_SALT_KEY, existing);
+      }
+      salt = existing;
+    } catch {
+      salt = "0";
+    }
+  }
+
+  const day = etDayKey(now);
+  return hashStr(`${day}:${salt}`) % n;
+}
 
 export function resolveCommishPicksEmptyCopy(): PicksEmptyCopy {
   const i = Math.max(
@@ -138,13 +202,7 @@ export function resolveCommishPicksEmptyCopy(): PicksEmptyCopy {
 }
 
 export function resolvePlayerPicksEmptyCopy(): PicksEmptyCopy {
-  const i = Math.max(
-    0,
-    Math.min(
-      PLAYER_PICKS_EMPTY_OPTIONS.length - 1,
-      ACTIVE_PLAYER_PICKS_EMPTY_INDEX
-    )
-  );
+  const i = resolvePlayerPicksEmptyIndex();
   return PLAYER_PICKS_EMPTY_OPTIONS[i]!;
 }
 
