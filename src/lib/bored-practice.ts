@@ -87,8 +87,19 @@ function lid() {
   return getLeague()?.id || "local";
 }
 
-/** Practice button only before opening week kickoff. */
+/**
+ * Practice Mode window.
+ * Members: only before official opening week kickoff.
+ * Guests: always open (tour only; conversion after practice done).
+ */
 export function isBoredPracticeWindowOpen(sportId?: string | null): boolean {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const g = require("./guest-mode") as typeof import("./guest-mode");
+    if (g.isGuestMode()) return true;
+  } catch {
+    /* ok */
+  }
   const sid = sportId ?? getLeague()?.sportId;
   return !hasOpeningWeekStarted(sid);
 }

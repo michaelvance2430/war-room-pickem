@@ -15,7 +15,8 @@ import {
 type Phase = "welcome" | "role" | "tutorial" | "done";
 
 /**
- * Guest Demo: welcome → role → short by-the-numbers tutorial.
+ * Guest Mode: welcome contract → role → short tour.
+ * Guests observe. Members belong.
  */
 export default function GuestOnboarding() {
   const router = useRouter();
@@ -121,9 +122,9 @@ export default function GuestOnboarding() {
               —unlocks when you join or create a real league.
             </p>
             <p className="text-xs text-muted leading-relaxed rounded-lg border border-border bg-background/50 px-3 py-2">
-              This tour uses a <strong className="text-foreground">simulated room
-              through Week 9</strong> with bots so the place feels alive. Nothing
-              here is your friend group yet.
+              You&apos;re in a <strong className="text-foreground">tour room
+              (Week 9 vibe)</strong> with bots so it feels alive. Nothing here
+              is your friend group yet — that&apos;s the point of joining.
             </p>
             <div className="flex flex-col gap-2">
               <button

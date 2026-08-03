@@ -1,6 +1,7 @@
 /**
- * Join as Guest — local Demo War Room (simulated through Week 9).
- * No real account required; does not touch production leagues.
+ * Guest Mode — explore War Room without an account.
+ * Mission: convince someone in five minutes that War Room is worth joining.
+ * Guests observe. Members belong. Local tour room only — not a real league.
  */
 
 import type { League, Session } from "./league";
@@ -153,7 +154,7 @@ export function exitGuestDemo() {
 export function getGuestLeagueHint(): Pick<League, "id" | "name" | "code"> {
   return {
     id: GUEST_LEAGUE_ID,
-    name: "Demo War Room",
+    name: "War Room Tour",
     code: "GUEST1",
   };
 }

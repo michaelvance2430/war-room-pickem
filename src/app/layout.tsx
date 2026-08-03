@@ -6,6 +6,7 @@ import SportThemeApplier from "@/components/SportThemeApplier";
 import FoundrySessionChrome from "@/components/FoundrySessionChrome";
 import SandboxSessionChrome from "@/components/SandboxSessionChrome";
 import PracticeModeChrome from "@/components/PracticeModeChrome";
+import BoredPracticeDoneModal from "@/components/BoredPracticeDoneModal";
 import LeagueBuildGate from "@/components/LeagueBuildGate";
 import SmoothRuntime from "@/components/SmoothRuntime";
 import AppShell from "@/components/AppShell";
@@ -89,6 +90,8 @@ export default function RootLayout({
           <LeagueBuildGate />
         </ThemeDecorGate>
         <PracticeModeChrome />
+        {/* Practice completion — not via DeferredChrome (production-safe) */}
+        <BoredPracticeDoneModal />
         <AppShell>{children}</AppShell>
       </body>
     </html>

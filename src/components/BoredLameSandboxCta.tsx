@@ -23,15 +23,18 @@ export default function BoredLameSandboxCta() {
   const [again, setAgain] = useState(false);
 
   useEffect(() => {
-    if (isGuestMode()) {
-      setShow(false);
-      return;
-    }
+    // Guests may practice too — conversion path after practice done
     const league = getLeague();
     const sid = league?.sportId || "cfb";
     setSportId(sid);
-    if (hasOpeningWeekStarted(sid)) {
+    if (!isGuestMode() && hasOpeningWeekStarted(sid)) {
       setShow(false);
+      return;
+    }
+    // Guests: always offer practice tour; members: only pre-opening window
+    if (isGuestMode()) {
+      setShow(true);
+      setAgain(isBoredPracticeActive());
       return;
     }
     setShow(!!getSession()?.playerId);
@@ -91,9 +94,8 @@ export default function BoredLameSandboxCta() {
         {sub}
       </p>
       <p className="text-[10px] text-muted/80 text-center mt-1.5 leading-relaxed max-w-sm mx-auto">
-        Private. Fake. Zero standings. Lock → we grade it on purpose → you get
-        the little “here&apos;s how the room wakes up” tour. Break it. Redo it.
-        We don&apos;t care. Yet.
+        Practice Mode only — nothing hits a real league. Lock → we grade it →
+        you see how a week ends. Break it. Redo it.
       </p>
       {note && (
         <p className="text-xs text-primary text-center mt-3 font-medium leading-relaxed">

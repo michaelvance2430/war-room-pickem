@@ -1,5 +1,5 @@
 /**
- * Seed a lived-in Demo War Room through Week 9 for guest mode.
+ * Seed a lived-in tour room through Week 9 for Guest Mode (not a real league).
  * LocalStorage only — bots, scored weeks 0–8, open card on week 9.
  */
 
@@ -126,7 +126,7 @@ function seedWeekCard(week: number) {
 export function seedGuestDemoWorld() {
   const league: League = {
     id: GUEST_LEAGUE_ID,
-    name: "Demo War Room",
+    name: "War Room Tour",
     code: "GUEST1",
     commissionerId: GUEST_PLAYER_ID,
     createdAt: "2026-08-15T12:00:00.000Z",

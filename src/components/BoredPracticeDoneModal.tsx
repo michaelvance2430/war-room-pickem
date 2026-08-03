@@ -1,10 +1,11 @@
 "use client";
 
 /**
- * End of a bored practice week — recap + “here’s how next week feels” + re-do.
+ * End of Practice Mode week — recap + goal CTAs (not app-route labels).
+ * Guest → convert. Member → this week / real picks.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   EVENT_BORED_PRACTICE_DONE,
   clearBoredPracticeDoneModal,
@@ -15,28 +16,42 @@ import {
 import { startBoredPracticeWeek } from "@/lib/bored-practice-run";
 import { isGuestMode } from "@/lib/guest-mode";
 import BrandMark from "@/components/BrandMark";
-import { hasLockedPicksOnce } from "@/lib/first-week";
-import { getSession } from "@/lib/league";
+import GuestJoinCtas from "@/components/GuestJoinCtas";
+
+const GUEST_ROASTS = [
+  "Practice is over. Turns out beating imaginary opponents doesn't impress anyone.",
+  "Nice warmup. Now quit hiding behind fake football.",
+  "You looked pretty good against nobody. Let's see what happens when your buddies start chirping.",
+  "Robots don't trash-talk. Your group chat will.",
+  "That was the dress rehearsal. The season is the show.",
+];
+
+const MEMBER_ROASTS = [
+  "Practice is over. Your real card is waiting — and so is the room.",
+  "Nice warmup. Live week is where dignity goes to die (or shine).",
+  "Bots don't care. Your friends will.",
+];
 
 export default function BoredPracticeDoneModal() {
   const [open, setOpen] = useState(false);
   const [recap, setRecap] = useState<BoredPracticeRecap | null>(null);
   const [busy, setBusy] = useState(false);
+  const [guest, setGuest] = useState(false);
 
   useEffect(() => {
-    if (isGuestMode()) return;
-    if (!isBoredPracticeWindowOpen()) return;
+    // Practice done is valid for guests and members (guest tour may practice)
+    if (!isGuestMode() && !isBoredPracticeWindowOpen()) return;
 
     function tryShow() {
       const pending = peekBoredPracticeDoneModal();
       if (!pending) return;
+      setGuest(isGuestMode());
       setRecap(pending);
       setOpen(true);
     }
 
     tryShow();
     window.addEventListener(EVENT_BORED_PRACTICE_DONE, tryShow);
-    // Picks may fire the event before this mounts / after navigation
     const t1 = window.setTimeout(tryShow, 200);
     const t2 = window.setTimeout(tryShow, 800);
     return () => {
@@ -46,12 +61,20 @@ export default function BoredPracticeDoneModal() {
     };
   }, []);
 
+  const roast = useMemo(() => {
+    const bank = guest ? GUEST_ROASTS : MEMBER_ROASTS;
+    const i =
+      recap?.runId != null
+        ? Math.abs(recap.runId) % bank.length
+        : Math.floor(Math.random() * bank.length);
+    return bank[i]!;
+  }, [guest, recap?.runId]);
+
   if (!open || !recap) return null;
 
   function leavePractice(href: string) {
     clearBoredPracticeDoneModal();
     setOpen(false);
-    // Always wipe practice so Home / Nav Picks cannot re-show the fake card
     void import("@/lib/bored-practice").then((m) => {
       m.exitBoredPracticeToLive();
       window.location.assign(href);
@@ -60,15 +83,6 @@ export default function BoredPracticeDoneModal() {
 
   function dismiss() {
     leavePractice("/");
-  }
-
-  function goRealPicks() {
-    leavePractice("/picks");
-  }
-
-  /** Close only — still leave practice so room links are real season */
-  function softCloseTo(href: string) {
-    leavePractice(href);
   }
 
   async function doItAgain() {
@@ -88,8 +102,6 @@ export default function BoredPracticeDoneModal() {
     setBusy(false);
   }
 
-  const unlocked = hasLockedPicksOnce(getSession()?.playerId);
-
   return (
     <div
       className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4"
@@ -108,22 +120,21 @@ export default function BoredPracticeDoneModal() {
           <BrandMark size={48} variant="force" className="rounded-lg" />
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
-              Fake week · you did a thing
+              Practice Mode · done
             </p>
             <h2
               id="bored-done-title"
               className="text-lg font-extrabold text-foreground leading-snug"
             >
-              Loop complete. Here&apos;s the real room.
+              {guest ? "Warmup complete." : "Loop complete."}
             </h2>
           </div>
         </div>
 
         <div className="px-5 py-4 space-y-4 text-sm text-muted leading-relaxed">
-          {/* Mini scoreboard — how scoring feels */}
           <div className="rounded-xl border border-border bg-black/40 px-4 py-3">
             <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary mb-2">
-              Final · against robots who don&apos;t care
+              Practice score · doesn&apos;t count
             </p>
             <div className="flex flex-wrap items-end justify-between gap-2">
               <div>
@@ -134,8 +145,7 @@ export default function BoredPracticeDoneModal() {
                   </span>
                 </p>
                 <p className="text-xs text-muted mt-0.5">
-                  {recap.correctCount}/{recap.games} correct · bots only · ego
-                  optional
+                  {recap.correctCount}/{recap.games} correct · practice only
                 </p>
               </div>
               <div className="text-right">
@@ -151,126 +161,99 @@ export default function BoredPracticeDoneModal() {
             </div>
           </div>
 
-          {/* Sample Gazette — how Monday paper feels */}
-          <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-amber-300">
-                Sample Gazette
-              </p>
-              <span className="text-[9px] font-bold uppercase tracking-wider text-amber-200/70">
-                Fake · still rude
-              </span>
-            </div>
-            <p className="text-sm font-black text-foreground leading-snug uppercase tracking-tight">
-              {recap.gazetteHeadline || "PRACTICE PAPER DROPS"}
-            </p>
-            <p className="text-xs text-foreground/85 leading-relaxed">
-              {recap.gazetteDeck ||
-                "After a real week, the commish scores and this paper hits Home."}
-            </p>
-            <p className="text-[11px] text-muted border-t border-amber-500/20 pt-2">
-              Real Gazette = crown, shame, freefalls, milk-carton no-locks.
-              Same energy. Louder. With your actual friends&apos; names.
-            </p>
-          </div>
-
-          {/* Board tease */}
-          <div className="rounded-xl border border-border bg-black/30 px-4 py-3 space-y-1.5">
-            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">
-              The Board after scores
-            </p>
-            <p className="text-xs text-foreground/90 leading-relaxed">
-              {recap.boardTease ||
-                "Standings update when results post. You just unlocked the Board path."}
-            </p>
-          </div>
-
-          {/* Here's how next week / the room feels */}
-          <div className="rounded-xl border border-primary/30 bg-primary/10 px-4 py-3 space-y-2">
-            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">
-              How a real week actually feels
-            </p>
-            <ul className="text-xs text-foreground/90 space-y-1.5">
-              <li>
-                <strong className="text-primary">My Picks</strong> — new card
-                drops; you lock before first kickoff or you eat zero. You just
-                practiced that.
-              </li>
-              <li>
-                <strong className="text-primary">Home</strong> — countdown,
-                who&apos;s in, then the paper when games die.
-              </li>
-              <li>
-                <strong className="text-primary">Gazette</strong> —
-                Sunday/Monday roast package. Front page energy. No soft landings.
-              </li>
-              <li>
-                <strong className="text-primary">The Board</strong> — season
-                standings + weekly swings
-                {unlocked
-                  ? " (you unlocked it, superstar)."
-                  : " — unlocked after this little practice lock."}
-              </li>
-              <li>
-                <strong className="text-primary">Locker</strong> — trash talk
-                while you wait. Use it. That&apos;s the point.
-              </li>
-            </ul>
-          </div>
-
-          <p className="text-[11px] text-muted">
-            Practice Mode only. Live card, real standings, and your friends&apos;
-            pride: untouched. Redo until Week 0 kickoff — then Practice Mode
-            closes for good.
+          <p className="text-sm font-semibold text-foreground leading-relaxed">
+            {roast}
           </p>
+
+          {!guest && (
+            <div className="rounded-xl border border-primary/30 bg-primary/10 px-4 py-3 space-y-2">
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">
+                How a real week feels
+              </p>
+              <ul className="text-xs text-foreground/90 space-y-1.5">
+                <li>
+                  <strong className="text-primary">This week</strong> — new
+                  card, lock before kickoff, or eat zero.
+                </li>
+                <li>
+                  <strong className="text-primary">Home</strong> — the room
+                  wakes up when scores post.
+                </li>
+                <li>
+                  <strong className="text-primary">Locker</strong> — trash talk
+                  with real names. That&apos;s the point.
+                </li>
+              </ul>
+            </div>
+          )}
+
+          {guest && (
+            <p className="text-xs text-muted leading-relaxed">
+              Guests observe. Members belong. Practice never counts as a real
+              season — your friends do.
+            </p>
+          )}
+
+          {!guest && (
+            <p className="text-[11px] text-muted">
+              Practice Mode only. Live card and real standings: untouched.
+            </p>
+          )}
         </div>
 
         <div className="px-5 py-4 border-t border-border flex flex-col gap-2">
-          <button
-            type="button"
-            onClick={goRealPicks}
-            className="w-full py-3.5 min-h-[48px] rounded-xl bg-primary text-black font-extrabold text-sm"
-          >
-            Open real season picks
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void doItAgain()}
-            className="w-full py-3 min-h-[48px] rounded-xl border border-amber-400/50 text-amber-100 font-bold text-sm disabled:opacity-50"
-          >
-            {busy ? "Cooking another fake week…" : "Do it again (fake only)"}
-          </button>
-          <div className="grid grid-cols-3 gap-2">
-            <button
-              type="button"
-              onClick={() => softCloseTo("/board")}
-              className="py-3 min-h-[44px] rounded-xl border border-border text-center text-[11px] font-bold text-foreground hover:border-primary/50 flex items-center justify-center"
-            >
-              Board
-            </button>
-            <button
-              type="button"
-              onClick={() => softCloseTo("/gazette")}
-              className="py-3 min-h-[44px] rounded-xl border border-amber-500/40 text-center text-[11px] font-bold text-amber-100 hover:border-amber-400/60 flex items-center justify-center"
-            >
-              Gazette
-            </button>
-            <button
-              type="button"
-              onClick={() => softCloseTo("/locker-room")}
-              className="py-3 min-h-[44px] rounded-xl border border-border text-center text-[11px] font-bold text-foreground hover:border-primary/50 flex items-center justify-center"
-            >
-              Locker
-            </button>
-          </div>
-          <button
-            type="button"
-            onClick={dismiss}
-            className="w-full py-2.5 text-sm font-semibold text-muted hover:text-foreground"
-          >
-            I&apos;m good · flee to Home
-          </button>
+          {guest ? (
+            <>
+              <GuestJoinCtas layout="stack" primary="create" />
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void doItAgain()}
+                className="w-full py-3 min-h-[48px] rounded-xl border border-amber-400/50 text-amber-100 font-bold text-sm disabled:opacity-50"
+              >
+                {busy ? "Cooking another practice week…" : "Practice again"}
+              </button>
+              <button
+                type="button"
+                onClick={dismiss}
+                className="w-full py-2.5 text-sm font-semibold text-muted hover:text-foreground"
+              >
+                Keep exploring
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => leavePractice("/")}
+                className="w-full py-3.5 min-h-[48px] rounded-xl bg-primary text-black font-extrabold text-sm"
+              >
+                Go to This Week →
+              </button>
+              <button
+                type="button"
+                onClick={() => leavePractice("/picks")}
+                className="w-full py-3 min-h-[48px] rounded-xl border border-primary/40 text-primary font-bold text-sm"
+              >
+                Return to My Picks
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void doItAgain()}
+                className="w-full py-3 min-h-[48px] rounded-xl border border-amber-400/50 text-amber-100 font-bold text-sm disabled:opacity-50"
+              >
+                {busy ? "Cooking another practice week…" : "Practice again"}
+              </button>
+              <button
+                type="button"
+                onClick={dismiss}
+                className="w-full py-2.5 text-sm font-semibold text-muted hover:text-foreground"
+              >
+                Keep exploring
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>
