@@ -27,7 +27,6 @@ import { resolveHomeChrome } from "@/lib/sports/home-chrome";
 import HomeSportAtmosphere from "@/components/HomeSportAtmosphere";
 import HomeSportHeader from "@/components/HomeSportHeader";
 import LeagueMembershipCard from "@/components/LeagueMembershipCard";
-import MultiLeagueHomeHub from "@/components/MultiLeagueHomeHub";
 import HomeRoomContext from "@/components/HomeRoomContext";
 import SoftUnlockBanner from "@/components/SoftUnlockBanner";
 import BoredLameSandboxCta from "@/components/BoredLameSandboxCta";
@@ -713,35 +712,22 @@ export default function Home() {
           </p>
         )}
 
-        {/* Deferred: multi-league + flavor — was competing with hero for bandwidth */}
-        {showSecondary && (
+        {/* Deferred flavor — League Hub lives only in the masthead */}
+        {showSecondary && !firstWeekChrome && (
           <>
-            {!firstWeekChrome && (
-              <>
-                <OpenRoomLeaveNudge />
-      <BetaLeagueBanner />
-              </>
-            )}
-            <MultiLeagueHomeHub
-              onSwitched={() => {
-                window.location.href = "/";
-              }}
-            />
-            {!firstWeekChrome && (
-              <>
-                <SportPoolPollBanner />
-      <HomeGazetteSpotlight />
-                <LockPicksRoast />
-      <PlayerWeekChecklist />
-                <HomeUnseenPulse />
-      <section className="mb-6">
-                  <HotTakeTicker variant="warroom" />
-      </section>
-                <section className="mb-8 sm:mb-10">
-      <CrownAndShame />
-                </section>
-              </>
-            )}
+            <OpenRoomLeaveNudge />
+            <BetaLeagueBanner />
+            <SportPoolPollBanner />
+            <HomeGazetteSpotlight />
+            <LockPicksRoast />
+            <PlayerWeekChecklist />
+            <HomeUnseenPulse />
+            <section className="mb-6">
+              <HotTakeTicker variant="warroom" />
+            </section>
+            <section className="mb-8 sm:mb-10">
+              <CrownAndShame />
+            </section>
           </>
         )}
 

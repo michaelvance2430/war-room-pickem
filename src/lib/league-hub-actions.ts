@@ -1,8 +1,12 @@
 /**
- * Home League Hub — sequential first-action resolver.
+ * Home League Hub — sequential first-action resolver + scan personality.
  *
  * Sequential means: the first incomplete task in workflow order wins.
  * Never invent urgency. If state cannot be determined reliably → ENTER.
+ *
+ * ENTER is not the default reward-for-loading. ENTER means caught up
+ * (or waiting with nothing actionable). The colored signal is the
+ * signature scan layer; the button still says the verb.
  */
 
 import { createClient } from "@/lib/supabase/client";
@@ -16,15 +20,33 @@ export type LeagueHubActionCode =
   | "FINISH_CARD"
   | "LOCK_CRYSTAL_BALL"
   | "LOCK_PICKS"
-  | "VIEW_RESULTS"
-  | "READ_GAZETTE"
   | "SET_WEEK"
   | "PUBLISH_WEEK"
-  | "REVIEW_RESULTS"
   | "ENTER";
+
+/**
+ * Signature UX signal — color + short phrase for at-a-glance scan.
+ * Button still carries the verb (Make Picks, Set Week, …).
+ */
+export type LeagueHubTone =
+  | "ready"
+  | "waiting"
+  | "commissioner"
+  | "prediction"
+  | "publish"
+  | "soon";
+
+export type LeagueHubSignal = {
+  tone: LeagueHubTone;
+  /** e.g. "Waiting — Make Picks" */
+  label: string;
+  /** emoji disc for scan */
+  emoji: string;
+};
 
 export type LeagueHubAction = {
   code: LeagueHubActionCode;
+  /** Button label — title case action */
   label: string;
   /** Path after league is active (switch first if needed) */
   href: string;
@@ -34,9 +56,10 @@ export type LeagueHubPulse = {
   leagueId: string;
   sportId: SportId;
   liveWeek: number | null;
-  /** Status line under league name */
-  statusLine: string;
+  /** Short week/status under league name, e.g. "Week 1" */
+  weekLine: string;
   action: LeagueHubAction;
+  signal: LeagueHubSignal;
   isHost: boolean;
 };
 
@@ -44,20 +67,47 @@ const ACTION_META: Record<
   LeagueHubActionCode,
   { label: string; href: string }
 > = {
-  MAKE_PICKS: { label: "MAKE PICKS", href: "/picks" },
-  FINISH_CARD: { label: "FINISH CARD", href: "/picks" },
-  LOCK_CRYSTAL_BALL: { label: "LOCK CRYSTAL BALL", href: "/crystal-ball" },
-  LOCK_PICKS: { label: "LOCK PICKS", href: "/picks" },
-  VIEW_RESULTS: { label: "VIEW RESULTS", href: "/board" },
-  READ_GAZETTE: { label: "READ GAZETTE", href: "/gazette" },
-  SET_WEEK: { label: "SET WEEK", href: "/commissioner?tab=card" },
-  PUBLISH_WEEK: { label: "PUBLISH WEEK", href: "/commissioner?tab=card" },
-  REVIEW_RESULTS: {
-    label: "REVIEW RESULTS",
-    href: "/commissioner?tab=results",
-  },
-  ENTER: { label: "ENTER", href: "/" },
+  MAKE_PICKS: { label: "Make Picks", href: "/picks" },
+  FINISH_CARD: { label: "Finish Card", href: "/picks" },
+  LOCK_CRYSTAL_BALL: { label: "Lock Crystal Ball", href: "/crystal-ball" },
+  LOCK_PICKS: { label: "Lock Picks", href: "/picks" },
+  SET_WEEK: { label: "Set Week", href: "/commissioner?tab=card" },
+  PUBLISH_WEEK: { label: "Publish Week", href: "/commissioner?tab=card" },
+  ENTER: { label: "Enter", href: "/" },
 };
+
+const SIGNALS: Record<
+  LeagueHubTone,
+  { emoji: string; phrase: (detail: string) => string }
+> = {
+  ready: { emoji: "🟢", phrase: (d) => (d ? `Ready — ${d}` : "Ready — Enter") },
+  waiting: {
+    emoji: "🟡",
+    phrase: (d) => (d ? `Waiting — ${d}` : "Waiting"),
+  },
+  commissioner: {
+    emoji: "🔵",
+    phrase: (d) => (d ? `Commissioner — ${d}` : "Commissioner"),
+  },
+  prediction: {
+    emoji: "🟣",
+    phrase: (d) =>
+      d ? `Prediction Needed — ${d}` : "Prediction Needed — Crystal Ball",
+  },
+  publish: {
+    emoji: "🟠",
+    phrase: (d) => (d ? d : "Ready to Publish"),
+  },
+  soon: {
+    emoji: "⚪",
+    phrase: (d) => (d ? d : "Coming Soon"),
+  },
+};
+
+function signalOf(tone: LeagueHubTone, detail = ""): LeagueHubSignal {
+  const s = SIGNALS[tone];
+  return { tone, emoji: s.emoji, label: s.phrase(detail) };
+}
 
 /** Commish FINISH CARD routes to build, player FINISH CARD to picks. */
 function actionOf(
@@ -90,19 +140,18 @@ export function isCrystalBallOpeningWeek(
   return false;
 }
 
-function enterPulse(
+function fallbackPulse(
   leagueId: string,
   sportId: SportId,
-  liveWeek: number | null,
-  isHost: boolean,
-  statusLine: string
+  isHost: boolean
 ): LeagueHubPulse {
   return {
     leagueId,
     sportId,
-    liveWeek,
-    statusLine,
+    liveWeek: null,
+    weekLine: "—",
     action: actionOf("ENTER"),
+    signal: signalOf("ready", "Enter"),
     isHost,
   };
 }
@@ -112,12 +161,10 @@ type FactBundle = {
   liveWeek: number | null;
   isHost: boolean;
   expectedGames: number;
-  /** week_cards row for live week */
   cardId: string | null;
   publishedAt: string | null;
   gameCount: number;
   hasProp: boolean;
-  /** player pick row */
   pickId: string | null;
   pickGameCount: number;
   pickHasProp: boolean;
@@ -155,7 +202,6 @@ async function loadFacts(
         ? Number((leagueRow as { current_week?: number }).current_week)
         : null;
     if (live != null && Number.isNaN(live)) live = null;
-    // NFL has no week 0
     if (live != null && sportId === "nfl" && live <= 0) live = 1;
 
     const expectedGames =
@@ -168,7 +214,8 @@ async function loadFacts(
     const crystalBallEnabled =
       typeof (leagueRow as { crystal_ball_enabled?: boolean } | null)
         ?.crystal_ball_enabled === "boolean"
-        ? !!(leagueRow as { crystal_ball_enabled?: boolean }).crystal_ball_enabled
+        ? !!(leagueRow as { crystal_ball_enabled?: boolean })
+            .crystal_ball_enabled
         : typeof m.crystalBallEnabled === "boolean"
           ? !!m.crystalBallEnabled
           : sportId === "cfb";
@@ -249,12 +296,8 @@ async function loadFacts(
       }
     }
 
-    // Crystal Ball: only query cloud for opening week when enabled
     let crystalBallSealed: boolean | null = null;
-    if (
-      crystalBallEnabled &&
-      isCrystalBallOpeningWeek(sportId, live)
-    ) {
+    if (crystalBallEnabled && isCrystalBallOpeningWeek(sportId, live)) {
       try {
         const { data: cb, error: cbErr } = await supabase
           .from("crystal_ball_picks")
@@ -263,7 +306,6 @@ async function loadFacts(
           .eq("user_id", uid)
           .maybeSingle();
         if (cbErr) {
-          // Table missing / RLS — do not invent a CB requirement
           crystalBallSealed = null;
         } else {
           crystalBallSealed = !!cb;
@@ -309,73 +351,58 @@ function pickIsComplete(f: FactBundle): boolean {
 }
 
 /**
- * Resolve sequential first action for one membership.
- * If facts fail to load → ENTER (no fake urgency).
+ * Resolve sequential first action + scan signal for one membership.
  */
 export function resolveLeagueHubAction(f: FactBundle): {
   action: LeagueHubAction;
-  statusLine: string;
+  weekLine: string;
+  signal: LeagueHubSignal;
 } {
-  const weekLabel =
-    f.liveWeek != null ? weekTitle(f.liveWeek, f.sportId) : null;
+  const weekLine =
+    f.liveWeek != null ? weekTitle(f.liveWeek, f.sportId) : "Not set";
 
   // ── Commissioner sequence (earliest blocking task) ──
   if (f.isHost) {
-    // 1. Current week not configured
-    if (f.liveWeek == null) {
+    if (f.liveWeek == null || !f.cardId) {
       return {
         action: actionOf("SET_WEEK"),
-        statusLine: "Commissioner setup incomplete",
+        weekLine: f.liveWeek == null ? "Commissioner" : weekLine,
+        signal: signalOf("commissioner", "Set Week"),
       };
     }
-    // No card at all for live week
-    if (!f.cardId) {
-      return {
-        action: actionOf("SET_WEEK"),
-        statusLine: `${weekLabel} · Commissioner setup incomplete`,
-      };
-    }
-    // 2. Card started but incomplete
     if (!cardIsComplete(f)) {
       return {
         action: actionOf("FINISH_CARD", { isHostCard: true }),
-        statusLine: `${weekLabel} · Card incomplete`,
+        weekLine,
+        signal: signalOf("commissioner", "Finish Card"),
       };
     }
-    // 3. Card complete but unpublished
     if (!f.publishedAt) {
       return {
         action: actionOf("PUBLISH_WEEK"),
-        statusLine: `${weekLabel} · Ready to publish`,
+        weekLine,
+        signal: signalOf("publish", "Ready to Publish"),
       };
     }
-    // 4. Results require commissioner action (only when we know scored=false)
-    // We cannot reliably know "games finished but unscored" without kickoff times.
-    // Skip inventing REVIEW RESULTS unless week_scored is false AND picks are locked
-    // for the room — too fuzzy; fall through to player sequence.
+    // Commish path clear → player sequence
   }
 
-  // ── Player sequence (also host after commish path is clear) ──
+  // ── Player sequence ──
   if (f.cardId && f.publishedAt) {
-    // 1. Weekly card not started
     if (!f.pickId || f.pickGameCount === 0) {
       return {
         action: actionOf("MAKE_PICKS"),
-        statusLine: weekLabel
-          ? `${weekLabel} · Picks missing`
-          : "Picks missing",
+        weekLine,
+        signal: signalOf("waiting", "Make Picks"),
       };
     }
-    // 2. Weekly card started but incomplete
     if (!pickIsComplete(f)) {
       return {
         action: actionOf("FINISH_CARD"),
-        statusLine: weekLabel
-          ? `${weekLabel} · Card incomplete`
-          : "Card incomplete",
+        weekLine,
+        signal: signalOf("waiting", "Finish Card"),
       };
     }
-    // 3. Opening-week Crystal Ball (authoritative cloud seal only)
     if (
       f.crystalBallEnabled &&
       isCrystalBallOpeningWeek(f.sportId, f.liveWeek) &&
@@ -383,59 +410,40 @@ export function resolveLeagueHubAction(f: FactBundle): {
     ) {
       return {
         action: actionOf("LOCK_CRYSTAL_BALL"),
-        statusLine: weekLabel
-          ? `${weekLabel} · Crystal Ball needed`
-          : "Crystal Ball needed",
+        weekLine,
+        signal: signalOf("prediction", "Crystal Ball"),
       };
     }
-    // 4. Picks submitted but not locked (separate lock step)
     if (pickIsComplete(f) && !f.lockedAt) {
       return {
         action: actionOf("LOCK_PICKS"),
-        statusLine: weekLabel
-          ? `${weekLabel} · Lock required`
-          : "Lock required",
+        weekLine,
+        signal: signalOf("waiting", "Lock Picks"),
       };
     }
-    // 5–6 VIEW RESULTS / READ GAZETTE — only when unread is authoritative.
-    // Skip: per-league gazette unread is session-scoped and localStorage;
-    // do not invent urgency across rooms.
-  }
 
-  // Host with published card, player work done
-  if (f.isHost && f.cardId && f.publishedAt && pickIsComplete(f) && f.lockedAt) {
+    // Caught up — ENTER is the reward
     return {
       action: actionOf("ENTER"),
-      statusLine: weekLabel
-        ? `${weekLabel} · Picks complete`
-        : "Picks complete",
+      weekLine,
+      signal: signalOf("ready", "Enter"),
     };
   }
 
-  if (f.lockedAt || pickIsComplete(f)) {
+  // Player: no published card yet — nothing to do
+  if (!f.isHost) {
     return {
       action: actionOf("ENTER"),
-      statusLine: weekLabel
-        ? `${weekLabel} · Picks complete`
-        : "Picks complete",
+      weekLine,
+      signal: signalOf("soon", "Coming Soon"),
     };
   }
 
-  // Published card missing → player waits (not MAKE PICKS)
-  if (f.isHost) {
-    // should have been caught above
-  } else if (!f.cardId || !f.publishedAt) {
-    return {
-      action: actionOf("ENTER"),
-      statusLine: weekLabel
-        ? `${weekLabel} · Waiting on card`
-        : "Waiting on card",
-    };
-  }
-
+  // Host fallthrough (shouldn't hit if sequence complete)
   return {
     action: actionOf("ENTER"),
-    statusLine: weekLabel || "Enter league",
+    weekLine,
+    signal: signalOf("ready", "Enter"),
   };
 }
 
@@ -453,34 +461,67 @@ export async function loadLeagueHubPulses(
       try {
         const facts = await loadFacts(m, uid);
         if (!facts) {
-          next[m.leagueId] = enterPulse(
-            m.leagueId,
-            sportId,
-            null,
-            isHost,
-            "Enter league"
-          );
+          next[m.leagueId] = fallbackPulse(m.leagueId, sportId, isHost);
           return;
         }
-        const { action, statusLine } = resolveLeagueHubAction(facts);
+        const { action, weekLine, signal } = resolveLeagueHubAction(facts);
         next[m.leagueId] = {
           leagueId: m.leagueId,
           sportId: facts.sportId,
           liveWeek: facts.liveWeek,
-          statusLine,
+          weekLine,
           action,
+          signal,
           isHost: facts.isHost,
         };
       } catch {
-        next[m.leagueId] = enterPulse(
-          m.leagueId,
-          sportId,
-          null,
-          isHost,
-          "Enter league"
-        );
+        next[m.leagueId] = fallbackPulse(m.leagueId, sportId, isHost);
       }
     })
   );
   return next;
+}
+
+/** Tailwind classes for tone dots / text accents */
+export function leagueHubToneClasses(tone: LeagueHubTone): {
+  text: string;
+  button: string;
+} {
+  switch (tone) {
+    case "ready":
+      return {
+        text: "text-emerald-300/90",
+        button:
+          "border border-emerald-500/40 text-emerald-100 hover:bg-emerald-500/10",
+      };
+    case "waiting":
+      return {
+        text: "text-amber-200/95",
+        button: "bg-primary text-black hover:opacity-90",
+      };
+    case "commissioner":
+      return {
+        text: "text-sky-300/95",
+        button:
+          "border border-sky-400/50 text-sky-100 bg-sky-500/10 hover:bg-sky-500/15",
+      };
+    case "prediction":
+      return {
+        text: "text-violet-300/95",
+        button:
+          "border border-violet-400/50 text-violet-100 bg-violet-500/15 hover:bg-violet-500/20",
+      };
+    case "publish":
+      return {
+        text: "text-orange-300/95",
+        button:
+          "border border-orange-400/50 text-orange-100 bg-orange-500/10 hover:bg-orange-500/15",
+      };
+    case "soon":
+    default:
+      return {
+        text: "text-muted",
+        button: "border border-border text-muted hover:text-foreground",
+      };
+  }
 }
