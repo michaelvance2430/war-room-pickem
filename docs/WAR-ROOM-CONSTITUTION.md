@@ -59,6 +59,24 @@ Not more *informed*.
 
 That is the magic. Information without investment is documentation. Investment is why people open the league again next August.
 
+### Guest Mode principle
+
+> **Convince someone in five minutes that War Room is worth joining.**
+
+That is the **mission** of Guest Mode — not “simulate every feature.”
+
+> **Guests observe. Members belong.**
+
+Restrictions are intentional membership, not broken software.  
+Every blocked guest action answers: *Why? What am I missing? How do I unlock it?*  
+Never permission-denied language. Always an invitation into a real league.
+
+Don’t only list what guests can’t do. Tell them what they’re **missing** — Locker, rivalries, crews, titles, everything that makes a league *theirs* — and how to unlock it by joining or creating.
+
+Quiet conversion close (no fireworks): *You’ve seen the app. The best part is your people.*
+
+See `docs/GUEST-MODE-EXPERIENCE-AUDIT.md`.
+
 ---
 
 ## Immersion principle

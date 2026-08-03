@@ -2,7 +2,7 @@
 
 **Status:** Audit + design only — **saved for later; no implementation yet**  
 **Date:** 2026-08-03  
-**Related:** Practice Mode (separate), Live League, login conversion  
+**Related:** Practice Mode (separate), Live League, login conversion, Constitution  
 **Trigger:** Friend guest hit Locker **Post** and experienced a silent / confusing failure
 
 ---
@@ -23,9 +23,12 @@ That mismatch reads as **broken**, not **preview**.
 
 ---
 
-## Purpose of Guest Mode (product)
+## Mission of Guest Mode (permanent product principle)
 
 > **Convince someone in five minutes that War Room is worth joining.**
+
+This is not a tagline for one screen.  
+It is the **mission** of the entire guest experience.
 
 Not:
 
@@ -39,33 +42,129 @@ Not:
 
 > “I want to see what this is like with my friends.”
 
-If guest leaves thinking “the app is broken,” Guest Mode failed.
+If guest leaves thinking “the app is broken,” Guest Mode failed.  
+If guest leaves thinking “I want this with my people,” Guest Mode succeeded.
 
 ---
 
-## Guest contract (proposed — post on entry)
+## Guiding philosophy
 
-The moment someone enters guest / demo, War Room should make **one simple promise**:
+> **Guests observe. Members belong.**
 
-> **You’re exploring War Room as a guest.**  
-> You can look around, try the pick experience, and feel the room.  
-> Social features like the Locker become available when you join a **real league**.
+Apply everywhere:
 
-Sticky chrome should reinforce the same contract (not only “DEMO · Week 9”).
+| Surface | Guest | Member |
+|---------|-------|--------|
+| **Locker** | Can read / feel the vibe | Talk trash |
+| **Board** | See how it works | Become part of the story |
+| **Standings** | See examples | Earn their place |
+| **Titles / trophies** | Browse | Earn |
+| **Crews / rivalries** | Glimpse | Live them |
+
+Every restriction should feel **intentional membership**, not a broken feature.
+
+---
+
+## Guest contract (aspirational — backstage pass)
+
+Don’t only say what they *are*.  
+Create aspiration: what they’re *getting a taste of*, and what **unlocks with real people**.
+
+### Entry welcome (proposed)
+
+```text
+👋 Welcome to War Room
+
+You're checking out War Room as a guest.
+
+Look around.
+Make some practice picks.
+See what football season feels like here.
+
+The social side—Locker, rivalries, crews, titles, and everything
+that makes your league yours—unlocks when you join or create
+a real league.
+
+[ Join a League ]    [ Create My League ]
+```
+
+**Copy law:**
+
+- Don’t lead with what they **can’t** do.  
+- Tell them what they’re **missing** — and how to unlock it.  
+- Frame as invitation into tradition, not account wall.
+
+Sticky chrome should reinforce: **Guest · exploring** (not only “DEMO · Week 9”).
+
+---
+
+## Blocked-action triad (required)
+
+Every blocked guest action answers **three questions**:
+
+1. **Why can’t I do this?**  
+2. **What am I missing?**  
+3. **How do I unlock it?**
+
+### Example — Locker Post (no error language)
+
+```text
+🔒 The Locker comes alive with real league members.
+
+You're exploring as a guest, so posting is disabled.
+
+Join a league and start the trash talk.
+
+[ Join a League → ]
+```
+
+**Never:**
+
+- Red “permission denied”  
+- Supabase / RLS / muted (unless truly muted as a real member)  
+- “Not signed in” as the only story  
+- Raw schema / SQL messages  
+
+A block is **another invitation into the experience**, not an error.
+
+---
+
+## Quiet conversion close (not fireworks)
+
+After they’ve explored a while (time and/or key surfaces visited), offer a **quiet** screen — no confetti, no Moments fireworks:
+
+```text
+You've seen the app.
+
+The best part isn't the app.
+It's your people.
+
+Ready to start your own War Room?
+
+[ Create My League ]
+[ Join a League ]
+```
+
+Matches constitution:
+
+> **Football is the excuse. Relationships are the product.**
+
+You’re not asking them to “create an account.”  
+You’re inviting them to **start a tradition with their friends**.
 
 ---
 
 ## Theme-park model
 
-| Can (preview rides) | Cannot (real ownership) |
-|---------------------|-------------------------|
-| ✅ Walk around (Home, Board, Standings, Picks, Gazette views) | ❌ Own a permanent locker identity |
-| ✅ Feel atmosphere (bots, mock drama, demo board) | ❌ Post real Locker messages |
-| ✅ Try local picks / demo card flows | ❌ Earn permanent rewards / career |
-| ✅ Tour host tools in demo role | ❌ Affect real players or real rooms |
-| ✅ Switch demo Player / Commish seat | ❌ Cloud social / real memberships |
+| Can (preview rides) | Belonging (members) |
+|---------------------|---------------------|
+| ✅ Walk around (Home, Board, Standings, Picks, Gazette views) | Own a locker identity |
+| ✅ Feel atmosphere (bots, mock drama, demo board) | Post real Locker messages |
+| ✅ Try local picks / demo card flows | Earn permanent rewards / career |
+| ✅ Tour host tools in demo role | Affect real friends / real rooms |
+| ✅ Switch demo Player / Commish seat | Cloud social / real memberships |
 
-OK — **as long as it’s obvious.**
+OK — **as long as the contract is obvious and every block is an invitation.**
 
 ---
 
@@ -142,26 +241,13 @@ Guest hits real Supabase path → RLS/auth failure → sounds like “you’re m
 
 ## Desired restriction UX (design)
 
-Never fail silently or with wrong story.
+See **Blocked-action triad** above. Summary:
 
-### Example — Locker Post
+1. Why can’t I?  
+2. What am I missing?  
+3. How do I unlock?  
 
-```text
-🔒 Locker messages are part of a real league.
-
-Join a league to start talking trash.
-
-[ Join a League ]   [ Create My League ]
-```
-
-Optional tertiary: “Keep exploring demo”
-
-### Pattern for every blocked action
-
-1. **What** is blocked (human language)  
-2. **Why** (guest / real league)  
-3. **Next step** toward conversion  
-4. Never “muted,” “RLS,” “not set up,” “Not signed in” unless literally true for a real account
+Optional tertiary: “Keep exploring” — never only a dead end.
 
 ---
 
@@ -199,13 +285,14 @@ Rules:
 
 | Priority | Work |
 |----------|------|
-| P0 | Guest contract copy on entry + sticky bar |
-| P0 | `postLockerMessage` (+ any social write) guest branch with join CTAs |
-| P1 | Capability map in chrome (“Exploring · social unlocks when you join”) |
-| P1 | Soften “click everything” → accurate promise |
-| P2 | Guest Locker read-only with sample trash + “Join to reply” |
-| P2 | Conversion moments after first demo lock / after touring Board |
-| P3 | Foundry: Guest Mode lab (preview contract, blocked actions list) |
+| P0 | Aspirational guest contract on entry (backstage pass + Join/Create) |
+| P0 | Sticky: Guest · exploring (not only DEMO week) |
+| P0 | `postLockerMessage` (+ social writes) guest triad UI — invitation, not error |
+| P1 | Apply triad pattern to every guest write path |
+| P1 | Kill “Safe to click everything” overpromise |
+| P2 | Guest Locker: observe (read) · members belong (post) |
+| P2 | Quiet conversion close after explore (relationships framing) |
+| P3 | Foundry: Guest Mode lab (contract, blocked list, conversion funnel) |
 
 **Do not implement until Mike approves.**  
 Saved for return.
@@ -242,3 +329,19 @@ After five minutes as guest, the person should think:
 Not:
 
 > “Is the app broken?”
+
+War Room’s differentiator vs typical apps:
+
+- Not broken demo.  
+- Not forced signup wall first.  
+- **“Come in. Look around. See what makes this place special.”**  
+- Convert because they *want* to join a tradition — not because they hit a paywall or an error.
+
+---
+
+## Design amendment log
+
+| Date | Note |
+|------|------|
+| 2026-08-03 | Initial audit (identity problem, Locker path) |
+| 2026-08-03 | Mission elevated; *Guests observe. Members belong.*; aspirational contract; blocked-action triad; quiet conversion close |
