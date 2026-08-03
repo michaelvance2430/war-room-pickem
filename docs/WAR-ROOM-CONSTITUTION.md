@@ -2,6 +2,10 @@
 
 *Stubborn. Not optional. Not marketing.*
 
+> **Architecture freeze (2026-08-03):** Philosophy phase complete.  
+> Source of truth and working agreement: `docs/PRODUCT-ARCHITECTURE-FREEZE.md`  
+> Execute the vision. Do not quietly redefine it.
+
 ---
 
 ## The War Room Promise

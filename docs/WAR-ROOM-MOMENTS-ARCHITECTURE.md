@@ -1,8 +1,9 @@
 # Promote "War Room Moments" to a Core Product System
 
-**Status:** Architecture decision — **approved as direction; design package complete; no code yet**  
+**Status:** Architecture decision — **FROZEN with product architecture package**  
 **Date:** 2026-08-03  
 **Audience:** Founder + implementers  
+**Freeze:** `docs/PRODUCT-ARCHITECTURE-FREEZE.md`  
 
 ### Design package (define traditions before implementing the first one)
 
