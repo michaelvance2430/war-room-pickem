@@ -47,8 +47,8 @@ export default function BoredLameSandboxCta() {
   const openLabel = weekTitle(first, sportId);
   const sub =
     first === 0
-      ? "Dies at Week 0 kickoff. Practice Mode until then."
-      : `Dies at ${openLabel} kickoff. Practice Mode until then.`;
+      ? "Available until Week 0 kickoff."
+      : `Available until ${openLabel} kickoff.`;
 
   async function onBored() {
     setNote(null);
@@ -94,8 +94,7 @@ export default function BoredLameSandboxCta() {
         {sub}
       </p>
       <p className="text-[10px] text-muted/80 text-center mt-1.5 leading-relaxed max-w-sm mx-auto">
-        Practice Mode only — nothing hits a real league. Lock → we grade it →
-        you see how a week ends. Break it. Redo it.
+        Nothing hits a real league. Lock, grade, see how a week ends.
       </p>
       {note && (
         <p className="text-xs text-primary text-center mt-3 font-medium leading-relaxed">

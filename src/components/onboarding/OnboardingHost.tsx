@@ -30,54 +30,11 @@ import { maybeStartOnboarding } from "@/lib/onboarding/start";
 import { prepareNavigation } from "@/lib/smooth";
 
 /**
- * Slim coach strip only when global PracticeModeChrome is not already up.
- * Same Practice Mode identity (amber) — never a second sky “mode” language.
+ * No second Practice banner — PracticeModeChrome is the only product cue.
+ * Coach conversation handles “follow the guide” without re-stating practice.
  */
 function PracticeStrip() {
-  const [chromeOwns, setChromeOwns] = useState(false);
-
-  useEffect(() => {
-    function sync() {
-      try {
-        // Dynamic import path avoided — mirror bored-practice keys cheaply
-        const active =
-          localStorage.getItem("warroom-bored-practice-active-v1") != null;
-        const sp = new URLSearchParams(window.location.search);
-        const url =
-          sp.get("practice") === "1" || sp.get("week") === "99";
-        setChromeOwns(active || url);
-      } catch {
-        setChromeOwns(false);
-      }
-    }
-    sync();
-    window.addEventListener("warroom-practice-mode", sync);
-    window.addEventListener("popstate", sync);
-    return () => {
-      window.removeEventListener("warroom-practice-mode", sync);
-      window.removeEventListener("popstate", sync);
-    };
-  }, []);
-
-  // Global PracticeModeChrome already shows identity + Return to Live League
-  if (chromeOwns) return null;
-
-  return (
-    <div className="fixed top-0 inset-x-0 z-[56] pointer-events-none">
-      <div
-        className="mx-auto max-w-lg px-3 pt-[max(0.35rem,env(safe-area-inset-top))]"
-      >
-        <div className="pointer-events-none rounded-b-lg border border-t-0 border-amber-400/45 bg-amber-950/90 backdrop-blur-md px-3 py-1.5 flex items-center justify-between gap-2 shadow-lg">
-          <p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-amber-300">
-            Practice Mode
-          </p>
-          <p className="text-[10px] text-amber-100/80 truncate">
-            Nothing here affects your real league · Follow the guide
-          </p>
-        </div>
-      </div>
-    </div>
-  );
+  return null;
 }
 
 /** Point at bottom nav — player drives, coach only guides attention */

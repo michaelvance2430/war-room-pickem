@@ -9,12 +9,25 @@
 
 | Item | Where |
 |------|--------|
-| Global **Practice Mode** chrome + Return to My League | `PracticeModeChrome`, layout |
+| Global **Practice** chrome + Return to Live League | `PracticeModeChrome`, layout |
 | `EVENT_PRACTICE_MODE` on start/exit | `bored-practice.ts` |
 | No **Trial sandbox** league rename | `PicksClient` keeps real league name |
-| Practice card / Practice Mode copy | Picks banners + lock CTA |
 | Sticky practice (no silent wipe on bare `/picks`) | `PicksClient` restores practice URL |
-| Onboarding strip aligns / defers to global chrome | `OnboardingHost` |
+
+### Graduation (shipped)
+
+**Teach once. Trust the player.**
+
+Practice is a **state** (data isolation + trust promise), not a product that constantly announces itself.
+
+| Keep | Remove |
+|------|--------|
+| One calm top banner (`PracticeModeChrome`) | Picks “Practice Mode · practice card” panel |
+| One **Return to Live League** | `PRACTICE · NOT LIVE` / dual exits on Picks |
+| Soft “I’m Bored” entry intent | Onboarding second Practice strip |
+| Done modal as recap, not re-branding | “fake week” lock CTAs |
+
+Entry intent (“I’m Bored”) is enough. After guided lesson + one practice run, the player should feel like they are playing War Room—not using a training simulator.
 
 ---
 

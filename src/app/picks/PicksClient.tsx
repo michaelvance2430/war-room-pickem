@@ -171,14 +171,6 @@ export default function PicksClient() {
   hasCardRef.current = hasCard;
   savingRef.current = saving;
 
-  /** Hard leave practice — wipe client practice state and go live. */
-  const leavePractice = useCallback((href: string) => {
-    void import("@/lib/bored-practice").then((m) => {
-      m.exitBoredPracticeToLive();
-      window.location.assign(href);
-    });
-  }, []);
-
   const loadPicksIntoState = useCallback(
     async (cloud: CloudCard, week: number) => {
       const mine = await loadMyPicks(week);
@@ -665,9 +657,7 @@ export default function PicksClient() {
         setPublishedWeeks([]);
         setScoredWeeks([]);
         setLoadError(null);
-        setCardNotice(
-          "Practice card — private to you. Nothing hits the real league."
-        );
+        setCardNotice(null);
         setChaosArmed(false);
         setChaosLockedWeek(false);
         setChaosConfirm(false);
@@ -1465,36 +1455,6 @@ export default function PicksClient() {
       </div>
         )}
 
-        {practiceMode && (
-          <div className="mb-4 rounded-xl border-2 border-dashed border-amber-400/70 bg-amber-500/10 px-4 py-3.5 space-y-3">
-      <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-300 mb-1">
-                Practice Mode · practice card
-              </p>
-              <p className="text-xs sm:text-sm text-foreground/90 leading-relaxed">
-                {practiceScored || saved
-                  ? "Graded on this device only. Real standings never noticed. Use Return to Live League when you're done practicing."
-                  : "Private practice card. Lock it; we grade it on your phone only. Real week cards and standings stay untouched."}
-              </p>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <button
-                type="button"
-                onClick={() => leavePractice("/")}
-                className="min-h-[48px] px-4 rounded-xl bg-primary text-black text-sm font-extrabold touch-manipulation"
-              >
-                Return to Live League
-              </button>
-              <button
-                type="button"
-                onClick={() => leavePractice("/picks")}
-                className="min-h-[48px] px-4 rounded-xl border border-amber-400/50 text-amber-100 text-sm font-bold touch-manipulation"
-              >
-                Exit → real picks
-              </button>
-            </div>
-          </div>
-        )}
 
         {quietPicks && !practiceMode && weekEditable && hasCard && !cardFrozen && (
           <div className="mb-4 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-xs text-muted leading-relaxed">
@@ -1746,43 +1706,35 @@ export default function PicksClient() {
           </div>
         )}
 
-        {/* Crystal-clear week banner — practice vs live never share chrome */}
+        {/* Week banner — practice uses normal card chrome; identity lives in PracticeModeChrome only */}
         <div
           className={`rounded-xl border px-4 py-3 mb-4 ${
-            practiceMode
-              ? "border-2 border-dashed border-amber-400/70 bg-amber-500/10"
-              : weekEditable
-                ? chaosArmed || chaosLockedWeek
-                  ? "border-orange-500/50 bg-orange-500/10"
-                  : "border-primary/50 bg-primary/10"
-                : "border-border bg-card"
+            weekEditable
+              ? chaosArmed || chaosLockedWeek
+                ? "border-orange-500/50 bg-orange-500/10"
+                : "border-primary/50 bg-primary/10"
+              : "border-border bg-card"
           }`}
         >
-      <div className="flex flex-wrap items-center gap-2 mb-1">
+          <div className="flex flex-wrap items-center gap-2 mb-1">
             <span
               className={`text-[10px] font-bold uppercase tracking-[0.2em] ${
-                practiceMode
-                  ? "text-amber-300"
-                  : weekEditable
-                    ? "text-primary"
-                    : "text-muted"
+                weekEditable ? "text-primary" : "text-muted"
               }`}
             >
-              {practiceMode
-                ? practiceScored || saved
-                  ? "Practice · finished · not the season"
-                  : "Practice · go cook · not the season"
-                : weekEditable
-                  ? "You are cooking"
+              {weekEditable
+                ? "You are cooking"
+                : practiceMode && (practiceScored || saved)
+                  ? "Card graded"
                   : "Just looking"}
             </span>
-            {practiceMode ? (
-              <span className="text-xs px-2 py-0.5 rounded-full border border-amber-400/60 text-amber-100 font-semibold bg-amber-500/15">
-                PRACTICE · NOT LIVE
-              </span>
-            ) : weekEditable ? (
+            {weekEditable ? (
               <span className="text-xs px-2 py-0.5 rounded-full bg-primary text-black font-semibold">
-                LIVE SEASON
+                {practiceMode ? "OPEN" : "LIVE SEASON"}
+              </span>
+            ) : practiceMode && (practiceScored || saved) ? (
+              <span className="text-xs px-2 py-0.5 rounded-full border border-border text-muted">
+                DONE
               </span>
             ) : (
               <span className="text-xs px-2 py-0.5 rounded-full border border-border text-muted">
@@ -1790,18 +1742,18 @@ export default function PicksClient() {
               </span>
             )}
           </div>
-      <h1 className="text-2xl font-bold">
+          <h1 className="text-2xl font-bold">
             {practiceMode
               ? practiceScored || saved
-                ? "Practice week — you survived"
-                : "Practice week picks"
+                ? "Your card — graded"
+                : "Your picks"
               : `${weekTitle(viewWeek)}${weekEditable ? " Picks" : " — your card"}`}
           </h1>
-      <p className="text-sm text-muted mt-1">
+          <p className="text-sm text-muted mt-1">
             {practiceMode
               ? practiceScored || saved
-                ? "Graded on your phone only. Real standings never noticed. Return to Live League for your real card."
-                : "Private practice. Lock when ready — we grade it and show how the room wakes up."
+                ? "Local grade only — real standings never saw this."
+                : "Lock when ready. We grade it here and show how a week ends."
               : `${leagueName ? `${leagueName} · ` : ""}${
                   weekEditable
                     ? missedLockWindow
@@ -2387,41 +2339,13 @@ export default function PicksClient() {
             </div>
 
             {practiceMode && (practiceScored || saved) ? (
-              <div className="rounded-xl border-2 border-dashed border-amber-400/60 bg-amber-500/10 px-4 py-4 space-y-2 text-center">
-      <p className="text-sm font-bold text-foreground">
-                  Practice card graded
-                  {weekScoredAt
-                    ? ` · ${Object.keys(weekResults).length} games roasted`
-                    : ""}
-                </p>
-                <p className="text-xs text-muted leading-relaxed">
-                  Practice is over for this run. Return to Live League for live
-                  picks — or peek the Board (leaves Practice Mode).
-                </p>
-                <div className="flex flex-col sm:flex-row gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => leavePractice("/")}
-                    className="flex-1 py-3 min-h-[48px] rounded-xl bg-primary text-black text-sm font-extrabold flex items-center justify-center touch-manipulation"
-                  >
-                    Return to Live League
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => leavePractice("/picks")}
-                    className="flex-1 py-3 min-h-[48px] rounded-xl border border-amber-400/50 text-amber-100 text-sm font-bold flex items-center justify-center touch-manipulation"
-                  >
-                    Real picks
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => leavePractice("/board")}
-                    className="flex-1 py-3 min-h-[48px] rounded-xl border border-border text-sm font-bold text-foreground flex items-center justify-center touch-manipulation"
-                  >
-                    Peek Board
-                  </button>
-                </div>
-              </div>
+              <p className="text-center text-sm text-muted py-3 rounded-xl border border-dashed border-border">
+                Card graded
+                {weekScoredAt
+                  ? ` · ${Object.keys(weekResults).length} games`
+                  : ""}
+                . Use the banner above when you&apos;re ready to leave.
+              </p>
             ) : weekEditable || (practiceMode && !saved) ? (
               <div className="phone-sticky-action">
       <button
@@ -2432,7 +2356,7 @@ export default function PicksClient() {
                 >
                   {saving
                     ? practiceMode
-                      ? "Grading your fake week…"
+                      ? "Grading…"
                       : "Locking…"
                     : fullyLocked || chaosLockedWeek
                       ? chaosLockedWeek
@@ -2443,7 +2367,7 @@ export default function PicksClient() {
                         : saved
                           ? "Update open picks"
                           : practiceMode
-                            ? "Lock & finish this fake week"
+                            ? "Lock it in"
                             : "Lock it in"}
                 </button>
                 {!allGamesPicked && !fullyLocked && (

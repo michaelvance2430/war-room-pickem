@@ -1,9 +1,9 @@
 "use client";
 
 /**
- * Global Practice Mode identity — customer-safe training chrome.
- * Only when I'm Bored / onboarding practice (bored-practice) is active.
- * Never Foundry / hop / lab language. Exit: Return to Live League.
+ * Single persistent Practice indicator.
+ * Teach once. Trust the player. Don't plaster "practice" across every surface.
+ * Trust promise: nothing here affects your real league.
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -51,42 +51,30 @@ export default function PracticeModeChrome() {
 
   if (!active) return null;
 
-  function exit(href: string) {
+  function exit() {
     exitBoredPracticeToLive();
-    window.location.assign(href);
+    window.location.assign("/");
   }
 
   return (
     <div
-      className="sticky top-0 z-[58] border-b-2 border-amber-400/60 bg-amber-950/95 backdrop-blur-md shadow-lg"
+      className="sticky top-0 z-[58] border-b border-amber-400/40 bg-amber-950/90 backdrop-blur-md"
       data-practice-chrome="1"
       role="status"
     >
-      <div className="max-w-3xl mx-auto px-3 py-2 flex flex-wrap items-center justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-300">
-            Practice Mode
-          </p>
-          <p className="text-[11px] sm:text-xs text-amber-50/90 leading-snug">
-            Nothing here affects your real league.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-1.5 shrink-0">
-          <button
-            type="button"
-            onClick={() => exit("/")}
-            className="min-h-[40px] px-3 py-1.5 rounded-lg bg-primary text-black text-[11px] font-extrabold"
-          >
-            Return to Live League
-          </button>
-          <button
-            type="button"
-            onClick={() => exit("/picks")}
-            className="min-h-[40px] px-3 py-1.5 rounded-lg border border-amber-400/50 text-amber-100 text-[11px] font-bold"
-          >
-            Exit → real picks
-          </button>
-        </div>
+      <div className="max-w-3xl mx-auto px-3 py-2 flex items-center justify-between gap-3">
+        <p className="text-[11px] sm:text-xs text-amber-100/90 leading-snug min-w-0">
+          <span className="font-bold text-amber-300">Practice</span>
+          {" · "}
+          Nothing here affects your real league.
+        </p>
+        <button
+          type="button"
+          onClick={exit}
+          className="shrink-0 min-h-[40px] px-3 py-1.5 rounded-lg bg-primary text-black text-[11px] font-extrabold touch-manipulation"
+        >
+          Return to Live League
+        </button>
       </div>
     </div>
   );

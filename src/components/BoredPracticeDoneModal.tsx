@@ -120,13 +120,13 @@ export default function BoredPracticeDoneModal() {
           <BrandMark size={48} variant="force" className="rounded-lg" />
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
-              Practice Mode · done
+              Warmup complete
             </p>
             <h2
               id="bored-done-title"
               className="text-lg font-extrabold text-foreground leading-snug"
             >
-              {guest ? "Warmup complete." : "Loop complete."}
+              {guest ? "Not bad for practice." : "You get the idea."}
             </h2>
           </div>
         </div>
@@ -134,7 +134,7 @@ export default function BoredPracticeDoneModal() {
         <div className="px-5 py-4 space-y-4 text-sm text-muted leading-relaxed">
           <div className="rounded-xl border border-border bg-black/40 px-4 py-3">
             <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary mb-2">
-              Practice score · doesn&apos;t count
+              Your card
             </p>
             <div className="flex flex-wrap items-end justify-between gap-2">
               <div>
@@ -145,7 +145,7 @@ export default function BoredPracticeDoneModal() {
                   </span>
                 </p>
                 <p className="text-xs text-muted mt-0.5">
-                  {recap.correctCount}/{recap.games} correct · practice only
+                  {recap.correctCount}/{recap.games} correct
                 </p>
               </div>
               <div className="text-right">
@@ -156,7 +156,7 @@ export default function BoredPracticeDoneModal() {
                     of {recap.botField}
                   </span>
                 </p>
-                <p className="text-[11px] text-muted">vs practice bots</p>
+                <p className="text-[11px] text-muted">vs bots</p>
               </div>
             </div>
           </div>
@@ -187,18 +187,6 @@ export default function BoredPracticeDoneModal() {
             </div>
           )}
 
-          {guest && (
-            <p className="text-xs text-muted leading-relaxed">
-              Guests observe. Members belong. Practice never counts as a real
-              season — your friends do.
-            </p>
-          )}
-
-          {!guest && (
-            <p className="text-[11px] text-muted">
-              Practice Mode only. Live card and real standings: untouched.
-            </p>
-          )}
         </div>
 
         <div className="px-5 py-4 border-t border-border flex flex-col gap-2">
