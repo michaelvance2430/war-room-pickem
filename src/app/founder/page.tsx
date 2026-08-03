@@ -39,6 +39,7 @@ import {
 } from "@/lib/founder-league-health";
 import FoundryPlatformApiUsage from "@/components/FoundryPlatformApiUsage";
 import SandboxHopOptIn from "@/components/SandboxHopOptIn";
+import WeeklyColdOpenModal from "@/components/WeeklyColdOpenModal";
 
 type Light = "green" | "yellow" | "red";
 
@@ -93,31 +94,6 @@ export default function FounderDashboardPage() {
   const [fleetBusy, setFleetBusy] = useState(false);
   const [fleetError, setFleetError] = useState<string | null>(null);
   const [enterBusy, setEnterBusy] = useState<string | null>(null);
-  /** Season Cold Open card — Available | Watched | Locked (live window + local seen) */
-  const [coldOpenStatus, setColdOpenStatus] = useState<
-    "available" | "watched" | "locked"
-  >("locked");
-
-  const refreshColdOpenStatus = useCallback(() => {
-    void import("@/lib/weekly-cold-open").then((m) => {
-      void import("@/lib/prior-season-seed").then(({ PRIOR_SEASON_YEAR }) => {
-        const session = getSession();
-        const league = getLeague();
-        const windowOpen = m.isWeeklyColdOpenWindowOpen(league?.sportId);
-        const seen =
-          !!session?.playerId &&
-          !!league?.id &&
-          m.hasSeenWeeklyColdOpen(
-            session.playerId,
-            league.id,
-            PRIOR_SEASON_YEAR
-          );
-        if (seen) setColdOpenStatus("watched");
-        else if (windowOpen) setColdOpenStatus("available");
-        else setColdOpenStatus("locked");
-      });
-    });
-  }, []);
 
   const refresh = useCallback(async () => {
     const session = getSession();
@@ -195,7 +171,6 @@ export default function FounderDashboardPage() {
 
   useEffect(() => {
     void refresh();
-    refreshColdOpenStatus();
     setEyes(getCreatorEyesMode());
     function onEyes() {
       setEyes(getCreatorEyesMode());
@@ -210,7 +185,7 @@ export default function FounderDashboardPage() {
       }, 200);
     }
     return () => window.removeEventListener(EVENT_CREATOR_EYES, onEyes);
-  }, [refresh, refreshColdOpenStatus]);
+  }, [refresh]);
 
   function setPlayWeek(w: number) {
     const n = Math.max(0, Math.min(22, Math.floor(w)));
@@ -326,15 +301,12 @@ export default function FounderDashboardPage() {
       return;
     }
     if (kind === "cold") {
-      // Stay on Foundry — one Moments engine (MomentHost), not a separate route
       void import("@/lib/weekly-cold-open").then((m) => {
         m.requestWeeklyColdOpenPreview();
       });
       setLabLog(
-        "✅ Season Cold Open — cinematic from War Room Moments (MomentHost)."
+        "✅ Season Cold Open — stays open until you close · sticky ✕ · article scrolls · background frozen."
       );
-      // Preview does not burn seen; re-read status for the card badge
-      window.setTimeout(() => refreshColdOpenStatus(), 400);
       return;
     }
     void import("@/lib/creator-sandbox").then(async (sb) => {
@@ -906,42 +878,38 @@ export default function FounderDashboardPage() {
                 </div>
               </div>
 
-              {/* Season Cold Open — sole entry point (not a standalone Foundry feature) */}
-              <div className="rounded-xl border border-amber-400/45 bg-amber-500/10 p-3 space-y-2.5">
+              {/* Season Cold Open — sole War Room Moments test surface */}
+              <div
+                id="war-room-moments"
+                className="rounded-xl border border-amber-400/50 bg-amber-500/10 p-3 space-y-2.5 scroll-mt-24"
+              >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="text-sm font-extrabold text-foreground leading-tight">
-                      🎬 Season Cold Open
+                    <p className="text-[10px] font-black uppercase tracking-wide text-amber-300">
+                      War Room Moments · 01
+                    </p>
+                    <p className="text-sm font-extrabold text-foreground leading-tight uppercase tracking-wide">
+                      Season Cold Open
                     </p>
                     <p className="text-[11px] text-muted mt-0.5 leading-snug">
-                      Preseason wanted package on last year&apos;s champ. Once per
-                      player · week before open. CFB inaugural pack locked.
+                      Cinematic heat on last year&apos;s champ. Read the whole
+                      piece — stays open until you close it.
                     </p>
                   </div>
-                  <span
-                    className={
-                      coldOpenStatus === "available"
-                        ? "shrink-0 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-black uppercase tracking-wide px-2 py-0.5"
-                        : coldOpenStatus === "watched"
-                          ? "shrink-0 rounded-full bg-sky-500/20 text-sky-300 text-[10px] font-black uppercase tracking-wide px-2 py-0.5"
-                          : "shrink-0 rounded-full bg-muted/40 text-muted text-[10px] font-black uppercase tracking-wide px-2 py-0.5"
-                    }
-                  >
-                    {coldOpenStatus === "available"
-                      ? "Available"
-                      : coldOpenStatus === "watched"
-                        ? "Watched"
-                        : "Locked"}
+                  <span className="shrink-0 rounded-full bg-amber-400/25 text-amber-200 text-[10px] font-black uppercase tracking-wide px-2 py-0.5">
+                    Ready for Mike to Test
                   </span>
                 </div>
                 <button
                   type="button"
                   onClick={() => jumpPopup("cold")}
-                  className="w-full py-2.5 min-h-[44px] rounded-lg bg-amber-400 text-black text-xs font-extrabold touch-manipulation active:scale-[0.99] hover:bg-amber-300"
+                  className="w-full py-3 min-h-[48px] rounded-lg bg-amber-400 text-black text-sm font-extrabold touch-manipulation active:scale-[0.99] hover:bg-amber-300"
                 >
-                  {coldOpenStatus === "watched" ? "▶ Replay" : "▶ Watch"}
+                  Test Moment
                 </button>
               </div>
+              {/* forceOnly: present Cold Open without mounting other Moments */}
+              <WeeklyColdOpenModal forceOnly />
               <button
                 type="button"
                 onClick={() => {
