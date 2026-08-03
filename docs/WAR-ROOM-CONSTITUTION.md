@@ -431,6 +431,8 @@ War Room Moments are how those relationships become annual traditions.
 War Room should not be remembered because of features.  
 It should be remembered because of **moments**.
 
+**Tier I Traditions** are governed by **Traditions Are Sacred** (above): frozen once shipped; founder test before any change; living systems iterate, traditions endure.
+
 ### Purpose
 
 A **Moment** is a player-facing emotional beat that players might remember a month later.
