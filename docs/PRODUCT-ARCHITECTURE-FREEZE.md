@@ -135,6 +135,18 @@ The architecture phase is complete.
 
 **Move into implementation.**
 
+### Execution status (living)
+
+| Order | Focus | Status |
+|-------|--------|--------|
+| P0.1 | Trust & Identity (Guest / Practice / Story / Chrome) | ✅ **Accepted** — lessons: `docs/P0-TRUST-AND-IDENTITY-LESSONS.md` |
+| P0.2 | **League (Host) Dashboard** polish | **Next** |
+| P0.3 | Season Opening Moment | Queued |
+| P0.4 | War Room Moments framework | Queued |
+| P0.5 | Personality return (Gazette, cheevos, crews, titles) | Queued |
+
+Do not reopen P0.1 unless a scrub finds a regression.
+
 Focus on quality over quantity.
 
 Each implementation should leave War Room feeling more polished, more intuitive, and more memorable.
