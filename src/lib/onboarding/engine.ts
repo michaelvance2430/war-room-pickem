@@ -72,9 +72,12 @@ export function getActiveStep(): OnboardingStep | null {
   return journey.steps.find((x) => x.id === s.stepId) || null;
 }
 
+/**
+ * Multi-step journey host is retired (contextual coaching replaced it).
+ * Always false so Moments / badges / chrome never treat a journey as active.
+ */
 export function isOnboardingActive(): boolean {
-  const s = readOnboardingState();
-  return s.active && s.phase !== "idle" && s.phase !== "complete";
+  return false;
 }
 
 export function hasCompletedJourney(id: OnboardingJourneyId): boolean {

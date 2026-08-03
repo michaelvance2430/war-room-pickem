@@ -45,12 +45,8 @@ import {
   wrProfileRoute,
 } from "@/lib/runtime-iso";
 
-const PlayerWalkthrough = dynamic(
-  () => import("@/components/PlayerWalkthrough"),
-  { ssr: false }
-);
-const OnboardingHost = dynamic(
-  () => import("@/components/onboarding/OnboardingHost"),
+const ContextualCoach = dynamic(
+  () => import("@/components/ContextualCoach"),
   { ssr: false }
 );
 
@@ -1046,14 +1042,8 @@ export default function Nav() {
       {/* Guest demo: sticky DEMO bar + welcome / role / tutorial */}
       <GuestDemoChrome />
       <GuestOnboarding />
-      {/*
-        First-hour coach only — no welcome/rules/ceremonies on the critical path.
-        Those used to mount with every Nav paint, body-lock, and freeze look-around.
-      */}
-      {/* New constitution-driven onboarding (player + commissioner journeys) */}
-      <OnboardingHost />
-      {/* Legacy coach — Account re-run only; suppressed while new engine owns first session */}
-      <PlayerWalkthrough />
+      {/* One-time contextual coaching (no full-screen walkthrough) */}
+      <ContextualCoach />
       {/* Roster + optional modals — staged late so tabs stay live after login */}
       {/*
         EMERGENCY: always mount the gate.

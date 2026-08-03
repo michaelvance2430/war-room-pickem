@@ -1125,9 +1125,6 @@ export default function PicksClient() {
         try {
           const { markHasLockedPicksOnce } = await import("@/lib/first-week");
           markHasLockedPicksOnce(getSession()?.playerId);
-          const { completePlayerTutorial, isPlayerTutorialActive } =
-            await import("@/lib/player-tutorial");
-          if (isPlayerTutorialActive()) completePlayerTutorial();
         } catch {
           /* ok */
         }
@@ -1276,10 +1273,13 @@ export default function PicksClient() {
     }
     try {
       sessionStorage.setItem("warroom-tut-picks-saved", "1");
-      const { completePlayerTutorial, isPlayerTutorialActive } = await import(
-        "@/lib/player-tutorial"
-      );
-      if (isPlayerTutorialActive()) completePlayerTutorial();
+    } catch {
+      /* ignore */
+    }
+    // Contextual coaching — complete from real lock, not display
+    try {
+      const { onPicksLocked } = await import("@/lib/coaching/complete");
+      onPicksLocked(getLeague()?.id);
     } catch {
       /* ignore */
     }
@@ -1367,11 +1367,14 @@ export default function PicksClient() {
     }
   }, [saved, loaded, fullyLocked]);
 
-  // Walk-the-dog tutorial: card filled → coach advances to Save
+  // Coaching: card filled → complete "make first picks" (submit still needs lock)
   useEffect(() => {
     if (!allGamesPicked) return;
     try {
       sessionStorage.setItem("warroom-tut-picks-filled", "1");
+      void import("@/lib/coaching/complete").then((m) => {
+        m.onPicksSaved({ leagueId: getLeague()?.id, locked: false });
+      });
     } catch {
       /* ignore */
     }

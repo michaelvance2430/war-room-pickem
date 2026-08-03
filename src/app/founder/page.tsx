@@ -851,6 +851,61 @@ export default function FounderDashboardPage() {
                 Reset Season Opening claim (local)
               </button>
 
+              {/* Creator-only: reset one-time coaching flags (never customer-facing) */}
+              <div className="rounded-xl border border-border bg-background/60 p-3 space-y-2">
+                <p className="text-[10px] font-black uppercase tracking-wide text-muted">
+                  Coaching flags (admin)
+                </p>
+                <p className="text-[11px] text-muted leading-snug">
+                  Per-milestone keys — not a global tutorial_completed. Reset
+                  for QA only.
+                </p>
+                <div className="grid grid-cols-1 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void import("@/lib/coaching").then((m) => {
+                        m.resetCommissionerCoaching();
+                        setLabLog(
+                          "✅ Reset commissioner coaching (invite / build / publish) for this league"
+                        );
+                      });
+                    }}
+                    className="py-2 rounded-lg border border-border text-xs font-semibold hover:bg-background text-left px-2.5"
+                  >
+                    Reset · Commissioner first-card coaching
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void import("@/lib/coaching").then((m) => {
+                        m.resetPlayerCoaching();
+                        setLabLog(
+                          "✅ Reset player coaching (make / submit / results) for this league"
+                        );
+                      });
+                    }}
+                    className="py-2 rounded-lg border border-border text-xs font-semibold hover:bg-background text-left px-2.5"
+                  >
+                    Reset · Player first-picks coaching
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void import("@/lib/coaching").then((m) => {
+                        m.resetAllCoachingForLeague();
+                        setLabLog(
+                          "✅ Reset all coaching flags for this league"
+                        );
+                      });
+                    }}
+                    className="py-2 rounded-lg border border-warning/40 bg-warning/10 text-xs font-semibold hover:bg-warning/15 text-left px-2.5"
+                  >
+                    Reset · All coaching for this league
+                  </button>
+                </div>
+              </div>
+
               {/* Season Cold Open — sole entry point (not a standalone Foundry feature) */}
               <div className="rounded-xl border border-amber-400/45 bg-amber-500/10 p-3 space-y-2.5">
                 <div className="flex items-start justify-between gap-2">

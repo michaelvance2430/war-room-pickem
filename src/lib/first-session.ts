@@ -73,6 +73,14 @@ export function notifyCardPublished(detail: CardPublishedDetail) {
   } catch {
     /* ignore */
   }
+  try {
+    void import("@/lib/coaching/complete").then(async (m) => {
+      const { getLeague } = await import("@/lib/league");
+      m.onWeekCardPublished(getLeague()?.id);
+    });
+  } catch {
+    /* ignore */
+  }
 }
 
 export function takeJustPublished(): CardPublishedDetail | null {

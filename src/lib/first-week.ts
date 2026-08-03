@@ -77,6 +77,13 @@ export function markHasLockedPicksOnce(playerId?: string | null): void {
   map[id] = true;
   writeMap(KEY_LOCKED, map);
   notifyProgress();
+  try {
+    void import("./coaching/complete").then((m) => {
+      m.onPicksLocked();
+    });
+  } catch {
+    /* ok */
+  }
 }
 
 /**

@@ -83,44 +83,33 @@ function write(s: PlayerTutorialState) {
   }
 }
 
+/**
+ * Legacy walkthrough retired — always inactive.
+ * Contextual coaching (@/lib/coaching) owns first-session nudges.
+ */
 export function isPlayerTutorialActive(): boolean {
-  const s = getPlayerTutorialState();
-  return s.active && !s.completed && s.step !== "done";
+  return false;
 }
 
 export function needsPlayerTutorial(): boolean {
-  return !getPlayerTutorialState().completed;
+  return false;
 }
 
 /**
  * First login after rules — or Account re-run.
  * Default mode is picks-only (Crystal Ball is optional / Account full re-run).
  */
+/** @deprecated Walkthrough retired — no-op. */
 export function startPlayerTutorial(
-  userId?: string,
-  opts?: { startAt?: PlayerTutorialStep; mode?: PlayerTutorialMode }
+  _userId?: string,
+  _opts?: { startAt?: PlayerTutorialStep; mode?: PlayerTutorialMode }
 ) {
-  const mode: PlayerTutorialMode =
-    opts?.mode ??
-    (opts?.startAt === "open_crystal" ||
-    opts?.startAt === "search_team" ||
-    opts?.startAt === "lock_crystal"
-      ? "full"
-      : "picks");
-  const startAt =
-    opts?.startAt || (mode === "full" ? "open_crystal" : "open_picks");
-  write({
-    completed: false,
-    active: true,
-    step: startAt,
-    userId,
-    mode,
-  });
+  completePlayerTutorial();
 }
 
-/** Picks-only coach — default first-week path. */
-export function startPicksOnlyTutorial(userId?: string) {
-  startPlayerTutorial(userId, { mode: "picks", startAt: "open_picks" });
+/** @deprecated Walkthrough retired — no-op. */
+export function startPicksOnlyTutorial(_userId?: string) {
+  completePlayerTutorial();
 }
 
 /**
@@ -192,9 +181,9 @@ export function padawanOutroLines(sportId?: string | null): {
   };
 }
 
-/** Full coach including Crystal Ball (Account re-run). */
-export function startFullPlayerTutorial(userId?: string) {
-  startPlayerTutorial(userId, { mode: "full", startAt: "open_crystal" });
+/** @deprecated Walkthrough retired — no-op. */
+export function startFullPlayerTutorial(_userId?: string) {
+  completePlayerTutorial();
 }
 
 export function completePlayerTutorial() {
