@@ -74,7 +74,7 @@ If design wants a fifth ⭐⭐⭐⭐⭐, **demote or remove** another peak first
 |----------|-----------------|-----------|--------|
 | Confetti on lock | ⭐ | full_ceremony | **No** |
 | Full fireworks on weekly Gazette | ⭐⭐⭐ | full_ceremony | **No** |
-| CFB Opening 5s ritual | ⭐⭐⭐⭐⭐ | full_ceremony | **Yes** |
+| CFB / NFL Opening (~7.5s, silence breath) | ⭐⭐⭐⭐⭐ | full_ceremony (authentic stadium / broadcast) | **Yes — spend the budget** |
 | Soft unlock banner | ⭐⭐ | none/light | **Yes** |
 | Second full-screen “season is open” same week | ⭐⭐⭐⭐⭐ | full | **No** (duplicate spend) |
 

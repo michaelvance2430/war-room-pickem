@@ -18,7 +18,8 @@ export const MOMENT_SEASON_OPEN_CFB: MomentDefinition = {
   animation: "full_ceremony",
   replayPolicy: "once_per_user_league_season",
   blocksNavigation: true,
-  durationTargetMs: 5000,
+  /** ~7.5s — peak budget includes silence after Practice line */
+  durationTargetMs: 7600,
   foundryPreview: true,
 };
 
@@ -35,7 +36,7 @@ export const MOMENT_SEASON_OPEN_NFL: MomentDefinition = {
   animation: "full_ceremony",
   replayPolicy: "once_per_user_league_season",
   blocksNavigation: true,
-  durationTargetMs: 5000,
+  durationTargetMs: 7600,
   foundryPreview: true,
 };
 

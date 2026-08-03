@@ -15,7 +15,11 @@
 | Foundry preview / reset | Foundry → War Room Moments |
 | Practice retire line | Beat 3: *Practice is over. The season is here.* |
 
-**Law:** Optimize for emotional memory, not particle count.
+**Law:** Optimize for **authentic spectacle** and emotional memory — stadium / broadcast Opening Day energy, not app confetti.
+
+⭐⭐⭐⭐⭐ Emotional Budget. One of ~four max spends per season. Spend it.
+
+Beats: Anticipation → Celebration (sound cue + atmosphere) → Transition (*Practice is over. The season is here.*) → **Silence** → Fade → Home.
 
 ---
 

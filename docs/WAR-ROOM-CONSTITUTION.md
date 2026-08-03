@@ -187,6 +187,19 @@ If players stop thinking about Practice and only remember *“War Room was easy 
 > Not only its content. Its experience.  
 > Players should feel the season changing.
 
+### Authentic spectacle (Moments)
+
+> **Optimize for authentic spectacle — not software celebration.**
+
+⭐⭐⭐⭐⭐ Moments (Season Opening, Finale, etc.) **spend** the Emotional Budget.  
+They may feel like television Opening Day: stadium lights, haze, crowd energy, a sound cue, a held silence.
+
+They must **not** feel like: random confetti, particle spam, or the app congratulating itself.
+
+The test: *Does this feel worthy of Opening Day?*  
+If removing an effect makes it more authentic, remove it.  
+If the room still feels cheap for a once-a-season peak, add **football** atmosphere — not sparkles.
+
 ### Offseason Practice principle
 
 > **Practice exists until football exists.**  

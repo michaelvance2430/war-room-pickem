@@ -3,11 +3,12 @@
 /**
  * Season Opening — first official War Room Moment.
  *
- * Do not optimize for visual spectacle. Optimize for emotional memory.
- * If removing an effect makes the ceremony feel more authentic, remove it.
+ * ⭐⭐⭐⭐⭐ Emotional Budget — one of ~four max-spend Moments per season.
+ * Optimize for **authentic spectacle** (stadium / broadcast Opening Day),
+ * not software celebration or random particle spam.
  *
- * Four beats: Anticipation → Celebration → Transition → Arrival.
- * ≤ ~5s. Skip allowed. Lands on Home. No tutorial. No CTA stack.
+ * Beats: Anticipation → Celebration → Transition → Silence → Fade → Home.
+ * "Practice is over. The season is here." must breathe.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -21,14 +22,50 @@ import {
   type SeasonOpenShowPayload,
 } from "@/lib/moments/season-open";
 import { seasonOpenMomentIdForSport } from "@/lib/moments/registry";
+import { playSeasonOpenCue } from "@/lib/moments/season-open-audio";
 
-type Phase = "anticipation" | "celebration" | "transition" | "done";
+type Phase =
+  | "anticipation"
+  | "celebration"
+  | "transition"
+  | "silence"
+  | "fade"
+  | "done";
 
+/**
+ * ~7.5s total — peak budget earns the breath.
+ * Silence after the Practice line is the power move.
+ */
 const PHASE_MS = {
-  anticipation: 700,
-  celebration: 2400,
-  transition: 1600,
+  anticipation: 900,
+  celebration: 2800,
+  transition: 1800,
+  silence: 1400,
+  fade: 700,
 } as const;
+
+function flashPositions(count: number, seed: string) {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 33 + seed.charCodeAt(i)) >>> 0;
+  const out: { left: string; top: string; delay: string; size: string }[] = [];
+  for (let i = 0; i < count; i++) {
+    h = (h * 1103515245 + 12345) >>> 0;
+    const left = 8 + (h % 84);
+    h = (h * 1103515245 + 12345) >>> 0;
+    const top = 10 + (h % 70);
+    h = (h * 1103515245 + 12345) >>> 0;
+    const delay = ((h % 40) / 10).toFixed(2);
+    h = (h * 1103515245 + 12345) >>> 0;
+    const size = 2 + (h % 5);
+    out.push({
+      left: `${left}%`,
+      top: `${top}%`,
+      delay: `${delay}s`,
+      size: `${size}px`,
+    });
+  }
+  return out;
+}
 
 export default function SeasonOpeningMoment() {
   const pathname = usePathname();
@@ -37,10 +74,20 @@ export default function SeasonOpeningMoment() {
   const timers = useRef<number[]>([]);
   const finished = useRef(false);
   const payloadRef = useRef<SeasonOpenShowPayload | null>(null);
+  const stopAudio = useRef<(() => void) | null>(null);
 
   const clearTimers = useCallback(() => {
     for (const t of timers.current) window.clearTimeout(t);
     timers.current = [];
+  }, []);
+
+  const stopCue = useCallback(() => {
+    try {
+      stopAudio.current?.();
+    } catch {
+      /* ok */
+    }
+    stopAudio.current = null;
   }, []);
 
   const finish = useCallback(
@@ -48,6 +95,7 @@ export default function SeasonOpeningMoment() {
       if (finished.current) return;
       finished.current = true;
       clearTimers();
+      stopCue();
       const p = payloadRef.current;
       if (p) {
         completeSeasonOpenShow({
@@ -62,7 +110,7 @@ export default function SeasonOpeningMoment() {
       setPhase("done");
       setPayload(null);
     },
-    [clearTimers]
+    [clearTimers, stopCue]
   );
 
   const runPhases = useCallback(
@@ -72,6 +120,12 @@ export default function SeasonOpeningMoment() {
       setPayload(show);
       setPhase("anticipation");
       clearTimers();
+      stopCue();
+
+      // Sound on celebration — stadium cue, not a jingle
+      const tAudio = window.setTimeout(() => {
+        stopAudio.current = playSeasonOpenCue(show.sport);
+      }, PHASE_MS.anticipation - 80);
 
       const t1 = window.setTimeout(() => {
         setPhase("celebration");
@@ -82,15 +136,30 @@ export default function SeasonOpeningMoment() {
       }, PHASE_MS.anticipation + PHASE_MS.celebration);
 
       const t3 = window.setTimeout(() => {
-        finish(false);
+        setPhase("silence");
+        stopCue();
       }, PHASE_MS.anticipation + PHASE_MS.celebration + PHASE_MS.transition);
 
-      timers.current = [t1, t2, t3];
+      const t4 = window.setTimeout(() => {
+        setPhase("fade");
+      }, PHASE_MS.anticipation +
+        PHASE_MS.celebration +
+        PHASE_MS.transition +
+        PHASE_MS.silence);
+
+      const t5 = window.setTimeout(() => {
+        finish(false);
+      }, PHASE_MS.anticipation +
+        PHASE_MS.celebration +
+        PHASE_MS.transition +
+        PHASE_MS.silence +
+        PHASE_MS.fade);
+
+      timers.current = [tAudio, t1, t2, t3, t4, t5];
     },
-    [clearTimers, finish]
+    [clearTimers, finish, stopCue]
   );
 
-  // Production path — Home only, once per user·league·sport·season
   useEffect(() => {
     if (pathname !== "/" && pathname !== "") return;
 
@@ -103,16 +172,14 @@ export default function SeasonOpeningMoment() {
       if (show && !cancelled) runPhases(show);
     };
 
-    // Let Home paint first — arrival feels natural, not a hijack
     const t = window.setTimeout(tryShow, 450);
     return () => {
       cancelled = true;
       window.clearTimeout(t);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- fire once per home mount / session tick
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
-  // Foundry preview — no claim burn
   useEffect(() => {
     function onPreview() {
       const show = beginSeasonOpenShow({ preview: true });
@@ -128,19 +195,34 @@ export default function SeasonOpeningMoment() {
     };
   }, [clearTimers, runPhases]);
 
-  useEffect(() => () => clearTimers(), [clearTimers]);
+  useEffect(
+    () => () => {
+      clearTimers();
+      stopCue();
+    },
+    [clearTimers, stopCue]
+  );
 
   if (!payload || phase === "done") return null;
 
   const isNfl = payload.sport === "nfl";
-  const glow = isNfl
-    ? "rgba(193,18,31,0.32)"
-    : "rgba(34,197,94,0.28)";
   const accent = isNfl ? "text-[#f0a8ae]" : "text-primary";
+  const flashes = flashPositions(
+    isNfl ? 14 : 12,
+    `${payload.sport}:${payload.speech.id}`
+  );
+  const showAtmosphere =
+    phase === "celebration" ||
+    phase === "transition" ||
+    phase === "silence";
+  const showLines = phase === "transition" || phase === "silence";
+  const fading = phase === "fade";
 
   return (
     <div
-      className="fixed inset-0 z-[120] flex items-center justify-center p-5 sm:p-8"
+      className={`fixed inset-0 z-[120] flex items-center justify-center p-5 sm:p-8 season-open-root ${
+        fading ? "season-open-fade-out" : ""
+      } ${isNfl ? "season-open-nfl" : "season-open-cfb"}`}
       role="dialog"
       aria-modal="true"
       aria-labelledby="season-open-moment-title"
@@ -148,93 +230,139 @@ export default function SeasonOpeningMoment() {
       data-sport={payload.sport}
       data-phase={phase}
     >
-      {/* Dim — anticipation / hold */}
+      {/* Black house lights */}
       <div
-        className={`absolute inset-0 transition-opacity duration-500 ${
-          phase === "anticipation" ? "bg-black/95" : "bg-black/90"
+        className={`absolute inset-0 transition-opacity duration-700 ${
+          phase === "anticipation"
+            ? "bg-black opacity-100"
+            : fading
+              ? "bg-black/95 opacity-100"
+              : "bg-black/88 opacity-100"
         }`}
       />
 
-      {/* Sport-identifiable wash — recognizable before words */}
+      {/* Stadium bowl wash — sport identity before words */}
       <div
-        className="pointer-events-none absolute inset-0 transition-opacity duration-700"
-        style={{
-          opacity: phase === "anticipation" ? 0.15 : 0.55,
-          background: isNfl
-            ? `radial-gradient(ellipse 75% 55% at 50% 42%, ${glow}, transparent 62%),
-               linear-gradient(180deg, rgba(20,8,10,0.4) 0%, transparent 50%, rgba(0,0,0,0.5) 100%)`
-            : `radial-gradient(ellipse 75% 55% at 50% 42%, ${glow}, transparent 62%),
-               linear-gradient(180deg, rgba(6,20,12,0.35) 0%, transparent 50%, rgba(0,0,0,0.5) 100%)`,
-        }}
+        className={`pointer-events-none absolute inset-0 season-open-bowl transition-opacity duration-700 ${
+          phase === "anticipation"
+            ? "opacity-20"
+            : showAtmosphere
+              ? "opacity-100"
+              : "opacity-40"
+        }`}
       />
 
-      {/* Soft field grain — not particle confetti */}
-      {phase !== "anticipation" && (
-        <div
-          className="pointer-events-none absolute inset-0 opacity-[0.06]"
-          style={{
-            backgroundImage:
-              "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.04) 2px, rgba(255,255,255,0.04) 3px)",
-          }}
-        />
+      {/* Smoke / haze layer */}
+      {showAtmosphere && (
+        <div className="pointer-events-none absolute inset-0 season-open-smoke" />
       )}
 
-      <div className="relative z-10 w-full max-w-lg text-center">
+      {/* Stadium light beams */}
+      {showAtmosphere && (
+        <>
+          <div className="pointer-events-none absolute inset-0 season-open-beam season-open-beam-l" />
+          <div className="pointer-events-none absolute inset-0 season-open-beam season-open-beam-r" />
+          <div className="pointer-events-none absolute inset-0 season-open-beam season-open-beam-c" />
+        </>
+      )}
+
+      {/* Camera flashes — broadcast / crowd phones, not confetti */}
+      {phase === "celebration" &&
+        flashes.map((f, i) => (
+          <span
+            key={i}
+            className="pointer-events-none absolute season-open-flash"
+            style={{
+              left: f.left,
+              top: f.top,
+              width: f.size,
+              height: f.size,
+              animationDelay: f.delay,
+            }}
+          />
+        ))}
+
+      {/* Field / broadcast bottom bar */}
+      {showAtmosphere && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[28%] season-open-field" />
+      )}
+
+      {/* Scan / broadcast grit */}
+      {showAtmosphere && (
+        <div className="pointer-events-none absolute inset-0 season-open-scan" />
+      )}
+
+      <div
+        className={`relative z-10 w-full max-w-lg text-center transition-opacity duration-500 ${
+          fading ? "opacity-0" : "opacity-100"
+        }`}
+      >
         {phase === "anticipation" && (
-          <p className="text-[11px] font-bold uppercase tracking-[0.35em] text-muted animate-pulse">
-            {isNfl ? "Hold for kickoff" : "Hold for Saturday"}
-          </p>
+          <div className="space-y-4">
+            <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.42em] text-white/50 season-open-hold">
+              {isNfl ? "Opening Weekend" : "Opening Saturday"}
+            </p>
+            <div className="mx-auto h-px w-16 bg-white/25 season-open-hold-line" />
+          </div>
         )}
 
         {phase === "celebration" && (
-          <div className="space-y-5 transition-opacity duration-500">
+          <div className="space-y-5 season-open-celebrate-in">
             <p
-              className={`text-[11px] sm:text-xs font-bold uppercase tracking-[0.32em] ${accent}`}
+              className={`text-[11px] sm:text-xs font-bold uppercase tracking-[0.34em] ${accent}`}
             >
               {payload.speech.kicker}
             </p>
             <h1
               id="season-open-moment-title"
-              className="text-3xl sm:text-5xl font-black tracking-tight text-white leading-[1.08]"
-              style={{
-                filter: isNfl
-                  ? "drop-shadow(0 0 28px rgba(193,18,31,0.35))"
-                  : "drop-shadow(0 0 28px rgba(34,197,94,0.3))",
-              }}
+              className="text-3xl sm:text-5xl md:text-6xl font-black tracking-tight text-white leading-[1.05] season-open-title"
             >
               {payload.leagueName}
             </h1>
             <p className="text-lg sm:text-2xl font-bold text-primary tracking-tight">
               {payload.seasonKey}
             </p>
-            <p className="text-sm sm:text-base text-muted leading-relaxed max-w-md mx-auto">
+            <p className="text-sm sm:text-base text-white/75 leading-relaxed max-w-md mx-auto">
               {payload.speech.line}
             </p>
           </div>
         )}
 
-        {phase === "transition" && (
-          <div className="space-y-3 transition-opacity duration-500">
+        {showLines && (
+          <div
+            className={`space-y-4 ${
+              phase === "transition"
+                ? "season-open-transition-in"
+                : "season-open-silence-hold"
+            }`}
+          >
             <p
               id="season-open-moment-title"
-              className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight"
+              className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight"
             >
               {PRACTICE_OVER_LINES.primary}
             </p>
-            <p className={`text-xl sm:text-2xl font-bold ${accent}`}>
+            <p className={`text-xl sm:text-3xl font-bold ${accent}`}>
               {PRACTICE_OVER_LINES.secondary}
             </p>
+            {phase === "silence" && (
+              <p className="pt-4 text-[10px] uppercase tracking-[0.28em] text-white/35">
+                {isNfl ? "The room is live" : "The room is open"}
+              </p>
+            )}
           </div>
         )}
 
-        {/* Single quiet skip — no CTA stack */}
-        <button
-          type="button"
-          onClick={() => finish(true)}
-          className="mt-10 text-xs font-semibold text-muted/70 hover:text-muted min-h-[44px] px-3"
-        >
-          Skip
-        </button>
+        {/* Skip stays quiet — never competes with the door opening */}
+        {phase !== "fade" && (
+          <button
+            type="button"
+            onClick={() => finish(true)}
+            className="mt-12 text-[11px] font-semibold text-white/35 hover:text-white/60 min-h-[44px] px-3"
+          >
+            Skip
+          </button>
+        )}
       </div>
     </div>
   );
