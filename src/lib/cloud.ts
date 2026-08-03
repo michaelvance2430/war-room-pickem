@@ -12,17 +12,57 @@ import { weekTitle } from "@/lib/dates";
 import { MAX_LEAGUE_PLAYERS, seatsRemaining } from "@/lib/league-limits";
 
 // ── Hot-path TTL cache (nav / home / picks hit these constantly) ───────────
+
+/** Board Phase-1 per-await timing (dev or warroom-runtime-debug=1). */
+function wrBoardP1(name: string, phase: "START" | "DONE" | "FAIL" | "CACHE" | "TIMEOUT", ms?: number, extra?: string) {
+  try {
+    const on =
+      (typeof process !== "undefined" && process.env.NODE_ENV === "development") ||
+      (typeof window !== "undefined" &&
+        localStorage.getItem("warroom-runtime-debug") === "1");
+    if (!on) return;
+    const pad = name.padEnd(28, ".");
+    if (phase === "START") {
+      console.log(`[WR-PERF][board-p1] ${pad} START ${extra || ""}`);
+    } else if (phase === "CACHE") {
+      console.log(`[WR-PERF][board-p1] ${pad} CACHE_HIT ${extra || ""}`);
+    } else if (phase === "TIMEOUT") {
+      console.log(
+        `[WR-PERF][board-p1] ${pad} TIMEOUT ${ms != null ? ms + " ms" : ""} ${extra || ""}`
+      );
+    } else {
+      const d = ms != null ? `${ms} ms` : "";
+      console.log(
+        `[WR-PERF][board-p1] ${pad} ${d.padStart(10, " ")} ${phase} ${extra || ""}`
+      );
+    }
+  } catch {
+    /* ok */
+  }
+}
+
 /** Race a promise so mobile never hangs forever on a stuck fetch. */
 export function withTimeout<T>(
   p: Promise<T>,
   ms: number,
-  fallback: T
+  fallback: T,
+  /** Optional label for board-p1 timeout diagnosis */
+  timeoutLabel?: string
 ): Promise<T> {
   return new Promise((resolve) => {
     let done = false;
+    const t0 =
+      typeof performance !== "undefined" ? performance.now() : Date.now();
     const t = setTimeout(() => {
       if (done) return;
       done = true;
+      if (timeoutLabel) {
+        const elapsed =
+          typeof performance !== "undefined"
+            ? Math.round(performance.now() - t0)
+            : ms;
+        wrBoardP1(timeoutLabel, "TIMEOUT", elapsed, `limit=${ms}ms`);
+      }
       resolve(fallback);
     }, ms);
     p.then(
@@ -36,6 +76,13 @@ export function withTimeout<T>(
         if (done) return;
         done = true;
         clearTimeout(t);
+        if (timeoutLabel) {
+          const elapsed =
+            typeof performance !== "undefined"
+              ? Math.round(performance.now() - t0)
+              : ms;
+          wrBoardP1(timeoutLabel, "FAIL", elapsed, "promise-reject→fallback");
+        }
         resolve(fallback);
       }
     );
@@ -403,6 +450,9 @@ export async function loadLeagueActiveWeek(): Promise<number> {
     }
 
     let failed = false;
+    const q0 =
+      typeof performance !== "undefined" ? performance.now() : Date.now();
+    wrBoardP1("leagues.current_week", "START");
     try {
       const supabase = createClient();
       const data = await withTimeout(
@@ -416,11 +466,17 @@ export async function loadLeagueActiveWeek(): Promise<number> {
           return row;
         })(),
         6_000,
-        null
+        null,
+        "leagues.current_week"
       );
+      const qMs =
+        typeof performance !== "undefined"
+          ? Math.round(performance.now() - q0)
+          : 0;
       if (data === null) {
         // Timeout or empty — treat as soft fail for backoff
         failed = true;
+        wrBoardP1("leagues.current_week", "FAIL", qMs, "null/timeout");
       } else if (data.current_week != null) {
         const n = Number(data.current_week);
         if (!Number.isNaN(n)) {
@@ -431,9 +487,17 @@ export async function loadLeagueActiveWeek(): Promise<number> {
             /* ignore */
           }
         }
+        wrBoardP1("leagues.current_week", "DONE", qMs, `week=${week}`);
+      } else {
+        wrBoardP1("leagues.current_week", "DONE", qMs, "null-current_week");
       }
     } catch {
       failed = true;
+      const qMs =
+        typeof performance !== "undefined"
+          ? Math.round(performance.now() - q0)
+          : 0;
+      wrBoardP1("leagues.current_week", "FAIL", qMs, "catch");
       /* use local fallback; cache below = backoff so callers don't stampede */
     } finally {
       try {
@@ -449,6 +513,7 @@ export async function loadLeagueActiveWeek(): Promise<number> {
     if (failed) {
       wrCurrentWeekLog(`fail-backoff week=${week}`, leagueId);
     }
+    wrBoardP1("loadLeagueActiveWeek", "DONE", undefined, `week=${week}`);
     return week;
   })().finally(() => {
     activeWeekInflight.delete(leagueId);
@@ -943,12 +1008,18 @@ export async function listPublishedWeekNumbers(): Promise<number[]> {
   if (!session?.leagueId) return [];
   const hit = cacheGet(publishedCache, session.leagueId, LIST_TTL_MS);
   // Empty [] is valid — only skip cache when undefined (miss / expired)
-  if (hit !== undefined) return hit;
+  if (hit !== undefined) {
+    wrBoardP1("listPublishedWeekNumbers", "CACHE", undefined, `n=${hit.length}`);
+    return hit;
+  }
   try {
     const supabase = createClient();
     type PubResult =
       | { kind: "ok"; rows: { week_number: number }[] }
       | { kind: "fail" };
+    const q0 =
+      typeof performance !== "undefined" ? performance.now() : Date.now();
+    wrBoardP1("week_cards.week_number", "START");
     const data = await withTimeout<PubResult>(
       (async () => {
         const { data: rows, error } = await supabase
@@ -963,17 +1034,29 @@ export async function listPublishedWeekNumbers(): Promise<number[]> {
         };
       })(),
       8_000,
-      { kind: "fail" }
+      { kind: "fail" },
+      "week_cards.week_number"
     );
+    const qMs =
+      typeof performance !== "undefined"
+        ? Math.round(performance.now() - q0)
+        : 0;
     // Timeout / error: do NOT cache empty — that blocked week fallbacks on phone
-    if (data.kind === "fail") return [];
+    if (data.kind === "fail") {
+      wrBoardP1("week_cards.week_number", "FAIL", qMs, "kind=fail");
+      wrBoardP1("listPublishedWeekNumbers", "DONE", qMs, "empty-fail");
+      return [];
+    }
     const nums = data.rows
       .map((r) => Number(r.week_number))
       .filter((n) => !Number.isNaN(n));
     const out = [...new Set(nums)].sort((a, b) => a - b);
     cacheSet(publishedCache, session.leagueId, out);
+    wrBoardP1("week_cards.week_number", "DONE", qMs, `n=${out.length}`);
+    wrBoardP1("listPublishedWeekNumbers", "DONE", qMs, `n=${out.length}`);
     return out;
   } catch {
+    wrBoardP1("listPublishedWeekNumbers", "FAIL", undefined, "catch");
     return [];
   }
 }
@@ -1976,6 +2059,8 @@ export async function clearWeekScoreInCloud(
  * empty shells (score clicked with 0 locked picks) must not strike the pill.
  */
 export async function listScoredWeekNumbers(): Promise<number[]> {
+  const fn0 =
+    typeof performance !== "undefined" ? performance.now() : Date.now();
   try {
     const { isGuestMode } = await import("./guest-mode");
     if (isGuestMode()) {
@@ -1988,10 +2073,18 @@ export async function listScoredWeekNumbers(): Promise<number[]> {
   const session = getSession();
   if (!session?.leagueId) return [];
   const hit = cacheGet(scoredCache, session.leagueId, LIST_TTL_MS);
-  if (hit !== undefined) return hit;
+  if (hit !== undefined) {
+    wrBoardP1("listScoredWeekNumbers", "CACHE", undefined, `n=${hit.length}`);
+    return hit;
+  }
   try {
     const supabase = createClient();
     type ScoredRows = { id: string; week_number: number }[] | null;
+
+    // ── await #1: week_results ──
+    const wr0 =
+      typeof performance !== "undefined" ? performance.now() : Date.now();
+    wrBoardP1("week_results.id,week_number", "START");
     const data = await withTimeout<
       | { kind: "ok"; rows: ScoredRows }
       | { kind: "fail" }
@@ -2008,21 +2101,49 @@ export async function listScoredWeekNumbers(): Promise<number[]> {
         };
       })(),
       8_000,
-      { kind: "fail" }
+      { kind: "fail" },
+      "week_results.id,week_number"
     );
+    const wrMs =
+      typeof performance !== "undefined"
+        ? Math.round(performance.now() - wr0)
+        : 0;
     // Timeout / error: do not poison-cache empty scored list
-    if (data.kind === "fail") return [];
+    if (data.kind === "fail") {
+      wrBoardP1("week_results.id,week_number", "FAIL", wrMs, "kind=fail");
+      wrBoardP1(
+        "listScoredWeekNumbers",
+        "DONE",
+        typeof performance !== "undefined"
+          ? Math.round(performance.now() - fn0)
+          : wrMs,
+        "empty-after-wr-fail"
+      );
+      return [];
+    }
+    wrBoardP1(
+      "week_results.id,week_number",
+      "DONE",
+      wrMs,
+      `rows=${data.rows?.length ?? 0}`
+    );
     if (!data.rows?.length) {
       cacheSet(scoredCache, session.leagueId, []);
+      wrBoardP1("listScoredWeekNumbers", "DONE", wrMs, "empty-rows");
       return [];
     }
 
     const ids = data.rows.map((r) => r.id as string).filter(Boolean);
     if (!ids.length) {
       cacheSet(scoredCache, session.leagueId, []);
+      wrBoardP1("listScoredWeekNumbers", "DONE", wrMs, "empty-ids");
       return [];
     }
 
+    // ── await #2: game_results (SERIAL after week_results) ──
+    const gr0 =
+      typeof performance !== "undefined" ? performance.now() : Date.now();
+    wrBoardP1("game_results.week_result_id", "START", undefined, `ids=${ids.length}`);
     const gr = await withTimeout(
       (async () => {
         const { data: rows, error: grErr } = await supabase
@@ -2033,18 +2154,45 @@ export async function listScoredWeekNumbers(): Promise<number[]> {
         return rows;
       })(),
       6_000,
-      null
+      null,
+      "game_results.week_result_id"
     );
+    const grMs =
+      typeof performance !== "undefined"
+        ? Math.round(performance.now() - gr0)
+        : 0;
 
     // If game_results query fails (table missing), fall back to any week_results
     if (!gr) {
+      wrBoardP1(
+        "game_results.week_result_id",
+        "FAIL",
+        grMs,
+        "null/timeout→fallback"
+      );
       const fallback = data.rows
         .map((r) => Number(r.week_number))
         .filter((n) => !Number.isNaN(n))
         .sort((a, b) => a - b);
       cacheSet(scoredCache, session.leagueId, fallback);
+      const total =
+        typeof performance !== "undefined"
+          ? Math.round(performance.now() - fn0)
+          : wrMs + grMs;
+      wrBoardP1(
+        "listScoredWeekNumbers",
+        "DONE",
+        total,
+        `fallback n=${fallback.length} (wr=${wrMs}ms + gr=${grMs}ms SERIAL)`
+      );
       return fallback;
     }
+    wrBoardP1(
+      "game_results.week_result_id",
+      "DONE",
+      grMs,
+      `rows=${Array.isArray(gr) ? gr.length : 0}`
+    );
 
     const withGames = new Set(
       (gr || []).map((g) => g.week_result_id as string)
@@ -2056,8 +2204,19 @@ export async function listScoredWeekNumbers(): Promise<number[]> {
       .filter((n) => !Number.isNaN(n))
       .sort((a, b) => a - b);
     cacheSet(scoredCache, session.leagueId, out);
+    const total =
+      typeof performance !== "undefined"
+        ? Math.round(performance.now() - fn0)
+        : wrMs + grMs;
+    wrBoardP1(
+      "listScoredWeekNumbers",
+      "DONE",
+      total,
+      `n=${out.length} (wr=${wrMs}ms + gr=${grMs}ms SERIAL)`
+    );
     return out;
   } catch {
+    wrBoardP1("listScoredWeekNumbers", "FAIL", undefined, "catch");
     return [];
   }
 }

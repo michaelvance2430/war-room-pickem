@@ -91,14 +91,64 @@ function BoardInner() {
     setSelfId(getSession()?.playerId || null);
     try {
       mark("phase1-start");
+      // Time EACH Phase-1 branch (Promise.all wall = max of the three)
+      const timeP1 = async <T,>(
+        name: string,
+        fn: () => Promise<T>
+      ): Promise<T> => {
+        const t = performance.now();
+        try {
+          if (
+            process.env.NODE_ENV === "development" ||
+            localStorage.getItem("warroom-runtime-debug") === "1"
+          ) {
+            console.log(`[WR-PERF][board-p1] ${name.padEnd(28, ".")} START`);
+          }
+        } catch {
+          /* ok */
+        }
+        try {
+          const r = await fn();
+          const ms = Math.round(performance.now() - t);
+          try {
+            if (
+              process.env.NODE_ENV === "development" ||
+              localStorage.getItem("warroom-runtime-debug") === "1"
+            ) {
+              console.log(
+                `[WR-PERF][board-p1] ${name.padEnd(28, ".")} ${String(ms).padStart(8, " ")} ms DONE`
+              );
+            }
+          } catch {
+            /* ok */
+          }
+          return r;
+        } catch (e) {
+          const ms = Math.round(performance.now() - t);
+          try {
+            if (
+              process.env.NODE_ENV === "development" ||
+              localStorage.getItem("warroom-runtime-debug") === "1"
+            ) {
+              console.log(
+                `[WR-PERF][board-p1] ${name.padEnd(28, ".")} ${String(ms).padStart(8, " ")} ms FAIL`,
+                e
+              );
+            }
+          } catch {
+            /* ok */
+          }
+          throw e;
+        }
+      };
       const [pub, scoredList, active] = await Promise.all([
-        listPublishedWeekNumbers(),
-        listScoredWeekNumbers(),
-        loadLeagueActiveWeek(),
+        timeP1("listPublishedWeekNumbers", () => listPublishedWeekNumbers()),
+        timeP1("listScoredWeekNumbers", () => listScoredWeekNumbers()),
+        timeP1("loadLeagueActiveWeek", () => loadLeagueActiveWeek()),
       ]);
       mark(
         "phase1-done",
-        `pub=${pub.length} scored=${scoredList.length} active=${active}`
+        `pub=${pub.length} scored=${scoredList.length} active=${active} (see [WR-PERF][board-p1] per-await lines)`
       );
       const all = [...new Set([...pub, ...scoredList, active])].sort(
         (a, b) => a - b
