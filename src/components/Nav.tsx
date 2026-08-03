@@ -45,10 +45,7 @@ import {
   wrProfileRoute,
 } from "@/lib/runtime-iso";
 
-const ContextualCoach = dynamic(
-  () => import("@/components/ContextualCoach"),
-  { ssr: false }
-);
+
 
 /** Production: never arm deferred chrome (no mount, no import of wave tree). */
 const PRODUCTION_DEFERRED_SAFE = process.env.NODE_ENV === "production";
@@ -102,6 +99,14 @@ export default function Nav() {
   useEffect(() => {
     setAllowDeferred(isoEnabled("deferred"));
     setAllowProgressive(isoEnabled("navProgressive"));
+    // P0 recovery: kill orphan body locks / stuck modal chrome so the app is clickable
+    try {
+      void import("@/lib/smooth").then((m) => {
+        m.forceUnlockAllChrome();
+      });
+    } catch {
+      /* ok */
+    }
     return wrMount("Nav");
   }, []);
 
@@ -1042,8 +1047,7 @@ export default function Nav() {
       {/* Guest demo: sticky DEMO bar + welcome / role / tutorial */}
       <GuestDemoChrome />
       <GuestOnboarding />
-      {/* One-time contextual coaching (no full-screen walkthrough) */}
-      <ContextualCoach />
+      {/* Contextual coaching DISABLED (P0) — was intercepting clicks; rebuild safely later */}
       {/* Roster + optional modals — staged late so tabs stay live after login */}
       {/*
         EMERGENCY: always mount the gate.
