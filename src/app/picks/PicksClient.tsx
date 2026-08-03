@@ -8,8 +8,14 @@ import PicksSavedModal, {
   type PicksSavedModalDetail,
 } from "@/components/PicksSavedModal";
 import { Game, UserPick, Prop } from "@/lib/types";
-import { getSession, getLeague } from "@/lib/league";
+import { getSession, getLeague, isOps } from "@/lib/league";
 import Link from "next/link";
+import {
+  PICKS_EMPTY_BUILD_CARD_HREF,
+  PICKS_EMPTY_LOCKER_HREF,
+  resolveCommishPicksEmptyCopy,
+  resolvePlayerPicksEmptyCopy,
+} from "@/lib/picks-empty-copy";
 import {
   loadWeekCard,
   loadBestAvailableWeekCard,
@@ -1883,58 +1889,95 @@ export default function PicksClient() {
       </div>
         )}
 
-                {!loadError && !hasCard && !cardBusy && (
-          <div className="rounded-xl border border-border bg-card p-8 text-center">
-            <p className="text-[10px] uppercase tracking-wider text-primary font-bold mb-2">
-              Waiting room
-            </p>
-            <p className="font-semibold text-lg mb-2">
-              No card for {weekTitle(viewWeek)} yet
-            </p>
-            <p className="text-sm text-muted mb-5 max-w-md mx-auto leading-relaxed">
-              {viewWeek === activeWeek
-                ? "You are not broken — your commish has not published this week's games. Nothing to pick until they drop a card. Hang in the Locker, then come back here."
-                : "This week was not published (or was cleared). Jump to the live week if one exists."}
-            </p>
-            <div className="flex flex-wrap justify-center gap-3">
-              <a
-                href="/locker-room"
-                className="px-4 py-2.5 min-h-[44px] rounded-xl bg-primary text-black text-sm font-bold inline-flex items-center"
-              >
-                Hang in the Locker
-              </a>
-              <button
-                type="button"
-                onClick={() => {
-                  setCardBusy(true);
-                  setLoadError(null);
-                  void loadWeek(viewWeek, {
-                    forceReloadPicks: true,
-                    explicit: true,
-                  });
-                }}
-                className="px-4 py-2.5 min-h-[44px] rounded-xl border border-border text-sm font-semibold"
-              >
-                Check again
-              </button>
-              {viewWeek !== activeWeek && (
+        {!loadError && !hasCard && !cardBusy && (() => {
+          // Role-aware empty: what can *I* do next?
+          // Ops (commish/deputy, not view-as-player) → Build Card.
+          // Everyone else → Locker / wait. Never tell players to build.
+          const hostCanBuild = isOps();
+          const liveEmpty = viewWeek === activeWeek;
+          const copy = hostCanBuild
+            ? resolveCommishPicksEmptyCopy()
+            : resolvePlayerPicksEmptyCopy();
+          const weekLabel = weekTitle(viewWeek);
+
+          return (
+            <div className="rounded-xl border border-border bg-card p-8 text-center">
+              <p className="text-[10px] uppercase tracking-wider text-primary font-bold mb-2">
+                {liveEmpty
+                  ? copy.eyebrow
+                  : hostCanBuild
+                    ? "Commish · archive"
+                    : "Waiting room"}
+              </p>
+              <p className="font-semibold text-lg mb-2">
+                {liveEmpty
+                  ? copy.title
+                  : `No card for ${weekLabel} yet`}
+              </p>
+              <p className="text-sm text-muted mb-5 max-w-md mx-auto leading-relaxed">
+                {liveEmpty
+                  ? copy.body
+                  : hostCanBuild
+                    ? `This week isn’t published. Jump to live ${weekTitle(activeWeek)} or build a card for ${weekLabel} if that’s the week you meant.`
+                    : "This week was not published (or was cleared). Jump to the live week if one exists — or hang in the Locker while the host cooks."}
+              </p>
+              <div className="flex flex-wrap justify-center gap-3">
+                {liveEmpty && hostCanBuild ? (
+                  <Link
+                    href={PICKS_EMPTY_BUILD_CARD_HREF}
+                    className="px-4 py-2.5 min-h-[44px] rounded-xl bg-primary text-black text-sm font-bold inline-flex items-center touch-manipulation"
+                  >
+                    {copy.cta}
+                  </Link>
+                ) : (
+                  <Link
+                    href={PICKS_EMPTY_LOCKER_HREF}
+                    className="px-4 py-2.5 min-h-[44px] rounded-xl bg-primary text-black text-sm font-bold inline-flex items-center touch-manipulation"
+                  >
+                    {liveEmpty ? copy.cta : "Go to Locker"}
+                  </Link>
+                )}
+                {liveEmpty && hostCanBuild ? (
+                  <Link
+                    href={PICKS_EMPTY_LOCKER_HREF}
+                    className="px-4 py-2.5 min-h-[44px] rounded-xl border border-border text-sm font-semibold inline-flex items-center touch-manipulation"
+                  >
+                    Locker
+                  </Link>
+                ) : null}
                 <button
                   type="button"
-                  onClick={() => void selectWeek(activeWeek)}
-                  className="text-sm text-primary hover:underline font-medium min-h-[44px] px-2"
+                  onClick={() => {
+                    setCardBusy(true);
+                    setLoadError(null);
+                    void loadWeek(viewWeek, {
+                      forceReloadPicks: true,
+                      explicit: true,
+                    });
+                  }}
+                  className="px-4 py-2.5 min-h-[44px] rounded-xl border border-border text-sm font-semibold touch-manipulation"
                 >
-                  Go to live {weekTitle(activeWeek)} →
+                  Check again
                 </button>
-              )}
-              <a
-                href="/"
-                className="text-sm text-muted hover:text-foreground underline-offset-2 hover:underline min-h-[44px] inline-flex items-center px-2"
-              >
-                Home
-              </a>
+                {viewWeek !== activeWeek && (
+                  <button
+                    type="button"
+                    onClick={() => void selectWeek(activeWeek)}
+                    className="text-sm text-primary hover:underline font-medium min-h-[44px] px-2"
+                  >
+                    Go to live {weekTitle(activeWeek)} →
+                  </button>
+                )}
+                <Link
+                  href="/"
+                  className="text-sm text-muted hover:text-foreground underline-offset-2 hover:underline min-h-[44px] inline-flex items-center px-2"
+                >
+                  Home
+                </Link>
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {hasCard && (
           <>
