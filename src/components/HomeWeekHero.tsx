@@ -340,21 +340,20 @@ export default function HomeWeekHero() {
       secondaryLabel = state.isOps ? "Locker" : "Peek standings";
     }
   } else if (state.iLocked) {
-    eyebrow = state.frozen ? "Card locked" : "You’re in";
+    // Caught up — reward attention, don't invent the next click
+    eyebrow = state.frozen ? "Games are on" : "You're caught up";
     title = state.frozen
-      ? `${weekLabel} is frozen`
-      : `You’re locked for ${weekLabel}`;
+      ? `${weekLabel} is live — sit tight`
+      : `You're locked for ${weekLabel}`;
     body = state.frozen
-      ? "First kickoff hit. Sit tight for scores — then the Sunday / Monday Gazette drops. That’s the paper the room waits for."
-      : `You’re locked before first kickoff${state.lockLabel ? ` (${state.lockLabel})` : ""}. Change nothing if you want First & Final.`;
-    // After freeze: paper is the appointment; board still one tap away
-    primaryHref = state.frozen ? "/gazette" : "/board";
-    primaryLabel = state.frozen ? "Read the paper" : "The Board";
-    primaryClass = state.frozen
-      ? "bg-red-700 text-white hover:bg-red-600 shadow-[0_0_24px_rgba(185,28,28,0.35)]"
-      : "border border-primary/50 text-primary hover:bg-primary/10 bg-transparent";
-    secondaryHref = state.frozen ? "/board" : "/locker-room";
-    secondaryLabel = state.frozen ? "The Board" : "Locker";
+      ? "Football's running. Standings move when the card is scored — then the Gazette drops. Nothing fake to do until something real happens."
+      : `You're done for now${state.lockLabel ? ` · lock was ${state.lockLabel}` : ""}. Enjoy the wait. Come back when kickoff hits, the paper drops, or the room has something worth talking about. War Room doesn't cry wolf.`;
+    primaryHref = "/board";
+    primaryLabel = "The Board";
+    primaryClass =
+      "border border-primary/50 text-primary hover:bg-primary/10 bg-transparent";
+    secondaryHref = "/locker-room";
+    secondaryLabel = "Locker";
   } else if (state.frozen) {
     eyebrow = "Too late";
     title = `${weekLabel} already kicked off`;
@@ -532,37 +531,11 @@ export default function HomeWeekHero() {
           <span className="text-border">·</span>
           <span>
             {state.scoredWeeks === 0
-              ? "No weeks scored yet (preseason vibes)"
+              ? "Season breathing · no scores yet"
               : `${state.scoredWeeks} of ${SEASON_MAX_WEEK + 1} slots scored`}
           </span>
         </div>
 
-        {/* Commish-only secondary strip — keep ops path without drowning players */}
-        {state.isOps && (
-          <div className="mt-4 rounded-xl border border-primary/25 bg-primary/5 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <p className="text-xs text-muted">
-              <span className="text-primary font-semibold">
-                {state.isCommish ? "Commissioner" : "Deputy"}
-              </span>
-              {" — "}
-              {state.hasCard
-                ? state.scoredWeeks === 0
-                  ? "Card is live. After games: score the week so standings wake up."
-                  : "Card is live. After games: score the week, then Gazette."
-                : "Share League → First card wizard → Publish. Advanced tools wait until you score once."}
-            </p>
-            <Link
-              href={
-                state.hasCard
-                  ? "/commissioner?tab=results"
-                  : "/commissioner?tab=card&first=1"
-              }
-              className="shrink-0 text-xs font-semibold text-primary hover:underline"
-            >
-              {state.hasCard ? "Score week →" : "First card wizard →"}
-            </Link>
-          </div>
-        )}
       </div>
     </section>
   );

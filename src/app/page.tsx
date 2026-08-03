@@ -7,7 +7,6 @@ import dynamic from "next/dynamic";
 import IncidentBanner from "@/components/IncidentBanner";
 import HomeWeekHero from "@/components/HomeWeekHero";
 import CommishSetupBanner from "@/components/CommishSetupBanner";
-import HomeCrewWhisper from "@/components/HomeCrewWhisper";
 import HomeTileUnseen from "@/components/HomeTileUnseen";
 import {
   getSession,
@@ -28,7 +27,6 @@ import HomeSportAtmosphere from "@/components/HomeSportAtmosphere";
 import HomeSportHeader from "@/components/HomeSportHeader";
 import LeagueMembershipCard from "@/components/LeagueMembershipCard";
 import HomeRoomContext from "@/components/HomeRoomContext";
-import SoftUnlockBanner from "@/components/SoftUnlockBanner";
 import SandboxSimBanner from "@/components/SandboxSimBanner";
 import GuestConversionClose from "@/components/GuestConversionClose";
 import { isGuestMode } from "@/lib/guest-mode";
@@ -38,37 +36,8 @@ import {
 } from "@/lib/progressive-disclosure";
 import { isFirstWeekChrome } from "@/lib/first-week";
 
-/** Below-the-job widgets — not needed for Home first paint from Picks. */
-const HotTakeTicker = dynamic(() => import("@/components/HotTakeTicker"), {
-  ssr: false,
-});
-const CrownAndShame = dynamic(() => import("@/components/CrownAndShame"), {
-  ssr: false,
-});
-const PlayerWeekChecklist = dynamic(
-  () => import("@/components/PlayerWeekChecklist"),
-  { ssr: false }
-);
-const HomeUnseenPulse = dynamic(() => import("@/components/HomeUnseenPulse"), {
-  ssr: false,
-});
 const HomeGazetteSpotlight = dynamic(
   () => import("@/components/HomeGazetteSpotlight"),
-  { ssr: false }
-);
-const LockPicksRoast = dynamic(() => import("@/components/LockPicksRoast"), {
-  ssr: false,
-});
-const SportPoolPollBanner = dynamic(
-  () => import("@/components/SportPoolPollBanner"),
-  { ssr: false }
-);
-const BetaLeagueBanner = dynamic(
-  () => import("@/components/BetaLeagueBanner"),
-  { ssr: false }
-);
-const OpenRoomLeaveNudge = dynamic(
-  () => import("@/components/OpenRoomLeaveNudge"),
   { ssr: false }
 );
 const InviteFriends = dynamic(() => import("@/components/InviteFriends"), {
@@ -665,13 +634,9 @@ export default function Home() {
 
         {/* Primary job — always paint first on return from Picks */}
         <HomeWeekHero />
-      <HomeCrewWhisper />
 
         {/* Host first-hour spine */}
         <CommishSetupBanner />
-
-        {/* One-time: first lock opened the full room */}
-        <SoftUnlockBanner />
 
         {/* Guest: quiet conversion after exploring (not fireworks) */}
         <GuestConversionClose />
@@ -707,25 +672,9 @@ export default function Home() {
             )}
           </p>
         )}
+        {/* Real moments only — paper when it is real. No manufactured busywork. */}
+        {showSecondary && !firstWeekChrome && <HomeGazetteSpotlight />}
 
-        {/* Deferred flavor — League Hub lives only in the masthead */}
-        {showSecondary && !firstWeekChrome && (
-          <>
-            <OpenRoomLeaveNudge />
-            <BetaLeagueBanner />
-            <SportPoolPollBanner />
-            <HomeGazetteSpotlight />
-            <LockPicksRoast />
-            <PlayerWeekChecklist />
-            <HomeUnseenPulse />
-            <section className="mb-6">
-              <HotTakeTicker variant="warroom" />
-            </section>
-            <section className="mb-8 sm:mb-10">
-              <CrownAndShame />
-            </section>
-          </>
-        )}
 
         {/* First hour: job depends on whether a card exists. */}
         {firstWeekChrome ? (
@@ -1010,7 +959,7 @@ export default function Home() {
                 </p>
       </Link>
 
-<Link
+              <Link
                 href="/account"
                 className="group rounded-xl border border-sky-400/35 bg-sky-500/10 backdrop-blur-sm p-6 hover:border-sky-300/60 hover:bg-sky-500/15 transition shadow-[0_0_40px_rgba(56,189,248,0.08)] sm:col-span-2 lg:col-span-3"
               >
