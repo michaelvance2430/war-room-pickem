@@ -40,6 +40,9 @@ export default function PlayerLink({
   const [liveWeek, setLiveWeek] = useState(0);
   const [chaosTick, setChaosTick] = useState(0);
 
+  // Load week once on mount for Chaos flames. Do NOT re-fetch on every
+  // warroom-route-change — that × roster size caused current_week request storms.
+  // loadLeagueActiveWeek is single-flight + TTL cached in cloud.ts.
   useEffect(() => {
     let cancelled = false;
     void loadLeagueActiveWeek().then((w) => {
@@ -48,17 +51,10 @@ export default function PlayerLink({
     function onChaos() {
       setChaosTick((t) => t + 1);
     }
-    function onRoute() {
-      void loadLeagueActiveWeek().then((w) => {
-        if (!cancelled) setLiveWeek(w);
-      });
-    }
     window.addEventListener("warroom-chaos-active", onChaos);
-    window.addEventListener("warroom-route-change", onRoute);
     return () => {
       cancelled = true;
       window.removeEventListener("warroom-chaos-active", onChaos);
-      window.removeEventListener("warroom-route-change", onRoute);
     };
   }, []);
 

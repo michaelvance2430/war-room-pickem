@@ -49,6 +49,8 @@ const cardInflight = new Map<string, Promise<CloudCard | null>>();
 const publishedCache = new Map<string, CacheEntry<number[]>>();
 const scoredCache = new Map<string, CacheEntry<number[]>>();
 const activeWeekCache = new Map<string, CacheEntry<number>>();
+/** Single-flight: one current_week network GET per league at a time. */
+const activeWeekInflight = new Map<string, Promise<number>>();
 const playersCache = new Map<
   string,
   CacheEntry<import("./types").Player[]>
@@ -64,6 +66,7 @@ const rosterInflight = new Map<string, Promise<object[]>>();
 
 const CARD_TTL_MS = 12_000;
 const LIST_TTL_MS = 12_000;
+/** Success + failure backoff for current_week reads (no stampede). */
 const ACTIVE_WEEK_TTL_MS = 5_000;
 const PLAYERS_TTL_MS = 15_000;
 const ROSTER_TTL_MS = 25_000;
@@ -154,6 +157,7 @@ export function invalidateCloudWeekCaches(leagueId?: string | null) {
     publishedCache.clear();
     scoredCache.clear();
     activeWeekCache.clear();
+    activeWeekInflight.clear();
     playersCache.clear();
     playersInflight.clear();
     rosterCache.clear();
@@ -170,6 +174,7 @@ export function invalidateCloudWeekCaches(leagueId?: string | null) {
   publishedCache.delete(leagueId);
   scoredCache.delete(leagueId);
   activeWeekCache.delete(leagueId);
+  activeWeekInflight.delete(leagueId);
   playersCache.delete(leagueId);
   playersInflight.delete(leagueId);
   rosterCache.delete(leagueId);
@@ -250,6 +255,8 @@ export async function setLeagueActiveWeek(
         /* ignore */
       }
       eyes.applyEyesWeek(weekNumber);
+      cacheSet(activeWeekCache, session.leagueId, weekNumber);
+      activeWeekInflight.delete(session.leagueId);
       return { ok: true };
     }
   } catch {
@@ -266,6 +273,9 @@ export async function setLeagueActiveWeek(
   } catch {
     /* ignore */
   }
+  // Fresh week for all readers immediately
+  cacheSet(activeWeekCache, session.leagueId, weekNumber);
+  activeWeekInflight.delete(session.leagueId);
   // Tenure for Elite Commish — true commissioner only (not deputies)
   if (session.isCommissioner && session.playerId) {
     try {
@@ -282,7 +292,39 @@ export async function setLeagueActiveWeek(
   return { ok: true };
 }
 
-/** Active pick'em week for the league (local first, cloud refresh, short TTL). */
+function shouldLogCurrentWeek(): boolean {
+  if (typeof process !== "undefined" && process.env.NODE_ENV === "development") {
+    return true;
+  }
+  if (typeof window === "undefined") return false;
+  try {
+    return localStorage.getItem("warroom-runtime-debug") === "1";
+  } catch {
+    return false;
+  }
+}
+
+function wrCurrentWeekLog(
+  msg: string,
+  leagueId: string,
+  stack?: string
+) {
+  if (!shouldLogCurrentWeek()) return;
+  try {
+    if (stack) {
+      console.log(`[WR-CURRENT-WEEK] ${msg} league=${leagueId}`, stack);
+    } else {
+      console.log(`[WR-CURRENT-WEEK] ${msg} league=${leagueId}`);
+    }
+  } catch {
+    /* ok */
+  }
+}
+
+/**
+ * Active pick'em week for the league (local first, cloud refresh, short TTL).
+ * Single-flight per leagueId — concurrent callers share one network GET.
+ */
 export async function loadLeagueActiveWeek(): Promise<number> {
   try {
     const { isGuestMode } = await import("./guest-mode");
@@ -306,51 +348,114 @@ export async function loadLeagueActiveWeek(): Promise<number> {
     /* ignore */
   }
   const session = getSession();
-  let week = 1;
+  let fallbackWeek = 1;
   try {
     const saved = localStorage.getItem("warroom-active-week");
     if (saved != null && saved !== "") {
       const n = parseInt(saved, 10);
-      if (!Number.isNaN(n)) week = n;
+      if (!Number.isNaN(n)) fallbackWeek = n;
     }
   } catch {
     /* ignore */
   }
-  if (!session?.leagueId) return week;
+  if (!session?.leagueId) return fallbackWeek;
 
-  const cached = cacheGet(activeWeekCache, session.leagueId, ACTIVE_WEEK_TTL_MS);
+  const leagueId = session.leagueId;
+  const cached = cacheGet(activeWeekCache, leagueId, ACTIVE_WEEK_TTL_MS);
   if (cached != null) return cached;
 
-  try {
-    const supabase = createClient();
-    const data = await withTimeout(
-      (async () => {
-        const { data: row } = await supabase
-          .from("leagues")
-          .select("current_week")
-          .eq("id", session.leagueId)
-          .maybeSingle();
-        return row;
-      })(),
-      6_000,
-      null
-    );
-    if (data && data.current_week != null) {
-      const n = Number(data.current_week);
-      if (!Number.isNaN(n)) {
-        week = n;
-        try {
-          localStorage.setItem("warroom-active-week", String(week));
-        } catch {
-          /* ignore */
+  const existing = activeWeekInflight.get(leagueId);
+  if (existing) {
+    wrCurrentWeekLog("join-inflight", leagueId);
+    return existing;
+  }
+
+  const promise = (async (): Promise<number> => {
+    let week = fallbackWeek;
+
+    // Diagnostics: count real network attempts only (not joiners)
+    try {
+      const g = globalThis as unknown as {
+        __WR_CW_N?: number;
+        __WR_CW_INFLIGHT?: number;
+      };
+      g.__WR_CW_N = (g.__WR_CW_N || 0) + 1;
+      g.__WR_CW_INFLIGHT = (g.__WR_CW_INFLIGHT || 0) + 1;
+      const n = g.__WR_CW_N;
+      const inflight = g.__WR_CW_INFLIGHT;
+      let route = "";
+      try {
+        route = typeof window !== "undefined" ? window.location.pathname : "";
+      } catch {
+        /* ok */
+      }
+      const stack =
+        typeof Error !== "undefined"
+          ? (new Error().stack || "").split("\n").slice(1, 8).join(" | ")
+          : "";
+      wrCurrentWeekLog(
+        `#${n} NET inflight=${inflight} route=${route} t=${Date.now()}`,
+        leagueId,
+        stack
+      );
+    } catch {
+      /* ok */
+    }
+
+    let failed = false;
+    try {
+      const supabase = createClient();
+      const data = await withTimeout(
+        (async () => {
+          const { data: row, error } = await supabase
+            .from("leagues")
+            .select("current_week")
+            .eq("id", leagueId)
+            .maybeSingle();
+          if (error) throw error;
+          return row;
+        })(),
+        6_000,
+        null
+      );
+      if (data === null) {
+        // Timeout or empty — treat as soft fail for backoff
+        failed = true;
+      } else if (data.current_week != null) {
+        const n = Number(data.current_week);
+        if (!Number.isNaN(n)) {
+          week = n;
+          try {
+            localStorage.setItem("warroom-active-week", String(week));
+          } catch {
+            /* ignore */
+          }
         }
       }
+    } catch {
+      failed = true;
+      /* use local fallback; cache below = backoff so callers don't stampede */
+    } finally {
+      try {
+        const g = globalThis as unknown as { __WR_CW_INFLIGHT?: number };
+        g.__WR_CW_INFLIGHT = Math.max(0, (g.__WR_CW_INFLIGHT || 1) - 1);
+      } catch {
+        /* ok */
+      }
     }
-  } catch {
-    /* ignore */
-  }
-  cacheSet(activeWeekCache, session.leagueId, week);
-  return week;
+
+    // Success and failure both cache ≥5s (ACTIVE_WEEK_TTL_MS) — no immediate re-GET
+    cacheSet(activeWeekCache, leagueId, week);
+    if (failed) {
+      wrCurrentWeekLog(`fail-backoff week=${week}`, leagueId);
+    }
+    return week;
+  })().finally(() => {
+    activeWeekInflight.delete(leagueId);
+  });
+
+  activeWeekInflight.set(leagueId, promise);
+  return promise;
 }
 
 export interface ScoreWeekResult {
@@ -498,6 +603,8 @@ export async function publishWeekCard(opts: {
   } catch {
     /* ignore */
   }
+  cacheSet(activeWeekCache, leagueId, opts.weekNumber);
+  activeWeekInflight.delete(leagueId);
 
   const rows = opts.games.map((g, i) => ({
     week_card_id: weekCardId,
@@ -3995,6 +4102,13 @@ async function resetSeasonClientFallback(
   }
 
   await supabase.from("leagues").update({ current_week: 0 }).eq("id", leagueId);
+  try {
+    localStorage.setItem("warroom-active-week", "0");
+  } catch {
+    /* ignore */
+  }
+  cacheSet(activeWeekCache, leagueId, 0);
+  activeWeekInflight.delete(leagueId);
 
   return {
     ok: true,
