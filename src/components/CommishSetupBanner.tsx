@@ -16,20 +16,46 @@ import {
 } from "@/lib/commish-onboarding";
 import InviteFriends from "@/components/InviteFriends";
 import { weekTitle } from "@/lib/dates";
+import {
+  isOnboardingActive,
+  readOnboardingState,
+  ONBOARDING_EVENT,
+} from "@/lib/onboarding";
 
 /**
- * First-time host: three obvious jobs only. Phone-first KISS.
- * 1 Share · 2 Publish · 3 Score (later)
+ * First-time host companion on Home.
+ * Conversation, not a checklist. One action only. No "3 jobs."
+ * Scoring stays quiet until a practice week card is live.
+ * Hidden while the commissioner conversation engine is active (coach owns the path).
  */
 export default function CommishSetupBanner() {
   const [show, setShow] = useState(false);
+  const [journeyActive, setJourneyActive] = useState(false);
+  const [journeyStepId, setJourneyStepId] = useState<string | null>(null);
   const [humans, setHumans] = useState(0);
   const [hasCard, setHasCard] = useState(false);
-  const [scored, setScored] = useState(0);
   const [code, setCode] = useState("");
   const [leagueName, setLeagueName] = useState("War Room");
   const [leagueId, setLeagueId] = useState("");
   const [weekLabel, setWeekLabel] = useState("this week");
+
+  useEffect(() => {
+    function syncJourney() {
+      try {
+        const s = readOnboardingState();
+        const active =
+          isOnboardingActive() && s.journeyId === "commissioner";
+        setJourneyActive(active);
+        setJourneyStepId(active ? s.stepId : null);
+      } catch {
+        setJourneyActive(false);
+        setJourneyStepId(null);
+      }
+    }
+    syncJourney();
+    window.addEventListener(ONBOARDING_EVENT, syncJourney);
+    return () => window.removeEventListener(ONBOARDING_EVENT, syncJourney);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -66,14 +92,12 @@ export default function CommishSetupBanner() {
         setLeagueName(league.name || "War Room");
         setHumans(roster.filter((m) => !m.isBot).length);
         setHasCard(!!(card?.games?.length) || published.length > 0);
-        setScored(scoredWeeks.length);
         setWeekLabel(weekTitle(week));
         setShow(true);
       } catch {
         if (!cancelled) setShow(false);
       }
     }
-    // Don't compete with Home hero for bandwidth on first paint
     const t = window.setTimeout(() => void load(), 700);
     return () => {
       cancelled = true;
@@ -83,104 +107,92 @@ export default function CommishSetupBanner() {
 
   if (!show) return null;
 
-  const invited = humans >= 2 || getCommishSetup(leagueId).inviteCopied;
-  const step: "invite" | "card" | "score" | "done" = !invited
-    ? "invite"
-    : !hasCard
-      ? "card"
-      : scored === 0
-        ? "score"
-        : "done";
+  // While conversation engine runs: only surface the ONE current action UI
+  // (never a second manual / checklist). Welcome + finish stay coach-only.
+  if (journeyActive) {
+    if (journeyStepId !== "invite" && journeyStepId !== "build_week") {
+      return null;
+    }
+  }
 
-  if (step === "done") return null;
+  const invited = humans >= 2 || getCommishSetup(leagueId).inviteCopied;
+  // One action only — never a three-step syllabus
+  type HostBeat = "invite" | "card" | "soft_score";
+  let beat: HostBeat = !invited ? "invite" : !hasCard ? "card" : "soft_score";
+  if (journeyActive && journeyStepId === "invite") beat = "invite";
+  if (journeyActive && journeyStepId === "build_week") beat = "card";
+  // Soft score only after practice week exists AND journey is done
+  if (journeyActive && beat === "soft_score") return null;
 
   return (
-    <section className="mb-5 rounded-2xl border-2 border-primary/50 bg-primary/10 p-4 sm:p-5">
-      <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
-        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">
-          Commish · first jobs
-        </p>
-        <p className="text-[10px] font-semibold tabular-nums text-muted">
-          Step {step === "invite" ? 1 : step === "card" ? 2 : 3} of 3
+    <section
+      id="host-start-here"
+      className="mb-5 rounded-2xl border-2 border-primary/50 bg-card/95 p-4 sm:p-5 shadow-lg"
+    >
+      <div className="flex flex-wrap items-center gap-2 mb-2">
+        <span className="inline-flex items-center rounded-full bg-primary px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-[0.14em] text-black">
+          Start here
+        </span>
+        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">
+          Host · I&apos;m with you
         </p>
       </div>
-      <h2 className="text-lg sm:text-xl font-bold text-foreground mb-1">
-        {step === "invite" && "Share your invite so people can join"}
-        {step === "card" && "Publish this week’s card"}
-        {step === "score" && `Score ${weekLabel} when games are done`}
-      </h2>
-      <p className="text-sm text-muted mb-3 leading-relaxed">
-        {step === "invite" &&
-          "One tap shares a link with the code already filled in. Friends open it, make an account if they need one, and they’re in the room."}
-        {step === "card" &&
-          `${humans} ${humans === 1 ? "person" : "people"} in the room. Open Commish → Pull Odds for ${weekLabel}, pick 5 games, then Publish so everyone can lock picks.`}
-        {step === "score" &&
-          "Card’s live. When the games finish: open Enter Results, fill winners, and score the week. That updates standings and drops the paper."}
-      </p>
 
-      {/* Progress dots */}
-      <div className="flex gap-2 mb-4">
-        {(["invite", "card", "score"] as const).map((s, i) => {
-          const done =
-            (s === "invite" && invited) ||
-            (s === "card" && hasCard) ||
-            (s === "score" && scored > 0);
-          const current = step === s;
-          return (
-            <div
-              key={s}
-              className={`h-1.5 flex-1 rounded-full ${
-                done
-                  ? "bg-primary"
-                  : current
-                    ? "bg-primary/50"
-                    : "bg-border"
-              }`}
-              title={`Step ${i + 1}`}
+      {beat === "invite" && (
+        <>
+          <h2 className="text-lg sm:text-xl font-bold text-foreground mb-1">
+            Get one friend in the door.
+          </h2>
+          <p className="text-sm text-muted mb-3 leading-relaxed">
+            One share. Drop it in the group chat. That&apos;s the whole job
+            right now — not a checklist.
+          </p>
+          {code ? (
+            <InviteFriends
+              leagueName={leagueName}
+              code={code}
+              leagueId={leagueId}
+              compact
+              startHere
             />
-          );
-        })}
-      </div>
-
-      {step === "invite" && code && (
-        <InviteFriends
-          leagueName={leagueName}
-          code={code}
-          leagueId={leagueId}
-          compact
-        />
+          ) : null}
+        </>
       )}
 
-      {step === "card" && (
-        <Link
-          href="/commissioner?tab=card&first=1"
-          className="flex items-center justify-center w-full py-4 min-h-[56px] rounded-xl bg-primary text-black text-base font-extrabold touch-manipulation active:scale-[0.99]"
-        >
-          Pull Odds & publish {weekLabel} →
-        </Link>
+      {beat === "card" && (
+        <>
+          <h2 className="text-lg sm:text-xl font-bold text-foreground mb-1">
+            Build one practice week.
+          </h2>
+          <p className="text-sm text-muted mb-3 leading-relaxed">
+            {humans} {humans === 1 ? "person" : "people"} in the room. Pull
+            Odds, pick 5, Publish. One card — then the room is alive.
+          </p>
+          <Link
+            href="/commissioner?tab=card&first=1"
+            className="flex items-center justify-center w-full py-4 min-h-[56px] rounded-xl bg-primary text-black text-base font-extrabold touch-manipulation active:scale-[0.99]"
+          >
+            Start here · Build {weekLabel} →
+          </Link>
+        </>
       )}
 
-      {step === "score" && (
-        <div className="flex flex-col gap-2">
+      {beat === "soft_score" && (
+        <>
+          <h2 className="text-lg sm:text-xl font-bold text-foreground mb-1">
+            You already ran a week.
+          </h2>
+          <p className="text-sm text-muted mb-3 leading-relaxed">
+            When the games die, come back and score — standings move, paper
+            drops. Not now. Only when kickoffs are done.
+          </p>
           <Link
             href="/commissioner?tab=results"
-            className="flex items-center justify-center w-full py-4 min-h-[56px] rounded-xl bg-primary text-black text-base font-extrabold touch-manipulation"
+            className="flex items-center justify-center w-full py-3.5 min-h-[48px] rounded-xl border border-primary/50 text-primary text-sm font-bold touch-manipulation"
           >
-            Score {weekLabel} →
+            I&apos;ll score when games are done →
           </Link>
-          <Link
-            href="/picks"
-            className="flex items-center justify-center w-full py-2.5 min-h-[44px] text-sm font-semibold text-muted hover:text-foreground touch-manipulation"
-          >
-            Did I lock my own picks?
-          </Link>
-        </div>
-      )}
-
-      {step !== "score" && (
-        <p className="text-xs text-muted mt-3 text-center leading-relaxed">
-          Extra settings stay under League settings until you score a week.
-        </p>
+        </>
       )}
     </section>
   );

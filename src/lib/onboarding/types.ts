@@ -39,6 +39,11 @@ export type ConversationBeat = {
   nextHint?: string;
   /** Point at real nav so user drives the app */
   pointAt?: PointAtTarget;
+  /**
+   * Exactly one actionable UI cue this beat ("Start Here").
+   * Never leave the host wondering what to click.
+   */
+  startHere?: boolean;
 };
 
 export type OnboardingAction = {

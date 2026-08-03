@@ -1,133 +1,121 @@
 /**
- * Journey A — New Commissioner (immersion: host voice, Home front door)
+ * Journey A — New Commissioner (Scrub #2: host conversation, not a manual)
+ *
+ * Emotional goal: "Wow... I can actually run this."
+ * NOT: "I know the three jobs."
+ *
+ * Rules:
+ * - One action at a time
+ * - Always one "Start Here"
+ * - Coach stays with you
+ * - No scoring / advanced until after a practice week is live
+ * - Foundry never appears in this copy
  */
 
 import type { OnboardingJourney } from "../types";
 
 export const commissionerJourney: OnboardingJourney = {
   id: "commissioner",
-  name: "First league as host",
-  successFeeling: "I can run this league.",
+  name: "First hour as host",
+  successFeeling: "Wow... I can actually run this.",
   steps: [
     {
       id: "welcome",
-      goal: "Welcome host on Home energy",
+      goal: "Welcome as a host — promise company, not a syllabus",
       layout: "fullscreen",
       conversation: {
-        kicker: "You're the host",
-        title: "You're running the room.",
+        kicker: "Hey, host",
+        title: "This is your room.",
         speak:
-          "Friends don't need another spreadsheet. They need bragging rights, rivalries, and a paper when the week dies.",
-        whyCare:
-          "Three jobs: invite the crew, wake the room with a card, know how scoring works. You can't break the league from here.",
+          "I'm staying with you. Not a manual — just the next thing, one step at a time. You can't break the league from here.",
+        whyCare: "A few minutes. Then you'll know you can actually run this.",
         celebrate: "none",
+        startHere: true,
         pointAt: "home",
       },
       action: {
-        label: "Let's go — Home →",
+        label: "Start here — walk me in →",
         resolveHref: "home",
         advancesOnClick: true,
       },
-      secondaryAction: { label: "Skip for now", skipTo: "complete" },
+      secondaryAction: { label: "I'll explore on my own", skipTo: "complete" },
       successCondition: { type: "always" },
       nextStep: "invite",
     },
     {
       id: "invite",
-      goal: "Share invite from Home",
+      goal: "One action: get a friend in the door",
       layout: "coach",
       conversation: {
-        kicker: "Every great league starts with one message",
-        title: "Invite your people.",
+        kicker: "Still with you",
+        title: "Get one friend in the door.",
         speak:
-          "This is the easiest part. Copy the invite. Drop it in the group chat. The fun starts when the first person joins.",
-        whyCare: "An empty room isn't broken — it's waiting for your crew.",
+          "That's the whole job right now. Tap Share invite — drop it in the group chat. Empty room isn't broken. It's waiting.",
         celebrate: "micro",
-        celebrateCopy: "✓ Nice. The room is waiting for friends.",
-        explainAfter: "Next: wake the room — publish a card so they can pick.",
-        nextHint: "Publish the first card",
+        celebrateCopy: "✓ Nice. Someone's about to walk in.",
+        explainAfter:
+          "Next we wake the room with one practice week. Same moves you'll use all season.",
+        nextHint: "Share invite on Home",
+        startHere: true,
         pointAt: "home",
       },
       action: {
-        label: "I'm on Home — I'll share →",
-        href: "/",
+        label: "Start here · Share invite",
+        href: "/#invite-friends",
         advancesOnClick: true,
       },
       secondaryAction: {
-        label: "I've shared (or I'll do it later) →",
+        label: "I shared it →",
       },
-      successCondition: { type: "manual" },
-      nextStep: "publish",
+      successCondition: { type: "sessionFlag", key: "warroom-invite-shared" },
+      nextStep: "build_week",
     },
     {
-      id: "publish",
-      goal: "Publish first week — room comes alive",
+      id: "build_week",
+      goal: "One action: publish a practice week so the room is alive",
       layout: "coach",
       conversation: {
-        kicker: "The room isn't alive yet",
-        title: "Publish the first card.",
+        kicker: "Still with you",
+        title: "Build one practice week.",
         speak:
-          "Pull Odds → pick 5 → Publish. That's the moment everyone starts checking their phones.",
+          "Open Commish → Pull Odds → pick 5 → Publish. One card. That's it. Friends can lock picks after this.",
         whyCare:
-          "Until you publish, My Picks stays empty and they think the room is broken.",
+          "Practice week energy — you're learning the real host move, not reading about it.",
         celebrate: "peak",
         celebrateCopy:
-          "🎉 The room is alive.\n\nYour first week is LIVE. Players can lock picks now.\n\nText the crew once — then see what they see.",
-        explainAfter: "Friends can open My Picks.",
-        nextHint: "Know the host loop",
+          "🎉 You just ran a week.\n\nThe room is alive. Players can open My Picks.\n\nWow… you can actually run this.",
+        explainAfter: "That's the hard part. You're the host now.",
+        nextHint: "Open Commish · Build Card",
+        startHere: true,
         pointAt: "commissioner",
       },
       action: {
-        label: "Open Build Card →",
+        label: "Start here · Build the card →",
         resolveHref: "commissionerCard",
         advancesOnClick: true,
       },
       successCondition: { type: "event", name: "warroom-card-published" },
       secondaryAction: {
-        label: "I've published (or will soon) →",
+        label: "I published it →",
       },
-      nextStep: "score_hint",
-    },
-    {
-      id: "score_hint",
-      goal: "Know scoring without forced action",
-      layout: "coach",
-      conversation: {
-        kicker: "When the games die",
-        title: "You write the ending.",
-        speak:
-          "Enter Results → winners → Score. Standings move. The paper cooks. That's the host loop every week.",
-        whyCare: "You don't need to score right now — just know the door.",
-        celebrate: "micro",
-        celebrateCopy: "✓ You know the host loop.",
-        explainAfter: "Invite. Publish. Score. You've walked it.",
-        pointAt: "commissioner",
-      },
-      action: {
-        label: "Peek Results →",
-        resolveHref: "commissionerResults",
-        advancesOnClick: true,
-      },
-      secondaryAction: {
-        label: "Got it → finish",
-      },
-      successCondition: { type: "manual" },
+      // Scoring deliberately NOT next — delay until after practice week exists
       nextStep: "youre_ready",
     },
     {
       id: "youre_ready",
-      goal: "Single host finish",
+      goal: "Single emotional finish — confidence, not curriculum",
       layout: "fullscreen",
       conversation: {
-        kicker: "Welcome, host",
-        title: "You can run this league.",
+        kicker: "You did it",
+        title: "You can run this.",
         speak:
-          "Invite. Publish. Score. When friends text “is the league open?” — you’ll know exactly what to do.",
-        whyCare: "Welcome to the War Room.",
+          "Invite. Card. Room alive. When friends text “is the league open?” — you already know what to do. Scoring waits until the games die. We'll do that together then.",
+        whyCare: "Welcome to the War Room, host.",
         celebrate: "none",
+        startHere: true,
       },
       action: {
-        label: "Take me home →",
+        label: "Start here · Take me home →",
         href: "/",
         advancesOnClick: true,
       },

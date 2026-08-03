@@ -32,6 +32,24 @@ Constitution line to hold:
 
 ---
 
+## Scrub #2 — Commissioner hosting (P0)
+
+Walk the **commissioner** journey. Emotional goal:
+
+> **“Wow… I can actually run this.”**  
+> Not: “I know the three jobs.”
+
+| # | Check | Pass? |
+|---|-------|-------|
+| 1 | **Zero Foundry** language in production onboarding UI | |
+| 2 | Opening is a **conversation** (coach stays with you) — not a checklist | |
+| 3 | **One action at a time** — never a full responsibility dump | |
+| 4 | Exactly one **Start here** cue every beat | |
+| 5 | Feels like **walking into** the room, not reading a manual | |
+| 6 | **Scoring / advanced** only after a practice week is live | |
+
+---
+
 ## Two kinds of verification
 
 | | Engineering pass | Emotion pass |

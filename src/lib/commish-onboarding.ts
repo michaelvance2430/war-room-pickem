@@ -60,6 +60,18 @@ export function markHostScreenSeen(leagueId: string) {
 
 export function markInviteCopied(leagueId: string) {
   patchCommishSetup(leagueId, { inviteCopied: true });
+  // Onboarding conversation engine — one-action success for "invite"
+  try {
+    if (typeof sessionStorage !== "undefined") {
+      sessionStorage.setItem("warroom-invite-shared", "1");
+    }
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("warroom-invite-shared"));
+      window.dispatchEvent(new CustomEvent("warroom-onboarding"));
+    }
+  } catch {
+    /* ok */
+  }
 }
 
 export function markFirstCardPublished(leagueId: string) {

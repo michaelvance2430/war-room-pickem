@@ -26,6 +26,8 @@ type Props = {
   /** Compact for banners */
   compact?: boolean;
   className?: string;
+  /** Highlight as the single onboarding "Start Here" control */
+  startHere?: boolean;
 };
 
 const FLAVOR_CHIPS: {
@@ -54,6 +56,7 @@ export default function InviteFriends({
   sportId: sportIdProp,
   compact,
   className = "",
+  startHere = false,
 }: Props) {
   const session = getSession();
   const league = getLeague();
@@ -158,7 +161,10 @@ export default function InviteFriends({
 
   if (compact) {
     return (
-      <div className={className}>
+      <div
+        id={startHere ? "invite-start-here" : undefined}
+        className={className}
+      >
         {multiLeague && (
           <p className="text-[10px] font-bold uppercase tracking-wider text-muted mb-1.5">
             Sharing as{" "}
@@ -172,9 +178,13 @@ export default function InviteFriends({
             type="button"
             disabled={busy}
             onClick={() => void onShare()}
-            className="px-4 py-2.5 rounded-xl bg-primary text-black text-sm font-bold disabled:opacity-50 min-h-[44px]"
+            className={
+              startHere
+                ? "px-4 py-2.5 rounded-xl bg-primary text-black text-sm font-extrabold disabled:opacity-50 min-h-[48px] ring-2 ring-primary ring-offset-2 ring-offset-background shadow-lg"
+                : "px-4 py-2.5 rounded-xl bg-primary text-black text-sm font-bold disabled:opacity-50 min-h-[44px]"
+            }
           >
-            {busy ? "…" : "Share invite"}
+            {busy ? "…" : startHere ? "Start here · Share invite" : "Share invite"}
           </button>
           <button
             type="button"

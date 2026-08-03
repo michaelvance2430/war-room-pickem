@@ -50,7 +50,13 @@ function PracticeStrip() {
 }
 
 /** Point at bottom nav — player drives, coach only guides attention */
-function NavPointer({ target }: { target: PointAtTarget }) {
+function NavPointer({
+  target,
+  startHere,
+}: {
+  target: PointAtTarget;
+  startHere?: boolean;
+}) {
   if (!target) return null;
   const labels: Record<string, string> = {
     home: "Home",
@@ -69,13 +75,22 @@ function NavPointer({ target }: { target: PointAtTarget }) {
       aria-hidden
     >
       <div className="flex flex-col items-center animate-bounce">
-        <span className="text-[10px] font-bold text-primary bg-card/95 border border-primary/50 rounded-full px-2.5 py-1 shadow-lg mb-0.5">
-          Tap {label}
+        <span className="text-[10px] font-extrabold text-black bg-primary border border-primary rounded-full px-2.5 py-1 shadow-lg mb-0.5">
+          {startHere ? `Start here · ${label}` : `Tap ${label}`}
         </span>
         <span className="text-primary text-lg leading-none">↓</span>
       </div>
     </div>
   );
+}
+
+function primaryLabel(step: OnboardingStep, busy?: boolean): string {
+  if (busy) return "…";
+  const raw = step.action?.label || "Continue →";
+  if (step.conversation.startHere && !/^start here/i.test(raw)) {
+    return `Start here · ${raw}`;
+  }
+  return raw;
 }
 
 function CoachStrip({
@@ -188,7 +203,7 @@ function CoachStrip({
             onClick={onPrimary}
             className="w-full py-3.5 min-h-[48px] rounded-xl bg-primary text-black font-extrabold text-sm disabled:opacity-60"
           >
-            {primaryBusy ? "…" : step.action?.label || "Continue →"}
+            {primaryLabel(step, primaryBusy)}
           </button>
           {step.secondaryAction && (
             <button
@@ -222,6 +237,11 @@ function CoachStrip({
       <div className="max-w-lg mx-auto pointer-events-auto rounded-xl border border-primary/60 bg-card/95 backdrop-blur-md shadow-xl overflow-hidden mb-1">
         <div className="px-3 py-2 flex items-start gap-2">
           <div className="min-w-0 flex-1">
+            {c.startHere && (
+              <span className="inline-flex mb-1 rounded-full bg-primary px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-[0.12em] text-black">
+                Start here
+              </span>
+            )}
             {c.kicker && (
               <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-primary mb-0.5">
                 {c.kicker}
@@ -253,9 +273,9 @@ function CoachStrip({
               type="button"
               disabled={primaryBusy}
               onClick={onPrimary}
-              className="flex-1 min-w-[7rem] py-2 rounded-lg bg-primary text-black text-xs font-bold disabled:opacity-60"
+              className="flex-1 min-w-[7rem] py-2 rounded-lg bg-primary text-black text-xs font-extrabold disabled:opacity-60"
             >
-              {primaryBusy ? "…" : step.action.label}
+              {primaryLabel(step, primaryBusy)}
             </button>
           )}
           {phase === "awaiting" &&
@@ -313,19 +333,32 @@ export default function OnboardingHost() {
       const s = readOnboardingState();
       if (s.active && s.phase === "awaiting") {
         const st = getActiveStep();
-        if (st?.successCondition.type === "event") {
+        if (
+          st?.successCondition.type === "event" &&
+          (st.successCondition.name === "warroom-card-published" ||
+            !st.successCondition.name)
+        ) {
           confirmStepComplete();
           sync();
         }
       }
     }
+    function onInviteShared() {
+      const s = readOnboardingState();
+      if (s.active && s.phase === "awaiting") {
+        evaluateSuccess(window.location.pathname);
+        sync();
+      }
+    }
     window.addEventListener(ONBOARDING_EVENT, onOb);
     window.addEventListener("warroom-card-published", onCardPublished);
+    window.addEventListener("warroom-invite-shared", onInviteShared);
     return () => {
       cancelled = true;
       window.clearTimeout(t);
       window.removeEventListener(ONBOARDING_EVENT, onOb);
       window.removeEventListener("warroom-card-published", onCardPublished);
+      window.removeEventListener("warroom-invite-shared", onInviteShared);
     };
   }, [sync]);
 
@@ -359,7 +392,7 @@ export default function OnboardingHost() {
     if (a.href) return a.href;
     if (a.resolveHref === "home") return "/";
     if (a.resolveHref === "tutorialPicks") {
-      // Prefer practice so Promise #2 holds — stay inside War Room UI, not Foundry
+      // Prefer practice so Promise #2 holds — real app UI only
       try {
         const { isBoredPracticeWindowOpen } = await import(
           "@/lib/bored-practice"
@@ -488,18 +521,28 @@ export default function OnboardingHost() {
     <>
       {showPracticeStrip && <PracticeStrip />}
       {pointAt && state.phase === "awaiting" && (
-        <NavPointer target={pointAt} />
+        <NavPointer
+          target={pointAt}
+          startHere={!!step.conversation.startHere}
+        />
       )}
       {pointAt &&
         state.phase === "speak" &&
         step.action?.resolveHref === "tutorialPicks" && (
-          <NavPointer target={pointAt} />
+          <NavPointer
+            target={pointAt}
+            startHere={!!step.conversation.startHere}
+          />
         )}
       {pointAt &&
         state.phase === "speak" &&
         (step.action?.href === "/standings" ||
-          step.action?.href === "/locker-room") && (
-          <NavPointer target={pointAt} />
+          step.action?.href === "/locker-room" ||
+          step.action?.resolveHref === "commissionerCard") && (
+          <NavPointer
+            target={pointAt}
+            startHere={!!step.conversation.startHere}
+          />
         )}
       <CoachStrip
         step={step}

@@ -691,12 +691,10 @@ export default function Home() {
           <p className="text-xs text-muted mb-4 leading-relaxed max-w-xl -mt-1">
             {isCommish ? (
               <>
-                First ten minutes, host edition:{" "}
-                <strong className="text-foreground">
-                  spam the invite → drop a card → lock your own picks
-                </strong>
-                . No trophies, papers, or fireworks until somebody actually
-                locks. Yes, including you.
+                You&apos;re the host — follow{" "}
+                <strong className="text-foreground">Start here</strong> one
+                step at a time. No trophies or papers until someone locks.
+                Yes, including you.
               </>
             ) : liveCard === false ? (
               <>
