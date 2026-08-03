@@ -80,7 +80,7 @@ P0 freezes (DeferredChrome, sport-theme recursion, event-loop starvation, 20–1
 
 #### One-line backlog label
 
-> **PB-2 — Duplicate concurrent scored-week snapshot loads on Home; observed 994 ms longtask and repeated 230–511 ms serial query chains.**
+> **PB-2 — Home longtask (~1–1.5s) persists even when `listScoredWeekNumbers` is CACHE_HIT; cold path also has concurrent scored-week stampede.**
 
 #### Raw evidence (as reported)
 
@@ -109,10 +109,32 @@ P0 freezes (DeferredChrome, sport-theme recursion, event-loop starvation, 20–1
 | Freeze | **None** |
 | Noise | `feature_collector.js` — **browser/extension** (ignore) |
 
+**Sample C — fully warm scored-week cache (stronger counter-evidence)**
+
+| Signal | Value |
+|--------|--------|
+| Context | Home / app-shell (production healthy; usability scrub period) |
+| `listScoredWeekNumbers` | **CACHE_HIT** (already warm — network query did not own the path) |
+| Longtask | **~1546 ms** |
+| Timer-lag starvation | **~651 ms** |
+| Failed War Room requests | **None** |
+| Freeze | **None** |
+| Noise | `feature_collector.js` — **browser/extension** (ignore; not War Room) |
+
 **Interpretation (baseline only):**
 
 - **Sample A:** Multiple independent callers race `listScoredWeekNumbers` before the TTL cache is filled. Concurrent misses each run the full serial two-query path. Completions + React setState fan-out can align with a ~1s main-thread longtask. This is **overlap waste**, not a single multi-second Supabase hang.  
-- **Sample B:** Does **not** show another query storm — scored-week cache was warm (CACHE_HIT). Still shows another **~1.2s main-thread task** around shared **Home / app-shell** work while network stays small (176 ms scored-week + 102 ms memberships). So PB-2 may be **two related problems**: (1) cold concurrent scored-week stampede, and (2) a **main-thread** cost that remains even when scored-week is cached.
+- **Sample B:** Does **not** show another query storm — scored-week cache was warm (CACHE_HIT after one 176 ms load). Still shows another **~1.2s main-thread task** while network stays small.  
+- **Sample C:** Further **weakens** the theory that the **network query itself owns the longtask**. Scored-week was already warm (**CACHE_HIT** only); longtask rose to **~1546 ms** with timer-lag **~651 ms**, still no failed WR requests and no freeze.  
+
+**Working split (evidence-only, no fix yet):**
+
+| Thread | What samples support | What they do not prove |
+|--------|----------------------|-------------------------|
+| **(1) Cold concurrent stampede** | Sample A only | Not the sole cause of ~1–1.5s longtask |
+| **(2) Main-thread Home / app-shell work** | Samples B + C (warm / CACHE_HIT) | Exact owning function unknown without Bottom-Up |
+
+**Implication for later attribution:** Single-flight scored-week may still be worth doing for Sample A waste, but **will not by itself explain Sample C**. Trace must prioritize main-thread causes (see checklist below).
 
 #### Audit answers (code, no code changes)
 
@@ -181,43 +203,56 @@ Each sets its **own** React state when done → multiple identical list results 
 - Each completion: cache write + promise resolve + component `setState`  
 - Main-thread longtask **~994 ms** + timer starvation **~647 ms** is consistent with **batched layout/commit work** when several widgets update from the same data shape, not with a single 994 ms Supabase RTT  
 
-**Sample B (important counter-evidence):**
+**Sample B (counter-evidence):**
 
 - Scored-week was **warm** (CACHE_HIT after one 176 ms load)  
 - Network small (`memberships` ~102 ms)  
 - Longtask still **~1197 ms**  
-→ Longtask is **not explained only** by scored-week query storms; shared Home/app-shell main-thread work remains a candidate  
+
+**Sample C (stronger counter-evidence):**
+
+- `listScoredWeekNumbers` already **CACHE_HIT** (no scored-week network work observed as owner)  
+- Longtask **~1546 ms** + timer-lag **~651 ms**  
+- No failed War Room request; no freeze  
+→ Longtask is **not explained by** the scored-week network query. Prefer main-thread attribution on later traces.  
 
 #### Later Performance trace checklist (when PB-2 is worked)
 
-Compare whether the longtask occurs:
+**Priority order for the later warm-cache / CACHE_HIT longtask (Sample B–C class):**
 
-1. **After** scored-week / query completions  
-2. During **React state fan-out** (many widgets `setState` from same snapshot)  
-3. During **shared component render** (Home / Nav / AppShell)  
-4. During **chunk / module evaluation**  
+1. **Shared Home / app-shell React commit work** (Home page + Nav + layout shell paint)  
+2. **Multiple consumers updating from the same cached snapshot** (many widgets `setState` / re-render on identical scored-week / progressive data)  
+3. **Synchronous derived calculations** (on render or immediately after resolve — not network)  
+4. **Chunk / module evaluation** (route or shared chunk first-eval on the critical path)  
+5. **Global route-change listeners** (shell effects that re-fire on Home nav)
 
-Record cold vs warm Home, CACHE_HIT rate, and Bottom-Up self time for the slowest longtask.
+Still record for cold path (Sample A class):
+
+- Scored-week START vs CACHE_HIT counts  
+- Whether single-flight would collapse concurrent chains  
+
+**Always:** cold vs warm Home, largest longtask, Bottom-Up **self time** for the slowest **warm CACHE_HIT** run.
 
 #### Likely future safe fix (do not implement yet)
 
-1. **Single-flight Promise per league** for `listScoredWeekNumbers` (mirror `activeWeekInflight` / `cardInflight`).  
+1. **Single-flight Promise per league** for `listScoredWeekNumbers` (mirror `activeWeekInflight` / `cardInflight`) — addresses Sample A stampede only.  
 2. **One shared scored-week snapshot** (or callers always go through `resolvePlayerActiveWeek` / progressive snapshot only).  
 3. Parallelize `week_results` + `game_results` **only if** semantics allow (today game_results needs week_result ids — second query must wait for first; **intra-function** stays serial; **inter-caller** must dedupe).  
-4. Prevent multiple widgets from independently re-deriving UI from identical parallel fetches (lift state or subscribe to one store).  
-5. After single-flight: if warm-cache Home still shows &gt;500 ms longtask, attribute via checklist above (may join PB-1-style chunk/render work).  
+4. Prevent multiple widgets from independently re-deriving UI from identical parallel / cache hits (lift state or subscribe to one store) — candidate for Sample B–C.  
+5. After single-flight: if warm-cache Home still shows &gt;500 ms longtask (Samples B–C already do), attribute via **priority checklist 1–5** (may join PB-1-style chunk/render work).  
 
-**Do not** change scoring logic, onboarding product flow, or production behavior in this backlog pass.
+**Do not** change scoring logic, onboarding product flow, or production behavior in this backlog pass.  
+**Do not modify production during the usability scrub.**
 
 #### When structured performance scrub resumes
 
 Measure before/after:
 
 1. Cold Home open — count of `listScoredWeekNumbers` START vs CACHE hits  
-2. Warm Home open (&lt;12s) — expect CACHE only  
-3. Longtask max on Home nav (**cold and warm** — Sample B shows warm can still be ~1.2s)  
-4. Whether single-flight collapses 5 chains → 1  
-5. Trace checklist items 1–4 above on the slowest warm run  
+2. Warm Home open (&lt;12s) — expect CACHE only (Sample C class)  
+3. Longtask max on Home nav (**cold and warm** — Sample B ~1.2s, Sample C ~1.5s warm)  
+4. Whether single-flight collapses 5 chains → 1 (Sample A only)  
+5. Trace **priority checklist 1–5** on the slowest **CACHE_HIT** run  
 
 ---
 
