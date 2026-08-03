@@ -84,6 +84,24 @@ The Board’s promise: *it reveals what happened this season.*
 Zero scored weeks → empty state, not placeholder weeks, not demo cards, not practice artifacts.  
 The first scored week is when The Board comes alive.
 
+### Moments principle
+
+> **Moments become traditions. Traditions keep leagues together.**
+
+Football is the excuse. Relationships are the product.  
+War Room Moments are how those relationships become annual traditions.
+
+War Room should not be remembered because of features.  
+It should be remembered because of moments.
+
+Every Moment answers: *Will players remember this a month later?*  
+If not, it probably doesn't belong as a Moment.
+
+Protect rarity: only a handful of season-scale goosebumps peaks.  
+If everything has fireworks, nothing has fireworks.
+
+See `docs/WAR-ROOM-MOMENTS-ARCHITECTURE.md`.
+
 ### Achievement principle
 
 > **War Room never awards what hasn't been earned.**
