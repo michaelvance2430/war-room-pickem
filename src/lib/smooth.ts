@@ -80,13 +80,65 @@ export function forceUnlockAllChrome(): void {
 /**
  * Call on every in-app navigation click (before route change).
  * Clears ghost locks so the next screen is interactive immediately.
+ *
+ * Optional caller label for event-loop diagnosis (e.g. "Nav.closeChrome").
  */
-export function prepareNavigation(): void {
-  wrLog("[WR-NAV]", "prepareNavigation()");
+export function prepareNavigation(caller?: string): void {
+  const t0 =
+    typeof performance !== "undefined" ? performance.now() : Date.now();
+  let stackTop = "";
+  try {
+    stackTop = (new Error().stack || "")
+      .split("\n")
+      .slice(2, 6)
+      .map((s) => s.trim())
+      .join(" ← ");
+  } catch {
+    /* ok */
+  }
+  const who = caller || "unknown";
+  try {
+    const debug =
+      (typeof process !== "undefined" &&
+        process.env.NODE_ENV === "development") ||
+      (typeof window !== "undefined" &&
+        localStorage.getItem("warroom-runtime-debug") === "1");
+    if (debug) {
+      console.log(`[WR-PERF][prep-nav] START caller=${who}`);
+    }
+  } catch {
+    /* ok */
+  }
+  wrLog("[WR-NAV]", `prepareNavigation() caller=${who}`);
   forceUnlockAllChrome();
   try {
     // Close any leftover open sheets by dispatching
     window.dispatchEvent(new CustomEvent("warroom-prepare-nav"));
+  } catch {
+    /* ok */
+  }
+  const ms =
+    typeof performance !== "undefined"
+      ? Math.round(performance.now() - t0)
+      : 0;
+  try {
+    const debug =
+      (typeof process !== "undefined" &&
+        process.env.NODE_ENV === "development") ||
+      (typeof window !== "undefined" &&
+        localStorage.getItem("warroom-runtime-debug") === "1");
+    if (debug) {
+      console.log(
+        `[WR-PERF][prep-nav] FINISH caller=${who} duration=${ms}ms`,
+        stackTop
+      );
+      // Sync work >16ms on click path is itself a mini long-task
+      if (ms >= 16) {
+        console.log(
+          `[WR-PERF][prep-nav] SLOW_SYNC ${ms}ms caller=${who} — main thread blocked during prepare`
+        );
+      }
+    }
   } catch {
     /* ok */
   }

@@ -356,7 +356,7 @@ export default function Nav() {
 
   useEffect(() => {
     if (!menuOpen) {
-      prepareNavigation();
+      prepareNavigation("Nav.menuOpen=false-effect");
       return;
     }
     try {
@@ -525,7 +525,7 @@ export default function Nav() {
   function closeChrome() {
     setMenuOpen(false);
     setMoreOpen(false);
-    prepareNavigation();
+    prepareNavigation("Nav.closeChrome");
   }
 
   /** Prefetch primary desks; leave deep/rare routes cold */

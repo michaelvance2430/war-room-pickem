@@ -90,7 +90,7 @@ export function hardNavPrepare() {
     // Prefer the global smooth contract when available
     const { prepareNavigation } =
       require("@/lib/smooth") as typeof import("@/lib/smooth");
-    prepareNavigation();
+    prepareNavigation("RouteHardSwitch.hardNavPrepare");
   } catch {
     /* ok */
   }

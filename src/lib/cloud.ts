@@ -62,6 +62,16 @@ export function withTimeout<T>(
             ? Math.round(performance.now() - t0)
             : ms;
         wrBoardP1(timeoutLabel, "TIMEOUT", elapsed, `limit=${ms}ms`);
+        // If event loop was starved, setTimeout fires far after `ms`
+        if (elapsed > ms * 1.25) {
+          try {
+            void import("./event-loop-probe").then((m) =>
+              m.wrTimeoutLate(timeoutLabel, ms, elapsed)
+            );
+          } catch {
+            /* ok */
+          }
+        }
       }
       resolve(fallback);
     }, ms);

@@ -31,6 +31,7 @@ import {
   installRuntimeDebugGlobals,
   isoEnabled,
 } from "@/lib/runtime-iso";
+import { installEventLoopProbe } from "@/lib/event-loop-probe";
 
 function scrollTopHard() {
   if (typeof window === "undefined") return;
@@ -73,6 +74,7 @@ export default function SmoothRuntime() {
 
   useEffect(() => {
     installRuntimeDebugGlobals();
+    installEventLoopProbe();
   }, []);
 
   // Every route change: hard unlock + top of page
@@ -217,7 +219,7 @@ export default function SmoothRuntime() {
       if (!href.startsWith("/") || href.startsWith("//")) return;
       if (a.target === "_blank") return;
       wrLog("[WR-NAV]", `prepareNavigation → ${href}`);
-      prepareNavigation();
+      prepareNavigation(`SmoothRuntime.click→${href}`);
     }
     document.addEventListener("click", onClick, true);
     return () => document.removeEventListener("click", onClick, true);
