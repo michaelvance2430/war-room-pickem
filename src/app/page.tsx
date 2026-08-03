@@ -1014,24 +1014,7 @@ export default function Home() {
                 </p>
       </Link>
 
-              {isCommish && (
-                <Link
-                  href="/commissioner"
-                  className="group rounded-xl border border-border/80 bg-black/40 backdrop-blur-sm p-6 hover:border-primary/50 hover:bg-primary/5 transition"
-                >
-      <div className="text-xs uppercase tracking-wider text-muted mb-2">
-                    Commish
-                  </div>
-      <div className="text-lg font-semibold text-white group-hover:text-primary transition">
-                    Run the Room
-                  </div>
-      <p className="text-sm text-muted mt-2">
-                    Card · results · settings
-                  </p>
-      </Link>
-              )}
-
-              <Link
+<Link
                 href="/account"
                 className="group rounded-xl border border-sky-400/35 bg-sky-500/10 backdrop-blur-sm p-6 hover:border-sky-300/60 hover:bg-sky-500/15 transition shadow-[0_0_40px_rgba(56,189,248,0.08)] sm:col-span-2 lg:col-span-3"
               >
