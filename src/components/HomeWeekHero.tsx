@@ -307,30 +307,21 @@ export default function HomeWeekHero() {
       eyebrow = "You’re the commish";
       title =
         state.rosterCount < 2
-          ? "Share your code — fill the room"
+          ? "Share the league — fill the room"
           : "Publish the first card";
       body =
         state.rosterCount < 2
-          ? state.leagueCode
-            ? `Your code is ${state.leagueCode} — text the crew, then build a card for ${weekLabel}. Demo slate is fine the first time.`
-            : `Copy your invite code, text the crew, then build a card for ${weekLabel}. Demo slate is fine the first time.`
-          : `${state.rosterCount} in the room. ${weekLabel} has no games yet — open Commish → First card wizard (demo → publish).`;
+          ? `Use Share League up top — friends open a link (code is built in). Then build a card for ${weekLabel}.`
+          : `${state.rosterCount} in the room. ${weekLabel} has no games yet — open League → First card wizard → publish.`;
       primaryHref =
         state.rosterCount < 2
-          ? "/commissioner?tab=settings"
+          ? "/commissioner?tab=card&first=1"
           : "/commissioner?tab=card&first=1";
       primaryLabel =
-        state.rosterCount < 2
-          ? state.leagueCode
-            ? `Invite code: ${state.leagueCode}`
-            : "Get invite code"
-          : "Build first card →";
-      secondaryHref =
-        state.rosterCount < 2
-          ? "/commissioner?tab=card&first=1"
-          : "/commissioner";
+        state.rosterCount < 2 ? "Build first card →" : "Build first card →";
+      secondaryHref = "/locker-room";
       secondaryLabel =
-        state.rosterCount < 2 ? "Or build first card" : "Commish tools";
+        state.rosterCount < 2 ? "Locker while you wait" : "Commish tools";
     } else {
       eyebrow = "You're in";
       title = state.isOps
@@ -558,7 +549,7 @@ export default function HomeWeekHero() {
                 ? state.scoredWeeks === 0
                   ? "Card is live. After games: score the week so standings wake up."
                   : "Card is live. After games: score the week, then Gazette."
-                : "Invite → First card wizard (demo) → Publish. Advanced tools wait until you score once."}
+                : "Share League → First card wizard → Publish. Advanced tools wait until you score once."}
             </p>
             <Link
               href={

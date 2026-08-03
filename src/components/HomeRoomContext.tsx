@@ -55,18 +55,9 @@ export default function HomeRoomContext({
         </p>
         <p className="text-[12px] text-muted mt-1">
           {isCommish ? (
-            <>
-              <span className="text-amber-200 font-semibold">You&apos;re hosting</span>
-              {leagueCode ? (
-                <>
-                  {" "}
-                  · code{" "}
-                  <span className="font-mono tracking-wider text-foreground/95 font-bold">
-                    {leagueCode}
-                  </span>
-                </>
-              ) : null}
-            </>
+            <span className="text-amber-200 font-semibold">
+              You&apos;re hosting · use Share League to invite
+            </span>
           ) : (
             <span>You&apos;re a player in this room</span>
           )}

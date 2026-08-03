@@ -151,7 +151,7 @@ export default function Home() {
   const [actuallyCommish, setActuallyCommish] = useState(false);
   const [bootError, setBootError] = useState<string | null>(null);
   const [pickList, setPickList] = useState<LeagueMembership[] | null>(null);
-  const [codeCopied, setCodeCopied] = useState(false);
+
   /** Demote museum/lore/brackets until first lock or first scores */
   const [firstWeekChrome, setFirstWeekChrome] = useState(true);
   /** Gazette / News shelf ~week 3 */
@@ -650,18 +650,8 @@ export default function Home() {
             tagline={homeTagline}
             leagueName={leagueName}
             leagueCode={leagueCode}
-            isCommish={isCommish}
-            codeCopied={codeCopied}
-            onCopyCode={async () => {
-              if (!leagueCode) return;
-              try {
-                await navigator.clipboard.writeText(leagueCode);
-                setCodeCopied(true);
-                setTimeout(() => setCodeCopied(false), 2000);
-              } catch {
-                /* ignore */
-              }
-            }}
+            canShare={!!getSession()?.playerId}
+            sportId={sportId}
           />
         ) : (
           <HomeRoomContext
