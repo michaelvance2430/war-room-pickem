@@ -1,5 +1,10 @@
 /**
  * Cloud-backed easter egg finds + Ready Player One milestone flexes.
+ *
+ * Production may lag migrations (schema drift). After one missing-table /
+ * missing-function error we stop re-hitting PostgREST for the session so
+ * profile "Load details" does not spam 404s. Local egg state still works.
+ * Full schema: supabase/easter-eggs.sql / FIX-EASTER-EGG-FINDS.sql
  */
 
 import { createClient } from "@/lib/supabase/client";
@@ -7,6 +12,33 @@ import { listEasterEggDefs } from "@/lib/easter-eggs";
 
 /** In-memory cache: userId → discovery ids from cloud */
 const cloudEggCache = new Map<string, Set<string>>();
+
+/**
+ * Session capability: easter_egg_finds + record_easter_egg_find package.
+ * null = unknown, true = works, false = missing (skip further requests).
+ */
+let eggFindsAvailable: boolean | null = null;
+/** Separate flag for egg_milestone_flexes reads */
+let eggFlexesAvailable: boolean | null = null;
+
+function isMissingSchemaError(err: {
+  code?: string;
+  message?: string;
+  details?: string;
+  hint?: string;
+} | null | undefined): boolean {
+  if (!err) return false;
+  const code = String(err.code || "");
+  const blob = `${err.message || ""} ${err.details || ""} ${err.hint || ""}`;
+  return (
+    code === "PGRST205" ||
+    code === "PGRST202" ||
+    code === "42P01" ||
+    /could not find the table|could not find the function|relation .* does not exist|schema cache/i.test(
+      blob
+    )
+  );
+}
 
 export function getCachedCloudEggIds(userId: string): string[] {
   if (!userId) return [];
@@ -32,13 +64,19 @@ export function addCloudEggToCache(userId: string, discoveryId: string) {
 /** Load egg finds for a profile (self or league mate). */
 export async function loadCloudEggFinds(userId: string): Promise<string[]> {
   if (!userId) return [];
+  if (eggFindsAvailable === false) return getCachedCloudEggIds(userId);
   try {
     const supabase = createClient();
     const { data, error } = await supabase
       .from("easter_egg_finds")
       .select("discovery_id")
       .eq("user_id", userId);
-    if (error || !data) return getCachedCloudEggIds(userId);
+    if (error) {
+      if (isMissingSchemaError(error)) eggFindsAvailable = false;
+      return getCachedCloudEggIds(userId);
+    }
+    eggFindsAvailable = true;
+    if (!data) return getCachedCloudEggIds(userId);
     const ids = data
       .map((r) => r.discovery_id as string)
       .filter((id) => id?.startsWith("egg_"));
@@ -64,6 +102,7 @@ export async function syncEasterEggFindToCloud(opts: {
 }> {
   const { discoveryId, playerName } = opts;
   if (!discoveryId?.startsWith("egg_")) return { ok: false };
+  if (eggFindsAvailable === false) return { ok: false };
   try {
     const supabase = createClient();
     const total = listEasterEggDefs().length;
@@ -73,18 +112,28 @@ export async function syncEasterEggFindToCloud(opts: {
       p_total_eggs: total,
     });
     if (error) {
-      // Fallback: direct insert if RPC missing
+      if (isMissingSchemaError(error)) {
+        eggFindsAvailable = false;
+        return { ok: false };
+      }
+      // Fallback: direct insert if RPC missing but table exists
       const { data: auth } = await supabase.auth.getUser();
       const uid = auth.user?.id;
       if (!uid) return { ok: false };
-      await supabase.from("easter_egg_finds").upsert({
+      const { error: insErr } = await supabase.from("easter_egg_finds").upsert({
         user_id: uid,
         discovery_id: discoveryId,
         found_at: new Date().toISOString(),
       });
+      if (insErr) {
+        if (isMissingSchemaError(insErr)) eggFindsAvailable = false;
+        return { ok: false };
+      }
+      eggFindsAvailable = true;
       addCloudEggToCache(uid, discoveryId);
       return { ok: true };
     }
+    eggFindsAvailable = true;
     const row = data as {
       ok?: boolean;
       found?: number;
@@ -149,6 +198,7 @@ export function markEggFlexSeen(flexId: string) {
  * Eggs are account-wide, not sport-specific.
  */
 export async function loadUnseenEggFlexes(): Promise<EggMilestoneFlex[]> {
+  if (eggFlexesAvailable === false) return [];
   try {
     const supabase = createClient();
     const { data, error } = await supabase
@@ -158,7 +208,12 @@ export async function loadUnseenEggFlexes(): Promise<EggMilestoneFlex[]> {
       )
       .order("created_at", { ascending: false })
       .limit(30);
-    if (error || !data) return [];
+    if (error) {
+      if (isMissingSchemaError(error)) eggFlexesAvailable = false;
+      return [];
+    }
+    eggFlexesAvailable = true;
+    if (!data) return [];
     const seen = readSeenFlexIds();
     return data
       .map((r) => ({
