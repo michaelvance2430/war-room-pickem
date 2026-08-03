@@ -266,12 +266,6 @@ function CommissionerPageInner() {
   const [loadingOdds, setLoadingOdds] = useState(false);
   const [oddsError, setOddsError] = useState<string | null>(null);
   const [rankLabel, setRankLabel] = useState<string | null>(null);
-  /** The Odds API free/paid quota (from response headers after pull/sync). */
-  const [oddsCreditsRemaining, setOddsCreditsRemaining] = useState<
-    string | null
-  >(null);
-  const [oddsCreditsUsed, setOddsCreditsUsed] = useState<string | null>(null);
-  const [oddsCreditsLast, setOddsCreditsLast] = useState<string | null>(null);
   const [cardSaved, setCardSaved] = useState(false);
   const [results, setResults] = useState<Record<string, GameResult>>({});
   const [propResult, setPropResult] = useState<string | null>(null);
@@ -895,16 +889,6 @@ function CommissionerPageInner() {
     await refreshPickStatus();
   }
 
-  function applyOddsQuota(q: {
-    remaining?: string | null;
-    used?: string | null;
-    last?: string | null;
-  }) {
-    if (q.remaining != null) setOddsCreditsRemaining(q.remaining);
-    if (q.used != null) setOddsCreditsUsed(q.used);
-    if (q.last != null) setOddsCreditsLast(q.last);
-  }
-
   function leagueFootballSport(): "cfb" | "nfl" {
     return getLeague()?.sportId === "nfl" ? "nfl" : "cfb";
   }
@@ -929,13 +913,9 @@ function CommissionerPageInner() {
         weekFilter,
         unfilteredCount,
         dryRun,
-        remaining,
-        used,
-        last,
       } = await fetchFootballOdds(sport, activeWeek, {
         dryRun: labTools && dryRunOdds,
       });
-      applyOddsQuota({ remaining, used, last });
       setRankLabel(pollLabel || null);
       if (!games.length) {
         setAvailableGames([]);
@@ -957,13 +937,7 @@ function CommissionerPageInner() {
       setRankHeatFilter("all");
       setOddsError(null);
     } catch (e: unknown) {
-      const err = e as Error & {
-        remaining?: string | null;
-        used?: string | null;
-      };
-      if (err.remaining != null || err.used != null) {
-        applyOddsQuota({ remaining: err.remaining, used: err.used });
-      }
+      const err = e as Error;
       setOddsError(err.message || "Failed to pull odds");
       setAvailableGames([]);
       setSelectedIds(new Set());
@@ -1676,11 +1650,6 @@ function CommissionerPageInner() {
     setSyncReport(null);
     try {
       const scoreRes = await fetchFootballScores(leagueFootballSport(), 3);
-      applyOddsQuota({
-        remaining: scoreRes.remaining,
-        used: scoreRes.used,
-        last: scoreRes.last,
-      });
       const events = scoreRes.events;
       const built = buildResultsFromScores(publishedGames, events);
       setResults((prev) => ({ ...prev, ...built.results }));
@@ -2458,61 +2427,28 @@ function CommissionerPageInner() {
               </p>
       </div>
           )}
-          {/* Player view + odds: not day-one noise */}
+          {/* Player view — quota telemetry is Foundry-only (not Commish) */}
           {!(firstTime || simpleHost) && (
-            <>
-              <div className="mt-3 rounded-xl border-2 border-warning bg-warning/15 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-      <div>
-                  <p className="text-sm font-bold text-warning">
-                    View as player
-                  </p>
-      <p className="text-xs text-muted">
-                    Hide Commish tools and see the app like your league mates.
-                  </p>
-      </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setViewAsPlayer(true);
-                    router.push("/");
-                  }}
-                  className="shrink-0 px-4 py-2 rounded-lg bg-warning text-black text-sm font-bold"
-                >
-                  Enter player view →
-                </button>
-      </div>
-              {oddsCreditsRemaining != null && (
-                <div
-                  className={`mt-3 rounded-xl border px-4 py-3 text-sm ${
-                    Number(oddsCreditsRemaining) <= 20
-                      ? "border-warning/50 bg-warning/10 text-warning"
-                      : Number(oddsCreditsRemaining) === 0
-                        ? "border-danger/50 bg-danger/10 text-danger"
-                        : "border-primary/30 bg-primary/5 text-foreground"
-                  }`}
-                >
-      <p className="font-semibold">
-                    Odds API credits left:{" "}
-                    <span className="font-mono text-lg">
-                      {oddsCreditsRemaining}
-                    </span>
-                    {oddsCreditsUsed != null && (
-                      <span className="text-muted font-normal text-xs ml-2">
-                        (used this period: {oddsCreditsUsed}
-                        {oddsCreditsLast != null
-                          ? ` · last call: ${oddsCreditsLast}`
-                          : ""}
-                        )
-                      </span>
-                    )}
-                  </p>
-      <p className="text-[11px] text-muted mt-1 leading-relaxed">
-                    Free plan is usually 500 credits/month (Pull Odds ≈ 1, Sync
-                    scores ≈ 2). Demo slate uses zero credits.
-                  </p>
-      </div>
-              )}
-            </>
+            <div className="mt-3 rounded-xl border-2 border-warning bg-warning/15 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div>
+                <p className="text-sm font-bold text-warning">
+                  View as player
+                </p>
+                <p className="text-xs text-muted">
+                  Hide Commish tools and see the app like your league mates.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setViewAsPlayer(true);
+                  router.push("/");
+                }}
+                className="shrink-0 px-4 py-2 rounded-lg bg-warning text-black text-sm font-bold"
+              >
+                Enter player view →
+              </button>
+            </div>
           )}
         </div>
 

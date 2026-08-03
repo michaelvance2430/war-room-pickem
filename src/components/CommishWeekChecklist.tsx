@@ -268,8 +268,8 @@ export default function CommishWeekChecklist({
             </li>
           ))}
           <p className="text-[10px] text-muted pt-1 px-1">
-            Advanced tools (bots, odds credits, reset, pass commissioner) stay
-            under Settings → Advanced until your first scored week.
+            Advanced tools (bots, reset, pass commissioner) stay under Settings
+            → Advanced until your first scored week.
           </p>
         </ol>
       )}
