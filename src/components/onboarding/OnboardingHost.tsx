@@ -63,7 +63,7 @@ function NavPointer({
     picks: "My Picks",
     standings: "Standings",
     locker: "Locker",
-    commissioner: "Commish",
+    commissioner: "League",
   };
   const label = labels[target] || target;
   return (

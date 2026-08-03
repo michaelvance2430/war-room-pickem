@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useMemo, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import PlayerLink from "@/components/PlayerLink";
 import FirstCardWizard from "@/components/FirstCardWizard";
@@ -75,9 +75,13 @@ import {
 } from "@/lib/ring-ceremony";
 import OpenRoomBotsNudge from "@/components/OpenRoomBotsNudge";
 import OpenRoomLeaveNudge from "@/components/OpenRoomLeaveNudge";
-import CommishWeekChecklist from "@/components/CommishWeekChecklist";
 import SportPoolCommishPanel from "@/components/SportPoolCommishPanel";
 import SandboxHopOptIn from "@/components/SandboxHopOptIn";
+import HostDashboardShell from "@/components/host-dashboard/HostDashboardShell";
+import {
+  buildThisWeekViewModel,
+  resolveHostHero,
+} from "@/lib/host-dashboard";
 import { setViewAsPlayer } from "@/lib/view-as-player";
 import {
   formatKickoff,
@@ -592,6 +596,13 @@ function CommissionerPageInner() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- boot + URL tab/first
   }, [searchParams]);
+
+  // Host Dashboard: lock pulse for Hero / This Week (not a checklist)
+  useEffect(() => {
+    if (allowed !== true) return;
+    void refreshPickStatus(activeWeek);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allowed, activeWeek, publishedGames.length]);
 
   /** Sync Build Card draft controls from a known prop (publish / full week load). */
   function applyDraftFromProp(loaded: Prop) {
@@ -2395,101 +2406,110 @@ function CommissionerPageInner() {
         </div>
       )}
       <main className="flex-1 max-w-3xl mx-auto w-full px-4 py-8">
-      <div className="mb-6">
-          <h1 className="text-2xl font-bold">
-            {isOwner
-              ? firstTime
-                ? "Commish · first hour"
-                : "Commish"
-              : "Deputy Ops"}
-          </h1>
-      <p className="text-sm text-muted">
-            {isOwner
-              ? firstTime
-                ? "Invite → Pull Odds → pick 5 → publish → score when games die."
-                : "Settings · Build card · Who\u2019s in · Results"
-              : "Build card · Who\u2019s in · Results (settings stay with the commish)"}
-          </p>
-          {(firstTime || simpleHost) && isOwner && (
-            <div className="mt-3 rounded-xl border-2 border-primary/50 bg-primary/10 px-4 py-3">
-      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-1">
-                Commish · first hour
-              </p>
-      <p className="text-sm text-foreground leading-relaxed">
-                Three jobs:{" "}
-                <strong className="text-primary">Build Card</strong>
-                {" · "}
-                <strong className="text-primary">Who&apos;s in</strong>
-                {" · "}
-                <strong className="text-primary">Enter Results</strong>
-                . Live odds only — fake weeks live in Foundry for the shop.
-                Settings stay buried until you score a week.
-              </p>
-      </div>
-          )}
-          {/* Player view — quota telemetry is Foundry-only (not Commish) */}
-          {!(firstTime || simpleHost) && (
-            <div className="mt-3 rounded-xl border-2 border-warning bg-warning/15 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <div>
-                <p className="text-sm font-bold text-warning">
-                  View as player
-                </p>
-                <p className="text-xs text-muted">
-                  Hide Commish tools and see the app like your league mates.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
+        {/* Host Dashboard — door to the league, not league software */}
+        {(() => {
+          const humanCount =
+            passRoster.filter((m) => !m.isBot).length ||
+            (rosterCount != null
+              ? Math.max(0, rosterCount - botCount)
+              : pickStatus.length);
+          const thisWeekVm = buildThisWeekViewModel({
+            weekNumber: activeWeek,
+            sportId: league?.sportId,
+            publishedGames,
+            propQuestion: publishedProp?.question || prop?.question,
+            scoredWeeks,
+            pickStatus,
+            humanRosterCount: humanCount,
+            inviteCritical: firstTime || humanCount < 4,
+          });
+          const hero = resolveHostHero(thisWeekVm, {
+            inviteCritical: firstTime || humanCount < 4,
+            humanRosterCount: humanCount,
+          });
+          const sportLabel = league?.sportId === "nfl" ? "NFL" : "CFB";
+          const scrollTools = () => {
+            window.setTimeout(() => {
+              document
+                .getElementById("host-workbench")
+                ?.scrollIntoView({ behavior: "smooth", block: "start" });
+            }, 60);
+          };
+          return (
+            <HostDashboardShell
+              leagueName={league?.name || "Your league"}
+              sportLabel={sportLabel}
+              isOwner={isOwner}
+              hero={hero}
+              thisWeek={thisWeekVm}
+              humanCount={humanCount}
+              inviteCode={league?.code}
+              settingsOpen={tab === "settings"}
+              onToggleSettings={() => {
+                if (tab === "settings") setTab("card");
+                else {
+                  setTab("settings");
+                  setAdvancedOpen(true);
+                }
+              }}
+              actions={{
+                onPublishCard: () => {
+                  setTab("card");
+                  scrollTools();
+                },
+                onScoreWeek: () => {
+                  setTab("results");
+                  void refreshPublishedProp(activeWeek);
+                  scrollTools();
+                },
+                onNudgeHoldouts: () => {
+                  setTab("picks");
+                  void refreshPickStatus();
+                  scrollTools();
+                },
+                onShareInvite: () => {
+                  void copyInviteText();
+                },
+                onPreviewPlayer: () => {
                   setViewAsPlayer(true);
                   router.push("/");
-                }}
-                className="shrink-0 px-4 py-2 rounded-lg bg-warning text-black text-sm font-bold"
-              >
-                Enter player view →
-              </button>
-            </div>
-          )}
-        </div>
+                },
+                onOpenStandings: () => router.push("/standings"),
+                onOpenGazette: () => router.push("/gazette"),
+                onEditCard: () => {
+                  setTab("card");
+                  scrollTools();
+                },
+                onSeeLocks: () => {
+                  setTab("picks");
+                  void refreshPickStatus();
+                  scrollTools();
+                },
+                onOpenSettings: () => {
+                  setTab("settings");
+                  setAdvancedOpen(true);
+                },
+              }}
+            />
+          );
+        })()}
 
-        {!(firstTime || simpleHost) && (
-          <CommishWeekChecklist
-            onGoTab={(t) => {
-              setTab(t);
-              if (t === "picks") void refreshPickStatus();
-              if (t === "results") void refreshPublishedProp(activeWeek);
-            }}
-          />
-        )}
-
-        <div id="commish-tab-panel" className="scroll-mt-20">
-      <div className="flex flex-wrap gap-2 mb-6">
-          {/* Simple host: Card · Who's in · Results only. Settings buried. */}
-          {isOwner && !(firstTime || simpleHost) && (
-            <button
-              type="button"
-              onClick={() => setTab("settings")}
-              className={
-                tab === "settings"
-                  ? "px-4 py-1.5 rounded-full text-sm font-medium bg-primary text-black"
-                  : "px-4 py-1.5 rounded-full text-sm font-medium bg-card border border-border text-muted"
-              }
-            >
-              Settings
-            </button>
-          )}
+        {/* Workbench — card / locks / score tools (secondary to Host Dashboard) */}
+        <div id="host-workbench" className="scroll-mt-24">
+        {tab !== "settings" && (
+        <div className="flex flex-wrap gap-2 mb-4">
           <button
             type="button"
             onClick={() => setTab("card")}
             className={
               tab === "card"
-                ? "px-4 py-1.5 rounded-full text-sm font-medium bg-primary text-black"
-                : "px-4 py-1.5 rounded-full text-sm font-medium bg-card border border-border text-muted"
+                ? "px-3 py-1.5 rounded-full text-xs font-medium bg-primary text-black"
+                : "px-3 py-1.5 rounded-full text-xs font-medium bg-card border border-border text-muted"
             }
           >
-            Build Card
+            Edit card
           </button>
-      <button
+          <button
             type="button"
             onClick={() => {
               setTab("picks");
@@ -2497,60 +2517,33 @@ function CommissionerPageInner() {
             }}
             className={
               tab === "picks"
-                ? "px-4 py-1.5 rounded-full text-sm font-medium bg-primary text-black"
-                : "px-4 py-1.5 rounded-full text-sm font-medium bg-card border border-border text-muted"
+                ? "px-3 py-1.5 rounded-full text-xs font-medium bg-primary text-black"
+                : "px-3 py-1.5 rounded-full text-xs font-medium bg-card border border-border text-muted"
             }
           >
-            Who&apos;s in
+            Locks
           </button>
-      <button
+          <button
             type="button"
             onClick={() => {
               setTab("results");
-              // Always re-load published prop so Finalize Scores matches the card
               void refreshPublishedProp(activeWeek);
             }}
             className={
               tab === "results"
-                ? "px-4 py-1.5 rounded-full text-sm font-medium bg-primary text-black"
-                : "px-4 py-1.5 rounded-full text-sm font-medium bg-card border border-border text-muted"
+                ? "px-3 py-1.5 rounded-full text-xs font-medium bg-primary text-black"
+                : "px-3 py-1.5 rounded-full text-xs font-medium bg-card border border-border text-muted"
             }
           >
-            Enter Results
+            Score
           </button>
-      </div>
-        {isOwner && (firstTime || simpleHost) && (
-          <p className="text-[11px] text-muted mb-4 -mt-2">
-            Need bots, open room, or advanced tools?{" "}
-            <button
-              type="button"
-              onClick={() => {
-                setTab("settings");
-                setAdvancedOpen(true);
-              }}
-              className="text-primary font-semibold underline-offset-2 hover:underline"
-            >
-              League settings
-            </button>
-      </p>
+        </div>
         )}
 
+        <div id="commish-tab-panel" className="scroll-mt-20">
         {tab === "settings" && isOwner && league && (
           <div className="space-y-6">
-            {simpleHost && (
-              <div className="rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-xs text-muted leading-relaxed">
-      <p className="font-bold text-primary text-sm">
-                  Simple host mode
-                </p>
-      <p className="mt-1">
-                  Your jobs: <strong className="text-foreground">invite</strong>
-                  , <strong className="text-foreground">post the card</strong>,{" "}
-                  <strong className="text-foreground">fill seats?</strong>,{" "}
-                  <strong className="text-foreground">score the week</strong>.
-                  Extra tools open after you score your first week.
-                </p>
-      </div>
-            )}
+
             {/* Foundry / creator only — not for regular room commiss */}
             {labTools && <SandboxHopOptIn />}
             {/* Multi-sport pool after first week — not day-one noise */}
@@ -5038,6 +5031,7 @@ function CommissionerPageInner() {
             )}
           </div>
         )}
+        </div>
         </div>
       </main>
     </div>

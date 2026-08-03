@@ -431,7 +431,8 @@ export default function Nav() {
           ? [
               {
                 href: "/commissioner",
-                label: isCommish ? "Commish" : "Ops",
+                // Destination, not role — "League" for hosts and deputies
+                label: "League",
                 className: "text-primary",
               } as NavLink,
             ]
@@ -456,7 +457,8 @@ export default function Nav() {
           ? [
               {
                 href: "/commissioner",
-                label: isCommish ? "Commish" : "Ops",
+                // Destination, not role — "League" for hosts and deputies
+                label: "League",
                 className: "text-primary",
               } as NavLink,
             ]

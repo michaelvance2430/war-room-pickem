@@ -73,6 +73,23 @@ Bigger than onboarding. How **every** future feature should feel.
 
 Design from **inside the world**, not from outside explaining the world.
 
+### Host Dashboard corollary
+
+> **The Commissioner page should feel like opening the door to your league—not opening league software.**
+
+Permission is “commissioner.” Identity is **host**. This is the headquarters of someone’s football season — not a settings desk.
+
+- ESPN Commissioner feels like: “I need to do admin.”  
+- War Room should feel like: “Let’s see what my idiots are up to.”  
+
+### Navigation naming
+
+> **People return because of the league. The navigation should reflect the world they're entering, not the permissions they have.**
+
+Bottom nav destination: **League** (not Commish / Host / Admin).  
+Labels answer *“Where am I going?”* — not *“What role am I?”*  
+Permissions stay exactly as they are; only the language of the destination changes.
+
 ### Onboarding corollary
 
 The coach should **illuminate** War Room — never interrupt it or replace it with a course.
