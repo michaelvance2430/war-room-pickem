@@ -1,6 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+/**
+ * Production Gazette reader — scroll fix only.
+ *
+ * Root cause of non-scrolling article:
+ *   Outer wrapper used max-h + overflow-y on a flex child without a real height
+ *   budget or min-height:0, so the box grew with content and never became a
+ *   scrollport; wheel/touch then hit the page behind (no body lock).
+ *
+ * Fix:
+ *   Fixed shell with explicit max-height → flex column → sticky header →
+ *   flex-1 min-h-0 overflow-y-auto article body only.
+ *   Local body lock preserves scroll Y (does not change global lock API).
+ */
+
+import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { loadLeaguePlayers } from "@/lib/cloud";
 import {
   GAZETTE_ENABLED,
@@ -11,14 +26,122 @@ import {
 import { notifyGazetteDone } from "@/lib/badge-celebration";
 import GazettePaper from "@/components/GazettePaper";
 
-/**
- * One-shot "newspaper cover" after a week is scored.
- * Big, shareable, phone-first — then badge unlocks can fire.
- */
 export default function GazetteModal() {
+  const pathname = usePathname();
+  const titleId = useId();
   const [edition, setEdition] = useState<GazetteEdition | null>(null);
   const [leagueId, setLeagueId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+
+  const openRef = useRef(false);
+  const pathAtOpen = useRef<string | null>(null);
+  const scrollYRef = useRef(0);
+  const bodyLocked = useRef(false);
+  const closeBtnRef = useRef<HTMLButtonElement | null>(null);
+  const shellRef = useRef<HTMLDivElement | null>(null);
+  const scrollBodyRef = useRef<HTMLDivElement | null>(null);
+  const editionRef = useRef<GazetteEdition | null>(null);
+  const leagueIdRef = useRef<string | null>(null);
+
+  const lockBackground = useCallback(() => {
+    if (typeof document === "undefined" || bodyLocked.current) return;
+    bodyLocked.current = true;
+    scrollYRef.current =
+      window.scrollY ||
+      window.pageYOffset ||
+      document.documentElement.scrollTop ||
+      0;
+    const b = document.body;
+    const h = document.documentElement;
+    b.style.overflow = "hidden";
+    b.style.position = "fixed";
+    b.style.top = `-${scrollYRef.current}px`;
+    b.style.left = "0";
+    b.style.right = "0";
+    b.style.width = "100%";
+    b.style.touchAction = "none";
+    h.style.overflow = "hidden";
+    h.style.touchAction = "none";
+  }, []);
+
+  const unlockBackground = useCallback(() => {
+    if (typeof document === "undefined" || !bodyLocked.current) return;
+    bodyLocked.current = false;
+    const y = scrollYRef.current;
+    const b = document.body;
+    const h = document.documentElement;
+    b.style.overflow = "";
+    b.style.position = "";
+    b.style.top = "";
+    b.style.left = "";
+    b.style.right = "";
+    b.style.width = "";
+    b.style.touchAction = "";
+    h.style.overflow = "";
+    h.style.touchAction = "";
+    try {
+      window.scrollTo(0, y);
+    } catch {
+      try {
+        document.documentElement.scrollTop = y;
+        document.body.scrollTop = y;
+      } catch {
+        /* ok */
+      }
+    }
+  }, []);
+
+  const hardClose = useCallback(
+    (opts?: { markSeen?: boolean }) => {
+      const ed = editionRef.current;
+      const lid = leagueIdRef.current;
+      if (opts?.markSeen !== false && ed && lid) {
+        try {
+          markGazetteSeen(lid, ed.weekIndex);
+        } catch {
+          /* ok */
+        }
+      }
+      openRef.current = false;
+      editionRef.current = null;
+      leagueIdRef.current = null;
+      setOpen(false);
+      setEdition(null);
+      setLeagueId(null);
+      pathAtOpen.current = null;
+      unlockBackground();
+      try {
+        notifyGazetteDone();
+      } catch {
+        /* ok */
+      }
+    },
+    [unlockBackground]
+  );
+
+  const openReader = useCallback(
+    (ed: GazetteEdition, lid: string) => {
+      editionRef.current = ed;
+      leagueIdRef.current = lid;
+      setEdition(ed);
+      setLeagueId(lid);
+      setOpen(true);
+      openRef.current = true;
+      pathAtOpen.current =
+        typeof window !== "undefined" ? window.location.pathname : null;
+      lockBackground();
+      window.setTimeout(() => {
+        try {
+          closeBtnRef.current?.focus();
+          // Ensure scroll body starts at top of article
+          if (scrollBodyRef.current) scrollBodyRef.current.scrollTop = 0;
+        } catch {
+          /* ok */
+        }
+      }, 40);
+    },
+    [lockBackground]
+  );
 
   useEffect(() => {
     if (!GAZETTE_ENABLED) return;
@@ -26,12 +149,12 @@ export default function GazetteModal() {
     let cancelled = false;
 
     async function tryShow(opts?: { force?: boolean }) {
-      // First 10 minutes: paper waits until after first lock
-      // Foundry testing (not quiet eyes) bypasses calm so you can see the paper
       try {
         const { isPreLockCalm } = await import("@/lib/first-week");
         const { getSession } = await import("@/lib/league");
-        const { allowFoundryCeremonies } = await import("@/lib/foundry-preview");
+        const { allowFoundryCeremonies } = await import(
+          "@/lib/foundry-preview"
+        );
         const calm = isPreLockCalm(getSession()?.playerId);
         if (calm && !opts?.force && !allowFoundryCeremonies()) {
           notifyGazetteDone();
@@ -44,21 +167,43 @@ export default function GazetteModal() {
       try {
         const players = await loadLeaguePlayers();
         if (cancelled) return;
-        const offer = await shouldOfferGazette(players);
+        let offer = await shouldOfferGazette(players);
+
+        // Force path: build paper even if already seen
+        if (!offer.show && opts?.force) {
+          const { buildGazetteEdition, clearGazetteSeenForWeek } = await import(
+            "@/lib/gazette"
+          );
+          const { getSession } = await import("@/lib/league");
+          const session = getSession();
+          if (session?.leagueId) {
+            const edition = await buildGazetteEdition(players);
+            if (edition) {
+              try {
+                clearGazetteSeenForWeek(session.leagueId, edition.weekIndex);
+              } catch {
+                /* ok */
+              }
+              offer = {
+                show: true,
+                edition,
+                leagueId: session.leagueId,
+              };
+            }
+          }
+        }
+
         if (!offer.show) {
           if (!opts?.force) notifyGazetteDone();
           return;
         }
-        setEdition(offer.edition);
-        setLeagueId(offer.leagueId);
-        setOpen(true);
+        openReader(offer.edition, offer.leagueId);
       } catch {
         if (!opts?.force) notifyGazetteDone();
       }
     }
 
-    // One delayed probe — was 3 timeouts + 1.5s interval hammering standings
-    const t1 = setTimeout(() => void tryShow(), 2200);
+    const t1 = window.setTimeout(() => void tryShow(), 2200);
 
     function onStorage(e: StorageEvent) {
       if (e.key?.includes("warroom-rules") || e.key?.includes("gazette")) {
@@ -77,46 +222,230 @@ export default function GazetteModal() {
 
     return () => {
       cancelled = true;
-      clearTimeout(t1);
+      window.clearTimeout(t1);
       window.removeEventListener("storage", onStorage);
       window.removeEventListener("warroom-force-gazette-paper", onForce);
       window.removeEventListener("warroom-week-scored", onScored);
     };
+  }, [openReader]);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== "Escape") return;
+      if (!openRef.current) return;
+      e.preventDefault();
+      e.stopPropagation();
+      hardClose({ markSeen: false });
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [hardClose]);
+
+  useEffect(() => {
+    if (!openRef.current || pathAtOpen.current == null) return;
+    if (pathname !== pathAtOpen.current) {
+      hardClose({ markSeen: false });
+    }
+  }, [pathname, hardClose]);
+
+  useEffect(() => {
+    return () => {
+      openRef.current = false;
+      if (bodyLocked.current) {
+        bodyLocked.current = false;
+        const y = scrollYRef.current;
+        try {
+          document.body.style.overflow = "";
+          document.body.style.position = "";
+          document.body.style.top = "";
+          document.body.style.left = "";
+          document.body.style.right = "";
+          document.body.style.width = "";
+          document.body.style.touchAction = "";
+          document.documentElement.style.overflow = "";
+          document.documentElement.style.touchAction = "";
+          window.scrollTo(0, y);
+        } catch {
+          /* ok */
+        }
+      }
+    };
   }, []);
 
-  function dismiss() {
-    if (edition && leagueId) {
-      markGazetteSeen(leagueId, edition.weekIndex);
+  // Focus trap within shell only
+  useEffect(() => {
+    if (!open) return;
+    function onTab(e: KeyboardEvent) {
+      if (e.key !== "Tab" || !shellRef.current) return;
+      const root = shellRef.current;
+      const nodes = root.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      const list = Array.from(nodes).filter(
+        (el) => !el.hasAttribute("disabled") && el.offsetParent !== null
+      );
+      if (!list.length) return;
+      const first = list[0];
+      const last = list[list.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+      if (e.shiftKey) {
+        if (active === first || !root.contains(active)) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else if (active === last) {
+        e.preventDefault();
+        first.focus();
+      }
     }
-    setOpen(false);
-    notifyGazetteDone();
-  }
+    document.addEventListener("keydown", onTab);
+    return () => document.removeEventListener("keydown", onTab);
+  }, [open]);
+
+  // Keyboard page scroll inside article body when focus is in dialog
+  useEffect(() => {
+    if (!open) return;
+    function onKeyScroll(e: KeyboardEvent) {
+      const body = scrollBodyRef.current;
+      if (!body || !openRef.current) return;
+      const keys = [
+        "ArrowDown",
+        "ArrowUp",
+        "PageDown",
+        "PageUp",
+        "Home",
+        "End",
+        " ",
+      ];
+      if (!keys.includes(e.key)) return;
+      // Don't steal if user is typing in an input
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;
+
+      const max = body.scrollHeight - body.clientHeight;
+      if (max <= 0) return;
+
+      let delta = 0;
+      if (e.key === "ArrowDown") delta = 40;
+      else if (e.key === "ArrowUp") delta = -40;
+      else if (e.key === "PageDown" || (e.key === " " && !e.shiftKey))
+        delta = body.clientHeight * 0.9;
+      else if (e.key === "PageUp" || (e.key === " " && e.shiftKey))
+        delta = -body.clientHeight * 0.9;
+      else if (e.key === "Home") {
+        e.preventDefault();
+        body.scrollTop = 0;
+        return;
+      } else if (e.key === "End") {
+        e.preventDefault();
+        body.scrollTop = max;
+        return;
+      }
+      if (delta !== 0) {
+        e.preventDefault();
+        body.scrollTop = Math.max(0, Math.min(max, body.scrollTop + delta));
+      }
+    }
+    window.addEventListener("keydown", onKeyScroll);
+    return () => window.removeEventListener("keydown", onKeyScroll);
+  }, [open]);
 
   if (!open || !edition) return null;
 
+  const issueLabel =
+    edition.weekLabel ||
+    edition.printedLine ||
+    edition.masthead ||
+    "War Room Gazette";
+
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="gazette-title"
+      className="fixed inset-0 z-[100] flex flex-col items-stretch sm:items-center sm:justify-center"
+      style={{
+        paddingTop: "env(safe-area-inset-top)",
+        paddingRight: "env(safe-area-inset-right)",
+        paddingBottom: "env(safe-area-inset-bottom)",
+        paddingLeft: "env(safe-area-inset-left)",
+      }}
+      data-moment="gazette"
+      data-fullscreen-overlay="gazette"
     >
+      {/* Backdrop — does not scroll, not the article container */}
       <button
         type="button"
         className="absolute inset-0 bg-black/85 backdrop-blur-sm"
-        aria-label="Close gazette"
-        onClick={dismiss}
+        aria-label="Close Gazette"
+        tabIndex={-1}
+        onClick={() => hardClose({ markSeen: true })}
       />
 
-      <div className="relative w-full sm:max-w-lg max-h-[94vh] overflow-y-auto overscroll-contain">
-        <span id="gazette-title" className="sr-only">
-          {edition.masthead}
-        </span>
-        <GazettePaper
-          edition={edition}
-          variant="modal"
-          onDismiss={dismiss}
-        />
+      {/*
+        Shell: explicit height budget so flex child can shrink (min-height:0).
+        overflow:hidden — shell itself never scrolls.
+      */}
+      <div
+        ref={shellRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="relative z-10 flex flex-col w-full sm:max-w-lg sm:mx-auto overflow-hidden rounded-t-2xl sm:rounded-sm shadow-2xl bg-[#f4f0e6] border-0 sm:border-2 sm:border-stone-700"
+        style={{
+          // Critical: fixed height budget → flex-1 body can scroll
+          height: "min(100dvh, 100%)",
+          maxHeight: "100dvh",
+          minHeight: 0,
+        }}
+      >
+        {/* Sticky header — always visible while article scrolls */}
+        <header className="shrink-0 flex items-center gap-2 px-3 py-2.5 border-b-2 border-stone-800 bg-[#1c1917] text-[#f4f0e6]">
+          <div className="min-w-0 flex-1">
+            <p
+              id={titleId}
+              className="text-[11px] sm:text-xs font-black uppercase tracking-[0.14em] truncate"
+            >
+              {edition.masthead || "The War Room Gazette"}
+            </p>
+            <p className="text-[10px] text-stone-400 truncate font-medium">
+              {issueLabel}
+            </p>
+          </div>
+          <button
+            ref={closeBtnRef}
+            type="button"
+            onClick={() => hardClose({ markSeen: true })}
+            className="shrink-0 min-w-[44px] min-h-[44px] rounded-lg border border-stone-500 text-[#f4f0e6] text-xl font-bold leading-none flex items-center justify-center hover:bg-stone-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 touch-manipulation"
+            aria-label="Close Gazette"
+          >
+            ✕
+          </button>
+        </header>
+
+        {/*
+          THE scrollport — only this node scrolls.
+          flex:1 1 0% + minHeight:0 is required inside a flex column.
+        */}
+        <div
+          ref={scrollBodyRef}
+          className="gazette-scroll-body"
+          data-gazette-scroll="1"
+          style={{
+            flex: "1 1 0%",
+            minHeight: 0,
+            overflowY: "auto",
+            overflowX: "hidden",
+            overscrollBehavior: "contain",
+            WebkitOverflowScrolling: "touch",
+            touchAction: "pan-y",
+          }}
+        >
+          <GazettePaper
+            edition={edition}
+            variant="modal"
+            onDismiss={() => hardClose({ markSeen: true })}
+            className="!rounded-none !border-0 !shadow-none"
+          />
+          <div className="h-6" aria-hidden />
+        </div>
       </div>
     </div>
   );

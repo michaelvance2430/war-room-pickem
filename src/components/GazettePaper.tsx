@@ -104,12 +104,14 @@ export default function GazettePaper({
     }
   }, [edition.weekIndex, edition.rareEgg]);
 
+  // Modal: no outer overflow trap — parent .gazette-scroll-body is the scrollport.
+  // Archive: normal card overflow.
   return (
     <div
-      className={`bg-[#f4f0e6] text-stone-900 overflow-hidden ${
+      className={`bg-[#f4f0e6] text-stone-900 ${
         variant === "modal"
-          ? "rounded-t-2xl sm:rounded-sm border-2 border-stone-700 shadow-2xl"
-          : "rounded-sm border-2 border-stone-600 shadow-lg"
+          ? "overflow-visible rounded-none border-0 shadow-none"
+          : "overflow-hidden rounded-sm border-2 border-stone-600 shadow-lg"
       } ${className}`}
     >
       {/* EXTRA stamp strip — CFB red · NFL navy/crimson · WWC Brazil */}
@@ -517,7 +519,7 @@ export default function GazettePaper({
               onClick={onDismiss}
               className="flex-1 py-3 min-h-[48px] rounded-xl bg-stone-900 text-[#f4f0e6] text-sm font-bold touch-manipulation"
             >
-              Got it
+              Return to War Room
             </button>
             <Link
               href="/standings"
