@@ -8,6 +8,7 @@ import {
   hotTakeTickerLabel,
   resolveVoiceSport,
 } from "@/lib/fun-board";
+import { hasOfficialScoredWeek } from "@/lib/season-scored";
 
 type Props = {
   /** Dark war-room strip (home) vs standard card strip */
@@ -34,9 +35,30 @@ export default function HotTakeTicker({
         // (was an extra cloud RTT every Home visit from Picks).
         const sport = sportIdProp ?? getLeague()?.sportId ?? null;
         const voice = resolveVoiceSport(sport);
+        setLabel(hotTakeTickerLabel(voice));
+
+        // Anticipation only until first official scored week — never invent achievement takes
+        const scored = await hasOfficialScoredWeek();
+        if (cancelled) return;
+        if (!scored) {
+          setTakes(
+            voice === "nfl"
+              ? [
+                  "Primetime wire is quiet — first scored week starts the trash talk board.",
+                  "No crown. No wall. No heaters. Everyone is undefeated on vibes alone.",
+                  "Lock the card. Drama ships after the host scores.",
+                ]
+              : [
+                  "Campus wire is quiet — first scored week starts the roast.",
+                  "No crown. No wall. No milk cartons yet. Everybody is undefeated.",
+                  "Saturday hasn't written standings. Go lock a card.",
+                ]
+          );
+          return;
+        }
+
         const players = await loadLeaguePlayers();
         if (cancelled) return;
-        setLabel(hotTakeTickerLabel(voice));
         setTakes(buildHotTakes(players, voice));
       } catch {
         if (!cancelled) {

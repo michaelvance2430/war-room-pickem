@@ -28,6 +28,7 @@ import { formatLastSeen, lastSeenToneClass } from "@/lib/last-seen";
 import InviteFriends from "@/components/InviteFriends";
 import { isPreseasonCommishToolsAllowed } from "@/lib/season-mode";
 import { getBlueFalconCount, hydrateBlueFalconFromCloud } from "@/lib/blue-falcon";
+import { hasOfficialScoredWeek } from "@/lib/season-scored";
 
 export default function PlayersPage() {
   const [players, setPlayers] = useState<LeagueRosterMember[]>([]);
@@ -44,6 +45,8 @@ export default function PlayersPage() {
   const [removingId, setRemovingId] = useState<string | null>(null);
   /** userId → Blue Falcon Count for kick risk */
   const [falconByUser, setFalconByUser] = useState<Record<string, number>>({});
+  /** Hide season pts until first official score — never invent achievement */
+  const [showSeasonPts, setShowSeasonPts] = useState(false);
   const preseasonKickOk = isPreseasonCommishToolsAllowed();
 
   async function reload() {
@@ -64,8 +67,12 @@ export default function PlayersPage() {
       return;
     }
 
-    const roster = await loadLeagueRoster();
+    const [roster, scored] = await Promise.all([
+      loadLeagueRoster(),
+      hasOfficialScoredWeek(),
+    ]);
     setPlayers(roster);
+    setShowSeasonPts(scored);
     // Blue Falcon counts for preseason kick risk
     const falcon: Record<string, number> = {};
     await Promise.all(
@@ -297,8 +304,8 @@ export default function PlayersPage() {
                         {divisionDisplayLabel(
                           b.division,
                           getLeague()?.sportId
-                        )}{" "}
-                        · {b.totalPoints} pts
+                        )}
+                        {showSeasonPts ? ` · ${b.totalPoints} pts` : ""}
                       </div>
       </div>
                     <button
@@ -400,7 +407,11 @@ export default function PlayersPage() {
                           )}
                         </div>
       <div className="text-xs text-muted flex flex-wrap items-center gap-x-1.5">
-                          <span>{p.totalPoints} pts</span>
+                          {showSeasonPts ? (
+                            <span>{p.totalPoints} pts</span>
+                          ) : (
+                            <span>Joined · undefeated</span>
+                          )}
                           {!p.isBot && (
                             <>
                               <span className="text-border">·</span>

@@ -1,8 +1,14 @@
 "use client";
 
+/**
+ * Standings — competitive columns only after an official scored week.
+ * Constitution: never invent achievement.
+ */
+
 import { useState, useEffect, Fragment } from "react";
 import SwingBadge from "@/components/SwingBadge";
 import CrownAndShame from "@/components/CrownAndShame";
+import SeasonNotStartedEmpty from "@/components/SeasonNotStartedEmpty";
 import { loadLeaguePlayers } from "@/lib/cloud";
 import { pageLoad } from "@/lib/smooth";
 import { getSession, getLeague } from "@/lib/league";
@@ -15,6 +21,7 @@ import { standingsHardwareFlair } from "@/lib/profile-hardware";
 import { Division, Player } from "@/lib/types";
 import { divisionTabLabel } from "@/lib/divisions";
 import { formatLastSeen, lastSeenToneClass } from "@/lib/last-seen";
+import { hasOfficialScoredWeek } from "@/lib/season-scored";
 
 const divisions: (Division | "Overall")[] = [
   "Overall",
@@ -41,6 +48,7 @@ const TIP_KEY = "warroom-tip-tap-names-v1";
 export default function StandingsPage() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
+  const [seasonStarted, setSeasonStarted] = useState(false);
   const [swingById, setSwingById] = useState<
     Record<string, ReturnType<typeof rankPlayersWithSwings>[0]["swing"]>
   >({});
@@ -79,7 +87,6 @@ export default function StandingsPage() {
           /* ignore */
         }
       }
-      // Fail-safe: never leave standings stuck on spinner if cloud hangs
       const failSafe = window.setTimeout(() => {
         if (!cancelled) {
           mark("failSafe-3.5s-clear-loading");
@@ -87,43 +94,42 @@ export default function StandingsPage() {
         }
       }, 3_500);
       try {
+        const scored = await hasOfficialScoredWeek();
+        if (cancelled) return;
+        setSeasonStarted(scored);
+
         mark("loadLeaguePlayers-start");
         const list = await pageLoad(loadLeaguePlayers(), []);
         mark(
           "loadLeaguePlayers-done",
-          `n=${Array.isArray(list) ? list.length : 0}`
+          `n=${Array.isArray(list) ? list.length : 0} scored=${scored}`
         );
         if (cancelled) return;
         setPlayers(Array.isArray(list) ? list : []);
-        try {
-          const ranked = rankPlayersWithSwings(
-            Array.isArray(list) ? list : [],
-            getLeague()?.sportId
-          );
-          const map: Record<string, (typeof ranked)[0]["swing"]> = {};
-          for (const r of ranked) map[r.id] = r.swing;
-          setSwingById(map);
-          mark("swing-calc-done");
-        } catch {
+
+        if (scored) {
+          try {
+            const ranked = rankPlayersWithSwings(
+              Array.isArray(list) ? list : [],
+              getLeague()?.sportId
+            );
+            const map: Record<string, (typeof ranked)[0]["swing"]> = {};
+            for (const r of ranked) map[r.id] = r.swing;
+            setSwingById(map);
+            mark("swing-calc-done");
+          } catch {
+            setSwingById({});
+          }
+        } else {
           setSwingById({});
         }
       } catch {
-        /* offline / cloud — leave empty after loading clears */
         if (!cancelled) setPlayers([]);
         mark("load-error");
       } finally {
         window.clearTimeout(failSafe);
         if (!cancelled) setLoading(false);
         mark("loading-false-interactive");
-        try {
-          performance.measure(
-            "wr-standings:total",
-            "wr-standings:effect-start",
-            "wr-standings:loading-false-interactive"
-          );
-        } catch {
-          /* ok */
-        }
       }
     }
     load();
@@ -139,46 +145,56 @@ export default function StandingsPage() {
 
   const filtered =
     active === "Overall"
+      ? [...players].sort((a, b) => a.name.localeCompare(b.name))
+      : players
+          .filter((p) => p.division === active)
+          .sort((a, b) => a.name.localeCompare(b.name));
+
+  const competitive = seasonStarted
+    ? active === "Overall"
       ? [...players].sort(compareForSeed)
       : players
           .filter((p) => p.division === active)
-          .sort(compareForSeed);
+          .sort(compareForSeed)
+    : filtered;
 
-  const cutIndex = active !== "Overall" ? Math.floor(filtered.length / 2) : -1;
-  const anyScored = players.some(
-    (p) => p.totalPoints > 0 || (p.weeklyPoints?.length || 0) > 0
-  );
-  const preseason = players.length > 0 && !anyScored;
+  const cutIndex =
+    seasonStarted && active !== "Overall"
+      ? Math.floor(competitive.length / 2)
+      : -1;
 
   return (
     <div className="min-h-screen flex flex-col">
       <main className="flex-1 max-w-5xl mx-auto w-full px-3 sm:px-4 py-5 sm:py-8">
         <div className="mb-6">
-      <h1 className="text-2xl font-bold">Standings</h1>
-      <p className="text-sm text-muted">
-            {preseason
-              ? "No weeks scored yet — everyone is tied at zero until the first card is locked and scored."
-              : "Live points · Bottom 50% of each division gets flushed · Swing labels after each scored week"}
+          <h1 className="text-2xl font-bold">Standings</h1>
+          <p className="text-sm text-muted">
+            {seasonStarted
+              ? "Live points · Bottom 50% of each division gets flushed · Swing labels after each scored week"
+              : "No standings until the first week is scored. Right now everybody is undefeated."}
           </p>
-      <p className="text-xs text-muted mt-1.5 leading-relaxed">
-            <span className="text-primary font-medium">Last in</span> = how
-            recently they opened the app (same on CFB and NFL rooms). Works on
-            phone via the <strong className="text-foreground">Table</strong>{" "}
-            tab.
-          </p>
-      <p className="text-xs text-primary/90 mt-1 font-medium">
-            Tap a green name → open their profile (badges &amp; trophies).
-          </p>
-          {showNameTip && (
+          {seasonStarted && (
+            <>
+              <p className="text-xs text-muted mt-1.5 leading-relaxed">
+                <span className="text-primary font-medium">Last in</span> = how
+                recently they opened the app. Works on phone via the{" "}
+                <strong className="text-foreground">Table</strong> tab.
+              </p>
+              <p className="text-xs text-primary/90 mt-1 font-medium">
+                Tap a green name → open their profile (badges &amp; trophies).
+              </p>
+            </>
+          )}
+          {showNameTip && seasonStarted && (
             <div className="mt-3 rounded-xl border border-primary/40 bg-primary/10 px-3 py-2.5 flex items-start justify-between gap-2">
-      <p className="text-xs text-foreground leading-relaxed">
+              <p className="text-xs text-foreground leading-relaxed">
                 <strong className="text-primary">Tip:</strong> Names in{" "}
                 <span className="font-semibold text-primary underline decoration-2">
                   green
                 </span>{" "}
                 are links. Tap anyone to roast their trophy case.
               </p>
-      <button
+              <button
                 type="button"
                 onClick={() => {
                   setShowNameTip(false);
@@ -192,206 +208,253 @@ export default function StandingsPage() {
               >
                 Got it
               </button>
-      </div>
+            </div>
           )}
         </div>
 
-        {preseason && (
-          <div className="mb-6 rounded-xl border border-primary/30 bg-primary/10 px-4 py-3">
-      <p className="text-xs font-bold uppercase tracking-wider text-primary mb-1">
-              Preseason board
-            </p>
-      <p className="text-sm text-foreground leading-relaxed">
-              This isn&apos;t broken — the season hasn&apos;t posted points yet.
-              Names, divisions, and hardware flair are live. Points and swing
-              labels light up after the commissioner scores week one.{" "}
-              <span className="text-muted">
-                Go lock picks when the card is published.
-              </span>
-      </p>
+        {loading && (
+          <div className="mb-6 rounded-xl border border-border bg-card/50 px-4 py-8 text-center">
+            <p className="font-medium mb-1 text-muted">Loading the board…</p>
+            <p className="text-sm text-muted">Pulling live standings.</p>
           </div>
         )}
 
-        {!loading && !preseason && (
-          <CrownAndShame className="mb-6" players={players} />
+        {!loading && !seasonStarted && (
+          <div className="mb-8">
+            <SeasonNotStartedEmpty
+              footnote="No Crown. No Wall of Shame. No ATS. No streaks. War Room never invents what hasn't been earned."
+            />
+          </div>
         )}
 
-        {loading && (
-          <div className="mb-6 rounded-xl border border-border bg-card/50 px-4 py-8 text-center">
-      <p className="font-medium mb-1 text-muted">Loading the board…</p>
-      <p className="text-sm text-muted">Pulling live standings.</p>
-      </div>
-        )}
-
-        {!loading && players.length === 0 && (
-          <div className="mb-6 rounded-xl border border-dashed border-border bg-card/50 px-4 py-8 text-center">
-      <p className="font-medium mb-1">Nobody on the board yet</p>
-      <p className="text-sm text-muted">
-              Share the league invite code. When friends join, they show up
-              here.
+        {!loading && !seasonStarted && players.length > 0 && (
+          <div className="mb-6">
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted mb-2">
+              Room · {players.length} joined
             </p>
-      </div>
-        )}
-
-        <p className="text-[11px] text-muted mb-3 leading-relaxed flex flex-wrap items-center gap-x-3 gap-y-1">
-      <span className="font-semibold text-foreground/80">Last in</span>
-      <span className="inline-flex items-center gap-1">
-            <span className="text-emerald-400 font-bold">●</span> ≤6h
-          </span>
-      <span className="inline-flex items-center gap-1">
-            <span className="text-amber-400 font-bold">●</span> 6–18h
-          </span>
-      <span className="inline-flex items-center gap-1">
-            <span className="text-red-400 font-bold">●</span> 18h+
-          </span>
-      </p>
-
-        <div className="phone-h-scroll sm:flex-wrap sm:overflow-visible mb-5">
-          {divisions.map((d) => (
-            <button
-              key={d}
-              type="button"
-              onClick={() => setActive(d)}
-              className={`px-4 py-2.5 min-h-[44px] rounded-full text-sm font-semibold transition touch-manipulation ${
-                active === d
-                  ? "bg-primary text-black"
-                  : "bg-card border border-border text-muted hover:text-foreground"
-              }`}
-            >
-              {divisionTabLabel(d, getLeague()?.sportId)}
-            </button>
-          ))}
-        </div>
-      <div className="rounded-xl border border-border overflow-hidden overflow-x-auto">
-          <table className="w-full text-sm">
-      <thead className="bg-card text-muted text-xs uppercase tracking-wide">
-              <tr>
-      <th className="text-left px-3 sm:px-4 py-3 font-medium">#</th>
-      <th className="text-left px-3 sm:px-4 py-3 font-medium">
-                  Player
-                </th>
-                {active === "Overall" && (
-                  <th className="text-left px-4 py-3 font-medium">Div</th>
-                )}
-                <th className="text-left px-3 py-3 font-medium hidden md:table-cell">
-                  Swing
-                </th>
-      <th className="text-right px-3 sm:px-4 py-3 font-medium hidden sm:table-cell">
-                  Last in
-                </th>
-      <th className="text-right px-4 py-3 font-medium">Pts</th>
-      <th className="text-right px-4 py-3 font-medium hidden sm:table-cell">
-                  ATS%
-                </th>
-      <th className="text-right px-4 py-3 font-medium">Streak</th>
-      </tr>
-            </thead>
-      <tbody>
-              {filtered.map((player, idx) => (
-                <Fragment key={player.id}>
-                  {idx === cutIndex && (
-                    <tr className="bg-danger/10">
-      <td
-                        colSpan={active === "Overall" ? 8 : 7}
-                        className="px-4 py-1.5 text-center text-xs text-danger font-medium"
-                      >
-                        — Cut Line (bottom 50% → Toilet Bowl) —
-                      </td>
-      </tr>
-                  )}
-                  <tr
-                    className={selfRowClass(
-                      isSelfPlayer(player.id, selfId),
-                      `border-t border-border hover:bg-card-hover transition ${
-                        cutIndex >= 0 &&
-                        idx >= cutIndex &&
-                        !isSelfPlayer(player.id, selfId)
-                          ? "opacity-60"
-                          : ""
-                      }`
-                    )}
-                  >
-                    <td className="px-3 sm:px-4 py-3.5 text-muted align-middle">
-                      {idx + 1}
-                    </td>
-      <td className="px-3 sm:px-4 py-3.5 font-medium align-middle">
-                      <div className="flex flex-col gap-1 min-w-0">
-      <span
+            <div className="rounded-xl border border-border overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-card text-muted text-xs uppercase tracking-wide">
+                  <tr>
+                    <th className="text-left px-3 sm:px-4 py-3 font-medium">
+                      Player
+                    </th>
+                    <th className="text-left px-3 sm:px-4 py-3 font-medium">
+                      Division
+                    </th>
+                    <th className="text-right px-3 sm:px-4 py-3 font-medium">
+                      Last in
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((player) => (
+                    <tr
+                      key={player.id}
+                      className={selfRowClass(
+                        isSelfPlayer(player.id, selfId),
+                        "border-t border-border hover:bg-card-hover transition"
+                      )}
+                    >
+                      <td className="px-3 sm:px-4 py-3.5 font-medium">
+                        <span
                           className={selfNameClass(
                             isSelfPlayer(player.id, selfId)
                           )}
                         >
                           <PlayerLink id={player.id} name={player.name} />
-                          {standingsHardwareFlair(player.name).map((f) => (
-                            <span
-                              key={f.title}
-                              className="ml-1 inline-block text-sm align-middle"
-                              title={f.title}
-                              aria-label={f.title}
-                            >
-                              {f.emoji}
-                            </span>
-                          ))}
                           {isSelfPlayer(player.id, selfId) && <YouBadge />}
                         </span>
-                        {/* Phone: last-in under the name */}
-                        <span
-                          className={`text-[11px] sm:hidden ${lastSeenToneClass(player.lastSeenAt)}`}
-                          title={
-                            player.lastSeenAt
-                              ? `Last in: ${new Date(player.lastSeenAt).toLocaleString()}`
-                              : "Not seen in the app yet"
-                          }
-                        >
-                          {formatLastSeen(player.lastSeenAt)}
-                        </span>
-                        {swingById[player.id] && (
-                          <span className="md:hidden">
-      <SwingBadge swing={swingById[player.id]} />
-                          </span>
-                        )}
-                      </div>
-      </td>
-                    {active === "Overall" && (
-                      <td className="px-3 sm:px-4 py-3.5 text-muted align-middle text-xs sm:text-sm">
+                      </td>
+                      <td className="px-3 sm:px-4 py-3.5 text-muted text-xs sm:text-sm">
                         {divisionTabLabel(
                           player.division,
                           getLeague()?.sportId
                         )}
                       </td>
-                    )}
-                    <td className="px-3 py-3.5 hidden md:table-cell align-middle">
-                      {swingById[player.id] ? (
-                        <SwingBadge swing={swingById[player.id]} />
-                      ) : (
-                        <span className="text-muted">—</span>
-                      )}
-                    </td>
-      <td
-                      className={`px-3 sm:px-4 py-3.5 text-right align-middle text-xs hidden sm:table-cell ${lastSeenToneClass(player.lastSeenAt)}`}
-                      title={
-                        player.lastSeenAt
-                          ? `Last in: ${new Date(player.lastSeenAt).toLocaleString()}`
-                          : "Not seen in the app yet"
-                      }
-                    >
-                      {formatLastSeen(player.lastSeenAt)}
-                    </td>
-      <td className="px-3 sm:px-4 py-3.5 text-right font-semibold align-middle text-base">
-                      {player.totalPoints}
-                    </td>
-      <td className="px-4 py-3.5 text-right text-muted hidden sm:table-cell align-middle">
-                      {atsPct(player)}
-                    </td>
-      <td className="px-3 sm:px-4 py-3.5 text-right align-middle">
-                      {streakDisplay(player.currentStreak)}
-                    </td>
-      </tr>
-                </Fragment>
+                      <td
+                        className={`px-3 sm:px-4 py-3.5 text-right text-xs ${lastSeenToneClass(player.lastSeenAt)}`}
+                      >
+                        {formatLastSeen(player.lastSeenAt)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-[11px] text-muted mt-2 leading-relaxed">
+              Competitive ranks, points, ATS, and streaks light up after the
+              first week is scored.
+            </p>
+          </div>
+        )}
+
+        {!loading && seasonStarted && (
+          <CrownAndShame className="mb-6" players={players} />
+        )}
+
+        {!loading && players.length === 0 && (
+          <div className="mb-6 rounded-xl border border-dashed border-border bg-card/50 px-4 py-8 text-center">
+            <p className="font-medium mb-1">Nobody on the board yet</p>
+            <p className="text-sm text-muted">
+              Share the league invite code. When friends join, they show up
+              here.
+            </p>
+          </div>
+        )}
+
+        {!loading && seasonStarted && players.length > 0 && (
+          <>
+            <p className="text-[11px] text-muted mb-3 leading-relaxed flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="font-semibold text-foreground/80">Last in</span>
+              <span className="inline-flex items-center gap-1">
+                <span className="text-emerald-400 font-bold">●</span> ≤6h
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="text-amber-400 font-bold">●</span> 6–18h
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="text-red-400 font-bold">●</span> 18h+
+              </span>
+            </p>
+
+            <div className="phone-h-scroll sm:flex-wrap sm:overflow-visible mb-5">
+              {divisions.map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => setActive(d)}
+                  className={`px-4 py-2.5 min-h-[44px] rounded-full text-sm font-semibold transition touch-manipulation ${
+                    active === d
+                      ? "bg-primary text-black"
+                      : "bg-card border border-border text-muted hover:text-foreground"
+                  }`}
+                >
+                  {divisionTabLabel(d, getLeague()?.sportId)}
+                </button>
               ))}
-            </tbody>
-      </table>
-        </div>
+            </div>
+            <div className="rounded-xl border border-border overflow-hidden overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-card text-muted text-xs uppercase tracking-wide">
+                  <tr>
+                    <th className="text-left px-3 sm:px-4 py-3 font-medium">#</th>
+                    <th className="text-left px-3 sm:px-4 py-3 font-medium">
+                      Player
+                    </th>
+                    {active === "Overall" && (
+                      <th className="text-left px-4 py-3 font-medium">Div</th>
+                    )}
+                    <th className="text-left px-3 py-3 font-medium hidden md:table-cell">
+                      Swing
+                    </th>
+                    <th className="text-right px-3 sm:px-4 py-3 font-medium hidden sm:table-cell">
+                      Last in
+                    </th>
+                    <th className="text-right px-4 py-3 font-medium">Pts</th>
+                    <th className="text-right px-4 py-3 font-medium hidden sm:table-cell">
+                      ATS%
+                    </th>
+                    <th className="text-right px-4 py-3 font-medium">Streak</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {competitive.map((player, idx) => (
+                    <Fragment key={player.id}>
+                      {idx === cutIndex && (
+                        <tr className="bg-danger/10">
+                          <td
+                            colSpan={active === "Overall" ? 8 : 7}
+                            className="px-4 py-1.5 text-center text-xs text-danger font-medium"
+                          >
+                            — Cut Line (bottom 50% → Toilet Bowl) —
+                          </td>
+                        </tr>
+                      )}
+                      <tr
+                        className={selfRowClass(
+                          isSelfPlayer(player.id, selfId),
+                          `border-t border-border hover:bg-card-hover transition ${
+                            cutIndex >= 0 &&
+                            idx >= cutIndex &&
+                            !isSelfPlayer(player.id, selfId)
+                              ? "opacity-60"
+                              : ""
+                          }`
+                        )}
+                      >
+                        <td className="px-3 sm:px-4 py-3.5 text-muted align-middle">
+                          {idx + 1}
+                        </td>
+                        <td className="px-3 sm:px-4 py-3.5 font-medium align-middle">
+                          <div className="flex flex-col gap-1 min-w-0">
+                            <span
+                              className={selfNameClass(
+                                isSelfPlayer(player.id, selfId)
+                              )}
+                            >
+                              <PlayerLink id={player.id} name={player.name} />
+                              {standingsHardwareFlair(player.name).map((f) => (
+                                <span
+                                  key={f.title}
+                                  className="ml-1 inline-block text-sm align-middle"
+                                  title={f.title}
+                                  aria-label={f.title}
+                                >
+                                  {f.emoji}
+                                </span>
+                              ))}
+                              {isSelfPlayer(player.id, selfId) && <YouBadge />}
+                            </span>
+                            <span
+                              className={`text-[11px] sm:hidden ${lastSeenToneClass(player.lastSeenAt)}`}
+                            >
+                              {formatLastSeen(player.lastSeenAt)}
+                            </span>
+                            {swingById[player.id] && (
+                              <span className="md:hidden">
+                                <SwingBadge swing={swingById[player.id]} />
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        {active === "Overall" && (
+                          <td className="px-3 sm:px-4 py-3.5 text-muted align-middle text-xs sm:text-sm">
+                            {divisionTabLabel(
+                              player.division,
+                              getLeague()?.sportId
+                            )}
+                          </td>
+                        )}
+                        <td className="px-3 py-3.5 hidden md:table-cell align-middle">
+                          {swingById[player.id] ? (
+                            <SwingBadge swing={swingById[player.id]} />
+                          ) : (
+                            <span className="text-muted">—</span>
+                          )}
+                        </td>
+                        <td
+                          className={`px-3 sm:px-4 py-3.5 text-right align-middle text-xs hidden sm:table-cell ${lastSeenToneClass(player.lastSeenAt)}`}
+                        >
+                          {formatLastSeen(player.lastSeenAt)}
+                        </td>
+                        <td className="px-3 sm:px-4 py-3.5 text-right font-semibold align-middle text-base">
+                          {player.totalPoints}
+                        </td>
+                        <td className="px-4 py-3.5 text-right text-muted hidden sm:table-cell align-middle">
+                          {atsPct(player)}
+                        </td>
+                        <td className="px-3 sm:px-4 py-3.5 text-right align-middle">
+                          {streakDisplay(player.currentStreak)}
+                        </td>
+                      </tr>
+                    </Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </main>
     </div>
   );

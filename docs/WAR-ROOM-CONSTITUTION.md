@@ -84,6 +84,19 @@ The Board’s promise: *it reveals what happened this season.*
 Zero scored weeks → empty state, not placeholder weeks, not demo cards, not practice artifacts.  
 The first scored week is when The Board comes alive.
 
+### Achievement principle
+
+> **War Room never awards what hasn't been earned.**
+
+Never invent champions, losers, rankings, or statistics.
+
+If nobody has won — nobody wears the crown.  
+If nobody has lost — there is no Wall of Shame.  
+If nobody has points — everybody is undefeated, and the UI says so without faking a leaderboard.
+
+Gate: official scored weeks (`listScoredWeekNumbers`), not leftover membership fields.  
+If War Room says something happened, the player must be able to trust that it actually happened.
+
 ### Anticipation principle
 
 > **War Room celebrates anticipation as much as history.**

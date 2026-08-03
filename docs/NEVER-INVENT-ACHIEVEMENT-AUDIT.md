@@ -1,8 +1,14 @@
 # P0 Trust Audit — Never Invent Results / Achievement
 
-**Status:** Audit only — **no implementation until Mike approves**  
+**Status:** ✅ **APPROVED & IMPLEMENTED** (2026-08-03)  
 **Date:** 2026-08-03  
 **Class:** Trust issue (same family as Board empty history)
+
+### Implementation
+
+- Gate: `hasOfficialScoredWeek()` → `listScoredWeekNumbers().length > 0`
+- Crown, Standings competitive columns, Stats power/season, Hot takes, Championship/Toilet seeds, Players pts all gated
+- Shared `SeasonNotStartedEmpty` + achievement constitution line
 
 ---
 

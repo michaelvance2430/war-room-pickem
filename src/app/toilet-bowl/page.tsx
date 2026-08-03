@@ -71,6 +71,17 @@ export default function ToiletBowlPage() {
         return;
       }
 
+      // Never invent a shame field before the first scored week
+      if (scoredWeeks.length === 0) {
+        setBracket(null);
+        setFieldSize(0);
+        setProgressNote(
+          "Toilet Bowl stays closed until the season has a scored week. Nobody has earned the flush yet."
+        );
+        if (!cancelled) setLoading(false);
+        return;
+      }
+
       const seeded = seedToiletBowl(players);
       setFieldSize(seeded.length);
       const built = buildBracket("toilet", seeded);
@@ -197,6 +208,25 @@ export default function ToiletBowlPage() {
               Go to Players →
             </Link>
       </div>
+        )}
+
+        {!loading && playerCount >= 2 && !bracket && (
+          <div className="rounded-xl border-2 border-dashed border-toilet/40 bg-card p-8 text-center space-y-3">
+            <p className="text-3xl" aria-hidden>
+              🚽
+            </p>
+            <p className="font-bold text-lg text-toilet">Toilet Bowl is closed for business</p>
+            <p className="text-sm text-muted leading-relaxed max-w-md mx-auto">
+              {progressNote ||
+                "Nobody has earned the flush yet. Come back after the first scored week."}
+            </p>
+            <Link
+              href="/picks"
+              className="inline-flex min-h-[48px] items-center justify-center px-4 rounded-xl bg-primary text-black text-sm font-extrabold"
+            >
+              Go make your picks →
+            </Link>
+          </div>
         )}
 
         {!loading && playerCount >= 2 && bracket && (

@@ -71,6 +71,17 @@ export default function ChampionshipPage() {
         return;
       }
 
+      // Never invent seeds before football has produced a scored week
+      if (scoredWeeks.length === 0) {
+        setBracket(null);
+        setFieldSize(0);
+        setProgressNote(
+          "No standings yet — championship seeds appear after the first week is scored. War Room never invents a field."
+        );
+        if (!cancelled) setLoading(false);
+        return;
+      }
+
       // Top half by points (min 2 for a bracket; seedChampionship uses top half, min 4 when large)
       const seeded = seedChampionship(players);
       setFieldSize(seeded.length);
@@ -215,6 +226,25 @@ export default function ChampionshipPage() {
               Go to Players →
             </Link>
       </div>
+        )}
+
+        {!loading && playerCount >= 2 && !bracket && (
+          <div className="rounded-xl border-2 border-dashed border-primary/35 bg-card p-8 text-center space-y-3">
+            <p className="text-3xl" aria-hidden>
+              🏆
+            </p>
+            <p className="font-bold text-lg">No Championship field yet</p>
+            <p className="text-sm text-muted leading-relaxed max-w-md mx-auto">
+              {progressNote ||
+                "Seeds appear after the first week is scored. War Room never invents a bracket."}
+            </p>
+            <Link
+              href="/picks"
+              className="inline-flex min-h-[48px] items-center justify-center px-4 rounded-xl bg-primary text-black text-sm font-extrabold"
+            >
+              Go make your picks →
+            </Link>
+          </div>
         )}
 
         {!loading && playerCount >= 2 && bracket && (

@@ -1,15 +1,21 @@
 "use client";
 
+/**
+ * Crown & Wall of Shame — only after an official scored week.
+ * Constitution: never invent achievement.
+ */
+
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import PlayerLink from "@/components/PlayerLink";
 import { loadLeaguePlayers } from "@/lib/cloud";
 import { weekCrownAndShame, type CrownShame } from "@/lib/fun-board";
+import { hasOfficialScoredWeek } from "@/lib/season-scored";
 import type { Player } from "@/lib/types";
 
 type Props = {
   className?: string;
-  /** When parent already loaded standings, skip a second cloud round-trip. */
+  /** When parent already loaded standings, skip a second cloud round-trip for players. */
   players?: Player[];
 };
 
@@ -18,28 +24,39 @@ export default function CrownAndShame({
   players: playersProp,
 }: Props) {
   const [data, setData] = useState<CrownShame | null | undefined>(undefined);
+  const [seasonStarted, setSeasonStarted] = useState<boolean | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    if (playersProp && playersProp.length > 0) {
-      setData(weekCrownAndShame(playersProp));
-      return () => {
-        cancelled = true;
-      };
-    }
-    loadLeaguePlayers()
-      .then((players) => {
+
+    async function load() {
+      const scored = await hasOfficialScoredWeek();
+      if (cancelled) return;
+      setSeasonStarted(scored);
+      if (!scored) {
+        setData(null);
+        return;
+      }
+
+      if (playersProp && playersProp.length > 0) {
+        setData(weekCrownAndShame(playersProp));
+        return;
+      }
+      try {
+        const players = await loadLeaguePlayers();
         if (!cancelled) setData(weekCrownAndShame(players));
-      })
-      .catch(() => {
+      } catch {
         if (!cancelled) setData(null);
-      });
+      }
+    }
+
+    void load();
     return () => {
       cancelled = true;
     };
   }, [playersProp]);
 
-  if (data === undefined) {
+  if (data === undefined || seasonStarted === null) {
     return (
       <div
         className={`rounded-xl border border-border bg-card/80 p-4 text-sm text-muted ${className}`}
@@ -49,24 +66,30 @@ export default function CrownAndShame({
     );
   }
 
-  if (!data) {
+  // Zero scored weeks — honest empty (not fake crown names)
+  if (!seasonStarted || !data) {
     return (
       <div
-        className={`rounded-xl border border-dashed border-border bg-card/60 p-5 ${className}`}
+        className={`rounded-xl border-2 border-dashed border-border bg-card/60 p-5 ${className}`}
       >
         <h2 className="font-semibold text-sm mb-1">Crown &amp; Wall of Shame</h2>
         <p className="text-sm text-muted leading-relaxed">
-          This populates once a week is scored —{" "}
-          <span className="text-primary">🐐 high scorer</span> and{" "}
-          <span className="text-toilet">🛍️ low scorer</span> for the latest
-          card. Until then, the board stays empty.
+          <span className="text-primary font-semibold">No Crown Yet.</span>{" "}
+          Week 1 decides who gets to wear it.{" "}
+          <span className="text-toilet font-semibold">Wall of Shame</span> is
+          still under construction — somebody will earn it soon enough.
         </p>
-        <Link
-          href="/gazette"
-          className="inline-block mt-3 text-xs text-primary hover:underline"
-        >
-          Gazette Archive →
-        </Link>
+        <p className="text-xs text-muted mt-2 leading-relaxed">
+          War Room never awards what hasn&apos;t been earned.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-3 text-xs">
+          <Link href="/picks" className="text-primary font-semibold hover:underline">
+            Make picks →
+          </Link>
+          <Link href="/standings" className="text-primary hover:underline">
+            Standings →
+          </Link>
+        </div>
       </div>
     );
   }

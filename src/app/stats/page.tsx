@@ -11,6 +11,8 @@ import { loadLeagueTrophies } from "@/lib/trophies";
 import { isSelfPlayer, selfNameClass, selfRowClass } from "@/lib/self-highlight";
 import YouBadge from "@/components/YouBadge";
 import PlayerLink from "@/components/PlayerLink";
+import SeasonNotStartedEmpty from "@/components/SeasonNotStartedEmpty";
+import { hasOfficialScoredWeek } from "@/lib/season-scored";
 import { Player } from "@/lib/types";
 
 type MainTab = "power" | "season" | "lore";
@@ -100,6 +102,7 @@ export default function StatsPage() {
   const [selfId, setSelfId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<StatKey>("totalPoints");
   const [loading, setLoading] = useState(true);
+  const [seasonStarted, setSeasonStarted] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -115,14 +118,23 @@ export default function StatsPage() {
     async function load() {
       setSelfId(getSession()?.playerId || null);
       try {
+        const scored = await hasOfficialScoredWeek();
+        if (cancelled) return;
+        setSeasonStarted(scored);
+
         const [list, trophies] = await Promise.all([
           loadLeaguePlayers(),
           loadLeagueTrophies(),
         ]);
         if (cancelled) return;
         setPlayers(list);
-        setRanked(powerBoardWithLabels(list, computePowerScore));
+        // Lore can use prior-season trophies; power/season ranks only after score
         setLoreCards(buildLeagueLoreCards(list, trophies));
+        if (scored) {
+          setRanked(powerBoardWithLabels(list, computePowerScore));
+        } else {
+          setRanked([]);
+        }
       } catch {
         /* empty board — still leave spinner */
       } finally {
@@ -213,8 +225,17 @@ export default function StatsPage() {
       </div>
         )}
 
+        {!loading &&
+          !seasonStarted &&
+          (mainTab === "power" || mainTab === "season") && (
+            <SeasonNotStartedEmpty
+              className="mb-6"
+              footnote="No power ranks, ATS, or streaks until football produces a scored week."
+            />
+          )}
+
         {/* —— Power Rankings tab —— */}
-        {mainTab === "power" && !loading && players.length > 0 && (
+        {mainTab === "power" && !loading && seasonStarted && players.length > 0 && (
           <>
             <HotTakeTicker className="mb-6" />
       <p className="text-xs text-muted mb-4">
@@ -292,7 +313,7 @@ export default function StatsPage() {
         )}
 
         {/* —— Season stats table tab —— */}
-        {mainTab === "season" && !loading && players.length > 0 && (
+        {mainTab === "season" && !loading && seasonStarted && players.length > 0 && (
           <>
             <div className="flex flex-wrap gap-2 mb-4">
               {sortTabs.map((t) => (
