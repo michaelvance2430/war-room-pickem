@@ -43,9 +43,12 @@ August / offseason
 
 | Tier | Name | Change policy |
 |------|------|----------------|
-| **I** | **Traditions** | Unanimous approval only once frozen |
-| **II** | **Weekly Rituals** | Normal product process; never promote to I casually |
+| **I** | **Traditions** | **Sacred** — Constitution law; founder + unanimous; feel-more test only |
+| **II** | **Weekly Rituals** | Living systems process; never promote to I casually |
 | **III** | **Recognition** | Delight; never steal Tradition budget |
+
+Living systems (League, Locker, Picks, Board) improve continuously.  
+Sacred traditions grow valuable by **not** changing.
 
 Internal star weights still map in `docs/EMOTIONAL-BUDGET.md`.  
 Talk about **Traditions**, not “five-star animations.”

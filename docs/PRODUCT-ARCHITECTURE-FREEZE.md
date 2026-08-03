@@ -114,8 +114,8 @@ They are **television production for the season** — not rewards for the login.
 **Tiers (product language):**  
 Tier I Traditions · Tier II Weekly Rituals · Tier III Recognition  
 
-**Tradition protection:** Tier I may only change by **unanimous** founder + implementer (+ product counsel) approval.  
-**Season Opening (P0.3):** 🔒 **FROZEN** after authentic-spectacle pass (`0b884c0`). Preview in Foundry. Do not keep polishing.
+**Traditions Are Sacred** (Constitution): Tier I frozen once shipped; change only with explicit founder approval + unanimous partners, and only if it increases feeling — not for cooler animation.  
+**Season Opening (P0.3):** 🔒 **FROZEN** (`0b884c0`). Foundry preview OK. Do not polish.
 
 ---
 

@@ -7,7 +7,9 @@ import type { MomentDefinition } from "./types";
 
 /**
  * 🔒 FROZEN Tier I Tradition — Season Opening (CFB).
- * Change only with unanimous Tradition protection approval.
+ * Constitution: Traditions Are Sacred.
+ * Change only with founder approval + unanimous partners, and only if
+ * players will feel more than before — not for a cooler animation.
  * Ship freeze: 0b884c0 · Do not keep polishing.
  */
 export const MOMENT_SEASON_OPEN_CFB: MomentDefinition = {

@@ -58,7 +58,7 @@ Legacy star table (engineers only):
 4. **Earned ≠ Tradition.** First cheevo is Recognition, not Opening Day.  
 5. **Trust moments are not spend.** Empty Board / empty Standings are honesty, not celebration — they cost **0** Emotional Budget.  
 6. **Skip is free.** Skip must never punish or re-spend.  
-7. **Tier I changes require unanimous approval** (Constitution: Tradition protection law). Once frozen, prefer aging over polish.
+7. **Tier I changes require explicit founder approval + unanimous partners** (Constitution: **Traditions Are Sacred**). Once frozen, prefer aging over polish. Founder test: *Will this make players feel more than they did before?*
 7. **Practice Mode spends nothing.** No Moments in Practice.  
 8. **Foundry preview does not spend customer budget.** Creator can replay; customers still once.
 

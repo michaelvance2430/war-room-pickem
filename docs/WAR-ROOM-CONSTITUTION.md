@@ -203,25 +203,82 @@ If the room still feels cheap for a once-a-season peak, add **football** atmosph
 Moments are **television production** for the season — not rewards for the user.  
 You celebrate **the season**. Not the login.
 
-### Tradition protection law
+### Traditions Are Sacred (constitutional law)
 
-> **Tier I Traditions may only change by unanimous approval.**
+War Room Traditions are **not** ordinary features.
 
-Who must agree before any change ships:
+They are annual rituals that create anticipation, nostalgia, and shared memories.
 
-1. The founder (Mike)  
-2. Implementation partner (Grok / engineering)  
+Once a Tradition ships, it is considered **frozen**.  
+Players should recognize it year after year.  
+**Familiarity increases emotional value.**
+
+#### Tradition Guardrail
+
+**Tier I Traditions** (Opening Day / Season Opening, Championship Celebration, Hall of Champions, and future Tier I peaks) cannot be casually redesigned.
+
+Changes require:
+
+1. **Explicit founder approval** (Mike)  
+2. **Unanimous agreement** with the implementer (Grok / engineering)  
 3. Product counsel when involved (ChatGPT / design steward)
 
 If anyone says no — **do not touch it.**
 
-Why: once players see a Tradition, it becomes sacred.  
-You do not redesign ESPN’s Monday Night open, College GameDay’s open, or the Masters theme every week.  
-Familiarity is the product.
+A change may ship **only** when it materially improves the **emotional** experience.
+
+**Not** because we found a cooler animation.  
+**Not** because we learned a new UI trick.  
+**Not** because six months later we are bored of our own work.
+
+#### Rule (the only test that matters)
+
+Players should remember the **feeling**.  
+Not notice the **redesign**.
+
+| First reaction | Verdict |
+|----------------|---------|
+| *“Oh… they changed it.”* | Probably the wrong change |
+| *“Here we go…”* | Tradition protected |
+
+#### Design philosophy
+
+> **Traditions gain value through repetition.**  
+> **Consistency creates nostalgia.**  
+> **Nostalgia creates loyalty.**
+
+Copy, timing, music, pacing, and emotional rhythm should remain **substantially unchanged** between seasons unless there is a compelling product reason under this law.
+
+Intentionally stable (examples):
+
+- Season Opening  
+- Championship Celebration  
+- Hall of Champions  
+- Other future Tier I Traditions  
+
+#### Founder Test (before any Tradition change)
+
+> **Will this make players feel more than they did before?**
+
+If not — **leave it alone.**
+
+This law gives permission to **stop**.  
+With traditions, **stability is often the improvement.**
 
 **Freeze means freeze.** Preview until everyone smiles — then stop polishing. Let it age.  
 Year one: “That was cool.”  
-Year five: “It’s football season.”
+Year five: “It’s football season.”  
+Five years out: “The room opens tonight.” — and nobody asks what that means.
+
+#### Two kinds of product work
+
+| Kind | What | How it should evolve |
+|------|------|----------------------|
+| **Living systems** | League, Locker, Picks, Board, Host tools | Continuously improve |
+| **Sacred traditions** | Opening Day, Championship, Hall of Champions | Become more meaningful **because they don’t change** |
+
+Do not apply “ship fast, iterate weekly” to Tier I.  
+That mindset is correct for living systems. It **erodes** Traditions.
 
 ### War Room calendar (experience, not features)
 

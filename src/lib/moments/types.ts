@@ -8,7 +8,8 @@
  * Product language: Tier I Traditions · Tier II Weekly Rituals · Tier III Recognition
  * Stars (emotionalWeight) are internal mapping only.
  *
- * Tier I changes require unanimous approval (Constitution: Tradition protection).
+ * Tier I: Constitution law "Traditions Are Sacred" — frozen once shipped;
+ * founder + unanimous partners; founder test = will players feel more?
  */
 
 /** Product-facing Moment tier (prefer over star talk) */
