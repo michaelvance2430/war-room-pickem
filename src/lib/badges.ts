@@ -187,6 +187,19 @@ export const BADGE_CATALOG: BadgeDef[] = [
     icon: "🎓",
   },
   {
+    id: "house_dragon_legendary",
+    name: "House Dragon",
+    description:
+      "Keeper of the chaos. Protector of the family. Somehow keeps the house standing despite occasionally forgetting why she walked into the room. The kingdom runs because she never stops trying—and somehow she still raised two incredible daughters. Long may House Dragon reign.",
+    howToEarn:
+      "Commissioner-issued lore. Not a grind. Not available to the field. Seeded for Marilynnsmum alone.",
+    lockedLabel: "Hard locked — House Dragon only",
+    tier: "legendary",
+    points: 200,
+    careerOnly: true,
+    icon: "🐉",
+  },
+  {
     id: CAREER_CELLAR_ID,
     name: "Sad Little Brains Forever",
     description:
@@ -1493,6 +1506,11 @@ function evaluateBadge(
         earned: hasPermanentBadge(player, "the_dr"),
       };
 
+    case "house_dragon_legendary":
+      return {
+        earned: hasPermanentBadge(player, "house_dragon_legendary"),
+      };
+
     case "immortal_streak":
       return progress(streak, 30);
 
@@ -2207,7 +2225,13 @@ export function getPlayerBadges(
     }
   }
 
-  return sortBadges(statuses);
+  // House Dragon etc. — never show locked for the whole field
+  const visible = statuses.filter((b) => {
+    if (b.def.id === "house_dragon_legendary" && !b.earned) return false;
+    return true;
+  });
+
+  return sortBadges(visible);
 }
 
 /**

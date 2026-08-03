@@ -64,6 +64,13 @@ export const EQUIPABLE_TITLE_CATALOG: EquipableTitleDef[] = [
       "PhD energy. Spreadsheet inferiority complex. Call her Doctor — then beat her ATS.",
   },
   {
+    badgeId: "house_dragon_legendary",
+    title: "House Dragon",
+    vibe: "brag",
+    blurb:
+      "Keeper of the chaos. Protector of the family. Long may House Dragon reign.",
+  },
+  {
     badgeId: "sad_little_brains",
     title: "Sad Little Brain",
     vibe: "roast",

@@ -10,6 +10,7 @@
  *  - Tbone Soulstache Rockstar / Football Guru → World Greatest Cavalry Scout
  *    (eggplant on a wooden base · +200 career)
  *  - Maria → The Dr. (doctorate at ~24 · legendary nerd flex · +200 career)
+ *  - Marilynnsmum → House Dragon (legendary family lore · +200 career only)
  *
  * Mistaken (hard-revoked whenever we see the name / on every app boot):
  *  - Andrew Visconti / Andy — was incorrectly given Kahmann’s champ seed
@@ -28,12 +29,32 @@ import { getSession } from "./league";
 export const WAR_ROOM_LEGEND_ID = "war_room_legend";
 export const CAVALRY_SCOUT_BADGE_ID = "worlds_greatest_cavalry_scout";
 export const THE_DR_BADGE_ID = "the_dr";
+export const HOUSE_DRAGON_BADGE_ID = "house_dragon_legendary";
+
+/**
+ * Optional hard UUID pins for House Dragon (preferred over name alone).
+ * Filled when Supabase service lookup is available — empty means name match only.
+ * Never grant House Dragon to an unknown random “Marilyn” without exact key.
+ */
+export const HOUSE_DRAGON_USER_IDS: readonly string[] = [
+  // Populate after service-role resolve of Marilynnsmum:
+  // "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+];
 
 type LegacyBadgeGrant = {
   pattern: RegExp;
   badgeId: string;
   reason: string;
+  /** If set, only grant when player.id is in this list (in addition to name OR alone) */
+  userIds?: readonly string[];
+  /** Name must match after alnum-normalize (e.g. marilynnsmum) */
+  exactNormalizedNames?: readonly string[];
 };
+
+/** Strip to a–z0–9 for username-style equality */
+export function normalizeDisplayKey(name: string): string {
+  return (name || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
 
 export const LEGACY_BADGE_GRANTS: LegacyBadgeGrant[] = [
   {
@@ -59,6 +80,14 @@ export const LEGACY_BADGE_GRANTS: LegacyBadgeGrant[] = [
     pattern: /\bmaria\b/i,
     badgeId: THE_DR_BADGE_ID,
     reason: "The Dr. — doctorate at 24, War Room still a nerd cage match",
+  },
+  {
+    // House Dragon — Marilynnsmum only (exact key after normalize)
+    pattern: /^marilynnsmum$/i,
+    badgeId: HOUSE_DRAGON_BADGE_ID,
+    reason: "House Dragon — legendary family lore",
+    userIds: HOUSE_DRAGON_USER_IDS,
+    exactNormalizedNames: ["marilynnsmum"],
   },
 ];
 
@@ -96,6 +125,28 @@ export function hardRevokeMistakenLegend(playerId: string): boolean {
   return true;
 }
 
+function legacyGrantMatches(
+  player: { id: string; name: string },
+  g: LegacyBadgeGrant
+): boolean {
+  // UUID pin (if any listed) is sufficient and preferred
+  if (g.userIds && g.userIds.length > 0) {
+    if (g.userIds.includes(player.id)) return true;
+    // When pins exist, refuse name-only for this grant (wrong-account safety)
+    // unless also exact-normalized match (allows pin empty → name path)
+  }
+  if (g.exactNormalizedNames && g.exactNormalizedNames.length > 0) {
+    const key = normalizeDisplayKey(player.name);
+    if (!g.exactNormalizedNames.includes(key)) return false;
+    // If UUID pins are configured, require pin OR exact name (pin already returned)
+    if (g.userIds && g.userIds.length > 0) {
+      return g.userIds.includes(player.id);
+    }
+    return true;
+  }
+  return g.pattern.test(player.name);
+}
+
 /**
  * Grant permanent badges for legacy winners and bank career points once.
  * Safe to call on every profile load. Also strips mistaken legends hard.
@@ -116,7 +167,7 @@ export function applyLegacyBadgeGrants(player: {
   }
 
   for (const g of LEGACY_BADGE_GRANTS) {
-    if (!g.pattern.test(player.name)) continue;
+    if (!legacyGrantMatches(player, g)) continue;
     const pts = getBadgeDef(g.badgeId)?.points ?? legendPts();
     if (known.has(g.badgeId)) {
       bankCareerBadgeId(player.id, g.badgeId, pts);

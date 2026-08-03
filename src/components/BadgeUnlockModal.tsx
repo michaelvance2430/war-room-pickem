@@ -186,13 +186,17 @@ export default function BadgeUnlockModal() {
 
         <div className="px-5 pt-5 pb-3 text-center border-b border-border">
           <p className="text-[10px] uppercase tracking-[0.25em] text-primary font-bold mb-2">
-            🎉 War Room flex
+            {current.def.id === "house_dragon_legendary"
+              ? "🐉 LEGENDARY ACHIEVEMENT UNLOCKED"
+              : "🎉 War Room flex"}
           </p>
           <h2
             id="badge-unlock-title"
             className="text-2xl font-black text-foreground tracking-tight"
           >
-            Achievement unlocked!
+            {current.def.id === "house_dragon_legendary"
+              ? "HOUSE DRAGON"
+              : "Achievement unlocked!"}
           </h2>
           {remaining > 0 && (
             <p className="text-[11px] text-muted mt-1.5">
@@ -215,31 +219,40 @@ export default function BadgeUnlockModal() {
               current.def.icon
             )}
           </div>
-          <div className="flex items-center justify-center gap-2 flex-wrap mb-1">
-            <span className="text-xl font-black text-foreground">
-              {current.def.name}
-            </span>
+          {current.def.id !== "house_dragon_legendary" && (
+            <div className="flex items-center justify-center gap-2 flex-wrap mb-1">
+              <span className="text-xl font-black text-foreground">
+                {current.def.name}
+              </span>
+              <span
+                className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border"
+                style={{ color: hex, borderColor: `${hex}66` }}
+              >
+                {TIER_LABEL[current.def.tier]}
+              </span>
+            </div>
+          )}
+          {current.def.id === "house_dragon_legendary" && (
             <span
-              className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border"
+              className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border mb-2"
               style={{ color: hex, borderColor: `${hex}66` }}
             >
               {TIER_LABEL[current.def.tier]}
             </span>
-          </div>
+          )}
           <p className="text-sm text-muted leading-snug max-w-sm">
             {current.def.description}
           </p>
-          <p
-            className="text-sm font-bold mt-3"
-            style={{ color: hex }}
-          >
-            {current.def.careerOnly || current.def.creatorOnly
-              ? `+${current.def.points} career pts · career only`
-              : `+${current.def.points} achievement pts`}
-            {current.def.stackable && current.earnCount
-              ? ` · lifetime ×${current.earnCount}`
-              : ""}
-          </p>
+          {current.def.id !== "house_dragon_legendary" && (
+            <p className="text-sm font-bold mt-3" style={{ color: hex }}>
+              {current.def.careerOnly || current.def.creatorOnly
+                ? `+${current.def.points} career pts · career only`
+                : `+${current.def.points} achievement pts`}
+              {current.def.stackable && current.earnCount
+                ? ` · lifetime ×${current.earnCount}`
+                : ""}
+            </p>
+          )}
           {(current.earnedSeasonYear != null ||
             current.earnedWeek != null) && (
             <p className="text-xs text-muted mt-2 font-medium">
@@ -258,19 +271,25 @@ export default function BadgeUnlockModal() {
             onClick={advance}
             className="flex-1 py-3 rounded-xl bg-primary text-black font-bold text-sm"
           >
-            {remaining > 0 ? "Hell yeah — next" : "Hell yeah"}
+            {current.def.id === "house_dragon_legendary"
+              ? "Long may House Dragon reign."
+              : remaining > 0
+                ? "Hell yeah — next"
+                : "Hell yeah"}
           </button>
-          <Link
-            href={
-              getSession()?.playerId
-                ? `/profile/${getSession()!.playerId}`
-                : "/standings"
-            }
-            onClick={advance}
-            className="flex-1 py-3 rounded-xl border border-border text-center text-sm font-medium text-muted hover:text-foreground"
-          >
-            View badge shelves
-          </Link>
+          {current.def.id !== "house_dragon_legendary" && (
+            <Link
+              href={
+                getSession()?.playerId
+                  ? `/profile/${getSession()!.playerId}`
+                  : "/standings"
+              }
+              onClick={advance}
+              className="flex-1 py-3 rounded-xl border border-border text-center text-sm font-medium text-muted hover:text-foreground"
+            >
+              View badge shelves
+            </Link>
+          )}
         </div>
       </div>
     </div>

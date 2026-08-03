@@ -8,6 +8,7 @@ import SandboxSessionChrome from "@/components/SandboxSessionChrome";
 import PracticeModeChrome from "@/components/PracticeModeChrome";
 import BoredPracticeDoneModal from "@/components/BoredPracticeDoneModal";
 import MomentHost from "@/components/moments/MomentHost";
+import BadgeUnlockModal from "@/components/BadgeUnlockModal";
 import LeagueBuildGate from "@/components/LeagueBuildGate";
 import SmoothRuntime from "@/components/SmoothRuntime";
 import AppShell from "@/components/AppShell";
@@ -95,6 +96,8 @@ export default function RootLayout({
         <BoredPracticeDoneModal />
         {/* War Room Moments — Season Opening first; never DeferredChrome */}
         <MomentHost />
+        {/* Achievement reveals (lore + cheevos) — never DeferredChrome */}
+        <BadgeUnlockModal />
         <AppShell>{children}</AppShell>
       </body>
     </html>
