@@ -69,6 +69,10 @@ export type WeeklyColdOpenCopy = {
   cta: string;
   ctaGazette: string;
   hardwareLabel: string;
+  /** Under the wanted carton — sport-specific */
+  cartonBanner: string;
+  /** Short sport tag for chrome (CFB / NFL) */
+  sportTag: string;
   /** Closing blurb under the article */
   foot: string;
   /** Debug / Foundry — which mix this room got */
@@ -283,25 +287,36 @@ type CopyCtx = {
   sport: "cfb" | "nfl";
   hardware: string;
   hardwareShort: string;
+  hardwareLabel: string;
   room: string;
   dayLabel: string;
+  /** e.g. Week 0 / Opening Weekend */
+  openLabel: string;
+  /** e.g. week before Week 0 */
+  weekBeforeLabel: string;
+  cartonBanner: string;
+  sportTag: string;
 };
 
 // ── Independent banks (mix freely; product = lots of unique packages) ─
+// Sport-specific nouns always come from CopyCtx (never hard-code crystal on NFL).
 
-const WANTED_BANK = [
-  "Have you seen this man?",
-  "WANTED: defending champ — season is open for hunting",
-  "TARGET ACQUIRED · TITLE STILL WARM",
-  "FACE OF THE ROOM — THE HUNT BEGINS",
-  "ALERT: reigning champ · bounty on the hardware",
-  "MILK CARTON MONDAY · COMPETITION BREWING",
-  "HAVE YOU SEEN THIS TARGET?",
-  "PERSON OF INTEREST · TROPHY DIVISION",
-  "IF FOUND: strip the crystal, keep the grudge",
-  "CHAMP WATCH · EVERYONE IS COMING",
-  "PUBLIC SERVICE ANNOUNCEMENT · LOAD UP",
-  "THE BOARD REMEMBERS THIS FACE",
+const WANTED_BANK: ((c: CopyCtx) => string)[] = [
+  () => "Have you seen this man?",
+  () => "WANTED: defending champ — season is open for hunting",
+  () => "TARGET ACQUIRED · TITLE STILL WARM",
+  () => "FACE OF THE ROOM — THE HUNT BEGINS",
+  () => "ALERT: reigning champ · bounty on the hardware",
+  () => "MILK CARTON MONDAY · COMPETITION BREWING",
+  () => "HAVE YOU SEEN THIS TARGET?",
+  () => "PERSON OF INTEREST · TROPHY DIVISION",
+  (c) =>
+    c.sport === "nfl"
+      ? "IF FOUND: strip the Super Bowl bragging rights, keep the grudge"
+      : "IF FOUND: return the crystal, keep the grudge",
+  () => "CHAMP WATCH · EVERYONE IS COMING",
+  () => "PUBLIC SERVICE ANNOUNCEMENT · LOAD UP",
+  () => "THE BOARD REMEMBERS THIS FACE",
 ];
 
 const HEADLINE_BANK: ((c: CopyCtx) => string)[] = [
@@ -425,13 +440,25 @@ const EDITION_BANK: ((c: CopyCtx) => string)[] = [
     `Edition mix unique to this league + season · new year, new chase`,
 ];
 
-const FOOT_BANK = [
-  "One-time preseason drop — the week before kickoff. Heat first. Hardware later. The board is waiting.",
-  "This carton airs once. Then it’s locks, crowns, and receipts. The room is already awake.",
-  "Preseason only. No weekly reruns. Different room, different year, same hunger — take the hardware back.",
-  "You get one look. Then it’s confidence points and bad intentions. The Gazette will be back with the scoreboard.",
+const FOOT_BANK: ((c: CopyCtx) => string)[] = [
+  (c) =>
+    c.sport === "nfl"
+      ? "One-time preseason drop — the week before Week 1. Heat first. Kickoffs next. The board is waiting."
+      : "One-time preseason drop — the week before Week 0. Heat first. Saturdays next. The board is waiting.",
+  () =>
+    "This carton airs once. Then it’s locks, crowns, and receipts. The room is already awake.",
+  (c) =>
+    c.sport === "nfl"
+      ? "Preseason only. No weekly reruns. Different room, different year, same hunger — take the Super Bowl energy back."
+      : "Preseason only. No weekly reruns. Different room, different year, same hunger — take the crystal back.",
+  () =>
+    "You get one look. Then it’s confidence points and bad intentions. The Gazette will be back with the scoreboard.",
 ];
 
+/**
+ * Sport lexicon — every player-facing noun for Cold Open.
+ * CFB and NFL must never share the wrong hardware / day / open-week words.
+ */
 function sportBits(sport: "cfb" | "nfl", year: number) {
   if (sport === "nfl") {
     return {
@@ -439,24 +466,42 @@ function sportBits(sport: "cfb" | "nfl", year: number) {
       hardwareShort: "Super Bowl title",
       hardwareLabel: `${year} Super Bowl champion`,
       dayLabel: "Sunday",
+      openLabel: "Opening Weekend",
+      weekBeforeLabel: "the week before Week 1",
+      cartonBanner: "Last year's Super Bowl · target on back",
+      sportTag: "NFL",
     };
   }
   return {
-    hardware: "championship crystal",
-    hardwareShort: "crystal",
-    hardwareLabel: `${year} War Room champion`,
+    hardware: "CFB championship crystal",
+    hardwareShort: "CFB crystal",
+    hardwareLabel: `${year} CFB War Room champion`,
     dayLabel: "Saturday",
+    openLabel: "Week 0",
+    weekBeforeLabel: "the week before Week 0",
+    cartonBanner: "Last year's CFB championship · target on back",
+    sportTag: "CFB",
   };
 }
 
-function champPhonetic(name: string): string | null {
-  if (isKahmann(name)) return "Kahmann — pronounced COMMON";
+function champPhonetic(
+  name: string,
+  sport: "cfb" | "nfl"
+): string | null {
+  // Kahmann bit is CFB room lore — don't force it on NFL packages
+  if (sport === "cfb" && isKahmann(name)) {
+    return "Kahmann — pronounced COMMON";
+  }
   return null;
 }
 
-function champNameCall(name: string): string {
-  if (isKahmann(name)) return `${name} (say it with us — COMMON)`;
-  if (isMaria(name)) return `${name} (defending Super Bowl energy)`;
+function champNameCall(name: string, sport: "cfb" | "nfl"): string {
+  if (sport === "cfb" && isKahmann(name)) {
+    return `${name} (say it with us — COMMON)`;
+  }
+  if (sport === "nfl" && isMaria(name)) {
+    return `${name} (defending Super Bowl energy)`;
+  }
   return name;
 }
 
@@ -483,37 +528,39 @@ export function isCfbInauguralColdOpenLocked(
 
 /** Frozen inaugural CFB package — the one locked from Foundry sign-off. */
 function buildCfbInauguralLockedCopy(ctx: CopyCtx): WeeklyColdOpenCopy {
-  const nameCall = isKahmann(ctx.name)
-    ? `${ctx.name} (say it with us — COMMON)`
-    : ctx.nameCall;
-  // Same label shape as rotating packs / NFL — always year + sport hardware words
+  const nameCall =
+    isKahmann(ctx.name)
+      ? `${ctx.name} (say it with us — COMMON)`
+      : ctx.nameCall;
   const bits = sportBits("cfb", ctx.year);
 
   return {
     stamp: `${GAZETTE_STATION.callSign} · ${GAZETTE_STATION.desk}`,
     wanted: "Have you seen this man?",
     headline: `${ctx.name}: known time traveler — some even say a cheat`,
-    phonetic: champPhonetic(ctx.name),
+    phonetic: champPhonetic(ctx.name, "cfb"),
     body:
       `Gazette Network has it on the record: ${nameCall} is a known time traveler. ` +
-      `Room veterans have long whispered that the reigning champ (${ctx.year} ${ctx.hardware}) ` +
-      `somehow always knows next week’s scores before the rest of us lock. ` +
+      `Room veterans have long whispered that the reigning CFB champ (${ctx.year} ${bits.hardware}) ` +
+      `somehow always knows next Saturday’s scores before the rest of us lock. ` +
       `Some even say a cheat. Investigative Desk has not recovered a DeLorean — ` +
-      `but the pattern is hard to unsee. This is the week-before package: ` +
+      `but the pattern is hard to unsee. This is the ${bits.weekBeforeLabel} package: ` +
       `face on the carton, name in the paper, target on their back. ` +
-      `The season hasn’t kicked off — and the competition is already brewing. ` +
-      `Every card this year is a heist attempt. Every Best Bet is a statement. ` +
+      `Week 0 hasn’t hit — and the competition is already brewing. ` +
+      `Every college card this year is a heist attempt. Every Best Bet is a statement. ` +
       `If you’re new: this is the person the whole room wants to unseat. ` +
       `If you’re not: you already know. Load up.`,
     kalshi:
-      `Kalshi odds have ${ctx.name} definitely not winning this year. Markets price the time-travel edge as spent. The board is open — the field is hungry — the tape says the hunt is on.`,
+      `Kalshi odds have ${ctx.name} definitely not winning this CFB season. Markets price the time-travel edge as spent. The board is open — the field is hungry — the tape says the hunt is on.`,
     cta: "I'm hunting — open the room",
     ctaGazette: "Open the Gazette",
     hardwareLabel: bits.hardwareLabel,
+    cartonBanner: bits.cartonBanner,
+    sportTag: bits.sportTag,
     foot:
-      "One-time preseason drop — the week before kickoff. Heat first. Locks next. When the commish scores, the full Gazette drops with crowns, shame, and receipts.",
+      "One-time CFB preseason drop — the week before Week 0. Heat first. Saturdays next. When the commish scores, the full Gazette drops with crowns, shame, and receipts.",
     packId: CFB_INAUGURAL_COLD_OPEN_PACK_ID,
-    editionLine: `Once per season · week before open · ${ctx.year} champ · ${ctx.room} · CFB inaugural (locked) · competition brewing`,
+    editionLine: `Once per season · week before Week 0 · ${ctx.year} CFB champ · ${ctx.room} · inaugural (locked) · competition brewing`,
   };
 }
 
@@ -544,17 +591,21 @@ export function getWeeklyColdOpenCopy(
 
   const ctx: CopyCtx = {
     name,
-    nameCall: champNameCall(name),
+    nameCall: champNameCall(name, sport),
     year,
     sport,
     hardware: bits.hardware,
     hardwareShort: bits.hardwareShort,
+    hardwareLabel: bits.hardwareLabel,
     room,
     dayLabel: bits.dayLabel,
+    openLabel: bits.openLabel,
+    weekBeforeLabel: bits.weekBeforeLabel,
+    cartonBanner: bits.cartonBanner,
+    sportTag: bits.sportTag,
   };
 
-  // ── LOCKED: upcoming CFB season’s first cold open (Foundry-approved) ──
-  // forceSalt must not break the lock — this is the package for this league year.
+  // ── LOCKED: CFB inaugural only (never runs for NFL) ──
   if (isCfbInauguralColdOpenLocked(sport, year)) {
     return buildCfbInauguralLockedCopy(ctx);
   }
@@ -589,37 +640,38 @@ export function getWeeklyColdOpenCopy(
   const ei = pick("edition", EDITION_BANK.length, "e");
   const fi = pick("foot", FOOT_BANK.length, "f");
 
-  // Extra anti-collision: if all banks somehow land on 0 for a new season,
-  // nudge body by league hash (rare; memory usually handles it).
   const bodyIdx =
     bi === 0 && hi === 0 && wi === 0
       ? hashStr(baseSeed + "|nudge") % BODY_BANK.length
       : bi;
 
-  // Champ-specific spice layered on top of the rotating bank (never the whole package)
   let body = BODY_BANK[bodyIdx]!(ctx);
   let headline = HEADLINE_BANK[hi]!(ctx);
-  if (isKahmann(name) && !/COMMON/i.test(body)) {
+  // CFB-only Kahmann spice
+  if (sport === "cfb" && isKahmann(name) && !/COMMON/i.test(body)) {
     body +=
       " Pronunciation desk reminds the nation: Kahmann — COMMON. File it.";
   }
-  if (isMaria(name) && sport === "nfl" && hi % 2 === 0) {
-    headline = `${name} still walks first — Super Bowl carton, preseason edition`;
+  // NFL-only Maria Super Bowl spice
+  if (sport === "nfl" && isMaria(name) && hi % 2 === 0) {
+    headline = `${name} still walks first — Super Bowl carton, week-before-Week-1 edition`;
   }
 
-  const packId = `w${wi}-h${hi}-b${bodyIdx}-k${ki}-c${ci}`;
+  const packId = `${sport}-w${wi}-h${hi}-b${bodyIdx}-k${ki}-c${ci}`;
 
   return {
     stamp: `${GAZETTE_STATION.callSign} · ${GAZETTE_STATION.desk}`,
-    wanted: WANTED_BANK[wi]!,
+    wanted: WANTED_BANK[wi]!(ctx),
     headline,
-    phonetic: champPhonetic(name),
+    phonetic: champPhonetic(name, sport),
     body,
     kalshi: KALSHI_BANK[ki]!(ctx),
     cta: CTA_BANK[ci]!,
     ctaGazette: "Open the Gazette",
     hardwareLabel: bits.hardwareLabel,
-    foot: FOOT_BANK[fi]!,
+    cartonBanner: bits.cartonBanner,
+    sportTag: bits.sportTag,
+    foot: FOOT_BANK[fi]!(ctx),
     packId,
     editionLine: EDITION_BANK[ei]!(ctx),
   };

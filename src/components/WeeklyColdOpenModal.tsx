@@ -70,12 +70,6 @@ export default function WeeklyColdOpenModal({ forceOnly = false }: Props) {
 
   const room = getLeague()?.name || "War Room";
   const sportId = getLeague()?.sportId;
-  const sportLabel =
-    sportId === "nfl"
-      ? "NFL"
-      : sportId === "soccer_wwc"
-        ? "WWC"
-        : "CFB";
 
   const lockBackground = useCallback(() => {
     if (typeof document === "undefined" || bodyLocked.current) return;
@@ -470,7 +464,7 @@ export default function WeeklyColdOpenModal({ forceOnly = false }: Props) {
         <header className="shrink-0 flex items-center gap-2 px-3 py-2.5 border-b-2 border-amber-400/40 bg-gradient-to-r from-amber-500 to-amber-400 text-black">
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-black uppercase tracking-[0.18em]">
-              ● Live · Season Cold Open · {sportLabel}
+              ● Live · Season Cold Open · {copy.sportTag}
             </p>
             <p
               id={titleId}
@@ -481,7 +475,8 @@ export default function WeeklyColdOpenModal({ forceOnly = false }: Props) {
             </p>
             <p className="text-[10px] font-extrabold truncate">
               {room}
-              {subject.year ? ` · ${subject.year} champ` : ""} · THE HUNT IS OPEN
+              {subject.year ? ` · ${subject.year} ${copy.sportTag} champ` : ""} ·
+              THE HUNT IS OPEN
             </p>
           </div>
           <button
@@ -565,7 +560,7 @@ export default function WeeklyColdOpenModal({ forceOnly = false }: Props) {
               </div>
               <div className="bg-amber-400/15 border-t border-amber-400/30 px-3 py-2 text-center space-y-0.5">
                 <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-amber-200">
-                  Last year&apos;s championship · target on back
+                  {copy.cartonBanner}
                 </p>
                 <p className="text-[11px] font-black uppercase tracking-[0.12em] text-amber-100">
                   Competition is brewing · load your card
