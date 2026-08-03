@@ -73,6 +73,17 @@ Bigger than onboarding. How **every** future feature should feel.
 
 Design from **inside the world**, not from outside explaining the world.
 
+### History principle
+
+> **War Room never invents history.**
+
+If something hasn’t happened, say so with confidence and personality.  
+Trust is more important than filling space.
+
+The Board’s promise: *it reveals what happened this season.*  
+Zero scored weeks → empty state, not placeholder weeks, not demo cards, not practice artifacts.  
+The first scored week is when The Board comes alive.
+
 ### Reality principle
 
 > **War Room should never make the user question whether their actions are real.**

@@ -2,8 +2,8 @@
 
 /**
  * The Board — fantasy-football style league pick reveal.
- * Card freezes at first kickoff; each game's picks reveal only when *that*
- * game starts (like not knowing someone's QB until their kickoff).
+ * Trust: never invent history. Zero scored weeks → empty state (no chips,
+ * demo cards, or placeholder slips). First scored week wakes the Board.
  * Views: By game · Full cards
  */
 
@@ -15,7 +15,6 @@ import {
   loadWeekCard,
   loadWeekResultsFromCloud,
   loadLeagueWeekBoard,
-  listPublishedWeekNumbers,
   listScoredWeekNumbers,
   loadLeagueActiveWeek,
   type WeekBoardSlip,
@@ -33,6 +32,10 @@ import { getSession } from "@/lib/league";
 import { formatRankedTeam } from "@/lib/rankings";
 import type { Game } from "@/lib/types";
 import { formatLastSeen, lastSeenToneClass } from "@/lib/last-seen";
+import {
+  BOARD_EMPTY_TAKES,
+  boardEmptyTakeAt,
+} from "@/lib/board-empty-copy";
 
 type ViewMode = "games" | "cards";
 
@@ -61,6 +64,10 @@ function BoardInner() {
   const [selfId, setSelfId] = useState<string | null>(null);
   const [mode, setMode] = useState<ViewMode>("games");
   const [now, setNow] = useState(() => Date.now());
+  /** Zero scored weeks — never invent history (Board empty state). */
+  const [noHistoryYet, setNoHistoryYet] = useState(false);
+  /** Mash for more empty-state takes */
+  const [emptyTakeIndex, setEmptyTakeIndex] = useState(0);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 30_000);
@@ -141,29 +148,42 @@ function BoardInner() {
           throw e;
         }
       };
-      const [pub, scoredList, active] = await Promise.all([
-        timeP1("listPublishedWeekNumbers", () => listPublishedWeekNumbers()),
+      const [scoredList, active] = await Promise.all([
         timeP1("listScoredWeekNumbers", () => listScoredWeekNumbers()),
         timeP1("loadLeagueActiveWeek", () => loadLeagueActiveWeek()),
       ]);
       mark(
         "phase1-done",
-        `pub=${pub.length} scored=${scoredList.length} active=${active} (see [WR-PERF][board-p1] per-await lines)`
+        `scored=${scoredList.length} active=${active} (see [WR-PERF][board-p1] per-await lines)`
       );
-      const all = [...new Set([...pub, ...scoredList, active])].sort(
-        (a, b) => a - b
-      );
-      setWeeks(all);
       setScoredWeeks(scoredList);
+
+      // ── Trust rule: never invent history ──────────────────────────
+      // Zero scored weeks → empty Board. No chips, cards, or demo slips.
+      if (scoredList.length === 0) {
+        setNoHistoryYet(true);
+        setWeeks([]);
+        setCard(null);
+        setResults({});
+        setPropResult(null);
+        setSlips([]);
+        setScored(false);
+        setLockedOpen(false);
+        setError(null);
+        setWeek(active >= 0 ? active : 1);
+        mark("empty-no-scored-weeks");
+        return;
+      }
+
+      setNoHistoryYet(false);
+      // Week chips = scored history only (plus live week if already scored path)
+      const all = [...new Set([...scoredList])].sort((a, b) => a - b);
+      setWeeks(all);
 
       let target = w;
       if (!all.includes(target)) {
-        // Prefer active week (live slate) then last scored
-        target = all.includes(active)
-          ? active
-          : scoredList[scoredList.length - 1] ??
-            all[all.length - 1] ??
-            active;
+        // Prefer last scored week (the Board is about what happened)
+        target = scoredList[scoredList.length - 1] ?? all[all.length - 1] ?? active;
       }
       setWeek(target);
       mark("phase2-start", `target=${target}`);
@@ -232,136 +252,32 @@ function BoardInner() {
   const firstKick = firstKickoffOnCardMs(games);
 
   const lockedCount = slips.filter((s) => s.lockedAt).length;
+  const emptyTake = boardEmptyTakeAt(emptyTakeIndex);
 
   return (
     <div className="min-h-screen flex flex-col">
       <main className="flex-1 max-w-3xl mx-auto w-full px-3 sm:px-4 py-5 sm:py-8">
         <div className="mb-5">
-      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
             League pick reveal
           </p>
-      <h1 className="text-2xl font-black mt-1">The Board</h1>
-      <p className="text-sm text-muted mt-2 leading-relaxed">
-            Like fantasy football: you don&apos;t see who they took until{" "}
-            <strong className="text-foreground font-medium">
-              that game kicks off
-            </strong>
-            . Earlier games on the card stay hidden until their own kickoff.
-          </p>
-      </div>
-
-        {/* Status banner */}
-        {!loading && games.length > 0 && (
-          <div
-            className={`rounded-xl border px-4 py-3 mb-5 ${
-              lockedNow
-                ? "border-primary/40 bg-primary/10"
-                : "border-border bg-card"
-            }`}
-          >
-            {lockedNow ? (
-              <>
-                <p className="text-sm font-bold text-primary">
-                  {scored
-                    ? `${weekTitle(week)} scored · full reveal`
-                    : `${weekTitle(week)} live · progressive reveal`}
-                </p>
-      <p className="text-xs text-muted mt-1">
-                  {lockedCount} of {slips.length} locked · each matchup unlocks
-                  at its own kickoff (not the whole card at once)
-                  {scored ? " · scored weeks show green/red" : ""}
-                </p>
-              </>
-            ) : (
-              <>
-                <p className="text-sm font-semibold text-foreground">
-                  Picks still secret
-                </p>
-      <p className="text-xs text-muted mt-1">
-                  Cards freeze at first kickoff
-                  {firstKick
-                    ? ` (${new Date(firstKick).toLocaleString(undefined, {
-                        weekday: "short",
-                        month: "short",
-                        day: "numeric",
-                        hour: "numeric",
-                        minute: "2-digit",
-                      })})`
-                    : ""}
-                  . Then each game reveals when it starts — like fantasy.
-                </p>
-              </>
-            )}
-          </div>
-        )}
-
-        {weeks.length > 0 && (
-          <div className="phone-h-scroll sm:flex-wrap sm:overflow-visible mb-4">
-            {weeks.map((w) => {
-              const isScored = scoredWeeks.includes(w);
-              return (
-                <button
-                  key={w}
-                  type="button"
-                  onClick={() => goWeek(w)}
-                  className={`px-3.5 py-2.5 min-h-[40px] rounded-full text-xs font-semibold transition touch-manipulation ${
-                    w === week
-                      ? "bg-primary text-black"
-                      : isScored
-                        ? "border border-primary/40 text-primary hover:bg-primary/10"
-                        : "border border-border text-muted hover:text-foreground"
-                  }`}
-                >
-                  {weekTitle(w)}
-                  {isScored ? " · done" : ""}
-                </button>
-              );
-            })}
-          </div>
-        )}
-
-        {lockedNow && !error && (
-          <div className="flex rounded-xl border border-border p-1 mb-5 bg-card gap-1">
-      <button
-              type="button"
-              onClick={() => setMode("games")}
-              className={`flex-1 py-3 min-h-[48px] rounded-lg text-sm font-bold transition touch-manipulation ${
-                mode === "games"
-                  ? "bg-primary text-black"
-                  : "text-muted hover:text-foreground"
-              }`}
-            >
-              By game
-            </button>
-      <button
-              type="button"
-              onClick={() => setMode("cards")}
-              className={`flex-1 py-3 min-h-[48px] rounded-lg text-sm font-bold transition touch-manipulation ${
-                mode === "cards"
-                  ? "bg-primary text-black"
-                  : "text-muted hover:text-foreground"
-              }`}
-            >
-              Full cards
-            </button>
-      </div>
-        )}
-
-        <div className="flex flex-wrap gap-3 mb-6 text-sm">
-      <Link
-            href="/picks"
-            className="text-primary font-semibold hover:underline min-h-[44px] inline-flex items-center"
-          >
-            ← My Picks
-          </Link>
-      <span className="text-muted">·</span>
-      <Link
-            href="/standings"
-            className="text-muted hover:text-foreground hover:underline"
-          >
-            Standings
-          </Link>
-      </div>
+          <h1 className="text-2xl font-black mt-1">The Board</h1>
+          {!noHistoryYet && (
+            <p className="text-sm text-muted mt-2 leading-relaxed">
+              Like fantasy football: you don&apos;t see who they took until{" "}
+              <strong className="text-foreground font-medium">
+                that game kicks off
+              </strong>
+              . Earlier games on the card stay hidden until their own kickoff.
+            </p>
+          )}
+          {noHistoryYet && !loading && (
+            <p className="text-sm text-muted mt-2 leading-relaxed">
+              The Board reveals what happened this season — nothing more,
+              nothing invented.
+            </p>
+          )}
+        </div>
 
         {loading && (
           <p className="text-sm text-muted py-12 text-center">
@@ -369,60 +285,223 @@ function BoardInner() {
           </p>
         )}
 
-        {!loading && error && (
-          <div className="rounded-xl border border-warning/40 bg-warning/10 px-4 py-4 mb-6">
-      <p className="text-sm text-warning font-medium">{error}</p>
-      <p className="text-xs text-muted mt-2 leading-relaxed">
-              Until first kickoff, only you see your card (like fantasy before
-              lock). Then The Board is the group chat fuel.
-            </p>
-      <p className="text-[11px] text-muted mt-2">
-              Commish: if kickoff already hit but this still blocks, run{" "}
-              <code className="text-foreground">
-                supabase/picks-reveal-after-lock.sql
-              </code>{" "}
-              in Supabase.
-            </p>
-      <Link
-              href="/picks"
-              className="inline-block mt-3 text-sm text-primary font-semibold hover:underline"
+        {/* Zero scored weeks — honest empty state (never invent history) */}
+        {!loading && noHistoryYet && (
+          <div className="space-y-4">
+            <button
+              type="button"
+              onClick={() =>
+                setEmptyTakeIndex((i) => (i + 1) % BOARD_EMPTY_TAKES.length)
+              }
+              className="w-full text-left rounded-2xl border-2 border-dashed border-primary/35 bg-card px-5 py-6 sm:px-6 sm:py-7 space-y-3 touch-manipulation active:scale-[0.99] transition shadow-[0_0_40px_rgba(34,197,94,0.06)]"
+              aria-label="Next empty Board take"
             >
-              Back to your card →
-            </Link>
-      </div>
+              <p className="text-3xl sm:text-4xl leading-none" aria-hidden>
+                {emptyTake.emoji}
+              </p>
+              <h2 className="text-xl sm:text-2xl font-black text-foreground leading-snug">
+                {emptyTake.title}
+              </h2>
+              <p className="text-sm sm:text-base text-muted leading-relaxed">
+                {emptyTake.body}
+              </p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary/80 pt-1">
+                Tap for another take · {emptyTakeIndex + 1}/
+                {BOARD_EMPTY_TAKES.length}
+              </p>
+            </button>
+
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Link
+                href="/picks"
+                className="flex-1 min-h-[52px] rounded-xl bg-primary text-black text-sm font-extrabold inline-flex items-center justify-center touch-manipulation"
+              >
+                Go make your picks →
+              </Link>
+              <Link
+                href="/"
+                className="flex-1 min-h-[52px] rounded-xl border border-border text-foreground text-sm font-bold inline-flex items-center justify-center touch-manipulation hover:bg-card"
+              >
+                Return Home →
+              </Link>
+            </div>
+
+            <button
+              type="button"
+              onClick={() =>
+                setEmptyTakeIndex((i) => (i + 1) % BOARD_EMPTY_TAKES.length)
+              }
+              className="w-full min-h-[48px] rounded-xl border border-primary/30 text-primary text-sm font-bold touch-manipulation"
+            >
+              Hit me with another one
+            </button>
+          </div>
         )}
 
-        {!loading && !error && !games.length && (
-          <p className="text-sm text-muted text-center py-8">
-            No card for {weekTitle(week)}.
-          </p>
-        )}
+        {/* Live Board — only after at least one scored week */}
+        {!loading && !noHistoryYet && (
+          <>
+            {games.length > 0 && (
+              <div
+                className={`rounded-xl border px-4 py-3 mb-5 ${
+                  lockedNow
+                    ? "border-primary/40 bg-primary/10"
+                    : "border-border bg-card"
+                }`}
+              >
+                {lockedNow ? (
+                  <>
+                    <p className="text-sm font-bold text-primary">
+                      {scored
+                        ? `${weekTitle(week)} scored · full reveal`
+                        : `${weekTitle(week)} live · progressive reveal`}
+                    </p>
+                    <p className="text-xs text-muted mt-1">
+                      {lockedCount} of {slips.length} locked · each matchup
+                      unlocks at its own kickoff (not the whole card at once)
+                      {scored ? " · scored weeks show green/red" : ""}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm font-semibold text-foreground">
+                      Picks still secret
+                    </p>
+                    <p className="text-xs text-muted mt-1">
+                      Cards freeze at first kickoff
+                      {firstKick
+                        ? ` (${new Date(firstKick).toLocaleString(undefined, {
+                            weekday: "short",
+                            month: "short",
+                            day: "numeric",
+                            hour: "numeric",
+                            minute: "2-digit",
+                          })})`
+                        : ""}
+                      . Then each game reveals when it starts — like fantasy.
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
 
-        {!loading && !error && games.length > 0 && lockedNow && mode === "games" && (
-          <ByGameView
-            games={games}
-            slips={slips}
-            results={results}
-            prop={prop}
-            propResult={propResult}
-            selfId={selfId}
-            scored={scored}
-          />
-        )}
+            {weeks.length > 0 && (
+              <div className="phone-h-scroll sm:flex-wrap sm:overflow-visible mb-4">
+                {weeks.map((w) => {
+                  const isScored = scoredWeeks.includes(w);
+                  return (
+                    <button
+                      key={w}
+                      type="button"
+                      onClick={() => goWeek(w)}
+                      className={`px-3.5 py-2.5 min-h-[40px] rounded-full text-xs font-semibold transition touch-manipulation ${
+                        w === week
+                          ? "bg-primary text-black"
+                          : isScored
+                            ? "border border-primary/40 text-primary hover:bg-primary/10"
+                            : "border border-border text-muted hover:text-foreground"
+                      }`}
+                    >
+                      {weekTitle(w)}
+                      {isScored ? " · done" : ""}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
-        {!loading && !error && games.length > 0 && lockedNow && mode === "cards" && (
-          <FullCardsView
-            games={games}
-            slips={slips}
-            results={results}
-            prop={prop}
-            propResult={propResult}
-            selfId={selfId}
-            scored={scored}
-          />
+            {lockedNow && !error && (
+              <div className="flex rounded-xl border border-border p-1 mb-5 bg-card gap-1">
+                <button
+                  type="button"
+                  onClick={() => setMode("games")}
+                  className={`flex-1 py-3 min-h-[48px] rounded-lg text-sm font-bold transition touch-manipulation ${
+                    mode === "games"
+                      ? "bg-primary text-black"
+                      : "text-muted hover:text-foreground"
+                  }`}
+                >
+                  By game
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMode("cards")}
+                  className={`flex-1 py-3 min-h-[48px] rounded-lg text-sm font-bold transition touch-manipulation ${
+                    mode === "cards"
+                      ? "bg-primary text-black"
+                      : "text-muted hover:text-foreground"
+                  }`}
+                >
+                  Full cards
+                </button>
+              </div>
+            )}
+
+            <div className="flex flex-wrap gap-3 mb-6 text-sm">
+              <Link
+                href="/picks"
+                className="text-primary font-semibold hover:underline min-h-[44px] inline-flex items-center"
+              >
+                ← My Picks
+              </Link>
+              <span className="text-muted">·</span>
+              <Link
+                href="/standings"
+                className="text-muted hover:text-foreground hover:underline"
+              >
+                Standings
+              </Link>
+            </div>
+
+            {error && (
+              <div className="rounded-xl border border-warning/40 bg-warning/10 px-4 py-4 mb-6">
+                <p className="text-sm text-warning font-medium">{error}</p>
+                <p className="text-xs text-muted mt-2 leading-relaxed">
+                  Until first kickoff, only you see your card (like fantasy
+                  before lock). Then The Board is the group chat fuel.
+                </p>
+                <Link
+                  href="/picks"
+                  className="inline-block mt-3 text-sm text-primary font-semibold hover:underline"
+                >
+                  Back to your card →
+                </Link>
+              </div>
+            )}
+
+            {!error && !games.length && (
+              <p className="text-sm text-muted text-center py-8">
+                No card for {weekTitle(week)}.
+              </p>
+            )}
+
+            {!error && games.length > 0 && lockedNow && mode === "games" && (
+              <ByGameView
+                games={games}
+                slips={slips}
+                results={results}
+                prop={prop}
+                propResult={propResult}
+                selfId={selfId}
+                scored={scored}
+              />
+            )}
+
+            {!error && games.length > 0 && lockedNow && mode === "cards" && (
+              <FullCardsView
+                games={games}
+                slips={slips}
+                results={results}
+                prop={prop}
+                propResult={propResult}
+                selfId={selfId}
+                scored={scored}
+              />
+            )}
+          </>
         )}
       </main>
-      </div>
+    </div>
   );
 }
 
