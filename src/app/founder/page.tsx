@@ -93,6 +93,31 @@ export default function FounderDashboardPage() {
   const [fleetBusy, setFleetBusy] = useState(false);
   const [fleetError, setFleetError] = useState<string | null>(null);
   const [enterBusy, setEnterBusy] = useState<string | null>(null);
+  /** Season Cold Open card — Available | Watched | Locked (live window + local seen) */
+  const [coldOpenStatus, setColdOpenStatus] = useState<
+    "available" | "watched" | "locked"
+  >("locked");
+
+  const refreshColdOpenStatus = useCallback(() => {
+    void import("@/lib/weekly-cold-open").then((m) => {
+      void import("@/lib/prior-season-seed").then(({ PRIOR_SEASON_YEAR }) => {
+        const session = getSession();
+        const league = getLeague();
+        const windowOpen = m.isWeeklyColdOpenWindowOpen(league?.sportId);
+        const seen =
+          !!session?.playerId &&
+          !!league?.id &&
+          m.hasSeenWeeklyColdOpen(
+            session.playerId,
+            league.id,
+            PRIOR_SEASON_YEAR
+          );
+        if (seen) setColdOpenStatus("watched");
+        else if (windowOpen) setColdOpenStatus("available");
+        else setColdOpenStatus("locked");
+      });
+    });
+  }, []);
 
   const refresh = useCallback(async () => {
     const session = getSession();
@@ -170,6 +195,7 @@ export default function FounderDashboardPage() {
 
   useEffect(() => {
     void refresh();
+    refreshColdOpenStatus();
     setEyes(getCreatorEyesMode());
     function onEyes() {
       setEyes(getCreatorEyesMode());
@@ -184,7 +210,7 @@ export default function FounderDashboardPage() {
       }, 200);
     }
     return () => window.removeEventListener(EVENT_CREATOR_EYES, onEyes);
-  }, [refresh]);
+  }, [refresh, refreshColdOpenStatus]);
 
   function setPlayWeek(w: number) {
     const n = Math.max(0, Math.min(22, Math.floor(w)));
@@ -300,11 +326,15 @@ export default function FounderDashboardPage() {
       return;
     }
     if (kind === "cold") {
-      // Stay on Foundry — cold open modal is mounted on MomentHost
+      // Stay on Foundry — one Moments engine (MomentHost), not a separate route
       void import("@/lib/weekly-cold-open").then((m) => {
         m.requestWeeklyColdOpenPreview();
       });
-      setLabLog("✅ Cold open preview — modal should present here (not a random page).");
+      setLabLog(
+        "✅ Season Cold Open — cinematic from War Room Moments (MomentHost)."
+      );
+      // Preview does not burn seen; re-read status for the card badge
+      window.setTimeout(() => refreshColdOpenStatus(), 400);
       return;
     }
     void import("@/lib/creator-sandbox").then(async (sb) => {
@@ -442,30 +472,6 @@ export default function FounderDashboardPage() {
           </p>
           <SandboxHopOptIn />
         </section>
-
-        {/* Quick: preseason cold open (last year’s champ wanted poster) */}
-        <section className="rounded-2xl border-2 border-amber-400/45 bg-amber-500/10 p-4 space-y-2">
-      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-300">
-            Preseason cold open · last year’s champ
-          </p>
-      <p className="text-xs text-muted leading-relaxed">
-            Week before the season only — once per player. Wanted carton with
-            the defending champ’s profile pic.{" "}
-            <strong className="text-foreground">
-              CFB inaugural (2025 champ) is LOCKED
-            </strong>{" "}
-            — Foundry + live always match that package (no remix). Later seasons
-            / NFL still rotate so it doesn’t go stale. Preview does not burn the
-            flag.
-          </p>
-      <button
-            type="button"
-            onClick={() => jumpPopup("cold")}
-            className="w-full py-3.5 min-h-[52px] rounded-xl bg-amber-400 text-black text-sm font-extrabold touch-manipulation active:scale-[0.99]"
-          >
-            ▶ Watch cold open
-          </button>
-      </section>
 
         {/* ========== CRITICAL: first hour ========== */}
         <section
@@ -813,13 +819,17 @@ export default function FounderDashboardPage() {
             </div>
       </div>
 
-          {/* E — War Room Moments (thin studio) */}
+          {/* E — War Room Moments (one studio · one engine) */}
           <div className="space-y-2">
       <p className="text-[10px] font-bold uppercase tracking-wide text-muted">
               5 · War Room Moments
             </p>
+            <p className="text-[11px] text-muted leading-snug">
+              Every moment lives here. Same MomentHost playback — no orphan
+              buttons or separate routes.
+            </p>
       <div className="grid grid-cols-1 gap-2">
-                            <button
+              <button
                 type="button"
                 onClick={() => jumpPopup("season_open")}
                 className="py-2.5 rounded-lg border border-primary/50 bg-primary/15 text-xs font-extrabold hover:bg-primary/20"
@@ -840,6 +850,43 @@ export default function FounderDashboardPage() {
               >
                 Reset Season Opening claim (local)
               </button>
+
+              {/* Season Cold Open — sole entry point (not a standalone Foundry feature) */}
+              <div className="rounded-xl border border-amber-400/45 bg-amber-500/10 p-3 space-y-2.5">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-extrabold text-foreground leading-tight">
+                      🎬 Season Cold Open
+                    </p>
+                    <p className="text-[11px] text-muted mt-0.5 leading-snug">
+                      Preseason wanted package on last year&apos;s champ. Once per
+                      player · week before open. CFB inaugural pack locked.
+                    </p>
+                  </div>
+                  <span
+                    className={
+                      coldOpenStatus === "available"
+                        ? "shrink-0 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-black uppercase tracking-wide px-2 py-0.5"
+                        : coldOpenStatus === "watched"
+                          ? "shrink-0 rounded-full bg-sky-500/20 text-sky-300 text-[10px] font-black uppercase tracking-wide px-2 py-0.5"
+                          : "shrink-0 rounded-full bg-muted/40 text-muted text-[10px] font-black uppercase tracking-wide px-2 py-0.5"
+                    }
+                  >
+                    {coldOpenStatus === "available"
+                      ? "Available"
+                      : coldOpenStatus === "watched"
+                        ? "Watched"
+                        : "Locked"}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => jumpPopup("cold")}
+                  className="w-full py-2.5 min-h-[44px] rounded-lg bg-amber-400 text-black text-xs font-extrabold touch-manipulation active:scale-[0.99] hover:bg-amber-300"
+                >
+                  {coldOpenStatus === "watched" ? "▶ Replay" : "▶ Watch"}
+                </button>
+              </div>
               <button
                 type="button"
                 onClick={() => {
@@ -881,13 +928,6 @@ export default function FounderDashboardPage() {
                 className="py-2.5 rounded-lg border border-warning/40 bg-warning/10 text-xs font-semibold hover:bg-warning/15"
               >
                 Audit week inventory (orphans · read-only)
-              </button>
-              <button
-                type="button"
-                onClick={() => jumpPopup("cold")}
-                className="py-2.5 rounded-lg border border-amber-400/40 bg-amber-500/10 text-xs font-semibold hover:bg-amber-500/15"
-              >
-                ▶ Watch cold open (champ wanted / Kalshi)
               </button>
       <button
                 type="button"
