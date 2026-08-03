@@ -1,8 +1,16 @@
 # Official Season Opening Ceremony + First-Login Sequence Control
 
-**Status:** ✅ **P0.3 shipped** (first War Room Moment) — 2026-08-03  
-**Date:** 2026-08-03  
-**Intent:** One ~5s “football is finally here” peak per user · league · sport · season — without reviving DeferredChrome freezes or stacking modals.
+**Status:** ✅ **P0.3 shipped** · 🔒 **FROZEN as Tier I Tradition**  
+**Date:** 2026-08-03 · Freeze ship: `0b884c0`  
+**Intent:** One Opening Day peak per user · league · sport · season — television for the season, not a login reward.
+
+### Freeze rule
+
+Do **not** keep polishing Season Opening.
+
+Change only under Constitution **Tradition protection law** (unanimous approval).  
+Foundry preview and claim-reset for testing remain allowed.  
+Sacred copy stays: *Practice is over. The season is here.* · *The room is open / live.*
 
 ### Implementation map
 

@@ -28,26 +28,37 @@ It is how much of the player's *goosebumps allowance* a Moment spends.
 
 ---
 
-## Weight levels
+## Named tiers (War Room language)
 
-| Level | Meaning | Typical animation | Examples |
-| ----- | ------- | ----------------- | -------- |
-| ⭐⭐⭐⭐⭐ | Once-a-season goosebumps | Full ceremony (confetti/fireworks allowed) | Sport Opening, Championship / Season Finale |
-| ⭐⭐⭐⭐ | Major milestone | Light → rare full | Ring Ceremony, First Week Scored peak, Season Winner callout |
-| ⭐⭐⭐ | Weekly excitement | Light | Gazette Reveal, Card Goes Live |
-| ⭐⭐ | Small delight | Light or none | Board Unlock, Soft Unlock, First Cheevo |
-| ⭐ | Tiny feedback | None | Checkmarks, lock confirmation, “saved” |
+Talk in **tier names** with players and in product docs. Stars remain internal mapping only.
+
+| Tier | Name | Job | Internal weight | Examples |
+|------|------|-----|-----------------|----------|
+| **I** | **Traditions** | Annual / once-a-season sacred peaks | ⭐⭐⭐⭐⭐ | Season Opening, Championship, Hall of Champions, Legacy |
+| **II** | **Weekly Rituals** | Heartbeat of the season | ⭐⭐⭐ (sometimes ⭐⭐⭐⭐) | Card Live, Locks, Board, Gazette |
+| **III** | **Recognition** | Personal delight / earned beats | ⭐⭐ · ⭐ | Achievement, Title, Birthday, first cheevo |
+
+Legacy star table (engineers only):
+
+| Level | Meaning | Typical animation |
+| ----- | ------- | ----------------- |
+| ⭐⭐⭐⭐⭐ | Tier I Tradition | Full ceremony (authentic spectacle) |
+| ⭐⭐⭐⭐ | Major milestone (rare full) | Light → rare full |
+| ⭐⭐⭐ | Tier II Weekly Ritual | Light |
+| ⭐⭐ | Tier III Recognition | Light or none |
+| ⭐ | Tiny feedback | None |
 
 ---
 
 ## Spending rules
 
-1. **Match animation to weight.** Full ceremony only for ⭐⭐⭐⭐⭐ (and rarely ⭐⭐⭐⭐ if on the peak list).  
-2. **Season-scale peaks are finite.** Default max **four** full-ceremony Moments per season arc (see rarity law).  
-3. **Weekly rituals stay weekly.** Never promote “Card Live” to ⭐⭐⭐⭐⭐.  
-4. **Earned ≠ fireworks.** First cheevo is delight (⭐⭐), not Opening Day.  
+1. **Match animation to tier.** Full ceremony only for **Tier I Traditions** (and rarely a listed peak).  
+2. **Season-scale Traditions are finite.** Default max **four** full-ceremony Moments per season arc (see rarity law).  
+3. **Weekly Rituals stay weekly.** Never promote “Card Live” to Tier I.  
+4. **Earned ≠ Tradition.** First cheevo is Recognition, not Opening Day.  
 5. **Trust moments are not spend.** Empty Board / empty Standings are honesty, not celebration — they cost **0** Emotional Budget.  
 6. **Skip is free.** Skip must never punish or re-spend.  
+7. **Tier I changes require unanimous approval** (Constitution: Tradition protection law). Once frozen, prefer aging over polish.
 7. **Practice Mode spends nothing.** No Moments in Practice.  
 8. **Foundry preview does not spend customer budget.** Creator can replay; customers still once.
 

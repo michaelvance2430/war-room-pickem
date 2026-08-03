@@ -1,14 +1,15 @@
 "use client";
 
 /**
- * Season Opening — first official War Room Moment.
+ * Season Opening — first Tier I Tradition.
  *
- * ⭐⭐⭐⭐⭐ Emotional Budget — one of ~four max-spend Moments per season.
- * Optimize for **authentic spectacle** (stadium / broadcast Opening Day),
- * not software celebration or random particle spam.
+ * 🔒 FROZEN — change only under Constitution Tradition protection law
+ * (unanimous founder + implementer + product counsel). Do not keep polishing.
+ *
+ * Television production for the season — not a reward for the login.
+ * Authentic spectacle. Sacred copy: Practice is over / The room is open|live.
  *
  * Beats: Anticipation → Celebration → Transition → Silence → Fade → Home.
- * "Practice is over. The season is here." must breathe.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";

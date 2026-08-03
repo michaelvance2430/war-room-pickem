@@ -3,8 +3,19 @@
  * Design source: docs/MOMENT-OBJECT-SCHEMA.md
  *
  * A Moment is a player-facing emotional beat players might remember a month later.
- * Not feedback. Not Foundry. Not fireworks for every login.
+ * Television for the season — not a reward for the login.
+ *
+ * Product language: Tier I Traditions · Tier II Weekly Rituals · Tier III Recognition
+ * Stars (emotionalWeight) are internal mapping only.
+ *
+ * Tier I changes require unanimous approval (Constitution: Tradition protection).
  */
+
+/** Product-facing Moment tier (prefer over star talk) */
+export type MomentTier =
+  | "tradition" // Tier I — sacred, once-a-season peaks
+  | "weekly_ritual" // Tier II — heartbeat
+  | "recognition"; // Tier III — personal delight
 
 export type MomentCategory =
   | "season_begins"
@@ -21,7 +32,7 @@ export type MomentReplayPolicy =
   | "every_occurrence"
   | "foundry_only";
 
-/** 1–5 stars → emotional weight (see docs/EMOTIONAL-BUDGET.md) */
+/** 1–5 stars → internal emotional weight only (docs/EMOTIONAL-BUDGET.md) */
 export type EmotionalWeight = 1 | 2 | 3 | 4 | 5;
 
 export type MomentSportId = "cfb" | "nfl";
@@ -29,6 +40,10 @@ export type MomentSportId = "cfb" | "nfl";
 export type MomentDefinition = {
   id: string;
   name: string;
+  /** Product language tier — Traditions are unanimous-change only when frozen */
+  tier: MomentTier;
+  /** When true, do not edit without unanimous Tradition protection approval */
+  frozen?: boolean;
   category: MomentCategory;
   purpose: string;
   emotionalWeight: EmotionalWeight;

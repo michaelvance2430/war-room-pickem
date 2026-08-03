@@ -108,9 +108,14 @@ Guest Mode is an **invitation** — not a crippled account.
 ### War Room Moments
 
 War Room Moments are a **first-class product system**.  
-They exist to create **traditions** — not animations.
+They exist to create **traditions** — not animations.  
+They are **television production for the season** — not rewards for the login.
 
-Every future celebration belongs inside this framework.
+**Tiers (product language):**  
+Tier I Traditions · Tier II Weekly Rituals · Tier III Recognition  
+
+**Tradition protection:** Tier I may only change by **unanimous** founder + implementer (+ product counsel) approval.  
+**Season Opening (P0.3):** 🔒 **FROZEN** after authentic-spectacle pass (`0b884c0`). Preview in Foundry. Do not keep polishing.
 
 ---
 
@@ -149,8 +154,8 @@ The architecture phase is complete.
 |-------|--------|--------|
 | P0.1 | Trust & Identity (Guest / Practice / Story / Chrome) | ✅ **Accepted** — lessons: `docs/P0-TRUST-AND-IDENTITY-LESSONS.md` |
 | P0.2 | **League (Host) Dashboard** polish | Shipped baseline — continue polish as needed |
-| P0.3 | Season Opening Moment (first Moment) | ✅ **Shipped** — tradition not animation; `src/lib/moments/*` + MomentHost |
-| P0.4 | War Room Moments framework (expand catalog) | Foundation live; migrate Ring / Finale next |
+| P0.3 | Season Opening Moment (first Tradition) | ✅ **Shipped + FROZEN** — unanimous change only; Foundry preview OK |
+| P0.4 | War Room Moments catalog (next Traditions / Rituals) | Foundation live; do **not** reopen Season Opening for polish |
 | P0.5 | Personality return (Gazette, cheevos, crews, titles) | Queued |
 
 Do not reopen P0.1 unless a scrub finds a regression.

@@ -191,7 +191,7 @@ If players stop thinking about Practice and only remember *“War Room was easy 
 
 > **Optimize for authentic spectacle — not software celebration.**
 
-⭐⭐⭐⭐⭐ Moments (Season Opening, Finale, etc.) **spend** the Emotional Budget.  
+**Tier I Traditions** (Season Opening, Championship, etc.) **spend** the Emotional Budget.  
 They may feel like television Opening Day: stadium lights, haze, crowd energy, a sound cue, a held silence.
 
 They must **not** feel like: random confetti, particle spam, or the app congratulating itself.
@@ -199,6 +199,56 @@ They must **not** feel like: random confetti, particle spam, or the app congratu
 The test: *Does this feel worthy of Opening Day?*  
 If removing an effect makes it more authentic, remove it.  
 If the room still feels cheap for a once-a-season peak, add **football** atmosphere — not sparkles.
+
+Moments are **television production** for the season — not rewards for the user.  
+You celebrate **the season**. Not the login.
+
+### Tradition protection law
+
+> **Tier I Traditions may only change by unanimous approval.**
+
+Who must agree before any change ships:
+
+1. The founder (Mike)  
+2. Implementation partner (Grok / engineering)  
+3. Product counsel when involved (ChatGPT / design steward)
+
+If anyone says no — **do not touch it.**
+
+Why: once players see a Tradition, it becomes sacred.  
+You do not redesign ESPN’s Monday Night open, College GameDay’s open, or the Masters theme every week.  
+Familiarity is the product.
+
+**Freeze means freeze.** Preview until everyone smiles — then stop polishing. Let it age.  
+Year one: “That was cool.”  
+Year five: “It’s football season.”
+
+### War Room calendar (experience, not features)
+
+War Room has **seasons of its own**:
+
+```
+Offseason → “I’m Bored”
+    ↓
+Season Opening (“The room is open.”)
+    ↓
+Week rhythm (card · locks · board · paper)
+    ↓
+Rivalry / peak weeks
+    ↓
+Championship
+    ↓
+Offseason → “I’m Bored” returns
+```
+
+That is a calendar of feeling — not a feature list.
+
+### Sacred copy (do not casually rewrite)
+
+These lines are brand. Changing them requires Tradition protection law:
+
+- **Practice is over. The season is here.**  
+- **The room is open.** / **The room is live.** (sport variants)
 
 ### Offseason Practice principle
 

@@ -5,10 +5,16 @@
 
 import type { MomentDefinition } from "./types";
 
-/** College Football Opening — Saturday / GameDay energy */
+/**
+ * 🔒 FROZEN Tier I Tradition — Season Opening (CFB).
+ * Change only with unanimous Tradition protection approval.
+ * Ship freeze: 0b884c0 · Do not keep polishing.
+ */
 export const MOMENT_SEASON_OPEN_CFB: MomentDefinition = {
   id: "season_open_cfb",
   name: "College Football Opening",
+  tier: "tradition",
+  frozen: true,
   category: "season_begins",
   purpose:
     "Mark that CFB season has officially begun in this room — annual tradition, not a login animation.",
@@ -23,10 +29,15 @@ export const MOMENT_SEASON_OPEN_CFB: MomentDefinition = {
   foundryPreview: true,
 };
 
-/** NFL Kickoff Opening — prime time / Opening Weekend */
+/**
+ * 🔒 FROZEN Tier I Tradition — Season Opening (NFL).
+ * Change only with unanimous Tradition protection approval.
+ */
 export const MOMENT_SEASON_OPEN_NFL: MomentDefinition = {
   id: "season_open_nfl",
   name: "NFL Kickoff Opening",
+  tier: "tradition",
+  frozen: true,
   category: "season_begins",
   purpose:
     "Mark that the NFL season has officially begun in this room — Opening Weekend energy.",
