@@ -470,7 +470,7 @@ export default function WeeklyColdOpenModal({ forceOnly = false }: Props) {
         <header className="shrink-0 flex items-center gap-2 px-3 py-2.5 border-b-2 border-amber-400/40 bg-gradient-to-r from-amber-500 to-amber-400 text-black">
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-black uppercase tracking-[0.18em]">
-              ● Breaking news · Season Cold Open · {sportLabel}
+              ● Live · Season Cold Open · {sportLabel}
             </p>
             <p
               id={titleId}
@@ -479,9 +479,9 @@ export default function WeeklyColdOpenModal({ forceOnly = false }: Props) {
             >
               {GAZETTE_STATION.masthead}
             </p>
-            <p className="text-[10px] font-bold truncate opacity-90">
+            <p className="text-[10px] font-extrabold truncate">
               {room}
-              {subject.year ? ` · ${subject.year} champ` : ""}
+              {subject.year ? ` · ${subject.year} champ` : ""} · THE HUNT IS OPEN
             </p>
           </div>
           <button
@@ -563,9 +563,12 @@ export default function WeeklyColdOpenModal({ forceOnly = false }: Props) {
                   </p>
                 </div>
               </div>
-              <div className="bg-amber-400/15 border-t border-amber-400/30 px-3 py-2 text-center">
+              <div className="bg-amber-400/15 border-t border-amber-400/30 px-3 py-2 text-center space-y-0.5">
                 <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-amber-200">
                   Last year&apos;s championship · target on back
+                </p>
+                <p className="text-[11px] font-black uppercase tracking-[0.12em] text-amber-100">
+                  Competition is brewing · load your card
                 </p>
               </div>
             </div>
@@ -573,6 +576,9 @@ export default function WeeklyColdOpenModal({ forceOnly = false }: Props) {
 
           {/* Full article — stay open to read */}
           <div className="px-4 py-4 space-y-3 text-sm text-muted leading-relaxed">
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-primary">
+              The room is awake · the chase is the product
+            </p>
             <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber-300">
               From the Gazette newsroom
               {copy.phonetic ? ` · ${copy.phonetic}` : ""}
@@ -602,11 +608,11 @@ export default function WeeklyColdOpenModal({ forceOnly = false }: Props) {
             <button
               type="button"
               onClick={() => dismiss({ markSeen: !preview })}
-              className="w-full py-3.5 min-h-[48px] rounded-xl bg-primary text-black font-bold text-sm touch-manipulation active:scale-[0.99]"
+              className="w-full py-3.5 min-h-[48px] rounded-xl bg-primary text-black font-extrabold text-sm touch-manipulation active:scale-[0.99]"
             >
               {preview || forceOnly
-                ? "Return to War Room Moments"
-                : copy.cta || "Return to War Room"}
+                ? "I'm ready — back to Moments"
+                : copy.cta || "I'm hunting — open the room"}
             </button>
             {!preview && !forceOnly && (
               <a

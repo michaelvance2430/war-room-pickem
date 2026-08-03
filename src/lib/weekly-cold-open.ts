@@ -291,34 +291,34 @@ type CopyCtx = {
 
 const WANTED_BANK = [
   "Have you seen this man?",
-  "WANTED: defending champ — approach with snacks",
-  "MISSING: humility. LAST SEEN WITH THE HARDWARE",
-  "FACE OF THE ROOM — CASE FILE OPEN",
-  "ALERT: reigning champ still at large",
-  "MILK CARTON MONDAY (PRESEASON EDITION)",
+  "WANTED: defending champ — season is open for hunting",
+  "TARGET ACQUIRED · TITLE STILL WARM",
+  "FACE OF THE ROOM — THE HUNT BEGINS",
+  "ALERT: reigning champ · bounty on the hardware",
+  "MILK CARTON MONDAY · COMPETITION BREWING",
   "HAVE YOU SEEN THIS TARGET?",
   "PERSON OF INTEREST · TROPHY DIVISION",
-  "IF FOUND: return crystal, keep the ego",
-  "SIDE OF THE CARTON · CHAMP WATCH",
-  "PUBLIC SERVICE ANNOUNCEMENT",
+  "IF FOUND: strip the crystal, keep the grudge",
+  "CHAMP WATCH · EVERYONE IS COMING",
+  "PUBLIC SERVICE ANNOUNCEMENT · LOAD UP",
   "THE BOARD REMEMBERS THIS FACE",
 ];
 
 const HEADLINE_BANK: ((c: CopyCtx) => string)[] = [
   (c) => `${c.name}: known time traveler — some even say a cheat`,
-  (c) => `${c.name} and the case of the suspiciously perfect card`,
-  (c) => `Is ${c.name} lucky… or running next week’s scores early?`,
-  (c) => `${c.name} still has the ${c.hardwareShort}. The room has questions.`,
-  (c) => `Defending champ ${c.name}: hero, villain, or time-zone tourist?`,
-  (c) => `${c.name} put a target on their own back. Gazette filed the photo.`,
-  (c) => `BREAKING: ${c.name} enters ${c.year + 1} as the one everyone hunts`,
-  (c) => `${c.name} — reigning ${c.hardwareShort} holder, alleged score psychic`,
-  (c) => `Room opens fire on ${c.name}: “prove it again or hand it over”`,
-  (c) => `${c.name}’s ${c.year} title still haunts the group chat`,
-  (c) => `Investigative Desk vs ${c.name}: DeLorean still not recovered`,
-  (c) => `${c.name} won last year. Kalshi already priced the hangover.`,
+  (c) => `${c.name} still has the ${c.hardwareShort}. The room wants it back.`,
+  (c) => `BREAKING: ${c.name} is the one everyone has to beat`,
   (c) => `Champ watch: ${c.name} walks into a room that wants blood`,
-  (c) => `${c.name} is the face on the carton. Season hasn’t started. Drama has.`,
+  (c) => `${c.name} put a target on their own back. Season hasn’t started. War has.`,
+  (c) => `Room opens fire on ${c.name}: prove it again or hand it over`,
+  (c) => `${c.name}’s ${c.year} title still haunts the group chat — and fuels it`,
+  (c) => `Is ${c.name} lucky… or already ahead of your first lock?`,
+  (c) => `${c.name} enters ${c.year + 1} as prey. The field is hungry.`,
+  (c) => `Defending champ ${c.name}: hero last year, bounty this year`,
+  (c) => `${c.name} won it. Now every card is a rematch.`,
+  (c) => `${c.name} — reigning ${c.hardwareShort} holder, public enemy #1`,
+  (c) => `Investigative Desk vs ${c.name}: the chase is the story`,
+  (c) => `${c.name} won last year. Kalshi priced the hangover. The room priced the hunt.`,
 ];
 
 const BODY_BANK: ((c: CopyCtx) => string)[] = [
@@ -328,106 +328,108 @@ const BODY_BANK: ((c: CopyCtx) => string)[] = [
     `somehow always knows next week’s scores before the rest of us lock. ` +
     `Some even say a cheat. Investigative Desk has not recovered a DeLorean — ` +
     `but the pattern is hard to unsee. This is the week-before package: ` +
-    `face on the carton, name in the paper, target on their back.`,
+    `face on the carton, name in the paper, target on their back. ` +
+    `Competition is not “starting soon.” It’s already brewing.`,
   (c) =>
     `Preseason drop from the ${c.room} desk: ${c.nameCall} still holds the ${c.year} ${c.hardware}. ` +
     `That means one thing — every card this year is a heist attempt. ` +
-    `Witnesses report suspiciously clean Best Bets, early locks, and a smirk that says “I already saw the box score.” ` +
-    `We print faces, not excuses. Have you seen this man?`,
+    `Witnesses report clean Best Bets, early locks, and a smirk that says “I already saw the box score.” ` +
+    `We print faces, not excuses. The room is loading up. Have you seen this man?`,
   (c) =>
     `${c.nameCall} raised the ${c.hardwareShort} last season. Now the carton is out. ` +
     `Sources close to the locker insist it’s skill. Sources closer to the standings insist it’s sorcery. ` +
     `Either way, ${c.dayLabel} energy is building and the room wants a rematch more than a parade. ` +
-    `Gazette Investigative Desk: open case, zero mercy, full roast.`,
+    `This is not a memorial. It’s a starting gun.`,
   (c) =>
-    `Last year’s champion is ${c.nameCall}. This year’s bulletin is simple: remember the face. ` +
-    `The ${c.year} ${c.hardware} doesn’t defend itself — the board does. ` +
-    `Whispers of time travel, spreads that “felt familiar,” and a prop pick that aged like prophecy. ` +
-    `We can’t prove cheat codes. We can print a wanted poster.`,
+    `Last year’s champion is ${c.nameCall}. This year’s bulletin is simple: remember the face — then beat it. ` +
+    `The ${c.year} ${c.hardware} doesn’t defend itself. You do. They do. The board keeps score. ` +
+    `Whispers of time travel and props that aged like prophecy only make the chase sweeter. ` +
+    `We can’t prove cheat codes. We can open season with a wanted poster.`,
   (c) =>
     `If you forgot who won, the hardware didn’t: ${c.nameCall}, ${c.year}. ` +
-    `The War Room does not do quiet title defenses. We do milk cartons, Kalshi screenshots, and group-chat forensics. ` +
-    `Some say traveler. Some say cheat. Most say “good luck surviving week one with that target.” ` +
+    `The War Room does not do quiet title defenses. We do cartons, markets, and group-chat forensics. ` +
+    `Some say traveler. Some say cheat. Most are already picking their upset card. ` +
     `This package airs once — then the season starts hunting.`,
   (c) =>
     `Case file ${c.year}-${c.name.replace(/\s+/g, "").slice(0, 12).toUpperCase()}: ` +
     `subject ${c.nameCall} last seen clutching ${c.hardware}. ` +
     `MO includes locking early, talking late, and finishing first. ` +
-    `Known associates: confidence points, Best Bets, and a room full of people practicing their “I told you so.” ` +
-    `Reward for unseating them: eternal bragging rights and a new face on next year’s carton.`,
+    `Known associates: confidence points, Best Bets, and a room full of people practicing “I told you so.” ` +
+    `Reward for unseating them: eternal bragging rights and a new face on next year’s carton. ` +
+    `Excitement is not optional. Competition is the product.`,
   (c) =>
     `Gazette Network special: the week before ${c.dayLabel}, we put the champ on blast. ` +
     `${c.nameCall} is the defending ${c.hardwareShort} holder. ` +
-    `That is not a compliment — it’s a bounty. ` +
-    `Reports of time-zone tourism and “lucky” props remain unconfirmed. ` +
-    `What is confirmed: their profile pic is now public domain for roasting.`,
+    `That is not a compliment — it’s a bounty notice. ` +
+    `The field is deep. The juice is live. The target is public. ` +
+    `What is confirmed: their profile pic is now public domain for roasting — and motivation.`,
   (c) =>
-    `${c.room} tradition holds: last year’s winner gets the preseason carton. ` +
-    `This year that’s ${c.nameCall}. No ticker. No pop-up words. Just the facts we can print without a lawyer — ` +
-    `they won the ${c.year} ${c.hardware}, the room is jealous, and Kalshi is not bullish on a repeat. ` +
-    `Some even say a cheat. We say: prove them wrong… or don’t.`,
+    `${c.room} tradition: last year’s winner gets the preseason carton. ` +
+    `This year that’s ${c.nameCall}. They won the ${c.year} ${c.hardware}. ` +
+    `The room is jealous. Kalshi is not bullish on a repeat. ` +
+    `Some even say a cheat. We say the chase is open — prove the market wrong, or prove the haters right.`,
   (c) =>
     `Anatomy of a target: ${c.nameCall} took home the ${c.year} title hardware. ` +
-    `Now every Saturday/Sunday is a referendum. Veterans swear the picks arrive from the future. ` +
-    `Newcomers just see a face and a name. ` +
-    `Investigative Desk position: unknown if traveler, unconfirmed if cheat, certain if hunted.`,
+    `Now every ${c.dayLabel} is a referendum. Veterans swear the picks arrive from the future. ` +
+    `Newcomers just see a face and a name — and a reason to lock with bad intentions. ` +
+    `Investigative Desk: unconfirmed traveler, unconfirmed cheat, certain they are hunted.`,
   (c) =>
-    `Stop us if you’ve heard this one: reigning champ ${c.nameCall} walks into ${c.room} ` +
-    `with last year’s ${c.hardwareShort} still warm. ` +
+    `Reigning champ ${c.nameCall} walks into ${c.room} with last year’s ${c.hardwareShort} still warm. ` +
+    `That’s not a victory lap. That’s blood in the water. ` +
     `Punchline writes itself — unless they three-peat, in which case we print a dynasty special. ` +
-    `Until then: carton energy, full article, zero animation, maximum disrespect wrapped in newsprint gold.`,
+    `Until then: carton energy, maximum disrespect, and a season that starts the second you feel the heat.`,
 ];
 
 const KALSHI_BANK: ((c: CopyCtx) => string)[] = [
   (c) =>
-    `Kalshi odds have ${c.name} definitely not winning this year. Markets price the time-travel edge as spent. The board is open — the tape says no.`,
+    `Kalshi odds have ${c.name} definitely not winning this year. Markets price the edge as spent. The board is open — the tape says the field is coming.`,
   (c) =>
-    `Markets update: Kalshi has ${c.name} as a fade. Repeat titles are priced like lottery tickets with worse juice.`,
+    `Markets update: Kalshi has ${c.name} as a fade. Repeat titles are lottery tickets. The room just bought tickets to the hunt.`,
   (c) =>
-    `Kalshi board: ${c.name} to defend? Traders say “absolutely not.” The room says “watch this.” Only one gets paid in pride.`,
+    `Kalshi: ${c.name} to defend? Traders say “absolutely not.” The room says “watch this.” Only pride pays out either way.`,
   (c) =>
-    `According to Kalshi, ${c.name} is not winning it again. According to ${c.name}, the market is a clown. We’ll keep score.`,
+    `According to Kalshi, ${c.name} is not winning it again. According to ${c.name}, the market is a clown. Competition will settle it.`,
   (c) =>
-    `Kalshi lists ${c.name} as “definitely not” this year’s champ. Bold claim. Print it. Frame it. Revisit in January.`,
+    `Kalshi lists ${c.name} as “definitely not” this year’s champ. Bold. Print it. Frame it. Let the season argue.`,
   (c) =>
-    `Contract watch: ${c.name} repeat = longshot. The tape is cold. The target on their back is not.`,
+    `Contract watch: ${c.name} repeat = longshot. The tape is cold. The target on their back is red hot.`,
   (c) =>
-    `Prediction markets (Kalshi) have ${c.name} buried. History says champs get hunted. Math says the field is deep. Drama says tune in.`,
+    `Prediction markets buried ${c.name}. History says champs get hunted. Math says the field is deep. Drama says load your card.`,
   (c) =>
-    `Kalshi: ${c.name} ❌ this year. Gazette: still putting their face on the carton just in case the market is wrong and annoying.`,
+    `Kalshi: ${c.name} ❌ this year. Gazette: face on the carton anyway — because nothing fuels a room like a public fade.`,
   (c) =>
-    `Oddsmakers have spoken — ${c.name} is not the pick to win it all. The carton stays up anyway. Hope is not a strategy; locking is.`,
+    `Oddsmakers say ${c.name} is not the pick. The carton stays up. Hope is not a strategy. Locking is.`,
   (c) =>
-    `Kalshi prices a ${c.name} defense as fantasy. The War Room prices it as motivation. Same headline, different bankroll.`,
+    `Kalshi prices a ${c.name} defense as fantasy. The War Room prices it as fuel. Same headline. Different heart rate.`,
 ];
 
 const CTA_BANK = [
-  "Cool — back to the room",
-  "Alright, hunt season",
-  "Got it — open the board",
+  "I'm hunting — open the room",
+  "Alright — season's on",
+  "Load my card energy",
   "Close carton · start beef",
-  "Enough news — lock soon",
-  "Back to the group chat",
+  "The chase is open",
+  "Back to the War Room — locks soon",
 ];
 
 const EDITION_BANK: ((c: CopyCtx) => string)[] = [
   (c) =>
-    `Once per season · week before open · ${c.year} champ package · ${c.room}`,
+    `Once per season · week before open · ${c.year} champ package · ${c.room} · competition brewing`,
   (c) =>
-    `Preseason exclusive · ${c.room} · not the same bit as last year`,
+    `Preseason exclusive · ${c.room} · the hunt is the product`,
   (c) =>
     `Gazette carton drop · one view · then the season eats the evidence`,
   (c) =>
     `${c.dayLabel} approaches · ${c.name} on notice · you on notice too`,
   (c) =>
-    `Edition mix unique to this league + season · don’t expect a rerun`,
+    `Edition mix unique to this league + season · new year, new chase`,
 ];
 
 const FOOT_BANK = [
-  "One-time preseason drop — the week before kickoff. When the commish scores a week, the full Gazette still drops with crowns, shame, and the works.",
-  "This carton airs once. Ring ceremony still walks opening week. Paper still drops after score. The roast economy is diversified.",
-  "Preseason only. No weekly reruns. Different room, different year, different mix — Gazette Network does not do syndication of the same roast.",
-  "You get one look. Then it’s hardware, locks, and the board. The Gazette will be back with receipts.",
+  "One-time preseason drop — the week before kickoff. Heat first. Hardware later. The board is waiting.",
+  "This carton airs once. Then it’s locks, crowns, and receipts. The room is already awake.",
+  "Preseason only. No weekly reruns. Different room, different year, same hunger — take the hardware back.",
+  "You get one look. Then it’s confidence points and bad intentions. The Gazette will be back with the scoreboard.",
 ];
 
 function sportBits(sport: "cfb" | "nfl", year: number) {
@@ -498,16 +500,20 @@ function buildCfbInauguralLockedCopy(ctx: CopyCtx): WeeklyColdOpenCopy {
       `somehow always knows next week’s scores before the rest of us lock. ` +
       `Some even say a cheat. Investigative Desk has not recovered a DeLorean — ` +
       `but the pattern is hard to unsee. This is the week-before package: ` +
-      `face on the carton, name in the paper, target on their back.`,
+      `face on the carton, name in the paper, target on their back. ` +
+      `The season hasn’t kicked off — and the competition is already brewing. ` +
+      `Every card this year is a heist attempt. Every Best Bet is a statement. ` +
+      `If you’re new: this is the person the whole room wants to unseat. ` +
+      `If you’re not: you already know. Load up.`,
     kalshi:
-      `Kalshi odds have ${ctx.name} definitely not winning this year. Markets price the time-travel edge as spent. The board is open — the tape says no.`,
-    cta: "Cool — back to the room",
+      `Kalshi odds have ${ctx.name} definitely not winning this year. Markets price the time-travel edge as spent. The board is open — the field is hungry — the tape says the hunt is on.`,
+    cta: "I'm hunting — open the room",
     ctaGazette: "Open the Gazette",
     hardwareLabel: bits.hardwareLabel,
     foot:
-      "One-time preseason drop — the week before kickoff. When the commish scores a week, the full Gazette still drops with crowns, shame, and the works.",
+      "One-time preseason drop — the week before kickoff. Heat first. Locks next. When the commish scores, the full Gazette drops with crowns, shame, and receipts.",
     packId: CFB_INAUGURAL_COLD_OPEN_PACK_ID,
-    editionLine: `Once per season · week before open · ${ctx.year} champ · ${ctx.room} · CFB inaugural (locked) · every league gets the same shell next year with new hardware`,
+    editionLine: `Once per season · week before open · ${ctx.year} champ · ${ctx.room} · CFB inaugural (locked) · competition brewing`,
   };
 }
 
