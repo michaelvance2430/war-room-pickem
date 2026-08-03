@@ -129,7 +129,7 @@ If the answer is **no**, it probably shouldn't ship.
 
 ---
 
-# Next Phase
+# Next Phase — Implementation (open)
 
 The architecture phase is complete.
 
@@ -141,7 +141,78 @@ Each implementation should leave War Room feeling more polished, more intuitive,
 
 - No feature sprawl.  
 - No philosophy rewrites.  
-- **Execute the vision.**
+- **Execute the vision.**  
+- No new architecture unless a **direct conflict** with the Constitution is discovered (raise it; don’t invent).
+
+---
+
+# Implementation rule
+
+Every implementation should leave War Room feeling:
+
+- More **trustworthy**  
+- More **intuitive**  
+- More **emotional**  
+- More like **football season**  
+
+Not simply feature-rich.
+
+---
+
+# Execution order
+
+Implement **one P0 item at a time**.
+
+Completely polish before the next.
+
+**Do not** begin multiple P0 efforts simultaneously.
+
+### Workflow (every P0)
+
+1. Build  
+2. Internal QA  
+3. Through Their Eyes  
+4. Mike scrub  
+5. Polish  
+6. Ship  
+7. Move to next P0  
+
+No parallel feature development.
+
+### Deliverables (every P0 ship)
+
+- Summary of what changed  
+- Why it improves War Room  
+- Constitution principles reinforced  
+- Screens affected  
+- Files changed  
+- Performance impact  
+- Verification checklist  
+- Anything intentionally deferred  
+
+No implementation ends with only “build passed.”
+
+### Success metric
+
+Not: features added.
+
+> **Does War Room feel more like War Room?**
+
+---
+
+# Guardian role (engineering + product consistency)
+
+> **Act as guardian of the Product Architecture Freeze.**  
+> If Mike proposes something that conflicts with the Constitution or introduces feature creep:  
+> **do not simply implement it.** Explain the conflict, propose alternatives, and ask for an explicit override before proceeding.
+
+Roles:
+
+| Role | Job |
+|------|-----|
+| Mike | Protect the product; explicit overrides only |
+| Product translator | Clarity of vision |
+| Grok | Execute beautifully + guard consistency |
 
 ---
 
