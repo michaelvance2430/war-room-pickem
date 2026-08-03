@@ -1,9 +1,18 @@
 # Promote "War Room Moments" to a Core Product System
 
-**Status:** Architecture decision — **critique first, no implementation until approved**  
+**Status:** Architecture decision — **approved as direction; design package complete; no code yet**  
 **Date:** 2026-08-03  
 **Audience:** Founder + implementers  
-**Related:** `OFFICIAL-SEASON-OPENING-SEQUENCE.md`, `WAR-ROOM-CONSTITUTION.md`, Foundry hub
+
+### Design package (define traditions before implementing the first one)
+
+| Phase | Doc |
+|-------|-----|
+| 1 | `docs/MOMENT-OBJECT-SCHEMA.md` — what a Moment is |
+| 2 | `docs/SEASON-MOMENT-TIMELINE.md` — full-season map |
+| 3 | `docs/EMOTIONAL-BUDGET.md` — emotional currency / weights |
+| Sacred | Constitution chapter **War Room Moments** |
+| First Moment | `docs/OFFICIAL-SEASON-OPENING-SEQUENCE.md` |
 
 ---
 

@@ -84,24 +84,6 @@ The Board’s promise: *it reveals what happened this season.*
 Zero scored weeks → empty state, not placeholder weeks, not demo cards, not practice artifacts.  
 The first scored week is when The Board comes alive.
 
-### Moments principle
-
-> **Moments become traditions. Traditions keep leagues together.**
-
-Football is the excuse. Relationships are the product.  
-War Room Moments are how those relationships become annual traditions.
-
-War Room should not be remembered because of features.  
-It should be remembered because of moments.
-
-Every Moment answers: *Will players remember this a month later?*  
-If not, it probably doesn't belong as a Moment.
-
-Protect rarity: only a handful of season-scale goosebumps peaks.  
-If everything has fireworks, nothing has fireworks.
-
-See `docs/WAR-ROOM-MOMENTS-ARCHITECTURE.md`.
-
 ### Achievement principle
 
 > **War Room never awards what hasn't been earned.**
@@ -224,6 +206,107 @@ Five years on, if thousands of group chats say that every August — people won�
 They’ll be talking about **their league**.
 
 That’s the highest compliment this product can earn.
+
+---
+
+## War Room Moments
+
+*Sacred product architecture. Not a Foundry rename. Not optional.*
+
+> **Moments become traditions. Traditions keep leagues together.**
+
+Football is the excuse. Relationships are the product.  
+War Room Moments are how those relationships become annual traditions.
+
+War Room should not be remembered because of features.  
+It should be remembered because of **moments**.
+
+### Purpose
+
+A **Moment** is a player-facing emotional beat that players might remember a month later.
+
+Foundry is the studio.  
+The Live League is the stage.  
+Customers never see lab language.
+
+### Categories (permanent)
+
+| Category | Role |
+|----------|------|
+| 🏈 **Season Begins** | Once — establish the new season (sport identity first) |
+| 📅 **Weekly Rituals** | Heartbeat — card, paper, board, weekly earned delight |
+| 🏆 **Milestones** | Earned — ring, cheevos, trophies, Hall of Fame |
+| 👑 **Season Finale** | Close — champion, wrap, trophy presentation |
+
+### Emotional Budget
+
+> **Every celebration spends emotional currency. Spend carefully.**
+
+| Level | Meaning | Examples |
+| ----- | ------- | -------- |
+| ⭐⭐⭐⭐⭐ | Once-a-season goosebumps | Sport Opening, Championship |
+| ⭐⭐⭐⭐ | Major milestone | Ring Ceremony, First Week Scored peak |
+| ⭐⭐⭐ | Weekly excitement | Gazette, Card Goes Live |
+| ⭐⭐ | Small delight | Board Unlock, First Cheevo |
+| ⭐ | Tiny feedback | Checkmarks, lock confirmation |
+
+Full ceremony / fireworks only when weight allows.  
+If everything has fireworks, nothing has fireworks.
+
+### Rarity Law
+
+Default max **four** season-scale goosebumps peaks:
+
+1. Season Opening  
+2. First Week Scored (if used as a peak)  
+3. League Champion Crowned  
+4. New Season Begins Again  
+
+A fifth peak requires demoting another.
+
+### Moment Gate
+
+Before cataloging anything as a Moment:
+
+> **Will players remember this a month later?**
+
+If not, it is feedback — not a Moment.
+
+### Sport Identity
+
+Season Begins Moments are **per sport**.  
+CFB feels like Saturdays and GameDay.  
+NFL feels like prime time and Opening Weekend.  
+No generic celebration with swapped week numbers.  
+The sport should be recognizable before a single word is read.
+
+### Replay Policy
+
+One-shot Moments (open, finale) are once per user · league · sport · season (cloud claim).  
+Weekly rituals may repeat by week.  
+Foundry may preview without spending customer rarity.
+
+### Foundry Preview
+
+Creator-only.  
+War Room Moments is the permanent home for major player-facing beats.  
+Not “previews” as toys — emotional beats verified before production.
+
+### Performance Budget
+
+Moments must not revive DeferredChrome freezes:  
+no multi-wave modal catalogs, no DOM scanning, no fetch storms, no body-lock orphans.  
+Emotional peaks still obey technical cheapness.
+
+### Design package (reference)
+
+| Doc | Role |
+|-----|------|
+| `docs/WAR-ROOM-MOMENTS-ARCHITECTURE.md` | Architecture decision |
+| `docs/MOMENT-OBJECT-SCHEMA.md` | What a Moment is |
+| `docs/SEASON-MOMENT-TIMELINE.md` | Full-season emotional arc |
+| `docs/EMOTIONAL-BUDGET.md` | Weight / spend rules |
+| `docs/OFFICIAL-SEASON-OPENING-SEQUENCE.md` | First Season Begins Moment design |
 
 ---
 
