@@ -4592,5 +4592,13 @@ export async function resetSeasonInCloud(): Promise<ResetSeasonResult> {
     /* best-effort */
   }
 
+  // Drop standings/roster/card caches so Museum / Standings cannot show trial points
+  // after a wipe (playersCache TTL was keeping 5-pt museum records alive).
+  try {
+    invalidateCloudWeekCaches(leagueId);
+  } catch {
+    /* ignore */
+  }
+
   return result;
 }

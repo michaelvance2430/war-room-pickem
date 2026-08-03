@@ -438,6 +438,19 @@ export function buildLeagueHistory(
 export function buildLeagueRecords(players: Player[]): LeagueRecordRow[] {
   const real = players.filter((p) => !p.isMock);
   if (!real.length) return [];
+
+  // No scored/played season activity → empty museum records (post-reset clean slate).
+  // Prevents trial total_points / best_week from showing as "league records" when
+  // memberships weren't fully zeroed or a stale client still has junk stats.
+  const seasonStarted = real.some(
+    (p) =>
+      (p.weeksPlayed || 0) > 0 ||
+      (p.atsTotal || 0) > 0 ||
+      (p.weeklyPoints && p.weeklyPoints.length > 0) ||
+      (p.perfectWeeks || 0) > 0
+  );
+  if (!seasonStarted) return [];
+
   const rows: LeagueRecordRow[] = [];
 
   const byPts = [...real].sort((a, b) => b.totalPoints - a.totalPoints);

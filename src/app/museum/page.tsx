@@ -11,7 +11,11 @@ import {
   buildMuseumTimeline,
   type MuseumEvent,
 } from "@/lib/player-history";
-import { loadLeaguePlayers } from "@/lib/cloud";
+import {
+  loadLeaguePlayers,
+  listScoredWeekNumbers,
+  invalidateCloudWeekCaches,
+} from "@/lib/cloud";
 import { loadLeagueTrophies, type LeagueTrophy } from "@/lib/trophies";
 import { getLeague, getSession, isCommissioner, isOps } from "@/lib/league";
 import type { Player } from "@/lib/types";
@@ -146,11 +150,35 @@ function MuseumInner() {
       let plist: Player[] = [];
       let tlist: LeagueTrophy[] = [];
       try {
-        const [p, t] = await Promise.all([
+        // Fresh standings after season reset (avoid stale playersCache trial points)
+        invalidateCloudWeekCaches(getLeague()?.id || undefined);
+        const [p, t, scored] = await Promise.all([
           loadLeaguePlayers().catch(() => [] as Player[]),
           loadLeagueTrophies().catch(() => [] as LeagueTrophy[]),
+          listScoredWeekNumbers().catch(() => [] as number[]),
         ]);
-        plist = p;
+        // No scored weeks this season → strip live season stats so League records
+        // stays empty after reset (last-season trophies still show on the wall).
+        if (!scored.length) {
+          plist = p.map((pl) => ({
+            ...pl,
+            totalPoints: 0,
+            weeklyPoints: [],
+            atsCorrect: 0,
+            atsTotal: 0,
+            currentStreak: 0,
+            bestWeek: 0,
+            worstWeek: 0,
+            perfectWeeks: 0,
+            bestBetHits: 0,
+            bestBetTotal: 0,
+            propHits: 0,
+            propTotal: 0,
+            weeksPlayed: 0,
+          }));
+        } else {
+          plist = p;
+        }
         tlist = t;
         paintSeeds(plist, tlist);
       } catch {
