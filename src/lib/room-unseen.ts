@@ -15,6 +15,9 @@ const LOCKER_SEEN_KEY = "warroom-locker-seen-v1";
 /** Fired after markLockerSeen so Nav / Home can drop badges without a full reload. */
 export const EVENT_LOCKER_SEEN = "warroom-locker-seen";
 
+/** Fired after News/announcements are marked read so Nav can drop the badge. */
+export const EVENT_ANNOUNCEMENTS_SEEN = "warroom-announcements-seen";
+
 const UNSEEN_TTL_MS = 30_000;
 const annCache = new Map<string, { at: number; n: number }>();
 const lockerCache = new Map<string, { at: number; n: number }>();
@@ -23,6 +26,21 @@ const lockerCache = new Map<string, { at: number; n: number }>();
 export function invalidateRoomUnseenCaches() {
   annCache.clear();
   lockerCache.clear();
+}
+
+/**
+ * Call when the user opens News (/announcements) and reads are stamped.
+ * Clears the 30s unread cache and notifies Nav / Home tiles.
+ */
+export function markAnnouncementsSeen(opts?: { silent?: boolean }) {
+  annCache.clear();
+  if (opts?.silent) return;
+  if (typeof window === "undefined") return;
+  try {
+    window.dispatchEvent(new CustomEvent(EVENT_ANNOUNCEMENTS_SEEN));
+  } catch {
+    /* ignore */
+  }
 }
 
 type LockerSeenStore = Record<string, string>; // `${leagueId}:${userId}` → ISO timestamp

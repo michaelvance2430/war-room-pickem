@@ -27,6 +27,7 @@ import {
   countUnreadAnnouncements,
   countUnseenLockerPosts,
   EVENT_LOCKER_SEEN,
+  EVENT_ANNOUNCEMENTS_SEEN,
 } from "@/lib/room-unseen";
 import BrandMark from "@/components/BrandMark";
 import { normalizeSportId } from "@/lib/sports/registry";
@@ -329,8 +330,12 @@ export default function Nav() {
       // Instant clear — walking into locker marks seen without extra taps
       setLockerUnseen(0);
     }
+    function onAnnouncementsSeen() {
+      setUnreadCount(0);
+    }
     document.addEventListener("visibilitychange", onVis);
     window.addEventListener(EVENT_LOCKER_SEEN, onLockerSeen);
+    window.addEventListener(EVENT_ANNOUNCEMENTS_SEEN, onAnnouncementsSeen);
     return () => {
       window.clearTimeout(unreadTimer);
       window.clearTimeout(staffTimer);
@@ -339,6 +344,7 @@ export default function Nav() {
       window.removeEventListener(SPORT_THEME_EVENT, onSportTheme);
       document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener(EVENT_LOCKER_SEEN, onLockerSeen);
+      window.removeEventListener(EVENT_ANNOUNCEMENTS_SEEN, onAnnouncementsSeen);
       window.removeEventListener("warroom-gazette-seen", onGazetteSeen);
       window.removeEventListener("warroom-profile-updated", onProfileUpdated);
     };
@@ -361,6 +367,14 @@ export default function Nav() {
     }
     if (pathname === "/gazette" || pathname.startsWith("/gazette/")) {
       setGazetteUnseen(0);
+      return;
+    }
+    // News = announcements — clear badge immediately on visit (page also marks reads)
+    if (
+      pathname === "/announcements" ||
+      pathname.startsWith("/announcements/")
+    ) {
+      setUnreadCount(0);
       return;
     }
     // Do NOT re-fetch badges on every route — caches cover 30s; visibility

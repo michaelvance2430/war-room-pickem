@@ -2,11 +2,16 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { EVENT_LOCKER_SEEN, loadRoomUnseen } from "@/lib/room-unseen";
+import {
+  EVENT_LOCKER_SEEN,
+  EVENT_ANNOUNCEMENTS_SEEN,
+  loadRoomUnseen,
+} from "@/lib/room-unseen";
 
 /**
  * Home: how many unseen announcements + locker posts.
  * Each count is a link to that page. Locker clears on walk-in (no extra taps).
+ * News clears when /announcements is opened and reads are stamped.
  */
 export default function HomeUnseenPulse() {
   const [announcements, setAnnouncements] = useState<number | null>(null);
@@ -34,12 +39,17 @@ export default function HomeUnseenPulse() {
     function onLockerSeen() {
       setLocker(0);
     }
+    function onAnnouncementsSeen() {
+      setAnnouncements(0);
+    }
     document.addEventListener("visibilitychange", onVis);
     window.addEventListener(EVENT_LOCKER_SEEN, onLockerSeen);
+    window.addEventListener(EVENT_ANNOUNCEMENTS_SEEN, onAnnouncementsSeen);
     return () => {
       cancelled = true;
       document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener(EVENT_LOCKER_SEEN, onLockerSeen);
+      window.removeEventListener(EVENT_ANNOUNCEMENTS_SEEN, onAnnouncementsSeen);
     };
   }, []);
 

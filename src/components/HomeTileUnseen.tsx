@@ -5,6 +5,7 @@ import {
   countUnreadAnnouncements,
   countUnseenLockerPosts,
   EVENT_LOCKER_SEEN,
+  EVENT_ANNOUNCEMENTS_SEEN,
 } from "@/lib/room-unseen";
 
 /** Small count pill for Home tiles. */
@@ -28,14 +29,19 @@ export default function HomeTileUnseen({
     function onLockerSeen() {
       if (kind === "locker") setN(0);
     }
+    function onAnnouncementsSeen() {
+      if (kind === "announcements") setN(0);
+    }
     function onVis() {
       if (document.visibilityState === "visible") void load();
     }
     window.addEventListener(EVENT_LOCKER_SEEN, onLockerSeen);
+    window.addEventListener(EVENT_ANNOUNCEMENTS_SEEN, onAnnouncementsSeen);
     document.addEventListener("visibilitychange", onVis);
     return () => {
       cancelled = true;
       window.removeEventListener(EVENT_LOCKER_SEEN, onLockerSeen);
+      window.removeEventListener(EVENT_ANNOUNCEMENTS_SEEN, onAnnouncementsSeen);
       document.removeEventListener("visibilitychange", onVis);
     };
   }, [kind]);

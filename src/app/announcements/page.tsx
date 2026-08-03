@@ -5,6 +5,10 @@ import { useRouter } from "next/navigation";
 import { getSession, getLeague } from "@/lib/league";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { markEngagement } from "@/lib/engagement";
+import {
+  markAnnouncementsSeen,
+  invalidateRoomUnseenCaches,
+} from "@/lib/room-unseen";
 
 type Announcement = {
   id: string;
@@ -118,10 +122,18 @@ export default function AnnouncementsPage() {
         announcement_id,
         user_id: session.playerId,
       }));
-      await supabase
+      const { error: readErr } = await supabase
         .from("announcement_reads")
         .upsert(rowsToInsert, { onConflict: "announcement_id,user_id" });
+      if (!readErr) {
+        setItems((prev) => prev.map((a) => ({ ...a, is_unread: false })));
+      }
     }
+    // Always clear nav badge cache + notify (even if already all-read).
+    // Locker/Gazette do this on route; News previously only wrote DB and
+    // left the 30s unread cache + Nav state stuck.
+    invalidateRoomUnseenCaches();
+    markAnnouncementsSeen();
   }
 
   useEffect(() => {
