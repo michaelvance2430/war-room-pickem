@@ -347,10 +347,42 @@ function formatReactionMarker(messageId: string, emoji: string): string {
   return `${RX_PREFIX}${messageId}|${emoji}`;
 }
 
-function isMissingReactionsTable(message?: string | null): boolean {
-  return /does not exist|schema cache|PGRST205|Could not find the table|locker_message_reactions/i.test(
-    message || ""
+/**
+ * Session capability for dedicated reactions table.
+ * null = unknown, true = works, false = missing (skip PostgREST for the tab).
+ * Marker path in locker_messages still works either way.
+ */
+let reactionsTableAvailable: boolean | null = null;
+
+function isMissingReactionsTable(err?: {
+  code?: string;
+  message?: string;
+  details?: string;
+  hint?: string;
+} | string | null): boolean {
+  if (err == null) return false;
+  if (typeof err === "string") {
+    return /does not exist|schema cache|PGRST205|Could not find the table|locker_message_reactions|42P01/i.test(
+      err
+    );
+  }
+  const code = String(err.code || "");
+  const blob = `${err.message || ""} ${err.details || ""} ${err.hint || ""}`;
+  return (
+    code === "PGRST205" ||
+    code === "42P01" ||
+    /does not exist|schema cache|Could not find the table|locker_message_reactions/i.test(
+      blob
+    )
   );
+}
+
+function markReactionsTableMissing(): void {
+  reactionsTableAvailable = false;
+}
+
+function markReactionsTablePresent(): void {
+  reactionsTableAvailable = true;
 }
 
 async function attachReactions(
@@ -369,16 +401,24 @@ async function attachReactions(
   const messageIds = messages.map((m) => m.id);
   type RxRow = { message_id: string; user_id: string; emoji: string };
   let tableRows: RxRow[] = [];
-  try {
-    const { data, error } = await supabase
-      .from("locker_message_reactions")
-      .select("message_id, user_id, emoji")
-      .in("message_id", messageIds);
-    if (!error && data) {
-      tableRows = data as RxRow[];
+  // Session suppress: one 404 must not fire on every Locker load
+  if (reactionsTableAvailable !== false) {
+    try {
+      const { data, error } = await supabase
+        .from("locker_message_reactions")
+        .select("message_id, user_id, emoji")
+        .in("message_id", messageIds);
+      if (error) {
+        if (isMissingReactionsTable(error)) {
+          markReactionsTableMissing();
+        }
+      } else if (data) {
+        markReactionsTablePresent();
+        tableRows = data as RxRow[];
+      }
+    } catch {
+      /* network — keep unknown; markers still apply */
     }
-  } catch {
-    /* table missing — markers only */
   }
 
   const byMsg = new Map<
@@ -480,12 +520,22 @@ export async function toggleLockerReaction(
     uid
   );
   if (markerRes.ok) {
-    // Best-effort dual-write to real table if it ever exists
-    void toggleReactionViaTable(supabase, messageId, em, uid).catch(() => {});
+    // Best-effort dual-write only when table is known present/unknown
+    if (reactionsTableAvailable !== false) {
+      void toggleReactionViaTable(supabase, messageId, em, uid).catch(() => {});
+    }
     return markerRes;
   }
 
-  // Markers failed — try dedicated table once
+  // Markers failed — try dedicated table once (skip if session knows it's gone)
+  if (reactionsTableAvailable === false) {
+    return {
+      ok: false,
+      error:
+        markerRes.error ||
+        "Could not save reaction. Try again.",
+    };
+  }
   const tableRes = await toggleReactionViaTable(
     supabase,
     messageId,
@@ -514,6 +564,10 @@ async function toggleReactionViaTable(
   error?: string;
   needsSetup?: boolean;
 }> {
+  if (reactionsTableAvailable === false) {
+    return { ok: false, needsSetup: true, error: "reactions table unavailable" };
+  }
+
   const { data: existing, error: existingErr } = await supabase
     .from("locker_message_reactions")
     .select("id")
@@ -523,7 +577,8 @@ async function toggleReactionViaTable(
     .maybeSingle();
 
   if (existingErr) {
-    if (isMissingReactionsTable(existingErr.message)) {
+    if (isMissingReactionsTable(existingErr)) {
+      markReactionsTableMissing();
       return { ok: false, needsSetup: true, error: existingErr.message };
     }
     // Other select errors — still try insert path
@@ -535,7 +590,8 @@ async function toggleReactionViaTable(
       .delete()
       .eq("id", existing.id as string);
     if (error) {
-      if (isMissingReactionsTable(error.message)) {
+      if (isMissingReactionsTable(error)) {
+        markReactionsTableMissing();
         return { ok: false, needsSetup: true, error: error.message };
       }
       return { ok: false, error: error.message };
@@ -547,7 +603,8 @@ async function toggleReactionViaTable(
       emoji: em,
     });
     if (error) {
-      if (isMissingReactionsTable(error.message)) {
+      if (isMissingReactionsTable(error)) {
+        markReactionsTableMissing();
         return { ok: false, needsSetup: true, error: error.message };
       }
       if (/policy|row-level|muted|violates|42501/i.test(error.message || "")) {
@@ -563,13 +620,16 @@ async function toggleReactionViaTable(
     }
   }
 
+  markReactionsTablePresent();
+
   const { data: all, error: allErr } = await supabase
     .from("locker_message_reactions")
     .select("user_id, emoji")
     .eq("message_id", messageId);
 
   if (allErr) {
-    if (isMissingReactionsTable(allErr.message)) {
+    if (isMissingReactionsTable(allErr)) {
+      markReactionsTableMissing();
       return { ok: false, needsSetup: true, error: allErr.message };
     }
     // Write succeeded — return at least this emoji so UI doesn't go empty
