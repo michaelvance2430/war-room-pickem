@@ -15,6 +15,85 @@ It must not block trust, navigation, picks, or normal league data.
 
 ---
 
+## Ritual principle (product law)
+
+> **The season opening is an emotional transition — not a feature demo.**
+
+Real sports has moments people remember: *It's finally March Madness. Opening Day. Week 1 is here.*  
+Those aren't calendar dates. They're **doors opening**.
+
+War Room is not only “make picks.”  
+This ceremony says: **the season has officially begun.**
+
+### Protect the rarity
+
+If it plays every login → “ugh, skip.”  
+If it plays **once per person per league per season** → it becomes tradition.
+
+One year later people should remember:
+
+> “Remember when the fireworks started and the league officially opened?”
+
+**If everything has fireworks, nothing has fireworks.**
+
+### Four goosebumps moments per season (max)
+
+Only these season-scale peaks may use full ceremony energy (confetti / fireworks / full-screen ritual):
+
+| # | Moment | When |
+|---|--------|------|
+| 1 | 🎆 **Season Opening** | Official opening week published (this design) |
+| 2 | 🏆 **First Week Scored** | First *official* scored week (separate design later) |
+| 3 | 🎉 **League Champion Crowned** | Hardware / finale (existing SeasonFinale / ring family) |
+| 4 | 👑 **New Season Begins Again** | Next season’s opening (same ceremony type, new `season_key`) |
+
+Everything else: quieter (toasts, banners, paper, Locker). No competing fireworks.
+
+### Never sound like software
+
+**Banned tone:** “Season initialized.” “Season status: open.” “Welcome to season 2026.”  
+
+**Required tone:** Only War Room would say it — group chat, excuses, dignity, bad first picks.
+
+### Flavor for everyone (not one speech)
+
+Mike’s bar: **a few different ones play so everyone gets their own flavor.**  
+Target bank: **15–20 opening speeches**, stable IDs, **one randomly assigned** (or stable hash) **per claim**.
+
+Social loop:
+
+> “What opening speech did you get?”
+
+That is classic War Room.
+
+Optional: store `speech_id` in `user_season_moments.metadata` so Foundry can show what Mike got, and so we never re-roll mid-show.
+
+### Personalization (feel like opening *your* room)
+
+When data is already local / cheap (no fetch storm), layer short personal lines:
+
+| Signal | Example touch |
+|--------|----------------|
+| Display name | “Welcome back, Mike.” |
+| Seasons in this room | “Year 3 begins tonight.” |
+| Room size | “25 people. One champion. Hundreds of bad decisions.” |
+| Defending champion (prior hardware) | 👑 “Welcome back, Champion. Everyone spent the offseason trying to take your crown.” |
+| Last place prior season | 😂 “Good news. You’re tied for first again. Try to keep it that way.” |
+| Host / commissioner | 🎩 “The room is full. The card is live. Now don’t screw it up.” |
+
+Personalization is **additive garnish** under the main speech — not a second modal.  
+If identity data is missing, speech bank still runs alone (never block ceremony on extra network).
+
+### Success test (north star)
+
+If a player ever says:
+
+> “Hold on, don’t start yet… I want to see War Room open the season.”
+
+…the ritual worked.
+
+---
+
 # PART 1 — Current sequence audit (traced from code)
 
 ## Critical production fact
@@ -278,10 +357,17 @@ layout / AppShell (authenticated only)
 
 | Time | Visual |
 |------|--------|
-| **0.0–1.0s** | Home remains recognizable under soft dark scrim. Line: **“ATTENTION IN THE WAR ROOM…”** |
-| **1.0–4.3s** | Confetti + fireworks (lightweight). Main announcement (chosen copy). |
-| **4.3–5.0s** | Sport-specific closer: **“Week 0 is live.”** (CFB) / **“Week 1 is live.”** (NFL) / registry label for future sports. Fade. |
-| **Skip** | Always visible; ends immediately, still marks claimed after successful start |
+| **0.0–1.0s** | Home remains recognizable under soft dark scrim. Stamp: **“ATTENTION IN THE WAR ROOM…”** (or cold open silence for reduced-motion). |
+| **1.0–4.3s** | Confetti + fireworks (lightweight). **Main speech** from bank (15–20). Optional personal line under it. |
+| **4.3–5.0s** | Sport closer: **“Week 0 is live.”** / **“Week 1 is live.”** / registry. Fade. |
+| **Skip** | Always visible; ends immediately; claim still sticks if show already started |
+
+**Speech selection (at claim time):**
+
+1. Build eligible speech pool (all 15–20, minus any “host-only” / “champ-only” variants if using tagged speeches).  
+2. Pick one: `random` **or** stable `hash(user+league+season) % N` so refresh never re-rolls (prefer **stable after claim**; random is fine if stored in claim metadata).  
+3. Persist `speech_id` on claim row.  
+4. Optionally append one **personal garnish** (name / year / champ / last / host) if cheap data exists.
 
 **Requirements:**
 
@@ -293,6 +379,7 @@ layout / AppShell (authenticated only)
 - Timers cleaned on unmount
 - No second “ending modal” after ceremony
 - Failsafe auto-dismiss at 6s if timers glitch
+- **Not software-speak** — speech bank review is a ship gate
 
 ## Visual budget
 
@@ -366,8 +453,9 @@ create table if not exists public.user_season_moments (
    - If row returned → **this tab owns the show**  
    - If no row (conflict) → already claimed → never show  
 3. **Mark timing:** claim **after** eligibility confirmed and **as ceremony starts** (not on mere eligibility check)  
-4. Optional: write localStorage after successful claim for offline skip  
-5. Fail: no claim write → may retry next login (see failure section)
+4. On claim, write `metadata.speech_id` (+ optional `personal_tags`) so flavor is fixed and Foundry can inspect  
+5. Optional: write localStorage after successful claim for offline skip  
+6. Fail: no claim write → may retry next login (see failure section)
 
 No write on every render. No poll.
 
@@ -594,22 +682,43 @@ Part 6.
 
 Part 2.
 
-## 9. Ten announcement options (for Mike’s approval — not final)
+## 9. Speech bank (draft — expand to 15–20; Mike approves before ship)
 
-1. “It took long enough. Football is finally back.”  
-2. “Cancel your weekend plans. The War Room is open.”  
-3. “The excuses start now. The season is officially live.”  
-4. “ATTENTION: the group chat just became a competitive sport.”  
-5. “Lock your phones. Lock your cards. Hide your dignity.”  
-6. “We’re back. The board is hungry. Feed it picks.”  
-7. “Preseason feelings are canceled. Real weeks only.”  
-8. “If you forgot how this works: pick sides, take a Best Bet, get roasted.”  
-9. “Welcome to the season. Your friends already think they’re smarter than you.”  
-10. “Football is here. Try not to peak in the group chat before Thursday.”  
+**Stamp (shared or alternating):** `ATTENTION IN THE WAR ROOM`
 
-Sport closer line (separate from main joke):  
+**Body candidates (War Room voice only):**
+
+1. Gentlemen… the excuses officially begin now.  
+2. It took long enough. Football is finally back.  
+3. Cancel your weekend plans. The War Room is open.  
+4. Months of talking. Hours of research. Thirty seconds until somebody makes a terrible first pick. Welcome back.  
+5. You've waited all summer. Now stop pretending you'll make perfect picks. Good luck.  
+6. BREAKING NEWS: Everyone currently believes they're winning the league. We'll see about that.  
+7. The group chat just became a competitive sport.  
+8. Lock your phones. Lock your cards. Hide your dignity.  
+9. We're back. The board is hungry. Feed it picks.  
+10. Preseason feelings are canceled. Real weeks only.  
+11. If you forgot how this works: pick sides, take a Best Bet, get roasted.  
+12. Your friends already think they're smarter than you.  
+13. Football is here. Try not to peak in the group chat before Thursday.  
+14. Well… here we go.  
+15. One room. One card. One long season of bad decisions. Begin.  
+
+**Personal garnish (optional, not the whole speech):**
+
+- Name: “Welcome back, {name}.”  
+- Tenure: “Year {n} begins tonight.”  
+- Size: “{n} people. One champion. Hundreds of bad decisions.”  
+- Champ: 👑 Welcome back, Champion. Everyone spent the offseason trying to take your crown. Don't let them.  
+- Last: 😂 Good news. You're tied for first again. Try to keep it that way.  
+- Host: 🎩 The room is full. The card is live. Now don't screw it up.  
+
+**Sport closer (always):**  
 - CFB: “Week 0 is live.”  
-- NFL: “Week 1 is live.”
+- NFL: “Week 1 is live.”  
+- Future: registry `officialOpeningWeekLabel` + “is live.”
+
+**Ship rule:** Final bank size **15–20** distinct main speeches so the room compares flavors. Do not ship a single global line.
 
 ## 10. Performance budget and verification
 
@@ -662,10 +771,20 @@ Part 7 + after ship: cold Home with ceremony eligible ×3, reduced-motion ×3, t
 - [ ] Onboarding-before-ceremony rule  
 - [ ] `user_season_moments` table  
 - [ ] ExperienceQueue priorities  
-- [ ] Ten copy lines (pick / edit)  
+- [ ] Speech bank 15–20 + personal garnish rules  
+- [ ] Four goosebumps moments / rarity law  
 - [ ] Foundry lab scope  
 - [ ] Explicit: **do not re-enable RoomDeferredChrome** for this feature  
 
 **No implementation until Mike and ChatGPT approve this design.**
+
+---
+
+## Design amendment log
+
+| Date | Note |
+|------|------|
+| 2026-08-03 | Initial audit + design |
+| 2026-08-03 | **Ritual amendment (Mike):** multi-speech flavor (15–20), personalization (name/year/room/champ/last/host), four goosebumps moments max, anti-software tone, tradition over confetti. Still no implementation. |
 
 Then stop.
