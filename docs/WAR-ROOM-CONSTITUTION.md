@@ -99,12 +99,18 @@ Design from **inside the world**, not from outside explaining the world.
 
 > **War Room never invents history.**
 
+> **War Room never invents or implies a history the player has not actually earned.**
+
 If something hasn’t happened, say so with confidence and personality.  
 Trust is more important than filling space.
 
 The Board’s promise: *it reveals what happened this season.*  
 Zero scored weeks → empty state, not placeholder weeks, not demo cards, not practice artifacts.  
 The first scored week is when The Board comes alive.
+
+**Every empty state should feel exciting, not unfinished.**  
+Not “0 points.” Prefer “Your first great Saturday is still ahead.”  
+Same honesty on Profile “Plot so far,” Standings, Stats, and every story surface.
 
 ### Achievement principle
 

@@ -2,7 +2,7 @@
 
 /**
  * This season's plot — rival, streak, last card, room rank.
- * Intimate. Not a second standings grid.
+ * Trust: never invent / imply history before a real scored week.
  */
 
 import Link from "next/link";
@@ -15,13 +15,67 @@ type Rival = {
 } | null;
 
 type Props = {
-  plot: SeasonPlot;
+  plot: SeasonPlot | null;
   rival: Rival;
   sportId?: string | null;
+  /** Official scored week exists for this league (authoritative). */
+  storyStarted: boolean;
+  isSelf?: boolean;
 };
 
-export default function ProfileSeasonPlot({ plot, rival, sportId }: Props) {
+export default function ProfileSeasonPlot({
+  plot,
+  rival,
+  sportId,
+  storyStarted,
+  isSelf,
+}: Props) {
   const nfl = sportId === "nfl";
+  const day = nfl ? "Sunday" : "Saturday";
+
+  if (!storyStarted || !plot) {
+    return (
+      <section className="rounded-2xl border-2 border-dashed border-primary/30 bg-gradient-to-b from-primary/10 to-card p-5 sm:p-6 mb-6 space-y-4">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
+            This season
+          </p>
+          <h2 className="text-lg font-bold text-foreground mt-0.5">
+            Your story starts here
+          </h2>
+          <p className="text-sm text-muted mt-2 leading-relaxed">
+            This section comes alive after your first scored week.
+          </p>
+        </div>
+
+        <ul className="text-xs text-foreground/85 space-y-1.5 list-disc pl-5 leading-relaxed">
+          <li>Current streak</li>
+          <li>Best week</li>
+          <li>ATS record</li>
+          <li>Room rank</li>
+          <li>Rivalries</li>
+          <li>Season highs</li>
+        </ul>
+
+        <p className="text-sm font-semibold text-foreground leading-relaxed">
+          Right now… your story hasn&apos;t been written yet.
+        </p>
+        <p className="text-xs text-muted leading-relaxed">
+          Your first great {day} is still ahead.
+          {isSelf ? " Go make your picks." : ""}
+        </p>
+
+        {isSelf && (
+          <Link
+            href="/picks"
+            className="inline-flex min-h-[44px] items-center justify-center px-4 rounded-xl bg-primary text-black text-sm font-extrabold"
+          >
+            Go make your picks →
+          </Link>
+        )}
+      </section>
+    );
+  }
 
   return (
     <section className="rounded-2xl border border-primary/25 bg-gradient-to-b from-primary/10 to-card p-5 sm:p-6 mb-6 space-y-4">
@@ -101,7 +155,7 @@ export default function ProfileSeasonPlot({ plot, rival, sportId }: Props) {
 
       {!rival && (
         <p className="text-xs text-muted italic">
-          No rival yet — need another body on the board with a card in.
+          Rivalries show up once the room has real scored cards to argue about.
         </p>
       )}
     </section>

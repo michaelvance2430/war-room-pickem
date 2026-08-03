@@ -42,6 +42,7 @@ import { Player } from "@/lib/types";
 import type { LeagueTrophy } from "@/lib/trophies";
 import type { BadgeStatus } from "@/lib/types";
 import { wrProfile } from "@/lib/runtime-iso";
+import { hasOfficialScoredWeek } from "@/lib/season-scored";
 
 type Props = {
   player: Player;
@@ -96,6 +97,8 @@ export default function ProfileHeavyDetails({
   const [seasonPlot, setSeasonPlot] = useState<ReturnType<
     typeof buildSeasonPlot
   > | null>(null);
+  /** Official scored week in this league — never invent plot stats without it */
+  const [storyStarted, setStoryStarted] = useState(false);
   const [signature, setSignature] = useState<string>("");
   const [phase, setPhase] = useState<"loading" | "ready">("loading");
 
@@ -221,23 +224,34 @@ export default function ProfileHeavyDetails({
       );
       if (!cancelled && res) setResume(res);
 
-      const sig = await runChunked("buildSignature", () =>
-        mock
-          ? "Demo NPC. Not a real résumé."
-          : buildSignatureStyle({
-              player: subject,
-              badges: badgeSnap,
-              sportId,
-              peers: peerList,
-            })
+      const scored = await runChunked("hasOfficialScoredWeek", () =>
+        hasOfficialScoredWeek()
       );
+      if (!cancelled) setStoryStarted(!!scored);
+
+      const sig = await runChunked("buildSignature", () => {
+        if (mock) return "Demo NPC. Not a real résumé.";
+        if (!scored) {
+          return sportId === "nfl"
+            ? "Still writing their Sunday story."
+            : "Still writing their Saturday story.";
+        }
+        return buildSignatureStyle({
+          player: subject,
+          badges: badgeSnap,
+          sportId,
+          peers: peerList,
+        });
+      });
       if (!cancelled && sig) setSignature(sig);
 
-      if (!mock) {
+      if (!mock && scored) {
         const plot = await runChunked("buildSeasonPlot", () =>
           buildSeasonPlot(subject, peerList)
         );
         if (!cancelled && plot) setSeasonPlot(plot);
+      } else if (!cancelled) {
+        setSeasonPlot(null);
       }
 
       // Eggs — after shelves, still deferred
@@ -316,11 +330,13 @@ export default function ProfileHeavyDetails({
 
       <EasterEggTracker playerId={player.id} isSelf={isSelf} />
 
-      {!mock && seasonPlot && (
+      {!mock && (
         <ProfileSeasonPlot
           plot={seasonPlot}
-          rival={resume?.rival ?? null}
+          rival={storyStarted ? resume?.rival ?? null : null}
           sportId={sportId}
+          storyStarted={storyStarted}
+          isSelf={isSelf}
         />
       )}
 
@@ -329,6 +345,7 @@ export default function ProfileHeavyDetails({
           resume={resume}
           playerId={player.id}
           isSelf={isSelf}
+          storyStarted={storyStarted}
         />
       )}
 

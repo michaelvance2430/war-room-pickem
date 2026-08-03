@@ -1,6 +1,6 @@
 # P0 Trust Audit — Never Invent Results / Achievement
 
-**Status:** ✅ **APPROVED & IMPLEMENTED** (2026-08-03)  
+**Status:** ✅ **APPROVED & IMPLEMENTED** (2026-08-03) · **extended** Profile Plot So Far  
 **Date:** 2026-08-03  
 **Class:** Trust issue (same family as Board empty history)
 
@@ -9,6 +9,9 @@
 - Gate: `hasOfficialScoredWeek()` → `listScoredWeekNumbers().length > 0`
 - Crown, Standings competitive columns, Stats power/season, Hot takes, Championship/Toilet seeds, Players pts all gated
 - Shared `SeasonNotStartedEmpty` + achievement constitution line
+- **Profile “The plot so far”** → “Your story starts here” when no official scored week (no L2/rank/ATS filler)
+- Football Resume deep season ledger gated the same way
+- Expanded history principle: never **imply** unearned history
 
 ---
 

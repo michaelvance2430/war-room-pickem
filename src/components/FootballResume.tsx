@@ -28,6 +28,8 @@ type Props = {
   isSelf?: boolean;
   /** Start collapsed so the profile leads with story, not spreadsheet */
   defaultOpen?: boolean;
+  /** Official scored week exists — season ledger only after real football */
+  storyStarted?: boolean;
 };
 
 export default function FootballResume({
@@ -35,6 +37,7 @@ export default function FootballResume({
   playerId,
   isSelf = false,
   defaultOpen = false,
+  storyStarted = true,
 }: Props) {
   const [open, setOpen] = useState(defaultOpen);
   const [creeperJustEarned, setCreeperJustEarned] = useState(false);
@@ -245,15 +248,36 @@ export default function FootballResume({
           )}
 
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            <Stat label="Season record" value={resume.seasonRecordLabel} />
-            <Stat
-              label="Season ATS"
-              value={
-                resume.seasonAtsPct != null ? `${resume.seasonAtsPct}%` : "—"
-              }
-            />
-            <Stat label="Perfect weeks" value={String(resume.perfectWeeks)} />
-            <Stat label="Current streak" value={resume.currentStreakLabel} />
+            {storyStarted ? (
+              <>
+                <Stat label="Season record" value={resume.seasonRecordLabel} />
+                <Stat
+                  label="Season ATS"
+                  value={
+                    resume.seasonAtsPct != null
+                      ? `${resume.seasonAtsPct}%`
+                      : "—"
+                  }
+                />
+                <Stat
+                  label="Perfect weeks"
+                  value={String(resume.perfectWeeks)}
+                />
+                <Stat
+                  label="Current streak"
+                  value={resume.currentStreakLabel}
+                />
+                <Stat
+                  label="Pick’em pts"
+                  value={String(resume.seasonPickemPoints)}
+                />
+              </>
+            ) : (
+              <div className="col-span-2 sm:col-span-3 rounded-lg border border-dashed border-border px-3 py-2.5 text-xs text-muted leading-relaxed">
+                Season ledger (record, ATS, streak, pick’em pts) populates after
+                the first scored week. No invented history.
+              </div>
+            )}
             <Stat
               label="Achievements"
               value={`${resume.badgesEarned} / ${resume.badgesTotal || "?"}`}
@@ -261,10 +285,6 @@ export default function FootballResume({
             <Stat
               label="Career cheevo"
               value={String(resume.careerCheevoPoints)}
-            />
-            <Stat
-              label="Pick’em pts"
-              value={String(resume.seasonPickemPoints)}
             />
           </div>
           <p className="text-[10px] text-muted leading-relaxed">
