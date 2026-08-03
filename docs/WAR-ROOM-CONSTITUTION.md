@@ -113,6 +113,34 @@ The first scored week is when The Board comes alive.
 Not “0 points.” Prefer “Your first great Saturday is still ahead.”  
 Same honesty on Profile “Plot so far,” Standings, Stats, and every story surface.
 
+### Zero-tolerance: no fake data (North Star)
+
+> **War Room should never lie to the user—even with placeholder data.**
+
+Before any new feature ships, production-facing UI must not invent:
+
+* Point totals · standings · ATS% · streaks · swing labels  
+* Crown / Wall of Shame · “latest scored week” · fake weeks  
+* Commissioner progress · unread counts · activity urgency  
+* Dummy stats · placeholder league states · fabricated archives  
+
+If the underlying data does not exist, the UI **must never invent it**.
+
+| Situation | Truthful response |
+|-----------|-------------------|
+| Season hasn’t started | Say so. No fake Crown, Shame, or pts. |
+| No champion | “No Crown Yet” — not a dummy name + 5 pts. |
+| No standings | Empty / anticipation — not a fake table. |
+| Nothing needs attention | Don’t invent urgency. |
+| Week not open | Don’t pretend the card exists. |
+
+**Empty is allowed. Lying is not.**  
+Empty should still be entertaining and tell the player **when** real data appears.
+
+Gate competitive claims on **official scored weeks** (`listScoredWeekNumbers` + real `weeksPlayed`), not leftover membership fields or demo residue.
+
+Guest Mode is an explicit **tour** (labeled), not a real league. It may use demo history only while clearly DEMO — never as production league truth.
+
 ### Achievement principle
 
 > **War Room never awards what hasn't been earned.**
