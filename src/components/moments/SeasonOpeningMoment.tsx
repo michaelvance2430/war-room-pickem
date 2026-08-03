@@ -3,11 +3,9 @@
 /**
  * Season Opening — first Tier I Tradition.
  *
- * 🔒 FROZEN — change only under Constitution Tradition protection law
- * (unanimous founder + implementer + product counsel). Do not keep polishing.
- *
- * Television production for the season — not a reward for the login.
- * Authentic spectacle. Sacred copy: Practice is over / The room is open|live.
+ * Timing: default ~10s test baseline (Foundry duration presets 6/8/10/12).
+ * Ending: deliberate cinematic fade → black hold → destination ready.
+ * Sacred copy unchanged: Practice is over / The room is open|live.
  *
  * Beats: Anticipation → Celebration → Transition → Silence → Fade → Home.
  */
@@ -24,6 +22,14 @@ import {
 } from "@/lib/moments/season-open";
 import { seasonOpenMomentIdForSport } from "@/lib/moments/registry";
 import { playSeasonOpenCue } from "@/lib/moments/season-open-audio";
+import {
+  getSeasonOpenDurationSec,
+  getSeasonOpenPhaseMs,
+  setSeasonOpenDurationSec,
+  type SeasonOpenDurationSec,
+  type SeasonOpenPhaseMs,
+} from "@/lib/moments/duration";
+import { isFoundryBackstageUser } from "@/lib/foundry-preview";
 
 type Phase =
   | "anticipation"
@@ -32,18 +38,6 @@ type Phase =
   | "silence"
   | "fade"
   | "done";
-
-/**
- * ~7.5s total — peak budget earns the breath.
- * Silence after the Practice line is the power move.
- */
-const PHASE_MS = {
-  anticipation: 900,
-  celebration: 2800,
-  transition: 1800,
-  silence: 1400,
-  fade: 700,
-} as const;
 
 function flashPositions(count: number, seed: string) {
   let h = 0;
@@ -123,10 +117,12 @@ export default function SeasonOpeningMoment() {
       clearTimers();
       stopCue();
 
+      const PHASE_MS: SeasonOpenPhaseMs = getSeasonOpenPhaseMs();
+
       // Sound on celebration — stadium cue, not a jingle
       const tAudio = window.setTimeout(() => {
         stopAudio.current = playSeasonOpenCue(show.sport);
-      }, PHASE_MS.anticipation - 80);
+      }, Math.max(0, PHASE_MS.anticipation - 80));
 
       const t1 = window.setTimeout(() => {
         setPhase("celebration");
@@ -138,6 +134,7 @@ export default function SeasonOpeningMoment() {
 
       const t3 = window.setTimeout(() => {
         setPhase("silence");
+        // Soft audio falloff into silence
         stopCue();
       }, PHASE_MS.anticipation + PHASE_MS.celebration + PHASE_MS.transition);
 
@@ -148,6 +145,7 @@ export default function SeasonOpeningMoment() {
         PHASE_MS.transition +
         PHASE_MS.silence);
 
+      // Fade includes approach-to-black + brief full-black hold before unmount
       const t5 = window.setTimeout(() => {
         finish(false);
       }, PHASE_MS.anticipation +
@@ -204,6 +202,14 @@ export default function SeasonOpeningMoment() {
     [clearTimers, stopCue]
   );
 
+  const [devSec, setDevSec] = useState<SeasonOpenDurationSec>(10);
+  const [showDev, setShowDev] = useState(false);
+
+  useEffect(() => {
+    setDevSec(getSeasonOpenDurationSec());
+    setShowDev(isFoundryBackstageUser());
+  }, []);
+
   if (!payload || phase === "done") return null;
 
   const isNfl = payload.sport === "nfl";
@@ -231,13 +237,36 @@ export default function SeasonOpeningMoment() {
       data-sport={payload.sport}
       data-phase={phase}
     >
-      {/* Black house lights */}
+      {/* Foundry-only duration presets (preview; does not burn claim) */}
+      {showDev && payload.preview && (
+        <div className="absolute top-3 right-3 z-30 flex flex-wrap gap-1 max-w-[12rem]">
+          {([6, 8, 10, 12] as SeasonOpenDurationSec[]).map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => {
+                setSeasonOpenDurationSec(s);
+                setDevSec(s);
+              }}
+              className={`min-h-[32px] px-2 rounded text-[10px] font-bold border ${
+                devSec === s
+                  ? "border-primary bg-primary text-black"
+                  : "border-white/30 text-white/80 bg-black/50"
+              }`}
+            >
+              {s}s
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Black house lights — approaches full black on fade */}
       <div
-        className={`absolute inset-0 transition-opacity duration-700 ${
+        className={`absolute inset-0 transition-opacity duration-1000 ${
           phase === "anticipation"
             ? "bg-black opacity-100"
             : fading
-              ? "bg-black/95 opacity-100"
+              ? "bg-black opacity-100"
               : "bg-black/88 opacity-100"
         }`}
       />

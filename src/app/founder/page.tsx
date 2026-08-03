@@ -294,44 +294,59 @@ export default function FounderDashboardPage() {
       void import("@/lib/moments/season-open").then((m) => {
         m.requestSeasonOpenPreview();
       });
+      setLabLog(
+        "✅ Season Opening preview (stay here). Duration presets on overlay if Foundry."
+      );
       return;
     }
     if (kind === "cold") {
-      // Stay on Foundry — play broadcast in place (preview, no once-per-week burn)
+      // Stay on Foundry — cold open modal is mounted on MomentHost
       void import("@/lib/weekly-cold-open").then((m) => {
         m.requestWeeklyColdOpenPreview();
       });
+      setLabLog("✅ Cold open preview — modal should present here (not a random page).");
       return;
     }
     void import("@/lib/creator-sandbox").then(async (sb) => {
       if (kind === "ring") {
+        // Ring ceremony lives on MomentHost — fire preview, do NOT bounce to Home
         await sb.jumpRingCeremony();
-        router.push("/");
+        setLabLog(
+          "✅ Ring Ceremony preview event fired. Modal is mounted on MomentHost (not DeferredChrome)."
+        );
         return;
       }
       if (kind === "card") {
         await sb.jumpCardPublished(week);
-        router.push("/");
+        setLabLog(
+          "⚠️ Card-published moment still incomplete in production host — no silent Home dump. Prefer testing after real publish."
+        );
         return;
       }
       if (kind === "cut") {
-        sb.jumpCutStoryDoor();
-        router.push("/");
+        setLabLog(
+          "❌ Story door (cut) not production-complete. Not routing to a dead page."
+        );
         return;
       }
       if (kind === "trophy") {
-        sb.jumpTrophyStoryDoor();
-        router.push("/");
+        setLabLog(
+          "❌ Story door (trophy) not production-complete. Not routing to a dead page."
+        );
         return;
       }
       if (kind === "paper") {
-        // Real paper + cheevo path after a scored week (Foundry drama unlock)
+        // Exact target: Gazette, not Home
         await sb.jumpGazettePaperAndCheevos();
-        router.push("/");
+        const w = week;
+        router.push(w != null ? `/gazette?week=${w}` : "/gazette");
+        setLabLog("✅ Gazette drama prep → navigating to /gazette (exact target, not Home).");
         return;
       }
-      sb.jumpGazetteShelfReveal();
-      router.push("/");
+      // gazette shelf
+      setLabLog(
+        "❌ Gazette shelf unlock still progressive-only / incomplete as a Moment. Not routing Home."
+      );
     });
   }
 

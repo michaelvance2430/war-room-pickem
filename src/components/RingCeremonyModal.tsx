@@ -497,7 +497,11 @@ export default function RingCeremonyModal() {
               onClick={dismiss}
               className="w-full py-2.5 rounded-xl border border-white/20 text-sm font-medium text-white/70 hover:text-white hover:bg-white/5 min-h-[48px]"
             >
-              {pack.ctaEnter}
+              {isYou
+                ? "Claim the Ring"
+                : preview
+                  ? "Close preview"
+                  : pack.ctaEnter}
             </button>
           </div>
         </div>

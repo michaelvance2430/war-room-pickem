@@ -1819,7 +1819,7 @@ html[data-season-theme="newyear"] body::before {
 }
 
 .season-open-fade-out {
-  animation: season-open-fade 0.7s ease-in forwards;
+  animation: season-open-fade 1.45s ease-in forwards;
 }
 
 @keyframes season-open-smoke-drift {
@@ -1848,8 +1848,10 @@ html[data-season-theme="newyear"] body::before {
   50% { opacity: 1; }
 }
 @keyframes season-open-fade {
-  from { opacity: 1; }
-  to { opacity: 0; }
+  0% { opacity: 1; }
+  55% { opacity: 0.12; }
+  72% { opacity: 0; }
+  100% { opacity: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -4,3 +4,4 @@ export * from "./analytics";
 export * from "./registry";
 export * from "./season-open";
 export * from "./season-open-audio";
+export * from "./duration";
