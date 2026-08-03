@@ -13,6 +13,7 @@ import {
 import { isChaosFlamesActive } from "@/lib/chaos-mode";
 import { getLeague } from "@/lib/league";
 import { loadLeagueActiveWeek } from "@/lib/cloud";
+import { wrProfile } from "@/lib/runtime-iso";
 
 /**
  * Name → /profile/[id].
@@ -83,6 +84,13 @@ export default function PlayerLink({
     <span className="inline-flex flex-wrap items-center gap-1 max-w-full">
       <Link
         href={`/profile/${id}`}
+        onClick={() => {
+          try {
+            wrProfile("click-received", undefined, `PlayerLink→${id.slice(0, 8)}`);
+          } catch {
+            /* ok */
+          }
+        }}
         title={
           flames
             ? `${label} went CHAOS this week — pure random card, doubles if it hits`

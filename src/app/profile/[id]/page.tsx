@@ -53,7 +53,22 @@ import { findPlayer } from "@/lib/store";
 import { getLeague, getSession } from "@/lib/league";
 import { Player } from "@/lib/types";
 import type { LeagueTrophy } from "@/lib/trophies";
+import {
+  isoEnabled,
+  isoFlagTrue,
+  wrProfile,
+  wrProfileTimed,
+} from "@/lib/runtime-iso";
 
+/** Module eval cost (first navigate to /profile/*) */
+try {
+  if (typeof performance !== "undefined") {
+    (globalThis as unknown as { __WR_PROFILE_MOD_T0?: number }).__WR_PROFILE_MOD_T0 =
+      performance.now();
+  }
+} catch {
+  /* ok */
+}
 
 function initials(name: string) {
   return (
@@ -72,6 +87,28 @@ function initials(name: string) {
 export default function ProfilePage() {
   const params = useParams();
   const id = typeof params.id === "string" ? params.id : "";
+  const renderCount = useRef(0);
+  renderCount.current += 1;
+
+  // Isolation flags (localStorage warroom-iso)
+  const profileMinimal = isoFlagTrue("profileMinimal");
+  const showBadges = !profileMinimal && isoEnabled("profileBadges");
+  const showTrophies = !profileMinimal && isoEnabled("profileTrophies");
+  const showHistory = !profileMinimal && isoEnabled("profileHistory");
+
+  try {
+    const g = globalThis as unknown as { __WR_PROFILE_MOD_T0?: number };
+    if (g.__WR_PROFILE_MOD_T0 != null && renderCount.current === 1) {
+      wrProfile(
+        "module-eval-to-first-render",
+        performance.now() - g.__WR_PROFILE_MOD_T0
+      );
+      g.__WR_PROFILE_MOD_T0 = undefined;
+    }
+    wrProfile("component-render-start", undefined, `render#${renderCount.current} id=${id.slice(0, 8)}`);
+  } catch {
+    /* ok */
+  }
 
   const [player, setPlayer] = useState<Player | null>(null);
   const [ready, setReady] = useState(false);
@@ -87,6 +124,7 @@ export default function ProfilePage() {
   const hadPaintRef = useRef(false);
 
   useEffect(() => {
+    wrProfile("click-received / data-effect-start", undefined, `id=${id}`);
     let cancelled = false;
 
     function rosterToPlayer(row: {
@@ -185,11 +223,16 @@ export default function ProfilePage() {
           if (found) hadPaintRef.current = true;
           setReady(true);
           window.clearTimeout(failSafe);
+          wrProfile("data-effect-first-paint", undefined, found ? "found" : "missing");
         }
 
         if (!found || cancelled) return;
+        if (profileMinimal) {
+          wrProfile("data-effect-done", undefined, "profileMinimal skip bg");
+          return;
+        }
 
-        // 2) Background: standings peers, trophies, eggs, BF — never blocks open
+        // 2) Background: standings peers — setLeaguePeers(full) re-runs getPlayerBadges HEAVY
         void (async () => {
           try {
             const { loadLeaguePlayers } = await import("@/lib/cloud");
@@ -211,12 +254,19 @@ export default function ProfilePage() {
                 })
               );
               if (!cancelled) {
+                wrProfile(
+                  "bg-standings-peers",
+                  undefined,
+                  `n=${players.length} — re-eval badges`
+                );
                 setPlayer(merged);
                 setLeaguePeers(players);
               }
               try {
-                syncLeagueCheevoKing(
-                  players.map((p) => withPermanentBadges(p))
+                wrProfileTimed("syncLeagueCheevoKing", () =>
+                  syncLeagueCheevoKing(
+                    players.map((p) => withPermanentBadges(p))
+                  )
                 );
                 const { sanitizeLegacyLegendsOnBoot } = await import(
                   "@/lib/legacy-badge-grants"
@@ -235,53 +285,57 @@ export default function ProfilePage() {
           }
         })();
 
-        void (async () => {
-          try {
-            const { loadCareerTrophiesWonByUser, loadLeagueTrophies } =
-              await import("@/lib/trophies");
-            let trophies: LeagueTrophy[] = [];
+        if (showTrophies) {
+          void (async () => {
             try {
-              const career = await loadCareerTrophiesWonByUser(id, {
-                playerName: found!.name || undefined,
-              });
-              trophies = career.length
-                ? career
-                : await loadLeagueTrophies().catch(() => []);
+              const { loadCareerTrophiesWonByUser, loadLeagueTrophies } =
+                await import("@/lib/trophies");
+              let trophies: LeagueTrophy[] = [];
+              try {
+                const career = await loadCareerTrophiesWonByUser(id, {
+                  playerName: found!.name || undefined,
+                });
+                trophies = career.length
+                  ? career
+                  : await loadLeagueTrophies().catch(() => []);
+              } catch {
+                trophies = await loadLeagueTrophies().catch(() => []);
+              }
+              if (!cancelled) setLeagueTrophies(trophies);
             } catch {
-              trophies = await loadLeagueTrophies().catch(() => []);
+              /* optional */
             }
-            if (!cancelled) setLeagueTrophies(trophies);
-          } catch {
-            /* optional */
-          }
-        })();
+          })();
+        }
 
-        void (async () => {
-          try {
-            const { loadCloudEggFinds } = await import("@/lib/egg-cloud");
-            const { grantPermanentBadgeId, mergePermanentBadges } =
-              await import("@/lib/permanent-badges");
-            const eggIds = await loadCloudEggFinds(found!.id);
-            for (const eid of eggIds) {
-              grantPermanentBadgeId(found!.id, eid);
+        if (showBadges) {
+          void (async () => {
+            try {
+              const { loadCloudEggFinds } = await import("@/lib/egg-cloud");
+              const { grantPermanentBadgeId, mergePermanentBadges } =
+                await import("@/lib/permanent-badges");
+              const eggIds = await loadCloudEggFinds(found!.id);
+              for (const eid of eggIds) {
+                grantPermanentBadgeId(found!.id, eid);
+              }
+              if (!cancelled) {
+                setPlayer((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        permanentBadgeIds: mergePermanentBadges(
+                          prev.id,
+                          prev.permanentBadgeIds
+                        ),
+                      }
+                    : prev
+                );
+              }
+            } catch {
+              /* eggs optional */
             }
-            if (!cancelled) {
-              setPlayer((prev) =>
-                prev
-                  ? {
-                      ...prev,
-                      permanentBadgeIds: mergePermanentBadges(
-                        prev.id,
-                        prev.permanentBadgeIds
-                      ),
-                    }
-                  : prev
-              );
-            }
-          } catch {
-            /* eggs optional */
-          }
-        })();
+          })();
+        }
 
         void (async () => {
           try {
@@ -303,6 +357,7 @@ export default function ProfilePage() {
       } finally {
         window.clearTimeout(failSafe);
         if (!cancelled) setReady(true);
+        wrProfile("data-effect-done");
       }
     }
 
@@ -312,61 +367,70 @@ export default function ProfilePage() {
     return () => {
       cancelled = true;
     };
+    // isolation flags via getIsoFlags each effect run
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const badges = useMemo(() => {
-    if (!player) return [];
-    try {
-      // Scrub sim career before badge/career paint (accurate shelf numbers)
-      nukeAccumulatedSandboxCareersOnce([player.id]);
-      applyLegacyBadgeGrants({ id: player.id, name: player.name });
-      // Peers optional: full league only after background standings land
-      return getPlayerBadges(
-        player,
-        leaguePeers.length > 1 ? leaguePeers : [player]
-      );
-    } catch {
-      return [];
-    }
-  }, [player, leaguePeers]);
+    if (!player || !showBadges) return [];
+    return wrProfileTimed("evaluateBadges", () => {
+      try {
+        nukeAccumulatedSandboxCareersOnce([player.id]);
+        applyLegacyBadgeGrants({ id: player.id, name: player.name });
+        // HEAVY: BADGE_CATALOG.map(evaluateBadge) + whole-league peer sync
+        return getPlayerBadges(
+          player,
+          leaguePeers.length > 1 ? leaguePeers : [player]
+        );
+      } catch {
+        return [];
+      }
+    });
+  }, [player, leaguePeers, showBadges]);
 
   const isWwcLeague = getLeague()?.sportId === "soccer_wwc";
 
   const wwcBadges = useMemo(() => {
-    if (!player || !isWwcLeague) return [];
-    try {
-      return getPlayerWwcBadges(withPermanentBadges(player));
-    } catch {
-      return [];
-    }
-  }, [player, isWwcLeague]);
+    if (!player || !isWwcLeague || !showBadges) return [];
+    return wrProfileTimed("evaluateWwcBadges", () => {
+      try {
+        return getPlayerWwcBadges(withPermanentBadges(player));
+      } catch {
+        return [];
+      }
+    });
+  }, [player, isWwcLeague, showBadges]);
 
   // Bank career cheevos (side effect) — numbers live under resume fold, not hero
   useMemo(() => {
-    if (!player) return null;
-    try {
-      return syncCareerWithPlayer(player, badges);
-    } catch {
-      return null;
-    }
-  }, [player, badges]);
+    if (!player || !showBadges) return null;
+    return wrProfileTimed("syncCareerWithPlayer", () => {
+      try {
+        return syncCareerWithPlayer(player, badges);
+      } catch {
+        return null;
+      }
+    });
+  }, [player, badges, showBadges]);
 
   const hardware: ProfileTrophy[] = useMemo(() => {
-    if (!player) return [];
-    try {
-      const lg = getLeague();
-      return getProfileHardware({
-        playerId: player.id,
-        playerName: player.name,
-        leagueTrophies,
-        sportId: lg?.sportId,
-        activeLeagueName: lg?.name,
-        activeLeagueId: lg?.id,
-      });
-    } catch {
-      return [];
-    }
-  }, [player, leagueTrophies]);
+    if (!player || !showTrophies) return [];
+    return wrProfileTimed("buildTrophies", () => {
+      try {
+        const lg = getLeague();
+        return getProfileHardware({
+          playerId: player.id,
+          playerName: player.name,
+          leagueTrophies,
+          sportId: lg?.sportId,
+          activeLeagueName: lg?.name,
+          activeLeagueId: lg?.id,
+        });
+      } catch {
+        return [];
+      }
+    });
+  }, [player, leagueTrophies, showTrophies]);
 
   const leagueName = getLeague()?.name || "War Room";
   const sessionPlayerId = getSession()?.playerId;
@@ -414,35 +478,54 @@ export default function ProfilePage() {
   const peers = leaguePeers.length ? leaguePeers : [player];
 
   let resume = null as ReturnType<typeof buildFootballResume> | null;
-  try {
-    resume = buildFootballResume({
-      player,
-      peers,
-      trophies: leagueTrophies,
-      badges,
-      memberSinceLabel: mock
-        ? "Never"
-        : formatMemberSince(player.memberSince),
+  if (showHistory) {
+    resume = wrProfileTimed("buildResume", () => {
+      try {
+        return buildFootballResume({
+          player,
+          peers,
+          trophies: leagueTrophies,
+          badges,
+          memberSinceLabel: mock
+            ? "Never"
+            : formatMemberSince(player.memberSince),
+        });
+      } catch {
+        return null;
+      }
     });
-  } catch {
-    resume = null;
   }
 
-  const signature = mock
-    ? roast || "Demo NPC. Not a real résumé."
-    : buildSignatureStyle({
-        player,
-        badges,
-        sportId,
-        peers,
-      });
-  const seasonPlot = buildSeasonPlot(player, peers);
+  const signature = wrProfileTimed("buildSignature", () =>
+    mock
+      ? roast || "Demo NPC. Not a real résumé."
+      : buildSignatureStyle({
+          player,
+          badges,
+          sportId,
+          peers,
+        })
+  );
+  const seasonPlot = showHistory
+    ? wrProfileTimed("buildSeasonPlot", () => buildSeasonPlot(player, peers))
+    : null;
+
+  wrProfile(
+    "interactive",
+    undefined,
+    `peers=${peers.length} badges=${badges.length} minimal=${profileMinimal}`
+  );
 
   return (
     <div className="min-h-screen flex flex-col">
       <main className="flex-1 max-w-3xl mx-auto w-full px-4 py-8">
+        {profileMinimal && (
+          <p className="mb-3 text-[11px] font-bold text-amber-300 border border-amber-400/40 rounded-lg px-2 py-1">
+            ISO profileMinimal — heavy shelves off
+          </p>
+        )}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-4 text-xs">
-      <Link
+          <Link
             href="/"
             className="text-muted hover:text-foreground"
           >
@@ -627,51 +710,52 @@ export default function ProfilePage() {
       </div>
         </section>
 
-        {/* 1. Hardware — what they own */}
-        <ProfileTrophyCase
-          items={hardware}
-          playerName={player.name}
-          leagueName={leagueName}
-          isSelf={isSelfProfile}
-          winnerAvatarUrl={player.avatarUrl}
-        />
+        {/* 1. Hardware — isolation gates */}
+        {showTrophies ? (
+          <ProfileTrophyCase
+            items={hardware}
+            playerName={player.name}
+            leagueName={leagueName}
+            isSelf={isSelfProfile}
+            winnerAvatarUrl={player.avatarUrl}
+          />
+        ) : null}
 
-        {/* Passport stamps & zero-point discoveries */}
-        <DiscoveryPassportShelf
-          playerId={player.id}
-          isSelf={isSelfProfile}
-        />
+        {showHistory ? (
+          <DiscoveryPassportShelf
+            playerId={player.id}
+            isSelf={isSelfProfile}
+          />
+        ) : null}
 
-        {/* Easter egg finds — count only, never total catalog size */}
-        <EasterEggTracker
-          playerId={player.id}
-          isSelf={!!isSelfProfile}
-        />
+        {showBadges ? (
+          <EasterEggTracker
+            playerId={player.id}
+            isSelf={!!isSelfProfile}
+          />
+        ) : null}
 
-        {/* 2. Season plot — rival, streak, last card */}
-        {!mock && (
+        {!mock && showHistory && seasonPlot ? (
           <ProfileSeasonPlot
             plot={seasonPlot}
             rival={resume?.rival ?? null}
             sportId={sportId}
           />
-        )}
+        ) : null}
 
-        {/* 3. Resume — titles + years; spreadsheet folded */}
-        {resume && (
+        {resume && showHistory ? (
           <FootballResume
             resume={resume}
             playerId={player.id}
             isSelf={isSelfProfile}
           />
-        )}
+        ) : null}
 
-        {/* 4. Achievements — shelves, not X/Y hero numbers */}
-        {isWwcLeague && wwcBadges.length > 0 && (
+        {showBadges && isWwcLeague && wwcBadges.length > 0 ? (
           <WwcPassportShelf badges={wwcBadges} />
-        )}
+        ) : null}
 
-        {!isWwcLeague && badges.length > 0 && (
+        {showBadges && !isWwcLeague && badges.length > 0 ? (
           <div className="rounded-2xl border border-amber-400/30 bg-amber-400/5 p-5 sm:p-6 mb-6">
             <div className="flex items-center justify-between gap-2 mb-2">
               <p className="text-[10px] uppercase tracking-wider text-amber-300 font-bold">
@@ -687,47 +771,47 @@ export default function ProfilePage() {
             </p>
             <BadgeShelf badges={filterCrewCheevos(badges)} />
           </div>
-        )}
+        ) : null}
 
-        {!isWwcLeague && (
+        {showBadges && !isWwcLeague ? (
           <div className="rounded-2xl border border-border bg-card p-5 sm:p-6 mb-6">
             {badges.length > 0 ? (
               <>
                 <p className="text-[10px] uppercase tracking-wider text-muted font-bold mb-1">
                   Achievements
                 </p>
-      <p className="text-xs text-muted mb-4">
+                <p className="text-xs text-muted mb-4">
                   {earnedCount > 0
                     ? `${earnedCount} earned in this catalog — open a badge for the story.`
                     : "Nothing earned yet. The first card is still destiny."}
                 </p>
-      <BadgeShelf badges={badges} />
+                <BadgeShelf badges={badges} />
               </>
             ) : (
               <div>
-      <h2 className="font-semibold text-lg mb-2">Badge shelves</h2>
-      <p className="text-sm text-muted">
+                <h2 className="font-semibold text-lg mb-2">Badge shelves</h2>
+                <p className="text-sm text-muted">
                   Could not load badges. Try a hard refresh.
                 </p>
-      </div>
+              </div>
             )}
           </div>
-        )}
+        ) : null}
 
-        {isWwcLeague && (
+        {showBadges && isWwcLeague ? (
           <details className="rounded-2xl border border-border bg-card p-5 sm:p-6 mb-6">
-      <summary className="font-semibold text-sm cursor-pointer text-muted hover:text-foreground">
+            <summary className="font-semibold text-sm cursor-pointer text-muted hover:text-foreground">
               Also show classic War Room badge shelves
             </summary>
-      <div className="mt-4">
+            <div className="mt-4">
               {badges.length > 0 ? (
                 <BadgeShelf badges={badges} />
               ) : (
                 <p className="text-sm text-muted">No football badges loaded.</p>
               )}
             </div>
-      </details>
-        )}
+          </details>
+        ) : null}
       </main>
       <AvatarLightbox
         open={lightbox}

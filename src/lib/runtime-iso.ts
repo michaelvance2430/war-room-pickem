@@ -15,6 +15,11 @@
  *     smoothPrep: false, // G prepareNavigation + SmoothRuntime extras
  *     smoothPrefetch: false,
  *     smoothPulse: false,
+ *     smoothRuntime: false,
+ *     profileMinimal: true,   // name/identity only
+ *     profileBadges: false,
+ *     profileTrophies: false,
+ *     profileHistory: false,
  *   }))
  *
  * RESET:
@@ -23,6 +28,7 @@
  *
  * Production: no logs unless warroom-runtime-debug is set (opt-in).
  * Flags default to all enabled (normal product behavior).
+ * profileMinimal defaults false.
  */
 
 export type IsoFlags = {
@@ -35,6 +41,11 @@ export type IsoFlags = {
   smoothPrep: boolean;
   smoothPrefetch: boolean;
   smoothPulse: boolean;
+  smoothRuntime: boolean;
+  profileMinimal: boolean;
+  profileBadges: boolean;
+  profileTrophies: boolean;
+  profileHistory: boolean;
 };
 
 const DEFAULTS: IsoFlags = {
@@ -47,6 +58,11 @@ const DEFAULTS: IsoFlags = {
   smoothPrep: true,
   smoothPrefetch: true,
   smoothPulse: true,
+  smoothRuntime: true,
+  profileMinimal: false,
+  profileBadges: true,
+  profileTrophies: true,
+  profileHistory: true,
 };
 
 const ISO_KEY = "warroom-iso";
@@ -81,6 +97,33 @@ export function getIsoFlags(): IsoFlags {
 
 export function isoEnabled(key: keyof IsoFlags): boolean {
   return getIsoFlags()[key] !== false;
+}
+
+/** true only when flag is explicitly true (for profileMinimal). */
+export function isoFlagTrue(key: keyof IsoFlags): boolean {
+  return getIsoFlags()[key] === true;
+}
+
+/** Profile main-thread timing (debug or development). */
+export function wrProfile(msg: string, ms?: number, extra?: string) {
+  if (!isRuntimeDebug()) return;
+  const t = ms != null ? ` ${Math.round(ms)}ms` : "";
+  const e = extra ? ` ${extra}` : "";
+  console.log(`[WR-PERF][profile] ${msg}${t}${e}`);
+}
+
+export function wrProfileTimed<T>(label: string, fn: () => T): T {
+  const t0 =
+    typeof performance !== "undefined" ? performance.now() : Date.now();
+  try {
+    return fn();
+  } finally {
+    const ms =
+      typeof performance !== "undefined"
+        ? performance.now() - t0
+        : Date.now() - t0;
+    wrProfile(label, ms);
+  }
 }
 
 // ── Counters ─────────────────────────────────────────────────────────────
