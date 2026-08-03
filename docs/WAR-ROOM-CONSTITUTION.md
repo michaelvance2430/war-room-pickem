@@ -73,6 +73,13 @@ Bigger than onboarding. How **every** future feature should feel.
 
 Design from **inside the world**, not from outside explaining the world.
 
+### Reality principle
+
+> **War Room should never make the user question whether their actions are real.**
+
+Confidence builds trust. Ambiguity destroys it.  
+**Practice Mode** and **Real League** are two realities — never hybrid UI, never leak lab language into a normal host or player session.
+
 ### Host Dashboard corollary
 
 > **The Commissioner page should feel like opening the door to your league—not opening league software.**

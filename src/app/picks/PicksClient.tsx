@@ -559,12 +559,19 @@ export default function PicksClient() {
     }
   }, []);
 
-  // Client nav from /picks?practice=1 → /picks (Nav "Picks"): drop fake card.
+  // Sticky Practice Mode: bare /picks while practice is active restores the
+  // practice URL. Explicit Exit / Return to My League is the only full leave.
   useEffect(() => {
     if (!practiceModeRef.current) return;
     if (practiceFromUrl) return;
-    leavePractice("/picks");
-  }, [practiceFromUrl, leavePractice]);
+    try {
+      const path = `/picks?week=99&practice=1`;
+      window.history.replaceState({}, "", path);
+      setPracticeFromUrl(true);
+    } catch {
+      /* keep practice UI; do not silent-wipe */
+    }
+  }, [practiceFromUrl]);
 
   useEffect(() => {
     let cancelled = false;
@@ -647,12 +654,19 @@ export default function PicksClient() {
         setProp(card.prop);
         setHasCard(true);
         hasCardRef.current = true;
-        setLeagueName("Trial sandbox (not live)");
+        // Keep real league name — never rename the room to "Trial sandbox"
+        try {
+          const { getLeague } = await import("@/lib/league");
+          const name = getLeague()?.name;
+          if (name) setLeagueName(name);
+        } catch {
+          /* keep existing leagueName */
+        }
         setPublishedWeeks([]);
         setScoredWeeks([]);
         setLoadError(null);
         setCardNotice(
-          "Trial card — not the real season. Lock it to learn the job."
+          "Practice card — private to you. Nothing hits the real league."
         );
         setChaosArmed(false);
         setChaosLockedWeek(false);
@@ -1455,30 +1469,30 @@ export default function PicksClient() {
           <div className="mb-4 rounded-xl border-2 border-dashed border-amber-400/70 bg-amber-500/10 px-4 py-3.5 space-y-3">
       <div>
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-300 mb-1">
-                I&apos;m bored · fake week · not your real card
+                Practice Mode · practice card
               </p>
-      <p className="text-xs sm:text-sm text-foreground/90 leading-relaxed">
+              <p className="text-xs sm:text-sm text-foreground/90 leading-relaxed">
                 {practiceScored || saved
-                  ? "This graded card is practice only. Real Week 1 (or live week) lives behind Exit. Nav “Picks” without practice in the URL also drops you into the real season."
-                  : "These games are made up. Lock the card; we grade it on your phone only. Real week cards and standings stay untouched."}
+                  ? "Graded on this device only. Real standings never noticed. Use Return to My League when you're done practicing."
+                  : "Private practice card. Lock it; we grade it on your phone only. Real week cards and standings stay untouched."}
               </p>
-      </div>
+            </div>
             <div className="flex flex-col sm:flex-row gap-2">
-      <button
-                type="button"
-                onClick={() => leavePractice("/picks")}
-                className="min-h-[48px] px-4 rounded-xl bg-primary text-black text-sm font-extrabold touch-manipulation"
-              >
-                Exit practice → real picks
-              </button>
-      <button
+              <button
                 type="button"
                 onClick={() => leavePractice("/")}
+                className="min-h-[48px] px-4 rounded-xl bg-primary text-black text-sm font-extrabold touch-manipulation"
+              >
+                Return to My League
+              </button>
+              <button
+                type="button"
+                onClick={() => leavePractice("/picks")}
                 className="min-h-[48px] px-4 rounded-xl border border-amber-400/50 text-amber-100 text-sm font-bold touch-manipulation"
               >
-                Home (live season)
+                Exit → real picks
               </button>
-      </div>
+            </div>
           </div>
         )}
 
@@ -1756,15 +1770,15 @@ export default function PicksClient() {
             >
               {practiceMode
                 ? practiceScored || saved
-                  ? "Fake week · finished · not the season"
-                  : "Fake week · go cook · not the season"
+                  ? "Practice · finished · not the season"
+                  : "Practice · go cook · not the season"
                 : weekEditable
                   ? "You are cooking"
                   : "Just looking"}
             </span>
             {practiceMode ? (
               <span className="text-xs px-2 py-0.5 rounded-full border border-amber-400/60 text-amber-100 font-semibold bg-amber-500/15">
-                FAKE · NOT LIVE
+                PRACTICE · NOT LIVE
               </span>
             ) : weekEditable ? (
               <span className="text-xs px-2 py-0.5 rounded-full bg-primary text-black font-semibold">
@@ -1786,8 +1800,8 @@ export default function PicksClient() {
       <p className="text-sm text-muted mt-1">
             {practiceMode
               ? practiceScored || saved
-                ? "Graded on your phone only. Real standings never noticed. Exit practice for your real card."
-                : "Private dry-run. Lock when ready — we grade it and show how the room wakes up."
+                ? "Graded on your phone only. Real standings never noticed. Return to My League for your real card."
+                : "Private practice. Lock when ready — we grade it and show how the room wakes up."
               : `${leagueName ? `${leagueName} · ` : ""}${
                   weekEditable
                     ? missedLockWindow
@@ -2375,38 +2389,38 @@ export default function PicksClient() {
             {practiceMode && (practiceScored || saved) ? (
               <div className="rounded-xl border-2 border-dashed border-amber-400/60 bg-amber-500/10 px-4 py-4 space-y-2 text-center">
       <p className="text-sm font-bold text-foreground">
-                  Fake week graded
+                  Practice card graded
                   {weekScoredAt
                     ? ` · ${Object.keys(weekResults).length} games roasted`
                     : ""}
                 </p>
-      <p className="text-xs text-muted leading-relaxed">
-                  Practice is over for this run. Leave to open live season picks
-                  — or tour Board / Gazette (still leaves practice).
+                <p className="text-xs text-muted leading-relaxed">
+                  Practice is over for this run. Return to My League for live
+                  picks — or peek the Board (leaves Practice Mode).
                 </p>
-      <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => leavePractice("/")}
+                    className="flex-1 py-3 min-h-[48px] rounded-xl bg-primary text-black text-sm font-extrabold flex items-center justify-center touch-manipulation"
+                  >
+                    Return to My League
+                  </button>
                   <button
                     type="button"
                     onClick={() => leavePractice("/picks")}
-                    className="flex-1 py-3 min-h-[48px] rounded-xl bg-primary text-black text-sm font-extrabold flex items-center justify-center touch-manipulation"
+                    className="flex-1 py-3 min-h-[48px] rounded-xl border border-amber-400/50 text-amber-100 text-sm font-bold flex items-center justify-center touch-manipulation"
                   >
                     Real picks
                   </button>
-      <button
-                    type="button"
-                    onClick={() => leavePractice("/")}
-                    className="flex-1 py-3 min-h-[48px] rounded-xl border border-amber-400/50 text-amber-100 text-sm font-bold flex items-center justify-center touch-manipulation"
-                  >
-                    Home
-                  </button>
-      <button
+                  <button
                     type="button"
                     onClick={() => leavePractice("/board")}
                     className="flex-1 py-3 min-h-[48px] rounded-xl border border-border text-sm font-bold text-foreground flex items-center justify-center touch-manipulation"
                   >
                     Peek Board
                   </button>
-      </div>
+                </div>
               </div>
             ) : weekEditable || (practiceMode && !saved) ? (
               <div className="phone-sticky-action">

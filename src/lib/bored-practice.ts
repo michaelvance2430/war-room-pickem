@@ -18,6 +18,19 @@ const PICKS_KEY = "warroom-bored-practice-picks-v1";
 const RESULTS_KEY = "warroom-bored-practice-results-v1";
 const PENDING_DONE_KEY = "warroom-bored-practice-pending-done-v1";
 export const EVENT_BORED_PRACTICE_DONE = "warroom-bored-practice-done";
+/** Fired when practice mode starts or fully exits — app shell chrome listens */
+export const EVENT_PRACTICE_MODE = "warroom-practice-mode";
+
+function dispatchPracticeMode(active: boolean) {
+  if (typeof window === "undefined") return;
+  try {
+    window.dispatchEvent(
+      new CustomEvent(EVENT_PRACTICE_MODE, { detail: { active } })
+    );
+  } catch {
+    /* ok */
+  }
+}
 
 export type BoredPracticeState = {
   leagueId: string;
@@ -140,6 +153,7 @@ export function markBoredPracticeStarted(
   } catch {
     /* ok */
   }
+  dispatchPracticeMode(true);
   return next;
 }
 
@@ -187,6 +201,7 @@ export function clearBoredPracticeAll() {
   writeJson(PICKS_KEY, null);
   writeJson(RESULTS_KEY, null);
   clearBoredPracticeDoneModal();
+  dispatchPracticeMode(false);
 }
 
 /**

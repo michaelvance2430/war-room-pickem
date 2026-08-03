@@ -5,6 +5,7 @@ import SeasonThemeApplier from "@/components/SeasonThemeApplier";
 import SportThemeApplier from "@/components/SportThemeApplier";
 import FoundrySessionChrome from "@/components/FoundrySessionChrome";
 import SandboxSessionChrome from "@/components/SandboxSessionChrome";
+import PracticeModeChrome from "@/components/PracticeModeChrome";
 import LeagueBuildGate from "@/components/LeagueBuildGate";
 import SmoothRuntime from "@/components/SmoothRuntime";
 import AppShell from "@/components/AppShell";
@@ -87,6 +88,7 @@ export default function RootLayout({
           <SandboxSessionChrome />
           <LeagueBuildGate />
         </ThemeDecorGate>
+        <PracticeModeChrome />
         <AppShell>{children}</AppShell>
       </body>
     </html>
