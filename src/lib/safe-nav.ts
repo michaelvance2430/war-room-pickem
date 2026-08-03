@@ -1,18 +1,16 @@
 /**
- * P0 SAFE NAV MODE — baseline for controlled restoration
+ * P0 SAFE NAV MODE
  *
- * Default ON. Keeps auto Moments / coaching / welcome off while we
- * re-enable presenters one at a time with lifecycle fixes.
+ * Temporarily disables nonessential systems that can intercept navigation:
+ * auto Moments, badge queues, coaching, cinematic full-screens, etc.
  *
- * RESTORED while SAFE NAV stays on:
- *   - BadgeUnlockModal (achievement reveal) — lifecycle fixed; not suppressed
+ * Default: ON until plain-app navigation is proven stable.
  *
- * Still OFF under SAFE NAV:
- *   - MomentHost (Season Opening, Ring, Gazette modal, Cold Open)
- *   - LoginWelcomeModal, ContextualCoach, DeferredChrome ceremony waves
- *
- * Escape hatch for full Moments (this browser only):
+ * Escape hatch for creator QA (re-enable moments on this browser only):
  *   localStorage.setItem("warroom-safe-nav-off", "1"); location.reload()
+ *
+ * Force safe mode even if code default flips later:
+ *   localStorage.setItem("warroom-safe-nav-on", "1")
  */
 
 /** Master switch — keep true until navigation regression is closed. */
