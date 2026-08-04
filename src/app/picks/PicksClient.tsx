@@ -105,6 +105,8 @@ export default function PicksClient() {
   const [propChoice, setPropChoice] = useState<string | null>(null);
   const [usedConfidence, setUsedConfidence] = useState<number[]>([]);
   const [saved, setSaved] = useState(false);
+  /** Saved vs Edit: saved+!editing=readonly; editing=Save Picks; frozen=Picks Locked */
+  const [editing, setEditing] = useState(false);
   /**
    * Shell always ready — never full-page "Loading…" forever.
    * Card content uses cardBusy instead.
@@ -168,6 +170,12 @@ export default function PicksClient() {
   const bestBetRef = useRef(bestBetId);
   const propChoiceRef = useRef(propChoice);
   const savedRef = useRef(saved);
+  const editingRef = useRef(false);
+  const savedSnapshotRef = useRef<{
+    picks: Record<string, UserPick>;
+    bestBetId: string | null;
+    propChoice: string | null;
+  } | null>(null);
   /** Mount-once softRefresh must read current practice flag (not a stale false). */
   const practiceModeRef = useRef(false);
   const hasCardRef = useRef(false);
@@ -177,6 +185,7 @@ export default function PicksClient() {
   bestBetRef.current = bestBetId;
   propChoiceRef.current = propChoice;
   savedRef.current = saved;
+  editingRef.current = editing;
   viewWeekRef.current = viewWeek;
   practiceModeRef.current = practiceMode;
   hasCardRef.current = hasCard;
@@ -205,10 +214,21 @@ export default function PicksClient() {
             : null;
         propChoiceRef.current = propOk;
         setPropChoice(propOk);
-        setSaved(
+        const isSaved =
           !!mine.lockedAt &&
-            Object.keys(filtered).length === cloud.games.length
-        );
+          Object.keys(filtered).length === cloud.games.length;
+        setSaved(isSaved);
+        setEditing(!isSaved);
+        editingRef.current = !isSaved;
+        if (isSaved) {
+          savedSnapshotRef.current = {
+            picks: { ...filtered },
+            bestBetId: bb,
+            propChoice: propOk,
+          };
+        } else {
+          savedSnapshotRef.current = null;
+        }
         if (mine.lockedAt) {
           void import("@/lib/first-week").then((m) =>
             m.markHasLockedPicksOnce(getSession()?.playerId)
@@ -231,6 +251,9 @@ export default function PicksClient() {
         setBestBetId(null);
         setPropChoice(null);
         setSaved(false);
+        setEditing(true);
+        editingRef.current = true;
+        savedSnapshotRef.current = null;
         setUsedConfidence([]);
         setChaosLockedWeek(false);
         setChaosArmed(false);
@@ -294,10 +317,16 @@ export default function PicksClient() {
 
       if (dropped > 0 || Object.keys(kept).length < cloud.games.length) {
         setSaved(false);
+        setEditing(true);
+        editingRef.current = true;
+        savedSnapshotRef.current = null;
         setCardNotice(
           "Commissioner updated this week’s games. Your card refreshed automatically — re-check open picks and Save again."
         );
       } else {
+        // Lines/prop changed — keep saved status but force review in edit mode
+        setEditing(true);
+        editingRef.current = true;
         setCardNotice(
           "Commissioner updated the card (lines/prop). Review open games and Save if needed."
         );
@@ -520,8 +549,9 @@ export default function PicksClient() {
   const softRefresh = useCallback(async () => {
     // Private practice must never pull live cards / active week
     if (practiceModeRef.current) return;
-    // Don't yank the card while the user is locking picks
+    // Don't yank the card while locking or mid-edit
     if (savingRef.current) return;
+    if (editingRef.current) return;
     const now = Date.now();
     if (now - lastSoftRefreshAt.current < SOFT_REFRESH_GAP_MS) return;
     lastSoftRefreshAt.current = now;
@@ -538,6 +568,7 @@ export default function PicksClient() {
 
   async function selectWeek(week: number) {
     if (week === viewWeek && hasCard) return;
+    if (!confirmLeaveEditIfNeeded()) return;
     setSwitching(true);
     setCardBusy(true);
     setSaveError(null);
@@ -728,6 +759,8 @@ export default function PicksClient() {
           propChoiceRef.current = mine.propChoice;
           setSaved(true);
           savedRef.current = true;
+          setEditing(false);
+          editingRef.current = false;
           const used = Object.values(filtered)
             .map((p) => p.confidence)
             .filter((c) => c > 0);
@@ -931,16 +964,113 @@ export default function PicksClient() {
       cardFrozen ||
       (allGamesLocked && (!prop.question || propLockedNow));
 
+  /** Live mutate only in edit mode (or first fill). Chaos/freeze = no human edits. */
+  const canMutatePicks = practiceMode
+    ? !saved && !practiceScored
+    : weekEditable &&
+      !cardFrozen &&
+      !missedLockWindow &&
+      !(chaosArmed || chaosLockedWeek) &&
+      (!saved || editing);
+
   const confidenceOptions = [1, 2, 3, 4, 5];
 
+  function snapshotNow() {
+    return {
+      picks: JSON.parse(JSON.stringify(picksRef.current)) as Record<
+        string,
+        UserPick
+      >,
+      bestBetId: bestBetRef.current,
+      propChoice: propChoiceRef.current,
+    };
+  }
+
+  function picksAreDirty(): boolean {
+    if (!editingRef.current) return false;
+    if (!savedRef.current) {
+      return (
+        Object.keys(picksRef.current).length > 0 ||
+        !!bestBetRef.current ||
+        !!propChoiceRef.current
+      );
+    }
+    const snap = savedSnapshotRef.current;
+    if (!snap) return true;
+    try {
+      return (
+        JSON.stringify(picksRef.current) !== JSON.stringify(snap.picks) ||
+        bestBetRef.current !== snap.bestBetId ||
+        propChoiceRef.current !== snap.propChoice
+      );
+    } catch {
+      return true;
+    }
+  }
+
+  function enterEditMode() {
+    if (practiceMode || cardFrozen || chaosArmed || chaosLockedWeek) return;
+    if (!weekEditable || !saved) return;
+    savedSnapshotRef.current = snapshotNow();
+    setEditing(true);
+    editingRef.current = true;
+    setSaveError(null);
+  }
+
+  function discardEdits() {
+    const snap = savedSnapshotRef.current;
+    if (snap) {
+      const picksCopy = { ...snap.picks };
+      picksRef.current = picksCopy;
+      setPicks(picksCopy);
+      bestBetRef.current = snap.bestBetId;
+      setBestBetId(snap.bestBetId);
+      propChoiceRef.current = snap.propChoice;
+      setPropChoice(snap.propChoice);
+      const used = Object.values(picksCopy)
+        .map((p) => p.confidence)
+        .filter((c) => c >= 1 && c <= 5);
+      setUsedConfidence(used);
+    }
+    setEditing(false);
+    editingRef.current = false;
+    setSaveError(null);
+  }
+
+  function confirmLeaveEditIfNeeded(): boolean {
+    if (!editingRef.current) return true;
+    if (!picksAreDirty()) {
+      if (savedRef.current) {
+        setEditing(false);
+        editingRef.current = false;
+      }
+      return true;
+    }
+    const ok = window.confirm(
+      "You have unsaved changes. Leave without saving? Your edits will be discarded."
+    );
+    if (!ok) return false;
+    if (savedRef.current) {
+      discardEdits();
+    } else {
+      picksRef.current = {};
+      setPicks({});
+      bestBetRef.current = null;
+      setBestBetId(null);
+      propChoiceRef.current = null;
+      setPropChoice(null);
+      setUsedConfidence([]);
+      setEditing(true);
+      editingRef.current = true;
+    }
+    return true;
+  }
+
   function selectSide(gameId: string, side: "home" | "away") {
-    if (!weekEditable || cardFrozen) return;
-    // Chaos committed = no human control (no undo)
-    if (chaosArmed || chaosLockedWeek) return;
+    if (!canMutatePicks) return;
     const game = games.find((g) => g.id === gameId);
     if (!game || isGameLocked(game, now, games)) return;
 
-    setSaved(false);
     setConfTipGameId(null);
     setPicks((prev) => ({
       ...prev,
@@ -956,7 +1086,7 @@ export default function PicksClient() {
   }
 
   function selectConfidence(gameId: string, conf: number) {
-    if (!weekEditable || cardFrozen || chaosArmed || chaosLockedWeek) return;
+    if (!canMutatePicks) return;
     const game = games.find((g) => g.id === gameId);
     if (!game || isGameLocked(game, now, games)) return;
 
@@ -970,7 +1100,6 @@ export default function PicksClient() {
 
     // Tap selected number again → deselect (free that confidence for another game)
     if (picks[gameId]?.confidence === conf) {
-      setSaved(false);
       setPicks((prev) => {
         const next = {
           ...prev,
@@ -998,7 +1127,6 @@ export default function PicksClient() {
     );
     if (takenByOther) return;
 
-    setSaved(false);
     setPicks((prev) => {
       const next = {
         ...prev,
@@ -1021,7 +1149,7 @@ export default function PicksClient() {
   }
 
   function toggleBestBet(gameId: string) {
-    if (!weekEditable || cardFrozen || chaosArmed || chaosLockedWeek) return;
+    if (!canMutatePicks) return;
     const game = games.find((g) => g.id === gameId);
     if (!game || isGameLocked(game, now, games)) return;
     // Can't move BB off a locked game
@@ -1030,7 +1158,6 @@ export default function PicksClient() {
       if (prevG && isGameLocked(prevG, now, games)) return;
     }
 
-    setSaved(false);
     if (bestBetId === gameId) {
       setBestBetId(null);
       setPicks((prev) => {
@@ -1148,6 +1275,8 @@ export default function PicksClient() {
         propChoiceRef.current = nextProp;
         setSaved(true);
         savedRef.current = true;
+        setEditing(false);
+        editingRef.current = false;
         try {
           const { markHasLockedPicksOnce } = await import("@/lib/first-week");
           markHasLockedPicksOnce(getSession()?.playerId);
@@ -1289,9 +1418,20 @@ export default function PicksClient() {
     }
 
     setPicks(lockedPicks);
+    picksRef.current = lockedPicks;
     setBestBetId(nextBest);
+    bestBetRef.current = nextBest;
     setPropChoice(nextProp);
+    propChoiceRef.current = nextProp;
     setSaved(true);
+    savedRef.current = true;
+    setEditing(false);
+    editingRef.current = false;
+    savedSnapshotRef.current = {
+      picks: { ...lockedPicks },
+      bestBetId: nextBest,
+      propChoice: nextProp,
+    };
     if (chaosArmed || chaosLockedWeek) {
       setChaosLockedWeek(true);
       setChaosArmed(true);
@@ -1409,8 +1549,6 @@ export default function PicksClient() {
 
   const allGamesPicked =
     hasCard &&
-    weekEditable &&
-    !cardFrozen &&
     games.length > 0 &&
     games.every(
       (g) => picks[g.id]?.pick && (picks[g.id]?.confidence ?? 0) > 0
@@ -1427,6 +1565,18 @@ export default function PicksClient() {
       setEyesPreview(false);
     }
   }, [saved, loaded, fullyLocked]);
+
+  // Warn on tab close if edit session has unsaved work
+  useEffect(() => {
+    function onBeforeUnload(e: BeforeUnloadEvent) {
+      if (!editingRef.current) return;
+      if (!picksAreDirty()) return;
+      e.preventDefault();
+      e.returnValue = "";
+    }
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, []);
 
   // Coaching: card filled → complete "make first picks" (submit still needs lock)
   useEffect(() => {
@@ -1549,7 +1699,7 @@ export default function PicksClient() {
         )}
 
         {/* Progress bubble — sticky under nav so it stays visible while picking */}
-        {hasCard && weekEditable && !cardFrozen && games.length > 0 && (
+        {hasCard && canMutatePicks && games.length > 0 && (
           <div
             className="sticky z-[45] mb-4 -mx-1 px-1"
             style={{
@@ -1658,7 +1808,7 @@ export default function PicksClient() {
               })()}
               {allGamesPicked && (
                 <p className="text-[11px] text-primary font-semibold mt-1.5">
-                  Card full — hit Lock at the bottom.
+                  Card full — hit Save Picks at the bottom.
                 </p>
               )}
             </div>
@@ -1671,6 +1821,7 @@ export default function PicksClient() {
           hasCard &&
           !cardFrozen &&
           !missedLockWindow &&
+          (!saved || editing) &&
           !quietPicks &&
           canSurfaceChaosMode(activeWeek, {
             alreadyChaosThisWeek: chaosArmed || chaosLockedWeek,
@@ -1772,6 +1923,8 @@ export default function PicksClient() {
                   setChaosLockedWeek(true);
                   setChaosRemaining(spent.remaining);
                   setSaved(false);
+                  setEditing(true);
+                  editingRef.current = true;
                   setChaosConfirm(false);
                 }}
                 className="w-full py-3.5 min-h-[52px] rounded-xl bg-orange-600 text-white font-extrabold"
@@ -2106,8 +2259,11 @@ export default function PicksClient() {
             )}
 
             {weekEditable && cardFrozen && !missedLockWindow && (
-              <div className="mb-4 rounded-lg border border-border bg-card-hover px-4 py-2 text-sm text-muted">
-                🔒 First kickoff hit — entire card is frozen. No more changes.
+              <div className="mb-4 rounded-lg border border-border bg-card-hover px-4 py-2 text-sm font-semibold text-foreground">
+                Picks Locked
+                <span className="block text-xs font-normal text-muted mt-0.5">
+                  First kickoff hit — no more changes.
+                </span>
               </div>
             )}
 
@@ -2116,12 +2272,18 @@ export default function PicksClient() {
                 {saveError}
               </div>
             )}
-            {saved && weekEditable && !cardFrozen && (
-              <div className="mb-4 rounded-lg border border-primary/40 bg-primary/10 px-4 py-2 text-sm text-primary">
-                ✓ Card locked. You can still edit until{" "}
-                <strong>first kickoff</strong> (
-                {formatCardLockDeadline(games)}). After that the whole card
-                freezes.
+            {saved && weekEditable && !cardFrozen && !editing && (
+              <div className="mb-4 rounded-lg border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary">
+                Picks Saved
+                <span className="block text-xs font-normal text-primary/80 mt-0.5">
+                  Your card is on file. Tap Update Picks to change anything
+                  before first kickoff ({formatCardLockDeadline(games)}).
+                </span>
+              </div>
+            )}
+            {saved && weekEditable && !cardFrozen && editing && (
+              <div className="mb-4 rounded-lg border border-amber-400/40 bg-amber-500/10 px-4 py-2 text-sm text-amber-100">
+                Editing — changes are not saved until you tap Save Picks.
               </div>
             )}
 
@@ -2132,7 +2294,7 @@ export default function PicksClient() {
                 const displaySpread = pick?.lockedSpread ?? game.spread;
                 const displayFavorite = pick?.lockedFavorite ?? game.favorite;
                 const locked =
-                  !weekEditable || cardFrozen || isGameLocked(game, now, games);
+                  !canMutatePicks || isGameLocked(game, now, games);
                 const kick = formatKickoffLockLabel(game, now, games);
                 const rankTier = getRankedMatchupTier(
                   game.awayRank,
@@ -2409,12 +2571,11 @@ export default function PicksClient() {
                       <button
                         key={opt}
                         type="button"
-                        disabled={!canEditProp || chaosArmed || chaosLockedWeek}
+                        disabled={!canMutatePicks || !canEditProp}
                         onClick={() => {
-                          if (!canEditProp || chaosArmed || chaosLockedWeek)
-                            return;
-                          setSaved(false);
+                          if (!canMutatePicks || !canEditProp) return;
                           setPropChoice(opt);
+                          propChoiceRef.current = opt;
                           setBonusOpen(true);
                         }}
                         className={`min-h-[52px] p-3.5 rounded-lg border text-base sm:text-sm transition touch-manipulation disabled:cursor-not-allowed ${
@@ -2435,7 +2596,7 @@ export default function PicksClient() {
                   )}
                   {weekEditable && canEditProp && !propChoice && (
                     <p className="text-[11px] text-warning mt-2">
-                      Tap one answer, then Lock it in.
+                      Tap one answer, then Save Picks.
                     </p>
                   )}
                 </>
@@ -2451,35 +2612,84 @@ export default function PicksClient() {
                 . Use the banner above when you&apos;re ready to leave.
               </p>
             ) : weekEditable || (practiceMode && !saved) ? (
-              <div className="phone-sticky-action">
-      <button
-                  type="button"
-                  onClick={() => void savePicks()}
-                  disabled={!allGamesPicked || saving || fullyLocked}
-                  className="w-full py-3.5 sm:py-3 rounded-xl bg-primary text-black text-base font-bold disabled:opacity-50 min-h-[52px] touch-manipulation shadow-lg shadow-primary/20"
-                >
-                  {saving
-                    ? practiceMode
-                      ? "Grading…"
-                      : "Locking…"
-                    : fullyLocked || chaosLockedWeek
-                      ? chaosLockedWeek
-                        ? "🔥 Chaos locked"
-                        : "Locked in"
-                      : chaosArmed
-                        ? "Lock Chaos card 🔥"
-                        : saved
-                          ? "Update open picks"
-                          : practiceMode
-                            ? "Lock it in"
-                            : "Lock it in"}
-                </button>
-                {!allGamesPicked && !fullyLocked && (
-                  <p className="text-xs text-muted text-center mt-2 px-1">
+              <div className="phone-sticky-action space-y-2">
+                {practiceMode ? (
+                  <button
+                    type="button"
+                    onClick={() => void savePicks()}
+                    disabled={!allGamesPicked || saving || fullyLocked}
+                    className="w-full py-3.5 sm:py-3 rounded-xl bg-primary text-black text-base font-bold disabled:opacity-50 min-h-[52px] touch-manipulation shadow-lg shadow-primary/20"
+                  >
+                    {saving ? "Grading…" : "Save Picks"}
+                  </button>
+                ) : cardFrozen || fullyLocked ? (
+                  <div className="w-full py-3.5 sm:py-3 rounded-xl border border-border bg-card text-center text-base font-bold text-muted min-h-[52px] flex items-center justify-center">
+                    Picks Locked
+                  </div>
+                ) : saved && !editing ? (
+                  <>
+                    <p className="text-center text-sm font-semibold text-primary">
+                      Picks Saved
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => enterEditMode()}
+                      disabled={saving || chaosLockedWeek || chaosArmed}
+                      className="w-full py-3.5 sm:py-3 rounded-xl bg-primary text-black text-base font-bold disabled:opacity-50 min-h-[52px] touch-manipulation shadow-lg shadow-primary/20"
+                    >
+                      Update Picks
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => void savePicks()}
+                      disabled={
+                        !allGamesPicked ||
+                        saving ||
+                        fullyLocked ||
+                        (chaosLockedWeek && saved)
+                      }
+                      className="w-full py-3.5 sm:py-3 rounded-xl bg-primary text-black text-base font-bold disabled:opacity-50 min-h-[52px] touch-manipulation shadow-lg shadow-primary/20"
+                    >
+                      {saving
+                        ? "Saving…"
+                        : chaosArmed || chaosLockedWeek
+                          ? "Save Picks 🔥"
+                          : "Save Picks"}
+                    </button>
+                    {saved && editing && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!picksAreDirty()) {
+                            setEditing(false);
+                            editingRef.current = false;
+                            return;
+                          }
+                          const ok = window.confirm(
+                            "Discard unsaved changes and keep your last saved card?"
+                          );
+                          if (ok) discardEdits();
+                        }}
+                        disabled={saving}
+                        className="w-full py-2.5 min-h-[44px] rounded-xl border border-border text-sm font-semibold text-muted hover:text-foreground touch-manipulation"
+                      >
+                        Discard changes
+                      </button>
+                    )}
+                  </>
+                )}
+                {(!saved || editing) &&
+                  !cardFrozen &&
+                  !fullyLocked &&
+                  !allGamesPicked && (
+                  <p className="text-xs text-muted text-center mt-1 px-1">
                     {!propChoice
-                      ? "Almost — pick the bonus (prop) answer, then lock."
+                      ? "Almost — pick the bonus (prop) answer, then Save Picks."
                       : !bestBetId
-                        ? "Almost — mark one Best Bet, then lock."
+                        ? "Almost — mark one Best Bet, then Save Picks."
                         : quietPicks || practiceMode
                           ? "Need: side + confidence on every game, one Best Bet, and the bonus."
                           : "Need: side + unique confidence on every open game, one Best Bet, and a bonus pick."}

@@ -62,7 +62,7 @@ export default function PicksSavedModal({ detail, onClose }: Props) {
               <span className="text-2xl font-black text-primary">✓</span>
             </div>
             <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-primary">
-              {isUpdate ? "Picks updated" : "Picks saved"}
+              Picks Saved
             </p>
             <h2
               id="picks-saved-title"
