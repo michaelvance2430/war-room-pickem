@@ -9,8 +9,6 @@ import {
   markFirstCardPublished,
   markPracticeWeekDone,
   markCommishGraduated,
-  markInviteCopied,
-  buildInviteShareText,
 } from "@/lib/commish-onboarding";
 import { Game, Prop } from "@/lib/types";
 import { fetchFootballOdds } from "@/lib/odds";
@@ -41,7 +39,6 @@ import {
 import {
   syncLeagueFromCloud,
   saveLeagueToCloud,
-  regenerateCodeInCloud,
 } from "@/lib/league-sync";
 import {
   publishWeekCard,
@@ -235,7 +232,6 @@ function CommissionerPageInner() {
   const [activeWeek, setActiveWeek] = useState(1);
   const [settingsSaved, setSettingsSaved] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
   const [availableGames, setAvailableGames] = useState<Game[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [publishedGames, setPublishedGames] = useState<Game[]>([]);
@@ -2027,13 +2023,6 @@ function CommissionerPageInner() {
     }
   }
 
-  async function handleRegenCode() {
-    if (!confirm("Generate a new code? The old code will stop working.")) return;
-    const result = await regenerateCodeInCloud();
-    if (result.ok && result.league) setLeague(result.league);
-    else alert(result.error || "Failed to regenerate code");
-  }
-
   function handleReset() {
     if (!confirm("Delete this league and all local data?")) return;
     resetLeague();
@@ -2209,38 +2198,6 @@ function CommissionerPageInner() {
     return handleStartNextSeason({ advancedResetLabel: true });
   }
 
-  function copyCode() {
-    if (!league) return;
-    navigator.clipboard?.writeText(league.code);
-    try {
-      const lid = getSession()?.leagueId || league.id;
-      if (lid) markInviteCopied(lid);
-    } catch {
-      /* ignore */
-    }
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  }
-
-  async function copyInviteText() {
-    if (!league) return;
-    const text = buildInviteShareText({
-      leagueName: league.name || "War Room",
-      code: league.code,
-      sportId: league.sportId,
-      inviterName: getSession()?.playerName,
-    });
-    try {
-      await navigator.clipboard.writeText(text);
-      const lid = getSession()?.leagueId || league.id;
-      if (lid) markInviteCopied(lid);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      /* ignore */
-    }
-  }
-
   const allResultsIn =
     publishedGames.length > 0 &&
     !!publishedProp?.question &&
@@ -2407,10 +2364,8 @@ function CommissionerPageInner() {
             scoredWeeks,
             pickStatus,
             humanRosterCount: humanCount,
-            inviteCritical: firstTime || humanCount < 4,
           });
           const hero = resolveHostHero(thisWeekVm, {
-            inviteCritical: firstTime || humanCount < 4,
             humanRosterCount: humanCount,
           });
           const sportLabel = league?.sportId === "nfl" ? "NFL" : "CFB";
@@ -2429,7 +2384,6 @@ function CommissionerPageInner() {
               hero={hero}
               thisWeek={thisWeekVm}
               humanCount={humanCount}
-              inviteCode={league?.code}
               settingsOpen={tab === "settings"}
               onToggleSettings={() => {
                 if (tab === "settings") {
@@ -2456,9 +2410,6 @@ function CommissionerPageInner() {
                   setTab("picks");
                   void refreshPickStatus();
                   scrollTools();
-                },
-                onShareInvite: () => {
-                  void copyInviteText();
                 },
                 onPreviewPlayer: () => {
                   setViewAsPlayer(true);
@@ -2551,42 +2502,7 @@ function CommissionerPageInner() {
                   className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm"
                 />
               </div>
-      <div>
-                <label className="text-xs text-muted block mb-1">Invite code</label>
-      <div className="flex flex-wrap items-center gap-2">
-                  <div className="flex-1 min-w-[8rem] font-mono text-2xl tracking-[0.25em] text-primary font-bold">
-                    {league.code}
-                  </div>
-      <button
-                    type="button"
-                    onClick={copyCode}
-                    className="px-3 py-2 text-xs rounded-lg border border-border"
-                  >
-                    {copied ? "Copied!" : "Copy code"}
-                  </button>
-      <button
-                    type="button"
-                    onClick={() => void copyInviteText()}
-                    className="px-3 py-2 text-xs rounded-lg border border-primary/40 text-primary font-semibold"
-                  >
-                    Copy invite text
-                  </button>
-      <button
-                    type="button"
-                    onClick={handleRegenCode}
-                    className="px-3 py-2 text-xs rounded-lg border border-border"
-                  >
-                    New code
-                  </button>
-      </div>
-                {firstTime && (
-                  <p className="text-[11px] text-muted mt-2 leading-relaxed">
-                    Text the invite to the group chat first — empty room is the
-                    #1 first-week failure mode.
-                  </p>
-                )}
-              </div>
-      <div className="text-sm text-muted">
+<div className="text-sm text-muted">
                 Commissioner:{" "}
                 <span className="text-foreground font-medium">
                   {session?.playerName || "You"}

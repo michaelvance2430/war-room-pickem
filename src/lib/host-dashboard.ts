@@ -16,7 +16,6 @@ export type HostHeroId =
   | "H_BLOCK_NO_CARD"
   | "H_BLOCK_NEEDS_SCORE"
   | "H_ATTN_HOLDOUTS"
-  | "H_ATTN_INVITES"
   | "H_CELEB_ALL_LOCKED"
   | "H_CELEB_SCORED"
   | "H_QUIET_COUNTDOWN"
@@ -26,7 +25,6 @@ export type HostHeroAction =
   | "publish_card"
   | "score_week"
   | "nudge_holdouts"
-  | "share_invite"
   | "preview_player"
   | "open_standings"
   | "open_gazette"
@@ -71,8 +69,6 @@ export type HostDashboardInput = {
   pickStatus: PickSubmissionStatus[];
   /** Non-bot roster size if known */
   humanRosterCount?: number | null;
-  /** First-time / thin room — invite still critical */
-  inviteCritical?: boolean;
 };
 
 function earliestKickoff(games: Game[]): string | null {
@@ -164,17 +160,15 @@ export function buildThisWeekViewModel(input: HostDashboardInput): ThisWeekViewM
 }
 
 /**
- * Single most important thing right now.
+ * Single most important *operations* job right now.
  * Priority: blocked → attention → celebrate → quiet.
+ * Invite / share lives on Home — never a Commissioner hero.
  */
-export function resolveHostHero(vm: ThisWeekViewModel, opts?: {
+export function resolveHostHero(vm: ThisWeekViewModel, _opts?: {
+  /** @deprecated Invite growth is Home's job — ignored */
   inviteCritical?: boolean;
   humanRosterCount?: number | null;
 }): HostHeroState {
-  const inviteCritical =
-    !!opts?.inviteCritical ||
-    (opts?.humanRosterCount != null && opts.humanRosterCount < 3);
-
   // 1 🚨 Blocked
   if (vm.status === "draft" || !vm.published) {
     return {
@@ -199,7 +193,7 @@ export function resolveHostHero(vm: ThisWeekViewModel, opts?: {
     };
   }
 
-  // 2 ⚠️ Attention
+  // 2 ⚠️ Attention — ops only (holdouts). Growth is Home · Share League.
   if (vm.status === "live" && vm.missingNames.length > 0) {
     const one = vm.missingNames.length === 1;
     return {
@@ -214,17 +208,6 @@ export function resolveHostHero(vm: ThisWeekViewModel, opts?: {
         : undefined,
       action: "nudge_holdouts",
       actionLabel: "Call out the holdouts →",
-    };
-  }
-  if (inviteCritical && (opts?.humanRosterCount ?? 99) < 4) {
-    return {
-      id: "H_ATTN_INVITES",
-      priority: 2,
-      tone: "attention",
-      title: "The room’s thin — friends still need a way in.",
-      detail: "Share the invite. The fun starts when people show up.",
-      action: "share_invite",
-      actionLabel: "Share invite →",
     };
   }
 

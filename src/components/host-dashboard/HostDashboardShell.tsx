@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * League front porch — Hero → This Week → The Room → League Settings.
- * IA frozen. Not a control panel. Not a checklist.
+ * League operations porch — Hero → This Week → The Room → League Settings.
+ * Invite / Share League lives on Home — not here.
  */
 
 import type { ReactNode } from "react";
@@ -16,7 +16,6 @@ export type HostDashboardActions = {
   onPublishCard: () => void;
   onScoreWeek: () => void;
   onNudgeHoldouts: () => void;
-  onShareInvite: () => void;
   onPreviewPlayer: () => void;
   onOpenStandings: () => void;
   onOpenGazette: () => void;
@@ -32,7 +31,6 @@ type Props = {
   hero: HostHeroState;
   thisWeek: ThisWeekViewModel;
   humanCount: number;
-  inviteCode?: string | null;
   settingsOpen: boolean;
   onToggleSettings: () => void;
   actions: HostDashboardActions;
@@ -63,7 +61,6 @@ export default function HostDashboardShell({
   hero,
   thisWeek,
   humanCount,
-  inviteCode,
   settingsOpen,
   onToggleSettings,
   actions,
@@ -80,9 +77,6 @@ export default function HostDashboardShell({
         break;
       case "nudge_holdouts":
         actions.onNudgeHoldouts();
-        break;
-      case "share_invite":
-        actions.onShareInvite();
         break;
       case "preview_player":
         actions.onPreviewPlayer();
@@ -276,22 +270,7 @@ export default function HostDashboardShell({
               </>
             ) : null}
           </p>
-          {inviteCode && (
-            <p className="text-xs text-muted">
-              Invite{" "}
-              <span className="font-mono text-primary font-bold tracking-widest">
-                {inviteCode}
-              </span>
-            </p>
-          )}
           <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={actions.onShareInvite}
-              className="px-3 py-2 rounded-lg border border-primary/40 text-primary text-xs font-bold min-h-[44px]"
-            >
-              Share invite
-            </button>
             <a
               href="/standings"
               className="inline-flex items-center px-3 py-2 rounded-lg border border-border text-xs font-semibold text-foreground min-h-[44px]"
