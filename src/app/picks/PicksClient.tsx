@@ -92,6 +92,36 @@ function formatSpread(
   return `+${Math.abs(spread)}`;
 }
 
+/**
+ * Full valid card — same bar as the live save path.
+ * Never treat a partial slip as "YOUR CARD IS IN".
+ */
+function isCompleteValidCard(
+  cardGames: Game[],
+  cardPicks: Record<string, UserPick>,
+  bestId: string | null,
+  propAns: string | null,
+  propOptions?: string[] | null
+): boolean {
+  if (!cardGames.length) return false;
+  if (!bestId || !cardPicks[bestId]?.pick) return false;
+  if (!propAns) return false;
+  if (propOptions?.length && !propOptions.includes(propAns)) return false;
+  const confs: number[] = [];
+  for (const g of cardGames) {
+    const p = cardPicks[g.id];
+    if (!p?.pick) return false;
+    const c = p.confidence ?? 0;
+    if (c < 1 || c > 5) return false;
+    confs.push(c);
+  }
+  const expected = [1, 2, 3, 4, 5].slice(0, cardGames.length);
+  if ([...confs].sort((a, b) => a - b).join() !== expected.join()) {
+    return false;
+  }
+  return true;
+}
+
 const EMPTY_PROP: Prop = {
   id: "prop",
   question: "",
@@ -239,9 +269,16 @@ export default function PicksClient() {
             : null;
         propChoiceRef.current = propOk;
         setPropChoice(propOk);
+        // locked_at alone is not enough — require full save-path validity
         const isSaved =
           !!mine.lockedAt &&
-          Object.keys(filtered).length === cloud.games.length;
+          isCompleteValidCard(
+            cloud.games,
+            filtered,
+            bb,
+            propOk,
+            cloud.prop?.options
+          );
         setSaved(isSaved);
         setEditing(!isSaved);
         editingRef.current = !isSaved;
@@ -1656,16 +1693,19 @@ export default function PicksClient() {
 
   const allGamesPicked =
     hasCard &&
-    games.length > 0 &&
-    games.every(
-      (g) => picks[g.id]?.pick && (picks[g.id]?.confidence ?? 0) > 0
-    ) &&
-    propChoice !== null &&
-    bestBetId !== null;
+    isCompleteValidCard(
+      games,
+      picks,
+      bestBetId,
+      propChoice,
+      prop.options
+    );
 
   /**
    * Compact receipt — only for genuinely complete saved cards.
    * Drafts, edit mode, and incomplete slips stay in the full editor.
+   * Requires: locked submission + every game pick + unique confidences +
+   * Best Bet + prop (same bar as savePicks).
    */
   const showCompletedSummary =
     hasCard &&
@@ -1673,6 +1713,7 @@ export default function PicksClient() {
     !editing &&
     !practiceScored &&
     allGamesPicked &&
+    !!picksLockedAt &&
     !missedLockWindow;
 
   const completedPhase =

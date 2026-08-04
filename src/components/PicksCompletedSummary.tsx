@@ -37,7 +37,12 @@ type Props = {
   onChangePicks?: () => void;
 };
 
-function formatSavedLine(iso: string | null | undefined): string | null {
+/**
+ * picks.locked_at is first successful submission time (app “lock your card”),
+ * not the kickoff freeze. Re-saves keep the original stamp (see savePicksToCloud).
+ * Label carefully — never “locked at kickoff”.
+ */
+function formatSubmittedLine(iso: string | null | undefined): string | null {
   if (!iso) return null;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
@@ -50,7 +55,7 @@ function formatSavedLine(iso: string | null | undefined): string | null {
     minute: "2-digit",
     timeZone: "America/New_York",
   });
-  return `Saved ${weekday} at ${time}`;
+  return `Submitted ${weekday} at ${time}`;
 }
 
 function sideSpread(
@@ -85,7 +90,7 @@ export default function PicksCompletedSummary({
   const sportLabel =
     sportId === "nfl" ? "NFL" : sportId === "cfb" ? "CFB" : sportId.toUpperCase();
   const weekLabel = weekTitle(weekNumber, sportId) || `Week ${weekNumber}`;
-  const savedLine = formatSavedLine(lockedAt);
+  const submittedLine = formatSubmittedLine(lockedAt);
   const lockWhen = formatCardLockDeadline(games);
   const canChange = phase === "in" && typeof onChangePicks === "function";
 
@@ -101,11 +106,11 @@ export default function PicksCompletedSummary({
   const statusLine =
     phase === "locked"
       ? lockWhen
-        ? `Locked at first kickoff · ${lockWhen}`
+        ? `Frozen at first kickoff · ${lockWhen}`
         : "Card is frozen — no more changes."
       : lockWhen
-        ? `Editable until ${lockWhen}`
-        : "Changes remain available until the card locks.";
+        ? `Editable until first kickoff · ${lockWhen}`
+        : "Changes remain available until the card freezes at first kickoff.";
 
   // Confidence high → low (5…1)
   const rows = [...games]
@@ -136,8 +141,8 @@ export default function PicksCompletedSummary({
       <p className="text-sm text-muted">
         {sportLabel} · {weekLabel}
       </p>
-      {savedLine && (
-        <p className="text-xs text-muted mt-0.5">{savedLine}</p>
+      {submittedLine && (
+        <p className="text-xs text-muted mt-0.5">{submittedLine}</p>
       )}
       <p className="text-xs text-muted/90 mt-1 leading-snug">{statusLine}</p>
 

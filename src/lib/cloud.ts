@@ -1258,7 +1258,8 @@ export async function savePicksToCloud(opts: {
 
   if (existing?.id) {
     pickId = existing.id;
-    // Keep original locked_at — re-save is an edit, not a new first-lock time
+    // Keep original locked_at — first successful submission stamp only.
+    // Not kickoff freeze time; re-save updates pick_games + updated_at only.
     // Once Chaos, stay Chaos (no silent un-chaos on edit — use already spent)
     const updatePayload: Record<string, unknown> = {
       prop_choice: opts.propChoice,
