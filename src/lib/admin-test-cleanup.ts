@@ -344,3 +344,190 @@ export async function adminScrubAllCrystalBallContamination(): Promise<{
 
   return { ok: true, reports };
 }
+
+export type OrphanWeekPurgeReport = {
+  ok: boolean;
+  error?: string;
+  leagueId: string;
+  liveWeek: number;
+  orphanWeeks: number[];
+  deletedWeekCards: number;
+  deletedWeekResults: number;
+  notes: string[];
+};
+
+/**
+ * Admin: delete Foundry/sim week inventory that sits AHEAD of trusted live week.
+ * Example: live=0 but week_cards/week_results exist for week 5 → Board showed Week 5.
+ *
+ * Does NOT delete weeks ≤ live. Does NOT wipe the whole season.
+ * Creator-only.
+ */
+export async function adminPurgeOrphanWeeksAheadOfLive(opts: {
+  leagueId: string;
+}): Promise<OrphanWeekPurgeReport> {
+  const auth = requireCreator();
+  const base: OrphanWeekPurgeReport = {
+    ok: false,
+    leagueId: opts.leagueId,
+    liveWeek: 0,
+    orphanWeeks: [],
+    deletedWeekCards: 0,
+    deletedWeekResults: 0,
+    notes: [],
+  };
+  if (!auth.ok) return { ...base, error: auth.error };
+  if (!opts.leagueId) return { ...base, error: "No league id" };
+
+  const supabase = createClient();
+  const notes: string[] = [];
+
+  // Trusted live week from leagues.current_week
+  let liveWeek = 0;
+  try {
+    const { data: lg } = await supabase
+      .from("leagues")
+      .select("current_week, sport_id")
+      .eq("id", opts.leagueId)
+      .maybeSingle();
+    liveWeek = Number(lg?.current_week);
+    if (!Number.isFinite(liveWeek)) liveWeek = lg?.sport_id === "nfl" ? 1 : 0;
+  } catch {
+    liveWeek = 0;
+  }
+  base.liveWeek = liveWeek;
+
+  // Collect week numbers from cards + results ahead of live
+  const orphanSet = new Set<number>();
+  try {
+    const { data: cards } = await supabase
+      .from("week_cards")
+      .select("id, week_number")
+      .eq("league_id", opts.leagueId);
+    for (const c of cards || []) {
+      const w = Number(c.week_number);
+      if (Number.isFinite(w) && w > liveWeek && w !== 99) orphanSet.add(w);
+    }
+  } catch {
+    notes.push("Could not list week_cards.");
+  }
+  try {
+    const { data: results } = await supabase
+      .from("week_results")
+      .select("id, week_number")
+      .eq("league_id", opts.leagueId);
+    for (const r of results || []) {
+      const w = Number(r.week_number);
+      if (Number.isFinite(w) && w > liveWeek && w !== 99) orphanSet.add(w);
+    }
+  } catch {
+    notes.push("Could not list week_results.");
+  }
+
+  const orphanWeeks = [...orphanSet].sort((a, b) => a - b);
+  base.orphanWeeks = orphanWeeks;
+  if (!orphanWeeks.length) {
+    notes.push(
+      `No orphan weeks ahead of live week ${liveWeek}. Board should stay clean.`
+    );
+    base.ok = true;
+    base.notes = notes;
+    return base;
+  }
+
+  notes.push(
+    `Live week=${liveWeek}. Purging sim residue weeks: ${orphanWeeks.join(", ")}`
+  );
+
+  // Delete week_results (+ game_results via cascade if configured; else explicit)
+  try {
+    const { data: wr } = await supabase
+      .from("week_results")
+      .select("id")
+      .eq("league_id", opts.leagueId)
+      .in("week_number", orphanWeeks);
+    const wrIds = (wr || []).map((r) => r.id as string).filter(Boolean);
+    if (wrIds.length) {
+      await supabase.from("game_results").delete().in("week_result_id", wrIds);
+      const { data: delWr, error } = await supabase
+        .from("week_results")
+        .delete()
+        .eq("league_id", opts.leagueId)
+        .in("week_number", orphanWeeks)
+        .select("id");
+      if (error) notes.push(`week_results delete: ${error.message}`);
+      else base.deletedWeekResults = delWr?.length ?? wrIds.length;
+    }
+  } catch (e) {
+    notes.push(
+      `week_results purge failed: ${e instanceof Error ? e.message : "error"}`
+    );
+  }
+
+  // Delete week_cards (+ card_games via cascade if present)
+  try {
+    const { data: cards } = await supabase
+      .from("week_cards")
+      .select("id")
+      .eq("league_id", opts.leagueId)
+      .in("week_number", orphanWeeks);
+    const cardIds = (cards || []).map((c) => c.id as string).filter(Boolean);
+    if (cardIds.length) {
+      try {
+        await supabase.from("card_games").delete().in("week_card_id", cardIds);
+      } catch {
+        /* optional table */
+      }
+      try {
+        await supabase.from("picks").delete().in("week_card_id", cardIds);
+      } catch {
+        /* optional */
+      }
+      const { data: delCards, error } = await supabase
+        .from("week_cards")
+        .delete()
+        .eq("league_id", opts.leagueId)
+        .in("week_number", orphanWeeks)
+        .select("id");
+      if (error) notes.push(`week_cards delete: ${error.message}`);
+      else base.deletedWeekCards = delCards?.length ?? cardIds.length;
+    }
+  } catch (e) {
+    notes.push(
+      `week_cards purge failed: ${e instanceof Error ? e.message : "error"}`
+    );
+  }
+
+  // Clear client scored/card caches so Board reloads clean
+  try {
+    const { invalidateCloudWeekCaches } = await import("./cloud");
+    invalidateCloudWeekCaches(opts.leagueId);
+  } catch {
+    /* ok */
+  }
+
+  notes.push(
+    `Deleted ${base.deletedWeekCards} week card(s), ${base.deletedWeekResults} week result(s).`
+  );
+  base.ok = true;
+  base.notes = notes;
+  return base;
+}
+
+/** Purge orphan weeks for every membership league (creator). */
+export async function adminPurgeAllOrphanWeeksAheadOfLive(): Promise<{
+  ok: boolean;
+  error?: string;
+  reports: OrphanWeekPurgeReport[];
+}> {
+  const list = await listAdminCleanupLeagues();
+  if (!list.ok) return { ok: false, error: list.error, reports: [] };
+  const reports: OrphanWeekPurgeReport[] = [];
+  for (const row of list.leagues) {
+    const r = await adminPurgeOrphanWeeksAheadOfLive({
+      leagueId: row.leagueId,
+    });
+    reports.push(r);
+  }
+  return { ok: true, reports };
+}

@@ -38,34 +38,19 @@ Not acceptable:
 
 Also: `loadBestAvailableWeekCard` no longer prefers the **highest** published week (that could load week 7 while live is 0).
 
-## Data cleanup (not done)
+## Data cleanup (Foundry admin)
 
-Foundry → **Audit week inventory (orphans · read-only)** prints:
+**Player UI (always):** `trustScoredWeeksForPlayerFacing` — scored weeks **ahead of trusted live** never appear on Board / competitive gates (e.g. live=0 + Week 5 sim residue → Board empty of that week).
 
-- orphan week numbers  
-- card ids  
-- game counts  
-- published_at  
-- likely creator paths  
-
-**No SQL delete without Mike’s approval.**
-
-### Proposed cleanup (B — pending approval)
-
-For confirmed orphan `week_cards` only (not in player-visible contiguous set):
-
-1. Confirm audit report on the affected league  
-2. Delete `card_games` for those week_card ids  
-3. Delete related `picks` / `week_results` / `game_results` for those week numbers  
-4. Delete `week_cards` rows  
-5. Re-audit  
+**Hard purge (creator only):** `/founder#career-cleanup` → **Purge orphan Board weeks (ahead of live)**  
+Deletes `week_cards` / `week_results` / related rows for week numbers **> leagues.current_week**. Does not delete weeks ≤ live.
 
 ## Consumers
 
 | Surface | Behavior after fix |
 |---------|-------------------|
 | My Picks Jump to week | Contiguous around live |
-| Board | Scored history only (already gated) |
+| Board | Scored history only, **capped at live week** |
 | loadBestAvailableWeekCard | Trusted neighbors only |
 | Host auto-score range | Full season list (tooling) |
-| Foundry audit | Full inventory + orphan flags |
+| Foundry purge | Removes orphan week inventory ahead of live |

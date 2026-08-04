@@ -84,6 +84,27 @@ export function trustOfficialScoredWeeks(
 }
 
 /**
+ * Player-facing scored history (Board chips, competitive gates).
+ *
+ * Cap at trusted live week so Foundry/sim "Week 5 scored" residue cannot
+ * surface while the league is still on Week 0/1.
+ *
+ * live=0 + scored [0,5] → [0]
+ * live=0 + scored [5]   → []  (orphan island — Board empty / no false history)
+ * live=5 + scored [0,1,5] → [0,1,5]
+ */
+export function trustScoredWeeksForPlayerFacing(
+  scored: number[],
+  published: number[] | null | undefined,
+  activeWeek: number,
+  sportId?: string | null
+): number[] {
+  const base = trustOfficialScoredWeeks(scored, published, sportId);
+  const live = clampLiveWeek(activeWeek, sportId);
+  return base.filter((w) => w <= live);
+}
+
+/**
  * Published history at-or-before the official live week.
  *
  * FREEZE RULE (season archive): every published week ≤ live stays visible,

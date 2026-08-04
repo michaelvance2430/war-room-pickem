@@ -541,6 +541,42 @@ export default function FounderDashboardPage() {
             >
               Scrub all trophy contamination (admin)
             </button>
+            <button
+              type="button"
+              disabled={cleanupBusy}
+              onClick={() => {
+                if (
+                  !confirm(
+                    "Purge orphan week cards/results AHEAD of each league’s live week? (e.g. Week 5 sim while live is Week 0). Does not delete weeks ≤ live."
+                  )
+                ) {
+                  return;
+                }
+                setCleanupBusy(true);
+                setCleanupLog(null);
+                void import("@/lib/admin-test-cleanup")
+                  .then((m) => m.adminPurgeAllOrphanWeeksAheadOfLive())
+                  .then((res) => {
+                    if (!res.ok) {
+                      setCleanupLog(res.error || "Orphan purge failed");
+                      return;
+                    }
+                    const lines = res.reports.flatMap((r) => [
+                      `— live=${r.liveWeek} orphans=[${r.orphanWeeks.join(",") || "none"}] cards:${r.deletedWeekCards} results:${r.deletedWeekResults}`,
+                      ...r.notes,
+                    ]);
+                    setCleanupLog(
+                      lines.length
+                        ? lines.join("\n")
+                        : "No orphan weeks found."
+                    );
+                  })
+                  .finally(() => setCleanupBusy(false));
+              }}
+              className="w-full py-3 min-h-[48px] rounded-xl border-2 border-amber-400/50 bg-amber-500/10 text-amber-100 text-sm font-extrabold disabled:opacity-50"
+            >
+              Purge orphan Board weeks (ahead of live)
+            </button>
           </div>
           {cleanupLog && (
             <pre className="text-[11px] text-muted whitespace-pre-wrap rounded-lg border border-border bg-background/60 px-3 py-2 max-h-48 overflow-y-auto">

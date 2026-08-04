@@ -2312,16 +2312,19 @@ export async function listScoredWeekNumbers(): Promise<number[]> {
       .filter((n) => !Number.isNaN(n) && n !== 99)
       .sort((a, b) => a - b);
 
-    // Contiguous published prefix only — drop orphan "Week 5 scored" residue
+    // Player-facing: drop orphan sim residue (e.g. Week 5 scored while live is 0)
     try {
-      const { trustOfficialScoredWeeks } = await import(
+      const { trustScoredWeeksForPlayerFacing } = await import(
         "./week-history-trust"
       );
       const published = await listPublishedWeekNumbers().catch(
         () => [] as number[]
       );
       const sid = getLeague()?.sportId;
-      out = trustOfficialScoredWeeks(out, published, sid);
+      const active = await loadLeagueActiveWeek().catch(() =>
+        sid === "nfl" ? 1 : 0
+      );
+      out = trustScoredWeeksForPlayerFacing(out, published, active, sid);
     } catch {
       /* keep raw out */
     }
