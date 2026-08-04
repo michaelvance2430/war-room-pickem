@@ -1,13 +1,16 @@
 /**
- * Production black-box recorder for Standings → peer profile freezes.
+ * Optional black-box recorder for profile navigation freezes.
  *
- * Enable (optional kill-switch off):
- *   localStorage.setItem("warroom-profile-nav", "1")  // force on
- *   localStorage.setItem("warroom-profile-nav", "0")  // force off
- * Default: ON for profile navigations (P0 freeze capture).
+ * Default: OFF (production quiet after P0 fix).
+ * Enable for field debug:
+ *   localStorage.setItem("warroom-profile-nav", "1")
+ *   localStorage.setItem("warroom-runtime-debug", "1")  // also enables
+ * Disable: localStorage.removeItem("warroom-profile-nav")
  *
- * Logs: [WR-PROFILE-NAV][<traceId>] <event> +Nms …
+ * Logs: [WR-PROFILE-NAV][<traceId>] … and [WR-LLP-GRAPH][…]
  * No private profile content — ids, timings, network meta only.
+ *
+ * See docs/PROFILE-FREEZE-POSTMORTEM.md
  */
 
 import { readLeague, readSession } from "@/lib/session-read";
@@ -35,20 +38,18 @@ function canUse() {
   return typeof window !== "undefined";
 }
 
-/** Default ON; set warroom-profile-nav=0 to silence. */
+/** Opt-in only — quiet after freeze fix. */
 export function isProfileNavTraceEnabled(): boolean {
   if (!canUse()) return false;
   try {
     const v = localStorage.getItem("warroom-profile-nav");
     if (v === "0" || v === "false") return false;
     if (v === "1" || v === "true") return true;
-    // Also on when runtime debug is on
     if (localStorage.getItem("warroom-runtime-debug") === "1") return true;
   } catch {
     /* ok */
   }
-  // Default ON — P0 capture until freeze is solved
-  return true;
+  return false;
 }
 
 function shortId(id: string) {
