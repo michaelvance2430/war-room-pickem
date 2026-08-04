@@ -3,7 +3,6 @@
 import { useState, FormEvent, Suspense, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
-import { enterGuestDemo } from "@/lib/guest-mode";
 import Link from "next/link";
 import {
   peekPendingJoinCode,
@@ -11,6 +10,7 @@ import {
 } from "@/lib/commish-onboarding";
 import OwnershipNotice from "@/components/OwnershipNotice";
 import BrandMark from "@/components/BrandMark";
+import { purgeRetiredGuestSession } from "@/lib/guest-mode";
 
 function LoginPageInner() {
   const searchParams = useSearchParams();
@@ -23,11 +23,16 @@ function LoginPageInner() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [guestLoading, setGuestLoading] = useState(false);
   const [inviteHint, setInviteHint] = useState<string | null>(null);
 
   // Preserve deep-link invite through login/signup; honor ?mode=
+  // Purge any leftover guest tour so login always starts in the real world.
   useEffect(() => {
+    try {
+      purgeRetiredGuestSession();
+    } catch {
+      /* ignore */
+    }
     const modeParam = searchParams.get("mode");
     if (modeParam === "signup" || modeParam === "join") {
       setMode("signup");
@@ -43,7 +48,7 @@ function LoginPageInner() {
     if (code) {
       stashPendingJoinCode(code);
       setInviteHint(code);
-      // Real invite → default to signup (new friends) not guest demo
+      // Real invite → default to signup (new friends)
       setMode("signup");
     }
   }, [searchParams]);
@@ -183,63 +188,7 @@ function LoginPageInner() {
           )}
         </div>
 
-        {/* Four doors in — host, code, open lobby, demo */}
-        {!inviteHint && (
-          <div className="mb-5 grid grid-cols-1 gap-2">
-      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary text-center mb-1">
-              How do you want in?
-            </p>
-      <Link
-              href="/join?mode=create"
-              className="w-full py-3.5 min-h-[52px] rounded-xl bg-primary text-black text-sm font-extrabold touch-manipulation flex items-center justify-center"
-            >
-              Commissioner — create league
-            </Link>
-      <Link
-              href="/join?mode=join"
-              className="w-full py-3.5 min-h-[52px] rounded-xl border border-border bg-card text-sm font-bold touch-manipulation flex items-center justify-center"
-            >
-              Join with code
-            </Link>
-      <Link
-              href="/open-room"
-              className="w-full py-3.5 min-h-[52px] rounded-xl border-2 border-primary/40 bg-primary/10 text-sm font-bold touch-manipulation flex items-center justify-center"
-            >
-              Join open room
-            </Link>
-      <button
-              type="button"
-              disabled={guestLoading || loading}
-              onClick={() => {
-                setError(null);
-                setGuestLoading(true);
-                const res = enterGuestDemo();
-                if (!res.ok) {
-                  setGuestLoading(false);
-                  setError(res.error || "Could not start guest demo");
-                  return;
-                }
-                try {
-                  window.location.assign("/");
-                } catch {
-                  window.location.href = "/";
-                }
-              }}
-              className="w-full py-3.5 min-h-[52px] rounded-xl border border-border text-sm font-medium text-muted touch-manipulation disabled:opacity-50"
-            >
-              {guestLoading
-                ? "Opening the tour…"
-                : "Explore as guest · look around first"}
-            </button>
-            <p className="text-[11px] text-muted text-center leading-relaxed px-1">
-              Guests observe. Members belong. Try the room free — Locker &amp;
-              real leagues unlock when you join or create. Open lobby fills one
-              room at a time.
-            </p>
-      </div>
-        )}
-
-        {/* Auth form FIRST when invited; always big phone fields */}
+        {/* Account first — real identity, then join/create */}
         <form
           onSubmit={handleSubmit}
           className="rounded-xl border border-border bg-card p-5 space-y-4"
@@ -352,10 +301,42 @@ function LoginPageInner() {
           </button>
       </form>
 
+        
+        {/* Community doors — account first, then real room. No guest tour. */}
+        {!inviteHint && (
+          <div className="mb-5 grid grid-cols-1 gap-2">
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary text-center mb-1">
+              Then join or create a room
+            </p>
+            <Link
+              href="/join?mode=create"
+              className="w-full py-3.5 min-h-[52px] rounded-xl bg-primary text-black text-sm font-extrabold touch-manipulation flex items-center justify-center"
+            >
+              Commissioner — create league
+            </Link>
+            <Link
+              href="/join?mode=join"
+              className="w-full py-3.5 min-h-[52px] rounded-xl border border-border bg-card text-sm font-bold touch-manipulation flex items-center justify-center"
+            >
+              Join with code
+            </Link>
+            <Link
+              href="/open-room"
+              className="w-full py-3.5 min-h-[52px] rounded-xl border-2 border-primary/40 bg-primary/10 text-sm font-bold touch-manipulation flex items-center justify-center"
+            >
+              Join open room
+            </Link>
+            <p className="text-[11px] text-muted text-center leading-relaxed px-1">
+              War Room is something you join — not something you browse. Create
+              an account below (under a minute), then create a league or enter a
+              code. Same world for everyone.
+            </p>
+          </div>
+        )}
+
         {inviteHint && (
           <p className="text-center text-[11px] text-muted mt-4 leading-relaxed">
-            Guest demo is off while you have an invite — we don&apos;t want you
-            in the wrong room.
+            Invite locked in — create an account or log in, then you land in the real room.
           </p>
         )}
 

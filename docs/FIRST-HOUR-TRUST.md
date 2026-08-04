@@ -20,11 +20,11 @@ Yes: “The first hour keeps getting in the way of the picks.”
 
 A friend with zero context should be able to:
 
-1. Join as guest  
-2. Understand what War Room is  
-3. Browse  
-4. Make picks  
-5. Leave wanting to create their own league  
+1. Create an account (under a minute)  
+2. Join a league **or** create a league  
+3. Understand what War Room is  
+4. Make picks in a **real** room  
+5. Leave wanting to start their own league  
 
 …without seeing:
 
@@ -32,6 +32,16 @@ A friend with zero context should be able to:
 * Loading loops  
 * Contradictory states (Home vs Picks vs Board)  
 * Stuck tutorials  
+* **Guest / demo alternate universe** (retired — one world only)
+
+---
+
+## Guest mode — RETIRED
+
+Guest tour created a parallel product (fake league, UUID ghosts, dual Home).  
+**Direction:** Account → Join/Create → play. No `Explore as guest`.  
+Kill-switch: `GUEST_MODE_RETIRED` in `src/lib/guest-mode.ts`.  
+Purge leftover guest localStorage on login / Nav boot.
 
 ---
 

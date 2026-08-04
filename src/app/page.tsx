@@ -29,7 +29,6 @@ import HomeSportHeader from "@/components/HomeSportHeader";
 import LeagueMembershipCard from "@/components/LeagueMembershipCard";
 import HomeRoomContext from "@/components/HomeRoomContext";
 import SandboxSimBanner from "@/components/SandboxSimBanner";
-import GuestConversionClose from "@/components/GuestConversionClose";
 import { isGuestMode } from "@/lib/guest-mode";
 import {
   wantsFullRoom,
@@ -703,9 +702,6 @@ export default function Home() {
 
         {/* Host first-hour spine */}
         <CommishSetupBanner />
-
-        {/* Guest: quiet conversion after exploring (not fireworks) */}
-        <GuestConversionClose />
 
         {firstWeekChrome && (
           <p className="text-xs text-muted mb-4 leading-relaxed max-w-xl -mt-1">

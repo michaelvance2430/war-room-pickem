@@ -14,11 +14,10 @@ import {
 } from "@/lib/league";
 import Avatar from "@/components/Avatar";
 import DeferredChromeGate from "@/components/DeferredChromeGate";
-import GuestDemoChrome from "@/components/GuestDemoChrome";
-import GuestOnboarding from "@/components/GuestOnboarding";
+
 import { touchLastSeen } from "@/lib/last-seen";
 import { loadMyProfile } from "@/lib/profile";
-import { isGuestMode } from "@/lib/guest-mode";
+import { isGuestMode, purgeRetiredGuestSession } from "@/lib/guest-mode";
 import {
   isViewAsPlayer,
   setViewAsPlayer,
@@ -105,6 +104,12 @@ export default function Nav() {
       void import("@/lib/smooth").then((m) => {
         m.forceUnlockAllChrome();
       });
+    } catch {
+      /* ok */
+    }
+    // Guest tour retired — clear leftover demo session so Home never forks
+    try {
+      purgeRetiredGuestSession();
     } catch {
       /* ok */
     }
@@ -1059,9 +1064,7 @@ export default function Nav() {
           Exit → Home
         </button>
       )}
-      {/* Guest demo: sticky DEMO bar + welcome / role / tutorial */}
-      <GuestDemoChrome />
-      <GuestOnboarding />
+      {/* Guest tour retired — no DEMO chrome / guest onboarding */}
       {/* Contextual coaching DISABLED (P0) — was intercepting clicks; rebuild safely later */}
       {/* Roster + optional modals — staged late so tabs stay live after login */}
       {/*

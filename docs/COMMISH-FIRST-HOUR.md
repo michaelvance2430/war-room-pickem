@@ -17,7 +17,7 @@ Path:
 3. Build first card (week-ops)  
 4. Publish  
 5. Return Home with complete confidence  
-6. Know what players experience (optional player view)
+6. Share the room · open Standings pulse (who joined)
 
 ---
 
@@ -39,13 +39,14 @@ Rule of Closure — they always know:
 ## Canonical spine (production)
 
 ```text
-Create league
+Create account
+    → Create league
     → /league-build?new=1
     → Save room · build first card
     → /week-ops?first=1
     → Odds → Games → Prop → Publish
     → "{Week} is LIVE." · Done → Home
-    → (optional) See what players see
+    → Share League · Standings pulse
 ```
 
 **Not** the first-hour path: Manage League (`/commissioner`) admin desk.  
@@ -84,9 +85,9 @@ A friend handed War Room for the first time should:
 2. Accept recommended (or customize once)  
 3. Publish a card in under ~10 minutes  
 4. Land on Home knowing the week is live  
-5. Optionally see the player view  
+5. Share the room and open Standings pulse  
 
-…without opening Foundry, reading a manual, or asking “is this admin software?”
+…without opening Foundry, reading a manual, guest demo, or asking “is this admin software?”
 
 ---
 

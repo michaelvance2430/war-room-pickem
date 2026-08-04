@@ -1,7 +1,11 @@
 /**
- * Guest Mode — explore War Room without an account.
- * Mission: convince someone in five minutes that War Room is worth joining.
- * Guests observe. Members belong. Local tour room only — not a real league.
+ * Guest Mode — RETIRED from the live product (2026).
+ *
+ * War Room is a community: account → join/create → real room.
+ * No parallel universe. Defensive helpers remain so old localStorage
+ * and call sites fail closed without crashing.
+ *
+ * Foundry / future demos: do not re-enable without product review.
  */
 
 import type { League, Session } from "./league";
@@ -9,6 +13,9 @@ import { setViewAsPlayer } from "./view-as-player";
 import { seedGuestDemoWorld, GUEST_LEAGUE_ID, GUEST_PLAYER_ID } from "./guest-demo-seed";
 
 const KEY = "warroom-guest-mode-v1";
+
+/** Product kill-switch — never ship true without reopening guest onboarding. */
+export const GUEST_MODE_RETIRED = true;
 
 export type GuestRole = "player" | "commissioner";
 
@@ -55,7 +62,46 @@ function write(s: GuestState) {
 }
 
 export function isGuestMode(): boolean {
+  // Retired: always false so Home/Picks/Locker never take the guest fork.
+  if (GUEST_MODE_RETIRED) return false;
   return getGuestState().active === true;
+}
+
+/**
+ * Clear leftover guest tour local state (old browsers still on KEY=active).
+ * Safe to call on app boot / login. Does not touch real auth sessions unless
+ * the stored session is the guest tour player id.
+ */
+export function purgeRetiredGuestSession(): void {
+  if (!canUse()) return;
+  try {
+    const raw = localStorage.getItem(KEY);
+    let wasGuest = false;
+    if (raw) {
+      try {
+        const s = JSON.parse(raw) as GuestState;
+        wasGuest = s?.active === true;
+      } catch {
+        wasGuest = true;
+      }
+    }
+    let sessionIsGuest = false;
+    try {
+      const sessRaw = localStorage.getItem("warroom-session");
+      if (sessRaw) {
+        const sess = JSON.parse(sessRaw) as Session;
+        sessionIsGuest =
+          sess?.playerId === GUEST_PLAYER_ID ||
+          sess?.leagueId === GUEST_LEAGUE_ID;
+      }
+    } catch {
+      /* ignore */
+    }
+    if (!wasGuest && !sessionIsGuest) return;
+    exitGuestDemo();
+  } catch {
+    /* ignore */
+  }
 }
 
 export function patchGuestState(partial: Partial<GuestState>) {
@@ -66,12 +112,11 @@ export function patchGuestState(partial: Partial<GuestState>) {
 }
 
 /**
- * First-hour trust: guest Home/Picks must never hang on missing cache.
- * Re-seeds the tour room if session/league/cards disappeared mid-browse.
- * Preserves role + tutorial flags.
+ * @deprecated Guest retired — always false. Kept so call sites compile.
  */
 export function ensureGuestWorld(): boolean {
-  if (!canUse() || !isGuestMode()) return false;
+  if (GUEST_MODE_RETIRED) return false;
+  if (!canUse() || getGuestState().active !== true) return false;
   try {
     const prev = getGuestState();
     let sessionRaw = localStorage.getItem("warroom-session");
@@ -132,33 +177,14 @@ export function dismissGuestTutorialForever() {
 }
 
 /**
- * Start guest demo: seed local world, session, league. Returns home path.
+ * Guest entry retired. Create an account — then join or host a real room.
  */
 export function enterGuestDemo(): { ok: true } | { ok: false; error: string } {
-  if (!canUse()) return { ok: false, error: "Storage unavailable" };
-  try {
-    seedGuestDemoWorld();
-    write({
-      active: true,
-      role: null,
-      welcomeDone: false,
-      playerTutorialDone: false,
-      commishTutorialDone: false,
-      enteredAt: new Date().toISOString(),
-    });
-    setViewAsPlayer(false);
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(
-        new CustomEvent("warroom-guest-mode", { detail: getGuestState() })
-      );
-    }
-    return { ok: true };
-  } catch (e) {
-    return {
-      ok: false,
-      error: e instanceof Error ? e.message : "Could not start guest demo",
-    };
-  }
+  return {
+    ok: false,
+    error:
+      "Guest tour is gone. Create a free account — then join a league or start your own. Real room, real history.",
+  };
 }
 
 export function setGuestRole(role: GuestRole) {
