@@ -663,24 +663,35 @@ export default function Home() {
         <IncidentBanner />
 
         {/* ── Room name once, then job (hero) first — switcher/flavor after ── */}
-        {!firstWeekChrome ? (
-          <HomeSportHeader
-            chrome={homeChrome}
-            tagline={homeTagline}
-            leagueName={leagueName}
-            leagueCode={leagueCode}
-            canShare={!!getSession()?.playerId}
-            sportId={sportId}
-          />
-        ) : (
-          <HomeRoomContext
-            leagueName={leagueName}
-            sportId={sportId}
-            isCommish={isCommish}
-            actuallyCommish={actuallyCommish}
-            leagueCode={leagueCode}
-          />
-        )}
+        {/*
+          Share League: every authenticated member with a code — not ops/commish-only.
+          Hidden for guest tour. firstWeekChrome uses HomeRoomContext (was missing Share).
+        */}
+        {(() => {
+          const canShareLeague =
+            !isGuestMode() &&
+            !!getSession()?.playerId &&
+            !!leagueCode?.trim();
+          return !firstWeekChrome ? (
+            <HomeSportHeader
+              chrome={homeChrome}
+              tagline={homeTagline}
+              leagueName={leagueName}
+              leagueCode={leagueCode}
+              canShare={canShareLeague}
+              sportId={sportId}
+            />
+          ) : (
+            <HomeRoomContext
+              leagueName={leagueName}
+              sportId={sportId}
+              isCommish={isCommish}
+              actuallyCommish={actuallyCommish}
+              leagueCode={leagueCode}
+              canShare={canShareLeague}
+            />
+          );
+        })()}
 
         <SandboxSimBanner />
 
