@@ -42,3 +42,6 @@ next-env.d.ts
 
 ODDS_API_KEY.txt
 supabase/PASTE-ME-all-pending.sql
+
+.tmp-sim/
+
