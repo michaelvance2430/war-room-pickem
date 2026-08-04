@@ -22,6 +22,7 @@ import { divisionTabLabel } from "@/lib/divisions";
 import {
   formatLeaguePulse,
   lastSeenToneClass,
+  touchLastSeen,
 } from "@/lib/last-seen";
 import { hasOfficialScoredWeek } from "@/lib/season-scored";
 import { markStandingsWarm } from "@/lib/profile-nav-trace";
@@ -86,6 +87,8 @@ export default function StandingsPage() {
         } catch {
           /* ignore */
         }
+        // Presence: mark activity when opening Standings (meaningful open, not a hidden tab)
+        void touchLastSeen();
       }
       const failSafe = window.setTimeout(() => {
         if (!cancelled) {
@@ -225,6 +228,7 @@ export default function StandingsPage() {
                 <tbody>
                   {filtered.map((player) => {
                     const pulse = formatLeaguePulse(player.lastSeenAt);
+                    const showPulse = !player.isMock;
                     return (
                     <tr
                       key={player.id}
@@ -243,14 +247,16 @@ export default function StandingsPage() {
                             <PlayerLink id={player.id} name={player.name} />
                             {isSelfPlayer(player.id, selfId) && <YouBadge />}
                           </span>
-                          <span
-                            className={`text-[11px] inline-flex items-center gap-1 ${lastSeenToneClass(player.lastSeenAt)}`}
-                          >
-                            <span aria-hidden>
-                              {pulse.online ? "🟢" : "○"}
+                          {showPulse && (
+                            <span
+                              className={`text-[11px] inline-flex items-center gap-1 ${lastSeenToneClass(player.lastSeenAt)}`}
+                            >
+                              <span aria-hidden>
+                                {pulse.online ? "🟢" : "○"}
+                              </span>
+                              {pulse.label}
                             </span>
-                            {pulse.label}
-                          </span>
+                          )}
                         </div>
                       </td>
                       <td className="px-3 sm:px-4 py-3.5 text-muted text-xs sm:text-sm">
@@ -369,21 +375,22 @@ export default function StandingsPage() {
                               ))}
                               {isSelfPlayer(player.id, selfId) && <YouBadge />}
                             </span>
-                            {(() => {
-                              const pulse = formatLeaguePulse(
-                                player.lastSeenAt
-                              );
-                              return (
-                                <span
-                                  className={`text-[11px] inline-flex items-center gap-1 ${lastSeenToneClass(player.lastSeenAt)}`}
-                                >
-                                  <span aria-hidden>
-                                    {pulse.online ? "🟢" : "○"}
+                            {!player.isMock &&
+                              (() => {
+                                const pulse = formatLeaguePulse(
+                                  player.lastSeenAt
+                                );
+                                return (
+                                  <span
+                                    className={`text-[11px] inline-flex items-center gap-1 ${lastSeenToneClass(player.lastSeenAt)}`}
+                                  >
+                                    <span aria-hidden>
+                                      {pulse.online ? "🟢" : "○"}
+                                    </span>
+                                    {pulse.label}
                                   </span>
-                                  {pulse.label}
-                                </span>
-                              );
-                            })()}
+                                );
+                              })()}
                             {swingById[player.id] && (
                               <span className="md:hidden">
                                 <SwingBadge swing={swingById[player.id]} />

@@ -2791,7 +2791,26 @@ type StandingsCloudRow = {
   propTotal: number;
   weeksPlayed: number;
   lastSeenAt: string | null;
+  isBot: boolean;
 };
+
+/** PostgREST embed may be object or single-element array. */
+function embedProfile(raw: unknown): {
+  display_name?: string;
+  last_seen_at?: string | null;
+} | null {
+  if (!raw) return null;
+  if (Array.isArray(raw)) {
+    const first = raw[0];
+    return first && typeof first === "object"
+      ? (first as { display_name?: string; last_seen_at?: string | null })
+      : null;
+  }
+  if (typeof raw === "object") {
+    return raw as { display_name?: string; last_seen_at?: string | null };
+  }
+  return null;
+}
 
 function mapStandingsRows(rows: Record<string, unknown>[]): StandingsCloudRow[] {
   // Sync attribution — production freeze after memberships/standings response
@@ -2810,10 +2829,7 @@ function mapStandingsRows(rows: Record<string, unknown>[]): StandingsCloudRow[] 
   try {
     return rows
       .map((m: Record<string, unknown>) => {
-        const profile = m.profiles as {
-          display_name?: string;
-          last_seen_at?: string | null;
-        } | null;
+        const profile = embedProfile(m.profiles);
         return {
           userId: m.user_id as string,
           name: profile?.display_name || "Player",
@@ -2832,11 +2848,50 @@ function mapStandingsRows(rows: Record<string, unknown>[]): StandingsCloudRow[] 
           propTotal: (m.prop_total as number) || 0,
           weeksPlayed: (m.weeks_played as number) || 0,
           lastSeenAt: (profile?.last_seen_at as string | null) || null,
+          isBot: !!(m.is_bot as boolean | null | undefined),
         };
       })
       .sort((a, b) => b.totalPoints - a.totalPoints);
   } finally {
     if (end) end("mapStandingsRows", t0, `rows=${rows.length}`);
+  }
+}
+
+/**
+ * Direct profiles.last_seen_at hydrate — does not depend on memberships embed.
+ * Fixes silent null when embed omits last_seen_at or column was late-added.
+ */
+async function hydratePlayersLastSeen(
+  players: import("./types").Player[]
+): Promise<import("./types").Player[]> {
+  if (!players.length) return players;
+  const humanIds = [
+    ...new Set(
+      players.filter((p) => !p.isMock && p.id).map((p) => p.id)
+    ),
+  ];
+  if (!humanIds.length) return players;
+  try {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, last_seen_at")
+      .in("id", humanIds);
+    if (error || !data?.length) return players;
+    const map = new Map<string, string | null>();
+    for (const row of data) {
+      map.set(
+        row.id as string,
+        (row.last_seen_at as string | null) || null
+      );
+    }
+    return players.map((p) => {
+      if (p.isMock) return p;
+      if (!map.has(p.id)) return p;
+      return { ...p, lastSeenAt: map.get(p.id) ?? null };
+    });
+  } catch {
+    return players;
   }
 }
 
@@ -3090,11 +3145,14 @@ async function fetchLeaguePlayersNetwork(
         propTotal: c.propTotal,
         weeksPlayed: c.weeksPlayed,
         lastSeenAt: c.lastSeenAt ?? null,
+        isMock: c.isBot,
       }));
     } finally {
       if (mapEnd)
         mapEnd("loadLeaguePlayers.mapToPlayer", mapT0, `n=${cloud.length}`);
     }
+    // Presence: always hydrate last_seen from profiles (embed is unreliable)
+    players = await hydratePlayersLastSeen(players);
     cacheSet(playersCache, key, players);
     return players;
   })()
