@@ -624,42 +624,33 @@ function JoinPageInner() {
             </li>
       </ol>
 
-          <p className="text-[11px] text-muted text-center mb-3 leading-relaxed">
-            Share first — then build the card. Friends can&apos;t join a secret.
+                    <p className="text-[11px] text-muted text-center mb-3 leading-relaxed">
+            You can invite from Home anytime. First job: publish a card so
+            people can pick.
           </p>
-      <button
-            type="button"
-            onClick={() => {
-              if (leagueId) markInviteCopied(leagueId);
-              const el = document.getElementById("invite-friends-root");
-              el?.scrollIntoView({ behavior: "smooth", block: "center" });
-            }}
-            className="w-full py-4 min-h-[56px] rounded-xl bg-primary text-black text-base font-extrabold mb-2 touch-manipulation"
-          >
-            Share invite first ↑
-          </button>
-      <button
+          <button
             type="button"
             onClick={() => {
               if (leagueId) markHostScreenSeen(leagueId);
               router.push("/commissioner?tab=card&first=1");
               router.refresh();
             }}
-            className="w-full py-3.5 min-h-[52px] rounded-xl border-2 border-primary/40 bg-primary/10 text-primary text-sm font-bold mb-2 touch-manipulation"
+            className="w-full py-4 min-h-[56px] rounded-xl bg-primary text-black text-base font-extrabold mb-2 touch-manipulation"
           >
-            Then publish first card →
+            Build first card →
           </button>
-      <button
+          <button
             type="button"
             onClick={() => {
               if (leagueId) markHostScreenSeen(leagueId);
-              router.push("/");
+              router.push("/league-build?new=1");
               router.refresh();
             }}
-            className="w-full py-3 min-h-[48px] rounded-xl border border-border text-sm text-muted hover:text-foreground touch-manipulation"
+            className="w-full py-3 min-h-[48px] rounded-xl border border-border text-sm font-semibold text-muted hover:text-foreground touch-manipulation"
           >
-            Home first
+            Finish room setup first
           </button>
+
       </div>
       </div>
     );
