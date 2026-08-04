@@ -164,6 +164,7 @@ Add a row when a real bug or near-miss teaches us something. Never delete a row;
 | P4 | View-as-player while on empty Picks flips host → player copy without leaving page | Role stuck was a real bug (f933fbd) | | |
 | P5 | Hard refresh on empty Picks: player copy may rotate (session salt) | Variety without flicker mid-session | | |
 | P6 | Non-live week with no card: archive messaging + jump to live | Wrong week empty | | |
+| P7 | Week chips: only weeks with a real card — no ghost Week 1 before created | Fake affordance | 2026 · trustWeekBrowserWeeks | |
 
 ### Picks with card
 

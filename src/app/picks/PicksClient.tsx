@@ -1453,9 +1453,10 @@ export default function PicksClient() {
         sportId: getLeague()?.sportId,
       });
     } catch {
+      // Fallback: published cards only — never invent activeWeek without a card
       return [
         ...new Set(
-          [...publishedWeeks, ...scoredWeeks, activeWeek].filter(
+          [...publishedWeeks, ...scoredWeeks].filter(
             (w) => w >= 0 && w !== 99
           )
         ),

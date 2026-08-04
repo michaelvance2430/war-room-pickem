@@ -67,12 +67,13 @@ export function trustOfficialScoredWeeks(
 }
 
 /**
- * Contiguous published run that touches the official live week.
+ * Contiguous published run around the official live week.
+ *
+ * PRODUCT RULE: Never show a week that hasn't been created (no week_card).
+ * No ghost "Week 1" when only Week 0 exists. The season bar grows as cards exist.
  *
  * Walk backward and forward from `activeWeek` only while week_cards exist.
  * Stops at the first gap — so [0,1,5,6,7] with live=0 → [0,1] only.
- *
- * Does not invent weeks that aren't published (except the live week chip itself).
  */
 export function trustContiguousPublishedAroundLive(
   published: number[],
@@ -88,17 +89,31 @@ export function trustContiguousPublishedAroundLive(
   live = Math.max(first, Math.min(max, live));
 
   const out = new Set<number>();
-  // Always show the official live week (even if card missing — waiting room)
-  out.add(live);
+  // Live week only if a real card exists — never a placeholder chip
+  if (set.has(live)) out.add(live);
+
+  // Prefer a seed: if live has no card yet, still show contiguous published history
+  // ending at the highest published week ≤ live (season growing behind you)
+  let seed = live;
+  if (!set.has(live)) {
+    const publishedSorted = [...set].sort((a, b) => a - b);
+    const behind = publishedSorted.filter((w) => w <= live);
+    if (behind.length === 0) {
+      // Nothing created yet — empty bar (header still names the live week)
+      return [];
+    }
+    seed = behind[behind.length - 1]!;
+    out.add(seed);
+  }
 
   // Backward through contiguous published history
-  for (let w = live - 1; w >= first; w--) {
+  for (let w = seed - 1; w >= first; w--) {
     if (set.has(w)) out.add(w);
     else break;
   }
 
-  // Forward through contiguous prepared future cards only
-  for (let w = live + 1; w <= max; w++) {
+  // Forward through contiguous prepared future cards only (real cards only)
+  for (let w = seed + 1; w <= max; w++) {
     if (set.has(w)) out.add(w);
     else break;
   }
@@ -108,8 +123,9 @@ export function trustContiguousPublishedAroundLive(
 
 /**
  * Player-facing week selector inventory.
- * Live + contiguous published around live + trusted scored history.
- * Never practice week. Never orphan islands (5–7 while live is 0).
+ * Only weeks with a real card (published) and trusted scored history that
+ * belongs to that published set. Never invent next week. Never practice week.
+ * Never orphan islands (5–7 while live is 0).
  */
 export function trustWeekBrowserWeeks(opts: {
   published: number[];
@@ -128,10 +144,13 @@ export function trustWeekBrowserWeeks(opts: {
     opts.published,
     opts.sportId
   );
+  // Scored chips only if that week was actually published (created)
+  const publishedSet = new Set(cleanWeekList(opts.published, opts.sportId));
+  const scoredCreated = trustedScored.filter((w) => publishedSet.has(w));
 
-  return [
-    ...new Set([...contiguousPub, ...trustedScored]),
-  ].sort((a, b) => a - b);
+  return [...new Set([...contiguousPub, ...scoredCreated])].sort(
+    (a, b) => a - b
+  );
 }
 
 /**
