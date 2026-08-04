@@ -58,6 +58,7 @@ import {
   loadPickSubmissionStatus,
   postMissingPicksAnnouncement,
   setLeagueActiveWeek,
+  loadLeagueActiveWeek,
   resetSeasonInCloud,
   startNextSeasonInCloud,
   seedTrialBotsInCloud,
@@ -148,8 +149,7 @@ import {
   resolveHomeTagline,
 } from "@/lib/home-tagline";
 import { paintAutomaticSeasonTheme } from "@/lib/season-theme";
-
-const ACTIVE_WEEK_KEY = "warroom-active-week";
+import { writeScopedActiveWeek } from "@/lib/active-week-storage";
 
 function storageKeys(week: number) {
   return {
@@ -157,6 +157,21 @@ function storageKeys(week: number) {
     results: `warroom-results-week-${week}`,
     card: `warroom-card-week-${week}`,
   };
+}
+
+/** League-scoped view cache only — never unscoped warroom-active-week. */
+function rememberActiveWeekLocal(week: number) {
+  try {
+    const sess = getSession();
+    if (!sess?.leagueId) return;
+    writeScopedActiveWeek(week, {
+      userId: sess.playerId,
+      leagueId: sess.leagueId,
+      sportId: getLeague()?.sportId,
+    });
+  } catch {
+    /* ignore */
+  }
 }
 
 /**
@@ -244,8 +259,17 @@ function CommissionerPageInner() {
   const [openRoomNote, setOpenRoomNote] = useState<string | null>(null);
   const [homeTaglineId, setHomeTaglineId] = useState(DEFAULT_HOME_TAGLINE_ID);
   const [homeTaglineCustom, setHomeTaglineCustom] = useState("");
-  /** CFB week number: 0 = openers … 18 = CFP Final (fixed length). */
-  const [activeWeek, setActiveWeek] = useState(1);
+  /**
+   * Pick'em week for Build Card / odds. Cloud leagues.current_week is source
+   * of truth after boot; never permanently seed as 1 (NFL default).
+   */
+  const [activeWeek, setActiveWeek] = useState(() => {
+    try {
+      return firstSeasonWeek(getLeague()?.sportId);
+    } catch {
+      return 0;
+    }
+  });
   const [settingsSaved, setSettingsSaved] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [availableGames, setAvailableGames] = useState<Game[]>([]);
@@ -407,17 +431,9 @@ function CommissionerPageInner() {
         void paintAutomaticSeasonTheme();
       }
 
-      let week = 1;
-      try {
-        const saved = localStorage.getItem(ACTIVE_WEEK_KEY);
-        if (saved != null && saved !== "") week = parseInt(saved, 10);
-        if (Number.isNaN(week)) week = 1;
-      } catch {
-        /* ignore */
-      }
-      const minW = firstSeasonWeek(lg?.sportId);
-      if (week < minW) week = minW;
-      setActiveWeek(week);
+      // Optimistic paint: sport-first week (CFB 0 / NFL 1) — cloud overwrites next
+      const paintWeek = firstSeasonWeek(lg?.sportId);
+      setActiveWeek(paintWeek);
 
       // URL tab landing — sync, no cloud
       const tabParam = searchParams.get("tab");
@@ -462,7 +478,34 @@ function CommissionerPageInner() {
         }, 400);
       }
 
-      // 4) Week card — soft, hard ceiling so tab never feels stuck
+      // 4) Cloud week is authoritative — never let generic local Week 1 win
+      let week = paintWeek;
+      try {
+        const cloudWeek = await loadLeagueActiveWeek();
+        if (Number.isFinite(cloudWeek)) {
+          week = cloudWeek;
+          setActiveWeek(week);
+          try {
+            const { writeScopedActiveWeek } = await import(
+              "@/lib/active-week-storage"
+            );
+            const sess = getSession();
+            if (sess?.leagueId) {
+              writeScopedActiveWeek(week, {
+                userId: sess.playerId,
+                leagueId: sess.leagueId,
+                sportId: lg?.sportId || getLeague()?.sportId,
+              });
+            }
+          } catch {
+            /* ignore */
+          }
+        }
+      } catch {
+        /* keep paintWeek */
+      }
+
+      // 5) Week card — soft, hard ceiling so tab never feels stuck
       setWeekBootBusy(true);
       try {
         await Promise.race([
@@ -854,7 +897,7 @@ function CommissionerPageInner() {
     setSelectedIds(new Set());
     setOddsError(null);
     try {
-      localStorage.setItem(ACTIVE_WEEK_KEY, String(week));
+      rememberActiveWeekLocal(week);
     } catch {
       /* ignore */
     }
@@ -1100,7 +1143,7 @@ function CommissionerPageInner() {
       /* ignore */
     }
     try {
-      localStorage.setItem(ACTIVE_WEEK_KEY, String(activeWeek));
+      rememberActiveWeekLocal(activeWeek);
       localStorage.setItem(
         keys.card,
         JSON.stringify({
@@ -1344,7 +1387,7 @@ function CommissionerPageInner() {
       /* ignore */
     }
     try {
-      localStorage.setItem(ACTIVE_WEEK_KEY, String(activeWeek));
+      rememberActiveWeekLocal(activeWeek);
       localStorage.setItem(
         keys.card,
         JSON.stringify({
@@ -2003,7 +2046,7 @@ function CommissionerPageInner() {
     if (nextWeek != null) {
       setActiveWeek(nextWeek);
       try {
-        localStorage.setItem(ACTIVE_WEEK_KEY, String(nextWeek));
+        rememberActiveWeekLocal(nextWeek);
       } catch {
         /* ignore */
       }
@@ -2203,7 +2246,7 @@ function CommissionerPageInner() {
     setBotReport(null);
     setActiveWeek(0);
     try {
-      localStorage.setItem(ACTIVE_WEEK_KEY, "0");
+      rememberActiveWeekLocal(0);
     } catch {
       /* ignore */
     }

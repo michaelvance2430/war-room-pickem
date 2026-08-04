@@ -167,10 +167,15 @@ function JoinPageInner() {
         display_name: nick,
       });
 
+      const { resolveNewLeagueOpeningWeek } = await import(
+        "@/lib/active-week-storage"
+      );
+      const openingWeek = resolveNewLeagueOpeningWeek(selectedSportId);
       const baseRow: Record<string, unknown> = {
         name: room,
         code: newCode,
         commissioner_id: userId,
+        current_week: openingWeek,
       };
       // Crystal Ball / Super Bowl pride pick — default ON; League Build wizard confirms
       const withSport: Record<string, unknown> = {
@@ -178,6 +183,7 @@ function JoinPageInner() {
         sport_id: selectedSportId,
         sport_settings: {},
         crystal_ball_enabled: true,
+        current_week: openingWeek,
       };
       if (listAsOpen) {
         withSport.is_open = true;
@@ -245,6 +251,7 @@ function JoinPageInner() {
               sport_id: selectedSportId,
               sport_settings: {},
               crystal_ball_enabled: true,
+              current_week: openingWeek,
             })
             .eq("id", league.id as string);
           if (!sportUpErr) {
@@ -280,9 +287,10 @@ function JoinPageInner() {
           .update({
             sport_id: createdSportId,
             crystal_ball_enabled: true,
+            current_week: openingWeek,
           })
           .eq("id", leagueId)
-          .select("sport_id")
+          .select("sport_id, current_week")
           .single();
         if (
           sportErr &&
@@ -347,6 +355,18 @@ function JoinPageInner() {
         userId
       );
       saveActiveLeagueId(leagueId);
+      try {
+        const { writeScopedActiveWeek } = await import(
+          "@/lib/active-week-storage"
+        );
+        writeScopedActiveWeek(openingWeek, {
+          userId,
+          leagueId,
+          sportId: createdSportId,
+        });
+      } catch {
+        /* ignore */
+      }
       markLeagueBuildNeeded(leagueId);
       // Silent Crew + first chapter (no day-one lecture — story at finale)
       try {

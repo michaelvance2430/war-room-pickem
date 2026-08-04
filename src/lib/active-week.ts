@@ -103,7 +103,18 @@ export async function resolvePlayerActiveWeek(opts?: {
 
     if (advanced) {
       try {
-        localStorage.setItem("warroom-active-week", String(week));
+        const { writeScopedActiveWeek } = await import(
+          "./active-week-storage"
+        );
+        const { getSession } = await import("./league");
+        const sess = getSession();
+        if (sess?.leagueId) {
+          writeScopedActiveWeek(week, {
+            userId: sess.playerId,
+            leagueId: sess.leagueId,
+            sportId: sid,
+          });
+        }
       } catch {
         /* ignore */
       }
@@ -130,7 +141,16 @@ export async function resolvePlayerActiveWeek(opts?: {
 
   if (advanced) {
     try {
-      localStorage.setItem("warroom-active-week", String(week));
+      const { writeScopedActiveWeek } = await import("./active-week-storage");
+      const { getSession } = await import("./league");
+      const sess = getSession();
+      if (sess?.leagueId) {
+        writeScopedActiveWeek(week, {
+          userId: sess.playerId,
+          leagueId: sess.leagueId,
+          sportId: sid,
+        });
+      }
     } catch {
       /* ignore */
     }

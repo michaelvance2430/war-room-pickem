@@ -356,7 +356,15 @@ export async function setLeagueActiveWeek(
     const eyes = await import("./creator-eyes");
     if (eyes.isEyesLocalPlayActive()) {
       try {
-        localStorage.setItem("warroom-active-week", String(weekNumber));
+        const { writeScopedActiveWeek } = await import(
+          "./active-week-storage"
+        );
+        const { getLeague } = await import("./league");
+        writeScopedActiveWeek(weekNumber, {
+          userId: session.playerId,
+          leagueId: session.leagueId,
+          sportId: getLeague()?.sportId,
+        });
       } catch {
         /* ignore */
       }
@@ -375,7 +383,13 @@ export async function setLeagueActiveWeek(
     .eq("id", session.leagueId);
   if (error) return { ok: false, error: error.message };
   try {
-    localStorage.setItem("warroom-active-week", String(weekNumber));
+    const { writeScopedActiveWeek } = await import("./active-week-storage");
+    const { getLeague } = await import("./league");
+    writeScopedActiveWeek(weekNumber, {
+      userId: session.playerId,
+      leagueId: session.leagueId,
+      sportId: getLeague()?.sportId,
+    });
   } catch {
     /* ignore */
   }
@@ -450,15 +464,28 @@ export async function loadLeagueActiveWeek(): Promise<number> {
     /* ignore */
   }
   const session = getSession();
-  let fallbackWeek = 1;
+  let sportId: string | null = null;
   try {
-    const saved = localStorage.getItem("warroom-active-week");
-    if (saved != null && saved !== "") {
-      const n = parseInt(saved, 10);
-      if (!Number.isNaN(n)) fallbackWeek = n;
-    }
+    const { getLeague } = await import("./league");
+    sportId = getLeague()?.sportId || null;
   } catch {
-    /* ignore */
+    sportId = null;
+  }
+  let fallbackWeek = sportId === "nfl" ? 1 : 0;
+  try {
+    const { readActiveWeekFallback } = await import("./active-week-storage");
+    fallbackWeek = readActiveWeekFallback({
+      userId: session?.playerId,
+      leagueId: session?.leagueId,
+      sportId,
+    });
+  } catch {
+    try {
+      const { firstSeasonWeek } = await import("./season-calendar");
+      fallbackWeek = firstSeasonWeek(sportId);
+    } catch {
+      /* keep */
+    }
   }
   if (!session?.leagueId) return fallbackWeek;
 
@@ -536,15 +563,24 @@ export async function loadLeagueActiveWeek(): Promise<number> {
         const n = Number(data.current_week);
         if (!Number.isNaN(n)) {
           week = n;
+          // Cloud is authoritative — write scoped cache only; never legacy key
           try {
-            localStorage.setItem("warroom-active-week", String(week));
+            const { writeScopedActiveWeek, clampWeek } = await import(
+              "./active-week-storage"
+            );
+            week = clampWeek(week, sportId);
+            writeScopedActiveWeek(week, {
+              userId: session.playerId,
+              leagueId,
+              sportId,
+            });
           } catch {
             /* ignore */
           }
         }
         wrBoardP1("leagues.current_week", "DONE", qMs, `week=${week}`);
       } else {
-        wrBoardP1("leagues.current_week", "DONE", qMs, "null-current_week");
+        wrBoardP1("leagues.current_week", "DONE", qMs, "null-current-week");
       }
     } catch {
       failed = true;
@@ -719,7 +755,13 @@ export async function publishWeekCard(opts: {
     .update({ current_week: opts.weekNumber })
     .eq("id", leagueId);
   try {
-    localStorage.setItem("warroom-active-week", String(opts.weekNumber));
+    const { writeScopedActiveWeek } = await import("./active-week-storage");
+    const { getLeague } = await import("./league");
+    writeScopedActiveWeek(opts.weekNumber, {
+      userId: session.playerId,
+      leagueId,
+      sportId: getLeague()?.sportId,
+    });
   } catch {
     /* ignore */
   }
@@ -4780,7 +4822,13 @@ async function resetSeasonClientFallback(
 
   await supabase.from("leagues").update({ current_week: 0 }).eq("id", leagueId);
   try {
-    localStorage.setItem("warroom-active-week", "0");
+    const { writeScopedActiveWeek } = await import("./active-week-storage");
+    const sess = getSession();
+    writeScopedActiveWeek(0, {
+      userId: sess?.playerId,
+      leagueId,
+      sportId: getLeague()?.sportId || "cfb",
+    });
   } catch {
     /* ignore */
   }
@@ -4908,7 +4956,19 @@ export async function resetSeasonInCloud(): Promise<ResetSeasonResult> {
       localStorage.removeItem(`warroom-results-week-${w}`);
       localStorage.removeItem(`warroom-picks-week-${w}`);
     }
-    localStorage.setItem("warroom-active-week", "0");
+    try {
+      const { writeScopedActiveWeek, LEGACY_ACTIVE_WEEK_KEY } = await import(
+        "./active-week-storage"
+      );
+      writeScopedActiveWeek(0, {
+        userId: getSession()?.playerId,
+        leagueId,
+        sportId: "cfb",
+      });
+      localStorage.removeItem(LEGACY_ACTIVE_WEEK_KEY);
+    } catch {
+      /* ignore */
+    }
     // Crystal Ball / Super Bowl pride picks (device fallback board)
     localStorage.removeItem(`warroom-crystal-ball-${leagueId}`);
     // Stale local roster stats (guest/demo residue)
