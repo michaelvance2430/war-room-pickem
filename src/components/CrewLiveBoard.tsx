@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * Real-time-ish Crew presence + points burn board.
- * Refreshes on an interval so you can watch who is live in the room.
+ * Crew presence board.
+ * Points / burn ranks only after an official scored week — never residue.
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -15,13 +15,14 @@ import {
   type CrewBoardRow,
 } from "@/lib/crew-cheevos";
 import { formatLastSeen, lastSeenToneClass } from "@/lib/last-seen";
+import { hasOfficialScoredWeek } from "@/lib/season-scored";
 import type { Player } from "@/lib/types";
 
 const POLL_MS = 25_000;
 
 type Props = {
   className?: string;
-  /** Show burn ranks */
+  /** Show burn ranks — ignored until a week is officially scored */
   showBurn?: boolean;
 };
 
@@ -32,9 +33,14 @@ export default function CrewLiveBoard({
   const [rows, setRows] = useState<CrewBoardRow[]>([]);
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** Competitive points only after real scored week */
+  const [seasonScored, setSeasonScored] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
+      const scored = await hasOfficialScoredWeek().catch(() => false);
+      setSeasonScored(scored);
+
       const [players, roster] = await Promise.all([
         loadLeaguePlayers().catch(() => [] as Player[]),
         loadLeagueRoster().catch(() => []),
@@ -50,7 +56,6 @@ export default function CrewLiveBoard({
           lastSeenById[p.id] = p.lastSeenAt;
         }
       }
-      // Prefer full standings players; fall back to roster shells
       let field = players;
       if (!field.length && roster.length) {
         field = roster
@@ -61,7 +66,8 @@ export default function CrewLiveBoard({
                 id: m.userId,
                 name: m.name || "Player",
                 division: "North",
-                totalPoints: m.totalPoints || 0,
+                // Never seed residual points before official score
+                totalPoints: scored ? m.totalPoints || 0 : 0,
                 weeklyPoints: [],
                 atsCorrect: 0,
                 atsTotal: 0,
@@ -78,10 +84,32 @@ export default function CrewLiveBoard({
                 lastSeenAt: m.lastSeenAt || undefined,
               }) as Player
           );
+      } else if (!scored && field.length) {
+        // Strip residue season points — constitution: never invent achievement
+        field = field.map((p) => ({
+          ...p,
+          totalPoints: 0,
+          weeklyPoints: [],
+          weeksPlayed: 0,
+        }));
       }
       const board = buildCrewCommitmentBoard(field, {
         lastSeenById,
       });
+      // Presence-first sort when no scored week (last in, then name)
+      if (!scored) {
+        board.sort((a, b) => {
+          const at = a.lastSeenAt ? new Date(a.lastSeenAt).getTime() : 0;
+          const bt = b.lastSeenAt ? new Date(b.lastSeenAt).getTime() : 0;
+          if (bt !== at) return bt - at;
+          return a.name.localeCompare(b.name);
+        });
+        board.forEach((r, i) => {
+          r.burnRank = i + 1;
+          r.totalPoints = 0;
+          r.weeksPlayed = 0;
+        });
+      }
       setRows(board);
       setUpdatedAt(Date.now());
       setError(null);
@@ -104,6 +132,7 @@ export default function CrewLiveBoard({
   }, [refresh]);
 
   const selfId = getSession()?.playerId;
+  const showPoints = showBurn && seasonScored;
 
   return (
     <section className={`space-y-3 ${className}`}>
@@ -125,9 +154,7 @@ export default function CrewLiveBoard({
         </p>
       </div>
 
-      {error && (
-        <p className="text-xs text-danger">{error}</p>
-      )}
+      {error && <p className="text-xs text-danger">{error}</p>}
 
       {rows.length === 0 ? (
         <p className="text-sm text-muted">No roster yet.</p>
@@ -140,9 +167,11 @@ export default function CrewLiveBoard({
                 r.playerId === selfId ? "bg-primary/5" : ""
               }`}
             >
-              <div className="w-7 shrink-0 text-center text-xs font-bold text-muted tabular-nums">
-                {showBurn ? r.burnRank : "·"}
-              </div>
+              {showPoints ? (
+                <div className="w-7 shrink-0 text-center text-xs font-bold text-muted tabular-nums">
+                  {r.burnRank}
+                </div>
+              ) : null}
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <PlayerLink
@@ -167,7 +196,7 @@ export default function CrewLiveBoard({
                   Last in: {formatLastSeen(r.lastSeenAt)}
                 </p>
               </div>
-              {showBurn && (
+              {showPoints ? (
                 <div className="text-right shrink-0">
                   <p className="text-sm font-bold tabular-nums text-foreground">
                     {r.totalPoints}
@@ -179,19 +208,22 @@ export default function CrewLiveBoard({
                     {r.weeksPlayed}w played
                   </p>
                 </div>
-              )}
+              ) : null}
             </li>
           ))}
         </ul>
       )}
 
       <p className="text-[11px] text-muted leading-relaxed">
-        Live links = every name is a profile. Ranks = who&apos;s burning the most
-        season points. Last-in uses the same presence pulse as Standings.
+        {showPoints
+          ? "Live links = every name is a profile. Ranks = who is burning the most season points after a scored week. Last-in uses the same presence pulse as Standings."
+          : "Presence only until a week is scored. No points, ranks, or burn board until football earns them."}
       </p>
-      <Link href="/standings" className="text-xs font-bold text-primary">
-        Full standings →
-      </Link>
+      {showPoints ? (
+        <Link href="/standings" className="text-xs font-bold text-primary">
+          Full standings →
+        </Link>
+      ) : null}
     </section>
   );
 }
