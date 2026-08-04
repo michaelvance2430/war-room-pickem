@@ -132,7 +132,16 @@ export default function PlayerLink({
     wrProfile("click-received", undefined, `PlayerLink→${id.slice(0, 8)}`);
     wrProfileRoute("click", `id=${id.slice(0, 8)} href=/profile/${id.slice(0, 8)}`);
     try {
+      performance.mark?.("wr-profile:click");
       performance.mark?.("wr-profile-route:click");
+      if (
+        process.env.NODE_ENV === "development" ||
+        localStorage.getItem("warroom-runtime-debug") === "1"
+      ) {
+        console.log(
+          `[WR-PERF][profile] click +0ms id=${id.slice(0, 8)}`
+        );
+      }
     } catch {
       /* ok */
     }

@@ -1,7 +1,9 @@
 import { Player, Game, Prop, UserPick } from "./types";
-import { syncLeagueCheevoKing } from "./badges";
 import { scoreWeek, GameResult } from "./scoring";
 import { mockPlayers } from "./mock-data";
+
+// NEVER static-import ./badges here — profile route and other light readers
+// must not pay for the full badge catalog. Cheevo sync loads badges lazily.
 
 const PLAYERS_KEY = "warroom-players";
 const RESULTS_KEY = "warroom-results-week-1";
@@ -62,15 +64,22 @@ export function loadPlayers(): Player[] {
 
 /**
  * Load roster, crown Cheevo King(s), save if anyone newly earned it.
- * Use when opening profiles / standings so the rare badge stays in sync.
+ * Lazy-loads badges so importing this module does not pull the catalog.
  */
 export function loadPlayersAndSyncCheevos(): Player[] {
   const players = loadPlayers();
-  const synced = syncLeagueCheevoKing(players);
-  if (synced !== players) {
-    savePlayers(synced);
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { syncLeagueCheevoKing } =
+      require("./badges") as typeof import("./badges");
+    const synced = syncLeagueCheevoKing(players);
+    if (synced !== players) {
+      savePlayers(synced);
+    }
+    return synced;
+  } catch {
+    return players;
   }
-  return synced;
 }
 
 export function savePlayers(players: Player[]) {
@@ -82,12 +91,15 @@ export function savePlayers(players: Player[]) {
   }
 }
 
-/** Simple: look up by id in roster (after cheevo sync), then mock catalog. */
+/**
+ * Look up by id in local roster, then mock catalog.
+ * Does NOT run Cheevo King sync (that was a multi-second badge catalog path).
+ */
 export function findPlayer(id: string | null | undefined): Player | null {
   if (!id) return null;
   const key = String(id);
 
-  const fromRoster = loadPlayersAndSyncCheevos().find((p) => p.id === key);
+  const fromRoster = loadPlayers().find((p) => p.id === key);
   if (fromRoster) return fromRoster;
 
   const fromMocks = mockPlayers.find((p) => p.id === key);

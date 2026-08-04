@@ -1,15 +1,15 @@
 "use client";
 
 /**
- * EMERGENCY CONTAINMENT (P0 main-thread freeze)
- * - Identity-first paint only
- * - No getPlayerBadges / badge catalog on initial render
- * - Heavy sections deferred until user expands (dynamic import)
- * - No league-wide peer sync before interactive
+ * P0 FREEZE FIX — identity-first profile route.
  *
- * NOTE: Still static-imports @/lib/store (findPlayer) and @/lib/league —
- * both pull store → badges.ts. Pre-render freeze investigation: see
- * docs/PROFILE_PRE_RENDER_FREEZE.md. Do not restore eager shelves yet.
+ * NEVER static-import @/lib/store or @/lib/league here.
+ * Both pull store → badges.ts (~70KB catalog) into the route chunk and
+ * caused 17s main-thread longtasks on "View Profile" (Standings → profile).
+ *
+ * Session/league: @/lib/session-read (localStorage only).
+ * Offline fallback findPlayer: dynamic import after first paint only.
+ * Badges / trophies / résumé: ProfileHeavyDetails dynamic import on demand.
  */
 
 import { useEffect, useRef, useState, type ComponentType } from "react";
@@ -18,7 +18,6 @@ import { useParams } from "next/navigation";
 import Avatar from "@/components/Avatar";
 import AvatarLightbox from "@/components/AvatarLightbox";
 import { divisionFullLabel } from "@/lib/divisions";
-import { isSandboxMode } from "@/lib/season-mode";
 import { withCreatorFlag } from "@/lib/creator";
 import {
   computeJoinTitles,
@@ -33,13 +32,53 @@ import {
   mockRoastFor,
   mockRoastLabel,
 } from "@/lib/mock-roasts";
-import { findPlayer } from "@/lib/store";
-import { getLeague, getSession } from "@/lib/league";
+import { readLeague, readSession } from "@/lib/session-read";
 import { Player } from "@/lib/types";
 import { wrProfile, wrProfileTimed, wrProfileRoute } from "@/lib/runtime-iso";
 
 // Module evaluation boundary — if this never logs, freeze is BEFORE profile chunk runs
+const __profileModuleT0 =
+  typeof performance !== "undefined" ? performance.now() : 0;
 wrProfileRoute("module-top");
+if (typeof performance !== "undefined") {
+  try {
+    performance.mark("wr-profile:module-eval");
+  } catch {
+    /* ok */
+  }
+}
+
+function mark(label: string, extra?: string) {
+  wrProfileRoute(label, extra);
+  try {
+    performance.mark(`wr-profile:${label}`);
+    if (
+      typeof process !== "undefined" &&
+      process.env.NODE_ENV === "development"
+    ) {
+      const ms =
+        typeof performance !== "undefined"
+          ? Math.round(performance.now() - __profileModuleT0)
+          : 0;
+      console.log(
+        `[WR-PERF][profile] ${label} +${ms}ms${extra ? ` ${extra}` : ""}`
+      );
+    } else if (
+      typeof localStorage !== "undefined" &&
+      localStorage.getItem("warroom-runtime-debug") === "1"
+    ) {
+      const ms =
+        typeof performance !== "undefined"
+          ? Math.round(performance.now() - __profileModuleT0)
+          : 0;
+      console.log(
+        `[WR-PERF][profile] ${label} +${ms}ms${extra ? ` ${extra}` : ""}`
+      );
+    }
+  } catch {
+    /* ok */
+  }
+}
 
 /** Local copy — do NOT import from @/lib/badges (pulls full catalog onto route). */
 function formatMemberSince(iso?: string): string {
@@ -120,7 +159,7 @@ const HeavyDetailsPlaceholder = ({
  * Lightweight production profile — identity first, heavy work deferred.
  */
 export default function ProfilePage() {
-  wrProfileRoute("render-enter");
+  mark("render-enter");
   const params = useParams();
   const id = typeof params.id === "string" ? params.id : "";
 
@@ -131,6 +170,7 @@ export default function ProfilePage() {
   const [joinTitle, setJoinTitle] = useState<string | null>(null);
   const [lastSeenAt, setLastSeenAt] = useState<string | null>(null);
   const [blueFalconCount, setBlueFalconCount] = useState(0);
+  const [sandboxHint, setSandboxHint] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [DetailsPanel, setDetailsPanel] = useState<ComponentType<{
@@ -141,7 +181,7 @@ export default function ProfilePage() {
   const hadPaintRef = useRef(false);
 
   useEffect(() => {
-    wrProfileRoute("effect-enter", `id=${id.slice(0, 8)}`);
+    mark("effect-enter", `id=${id.slice(0, 8)}`);
     wrProfile("data-effect-start", undefined, `id=${id.slice(0, 8)}`);
     let cancelled = false;
 
@@ -184,7 +224,10 @@ export default function ProfilePage() {
       setDetailsPanel(null);
 
       const failSafe = window.setTimeout(() => {
-        if (!cancelled) setReady(true);
+        if (!cancelled) {
+          mark("failsafe-ready");
+          setReady(true);
+        }
       }, 2_500);
 
       try {
@@ -192,10 +235,21 @@ export default function ProfilePage() {
         let title: string | null = null;
         let seen: string | null = null;
 
-        // Roster only — no standings, no badge catalog
+        // Roster only — never pull store/badges on open
         try {
+          mark("roster-import-start");
+          const tRoster = performance.now();
           const { loadLeagueRoster } = await import("@/lib/cloud");
+          mark(
+            "roster-import-done",
+            `${Math.round(performance.now() - tRoster)}ms`
+          );
+          const tLoad = performance.now();
           const roster = await loadLeagueRoster();
+          mark(
+            "roster-fetch-done",
+            `${Math.round(performance.now() - tLoad)}ms n=${roster.length}`
+          );
           if (cancelled) return;
           if (roster.length) {
             const titles = computeJoinTitles(roster);
@@ -210,13 +264,26 @@ export default function ProfilePage() {
           /* offline */
         }
 
-        if (!found) found = findPlayer(id);
+        // Offline / demo fallback only — dynamic so badges never join first paint
+        if (!found) {
+          try {
+            mark("store-fallback-start");
+            const tStore = performance.now();
+            const { findPlayer } = await import("@/lib/store");
+            found = findPlayer(id);
+            mark(
+              "store-fallback-done",
+              `${Math.round(performance.now() - tStore)}ms found=${!!found}`
+            );
+          } catch {
+            /* ignore */
+          }
+        }
 
         if (found) {
-          // Lightweight creator flag only — no permanent badge grants / catalog
           found = withCreatorFlag(found);
           try {
-            const me = getSession()?.playerId;
+            const me = readSession()?.playerId;
             if (me && me !== found.id) {
               void import("@/lib/engagement").then(({ markEngagement }) => {
                 markEngagement(me, "opened_other_profile");
@@ -234,10 +301,21 @@ export default function ProfilePage() {
           if (found) hadPaintRef.current = true;
           setReady(true);
           window.clearTimeout(failSafe);
-          wrProfile("data-effect-first-paint", undefined, found ? "found" : "missing");
+          mark("first-usable-paint", found ? "found" : "missing");
+          wrProfile(
+            "data-effect-first-paint",
+            undefined,
+            found ? "found" : "missing"
+          );
+          wrProfile("interactive");
         }
 
         if (!found || cancelled) return;
+
+        // Sandbox hint after paint (season-mode is light but keep it off critical path)
+        void import("@/lib/season-mode").then((m) => {
+          if (!cancelled) setSandboxHint(m.isSandboxMode());
+        });
 
         // Blue Falcon — non-blocking, after paint
         void (async () => {
@@ -262,7 +340,6 @@ export default function ProfilePage() {
         if (!cancelled) {
           setReady(true);
           wrProfile("data-effect-done");
-          wrProfile("interactive");
         }
       }
     }
@@ -277,12 +354,13 @@ export default function ProfilePage() {
   async function loadHeavyDetails() {
     if (!player || detailsLoading) return;
     setDetailsLoading(true);
+    mark("details-import-start");
     wrProfile("details-import-start");
     const t0 = performance.now();
     try {
-      // Dynamic import — modules NOT on initial render path
       const mod = await import("@/components/ProfileHeavyDetails");
       const ms = performance.now() - t0;
+      mark("details-import-done", `${Math.round(ms)}ms`);
       if (ms > 500) {
         wrProfile("SLOW_SECTION", ms, "ProfileHeavyDetails import");
       } else {
@@ -290,7 +368,6 @@ export default function ProfilePage() {
       }
       setDetailsPanel(() => mod.default);
       setDetailsOpen(true);
-      // Yield before React mounts the heavy tree
       await new Promise((r) => setTimeout(r, 0));
     } catch (e) {
       wrProfile(
@@ -303,9 +380,12 @@ export default function ProfilePage() {
     }
   }
 
-  const leagueName = getLeague()?.name || "War Room";
-  const sessionPlayerId = getSession()?.playerId;
-  const sportId = getLeague()?.sportId || "cfb";
+  // Light localStorage only — never @/lib/league (that pulls store→badges)
+  const league = readLeague();
+  const session = readSession();
+  const leagueName = league?.name || "War Room";
+  const sessionPlayerId = session?.playerId;
+  const sportId = league?.sportId || "cfb";
 
   if (!ready) {
     return (
@@ -495,7 +575,7 @@ export default function ProfilePage() {
                 <p className="text-[10px] text-muted mt-2 leading-relaxed">
                   Standings own season points. Badges and hardware load when you
                   open details below.
-                  {isSandboxMode()
+                  {sandboxHint
                     ? " Preseason: early cheevos don't stick to career yet."
                     : ""}
                 </p>
