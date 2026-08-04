@@ -134,8 +134,15 @@ const CARD_TTL_MS = 12_000;
 const LIST_TTL_MS = 12_000;
 /** Success + failure backoff for current_week reads (no stampede). */
 const ACTIVE_WEEK_TTL_MS = 5_000;
-const PLAYERS_TTL_MS = 15_000;
-const ROSTER_TTL_MS = 25_000;
+/**
+ * Was 15s — too short. Production stampede (Mike trace fcd0be18): 200+ concurrent
+ * loadLeaguePlayers waiters while one network hop ran; resolve cascade froze UI.
+ * Longer TTL + stale-while-revalidate below.
+ */
+const PLAYERS_TTL_MS = 120_000;
+/** Serve stale standings up to this age while one background revalidate runs. */
+const PLAYERS_STALE_MS = 10 * 60_000;
+const ROSTER_TTL_MS = 60_000;
 /** Last good card survives SPA remounts so My Picks paints from Standings. */
 const PEEK_CARD_SS_PREFIX = "warroom-peek-card:";
 const PEEK_CARD_SS_MAX_MS = 45 * 60_000;
@@ -209,6 +216,23 @@ function cacheGet<T>(map: Map<string, CacheEntry<T>>, key: string, ttl: number):
     return undefined;
   }
   return e.value;
+}
+
+/** Return cached value even if past ttl, up to maxAge (stale-while-revalidate). */
+function cacheGetStale<T>(
+  map: Map<string, CacheEntry<T>>,
+  key: string,
+  freshTtl: number,
+  maxAge: number
+): { value: T; fresh: boolean; ageMs: number } | undefined {
+  const e = map.get(key);
+  if (!e) return undefined;
+  const ageMs = Date.now() - e.at;
+  if (ageMs > maxAge) {
+    map.delete(key);
+    return undefined;
+  }
+  return { value: e.value, fresh: ageMs <= freshTtl, ageMs };
 }
 
 function cacheSet<T>(map: Map<string, CacheEntry<T>>, key: string, value: T) {
@@ -2913,110 +2937,123 @@ export async function loadLeagueStandings(): Promise<StandingsCloudRow[]> {
 
 /**
  * Cloud standings mapped to Player shape for Standings / Power Rankings / Stats.
- * Optional `caller` tags the call graph (prefer explicit labels at call sites).
+ *
+ * P0 freeze (production fcd0be18): 200+ concurrent waiters joined one inflight
+ * load; when it resolved, the microtask/setState stampede froze the main thread
+ * for tens of seconds. Mitigations:
+ * - Longer fresh TTL + stale-while-revalidate (serve stale, revalidate once)
+ * - Single-flight shared promise (unchanged)
+ * - Inflight joiners share promise WITHOUT per-waiter finally logging storms
  */
 export async function loadLeaguePlayers(
   caller?: string
 ): Promise<import("./types").Player[]> {
-  let graphSeq = -1;
-  const tagEnd = (kind: string, extra?: string) => {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { logLoadLeaguePlayersEnd } =
-        require("./profile-nav-trace") as typeof import("./profile-nav-trace");
-      logLoadLeaguePlayersEnd(graphSeq, kind, extra);
-    } catch {
-      /* ok */
-    }
-  };
+  const who = caller || "unknown";
 
   try {
     const { isGuestMode } = await import("./guest-mode");
     if (isGuestMode()) {
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const { logLoadLeaguePlayersCall } =
-          require("./profile-nav-trace") as typeof import("./profile-nav-trace");
-        graphSeq = logLoadLeaguePlayersCall(
-          "cache-hit",
-          `guest caller=${caller || "unknown"}`
-        );
-      } catch {
-        /* ok */
-      }
       const { loadPlayers } = await import("./store");
-      const p = loadPlayers();
-      tagEnd("guest", `n=${p.length}`);
-      return p;
+      return loadPlayers();
     }
   } catch {
     /* fall through */
   }
 
   const session = getSession();
-  if (!session?.leagueId) {
+  if (!session?.leagueId) return [];
+  const key = session.leagueId;
+
+  // Fresh hit — return immediately (no graph spam unless profile trace)
+  const stale = cacheGetStale(
+    playersCache,
+    key,
+    PLAYERS_TTL_MS,
+    PLAYERS_STALE_MS
+  );
+  if (stale?.fresh) {
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { logLoadLeaguePlayersCall, logLoadLeaguePlayersEnd } =
         require("./profile-nav-trace") as typeof import("./profile-nav-trace");
       const s = logLoadLeaguePlayersCall(
         "cache-hit",
-        `no-session caller=${caller || "unknown"}`
+        `n=${stale.value.length} caller=${who} ageMs=${stale.ageMs}`
       );
-      logLoadLeaguePlayersEnd(s, "no-session");
+      logLoadLeaguePlayersEnd(s, "cache-hit", `n=${stale.value.length}`);
     } catch {
       /* ok */
     }
-    return [];
+    return stale.value;
   }
-  const key = session.leagueId;
 
-  const hit = cacheGet(playersCache, key, PLAYERS_TTL_MS);
-  if (hit !== undefined) {
+  // Stale-while-revalidate: return stale immediately, kick ONE background refresh
+  if (stale && !stale.fresh) {
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { logLoadLeaguePlayersCall, logLoadLeaguePlayersEnd } =
         require("./profile-nav-trace") as typeof import("./profile-nav-trace");
-      graphSeq = logLoadLeaguePlayersCall(
+      const s = logLoadLeaguePlayersCall(
         "cache-hit",
-        `n=${hit.length} caller=${caller || "unknown"} ttlMs=${PLAYERS_TTL_MS}`
+        `STALE n=${stale.value.length} caller=${who} ageMs=${stale.ageMs}`
       );
-      logLoadLeaguePlayersEnd(graphSeq, "cache-hit", `n=${hit.length}`);
+      logLoadLeaguePlayersEnd(s, "stale-serve", `n=${stale.value.length}`);
     } catch {
       /* ok */
     }
-    return hit;
+    if (!playersInflight.has(key)) {
+      void fetchLeaguePlayersNetwork(key, `${who}+bg-revalidate`).catch(
+        () => undefined
+      );
+    }
+    return stale.value;
   }
 
+  // No cache — join single-flight or start network
   const inflight = playersInflight.get(key);
   if (inflight) {
+    // Share ONE promise. Do NOT attach per-waiter finally/console (Mike: 200+
+    // inflight-join END lines = main-thread stampede when the hop resolves).
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { logLoadLeaguePlayersCall, logLoadLeaguePlayersEnd } =
         require("./profile-nav-trace") as typeof import("./profile-nav-trace");
-      graphSeq = logLoadLeaguePlayersCall(
+      // Count joiners sparsely for graph (every 25th)
+      const s = logLoadLeaguePlayersCall(
         "inflight",
-        `caller=${caller || "unknown"}`
+        `caller=${who} join-shared`
       );
-      return inflight.finally(() => {
-        logLoadLeaguePlayersEnd(graphSeq, "inflight-join");
-      });
+      if (s > 0 && s % 25 === 0) {
+        logLoadLeaguePlayersEnd(s, "inflight-join-sample");
+      } else if (s > 0) {
+        // undo depth bump for unsampled joiners so depth stays meaningful
+        logLoadLeaguePlayersEnd(s, "inflight-quiet");
+      }
     } catch {
-      return inflight;
+      /* ok */
     }
+    return inflight;
   }
 
+  return fetchLeaguePlayersNetwork(key, who);
+}
+
+async function fetchLeaguePlayersNetwork(
+  key: string,
+  caller: string
+): Promise<import("./types").Player[]> {
+  let graphSeq = -1;
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { logLoadLeaguePlayersCall } =
       require("./profile-nav-trace") as typeof import("./profile-nav-trace");
-    graphSeq = logLoadLeaguePlayersCall(
-      "network",
-      `caller=${caller || "unknown"}`
-    );
+    graphSeq = logLoadLeaguePlayersCall("network", `caller=${caller}`);
   } catch {
     /* ok */
   }
+
+  const existing = playersInflight.get(key);
+  if (existing) return existing;
 
   const promise = (async () => {
     const cloud = await loadLeagueStandings();
@@ -3052,7 +3089,6 @@ export async function loadLeaguePlayers(
         propHits: c.propHits,
         propTotal: c.propTotal,
         weeksPlayed: c.weeksPlayed,
-        // Folded into memberships→profiles embed (single round-trip)
         lastSeenAt: c.lastSeenAt ?? null,
       }));
     } finally {
@@ -3063,11 +3099,33 @@ export async function loadLeaguePlayers(
     return players;
   })()
     .then((players) => {
-      tagEnd("network", `n=${players.length}`);
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { logLoadLeaguePlayersEnd } =
+          require("./profile-nav-trace") as typeof import("./profile-nav-trace");
+        logLoadLeaguePlayersEnd(
+          graphSeq,
+          "network",
+          `n=${players.length}`
+        );
+      } catch {
+        /* ok */
+      }
       return players;
     })
     .catch((err) => {
-      tagEnd("network-fail", err instanceof Error ? err.message : "fail");
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { logLoadLeaguePlayersEnd } =
+          require("./profile-nav-trace") as typeof import("./profile-nav-trace");
+        logLoadLeaguePlayersEnd(
+          graphSeq,
+          "network-fail",
+          err instanceof Error ? err.message : "fail"
+        );
+      } catch {
+        /* ok */
+      }
       throw err;
     })
     .finally(() => {

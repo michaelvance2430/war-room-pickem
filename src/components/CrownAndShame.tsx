@@ -71,6 +71,13 @@ export default function CrownAndShame({
   const [data, setData] = useState<CrownShame | null | undefined>(undefined);
   const [seasonStarted, setSeasonStarted] = useState<boolean | null>(null);
 
+  // Depend on length + ids, NOT array identity — new [] every parent render
+  // was re-firing loadLeaguePlayers (stampede contributor).
+  const propKey =
+    playersProp && playersProp.length > 0
+      ? `${playersProp.length}:${playersProp[0]?.id || ""}:${playersProp[playersProp.length - 1]?.id || ""}`
+      : "";
+
   useEffect(() => {
     let cancelled = false;
 
@@ -84,6 +91,8 @@ export default function CrownAndShame({
       }
 
       try {
+        // Prefer parent-provided roster (Standings already loaded) — never
+        // re-fetch league standings just for crown chrome.
         const players =
           playersProp && playersProp.length > 0
             ? playersProp
@@ -101,7 +110,8 @@ export default function CrownAndShame({
     return () => {
       cancelled = true;
     };
-  }, [playersProp]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- propKey encodes roster identity
+  }, [propKey]);
 
   if (data === undefined || seasonStarted === null) {
     return (
