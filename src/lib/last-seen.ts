@@ -61,7 +61,7 @@ export async function touchLastSeen(): Promise<void> {
   }
 }
 
-/** Human relative time for last seen. */
+/** Human relative time for last seen (compact). */
 export function formatLastSeen(
   iso: string | null | undefined,
   nowMs = Date.now()
@@ -91,6 +91,75 @@ export function formatLastSeen(
   }
 }
 
+/**
+ * League pulse under a player name — is this room alive?
+ * Color via lastSeenToneClass / onlineNowDotClass. No gamification.
+ *
+ * Examples:
+ *  🟢 Online now
+ *  Last seen 8 min ago
+ *  Last seen Today
+ *  Last seen Yesterday
+ *  Last seen 5 days ago
+ */
+export function formatLeaguePulse(
+  iso: string | null | undefined,
+  nowMs = Date.now()
+): { label: string; online: boolean } {
+  if (!iso) return { label: "Last seen —", online: false };
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return { label: "Last seen —", online: false };
+  const diff = Math.max(0, nowMs - t);
+  const sec = Math.floor(diff / 1000);
+  const min = Math.floor(sec / 60);
+  const hr = Math.floor(min / 60);
+  const day = Math.floor(hr / 24);
+
+  // ~15 min = "online now" for room pulse (not engagement score)
+  if (min < 15) return { label: "Online now", online: true };
+  if (min < 60) return { label: `Last seen ${min} min ago`, online: false };
+  if (hr < 24) {
+    // Same calendar day ET-ish: still "Today" after hours
+    try {
+      const seenDay = new Date(iso).toLocaleDateString("en-US", {
+        timeZone: "America/New_York",
+      });
+      const nowDay = new Date(nowMs).toLocaleDateString("en-US", {
+        timeZone: "America/New_York",
+      });
+      if (seenDay === nowDay) {
+        return { label: "Last seen Today", online: false };
+      }
+    } catch {
+      /* fall through */
+    }
+    return { label: `Last seen ${hr}h ago`, online: false };
+  }
+  if (day === 1) return { label: "Last seen Yesterday", online: false };
+  if (day < 14) return { label: `Last seen ${day} days ago`, online: false };
+  if (day < 60) {
+    const w = Math.floor(day / 7);
+    return {
+      label: `Last seen ${w} week${w === 1 ? "" : "s"} ago`,
+      online: false,
+    };
+  }
+  try {
+    const d = new Date(iso).toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+    });
+    return { label: `Last seen ${d}`, online: false };
+  } catch {
+    return { label: "Last seen a while ago", online: false };
+  }
+}
+
+/** Green dot class when online-now for league pulse */
+export function leaguePulseDotClass(online: boolean): string {
+  return online ? "text-emerald-400" : "text-muted/50";
+}
+
 /** True if seen within window (default 6h = "green" tier). */
 export function isRecentlyActive(
   iso: string | null | undefined,
@@ -106,10 +175,10 @@ export function isRecentlyActive(
 const HOUR_MS = 60 * 60 * 1000;
 
 /**
- * Last-in freshness for UI color:
- *  - fresh (green):  ≤ 6 hours
+ * Last-in freshness for UI color (scan only — not a score):
+ *  - online / fresh (green):  ≤ 15 min online · ≤ 6 hours still green-ish
  *  - warm (yellow):  > 6 and < 18 hours
- *  - stale (red):    ≥ 18 hours
+ *  - stale (muted):    ≥ 18 hours (not red gamification — quiet)
  *  - unknown:        never seen / bad timestamp
  */
 export type LastSeenTone = "fresh" | "warm" | "stale" | "unknown";
@@ -121,7 +190,9 @@ export function getLastSeenTone(
   if (!iso) return "unknown";
   const t = new Date(iso).getTime();
   if (Number.isNaN(t)) return "unknown";
-  const hrs = Math.max(0, nowMs - t) / HOUR_MS;
+  const min = Math.max(0, nowMs - t) / (60 * 1000);
+  if (min <= 15) return "fresh"; // online now band
+  const hrs = min / 60;
   if (hrs <= 6) return "fresh";
   if (hrs < 18) return "warm";
   return "stale";
@@ -136,9 +207,9 @@ export function lastSeenToneClass(
     case "fresh":
       return "text-emerald-400 font-semibold";
     case "warm":
-      return "text-amber-400 font-semibold";
+      return "text-amber-400/90 font-medium";
     case "stale":
-      return "text-red-400 font-semibold";
+      return "text-muted font-medium";
     default:
       return "text-muted";
   }

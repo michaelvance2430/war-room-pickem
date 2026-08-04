@@ -16,31 +16,32 @@ export default function RulesPage() {
     <div className="min-h-screen flex flex-col">
       <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-8">
         <div className="mb-6">
-      <h1 className="text-2xl font-bold mb-1">Rules</h1>
-      <p className="text-sm text-muted">
-            How War Room Pick&apos;Em works — same guide as the first-login
-            popup.
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-2">
+            How we play
           </p>
-      </div>
+          <h1 className="text-2xl font-black mb-2">Rules</h1>
+          <p className="text-base text-foreground/90 leading-relaxed max-w-xl">
+            War Room exists to make Saturdays (and Sundays) with friends a little
+            more fun.
+          </p>
+          <p className="text-sm text-muted mt-2 leading-relaxed max-w-xl">
+            Everything below protects that experience. Culture first. Fine print
+            second.
+          </p>
+        </div>
 
         <div className="rounded-xl border border-border bg-card p-5 sm:p-6 mb-6">
-      <RulesContent />
+          <RulesContent />
         </div>
-      <div className="flex flex-col sm:flex-row gap-3">
-          <Link
-            href="/picks"
-            className="flex-1 text-center py-3 rounded-xl bg-primary text-black font-semibold text-sm"
-          >
-            Go to My Picks
-          </Link>
-      <Link
-            href="/"
-            className="flex-1 text-center py-3 rounded-xl border border-border text-sm text-muted hover:text-foreground font-medium"
-          >
-            Home
-          </Link>
-      </div>
+
+        {/* Home owns navigation — one exit, not a tour of the app */}
+        <Link
+          href="/"
+          className="flex items-center justify-center w-full min-h-[48px] rounded-xl border border-border text-sm font-bold text-foreground hover:bg-card-hover touch-manipulation"
+        >
+          Home
+        </Link>
       </main>
-      </div>
+    </div>
   );
 }

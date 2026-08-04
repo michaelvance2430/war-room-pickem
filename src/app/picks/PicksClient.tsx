@@ -1351,7 +1351,41 @@ export default function PicksClient() {
       setCardNotice(null);
     }
 
-    // One clear popup: YES saved (+ optional First & Final note). No double stack.
+    // Next required task only (Crystal Ball opening week) — else Done/Home.
+    let nextAction: { href: string; label: string } | null = null;
+    try {
+      const league = getLeague();
+      const sid = league?.sportId || "cfb";
+      const cbOn =
+        league?.settings?.crystalBallEnabled !== false && sid !== "soccer_wwc";
+      if (cbOn) {
+        const { isCrystalBallOpeningWeek: openWeek } = await import(
+          "@/lib/league-hub-actions"
+        );
+        if (openWeek(sid, activeWeek)) {
+          const supabase = createClient();
+          const uid = getSession()?.playerId;
+          if (uid && league?.id) {
+            const { data: cb, error } = await supabase
+              .from("crystal_ball_picks")
+              .select("user_id")
+              .eq("league_id", league.id)
+              .eq("user_id", uid)
+              .maybeSingle();
+            if (!error && !cb) {
+              nextAction = {
+                href: "/crystal-ball",
+                label: "Lock Crystal Ball",
+              };
+            }
+          }
+        }
+      }
+    } catch {
+      nextAction = null;
+    }
+
+    // Celebrate · reassure · exit (or next required task)
     setFirstFinalModal(null);
     setPicksSavedModal({
       weekLabel,
@@ -1365,6 +1399,7 @@ export default function PicksClient() {
         result.firstFinal === "forfeit"
           ? Math.abs(result.firstFinalPointsDelta ?? 0) || undefined
           : undefined,
+      nextAction,
     });
 
     setSaving(false);

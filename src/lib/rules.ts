@@ -18,10 +18,10 @@ export type RuleSection = {
 export const RULES_SEEN_KEY = "warroom-rules-seen-v2";
 
 export const RULES_INTRO =
-  "College football pick'em against the spread. Five games each week, confidence points, one Best Bet multiplier, and a weekly prop. Tap any green player name to open their profile.";
+  "War Room exists to make Saturdays with friends a little more fun. Everything below protects that experience — not corporate fine print.";
 
 export const RULES_INTRO_NFL =
-  "Pro football pick'em against the spread. Five games each week, confidence points, one Best Bet multiplier, and a weekly prop. Sundays, primetime, no campus. Tap any player name to open their profile.";
+  "War Room exists to make Sundays with friends a little more fun. Everything below protects that experience — not corporate fine print.";
 
 export const RULE_SECTIONS: RuleSection[] = [
   {

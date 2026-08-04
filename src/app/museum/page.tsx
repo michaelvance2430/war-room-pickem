@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import PlayerLink from "@/components/PlayerLink";
-import ChampionshipBanner from "@/components/ChampionshipBanner";
 import {
   buildLeagueHistory,
   buildLeagueRecords,
@@ -289,11 +288,7 @@ function MuseumInner() {
 
         {/* Crew story — full wall after first finale; quiet teaser before */}
         <CrewMuseumStrip />
-      <ChampionshipBanner
-          trophies={trophies}
-          leagueName={leagueName}
-          sportId={getLeague()?.sportId}
-        />
+        {/* ChampionshipBanner removed — hardware wall + history own champ story once each */}
 
         <div className="flex flex-wrap gap-2 mb-6">
           {(

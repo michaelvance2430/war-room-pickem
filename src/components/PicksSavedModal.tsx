@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * After a successful Save / Lock it in — loud confirmation:
- * YES you’re good. You can still edit until first kickoff.
+ * Picks success — celebrate, reassure, exit.
+ * Home owns navigation. Only advertise another page when a required task remains.
  */
 
 import Link from "next/link";
@@ -15,6 +15,11 @@ export type PicksSavedModalDetail = {
   isUpdate: boolean;
   firstFinal?: "earned" | "forfeit" | null;
   firstFinalPointsRemoved?: number;
+  /**
+   * Required next job only (e.g. Crystal Ball).
+   * If null → single Done button (close or Home).
+   */
+  nextAction?: { href: string; label: string } | null;
 };
 
 type Props = {
@@ -25,7 +30,13 @@ type Props = {
 export default function PicksSavedModal({ detail, onClose }: Props) {
   if (!detail) return null;
 
-  const { weekLabel, lockDeadlineLabel, isUpdate, firstFinal } = detail;
+  const {
+    weekLabel,
+    lockDeadlineLabel,
+    isUpdate,
+    firstFinal,
+    nextAction,
+  } = detail;
 
   return (
     <div
@@ -40,15 +51,15 @@ export default function PicksSavedModal({ detail, onClose }: Props) {
         aria-label="Close"
         onClick={onClose}
       />
-      <div className="relative w-full sm:max-w-md max-h-[90vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl border-2 border-primary/55 bg-card shadow-2xl">
+      <div className="relative w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl border-2 border-primary/55 bg-card shadow-2xl">
         <div className="h-1.5 w-full bg-gradient-to-r from-primary via-emerald-400 to-primary" />
         <div className="p-5 sm:p-6 space-y-4">
           <div className="text-center">
             <div
-              className="mx-auto mb-3 w-16 h-16 rounded-full bg-primary/20 border-2 border-primary flex items-center justify-center"
+              className="mx-auto mb-3 w-14 h-14 rounded-full bg-primary/20 border-2 border-primary flex items-center justify-center"
               aria-hidden
             >
-              <span className="text-3xl font-black text-primary">✓</span>
+              <span className="text-2xl font-black text-primary">✓</span>
             </div>
             <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-primary">
               {isUpdate ? "Picks updated" : "Picks saved"}
@@ -57,41 +68,22 @@ export default function PicksSavedModal({ detail, onClose }: Props) {
               id="picks-saved-title"
               className="text-2xl sm:text-3xl font-black mt-1.5 text-white leading-tight"
             >
-              Yes — you&apos;re good for {weekLabel}
+              You&apos;re ready for {weekLabel}
             </h2>
             <p className="text-sm text-muted mt-3 leading-relaxed max-w-sm mx-auto">
-              Your card is locked in the cloud. You&apos;re set for this week.
+              You can edit your picks until first kickoff
               {lockDeadlineLabel ? (
                 <>
                   {" "}
-                  You can still change anything until{" "}
-                  <strong className="text-foreground">
-                    first kickoff ({lockDeadlineLabel})
+                  (
+                  <strong className="text-foreground font-semibold">
+                    {lockDeadlineLabel}
                   </strong>
-                  .
+                  )
                 </>
-              ) : (
-                <>
-                  {" "}
-                  You can still make changes until the{" "}
-                  <strong className="text-foreground">
-                    first kickoff on the card
-                  </strong>
-                  .
-                </>
-              )}
+              ) : null}
+              .
             </p>
-          </div>
-
-          <div className="rounded-xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm leading-relaxed">
-            <p className="font-bold text-primary text-xs uppercase tracking-wide mb-1">
-              What happens next
-            </p>
-            <ul className="space-y-1.5 text-foreground/90 text-[13px]">
-              <li>· Re-open My Picks anytime before kickoff to edit.</li>
-              <li>· After first kickoff, the whole card freezes — no more edits.</li>
-              <li>· Sit back, talk trash in the Locker, wait for the paper.</li>
-            </ul>
           </div>
 
           {firstFinal === "earned" && (
@@ -100,8 +92,8 @@ export default function PicksSavedModal({ detail, onClose }: Props) {
                 First &amp; Final
               </p>
               <p className="text-foreground/90 text-[13px]">
-                You&apos;re first to lock this week. Keep this slip clean until
-                kickoff for the bonus — change anything and the bonus voids.
+                First lock this week. Keep this slip clean until kickoff for the
+                bonus.
               </p>
             </div>
           )}
@@ -113,35 +105,48 @@ export default function PicksSavedModal({ detail, onClose }: Props) {
               <p className="text-foreground/90 text-[13px]">
                 You changed a First &amp; Final slip
                 {detail.firstFinalPointsRemoved
-                  ? ` (−${detail.firstFinalPointsRemoved} season & career pts)`
+                  ? ` (−${detail.firstFinalPointsRemoved} pts)`
                   : ""}
-                . Your current picks are still saved.
+                . Current picks are still saved.
               </p>
             </div>
           )}
 
           <div className="flex flex-col gap-2 pt-1">
-            <button
-              type="button"
-              onClick={onClose}
-              className="w-full min-h-[52px] rounded-xl bg-primary text-black text-base font-extrabold touch-manipulation"
-            >
-              Got it — I&apos;m good
-            </button>
-            <Link
-              href="/locker-room"
-              onClick={onClose}
-              className="w-full min-h-[48px] rounded-xl border border-border text-sm font-bold flex items-center justify-center touch-manipulation text-foreground hover:bg-card-hover"
-            >
-              Open Locker Room
-            </Link>
-            <Link
-              href="/"
-              onClick={onClose}
-              className="w-full min-h-[44px] rounded-xl text-sm font-semibold flex items-center justify-center text-muted hover:text-foreground touch-manipulation"
-            >
-              Back to Home
-            </Link>
+            {nextAction ? (
+              <Link
+                href={nextAction.href}
+                onClick={onClose}
+                className="w-full min-h-[52px] rounded-xl bg-primary text-black text-base font-extrabold flex items-center justify-center touch-manipulation"
+              >
+                {nextAction.label}
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-full min-h-[52px] rounded-xl bg-primary text-black text-base font-extrabold touch-manipulation"
+              >
+                Done
+              </button>
+            )}
+            {!nextAction ? (
+              <Link
+                href="/"
+                onClick={onClose}
+                className="w-full min-h-[44px] rounded-xl text-sm font-semibold flex items-center justify-center text-muted hover:text-foreground touch-manipulation"
+              >
+                Home
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-full min-h-[44px] rounded-xl text-sm font-semibold text-muted hover:text-foreground touch-manipulation"
+              >
+                Done
+              </button>
+            )}
           </div>
         </div>
       </div>

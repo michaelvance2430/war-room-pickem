@@ -20,7 +20,10 @@ import PlayerLink from "@/components/PlayerLink";
 import { standingsHardwareFlair } from "@/lib/profile-hardware";
 import { Division, Player } from "@/lib/types";
 import { divisionTabLabel } from "@/lib/divisions";
-import { formatLastSeen, lastSeenToneClass } from "@/lib/last-seen";
+import {
+  formatLeaguePulse,
+  lastSeenToneClass,
+} from "@/lib/last-seen";
 import { hasOfficialScoredWeek } from "@/lib/season-scored";
 
 const divisions: (Division | "Overall")[] = [
@@ -43,8 +46,6 @@ function streakDisplay(streak: number) {
   return <span className="text-muted">—</span>;
 }
 
-const TIP_KEY = "warroom-tip-tap-names-v1";
-
 export default function StandingsPage() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,7 +55,6 @@ export default function StandingsPage() {
   >({});
   const [selfId, setSelfId] = useState<string | null>(null);
   const [active, setActive] = useState<Division | "Overall">("Overall");
-  const [showNameTip, setShowNameTip] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -133,11 +133,6 @@ export default function StandingsPage() {
       }
     }
     load();
-    try {
-      if (localStorage.getItem(TIP_KEY) !== "1") setShowNameTip(true);
-    } catch {
-      setShowNameTip(true);
-    }
     return () => {
       cancelled = true;
     };
@@ -174,41 +169,10 @@ export default function StandingsPage() {
               : "No standings until the first week is scored. Right now everybody is undefeated."}
           </p>
           {seasonStarted && (
-            <>
-              <p className="text-xs text-muted mt-1.5 leading-relaxed">
-                <span className="text-primary font-medium">Last in</span> = how
-                recently they opened the app. Works on phone via the{" "}
-                <strong className="text-foreground">Table</strong> tab.
-              </p>
-              <p className="text-xs text-primary/90 mt-1 font-medium">
-                Tap a green name → open their profile (badges &amp; trophies).
-              </p>
-            </>
-          )}
-          {showNameTip && seasonStarted && (
-            <div className="mt-3 rounded-xl border border-primary/40 bg-primary/10 px-3 py-2.5 flex items-start justify-between gap-2">
-              <p className="text-xs text-foreground leading-relaxed">
-                <strong className="text-primary">Tip:</strong> Names in{" "}
-                <span className="font-semibold text-primary underline decoration-2">
-                  green
-                </span>{" "}
-                are links. Tap anyone to roast their trophy case.
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowNameTip(false);
-                  try {
-                    localStorage.setItem(TIP_KEY, "1");
-                  } catch {
-                    /* ignore */
-                  }
-                }}
-                className="shrink-0 text-[11px] text-muted hover:text-foreground px-1"
-              >
-                Got it
-              </button>
-            </div>
+            <p className="text-xs text-muted mt-1.5 leading-relaxed">
+              Under each name: league pulse (online / last seen). Color is for
+              scanning only — is the room alive?
+            </p>
           )}
         </div>
 
@@ -240,13 +204,12 @@ export default function StandingsPage() {
                     <th className="text-left px-3 sm:px-4 py-3 font-medium">
                       Division
                     </th>
-                    <th className="text-right px-3 sm:px-4 py-3 font-medium">
-                      Last in
-                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((player) => (
+                  {filtered.map((player) => {
+                    const pulse = formatLeaguePulse(player.lastSeenAt);
+                    return (
                     <tr
                       key={player.id}
                       className={selfRowClass(
@@ -255,14 +218,24 @@ export default function StandingsPage() {
                       )}
                     >
                       <td className="px-3 sm:px-4 py-3.5 font-medium">
-                        <span
-                          className={selfNameClass(
-                            isSelfPlayer(player.id, selfId)
-                          )}
-                        >
-                          <PlayerLink id={player.id} name={player.name} />
-                          {isSelfPlayer(player.id, selfId) && <YouBadge />}
-                        </span>
+                        <div className="flex flex-col gap-0.5 min-w-0">
+                          <span
+                            className={selfNameClass(
+                              isSelfPlayer(player.id, selfId)
+                            )}
+                          >
+                            <PlayerLink id={player.id} name={player.name} />
+                            {isSelfPlayer(player.id, selfId) && <YouBadge />}
+                          </span>
+                          <span
+                            className={`text-[11px] inline-flex items-center gap-1 ${lastSeenToneClass(player.lastSeenAt)}`}
+                          >
+                            <span aria-hidden>
+                              {pulse.online ? "🟢" : "○"}
+                            </span>
+                            {pulse.label}
+                          </span>
+                        </div>
                       </td>
                       <td className="px-3 sm:px-4 py-3.5 text-muted text-xs sm:text-sm">
                         {divisionTabLabel(
@@ -270,13 +243,9 @@ export default function StandingsPage() {
                           getLeague()?.sportId
                         )}
                       </td>
-                      <td
-                        className={`px-3 sm:px-4 py-3.5 text-right text-xs ${lastSeenToneClass(player.lastSeenAt)}`}
-                      >
-                        {formatLastSeen(player.lastSeenAt)}
-                      </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -304,19 +273,6 @@ export default function StandingsPage() {
 
         {!loading && seasonStarted && players.length > 0 && (
           <>
-            <p className="text-[11px] text-muted mb-3 leading-relaxed flex flex-wrap items-center gap-x-3 gap-y-1">
-              <span className="font-semibold text-foreground/80">Last in</span>
-              <span className="inline-flex items-center gap-1">
-                <span className="text-emerald-400 font-bold">●</span> ≤6h
-              </span>
-              <span className="inline-flex items-center gap-1">
-                <span className="text-amber-400 font-bold">●</span> 6–18h
-              </span>
-              <span className="inline-flex items-center gap-1">
-                <span className="text-red-400 font-bold">●</span> 18h+
-              </span>
-            </p>
-
             <div className="phone-h-scroll sm:flex-wrap sm:overflow-visible mb-5">
               {divisions.map((d) => (
                 <button
@@ -347,9 +303,6 @@ export default function StandingsPage() {
                     <th className="text-left px-3 py-3 font-medium hidden md:table-cell">
                       Swing
                     </th>
-                    <th className="text-right px-3 sm:px-4 py-3 font-medium hidden sm:table-cell">
-                      Last in
-                    </th>
                     <th className="text-right px-4 py-3 font-medium">Pts</th>
                     <th className="text-right px-4 py-3 font-medium hidden sm:table-cell">
                       ATS%
@@ -363,7 +316,7 @@ export default function StandingsPage() {
                       {idx === cutIndex && (
                         <tr className="bg-danger/10">
                           <td
-                            colSpan={active === "Overall" ? 8 : 7}
+                            colSpan={active === "Overall" ? 7 : 6}
                             className="px-4 py-1.5 text-center text-xs text-danger font-medium"
                           >
                             — Cut Line (bottom 50% → Toilet Bowl) —
@@ -386,7 +339,7 @@ export default function StandingsPage() {
                           {idx + 1}
                         </td>
                         <td className="px-3 sm:px-4 py-3.5 font-medium align-middle">
-                          <div className="flex flex-col gap-1 min-w-0">
+                          <div className="flex flex-col gap-0.5 min-w-0">
                             <span
                               className={selfNameClass(
                                 isSelfPlayer(player.id, selfId)
@@ -405,11 +358,21 @@ export default function StandingsPage() {
                               ))}
                               {isSelfPlayer(player.id, selfId) && <YouBadge />}
                             </span>
-                            <span
-                              className={`text-[11px] sm:hidden ${lastSeenToneClass(player.lastSeenAt)}`}
-                            >
-                              {formatLastSeen(player.lastSeenAt)}
-                            </span>
+                            {(() => {
+                              const pulse = formatLeaguePulse(
+                                player.lastSeenAt
+                              );
+                              return (
+                                <span
+                                  className={`text-[11px] inline-flex items-center gap-1 ${lastSeenToneClass(player.lastSeenAt)}`}
+                                >
+                                  <span aria-hidden>
+                                    {pulse.online ? "🟢" : "○"}
+                                  </span>
+                                  {pulse.label}
+                                </span>
+                              );
+                            })()}
                             {swingById[player.id] && (
                               <span className="md:hidden">
                                 <SwingBadge swing={swingById[player.id]} />
@@ -431,11 +394,6 @@ export default function StandingsPage() {
                           ) : (
                             <span className="text-muted">—</span>
                           )}
-                        </td>
-                        <td
-                          className={`px-3 sm:px-4 py-3.5 text-right align-middle text-xs hidden sm:table-cell ${lastSeenToneClass(player.lastSeenAt)}`}
-                        >
-                          {formatLastSeen(player.lastSeenAt)}
                         </td>
                         <td className="px-3 sm:px-4 py-3.5 text-right font-semibold align-middle text-base">
                           {player.totalPoints}
