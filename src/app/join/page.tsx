@@ -44,11 +44,19 @@ function JoinPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [userId, setUserId] = useState<string | null>(null);
+  /**
+   * Per-league nickname (create/join). Starts empty on purpose —
+   * invite a new identity; do not clone the last room’s handle.
+   * Career / trophies stay on auth userId, not this string.
+   */
   const [displayName, setDisplayName] = useState("");
+  /** Account label for chrome only (email / meta) — never pre-fills nickname fields */
+  const [accountHint, setAccountHint] = useState("");
   const [mode, setMode] = useState<"choose" | "create" | "join">("choose");
   /** Create wizard: sport first, then name / open listing */
   const [createStep, setCreateStep] = useState<"sport" | "details">("sport");
-  const [leagueName, setLeagueName] = useState("War Room");
+  /** Empty on purpose — room name is intentional, not a copy of last league */
+  const [leagueName, setLeagueName] = useState("");
   /** Multi-sport: CFB + NFL live; others coming soon */
   const [sportId, setSportId] = useState<SportId>(DEFAULT_SPORT_ID);
   /** List new league in open-room lobby for strangers to fill seats */
@@ -79,12 +87,19 @@ function JoinPageInner() {
     if (m === "create") {
       setMode("create");
       setCreateStep("sport");
+      setLeagueName("");
+      setDisplayName("");
     }
-    if (m === "join") setMode("join");
+    if (m === "join") {
+      setMode("join");
+      setDisplayName("");
+    }
     if (searchParams.get("open") === "1") {
       setMode("create");
       setCreateStep("sport");
       setListAsOpen(true);
+      setLeagueName("");
+      setDisplayName("");
     }
   }, [searchParams]);
 
@@ -110,7 +125,9 @@ function JoinPageInner() {
         }
         setUserId(data.user.id);
         const metaName = data.user.user_metadata?.display_name as string | undefined;
-        setDisplayName(metaName || data.user.email?.split("@")[0] || "Player");
+        const emailLocal = data.user.email?.split("@")[0] || "";
+        // Account chrome only — never pre-fill league nickname (per-room identity)
+        setAccountHint(metaName || emailLocal || "your account");
         setChecking(false);
       });
     } catch (e: unknown) {
@@ -128,6 +145,16 @@ function JoinPageInner() {
       );
       return;
     }
+    const room = leagueName.trim();
+    const nick = displayName.trim();
+    if (!room) {
+      setError("Name your room — every league starts a new story.");
+      return;
+    }
+    if (!nick) {
+      setError("Choose how this room will know you.");
+      return;
+    }
     setLoading(true);
     const supabase = createClient();
     const newCode = generateCode();
@@ -137,11 +164,11 @@ function JoinPageInner() {
     try {
       await supabase.from("profiles").upsert({
         id: userId,
-        display_name: displayName.trim() || "Commissioner",
+        display_name: nick,
       });
 
       const baseRow: Record<string, unknown> = {
-        name: leagueName.trim() || "War Room",
+        name: room,
         code: newCode,
         commissioner_id: userId,
       };
@@ -300,7 +327,7 @@ function JoinPageInner() {
       writeSessionAndLeague(
         {
           leagueId,
-          leagueName: (league.name as string) || leagueName.trim() || "War Room",
+          leagueName: (league.name as string) || room,
           code: (league.code as string) || newCode,
           commissionerId: userId,
           createdAt: (league.created_at as string) || new Date().toISOString(),
@@ -309,7 +336,7 @@ function JoinPageInner() {
           gamesPerWeek:
             (league.games_per_week as number) ?? pack.defaultGamesPerWeek,
           role: "commissioner",
-          displayName: displayName.trim() || "Commissioner",
+          displayName: nick,
           crystalBallEnabled: true,
           homeTaglineId: "good-teams",
           homeTaglineCustom: "",
@@ -326,8 +353,7 @@ function JoinPageInner() {
         const { ensureCrewForLeague } = await import("@/lib/crew");
         ensureCrewForLeague({
           leagueId,
-          leagueName:
-            (league.name as string) || leagueName.trim() || "War Room",
+          leagueName: (league.name as string) || room,
           sportId: createdSportId,
           createdBy: userId,
           foundedAt:
@@ -395,12 +421,17 @@ function JoinPageInner() {
   async function handleJoin() {
     if (!userId) return;
     setError(null);
+    const nick = displayName.trim();
+    if (!nick) {
+      setError("Choose how this room will know you.");
+      return;
+    }
     setLoading(true);
     const supabase = createClient();
     try {
       await supabase.from("profiles").upsert({
         id: userId,
-        display_name: displayName.trim() || "Player",
+        display_name: nick,
       });
       const { data: league, error: findError } = await supabase
         .from("leagues")
@@ -512,7 +543,7 @@ function JoinPageInner() {
             (league.games_per_week as number) ?? joinPack.defaultGamesPerWeek,
           role:
             league.commissioner_id === userId ? "commissioner" : "player",
-          displayName: displayName.trim() || "Player",
+          displayName: nick,
           crystalBallEnabled: crystalOn,
           homeTaglineId: (league.home_tagline_id as string) || "good-teams",
           homeTaglineCustom: (league.home_tagline_custom as string) || "",
@@ -664,21 +695,39 @@ function JoinPageInner() {
             <BrandMark size={80} variant="force" className="rounded-xl" />
       </div>
           <h1 className="text-2xl font-bold">War Room Pick&apos;Em</h1>
-      <p className="text-sm text-muted mt-1">Signed in as {displayName}</p>
+      <p className="text-sm text-muted mt-1">
+            Signed in
+            {accountHint ? (
+              <>
+                {" · "}
+                <span className="text-foreground/80">{accountHint}</span>
+              </>
+            ) : null}
+          </p>
       </div>
 
         {mode === "choose" && (
           <div className="space-y-3">
       <button
               type="button"
-              onClick={() => setMode("create")}
+              onClick={() => {
+                setMode("create");
+                setCreateStep("sport");
+                setLeagueName("");
+                setDisplayName("");
+                setError(null);
+              }}
               className="w-full py-4 min-h-[56px] rounded-xl bg-primary text-black text-base font-extrabold touch-manipulation"
             >
               Commissioner — create league
             </button>
       <button
               type="button"
-              onClick={() => setMode("join")}
+              onClick={() => {
+                setMode("join");
+                setDisplayName("");
+                setError(null);
+              }}
               className="w-full py-4 min-h-[56px] rounded-xl border border-border bg-card text-base font-bold touch-manipulation"
             >
               Join with code
@@ -800,25 +849,52 @@ function JoinPageInner() {
                   <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-1">
                     Step 2 of 2 · {getSportPack(sportId).shortLabel}
                   </p>
-                  <h2 className="font-semibold text-lg">Name the room</h2>
+                  <h2 className="font-semibold text-lg">
+                    What kind of room are you building today?
+                  </h2>
                   <p className="text-xs text-muted mt-1 leading-relaxed">
+                    Fresh names invite a new story — not a copy of last league.
                     Best with{" "}
                     <strong className="text-foreground">8–16 friends</strong>{" "}
                     (bots can fill empty seats later). Cap {MAX_LEAGUE_PLAYERS}.
                   </p>
                 </div>
-                <input
-                  value={leagueName}
-                  onChange={(e) => setLeagueName(e.target.value)}
-                  placeholder="League name"
-                  className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm"
-                />
-                <input
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder="Your name"
-                  className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm"
-                />
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="create-room-name"
+                    className="text-[11px] font-semibold uppercase tracking-wide text-muted"
+                  >
+                    Room name
+                  </label>
+                  <input
+                    id="create-room-name"
+                    value={leagueName}
+                    onChange={(e) => setLeagueName(e.target.value)}
+                    placeholder="e.g. Saturday Situation Room"
+                    autoComplete="off"
+                    className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="create-display-name"
+                    className="text-[11px] font-semibold uppercase tracking-wide text-muted"
+                  >
+                    Your name in this room
+                  </label>
+                  <input
+                    id="create-display-name"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    placeholder="How will this room know you?"
+                    autoComplete="off"
+                    className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm"
+                  />
+                  <p className="text-[11px] text-muted leading-relaxed">
+                    Nickname for this league only. Career, trophies, and
+                    cheevos stay on your War Room account.
+                  </p>
+                </div>
                 <label className="flex items-start gap-3 rounded-xl border border-border bg-background/50 px-3 py-3 cursor-pointer">
                   <input
                     type="checkbox"
@@ -894,27 +970,22 @@ function JoinPageInner() {
               maxLength={6}
               className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm tracking-widest uppercase font-mono"
             />
-            {displayName.trim() ? (
-              <p className="text-xs text-muted">
-                Joining as{" "}
-                <strong className="text-foreground">{displayName.trim()}</strong>
-                {" · "}
-                <button
-                  type="button"
-                  className="text-primary underline"
-                  onClick={() => setDisplayName("")}
-                >
-                  change name
-                </button>
-      </p>
-            ) : (
+            <div className="space-y-1.5">
+              <label
+                htmlFor="join-display-name"
+                className="text-[11px] font-semibold uppercase tracking-wide text-muted"
+              >
+                Your name in this room
+              </label>
               <input
+                id="join-display-name"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="Your name in the league"
+                placeholder="Choose your league nickname"
+                autoComplete="off"
                 className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm"
               />
-            )}
+            </div>
             {error && <p className="text-sm text-danger">{error}</p>}
             <button
               onClick={handleJoin}
