@@ -35,6 +35,15 @@ import {
 import { readLeague, readSession } from "@/lib/session-read";
 import { Player } from "@/lib/types";
 import { wrProfile, wrProfileTimed, wrProfileRoute } from "@/lib/runtime-iso";
+import {
+  ensureProfileNavTraceForRoute,
+  profileNavIdentityEnd,
+  profileNavIdentityStart,
+  profileNavMark,
+  profileNavMount,
+  profileNavRender,
+  profileNavUsable,
+} from "@/lib/profile-nav-trace";
 
 // Module evaluation boundary — if this never logs, freeze is BEFORE profile chunk runs
 const __profileModuleT0 =
@@ -162,6 +171,7 @@ export default function ProfilePage() {
   mark("render-enter");
   const params = useParams();
   const id = typeof params.id === "string" ? params.id : "";
+  profileNavRender();
 
   const [player, setPlayer] = useState<Player | null>(null);
   const [ready, setReady] = useState(false);
@@ -181,6 +191,10 @@ export default function ProfilePage() {
   const hadPaintRef = useRef(false);
 
   useEffect(() => {
+    if (id) {
+      ensureProfileNavTraceForRoute(id);
+      profileNavMount(id);
+    }
     mark("effect-enter", `id=${id.slice(0, 8)}`);
     wrProfile("data-effect-start", undefined, `id=${id.slice(0, 8)}`);
     let cancelled = false;
@@ -229,11 +243,16 @@ export default function ProfilePage() {
         "identity",
         `route_id=${id.slice(0, 8)} expect=user_id self=${isSelf}`
       );
+      profileNavIdentityStart(
+        `route_id=${id.slice(0, 8)} self=${isSelf}`
+      );
 
       const failSafe = window.setTimeout(() => {
         if (!cancelled) {
           mark("failsafe-ready");
+          profileNavMark("failsafe-ready");
           setReady(true);
+          profileNavUsable("failsafe");
         }
       }, 2_500);
 
@@ -247,6 +266,7 @@ export default function ProfilePage() {
         //    Warm cache hit after Standings = paint without waiting on roster RPC.
         try {
           mark("players-import-start");
+          profileNavMark("identity-players-import-start");
           const t0 = performance.now();
           const { loadLeaguePlayers, loadLeagueRoster } = await import(
             "@/lib/cloud"
@@ -255,10 +275,18 @@ export default function ProfilePage() {
             "cloud-import-done",
             `${Math.round(performance.now() - t0)}ms`
           );
+          profileNavMark(
+            "identity-cloud-import-done",
+            `${Math.round(performance.now() - t0)}ms`
+          );
           const t1 = performance.now();
           const players = await loadLeaguePlayers();
           mark(
             "players-fetch-done",
+            `${Math.round(performance.now() - t1)}ms n=${players.length}`
+          );
+          profileNavMark(
+            "identity-players-fetch-done",
             `${Math.round(performance.now() - t1)}ms n=${players.length}`
           );
           if (cancelled) return;
@@ -276,6 +304,8 @@ export default function ProfilePage() {
                 "first-usable-paint",
                 `fast source=${source} name=${found.name.slice(0, 20)}`
               );
+              profileNavIdentityEnd(`fast source=${source}`);
+              profileNavUsable(`first-content source=${source}`);
               wrProfile("interactive");
             }
           }
@@ -285,6 +315,10 @@ export default function ProfilePage() {
           const roster = await loadLeagueRoster();
           mark(
             "roster-fetch-done",
+            `${Math.round(performance.now() - t2)}ms n=${roster.length}`
+          );
+          profileNavMark(
+            "identity-roster-fetch-done",
             `${Math.round(performance.now() - t2)}ms n=${roster.length}`
           );
           if (cancelled) return;
@@ -304,6 +338,10 @@ export default function ProfilePage() {
                 mark(
                   "ID_MISMATCH",
                   `route used membership_id; user_id=${byMem.userId.slice(0, 8)}`
+                );
+                profileNavMark(
+                  "route-replace",
+                  `membership_id→user_id=${byMem.userId.slice(0, 8)}`
                 );
                 found = rosterToPlayer(byMem);
                 source = "membership_id→user_id";
@@ -362,6 +400,12 @@ export default function ProfilePage() {
             found
               ? `found source=${source} name=${found.name.slice(0, 20)}`
               : "missing"
+          );
+          profileNavIdentityEnd(
+            found ? `source=${source}` : "missing"
+          );
+          profileNavUsable(
+            found ? `first-content source=${source}` : "missing"
           );
           wrProfile(
             "data-effect-first-paint",

@@ -39,6 +39,7 @@ import {
   wrProfileRoute,
 } from "@/lib/runtime-iso";
 import { installEventLoopProbe } from "@/lib/event-loop-probe";
+import { profileNavRouteCommit } from "@/lib/profile-nav-trace";
 
 function scrollTopHard() {
   if (typeof window === "undefined") return;
@@ -105,6 +106,7 @@ export default function SmoothRuntime() {
     wrEffect("SmoothRuntime.routeUnlock");
     if (pathname?.startsWith("/profile")) {
       wrProfileRoute("SmoothRuntime.route-effect", pathname);
+      profileNavRouteCommit(pathname);
     }
     noteNavAttempt({
       source: "SmoothRuntime.route",

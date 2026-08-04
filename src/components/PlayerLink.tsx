@@ -14,6 +14,7 @@ import { isChaosFlamesActive } from "@/lib/chaos-mode";
 import { readLeague } from "@/lib/session-read";
 import { loadLeagueActiveWeek } from "@/lib/cloud";
 import { wrProfile, wrProfileRoute } from "@/lib/runtime-iso";
+import { startProfileNavTrace } from "@/lib/profile-nav-trace";
 
 /** One in-flight profile navigation at a time (P0 freeze: triple click-received). */
 const pendingNav = new Map<string, number>();
@@ -130,6 +131,8 @@ export default function PlayerLink({
     }
     setNavLocked(true);
     const href = `/profile/${id}`;
+    // Production black-box trace (Standings → peer profile freeze)
+    startProfileNavTrace(id, "player-link");
     wrProfile("click-received", undefined, `PlayerLink→${id.slice(0, 8)}`);
     wrProfileRoute(
       "click",

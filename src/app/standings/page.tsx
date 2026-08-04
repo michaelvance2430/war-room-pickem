@@ -24,6 +24,7 @@ import {
   lastSeenToneClass,
 } from "@/lib/last-seen";
 import { hasOfficialScoredWeek } from "@/lib/season-scored";
+import { markStandingsWarm } from "@/lib/profile-nav-trace";
 
 const divisions: (Division | "Overall")[] = [
   "Overall",
@@ -129,6 +130,7 @@ export default function StandingsPage() {
         window.clearTimeout(failSafe);
         if (!cancelled) setLoading(false);
         mark("loading-false-interactive");
+        markStandingsWarm();
       }
     }
     load();
