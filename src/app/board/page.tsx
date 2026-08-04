@@ -11,6 +11,7 @@ import { useCallback, useEffect, useMemo, useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import PlayerLink from "@/components/PlayerLink";
+// Link still used for player profiles / week chips elsewhere
 import {
   loadWeekCard,
   loadWeekResultsFromCloud,
@@ -32,10 +33,7 @@ import { getSession } from "@/lib/league";
 import { formatRankedTeam } from "@/lib/rankings";
 import type { Game } from "@/lib/types";
 import { formatLastSeen, lastSeenToneClass } from "@/lib/last-seen";
-import {
-  BOARD_EMPTY_TAKES,
-  boardEmptyTakeAt,
-} from "@/lib/board-empty-copy";
+import { boardEmptyTakeAt } from "@/lib/board-empty-copy";
 
 type ViewMode = "games" | "cards";
 
@@ -66,8 +64,6 @@ function BoardInner() {
   const [now, setNow] = useState(() => Date.now());
   /** Zero scored weeks — never invent history (Board empty state). */
   const [noHistoryYet, setNoHistoryYet] = useState(false);
-  /** Mash for more empty-state takes */
-  const [emptyTakeIndex, setEmptyTakeIndex] = useState(0);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 30_000);
@@ -252,31 +248,21 @@ function BoardInner() {
   const firstKick = firstKickoffOnCardMs(games);
 
   const lockedCount = slips.filter((s) => s.lockedAt).length;
-  const emptyTake = boardEmptyTakeAt(emptyTakeIndex);
+  const emptyTake = boardEmptyTakeAt();
 
   return (
     <div className="min-h-screen flex flex-col">
       <main className="flex-1 max-w-3xl mx-auto w-full px-3 sm:px-4 py-5 sm:py-8">
         <div className="mb-5">
           <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
-            League pick reveal
+            Weekly reveal
           </p>
           <h1 className="text-2xl font-black mt-1">The Board</h1>
-          {!noHistoryYet && (
-            <p className="text-sm text-muted mt-2 leading-relaxed">
-              Like fantasy football: you don&apos;t see who they took until{" "}
-              <strong className="text-foreground font-medium">
-                that game kicks off
-              </strong>
-              . Earlier games on the card stay hidden until their own kickoff.
-            </p>
-          )}
-          {noHistoryYet && !loading && (
-            <p className="text-sm text-muted mt-2 leading-relaxed">
-              The Board reveals what happened this season — nothing more,
-              nothing invented.
-            </p>
-          )}
+          <p className="text-sm text-muted mt-2 leading-relaxed max-w-xl">
+            Once the first game kicks off, every player&apos;s locked card is
+            revealed here. Compare picks, celebrate the bold calls, and see who
+            saw the week coming.
+          </p>
         </div>
 
         {loading && (
@@ -285,56 +271,18 @@ function BoardInner() {
           </p>
         )}
 
-        {/* Zero scored weeks — honest empty state (never invent history) */}
+        {/* Quiet empty — no CTAs (nav owns destinations) */}
         {!loading && noHistoryYet && (
-          <div className="space-y-4">
-            <button
-              type="button"
-              onClick={() =>
-                setEmptyTakeIndex((i) => (i + 1) % BOARD_EMPTY_TAKES.length)
-              }
-              className="w-full text-left rounded-2xl border-2 border-dashed border-primary/35 bg-card px-5 py-6 sm:px-6 sm:py-7 space-y-3 touch-manipulation active:scale-[0.99] transition shadow-[0_0_40px_rgba(34,197,94,0.06)]"
-              aria-label="Next empty Board take"
-            >
-              <p className="text-3xl sm:text-4xl leading-none" aria-hidden>
-                {emptyTake.emoji}
-              </p>
-              <h2 className="text-xl sm:text-2xl font-black text-foreground leading-snug">
-                {emptyTake.title}
-              </h2>
-              <p className="text-sm sm:text-base text-muted leading-relaxed">
-                {emptyTake.body}
-              </p>
-              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary/80 pt-1">
-                Tap for another take · {emptyTakeIndex + 1}/
-                {BOARD_EMPTY_TAKES.length}
-              </p>
-            </button>
-
-            <div className="flex flex-col sm:flex-row gap-2">
-              <Link
-                href="/picks"
-                className="flex-1 min-h-[52px] rounded-xl bg-primary text-black text-sm font-extrabold inline-flex items-center justify-center touch-manipulation"
-              >
-                Go make your picks →
-              </Link>
-              <Link
-                href="/"
-                className="flex-1 min-h-[52px] rounded-xl border border-border text-foreground text-sm font-bold inline-flex items-center justify-center touch-manipulation hover:bg-card"
-              >
-                Return Home →
-              </Link>
-            </div>
-
-            <button
-              type="button"
-              onClick={() =>
-                setEmptyTakeIndex((i) => (i + 1) % BOARD_EMPTY_TAKES.length)
-              }
-              className="w-full min-h-[48px] rounded-xl border border-primary/30 text-primary text-sm font-bold touch-manipulation"
-            >
-              Hit me with another one
-            </button>
+          <div className="rounded-xl border border-border bg-card px-4 py-5 sm:px-5 sm:py-6">
+            <p className="text-3xl leading-none mb-3" aria-hidden>
+              {emptyTake.emoji}
+            </p>
+            <h2 className="text-lg sm:text-xl font-black text-foreground leading-snug">
+              {emptyTake.title}
+            </h2>
+            <p className="text-sm text-muted mt-2 leading-relaxed max-w-xl">
+              {emptyTake.body}
+            </p>
           </div>
         )}
 
@@ -365,10 +313,10 @@ function BoardInner() {
                 ) : (
                   <>
                     <p className="text-sm font-semibold text-foreground">
-                      Picks still secret
+                      Nothing to reveal…yet
                     </p>
                     <p className="text-xs text-muted mt-1">
-                      Cards freeze at first kickoff
+                      Cards become public after the first kickoff
                       {firstKick
                         ? ` (${new Date(firstKick).toLocaleString(undefined, {
                             weekday: "short",
@@ -378,7 +326,7 @@ function BoardInner() {
                             minute: "2-digit",
                           })})`
                         : ""}
-                      . Then each game reveals when it starts — like fantasy.
+                      . Until then, everyone&apos;s picks stay secret.
                     </p>
                   </>
                 )}
@@ -437,35 +385,15 @@ function BoardInner() {
               </div>
             )}
 
-            <div className="flex flex-wrap gap-3 mb-6 text-sm">
-              <Link
-                href="/picks"
-                className="text-primary font-semibold hover:underline min-h-[44px] inline-flex items-center"
-              >
-                ← My Picks
-              </Link>
-              <span className="text-muted">·</span>
-              <Link
-                href="/standings"
-                className="text-muted hover:text-foreground hover:underline"
-              >
-                Standings
-              </Link>
-            </div>
-
             {error && (
-              <div className="rounded-xl border border-warning/40 bg-warning/10 px-4 py-4 mb-6">
-                <p className="text-sm text-warning font-medium">{error}</p>
-                <p className="text-xs text-muted mt-2 leading-relaxed">
-                  Until first kickoff, only you see your card (like fantasy
-                  before lock). Then The Board is the group chat fuel.
+              <div className="rounded-xl border border-border bg-card px-4 py-4 mb-6">
+                <p className="text-sm font-semibold text-foreground">
+                  Nothing to reveal…yet
                 </p>
-                <Link
-                  href="/picks"
-                  className="inline-block mt-3 text-sm text-primary font-semibold hover:underline"
-                >
-                  Back to your card →
-                </Link>
+                <p className="text-xs text-muted mt-2 leading-relaxed">
+                  Cards become public after the first kickoff. Until then,
+                  everyone&apos;s picks stay secret.
+                </p>
               </div>
             )}
 
