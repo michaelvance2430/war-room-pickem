@@ -1,11 +1,14 @@
 /**
  * Role-aware Picks empty state (no card for the week).
  *
- * Commissioner: locked option #0 — "You had one job…"
- * Player: War Room buddy voice — light roast of the host, never customer-support.
- *         Rotates daily (ET) and again on hard reset (new browser session).
+ * STABILITY (P0):
+ *   Select exactly ONE message per (day × league × user × role).
+ *   Never auto-rotate, never interval-cycle, never re-roll on re-render.
  *
- * Routing stays: Build Card vs Go to Locker.
+ * Preferred key:
+ *   stable = ET date + league_id + user_id + effective role
+ *
+ * Routing: Build Card (host) vs Go to Locker (player).
  */
 
 export type PicksEmptyCopy = {
@@ -16,9 +19,11 @@ export type PicksEmptyCopy = {
   cta: string;
 };
 
+export type PicksEmptyRole = "host" | "player";
+
 /**
  * Host / commissioner / deputy — they can actually build the card.
- * Locked primary: index 0.
+ * Variety is daily-stable, not a carousel.
  */
 export const COMMISH_PICKS_EMPTY_OPTIONS: PicksEmptyCopy[] = [
   {
@@ -27,7 +32,6 @@ export const COMMISH_PICKS_EMPTY_OPTIONS: PicksEmptyCopy[] = [
     body: "The room is staring at a blank week because the card still lives in your head. Build it. Publish it. Let them pick.",
     cta: "Build Card",
   },
-  // Kept as archive if we ever want variety for hosts later
   {
     eyebrow: "Your move",
     title: "Your league is waiting on you.",
@@ -75,7 +79,6 @@ export const COMMISH_PICKS_EMPTY_OPTIONS: PicksEmptyCopy[] = [
 /**
  * Player (non-ops) — buddy across the room, not support desk.
  * Light roast of the commissioner. CTA always Locker (peer pressure).
- * These rotate (see resolvePlayerPicksEmptyCopy).
  */
 export const PLAYER_PICKS_EMPTY_OPTIONS: PicksEmptyCopy[] = [
   {
@@ -131,10 +134,11 @@ export const PLAYER_PICKS_EMPTY_OPTIONS: PicksEmptyCopy[] = [
   },
 ];
 
-/** Commissioner stays on the winner. */
+/** @deprecated Prefer resolvePicksEmptyCopy with stable key. Locked primary was index 0. */
 export const ACTIVE_COMMISH_PICKS_EMPTY_INDEX = 0;
 
-const PLAYER_EMPTY_SALT_KEY = "warroom-picks-empty-player-salt-v1";
+/** sessionStorage cache so re-renders never re-hash mid-visit */
+const EMPTY_COPY_CACHE_PREFIX = "warroom-picks-empty-copy-v2:";
 
 function etDayKey(now = new Date()): string {
   try {
@@ -153,7 +157,7 @@ function etDayKey(now = new Date()): string {
   }
 }
 
-/** Stable-ish hash → non-negative int */
+/** Stable hash → non-negative int */
 function hashStr(s: string): number {
   let h = 0;
   for (let i = 0; i < s.length; i++) {
@@ -163,47 +167,117 @@ function hashStr(s: string): number {
 }
 
 /**
- * Player empty index:
- * - Changes with Eastern calendar day
- * - New random salt on hard reset (new sessionStorage session)
- * Same day + same tab session → same line (no flicker on soft re-render).
+ * Daily-stable key: same person, league, role → same message all day.
+ * Changes only when the calendar day (ET) rolls, or role/league/user changes.
  */
-export function resolvePlayerPicksEmptyIndex(now = new Date()): number {
-  const n = PLAYER_PICKS_EMPTY_OPTIONS.length;
-  if (n <= 1) return 0;
+export function picksEmptyStableKey(opts: {
+  role: PicksEmptyRole;
+  leagueId?: string | null;
+  userId?: string | null;
+  now?: Date;
+}): string {
+  const day = etDayKey(opts.now ?? new Date());
+  const league = opts.leagueId || "no-league";
+  const user = opts.userId || "anon";
+  return `${day}|${league}|${user}|${opts.role}`;
+}
 
-  let salt = "0";
+function pickFromPool(
+  pool: PicksEmptyCopy[],
+  stableKey: string
+): PicksEmptyCopy {
+  const n = pool.length;
+  if (n <= 0) {
+    return {
+      eyebrow: "Empty slate",
+      title: "No card yet.",
+      body: "Come back when the host publishes.",
+      cta: "Go to Locker",
+    };
+  }
+  if (n === 1) return pool[0]!;
+  return pool[hashStr(stableKey) % n]!;
+}
+
+/**
+ * Resolve one empty-state message for the given role + identity.
+ * Pure given inputs — no Math.random on the hot path, no clocks except day bucket.
+ *
+ * When sessionStorage is available, memoizes the chosen copy for this stable key
+ * so even if callers re-invoke, the same object shape is returned for the visit/day.
+ */
+export function resolvePicksEmptyCopy(opts: {
+  role: PicksEmptyRole;
+  leagueId?: string | null;
+  userId?: string | null;
+  now?: Date;
+}): PicksEmptyCopy {
+  const key = picksEmptyStableKey(opts);
+  const pool =
+    opts.role === "host"
+      ? COMMISH_PICKS_EMPTY_OPTIONS
+      : PLAYER_PICKS_EMPTY_OPTIONS;
+
   if (typeof window !== "undefined") {
     try {
-      let existing = sessionStorage.getItem(PLAYER_EMPTY_SALT_KEY);
-      if (existing == null || existing === "") {
-        existing = String(Math.floor(Math.random() * 10_000));
-        sessionStorage.setItem(PLAYER_EMPTY_SALT_KEY, existing);
+      const cacheKey = EMPTY_COPY_CACHE_PREFIX + key;
+      const cached = sessionStorage.getItem(cacheKey);
+      if (cached) {
+        const parsed = JSON.parse(cached) as PicksEmptyCopy;
+        if (
+          parsed &&
+          typeof parsed.title === "string" &&
+          typeof parsed.body === "string"
+        ) {
+          return parsed;
+        }
       }
-      salt = existing;
+      const chosen = pickFromPool(pool, key);
+      sessionStorage.setItem(cacheKey, JSON.stringify(chosen));
+      return chosen;
     } catch {
-      salt = "0";
+      /* fall through — pure hash still stable for the day */
     }
   }
 
-  const day = etDayKey(now);
-  return hashStr(`${day}:${salt}`) % n;
+  return pickFromPool(pool, key);
 }
 
-export function resolveCommishPicksEmptyCopy(): PicksEmptyCopy {
-  const i = Math.max(
-    0,
-    Math.min(
-      COMMISH_PICKS_EMPTY_OPTIONS.length - 1,
-      ACTIVE_COMMISH_PICKS_EMPTY_INDEX
-    )
-  );
-  return COMMISH_PICKS_EMPTY_OPTIONS[i]!;
+/** @deprecated use resolvePicksEmptyCopy({ role: "host", ... }) */
+export function resolveCommishPicksEmptyCopy(opts?: {
+  leagueId?: string | null;
+  userId?: string | null;
+}): PicksEmptyCopy {
+  return resolvePicksEmptyCopy({
+    role: "host",
+    leagueId: opts?.leagueId,
+    userId: opts?.userId,
+  });
 }
 
-export function resolvePlayerPicksEmptyCopy(): PicksEmptyCopy {
-  const i = resolvePlayerPicksEmptyIndex();
-  return PLAYER_PICKS_EMPTY_OPTIONS[i]!;
+/** @deprecated use resolvePicksEmptyCopy({ role: "player", ... }) */
+export function resolvePlayerPicksEmptyCopy(opts?: {
+  leagueId?: string | null;
+  userId?: string | null;
+}): PicksEmptyCopy {
+  return resolvePicksEmptyCopy({
+    role: "player",
+    leagueId: opts?.leagueId,
+    userId: opts?.userId,
+  });
+}
+
+/** @deprecated — player index was visit-salted; use resolvePicksEmptyCopy */
+export function resolvePlayerPicksEmptyIndex(now = new Date()): number {
+  const key = picksEmptyStableKey({
+    role: "player",
+    leagueId: null,
+    userId: null,
+    now,
+  });
+  const n = PLAYER_PICKS_EMPTY_OPTIONS.length;
+  if (n <= 1) return 0;
+  return hashStr(key) % n;
 }
 
 /** Build Card destination — same host path used elsewhere. */

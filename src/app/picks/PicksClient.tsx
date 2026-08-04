@@ -13,8 +13,8 @@ import Link from "next/link";
 import {
   PICKS_EMPTY_BUILD_CARD_HREF,
   PICKS_EMPTY_LOCKER_HREF,
-  resolveCommishPicksEmptyCopy,
-  resolvePlayerPicksEmptyCopy,
+  resolvePicksEmptyCopy,
+  type PicksEmptyCopy,
 } from "@/lib/picks-empty-copy";
 import {
   loadWeekCard,
@@ -163,6 +163,12 @@ export default function PicksClient() {
    * copy flips without requiring a route change.
    */
   const [hostCanBuild, setHostCanBuild] = useState(() => isOps());
+  /**
+   * Empty-state copy — selected ONCE per role (and when role deliberately changes).
+   * Never re-rolled on soft refresh, setNow ticks, or re-render.
+   */
+  const [emptyCopy, setEmptyCopy] = useState<PicksEmptyCopy | null>(null);
+  const emptyCopyRoleRef = useRef<"host" | "player" | null>(null);
 
   const revisionRef = useRef<string>("");
   const viewWeekRef = useRef(1);
@@ -608,6 +614,23 @@ export default function PicksClient() {
     };
   }, []);
 
+  // P0: pick ONE empty message when role is known / changes — then freeze it.
+  // Not an interval carousel. Not re-resolved on every render / soft refresh.
+  useEffect(() => {
+    const role: "host" | "player" = hostCanBuild ? "host" : "player";
+    if (emptyCopyRoleRef.current === role) return;
+    emptyCopyRoleRef.current = role;
+    const session = getSession();
+    const league = getLeague();
+    setEmptyCopy(
+      resolvePicksEmptyCopy({
+        role,
+        leagueId: session?.leagueId || league?.id || null,
+        userId: session?.playerId || null,
+      })
+    );
+  }, [hostCanBuild]);
+
   // Sticky Practice Mode: bare /picks while practice is active restores the
   // practice URL. Explicit Exit / Return to Live League is the only full leave.
   useEffect(() => {
@@ -659,8 +682,9 @@ export default function PicksClient() {
       } catch {
         /* ok */
       }
+      // No isInitial — that set cardBusy and remounted empty state (looked like
+      // a message carousel). Soft retry only; copy stays frozen in state.
       void loadWeek(viewWeekRef.current, {
-        isInitial: true,
         forceReloadPicks: true,
       });
     }, 2_500);
@@ -2102,14 +2126,13 @@ export default function PicksClient() {
         )}
 
         {!loadError && !hasCard && !cardBusy && (() => {
-          // Role-aware empty: what can *I* do next?
+          // Role-aware empty: frozen copy from state (one pick per role/day).
           // Ops (commish/deputy, not view-as-player) → Build Card.
           // Everyone else → Locker / wait. Never tell players to build.
           const liveEmpty = viewWeek === activeWeek;
-          const copy = hostCanBuild
-            ? resolveCommishPicksEmptyCopy()
-            : resolvePlayerPicksEmptyCopy();
+          const copy = emptyCopy;
           const weekLabel = weekTitle(viewWeek);
+          if (!copy) return null;
 
           return (
             <div className="rounded-xl border border-border bg-card p-8 text-center">
