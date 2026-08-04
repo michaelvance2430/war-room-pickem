@@ -10,7 +10,7 @@ import Link from "next/link";
 import PlayerLink from "@/components/PlayerLink";
 import { loadLeaguePlayers } from "@/lib/cloud";
 import { weekCrownAndShame, type CrownShame } from "@/lib/fun-board";
-import { hasOfficialScoredWeek } from "@/lib/season-scored";
+
 import type { Player } from "@/lib/types";
 
 type Props = {
@@ -82,10 +82,14 @@ export default function CrownAndShame({
     let cancelled = false;
 
     async function load() {
-      const scored = await hasOfficialScoredWeek();
+      // Preseason / non-production: never mint Crown/Shame from practice scores
+      const { hasCompetitiveAchievementData } = await import(
+        "@/lib/season-scored"
+      );
+      const competitive = await hasCompetitiveAchievementData();
       if (cancelled) return;
-      setSeasonStarted(scored);
-      if (!scored) {
+      setSeasonStarted(competitive);
+      if (!competitive) {
         setData(null);
         return;
       }

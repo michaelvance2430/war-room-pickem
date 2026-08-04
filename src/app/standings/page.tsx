@@ -25,8 +25,9 @@ import {
   touchLastSeen,
 } from "@/lib/last-seen";
 import { hydratePlayersLastSeen } from "@/lib/cloud";
-import { hasOfficialScoredWeek } from "@/lib/season-scored";
+import { hasCompetitiveAchievementData } from "@/lib/season-scored";
 import { markStandingsWarm } from "@/lib/profile-nav-trace";
+import { isProductionMode } from "@/lib/league-mode";
 
 const divisions: (Division | "Overall")[] = [
   "Overall",
@@ -51,7 +52,9 @@ function streakDisplay(streak: number) {
 export default function StandingsPage() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
+  /** Competitive crown/PTS table — production + official scores only */
   const [seasonStarted, setSeasonStarted] = useState(false);
+  const [preseasonPractice, setPreseasonPractice] = useState(false);
   const [swingById, setSwingById] = useState<
     Record<string, ReturnType<typeof rankPlayersWithSwings>[0]["swing"]>
   >({});
@@ -98,9 +101,11 @@ export default function StandingsPage() {
         }
       }, 3_500);
       try {
-        const scored = await hasOfficialScoredWeek();
+        // Competitive UI only in production reality — preseason scores stay theater
+        const competitive = await hasCompetitiveAchievementData();
         if (cancelled) return;
-        setSeasonStarted(scored);
+        setSeasonStarted(competitive);
+        setPreseasonPractice(!isProductionMode());
 
         mark("loadLeaguePlayers-start");
         const list = await pageLoad(
@@ -109,7 +114,7 @@ export default function StandingsPage() {
         );
         mark(
           "loadLeaguePlayers-done",
-          `n=${Array.isArray(list) ? list.length : 0} scored=${scored}`
+          `n=${Array.isArray(list) ? list.length : 0} competitive=${competitive}`
         );
         if (cancelled) return;
         setPlayers(Array.isArray(list) ? list : []);
@@ -204,8 +209,17 @@ export default function StandingsPage() {
           <p className="text-sm text-muted">
             {seasonStarted
               ? "Live points · Bottom 50% of each division gets flushed · Swing labels after each scored week"
-              : "No standings until the first week is scored. Right now everybody is undefeated."}
+              : preseasonPractice
+                ? "Preseason practice — room is open, but crowns and points wait for the real season."
+                : "No standings until the first week is scored. Right now everybody is undefeated."}
           </p>
+          {preseasonPractice && !seasonStarted && (
+            <p className="text-xs text-amber-200/90 mt-1.5 leading-relaxed">
+              You can still practice cards and scores. Those runs don&apos;t
+              unlock Crown, Wall of Shame, or competitive standings — that&apos;s
+              how the room stays trustworthy.
+            </p>
+          )}
           {seasonStarted && (
             <p className="text-xs text-muted mt-1.5 leading-relaxed">
               Under each name: league pulse (online / last seen).{" "}

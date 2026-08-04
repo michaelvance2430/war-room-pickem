@@ -88,3 +88,23 @@ export async function hasOfficialScoredWeek(): Promise<boolean> {
     }
   }
 }
+
+/**
+ * Competitive achievement chrome (Crown, Shame, PTS table, power ranks).
+ *
+ * Production is Reality: preseason / sandbox / foundry / guest may still
+ * score practice weeks for learning, but those must NOT unlock the same
+ * competitive UI as the real season — that is the trust break.
+ *
+ * Use this for Standings hero + competitive columns.
+ * Use hasOfficialScoredWeek only when you need "did any week_results exist?"
+ */
+export async function hasCompetitiveAchievementData(): Promise<boolean> {
+  try {
+    const { isProductionMode } = await import("./league-mode");
+    if (!isProductionMode()) return false;
+  } catch {
+    /* if mode helper missing, fall through to scored-only gate */
+  }
+  return hasOfficialScoredWeek();
+}
