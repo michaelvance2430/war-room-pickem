@@ -1,86 +1,48 @@
 /**
  * Career Integrity — permanent legacy writes.
  *
- * Constitution:
- *  - Foundry / eyes / guest / preseason sandbox never write career.
- *  - Production leagues alone may earn permanent hardware & career stats.
- *  - Commissioners create experiences; they do not manufacture history.
+ * One rule (Constitution · Production is Reality):
+ *
+ *   if (resolveLeagueMode() !== "production") → no permanent career write
+ *
+ * Do not add guest || foundry || preseason || … lists at call sites.
+ * Put new theater modes on LeagueMode and derive in resolveLeagueMode().
  */
 
-import { isSandboxMode } from "./season-mode";
+import {
+  isProductionMode,
+  resolveLeagueMode,
+  type LeagueMode,
+} from "./league-mode";
 
 export type CareerWriteDenial = {
   ok: false;
   reason: string;
+  mode: LeagueMode;
 };
 
-export type CareerWriteAllow = { ok: true };
+export type CareerWriteAllow = { ok: true; mode: "production" };
 
 export type CareerWriteGate = CareerWriteAllow | CareerWriteDenial;
-
-function isGuestActive(): boolean {
-  try {
-    if (typeof window === "undefined") return false;
-    const raw = localStorage.getItem("warroom-guest-mode-v1");
-    if (!raw) return false;
-    const g = JSON.parse(raw) as { active?: boolean };
-    return g?.active === true;
-  } catch {
-    return false;
-  }
-}
-
-function isEyesOrFoundryLocal(): boolean {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const eyes = require("./creator-eyes") as typeof import("./creator-eyes");
-    if (eyes.isEyesLocalPlayActive()) return true;
-  } catch {
-    /* ignore */
-  }
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const fp = require("./foundry-preview") as typeof import("./foundry-preview");
-    if (typeof fp.allowFoundryCeremonies === "function" && fp.allowFoundryCeremonies()) {
-      // Ceremony preview may celebrate UI — permanent engrave still blocked via sandbox/eyes
-    }
-  } catch {
-    /* ignore */
-  }
-  return false;
-}
 
 /**
  * Gate every permanent career / hardware write.
  * Call before league_trophies upsert, career bank, permanent badge (non-protected), etc.
  */
 export function canWritePermanentCareer(opts?: {
-  /** Optional source tag for logs */
   source?: string;
+  league?: Parameters<typeof resolveLeagueMode>[0];
 }): CareerWriteGate {
-  if (isGuestActive()) {
+  const mode = resolveLeagueMode(opts?.league);
+  if (mode !== "production") {
     return {
       ok: false,
-      reason: "Guest tour never writes career or hardware.",
-    };
-  }
-  if (isEyesOrFoundryLocal()) {
-    return {
-      ok: false,
-      reason:
-        "Foundry / new-player eyes preview never engraves permanent hardware or career.",
-    };
-  }
-  // Preseason dry-run calendar: sim may create disposable theater only
-  if (isSandboxMode()) {
-    return {
-      ok: false,
-      reason:
-        "Preseason sandbox — trophies and career progress do not stick until the real season is open.",
+      mode,
+      reason: `league.mode=${mode} — only production engraves history. Everything else is rehearsal.`,
     };
   }
   void opts?.source;
-  return { ok: true };
+  return { ok: true, mode: "production" };
 }
 
 /** Log + return false when a write was blocked (ops visibility). */
@@ -88,11 +50,18 @@ export function assertCareerWriteOrLog(source: string): boolean {
   const g = canWritePermanentCareer({ source });
   if (!g.ok) {
     try {
-      console.info("[career-integrity] blocked", source, g.reason);
+      console.info("[career-integrity] blocked", source, g.mode, g.reason);
     } catch {
       /* ok */
     }
     return false;
   }
   return true;
+}
+
+/** Convenience for call sites that only need a boolean. */
+export function careerWritesAllowed(
+  league?: Parameters<typeof resolveLeagueMode>[0]
+): boolean {
+  return isProductionMode(league);
 }

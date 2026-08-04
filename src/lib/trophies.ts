@@ -318,7 +318,7 @@ export async function awardTrophy(opts: {
     return { ok: false, error: "Only the commissioner can award trophies" };
   }
 
-  // Career Integrity: Foundry / eyes / guest / preseason sandbox never engrave
+  // Career Integrity: only production engraves history (one mode gate)
   try {
     const { canWritePermanentCareer } = await import("./career-integrity");
     const gate = canWritePermanentCareer({ source: "awardTrophy" });
@@ -326,14 +326,13 @@ export async function awardTrophy(opts: {
       return { ok: false, error: gate.reason };
     }
   } catch {
-    /* if gate module fails open for legacy — still prefer block in sandbox */
     try {
-      const { isSandboxMode } = await import("./season-mode");
-      if (isSandboxMode()) {
+      const { isProductionMode } = await import("./league-mode");
+      if (!isProductionMode()) {
         return {
           ok: false,
           error:
-            "Preseason sandbox — trophies do not engrave permanently (Career Integrity).",
+            "league.mode ≠ production — trophies do not engrave permanently.",
         };
       }
     } catch {

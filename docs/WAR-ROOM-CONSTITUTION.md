@@ -229,13 +229,40 @@ They may **never** manufacture career accomplishments — hardware, achievements
 > When someone opens a profile they should think: *Everything I’m looking at was earned.*  
 > Not: *Maybe the commissioner clicked something.*
 
-**Foundry / sandbox / development never write career.** Lab may create disposable fake trophies, Gazette, and standings — they disappear when testing ends. Production leagues alone may earn permanent legacy.
-
-**League mode gate:** if `mode != production` (or `is_test`), no permanent write to trophies, career stats, achievements, museum, Gazette archives, profile history, or streaks. Nothing permanent. Ever.
-
 **Hardware chain of custody:** every trophy answers *Where did this come from?* (source, verified, league, season) — stored even when not shown.
 
 Full milestone and write-path checklist: `docs/CAREER-INTEGRITY-AUDIT.md`.
+
+### Production is Reality
+
+> **Only production leagues may permanently change a player's legacy.**
+
+Everything else is rehearsal.
+
+| Mode | Role |
+|------|------|
+| **production** | Reality — may engrave history |
+| **sandbox** | Preseason / dry-run theater |
+| **foundry** | Creator lab / eyes preview |
+| **demo** | Disposable demo rooms |
+| **guest** | Tour room — never career |
+
+Foundry. Sandbox. Demo. Guest. Simulation.  
+All of them are **theater**.  
+Only production engraves history.
+
+**Engineering rule (one gate, not ten exceptions):**
+
+```ts
+if (resolveLeagueMode(league) !== "production") {
+  // no permanent career / hardware write
+  return;
+}
+```
+
+When a new mode is invented six months from now, add it to `LeagueMode` and `resolveLeagueMode` — never sprinkle `|| newMode` at every writer. One rule is safer than ten exceptions.
+
+Source: `src/lib/league-mode.ts` · `src/lib/career-integrity.ts`.
 
 ### League ownership principle
 

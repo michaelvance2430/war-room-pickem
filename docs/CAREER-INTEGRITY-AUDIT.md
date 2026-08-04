@@ -77,19 +77,22 @@ Foundry **may** create:
 
 ## League mode (required flag)
 
-Preferred model (name TBD in schema work):
+**Single axis — not a pile of exceptions:**
 
 ```text
-league.mode = production | sandbox | development
+league.mode = production | sandbox | foundry | demo | guest
 ```
 
-or boolean:
-
-```text
-league.is_test = true
+```ts
+if (resolveLeagueMode(league) !== "production") {
+  // no permanent career write — ever
+}
 ```
 
-**Rule:** if `mode != production` (or `is_test`):
+`src/lib/league-mode.ts` derives mode until DB column is universal  
+(guest session, eyes/foundry, is_test, preseason calendar → non-production).
+
+**Rule:** if `mode !== "production"`:
 
 | Surface | Permanent write? |
 |---------|------------------|
@@ -238,11 +241,22 @@ If **yes** → **fix it** (gate on `production`, route through result pipeline, 
 - [ ] Profile / Trophy Room: never show unverified lab hardware as career  
 - [ ] Regression: sim week → prove career tables unchanged  
 - [x] Production hard-delete blocked when other humans or any season history exist  
-- [x] `awardTrophy` gated — Foundry / eyes / guest / preseason sandbox cannot engrave  
+- [x] `awardTrophy` gated via `resolveLeagueMode() !== "production"`  
 - [x] Permanent badge grants gated the same way (non-protected)  
 - [x] Admin-only Foundry cleanup (`admin-test-cleanup` + `/founder#career-cleanup`) — not a commissioner feature  
-- [ ] League mode flag fully gates disposable vs production  
+- [x] One-rule architecture: `league-mode.ts` (not guest \|\| foundry \|\| … lists)  
+- [ ] Persist `leagues.mode` column + backfill production rooms  
 - [ ] Request League Retirement + community vote (design later)  
+
+### V1 acceptance (manual — creator)
+
+1. Scrub sim league on `/founder#career-cleanup`  
+2. Verify production profile: Village Nerd / sim points / hardware gone  
+3. Verify real league history still present  
+4. Create new test/sim room · sim a week · auto-engrave  
+5. **Prove nothing permanent was written**  
+
+If step 5 passes → **Career Integrity v1 complete**.
 
 ---
 

@@ -76,7 +76,8 @@ The following are now considered **permanent** unless explicitly changed by Mike
 - **Foundry / sandbox never write career** — lab artifacts are disposable.  
 - Pre-launch milestone: **Career Integrity Audit** (`docs/CAREER-INTEGRITY-AUDIT.md`).  
 - **Rule of Closure** — every meaningful action ends with certainty (what happened · success · one next step). No limbo. (`docs/WAR-ROOM-CONSTITUTION.md`)  
-- **Leagues are sacred** — community owns history; commissioners cannot hard-delete production rooms. Retirement = future community vote only.
+- **Leagues are sacred** — community owns history; commissioners cannot hard-delete production rooms. Retirement = future community vote only.  
+- **Production is Reality** — only `league.mode === production` may permanently change legacy. Foundry / sandbox / guest / demo = theater (`league-mode.ts`).
 
 ### Onboarding
 

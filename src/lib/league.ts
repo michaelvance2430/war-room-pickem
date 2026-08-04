@@ -17,6 +17,13 @@ export interface LeagueSettings {
   homeTaglineCustom: string;
   /** Holiday / season background for the whole league (see season-theme.ts). */
   seasonThemeId: string;
+  /**
+   * Career integrity mode (prefer top-level league.mode when present).
+   * Only production may engrave permanent legacy.
+   */
+  mode?: import("./league-mode").LeagueMode;
+  /** @deprecated use mode: "sandbox" */
+  isTest?: boolean;
 }
 
 export interface League {
@@ -31,6 +38,14 @@ export interface League {
    * See src/lib/sports/registry.ts
    */
   sportId?: string;
+  /**
+   * Career integrity: production | sandbox | foundry | demo | guest.
+   * Only production permanently changes player legacy.
+   * See league-mode.ts · Constitution "Production is Reality".
+   */
+  mode?: import("./league-mode").LeagueMode;
+  /** @deprecated use mode: "sandbox" */
+  is_test?: boolean;
 }
 
 export interface Session {
