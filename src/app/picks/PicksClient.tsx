@@ -418,7 +418,8 @@ export default function PicksClient() {
 
         setActiveWeek(resolved.week);
         if (resolved.scored?.length) setScoredWeeks(resolved.scored);
-        if (published.length) setPublishedWeeks(published);
+        // Always replace — empty list means no cards yet (clear stale league residue)
+        setPublishedWeeks(published);
 
         if (opts.isInitial) {
           target = resolved.week;

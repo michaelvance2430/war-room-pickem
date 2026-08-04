@@ -1015,7 +1015,11 @@ export async function loadWeekCard(weekNumber = 1): Promise<CloudCard | null> {
   return work;
 }
 
-/** Weeks that have a published card (for My Picks week browser). */
+/**
+ * Weeks that actually exist for player UI (My Picks week bar, Board, etc.).
+ * PRODUCT: only weeks with a real card (at least one game). Empty shells /
+ * orphan week_card rows do not count — never ghost "Week 1" before it exists.
+ */
 export async function listPublishedWeekNumbers(): Promise<number[]> {
   try {
     const { isGuestMode } = await import("./guest-mode");
@@ -1038,23 +1042,40 @@ export async function listPublishedWeekNumbers(): Promise<number[]> {
   }
   try {
     const supabase = createClient();
+    type CardRow = {
+      week_number: number;
+      card_games?: { id: string }[] | null;
+    };
     type PubResult =
-      | { kind: "ok"; rows: { week_number: number }[] }
+      | { kind: "ok"; rows: CardRow[] }
       | { kind: "fail" };
     const q0 =
       typeof performance !== "undefined" ? performance.now() : Date.now();
     wrBoardP1("week_cards.week_number", "START");
     const data = await withTimeout<PubResult>(
       (async () => {
+        // Prefer embed so empty shells (no games) never appear as week pills
         const { data: rows, error } = await supabase
           .from("week_cards")
-          .select("week_number")
+          .select("week_number, card_games(id)")
           .eq("league_id", session.leagueId)
           .order("week_number", { ascending: true });
-        if (error) return { kind: "fail" as const };
+        if (error) {
+          // Older schema / RLS: bare week_number only
+          const bare = await supabase
+            .from("week_cards")
+            .select("week_number")
+            .eq("league_id", session.leagueId)
+            .order("week_number", { ascending: true });
+          if (bare.error) return { kind: "fail" as const };
+          return {
+            kind: "ok" as const,
+            rows: (bare.data as CardRow[]) || [],
+          };
+        }
         return {
           kind: "ok" as const,
-          rows: (rows as { week_number: number }[]) || [],
+          rows: (rows as CardRow[]) || [],
         };
       })(),
       8_000,
@@ -1072,6 +1093,12 @@ export async function listPublishedWeekNumbers(): Promise<number[]> {
       return [];
     }
     const nums = data.rows
+      .filter((r) => {
+        // If embed present: require ≥1 game. Bare rows (no card_games key): keep
+        // (legacy fallback) — still better than inventing weeks client-side.
+        if (r.card_games === undefined || r.card_games === null) return true;
+        return Array.isArray(r.card_games) && r.card_games.length > 0;
+      })
       .map((r) => Number(r.week_number))
       .filter((n) => !Number.isNaN(n));
     const out = [...new Set(nums)].sort((a, b) => a - b);

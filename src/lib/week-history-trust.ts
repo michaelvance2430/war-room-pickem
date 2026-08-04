@@ -123,9 +123,14 @@ export function trustContiguousPublishedAroundLive(
 
 /**
  * Player-facing week selector inventory.
- * Only weeks with a real card (published) and trusted scored history that
- * belongs to that published set. Never invent next week. Never practice week.
- * Never orphan islands (5–7 while live is 0).
+ *
+ * PRODUCT RULE: Only weeks that exist (real created cards in `published`).
+ * - No future placeholders
+ * - No disabled ghost pills
+ * - No inventing activeWeek without a card
+ * Season bar grows as the commissioner creates weeks.
+ *
+ * Still strips orphan residue islands when possible (contiguous around live).
  */
 export function trustWeekBrowserWeeks(opts: {
   published: number[];
@@ -133,24 +138,20 @@ export function trustWeekBrowserWeeks(opts: {
   activeWeek: number;
   sportId?: string | null;
 }): number[] {
-  const contiguousPub = trustContiguousPublishedAroundLive(
+  const created = cleanWeekList(opts.published, opts.sportId);
+  if (created.length === 0) return [];
+
+  // Prefer contiguous run around live so orphan high weeks don't appear early
+  const contiguous = trustContiguousPublishedAroundLive(
     opts.published,
     opts.activeWeek,
     opts.sportId
   );
-  const trustedScored = trustOfficialScoredWeeks(
-    opts.scored,
-    // Score trust uses full published list so contiguous prefix is correct
-    opts.published,
-    opts.sportId
-  );
-  // Scored chips only if that week was actually published (created)
-  const publishedSet = new Set(cleanWeekList(opts.published, opts.sportId));
-  const scoredCreated = trustedScored.filter((w) => publishedSet.has(w));
+  // Contiguous may be empty if live has no card yet but older cards exist —
+  // then show all created weeks (season history growing behind you)
+  if (contiguous.length > 0) return contiguous;
 
-  return [...new Set([...contiguousPub, ...scoredCreated])].sort(
-    (a, b) => a - b
-  );
+  return created;
 }
 
 /**
