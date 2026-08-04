@@ -3,7 +3,7 @@
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   getSession,
   getLeague,
@@ -78,6 +78,8 @@ export default function Nav() {
   const [gazetteUnseen, setGazetteUnseen] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  /** Phone More sheet scroll body — always open at top, never mid-list */
+  const moreSheetScrollRef = useRef<HTMLDivElement>(null);
   const [crystalBallOn, setCrystalBallOn] = useState(true);
   const [sportIsWwc, setSportIsWwc] = useState(false);
   const [sportIsNfl, setSportIsNfl] = useState(false);
@@ -400,13 +402,11 @@ export default function Nav() {
       return;
     }
     try {
-      const { lockBodyScroll } =
+      const { acquireBodyLock } =
         require("@/lib/smooth") as typeof import("@/lib/smooth");
-      lockBodyScroll();
+      const release = acquireBodyLock("nav-more-sheet");
       return () => {
-        const { unlockBodyScroll } =
-          require("@/lib/smooth") as typeof import("@/lib/smooth");
-        unlockBodyScroll();
+        release();
       };
     } catch {
       document.body.style.overflow = "hidden";
@@ -414,6 +414,18 @@ export default function Nav() {
         document.body.style.overflow = "";
       };
     }
+  }, [menuOpen]);
+
+  // More sheet must open scrolled to top (iOS often jumps to mid-list / focused control)
+  useLayoutEffect(() => {
+    if (!menuOpen) return;
+    const el = moreSheetScrollRef.current;
+    if (!el) return;
+    el.scrollTop = 0;
+    const id = window.requestAnimationFrame(() => {
+      el.scrollTop = 0;
+    });
+    return () => window.cancelAnimationFrame(id);
   }, [menuOpen]);
 
   useEffect(() => {
@@ -568,6 +580,26 @@ export default function Nav() {
     setMenuOpen(false);
     setMoreOpen(false);
     prepareNavigation("Nav.closeChrome");
+  }
+
+  /** Open/close More sheet; always reset list scroll to top (phone iOS mid-sheet jump). */
+  function toggleMoreSheet() {
+    setMenuOpen((open) => {
+      const next = !open;
+      if (next) {
+        window.requestAnimationFrame(() => {
+          try {
+            (document.activeElement as HTMLElement | null)?.blur?.();
+          } catch {
+            /* ok */
+          }
+          if (moreSheetScrollRef.current) {
+            moreSheetScrollRef.current.scrollTop = 0;
+          }
+        });
+      }
+      return next;
+    });
   }
 
   /** Prefetch primary desks; leave deep/rare routes cold */
@@ -794,7 +826,7 @@ export default function Nav() {
               aria-label={menuOpen ? "Close menu" : "More menu"}
               aria-expanded={menuOpen}
               aria-controls="mobile-nav-menu"
-              onClick={() => setMenuOpen((open) => !open)}
+              onClick={() => toggleMoreSheet()}
             >
               {menuOpen ? (
                 <svg
@@ -846,9 +878,11 @@ export default function Nav() {
           />
           <nav
             id="mobile-nav-menu"
-            className="md:hidden fixed left-0 right-0 bottom-0 z-[60] rounded-t-2xl border-t border-border bg-card shadow-[0_-12px_40px_rgba(0,0,0,0.5)] max-h-[min(78dvh,640px)] overflow-y-auto overscroll-contain pb-[calc(4.25rem+env(safe-area-inset-bottom,0px))]"
+            className="md:hidden fixed left-0 right-0 bottom-0 z-[60] flex flex-col rounded-t-2xl border-t border-border bg-card shadow-[0_-12px_40px_rgba(0,0,0,0.5)] max-h-[min(78dvh,640px)] pb-[calc(3.75rem+env(safe-area-inset-bottom,0px))]"
+            aria-label="More of the room"
           >
-            <div className="sticky top-0 bg-card/95 backdrop-blur pt-2 pb-1 border-b border-border z-10">
+            {/* Fixed header — not inside the scroll body */}
+            <div className="shrink-0 bg-card pt-2 pb-1 border-b border-border">
               <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-border" />
               <div className="flex items-center justify-between px-4 pb-2">
                 <p className="text-sm font-bold">More of the room</p>
@@ -861,89 +895,101 @@ export default function Nav() {
                 </button>
               </div>
             </div>
-            {playerPreview && (
-              <div className="px-4 pt-3 pb-2">
-                <button
-                  type="button"
-                  onClick={exitPlayerView}
-                  className="w-full py-3.5 rounded-xl bg-warning text-black text-sm font-extrabold uppercase tracking-wide min-h-[48px]"
-                >
-                  Exit → Home (Commish)
-                </button>
-              </div>
-            )}
-            <p className="px-4 pt-3 pb-1 text-[10px] uppercase tracking-wider text-muted font-semibold">
-              Weekly
-            </p>
-            <ul className="pb-1">
-              {primaryLinks.map((link) => {
-                const active = linkActive(link.href);
-                const isHome = link.href === "/";
-                return (
-                  <li key={link.href}>
-                    <Link
-                      href={link.href}
-                      prefetch={shouldPrefetch(link.href)}
-                      onClick={() => closeChrome()}
-                      className={`flex items-center justify-between gap-3 px-4 min-h-[48px] transition touch-manipulation ${
-                        isHome
-                          ? `text-lg font-extrabold ${
-                              active
-                                ? "bg-primary/15 text-primary"
-                                : "text-primary hover:bg-primary/10"
-                            }`
-                          : `text-base ${
-                              active
-                                ? "bg-card-hover text-foreground"
-                                : "text-muted hover:bg-card-hover hover:text-foreground"
-                            } ${link.className || ""}`
-                      }`}
-                    >
-                      <span className={isHome ? "font-extrabold" : "font-medium"}>
-                        {link.label}
-                      </span>
-                      {link.badge != null && link.badge > 0 && (
-                        <UnreadBadge count={link.badge} />
-                      )}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-            <p className="px-4 pt-2 pb-1 text-[10px] uppercase tracking-wider text-muted font-semibold border-t border-border">
-              Everything else
-            </p>
-            <ul className="py-1 pb-3">
-              {moreLinks.map((link) => {
-                const active = linkActive(link.href);
-                const isAccount = link.href === "/account";
-                return (
-                  <li key={link.href}>
-                    <Link
-                      href={link.href}
-                      prefetch={shouldPrefetch(link.href)}
-                      onClick={() => closeChrome()}
-                      className={`flex items-center justify-between gap-3 px-4 min-h-[48px] text-base transition touch-manipulation ${
-                        isAccount
-                          ? active
-                            ? "bg-sky-500/15 text-sky-200 font-semibold"
-                            : "text-sky-200/90 hover:bg-sky-500/10 font-semibold"
-                          : active
-                            ? "bg-card-hover text-foreground"
-                            : "text-muted hover:bg-card-hover hover:text-foreground"
-                      } ${!isAccount ? link.className || "" : ""}`}
-                    >
-                      <span className={isAccount ? "font-semibold" : "font-medium"}>
-                        {isAccount ? "⚙ Account" : link.label}
-                      </span>
-                      {link.badge != null && link.badge > 0 && (
-                        <UnreadBadge count={link.badge} />
-                      )}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
+            {/* Scroll body always starts at top when opened */}
+            <div
+              ref={moreSheetScrollRef}
+              className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+            >
+              {playerPreview && (
+                <div className="px-4 pt-3 pb-2">
+                  <button
+                    type="button"
+                    onClick={exitPlayerView}
+                    className="w-full py-3.5 rounded-xl bg-warning text-black text-sm font-extrabold uppercase tracking-wide min-h-[48px]"
+                  >
+                    Exit → Home (Commish)
+                  </button>
+                </div>
+              )}
+              <p className="px-4 pt-3 pb-1 text-[10px] uppercase tracking-wider text-muted font-semibold">
+                Weekly
+              </p>
+              <ul className="pb-1">
+                {primaryLinks.map((link) => {
+                  const active = linkActive(link.href);
+                  const isHome = link.href === "/";
+                  return (
+                    <li key={link.href}>
+                      <Link
+                        href={link.href}
+                        prefetch={shouldPrefetch(link.href)}
+                        onClick={() => closeChrome()}
+                        className={`flex items-center justify-between gap-3 px-4 min-h-[48px] transition touch-manipulation ${
+                          isHome
+                            ? `text-lg font-extrabold ${
+                                active
+                                  ? "bg-primary/15 text-primary"
+                                  : "text-primary hover:bg-primary/10"
+                              }`
+                            : `text-base ${
+                                active
+                                  ? "bg-card-hover text-foreground"
+                                  : "text-muted hover:bg-card-hover hover:text-foreground"
+                              } ${link.className || ""}`
+                        }`}
+                      >
+                        <span
+                          className={isHome ? "font-extrabold" : "font-medium"}
+                        >
+                          {link.label}
+                        </span>
+                        {link.badge != null && link.badge > 0 && (
+                          <UnreadBadge count={link.badge} />
+                        )}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+              <p className="px-4 pt-2 pb-1 text-[10px] uppercase tracking-wider text-muted font-semibold border-t border-border">
+                Everything else
+              </p>
+              <ul className="py-1 pb-4">
+                {moreLinks.map((link) => {
+                  const active = linkActive(link.href);
+                  const isAccount = link.href === "/account";
+                  return (
+                    <li key={link.href}>
+                      <Link
+                        href={link.href}
+                        prefetch={shouldPrefetch(link.href)}
+                        onClick={() => closeChrome()}
+                        className={`flex items-center justify-between gap-3 px-4 min-h-[48px] text-base transition touch-manipulation ${
+                          isAccount
+                            ? active
+                              ? "bg-sky-500/15 text-sky-200 font-semibold"
+                              : "text-sky-200/90 hover:bg-sky-500/10 font-semibold"
+                            : active
+                              ? "bg-card-hover text-foreground"
+                              : "text-muted hover:bg-card-hover hover:text-foreground"
+                        } ${!isAccount ? link.className || "" : ""}`}
+                      >
+                        <span
+                          className={
+                            isAccount ? "font-semibold" : "font-medium"
+                          }
+                        >
+                          {isAccount ? "⚙ Account" : link.label}
+                        </span>
+                        {link.badge != null && link.badge > 0 && (
+                          <UnreadBadge count={link.badge} />
+                        )}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
           </nav>
         </>
       )}
@@ -997,7 +1043,7 @@ export default function Nav() {
           <li className="min-w-0">
             <button
               type="button"
-              onClick={() => setMenuOpen((o) => !o)}
+              onClick={() => toggleMoreSheet()}
               className={`relative flex flex-col items-center justify-center h-full w-full gap-0.5 text-[10px] font-semibold touch-manipulation transition ${
                 menuOpen || moreActive ? "text-primary" : "text-muted"
               }`}
