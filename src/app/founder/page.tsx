@@ -40,6 +40,7 @@ import {
 import FoundryPlatformApiUsage from "@/components/FoundryPlatformApiUsage";
 import SandboxHopOptIn from "@/components/SandboxHopOptIn";
 import WeeklyColdOpenModal from "@/components/WeeklyColdOpenModal";
+import CreatorSkinPreview from "@/components/CreatorSkinPreview";
 
 type Light = "green" | "yellow" | "red";
 
@@ -450,6 +451,9 @@ export default function FounderDashboardPage() {
           </p>
           <SandboxHopOptIn />
         </section>
+
+        {/* Skin / atmosphere workshop — never on player Home / Picks / Standings */}
+        <CreatorSkinPreview />
 
         {/* ========== Career Integrity · admin cleanup ========== */}
         <section

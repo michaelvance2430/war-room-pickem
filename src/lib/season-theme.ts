@@ -557,7 +557,7 @@ export function installCreatorSkinConsoleRecovery(): void {
   w.__wrSkinPreviewHelp = () => {
     // eslint-disable-next-line no-console
     console.info(
-      "[War Room] Creator skin preview: panel bottom-left when signed in as creator. Recovery: __wrResetSkinPreview()"
+      "[War Room] Creator skin preview: Foundry Hub → Skin tester. Recovery: __wrResetSkinPreview()"
     );
   };
 }

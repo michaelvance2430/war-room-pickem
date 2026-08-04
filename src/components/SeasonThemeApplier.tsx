@@ -11,6 +11,7 @@ import {
   applySeasonTheme,
   CREATOR_SKIN_SIM_EVENT,
   DEFAULT_SEASON_THEME_ID,
+  installCreatorSkinConsoleRecovery,
   isHolidayThemeId,
   paintAutomaticSeasonTheme,
   reapplySeasonThemeFromLocal,
@@ -23,9 +24,21 @@ import ChristmasLights from "@/components/ChristmasLights";
 import HalloweenDecor from "@/components/HalloweenDecor";
 import ThanksgivingDecor from "@/components/ThanksgivingDecor";
 import NewYearDecor from "@/components/NewYearDecor";
+import { isAppCreator } from "@/lib/creator";
 
 export default function SeasonThemeApplier() {
   const [theme, setTheme] = useState<SeasonThemeId>(DEFAULT_SEASON_THEME_ID);
+
+  useEffect(() => {
+    // Silent console recovery for stuck skin sim — no player UI
+    try {
+      if (isAppCreator(getSession()?.playerId)) {
+        installCreatorSkinConsoleRecovery();
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;

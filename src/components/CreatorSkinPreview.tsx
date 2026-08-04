@@ -1,9 +1,9 @@
 "use client";
 
 /**
- * Creator-only CFB skin preview.
+ * Foundry-only CFB skin / atmosphere tester.
  * Drives the REAL production resolver + Home atmosphere.
- * Invisible to commissioners / players. Browser-only. No DB writes.
+ * Never mounted in the player shell — Foundry is the workshop.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -32,7 +32,6 @@ const PRESETS: { label: string; etDate: string; etTime: string; week: number }[]
     { label: "Grind · W13", etDate: "2026-11-21", etTime: "12:00", week: 13 },
     { label: "Champ · W14", etDate: "2026-12-05", etTime: "12:00", week: 14 },
     { label: "Champ · W18", etDate: "2027-01-19", etTime: "12:00", week: 18 },
-    // Halloween window
     {
       label: "Halloween eve",
       etDate: "2026-10-30",
@@ -57,7 +56,6 @@ const PRESETS: { label: string; etDate: string; etTime: string; week: number }[]
       etTime: "00:00",
       week: 9,
     },
-    // Christmas
     {
       label: "Xmas eve-1",
       etDate: "2026-12-24",
@@ -82,7 +80,6 @@ const PRESETS: { label: string; etDate: string; etTime: string; week: number }[]
       etTime: "00:00",
       week: 15,
     },
-    // New Year
     {
       label: "NYE",
       etDate: "2026-12-31",
@@ -123,9 +120,12 @@ function thanksgivingPresets(year: number) {
   ];
 }
 
+/**
+ * Full skin/theme controls for Foundry Hub only.
+ * Not a floating player-app control.
+ */
 export default function CreatorSkinPreview() {
   const [allowed, setAllowed] = useState(false);
-  const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>("real");
   const [etDate, setEtDate] = useState("2026-10-31");
   const [etTime, setEtTime] = useState("12:00");
@@ -153,7 +153,6 @@ export default function CreatorSkinPreview() {
     if (!ok) return;
     installCreatorSkinConsoleRecovery();
     refreshIndicator();
-    // Seed form with real Eastern wall
     const wall = formatEasternWall(new Date());
     setEtDate(wall.etDate);
     setEtTime(wall.etTime);
@@ -210,167 +209,163 @@ export default function CreatorSkinPreview() {
   }
 
   return (
-    <>
-      {/* Indicator — only while sim active */}
+    <section
+      id="skin-tester"
+      className="rounded-2xl border-2 border-amber-400/40 bg-card p-4 space-y-3 scroll-mt-24"
+    >
+      <div>
+        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-300">
+          Foundry · skin tester
+        </p>
+        <h2 className="text-sm font-bold text-foreground mt-0.5">
+          CFB atmosphere preview
+        </h2>
+        <p className="text-xs text-muted mt-1 leading-relaxed">
+          Workshop only — never on the player app. Uses the production resolver
+          + real Home paint. Browser only. No DB writes.
+        </p>
+      </div>
+
       {indicator ? (
         <div
-          className="fixed top-2 left-1/2 -translate-x-1/2 z-[100] pointer-events-none"
+          className="rounded-lg border border-amber-400/50 bg-amber-500/10 px-3 py-2"
           role="status"
         >
-          <div className="rounded-full border border-amber-400/60 bg-black/90 px-3 py-1 shadow-lg">
-            <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-amber-300 text-center">
-              Skin Preview
-            </p>
-            <p className="text-[11px] font-semibold text-amber-100 text-center tabular-nums">
-              {indicator}
-            </p>
-          </div>
+          <p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-amber-300">
+            Sim active
+          </p>
+          <p className="text-xs font-semibold text-amber-100 tabular-nums mt-0.5">
+            {indicator}
+          </p>
+          <p className="text-[11px] text-muted mt-1 leading-snug">
+            Theme will paint while you walk the app. Reset here or in console
+            before demos.
+          </p>
         </div>
       ) : null}
 
-      {/* Toggle */}
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="fixed bottom-20 left-3 z-[100] min-h-[40px] px-2.5 rounded-lg border border-amber-500/50 bg-black/90 text-[10px] font-extrabold uppercase tracking-wide text-amber-200 shadow-lg touch-manipulation"
-        title="Creator skin preview"
-      >
-        {open ? "Skin ▾" : "Skin ▴"}
-      </button>
+      <div className="space-y-1">
+        <p className="text-[10px] font-bold uppercase text-muted">Mode</p>
+        <div className="flex gap-1">
+          <button
+            type="button"
+            onClick={() => setMode("real")}
+            className={`flex-1 min-h-[40px] rounded-lg text-[11px] font-bold ${
+              mode === "real"
+                ? "bg-primary/20 text-primary border border-primary/40"
+                : "border border-border text-muted"
+            }`}
+          >
+            Real / Automatic
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("simulated")}
+            className={`flex-1 min-h-[40px] rounded-lg text-[11px] font-bold ${
+              mode === "simulated"
+                ? "bg-amber-500/20 text-amber-100 border border-amber-400/50"
+                : "border border-border text-muted"
+            }`}
+          >
+            Simulated
+          </button>
+        </div>
+      </div>
 
-      {open ? (
-        <div className="fixed bottom-32 left-3 z-[100] w-[min(22rem,calc(100vw-1.5rem))] rounded-xl border border-amber-500/40 bg-card/95 backdrop-blur-md shadow-2xl p-3 space-y-2.5 max-h-[min(70vh,32rem)] overflow-y-auto">
-          <p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-amber-300">
-            Creator · CFB skin preview
-          </p>
-          <p className="text-[11px] text-muted leading-snug">
-            Uses production resolver + real Home. Browser only. No DB.
-          </p>
+      {mode === "simulated" ? (
+        <>
+          <label className="block text-[10px] font-bold uppercase text-muted">
+            Simulated Eastern date
+            <input
+              type="date"
+              value={etDate}
+              onChange={(e) => setEtDate(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-border bg-background px-2 py-2 text-sm text-foreground"
+            />
+          </label>
+          <label className="block text-[10px] font-bold uppercase text-muted">
+            Simulated Eastern time
+            <input
+              type="time"
+              value={etTime}
+              onChange={(e) => setEtTime(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-border bg-background px-2 py-2 text-sm text-foreground"
+            />
+          </label>
+          <label className="block text-[10px] font-bold uppercase text-muted">
+            Simulated CFB week (0–18)
+            <input
+              type="number"
+              min={0}
+              max={18}
+              value={week}
+              onChange={(e) => setWeek(Number(e.target.value))}
+              className="mt-1 w-full rounded-lg border border-border bg-background px-2 py-2 text-sm text-foreground"
+            />
+          </label>
 
-          <div className="space-y-1">
-            <p className="text-[10px] font-bold uppercase text-muted">Mode</p>
-            <div className="flex gap-1">
-              <button
-                type="button"
-                onClick={() => setMode("real")}
-                className={`flex-1 min-h-[36px] rounded-lg text-[11px] font-bold ${
-                  mode === "real"
-                    ? "bg-primary/20 text-primary border border-primary/40"
-                    : "border border-border text-muted"
-                }`}
-              >
-                Real / Automatic
-              </button>
-              <button
-                type="button"
-                onClick={() => setMode("simulated")}
-                className={`flex-1 min-h-[36px] rounded-lg text-[11px] font-bold ${
-                  mode === "simulated"
-                    ? "bg-amber-500/20 text-amber-100 border border-amber-400/50"
-                    : "border border-border text-muted"
-                }`}
-              >
-                Simulated
-              </button>
+          <div>
+            <p className="text-[10px] font-bold uppercase text-muted mb-1">
+              Quick jumps
+            </p>
+            <div className="flex flex-wrap gap-1">
+              {allPresets.map((p) => (
+                <button
+                  key={p.label}
+                  type="button"
+                  onClick={() => {
+                    setEtDate(p.etDate);
+                    setEtTime(p.etTime);
+                    setWeek(p.week);
+                    setMode("simulated");
+                  }}
+                  className="min-h-[32px] px-2 rounded-md border border-border/70 text-[10px] font-semibold text-foreground hover:border-amber-400/50"
+                >
+                  {p.label}
+                </button>
+              ))}
             </div>
           </div>
-
-          {mode === "simulated" ? (
-            <>
-              <label className="block text-[10px] font-bold uppercase text-muted">
-                Simulated Eastern date
-                <input
-                  type="date"
-                  value={etDate}
-                  onChange={(e) => setEtDate(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-border bg-background px-2 py-2 text-sm text-foreground"
-                />
-              </label>
-              <label className="block text-[10px] font-bold uppercase text-muted">
-                Simulated Eastern time
-                <input
-                  type="time"
-                  value={etTime}
-                  onChange={(e) => setEtTime(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-border bg-background px-2 py-2 text-sm text-foreground"
-                />
-              </label>
-              <label className="block text-[10px] font-bold uppercase text-muted">
-                Simulated CFB week (0–18)
-                <input
-                  type="number"
-                  min={0}
-                  max={18}
-                  value={week}
-                  onChange={(e) => setWeek(Number(e.target.value))}
-                  className="mt-1 w-full rounded-lg border border-border bg-background px-2 py-2 text-sm text-foreground"
-                />
-              </label>
-
-              <div>
-                <p className="text-[10px] font-bold uppercase text-muted mb-1">
-                  Quick jumps
-                </p>
-                <div className="flex flex-wrap gap-1">
-                  {allPresets.map((p) => (
-                    <button
-                      key={p.label}
-                      type="button"
-                      onClick={() => {
-                        setEtDate(p.etDate);
-                        setEtTime(p.etTime);
-                        setWeek(p.week);
-                        setMode("simulated");
-                      }}
-                      className="min-h-[32px] px-2 rounded-md border border-border/70 text-[10px] font-semibold text-foreground hover:border-amber-400/50"
-                    >
-                      {p.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </>
-          ) : null}
-
-          <div className="rounded-lg border border-border/60 bg-black/40 px-2.5 py-2">
-            <p className="text-[10px] font-bold uppercase text-muted">
-              Resolved skin
-            </p>
-            <p className="text-sm font-extrabold text-white mt-0.5">
-              {mode === "real" ? "(real time on Apply)" : resolved.label}
-            </p>
-            {mode === "simulated" ? (
-              <p className="text-[10px] text-muted mt-0.5 font-mono">
-                {resolved.id}
-              </p>
-            ) : null}
-          </div>
-
-          <div className="flex gap-2">
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void applySim()}
-              className="flex-1 min-h-[44px] rounded-lg bg-amber-500 text-black text-xs font-extrabold disabled:opacity-50"
-            >
-              {busy ? "…" : "Apply"}
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void resetReal()}
-              className="flex-1 min-h-[44px] rounded-lg border border-border text-xs font-bold text-foreground disabled:opacity-50"
-            >
-              Reset to real time
-            </button>
-          </div>
-
-          <p className="text-[10px] text-muted leading-snug">
-            Console recovery:{" "}
-            <code className="text-amber-200/90">__wrResetSkinPreview()</code>
-          </p>
-        </div>
+        </>
       ) : null}
-    </>
+
+      <div className="rounded-lg border border-border/60 bg-black/40 px-2.5 py-2">
+        <p className="text-[10px] font-bold uppercase text-muted">
+          Resolved skin
+        </p>
+        <p className="text-sm font-extrabold text-white mt-0.5">
+          {mode === "real" ? "(real time on Apply)" : resolved.label}
+        </p>
+        {mode === "simulated" ? (
+          <p className="text-[10px] text-muted mt-0.5 font-mono">{resolved.id}</p>
+        ) : null}
+      </div>
+
+      <div className="flex gap-2">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void applySim()}
+          className="flex-1 min-h-[44px] rounded-lg bg-amber-500 text-black text-xs font-extrabold disabled:opacity-50"
+        >
+          {busy ? "…" : "Apply"}
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void resetReal()}
+          className="flex-1 min-h-[44px] rounded-lg border border-border text-xs font-bold text-foreground disabled:opacity-50"
+        >
+          Reset to real time
+        </button>
+      </div>
+
+      <p className="text-[10px] text-muted leading-snug">
+        Console recovery:{" "}
+        <code className="text-amber-200/90">__wrResetSkinPreview()</code>
+        {" · "}
+        Foundry only — not on Home / Picks / Standings.
+      </p>
+    </section>
   );
 }
