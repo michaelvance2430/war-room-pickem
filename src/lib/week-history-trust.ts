@@ -2,19 +2,15 @@
  * Trust gate for week browsers / scored chips / published inventory.
  * Constitution: War Room never invents or implies history that hasn't happened.
  *
- * Phantom patterns (all real in production):
- * - Week 0 live + "Week 5 · scored" with no 0–4 scored (Foundry residue)
- * - Week 0 live + chips 0,1 (contiguous week_cards for Week 1 that is NOT live yet)
- * - Week 0 live + chips 0,1,5,6,7 (orphan islands after a gap)
+ * PLAYER WEEK SELECTOR RULE (Picks bar) — FREEZE:
+ *   Show every published week ≤ trusted live (season archive).
+ *   Gaps stay visible when those weeks had real cards.
+ *   Never show weeks > activeWeek (future residue).
+ *   Never invent a week without a week_cards row with games.
  *
- * PLAYER WEEK SELECTOR RULE (Picks bar):
- *   Show only:
- *     • trusted live/current week (if a real card exists)
- *     • prior legitimate published weeks (contiguous history behind live)
- *   Never show:
- *     • weeks > activeWeek (future — even if week_cards rows exist)
- *     • currentWeek + 1 anticipation
- *     • non-contiguous orphan / Foundry residue islands
+ * OFFICIAL SCORED RULE — FREEZE:
+ *   Any week_results+game_results week with a published card is official.
+ *   Contiguous-from-Week-0 is NOT required (that zeroed Foundry standings).
  *
  * Do not silently delete week_cards. Filter player-facing inventory instead.
  * Use findOrphanPublishedWeeks / week-inventory-audit to report residue.
@@ -58,9 +54,17 @@ function clampLiveWeek(
 }
 
 /**
- * Official scored weeks only:
- * Contiguous published prefix from the start of the published season.
- * Orphan mid-season scores with gaps → stripped.
+ * Official scored weeks (standings gate + scored chips).
+ *
+ * FREEZE RULE: Any week that was truly scored (week_results + game_results)
+ * and has a published card is official — including mid-season Foundry sims.
+ *
+ * Do NOT require a contiguous scored prefix from Week 0. That hid legitimate
+ * points when week 0 was published but not scored yet (Foundry post/score on
+ * week N left standings empty forever).
+ *
+ * Still drop practice week 99 and weeks outside the sport calendar.
+ * Prefer intersection with published cards when that list is available.
  */
 export function trustOfficialScoredWeeks(
   scored: number[],
@@ -71,79 +75,46 @@ export function trustOfficialScoredWeeks(
   if (scoredClean.length === 0) return [];
 
   const pubSorted = cleanWeekList(published, sportId);
-  if (pubSorted.length === 0) return [];
+  // No published inventory yet — still trust real scores (caller already
+  // filtered empty week_results shells via game_results).
+  if (pubSorted.length === 0) return scoredClean;
 
-  const scoredSet = new Set(scoredClean);
-  const trusted: number[] = [];
-
-  for (const w of pubSorted) {
-    if (scoredSet.has(w)) {
-      trusted.push(w);
-    } else {
-      // First unscored published week ends the official scored prefix.
-      break;
-    }
-  }
-
-  return trusted;
+  const pubSet = new Set(pubSorted);
+  return scoredClean.filter((w) => pubSet.has(w));
 }
 
 /**
- * Contiguous published history at-or-before the official live week.
+ * Published history at-or-before the official live week.
  *
- * PRODUCT RULE (P0): Never show a week ahead of trusted live.
- *   live=0 + week_cards [0,1,5] → player sees [0] only
- *   live=1 + week_cards [0,1]   → player sees [0,1]
- *   live=0 + week_cards [1,5]   → [] (nothing at-or-before live with a card
- *                                    on a contiguous walk from live)
+ * FREEZE RULE (season archive): every published week ≤ live stays visible,
+ * even with gaps. Contiguous-only walk was hiding Week 0–11 when live was 12
+ * after a gap or sparse Foundry inventory.
  *
- * Walks BACKWARD from live only. Forward walk was the Week 1 ghost bug:
- * residue week_cards for week 1 while live is still 0 looked "contiguous"
- * and became a pill.
+ * PRODUCT RULE: Never show a week ahead of trusted live.
+ *   live=0 + week_cards [0,1,5] → player sees [0] only (1 and 5 are future)
+ *   live=12 + week_cards [0..12] → player sees [0..12]
+ *   live=12 + week_cards [0,1,2,12] → player sees [0,1,2,12]
+ *
+ * Never invents chips without a published card.
  */
 export function trustContiguousPublishedAroundLive(
   published: number[],
   activeWeek: number,
   sportId?: string | null
 ): number[] {
-  const first = firstSeasonWeek(sportId);
   const set = new Set(cleanWeekList(published, sportId));
   const live = clampLiveWeek(activeWeek, sportId);
 
   // Cap inventory to at-or-before live — future week_cards are not player-visible
-  const atOrBefore = [...set].filter((w) => w <= live).sort((a, b) => a - b);
-  if (atOrBefore.length === 0) return [];
-
-  const out = new Set<number>();
-
-  // Live week only if a real card exists — never invent a placeholder chip
-  if (set.has(live)) out.add(live);
-
-  // Seed: live card if present, else highest published week ≤ live
-  let seed = live;
-  if (!set.has(live)) {
-    seed = atOrBefore[atOrBefore.length - 1]!;
-    out.add(seed);
-  }
-
-  // Backward through contiguous published history only
-  for (let w = seed - 1; w >= first; w--) {
-    if (set.has(w)) out.add(w);
-    else break;
-  }
-
-  // NO forward walk past live. Future cards (even commissioner-prebuilt) stay
-  // invisible on the player bar until they become the trusted live week
-  // (or fall behind it as prior history).
-
-  return [...out].sort((a, b) => a - b);
+  return [...set].filter((w) => w <= live).sort((a, b) => a - b);
 }
 
 /**
  * Player-facing week selector inventory (Picks bar, etc.).
  *
- * Only weeks that exist AND are ≤ trusted live week, contiguous around live.
- * Never invents activeWeek without a card. Never anticipates currentWeek+1.
+ * Season archive: every published week ≤ live, plus any scored week ≤ live
+ * that still has a card in the published list. Never invents future weeks.
+ * Never invents a week without a published card.
  */
 export function trustWeekBrowserWeeks(opts: {
   published: number[];
@@ -158,6 +129,15 @@ export function trustWeekBrowserWeeks(opts: {
   // Hard cap: future published rows never enter the player inventory
   const notFuture = created.filter((w) => w <= live);
   if (notFuture.length === 0) return [];
+
+  // Union with scored ≤ live that still have cards (archive of finished weeks)
+  const scoredClean = cleanWeekList(opts.scored, opts.sportId);
+  const createdSet = new Set(notFuture);
+  for (const w of scoredClean) {
+    if (w <= live && createdSet.has(w)) {
+      /* already in set via published */
+    }
+  }
 
   return trustContiguousPublishedAroundLive(
     notFuture,

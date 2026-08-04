@@ -271,7 +271,44 @@ export async function founderScoreWeek(weekNumber: number): Promise<OneClickLog>
         steps,
       };
     }
+    if (!(scored.scoredCount ?? 0)) {
+      return {
+        ok: false,
+        message:
+          "Score wrote results but 0 membership standings updated — check picks / bot slips / memberships RLS.",
+        steps: [
+          ...steps,
+          `Scored count: 0`,
+          ...(scored.details || []).map(
+            (d) => `${d.name}: ${d.points} pts (pick only?)`
+          ),
+        ],
+      };
+    }
     steps.push(`Scored ${scored.scoredCount ?? 0} player(s)`);
+    // Sample board so Foundry log proves standings pipeline
+    try {
+      const { loadLeaguePlayers, invalidateCloudWeekCaches } = await import(
+        "./cloud"
+      );
+      invalidateCloudWeekCaches(getSession()?.leagueId);
+      const board = await loadLeaguePlayers();
+      const withPts = board
+        .filter((p) => (p.totalPoints || 0) > 0)
+        .sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0))
+        .slice(0, 5);
+      steps.push(
+        withPts.length
+          ? `Standings sample: ${withPts
+              .map((p) => `${p.name} ${p.totalPoints}`)
+              .join(" · ")}`
+          : "Standings sample: all 0 pts after score (pipeline still broken)"
+      );
+    } catch (e) {
+      steps.push(
+        `Standings sample skip: ${e instanceof Error ? e.message : "fail"}`
+      );
+    }
     await setLeagueActiveWeek(weekNumber);
 
     // Foundry: unlock Gazette + cheevo path (not stuck in pre-lock calm)

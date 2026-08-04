@@ -2056,11 +2056,11 @@ export default function PicksClient() {
             </p>
           )}
 
-          {/* Week chips in header — no separate card, no lecture copy */}
+          {/* Week chips — full season archive ≤ live; scored weeks muted but clickable */}
           {!practiceMode && weekPills.length > 0 && (
             <div
-              className="phone-h-scroll sm:flex-wrap sm:overflow-visible mt-3"
-              aria-label="Week"
+              className="phone-h-scroll sm:flex-wrap sm:overflow-visible mt-3 gap-1.5"
+              aria-label="Week history"
             >
               {weekPills.map((w) => {
                 const isView = w === viewWeek;
@@ -2072,7 +2072,14 @@ export default function PicksClient() {
                     type="button"
                     disabled={switching}
                     onClick={() => void selectWeek(w)}
-                    className={`px-3.5 py-2 min-h-[40px] rounded-full text-xs font-semibold transition touch-manipulation ${
+                    title={
+                      isActive
+                        ? `${weekTitle(w)} · live`
+                        : isScored
+                          ? `${weekTitle(w)} · finished — tap to relive`
+                          : weekTitle(w)
+                    }
+                    className={`relative shrink-0 px-3.5 py-2 min-h-[40px] rounded-full text-xs font-semibold transition touch-manipulation ${
                       isView && isActive
                         ? "bg-primary text-black"
                         : isView
@@ -2080,12 +2087,24 @@ export default function PicksClient() {
                           : isActive
                             ? "border border-primary/50 text-primary hover:bg-primary/10"
                             : isScored
-                              ? "border border-border text-foreground hover:bg-card-hover"
+                              ? "border border-border/70 bg-card/40 text-muted hover:text-foreground hover:bg-card-hover opacity-80"
                               : "border border-border text-muted hover:text-foreground"
                     }`}
                   >
-                    {weekTitle(w)}
-                    {isActive ? " · live" : isScored ? " · scored" : ""}
+                    <span
+                      className={
+                        isScored && !isView && !isActive
+                          ? "line-through decoration-muted/70 decoration-1"
+                          : undefined
+                      }
+                    >
+                      {weekTitle(w)}
+                    </span>
+                    {isActive ? (
+                      <span className="font-extrabold"> · Live</span>
+                    ) : isScored ? (
+                      <span className="opacity-90"> · ✓</span>
+                    ) : null}
                   </button>
                 );
               })}

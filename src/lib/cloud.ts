@@ -2539,12 +2539,10 @@ export async function saveResultsAndScoreWeek(opts: {
     );
 
     const previousPoints = pickRow.total_points as number | null;
-    const alreadyScored = previousPoints !== null && previousPoints !== undefined;
-
-    await supabase
-      .from("picks")
-      .update({ total_points: weekScore.totalPoints })
-      .eq("id", pickId);
+    // Re-score only when this pick already has a non-null total from a prior
+    // score pass. Do NOT treat SQL default 0 as "already scored" when nullish
+    // was intended — but 0 can mean a real zero week; use weekly_points index.
+    let membershipWeekly: number[] = [];
 
     const { data: membership } = await supabase
       .from("memberships")
@@ -2553,7 +2551,42 @@ export async function saveResultsAndScoreWeek(opts: {
       .eq("user_id", userId)
       .maybeSingle();
 
-    if (!membership) continue;
+    if (!membership) {
+      try {
+        console.warn(
+          "[score] membership missing — skipping standings update",
+          { userId, weekNumber, leagueId }
+        );
+      } catch {
+        /* ok */
+      }
+      continue;
+    }
+
+    membershipWeekly = Array.isArray(membership.weekly_points)
+      ? [...(membership.weekly_points as number[])]
+      : [];
+    // Week 0 → index 0, Week 1 → index 1, … (do NOT use weekNumber-1)
+    const idx = weekNumber;
+    while (membershipWeekly.length <= idx) membershipWeekly.push(0);
+    const priorWeekPts = membershipWeekly[idx] || 0;
+    // Re-score when this membership already has points banked for this week index
+    // or the pick row already carries a scored total (null = never scored).
+    const alreadyScored =
+      priorWeekPts > 0 ||
+      (previousPoints !== null && previousPoints !== undefined);
+
+    const pickUpdate = await supabase
+      .from("picks")
+      .update({ total_points: weekScore.totalPoints })
+      .eq("id", pickId);
+    if (pickUpdate.error) {
+      try {
+        console.warn("[score] pick total_points update failed", pickUpdate.error);
+      } catch {
+        /* ok */
+      }
+    }
 
     const pts = weekScore.totalPoints;
     const gamesCount = opts.games.length;
@@ -2582,14 +2615,8 @@ export async function saveResultsAndScoreWeek(opts: {
       }
     }
 
-    let weekly: number[] = Array.isArray(membership.weekly_points)
-      ? [...membership.weekly_points]
-      : [];
-    // Week 0 → index 0, Week 1 → index 1, … (do NOT use weekNumber-1; that breaks Week 0)
-    const idx = weekNumber;
-    while (weekly.length <= idx) weekly.push(0);
-
-    let totalPoints = membership.total_points || 0;
+    let weekly = membershipWeekly;
+    let totalPoints = Number(membership.total_points) || 0;
     let atsCorrect = membership.ats_correct || 0;
     let atsTotal = membership.ats_total || 0;
     let bestWeek = membership.best_week || 0;
@@ -2603,7 +2630,9 @@ export async function saveResultsAndScoreWeek(opts: {
     let streak = membership.current_streak || 0;
 
     if (alreadyScored) {
-      const oldPts = weekly[idx] || previousPoints || 0;
+      const oldPts =
+        priorWeekPts ||
+        (typeof previousPoints === "number" ? previousPoints : 0);
       totalPoints = Math.max(0, totalPoints - oldPts) + pts;
       weekly[idx] = pts;
     } else {
@@ -2625,7 +2654,7 @@ export async function saveResultsAndScoreWeek(opts: {
       else streak = streak < 0 ? streak - 1 : -1;
     }
 
-    await supabase
+    const memUpdate = await supabase
       .from("memberships")
       .update({
         total_points: totalPoints,
@@ -2643,6 +2672,20 @@ export async function saveResultsAndScoreWeek(opts: {
         weeks_played: weeksPlayed,
       })
       .eq("id", membership.id);
+
+    if (memUpdate.error) {
+      try {
+        console.error(
+          "[score] membership standings update FAILED",
+          memUpdate.error.message,
+          { userId, weekNumber, pts, totalPoints }
+        );
+      } catch {
+        /* ok */
+      }
+      // Pick total may be saved; standings row failed — do not pretend success
+      continue;
+    }
 
     const { data: profile } = await supabase
       .from("profiles")
