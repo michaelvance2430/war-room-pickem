@@ -448,16 +448,8 @@ export default function Nav() {
         { href: "/picks", label: "Picks" },
         { href: "/standings", label: "Standings" },
         { href: "/locker-room", label: "Locker", badge: lockerUnseen },
-        ...(ops
-          ? [
-              {
-                href: "/commissioner",
-                // Destination, not role — "League" for hosts and deputies
-                label: "League",
-                className: "text-primary",
-              } as NavLink,
-            ]
-          : []),
+        // Weekly host work lives on Home (mission button) + /week-ops.
+        // /commissioner is Manage League — secondary, under More.
       ]
     : [
         { href: "/", label: "Home" },
@@ -474,16 +466,6 @@ export default function Nav() {
               } as NavLink,
             ]
           : []),
-        ...(ops
-          ? [
-              {
-                href: "/commissioner",
-                // Destination, not role — "League" for hosts and deputies
-                label: "League",
-                className: "text-primary",
-              } as NavLink,
-            ]
-          : []),
       ];
 
   // More: Account first (settings hub) so it never hides under Standings thumb zone.
@@ -497,6 +479,15 @@ export default function Nav() {
           label: "Crew",
           className: "text-amber-300/80 hover:text-amber-200",
         },
+        ...(ops
+          ? [
+              {
+                href: "/commissioner",
+                label: "Manage League",
+                className: "text-primary",
+              } as NavLink,
+            ]
+          : []),
       ]
     : [
         { href: "/account", label: "Account" },
@@ -536,6 +527,15 @@ export default function Nav() {
           className: "text-amber-300 hover:text-amber-200",
         },
         { href: "/rules", label: "How to play" },
+        ...(ops
+          ? [
+              {
+                href: "/commissioner",
+                label: "Manage League",
+                className: "text-primary",
+              } as NavLink,
+            ]
+          : []),
         ...(staff
           ? [
               {

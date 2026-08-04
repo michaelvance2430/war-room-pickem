@@ -103,7 +103,7 @@ export default function HostDashboardShell({
       {/* Page identity — not a third summary of the week */}
       <div>
         <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
-          Operations
+          Manage League
         </p>
         <h1 className="text-2xl sm:text-3xl font-black text-foreground mt-0.5 tracking-tight">
           {leagueName || "Your league"}

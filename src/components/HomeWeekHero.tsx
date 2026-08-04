@@ -315,8 +315,8 @@ export default function HomeWeekHero() {
           : `${state.rosterCount} in the room. ${weekLabel} has no games yet — open League → First card wizard → publish.`;
       primaryHref =
         state.rosterCount < 2
-          ? "/commissioner?tab=card&first=1"
-          : "/commissioner?tab=card&first=1";
+          ? "/week-ops?step=1"
+          : "/week-ops?step=1";
       primaryLabel =
         state.rosterCount < 2 ? "Build first card →" : "Build first card →";
       secondaryHref = "/locker-room";
@@ -331,7 +331,7 @@ export default function HomeWeekHero() {
         ? `One job: publish ${weekLabel} (demo week is fine). Then text the crew.`
         : `You're seated. Your commish hasn't published ${weekLabel} yet — there's nothing to pick. Hang in the Locker, poke Standings if you want, or check back when they drop a card. First ten minutes = chill.`;
       primaryHref = state.isOps
-        ? "/commissioner?tab=card&first=1"
+        ? "/week-ops?step=1"
         : "/locker-room";
       primaryLabel = state.isOps
         ? "Publish this week's card →"
@@ -393,7 +393,7 @@ export default function HomeWeekHero() {
     title = `Score ${weekLabel} when the games die`;
     body =
       "Card’s in. One tap grades the room and drops the paper. Don’t leave them hanging.";
-    primaryHref = "/commissioner?tab=results";
+    primaryHref = "/week-ops?step=score";
     primaryLabel = `Score ${weekLabel} →`;
     primaryClass = isNfl
       ? "bg-primary text-black hover:opacity-90 shadow-[0_0_24px_rgba(193,18,31,0.35)]"

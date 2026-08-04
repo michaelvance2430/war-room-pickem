@@ -281,5 +281,5 @@ export function resolvePlayerPicksEmptyIndex(now = new Date()): number {
 }
 
 /** Build Card destination — same host path used elsewhere. */
-export const PICKS_EMPTY_BUILD_CARD_HREF = "/commissioner?tab=card";
+export const PICKS_EMPTY_BUILD_CARD_HREF = "/week-ops";
 export const PICKS_EMPTY_LOCKER_HREF = "/locker-room";

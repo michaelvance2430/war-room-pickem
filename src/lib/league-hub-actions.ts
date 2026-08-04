@@ -71,8 +71,8 @@ const ACTION_META: Record<
   FINISH_CARD: { label: "Finish Card", href: "/picks" },
   LOCK_CRYSTAL_BALL: { label: "Lock Crystal Ball", href: "/crystal-ball" },
   LOCK_PICKS: { label: "Lock Picks", href: "/picks" },
-  SET_WEEK: { label: "Set Week", href: "/commissioner?tab=card" },
-  PUBLISH_WEEK: { label: "Publish Week", href: "/commissioner?tab=card" },
+  SET_WEEK: { label: "Set Week", href: "/week-ops" },
+  PUBLISH_WEEK: { label: "Publish Week", href: "/week-ops" },
   ENTER: { label: "Enter", href: "/" },
 };
 
@@ -119,7 +119,7 @@ function actionOf(
     return {
       code,
       label: meta.label,
-      href: "/commissioner?tab=card",
+      href: "/week-ops",
     };
   }
   return { code, label: meta.label, href: meta.href };

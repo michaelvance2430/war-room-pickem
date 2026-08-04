@@ -77,7 +77,7 @@ export default function HomeHostScoreStrip() {
           </p>
         </div>
         <Link
-          href="/commissioner?tab=results"
+          href="/week-ops?step=score"
           className="shrink-0 flex items-center justify-center px-5 py-3 min-h-[48px] rounded-xl bg-primary text-black text-sm font-extrabold hover:opacity-90 touch-manipulation"
         >
           Score {label} →

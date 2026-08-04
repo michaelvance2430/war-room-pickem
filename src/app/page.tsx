@@ -6,6 +6,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import IncidentBanner from "@/components/IncidentBanner";
 import HomeWeekHero from "@/components/HomeWeekHero";
+import HomeCommishMissionButton from "@/components/HomeCommishMissionButton";
 import CommishSetupBanner from "@/components/CommishSetupBanner";
 import HomeTileUnseen from "@/components/HomeTileUnseen";
 import {
@@ -635,6 +636,9 @@ export default function Home() {
         {/* Primary job — always paint first on return from Picks */}
         <HomeWeekHero />
 
+        {/* Commissioner: one mission above player destinations — never for pure players */}
+        <HomeCommishMissionButton />
+
         {/* Host first-hour spine */}
         <CommishSetupBanner />
 
@@ -751,19 +755,6 @@ export default function Home() {
                     Locker Room
                   </div>
                 </Link>
-                {isCommish && (
-                  <Link
-                    href="/commissioner?tab=card&first=1"
-                    className="group rounded-xl border border-primary/40 bg-primary/10 p-5 hover:border-primary transition"
-                  >
-                    <div className="text-xs uppercase tracking-wider text-primary mb-1">
-                      Commish
-                    </div>
-                    <div className="text-lg font-semibold text-white">
-                      Publish card
-                    </div>
-                  </Link>
-                )}
                 <Link
                   href="/rules"
                   className="group rounded-xl border border-border/80 bg-black/40 p-5 hover:border-primary/40 transition sm:col-span-2"
