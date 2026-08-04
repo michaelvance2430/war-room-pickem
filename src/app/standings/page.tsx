@@ -183,6 +183,16 @@ export default function StandingsPage() {
           </div>
         )}
 
+        {/*
+          HERO: Crown + Wall of Shame answer the page first.
+          Who's on top? Who had the worst week?
+          The leaderboard below explains how those awards happened.
+          Layout only — scoring / awards logic unchanged.
+        */}
+        {!loading && (
+          <CrownAndShame className="mb-6" players={players} />
+        )}
+
         {!loading && !seasonStarted && (
           <div className="mb-6">
             <SeasonNotStartedEmpty />
@@ -254,11 +264,6 @@ export default function StandingsPage() {
               first week is scored.
             </p>
           </div>
-        )}
-
-        {/* Always mount Crown/Shame: empty state when no official score; never fake pts */}
-        {!loading && (
-          <CrownAndShame className="mb-6" players={players} />
         )}
 
         {!loading && players.length === 0 && (
