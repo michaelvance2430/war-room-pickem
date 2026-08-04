@@ -218,6 +218,25 @@ If nobody has points — everybody is undefeated, and the UI says so without fak
 Gate: official scored weeks (`listScoredWeekNumbers`), not leftover membership fields.  
 If War Room says something happened, the player must be able to trust that it actually happened.
 
+### Career integrity principle (P0 — pre-public launch)
+
+> **Commissioners create experiences. They do not create history.**
+
+A commissioner may build cards, publish weeks, score manual props, close the league, and edit league settings.  
+They may **never** manufacture career accomplishments — hardware, achievements, titles, career stats, museum entries, Gazette archives, streaks, or profile progression.
+
+> **The profile is sacred.**  
+> When someone opens a profile they should think: *Everything I’m looking at was earned.*  
+> Not: *Maybe the commissioner clicked something.*
+
+**Foundry / sandbox / development never write career.** Lab may create disposable fake trophies, Gazette, and standings — they disappear when testing ends. Production leagues alone may earn permanent legacy.
+
+**League mode gate:** if `mode != production` (or `is_test`), no permanent write to trophies, career stats, achievements, museum, Gazette archives, profile history, or streaks. Nothing permanent. Ever.
+
+**Hardware chain of custody:** every trophy answers *Where did this come from?* (source, verified, league, season) — stored even when not shown.
+
+Full milestone and write-path checklist: `docs/CAREER-INTEGRITY-AUDIT.md`.
+
 ### Anticipation principle
 
 > **War Room celebrates anticipation as much as history.**
@@ -428,6 +447,9 @@ If a customer ever sees Sandbox, Dry Run, Hop, Lab, Shop, Through Their Eyes, or
 Disney doesn’t let guests see maintenance tunnels. War Room doesn’t let players see Foundry.
 
 Keep Foundry ridiculously powerful for the creator. Make every lab tool **impossible for customers to discover** — not hidden, not collapsed, not “advanced.” **Gone** from the customer product.
+
+> **Foundry proves production. Foundry never writes career.**  
+> Disposable lab artifacts are fine. Permanent player legacy is not.
 
 ### Host Dashboard corollary
 

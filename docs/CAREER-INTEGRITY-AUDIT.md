@@ -100,7 +100,27 @@ Every writer checks the flag. No exceptions for “just this one trophy.”
 
 Every trophy answers: **Where did this come from?**
 
-Stored (not always shown):
+Example (stored; not necessarily shown to users):
+
+```text
+Village Nerd
+2026
+CFB
+
+Source:
+League Close
+
+Verified:
+YES
+
+League:
+Saturday Situation Room
+
+Season:
+2026
+```
+
+Ledger fields (minimum):
 
 ```text
 trophy_type / label
@@ -110,7 +130,6 @@ source: league_close | week_score | system_auto | …
 verified: boolean
 league_id
 league_name (snapshot at award time)
-season_year
 awarded_at
 ```
 
@@ -211,3 +230,5 @@ If **yes** → **fix it** (gate on `production`, route through result pipeline, 
 
 > A sports app that prevents pick-cheating is common.  
 > An app that **protects a player’s legacy from commissioners and labs** is rare — and that’s War Room’s weight.
+
+If War Room becomes known as the app where **every trophy was genuinely earned**, the profile system has weight. Ten championship plaques five years from now only mean something if everyone knows they survived the same rules as everyone else’s — not a commissioner click in a lab. That trust keeps rivalries meaningful across seasons.
