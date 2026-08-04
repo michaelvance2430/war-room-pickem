@@ -71,7 +71,10 @@ The following are now considered **permanent** unless explicitly changed by Mike
 - War Room never invents history.  
 - War Room never invents achievement.  
 - War Room never invents reality.  
-- Guests observe. Members belong.
+- Guests observe. Members belong.  
+- **Commissioners create experiences, not history** — no free-form hardware, cheevos, career stats, or archives.  
+- **Foundry / sandbox never write career** — lab artifacts are disposable.  
+- Pre-launch milestone: **Career Integrity Audit** (`docs/CAREER-INTEGRITY-AUDIT.md`).
 
 ### Onboarding
 
