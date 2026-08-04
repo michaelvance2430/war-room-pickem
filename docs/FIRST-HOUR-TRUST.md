@@ -2,7 +2,8 @@
 
 **Status:** ACTIVE — 2026-08-04  
 **Mission:** Make the first 15 minutes feel inevitable.  
-**Whiteboard:** *The product is better than what the sim currently allows people to trust.*
+**Whiteboard:** *The product is better than what the sim currently allows people to trust.*  
+**Host path:** `docs/COMMISH-FIRST-HOUR.md`
 
 ---
 

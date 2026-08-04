@@ -80,7 +80,8 @@ The following are now considered **permanent** unless explicitly changed by Mike
 ### Onboarding
 
 **Goal:** Build confidence. Create excitement. Teach naturally. Never overwhelm.  
-**Closure:** After every important first-hour step, the player knows it worked and where to go next.
+**Closure:** After every important first-hour step, the player knows it worked and where to go next.  
+**Host spine:** Create → League Build → week-ops publish → Done → Home (`docs/COMMISH-FIRST-HOUR.md`).
 
 ### League
 

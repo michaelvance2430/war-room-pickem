@@ -409,6 +409,11 @@ function CommissionerPageInner() {
       // URL tab landing — sync, no cloud
       const tabParam = searchParams.get("tab");
       const firstParam = searchParams.get("first");
+      // First-hour card work lives on week-ops (football, not admin)
+      if (firstParam === "1" && (tabParam === "card" || !tabParam)) {
+        router.replace("/week-ops?first=1");
+        return;
+      }
       const hash =
         typeof window !== "undefined"
           ? window.location.hash.replace("#", "")
@@ -425,8 +430,6 @@ function CommissionerPageInner() {
           setTab("card");
           setCommunityPulseOpen(true);
         } else setTab(tabParam);
-      } else if (firstParam === "1") {
-        setTab("card");
       } else if (ownerNow) {
         setTab("settings");
       } else {

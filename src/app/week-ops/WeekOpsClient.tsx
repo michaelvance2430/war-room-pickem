@@ -105,6 +105,10 @@ export default function WeekOpsClient() {
   const [results, setResults] = useState<Record<string, GameResult>>({});
   const [propResult, setPropResult] = useState<string | null>(null);
   const [doneLabel, setDoneLabel] = useState("");
+  /** First-hour host: room just set, or first card path */
+  const [roomJustReady, setRoomJustReady] = useState<string | null>(null);
+  const isFirstHour =
+    searchParams.get("first") === "1" || roomJustReady != null;
 
   const sportId = getLeague()?.sportId || "cfb";
   const weekLabel = weekTitle(week, sportId);
@@ -185,6 +189,20 @@ export default function WeekOpsClient() {
   useEffect(() => {
     void boot();
   }, [boot]);
+
+  // Rule of Closure handoff from League Build
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem("warroom-league-build-just-done");
+      if (!raw) return;
+      sessionStorage.removeItem("warroom-league-build-just-done");
+      const p = JSON.parse(raw) as { at?: number; name?: string };
+      if (p.at && Date.now() - p.at > 15 * 60_000) return;
+      setRoomJustReady(p.name?.trim() || getLeague()?.name || "Your room");
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   async function pullGames() {
     setBusy(true);
@@ -267,8 +285,24 @@ export default function WeekOpsClient() {
         setError(res.error || "Publish failed");
         return;
       }
-      setDoneLabel(`${weekLabel} is live.`);
+      setDoneLabel(`${weekLabel} is LIVE.`);
       setStep("done");
+      setRoomJustReady(null);
+      try {
+        const { notifyCardPublished } = await import("@/lib/first-session");
+        notifyCardPublished({
+          weekNumber: week,
+          weekLabel,
+        });
+      } catch {
+        /* optional */
+      }
+      try {
+        const { onWeekCardPublished } = await import("@/lib/coaching/complete");
+        onWeekCardPublished(getLeague()?.id);
+      } catch {
+        /* optional */
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Publish failed");
     } finally {
@@ -309,6 +343,20 @@ export default function WeekOpsClient() {
     } finally {
       setBusy(false);
     }
+  }
+
+  function goHomeDone() {
+    router.push("/");
+  }
+
+  function seePlayerView() {
+    try {
+      const { setViewAsPlayer } = require("@/lib/view-as-player") as typeof import("@/lib/view-as-player");
+      setViewAsPlayer(true);
+    } catch {
+      /* ignore */
+    }
+    window.location.href = "/";
   }
 
   if (!getSession()) {
@@ -354,6 +402,34 @@ export default function WeekOpsClient() {
             </p>
           )}
         </header>
+
+        {/* First-hour: room saved → one job left */}
+        {roomJustReady && step !== "done" && step !== "score" && (
+          <div className="mb-5 rounded-2xl border-2 border-primary/45 bg-primary/10 px-4 py-3.5">
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">
+              Room ready
+            </p>
+            <p className="text-base font-bold text-foreground mt-0.5">
+              {roomJustReady} is set.
+            </p>
+            <p className="text-sm text-muted mt-1 leading-relaxed">
+              One job left: pull odds, pick 5 games, add a prop, publish. Then
+              friends can open My Picks.
+            </p>
+          </div>
+        )}
+
+        {isFirstHour && !roomJustReady && step === 1 && (
+          <div className="mb-5 rounded-xl border border-border bg-card px-4 py-3">
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">
+              First card
+            </p>
+            <p className="text-sm text-muted mt-1 leading-relaxed">
+              Four steps. One button each. When you hit Publish, the week goes
+              live.
+            </p>
+          </div>
+        )}
 
         {/* Progress — completed steps quiet, current loud */}
         {buildStep >= 1 && buildStep <= 4 && (
@@ -811,17 +887,34 @@ export default function WeekOpsClient() {
           </div>
         )}
 
-        {/* ── DONE ────────────────────────────────────────────── */}
+        {/* ── DONE — Rule of Closure ──────────────────────────── */}
         {step === "done" && (
-          <div className="rounded-2xl border-2 border-primary/50 bg-primary/10 px-5 py-10 text-center space-y-5">
-            <p className="text-2xl font-black">{doneLabel}</p>
+          <div className="rounded-2xl border-2 border-primary/50 bg-primary/10 px-5 py-8 text-center space-y-4">
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
+              It worked
+            </p>
+            <p className="text-2xl font-black leading-tight">{doneLabel}</p>
+            <p className="text-sm text-muted leading-relaxed max-w-sm mx-auto">
+              {/LIVE/i.test(doneLabel)
+                ? "Friends can open My Picks now. Home is your resting place — or peek at the player view once."
+                : "Standings and the room update from real results. Head Home when you’re ready."}
+            </p>
             <button
               type="button"
-              onClick={() => router.push("/")}
-              className="w-full min-h-[56px] rounded-2xl bg-primary text-black text-base font-extrabold"
+              onClick={goHomeDone}
+              className="w-full min-h-[56px] rounded-2xl bg-primary text-black text-base font-extrabold touch-manipulation"
             >
-              Done
+              Done → Home
             </button>
+            {/LIVE/i.test(doneLabel) && (
+              <button
+                type="button"
+                onClick={seePlayerView}
+                className="w-full min-h-[48px] rounded-xl border-2 border-warning/50 bg-warning/10 text-warning text-sm font-bold touch-manipulation"
+              >
+                See what players see
+              </button>
+            )}
           </div>
         )}
 

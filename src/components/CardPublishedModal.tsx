@@ -76,14 +76,14 @@ export default function CardPublishedModal() {
               🟢
             </div>
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">
-              Card is live
+              It worked
             </p>
             <h2 id="card-live-title" className="text-2xl font-black mt-1">
-              {label} is open
+              {label} is LIVE
             </h2>
             <p className="text-sm text-muted mt-2 leading-relaxed">
-              Friends can lock picks now. Text the crew once more, then check
-              what they see.
+              Friends can lock picks now. Home is your resting place — or peek
+              at what they see first.
             </p>
           </div>
 
@@ -97,6 +97,13 @@ export default function CardPublishedModal() {
           )}
 
           <div className="flex flex-col gap-2">
+            <Link
+              href="/"
+              onClick={dismiss}
+              className="w-full py-3.5 min-h-[52px] rounded-xl bg-primary text-black font-extrabold text-center flex items-center justify-center touch-manipulation"
+            >
+              Done → Home
+            </Link>
             <button
               type="button"
               onClick={() => {
@@ -106,22 +113,15 @@ export default function CardPublishedModal() {
               }}
               className="w-full py-3.5 min-h-[52px] rounded-xl border-2 border-warning bg-warning/15 text-warning font-bold text-sm touch-manipulation"
             >
-              See player view (what they see)
+              See what players see
             </button>
             <Link
               href="/picks"
               onClick={dismiss}
-              className="w-full py-3.5 min-h-[52px] rounded-xl bg-primary text-black font-extrabold text-center flex items-center justify-center touch-manipulation"
+              className="w-full py-3 min-h-[48px] rounded-xl border border-border text-muted text-sm font-medium text-center flex items-center justify-center touch-manipulation"
             >
               Open My Picks
             </Link>
-            <button
-              type="button"
-              onClick={dismiss}
-              className="w-full py-3 min-h-[48px] rounded-xl border border-border text-muted text-sm font-medium touch-manipulation"
-            >
-              Done
-            </button>
           </div>
         </div>
       </div>

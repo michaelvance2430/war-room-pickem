@@ -228,8 +228,19 @@ function LeagueBuildInner() {
       }
 
       markLeagueBuildComplete(league.id);
-      // Next logical job: publish the first card — not Home dead-end
-      router.replace("/commissioner?tab=card&first=1");
+      // Rule of Closure: room is set → one next job (week-ops, not admin desk)
+      try {
+        sessionStorage.setItem(
+          "warroom-league-build-just-done",
+          JSON.stringify({
+            at: Date.now(),
+            name: name.trim() || league.name,
+          })
+        );
+      } catch {
+        /* ignore */
+      }
+      router.replace("/week-ops?first=1");
       router.refresh();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Could not save league build");
@@ -591,8 +602,7 @@ function LeagueBuildInner() {
             </ul>
       <p className="text-sm text-muted leading-relaxed">
               You can change this until{" "}
-              <strong className="text-foreground">{lockLabel}</strong>. Next:
-              publish the first week card so people can pick.
+              <strong className="text-foreground">{lockLabel}</strong>. After save, one job: put a live card up so friends can pick.
             </p>
       </div>
         )}
@@ -615,7 +625,7 @@ function LeagueBuildInner() {
                 onClick={() => void finish()}
                 className="w-full py-4 min-h-[56px] rounded-xl bg-primary text-black text-base font-extrabold touch-manipulation disabled:opacity-50"
               >
-                {busy ? "Saving…" : "Build first card →"}
+                {busy ? "Saving room…" : "Save room · build first card →"}
               </button>
             )}
 

@@ -50,7 +50,7 @@ export const COACH_DEFS: Record<CoachKey, CoachDefinition> = {
     title: "👋 One thing to get started",
     body: "Build your first card so your league can make picks.",
     primaryLabel: "Build card",
-    href: "/commissioner?tab=card&first=1",
+    href: "/week-ops?first=1",
     secondaryLabel: "Not now",
   },
   [COACH_KEYS.COMMISH_PUBLISH_FIRST_CARD]: {
@@ -59,8 +59,8 @@ export const COACH_DEFS: Record<CoachKey, CoachDefinition> = {
     role: "commissioner",
     title: "Publish so friends can pick",
     body: "A draft isn’t live. Publish the week card to open picks for the room.",
-    primaryLabel: "Open host tools",
-    href: "/commissioner?tab=card",
+    primaryLabel: "Finish this week’s card",
+    href: "/week-ops?first=1",
     secondaryLabel: "Not now",
   },
   [COACH_KEYS.PLAYER_MAKE_FIRST_PICKS]: {

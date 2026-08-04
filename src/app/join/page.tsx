@@ -632,7 +632,7 @@ function JoinPageInner() {
             type="button"
             onClick={() => {
               if (leagueId) markHostScreenSeen(leagueId);
-              router.push("/commissioner?tab=card&first=1");
+              router.push("/week-ops?first=1");
               router.refresh();
             }}
             className="w-full py-4 min-h-[56px] rounded-xl bg-primary text-black text-base font-extrabold mb-2 touch-manipulation"
