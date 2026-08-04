@@ -210,6 +210,7 @@ Add a row when a real bug or near-miss teaches us something. Never delete a row;
 |----|----------|----------------|--------------|-------------|
 | C1 | Build card from Picks empty Build Card CTA lands on card tab | Direct routing | | |
 | C2 | Publish week; player empty becomes picks UI | State transition | | |
+| CR1 | Crew page before first scored week: **no points / burn ranks** (presence only) | Residue “6 pts” lied | 2026 · 8b762b9 | |
 
 ---
 
