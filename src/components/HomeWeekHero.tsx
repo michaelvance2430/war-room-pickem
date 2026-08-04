@@ -443,7 +443,7 @@ export default function HomeWeekHero() {
     secondaryLabel = "Locker";
   }
 
-  // Later weeks only (first score lives on CommishSetupBanner — no twin green buttons).
+  // Score CTA is HomeCommishMissionButton only (no twin Host Tip coaching cards).
   // Host: after the room has scored at least once, push score when this week is still open.
   if (
     state.isOps &&

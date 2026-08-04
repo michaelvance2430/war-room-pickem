@@ -39,20 +39,29 @@ export default function HomeCommishMissionButton() {
     };
   }, []);
 
-  // Re-resolve when host returns from week-ops / view-as-player
+  // Re-resolve when league state changes (same on phone + desktop)
   useEffect(() => {
     function refresh() {
       if (!isOps()) {
         setMission(null);
         return;
       }
-      void resolveCommishHomeMission().then(setMission).catch(() => setMission(null));
+      void resolveCommishHomeMission()
+        .then(setMission)
+        .catch(() => setMission(null));
+    }
+    function onVis() {
+      if (document.visibilityState === "visible") refresh();
     }
     window.addEventListener("focus", refresh);
     window.addEventListener("warroom-view-as-player", refresh);
+    window.addEventListener("warroom-card-published", refresh);
+    document.addEventListener("visibilitychange", onVis);
     return () => {
       window.removeEventListener("focus", refresh);
       window.removeEventListener("warroom-view-as-player", refresh);
+      window.removeEventListener("warroom-card-published", refresh);
+      document.removeEventListener("visibilitychange", onVis);
     };
   }, []);
 

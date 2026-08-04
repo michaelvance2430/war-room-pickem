@@ -30,12 +30,15 @@ import {
 } from "@/lib/cloud";
 import { isCardLockDeadlinePassed } from "@/lib/dates";
 import { weekTitle } from "@/lib/dates";
+import { seasonMaxWeek } from "@/lib/season-calendar";
 
 export type CommishMissionKind =
   | "build"
   | "finish"
   | "publish"
   | "score"
+  | "picks"
+  | "next_week"
   | "trophy_ceremony"
   | "none";
 
@@ -108,8 +111,28 @@ export async function resolveCommishHomeMission(): Promise<CommishHomeMission | 
   const ceremonyFirst = await maybeCeremony();
   if (ceremonyFirst) return ceremonyFirst;
 
-  // Active week already scored → no weekly CTA
+  // Active week already scored → prepare next card if season continues
   if (scored.includes(week)) {
+    const max = seasonMaxWeek(sportId);
+    const next = week + 1;
+    if (next <= max) {
+      let nextCard = null as Awaited<ReturnType<typeof loadWeekCard>>;
+      try {
+        nextCard = await loadWeekCard(next);
+      } catch {
+        nextCard = null;
+      }
+      if (!nextCard?.games?.length) {
+        const nextLabel = weekTitle(next, sportId);
+        return {
+          kind: "next_week",
+          label: `Build ${nextLabel} Card`,
+          href: `/week-ops?week=${next}&step=1`,
+          weekNumber: next,
+          weekLabel: nextLabel,
+        };
+      }
+    }
     return null;
   }
 
@@ -127,7 +150,7 @@ export async function resolveCommishHomeMission(): Promise<CommishHomeMission | 
   // published_at exists when loadWeekCard returns a real card with games
   const published = hasGames; // card with games is live for player picks
 
-  // Scoring: published + kickoff passed + not scored
+  // Scoring: published + kickoff passed + not scored — one host job
   if (published && isCardLockDeadlinePassed(games)) {
     return {
       kind: "score",
@@ -168,6 +191,7 @@ export async function resolveCommishHomeMission(): Promise<CommishHomeMission | 
     };
   }
 
-  // Has 5 games + prop — live for picks. Host plays.
+  // Card live, before kickoff — host plays like everyone else (hero owns picks CTA).
+  // No second coaching card. Mission button stays silent.
   return null;
 }

@@ -3,9 +3,8 @@
 /**
  * Ops-only Home strip: score CTA for later weeks.
  *
- * HARD RULE — never stack with CommishSetupBanner step 3:
+ * HARD RULE — prefer HomeCommishMissionButton for score CTA.
  * If the league has zero scored weeks yet, this strip stays hidden.
- * First score belongs entirely to the first-hour host spine.
  */
 
 import { useEffect, useState } from "react";
