@@ -12,8 +12,9 @@ import { scheduleUsageFromRequest } from "@/lib/platform-odds-usage";
 
 /**
  * Server-side odds fetch so the API key is never exposed in the browser.
- * Optional ?week=N filters kickoffs to that pick'em week’s date window
- * (Week 0 = Aug 29 2026; Week 1 = Sep 3–7; …).
+ * Optional ?week=N filters kickoffs to that pick'em week’s ET date window
+ * (Week 0 = Aug 27–Sep 2 2026; Week 1 = Sep 3–7; …).
+ * Provider has no War Room week index — filtering is date-only after FBS filter.
  * Optional leagueId is attributed only after server-side membership check.
  */
 export async function GET(req: Request) {

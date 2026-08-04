@@ -21,9 +21,7 @@ import {
   rankedMatchupBadge,
   rankedMatchupShellClass,
   sortGamesRankHeatFirst,
-  filterGamesByRankHeat,
   countRankHeat,
-  type RankHeatFilter,
 } from "@/lib/rankings";
 import {
   loadLeagueFavoriteTeamCounts,
@@ -35,6 +33,9 @@ import LeagueInterestGameMeta, {
   leagueInterestShellClass,
   leagueInterestShellStyle,
 } from "@/components/LeagueInterestGameMeta";
+
+/** Build Card slate filter — one row, always visible */
+type SlateFilter = "all" | "ranked" | "fan-favorites";
 import { scoreWeek, GameResult } from "@/lib/scoring";
 import { applyWeekScores } from "@/lib/store";
 import {
@@ -316,13 +317,8 @@ function CommissionerPageInner() {
   const [rosterCount, setRosterCount] = useState<number | null>(null);
   /** Skip week date filter on Pull Odds — all open FBS games for season dry-run. */
   const [dryRunOdds, setDryRunOdds] = useState(false);
-  /** Build Card: default All games; ranked buckets are opt-in filters */
-  const [rankHeatFilter, setRankHeatFilter] =
-    useState<RankHeatFilter>("all");
-  /** Optional slate sort — league interest is informational only */
-  const [gameListSort, setGameListSort] = useState<
-    "default" | "league-interest"
-  >("default");
+  /** Build Card: ALL | RANKED | FAN FAVORITES (filters only — never auto-select) */
+  const [slateFilter, setSlateFilter] = useState<SlateFilter>("all");
   /** team_id → supporter count (anonymous); loaded once per open / refresh */
   const [leagueFavCounts, setLeagueFavCounts] =
     useState<LeagueFavoriteCounts>({});
@@ -967,8 +963,8 @@ function CommissionerPageInner() {
       }
       setAvailableGames(games);
       setSelectedIds(new Set());
-      // Always land on All games after pull — ranked chips are opt-in
-      setRankHeatFilter("all");
+      // Always land on ALL after pull — Ranked / Fan Favorites stay opt-in filters
+      setSlateFilter("all");
       setOddsError(null);
       // Refresh anonymous interest with the slate (not realtime)
       void loadLeagueFavoriteTeamCounts(sport).then(setLeagueFavCounts);
@@ -1002,8 +998,8 @@ function CommissionerPageInner() {
     const games = generateDemoSlate(activeWeek, 5, sport);
     setAvailableGames(games);
     setSelectedIds(new Set(games.map((g) => g.id)));
-    // Demo / NFL games have no AP ranks — "Good teams" bucket is empty by design
-    setRankHeatFilter("all");
+    // Demo / NFL games have no AP ranks — still land on ALL
+    setSlateFilter("all");
     setCardSaved(false);
     setBotReport(
       `Demo slate ready for ${weekTitle(activeWeek)} (5 fake ${sport === "nfl" ? "NFL" : "CFB"} games, all selected). Scroll down to see them, or use “Publish demo week” for one tap.`
@@ -1026,8 +1022,8 @@ function CommissionerPageInner() {
     const games = generateDemoSlate(activeWeek, 5, sport);
     setAvailableGames(games);
     setSelectedIds(new Set(games.map((g) => g.id)));
-    // Unranked demo slate — show All games, not empty "Good teams"
-    setRankHeatFilter("all");
+    // Unranked demo slate — land on ALL
+    setSlateFilter("all");
     setCardSaved(false);
 
     // Prefer the draft prop on the form; fall back to a rotating sport preset.
@@ -3829,189 +3825,168 @@ function CommissionerPageInner() {
                   )}
                 </p>
                 {(() => {
+                  const sportId = leagueFootballSport();
                   const heatCounts = countRankHeat(availableGames);
                   const isDemoSlate = availableGames.every(
                     (g) =>
                       g.bookmaker === "demo-sim" ||
                       g.bookmaker === "demo-nfl-sim"
                   );
-                  const noRankHeat =
-                    isDemoSlate ||
-                    leagueFootballSport() === "nfl" ||
-                    (heatCounts.heat === 0 &&
-                      heatCounts.ranked === 0 &&
-                      heatCounts.top25 === 0 &&
-                      heatCounts.legendary === 0);
-                  // If user is stuck on an empty heat bucket, show all games
-                  const effectiveFilter: RankHeatFilter =
-                    noRankHeat && rankHeatFilter !== "all"
-                      ? "all"
-                      : rankHeatFilter;
-                  const sportId = leagueFootballSport();
-                  const applyListSort = (list: Game[]) =>
-                    gameListSort === "league-interest"
-                      ? sortGamesByLeagueInterest(
-                          list,
-                          leagueFavCounts,
-                          sportId
+                  const ranksAvailable =
+                    !isDemoSlate &&
+                    sportId !== "nfl" &&
+                    heatCounts.heat > 0;
+                  const rankedCount = availableGames.filter(
+                    (g) =>
+                      getRankedMatchupTier(g.awayRank, g.homeRank) != null
+                  ).length;
+                  const fanCount = availableGames.filter(
+                    (g) =>
+                      resolveGameLeagueInterest(g, leagueFavCounts, sportId)
+                        .combined > 0
+                  ).length;
+
+                  function applySlateFilter(list: Game[]): Game[] {
+                    if (slateFilter === "all") {
+                      return sortGamesRankHeatFirst(list);
+                    }
+                    if (slateFilter === "ranked") {
+                      return sortGamesRankHeatFirst(
+                        list.filter(
+                          (g) =>
+                            getRankedMatchupTier(g.awayRank, g.homeRank) !=
+                            null
                         )
-                      : sortGamesRankHeatFirst(list);
-                  // League Interest sorts the full slate (filter chips hidden)
-                  const filtered = applyListSort(
-                    gameListSort === "league-interest"
-                      ? availableGames
-                      : filterGamesByRankHeat(availableGames, effectiveFilter)
+                      );
+                    }
+                    const withFan = list.filter(
+                      (g) =>
+                        resolveGameLeagueInterest(g, leagueFavCounts, sportId)
+                          .combined > 0
+                    );
+                    return sortGamesByLeagueInterest(
+                      withFan,
+                      leagueFavCounts,
+                      sportId
+                    );
+                  }
+
+                  const filtered = applySlateFilter(availableGames);
+                  const selectedOutside = availableGames.filter(
+                    (g) =>
+                      selectedIds.has(g.id) &&
+                      !filtered.some((f) => f.id === g.id)
                   );
+                  const seen = new Set<string>();
+                  const ordered: Game[] = [];
+                  for (const g of selectedOutside) {
+                    if (!seen.has(g.id)) {
+                      seen.add(g.id);
+                      ordered.push(g);
+                    }
+                  }
+                  for (const g of filtered) {
+                    if (!seen.has(g.id)) {
+                      seen.add(g.id);
+                      ordered.push(g);
+                    }
+                  }
+
+                  const dateGroups =
+                    slateFilter === "fan-favorites"
+                      ? [
+                          {
+                            dateKey: "fan",
+                            dateLabel: "Fan favorites",
+                            games: ordered,
+                          },
+                        ]
+                      : groupGamesByDate(ordered).map((grp) => ({
+                          ...grp,
+                          games: sortGamesRankHeatFirst(grp.games),
+                        }));
+
                   const chips: {
-                    id: RankHeatFilter;
+                    id: SlateFilter;
                     label: string;
                     count: number;
                     accent: string;
                   }[] = [
                     {
                       id: "all",
-                      label: "All games",
+                      label: "ALL",
                       count: availableGames.length,
                       accent: "border-border text-muted",
                     },
                     {
-                      id: "heat",
-                      label: "Good teams",
-                      count: heatCounts.heat,
-                      accent: "border-primary/50 text-primary",
-                    },
-                    {
-                      id: "legendary",
-                      label: "Top 10",
-                      count: heatCounts.legendary,
+                      id: "ranked",
+                      label: "RANKED",
+                      count: rankedCount,
                       accent: "border-amber-400/50 text-amber-200",
                     },
                     {
-                      id: "top25",
-                      label: "Both 25",
-                      count: heatCounts.top25,
-                      accent: "border-violet-400/50 text-violet-200",
-                    },
-                    {
-                      id: "ranked",
-                      label: "One ranked",
-                      count: heatCounts.ranked,
-                      accent: "border-emerald-400/50 text-emerald-200",
+                      id: "fan-favorites",
+                      label: "FAN FAVORITES",
+                      count: fanCount,
+                      accent: "border-sky-500/50 text-sky-300",
                     },
                   ];
-                  const dateGroups =
-                    gameListSort === "league-interest"
-                      ? [
-                          {
-                            dateKey: "league-interest",
-                            dateLabel: "League interest first",
-                            games: filtered,
-                          },
-                        ]
-                      : effectiveFilter === "all"
-                        ? groupGamesByDate(
-                            sortGamesRankHeatFirst(availableGames)
-                          ).map((g) => ({
-                            ...g,
-                            games: sortGamesRankHeatFirst(g.games),
-                          }))
-                        : [
-                            {
-                              dateKey: "heat",
-                              dateLabel:
-                                effectiveFilter === "heat"
-                                  ? "Ranked matchups first"
-                                  : effectiveFilter === "legendary"
-                                    ? "Both Top 10"
-                                    : effectiveFilter === "top25"
-                                      ? "Both Top 25"
-                                      : "One team Top 25",
-                              games: filtered,
-                            },
-                          ];
-                  const interestTeamCount = Object.keys(leagueFavCounts).length;
+
                   return (
                     <>
-                      <div className="flex flex-wrap items-center gap-2 mb-2">
-                        <p className="text-[10px] uppercase tracking-wider text-muted font-bold">
-                          Sort
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => setGameListSort("default")}
-                          className={`px-3 py-1.5 min-h-[36px] rounded-full text-[11px] font-bold border transition touch-manipulation ${
-                            gameListSort === "default"
-                              ? "bg-primary/15 border-primary text-primary"
-                              : "border-border text-muted"
-                          }`}
-                        >
-                          Default
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setGameListSort("league-interest")}
-                          className={`px-3 py-1.5 min-h-[36px] rounded-full text-[11px] font-bold border transition touch-manipulation ${
-                            gameListSort === "league-interest"
-                              ? "bg-sky-500/15 border-sky-500/60 text-sky-300"
-                              : "border-border text-muted"
-                          }`}
-                          title="Games with league favorites sort higher — does not auto-select"
-                        >
-                          League Interest
-                          {interestTeamCount > 0 && (
-                            <span className="ml-1 opacity-80 tabular-nums">
-                              {interestTeamCount}
-                            </span>
-                          )}
-                        </button>
-                      </div>
-                      {!noRankHeat && gameListSort === "default" && (
-                        <>
-                          <p className="text-[10px] uppercase tracking-wider text-muted font-bold mb-1.5">
-                            Filter slate · default is All games
-                          </p>
-                          <div className="phone-h-scroll sm:flex-wrap sm:overflow-visible gap-1.5 mb-3">
-                            {chips.map((c) => (
-                              <button
-                                key={c.id}
-                                type="button"
-                                disabled={c.count === 0 && c.id !== "all"}
-                                onClick={() => setRankHeatFilter(c.id)}
-                                className={`px-3 py-2 min-h-[40px] rounded-full text-[11px] font-bold border transition touch-manipulation disabled:opacity-40 ${
-                                  effectiveFilter === c.id
-                                    ? "bg-primary/15 border-primary text-primary"
-                                    : c.accent
-                                }`}
-                              >
-                                {c.label}
-                                <span className="ml-1 opacity-80 tabular-nums">
-                                  {c.count}
-                                </span>
-                              </button>
-                            ))}
-                          </div>
-                        </>
-                      )}
-                      {noRankHeat && (
-                        <p className="text-[11px] text-warning mb-2">
-                          {isDemoSlate
-                            ? "Demo slate — all 5 fake games listed below (already selected)."
-                            : "No AP ranks on this slate — showing all games."}
-                        </p>
-                      )}
-                      {filtered.length === 0 && effectiveFilter !== "all" ? (
-                        <p className="text-sm text-muted py-6 text-center border border-dashed border-border rounded-xl">
-                          No games in this bucket. Try{" "}
+                      <p className="text-[10px] uppercase tracking-wider text-muted font-bold mb-1.5">
+                        Filter slate
+                      </p>
+                      <div className="phone-h-scroll sm:flex-wrap sm:overflow-visible gap-1.5 mb-3">
+                        {chips.map((c) => (
                           <button
+                            key={c.id}
                             type="button"
-                            className="text-primary font-semibold underline"
-                            onClick={() => setRankHeatFilter("all")}
+                            onClick={() => setSlateFilter(c.id)}
+                            className={`px-3 py-2 min-h-[40px] rounded-full text-[11px] font-bold border transition touch-manipulation ${
+                              slateFilter === c.id
+                                ? c.id === "fan-favorites"
+                                  ? "bg-sky-500/15 border-sky-500/60 text-sky-300"
+                                  : c.id === "ranked"
+                                    ? "bg-amber-500/15 border-amber-400/60 text-amber-200"
+                                    : "bg-primary/15 border-primary text-primary"
+                                : c.accent
+                            }`}
                           >
-                            All games
+                            {c.label}
+                            <span className="ml-1 opacity-80 tabular-nums">
+                              {c.count}
+                            </span>
                           </button>
-                          .
+                        ))}
+                      </div>
+                      {isDemoSlate && (
+                        <p className="text-[11px] text-warning mb-2">
+                          Demo slate — fake games for Foundry practice only.
                         </p>
-                      ) : null}
+                      )}
+                      {slateFilter === "ranked" && !ranksAvailable && (
+                        <p className="text-sm text-muted py-4 text-center border border-dashed border-border rounded-xl mb-2">
+                          Current AP rankings are not available yet.
+                          {rankLabel ? ` · ${rankLabel}` : ""}
+                        </p>
+                      )}
+                      {slateFilter === "fan-favorites" &&
+                        fanCount === 0 &&
+                        selectedOutside.length === 0 && (
+                          <p className="text-sm text-muted py-4 text-center border border-dashed border-border rounded-xl mb-2">
+                            No league favorites match this slate yet. Members
+                            declare allegiance on profiles; filters never
+                            auto-select games.
+                          </p>
+                        )}
+                      {selectedOutside.length > 0 && slateFilter !== "all" && (
+                        <p className="text-[11px] text-primary mb-2 font-semibold">
+                          {selectedOutside.length} selected game
+                          {selectedOutside.length === 1 ? "" : "s"} stay on the
+                          card (outside this filter).
+                        </p>
+                      )}
                 {/* Games only in nested scroll — prop lives outside so mobile can change it */}
                 <div className="space-y-4 max-h-[28rem] overflow-y-auto mt-2 overscroll-contain">
                   {dateGroups.map((group) => (
@@ -4023,16 +3998,19 @@ function CommissionerPageInner() {
       <span className="text-[11px] text-muted ml-2">
                           {group.games.length} game
                           {group.games.length === 1 ? "" : "s"}
-                          {effectiveFilter !== "all"
-                            ? " · best first"
-                            : noRankHeat
-                              ? ""
+                          {slateFilter === "ranked"
+                            ? " · ranked first"
+                            : slateFilter === "fan-favorites"
+                              ? " · fan interest first"
                               : " · ranked first within day"}
                         </span>
       </div>
                       <div className="space-y-2">
                         {group.games.map((g) => {
                           const selected = selectedIds.has(g.id);
+                          const outsideActiveFilter =
+                            selected &&
+                            selectedOutside.some((x) => x.id === g.id);
                           const kick = formatKickoff(
                             g.commenceTime || g.startTime
                           );
@@ -4104,6 +4082,11 @@ function CommissionerPageInner() {
                                       ✓ On card
                                     </span>
                                   )}
+                                  {outsideActiveFilter && (
+                                    <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted border border-border px-1.5 py-0.5 rounded shrink-0">
+                                      Outside filter
+                                    </span>
+                                  )}
                                   {rankBadge && (
                                     <span className={rankBadge.className}>
                                       {rankBadge.label}
@@ -4111,7 +4094,7 @@ function CommissionerPageInner() {
                                   )}
                                   {leagueInterest.combined > 0 && (
                                     <span className="text-[10px] font-extrabold uppercase tracking-wide text-sky-300 border border-sky-500/40 bg-sky-500/10 px-1.5 py-0.5 rounded shrink-0">
-                                      League
+                                      Fan
                                     </span>
                                   )}
                                 </div>

@@ -57,8 +57,11 @@ export const DEFAULT_SEASON_WEEKS = FULL_SEASON_MAX_WEEK;
 /**
  * 2026 CFB pick'em windows (America/New_York civil dates, inclusive).
  *
- * Week 0: Sat Aug 29 only (special kickoff)
- * Week 1+: Thu–Mon college windows (Labor Day week for Week 1)
+ * Week 0: Thu Aug 27 00:00 ET → Wed Sep 2 23:59:59.999 ET
+ *   (NCAA Week 0 openers through the day before Labor Day week)
+ * Week 1+: Thu–Mon college windows starting Thu Sep 3 (Labor Day week)
+ *
+ * Never map provider/ESPN week indexes — only ET civil windows.
  */
 export type WeekDateWindow = {
   weekNumber: number;
@@ -68,10 +71,10 @@ export type WeekDateWindow = {
   endDate: string;
 };
 
-/** Week 0 = Aug 29, 2026. Week 1 = Sep 3–7, then +7 days each RS week. */
+/** Week 0 = Aug 27–Sep 2, 2026. Week 1 = Sep 3–7, then +7 days each RS week. */
 function buildRegularWindows2026(): WeekDateWindow[] {
   const out: WeekDateWindow[] = [
-    { weekNumber: 0, startDate: "2026-08-29", endDate: "2026-08-29" },
+    { weekNumber: 0, startDate: "2026-08-27", endDate: "2026-09-02" },
   ];
   // Week 1 opens Thu Sep 3, 2026 through Mon Sep 7
   let start = utcNoonFromYmd("2026-09-03");
