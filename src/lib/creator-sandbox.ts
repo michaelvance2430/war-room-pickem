@@ -263,3 +263,65 @@ export function jumpOpenGazette(): void {
   if (typeof window === "undefined") return;
   window.location.href = "/gazette";
 }
+
+/**
+ * Foundry key memory: CFB NATIONAL CHAMPIONSHIP IS FINAL.
+ * Sets simulation state only — does not close a real season or grant trophies.
+ * Then opens Trophy Ceremony so Mike can walk the real production pipeline.
+ */
+export async function jumpCfbChampionshipFinal(opts?: {
+  winnerTeam?: string;
+  loserTeam?: string;
+  winnerScore?: number;
+  loserScore?: number;
+  /** Navigate to ceremony UI */
+  openCeremony?: boolean;
+}): Promise<{ ok: boolean; message: string }> {
+  try {
+    const { isFoundryBackstageUser, isFoundrySessionSticky } = await import(
+      "./foundry-preview"
+    );
+    if (!isFoundryBackstageUser()) {
+      return { ok: false, message: "Creator only" };
+    }
+    // Sticky Foundry session so ceremony path treats sim as trusted for creator
+    if (!isFoundrySessionSticky() && typeof window !== "undefined") {
+      try {
+        localStorage.setItem("warroom-foundry-session-v1", "1");
+      } catch {
+        /* ok */
+      }
+    }
+    const { setFoundryCfbChampSim } = await import("./cfb-championship-result");
+    const res = setFoundryCfbChampSim({
+      winnerTeam: opts?.winnerTeam || "Ohio State",
+      loserTeam: opts?.loserTeam || "Texas",
+      winnerScore: opts?.winnerScore ?? 34,
+      loserScore: opts?.loserScore ?? 21,
+    });
+    if (!res.ok) return { ok: false, message: res.error || "Sim failed" };
+
+    if (opts?.openCeremony !== false && typeof window !== "undefined") {
+      window.location.href = "/trophy-ceremony";
+    }
+    return {
+      ok: true,
+      message:
+        "CFB NATIONAL CHAMPIONSHIP IS FINAL (sim). Production data untouched until you press BEGIN TROPHY CEREMONY in an isolated test league.",
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : "Sim failed",
+    };
+  }
+}
+
+export async function clearCfbChampionshipFinalSim(): Promise<void> {
+  try {
+    const { setFoundryCfbChampSim } = await import("./cfb-championship-result");
+    setFoundryCfbChampSim(null);
+  } catch {
+    /* ok */
+  }
+}

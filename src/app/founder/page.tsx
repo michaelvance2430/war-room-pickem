@@ -955,7 +955,36 @@ export default function FounderDashboardPage() {
               >
                 Audit week inventory (orphans · read-only)
               </button>
-      <button
+                    <button
+                type="button"
+                onClick={() => {
+                  void import("@/lib/creator-sandbox").then(async (sb) => {
+                    const res = await sb.jumpCfbChampionshipFinal({
+                      openCeremony: true,
+                    });
+                    setLabLog(
+                      res.ok
+                        ? `✅ ${res.message}`
+                        : `❌ ${res.message}`
+                    );
+                  });
+                }}
+                className="py-2.5 rounded-lg border-2 border-primary/50 bg-primary/15 text-xs font-bold hover:bg-primary/20 col-span-full sm:col-span-2"
+              >
+                CFB NATIONAL CHAMPIONSHIP IS FINAL → Trophy Ceremony
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  void import("@/lib/creator-sandbox").then(async (sb) => {
+                    await sb.clearCfbChampionshipFinalSim();
+                    setLabLog("✅ Cleared CFB championship final simulation.");
+                  });
+                }}
+                className="py-2.5 rounded-lg border border-border text-xs font-semibold hover:bg-background"
+              >
+                Clear CFB title sim
+              </button><button
                 type="button"
                 onClick={() => jumpPopup("ring")}
                 className="py-2.5 rounded-lg border border-border text-xs font-semibold hover:bg-background"

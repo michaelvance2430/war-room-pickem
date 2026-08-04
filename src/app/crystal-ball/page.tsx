@@ -453,36 +453,47 @@ export default function CrystalBallPage() {
           )}
         </section>
 
-        {/* Commissioner crown */}
-        {isCommish && (
+        {/*
+          CFB: automated Trophy Ceremony (Home → BEGIN TROPHY CEREMONY).
+          Manual selector removed from normal product. Foundry keeps emergency crown.
+        */}
+        {isCommish && !nfl && (
+          <section className="rounded-xl border border-border bg-card/50 p-4">
+            <p className="text-xs text-muted leading-relaxed">
+              When the National Championship is final and the last league week is
+              scored, open Home and press{" "}
+              <strong className="text-foreground">BEGIN TROPHY CEREMONY</strong>.
+              Crystal Ball winners are crowned automatically — zero standings
+              points, permanent pride.
+            </p>
+          </section>
+        )}
+        {isCommish && nfl && (
           <section className="rounded-xl border border-primary/30 bg-primary/5 p-5">
-      <h2 className="font-semibold text-primary mb-1">
-              Commissioner · Crown champion
+            <h2 className="font-semibold text-primary mb-1">
+              Commissioner · Crown Super Bowl champion
             </h2>
-      <p className="text-xs text-muted mb-3">
-              After the title game, set the real{" "}
-              {nfl ? "Super Bowl champion" : "national champion"}. Correct
-              Crystal Ball picks get{" "}
+            <p className="text-xs text-muted mb-3">
+              After the Super Bowl, set the real champion. Correct Crystal Ball
+              picks get{" "}
               <strong className="text-foreground">
                 Village Witch / Wizard Nerd
               </strong>{" "}
               — still zero points.
             </p>
-      <select
+            <select
               value={crownTeam}
               onChange={(e) => setCrownTeam(e.target.value)}
               className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm mb-3"
             >
-              <option value="">
-                {nfl ? "Select Super Bowl champ…" : "Select champion…"}
-              </option>
+              <option value="">Select Super Bowl champ…</option>
               {teams.map((t) => (
                 <option key={t.name} value={t.name}>
                   {t.name} ({t.conference})
                 </option>
               ))}
             </select>
-      <button
+            <button
               type="button"
               disabled={!crownTeam || crowning}
               onClick={() => void crown()}
@@ -490,12 +501,71 @@ export default function CrystalBallPage() {
             >
               {crowning ? "Crowning…" : "Crown & grant achievements"}
             </button>
-      <p className="text-[11px] text-muted mt-2">
-              Lock time reference: {crystalBallLockLabel()}
-            </p>
-      </section>
+          </section>
         )}
+        {isCommish && !nfl && <FoundryEmergencyCrownCfb />}
       </main>
       </div>
+  );
+}
+
+function FoundryEmergencyCrownCfb() {
+  const [show, setShow] = useState(false);
+  const [team, setTeam] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const teams = useMemo(() => crystalBallTeams("cfb"), []);
+
+  useEffect(() => {
+    void import("@/lib/foundry-preview").then((m) => {
+      setShow(m.isFoundryBackstageUser() && m.isFoundrySessionSticky());
+    });
+  }, []);
+
+  if (!show) return null;
+
+  async function emergencyCrown() {
+    if (!team || busy) return;
+    setBusy(true);
+    setMsg(null);
+    const res = await crownNationalChampion(team);
+    setBusy(false);
+    setMsg(
+      res.ok
+        ? `Foundry emergency crown: ${team} · ${res.winners ?? 0} winner(s)`
+        : res.error || "Crown failed"
+    );
+  }
+
+  return (
+    <section className="mt-4 rounded-xl border border-warning/40 bg-warning/5 p-4">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-warning mb-1">
+        Foundry only · emergency crown
+      </p>
+      <p className="text-[11px] text-muted mb-2">
+        Prefer Trophy Ceremony. This is recovery if automation is blocked.
+      </p>
+      <select
+        value={team}
+        onChange={(e) => setTeam(e.target.value)}
+        className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm mb-2"
+      >
+        <option value="">Select champion…</option>
+        {teams.map((t) => (
+          <option key={t.name} value={t.name}>
+            {t.name}
+          </option>
+        ))}
+      </select>
+      <button
+        type="button"
+        disabled={!team || busy}
+        onClick={() => void emergencyCrown()}
+        className="w-full py-2 rounded-lg border border-warning/50 text-warning text-xs font-bold disabled:opacity-50"
+      >
+        {busy ? "Crowning…" : "Emergency crown (Foundry)"}
+      </button>
+      {msg && <p className="text-[11px] text-muted mt-2">{msg}</p>}
+    </section>
   );
 }

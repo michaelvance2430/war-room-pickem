@@ -53,9 +53,33 @@ export const MOMENT_SEASON_OPEN_NFL: MomentDefinition = {
   foundryPreview: true,
 };
 
+/**
+ * Trophy Ceremony — CFB season closeout (commissioner-presided).
+ * Not a Tier I frozen tradition yet; presentation order is product law:
+ * League Champ → Toilet → Crystal Ball → Season Complete.
+ */
+export const MOMENT_TROPHY_CEREMONY_CFB: MomentDefinition = {
+  id: "trophy_ceremony_cfb",
+  name: "CFB Trophy Ceremony",
+  tier: "tradition",
+  frozen: false,
+  category: "season_finale",
+  purpose:
+    "When the National Championship is final and the last league week is scored, the commissioner begins one protected ceremony that engraves hardware and closes the season.",
+  emotionalWeight: 5,
+  supportedSports: ["cfb"],
+  priority: 20,
+  animation: "full_ceremony",
+  replayPolicy: "once_per_user_league_season",
+  blocksNavigation: true,
+  durationTargetMs: 12000,
+  foundryPreview: true,
+};
+
 const ALL: MomentDefinition[] = [
   MOMENT_SEASON_OPEN_CFB,
   MOMENT_SEASON_OPEN_NFL,
+  MOMENT_TROPHY_CEREMONY_CFB,
 ];
 
 export function getMomentDefinition(id: string): MomentDefinition | null {

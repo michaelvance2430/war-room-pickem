@@ -36,6 +36,7 @@ export type CommishMissionKind =
   | "finish"
   | "publish"
   | "score"
+  | "trophy_ceremony"
   | "none";
 
 export type CommishHomeMission = {
@@ -51,6 +52,9 @@ export type CommishHomeMission = {
 /**
  * Resolve the single commissioner-only mission for Home.
  * Returns null if not ops, or no host task (hide the button).
+ *
+ * Priority: scoring / card work first; then BEGIN TROPHY CEREMONY when
+ * CFB title is final + last week scored + season not closed.
  */
 export async function resolveCommishHomeMission(): Promise<CommishHomeMission | null> {
   if (!isOps()) return null;
@@ -72,8 +76,41 @@ export async function resolveCommishHomeMission(): Promise<CommishHomeMission | 
   } catch {
     scored = [];
   }
+
+  /**
+   * Trophy ceremony when closeout readiness is fully ready
+   * (final league week scored + title game final + not already closed).
+   * Beats Build/Finish for stray empty active weeks after the finale.
+   * Score path for an unscored active week only applies when not ready yet.
+   */
+  async function maybeCeremony(): Promise<CommishHomeMission | null> {
+    if (sportId === "nfl") return null;
+    try {
+      const { resolveSeasonCloseoutReadiness } = await import(
+        "./season-closeout"
+      );
+      const close = await resolveSeasonCloseoutReadiness();
+      if (close.status === "ready") {
+        return {
+          kind: "trophy_ceremony",
+          label: "BEGIN TROPHY CEREMONY",
+          href: "/trophy-ceremony",
+          weekNumber: week,
+          weekLabel,
+        };
+      }
+    } catch {
+      /* hide ceremony on error */
+    }
+    return null;
+  }
+
+  const ceremonyFirst = await maybeCeremony();
+  if (ceremonyFirst) return ceremonyFirst;
+
+  // Active week already scored → no weekly CTA
   if (scored.includes(week)) {
-    return null; // week complete — no host CTA
+    return null;
   }
 
   let card = null as Awaited<ReturnType<typeof loadWeekCard>>;
@@ -131,11 +168,6 @@ export async function resolveCommishHomeMission(): Promise<CommishHomeMission | 
     };
   }
 
-  // Has 5 games + prop — if not yet "live" for room we still offer publish
-  // (re-publish / confirm). Prefer preview step.
-  // Treat incomplete draft: less than 5 or no prop already handled.
-  // With full card, mission is publish if we consider draft state —
-  // current product: card in cloud with games IS published. So host plays.
-  // Offer edit path only via finish when incomplete; hide when complete + live.
+  // Has 5 games + prop — live for picks. Host plays.
   return null;
 }
