@@ -2127,12 +2127,33 @@ export default function PicksClient() {
 
         {!loadError && !hasCard && !cardBusy && (() => {
           // Role-aware empty: frozen copy from state (one pick per role/day).
-          // Ops (commish/deputy, not view-as-player) → Build Card.
-          // Everyone else → Locker / wait. Never tell players to build.
+          // Host live empty → ONE problem, ONE button: Build Card.
+          // Player → Locker only. Nav owns global navigation.
           const liveEmpty = viewWeek === activeWeek;
           const copy = emptyCopy;
           const weekLabel = weekTitle(viewWeek);
           if (!copy) return null;
+
+          // Commissioner: one failure, one fix — never compete with Build Card.
+          if (hostCanBuild && liveEmpty) {
+            return (
+              <div className="rounded-xl border border-border bg-card p-8 text-center">
+                <p className="text-[10px] uppercase tracking-wider text-primary font-bold mb-2">
+                  {copy.eyebrow}
+                </p>
+                <p className="font-semibold text-lg mb-2">{copy.title}</p>
+                <p className="text-sm text-muted mb-5 max-w-md mx-auto leading-relaxed">
+                  {copy.body}
+                </p>
+                <Link
+                  href={PICKS_EMPTY_BUILD_CARD_HREF}
+                  className="inline-flex items-center justify-center px-5 py-3 min-h-[48px] rounded-xl bg-primary text-black text-sm font-extrabold touch-manipulation"
+                >
+                  Build Card
+                </Link>
+              </div>
+            );
+          }
 
           return (
             <div className="rounded-xl border border-border bg-card p-8 text-center">
@@ -2152,16 +2173,16 @@ export default function PicksClient() {
                 {liveEmpty
                   ? copy.body
                   : hostCanBuild
-                    ? `This week isn’t published. Jump to live ${weekTitle(activeWeek)} or build a card for ${weekLabel} if that’s the week you meant.`
-                    : "This week was not published (or was cleared). Jump to the live week if one exists — or hang in the Locker while the host cooks."}
+                    ? `This week isn’t published. Build a card for ${weekLabel}, or switch to live ${weekTitle(activeWeek)}.`
+                    : "This week was not published (or was cleared). Hang in the Locker while the host cooks."}
               </p>
               <div className="flex flex-wrap justify-center gap-3">
-                {liveEmpty && hostCanBuild ? (
+                {hostCanBuild ? (
                   <Link
                     href={PICKS_EMPTY_BUILD_CARD_HREF}
                     className="px-4 py-2.5 min-h-[44px] rounded-xl bg-primary text-black text-sm font-bold inline-flex items-center touch-manipulation"
                   >
-                    {copy.cta}
+                    Build Card
                   </Link>
                 ) : (
                   <Link
@@ -2171,29 +2192,7 @@ export default function PicksClient() {
                     {liveEmpty ? copy.cta : "Go to Locker"}
                   </Link>
                 )}
-                {liveEmpty && hostCanBuild ? (
-                  <Link
-                    href={PICKS_EMPTY_LOCKER_HREF}
-                    className="px-4 py-2.5 min-h-[44px] rounded-xl border border-border text-sm font-semibold inline-flex items-center touch-manipulation"
-                  >
-                    Locker
-                  </Link>
-                ) : null}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCardBusy(true);
-                    setLoadError(null);
-                    void loadWeek(viewWeek, {
-                      forceReloadPicks: true,
-                      explicit: true,
-                    });
-                  }}
-                  className="px-4 py-2.5 min-h-[44px] rounded-xl border border-border text-sm font-semibold touch-manipulation"
-                >
-                  Check again
-                </button>
-                {viewWeek !== activeWeek && (
+                {hostCanBuild && viewWeek !== activeWeek && (
                   <button
                     type="button"
                     onClick={() => void selectWeek(activeWeek)}
@@ -2202,12 +2201,6 @@ export default function PicksClient() {
                     Go to live {weekTitle(activeWeek)} →
                   </button>
                 )}
-                <Link
-                  href="/"
-                  className="text-sm text-muted hover:text-foreground underline-offset-2 hover:underline min-h-[44px] inline-flex items-center px-2"
-                >
-                  Home
-                </Link>
               </div>
             </div>
           );
