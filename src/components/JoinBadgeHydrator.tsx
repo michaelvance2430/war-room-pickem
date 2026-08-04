@@ -18,7 +18,7 @@ export default function JoinBadgeHydrator() {
     let cancelled = false;
     let timer: ReturnType<typeof setInterval> | null = null;
 
-    async function load() {
+    async function load(reason: "boot" | "interval-60s" | "visibility") {
       const session = getSession();
       const league = getLeague();
       const leagueId = league?.id || session?.leagueId || "";
@@ -27,8 +27,25 @@ export default function JoinBadgeHydrator() {
         return;
       }
       try {
+        let syncStart: ((fn: string) => number) | null = null;
+        let syncEnd:
+          | ((fn: string, t0: number, extra?: string) => void)
+          | null = null;
+        try {
+          const tr = await import("@/lib/profile-nav-trace");
+          tr.profileNavLeagueWork("JoinBadgeHydrator.load", reason);
+          if (tr.isProfileNavTraceActive()) {
+            syncStart = tr.profileNavSyncStart;
+            syncEnd = tr.profileNavSyncEnd;
+          }
+        } catch {
+          /* ok */
+        }
         const roster = await loadLeagueRoster();
         if (cancelled) return;
+        const t0 = syncStart
+          ? syncStart("JoinBadgeHydrator.hydrateJoinBadges")
+          : 0;
         hydrateJoinBadges(
           leagueId,
           roster.map((m) => ({
@@ -39,19 +56,27 @@ export default function JoinBadgeHydrator() {
             joinedAt: m.joinedAt,
           }))
         );
+        if (syncEnd) {
+          syncEnd(
+            "JoinBadgeHydrator.hydrateJoinBadges",
+            t0,
+            `n=${roster.length}`
+          );
+        }
       } catch {
         if (!cancelled) clearJoinBadges();
       }
     }
 
-    void load();
+    void load("boot");
     // Refresh periodically so badges drop off without a full reload
+    // NOTE: 60s — candidate for +~90s memberships on profile if cache cold
     timer = setInterval(() => {
-      void load();
+      void load("interval-60s");
     }, 60_000);
 
     function onVis() {
-      if (document.visibilityState === "visible") void load();
+      if (document.visibilityState === "visible") void load("visibility");
     }
     document.addEventListener("visibilitychange", onVis);
 

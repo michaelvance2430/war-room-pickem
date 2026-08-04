@@ -398,6 +398,12 @@ function wrCurrentWeekLog(
  */
 export async function loadLeagueActiveWeek(): Promise<number> {
   try {
+    const { profileNavLeagueWork } = await import("./profile-nav-trace");
+    profileNavLeagueWork("loadLeagueActiveWeek", "call");
+  } catch {
+    /* ok */
+  }
+  try {
     const { isGuestMode } = await import("./guest-mode");
     if (isGuestMode()) {
       const saved = localStorage.getItem("warroom-active-week");
@@ -2753,36 +2759,59 @@ type StandingsCloudRow = {
 };
 
 function mapStandingsRows(rows: Record<string, unknown>[]): StandingsCloudRow[] {
-  return rows
-    .map((m: Record<string, unknown>) => {
-      const profile = m.profiles as {
-        display_name?: string;
-        last_seen_at?: string | null;
-      } | null;
-      return {
-        userId: m.user_id as string,
-        name: profile?.display_name || "Player",
-        division: (m.division as string) || "North",
-        totalPoints: (m.total_points as number) || 0,
-        weeklyPoints: normalizeWeeklyPointsField(m.weekly_points),
-        atsCorrect: (m.ats_correct as number) || 0,
-        atsTotal: (m.ats_total as number) || 0,
-        currentStreak: (m.current_streak as number) || 0,
-        bestWeek: (m.best_week as number) || 0,
-        worstWeek: (m.worst_week as number) || 0,
-        perfectWeeks: (m.perfect_weeks as number) || 0,
-        bestBetHits: (m.best_bet_hits as number) || 0,
-        bestBetTotal: (m.best_bet_total as number) || 0,
-        propHits: (m.prop_hits as number) || 0,
-        propTotal: (m.prop_total as number) || 0,
-        weeksPlayed: (m.weeks_played as number) || 0,
-        lastSeenAt: (profile?.last_seen_at as string | null) || null,
-      };
-    })
-    .sort((a, b) => b.totalPoints - a.totalPoints);
+  // Sync attribution — production freeze after memberships/standings response
+  let t0 = 0;
+  let end: ((fn: string, t0: number, extra?: string) => void) | null = null;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const tr = require("./profile-nav-trace") as typeof import("./profile-nav-trace");
+    if (tr.isProfileNavTraceActive()) {
+      t0 = tr.profileNavSyncStart("mapStandingsRows");
+      end = tr.profileNavSyncEnd;
+    }
+  } catch {
+    /* ok */
+  }
+  try {
+    return rows
+      .map((m: Record<string, unknown>) => {
+        const profile = m.profiles as {
+          display_name?: string;
+          last_seen_at?: string | null;
+        } | null;
+        return {
+          userId: m.user_id as string,
+          name: profile?.display_name || "Player",
+          division: (m.division as string) || "North",
+          totalPoints: (m.total_points as number) || 0,
+          weeklyPoints: normalizeWeeklyPointsField(m.weekly_points),
+          atsCorrect: (m.ats_correct as number) || 0,
+          atsTotal: (m.ats_total as number) || 0,
+          currentStreak: (m.current_streak as number) || 0,
+          bestWeek: (m.best_week as number) || 0,
+          worstWeek: (m.worst_week as number) || 0,
+          perfectWeeks: (m.perfect_weeks as number) || 0,
+          bestBetHits: (m.best_bet_hits as number) || 0,
+          bestBetTotal: (m.best_bet_total as number) || 0,
+          propHits: (m.prop_hits as number) || 0,
+          propTotal: (m.prop_total as number) || 0,
+          weeksPlayed: (m.weeks_played as number) || 0,
+          lastSeenAt: (profile?.last_seen_at as string | null) || null,
+        };
+      })
+      .sort((a, b) => b.totalPoints - a.totalPoints);
+  } finally {
+    if (end) end("mapStandingsRows", t0, `rows=${rows.length}`);
+  }
 }
 
 export async function loadLeagueStandings(): Promise<StandingsCloudRow[]> {
+  try {
+    const { profileNavLeagueWork } = await import("./profile-nav-trace");
+    profileNavLeagueWork("loadLeagueStandings", "call");
+  } catch {
+    /* ok */
+  }
   const session = getSession();
   if (!session?.leagueId) return [];
   const supabase = createClient();
@@ -2876,6 +2905,12 @@ export async function loadLeaguePlayers(): Promise<
   import("./types").Player[]
 > {
   try {
+    const { profileNavLeagueWork } = await import("./profile-nav-trace");
+    profileNavLeagueWork("loadLeaguePlayers", "call");
+  } catch {
+    /* ok */
+  }
+  try {
     const { isGuestMode } = await import("./guest-mode");
     if (isGuestMode()) {
       const { loadPlayers } = await import("./store");
@@ -2890,33 +2925,59 @@ export async function loadLeaguePlayers(): Promise<
   const key = session.leagueId;
 
   const hit = cacheGet(playersCache, key, PLAYERS_TTL_MS);
-  if (hit !== undefined) return hit;
+  if (hit !== undefined) {
+    try {
+      const { profileNavLeagueWork } = await import("./profile-nav-trace");
+      profileNavLeagueWork("loadLeaguePlayers", "cache-hit", `n=${hit.length}`);
+    } catch {
+      /* ok */
+    }
+    return hit;
+  }
 
   const inflight = playersInflight.get(key);
   if (inflight) return inflight;
 
   const promise = (async () => {
     const cloud = await loadLeagueStandings();
-    const players: import("./types").Player[] = cloud.map((c) => ({
-      id: c.userId,
-      name: c.name,
-      division: (c.division as import("./types").Player["division"]) || "North",
-      totalPoints: c.totalPoints,
-      weeklyPoints: c.weeklyPoints || [],
-      atsCorrect: c.atsCorrect,
-      atsTotal: c.atsTotal,
-      currentStreak: c.currentStreak,
-      bestWeek: c.bestWeek,
-      worstWeek: c.worstWeek,
-      perfectWeeks: c.perfectWeeks,
-      bestBetHits: c.bestBetHits,
-      bestBetTotal: c.bestBetTotal,
-      propHits: c.propHits,
-      propTotal: c.propTotal,
-      weeksPlayed: c.weeksPlayed,
-      // Folded into memberships→profiles embed (single round-trip)
-      lastSeenAt: c.lastSeenAt ?? null,
-    }));
+    let mapT0 = 0;
+    let mapEnd: ((fn: string, t0: number, extra?: string) => void) | null =
+      null;
+    try {
+      const tr = await import("./profile-nav-trace");
+      if (tr.isProfileNavTraceActive()) {
+        mapT0 = tr.profileNavSyncStart("loadLeaguePlayers.mapToPlayer");
+        mapEnd = tr.profileNavSyncEnd;
+      }
+    } catch {
+      /* ok */
+    }
+    let players: import("./types").Player[];
+    try {
+      players = cloud.map((c) => ({
+        id: c.userId,
+        name: c.name,
+        division:
+          (c.division as import("./types").Player["division"]) || "North",
+        totalPoints: c.totalPoints,
+        weeklyPoints: c.weeklyPoints || [],
+        atsCorrect: c.atsCorrect,
+        atsTotal: c.atsTotal,
+        currentStreak: c.currentStreak,
+        bestWeek: c.bestWeek,
+        worstWeek: c.worstWeek,
+        perfectWeeks: c.perfectWeeks,
+        bestBetHits: c.bestBetHits,
+        bestBetTotal: c.bestBetTotal,
+        propHits: c.propHits,
+        propTotal: c.propTotal,
+        weeksPlayed: c.weeksPlayed,
+        // Folded into memberships→profiles embed (single round-trip)
+        lastSeenAt: c.lastSeenAt ?? null,
+      }));
+    } finally {
+      if (mapEnd) mapEnd("loadLeaguePlayers.mapToPlayer", mapT0, `n=${cloud.length}`);
+    }
     cacheSet(playersCache, key, players);
     return players;
   })().finally(() => {
@@ -3190,13 +3251,31 @@ export async function recordLeagueFirstJoin(
 
 /** Live league roster from Supabase memberships (not local mock players). */
 export async function loadLeagueRoster(): Promise<LeagueRosterMember[]> {
+  try {
+    const { profileNavLeagueWork } = await import("./profile-nav-trace");
+    profileNavLeagueWork("loadLeagueRoster", "call");
+  } catch {
+    /* ok */
+  }
   const session = getSession();
   if (!session?.leagueId) return [];
   const key = session.leagueId;
 
   const hit = cacheGet(rosterCache, key, ROSTER_TTL_MS);
   // Empty roster is valid — only miss when undefined
-  if (hit !== undefined) return hit as LeagueRosterMember[];
+  if (hit !== undefined) {
+    try {
+      const { profileNavLeagueWork } = await import("./profile-nav-trace");
+      profileNavLeagueWork(
+        "loadLeagueRoster",
+        "cache-hit",
+        `n=${(hit as LeagueRosterMember[]).length}`
+      );
+    } catch {
+      /* ok */
+    }
+    return hit as LeagueRosterMember[];
+  }
 
   const inflight = rosterInflight.get(key);
   if (inflight) return inflight as Promise<LeagueRosterMember[]>;
@@ -3226,7 +3305,21 @@ async function loadLeagueRosterFresh(
       p_league_id: leagueId,
     });
     if (!error && Array.isArray(data) && data.length) {
-      let mapped: LeagueRosterMember[] = (data as Record<string, unknown>[])
+      let mapT0 = 0;
+      let mapEnd: ((fn: string, t0: number, extra?: string) => void) | null =
+        null;
+      try {
+        const tr = await import("./profile-nav-trace");
+        if (tr.isProfileNavTraceActive()) {
+          mapT0 = tr.profileNavSyncStart("loadLeagueRoster.mapRpc");
+          mapEnd = tr.profileNavSyncEnd;
+        }
+      } catch {
+        /* ok */
+      }
+      let mapped: LeagueRosterMember[];
+      try {
+        mapped = (data as Record<string, unknown>[])
         .map((m) => {
           const role = m.role === "commissioner" ? "commissioner" : "player";
           const division =
@@ -3254,6 +3347,15 @@ async function loadLeagueRosterFresh(
           if (!!a.isBot !== !!b.isBot) return a.isBot ? 1 : -1;
           return a.name.localeCompare(b.name);
         });
+      } finally {
+        if (mapEnd) {
+          mapEnd(
+            "loadLeagueRoster.mapRpc",
+            mapT0,
+            `n=${(data as unknown[]).length}`
+          );
+        }
+      }
 
       // Fill missing join times + titles/borders in parallel (not serial)
       const needsJoin = mapped.some((m) => !m.joinedAt);

@@ -307,6 +307,109 @@ export function profileNavMark(event: string, extra?: string) {
   log(active, event, extra);
 }
 
+/** True when a profile-nav trace is active (for cloud/hydrator hooks). */
+export function isProfileNavTraceActive(): boolean {
+  return !!(active && isProfileNavTraceEnabled());
+}
+
+export function getActiveProfileNavTraceAgeMs(): number {
+  if (!active) return -1;
+  return Math.round(nowMs() - active.t0);
+}
+
+function stackHint(depth = 5): string {
+  try {
+    return (new Error().stack || "")
+      .split("\n")
+      .slice(2, 2 + depth)
+      .map((s) => s.trim().replace(/\s+/g, " "))
+      .join(" ← ")
+      .slice(0, 220);
+  } catch {
+    return "?";
+  }
+}
+
+/**
+ * Synchronous block attribution — name the function that owns the main thread.
+ * Usage:
+ *   const t0 = profileNavSyncStart("trophy-parse");
+ *   ... work ...
+ *   profileNavSyncEnd("trophy-parse", t0);
+ */
+export function profileNavSyncStart(fn: string): number {
+  if (!active || !isProfileNavTraceEnabled()) return nowMs();
+  log(active, "sync-start", fn);
+  try {
+    performance.mark?.(`wr-profile-nav:sync-start:${fn}`);
+  } catch {
+    /* ok */
+  }
+  return nowMs();
+}
+
+export function profileNavSyncEnd(fn: string, t0: number, extra?: string) {
+  if (!active || !isProfileNavTraceEnabled()) return;
+  const ms = Math.round(nowMs() - t0);
+  const e = extra ? ` ${extra}` : "";
+  log(active, "sync-end", `${fn} duration=${ms}ms${e}`);
+  try {
+    performance.mark?.(`wr-profile-nav:sync-end:${fn}`);
+  } catch {
+    /* ok */
+  }
+  if (ms >= 50) {
+    log(active, "sync-slow", `${fn} duration=${ms}ms${e}`);
+  }
+}
+
+export function profileNavSync<T>(fn: string, work: () => T): T {
+  const t0 = profileNavSyncStart(fn);
+  try {
+    return work();
+  } finally {
+    profileNavSyncEnd(fn, t0);
+  }
+}
+
+/**
+ * League-wide work while on profile — tag caller (interval/vis/force/stack).
+ */
+export function profileNavLeagueWork(
+  fn: string,
+  reason: string,
+  extra?: string
+) {
+  if (!isProfileNavTraceEnabled()) return;
+  let path = "?";
+  try {
+    path = typeof location !== "undefined" ? location.pathname : "?";
+  } catch {
+    /* ok */
+  }
+  const onProfile = path.startsWith("/profile");
+  // Always log when a profile nav trace is active OR work runs on /profile
+  if (!active && !onProfile) return;
+  if (!active && onProfile) {
+    // orphan league work on profile without click trace
+    // eslint-disable-next-line no-console
+    console.log(
+      `[WR-PROFILE-NAV][orphan] league-work ${fn} reason=${reason} path=${path}${
+        extra ? ` ${extra}` : ""
+      } stack=${stackHint()}`
+    );
+    return;
+  }
+  if (!active) return;
+  log(
+    active,
+    "league-work",
+    `fn=${fn} reason=${reason} path=${path} age=${elapsed(active)}ms${
+      extra ? ` ${extra}` : ""
+    } stack=${stackHint()}`
+  );
+}
+
 export function profileNavRouteCommit(pathname: string) {
   if (!pathname?.startsWith("/profile")) return;
   const id = pathname.split("/")[2] || "";

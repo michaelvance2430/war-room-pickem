@@ -43,6 +43,11 @@ import type { LeagueTrophy } from "@/lib/trophies";
 import type { BadgeStatus } from "@/lib/types";
 import { wrProfile } from "@/lib/runtime-iso";
 import { hasOfficialScoredWeek } from "@/lib/season-scored";
+import {
+  profileNavMark,
+  profileNavSyncEnd,
+  profileNavSyncStart,
+} from "@/lib/profile-nav-trace";
 
 type Props = {
   player: Player;
@@ -65,18 +70,25 @@ async function runChunked<T>(
   fn: () => T
 ): Promise<T | null> {
   await yieldToBrowser();
-  const t0 = performance.now();
+  const t0 = profileNavSyncStart(`ProfileHeavyDetails.${label}`);
+  const wall0 = performance.now();
   try {
     const out = fn();
-    const ms = performance.now() - t0;
+    const ms = performance.now() - wall0;
+    profileNavSyncEnd(`ProfileHeavyDetails.${label}`, t0);
     if (ms > SLOW_MS) wrProfile("SLOW_SECTION", ms, label);
     else wrProfile(label, ms);
     await yieldToBrowser();
     return out;
   } catch (e) {
+    profileNavSyncEnd(
+      `ProfileHeavyDetails.${label}`,
+      t0,
+      e instanceof Error ? e.message : "fail"
+    );
     wrProfile(
       "SLOW_SECTION",
-      performance.now() - t0,
+      performance.now() - wall0,
       `${label} FAIL ${e instanceof Error ? e.message : ""}`
     );
     return null;
@@ -112,6 +124,7 @@ export default function ProfileHeavyDetails({
        * trophies. CRITICAL PATH = subject-only badges + trophies; peers idle.
        */
       wrProfile("heavy-details-start");
+      profileNavMark("heavy-details-start");
       await yieldToBrowser();
       if (cancelled) return;
 
@@ -158,15 +171,15 @@ export default function ProfileHeavyDetails({
       try {
         await yieldToBrowser();
         if (cancelled) return;
-        const tImport0 = performance.now();
+        const tImport0 = profileNavSyncStart("trophies-module-import");
+        const wallImp = performance.now();
         const { loadCareerTrophiesWonByUser, loadLeagueTrophies } =
           await import("@/lib/trophies");
-        wrProfile(
-          "trophies-module-import",
-          performance.now() - tImport0
-        );
+        profileNavSyncEnd("trophies-module-import", tImport0);
+        wrProfile("trophies-module-import", performance.now() - wallImp);
         await yieldToBrowser();
         if (cancelled) return;
+        profileNavMark("trophy-fetch-start");
         try {
           const career = await loadCareerTrophiesWonByUser(seed.id, {
             playerName: seed.name || undefined,
@@ -179,6 +192,7 @@ export default function ProfileHeavyDetails({
             () => [] as LeagueTrophy[]
           );
         }
+        profileNavMark("trophy-fetch-end", `n=${trophies.length}`);
         await yieldToBrowser();
         if (cancelled) return;
 
@@ -192,7 +206,11 @@ export default function ProfileHeavyDetails({
             activeLeagueId: lg?.id,
           })
         );
-        if (!cancelled && hw) setHardware(hw);
+        if (!cancelled && hw) {
+          const tSet = profileNavSyncStart("setHardware");
+          setHardware(hw);
+          profileNavSyncEnd("setHardware", tSet, `n=${hw.length}`);
+        }
       } catch {
         /* ok */
       }
@@ -247,8 +265,11 @@ export default function ProfileHeavyDetails({
 
       // Paint shelves before peer upgrade / eggs
       if (!cancelled) {
+        const tPhase = profileNavSyncStart("setPhase-ready");
         setPhase("ready");
+        profileNavSyncEnd("setPhase-ready", tPhase);
         wrProfile("heavy-details-ready");
+        profileNavMark("heavy-details-ready");
       }
 
       // ── Phase C (idle): full league peers — may re-hit standings; never block paint ──

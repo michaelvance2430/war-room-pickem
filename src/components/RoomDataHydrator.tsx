@@ -67,7 +67,10 @@ export default function RoomDataHydrator() {
       }
     }
 
-    async function loadRoster(force = false) {
+    async function loadRoster(
+      force = false,
+      reason: "force-boot" | "interval-5m" | "visibility" = "force-boot"
+    ) {
       const session = getSession();
       const league = getLeague();
       const leagueId = league?.id || session?.leagueId || "";
@@ -83,9 +86,30 @@ export default function RoomDataHydrator() {
       if (!force && now - lastRosterAt.current < VIS_MIN_GAP_MS) return;
 
       try {
+        let syncStart: ((fn: string) => number) | null = null;
+        let syncEnd:
+          | ((fn: string, t0: number, extra?: string) => void)
+          | null = null;
+        try {
+          const tr = await import("@/lib/profile-nav-trace");
+          tr.profileNavLeagueWork(
+            "RoomDataHydrator.loadRoster",
+            reason,
+            `force=${force} sinceLast=${now - lastRosterAt.current}ms gap=${VIS_MIN_GAP_MS}`
+          );
+          if (tr.isProfileNavTraceActive()) {
+            syncStart = tr.profileNavSyncStart;
+            syncEnd = tr.profileNavSyncEnd;
+          }
+        } catch {
+          /* ok */
+        }
         const roster = await loadLeagueRoster();
         if (cancelled) return;
         lastRosterAt.current = Date.now();
+        const tHyd = syncStart
+          ? syncStart("RoomDataHydrator.hydrateStores")
+          : 0;
         hydrateJoinBadges(
           leagueId,
           roster.map((m) => ({
@@ -108,6 +132,13 @@ export default function RoomDataHydrator() {
             borderId: m.equippedBorderId ?? null,
           }))
         );
+        if (syncEnd) {
+          syncEnd(
+            "RoomDataHydrator.hydrateStores",
+            tHyd,
+            `n=${roster.length}`
+          );
+        }
         // If Creator is on this roster and has last_seen, unlock room cheevo flag
         try {
           const { isAppCreator } = await import("@/lib/creator");
@@ -129,17 +160,29 @@ export default function RoomDataHydrator() {
     const start = window.setTimeout(() => {
       void (async () => {
         await syncSelfOnce();
-        if (!cancelled) await loadRoster(true);
+        if (!cancelled) await loadRoster(true, "force-boot");
       })();
     }, 1_400);
 
     // Warm picks card late so Home/Standings first paint wins
+    // (also triggers loadLeagueActiveWeek — tagged for profile-nav traces)
     const warmPicks = window.setTimeout(() => {
       if (cancelled || isGuestMode()) return;
       void (async () => {
         try {
           const session = getSession();
           if (!session?.leagueId) return;
+          try {
+            const { profileNavLeagueWork } = await import(
+              "@/lib/profile-nav-trace"
+            );
+            profileNavLeagueWork(
+              "RoomDataHydrator.warmPicks",
+              "timeout-2800ms"
+            );
+          } catch {
+            /* ok */
+          }
           const { loadLeagueActiveWeek, loadWeekCard } = await import(
             "@/lib/cloud"
           );
@@ -154,11 +197,13 @@ export default function RoomDataHydrator() {
     }, 2_800);
 
     const timer = window.setInterval(() => {
-      void loadRoster(false);
+      void loadRoster(false, "interval-5m");
     }, ROSTER_REFRESH_MS);
 
     function onVis() {
-      if (document.visibilityState === "visible") void loadRoster(false);
+      if (document.visibilityState === "visible") {
+        void loadRoster(false, "visibility");
+      }
     }
     document.addEventListener("visibilitychange", onVis);
 

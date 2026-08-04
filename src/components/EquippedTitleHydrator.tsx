@@ -22,10 +22,17 @@ export default function EquippedTitleHydrator() {
   useEffect(() => {
     let cancelled = false;
 
-    async function load() {
+    async function load(reason: "boot" | "interval-120s" | "visibility") {
       const session = getSession();
       const league = getLeague();
       if (!session?.playerId) return;
+
+      try {
+        const { profileNavLeagueWork } = await import("@/lib/profile-nav-trace");
+        profileNavLeagueWork("EquippedTitleHydrator.load", reason);
+      } catch {
+        /* ok */
+      }
 
       await syncMyEquippedTitleFromCloud();
       // Birthday hard-lock: rehydrate from profiles so post-login never
@@ -51,24 +58,40 @@ export default function EquippedTitleHydrator() {
       try {
         const roster = await loadLeagueRoster();
         if (cancelled) return;
-        hydrateEquippedTitles(
-          roster.map((m) => ({
-            userId: m.userId,
-            badgeId: m.equippedTitleId ?? null,
-            label: titleLabelForBadgeId(m.equippedTitleId ?? null),
-          }))
-        );
+        let t0 = 0;
+        let end: ((fn: string, t0: number, extra?: string) => void) | null =
+          null;
+        try {
+          const tr = await import("@/lib/profile-nav-trace");
+          if (tr.isProfileNavTraceActive()) {
+            t0 = tr.profileNavSyncStart("EquippedTitleHydrator.hydrate");
+            end = tr.profileNavSyncEnd;
+          }
+        } catch {
+          /* ok */
+        }
+        try {
+          hydrateEquippedTitles(
+            roster.map((m) => ({
+              userId: m.userId,
+              badgeId: m.equippedTitleId ?? null,
+              label: titleLabelForBadgeId(m.equippedTitleId ?? null),
+            }))
+          );
+        } finally {
+          if (end) end("EquippedTitleHydrator.hydrate", t0, `n=${roster.length}`);
+        }
       } catch {
         /* self still works from local */
       }
     }
 
-    void load();
+    void load("boot");
     function onVis() {
-      if (document.visibilityState === "visible") void load();
+      if (document.visibilityState === "visible") void load("visibility");
     }
     document.addEventListener("visibilitychange", onVis);
-    const t = setInterval(() => void load(), 120_000);
+    const t = setInterval(() => void load("interval-120s"), 120_000);
     return () => {
       cancelled = true;
       document.removeEventListener("visibilitychange", onVis);
