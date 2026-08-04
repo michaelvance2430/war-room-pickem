@@ -44,6 +44,16 @@ const NEED = 5;
 
 const STEP_LABELS = ["Odds", "Games", "Prop", "Publish"] as const;
 
+/** Favorite line: always beside the favored team, never "fav home" puzzles. */
+function favoriteSpreadLabel(spread: number | null | undefined): string {
+  if (spread == null || Number.isNaN(Number(spread))) return "";
+  const n = Number(spread);
+  // Stored as favorite's line (typically negative); show as-is if signed, else −abs
+  if (n === 0) return "PK";
+  if (n < 0) return String(n);
+  return `-${Math.abs(n)}`;
+}
+
 function formatSynced(d: Date): string {
   try {
     return d.toLocaleString(undefined, {
@@ -456,57 +466,120 @@ export default function WeekOpsClient() {
         {/* ── 2 CHOOSE GAMES ──────────────────────────────────── */}
         {step === 2 && (
           <div className="space-y-3">
-            <div className="flex items-baseline justify-between gap-2">
-              <p className="text-sm font-bold">
-                {selectedIds.length}/{NEED}
-              </p>
+            {/* Progress: five dots — brain sees “two left”, no reading */}
+            <div className="flex items-center justify-between gap-3">
+              <div
+                className="flex items-center gap-2"
+                aria-label={`${selectedIds.length} of ${NEED} selected`}
+              >
+                {Array.from({ length: NEED }, (_, i) => {
+                  const filled = i < selectedIds.length;
+                  return (
+                    <span
+                      key={i}
+                      className={`inline-block w-3.5 h-3.5 rounded-full transition ${
+                        filled
+                          ? "bg-primary shadow-[0_0_8px_rgba(34,197,94,0.55)]"
+                          : "border-2 border-border bg-transparent"
+                      }`}
+                      aria-hidden
+                    />
+                  );
+                })}
+                {selectedIds.length === NEED && (
+                  <span className="text-primary text-lg font-black leading-none ml-0.5">
+                    ✓
+                  </span>
+                )}
+              </div>
               <button
                 type="button"
                 disabled={busy}
                 onClick={() => void pullGames()}
-                className="text-xs text-muted font-semibold"
+                className="text-xs text-muted font-semibold min-h-[40px] px-2 shrink-0"
               >
-                Refresh
+                {busy ? "…" : "Sync Odds"}
               </button>
             </div>
-            <div className="space-y-2 max-h-[52vh] overflow-y-auto">
+
+            <div className="space-y-2.5 max-h-[52vh] overflow-y-auto pb-1">
               {available.map((g) => {
                 const on = selectedIds.includes(g.id);
                 const full = selectedIds.length >= NEED && !on;
+                const awayFav = g.favorite === "away";
+                const homeFav = g.favorite === "home";
+                const line = favoriteSpreadLabel(g.spread);
+                const kick = formatKickoff(g.commenceTime || g.startTime);
+
                 return (
                   <button
                     key={g.id}
                     type="button"
                     disabled={full}
                     onClick={() => toggleGame(g.id)}
-                    className={`w-full text-left rounded-xl border px-3 py-3 min-h-[52px] touch-manipulation disabled:opacity-35 ${
+                    className={`relative w-full text-left rounded-2xl border-2 px-3.5 py-3.5 min-h-[88px] touch-manipulation transition active:scale-[0.99] disabled:opacity-35 ${
                       on
-                        ? "border-primary bg-primary/15"
-                        : "border-border bg-card"
+                        ? "border-primary bg-primary/15 ring-2 ring-primary/30 shadow-[0_0_24px_rgba(34,197,94,0.2)]"
+                        : "border-border bg-card hover:border-border/80"
                     }`}
                   >
-                    <p className="text-sm font-semibold">
-                      {on ? "✓ " : ""}
-                      {formatRankedTeam(g.awayTeam, g.awayRank)} @{" "}
-                      {formatRankedTeam(g.homeTeam, g.homeRank)}
-                    </p>
-                    <p className="text-[11px] text-muted mt-0.5">
-                      {g.spread != null
-                        ? `${g.favorite === "home" ? g.homeTeam.split(" ").pop() : g.awayTeam.split(" ").pop()} ${g.spread}`
-                        : "—"}
-                      {" · "}
-                      {formatKickoff(g.commenceTime || g.startTime).full}
+                    {on && (
+                      <span
+                        className="absolute top-2.5 right-2.5 w-8 h-8 rounded-full bg-primary text-black flex items-center justify-center text-lg font-black"
+                        aria-hidden
+                      >
+                        ✓
+                      </span>
+                    )}
+
+                    {/* AWAY */}
+                    <div className={`pr-10 ${on ? "" : ""}`}>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-muted">
+                          Away
+                        </span>
+                        {awayFav && line && (
+                          <span className="text-sm font-extrabold text-primary tabular-nums">
+                            ⭐ {line}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-base sm:text-[17px] font-bold text-foreground leading-snug mt-0.5">
+                        {formatRankedTeam(g.awayTeam, g.awayRank)}
+                      </p>
+                    </div>
+
+                    {/* HOME */}
+                    <div className="mt-2.5 pr-10">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-muted">
+                          Home
+                        </span>
+                        {homeFav && line && (
+                          <span className="text-sm font-extrabold text-primary tabular-nums">
+                            ⭐ {line}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-base sm:text-[17px] font-bold text-foreground leading-snug mt-0.5">
+                        {formatRankedTeam(g.homeTeam, g.homeRank)}
+                      </p>
+                    </div>
+
+                    <p className="text-[11px] text-muted mt-2.5">
+                      {kick.full}
                     </p>
                   </button>
                 );
               })}
               {!available.length && (
                 <p className="text-sm text-muted text-center py-6">
-                  Pull odds first.
+                  Sync odds first.
                 </p>
               )}
             </div>
-            <div className="flex gap-2 sticky bottom-0 pt-2 bg-background/95">
+
+            <div className="flex gap-2 sticky bottom-0 pt-2 pb-1 bg-background/95 backdrop-blur-sm">
               <button
                 type="button"
                 onClick={() => setStep(1)}
