@@ -2292,18 +2292,32 @@ export default function PicksClient() {
                   </Link>
       </div>
               )}
-            {weekEditable &&
-              !isCardLockDeadlinePassed(games, now) &&
-              trustedScoredWeeks.length > 0 && (
+            {(() => {
+              // Only when a real prior week exists — never Week 0 with no
+              // history. No disabled state, no placeholder strip.
+              const priorScored = trustedScoredWeeks
+                .filter((w) => Number.isFinite(w) && w < viewWeek)
+                .sort((a, b) => a - b);
+              const lastReviewable = priorScored[priorScored.length - 1];
+              if (
+                !weekEditable ||
+                isCardLockDeadlinePassed(games, now) ||
+                viewWeek < 1 ||
+                lastReviewable == null
+              ) {
+                return null;
+              }
+              return (
                 <div className="mb-4 rounded-lg border border-border bg-card-hover px-4 py-2 text-sm">
-      <Link
-                    href={`/board?week=${trustedScoredWeeks[trustedScoredWeeks.length - 1]}`}
+                  <Link
+                    href={`/board?week=${lastReviewable}`}
                     className="text-primary font-semibold hover:underline"
                   >
                     See last week&apos;s Board →
                   </Link>
-      </div>
-              )}
+                </div>
+              );
+            })()}
 
             {missedLockWindow && (
               <div className="mb-4 rounded-xl border-2 border-danger/60 bg-danger/15 px-4 py-3">
