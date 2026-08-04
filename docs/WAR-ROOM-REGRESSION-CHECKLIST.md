@@ -17,6 +17,34 @@ Every engineering report answers first:
 - **Yes** → list remaining residual risk.
 - **No** → state **why** (not a soft PASS).
 
+That question separates **hope** from **confidence**. Use it before every major freeze until launch.
+
+### Area confidence scoreboard (required)
+
+Do not only give a yes/no bet. Score each major surface **1–10**, then one overall:
+
+| Area | Confidence (1–10) | Notes (why not 10) |
+| ---- | ----------------: | ------------------ |
+| Home | | |
+| Picks | | |
+| League Hub | | |
+| Skins / theme | | |
+| Commissioner | | |
+| Standings | | |
+| Gazette | | |
+| Moments | | |
+| Navigation shell | | |
+| Mobile feel | | |
+
+**Overall Week 0 Confidence: X.X/10**
+
+Rules:
+
+- Score what you actually attacked this session — not what you hope is fine.
+- If an area was not device-tested, **cap it** (suggested max 6 without real phone).
+- Track scores freeze-over-freeze so confidence *compounds* toward launch.
+- Overall is not a marketing average — if one critical surface is a 4, overall cannot be a 9.
+
 Grok is excellent at code paths, state transitions, and structured attack.  
 Grok is **not** a substitute for Mike on a phone. Both legs are required.
 
@@ -198,6 +226,20 @@ Add a row when a real bug or near-miss teaches us something. Never delete a row;
 ```text
 $1000 BET: YES / NO
 Why not (if NO): <one paragraph>
+
+AREA CONFIDENCE
+Home:            /10
+Picks:           /10
+League Hub:      /10
+Skins / theme:   /10
+Commissioner:    /10
+Standings:       /10
+Gazette:         /10
+Moments:         /10
+Navigation:      /10
+Mobile feel:     /10
+
+Overall Week 0 Confidence: X.X/10
 
 FINDINGS (evidence format for each)
 
