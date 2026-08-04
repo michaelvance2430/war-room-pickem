@@ -3,8 +3,9 @@
  * One job: reveal locked cards after kickoff. No tour, no CTAs.
  * Voice: War Room — fun, dry, a little mean. Not corporate.
  *
- * One take per week index so the empty state rotates with the season
- * (Week 0 ≠ Week 1 ≠ Week 7). Loops if the season outruns the list.
+ * Weeks 0–4: vault / classified energy (actually about the Board).
+ * Week 5+: completely unhinged made-up “facts.” Accuracy is not the point.
+ * Loops if the season outruns the list.
  */
 
 export type BoardEmptyTake = {
@@ -13,8 +14,9 @@ export type BoardEmptyTake = {
   body: string;
 };
 
-/** Rotating empty-state takes — pick by week number. */
+/** Rotating empty-state takes — index = week number. */
 export const BOARD_EMPTY_TAKES: BoardEmptyTake[] = [
+  // ── Weeks 0–4: still about the Board ─────────────────────────────
   {
     emoji: "🔒",
     title: "Still classified.",
@@ -40,70 +42,132 @@ export const BOARD_EMPTY_TAKES: BoardEmptyTake[] = [
     title: "Sealed for shipping.",
     body: "The Board doesn't open early. First kickoff is the box cutter — and somebody's getting unboxed.",
   },
+
+  // ── Week 5+: random invented facts. Do not fact-check. ───────────
   {
-    emoji: "🤫",
-    title: "Silence is the product.",
-    body: "No peeks. No leaks. No “just curious.” Wait for kickoff like everybody else.",
+    emoji: "🐿️",
+    title: "Fun fact (probably false).",
+    body: "Squirrels invented the nickel defense in 1983 and never got credit. The Board is empty either way.",
   },
   {
-    emoji: "🎭",
-    title: "Masks stay on.",
-    body: "Half this room is bluffing. You'll find out which half after the first ball is snapped.",
+    emoji: "🍌",
+    title: "Banana fact.",
+    body: "A banana is a berry. A strawberry isn't. Your picks are neither. Wait for kickoff.",
   },
   {
-    emoji: "⏳",
-    title: "Drama is on a timer.",
-    body: "Nothing to roast until kickoff. Patience is hard. Being wrong in public is harder.",
+    emoji: "🦈",
+    title: "Ocean science (disputed).",
+    body: "Sharks can smell insecurity from three counties away. That's why this page is blank right now.",
   },
   {
-    emoji: "🗂️",
-    title: "File not found: courage.",
-    body: "Locked cards reveal after first kickoff. Until then, every take is still theoretical.",
+    emoji: "🧀",
+    title: "Cheese update.",
+    body: "There are more kinds of cheese than people in this league who will admit a bad pick. Vault's still locked.",
+  },
+  {
+    emoji: "🛰️",
+    title: "Space briefing.",
+    body: "The moon is roughly the size of a large grocery store if you squint and lie. Cards still secret.",
+  },
+  {
+    emoji: "🦆",
+    title: "Duck math.",
+    body: "Ducks can't echo. That's why they never call their own bluffs. You shouldn't either until kickoff.",
+  },
+  {
+    emoji: "🧱",
+    title: "Architecture note.",
+    body: "The Great Wall is not visible from space, but bad confidence rankings absolutely are. Not yet though.",
+  },
+  {
+    emoji: "🍕",
+    title: "Pizza intelligence.",
+    body: "Hawaii is not a pizza topping; it's a threat. The Board remains sealed until first kickoff.",
+  },
+  {
+    emoji: "🧠",
+    title: "Brain fact (unverified).",
+    body: "Your brain uses 20% of your calories and 0% of them on locking early. Come back after the whistle.",
+  },
+  {
+    emoji: "🦩",
+    title: "Flamingo report.",
+    body: "Flamingos are pink because they eat shrimp and bad decisions. This page eats silence.",
   },
   {
     emoji: "🧊",
-    title: "On ice.",
-    body: "The room stays quiet until the first game starts. Then the board thaws and the alibis melt.",
+    title: "Ice lore.",
+    body: "No two ice cubes are alike, which is also true of terrible Best Bets. Still nothing to show.",
   },
   {
-    emoji: "🚪",
-    title: "Door's locked. Good.",
-    body: "If you could see cards early, half the fun dies. Wait for the whistle. Earn the humiliation.",
+    emoji: "🎸",
+    title: "Music history.",
+    body: "The guitar was invented to settle arguments. It failed. Kickoff settles this one.",
+  },
+  {
+    emoji: "🐙",
+    title: "Octopus files.",
+    body: "Octopuses have three hearts and still better judgment than half this room. Board's empty.",
+  },
+  {
+    emoji: "🌵",
+    title: "Desert bulletin.",
+    body: "Cacti can survive years without water. You cannot survive a week without excuses. Wait for kickoff.",
+  },
+  {
+    emoji: "🪙",
+    title: "Coin theory.",
+    body: "Heads never existed until someone needed a coin flip. Your picks don't exist publicly yet either.",
+  },
+  {
+    emoji: "🦕",
+    title: "Paleontology drop.",
+    body: "Dinosaurs never watched football, which is why they went extinct. Scientists hate this fact.",
   },
   {
     emoji: "📡",
-    title: "Signal blackout.",
-    body: "Zero public slips. First kickoff restores transmission — and the group chat loses its mind.",
+    title: "Radio silence.",
+    body: "Wi-Fi stands for “waiting is fine, idiot.” Citation needed. Cards still classified.",
   },
   {
-    emoji: "🦴",
-    title: "No bones yet.",
-    body: "The Board is the skeleton of the week. Kickoff puts meat on it. Until then, empty plate.",
+    emoji: "🐸",
+    title: "Amphibian news.",
+    body: "Frogs absorb water through their skin. You absorb regret through The Board. Later.",
   },
   {
-    emoji: "🧪",
-    title: "Lab is closed.",
-    body: "You don't get to stress-test your rivals before kickoff. Science can wait. Football cannot.",
+    emoji: "🧲",
+    title: "Physics (adjacent).",
+    body: "Magnets don't work on wood, pride, or locked cards. First kickoff is the only force that matters.",
   },
   {
-    emoji: "🎬",
-    title: "Curtain's still down.",
-    body: "Opening night is first kickoff. Until then it's intermission and everybody's still in costume.",
+    emoji: "🍿",
+    title: "Snack doctrine.",
+    body: "Popcorn was invented so people had something to do with their hands while being wrong. Soon.",
   },
   {
-    emoji: "🧹",
-    title: "Nothing to clean up…yet.",
-    body: "The mess starts when picks go public. Come back after kickoff for the crime scene.",
+    emoji: "🐢",
+    title: "Camel classified.",
+    body: "Camels store drama in their humps, not water. This league stores it for kickoff. Still sealed.",
   },
   {
-    emoji: "🎰",
-    title: "Table's closed.",
-    body: "Cards stay face-down until the first kickoff. Then we flip 'em and pretend we always liked our side.",
+    emoji: "🪞",
+    title: "Mirror memo.",
+    body: "Mirrors reverse left and right but not up and down, much like your confidence. No cards yet.",
   },
   {
-    emoji: "🧾",
-    title: "No paper trail.",
-    body: "The Board is where the receipts live. Kickoff stamps the timestamp. Patience, villain.",
+    emoji: "🌋",
+    title: "Geology hour.",
+    body: "Lava is just rock that gave up. Your card will too — after first kickoff, not before.",
+  },
+  {
+    emoji: "🐝",
+    title: "Bee brief.",
+    body: "Bees do a waggle dance to explain directions. You do a group chat. Neither opens The Board early.",
+  },
+  {
+    emoji: "🧂",
+    title: "Seasoning intel.",
+    body: "Salt was once currency. Saltiness is still free. Spend some after the picks go public.",
   },
 ];
 
