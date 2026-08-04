@@ -238,6 +238,9 @@ If **yes** → **fix it** (gate on `production`, route through result pipeline, 
 - [ ] Profile / Trophy Room: never show unverified lab hardware as career  
 - [ ] Regression: sim week → prove career tables unchanged  
 - [x] Production hard-delete blocked when other humans or any season history exist  
+- [x] `awardTrophy` gated — Foundry / eyes / guest / preseason sandbox cannot engrave  
+- [x] Permanent badge grants gated the same way (non-protected)  
+- [x] Admin-only Foundry cleanup (`admin-test-cleanup` + `/founder#career-cleanup`) — not a commissioner feature  
 - [ ] League mode flag fully gates disposable vs production  
 - [ ] Request League Retirement + community vote (design later)  
 

@@ -64,6 +64,18 @@ export function grantPermanentBadgeId(
   if (isSandboxMode() && !isSandboxProtectedBadge(badgeId)) {
     return false;
   }
+  // Career Integrity: Foundry eyes / guest never stick hardware badges
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { canWritePermanentCareer } =
+      require("./career-integrity") as typeof import("./career-integrity");
+    const gate = canWritePermanentCareer({ source: "grantPermanentBadgeId" });
+    if (!gate.ok && !isSandboxProtectedBadge(badgeId)) {
+      return false;
+    }
+  } catch {
+    /* ignore */
+  }
   const map = readAll();
   const list = map[playerId] || [];
   if (list.includes(badgeId)) return false;

@@ -94,6 +94,12 @@ export default function FounderDashboardPage() {
   const [fleetBusy, setFleetBusy] = useState(false);
   const [fleetError, setFleetError] = useState<string | null>(null);
   const [enterBusy, setEnterBusy] = useState<string | null>(null);
+  /** Admin test-data cleanup (Career Integrity) */
+  const [cleanupRows, setCleanupRows] = useState<
+    import("@/lib/admin-test-cleanup").AdminLeagueCleanupRow[] | null
+  >(null);
+  const [cleanupBusy, setCleanupBusy] = useState(false);
+  const [cleanupLog, setCleanupLog] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const session = getSession();
@@ -443,6 +449,207 @@ export default function FounderDashboardPage() {
             this control or the bar.
           </p>
           <SandboxHopOptIn />
+        </section>
+
+        {/* ========== Career Integrity · admin cleanup ========== */}
+        <section
+          id="career-cleanup"
+          className="rounded-2xl border-2 border-danger/40 bg-danger/5 p-4 space-y-3 scroll-mt-24"
+        >
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-danger">
+              Foundry · admin only
+            </p>
+            <h2 className="text-base font-bold text-foreground mt-0.5">
+              Career integrity cleanup
+            </h2>
+            <p className="text-xs text-muted mt-1 leading-relaxed">
+              Not a commissioner feature. Scrub sim/Foundry hardware (Village
+              Nerd, etc.) so production profiles stay clean. Production leagues
+              stay non-deletable by hosts — this only helps the creator clean
+              lab residue.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              disabled={cleanupBusy}
+              onClick={() => {
+                setCleanupBusy(true);
+                setCleanupLog(null);
+                void import("@/lib/admin-test-cleanup")
+                  .then((m) => m.listAdminCleanupLeagues())
+                  .then((res) => {
+                    if (!res.ok) {
+                      setCleanupLog(res.error || "List failed");
+                      setCleanupRows([]);
+                      return;
+                    }
+                    setCleanupRows(res.leagues);
+                    setCleanupLog(
+                      `Found ${res.leagues.length} membership room(s). ${
+                        res.leagues.filter((l) => l.crystalBallTrophies > 0)
+                          .length
+                      } with Village Nerd engravings.`
+                    );
+                  })
+                  .finally(() => setCleanupBusy(false));
+              }}
+              className="w-full py-3 min-h-[48px] rounded-xl border border-border bg-card text-sm font-bold disabled:opacity-50"
+            >
+              {cleanupBusy ? "Working…" : "Scan my leagues for hardware residue"}
+            </button>
+            <button
+              type="button"
+              disabled={cleanupBusy}
+              onClick={() => {
+                if (
+                  !confirm(
+                    "Scrub ALL trophy engravings + local career residue from leagues that have trophies? Solo sim rooms will also be deleted when empty. Multi-player rooms keep the membership — only hardware is wiped."
+                  )
+                ) {
+                  return;
+                }
+                setCleanupBusy(true);
+                setCleanupLog(null);
+                void import("@/lib/admin-test-cleanup")
+                  .then((m) => m.adminScrubAllCrystalBallContamination())
+                  .then((res) => {
+                    if (!res.ok) {
+                      setCleanupLog(res.error || "Scrub failed");
+                      return;
+                    }
+                    const lines = res.reports.flatMap((r) => [
+                      `— ${r.leagueId.slice(0, 8)}… trophies:${r.trophiesDeleted} badges:${r.badgesRevoked} deleted:${r.leagueDeleted}`,
+                      ...r.notes,
+                    ]);
+                    setCleanupLog(
+                      lines.length
+                        ? lines.join("\n")
+                        : "No trophy contamination found."
+                    );
+                    return import("@/lib/admin-test-cleanup").then((m) =>
+                      m.listAdminCleanupLeagues()
+                    );
+                  })
+                  .then((res) => {
+                    if (res && res.ok) setCleanupRows(res.leagues);
+                  })
+                  .finally(() => setCleanupBusy(false));
+              }}
+              className="w-full py-3 min-h-[48px] rounded-xl border-2 border-danger/50 bg-danger/15 text-danger text-sm font-extrabold disabled:opacity-50"
+            >
+              Scrub all trophy contamination (admin)
+            </button>
+          </div>
+          {cleanupLog && (
+            <pre className="text-[11px] text-muted whitespace-pre-wrap rounded-lg border border-border bg-background/60 px-3 py-2 max-h-48 overflow-y-auto">
+              {cleanupLog}
+            </pre>
+          )}
+          {cleanupRows && cleanupRows.length > 0 && (
+            <ul className="space-y-2">
+              {cleanupRows.map((row) => (
+                <li
+                  key={row.leagueId}
+                  className="rounded-xl border border-border bg-card px-3 py-2.5 space-y-1.5"
+                >
+                  <p className="text-sm font-bold text-foreground">
+                    {row.name}{" "}
+                    <span className="text-muted font-normal text-xs">
+                      · {row.code} · {row.sportId}
+                    </span>
+                  </p>
+                  <p className="text-[11px] text-muted">
+                    Trophies: {row.trophyCount}
+                    {row.crystalBallTrophies > 0
+                      ? ` · 🧠 Village Nerd ×${row.crystalBallTrophies}`
+                      : ""}
+                    {" · "}
+                    other humans: {row.otherHumans}
+                    {row.isCommissioner ? " · you host" : ""}
+                  </p>
+                  {row.sampleTrophies.length > 0 && (
+                    <p className="text-[10px] text-muted/90">
+                      {row.sampleTrophies
+                        .map((t) => `${t.year} ${t.type}→${t.winner}`)
+                        .join(" · ")}
+                    </p>
+                  )}
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <button
+                      type="button"
+                      disabled={cleanupBusy}
+                      onClick={() => {
+                        setCleanupBusy(true);
+                        void import("@/lib/admin-test-cleanup")
+                          .then((m) =>
+                            m.adminScrubLeagueCareer({
+                              leagueId: row.leagueId,
+                              deleteLeagueAfter: false,
+                            })
+                          )
+                          .then((r) => {
+                            setCleanupLog(
+                              [`Scrub ${row.name}:`, ...r.notes, r.error || ""]
+                                .filter(Boolean)
+                                .join("\n")
+                            );
+                          })
+                          .finally(() => setCleanupBusy(false));
+                      }}
+                      className="px-3 py-2 rounded-lg border border-border text-xs font-bold"
+                    >
+                      Scrub hardware only
+                    </button>
+                    {row.otherHumans === 0 && row.isCommissioner && (
+                      <button
+                        type="button"
+                        disabled={cleanupBusy}
+                        onClick={() => {
+                          if (
+                            !confirm(
+                              `Scrub + delete empty solo room "${row.name}"?`
+                            )
+                          )
+                            return;
+                          setCleanupBusy(true);
+                          void import("@/lib/admin-test-cleanup")
+                            .then((m) =>
+                              m.adminScrubLeagueCareer({
+                                leagueId: row.leagueId,
+                                deleteLeagueAfter: true,
+                              })
+                            )
+                            .then((r) => {
+                              setCleanupLog(
+                                [
+                                  `Scrub+delete ${row.name}:`,
+                                  ...r.notes,
+                                  r.error || "",
+                                ]
+                                  .filter(Boolean)
+                                  .join("\n")
+                              );
+                              return import("@/lib/admin-test-cleanup").then(
+                                (m) => m.listAdminCleanupLeagues()
+                              );
+                            })
+                            .then((res) => {
+                              if (res.ok) setCleanupRows(res.leagues);
+                            })
+                            .finally(() => setCleanupBusy(false));
+                        }}
+                        className="px-3 py-2 rounded-lg border border-danger/50 text-danger text-xs font-bold"
+                      >
+                        Scrub + delete solo room
+                      </button>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
 
         {/* ========== CRITICAL: first hour ========== */}

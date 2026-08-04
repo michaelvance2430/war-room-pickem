@@ -317,6 +317,30 @@ export async function awardTrophy(opts: {
   if (!canAward || !session?.leagueId) {
     return { ok: false, error: "Only the commissioner can award trophies" };
   }
+
+  // Career Integrity: Foundry / eyes / guest / preseason sandbox never engrave
+  try {
+    const { canWritePermanentCareer } = await import("./career-integrity");
+    const gate = canWritePermanentCareer({ source: "awardTrophy" });
+    if (!gate.ok) {
+      return { ok: false, error: gate.reason };
+    }
+  } catch {
+    /* if gate module fails open for legacy — still prefer block in sandbox */
+    try {
+      const { isSandboxMode } = await import("./season-mode");
+      if (isSandboxMode()) {
+        return {
+          ok: false,
+          error:
+            "Preseason sandbox — trophies do not engrave permanently (Career Integrity).",
+        };
+      }
+    } catch {
+      /* continue */
+    }
+  }
+
   const name = opts.winnerName.trim();
   if (!name) return { ok: false, error: "Winner name is required" };
   if (opts.seasonYear < 2000 || opts.seasonYear > 2100) {
