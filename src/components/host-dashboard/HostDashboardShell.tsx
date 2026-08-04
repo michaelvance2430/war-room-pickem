@@ -233,9 +233,9 @@ export default function HostDashboardShell({
             <button
               type="button"
               onClick={actions.onSeeLocks}
-              className="px-3 py-2 rounded-lg border border-border text-xs font-semibold text-foreground min-h-[44px]"
+              className="px-3 py-2 rounded-lg border border-border text-xs font-semibold text-muted min-h-[44px]"
             >
-              Who’s locked
+              Community pulse
             </button>
             {thisWeek.canPreview && (
               <button
