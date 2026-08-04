@@ -220,10 +220,8 @@ export default function StandingsPage() {
         )}
 
         {!loading && !seasonStarted && (
-          <div className="mb-8">
-            <SeasonNotStartedEmpty
-              footnote="No Crown. No Wall of Shame. No ATS. No streaks. War Room never invents what hasn't been earned."
-            />
+          <div className="mb-6">
+            <SeasonNotStartedEmpty />
           </div>
         )}
 

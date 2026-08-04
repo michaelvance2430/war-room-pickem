@@ -1,85 +1,58 @@
 "use client";
 
 /**
- * Shared empty state when zero weeks are officially scored.
- * Never invent achievement — celebrate anticipation instead.
+ * Empty state when zero weeks are officially scored.
+ * Quiet truth only — no carousel, no CTA pile.
+ * War Room never invents standings, crowns, or shame.
  */
 
-import { useState } from "react";
 import Link from "next/link";
-import {
-  ACHIEVEMENT_EMPTY_TAKES,
-  achievementEmptyTakeAt,
-} from "@/lib/season-scored";
 
 type Props = {
   className?: string;
-  /** Extra line under the take (surface-specific). */
+  /** Extra line under the body (surface-specific). */
   footnote?: string;
-  showCtas?: boolean;
+  /**
+   * Optional single next action. Standings usually omits this —
+   * nav already owns destinations.
+   */
+  ctaHref?: string;
+  ctaLabel?: string;
 };
 
 export default function SeasonNotStartedEmpty({
   className = "",
   footnote,
-  showCtas = true,
+  ctaHref,
+  ctaLabel,
 }: Props) {
-  const [idx, setIdx] = useState(0);
-  const take = achievementEmptyTakeAt(idx);
-
-  function next() {
-    setIdx((i) => (i + 1) % ACHIEVEMENT_EMPTY_TAKES.length);
-  }
-
   return (
-    <div className={`space-y-4 ${className}`}>
-      <button
-        type="button"
-        onClick={next}
-        className="w-full text-left rounded-2xl border-2 border-dashed border-primary/35 bg-card px-5 py-6 sm:px-6 sm:py-7 space-y-3 touch-manipulation active:scale-[0.99] transition"
-        aria-label="Next empty-season take"
-      >
-        <p className="text-3xl sm:text-4xl leading-none" aria-hidden>
-          {take.emoji}
+    <div
+      className={`rounded-xl border border-border bg-card px-4 py-5 sm:px-5 sm:py-6 ${className}`}
+    >
+      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted mb-2">
+        Season not scored yet
+      </p>
+      <h2 className="text-lg sm:text-xl font-black text-foreground leading-snug">
+        No standings yet.
+      </h2>
+      <p className="text-sm text-muted mt-2 leading-relaxed max-w-xl">
+        The board wakes up after the first week is scored. Until then nobody has
+        points, crowns, or shame — and War Room won&apos;t invent them.
+      </p>
+      {footnote ? (
+        <p className="text-xs text-muted/90 mt-2 leading-relaxed max-w-xl">
+          {footnote}
         </p>
-        <h2 className="text-xl sm:text-2xl font-black text-foreground leading-snug">
-          {take.title}
-        </h2>
-        <p className="text-sm sm:text-base text-muted leading-relaxed">
-          {take.body}
-        </p>
-        {footnote && (
-          <p className="text-xs text-muted/90 leading-relaxed pt-1">{footnote}</p>
-        )}
-        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary/80 pt-1">
-          Tap for another take · {idx + 1}/{ACHIEVEMENT_EMPTY_TAKES.length}
-        </p>
-      </button>
-
-      {showCtas && (
-        <div className="flex flex-col sm:flex-row gap-2">
-          <Link
-            href="/picks"
-            className="flex-1 min-h-[52px] rounded-xl bg-primary text-black text-sm font-extrabold inline-flex items-center justify-center touch-manipulation"
-          >
-            Go make your picks →
-          </Link>
-          <Link
-            href="/"
-            className="flex-1 min-h-[52px] rounded-xl border border-border text-foreground text-sm font-bold inline-flex items-center justify-center touch-manipulation hover:bg-card"
-          >
-            Return Home →
-          </Link>
-        </div>
-      )}
-
-      <button
-        type="button"
-        onClick={next}
-        className="w-full min-h-[48px] rounded-xl border border-primary/30 text-primary text-sm font-bold touch-manipulation"
-      >
-        Hit me with another one
-      </button>
+      ) : null}
+      {ctaHref && ctaLabel ? (
+        <Link
+          href={ctaHref}
+          className="inline-flex mt-4 min-h-[44px] items-center justify-center px-4 rounded-xl border border-border text-sm font-bold text-foreground hover:bg-card-hover touch-manipulation"
+        >
+          {ctaLabel}
+        </Link>
+      ) : null}
     </div>
   );
 }

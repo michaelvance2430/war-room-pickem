@@ -230,7 +230,7 @@ export default function StatsPage() {
           (mainTab === "power" || mainTab === "season") && (
             <SeasonNotStartedEmpty
               className="mb-6"
-              footnote="No power ranks, ATS, or streaks until football produces a scored week."
+              footnote="No power ranks, ATS, or streaks until a week is scored."
             />
           )}
 
