@@ -156,6 +156,11 @@ export default function PicksClient() {
    * some mobile Safari / PWA soft navigations from Standings).
    */
   const [practiceFromUrl, setPracticeFromUrl] = useState(false);
+  /**
+   * Role for empty-state CTA. Re-sync on View as player so host vs player
+   * copy flips without requiring a route change.
+   */
+  const [hostCanBuild, setHostCanBuild] = useState(() => isOps());
 
   const revisionRef = useRef<string>("");
   const viewWeekRef = useRef(1);
@@ -555,6 +560,20 @@ export default function PicksClient() {
     } catch {
       setPracticeFromUrl(false);
     }
+  }, []);
+
+  // Empty-state role (Build Card vs Locker) must track View as player
+  useEffect(() => {
+    function syncRole() {
+      setHostCanBuild(isOps());
+    }
+    syncRole();
+    window.addEventListener("warroom-view-as-player", syncRole);
+    window.addEventListener("storage", syncRole);
+    return () => {
+      window.removeEventListener("warroom-view-as-player", syncRole);
+      window.removeEventListener("storage", syncRole);
+    };
   }, []);
 
   // Sticky Practice Mode: bare /picks while practice is active restores the
@@ -1893,7 +1912,6 @@ export default function PicksClient() {
           // Role-aware empty: what can *I* do next?
           // Ops (commish/deputy, not view-as-player) → Build Card.
           // Everyone else → Locker / wait. Never tell players to build.
-          const hostCanBuild = isOps();
           const liveEmpty = viewWeek === activeWeek;
           const copy = hostCanBuild
             ? resolveCommishPicksEmptyCopy()
