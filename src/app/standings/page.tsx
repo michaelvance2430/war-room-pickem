@@ -8,7 +8,6 @@
 import { useState, useEffect, Fragment } from "react";
 import SwingBadge from "@/components/SwingBadge";
 import CrownAndShame from "@/components/CrownAndShame";
-import SeasonNotStartedEmpty from "@/components/SeasonNotStartedEmpty";
 import { loadLeaguePlayers } from "@/lib/cloud";
 import { pageLoad } from "@/lib/smooth";
 import { getSession, getLeague } from "@/lib/league";
@@ -191,12 +190,6 @@ export default function StandingsPage() {
         */}
         {!loading && (
           <CrownAndShame className="mb-6" players={players} />
-        )}
-
-        {!loading && !seasonStarted && (
-          <div className="mb-6">
-            <SeasonNotStartedEmpty />
-          </div>
         )}
 
         {!loading && !seasonStarted && players.length > 0 && (
