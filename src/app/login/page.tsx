@@ -3,19 +3,17 @@
 import { useState, FormEvent, Suspense, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
-import Link from "next/link";
 import {
   peekPendingJoinCode,
   stashPendingJoinCode,
 } from "@/lib/commish-onboarding";
-import OwnershipNotice from "@/components/OwnershipNotice";
 import BrandMark from "@/components/BrandMark";
 import { purgeRetiredGuestSession } from "@/lib/guest-mode";
 
 function LoginPageInner() {
   const searchParams = useSearchParams();
-  /** Cold traffic defaults to create account — existing users switch to Sign in */
-  const [mode, setMode] = useState<"login" | "signup">("signup");
+  /** Primary path: log in. Create account is secondary. */
+  const [mode, setMode] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -24,18 +22,16 @@ function LoginPageInner() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [inviteHint, setInviteHint] = useState<string | null>(null);
+  const [resetBusy, setResetBusy] = useState(false);
 
-  // Preserve deep-link invite through login/signup; honor ?mode=
-  // Purge any leftover guest tour so login always starts in the real world.
+  // Invite codes stay in the background for post-auth routing only — never UI.
+  // Purge leftover guest tour residue.
   useEffect(() => {
     try {
       const purged = purgeRetiredGuestSession();
       if (purged) {
         setMode("signup");
-        setMessage(
-          "Welcome back — create an account to join a real room (guest tour is gone)."
-        );
+        setMessage("Create an account to get into a real room.");
       }
     } catch {
       /* ignore */
@@ -54,8 +50,6 @@ function LoginPageInner() {
       peekPendingJoinCode();
     if (code) {
       stashPendingJoinCode(code);
-      setInviteHint(code);
-      // Real invite → default to signup (new friends)
       setMode("signup");
     }
   }, [searchParams]);
@@ -68,13 +62,43 @@ function LoginPageInner() {
     return "/";
   }
 
+  async function handleForgotPassword() {
+    setError(null);
+    setMessage(null);
+    const addr = email.trim();
+    if (!addr) {
+      setError("Enter your email above, then tap Forgot password.");
+      return;
+    }
+    if (!hasSupabaseConfig()) {
+      setError("Supabase is not configured on this deployment.");
+      return;
+    }
+    setResetBusy(true);
+    try {
+      const supabase = createClient();
+      const origin =
+        typeof window !== "undefined" ? window.location.origin : "";
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+        addr,
+        { redirectTo: origin ? `${origin}/login` : undefined }
+      );
+      if (resetError) throw resetError;
+      setMessage("Check your email for a password reset link.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Could not send reset email");
+    } finally {
+      setResetBusy(false);
+    }
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setMessage(null);
     setLoading(true);
 
-    /** Never leave the Log in button spinning forever on flaky auth. */
+    /** Never leave the button spinning forever on flaky auth. */
     const AUTH_MS = 12_000;
     function withAuthTimeout<T>(p: PromiseLike<T>): Promise<T> {
       return new Promise((resolve, reject) => {
@@ -131,7 +155,7 @@ function LoginPageInner() {
         if (data.session) {
           navigating = true;
           landAfterAuth();
-          return; // keep spinner until hard nav
+          return;
         }
         setMessage("Check your email to confirm, then log in.");
       } else {
@@ -151,7 +175,7 @@ function LoginPageInner() {
 
         navigating = true;
         landAfterAuth();
-        return; // keep spinner until hard nav
+        return;
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -167,49 +191,30 @@ function LoginPageInner() {
     <div className="min-h-screen flex items-center justify-center px-4 py-8 pb-[max(2rem,env(safe-area-inset-bottom))]">
       <div className="max-w-md w-full">
         <div className="text-center mb-6">
-      <div className="flex justify-center mb-3">
-            <BrandMark size={96} variant="force" className="rounded-2xl shadow-[0_0_40px_rgba(34,197,94,0.2)]" />
-      </div>
+          <div className="flex justify-center mb-3">
+            <BrandMark
+              size={80}
+              variant="force"
+              className="rounded-2xl shadow-[0_0_40px_rgba(34,197,94,0.2)]"
+            />
+          </div>
           <h1 className="text-2xl font-bold">War Room Pick&apos;Em</h1>
-          {inviteHint ? (
-            <div className="mt-3 rounded-xl border-2 border-primary/50 bg-primary/10 px-4 py-3">
-      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
-                You&apos;re invited
-              </p>
-      <p className="text-sm text-foreground mt-1 leading-snug">
-                Code{" "}
-                <span className="font-mono font-bold tracking-[0.2em] text-primary text-lg">
-                  {inviteHint}
-                </span>
-      </p>
-              <p className="text-xs text-muted mt-1">
-                Create an account (or log in) — you&apos;ll land in that league.
-              </p>
-      </div>
-          ) : (
-            <div className="mt-2 space-y-1">
-              <p className="text-base font-semibold text-foreground">
-                Join War Room in under a minute.
-              </p>
-              <p className="text-sm text-muted leading-relaxed">
-                Weekly pick&apos;em with friends. One card. Confidence. Trash
-                talk optional.
-              </p>
-            </div>
-          )}
+          <p className="text-sm text-muted mt-2 leading-relaxed">
+            Weekly pick&apos;em with friends. One card. Confidence. Trash talk
+            optional.
+          </p>
         </div>
 
-        {/* Account first — real identity, then join/create */}
         <form
           onSubmit={handleSubmit}
           className="rounded-xl border border-border bg-card p-5 space-y-4"
         >
           {mode === "signup" && (
             <div>
-      <label className="text-xs text-muted block mb-1.5 font-medium">
-                Your name in the league
+              <label className="text-xs text-muted block mb-1.5 font-medium">
+                Display name
               </label>
-      <input
+              <input
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 className={inputClass}
@@ -218,11 +223,12 @@ function LoginPageInner() {
               />
             </div>
           )}
+
           <div>
-      <label className="text-xs text-muted block mb-1.5 font-medium">
+            <label className="text-xs text-muted block mb-1.5 font-medium">
               Email
             </label>
-      <input
+            <input
               type="email"
               required
               value={email}
@@ -232,14 +238,15 @@ function LoginPageInner() {
               inputMode="email"
             />
           </div>
-      <div>
+
+          <div>
             <label
               className="text-xs text-muted block mb-1.5 font-medium"
               htmlFor="warroom-password"
             >
               Password
             </label>
-      <div className="relative">
+            <div className="relative">
               <input
                 id="warroom-password"
                 type={showPassword ? "text" : "password"}
@@ -261,22 +268,34 @@ function LoginPageInner() {
               >
                 {showPassword ? "Hide" : "Show"}
               </button>
-      </div>
+            </div>
             {mode === "signup" && (
-              <p className="text-[11px] text-muted mt-1">At least 6 characters</p>
+              <p className="text-[11px] text-muted mt-1">
+                At least 6 characters
+              </p>
             )}
           </div>
 
           {mode === "login" && (
-            <label className="flex items-center gap-3 text-sm text-muted cursor-pointer select-none min-h-[44px]">
-      <input
-                type="checkbox"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                className="w-5 h-5 rounded border-border"
-              />
-              Remember me on this phone
-            </label>
+            <div className="flex items-center justify-between gap-3 min-h-[44px]">
+              <label className="flex items-center gap-2.5 text-sm text-muted cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="w-5 h-5 rounded border-border shrink-0"
+                />
+                Remember me
+              </label>
+              <button
+                type="button"
+                disabled={resetBusy || loading}
+                onClick={() => void handleForgotPassword()}
+                className="text-sm font-semibold text-primary hover:underline disabled:opacity-50 touch-manipulation min-h-[44px] px-1"
+              >
+                {resetBusy ? "Sending…" : "Forgot password?"}
+              </button>
+            </div>
           )}
 
           {error && <p className="text-sm text-danger">{error}</p>}
@@ -289,75 +308,39 @@ function LoginPageInner() {
           >
             {loading
               ? "…"
-              : inviteHint
-                ? mode === "login"
-                  ? "Log in & join league"
-                  : "Sign up & join league"
-                : mode === "login"
-                  ? "Log in"
-                  : "Create account"}
+              : mode === "login"
+                ? "LOG IN"
+                : "CREATE ACCOUNT"}
           </button>
-      <button
-            type="button"
-            onClick={() => {
-              setMode(mode === "login" ? "signup" : "login");
-              setError(null);
-              setMessage(null);
-            }}
-            className="w-full text-sm text-muted min-h-[44px] touch-manipulation"
-          >
-            {mode === "login"
-              ? "Need an account? Sign up"
-              : "Already have an account? Log in"}
-          </button>
-      </form>
+        </form>
 
-        
-        {/* Community doors — account first, then real room. No guest tour. */}
-        {!inviteHint && (
-          <div className="mb-5 grid grid-cols-1 gap-2">
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary text-center mb-1">
-              Then join or create a room
-            </p>
-            <Link
-              href="/join?mode=create"
-              className="w-full py-3.5 min-h-[52px] rounded-xl bg-primary text-black text-sm font-extrabold touch-manipulation flex items-center justify-center"
+        <div className="mt-4 space-y-3">
+          {mode === "login" ? (
+            <button
+              type="button"
+              onClick={() => {
+                setMode("signup");
+                setError(null);
+                setMessage(null);
+              }}
+              className="w-full py-3.5 min-h-[52px] rounded-xl border-2 border-primary/40 bg-primary/10 text-sm font-extrabold text-foreground touch-manipulation"
             >
-              Commissioner — create league
-            </Link>
-            <Link
-              href="/join?mode=join"
-              className="w-full py-3.5 min-h-[52px] rounded-xl border border-border bg-card text-sm font-bold touch-manipulation flex items-center justify-center"
+              CREATE ACCOUNT
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setMode("login");
+                setError(null);
+                setMessage(null);
+              }}
+              className="w-full text-sm font-semibold text-muted hover:text-foreground min-h-[44px] touch-manipulation"
             >
-              Join with code
-            </Link>
-            <Link
-              href="/open-room"
-              className="w-full py-3.5 min-h-[52px] rounded-xl border-2 border-primary/40 bg-primary/10 text-sm font-bold touch-manipulation flex items-center justify-center"
-            >
-              Join open room
-            </Link>
-            <p className="text-[11px] text-muted text-center leading-relaxed px-1">
-              War Room is something you join — not something you browse. Create
-              an account below (under a minute), then create a league or enter a
-              code. Same world for everyone.
-            </p>
-          </div>
-        )}
-
-        {inviteHint && (
-          <p className="text-center text-[11px] text-muted mt-4 leading-relaxed">
-            Invite locked in — create an account or log in, then you land in the real room.
-          </p>
-        )}
-
-        <p className="text-center text-xs text-muted mt-4">
-      <Link href="/" className="hover:text-foreground min-h-[44px] inline-flex items-center">
-            Back
-          </Link>
-      </p>
-
-        <OwnershipNotice variant="full" className="mt-8 px-2" />
+              Already have an account? Log in
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -373,6 +356,6 @@ export default function LoginPage() {
       }
     >
       <LoginPageInner />
-      </Suspense>
+    </Suspense>
   );
 }
