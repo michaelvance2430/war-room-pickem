@@ -27,6 +27,7 @@ export default function OwnershipNotice({
 }: Props) {
   return (
     <p
+      id="about"
       className={`text-[10px] leading-relaxed text-muted/80 text-center ${className}`}
       role="contentinfo"
     >

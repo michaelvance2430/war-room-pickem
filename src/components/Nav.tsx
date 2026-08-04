@@ -58,8 +58,8 @@ type NavLink = {
 };
 
 /**
- * Slim primary nav = what you need every week.
- * Everything else lives under More (flavor intact, less overwhelm).
+ * Bottom nav / desktop primary = play the game.
+ * Hamburger / More = manage yourself (account, help) — never a second nav bar.
  */
 export default function Nav() {
   const pathname = usePathname();
@@ -80,7 +80,6 @@ export default function Nav() {
   const [moreOpen, setMoreOpen] = useState(false);
   /** Phone More sheet scroll body — always open at top, never mid-list */
   const moreSheetScrollRef = useRef<HTMLDivElement>(null);
-  const [crystalBallOn, setCrystalBallOn] = useState(true);
   const [sportIsWwc, setSportIsWwc] = useState(false);
   const [sportIsNfl, setSportIsNfl] = useState(false);
   const [playerPreview, setPlayerPreview] = useState(false);
@@ -235,8 +234,6 @@ export default function Nav() {
     const sid = normalizeSportId(league?.sportId);
     setSportIsWwc(sid === "soccer_wwc");
     setSportIsNfl(sid === "nfl");
-    setCrystalBallOn(league?.settings?.crystalBallEnabled !== false);
-
     // Staff flags + profile after paint — session local is enough for first frame
     const staffTimer = window.setTimeout(() => {
       void import("@/lib/cloud")
@@ -440,16 +437,15 @@ export default function Nav() {
     return () => window.removeEventListener("keydown", onKey);
   }, [menuOpen, moreOpen]);
 
-  // Phone row (locked in): Home · Picks · Standings · Locker · More
-  // Desktop primary: same core; Board/Gazette/Host expand after first lock.
+  // Desktop primary only: play the game. Board/Gazette open after first lock.
+  // Phone bottom tabs are separate (Home · Picks · Standings · Locker · You).
+  // Never mirror primary destinations in the hamburger.
   const primaryLinks: NavLink[] = earlyNav
     ? [
         { href: "/", label: "Home" },
         { href: "/picks", label: "Picks" },
         { href: "/standings", label: "Standings" },
         { href: "/locker-room", label: "Locker", badge: lockerUnseen },
-        // Weekly host work lives on Home (mission button) + /week-ops.
-        // /commissioner is Manage League — secondary, under More.
       ]
     : [
         { href: "/", label: "Home" },
@@ -468,112 +464,73 @@ export default function Nav() {
           : []),
       ];
 
-  // More: Account first (settings hub) so it never hides under Standings thumb zone.
-  // Profiles reopened for design review — My Profile + Players (room roster → names).
-  // First hour = account + profile + rules + crew only (Board waits until first lock).
+  /**
+   * Account menu (hamburger / desktop You) — manage yourself, not the game.
+   * Game destinations live on bottom nav, desktop primary, or Home tiles.
+   */
   const myProfileHref = playerId ? `/profile/${playerId}` : null;
-  const moreLinks: NavLink[] = earlyNav
-    ? [
-        { href: "/account", label: "Account" },
-        ...(myProfileHref
-          ? [
-              {
-                href: myProfileHref,
-                label: "My Profile",
-                className: "text-primary",
-              } as NavLink,
-            ]
-          : []),
-        { href: "/players", label: "Players" },
-        { href: "/rules", label: "How to play" },
-        {
-          href: "/crew",
-          label: "Crew",
-          className: "text-amber-300/80 hover:text-amber-200",
-        },
-        ...(ops
-          ? [
-              {
-                href: "/commissioner",
-                label: "Manage League",
-                className: "text-primary",
-              } as NavLink,
-            ]
-          : []),
-      ]
-    : [
-        { href: "/account", label: "Account" },
-        ...(myProfileHref
-          ? [
-              {
-                href: myProfileHref,
-                label: "My Profile",
-                className: "text-primary",
-              } as NavLink,
-            ]
-          : []),
-        ...(crystalBallOn
-          ? [{ href: "/crystal-ball", label: "Crystal Ball" }]
-          : []),
-        { href: "/stats", label: "Stats" },
-        ...(showNewsNav
-          ? [
-              {
-                href: "/announcements",
-                label: "News",
-                badge: unreadCount,
-              } as NavLink,
-            ]
-          : []),
-        { href: "/players", label: "Players" },
-        { href: "/championship", label: "Champ" },
-        {
-          href: "/toilet-bowl",
-          label: "Toilet",
-          className: "text-toilet hover:text-toilet",
-        },
-        {
-          href: "/trophy-room",
-          label: "Trophies",
-          className: "text-amber-300 hover:text-amber-200",
-        },
-        {
-          href: "/crew",
-          label: "Crew",
-          className: "text-amber-300 hover:text-amber-200",
-        },
-        {
-          href: "/museum",
-          label: "Museum",
-          className: "text-amber-300 hover:text-amber-200",
-        },
-        { href: "/rules", label: "How to play" },
-        ...(ops
-          ? [
-              {
-                href: "/commissioner",
-                label: "Manage League",
-                className: "text-primary",
-              } as NavLink,
-            ]
-          : []),
-        ...(staff
-          ? [
-              {
-                href: "/moderation",
-                label: "Mod",
-                className: "text-amber-300 hover:text-amber-200",
-              } as NavLink,
-            ]
-          : []),
-      ];
+  const accountLinks: NavLink[] = [
+    { href: "/account", label: "Account" },
+    ...(myProfileHref
+      ? [
+          {
+            href: myProfileHref,
+            label: "Profile",
+            className: "text-primary",
+          } as NavLink,
+        ]
+      : []),
+    ...(showNewsNav
+      ? [
+          {
+            href: "/announcements",
+            label: "Notifications",
+            badge: unreadCount,
+          } as NavLink,
+        ]
+      : []),
+    { href: "/rules", label: "Help / Rules" },
+    { href: "/account#feedback", label: "Feedback / Report Issue" },
+    { href: "/account#about", label: "About War Room" },
+    ...(ops
+      ? [
+          {
+            href: "/commissioner",
+            label: "Manage League",
+            className: "text-primary",
+          } as NavLink,
+        ]
+      : []),
+    ...(staff
+      ? [
+          {
+            href: "/moderation",
+            label: "Mod",
+            className: "text-amber-300 hover:text-amber-200",
+          } as NavLink,
+        ]
+      : []),
+  ];
 
-  const allMobileLinks = [...primaryLinks, ...moreLinks];
+  const moreActive = accountLinks.some((l) => {
+    const path = l.href.split("#")[0] || l.href;
+    if (path === "/account") {
+      return pathname === "/account" || pathname.startsWith("/account/");
+    }
+    return pathname === path || pathname.startsWith(path + "/");
+  });
+  const moreBadge = accountLinks.reduce((n, l) => n + (l.badge || 0), 0);
 
-  const moreActive = moreLinks.some(
-    (l) => pathname === l.href || pathname.startsWith(l.href + "/")
-  );
-  const moreBadge = moreLinks.reduce((n, l) => n + (l.badge || 0), 0);
+  async function onMenuSignOut() {
+    closeChrome();
+    try {
+      const { signOutFully } = await import("@/lib/session-restore");
+      await signOutFully();
+    } catch {
+      /* still leave */
+    }
+    window.location.href = "/login";
+  }
 
   function linkActive(href: string) {
     if (href === "/") return pathname === "/";
@@ -757,7 +714,7 @@ export default function Nav() {
                 aria-expanded={moreOpen}
                 aria-haspopup="true"
               >
-                More
+                You
                 {moreBadge > 0 && (
                   <span className="ml-1 inline-flex min-w-[16px] h-[16px] px-0.5 rounded-full bg-primary text-black text-[9px] font-bold items-center justify-center align-middle">
                     {moreBadge > 99 ? "99+" : moreBadge}
@@ -770,12 +727,18 @@ export default function Nav() {
                   <button
                     type="button"
                     className="fixed inset-0 z-40 cursor-default"
-                    aria-label="Close more menu"
+                    aria-label="Close account menu"
                     onClick={() => setMoreOpen(false)}
                   />
-                  <div className="absolute right-0 top-full mt-2 z-50 w-48 rounded-xl border border-border bg-card shadow-xl py-1">
-                    {moreLinks.map((link) => {
-                      const isAccount = link.href === "/account";
+                  <div className="absolute right-0 top-full mt-2 z-50 w-56 rounded-xl border border-border bg-card shadow-xl py-1">
+                    {accountLinks.map((link) => {
+                      const path = link.href.split("#")[0] || link.href;
+                      const isAccount = path === "/account" && !link.href.includes("#");
+                      const active =
+                        path === "/account"
+                          ? pathname === "/account" ||
+                            pathname.startsWith("/account/")
+                          : linkActive(path);
                       return (
                         <Link
                           key={link.href}
@@ -784,8 +747,8 @@ export default function Nav() {
                           onClick={() => setMoreOpen(false)}
                           className={`flex items-center justify-between px-3 py-2 text-sm hover:bg-card-hover transition ${
                             isAccount
-                              ? "text-sky-200 font-semibold"
-                              : linkActive(link.href)
+                              ? "text-sky-200 font-semibold border-b border-border mb-0.5"
+                              : active
                                 ? "text-foreground font-medium"
                                 : "text-muted"
                           } ${!isAccount ? link.className || "" : ""}`}
@@ -797,6 +760,13 @@ export default function Nav() {
                         </Link>
                       );
                     })}
+                    <button
+                      type="button"
+                      onClick={() => void onMenuSignOut()}
+                      className="w-full text-left px-3 py-2 text-sm text-danger hover:bg-danger/10 border-t border-border mt-0.5"
+                    >
+                      Sign out
+                    </button>
                   </div>
                 </>
               )}
@@ -844,7 +814,7 @@ export default function Nav() {
             <button
               type="button"
               className="md:hidden relative min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md text-muted hover:text-foreground hover:bg-card-hover transition touch-manipulation"
-              aria-label={menuOpen ? "Close menu" : "More menu"}
+              aria-label={menuOpen ? "Close account menu" : "Account menu"}
               aria-expanded={menuOpen}
               aria-controls="mobile-nav-menu"
               onClick={() => toggleMoreSheet()}
@@ -876,11 +846,9 @@ export default function Nav() {
                   <path d="M4 7h16M4 12h16M4 17h16" />
                 </svg>
               )}
-              {!menuOpen && unreadCount + lockerUnseen > 0 && (
+              {!menuOpen && moreBadge > 0 && (
                 <span className="absolute top-0.5 right-0.5 min-w-[16px] h-4 px-0.5 rounded-full bg-primary text-black text-[9px] font-bold flex items-center justify-center">
-                  {unreadCount + lockerUnseen > 99
-                    ? "99+"
-                    : unreadCount + lockerUnseen}
+                  {moreBadge > 99 ? "99+" : moreBadge}
                 </span>
               )}
             </button>
@@ -889,7 +857,7 @@ export default function Nav() {
 
       </header>
 
-      {/* Phone: More sheet from the bottom (thumb zone) */}
+      {/* Phone: account sheet — manage yourself, not play the game */}
       {menuOpen && (
         <>
           <div
@@ -900,13 +868,12 @@ export default function Nav() {
           <nav
             id="mobile-nav-menu"
             className="md:hidden fixed left-0 right-0 bottom-0 z-[60] flex flex-col rounded-t-2xl border-t border-border bg-card shadow-[0_-12px_40px_rgba(0,0,0,0.5)] max-h-[min(78dvh,640px)] pb-[calc(3.75rem+env(safe-area-inset-bottom,0px))]"
-            aria-label="More of the room"
+            aria-label="Account and settings"
           >
-            {/* Fixed header — not inside the scroll body */}
             <div className="shrink-0 bg-card pt-2 pb-1 border-b border-border">
               <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-border" />
               <div className="flex items-center justify-between px-4 pb-2">
-                <p className="text-sm font-bold">More of the room</p>
+                <p className="text-sm font-bold">Account & settings</p>
                 <button
                   type="button"
                   onClick={() => setMenuOpen(false)}
@@ -916,7 +883,6 @@ export default function Nav() {
                 </button>
               </div>
             </div>
-            {/* Scroll body always starts at top when opened */}
             <div
               ref={moreSheetScrollRef}
               className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
@@ -933,57 +899,23 @@ export default function Nav() {
                 </div>
               )}
               <p className="px-4 pt-3 pb-1 text-[10px] uppercase tracking-wider text-muted font-semibold">
-                Weekly
+                Manage yourself
               </p>
-              <ul className="pb-1">
-                {primaryLinks.map((link) => {
-                  const active = linkActive(link.href);
-                  const isHome = link.href === "/";
+              <ul className="py-1 pb-2">
+                {accountLinks.map((link) => {
+                  const path = link.href.split("#")[0] || link.href;
+                  const isAccount =
+                    path === "/account" && !link.href.includes("#");
+                  const active =
+                    path === "/account"
+                      ? pathname === "/account" ||
+                        pathname.startsWith("/account/")
+                      : linkActive(path);
                   return (
                     <li key={link.href}>
                       <Link
                         href={link.href}
-                        prefetch={shouldPrefetch(link.href)}
-                        onClick={() => closeChrome()}
-                        className={`flex items-center justify-between gap-3 px-4 min-h-[48px] transition touch-manipulation ${
-                          isHome
-                            ? `text-lg font-extrabold ${
-                                active
-                                  ? "bg-primary/15 text-primary"
-                                  : "text-primary hover:bg-primary/10"
-                              }`
-                            : `text-base ${
-                                active
-                                  ? "bg-card-hover text-foreground"
-                                  : "text-muted hover:bg-card-hover hover:text-foreground"
-                              } ${link.className || ""}`
-                        }`}
-                      >
-                        <span
-                          className={isHome ? "font-extrabold" : "font-medium"}
-                        >
-                          {link.label}
-                        </span>
-                        {link.badge != null && link.badge > 0 && (
-                          <UnreadBadge count={link.badge} />
-                        )}
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-              <p className="px-4 pt-2 pb-1 text-[10px] uppercase tracking-wider text-muted font-semibold border-t border-border">
-                Everything else
-              </p>
-              <ul className="py-1 pb-4">
-                {moreLinks.map((link) => {
-                  const active = linkActive(link.href);
-                  const isAccount = link.href === "/account";
-                  return (
-                    <li key={link.href}>
-                      <Link
-                        href={link.href}
-                        prefetch={shouldPrefetch(link.href)}
+                        prefetch={false}
                         onClick={() => closeChrome()}
                         className={`flex items-center justify-between gap-3 px-4 min-h-[48px] text-base transition touch-manipulation ${
                           isAccount
@@ -1010,12 +942,21 @@ export default function Nav() {
                   );
                 })}
               </ul>
+              <div className="px-4 pt-1 pb-4 border-t border-border">
+                <button
+                  type="button"
+                  onClick={() => void onMenuSignOut()}
+                  className="w-full min-h-[48px] rounded-xl border border-danger/50 text-danger text-sm font-semibold hover:bg-danger/10 touch-manipulation"
+                >
+                  Sign out
+                </button>
+              </div>
             </div>
           </nav>
         </>
       )}
 
-      {/* Phone thumb nav — always: Home · Picks · Standings · Locker · More */}
+      {/* Phone thumb nav: play the game · You = account menu only */}
       <nav
         className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-card/95 backdrop-blur-md"
         style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
@@ -1070,11 +1011,12 @@ export default function Nav() {
               }`}
               aria-expanded={menuOpen}
               aria-controls="mobile-nav-menu"
+              aria-label="Account menu"
             >
               <span className="text-lg leading-none" aria-hidden>
                 ☰
               </span>
-              <span>More</span>
+              <span>You</span>
               {moreBadge > 0 && !menuOpen && (
                 <span className="absolute top-1.5 right-[18%] min-w-[14px] h-3.5 px-0.5 rounded-full bg-primary text-black text-[8px] font-bold flex items-center justify-center">
                   {moreBadge > 9 ? "9+" : moreBadge}
