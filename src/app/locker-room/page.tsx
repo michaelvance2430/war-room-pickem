@@ -584,24 +584,7 @@ export default function LockerRoomPage() {
             onSubmit={(e) => void onSubmit(e)}
             className="shrink-0 rounded-xl border border-border bg-card p-3 space-y-2 relative"
           >
-            <div className="flex flex-wrap gap-1.5">
-              {LOCKER_EMOJIS.map((em) => (
-                <button
-                  key={em}
-                  type="button"
-                  onMouseDown={(e) => {
-                    // Keep caret in the textarea so emoji actually inserts
-                    e.preventDefault();
-                  }}
-                  onClick={() => insertEmoji(em)}
-                  className="w-9 h-9 sm:w-8 sm:h-8 rounded-lg bg-background border border-border hover:border-primary/50 hover:bg-primary/10 text-base leading-none"
-                  title="Add emoji to your message"
-                >
-                  {em}
-                </button>
-              ))}
-            </div>
-      <div className="relative">
+            <div className="relative">
               {mentionOpen && mentionSuggestions.length > 0 && (
                 <ul
                   className="absolute bottom-full left-0 right-0 mb-1 max-h-48 overflow-y-auto rounded-lg border border-primary/40 bg-card shadow-xl z-20"
@@ -609,7 +592,7 @@ export default function LockerRoomPage() {
                 >
                   {mentionSuggestions.map((m, i) => (
                     <li key={m.userId}>
-      <button
+                      <button
                         type="button"
                         role="option"
                         aria-selected={i === mentionIndex}
@@ -625,7 +608,7 @@ export default function LockerRoomPage() {
                       >
                         @{m.name}
                       </button>
-      </li>
+                    </li>
                   ))}
                 </ul>
               )}
@@ -657,27 +640,45 @@ export default function LockerRoomPage() {
                 rows={3}
                 maxLength={LOCKER_MAX_CHARS}
                 placeholder="Talk your shit… @someone to call them out"
-                className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground resize-none focus:outline-none focus:ring-1 focus:ring-primary/50"
+                className="w-full bg-background border border-border rounded-lg px-3 pt-2 pb-7 text-sm text-foreground resize-none focus:outline-none focus:ring-1 focus:ring-primary/50"
               />
-            </div>
-      <div className="flex items-center justify-between gap-2">
+              {/* Char count: bottom-right of chat box, above emoji row */}
               <span
-                className={`text-xs ${
+                className={`pointer-events-none absolute bottom-2 right-2.5 text-[11px] font-semibold tabular-nums ${
                   remaining < 30 ? "text-warning" : "text-muted"
                 }`}
+                aria-live="polite"
               >
-                {remaining} left
-                {cooldownLeft > 0 ? ` · wait ${cooldownLeft}s` : ""}
-                {mentionOpen ? " · ↑↓ Enter to @tag" : ""}
+                {remaining}
+                {cooldownLeft > 0 ? ` · ${cooldownLeft}s` : ""}
               </span>
-      <button
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {LOCKER_EMOJIS.map((em) => (
+                <button
+                  key={em}
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                  }}
+                  onClick={() => insertEmoji(em)}
+                  className="w-9 h-9 sm:w-8 sm:h-8 rounded-lg bg-background border border-border hover:border-primary/50 hover:bg-primary/10 text-base leading-none touch-manipulation"
+                  title="Add emoji to your message"
+                >
+                  {em}
+                </button>
+              ))}
+              <button
                 type="submit"
                 disabled={!canPost}
-                className="px-4 py-2 rounded-lg bg-primary text-black text-sm font-semibold disabled:opacity-40"
+                className="ml-auto min-h-[36px] px-4 py-2 rounded-lg bg-primary text-black text-sm font-semibold disabled:opacity-40 touch-manipulation"
               >
                 {posting ? "Sending…" : "Post"}
               </button>
-      </div>
+            </div>
+            {mentionOpen ? (
+              <p className="text-[10px] text-muted">↑↓ Enter to @tag</p>
+            ) : null}
             {postError &&
               postError !== GUEST_LOCKER_POST_CODE &&
               postError !== GUEST_LOCKER_REACT_CODE && (
