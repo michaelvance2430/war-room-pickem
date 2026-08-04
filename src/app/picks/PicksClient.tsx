@@ -1858,15 +1858,13 @@ export default function PicksClient() {
               )}
             </p>
           )}
-        </div>
 
-        {/* Week browser — never show live weeks during private practice */}
-        {!practiceMode && weekPills.length > 0 && (
-          <div className="rounded-xl border border-border bg-card p-3 mb-6">
-      <p className="text-[10px] uppercase tracking-wider text-muted mb-2 font-semibold">
-              Jump to week
-            </p>
-      <div className="phone-h-scroll sm:flex-wrap sm:overflow-visible">
+          {/* Week chips in header — no separate card, no lecture copy */}
+          {!practiceMode && weekPills.length > 0 && (
+            <div
+              className="phone-h-scroll sm:flex-wrap sm:overflow-visible mt-3"
+              aria-label="Week"
+            >
               {weekPills.map((w) => {
                 const isView = w === viewWeek;
                 const isActive = w === activeWeek;
@@ -1877,7 +1875,7 @@ export default function PicksClient() {
                     type="button"
                     disabled={switching}
                     onClick={() => void selectWeek(w)}
-                    className={`px-3.5 py-2.5 min-h-[40px] rounded-full text-xs font-semibold transition touch-manipulation ${
+                    className={`px-3.5 py-2 min-h-[40px] rounded-full text-xs font-semibold transition touch-manipulation ${
                       isView && isActive
                         ? "bg-primary text-black"
                         : isView
@@ -1895,22 +1893,9 @@ export default function PicksClient() {
                 );
               })}
             </div>
-      <p className="text-[11px] text-muted mt-2">
-              Tap any week to review.{" "}
-              <span className="text-primary font-medium">Live</span> accepts
-              new picks.{" "}
-              <span className="text-foreground font-medium">Scored</span> weeks
-              show your results.{" "}
-              <Link
-                href={`/board?week=${viewWeek}`}
-                className="text-primary font-medium hover:underline"
-              >
-                The Board
-              </Link>{" "}
-              shows everyone&apos;s cards after first kickoff locks the week.
-            </p>
-      </div>
-        )}
+          )}
+
+        </div>
 
         {loadError && (
           <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-4 py-2 text-sm text-danger">
