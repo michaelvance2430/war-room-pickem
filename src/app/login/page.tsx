@@ -42,6 +42,10 @@ function LoginPageInner() {
     } else if (modeParam === "login") {
       setMode("login");
     }
+    if (searchParams.get("reset") === "ok") {
+      setMode("login");
+      setMessage("Password updated. Log in with your new password.");
+    }
     const next = searchParams.get("next") || "";
     const codeMatch = next.match(/[?&]code=([A-Za-z0-9]+)/i);
     const code =
@@ -79,12 +83,23 @@ function LoginPageInner() {
       const supabase = createClient();
       const origin =
         typeof window !== "undefined" ? window.location.origin : "";
+      // Must be allow-listed in Supabase Auth → URL configuration
+      const redirectTo = origin
+        ? `${origin}/reset-password`
+        : undefined;
+      try {
+        sessionStorage.setItem("warroom-password-recovery", "1");
+      } catch {
+        /* ignore */
+      }
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(
         addr,
-        { redirectTo: origin ? `${origin}/login` : undefined }
+        { redirectTo }
       );
       if (resetError) throw resetError;
-      setMessage("Check your email for a password reset link.");
+      setMessage(
+        "Check your email for a reset link. It opens a page to set a new password."
+      );
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Could not send reset email");
     } finally {
