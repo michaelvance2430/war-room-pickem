@@ -78,6 +78,7 @@ import {
   matchCfbTeamConfident,
   type CanonicalTeam,
 } from "@/lib/teams/cfb-catalog";
+import PicksCompletedSummary from "@/components/PicksCompletedSummary";
 
 function formatSpread(
   spread: number,
@@ -182,6 +183,11 @@ export default function PicksClient() {
   const emptyCopyRoleRef = useRef<"host" | "player" | null>(null);
   /** CFB allegiance for restrained Picks accent — null = none / unknown match */
   const [cfbFavorite, setCfbFavorite] = useState<CanonicalTeam | null>(null);
+  /** Authoritative picks.locked_at from cloud (or local practice lock). */
+  const [picksLockedAt, setPicksLockedAt] = useState<string | null>(null);
+  /** Brief completion transition after a successful save this session */
+  const [justCompleted, setJustCompleted] = useState(false);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
 
   const revisionRef = useRef<string>("");
   const viewWeekRef = useRef(1);
@@ -239,6 +245,8 @@ export default function PicksClient() {
         setSaved(isSaved);
         setEditing(!isSaved);
         editingRef.current = !isSaved;
+        setPicksLockedAt(mine.lockedAt || null);
+        setJustCompleted(false);
         if (isSaved) {
           savedSnapshotRef.current = {
             picks: { ...filtered },
@@ -273,6 +281,8 @@ export default function PicksClient() {
         setEditing(true);
         editingRef.current = true;
         savedSnapshotRef.current = null;
+        setPicksLockedAt(null);
+        setJustCompleted(false);
         setUsedConfidence([]);
         setChaosLockedWeek(false);
         setChaosArmed(false);
@@ -610,6 +620,18 @@ export default function PicksClient() {
       );
     } catch {
       setPracticeFromUrl(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+      setPrefersReducedMotion(mq.matches);
+      const onChange = () => setPrefersReducedMotion(mq.matches);
+      mq.addEventListener?.("change", onChange);
+      return () => mq.removeEventListener?.("change", onChange);
+    } catch {
+      setPrefersReducedMotion(false);
     }
   }, []);
 
@@ -1074,6 +1096,7 @@ export default function PicksClient() {
     savedSnapshotRef.current = snapshotNow();
     setEditing(true);
     editingRef.current = true;
+    setJustCompleted(false);
     setSaveError(null);
   }
 
@@ -1333,10 +1356,13 @@ export default function PicksClient() {
         bestBetRef.current = nextBest;
         setPropChoice(nextProp);
         propChoiceRef.current = nextProp;
+        const practiceLockedAt = new Date().toISOString();
         setSaved(true);
         savedRef.current = true;
         setEditing(false);
         editingRef.current = false;
+        setPicksLockedAt(practiceLockedAt);
+        setJustCompleted(true);
         try {
           const { markHasLockedPicksOnce } = await import("@/lib/first-week");
           markHasLockedPicksOnce(getSession()?.playerId);
@@ -1482,6 +1508,7 @@ export default function PicksClient() {
       return;
     }
 
+    const savedAt = new Date().toISOString();
     setPicks(lockedPicks);
     picksRef.current = lockedPicks;
     setBestBetId(nextBest);
@@ -1492,11 +1519,26 @@ export default function PicksClient() {
     savedRef.current = true;
     setEditing(false);
     editingRef.current = false;
+    setPicksLockedAt(savedAt);
+    setJustCompleted(true);
     savedSnapshotRef.current = {
       picks: { ...lockedPicks },
       bestBetId: nextBest,
       propChoice: nextProp,
     };
+    try {
+      if (prefersReducedMotion) {
+        window.scrollTo(0, 0);
+      } else {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    } catch {
+      try {
+        window.scrollTo(0, 0);
+      } catch {
+        /* ignore */
+      }
+    }
     if (chaosArmed || chaosLockedWeek) {
       setChaosLockedWeek(true);
       setChaosArmed(true);
@@ -1620,6 +1662,21 @@ export default function PicksClient() {
     ) &&
     propChoice !== null &&
     bestBetId !== null;
+
+  /**
+   * Compact receipt — only for genuinely complete saved cards.
+   * Drafts, edit mode, and incomplete slips stay in the full editor.
+   */
+  const showCompletedSummary =
+    hasCard &&
+    saved &&
+    !editing &&
+    !practiceScored &&
+    allGamesPicked &&
+    !missedLockWindow;
+
+  const completedPhase =
+    cardFrozen || isPastOrOtherWeek || fullyLocked ? "locked" : "in";
 
   // Keep quiet mode in sync (unlocks after first lock)
   useEffect(() => {
@@ -2361,6 +2418,40 @@ export default function PicksClient() {
               );
             })()}
 
+            {showCompletedSummary && (
+              <div className="mb-6">
+                <PicksCompletedSummary
+                  phase={completedPhase === "locked" ? "locked" : "in"}
+                  sportId={getLeague()?.sportId || "cfb"}
+                  weekNumber={viewWeek}
+                  games={games}
+                  picks={picks}
+                  bestBetId={bestBetId}
+                  prop={prop}
+                  propChoice={propChoice}
+                  lockedAt={picksLockedAt}
+                  favoriteTeam={
+                    (getLeague()?.sportId || "cfb") === "cfb"
+                      ? cfbFavorite
+                      : null
+                  }
+                  animateIn={justCompleted}
+                  reducedMotion={prefersReducedMotion}
+                  onChangePicks={
+                    completedPhase === "locked" ||
+                    cardFrozen ||
+                    chaosArmed ||
+                    chaosLockedWeek ||
+                    !weekEditable
+                      ? undefined
+                      : () => enterEditMode()
+                  }
+                />
+              </div>
+            )}
+
+            {!showCompletedSummary && (
+            <>
             {missedLockWindow && (
               <div className="mb-4 rounded-xl border-2 border-danger/60 bg-danger/15 px-4 py-3">
       <p className="text-sm font-bold text-danger">
@@ -2386,7 +2477,7 @@ export default function PicksClient() {
       </div>
             )}
 
-            {weekEditable && cardFrozen && !missedLockWindow && (
+            {!showCompletedSummary && weekEditable && cardFrozen && !missedLockWindow && (
               <div className="mb-4 rounded-lg border border-border bg-card-hover px-4 py-2 text-sm font-semibold text-foreground">
                 Picks Locked
                 <span className="block text-xs font-normal text-muted mt-0.5">
@@ -2400,7 +2491,7 @@ export default function PicksClient() {
                 {saveError}
               </div>
             )}
-            {saved && weekEditable && !cardFrozen && !editing && (
+            {!showCompletedSummary && saved && weekEditable && !cardFrozen && !editing && (
               <div className="mb-4 rounded-lg border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary">
                 Picks Saved
                 <span className="block text-xs font-normal text-primary/80 mt-0.5">
@@ -2412,7 +2503,7 @@ export default function PicksClient() {
                 </span>
               </div>
             )}
-            {saved && weekEditable && !cardFrozen && editing && (
+            {!showCompletedSummary && saved && weekEditable && !cardFrozen && editing && (
               <div className="mb-4 rounded-lg border border-amber-400/40 bg-amber-500/10 px-4 py-2 text-sm text-amber-100">
                 Editing — changes are not saved until you tap Save Picks.
               </div>
@@ -2926,6 +3017,8 @@ export default function PicksClient() {
                   Open {weekTitle(activeWeek)} live picks
                 </button>
       </p>
+            )}
+            </>
             )}
           </>
         )}
