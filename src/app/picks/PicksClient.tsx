@@ -43,6 +43,7 @@ import {
   formatKickoff,
   formatCardDateRange,
   formatCardLockDeadline,
+  picksLockBeforeCopy,
   weekTitle,
   weekSubtitle,
   isGameLocked,
@@ -1355,15 +1356,20 @@ export default function PicksClient() {
 
     // First kickoff on the card: entire slate freezes — no new locks, no edits
     if (isCardLockDeadlinePassed(cardGames, tick)) {
+      const when = formatCardLockDeadline(cardGames);
       if (!alreadyLocked) {
         setSaveError(
-          `Too late. First kickoff was ${formatCardLockDeadline(cardGames)}. All picks must be locked before then. You cannot lock after first kickoff — you score 0 this week.`
+          when
+            ? `Too late. First kickoff was ${when}. All picks must be locked before then. You cannot lock after first kickoff — you score 0 this week.`
+            : "Too late. First kickoff has passed. All picks must be locked before kickoff. You cannot lock after first kickoff — you score 0 this week."
         );
         setSaving(false);
         return;
       }
       setSaveError(
-        `Card is frozen. First kickoff was ${formatCardLockDeadline(cardGames)}. No more changes.`
+        when
+          ? `Card is frozen. First kickoff was ${when}. No more changes.`
+          : "Card is frozen. First kickoff has passed. No more changes."
       );
       setSaving(false);
       return;
@@ -2047,7 +2053,7 @@ export default function PicksClient() {
                       ? "First kickoff hit and you never locked. Card closed. 0 pts. The Gazette remembers."
                       : cardFrozen
                         ? "First kickoff hit — entire card is frozen. No more hero edits."
-                        : `Lock everything before first kickoff (${formatCardLockDeadline(games)}) or cry later.`
+                        : picksLockBeforeCopy(games)
                     : viewWeek < activeWeek
                       ? `Past week · league is on ${weekTitle(activeWeek)}. Look, don’t touch.`
                       : `Not the active week (league is on ${weekTitle(activeWeek)}). Read-only. Enjoy the archive.`
@@ -2056,12 +2062,14 @@ export default function PicksClient() {
           {games.length > 0 && (
             <p className="text-xs text-muted mt-1">
               {formatCardDateRange(games) || weekSubtitle(viewWeek)}
-              {weekEditable && !cardFrozen && (
-                <>
-                  {" · "}
-                  Lock deadline: {formatCardLockDeadline(games)}
-                </>
-              )}
+              {weekEditable &&
+                !cardFrozen &&
+                !!formatCardLockDeadline(games) && (
+                  <>
+                    {" · "}
+                    Lock deadline: {formatCardLockDeadline(games)}
+                  </>
+                )}
             </p>
           )}
 
@@ -2325,11 +2333,21 @@ export default function PicksClient() {
                   🥛 Too late — first kickoff already hit
                 </p>
       <p className="text-xs text-danger/90 mt-1.5 leading-relaxed">
-                  All picks must be locked before{" "}
-                  <strong>{formatCardLockDeadline(games)}</strong>. You never
-                  locked. After first kickoff you <strong>cannot</strong> lock.
-                  You score <strong>0</strong> this week. No makeups. Gazette
-                  may put you on the milk carton.
+                  {formatCardLockDeadline(games) ? (
+                    <>
+                      All picks must be locked before{" "}
+                      <strong>{formatCardLockDeadline(games)}</strong>. You
+                      never locked.
+                    </>
+                  ) : (
+                    <>
+                      All picks must be locked before first kickoff. You never
+                      locked.
+                    </>
+                  )}{" "}
+                  After first kickoff you <strong>cannot</strong> lock. You
+                  score <strong>0</strong> this week. No makeups. Gazette may
+                  put you on the milk carton.
                 </p>
       </div>
             )}
@@ -2353,7 +2371,10 @@ export default function PicksClient() {
                 Picks Saved
                 <span className="block text-xs font-normal text-primary/80 mt-0.5">
                   Your card is on file. Tap Update Picks to change anything
-                  before first kickoff ({formatCardLockDeadline(games)}).
+                  before
+                  {formatCardLockDeadline(games)
+                    ? ` first kickoff (${formatCardLockDeadline(games)}).`
+                    : " kickoff."}
                 </span>
               </div>
             )}

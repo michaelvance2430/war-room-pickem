@@ -141,11 +141,31 @@ export function formatKickoffLockLabel(
   return { locked: false, label: full };
 }
 
-/** Human label for the card-wide lock deadline (first kickoff). */
+/**
+ * Human label for the card-wide lock deadline (first kickoff).
+ * Returns "" when kickoff is unknown — never leak placeholders like
+ * "first kickoff" / "TBD" into surrounding copy.
+ */
 export function formatCardLockDeadline(games: Game[]): string {
   const t = firstKickoffOnCardMs(games);
-  if (!t) return "first kickoff";
-  return formatKickoff(new Date(t).toISOString()).full;
+  if (!t) return "";
+  const full = formatKickoff(new Date(t).toISOString()).full;
+  // formatKickoff uses "TBD" for empty input — we already guarded; still
+  // reject non-real labels so they never ship in production chrome.
+  if (!full || full === "TBD") return "";
+  return full;
+}
+
+/**
+ * Picks week-header lock line — clean copy with or without a resolved time.
+ * Never: "…before first kickoff (first kickoff)…"
+ */
+export function picksLockBeforeCopy(games: Game[]): string {
+  const when = formatCardLockDeadline(games);
+  if (when) {
+    return `Lock everything before first kickoff (${when}) or cry later.`;
+  }
+  return "Lock everything before kickoff or cry later.";
 }
 
 /** League Lock Timer personality — story of the week, not a generic clock. */
