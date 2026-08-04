@@ -31,7 +31,11 @@ import { getSession } from "@/lib/league";
 import { formatRankedTeam } from "@/lib/rankings";
 import type { Game } from "@/lib/types";
 import { formatLastSeen, lastSeenToneClass } from "@/lib/last-seen";
-import { boardEmptyTakeAt } from "@/lib/board-empty-copy";
+import {
+  boardEmptyTakeAt,
+  boardOpenCopy,
+  boardSealedCopy,
+} from "@/lib/board-empty-copy";
 
 type ViewMode = "games" | "cards";
 
@@ -246,8 +250,10 @@ function BoardInner() {
   const firstKick = firstKickoffOnCardMs(games);
 
   const lockedCount = slips.filter((s) => s.lockedAt).length;
-  // One empty-state take per week so the vault joke rotates with the season
+  // Truth status + progressive flavor (never invent league facts)
   const emptyTake = boardEmptyTakeAt(week);
+  const sealed = boardSealedCopy(week);
+  const open = boardOpenCopy(week);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -258,8 +264,8 @@ function BoardInner() {
           </p>
           <h1 className="text-2xl font-black mt-1">The Board</h1>
           <p className="text-sm text-muted mt-2 leading-relaxed max-w-xl">
-            First kickoff hits — every locked card gets dumped here. Who faded
-            the chalk, who went full chaos, and who already needs an alibi.
+            Locked cards go public after kickoff. Truth first — then the
+            commentary.
           </p>
         </div>
 
@@ -297,24 +303,29 @@ function BoardInner() {
               >
                 {lockedNow ? (
                   <>
+                    {/* Status = truth. Flavor = season voice. Mechanics stay factual. */}
                     <p className="text-sm font-bold text-primary">
+                      {open.status}
+                    </p>
+                    <p className="text-xs text-muted mt-1 leading-relaxed">
+                      {open.flavor}
+                    </p>
+                    <p className="text-[11px] text-muted/80 mt-1.5">
                       {scored
                         ? `${weekTitle(week)} scored · full reveal`
                         : `${weekTitle(week)} live · progressive reveal`}
-                    </p>
-                    <p className="text-xs text-muted mt-1">
-                      {lockedCount} of {slips.length} locked · each matchup
-                      unlocks at its own kickoff (not the whole card at once)
-                      {scored ? " · scored weeks show green/red" : ""}
+                      {" · "}
+                      {lockedCount} of {slips.length} locked
+                      {scored ? " · green/red on results" : " · unlocks per kickoff"}
                     </p>
                   </>
                 ) : (
                   <>
                     <p className="text-sm font-semibold text-foreground">
-                      {emptyTake.title}
+                      {sealed.status}
                     </p>
-                    <p className="text-xs text-muted mt-1">
-                      {emptyTake.body}
+                    <p className="text-xs text-muted mt-1 leading-relaxed">
+                      {sealed.flavor}
                       {firstKick
                         ? ` First kickoff: ${new Date(firstKick).toLocaleString(
                             undefined,
@@ -388,10 +399,10 @@ function BoardInner() {
             {error && (
               <div className="rounded-xl border border-border bg-card px-4 py-4 mb-6">
                 <p className="text-sm font-semibold text-foreground">
-                  {emptyTake.title}
+                  {sealed.status}
                 </p>
                 <p className="text-xs text-muted mt-2 leading-relaxed">
-                  {emptyTake.body}
+                  {sealed.flavor}
                 </p>
               </div>
             )}

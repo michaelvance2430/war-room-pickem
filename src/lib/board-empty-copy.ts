@@ -1,222 +1,346 @@
 /**
- * Empty Board — nothing public yet.
- * One job: reveal locked cards after kickoff. No tour, no CTAs.
- * Voice: War Room — fun, dry, a little mean. Not corporate.
+ * Board copy — truth + flavor.
  *
- * Index = week number:
- *   CFB: 0–18 (openers → CFP title)
- *   NFL: 1–22 (RS 1–18 → WC → Div → Conf → Super Bowl)
+ * GUARDRAIL
+ * ─────────
+ * The Board itself always tells the truth (is anything public? open? sealed?).
+ * Flavor can get increasingly sarcastic — but never invents league facts
+ * ("Mike faded Alabama 12 weeks") unless that is real data.
+ * Universal jokes are fine ("Somebody overthought this.").
  *
- * Weeks 0–4: vault / classified energy (actually about the Board).
- * Week 5+: completely unhinged made-up “facts.” Accuracy is not the point.
- * Enough unique takes through Super Bowl (22). Loops only past that.
+ * Season voice progression:
+ *   Early  (0–3)  → Teach
+ *   Mid    (4–9)  → Assume competence
+ *   Late   (10–18)→ Roast everyone equally
+ *   NFL PO (19–22)→ Playoff veterans (still universal, still true)
+ *
+ * Index = week number (CFB 0–18, NFL 1–22 Super Bowl).
  */
 
+export type BoardCopy = {
+  /** Always true for the board state. */
+  status: string;
+  /** Progressive personality. No fake league stats. */
+  flavor: string;
+  emoji?: string;
+};
+
+/** @deprecated prefer BoardCopy — kept for any residual callers */
 export type BoardEmptyTake = {
   emoji: string;
   title: string;
   body: string;
 };
 
-/** Rotating empty-state takes — index = week number (0…22+). */
-export const BOARD_EMPTY_TAKES: BoardEmptyTake[] = [
-  // ── 0–4: still about the Board ───────────────────────────────────
+// ─── SEALED (nothing public yet / pre-kickoff) ─────────────────────
+// Status = truth about privacy. Flavor progresses teach → roast.
+
+const SEALED: BoardCopy[] = [
+  // 0 — Teach
   {
-    // Week 0 (CFB openers)
     emoji: "🔒",
-    title: "Still classified.",
-    body: "Picks stay secret until the first whistle. Come back after kickoff when the whole room gets exposed.",
+    status: "Nothing to reveal yet.",
+    flavor: "Locked cards become public after kickoff.",
   },
+  // 1
   {
-    // Week 1
-    emoji: "🤐",
-    title: "Nobody's naked yet.",
-    body: "The vault is shut. First kickoff is when the blinds open and the excuses start writing themselves.",
+    emoji: "🔒",
+    status: "Nothing to reveal yet.",
+    flavor: "Picks stay secret until the first whistle. That's the whole point.",
   },
+  // 2
   {
-    // Week 2
-    emoji: "🕵️",
-    title: "Recon only. No intel.",
-    body: "Everyone's cards are still under the table. Whistle blows — then we see who actually believed their own take.",
+    emoji: "🔒",
+    status: "Still sealed.",
+    flavor: "First kickoff opens the room. Until then, nobody peeks.",
   },
+  // 3
   {
-    // Week 3
-    emoji: "🕶️",
-    title: "Dark room. No receipts.",
-    body: "Picks don't exist in public until kickoff. Until then it's pure vibes and pure denial.",
+    emoji: "🔒",
+    status: "Still sealed.",
+    flavor: "You know the rule: no Board until kickoff. Hang tight.",
   },
+  // 4 — assume competence
   {
-    // Week 4
-    emoji: "📦",
-    title: "Sealed for shipping.",
-    body: "The Board doesn't open early. First kickoff is the box cutter — and somebody's getting unboxed.",
+    emoji: "🔒",
+    status: "Nothing public yet.",
+    flavor: "Same vault as always. Whistle first, roast later.",
   },
-
-  // ── 5–18: random invented facts (CFB RS/CFP + NFL RS) ────────────
+  // 5
   {
-    // Week 5
-    emoji: "🐿️",
-    title: "Fun fact (probably false).",
-    body: "Squirrels invented the nickel defense in 1983 and never got credit. The Board is empty either way.",
+    emoji: "🔒",
+    status: "Nothing public yet.",
+    flavor: "You already know how this works. Kickoff is the unlock.",
   },
+  // 6
   {
-    // Week 6
-    emoji: "🍌",
-    title: "Banana fact.",
-    body: "A banana is a berry. A strawberry isn't. Your picks are neither. Wait for kickoff.",
+    emoji: "🔒",
+    status: "Still sealed.",
+    flavor: "Patience is hard. Being wrong in public is harder. Wait for it.",
   },
+  // 7
   {
-    // Week 7
-    emoji: "🦈",
-    title: "Ocean science (disputed).",
-    body: "Sharks can smell insecurity from three counties away. That's why this page is blank right now.",
+    emoji: "🔒",
+    status: "Still sealed.",
+    flavor: "The Board doesn't do sneak peeks. Neither should you.",
   },
+  // 8
   {
-    // Week 8
-    emoji: "🧀",
-    title: "Cheese update.",
-    body: "There are more kinds of cheese than people in this league who will admit a bad pick. Vault's still locked.",
+    emoji: "🔒",
+    status: "Nothing to reveal yet.",
+    flavor: "Cards stay face-down. Drama is scheduled for after kickoff.",
   },
+  // 9
   {
-    // Week 9
-    emoji: "🛰️",
-    title: "Space briefing.",
-    body: "The moon is roughly the size of a large grocery store if you squint and lie. Cards still secret.",
+    emoji: "🔒",
+    status: "Nothing to reveal yet.",
+    flavor: "If you needed a reminder, you wouldn't still be here. Whistle first.",
   },
+  // 10 — roast equally
   {
-    // Week 10
-    emoji: "🦆",
-    title: "Duck math.",
-    body: "Ducks can't echo. That's why they never call their own bluffs. You shouldn't either until kickoff.",
+    emoji: "🔒",
+    status: "Still sealed.",
+    flavor: "We're not early-access-ing your bad decisions. Kickoff only.",
   },
+  // 11
   {
-    // Week 11
-    emoji: "🧱",
-    title: "Architecture note.",
-    body: "The Great Wall is not visible from space, but bad confidence rankings absolutely are. Not yet though.",
+    emoji: "🔒",
+    status: "Still sealed.",
+    flavor: "The vault has higher standards than your confidence ranks.",
   },
+  // 12
   {
-    // Week 12
-    emoji: "🍕",
-    title: "Pizza intelligence.",
-    body: "Hawaii is not a pizza topping; it's a threat. The Board remains sealed until first kickoff.",
+    emoji: "🔒",
+    status: "Nothing public yet.",
+    flavor: "Come back when the ball moves. Until then, pure denial.",
   },
+  // 13
   {
-    // Week 13
-    emoji: "🧠",
-    title: "Brain fact (unverified).",
-    body: "Your brain uses 20% of your calories and 0% of them on locking early. Come back after the whistle.",
+    emoji: "🔒",
+    status: "Nothing public yet.",
+    flavor: "We've seen enough seasons to know you'll refresh anyway.",
   },
+  // 14
   {
-    // Week 14
-    emoji: "🦩",
-    title: "Flamingo report.",
-    body: "Flamingos are pink because they eat shrimp and bad decisions. This page eats silence.",
+    emoji: "🔒",
+    status: "Still sealed.",
+    flavor: "Late-season discipline: wait for kickoff like a professional degenerate.",
   },
+  // 15
   {
-    // Week 15
-    emoji: "🧊",
-    title: "Ice lore.",
-    body: "No two ice cubes are alike, which is also true of terrible Best Bets. Still nothing to show.",
+    emoji: "🔒",
+    status: "Still sealed.",
+    flavor: "Playoff energy, same old rule. No public picks before the whistle.",
   },
+  // 16
   {
-    // Week 16
-    emoji: "🎸",
-    title: "Music history.",
-    body: "The guitar was invented to settle arguments. It failed. Kickoff settles this one.",
+    emoji: "🔒",
+    status: "Nothing to reveal yet.",
+    flavor: "Big week. Empty Board. The math is cruel and correct.",
   },
+  // 17
   {
-    // Week 17
-    emoji: "🐙",
-    title: "Octopus files.",
-    body: "Octopuses have three hearts and still better judgment than half this room. Board's empty.",
+    emoji: "🔒",
+    status: "Nothing to reveal yet.",
+    flavor: "Everyone's a genius until the cards open. Not yet.",
   },
+  // 18
   {
-    // Week 18 — CFB title / NFL final RS
-    emoji: "🌵",
-    title: "Desert bulletin.",
-    body: "Cacti can survive years without water. You cannot survive a week without excuses. Wait for kickoff.",
+    emoji: "🔒",
+    status: "Still sealed.",
+    flavor: "Endgame rules still apply. Kickoff or nothing.",
   },
-
-  // ── 19–22: NFL playoffs → Super Bowl (still pure nonsense) ───────
+  // 19 — NFL Wild Card
   {
-    // Week 19 — Wild Card
-    emoji: "🃏",
-    title: "Wild Card anthropology.",
-    body: "Wild cards were invented by a raccoon in 1970 who refused to go home. Still no picks on this page.",
+    emoji: "🔒",
+    status: "Still sealed.",
+    flavor: "Wild Card week. Still no free looks. Earn the humiliation at kickoff.",
   },
+  // 20 — Divisional
   {
-    // Week 20 — Divisional
-    emoji: "📐",
-    title: "Divisional geometry.",
-    body: "A division is just a group chat with helmets. Kickoff is when the mute button fails. Board sealed.",
+    emoji: "🔒",
+    status: "Nothing public yet.",
+    flavor: "Divisional round. The vault doesn't care about your bracket.",
   },
+  // 21 — Conference
   {
-    // Week 21 — Conference
-    emoji: "🏆",
-    title: "Conference mythology.",
-    body: "Conference championships are decided by which logo looks better on a mug. Science pending. Cards hidden.",
+    emoji: "🔒",
+    status: "Nothing public yet.",
+    flavor: "Conference weekend. Secrets until the first snap. Always.",
   },
+  // 22 — Super Bowl
   {
-    // Week 22 — Super Bowl
-    emoji: "🏈",
-    title: "Super Bowl lore (fabricated).",
-    body: "The first Super Bowl was won by a coin that refused to land. Your picks still aren't public. Whistle first.",
-  },
-
-  // ── Bonus beyond Super Bowl (loop fodder / future weirdness) ─────
-  {
-    emoji: "🪙",
-    title: "Coin theory.",
-    body: "Heads never existed until someone needed a coin flip. Your picks don't exist publicly yet either.",
-  },
-  {
-    emoji: "🦕",
-    title: "Paleontology drop.",
-    body: "Dinosaurs never watched football, which is why they went extinct. Scientists hate this fact.",
-  },
-  {
-    emoji: "📡",
-    title: "Radio silence.",
-    body: "Wi-Fi stands for “waiting is fine, idiot.” Citation needed. Cards still classified.",
-  },
-  {
-    emoji: "🐸",
-    title: "Amphibian news.",
-    body: "Frogs absorb water through their skin. You absorb regret through The Board. Later.",
-  },
-  {
-    emoji: "🧲",
-    title: "Physics (adjacent).",
-    body: "Magnets don't work on wood, pride, or locked cards. First kickoff is the only force that matters.",
-  },
-  {
-    emoji: "🍿",
-    title: "Snack doctrine.",
-    body: "Popcorn was invented so people had something to do with their hands while being wrong. Soon.",
-  },
-  {
-    emoji: "🧂",
-    title: "Seasoning intel.",
-    body: "Salt was once currency. Saltiness is still free. Spend some after the picks go public.",
+    emoji: "🔒",
+    status: "Still sealed.",
+    flavor: "Super Bowl card. Same rule as Week 1. Kickoff opens the room.",
   },
 ];
 
-/**
- * Week-keyed empty take.
- * Week 0 → index 0 … Week 22 (Super Bowl) → index 22.
- * Negative / non-finite week falls back to 0. List loops past Super Bowl.
- */
-export function boardEmptyTakeAt(week?: number): BoardEmptyTake {
-  const n = BOARD_EMPTY_TAKES.length;
+// ─── OPEN (first kickoff hit — cards revealing) ────────────────────
+// Status = truth that the board is open. Flavor progresses teach → roast.
+
+const OPEN: BoardCopy[] = [
+  // 0 — Teach
+  {
+    status: "Cards are public now.",
+    flavor: "Compare locked picks. This is the whole point of The Board.",
+  },
+  // 1
+  {
+    status: "Everyone's cards are public now.",
+    flavor: "See who locked what. No take-backs after kickoff.",
+  },
+  // 2
+  {
+    status: "Everyone's cards are public now.",
+    flavor:
+      "Time to find out who thought the cupcake was the lock of the century.",
+  },
+  // 3
+  {
+    status: "The Board is open.",
+    flavor: "Bold calls and bad ones live here. Both get witnesses.",
+  },
+  // 4 — assume competence
+  {
+    status: "The Board is open.",
+    flavor: "You know what to do. Hunt the chaos. Nod at the chalk.",
+  },
+  // 5
+  {
+    status: "No more secrets.",
+    flavor: "Confidence ranks are public now. Act accordingly.",
+  },
+  // 6
+  {
+    status: "No more secrets.",
+    flavor: "Somebody really used their Confidence 5 on that game…",
+  },
+  // 7
+  {
+    status: "No more secrets.",
+    flavor: "Confidence ratings are apparently a work of fiction.",
+  },
+  // 8
+  {
+    status: "The Board is open.",
+    flavor: "Somebody definitely overthought this. Possibly several somebodies.",
+  },
+  // 9
+  {
+    status: "The Board is open.",
+    flavor: "If your Best Bet needs a paragraph of justification, it wasn't.",
+  },
+  // 10 — roast equally
+  {
+    status: "Welcome back.",
+    flavor:
+      'Statistically speaking, at least one of you still believes "gut feeling" beats research.',
+  },
+  // 11
+  {
+    status: "Welcome back.",
+    flavor: "Same room. New excuses. The cards don't care.",
+  },
+  // 12
+  {
+    status: "No more secrets.",
+    flavor: "We've stopped asking why. We're just documenting it now.",
+  },
+  // 13
+  {
+    status: "The Board is open.",
+    flavor: "Late season means fewer surprises and louder confidence. Prove it.",
+  },
+  // 14
+  {
+    status: "The Board is open.",
+    flavor:
+      "We've stopped questioning your decision-making. It's healthier this way.",
+  },
+  // 15
+  {
+    status: "The Board is open.",
+    flavor: "Playoff cards hit different. The witnesses stay the same.",
+  },
+  // 16
+  {
+    status: "No more secrets.",
+    flavor: "Big stage. Public picks. No alibis that survive a screenshot.",
+  },
+  // 17
+  {
+    status: "No more secrets.",
+    flavor: "If you're still chalk-maxxing, at least own it out loud.",
+  },
+  // 18
+  {
+    status: "The Board is open.",
+    flavor: "End of the regular grind. The receipts are all here.",
+  },
+  // 19 — Wild Card
+  {
+    status: "The Board is open.",
+    flavor: "Wild Card weekend. One-and-done energy. Cards don't flinch.",
+  },
+  // 20 — Divisional
+  {
+    status: "No more secrets.",
+    flavor: "Divisional round. Everyone's a bracket expert until the Board loads.",
+  },
+  // 21 — Conference
+  {
+    status: "The Board is open.",
+    flavor: "Conference championships. Public picks. Eternal group-chat fuel.",
+  },
+  // 22 — Super Bowl
+  {
+    status: "The Board is open.",
+    flavor:
+      "Super Bowl card is live. Every lock in this room is now a permanent record.",
+  },
+];
+
+function atWeek(list: BoardCopy[], week?: number): BoardCopy {
+  const n = list.length;
   if (n === 0) {
     return {
       emoji: "🔒",
-      title: "Still classified.",
-      body: "Picks stay secret until the first whistle.",
+      status: "Nothing to reveal yet.",
+      flavor: "Locked cards become public after kickoff.",
     };
   }
   const w = Number(week);
   const index = Number.isFinite(w) ? Math.trunc(w) : 0;
-  return BOARD_EMPTY_TAKES[((index % n) + n) % n]!;
+  return list[((index % n) + n) % n]!;
 }
+
+/** Pre-kickoff / empty Board — truth status + progressive flavor. */
+export function boardSealedCopy(week?: number): BoardCopy {
+  return atWeek(SEALED, week);
+}
+
+/** Post-kickoff Board open — truth status + progressive flavor. */
+export function boardOpenCopy(week?: number): BoardCopy {
+  return atWeek(OPEN, week);
+}
+
+/**
+ * Empty-state take (sealed). Prefer boardSealedCopy in new code.
+ * title = status (truth), body = flavor.
+ */
+export function boardEmptyTakeAt(week?: number): BoardEmptyTake {
+  const c = boardSealedCopy(week);
+  return {
+    emoji: c.emoji || "🔒",
+    title: c.status,
+    body: c.flavor,
+  };
+}
+
+/** @deprecated use boardEmptyTakeAt / boardSealedCopy */
+export const BOARD_EMPTY_TAKES: BoardEmptyTake[] = SEALED.map((c) => ({
+  emoji: c.emoji || "🔒",
+  title: c.status,
+  body: c.flavor,
+}));
