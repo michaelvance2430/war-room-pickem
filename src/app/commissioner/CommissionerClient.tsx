@@ -2417,12 +2417,6 @@ function CommissionerPageInner() {
                 onNudgeHoldouts: () => {
                   setCommunityPulseOpen(true);
                   void refreshPickStatus();
-                  scrollTools();
-                  window.setTimeout(() => {
-                    document
-                      .getElementById("community-pulse")
-                      ?.scrollIntoView({ behavior: "smooth", block: "start" });
-                  }, 80);
                 },
                 onPreviewPlayer: () => {
                   setViewAsPlayer(true);
@@ -2437,18 +2431,170 @@ function CommissionerPageInner() {
                 onSeeLocks: () => {
                   setCommunityPulseOpen(true);
                   void refreshPickStatus();
-                  scrollTools();
-                  window.setTimeout(() => {
-                    document
-                      .getElementById("community-pulse")
-                      ?.scrollIntoView({ behavior: "smooth", block: "start" });
-                  }, 80);
                 },
                 onOpenSettings: () => {
                   setTab("settings");
                   setAdvancedOpen(true);
                 },
               }}
+              communityPulse={
+                tab === "settings" ? null : (
+                  <div
+                    id="community-pulse"
+                    className="pt-3 mt-1 border-t border-border/60"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = !communityPulseOpen;
+                        setCommunityPulseOpen(next);
+                        if (next) void refreshPickStatus();
+                      }}
+                      className="w-full flex items-center justify-between gap-3 py-2 min-h-[40px] text-left touch-manipulation"
+                      aria-expanded={communityPulseOpen}
+                    >
+                      <span className="text-xs font-semibold text-muted">
+                        Community Pulse
+                        {!pickStatusLoading && pickStatus.length > 0 ? (
+                          <span className="ml-2 text-foreground/80">
+                            {pickStatus.filter((r) => r.complete).length}/
+                            {pickStatus.length} locked
+                          </span>
+                        ) : (
+                          <span className="ml-2 font-normal">
+                            Who&apos;s Locked
+                          </span>
+                        )}
+                      </span>
+                      <span className="text-muted text-xs shrink-0" aria-hidden>
+                        {communityPulseOpen ? "▲" : "▼"}
+                      </span>
+                    </button>
+
+                    {communityPulseOpen && (
+                      <div className="space-y-3 pb-1">
+                        <p className="text-[11px] text-muted leading-relaxed">
+                          Status only — never sides or props.{" "}
+                          {weekTitle(activeWeek)}.
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => refreshPickStatus()}
+                            disabled={pickStatusLoading || postingNudge}
+                            className="px-3 py-2 rounded-lg border border-border text-xs font-medium text-muted hover:text-foreground disabled:opacity-50 min-h-[40px]"
+                          >
+                            {pickStatusLoading ? "Refreshing…" : "Refresh"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => announceMissingPicks()}
+                            disabled={
+                              pickStatusLoading ||
+                              postingNudge ||
+                              pickStatus.filter((r) => !r.complete).length === 0
+                            }
+                            className="px-3 py-2 rounded-lg bg-primary text-black text-xs font-bold disabled:opacity-50 min-h-[40px]"
+                          >
+                            {postingNudge
+                              ? "Posting…"
+                              : "Announce who hasn't picked"}
+                          </button>
+                        </div>
+
+                        {nudgeMessage && (
+                          <div
+                            className={`text-sm rounded-lg border px-3 py-2 ${
+                              nudgeMessage.toLowerCase().includes("failed") ||
+                              nudgeMessage.toLowerCase().includes("error")
+                                ? "border-danger/40 bg-danger/10 text-danger"
+                                : "border-primary/40 bg-primary/10 text-primary"
+                            }`}
+                          >
+                            {nudgeMessage}
+                          </div>
+                        )}
+
+                        {pickStatusError && (
+                          <div className="text-sm text-danger">
+                            {pickStatusError}
+                          </div>
+                        )}
+
+                        {!pickStatusLoading && pickStatus.length > 0 && (
+                          <div className="flex flex-wrap gap-3 text-xs">
+                            <span className="text-primary">
+                              Locked:{" "}
+                              {pickStatus.filter((r) => r.complete).length}
+                            </span>
+                            <span className="text-warning">
+                              Partial:{" "}
+                              {
+                                pickStatus.filter(
+                                  (r) => r.submitted && !r.complete
+                                ).length
+                              }
+                            </span>
+                            <span className="text-danger">
+                              Pending:{" "}
+                              {pickStatus.filter((r) => !r.submitted).length}
+                            </span>
+                          </div>
+                        )}
+
+                        {pickStatusLoading && (
+                          <p className="text-sm text-muted py-2 text-center">
+                            Loading…
+                          </p>
+                        )}
+
+                        {!pickStatusLoading &&
+                          pickStatus.length === 0 &&
+                          !pickStatusError && (
+                            <p className="text-sm text-muted py-2 text-center">
+                              No members found.
+                            </p>
+                          )}
+
+                        {!pickStatusLoading && pickStatus.length > 0 && (
+                          <ul className="divide-y divide-border rounded-lg border border-border overflow-hidden max-h-64 overflow-y-auto">
+                            {pickStatus.map((r) => (
+                              <li
+                                key={r.userId}
+                                className="flex items-center gap-3 px-3 py-2 bg-card/80"
+                              >
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-sm font-medium truncate">
+                                    <PlayerLink id={r.userId} name={r.name} />
+                                    {r.role === "commissioner" && (
+                                      <span className="text-primary text-xs ml-1">
+                                        Commish
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                {r.complete ? (
+                                  <span className="text-xs font-medium text-primary shrink-0">
+                                    ✓ Locked
+                                  </span>
+                                ) : r.submitted ? (
+                                  <span className="text-xs font-medium text-warning shrink-0">
+                                    Partial
+                                  </span>
+                                ) : (
+                                  <span className="text-xs font-medium text-danger shrink-0">
+                                    Pending
+                                  </span>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              }
               workbench={
                 tab === "settings" ? null : (
                   <div className="space-y-4">
@@ -4723,186 +4869,6 @@ function CommissionerPageInner() {
                 No picks found. Lock picks first, then re-save results.
               </p>
             )}
-          </div>
-        )}
-
-        {/* Community Pulse — optional lock intel. Collapsed by default.
-            Prime work: Build card · Publish · Score. Locks support those jobs. */}
-        {tab !== "settings" && (
-          <div id="community-pulse" className="mt-6 scroll-mt-24">
-            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted mb-2">
-              Community Pulse
-            </p>
-            <div className="rounded-xl border border-border bg-card overflow-hidden">
-              <button
-                type="button"
-                onClick={() => {
-                  const next = !communityPulseOpen;
-                  setCommunityPulseOpen(next);
-                  if (next) void refreshPickStatus();
-                }}
-                className="w-full flex items-center justify-between gap-3 px-4 py-3 min-h-[48px] text-left touch-manipulation"
-                aria-expanded={communityPulseOpen}
-              >
-                <span className="text-sm font-semibold text-foreground">
-                  Who&apos;s Locked
-                  {!pickStatusLoading && pickStatus.length > 0 ? (
-                    <span className="ml-2 text-xs font-medium text-muted">
-                      {pickStatus.filter((r) => r.complete).length}/
-                      {pickStatus.length}
-                    </span>
-                  ) : null}
-                </span>
-                <span className="text-muted text-sm tabular-nums shrink-0" aria-hidden>
-                  {communityPulseOpen ? "▲" : "▼"}
-                </span>
-              </button>
-
-              {communityPulseOpen && (
-                <div className="px-4 pb-4 pt-0 border-t border-border space-y-3">
-                  <p className="text-xs text-muted pt-3 leading-relaxed">
-                    Status only — never sides, confidence, or prop choices.{" "}
-                    {weekTitle(activeWeek)}.
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => refreshPickStatus()}
-                      disabled={pickStatusLoading || postingNudge}
-                      className="px-3 py-2 rounded-lg border border-border text-xs font-medium text-muted hover:text-foreground disabled:opacity-50 min-h-[40px]"
-                    >
-                      {pickStatusLoading ? "Refreshing…" : "Refresh"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => announceMissingPicks()}
-                      disabled={
-                        pickStatusLoading ||
-                        postingNudge ||
-                        pickStatus.filter((r) => !r.complete).length === 0
-                      }
-                      className="px-3 py-2 rounded-lg bg-primary text-black text-xs font-bold disabled:opacity-50 min-h-[40px]"
-                    >
-                      {postingNudge
-                        ? "Posting…"
-                        : "Announce who hasn't picked"}
-                    </button>
-                  </div>
-
-                  {nudgeMessage && (
-                    <div
-                      className={`text-sm rounded-lg border px-3 py-2 ${
-                        nudgeMessage.toLowerCase().includes("failed") ||
-                        nudgeMessage.toLowerCase().includes("error")
-                          ? "border-danger/40 bg-danger/10 text-danger"
-                          : "border-primary/40 bg-primary/10 text-primary"
-                      }`}
-                    >
-                      {nudgeMessage}
-                    </div>
-                  )}
-
-                  {pickStatusError && (
-                    <div className="text-sm text-danger">
-                      {pickStatusError}
-                      {pickStatusError.toLowerCase().includes("policy") ||
-                      pickStatusError.toLowerCase().includes("permission") ||
-                      pickStatusError.toLowerCase().includes("rls") ? (
-                        <span className="block text-xs mt-1 text-muted">
-                          Run supabase/picks-privacy.sql in Supabase if you
-                          haven&apos;t yet.
-                        </span>
-                      ) : null}
-                    </div>
-                  )}
-
-                  {!pickStatusLoading && pickStatus.length > 0 && (
-                    <div className="flex flex-wrap gap-3 text-xs">
-                      <span className="text-primary">
-                        Locked:{" "}
-                        {pickStatus.filter((r) => r.complete).length}
-                      </span>
-                      <span className="text-warning">
-                        Partial:{" "}
-                        {
-                          pickStatus.filter(
-                            (r) => r.submitted && !r.complete
-                          ).length
-                        }
-                      </span>
-                      <span className="text-danger">
-                        Pending:{" "}
-                        {pickStatus.filter((r) => !r.submitted).length}
-                      </span>
-                      <span className="text-muted">
-                        of {pickStatus.length}
-                      </span>
-                    </div>
-                  )}
-
-                  {pickStatusLoading && (
-                    <p className="text-sm text-muted py-4 text-center">
-                      Loading…
-                    </p>
-                  )}
-
-                  {!pickStatusLoading &&
-                    pickStatus.length === 0 &&
-                    !pickStatusError && (
-                      <p className="text-sm text-muted py-4 text-center">
-                        No members found.
-                      </p>
-                    )}
-
-                  {!pickStatusLoading && pickStatus.length > 0 && (
-                    <ul className="divide-y divide-border rounded-lg border border-border overflow-hidden">
-                      {pickStatus.map((r) => (
-                        <li
-                          key={r.userId}
-                          className="flex items-center gap-3 px-3 py-2.5 bg-card hover:bg-card-hover"
-                        >
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium truncate">
-                              <PlayerLink id={r.userId} name={r.name} />
-                              {r.role === "commissioner" && (
-                                <span className="text-primary text-xs ml-1">
-                                  Commish
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-[11px] text-muted">
-                              {r.division}
-                              {r.submitted
-                                ? ` · ${r.gamePickCount} game picks`
-                                : ""}
-                              {r.submitted && !r.hasProp
-                                ? " · no prop"
-                                : ""}
-                              {r.submitted && !r.hasBestBet
-                                ? " · no best bet"
-                                : ""}
-                            </div>
-                          </div>
-                          {r.complete ? (
-                            <span className="text-xs font-medium text-primary shrink-0">
-                              ✓ Locked
-                            </span>
-                          ) : r.submitted ? (
-                            <span className="text-xs font-medium text-warning shrink-0">
-                              Partial
-                            </span>
-                          ) : (
-                            <span className="text-xs font-medium text-danger shrink-0">
-                              Pending
-                            </span>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              )}
-            </div>
           </div>
         )}
 
