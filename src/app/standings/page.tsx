@@ -169,8 +169,16 @@ export default function StandingsPage() {
           </p>
           {seasonStarted && (
             <p className="text-xs text-muted mt-1.5 leading-relaxed">
-              Under each name: league pulse (online / last seen). Color is for
-              scanning only — is the room alive?
+              Under each name: league pulse (online / last seen).{" "}
+              <span className="text-primary font-medium">
+                Tap a green name → open their profile
+              </span>
+              .
+            </p>
+          )}
+          {!seasonStarted && players.length > 0 && (
+            <p className="text-xs text-primary/90 mt-1.5 font-medium">
+              Tap a green name → open their profile (badges &amp; trophies).
             </p>
           )}
         </div>

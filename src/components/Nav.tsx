@@ -469,10 +469,22 @@ export default function Nav() {
       ];
 
   // More: Account first (settings hub) so it never hides under Standings thumb zone.
-  // First hour = account + rules + crew only (Board waits until first lock).
+  // Profiles reopened for design review — My Profile + Players (room roster → names).
+  // First hour = account + profile + rules + crew only (Board waits until first lock).
+  const myProfileHref = playerId ? `/profile/${playerId}` : null;
   const moreLinks: NavLink[] = earlyNav
     ? [
         { href: "/account", label: "Account" },
+        ...(myProfileHref
+          ? [
+              {
+                href: myProfileHref,
+                label: "My Profile",
+                className: "text-primary",
+              } as NavLink,
+            ]
+          : []),
+        { href: "/players", label: "Players" },
         { href: "/rules", label: "How to play" },
         {
           href: "/crew",
@@ -491,6 +503,15 @@ export default function Nav() {
       ]
     : [
         { href: "/account", label: "Account" },
+        ...(myProfileHref
+          ? [
+              {
+                href: myProfileHref,
+                label: "My Profile",
+                className: "text-primary",
+              } as NavLink,
+            ]
+          : []),
         ...(crystalBallOn
           ? [{ href: "/crystal-ball", label: "Crystal Ball" }]
           : []),

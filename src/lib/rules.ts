@@ -149,6 +149,8 @@ export const RULE_SECTIONS: RuleSection[] = [
     title: "Profile & tips",
     body: [
       "Upload a profile photo under Account so the league knows who’s who.",
+      "Tap a green underlined name on Standings, Board, or Players to open that player’s profile — badges, trophies, the whole flex.",
+      "Your own page is under More → My Profile (or Account → View public profile).",
       "If the commissioner changes the week’s games, My Picks refreshes automatically — re-check and Save if the slate changed.",
       "Revisit these rules anytime under Rules in the menu.",
     ],
