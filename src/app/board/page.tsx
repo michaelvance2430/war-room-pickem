@@ -246,7 +246,8 @@ function BoardInner() {
   const firstKick = firstKickoffOnCardMs(games);
 
   const lockedCount = slips.filter((s) => s.lockedAt).length;
-  const emptyTake = boardEmptyTakeAt();
+  // One empty-state take per week so the vault joke rotates with the season
+  const emptyTake = boardEmptyTakeAt(week);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -310,20 +311,22 @@ function BoardInner() {
                 ) : (
                   <>
                     <p className="text-sm font-semibold text-foreground">
-                      Still classified.
+                      {emptyTake.title}
                     </p>
                     <p className="text-xs text-muted mt-1">
-                      Vault opens at first kickoff
+                      {emptyTake.body}
                       {firstKick
-                        ? ` (${new Date(firstKick).toLocaleString(undefined, {
-                            weekday: "short",
-                            month: "short",
-                            day: "numeric",
-                            hour: "numeric",
-                            minute: "2-digit",
-                          })})`
+                        ? ` First kickoff: ${new Date(firstKick).toLocaleString(
+                            undefined,
+                            {
+                              weekday: "short",
+                              month: "short",
+                              day: "numeric",
+                              hour: "numeric",
+                              minute: "2-digit",
+                            }
+                          )}.`
                         : ""}
-                      . Until then, nobody sees nobody.
                     </p>
                   </>
                 )}
@@ -385,11 +388,10 @@ function BoardInner() {
             {error && (
               <div className="rounded-xl border border-border bg-card px-4 py-4 mb-6">
                 <p className="text-sm font-semibold text-foreground">
-                  Still classified.
+                  {emptyTake.title}
                 </p>
                 <p className="text-xs text-muted mt-2 leading-relaxed">
-                  Picks stay secret until the first whistle. Come back after
-                  kickoff when the whole room gets exposed.
+                  {emptyTake.body}
                 </p>
               </div>
             )}
