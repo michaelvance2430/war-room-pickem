@@ -2794,6 +2794,8 @@ type StandingsCloudRow = {
   propTotal: number;
   weeksPlayed: number;
   lastSeenAt: string | null;
+  /** memberships.joined_at — league pulse "when they entered the room" */
+  joinedAt: string | null;
   isBot: boolean;
 };
 
@@ -2851,6 +2853,7 @@ function mapStandingsRows(rows: Record<string, unknown>[]): StandingsCloudRow[] 
           propTotal: (m.prop_total as number) || 0,
           weeksPlayed: (m.weeks_played as number) || 0,
           lastSeenAt: (profile?.last_seen_at as string | null) || null,
+          joinedAt: (m.joined_at as string | null) || null,
           isBot: !!(m.is_bot as boolean | null | undefined),
         };
       })
@@ -3149,6 +3152,7 @@ async function fetchLeaguePlayersNetwork(
         propTotal: c.propTotal,
         weeksPlayed: c.weeksPlayed,
         lastSeenAt: c.lastSeenAt ?? null,
+        memberSince: c.joinedAt || undefined,
         isMock: c.isBot,
       }));
     } finally {
