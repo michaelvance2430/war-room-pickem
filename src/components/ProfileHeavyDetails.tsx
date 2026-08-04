@@ -106,50 +106,28 @@ export default function ProfileHeavyDetails({
     let cancelled = false;
 
     (async () => {
+      /**
+       * Production freeze (Mike 2026-08): 4s + 83s longtasks after render-enter
+       * while details ran. Standings re-query on this path was concurrent with
+       * trophies. CRITICAL PATH = subject-only badges + trophies; peers idle.
+       */
       wrProfile("heavy-details-start");
+      await yieldToBrowser();
+      if (cancelled) return;
+
       const lg = getLeague();
       const sportId = lg?.sportId || "cfb";
       const isWwc = sportId === "soccer_wwc";
       const mock = isMockPlayer(seed);
+      let subject: Player = withPermanentBadges(withCreatorFlag(seed));
+      let leaguePeers: Player[] = [subject];
 
-      // Optional standings peers — NOT required for first identity
-      let leaguePeers: Player[] = [seed];
-      let subject: Player = seed;
-      try {
-        const { loadLeaguePlayers } = await import("@/lib/cloud");
-        const players = await loadLeaguePlayers().catch(() => [] as Player[]);
-        if (cancelled) return;
-        if (players.length) {
-          leaguePeers = players;
-          const richer = players.find((p) => p.id === seed.id);
-          if (richer) {
-            subject = withPermanentBadges(
-              withCreatorFlag({
-                ...richer,
-                avatarUrl: seed.avatarUrl || richer.avatarUrl,
-                memberSince: seed.memberSince || richer.memberSince,
-                name: seed.name || richer.name,
-              })
-            );
-            if (!cancelled) setPlayer(subject);
-          }
-        }
-      } catch {
-        /* ok */
-      }
-
-      await yieldToBrowser();
-      if (cancelled) return;
-
-      // Badge eval only here — never on initial profile render
+      // ── Phase A: badges with [subject] only — NO loadLeaguePlayers/standings ──
       const badgeList = await runChunked("evaluateBadges", () => {
         try {
           nukeAccumulatedSandboxCareersOnce([seed.id]);
           applyLegacyBadgeGrants({ id: seed.id, name: seed.name });
-          return getPlayerBadges(
-            subject,
-            leaguePeers.length > 1 ? leaguePeers : [subject]
-          );
+          return getPlayerBadges(subject, [subject]);
         } catch {
           return [] as BadgeStatus[];
         }
@@ -175,11 +153,20 @@ export default function ProfileHeavyDetails({
         if (!cancelled && wwc) setWwcBadges(wwc);
       }
 
-      // Single trophy load — reused for hardware + resume (no double network)
+      // ── Phase B: trophies (yield around module eval — large chunk) ──
       let trophies: LeagueTrophy[] = [];
       try {
+        await yieldToBrowser();
+        if (cancelled) return;
+        const tImport0 = performance.now();
         const { loadCareerTrophiesWonByUser, loadLeagueTrophies } =
           await import("@/lib/trophies");
+        wrProfile(
+          "trophies-module-import",
+          performance.now() - tImport0
+        );
+        await yieldToBrowser();
+        if (cancelled) return;
         try {
           const career = await loadCareerTrophiesWonByUser(seed.id, {
             playerName: seed.name || undefined,
@@ -188,8 +175,12 @@ export default function ProfileHeavyDetails({
             ? career
             : await loadLeagueTrophies().catch(() => [] as LeagueTrophy[]);
         } catch {
-          trophies = await loadLeagueTrophies().catch(() => [] as LeagueTrophy[]);
+          trophies = await loadLeagueTrophies().catch(
+            () => [] as LeagueTrophy[]
+          );
         }
+        await yieldToBrowser();
+        if (cancelled) return;
 
         const hw = await runChunked("buildTrophies", () =>
           getProfileHardware({
@@ -208,8 +199,8 @@ export default function ProfileHeavyDetails({
 
       if (cancelled) return;
 
-      const peerList = leaguePeers.length ? leaguePeers : [subject];
       const badgeSnap = badgeList || [];
+      const peerList = leaguePeers;
 
       const res = await runChunked("buildResume", () =>
         buildFootballResume({
@@ -254,8 +245,61 @@ export default function ProfileHeavyDetails({
         setSeasonPlot(null);
       }
 
-      // Eggs — after shelves, still deferred
+      // Paint shelves before peer upgrade / eggs
+      if (!cancelled) {
+        setPhase("ready");
+        wrProfile("heavy-details-ready");
+      }
+
+      // ── Phase C (idle): full league peers — may re-hit standings; never block paint ──
+      await yieldToBrowser();
+      if (cancelled) return;
       try {
+        const { loadLeaguePlayers } = await import("@/lib/cloud");
+        const players = await loadLeaguePlayers().catch(() => [] as Player[]);
+        if (cancelled || !players.length) return;
+        leaguePeers = players;
+        const richer = players.find((p) => p.id === seed.id);
+        if (richer) {
+          subject = withPermanentBadges(
+            withCreatorFlag({
+              ...richer,
+              avatarUrl: seed.avatarUrl || richer.avatarUrl,
+              memberSince: seed.memberSince || richer.memberSince,
+              name: seed.name || richer.name,
+            })
+          );
+          if (!cancelled) setPlayer(subject);
+        }
+        const upgraded = await runChunked("evaluateBadges-peers", () => {
+          try {
+            return getPlayerBadges(subject, leaguePeers);
+          } catch {
+            return null;
+          }
+        });
+        if (!cancelled && upgraded) {
+          setBadges(upgraded);
+          try {
+            syncCareerWithPlayer(subject, upgraded);
+          } catch {
+            /* ok */
+          }
+        }
+        if (!cancelled && scored) {
+          const plot = await runChunked("buildSeasonPlot-peers", () =>
+            buildSeasonPlot(subject, leaguePeers)
+          );
+          if (!cancelled && plot) setSeasonPlot(plot);
+        }
+      } catch {
+        /* ok */
+      }
+
+      // Eggs — after shelves
+      try {
+        await yieldToBrowser();
+        if (cancelled) return;
         const { loadCloudEggFinds } = await import("@/lib/egg-cloud");
         const { grantPermanentBadgeId, mergePermanentBadges } =
           await import("@/lib/permanent-badges");
@@ -274,11 +318,6 @@ export default function ProfileHeavyDetails({
         }
       } catch {
         /* ok */
-      }
-
-      if (!cancelled) {
-        setPhase("ready");
-        wrProfile("heavy-details-ready");
       }
     })();
 

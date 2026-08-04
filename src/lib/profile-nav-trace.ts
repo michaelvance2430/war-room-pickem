@@ -355,7 +355,7 @@ export function profileNavUsable(extra?: string) {
     "usable",
     `${extra || ""} renders=${active.renderCount} requests=${active.requestCount} longtasks=${active.longTaskCount} maxLt=${Math.round(active.longTaskMax)}ms`.trim()
   );
-  // Keep longtask observer a bit longer for post-usable freezes
+  // Keep longtask observer long enough for post-usable freezes (Mike: 83s after usable)
   const t = active;
   setTimeout(() => {
     if (active?.id === t.id) {
@@ -364,9 +364,18 @@ export function profileNavUsable(extra?: string) {
         "trace-summary",
         `origin=${t.origin} maxLt=${Math.round(t.longTaskMax)}ms ltCount=${t.longTaskCount} renders=${t.renderCount} requests=${t.requestCount}`
       );
-      t.stopObservers?.();
     }
   }, 4000);
+  setTimeout(() => {
+    if (active?.id === t.id) {
+      log(
+        t,
+        "trace-summary-late",
+        `origin=${t.origin} maxLt=${Math.round(t.longTaskMax)}ms ltCount=${t.longTaskCount} renders=${t.renderCount} requests=${t.requestCount}`
+      );
+      t.stopObservers?.();
+    }
+  }, 120_000);
 }
 
 export function getActiveProfileNavTraceId(): string | null {
