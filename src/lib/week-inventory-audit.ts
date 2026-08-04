@@ -91,12 +91,13 @@ export async function auditWeekInventoryForCurrentLeague(): Promise<WeekInventor
   }[];
 
   const allWeeks = rows.map((r) => Number(r.week_number));
-  const { visible, orphans } = findOrphanPublishedWeeks({
+  const { visible, orphans, future } = findOrphanPublishedWeeks({
     published: allWeeks,
     activeWeek: currentWeek ?? 0,
     sportId,
   });
   const orphanSet = new Set(orphans);
+  // Future week_cards ahead of live are residue for player UI (Week 1 while live=0)
 
   // game counts
   const ids = rows.map((r) => r.id);
@@ -123,7 +124,7 @@ export async function auditWeekInventoryForCurrentLeague(): Promise<WeekInventor
   }));
 
   const likely: string[] = [];
-  if (orphans.length) {
+  if (orphans.length || future.length) {
     likely.push(
       "publishWeekCard (Host publish for an arbitrary week_number)"
     );
@@ -136,13 +137,18 @@ export async function auditWeekInventoryForCurrentLeague(): Promise<WeekInventor
     likely.push(
       "Not Practice Mode (week 99 is client-only and never writes week_cards)"
     );
+    if (future.length) {
+      likely.push(
+        `Future week_cards ahead of live (${future.join(", ")} > week ${currentWeek ?? "?"}) — player bar must not show these`
+      );
+    }
   }
 
   return {
     ok: true,
     message: orphans.length
-      ? `Found ${orphans.length} orphan published week(s): ${orphans.join(", ")}. Player UI hides them. Rows not deleted.`
-      : "No orphan published weeks relative to live week.",
+      ? `Found ${orphans.length} non-player-visible week_cards: ${orphans.join(", ")} (future=[${future.join(",") || "none"}]). Player UI filters them. Rows not deleted.`
+      : "No orphan/future published weeks relative to live week.",
     league_id: leagueId,
     league_name: league?.name || null,
     sport_id: sportId,

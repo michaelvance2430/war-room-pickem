@@ -1591,24 +1591,42 @@ export default function PicksClient() {
     }
   }, [allGamesPicked]);
 
-  // Trust: published + official scored + live only — never practice / orphan residue
-  // (e.g. "Week 5 · scored" when season is still on Week 0)
+  // Trust: live + prior published only — never future / orphan residue.
+  // Week 1 ghost during Week 0 was trustContiguous forward-walk over week_cards.
   const weekPills = (() => {
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { trustWeekBrowserWeeks } = require("@/lib/week-history-trust") as typeof import("@/lib/week-history-trust");
-      return trustWeekBrowserWeeks({
+      const trust = require("@/lib/week-history-trust") as typeof import("@/lib/week-history-trust");
+      const pills = trust.trustWeekBrowserWeeks({
         published: publishedWeeks,
         scored: scoredWeeks,
         activeWeek,
         sportId: getLeague()?.sportId,
       });
+      try {
+        if (
+          process.env.NODE_ENV === "development" ||
+          (typeof localStorage !== "undefined" &&
+            localStorage.getItem("warroom-runtime-debug") === "1")
+        ) {
+          const proof = trust.explainWeekBrowser({
+            published: publishedWeeks,
+            scored: scoredWeeks,
+            activeWeek,
+            sportId: getLeague()?.sportId,
+          });
+          console.log("[WR-WEEK-PILLS]", proof);
+        }
+      } catch {
+        /* ignore */
+      }
+      return pills;
     } catch {
-      // Fallback: published cards only — never invent activeWeek without a card
+      // Fallback: at-or-before live only — never invent future weeks
       return [
         ...new Set(
           [...publishedWeeks, ...scoredWeeks].filter(
-            (w) => w >= 0 && w !== 99
+            (w) => w >= 0 && w !== 99 && w <= activeWeek
           )
         ),
       ].sort((a, b) => a - b);

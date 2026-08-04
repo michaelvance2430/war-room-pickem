@@ -1104,7 +1104,12 @@ export async function listPublishedWeekNumbers(): Promise<number[]> {
     const out = [...new Set(nums)].sort((a, b) => a - b);
     cacheSet(publishedCache, session.leagueId, out);
     wrBoardP1("week_cards.week_number", "DONE", qMs, `n=${out.length}`);
-    wrBoardP1("listPublishedWeekNumbers", "DONE", qMs, `n=${out.length}`);
+    wrBoardP1(
+      "listPublishedWeekNumbers",
+      "DONE",
+      qMs,
+      `n=${out.length} weeks=[${out.join(",")}] league=${session.leagueId.slice(0, 8)}`
+    );
     return out;
   } catch {
     wrBoardP1("listPublishedWeekNumbers", "FAIL", undefined, "catch");
@@ -1141,11 +1146,13 @@ export async function loadBestAvailableWeekCard(
     if (!Number.isFinite(w) || w < 0 || w > 40 || w === 99) return;
     if (!candidates.includes(w)) candidates.push(w);
   };
-  // Official live first, then contiguous trusted published only
+  // Official live first, then contiguous trusted published only.
+  // Never preferred+1 — that pulled future residue cards (Week 1 while live=0).
   push(preferred);
-  for (const w of trustedPublished) push(w);
+  for (const w of trustedPublished) {
+    if (w <= preferred) push(w);
+  }
   push(preferred - 1);
-  push(preferred + 1);
 
   // Cap parallel fan-out — phone radio hates 10 at once
   const batch = candidates.slice(0, 6);
