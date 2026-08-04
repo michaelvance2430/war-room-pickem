@@ -11,7 +11,7 @@ import {
   subscribeEquippedTitles,
 } from "@/lib/equipped-title-store";
 import { isChaosFlamesActive } from "@/lib/chaos-mode";
-import { getLeague } from "@/lib/league";
+import { readLeague } from "@/lib/session-read";
 import { loadLeagueActiveWeek } from "@/lib/cloud";
 import { wrProfile, wrProfileRoute } from "@/lib/runtime-iso";
 
@@ -114,7 +114,7 @@ export default function PlayerLink({
   void chaosTick;
   const flames =
     chaosFlames === true ||
-    (!!id && isChaosFlamesActive(id, liveWeek, getLeague()?.id));
+    (!!id && isChaosFlamesActive(id, liveWeek, readLeague()?.id));
 
   if (!id) {
     return <span className={`text-muted ${className}`.trim()}>{label}</span>;
@@ -129,8 +129,12 @@ export default function PlayerLink({
       return;
     }
     setNavLocked(true);
+    const href = `/profile/${id}`;
     wrProfile("click-received", undefined, `PlayerLink→${id.slice(0, 8)}`);
-    wrProfileRoute("click", `id=${id.slice(0, 8)} href=/profile/${id.slice(0, 8)}`);
+    wrProfileRoute(
+      "click",
+      `user_id=${id} href=${href} name=${(name || "").slice(0, 24)}`
+    );
     try {
       performance.mark?.("wr-profile:click");
       performance.mark?.("wr-profile-route:click");
@@ -138,9 +142,13 @@ export default function PlayerLink({
         process.env.NODE_ENV === "development" ||
         localStorage.getItem("warroom-runtime-debug") === "1"
       ) {
-        console.log(
-          `[WR-PERF][profile] click +0ms id=${id.slice(0, 8)}`
-        );
+        // Identity handoff proof: Standings passes user_id, not membership id
+        console.log("[WR-PERF][profile] click", {
+          user_id: id,
+          display_name: name || null,
+          href,
+          self: id === readLeague()?.commissionerId ? "maybe-commish" : "peer",
+        });
       }
     } catch {
       /* ok */
@@ -160,6 +168,7 @@ export default function PlayerLink({
     >
       <Link
         href={`/profile/${id}`}
+        prefetch={false}
         onClick={onProfileClick}
         title={
           flames

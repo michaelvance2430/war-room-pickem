@@ -223,6 +223,13 @@ export default function ProfilePage() {
       setDetailsOpen(false);
       setDetailsPanel(null);
 
+      const me = readSession()?.playerId || null;
+      const isSelf = !!(me && me === id);
+      mark(
+        "identity",
+        `route_id=${id.slice(0, 8)} expect=user_id self=${isSelf}`
+      );
+
       const failSafe = window.setTimeout(() => {
         if (!cancelled) {
           mark("failsafe-ready");
@@ -234,43 +241,96 @@ export default function ProfilePage() {
         let found: Player | null = null;
         let title: string | null = null;
         let seen: string | null = null;
+        let source = "none";
 
-        // Roster only — never pull store/badges on open
+        // 1) Prefer loadLeaguePlayers — same list Standings uses (player.id = user_id).
+        //    Warm cache hit after Standings = paint without waiting on roster RPC.
         try {
-          mark("roster-import-start");
-          const tRoster = performance.now();
-          const { loadLeagueRoster } = await import("@/lib/cloud");
-          mark(
-            "roster-import-done",
-            `${Math.round(performance.now() - tRoster)}ms`
+          mark("players-import-start");
+          const t0 = performance.now();
+          const { loadLeaguePlayers, loadLeagueRoster } = await import(
+            "@/lib/cloud"
           );
-          const tLoad = performance.now();
+          mark(
+            "cloud-import-done",
+            `${Math.round(performance.now() - t0)}ms`
+          );
+          const t1 = performance.now();
+          const players = await loadLeaguePlayers();
+          mark(
+            "players-fetch-done",
+            `${Math.round(performance.now() - t1)}ms n=${players.length}`
+          );
+          if (cancelled) return;
+          const hit = players.find((p) => p.id === id);
+          if (hit) {
+            found = { ...hit };
+            source = "loadLeaguePlayers.user_id";
+            // Paint immediately — roster meta (join title / lastSeen) fills in after
+            if (!cancelled) {
+              setPlayer(withCreatorFlag(found));
+              setReady(true);
+              hadPaintRef.current = true;
+              window.clearTimeout(failSafe);
+              mark(
+                "first-usable-paint",
+                `fast source=${source} name=${found.name.slice(0, 20)}`
+              );
+              wrProfile("interactive");
+            }
+          }
+
+          // Roster only for join titles / lastSeen / membership_id recovery
+          const t2 = performance.now();
           const roster = await loadLeagueRoster();
           mark(
             "roster-fetch-done",
-            `${Math.round(performance.now() - tLoad)}ms n=${roster.length}`
+            `${Math.round(performance.now() - t2)}ms n=${roster.length}`
           );
           if (cancelled) return;
           if (roster.length) {
             const titles = computeJoinTitles(roster);
             title = titles.get(id) || null;
             const row = roster.find((m) => m.userId === id);
-            if (row) {
-              if (row.lastSeenAt) seen = row.lastSeenAt;
+            if (row?.lastSeenAt) seen = row.lastSeenAt;
+            if (!found && row) {
               found = rosterToPlayer(row);
+              source = "loadLeagueRoster.user_id";
+            }
+            // Detect membership_id mistaken as route id
+            if (!found) {
+              const byMem = roster.find((m) => m.membershipId === id);
+              if (byMem) {
+                mark(
+                  "ID_MISMATCH",
+                  `route used membership_id; user_id=${byMem.userId.slice(0, 8)}`
+                );
+                found = rosterToPlayer(byMem);
+                source = "membership_id→user_id";
+                try {
+                  window.history.replaceState(
+                    null,
+                    "",
+                    `/profile/${byMem.userId}`
+                  );
+                } catch {
+                  /* ok */
+                }
+              }
             }
           }
         } catch {
           /* offline */
         }
 
-        // Offline / demo fallback only — dynamic so badges never join first paint
+        // 2) Offline / demo fallback — only if cloud path missed
         if (!found) {
           try {
             mark("store-fallback-start");
             const tStore = performance.now();
             const { findPlayer } = await import("@/lib/store");
             found = findPlayer(id);
+            source = found ? "store.findPlayer" : "none";
             mark(
               "store-fallback-done",
               `${Math.round(performance.now() - tStore)}ms found=${!!found}`
@@ -282,15 +342,11 @@ export default function ProfilePage() {
 
         if (found) {
           found = withCreatorFlag(found);
-          try {
-            const me = readSession()?.playerId;
-            if (me && me !== found.id) {
-              void import("@/lib/engagement").then(({ markEngagement }) => {
-                markEngagement(me, "opened_other_profile");
-              });
-            }
-          } catch {
-            /* ignore */
+          // Peer-only engagement — never block paint
+          if (!isSelf) {
+            void import("@/lib/engagement").then(({ markEngagement }) => {
+              if (me) markEngagement(me, "opened_other_profile");
+            });
           }
         }
 
@@ -301,29 +357,33 @@ export default function ProfilePage() {
           if (found) hadPaintRef.current = true;
           setReady(true);
           window.clearTimeout(failSafe);
-          mark("first-usable-paint", found ? "found" : "missing");
+          mark(
+            "first-usable-paint",
+            found
+              ? `found source=${source} name=${found.name.slice(0, 20)}`
+              : "missing"
+          );
           wrProfile(
             "data-effect-first-paint",
             undefined,
-            found ? "found" : "missing"
+            found ? `found:${source}` : "missing"
           );
           wrProfile("interactive");
         }
 
         if (!found || cancelled) return;
 
-        // Sandbox hint after paint (season-mode is light but keep it off critical path)
         void import("@/lib/season-mode").then((m) => {
           if (!cancelled) setSandboxHint(m.isSandboxMode());
         });
 
-        // Blue Falcon — non-blocking, after paint
+        // Blue Falcon after paint — never on critical path
         void (async () => {
           try {
             const { hydrateBlueFalconFromCloud, getBlueFalconCount } =
               await import("@/lib/blue-falcon");
-            let bf = await hydrateBlueFalconFromCloud(id);
-            if (!bf) bf = getBlueFalconCount(id);
+            let bf = await hydrateBlueFalconFromCloud(found!.id);
+            if (!bf) bf = getBlueFalconCount(found!.id);
             if (!cancelled) setBlueFalconCount(bf);
           } catch {
             /* optional */

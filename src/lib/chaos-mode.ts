@@ -5,7 +5,19 @@
 
 import type { Game, Prop, UserPick } from "./types";
 import { getSession, getLeague } from "./league";
-import { defaultSeasonYear } from "./trophies";
+
+/** Lazy — avoid pulling trophies module onto every PlayerLink on Standings. */
+function defaultSeasonYearLazy(now = new Date()): number {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { defaultSeasonYear } =
+      require("./trophies") as typeof import("./trophies");
+    return defaultSeasonYear(now);
+  } catch {
+    const m = now.getMonth();
+    return m < 6 ? now.getFullYear() - 1 : now.getFullYear();
+  }
+}
 
 export const CHAOS_USES_PER_SEASON = 2;
 export const CHAOS_BADGE_ID = "let_them_cook";
@@ -58,7 +70,7 @@ function writeUsesStore(s: UsesStore) {
 export function getChaosUsesRemaining(
   leagueId?: string | null,
   userId?: string | null,
-  seasonYear = defaultSeasonYear()
+  seasonYear = defaultSeasonYearLazy()
 ): number {
   const lid = leagueId || getLeague()?.id;
   const uid = userId || getSession()?.playerId;
@@ -71,7 +83,7 @@ export function getChaosUsesRemaining(
 export function getChaosUsesState(
   leagueId?: string | null,
   userId?: string | null,
-  seasonYear = defaultSeasonYear()
+  seasonYear = defaultSeasonYearLazy()
 ): ChaosUsesState {
   const lid = leagueId || getLeague()?.id;
   const uid = userId || getSession()?.playerId;
@@ -90,7 +102,7 @@ export function spendChaosUse(
   weekNumber: number,
   leagueId?: string | null,
   userId?: string | null,
-  seasonYear = defaultSeasonYear()
+  seasonYear = defaultSeasonYearLazy()
 ): { ok: boolean; remaining: number; error?: string } {
   const lid = leagueId || getLeague()?.id;
   const uid = userId || getSession()?.playerId;
@@ -137,7 +149,7 @@ export function isWeekChaosForUser(
   weekNumber: number,
   leagueId?: string | null,
   userId?: string | null,
-  seasonYear = defaultSeasonYear()
+  seasonYear = defaultSeasonYearLazy()
 ): boolean {
   const st = getChaosUsesState(leagueId, userId, seasonYear);
   return st.weekNumbers.includes(weekNumber);

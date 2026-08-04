@@ -12,7 +12,17 @@
  */
 
 import type { BadgeStatus, BadgeTier } from "./types";
-import { getBadgeDef } from "./badges";
+
+/** Lazy — never static-import badges (profile route freeze). */
+function getBadgeDefLazy(badgeId: string) {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getBadgeDef } = require("./badges") as typeof import("./badges");
+    return getBadgeDef(badgeId);
+  } catch {
+    return undefined;
+  }
+}
 
 export type TitleVibe = "brag" | "roast" | "chaos";
 
@@ -490,7 +500,7 @@ export function titleLabelForBadgeId(
   const t = getEquipableTitleDef(badgeId);
   if (t) return t.title;
   // Creator badge id always resolves even if catalog lags
-  const def = badgeId ? getBadgeDef(badgeId) : undefined;
+  const def = badgeId ? getBadgeDefLazy(badgeId) : undefined;
   if (def?.creatorOnly) return def.name;
   return null;
 }
@@ -526,7 +536,7 @@ export function listEquipableTitlesFromBadges(
     if (!earned.has(t.badgeId)) continue;
     // Chaos Agent etc. — never a free pick in Account
     if (t.forceOnly) continue;
-    const def = getBadgeDef(t.badgeId);
+    const def = getBadgeDefLazy(t.badgeId);
     out.push({
       badgeId: t.badgeId,
       label: t.title,
