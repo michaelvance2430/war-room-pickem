@@ -200,6 +200,19 @@ export const BADGE_CATALOG: BadgeDef[] = [
     icon: "🐉",
   },
   {
+    id: "hodor_of_hodors",
+    name: "The Hodor of Hodors",
+    description:
+      "There are people who watched Game of Thrones. Then there's Andrew. Scientists are still studying how one man can channel this much Hodor energy without collapsing into a pile of Bran-related lore. If someone yells \"Hold the Door!\", he doesn't ask why — he just nods… and becomes the door. Hodor would be proud. Or confused. Probably both.",
+    howToEarn:
+      "Awarded to the one true Hodor. Some legends are chosen. Some are born. This one never had a choice.",
+    lockedLabel: "Hard locked — Hodor only",
+    tier: "legendary",
+    points: 200,
+    careerOnly: true,
+    icon: "🚪",
+  },
+  {
     id: CAREER_CELLAR_ID,
     name: "Sad Little Brains Forever",
     description:
@@ -1511,6 +1524,11 @@ function evaluateBadge(
         earned: hasPermanentBadge(player, "house_dragon_legendary"),
       };
 
+    case "hodor_of_hodors":
+      return {
+        earned: hasPermanentBadge(player, "hodor_of_hodors"),
+      };
+
     case "immortal_streak":
       return progress(streak, 30);
 
@@ -2225,9 +2243,13 @@ export function getPlayerBadges(
     }
   }
 
-  // House Dragon etc. — never show locked for the whole field
+  // Lore legendaries — never show locked for the whole field (inside joke only)
+  const LORE_HIDE_LOCKED = new Set([
+    "house_dragon_legendary",
+    "hodor_of_hodors",
+  ]);
   const visible = statuses.filter((b) => {
-    if (b.def.id === "house_dragon_legendary" && !b.earned) return false;
+    if (LORE_HIDE_LOCKED.has(b.def.id) && !b.earned) return false;
     return true;
   });
 

@@ -11,10 +11,12 @@
  *    (eggplant on a wooden base · +200 career)
  *  - Maria → The Dr. (doctorate at ~24 · legendary nerd flex · +200 career)
  *  - Marilynnsmum → House Dragon (legendary family lore · +200 career only)
+ *  - Andrew Visconti / Andy → The Hodor of Hodors (one-bit lore · +200 career only)
  *
  * Mistaken (hard-revoked whenever we see the name / on every app boot):
  *  - Andrew Visconti / Andy — was incorrectly given Kahmann’s champ seed
  *    (including when he only runs the app as commissioner of his own league)
+ *    He keeps Hodor. He does not keep War Room Legend.
  */
 
 import {
@@ -30,6 +32,7 @@ export const WAR_ROOM_LEGEND_ID = "war_room_legend";
 export const CAVALRY_SCOUT_BADGE_ID = "worlds_greatest_cavalry_scout";
 export const THE_DR_BADGE_ID = "the_dr";
 export const HOUSE_DRAGON_BADGE_ID = "house_dragon_legendary";
+export const HODOR_OF_HODORS_BADGE_ID = "hodor_of_hodors";
 
 /**
  * Optional hard UUID pins for House Dragon (preferred over name alone).
@@ -38,6 +41,15 @@ export const HOUSE_DRAGON_BADGE_ID = "house_dragon_legendary";
  */
 export const HOUSE_DRAGON_USER_IDS: readonly string[] = [
   // Populate after service-role resolve of Marilynnsmum:
+  // "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+];
+
+/**
+ * Optional hard UUID pins for Hodor of Hodors (Andrew Visconti / Andy).
+ * Empty → exact-normalized name match only.
+ */
+export const HODOR_USER_IDS: readonly string[] = [
+  // Populate after service-role resolve of Andrew:
   // "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
 ];
 
@@ -89,6 +101,20 @@ export const LEGACY_BADGE_GRANTS: LegacyBadgeGrant[] = [
     userIds: HOUSE_DRAGON_USER_IDS,
     exactNormalizedNames: ["marilynnsmum"],
   },
+  {
+    // The Hodor of Hodors — Andrew Visconti / Andy (lore bit, not football skill)
+    // Prefer exact normalized names; UUID pin when known.
+    pattern: /\bandrew\s+visconti\b|\bandy\b|\bandrew\b/i,
+    badgeId: HODOR_OF_HODORS_BADGE_ID,
+    reason: "The Hodor of Hodors — one true Hodor, holds the door",
+    userIds: HODOR_USER_IDS,
+    exactNormalizedNames: [
+      "andrewvisconti",
+      "andyvisconti",
+      "andy",
+      "andrew",
+    ],
+  },
 ];
 
 /** Names that should never hold a seeded War Room Legend */
@@ -98,9 +124,20 @@ export const REVOKE_LEGEND_PATTERNS: RegExp[] = [
   /\bvisconti\b/i,
 ];
 
+/**
+ * True when this display name must never keep seeded War Room Legend.
+ * Only real champ seeds (Kahmann / Ben) are exempt — other lore (Hodor, etc.)
+ * does not cancel the revoke.
+ */
 export function isMistakenLegendName(name: string): boolean {
   if (!name?.trim()) return false;
-  if (LEGACY_BADGE_GRANTS.some((g) => g.pattern.test(name))) return false;
+  if (
+    LEGACY_BADGE_GRANTS.some(
+      (g) => g.badgeId === WAR_ROOM_LEGEND_ID && g.pattern.test(name)
+    )
+  ) {
+    return false;
+  }
   return REVOKE_LEGEND_PATTERNS.some((p) => p.test(name));
 }
 
@@ -159,11 +196,10 @@ export function applyLegacyBadgeGrants(player: {
   const newly: string[] = [];
   const known = new Set(getPermanentBadgeIds(player.id));
 
-  // Hard revoke mistaken Visconti/Andy legend
+  // Hard revoke mistaken Visconti/Andy Legend — then continue so Hodor etc. still seed
   if (isMistakenLegendName(player.name)) {
     hardRevokeMistakenLegend(player.id);
     known.delete(WAR_ROOM_LEGEND_ID);
-    return newly;
   }
 
   for (const g of LEGACY_BADGE_GRANTS) {

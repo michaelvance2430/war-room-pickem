@@ -24,6 +24,7 @@ export const SANDBOX_PROTECTED_BADGE_IDS = new Set([
   "worlds_greatest_cavalry_scout", // Tbone Soulstache lore — sticks in dry-run
   "the_dr", // Maria PhD lore — sticks in dry-run
   "house_dragon_legendary", // Marilynnsmum lore — sticks forever
+  "hodor_of_hodors", // Andrew / Andy — one true Hodor lore — sticks forever
   "neighborhood_creeper", // discovery flex — stick in dry-run too
   "calendar_cosplayer", // holiday border discover — stick in dry-run
   // Easter eggs stick in sandbox (local + cloud when SQL is live)

@@ -34,6 +34,9 @@ const ALWAYS_KEEP = new Set([
   "the_commissioner",
   "war_room_legend",
   "worlds_greatest_cavalry_scout",
+  "the_dr",
+  "house_dragon_legendary",
+  "hodor_of_hodors",
   "neighborhood_creeper",
   "calendar_cosplayer",
 ]);

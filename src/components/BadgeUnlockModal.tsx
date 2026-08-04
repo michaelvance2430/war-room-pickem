@@ -225,7 +225,9 @@ export default function BadgeUnlockModal() {
           <p className="text-[10px] uppercase tracking-[0.25em] text-primary font-bold mb-2">
             {current.def.id === "house_dragon_legendary"
               ? "🐉 LEGENDARY ACHIEVEMENT UNLOCKED"
-              : "🎉 War Room flex"}
+              : current.def.id === "hodor_of_hodors"
+                ? "🟣 LEGENDARY CHEEVO"
+                : "🎉 War Room flex"}
           </p>
           <h2
             id="badge-unlock-title"
@@ -233,7 +235,9 @@ export default function BadgeUnlockModal() {
           >
             {current.def.id === "house_dragon_legendary"
               ? "HOUSE DRAGON"
-              : "Achievement unlocked!"}
+              : current.def.id === "hodor_of_hodors"
+                ? "THE HODOR OF HODORS"
+                : "Achievement unlocked!"}
           </h2>
           {remaining > 0 && (
             <p className="text-[11px] text-muted mt-1.5">
@@ -256,7 +260,8 @@ export default function BadgeUnlockModal() {
               current.def.icon
             )}
           </div>
-          {current.def.id !== "house_dragon_legendary" && (
+          {current.def.id !== "house_dragon_legendary" &&
+            current.def.id !== "hodor_of_hodors" && (
             <div className="flex items-center justify-center gap-2 flex-wrap mb-1">
               <span className="text-xl font-black text-foreground">
                 {current.def.name}
@@ -269,7 +274,8 @@ export default function BadgeUnlockModal() {
               </span>
             </div>
           )}
-          {current.def.id === "house_dragon_legendary" && (
+          {(current.def.id === "house_dragon_legendary" ||
+            current.def.id === "hodor_of_hodors") && (
             <span
               className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border mb-2"
               style={{ color: hex, borderColor: `${hex}66` }}
@@ -280,7 +286,13 @@ export default function BadgeUnlockModal() {
           <p className="text-sm text-muted leading-snug max-w-sm">
             {current.def.description}
           </p>
-          {current.def.id !== "house_dragon_legendary" && (
+          {current.def.id === "hodor_of_hodors" && (
+            <p className="text-xs text-muted/80 mt-3 italic tracking-wide">
+              &ldquo;Hold the Door.&rdquo;
+            </p>
+          )}
+          {current.def.id !== "house_dragon_legendary" &&
+            current.def.id !== "hodor_of_hodors" && (
             <p className="text-sm font-bold mt-3" style={{ color: hex }}>
               {current.def.careerOnly || current.def.creatorOnly
                 ? `+${current.def.points} career pts · career only`
@@ -310,11 +322,14 @@ export default function BadgeUnlockModal() {
           >
             {current.def.id === "house_dragon_legendary"
               ? "Long may House Dragon reign."
-              : remaining > 0
-                ? "Hell yeah — next"
-                : "Hell yeah"}
+              : current.def.id === "hodor_of_hodors"
+                ? "Hodor."
+                : remaining > 0
+                  ? "Hell yeah — next"
+                  : "Hell yeah"}
           </button>
-          {current.def.id !== "house_dragon_legendary" && (
+          {current.def.id !== "house_dragon_legendary" &&
+            current.def.id !== "hodor_of_hodors" && (
             <Link
               href={
                 getSession()?.playerId

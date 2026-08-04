@@ -81,6 +81,13 @@ export const EQUIPABLE_TITLE_CATALOG: EquipableTitleDef[] = [
       "Keeper of the chaos. Protector of the family. Long may House Dragon reign.",
   },
   {
+    badgeId: "hodor_of_hodors",
+    title: "Hodor",
+    vibe: "chaos",
+    blurb:
+      "One word. One bit. Holds the door. Ask the room for the story.",
+  },
+  {
     badgeId: "sad_little_brains",
     title: "Sad Little Brain",
     vibe: "roast",
