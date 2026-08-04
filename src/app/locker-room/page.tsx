@@ -96,9 +96,17 @@ export default function LockerRoomPage() {
     setSelfId(session?.playerId || null);
     setStaff(isStaff());
     setLeagueName(getLeague()?.name || "");
-    setGuest(isGuestMode());
+    const guestNow = isGuestMode();
+    setGuest(guestNow);
     // Immediate clear on walk-in — don't wait for network or extra taps
     markLockerSeen();
+    // Guest: never load cloud locker (fake league id). Membership invite only.
+    if (guestNow) {
+      setLoading(false);
+      setError(null);
+      setMessages([]);
+      return;
+    }
     // Never leave Locker on Loading… forever (stuck network)
     const failSafe = window.setTimeout(() => setLoading(false), 4_000);
     void refreshStaffSessionFlags().then(() => setStaff(isStaff()));
@@ -123,11 +131,12 @@ export default function LockerRoomPage() {
   }, [reload]);
 
   useEffect(() => {
+    if (guest || isGuestMode()) return;
     const t = setInterval(() => {
       void reload({ quiet: true });
     }, 12000);
     return () => clearInterval(t);
-  }, [reload]);
+  }, [reload, guest]);
 
   useEffect(() => {
     if (cooldownLeft <= 0) return;
@@ -408,14 +417,18 @@ export default function LockerRoomPage() {
           )}
           {!loading && messages.length === 0 && !error && (
             <div className="text-center py-12 px-4">
-      <div className="text-3xl mb-2" aria-hidden>
-                🏈💀
+              <div className="text-3xl mb-2" aria-hidden>
+                {guest ? "👀" : "🏈"}
               </div>
-      <p className="text-sm font-medium">Quiet in here</p>
-      <p className="text-xs text-muted mt-1">
-                First take of the week. Don&apos;t waste it. Try @someone.
+              <p className="text-sm font-medium">
+                {guest ? "You're visiting" : "Quiet in here"}
               </p>
-      </div>
+              <p className="text-xs text-muted mt-1">
+                {guest
+                  ? "The Locker opens with real league members. Join a league to talk trash here."
+                  : "First take of the week. Don't waste it. Try @someone."}
+              </p>
+            </div>
           )}
           <ul className="divide-y divide-border/60">
             {messages.map((m) => {

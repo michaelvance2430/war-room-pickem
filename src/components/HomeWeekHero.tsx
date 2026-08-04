@@ -82,10 +82,24 @@ export default function HomeWeekHero() {
           return week;
         }
       })();
+      // Guest / local card: never claim "no card" when the tour week exists
+      let guestCardGames = 0;
+      try {
+        const { isGuestMode } = require("@/lib/guest-mode") as typeof import("@/lib/guest-mode");
+        if (isGuestMode()) {
+          const raw = localStorage.getItem(`warroom-card-week-${localWeek}`);
+          if (raw) {
+            const p = JSON.parse(raw) as { games?: unknown[] };
+            guestCardGames = p.games?.length || 0;
+          }
+        }
+      } catch {
+        /* ok */
+      }
       const degraded: HeroState = {
         week: localWeek,
-        hasCard: false,
-        gameCount: 0,
+        hasCard: guestCardGames > 0,
+        gameCount: guestCardGames,
         lockLabel: null,
         frozen: false,
         iLocked: false,
@@ -149,6 +163,14 @@ export default function HomeWeekHero() {
 
     async function load() {
       try {
+        try {
+          const { isGuestMode, ensureGuestWorld } = await import(
+            "@/lib/guest-mode"
+          );
+          if (isGuestMode()) ensureGuestWorld();
+        } catch {
+          /* ok */
+        }
         // Active week + scored list (cached loaders)
         const { week, advanced, scored } = await resolvePlayerActiveWeek({
           persistIfOps: true,

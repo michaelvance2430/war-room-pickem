@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
+  dismissGuestTutorialForever,
   exitGuestDemo,
   getGuestState,
   isGuestMode,
@@ -12,18 +13,18 @@ import {
   type GuestRole,
 } from "@/lib/guest-mode";
 
-type Phase = "welcome" | "role" | "tutorial" | "done";
+type Phase = "welcome" | "role" | "coach" | "done";
 
 /**
- * Guest Mode: welcome contract → role → short tour.
- * Guests observe. Members belong.
+ * Guest Mode: welcome → seat → one coach beat → gone forever.
+ * Rule: Teach once. Then disappear. Never make them fight the coach.
  */
 export default function GuestOnboarding() {
   const router = useRouter();
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [phase, setPhase] = useState<Phase>("welcome");
   const [role, setRole] = useState<GuestRole | null>(null);
-  const [step, setStep] = useState(0);
 
   useEffect(() => {
     if (!isGuestMode()) {
@@ -38,61 +39,47 @@ export default function GuestOnboarding() {
     }
     setRole(s.role);
     if (needsGuestTutorial(s.role)) {
-      setPhase("tutorial");
-      setStep(0);
+      setPhase("coach");
       setOpen(true);
     } else {
       setOpen(false);
     }
   }, []);
 
+  // Navigating away while coach is up = they already got the idea. Never chase them.
+  useEffect(() => {
+    if (!open || phase !== "coach" || !role) return;
+    if (!pathname) return;
+    // Already on the destination they care about → dismiss forever
+    if (role === "player" && (pathname === "/picks" || pathname.startsWith("/picks/"))) {
+      markGuestTutorialDone(role);
+      setOpen(false);
+      return;
+    }
+    if (
+      role === "commissioner" &&
+      (pathname.startsWith("/commissioner") || pathname.startsWith("/league-build"))
+    ) {
+      markGuestTutorialDone(role);
+      setOpen(false);
+    }
+  }, [pathname, open, phase, role]);
+
+  function finishCoach(href?: string) {
+    if (role) markGuestTutorialDone(role);
+    else dismissGuestTutorialForever();
+    setOpen(false);
+    if (href) {
+      router.push(href);
+    }
+  }
+
+  function skipForever() {
+    dismissGuestTutorialForever();
+    setOpen(false);
+  }
+
   if (!open) return null;
-
-  // Guest lands on Week 9 — Crystal Ball is already locked; no CB in demo tour
-  const playerSteps = [
-    {
-      title: "1 · Open My Picks",
-      body: "This demo is already through Week 9 (Crystal Ball is sealed). Open My Picks for the live card.",
-      href: "/picks",
-      cta: "Open My Picks →",
-    },
-    {
-      title: "2 · Fill the card",
-      body: "Pick every game, confidence 1–5 (each once), one Best Bet (2×), and the prop. Take your time.",
-      href: "/picks",
-      cta: "I’m on My Picks",
-    },
-    {
-      title: "3 · Save before kickoff",
-      body: "Hit Save Picks. After first kickoff the whole card freezes — no late locks. That’s the whole game.",
-      href: "/picks",
-      cta: "Got it — let’s play",
-    },
-  ];
-
-  const commishSteps = [
-    {
-      title: "1 · Build the card",
-      body: "Commish tools → Build Card. One tap: Publish demo week (or pull real odds and pick 5).",
-      href: "/commissioner?tab=card&first=1",
-      cta: "Open Build Card",
-    },
-    {
-      title: "2 · Publish",
-      body: "Publish / Update Card so the room can lock. Until you publish, My Picks stays empty and they think it’s broken.",
-      href: "/commissioner?tab=card",
-      cta: "Open Commish",
-    },
-    {
-      title: "3 · Score the week",
-      body: "After games: Enter Results → set winners + prop → Save Results & Score League. Standings wake up. Advanced tools unlock after your first real score.",
-      href: "/commissioner?tab=results",
-      cta: "Open Results",
-    },
-  ];
-
-  const steps = role === "commissioner" ? commishSteps : playerSteps;
-  const current = steps[step];
 
   return (
     <div
@@ -100,7 +87,13 @@ export default function GuestOnboarding() {
       role="dialog"
       aria-modal="true"
     >
-      <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+      <div
+        className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+        onClick={() => {
+          // Backdrop: never trap — welcome/role stay intentional; coach dismisses
+          if (phase === "coach") skipForever();
+        }}
+      />
 
       <div className="relative w-full sm:max-w-md max-h-[92vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl border-2 border-primary/50 bg-card shadow-2xl">
         {phase === "welcome" && (
@@ -165,23 +158,21 @@ export default function GuestOnboarding() {
             </p>
             <h2 className="text-xl font-bold">Pick a seat</h2>
             <p className="text-sm text-muted">
-              You’ll get a short by-the-numbers tutorial for that role. You can
-              switch later from Account.
+              One quick tip, then you&apos;re free. You can switch later from
+              Account.
             </p>
             <button
               type="button"
               onClick={() => {
                 setGuestRole("player");
                 setRole("player");
-                setPhase("tutorial");
-                setStep(0);
+                setPhase("coach");
               }}
               className="w-full text-left rounded-xl border-2 border-border hover:border-primary/50 p-4 space-y-1 transition"
             >
               <p className="font-bold text-foreground">View as player</p>
               <p className="text-xs text-muted">
-                Crystal Ball, weekly picks, Save before kickoff — the friend
-                experience.
+                Weekly picks, confidence, Best Bet — the friend experience.
               </p>
             </button>
             <button
@@ -189,74 +180,73 @@ export default function GuestOnboarding() {
               onClick={() => {
                 setGuestRole("commissioner");
                 setRole("commissioner");
-                setPhase("tutorial");
-                setStep(0);
+                setPhase("coach");
               }}
               className="w-full text-left rounded-xl border-2 border-primary/40 bg-primary/10 hover:bg-primary/15 p-4 space-y-1 transition"
             >
               <p className="font-bold text-primary">View as commissioner</p>
               <p className="text-xs text-muted">
-                Build a card, publish, score the week — how you run the room.
+                Build a card, publish, score — how you run the room.
               </p>
             </button>
           </div>
         )}
 
-        {phase === "tutorial" && current && role && (
+        {phase === "coach" && role === "player" && (
           <div className="p-5 sm:p-6 space-y-4">
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">
-              {role === "commissioner" ? "Commish tutorial" : "Player tutorial"}{" "}
-              · {step + 1}/{steps.length}
+              One thing · then free
             </p>
-            <h2 className="text-xl font-bold">{current.title}</h2>
-            <p className="text-sm text-muted leading-relaxed">{current.body}</p>
-            <div className="flex gap-1.5">
-              {steps.map((_, i) => (
-                <span
-                  key={i}
-                  className={`h-1.5 flex-1 rounded-full ${
-                    i <= step ? "bg-primary" : "bg-border"
-                  }`}
-                />
-              ))}
-            </div>
+            <h2 className="text-xl font-bold">Make your picks</h2>
+            <p className="text-sm text-muted leading-relaxed">
+              This tour is already on Week 9. Open My Picks, take every side,
+              confidence 1–5 (each once), one Best Bet, the prop — then Save
+              before kickoff. That&apos;s the whole game.
+            </p>
             <div className="flex flex-col gap-2">
               <button
                 type="button"
-                onClick={() => {
-                  if (step < steps.length - 1) {
-                    setStep((s) => s + 1);
-                    return;
-                  }
-                  markGuestTutorialDone(role);
-                  setOpen(false);
-                  router.push(current.href);
-                  router.refresh();
-                }}
-                className="w-full py-3 rounded-xl bg-primary text-black font-bold"
+                onClick={() => finishCoach("/picks")}
+                className="w-full py-3 min-h-[48px] rounded-xl bg-primary text-black font-bold"
               >
-                {step < steps.length - 1 ? "Next →" : current.cta}
+                Open My Picks →
               </button>
-              {step < steps.length - 1 && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    router.push(current.href);
-                  }}
-                  className="w-full py-2.5 rounded-xl border border-border text-sm text-muted hover:text-foreground"
-                >
-                  {current.cta} (keep tutorial)
-                </button>
-              )}
               <button
                 type="button"
-                onClick={() => {
-                  markGuestTutorialDone(role);
-                  setOpen(false);
-                }}
+                onClick={skipForever}
                 className="w-full py-2 text-xs text-muted hover:text-foreground"
               >
-                Skip tutorial — explore free
+                Explore free — I&apos;ve got it
+              </button>
+            </div>
+          </div>
+        )}
+
+        {phase === "coach" && role === "commissioner" && (
+          <div className="p-5 sm:p-6 space-y-4">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">
+              One thing · then free
+            </p>
+            <h2 className="text-xl font-bold">Run the room</h2>
+            <p className="text-sm text-muted leading-relaxed">
+              Hosts do three jobs: build the card, publish it so friends can
+              lock, score after the games. Look around the tour room, then join
+              for real when you&apos;re ready to host your people.
+            </p>
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => finishCoach("/")}
+                className="w-full py-3 min-h-[48px] rounded-xl bg-primary text-black font-bold"
+              >
+                Show me Home →
+              </button>
+              <button
+                type="button"
+                onClick={skipForever}
+                className="w-full py-2 text-xs text-muted hover:text-foreground"
+              >
+                Explore free — I&apos;ve got it
               </button>
             </div>
           </div>

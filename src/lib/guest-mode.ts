@@ -66,6 +66,72 @@ export function patchGuestState(partial: Partial<GuestState>) {
 }
 
 /**
+ * First-hour trust: guest Home/Picks must never hang on missing cache.
+ * Re-seeds the tour room if session/league/cards disappeared mid-browse.
+ * Preserves role + tutorial flags.
+ */
+export function ensureGuestWorld(): boolean {
+  if (!canUse() || !isGuestMode()) return false;
+  try {
+    const prev = getGuestState();
+    let sessionRaw = localStorage.getItem("warroom-session");
+    let leagueRaw = localStorage.getItem("warroom-league");
+    let session: Session | null = null;
+    let league: League | null = null;
+    try {
+      session = sessionRaw ? (JSON.parse(sessionRaw) as Session) : null;
+    } catch {
+      session = null;
+    }
+    try {
+      league = leagueRaw ? (JSON.parse(leagueRaw) as League) : null;
+    } catch {
+      league = null;
+    }
+    const activeWeek = localStorage.getItem("warroom-active-week");
+    const week9 = localStorage.getItem("warroom-card-week-9");
+    const broken =
+      !session ||
+      !league ||
+      session.leagueId !== GUEST_LEAGUE_ID ||
+      league.id !== GUEST_LEAGUE_ID ||
+      !activeWeek ||
+      !week9;
+    if (broken) {
+      seedGuestDemoWorld();
+      if (prev.role) {
+        setGuestRole(prev.role);
+      }
+      // restore tutorial completion flags (seed doesn't touch guest KEY)
+      write({ ...getGuestState(), ...prev, active: true });
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Dismiss all guest coaching forever for this browser guest session. */
+export function dismissGuestTutorialForever() {
+  const role = getGuestState().role;
+  if (role === "commissioner") {
+    patchGuestState({
+      commishTutorialDone: true,
+      playerTutorialDone: true,
+      welcomeDone: true,
+    });
+  } else if (role === "player") {
+    patchGuestState({ playerTutorialDone: true, welcomeDone: true });
+  } else {
+    patchGuestState({
+      playerTutorialDone: true,
+      commishTutorialDone: true,
+      welcomeDone: true,
+    });
+  }
+}
+
+/**
  * Start guest demo: seed local world, session, league. Returns home path.
  */
 export function enterGuestDemo(): { ok: true } | { ok: false; error: string } {

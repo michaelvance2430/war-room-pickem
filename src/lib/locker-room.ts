@@ -233,6 +233,19 @@ export async function loadLockerMessages(limit = 100): Promise<{
   weekLabel?: string;
   error?: string;
 }> {
+  // Guest tour: never hit Supabase with a fake league id (uuid errors = broken product).
+  // Guests observe — membership unlock is the only message.
+  try {
+    const { isGuestMode } = await import("./guest-mode");
+    if (isGuestMode()) {
+      const { startIso, label } = getLockerWeekBounds();
+      void startIso;
+      return { ok: true, messages: [], weekLabel: label };
+    }
+  } catch {
+    /* fall through */
+  }
+
   const session = getSession();
   if (!session?.leagueId) {
     return { ok: false, error: "No league selected" };
@@ -262,7 +275,19 @@ export async function loadLockerMessages(limit = 100): Promise<{
           "Locker Room isn’t set up yet. Commissioner: run supabase/locker-room.sql in Supabase SQL Editor once.",
       };
     }
-    return { ok: false, error: error.message };
+    // Never leak Postgres / uuid / infrastructure strings into the room
+    const raw = error.message || "Could not load";
+    if (
+      /uuid|invalid input syntax|22P02|PGRST|permission|JWT|row-level/i.test(
+        raw
+      )
+    ) {
+      return {
+        ok: false,
+        error: "Couldn’t load Locker right now. Try again in a moment.",
+      };
+    }
+    return { ok: false, error: raw };
   }
 
   const rows = (data || []) as Record<string, unknown>[];

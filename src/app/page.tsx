@@ -135,6 +135,11 @@ export default function Home() {
   // Soft: is there a card to pick? (new-player waiting room)
   useEffect(() => {
     if (!ready) return;
+    // Guest tour always has Week 9 — never flash "waiting on the card"
+    if (isGuestMode()) {
+      setLiveCard(true);
+      return;
+    }
     let cancelled = false;
     void (async () => {
       try {
@@ -157,10 +162,19 @@ export default function Home() {
 
   // After hydrate: paint from local session before browser paint (no #418).
   // Soft nav re-mounts also re-run this — restores shell without stuck Loading.
+  // Sacred rule: Home always opens — especially guest tour.
   useLayoutEffect(() => {
     try {
       document.body.style.overflow = "";
       document.documentElement.style.overflow = "";
+    } catch {
+      /* ok */
+    }
+    try {
+      if (isGuestMode()) {
+        const { ensureGuestWorld } = require("@/lib/guest-mode") as typeof import("@/lib/guest-mode");
+        ensureGuestWorld();
+      }
     } catch {
       /* ok */
     }
@@ -175,6 +189,7 @@ export default function Home() {
     setFirstWeekChrome(shell.firstWeekChrome);
     setShowGazetteShelf(shell.showGazetteShelf);
     setReady(true);
+    setBootError(null);
     try {
       const { applySportTheme } =
         require("@/lib/sports/sport-theme") as typeof import("@/lib/sports/sport-theme");
@@ -212,10 +227,19 @@ export default function Home() {
 
   useEffect(() => {
     let cancelled = false;
-    // Never leave Home on "Loading…" forever
+    // Never leave Home on "Opening Home…" forever — fail open, not hang
     const bootWatch = window.setTimeout(() => {
       if (cancelled) return;
       try {
+        if (isGuestMode()) {
+          try {
+            const { ensureGuestWorld } =
+              require("@/lib/guest-mode") as typeof import("@/lib/guest-mode");
+            ensureGuestWorld();
+          } catch {
+            /* ok */
+          }
+        }
         const shell = readLocalHomeShell();
         if (shell) {
           setLeagueCode(shell.leagueCode);
@@ -227,29 +251,51 @@ export default function Home() {
           setFirstWeekChrome(shell.firstWeekChrome);
           setShowGazetteShelf(shell.showGazetteShelf);
           setReady(true);
+          setBootError(null);
           return;
         }
       } catch {
         /* fall through */
       }
-      // Still no local shell — fail open with error, not infinite spinner
+      // Still no local shell — recoverable path, not infinite spinner
       setBootError(
-        "App took too long to open. Check your connection, then try again."
+        "Couldn’t open your room yet. Sign in or refresh — Home never stays stuck."
       );
       setReady(false);
-    }, 4_000);
+    }, 2_500);
 
     async function boot() {
       try {
         if (isGuestMode()) {
+          try {
+            const { ensureGuestWorld } = await import("@/lib/guest-mode");
+            ensureGuestWorld();
+          } catch {
+            /* ok */
+          }
           const session = getSession();
           const league = getLeague();
           if (!session || !league) {
+            // Re-seed failed? Soft land on login — never hang on Opening Home
             router.replace("/login");
             return;
           }
-          // Layout effect usually already painted guest shell
+          setLeagueCode(league.code);
+          setLeagueName(league.name);
+          setSportId(league.sportId || "cfb");
+          setHomeTagline(
+            resolveHomeTagline({
+              homeTaglineId: league.settings?.homeTaglineId,
+              homeTaglineCustom: league.settings?.homeTaglineCustom,
+              sportId: league.sportId || "cfb",
+            })
+          );
+          setIsCommish(isCommissioner());
+          setActuallyCommish(isActuallyCommissioner());
+          setFirstWeekChrome(false);
+          setShowGazetteShelf(true);
           setReady(true);
+          setBootError(null);
           return;
         }
 
@@ -574,13 +620,18 @@ export default function Home() {
         <main className="flex-1 flex flex-col items-center justify-center px-4 gap-3">
           <p className="text-sm text-muted">Opening Home…</p>
           <p className="text-xs text-muted max-w-sm text-center leading-relaxed">
-            If this hangs, your room cache is empty — try Sign in or refresh.
+            One moment while we open your room.
           </p>
           <div className="flex gap-2 mt-2">
             <button
               type="button"
               onClick={() => {
                 try {
+                  if (isGuestMode()) {
+                    const { ensureGuestWorld } =
+                      require("@/lib/guest-mode") as typeof import("@/lib/guest-mode");
+                    ensureGuestWorld();
+                  }
                   window.location.assign("/");
                 } catch {
                   window.location.href = "/";

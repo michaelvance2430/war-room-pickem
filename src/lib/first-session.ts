@@ -27,6 +27,21 @@ export async function leagueHasLiveCard(opts?: {
   ) {
     return liveCardCache.value;
   }
+  // Guest tour always has a live card — never "waiting on the card"
+  try {
+    const { isGuestMode, ensureGuestWorld } = await import("./guest-mode");
+    if (isGuestMode()) {
+      ensureGuestWorld();
+      const week = await loadLeagueActiveWeek();
+      const card = await loadWeekCard(week);
+      const value = !!(card?.games && card.games.length > 0);
+      // Contract: tour room is pickable. Don't contradict Picks.
+      liveCardCache = { at: Date.now(), value: value || true };
+      return true;
+    }
+  } catch {
+    /* fall through */
+  }
   try {
     const pub = await listPublishedWeekNumbers();
     if (pub.length > 0) {
