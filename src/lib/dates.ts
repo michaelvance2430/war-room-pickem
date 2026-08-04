@@ -148,6 +148,92 @@ export function formatCardLockDeadline(games: Game[]): string {
   return formatKickoff(new Date(t).toISOString()).full;
 }
 
+/** League Lock Timer — time remaining until first kickoff freezes the card. */
+export type LeagueLockCountdown = {
+  locked: boolean;
+  /** No usable kickoff times on the card */
+  unknown: boolean;
+  msRemaining: number;
+  /** Primary display e.g. "1d 18h 42m" / "18h 12m" / "42m" */
+  headline: string;
+  /** Multi-part display when ≥ 24h: ["1 DAY", "18 HOURS", "42 MINUTES"] */
+  parts: string[] | null;
+};
+
+/**
+ * Format remaining time to first kickoff for the League Lock Timer.
+ * Quiet urgency — not a generic event countdown.
+ */
+export function formatLeagueLockCountdown(
+  games: Game[],
+  now = Date.now()
+): LeagueLockCountdown {
+  const lockAt = firstKickoffOnCardMs(games);
+  if (!lockAt) {
+    return {
+      locked: false,
+      unknown: true,
+      msRemaining: 0,
+      headline: "",
+      parts: null,
+    };
+  }
+  const ms = lockAt - now;
+  if (ms <= 0) {
+    return {
+      locked: true,
+      unknown: false,
+      msRemaining: 0,
+      headline: "LOCKED",
+      parts: null,
+    };
+  }
+  const totalMin = Math.floor(ms / 60_000);
+  const days = Math.floor(totalMin / (60 * 24));
+  const hours = Math.floor((totalMin % (60 * 24)) / 60);
+  const mins = totalMin % 60;
+
+  if (days >= 1) {
+    const dayLabel = days === 1 ? "1 DAY" : `${days} DAYS`;
+    const hourLabel = hours === 1 ? "1 HOUR" : `${hours} HOURS`;
+    const minLabel = mins === 1 ? "1 MINUTE" : `${mins} MINUTES`;
+    return {
+      locked: false,
+      unknown: false,
+      msRemaining: ms,
+      headline: `${days}d ${hours}h ${mins}m`,
+      parts: [dayLabel, hourLabel, minLabel],
+    };
+  }
+  if (totalMin >= 60) {
+    return {
+      locked: false,
+      unknown: false,
+      msRemaining: ms,
+      headline: `${hours}h ${mins}m`,
+      parts: null,
+    };
+  }
+  // Under one hour — show minutes (and seconds when < 10 min for live feel)
+  if (totalMin >= 10) {
+    return {
+      locked: false,
+      unknown: false,
+      msRemaining: ms,
+      headline: `${Math.max(1, mins)}m`,
+      parts: null,
+    };
+  }
+  const secs = Math.floor((ms % 60_000) / 1000);
+  return {
+    locked: false,
+    unknown: false,
+    msRemaining: ms,
+    headline: mins > 0 ? `${mins}m ${secs}s` : `${secs}s`,
+    parts: null,
+  };
+}
+
 /**
  * Human labels for pick'em weeks — see season-calendar.ts for full scrub
  * (Week 0 → RS → Conf Champ cut → CFP).

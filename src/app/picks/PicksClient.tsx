@@ -67,6 +67,7 @@ import {
   quietPicksIntro,
 } from "@/lib/picks-progressive";
 import { isEyesLocalPlayActive } from "@/lib/creator-eyes";
+import LeagueLockTimer from "@/components/LeagueLockTimer";
 
 function formatSpread(
   spread: number,
@@ -1730,6 +1731,14 @@ export default function PicksClient() {
       </div>
         )}
 
+
+                {/* League Lock Timer — answers "How long do I have left?" before the card */}
+        {hasCard && games.length > 0 && (
+          <LeagueLockTimer
+            games={games}
+            hidden={practiceMode || isPastOrOtherWeek || !weekEditable}
+          />
+        )}
 
         {quietPicks && !practiceMode && weekEditable && hasCard && !cardFrozen && (
           <div className="mb-4 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-xs text-muted leading-relaxed">
