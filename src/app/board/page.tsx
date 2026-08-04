@@ -257,9 +257,8 @@ function BoardInner() {
           </p>
           <h1 className="text-2xl font-black mt-1">The Board</h1>
           <p className="text-sm text-muted mt-2 leading-relaxed max-w-xl">
-            Once the first game kicks off, every player&apos;s locked card is
-            revealed here. Compare picks, celebrate the bold calls, and see who
-            saw the week coming.
+            First kickoff hits — every locked card gets dumped here. Who faded
+            the chalk, who went full chaos, and who already needs an alibi.
           </p>
         </div>
 
@@ -311,10 +310,10 @@ function BoardInner() {
                 ) : (
                   <>
                     <p className="text-sm font-semibold text-foreground">
-                      Nothing to reveal…yet
+                      Still classified.
                     </p>
                     <p className="text-xs text-muted mt-1">
-                      Cards become public after the first kickoff
+                      Vault opens at first kickoff
                       {firstKick
                         ? ` (${new Date(firstKick).toLocaleString(undefined, {
                             weekday: "short",
@@ -324,7 +323,7 @@ function BoardInner() {
                             minute: "2-digit",
                           })})`
                         : ""}
-                      . Until then, everyone&apos;s picks stay secret.
+                      . Until then, nobody sees nobody.
                     </p>
                   </>
                 )}
@@ -386,11 +385,11 @@ function BoardInner() {
             {error && (
               <div className="rounded-xl border border-border bg-card px-4 py-4 mb-6">
                 <p className="text-sm font-semibold text-foreground">
-                  Nothing to reveal…yet
+                  Still classified.
                 </p>
                 <p className="text-xs text-muted mt-2 leading-relaxed">
-                  Cards become public after the first kickoff. Until then,
-                  everyone&apos;s picks stay secret.
+                  Picks stay secret until the first whistle. Come back after
+                  kickoff when the whole room gets exposed.
                 </p>
               </div>
             )}

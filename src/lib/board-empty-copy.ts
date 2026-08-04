@@ -1,6 +1,7 @@
 /**
  * Empty Board — nothing public yet.
  * One job: reveal locked cards after kickoff. No tour, no CTAs.
+ * Voice: War Room — fun, dry, a little mean. Not corporate.
  */
 
 export type BoardEmptyTake = {
@@ -13,8 +14,8 @@ export type BoardEmptyTake = {
 export const BOARD_EMPTY_TAKES: BoardEmptyTake[] = [
   {
     emoji: "🔒",
-    title: "Nothing to reveal…yet.",
-    body: "Cards become public after the first kickoff. Until then, everyone's picks stay secret.",
+    title: "Still classified.",
+    body: "Picks stay secret until the first whistle. Come back after kickoff when the whole room gets exposed.",
   },
 ];
 
