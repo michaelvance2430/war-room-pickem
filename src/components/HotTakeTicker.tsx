@@ -57,7 +57,7 @@ export default function HotTakeTicker({
           return;
         }
 
-        const players = await loadLeaguePlayers();
+        const players = await loadLeaguePlayers("HotTakeTicker.load");
         if (cancelled) return;
         setTakes(buildHotTakes(players, voice));
       } catch {

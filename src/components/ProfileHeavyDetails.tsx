@@ -277,7 +277,9 @@ export default function ProfileHeavyDetails({
       if (cancelled) return;
       try {
         const { loadLeaguePlayers } = await import("@/lib/cloud");
-        const players = await loadLeaguePlayers().catch(() => [] as Player[]);
+        const players = await loadLeaguePlayers(
+          "ProfileHeavyDetails.peers"
+        ).catch(() => [] as Player[]);
         if (cancelled || !players.length) return;
         leaguePeers = players;
         const richer = players.find((p) => p.id === seed.id);

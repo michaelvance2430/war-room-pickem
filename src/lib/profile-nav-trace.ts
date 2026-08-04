@@ -484,3 +484,179 @@ export function profileNavUsable(extra?: string) {
 export function getActiveProfileNavTraceId(): string | null {
   return active?.id ?? null;
 }
+
+// ── loadLeaguePlayers CALL GRAPH (feedback-loop detector) ─────────────────
+// Not a timing trace — answers: who keeps calling loadLeaguePlayers?
+
+type LlpNode = {
+  seq: number;
+  at: number;
+  kind: "cache-hit" | "inflight" | "network";
+  caller: string;
+  stack: string;
+  path: string;
+  chainedFrom: number | null;
+  msSincePrev: number;
+  inflightDepth: number;
+};
+
+let llpSeq = 0;
+let llpInflightDepth = 0;
+let llpLastSeq = 0;
+let llpLastAt = 0;
+let llpLastEndSeq = 0;
+let llpLastEndAt = 0;
+const llpRecent: LlpNode[] = [];
+const LLP_CHAIN_MS = 80; // if re-entered this soon after prior end → treat as chain
+
+function appStackFrames(max = 8): string {
+  try {
+    const lines = (new Error().stack || "").split("\n").slice(2);
+    const app = lines
+      .map((s) => s.trim())
+      .filter(
+        (s) =>
+          /war-room|war_room|src[/\\]|app[/\\]|components[/\\]|lib[/\\]/i.test(
+            s
+          ) ||
+          (!/node_modules|webpack-internal|react-dom|scheduler/i.test(s) &&
+            s.includes("at "))
+      )
+      .slice(0, max);
+    return (app.length ? app : lines.slice(0, 4))
+      .map((s) => s.replace(/\s+/g, " ").slice(0, 100))
+      .join(" ← ");
+  } catch {
+    return "?";
+  }
+}
+
+function inferCallerFromStack(stack: string): string {
+  // Prefer first named function that is not loadLeaguePlayers itself
+  const parts = stack.split(" ← ");
+  for (const p of parts) {
+    const m =
+      p.match(/at\s+([A-Za-z0-9_$.]+)/) ||
+      p.match(/([A-Za-z0-9_]+)\s*\(/);
+    if (!m) continue;
+    const name = m[1];
+    if (/loadLeaguePlayers|profileNav|Object\.|async/i.test(name)) continue;
+    return name;
+  }
+  return "unknown";
+}
+
+/**
+ * Log one loadLeaguePlayers entry for call-graph reconstruction.
+ * Returns seq so the callee can log end + chain.
+ */
+export function logLoadLeaguePlayersCall(kind: LlpNode["kind"], extra?: string): number {
+  if (!canUse() || !isProfileNavTraceEnabled()) return -1;
+  // Always log LLP graph when on /profile OR profile-nav active
+  let path = "?";
+  try {
+    path = location.pathname || "?";
+  } catch {
+    /* ok */
+  }
+  const onProfile = path.startsWith("/profile");
+  if (!onProfile && !active) return -1;
+
+  const seq = ++llpSeq;
+  const now = nowMs();
+  const stack = appStackFrames(10);
+  const caller = inferCallerFromStack(stack);
+  const msSincePrev = llpLastAt ? Math.round(now - llpLastAt) : -1;
+  // Chained if we re-enter soon after a prior call *ended* (completion → re-fire)
+  const chainedFrom =
+    llpLastEndAt && now - llpLastEndAt < LLP_CHAIN_MS
+      ? llpLastEndSeq
+      : llpLastAt && now - llpLastAt < LLP_CHAIN_MS
+        ? llpLastSeq
+        : null;
+
+  llpInflightDepth += 1;
+  const node: LlpNode = {
+    seq,
+    at: now,
+    kind,
+    caller,
+    stack: stack.slice(0, 400),
+    path,
+    chainedFrom,
+    msSincePrev,
+    inflightDepth: llpInflightDepth,
+  };
+  llpRecent.push(node);
+  if (llpRecent.length > 80) llpRecent.shift();
+  llpLastSeq = seq;
+  llpLastAt = now;
+
+  const tid = active?.id || "llp";
+  const chain =
+    chainedFrom != null ? ` chainedFrom=#${chainedFrom}` : " chainedFrom=none";
+  // eslint-disable-next-line no-console
+  console.log(
+    `[WR-LLP-GRAPH][${tid}] #${seq} kind=${kind} caller=${caller}${chain} msSincePrev=${msSincePrev} depth=${llpInflightDepth} path=${path}${
+      extra ? ` ${extra}` : ""
+    }`
+  );
+  // eslint-disable-next-line no-console
+  console.log(`[WR-LLP-GRAPH][${tid}] #${seq} stack ${stack.slice(0, 350)}`);
+
+  // Burst warning: >15 calls in 2s
+  const windowStart = now - 2000;
+  const burst = llpRecent.filter((n) => n.at >= windowStart).length;
+  if (burst === 15 || burst === 30 || burst === 50) {
+    // eslint-disable-next-line no-console
+    console.log(
+      `[WR-LLP-GRAPH][${tid}] BURST ${burst} calls in 2s — likely feedback loop. Top callers: ${summarizeLlpCallers(windowStart)}`
+    );
+  }
+
+  return seq;
+}
+
+export function logLoadLeaguePlayersEnd(seq: number, kind: string, extra?: string) {
+  if (seq < 0) return;
+  llpInflightDepth = Math.max(0, llpInflightDepth - 1);
+  llpLastEndSeq = seq;
+  llpLastEndAt = nowMs();
+  if (!canUse() || !isProfileNavTraceEnabled()) return;
+  const tid = active?.id || "llp";
+  // eslint-disable-next-line no-console
+  console.log(
+    `[WR-LLP-GRAPH][${tid}] #${seq} END kind=${kind} depth=${llpInflightDepth}${
+      extra ? ` ${extra}` : ""
+    }`
+  );
+}
+
+function summarizeLlpCallers(since: number): string {
+  const counts = new Map<string, number>();
+  for (const n of llpRecent) {
+    if (n.at < since) continue;
+    counts.set(n.caller, (counts.get(n.caller) || 0) + 1);
+  }
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([c, n]) => `${c}×${n}`)
+    .join(", ");
+}
+
+export function logPlayersCacheInvalidate(reason: string) {
+  if (!canUse() || !isProfileNavTraceEnabled()) return;
+  let path = "?";
+  try {
+    path = location.pathname || "?";
+  } catch {
+    /* ok */
+  }
+  if (!path.startsWith("/profile") && !active) return;
+  const tid = active?.id || "llp";
+  // eslint-disable-next-line no-console
+  console.log(
+    `[WR-LLP-GRAPH][${tid}] CACHE-INVALIDATE reason=${reason} path=${path} stack=${appStackFrames(6)}`
+  );
+}

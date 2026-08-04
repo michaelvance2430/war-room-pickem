@@ -304,7 +304,7 @@ export async function findNewBadgeUnlocksForSession(): Promise<{
     }
 
     const { loadLeaguePlayers, loadLeagueActiveWeek } = await import("./cloud");
-    let players = await loadLeaguePlayers();
+    let players = await loadLeaguePlayers("badge-celebration.findUnlocks");
     players = syncLeagueCheevoKing(players.map((p) => withPermanentBadges(p)));
     const me = players.find((p) => p.id === session.playerId);
     if (!me) return null;

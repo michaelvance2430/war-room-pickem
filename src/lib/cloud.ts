@@ -217,6 +217,17 @@ function cacheSet<T>(map: Map<string, CacheEntry<T>>, key: string, value: T) {
 
 /** After publish / score / card edit — drop stale reads. */
 export function invalidateCloudWeekCaches(leagueId?: string | null) {
+  try {
+    // Feedback-loop detector: clearing playersCache forces every caller to re-network
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { logPlayersCacheInvalidate } =
+      require("./profile-nav-trace") as typeof import("./profile-nav-trace");
+    logPlayersCacheInvalidate(
+      leagueId ? `league=${String(leagueId).slice(0, 8)}` : "all-leagues"
+    );
+  } catch {
+    /* ok */
+  }
   if (!leagueId) {
     cardCache.clear();
     cardInflight.clear();
@@ -2720,7 +2731,7 @@ export async function saveResultsAndScoreWeek(opts: {
   // Snapshot Gazette edition for the archive (survives until season reset)
   try {
     const { snapshotGazetteAfterScore } = await import("@/lib/gazette");
-    const players = await loadLeaguePlayers();
+    const players = await loadLeaguePlayers("scoreWeek.snapshotGazette");
     await snapshotGazetteAfterScore(players, weekNumber);
   } catch {
     /* best-effort */
@@ -2729,7 +2740,7 @@ export async function saveResultsAndScoreWeek(opts: {
   // Auto Trophy Room — champs / toilet / divisions / nerd (no manual form)
   try {
     const { autoEngraveAllTrophies } = await import("./auto-trophies");
-    const players = await loadLeaguePlayers();
+    const players = await loadLeaguePlayers("scoreWeek.autoTrophies");
     await autoEngraveAllTrophies({ weekNumber, players });
   } catch {
     /* best-effort */
@@ -2900,35 +2911,77 @@ export async function loadLeagueStandings(): Promise<StandingsCloudRow[]> {
   return mapStandingsRows(fallback.data);
 }
 
-/** Cloud standings mapped to Player shape for Standings / Power Rankings / Stats. */
-export async function loadLeaguePlayers(): Promise<
-  import("./types").Player[]
-> {
-  try {
-    const { profileNavLeagueWork } = await import("./profile-nav-trace");
-    profileNavLeagueWork("loadLeaguePlayers", "call");
-  } catch {
-    /* ok */
-  }
+/**
+ * Cloud standings mapped to Player shape for Standings / Power Rankings / Stats.
+ * Optional `caller` tags the call graph (prefer explicit labels at call sites).
+ */
+export async function loadLeaguePlayers(
+  caller?: string
+): Promise<import("./types").Player[]> {
+  let graphSeq = -1;
+  const tagEnd = (kind: string, extra?: string) => {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { logLoadLeaguePlayersEnd } =
+        require("./profile-nav-trace") as typeof import("./profile-nav-trace");
+      logLoadLeaguePlayersEnd(graphSeq, kind, extra);
+    } catch {
+      /* ok */
+    }
+  };
+
   try {
     const { isGuestMode } = await import("./guest-mode");
     if (isGuestMode()) {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { logLoadLeaguePlayersCall } =
+          require("./profile-nav-trace") as typeof import("./profile-nav-trace");
+        graphSeq = logLoadLeaguePlayersCall(
+          "cache-hit",
+          `guest caller=${caller || "unknown"}`
+        );
+      } catch {
+        /* ok */
+      }
       const { loadPlayers } = await import("./store");
-      return loadPlayers();
+      const p = loadPlayers();
+      tagEnd("guest", `n=${p.length}`);
+      return p;
     }
   } catch {
     /* fall through */
   }
 
   const session = getSession();
-  if (!session?.leagueId) return [];
+  if (!session?.leagueId) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { logLoadLeaguePlayersCall, logLoadLeaguePlayersEnd } =
+        require("./profile-nav-trace") as typeof import("./profile-nav-trace");
+      const s = logLoadLeaguePlayersCall(
+        "cache-hit",
+        `no-session caller=${caller || "unknown"}`
+      );
+      logLoadLeaguePlayersEnd(s, "no-session");
+    } catch {
+      /* ok */
+    }
+    return [];
+  }
   const key = session.leagueId;
 
   const hit = cacheGet(playersCache, key, PLAYERS_TTL_MS);
   if (hit !== undefined) {
     try {
-      const { profileNavLeagueWork } = await import("./profile-nav-trace");
-      profileNavLeagueWork("loadLeaguePlayers", "cache-hit", `n=${hit.length}`);
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { logLoadLeaguePlayersCall, logLoadLeaguePlayersEnd } =
+        require("./profile-nav-trace") as typeof import("./profile-nav-trace");
+      graphSeq = logLoadLeaguePlayersCall(
+        "cache-hit",
+        `n=${hit.length} caller=${caller || "unknown"} ttlMs=${PLAYERS_TTL_MS}`
+      );
+      logLoadLeaguePlayersEnd(graphSeq, "cache-hit", `n=${hit.length}`);
     } catch {
       /* ok */
     }
@@ -2936,7 +2989,34 @@ export async function loadLeaguePlayers(): Promise<
   }
 
   const inflight = playersInflight.get(key);
-  if (inflight) return inflight;
+  if (inflight) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { logLoadLeaguePlayersCall, logLoadLeaguePlayersEnd } =
+        require("./profile-nav-trace") as typeof import("./profile-nav-trace");
+      graphSeq = logLoadLeaguePlayersCall(
+        "inflight",
+        `caller=${caller || "unknown"}`
+      );
+      return inflight.finally(() => {
+        logLoadLeaguePlayersEnd(graphSeq, "inflight-join");
+      });
+    } catch {
+      return inflight;
+    }
+  }
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { logLoadLeaguePlayersCall } =
+      require("./profile-nav-trace") as typeof import("./profile-nav-trace");
+    graphSeq = logLoadLeaguePlayersCall(
+      "network",
+      `caller=${caller || "unknown"}`
+    );
+  } catch {
+    /* ok */
+  }
 
   const promise = (async () => {
     const cloud = await loadLeagueStandings();
@@ -2976,13 +3056,23 @@ export async function loadLeaguePlayers(): Promise<
         lastSeenAt: c.lastSeenAt ?? null,
       }));
     } finally {
-      if (mapEnd) mapEnd("loadLeaguePlayers.mapToPlayer", mapT0, `n=${cloud.length}`);
+      if (mapEnd)
+        mapEnd("loadLeaguePlayers.mapToPlayer", mapT0, `n=${cloud.length}`);
     }
     cacheSet(playersCache, key, players);
     return players;
-  })().finally(() => {
-    playersInflight.delete(key);
-  });
+  })()
+    .then((players) => {
+      tagEnd("network", `n=${players.length}`);
+      return players;
+    })
+    .catch((err) => {
+      tagEnd("network-fail", err instanceof Error ? err.message : "fail");
+      throw err;
+    })
+    .finally(() => {
+      playersInflight.delete(key);
+    });
 
   playersInflight.set(key, promise);
   return promise;

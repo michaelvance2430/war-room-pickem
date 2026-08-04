@@ -99,7 +99,10 @@ export default function StandingsPage() {
         setSeasonStarted(scored);
 
         mark("loadLeaguePlayers-start");
-        const list = await pageLoad(loadLeaguePlayers(), []);
+        const list = await pageLoad(
+          loadLeaguePlayers("StandingsPage.load"),
+          []
+        );
         mark(
           "loadLeaguePlayers-done",
           `n=${Array.isArray(list) ? list.length : 0} scored=${scored}`

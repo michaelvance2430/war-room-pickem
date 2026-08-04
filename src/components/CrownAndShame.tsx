@@ -87,7 +87,7 @@ export default function CrownAndShame({
         const players =
           playersProp && playersProp.length > 0
             ? playersProp
-            : await loadLeaguePlayers();
+            : await loadLeaguePlayers("CrownAndShame.load");
         if (cancelled) return;
         // Double gate: cloud scored weeks + real weeksPlayed on memberships
         const crown = weekCrownAndShame(players);

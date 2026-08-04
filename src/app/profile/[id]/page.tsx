@@ -280,7 +280,7 @@ export default function ProfilePage() {
             `${Math.round(performance.now() - t0)}ms`
           );
           const t1 = performance.now();
-          const players = await loadLeaguePlayers();
+          const players = await loadLeaguePlayers("ProfilePage.identity");
           mark(
             "players-fetch-done",
             `${Math.round(performance.now() - t1)}ms n=${players.length}`
