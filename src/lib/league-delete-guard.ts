@@ -1,8 +1,12 @@
 /**
- * Mid-season league delete protection.
+ * League delete protection — community owns history.
  *
- * PRODUCT RULE: A commissioner who is getting crushed cannot nuke the room
- * for everyone. Mid-season delete is blocked so the team stays together.
+ * CONSTITUTION:
+ *  - The league belongs to the community, not the commissioner.
+ *  - Nothing earned should disappear because one person clicked a button.
+ *  - Commissioners cannot hard-delete production rooms with history.
+ *  - Disposable only: solo empty rooms (no other humans, no scores, no play).
+ *  - Full retirement = future community vote (not hard-delete).
  *
  * Nobody is forced to become commissioner. The room stays open; any other
  * real player can voluntarily take the keys so everyone can finish the season.
@@ -26,7 +30,10 @@ export type PassCandidate = {
 };
 
 export type LeagueDeleteEval = {
-  /** True if hard delete is allowed (preseason / empty / solo) */
+  /**
+   * True only for disposable empty solo rooms.
+   * Never true when other humans or any play/score history exist.
+   */
   canHardDelete: boolean;
   /** Human explanation */
   reason: string;
@@ -39,15 +46,16 @@ export type LeagueDeleteEval = {
 };
 
 /**
- * Mid-season = at least one other real player AND the season has real progress
- * (a scored week, or anyone has points / weeks played).
+ * Hard delete only when the room is disposable:
+ * no other real players, no scored weeks, nobody has played.
+ * Anything else = community history (or a multi-human commitment) → survive.
  */
 export async function evaluateLeagueDelete(
   leagueId: string
 ): Promise<LeagueDeleteEval> {
   const empty: LeagueDeleteEval = {
     canHardDelete: true,
-    reason: "Empty or preseason room — hard delete is allowed.",
+    reason: "Empty solo room — no community history yet.",
     otherHumans: 0,
     scoredWeeks: 0,
     firstPlace: null,
@@ -105,9 +113,6 @@ export async function evaluateLeagueDelete(
       (r.weeks_played || 0) > 0
   );
 
-  const midSeason =
-    otherHumans >= 1 && (scoredWeeks > 0 || anyonePlayed);
-
   // All other humans, points high → low (for voluntary pick list)
   const candidates: PassCandidate[] = [...others]
     .sort((a, b) => {
@@ -133,13 +138,14 @@ export async function evaluateLeagueDelete(
       }
     : null;
 
-  if (!midSeason) {
+  // Disposable = solo + zero history. Not "preseason with friends."
+  const disposable =
+    otherHumans === 0 && scoredWeeks === 0 && !anyonePlayed;
+
+  if (disposable) {
     return {
       canHardDelete: true,
-      reason:
-        otherHumans === 0
-          ? "No other real players — you can delete this room."
-          : "Season hasn't really started yet — hard delete is still allowed.",
+      reason: "Empty solo room — no community history yet.",
       otherHumans,
       scoredWeeks,
       firstPlace,
@@ -147,10 +153,14 @@ export async function evaluateLeagueDelete(
     };
   }
 
+  const reason =
+    scoredWeeks > 0 || anyonePlayed
+      ? "This room has real season history. Commissioners cannot erase it. Pass the keys if you need to step down — retirement is a community decision later."
+      : "Other players are in this room. The league belongs to the community. Pass the keys if you need to step down — you cannot delete their seat.";
+
   return {
     canHardDelete: false,
-    reason:
-      "This season is live with other players. The room stays so the team can finish — you can't delete it mid-season. Nobody is forced to be commissioner: when someone is ready to jump in, pass them the keys.",
+    reason,
     otherHumans,
     scoredWeeks,
     firstPlace,

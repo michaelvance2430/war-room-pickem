@@ -23,15 +23,27 @@ Those make people question **every** achievement.
 
 > **Commissioners create experiences. They do not create history.**
 
+> **The league belongs to the community, not the commissioner.**
+
+> **Nothing earned in War Room should disappear because one person clicked a button.**
+
 A commissioner may:
 
 * Build cards  
 * Publish weeks  
 * Score **manual props** (when the product requires human input)  
-* Close the league  
-* Edit **league settings** (name, theme, schedule prefs — not careers)
+* Close the **season** (system closeout / trophy ceremony — not free-form erase)  
+* Edit **league settings** (name, theme, schedule prefs — not careers)  
+* Voluntarily pass the keys  
+* **Request** league retirement (future) — never unilaterally delete production history  
 
-A commissioner may **never** manufacture career accomplishments.
+A commissioner may **never**:
+
+* Manufacture career accomplishments  
+* Hard-delete a production league that has community history  
+* Erase trophies, Gazette, standings, or career progression by a single click  
+
+**Profiles are sacred. Leagues are sacred.**
 
 ---
 
@@ -162,8 +174,21 @@ User-facing can stay beautiful. Trust lives in the ledger.
 | Modify streaks | Same |
 | Change standings manually | Standings are computed |
 | Trigger celebration systems arbitrarily | Celebrations follow real earns |
+| **Delete a production league** | Community owns history — not one host click |
+| Retire a league alone | Future: community vote only |
 
 Everything permanent happens only from **validated game results** (or documented system closeout rules).
+
+### League delete / retirement (audit)
+
+| Type | Delete? | Notes |
+|------|---------|--------|
+| Foundry / sandbox / `is_test` | Yes (disposable) | Never wrote career |
+| Production · empty solo (no other humans, no scores, no play) | Soft escape only | Abandoned empty room — no community history |
+| Production · any community history | **Never hard-delete** | Pass keys; later: Request Retirement vote |
+| Approved community retirement | Close + **preserve forever** | Not implement yet |
+
+**Code bar (now):** `evaluateLeagueDelete` / `deleteLeague` must not allow nuking rooms with other players or any scored/played history.
 
 ---
 
@@ -212,6 +237,9 @@ If **yes** → **fix it** (gate on `production`, route through result pipeline, 
 - [ ] Close League: system-only engraving from scored truth  
 - [ ] Profile / Trophy Room: never show unverified lab hardware as career  
 - [ ] Regression: sim week → prove career tables unchanged  
+- [x] Production hard-delete blocked when other humans or any season history exist  
+- [ ] League mode flag fully gates disposable vs production  
+- [ ] Request League Retirement + community vote (design later)  
 
 ---
 

@@ -237,6 +237,40 @@ They may **never** manufacture career accomplishments — hardware, achievements
 
 Full milestone and write-path checklist: `docs/CAREER-INTEGRITY-AUDIT.md`.
 
+### League ownership principle
+
+> **The league belongs to the community, not the commissioner.**
+
+A commissioner creates the experience. They do **not** own the league, and they cannot erase its history.
+
+> **Nothing earned in War Room should disappear because one person clicked a button.**
+
+That includes league history, championships, Toilet Bowls, hardware, Gazette editions, standings history, and career progression. The community owns those memories.
+
+**Profiles are sacred. Leagues are sacred.** Those two ideas reinforce each other.
+
+#### Product laws
+
+1. **Commissioners cannot delete production leagues. Ever.**  
+   No “Delete League” as a way to erase a real room.  
+   If a commissioner leaves, the league continues.  
+   Commissionership transfers (automatic or voluntary handoff); the room survives.  
+   Players own the history they helped create.
+
+2. **Test / sandbox / Foundry leagues are disposable.**  
+   They may be deleted because they never write career data.  
+   Production leagues cannot be nuked the same way.
+
+3. **League retirement is a community decision (design later).**  
+   A commissioner who believes a room has reached the end of its life may only  
+   **Request League Retirement** — never retire it alone.  
+   War Room runs a league-wide vote (e.g. Keep Active vs Retire; high approval bar;  
+   voting period; idle players must not forever block).  
+   On approved retirement: the league permanently closes, but **all history is preserved forever.**
+
+**Not building the vote system yet.** Law is locked now; workflow comes later.  
+Engineering bar today: no commissioner action may erase production league history.
+
 ### Anticipation principle
 
 > **War Room celebrates anticipation as much as history.**

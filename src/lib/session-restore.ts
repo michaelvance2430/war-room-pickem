@@ -714,9 +714,9 @@ export async function leaveLeague(leagueId: string): Promise<{
 }
 
 /**
- * Commissioner only — deletes the league (cascades memberships, cards, etc.).
- * Mid-season with other humans: blocked (see league-delete-guard). Call
- * evaluateLeagueDelete first; hard-delete only when canHardDelete is true.
+ * Commissioner only — hard-delete disposable empty solo rooms only.
+ * Constitution: community owns league history; production rooms with people
+ * or play cannot be erased by one click (see league-delete-guard).
  */
 export async function deleteLeague(leagueId: string): Promise<{ ok: boolean; error?: string }> {
   const supabase = createClient();
@@ -733,7 +733,7 @@ export async function deleteLeague(leagueId: string): Promise<{ ok: boolean; err
     return { ok: false, error: "Only the commissioner can delete this league" };
   }
 
-  // Server-side belt: block nuke mid-season even if UI is bypassed
+  // Belt: never hard-delete when community/history exists — even if UI is bypassed
   try {
     const { evaluateLeagueDelete } = await import("./league-delete-guard");
     const eval_ = await evaluateLeagueDelete(leagueId);
@@ -742,11 +742,16 @@ export async function deleteLeague(leagueId: string): Promise<{ ok: boolean; err
         ok: false,
         error:
           eval_.reason ||
-          "Mid-season rooms can't be deleted. Keep the team together — pass the keys when someone is ready to jump in.",
+          "This league belongs to the community. Pass the keys — you cannot erase its history.",
       };
     }
   } catch {
-    /* if eval fails, still allow delete only for empty rooms below */
+    // Fail closed: if we cannot prove the room is disposable, do not delete
+    return {
+      ok: false,
+      error:
+        "Could not verify league status. Rooms with players or history cannot be deleted.",
+    };
   }
 
   const { error } = await supabase.from("leagues").delete().eq("id", leagueId);

@@ -487,12 +487,14 @@ export default function AccountPage() {
         passToUserId: eval_.firstPlace?.userId || "",
       });
     } catch {
+      // Fail closed — never offer hard-delete when status is unknown
       setDeleteModal({
         leagueId,
         leagueName,
         eval: {
-          canHardDelete: true,
-          reason: "Could not check season status.",
+          canHardDelete: false,
+          reason:
+            "Could not check league status. Rooms with players or history cannot be deleted — pass the keys instead.",
           otherHumans: 0,
           scoredWeeks: 0,
           firstPlace: null,
@@ -1388,7 +1390,7 @@ export default function AccountPage() {
             <h2 id="delete-league-title" className="text-lg font-bold">
               {deleteModal.eval?.canHardDelete
                 ? `Delete ${deleteModal.leagueName}?`
-                : "Keep the team together"}
+                : "The league stays open"}
             </h2>
 
             {deleteModal.eval?.canHardDelete ? (
@@ -1396,7 +1398,7 @@ export default function AccountPage() {
                 <p className="text-sm text-muted leading-relaxed">
                   This removes <strong className="text-foreground">{deleteModal.leagueName}</strong>{" "}
                   for everyone — standings, picks, the whole board. Only use this
-                  on empty practice rooms or before the season is real.
+                  Only empty solo rooms with no history. Real leagues belong to the community.
                 </p>
       <div className="flex flex-col gap-2">
                   <button
@@ -1405,7 +1407,7 @@ export default function AccountPage() {
                     onClick={() => void confirmHardDelete()}
                     className="w-full min-h-[48px] rounded-xl border border-danger text-danger font-bold text-sm hover:bg-danger/10 disabled:opacity-50"
                   >
-                    {deleteModal.busy ? "Deleting…" : "Yes, delete forever"}
+                    {deleteModal.busy ? "Deleting…" : "Yes, delete empty room"}
                   </button>
       <button
                     type="button"
@@ -1425,11 +1427,12 @@ export default function AccountPage() {
       <p className="text-sm text-muted leading-relaxed">
                   Getting crushed is not a delete button.{" "}
                   <strong className="text-foreground">
-                    Nobody is forced to be commissioner
+                    The league belongs to the community
                   </strong>
-                  . When someone wants to jump in so the room can keep running
-                  week to week, pass them the keys. You stay as a player. Trophy
-                  Room stays with the league.
+                  — not the commissioner. Nobody is forced to host. Pass the
+                  keys when someone is ready. History, trophies, and Gazette stay
+                  with the room. League retirement will be a community vote later
+                  — never one click erase.
                 </p>
 
                 {(deleteModal.eval?.candidates?.length ?? 0) > 0 && (
