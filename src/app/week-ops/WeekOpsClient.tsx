@@ -42,6 +42,16 @@ import {
   type PropCategory,
 } from "@/lib/prop-presets";
 import type { GameResult } from "@/lib/scoring";
+import {
+  loadLeagueFavoriteTeamCounts,
+  resolveGameLeagueInterest,
+  sortGamesByLeagueInterest,
+  type LeagueFavoriteCounts,
+} from "@/lib/league-favorite-interest";
+import LeagueInterestGameMeta, {
+  leagueInterestShellClass,
+  leagueInterestShellStyle,
+} from "@/components/LeagueInterestGameMeta";
 
 type Step = 1 | 2 | 3 | 4 | "score" | "done";
 
@@ -88,6 +98,11 @@ export default function WeekOpsClient() {
 
   const [available, setAvailable] = useState<Game[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [leagueFavCounts, setLeagueFavCounts] =
+    useState<LeagueFavoriteCounts>({});
+  const [gameListSort, setGameListSort] = useState<
+    "default" | "league-interest"
+  >("default");
   const [propCategory, setPropCategory] = useState<PropCategory>(() =>
     defaultPropPreset("cfb").category
   );
@@ -119,6 +134,14 @@ export default function WeekOpsClient() {
         .map((id) => available.find((g) => g.id === id))
         .filter(Boolean) as Game[],
     [selectedIds, available]
+  );
+
+  const displayedGames = useMemo(
+    () =>
+      gameListSort === "league-interest"
+        ? sortGamesByLeagueInterest(available, leagueFavCounts, sportId)
+        : available,
+    [available, gameListSort, leagueFavCounts, sportId]
   );
 
   const boot = useCallback(async () => {
@@ -172,6 +195,13 @@ export default function WeekOpsClient() {
         setLastSynced(new Date());
       }
 
+      try {
+        const counts = await loadLeagueFavoriteTeamCounts(sportId);
+        setLeagueFavCounts(counts);
+      } catch {
+        setLeagueFavCounts({});
+      }
+
       const sp = stepParam ? parseInt(stepParam, 10) : NaN;
       if (sp >= 1 && sp <= 4) setStep(sp as Step);
       else if (card?.games?.length === NEED && card.prop?.question)
@@ -214,6 +244,7 @@ export default function WeekOpsClient() {
       );
       setAvailable(res.games || []);
       setLastSynced(new Date());
+      void loadLeagueFavoriteTeamCounts(sportId).then(setLeagueFavCounts);
       if (!res.games?.length) setError("No games available.");
       else if (selectedIds.length < NEED) setStep(2);
     } catch (e) {
@@ -596,14 +627,48 @@ export default function WeekOpsClient() {
               </button>
             </div>
 
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-[10px] uppercase tracking-wider text-muted font-bold">
+                Sort
+              </p>
+              <button
+                type="button"
+                onClick={() => setGameListSort("default")}
+                className={`px-3 py-1.5 min-h-[36px] rounded-full text-[11px] font-bold border ${
+                  gameListSort === "default"
+                    ? "bg-primary/15 border-primary text-primary"
+                    : "border-border text-muted"
+                }`}
+              >
+                Default
+              </button>
+              <button
+                type="button"
+                onClick={() => setGameListSort("league-interest")}
+                className={`px-3 py-1.5 min-h-[36px] rounded-full text-[11px] font-bold border ${
+                  gameListSort === "league-interest"
+                    ? "bg-sky-500/15 border-sky-500/60 text-sky-300"
+                    : "border-border text-muted"
+                }`}
+                title="Does not auto-select games"
+              >
+                League Interest
+              </button>
+            </div>
+
             <div className="space-y-2.5 max-h-[52vh] overflow-y-auto pb-1">
-              {available.map((g) => {
+              {displayedGames.map((g) => {
                 const on = selectedIds.includes(g.id);
                 const full = selectedIds.length >= NEED && !on;
                 const awayFav = g.favorite === "away";
                 const homeFav = g.favorite === "home";
                 const line = favoriteSpreadLabel(g.spread);
                 const kick = formatKickoff(g.commenceTime || g.startTime);
+                const leagueInterest = resolveGameLeagueInterest(
+                  g,
+                  leagueFavCounts,
+                  sportId
+                );
 
                 return (
                   <button
@@ -614,8 +679,12 @@ export default function WeekOpsClient() {
                     className={`relative w-full text-left rounded-2xl border-2 px-3.5 py-3.5 min-h-[88px] touch-manipulation transition active:scale-[0.99] disabled:opacity-35 ${
                       on
                         ? "border-primary bg-primary/15 ring-2 ring-primary/30 shadow-[0_0_24px_rgba(34,197,94,0.2)]"
-                        : "border-border bg-card hover:border-border/80"
+                        : `border-border bg-card hover:border-border/80 ${leagueInterestShellClass(
+                            leagueInterest,
+                            on
+                          )}`
                     }`}
+                    style={leagueInterestShellStyle(leagueInterest, on)}
                   >
                     {on && (
                       <span
@@ -659,6 +728,8 @@ export default function WeekOpsClient() {
                         {formatRankedTeam(g.homeTeam, g.homeRank)}
                       </p>
                     </div>
+
+                    <LeagueInterestGameMeta interest={leagueInterest} />
 
                     <p className="text-[11px] text-muted mt-2.5">
                       {kick.full}
