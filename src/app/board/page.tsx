@@ -8,10 +8,8 @@
  */
 
 import { useCallback, useEffect, useMemo, useState, Suspense } from "react";
-import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import PlayerLink from "@/components/PlayerLink";
-// Link still used for player profiles / week chips elsewhere
 import {
   loadWeekCard,
   loadWeekResultsFromCloud,
