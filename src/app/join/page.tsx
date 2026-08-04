@@ -496,13 +496,21 @@ function JoinPageInner() {
           }
         }
 
-        // Mid-season OK: 0 season pts (no catch-up). Cheevos/trophies still earnable.
+        // Fair Entry: mid-season joiners start at a frozen band percentile (not 0).
+        let startPts = 0;
+        try {
+          const { resolveFairEntryForJoin } = await import("@/lib/fair-entry");
+          const fe = await resolveFairEntryForJoin(league.id as string);
+          startPts = fe.midSeason ? fe.points : 0;
+        } catch {
+          startPts = 0;
+        }
         const { error: memError } = await supabase.from("memberships").insert({
           league_id: league.id,
           user_id: userId,
           role: "player",
           division,
-          total_points: 0,
+          total_points: startPts,
           weeks_played: 0,
         });
         if (memError) {
@@ -517,6 +525,26 @@ function JoinPageInner() {
           await recordLeagueFirstJoin(league.id);
         } catch {
           /* optional until join-order.sql is run */
+        }
+        // Notice only — never show the point number
+        if (startPts > 0) {
+          try {
+            const { markFairEntryPendingNotice, bandForLatestScoredWeek } =
+              await import("@/lib/fair-entry");
+            const { listScoredWeekNumbers } = await import("@/lib/cloud");
+            const scored = await listScoredWeekNumbers();
+            const latest =
+              scored.length > 0 ? Math.max(...scored.filter((w) => w >= 0)) : null;
+            const band = bandForLatestScoredWeek(latest);
+            if (band) {
+              markFairEntryPendingNotice(league.id as string, userId, {
+                points: startPts,
+                bandId: band.id,
+              });
+            }
+          } catch {
+            /* ignore */
+          }
         }
       }
       // Full settings from cloud so season theme paints immediately for joiners

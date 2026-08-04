@@ -34,6 +34,7 @@ import {
   hasSeenGazetteShelfReveal,
 } from "@/lib/progressive-disclosure";
 import { isFirstWeekChrome } from "@/lib/first-week";
+import FairEntryNotice from "@/components/FairEntryNotice";
 
 const HomeGazetteSpotlight = dynamic(
   () => import("@/components/HomeGazetteSpotlight"),
@@ -620,6 +621,9 @@ export default function Home() {
 
         {/* Host first-hour spine */}
         <CommishSetupBanner />
+
+        {/* Mid-season join — Fair Entry explanation (no point math) */}
+        <FairEntryNotice />
 
         {firstWeekChrome && (
           <p className="text-xs text-muted mb-4 leading-relaxed max-w-xl -mt-1">

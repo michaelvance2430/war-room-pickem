@@ -217,13 +217,28 @@ export async function seatPlayerInLeague(opts: {
     }
     const division = leastPopulatedDivision(counts);
 
-    // Late joiners: 0 season pts (no catch-up). Still earn cheevos/trophies going forward.
+    // Fair Entry: mid-season placement (frozen band), not raw 0.
+    let startPts = 0;
+    try {
+      const { resolveFairEntryForJoin, markFairEntryPendingNotice } =
+        await import("@/lib/fair-entry");
+      const fe = await resolveFairEntryForJoin(league.id as string);
+      startPts = fe.midSeason ? fe.points : 0;
+      if (startPts > 0 && fe.band) {
+        markFairEntryPendingNotice(league.id as string, userId, {
+          points: startPts,
+          bandId: fe.band.id,
+        });
+      }
+    } catch {
+      startPts = 0;
+    }
     const { error: memError } = await supabase.from("memberships").insert({
       league_id: league.id,
       user_id: userId,
       role: "player",
       division,
-      total_points: 0,
+      total_points: startPts,
       weeks_played: 0,
     });
     if (memError) {

@@ -2720,6 +2720,14 @@ export async function saveResultsAndScoreWeek(opts: {
     /* best-effort */
   }
 
+  // Fair Entry — freeze join bands after official score (idempotent)
+  try {
+    const { freezeFairEntryAfterScore } = await import("./fair-entry");
+    await freezeFairEntryAfterScore(weekNumber, leagueId);
+  } catch {
+    /* best-effort */
+  }
+
   return { ok: true, scoredCount, details };
 }
 
