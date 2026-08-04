@@ -220,12 +220,6 @@ export default function ToiletBowlPage() {
               {progressNote ||
                 "Nobody has earned the flush yet. Come back after the first scored week."}
             </p>
-            <Link
-              href="/picks"
-              className="inline-flex min-h-[48px] items-center justify-center px-4 rounded-xl bg-primary text-black text-sm font-extrabold"
-            >
-              Go make your picks →
-            </Link>
           </div>
         )}
 

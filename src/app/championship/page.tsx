@@ -238,12 +238,6 @@ export default function ChampionshipPage() {
               {progressNote ||
                 "Seeds appear after the first week is scored. War Room never invents a bracket."}
             </p>
-            <Link
-              href="/picks"
-              className="inline-flex min-h-[48px] items-center justify-center px-4 rounded-xl bg-primary text-black text-sm font-extrabold"
-            >
-              Go make your picks →
-            </Link>
           </div>
         )}
 
