@@ -295,7 +295,7 @@ export default function HomeWeekHero() {
   let eyebrow = progress;
   let title = weekLabel;
   let body = "";
-  let primaryHref = "/picks";
+  let primaryHref: string | null = "/picks";
   let primaryLabel = "Open My Picks";
   let primaryClass =
     "bg-primary text-black hover:opacity-90";
@@ -340,20 +340,16 @@ export default function HomeWeekHero() {
       secondaryLabel = state.isOps ? "Locker" : "Peek standings";
     }
   } else if (state.iLocked) {
-    // Caught up — reward attention, don't invent the next click
+    // Caught up — status only. Nav owns destinations (no Board/Locker duplicates).
     eyebrow = state.frozen ? "Games are on" : "You're caught up";
     title = state.frozen
       ? `${weekLabel} is live — sit tight`
       : `You're locked for ${weekLabel}`;
     body = state.frozen
       ? "Football's running. Standings move when the card is scored — then the Gazette drops. Nothing fake to do until something real happens."
-      : `You're done for now${state.lockLabel ? ` · lock was ${state.lockLabel}` : ""}. Enjoy the wait. Come back when kickoff hits, the paper drops, or the room has something worth talking about. War Room doesn't cry wolf.`;
-    primaryHref = "/board";
-    primaryLabel = "The Board";
-    primaryClass =
-      "border border-primary/50 text-primary hover:bg-primary/10 bg-transparent";
-    secondaryHref = "/locker-room";
-    secondaryLabel = "Locker";
+      : `You're done for now${state.lockLabel ? ` · lock was ${state.lockLabel}` : ""}. Enjoy the wait. Come back when kickoff hits, the Gazette drops, or the room has something worth talking about.`;
+    primaryHref = null;
+    secondaryHref = null;
   } else if (state.frozen) {
     eyebrow = "Too late";
     title = `${weekLabel} already kicked off`;
@@ -484,24 +480,11 @@ export default function HomeWeekHero() {
           {body}
         </p>
 
-        {/* Full-width primary on phone = one-thumb job; hard nav prepare = clean switch */}
-        <div className="flex flex-col sm:flex-row gap-2 mb-4">
-          <Link
-            href={primaryHref}
-            onClick={() => {
-              try {
-                document.body.style.overflow = "";
-              } catch {
-                /* ignore */
-              }
-            }}
-            className={`inline-flex items-center justify-center w-full sm:w-auto px-5 py-3.5 sm:py-2.5 min-h-[52px] sm:min-h-0 rounded-xl text-base sm:text-sm font-bold transition touch-manipulation active:scale-[0.98] relative z-10 ${primaryClass}`}
-          >
-            {primaryLabel}
-          </Link>
-          {secondaryHref && (
+        {/* Actions only when there is a real job — never duplicate global nav */}
+        {primaryHref && (
+          <div className="flex flex-col sm:flex-row gap-2 mb-4">
             <Link
-              href={secondaryHref}
+              href={primaryHref}
               onClick={() => {
                 try {
                   document.body.style.overflow = "";
@@ -509,12 +492,27 @@ export default function HomeWeekHero() {
                   /* ignore */
                 }
               }}
-              className="inline-flex items-center justify-center w-full sm:w-auto px-4 py-3 sm:py-2.5 min-h-[48px] sm:min-h-0 rounded-xl text-sm font-medium border border-border text-muted hover:text-foreground hover:bg-card/50 transition touch-manipulation relative z-10"
+              className={`inline-flex items-center justify-center w-full sm:w-auto px-5 py-3.5 sm:py-2.5 min-h-[52px] sm:min-h-0 rounded-xl text-base sm:text-sm font-bold transition touch-manipulation active:scale-[0.98] relative z-10 ${primaryClass}`}
             >
-              {secondaryLabel}
+              {primaryLabel}
             </Link>
-          )}
-        </div>
+            {secondaryHref && (
+              <Link
+                href={secondaryHref}
+                onClick={() => {
+                  try {
+                    document.body.style.overflow = "";
+                  } catch {
+                    /* ignore */
+                  }
+                }}
+                className="inline-flex items-center justify-center w-full sm:w-auto px-4 py-3 sm:py-2.5 min-h-[48px] sm:min-h-0 rounded-xl text-sm font-medium border border-border text-muted hover:text-foreground hover:bg-card/50 transition touch-manipulation relative z-10"
+              >
+                {secondaryLabel}
+              </Link>
+            )}
+          </div>
+        )}
 
         {/* League pulse — honesty, not clutter */}
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted border-t border-border/50 pt-3">
