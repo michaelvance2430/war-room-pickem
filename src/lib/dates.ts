@@ -148,17 +148,45 @@ export function formatCardLockDeadline(games: Game[]): string {
   return formatKickoff(new Date(t).toISOString()).full;
 }
 
+/** League Lock Timer personality — story of the week, not a generic clock. */
+export type LeagueLockPhase =
+  | "plenty" // ≥ 24h
+  | "final_day" // < 24h
+  | "locking_soon" // < 1h
+  | "last_call" // < 15m
+  | "locked";
+
+export type LeagueLockSegment = {
+  /** Display value — zero-padded for hours/mins when multi-unit */
+  value: string;
+  /** Small label under the number */
+  unit: string;
+};
+
 /** League Lock Timer — time remaining until first kickoff freezes the card. */
 export type LeagueLockCountdown = {
   locked: boolean;
   /** No usable kickoff times on the card */
   unknown: boolean;
   msRemaining: number;
-  /** Primary display e.g. "1d 18h 42m" / "18h 12m" / "42m" */
+  phase: LeagueLockPhase;
+  /** Screen-reader / compact: "37d 08h 01m" */
   headline: string;
-  /** Multi-part display when ≥ 24h: ["1 DAY", "18 HOURS", "42 MINUTES"] */
-  parts: string[] | null;
+  /** Large number + small unit pairs for visual breath */
+  segments: LeagueLockSegment[];
 };
+
+function pad2(n: number): string {
+  return n < 10 ? `0${n}` : String(n);
+}
+
+function phaseForMs(ms: number): LeagueLockPhase {
+  if (ms <= 0) return "locked";
+  if (ms < 15 * 60_000) return "last_call";
+  if (ms < 60 * 60_000) return "locking_soon";
+  if (ms < 24 * 60 * 60_000) return "final_day";
+  return "plenty";
+}
 
 /**
  * Format remaining time to first kickoff for the League Lock Timer.
@@ -174,8 +202,9 @@ export function formatLeagueLockCountdown(
       locked: false,
       unknown: true,
       msRemaining: 0,
+      phase: "plenty",
       headline: "",
-      parts: null,
+      segments: [],
     };
   }
   const ms = lockAt - now;
@@ -184,25 +213,30 @@ export function formatLeagueLockCountdown(
       locked: true,
       unknown: false,
       msRemaining: 0,
+      phase: "locked",
       headline: "LOCKED",
-      parts: null,
+      segments: [],
     };
   }
   const totalMin = Math.floor(ms / 60_000);
   const days = Math.floor(totalMin / (60 * 24));
   const hours = Math.floor((totalMin % (60 * 24)) / 60);
   const mins = totalMin % 60;
+  const secs = Math.floor((ms % 60_000) / 1000);
+  const phase = phaseForMs(ms);
 
   if (days >= 1) {
-    const dayLabel = days === 1 ? "1 DAY" : `${days} DAYS`;
-    const hourLabel = hours === 1 ? "1 HOUR" : `${hours} HOURS`;
-    const minLabel = mins === 1 ? "1 MINUTE" : `${mins} MINUTES`;
     return {
       locked: false,
       unknown: false,
       msRemaining: ms,
-      headline: `${days}d ${hours}h ${mins}m`,
-      parts: [dayLabel, hourLabel, minLabel],
+      phase,
+      headline: `${days}d ${pad2(hours)}h ${pad2(mins)}m`,
+      segments: [
+        { value: String(days), unit: days === 1 ? "DAY" : "DAYS" },
+        { value: pad2(hours), unit: "HOURS" },
+        { value: pad2(mins), unit: "MIN" },
+      ],
     };
   }
   if (totalMin >= 60) {
@@ -210,27 +244,46 @@ export function formatLeagueLockCountdown(
       locked: false,
       unknown: false,
       msRemaining: ms,
-      headline: `${hours}h ${mins}m`,
-      parts: null,
+      phase,
+      headline: `${pad2(hours)}h ${pad2(mins)}m`,
+      segments: [
+        { value: pad2(hours), unit: hours === 1 ? "HOUR" : "HOURS" },
+        { value: pad2(mins), unit: "MIN" },
+      ],
     };
   }
-  // Under one hour — show minutes (and seconds when < 10 min for live feel)
-  if (totalMin >= 10) {
+  // Under one hour
+  if (totalMin >= 15) {
     return {
       locked: false,
       unknown: false,
       msRemaining: ms,
-      headline: `${Math.max(1, mins)}m`,
-      parts: null,
+      phase,
+      headline: `${mins}m`,
+      segments: [{ value: String(Math.max(1, mins)), unit: "MIN" }],
     };
   }
-  const secs = Math.floor((ms % 60_000) / 1000);
+  // Last call — minutes + seconds so it breathes
+  if (mins > 0) {
+    return {
+      locked: false,
+      unknown: false,
+      msRemaining: ms,
+      phase,
+      headline: `${mins}m ${pad2(secs)}s`,
+      segments: [
+        { value: String(mins), unit: "MIN" },
+        { value: pad2(secs), unit: "SEC" },
+      ],
+    };
+  }
   return {
     locked: false,
     unknown: false,
     msRemaining: ms,
-    headline: mins > 0 ? `${mins}m ${secs}s` : `${secs}s`,
-    parts: null,
+    phase,
+    headline: `${secs}s`,
+    segments: [{ value: String(secs), unit: "SEC" }],
   };
 }
 
