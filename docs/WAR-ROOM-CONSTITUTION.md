@@ -292,6 +292,46 @@ They give just enough confidence for the next step, then quietly disappear.
 **Practice’s job is to disappear.**  
 If players stop thinking about Practice and only remember *“War Room was easy to learn,”* it was built correctly.
 
+### Rule of Closure
+
+> **Every meaningful action must end with certainty.**
+
+A player should never have to wonder:
+
+* Did it work?  
+* Did it save?  
+* What just happened?  
+* Where do I go next?  
+
+Every important workflow answers three questions:
+
+1. **What just happened?**  
+2. **Did it succeed?**  
+3. **What's the one obvious next step?**  
+
+Examples (shape, not a mandate for more popups):
+
+| Action | Closure |
+|--------|---------|
+| Save picks | *Week 4 Picks Saved.* → Return Home |
+| Publish | *Week 4 is LIVE.* → Done → Home |
+| Join league | *Welcome to Saturday Situation Room.* → Make Your Picks |
+| Rename | *Name Updated.* (one rename per league) |
+| Close league | *Season Complete.* → Begin Trophy Ceremony |
+
+This is **not** about more modals. It is about **removing ambiguity.**
+
+Home is the natural resting place after most completed workflows.  
+Players should not finish a task and think *“Okay… now what?”*
+
+**Audit lens (especially first hour):**
+
+> Does the player immediately know it worked, and do they know exactly where to go next?
+
+If no — the workflow is not finished.
+
+> **War Room should never leave the player in limbo. Every action closes one chapter and clearly opens the next.**
+
 ### Season calendar principle
 
 > **War Room should change with the football calendar.**  

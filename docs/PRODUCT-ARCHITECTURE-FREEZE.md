@@ -74,11 +74,13 @@ The following are now considered **permanent** unless explicitly changed by Mike
 - Guests observe. Members belong.  
 - **Commissioners create experiences, not history** — no free-form hardware, cheevos, career stats, or archives.  
 - **Foundry / sandbox never write career** — lab artifacts are disposable.  
-- Pre-launch milestone: **Career Integrity Audit** (`docs/CAREER-INTEGRITY-AUDIT.md`).
+- Pre-launch milestone: **Career Integrity Audit** (`docs/CAREER-INTEGRITY-AUDIT.md`).  
+- **Rule of Closure** — every meaningful action ends with certainty (what happened · success · one next step). No limbo. (`docs/WAR-ROOM-CONSTITUTION.md`)
 
 ### Onboarding
 
-**Goal:** Build confidence. Create excitement. Teach naturally. Never overwhelm.
+**Goal:** Build confidence. Create excitement. Teach naturally. Never overwhelm.  
+**Closure:** After every important first-hour step, the player knows it worked and where to go next.
 
 ### League
 

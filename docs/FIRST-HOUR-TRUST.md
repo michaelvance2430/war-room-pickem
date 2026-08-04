@@ -36,6 +36,18 @@ A friend with zero context should be able to:
 
 ## Rules
 
+### Rule of Closure (product law)
+
+> **Every meaningful action must end with certainty.**
+
+Audit every first-hour transition:
+
+> Does the player immediately know it worked, and do they know exactly where to go next?
+
+If no — the workflow is not finished.  
+Home is the natural resting place after most completed jobs.  
+Full law: `docs/WAR-ROOM-CONSTITUTION.md` · Rule of Closure.
+
 ### Teach once. Then disappear forever.
 
 Tutorials never become obstacles.  
