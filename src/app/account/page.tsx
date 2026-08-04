@@ -32,6 +32,16 @@ import {
   hydrateBirthdayFromCloud,
 } from "@/lib/profile";
 import { isAppCreator, withCreatorFlag } from "@/lib/creator";
+import {
+  getMyFavoriteTeam,
+  getMyFavoriteTeamId,
+  isNoTeamId,
+  isRealTeamId,
+  NO_TEAM_ID,
+  setMyFavoriteTeam,
+} from "@/lib/favorite-teams";
+import type { CanonicalTeam } from "@/lib/teams/cfb-catalog";
+import TeamAllegiancePicker from "@/components/TeamAllegiancePicker";
 
 import FeedbackForm from "@/components/FeedbackForm";
 import OwnershipNotice from "@/components/OwnershipNotice";
@@ -95,6 +105,16 @@ export default function AccountPage() {
   const [equippedBorderId, setEquippedBorderId] = useState<string>("plain");
   const [borderBusy, setBorderBusy] = useState(false);
   const [chaosTitleLock, setChaosTitleLock] = useState(false);
+  const [cfbTeam, setCfbTeam] = useState<CanonicalTeam | null>(null);
+  /** Raw row team_id: real id, "no-team", or null if never answered */
+  const [cfbTeamId, setCfbTeamId] = useState<string | null>(null);
+  const [allegianceEdit, setAllegianceEdit] = useState(false);
+  const [allegiancePick, setAllegiancePick] = useState<CanonicalTeam | null>(
+    null
+  );
+  /** When editing, allow selecting the explicit no-team answer */
+  const [allegianceNoTeam, setAllegianceNoTeam] = useState(false);
+  const [allegianceBusy, setAllegianceBusy] = useState(false);
 
   async function reload() {
     const session = getSession();
@@ -107,6 +127,19 @@ export default function AccountPage() {
       setFullRoom(wantsFullRoom(session?.playerId));
     } catch {
       setFullRoom(false);
+    }
+    try {
+      const id = await getMyFavoriteTeamId("cfb");
+      setCfbTeamId(id);
+      if (isRealTeamId(id)) {
+        const t = await getMyFavoriteTeam("cfb");
+        setCfbTeam(t);
+      } else {
+        setCfbTeam(null);
+      }
+    } catch {
+      setCfbTeamId(null);
+      setCfbTeam(null);
     }
     const profile = await loadMyProfile();
     if (profile) {
@@ -736,11 +769,165 @@ export default function AccountPage() {
           </div>
       </section>
 
+        <section className="rounded-xl border border-border bg-card p-5 mb-6">
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-1">
+            Allegiance
+          </p>
+          <h2 className="font-semibold mb-1">CFB favorite team</h2>
+          <p className="text-xs text-muted mb-3 leading-relaxed">
+            Who you ride with. Change anytime — identity only, not points.
+          </p>
+          {cfbTeamId && !allegianceEdit ? (
+            <div className="space-y-3">
+              {cfbTeam ? (
+                <div
+                  className="rounded-xl border-2 px-3 py-3 flex items-center gap-3"
+                  style={{
+                    borderColor: `${cfbTeam.colors.primary}99`,
+                    backgroundColor: `${cfbTeam.colors.primary}14`,
+                  }}
+                >
+                  <span
+                    className="w-3 h-10 rounded-full shrink-0"
+                    style={{ backgroundColor: cfbTeam.colors.primary }}
+                    aria-hidden
+                  />
+                  <div>
+                    <p className="font-bold">{cfbTeam.name}</p>
+                    <p className="text-xs text-muted">{cfbTeam.conference}</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-border px-3 py-3">
+                  <p className="font-bold">No team declared</p>
+                  <p className="text-xs text-muted">
+                    Neutral. Change anytime.
+                  </p>
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setAllegiancePick(cfbTeam);
+                  setAllegianceNoTeam(isNoTeamId(cfbTeamId));
+                  setAllegianceEdit(true);
+                }}
+                className="w-full sm:w-auto px-4 py-2.5 min-h-[44px] rounded-xl border border-border text-sm font-semibold"
+              >
+                Change team
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {!cfbTeamId && !allegianceEdit && (
+                <>
+                  <p className="text-sm text-muted">
+                    You haven&apos;t answered yet. Pick a team or say no team.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAllegianceNoTeam(false);
+                      setAllegiancePick(null);
+                      setAllegianceEdit(true);
+                    }}
+                    className="w-full py-3 min-h-[48px] rounded-xl bg-primary text-black text-sm font-bold"
+                  >
+                    ANSWER NOW
+                  </button>
+                </>
+              )}
+              {allegianceEdit && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAllegianceNoTeam(true);
+                      setAllegiancePick(null);
+                    }}
+                    className={`w-full rounded-xl border px-4 py-3 min-h-[48px] text-left transition ${
+                      allegianceNoTeam
+                        ? "border-primary bg-primary/10 ring-2 ring-primary/30"
+                        : "border-border hover:border-muted"
+                    }`}
+                  >
+                    <span className="block text-sm font-bold">
+                      No team declared
+                    </span>
+                    <span className="block text-xs text-muted mt-0.5">
+                      Stay neutral. Change anytime.
+                    </span>
+                  </button>
+                  <TeamAllegiancePicker
+                    selectedId={allegiancePick?.id ?? null}
+                    onSelect={(t) => {
+                      setAllegiancePick(t);
+                      setAllegianceNoTeam(false);
+                    }}
+                  />
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <button
+                      type="button"
+                      disabled={
+                        allegianceBusy ||
+                        (!allegianceNoTeam && !allegiancePick)
+                      }
+                      onClick={() => {
+                        const teamId = allegianceNoTeam
+                          ? NO_TEAM_ID
+                          : allegiancePick?.id;
+                        if (!teamId) return;
+                        setAllegianceBusy(true);
+                        void setMyFavoriteTeam("cfb", teamId)
+                          .then((res) => {
+                            if (res.ok) {
+                              setCfbTeamId(teamId);
+                              setCfbTeam(res.team ?? null);
+                              setAllegianceEdit(false);
+                              setAllegiancePick(null);
+                              setAllegianceNoTeam(false);
+                              setMessage(
+                                res.noTeam
+                                  ? "Allegiance: no team."
+                                  : `Allegiance: ${res.team?.name}.`
+                              );
+                            } else {
+                              setMessage(res.error || "Could not update team.");
+                            }
+                          })
+                          .finally(() => setAllegianceBusy(false));
+                      }}
+                      className="flex-1 py-3 min-h-[48px] rounded-xl bg-primary text-black text-sm font-bold disabled:opacity-40"
+                    >
+                      {allegianceBusy
+                        ? "…"
+                        : allegianceNoTeam
+                          ? "SAVE — NO TEAM"
+                          : "SAVE TEAM"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAllegianceEdit(false);
+                        setAllegiancePick(null);
+                        setAllegianceNoTeam(false);
+                      }}
+                      className="px-4 py-3 min-h-[48px] rounded-xl border border-border text-sm font-semibold"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </section>
+
         <section className="rounded-xl border border-primary/35 bg-primary/10 p-5 mb-6">
-      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-1">
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-1">
             First steps
           </p>
-      <h2 className="font-semibold mb-1">Getting started</h2>
+          <h2 className="font-semibold mb-1">Getting started</h2>
           <p className="text-xs text-muted mb-3 leading-relaxed">
             Small one-time tips appear when you need them (invite, first card,
             first picks). There is no full-screen walkthrough.

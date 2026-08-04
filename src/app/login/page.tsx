@@ -58,12 +58,22 @@ function LoginPageInner() {
     }
   }, [searchParams]);
 
-  function afterAuthPath(): string {
-    const next = searchParams.get("next");
-    if (next && next.startsWith("/") && !next.startsWith("//")) return next;
+  function afterAuthPath(opts?: { isNewSignup?: boolean }): string {
+    const nextRaw = searchParams.get("next");
+    const next =
+      nextRaw && nextRaw.startsWith("/") && !nextRaw.startsWith("//")
+        ? nextRaw
+        : null;
     const code = peekPendingJoinCode();
-    if (code) return `/join?code=${encodeURIComponent(code)}`;
-    return "/";
+    const dest =
+      next ||
+      (code ? `/join?code=${encodeURIComponent(code)}` : "/");
+
+    // New accounts: declare allegiance first, then invite/join/Home
+    if (opts?.isNewSignup) {
+      return `/declare-allegiance?next=${encodeURIComponent(dest)}`;
+    }
+    return dest;
   }
 
   async function handleForgotPassword() {
@@ -138,8 +148,8 @@ function LoginPageInner() {
     }
 
     /** One hard open after auth so session storage is fully settled. */
-    function landAfterAuth() {
-      const path = afterAuthPath();
+    function landAfterAuth(opts?: { isNewSignup?: boolean }) {
+      const path = afterAuthPath(opts);
       try {
         window.location.assign(path);
       } catch {
@@ -169,7 +179,7 @@ function LoginPageInner() {
         if (signError) throw signError;
         if (data.session) {
           navigating = true;
-          landAfterAuth();
+          landAfterAuth({ isNewSignup: true });
           return;
         }
         setMessage("Check your email to confirm, then log in.");
@@ -189,7 +199,8 @@ function LoginPageInner() {
         }
 
         navigating = true;
-        landAfterAuth();
+        // Existing accounts: Home card handles missing allegiance
+        landAfterAuth({ isNewSignup: false });
         return;
       }
     } catch (err: unknown) {

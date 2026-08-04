@@ -69,6 +69,15 @@ import {
 } from "@/lib/picks-progressive";
 import { isEyesLocalPlayActive } from "@/lib/creator-eyes";
 import LeagueLockTimer from "@/components/LeagueLockTimer";
+import {
+  EVENT_FAVORITE_TEAM_UPDATED,
+  getMyFavoriteTeamId,
+} from "@/lib/favorite-teams";
+import {
+  getCfbTeamById,
+  matchCfbTeamConfident,
+  type CanonicalTeam,
+} from "@/lib/teams/cfb-catalog";
 
 function formatSpread(
   spread: number,
@@ -171,6 +180,8 @@ export default function PicksClient() {
    */
   const [emptyCopy, setEmptyCopy] = useState<PicksEmptyCopy | null>(null);
   const emptyCopyRoleRef = useRef<"host" | "player" | null>(null);
+  /** CFB allegiance for restrained Picks accent — null = none / unknown match */
+  const [cfbFavorite, setCfbFavorite] = useState<CanonicalTeam | null>(null);
 
   const revisionRef = useRef<string>("");
   const viewWeekRef = useRef(1);
@@ -632,6 +643,29 @@ export default function PicksClient() {
       })
     );
   }, [hostCanBuild]);
+
+  // CFB favorite for restrained side accent (no pick/scoring side effects)
+  useEffect(() => {
+    let cancelled = false;
+    async function loadFav() {
+      try {
+        const id = await getMyFavoriteTeamId("cfb");
+        if (cancelled) return;
+        setCfbFavorite(id ? getCfbTeamById(id) : null);
+      } catch {
+        if (!cancelled) setCfbFavorite(null);
+      }
+    }
+    void loadFav();
+    function onFav() {
+      void loadFav();
+    }
+    window.addEventListener(EVENT_FAVORITE_TEAM_UPDATED, onFav);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(EVENT_FAVORITE_TEAM_UPDATED, onFav);
+    };
+  }, []);
 
   // Sticky Practice Mode: bare /picks while practice is active restores the
   // practice URL. Explicit Exit / Return to Live League is the only full leave.
@@ -2402,6 +2436,22 @@ export default function PicksClient() {
                 const gameScore = myWeekScore?.gameScores.find(
                   (s) => s.gameId === game.id
                 );
+                // Restrained allegiance accent — CFB only, confident match only
+                const sportId = getLeague()?.sportId || "cfb";
+                const favAway =
+                  sportId === "cfb" && cfbFavorite
+                    ? matchCfbTeamConfident(game.awayTeam)?.id ===
+                      cfbFavorite.id
+                      ? cfbFavorite
+                      : null
+                    : null;
+                const favHome =
+                  sportId === "cfb" && cfbFavorite
+                    ? matchCfbTeamConfident(game.homeTeam)?.id ===
+                      cfbFavorite.id
+                      ? cfbFavorite
+                      : null
+                    : null;
 
                 return (
                   <div
@@ -2489,26 +2539,62 @@ export default function PicksClient() {
       </div>
 
                     <div className="grid grid-cols-2 gap-2 sm:gap-3 mb-4">
-      <button
+                      <button
                         type="button"
                         disabled={locked}
                         onClick={() => selectSide(game.id, "away")}
                         className={`min-h-[72px] p-3 sm:p-3.5 rounded-xl border text-left transition touch-manipulation active:scale-[0.98] disabled:cursor-not-allowed ${
                           pick?.pick === "away"
                             ? "border-primary bg-primary/15 ring-2 ring-primary/40"
-                            : "border-border hover:border-muted disabled:opacity-70"
+                            : favAway
+                              ? "disabled:opacity-70"
+                              : "border-border hover:border-muted disabled:opacity-70"
                         }`}
+                        style={
+                          favAway
+                            ? {
+                                borderColor:
+                                  pick?.pick === "away"
+                                    ? undefined
+                                    : `${favAway.colors.primary}99`,
+                                borderWidth: pick?.pick === "away" ? undefined : 2,
+                                backgroundColor:
+                                  pick?.pick === "away"
+                                    ? undefined
+                                    : `${favAway.colors.primary}12`,
+                                boxShadow:
+                                  pick?.pick === "away"
+                                    ? `0 0 0 1px ${favAway.colors.primary}40`
+                                    : `inset 3px 0 0 0 ${favAway.colors.primary}`,
+                              }
+                            : undefined
+                        }
                       >
-                        <div className="text-[10px] uppercase tracking-wider text-muted mb-1">
+                        <div className="text-[10px] uppercase tracking-wider text-muted mb-1 flex items-center gap-1.5">
                           Away
+                          {favAway && (
+                            <span
+                              className="w-1.5 h-1.5 rounded-full shrink-0"
+                              style={{
+                                backgroundColor: favAway.colors.primary,
+                              }}
+                              title="Your team"
+                              aria-hidden
+                            />
+                          )}
                         </div>
-      <div className="font-semibold text-[15px] sm:text-base leading-snug">
+                        <div
+                          className="font-semibold text-[15px] sm:text-base leading-snug"
+                          style={
+                            favAway ? { color: favAway.colors.primary } : undefined
+                          }
+                        >
                           {formatRankedTeam(game.awayTeam, game.awayRank)}
                         </div>
-      <div className="text-sm text-muted mt-1 font-medium">
+                        <div className="text-sm text-muted mt-1 font-medium">
                           {formatSpread(displaySpread, displayFavorite, "away")}
                         </div>
-      </button>
+                      </button>
 
                       <button
                         type="button"
@@ -2517,19 +2603,55 @@ export default function PicksClient() {
                         className={`min-h-[72px] p-3 sm:p-3.5 rounded-xl border text-left transition touch-manipulation active:scale-[0.98] disabled:cursor-not-allowed ${
                           pick?.pick === "home"
                             ? "border-primary bg-primary/15 ring-2 ring-primary/40"
-                            : "border-border hover:border-muted disabled:opacity-70"
+                            : favHome
+                              ? "disabled:opacity-70"
+                              : "border-border hover:border-muted disabled:opacity-70"
                         }`}
+                        style={
+                          favHome
+                            ? {
+                                borderColor:
+                                  pick?.pick === "home"
+                                    ? undefined
+                                    : `${favHome.colors.primary}99`,
+                                borderWidth: pick?.pick === "home" ? undefined : 2,
+                                backgroundColor:
+                                  pick?.pick === "home"
+                                    ? undefined
+                                    : `${favHome.colors.primary}12`,
+                                boxShadow:
+                                  pick?.pick === "home"
+                                    ? `0 0 0 1px ${favHome.colors.primary}40`
+                                    : `inset 3px 0 0 0 ${favHome.colors.primary}`,
+                              }
+                            : undefined
+                        }
                       >
-                        <div className="text-[10px] uppercase tracking-wider text-muted mb-1">
+                        <div className="text-[10px] uppercase tracking-wider text-muted mb-1 flex items-center gap-1.5">
                           Home
+                          {favHome && (
+                            <span
+                              className="w-1.5 h-1.5 rounded-full shrink-0"
+                              style={{
+                                backgroundColor: favHome.colors.primary,
+                              }}
+                              title="Your team"
+                              aria-hidden
+                            />
+                          )}
                         </div>
-      <div className="font-semibold text-[15px] sm:text-base leading-snug">
+                        <div
+                          className="font-semibold text-[15px] sm:text-base leading-snug"
+                          style={
+                            favHome ? { color: favHome.colors.primary } : undefined
+                          }
+                        >
                           {formatRankedTeam(game.homeTeam, game.homeRank)}
                         </div>
-      <div className="text-sm text-muted mt-1 font-medium">
+                        <div className="text-sm text-muted mt-1 font-medium">
                           {formatSpread(displaySpread, displayFavorite, "home")}
                         </div>
-      </button>
+                      </button>
                     </div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div className="flex flex-col gap-1.5">

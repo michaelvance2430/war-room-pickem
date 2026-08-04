@@ -35,6 +35,7 @@ import {
 } from "@/lib/progressive-disclosure";
 import { isFirstWeekChrome } from "@/lib/first-week";
 import FairEntryNotice from "@/components/FairEntryNotice";
+import HomeAllegianceCard from "@/components/HomeAllegianceCard";
 
 const HomeGazetteSpotlight = dynamic(
   () => import("@/components/HomeGazetteSpotlight"),
@@ -624,6 +625,9 @@ export default function Home() {
 
         {/* Mid-season join — Fair Entry explanation (no point math) */}
         <FairEntryNotice />
+
+        {/* Existing users without CFB allegiance — primary identity job */}
+        <HomeAllegianceCard />
 
         {firstWeekChrome && (
           <p className="text-xs text-muted mb-4 leading-relaxed max-w-xl -mt-1">

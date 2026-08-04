@@ -44,6 +44,7 @@ import {
   profileNavRender,
   profileNavUsable,
 } from "@/lib/profile-nav-trace";
+import type { CanonicalTeam } from "@/lib/teams/cfb-catalog";
 
 // Module evaluation boundary — if this never logs, freeze is BEFORE profile chunk runs
 const __profileModuleT0 =
@@ -176,6 +177,7 @@ export default function ProfilePage() {
   const [player, setPlayer] = useState<Player | null>(null);
   const [ready, setReady] = useState(false);
   const [lightbox, setLightbox] = useState(false);
+  const [favoriteTeam, setFavoriteTeam] = useState<CanonicalTeam | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [joinTitle, setJoinTitle] = useState<string | null>(null);
   const [lastSeenAt, setLastSeenAt] = useState<string | null>(null);
@@ -236,6 +238,7 @@ export default function ProfilePage() {
       setBlueFalconCount(0);
       setDetailsOpen(false);
       setDetailsPanel(null);
+      setFavoriteTeam(null);
 
       const me = readSession()?.playerId || null;
       const isSelf = !!(me && me === id);
@@ -308,6 +311,15 @@ export default function ProfilePage() {
               profileNavUsable(`first-content source=${source}`);
               wrProfile("interactive");
             }
+            // Allegiance (non-blocking)
+            void import("@/lib/favorite-teams").then(async (m) => {
+              try {
+                const t = await m.getUserFavoriteTeam(id, "cfb");
+                if (!cancelled) setFavoriteTeam(t);
+              } catch {
+                /* ignore */
+              }
+            });
           }
 
           // Roster only for join titles / lastSeen / membership_id recovery
@@ -419,6 +431,15 @@ export default function ProfilePage() {
 
         void import("@/lib/season-mode").then((m) => {
           if (!cancelled) setSandboxHint(m.isSandboxMode());
+        });
+
+        void import("@/lib/favorite-teams").then(async (m) => {
+          try {
+            const t = await m.getUserFavoriteTeam(found!.id, "cfb");
+            if (!cancelled) setFavoriteTeam(t);
+          } catch {
+            /* optional until migration */
+          }
         });
 
         // Blue Falcon after paint — never on critical path
@@ -606,6 +627,24 @@ export default function ProfilePage() {
                   </span>
                 )}
                 <h1 className="text-2xl font-bold truncate">{player.name}</h1>
+                {favoriteTeam && !mock && (
+                  <span
+                    className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full border"
+                    style={{
+                      borderColor: `${favoriteTeam.colors.primary}99`,
+                      color: favoriteTeam.colors.primary,
+                      backgroundColor: `${favoriteTeam.colors.primary}14`,
+                    }}
+                    title="CFB allegiance"
+                  >
+                    <span
+                      className="w-2 h-2 rounded-full shrink-0"
+                      style={{ backgroundColor: favoriteTeam.colors.primary }}
+                      aria-hidden
+                    />
+                    {favoriteTeam.name}
+                  </span>
+                )}
                 {!mock && isJustJoined(player.memberSince) && (
                   <span
                     className="text-[10px] uppercase font-extrabold px-2 py-0.5 rounded-full border border-sky-400/50 bg-sky-400/15 text-sky-200"
