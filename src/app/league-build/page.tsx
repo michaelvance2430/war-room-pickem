@@ -228,7 +228,8 @@ function LeagueBuildInner() {
       }
 
       markLeagueBuildComplete(league.id);
-      router.replace(isEyes ? "/commissioner?tab=card&first=1" : "/");
+      // Next logical job: publish the first card — not Home dead-end
+      router.replace("/commissioner?tab=card&first=1");
       router.refresh();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Could not save league build");
@@ -591,7 +592,7 @@ function LeagueBuildInner() {
       <p className="text-sm text-muted leading-relaxed">
               You can change this until{" "}
               <strong className="text-foreground">{lockLabel}</strong>. Next:
-              invite friends so they can join.
+              publish the first week card so people can pick.
             </p>
       </div>
         )}
@@ -614,7 +615,7 @@ function LeagueBuildInner() {
                 onClick={() => void finish()}
                 className="w-full py-4 min-h-[56px] rounded-xl bg-primary text-black text-base font-extrabold touch-manipulation disabled:opacity-50"
               >
-                {busy ? "Saving…" : "Invite friends →"}
+                {busy ? "Saving…" : "Build first card →"}
               </button>
             )}
 

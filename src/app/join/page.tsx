@@ -46,6 +46,8 @@ function JoinPageInner() {
   const [userId, setUserId] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState("");
   const [mode, setMode] = useState<"choose" | "create" | "join">("choose");
+  /** Create wizard: sport first, then name / open listing */
+  const [createStep, setCreateStep] = useState<"sport" | "details">("sport");
   const [leagueName, setLeagueName] = useState("War Room");
   /** Multi-sport: CFB + NFL live; others coming soon */
   const [sportId, setSportId] = useState<SportId>(DEFAULT_SPORT_ID);
@@ -74,10 +76,14 @@ function JoinPageInner() {
       return;
     }
     const m = (searchParams.get("mode") || "").toLowerCase();
-    if (m === "create") setMode("create");
+    if (m === "create") {
+      setMode("create");
+      setCreateStep("sport");
+    }
     if (m === "join") setMode("join");
     if (searchParams.get("open") === "1") {
       setMode("create");
+      setCreateStep("sport");
       setListAsOpen(true);
     }
   }, [searchParams]);
@@ -559,7 +565,7 @@ function JoinPageInner() {
           </p>
       <h1 className="text-2xl font-bold mb-1 text-center">League created</h1>
       <p className="text-sm text-muted mb-4 text-center">
-            {leagueLabel} — share the invite link, then build the first card.
+            {leagueLabel} — next: set up the room, then publish the first card.
             {listAsOpen ? " Listed in the open room lobby." : ""}
           </p>
       <div className="text-3xl font-bold tracking-[0.3em] text-primary text-center mb-4 font-mono">
@@ -701,170 +707,173 @@ function JoinPageInner() {
           </div>
         )}
 
-        {mode === "create" && (
+                {mode === "create" && (
           <div className="rounded-xl border border-border bg-card p-5 space-y-4">
-      <h2 className="font-semibold">Create league</h2>
-      <p className="text-xs text-muted">
-              Pick CFB or NFL, then name the room. Best with{" "}
-              <strong className="text-foreground">8–16 friends</strong> (bots
-              can fill empty seats later). Cap {MAX_LEAGUE_PLAYERS}.
-            </p>
-      <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-2">
-                Sport
-              </p>
-      <div className="space-y-2 pr-0.5">
-                {listSportPickerOptions()
-                  .filter((s) => s.status === "live")
-                  .map((s) => {
-                  const live = true;
-                  const selected = sportId === s.id;
-                  const isWwc = s.id === "soccer_wwc";
-                  const isNfl = s.id === "nfl";
-                  return (
-                    <button
-                      key={s.id}
-                      type="button"
-                      disabled={!live}
-                      onClick={() => {
-                        if (!live) return;
-                        const next = s.id as SportId;
-                        setSportId(next);
-                        // Paint NFL/CFB skin immediately so create flow feels right
-                        void import("@/lib/sports/sport-theme").then(
-                          ({ applySportTheme }) => applySportTheme(next)
-                        );
-                        void import("@/lib/sport-room-scope").then(
-                          ({ setSportScope }) => setSportScope(next)
-                        );
-                      }}
-                      className={`w-full text-left rounded-xl border px-3 py-3 transition touch-manipulation ${
-                        selected && isWwc
-                          ? "border-[#FFDF00]/60 bg-[#009C3B]/15 shadow-[0_0_22px_rgba(0,156,59,0.2)]"
-                          : selected && isNfl
-                            ? "border-[#C1121F]/70 bg-[#0B1426] shadow-[0_0_22px_rgba(193,18,31,0.25)]"
-                            : selected
-                              ? "border-primary bg-primary/15 shadow-[0_0_20px_rgba(34,197,94,0.12)]"
-                              : live
-                                ? "border-border bg-background hover:border-primary/40"
-                                : "border-border/50 bg-background/40 opacity-55 cursor-not-allowed"
-                      }`}
-                    >
-                      <div className="flex items-start gap-2.5">
-                        {isWwc ? (
-                          <WwcTrophyLogo size={36} className="shrink-0 mt-0.5" />
-                        ) : isNfl ? (
-                          <NflBrandMark size={36} className="shrink-0 mt-0.5" />
-                        ) : (
-                          <span className="text-xl shrink-0" aria-hidden>
-                            {s.emoji}
-                          </span>
-                        )}
-                        <div className="min-w-0 flex-1">
-      <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-sm font-bold text-foreground">
-                              {s.label}
-                            </span>
-                            {live ? (
-                              <span
-                                className={`text-[10px] font-bold uppercase tracking-wide ${
-                                  isWwc
-                                    ? "text-[#FFDF00]"
-                                    : isNfl
-                                      ? "text-[#C5CCD3]"
-                                      : "text-primary"
-                                }`}
-                              >
-                                Live
-                              </span>
+            {createStep === "sport" ? (
+              <>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-1">
+                    Step 1 of 2
+                  </p>
+                  <h2 className="font-semibold text-lg">Which sport?</h2>
+                  <p className="text-xs text-muted mt-1 leading-relaxed">
+                    Everything about this room follows from the sport desk.
+                    College Football or NFL — pick one first.
+                  </p>
+                </div>
+                <div className="space-y-2 pr-0.5">
+                  {listSportPickerOptions()
+                    .filter((s) => s.status === "live")
+                    .map((s) => {
+                      const selected = sportId === s.id;
+                      const isNfl = s.id === "nfl";
+                      return (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => {
+                            const next = s.id as SportId;
+                            setSportId(next);
+                            void import("@/lib/sports/sport-theme").then(
+                              ({ applySportTheme }) => applySportTheme(next)
+                            );
+                            void import("@/lib/sport-room-scope").then(
+                              ({ setSportScope }) => setSportScope(next)
+                            );
+                          }}
+                          className={`w-full text-left rounded-xl border px-3 py-3.5 transition touch-manipulation ${
+                            selected && isNfl
+                              ? "border-[#C1121F]/70 bg-[#0B1426] shadow-[0_0_22px_rgba(193,18,31,0.25)]"
+                              : selected
+                                ? "border-primary bg-primary/15 shadow-[0_0_20px_rgba(34,197,94,0.12)]"
+                                : "border-border bg-background hover:border-primary/40"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5">
+                            {isNfl ? (
+                              <NflBrandMark size={36} className="shrink-0" />
                             ) : (
-                              <span className="text-[10px] font-bold uppercase tracking-wide text-muted">
-                                Coming soon
+                              <span className="text-xl shrink-0" aria-hidden>
+                                {s.emoji}
+                              </span>
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <span className="text-sm font-bold text-foreground block">
+                                {s.id === "cfb"
+                                  ? "College Football"
+                                  : s.id === "nfl"
+                                    ? "NFL"
+                                    : s.label}
+                              </span>
+                              <p className="text-[11px] text-muted mt-0.5 leading-snug">
+                                {s.blurb}
+                              </p>
+                            </div>
+                            {selected && (
+                              <span className="text-sm font-black text-primary shrink-0">
+                                ✓
                               </span>
                             )}
                           </div>
-      <p className="text-[11px] text-muted mt-0.5 leading-snug">
-                            {s.blurb}
-                          </p>
-      </div>
-                        {selected && live && (
-                          <span
-                            className={`text-sm font-black shrink-0 ${
-                              isWwc
-                                ? "text-[#FFDF00]"
-                                : isNfl
-                                  ? "text-[#C1121F]"
-                                  : "text-primary"
-                            }`}
-                          >
-                            ✓
-                          </span>
-                        )}
-                      </div>
-      </button>
-                  );
-                })}
-              </div>
-      <p className="text-[11px] text-muted mt-2 leading-relaxed">
-                More sports (WWC and friends) ship next — same clubhouse,
-                different desk.
-              </p>
-      </div>
-
-            <input
-              value={leagueName}
-              onChange={(e) => setLeagueName(e.target.value)}
-              placeholder="League name"
-              className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm"
-            />
-            <input
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              placeholder="Your name"
-              className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm"
-            />
-            <label className="flex items-start gap-3 rounded-xl border border-border bg-background/50 px-3 py-3 cursor-pointer">
-      <input
-                type="checkbox"
-                checked={listAsOpen}
-                onChange={(e) => setListAsOpen(e.target.checked)}
-                className="mt-1 w-5 h-5 rounded border-border shrink-0"
-              />
-              <span>
-      <span className="text-sm font-semibold text-foreground block">
-                  List as open room
-                </span>
-      <span className="text-xs text-muted leading-relaxed">
-                  Strangers can find you in the open lobby. We fill this room
-                  first before seating people elsewhere. Turn off anytime in
-                  Settings.
-                </span>
-      </span>
-            </label>
-            {error && <p className="text-sm text-danger">{error}</p>}
-            <button
-              onClick={() => void handleCreate()}
-              disabled={loading || !isLiveSport(sportId)}
-              className="w-full py-3 min-h-[48px] rounded-xl bg-primary text-black font-semibold disabled:opacity-50"
-            >
-              {loading
-                ? "Creating…"
-                : sportId === "soccer_wwc"
-                  ? "Create FIFA WWC Brazil 2027™ league"
-                  : sportId === "nfl"
-                    ? "Create NFL league"
-                    : `Create ${getSportPack(sportId).shortLabel} league`}
-            </button>
-      <button
-              onClick={() => setMode("choose")}
-              className="w-full text-sm text-muted"
-            >
-              Back
-            </button>
-      </div>
+                        </button>
+                      );
+                    })}
+                </div>
+                {error && <p className="text-sm text-danger">{error}</p>}
+                <button
+                  type="button"
+                  disabled={!isLiveSport(sportId)}
+                  onClick={() => {
+                    if (!isLiveSport(sportId)) {
+                      setError("Pick College Football or NFL to continue.");
+                      return;
+                    }
+                    setError(null);
+                    setCreateStep("details");
+                  }}
+                  className="w-full py-3.5 min-h-[52px] rounded-xl bg-primary text-black font-extrabold disabled:opacity-50 touch-manipulation"
+                >
+                  Continue →
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMode("choose")}
+                  className="w-full text-sm text-muted min-h-[44px]"
+                >
+                  Back
+                </button>
+              </>
+            ) : (
+              <>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-1">
+                    Step 2 of 2 · {getSportPack(sportId).shortLabel}
+                  </p>
+                  <h2 className="font-semibold text-lg">Name the room</h2>
+                  <p className="text-xs text-muted mt-1 leading-relaxed">
+                    Best with{" "}
+                    <strong className="text-foreground">8–16 friends</strong>{" "}
+                    (bots can fill empty seats later). Cap {MAX_LEAGUE_PLAYERS}.
+                  </p>
+                </div>
+                <input
+                  value={leagueName}
+                  onChange={(e) => setLeagueName(e.target.value)}
+                  placeholder="League name"
+                  className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm"
+                />
+                <input
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  placeholder="Your name"
+                  className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm"
+                />
+                <label className="flex items-start gap-3 rounded-xl border border-border bg-background/50 px-3 py-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={listAsOpen}
+                    onChange={(e) => setListAsOpen(e.target.checked)}
+                    className="mt-1 w-5 h-5 rounded border-border shrink-0"
+                  />
+                  <span>
+                    <span className="text-sm font-semibold text-foreground block">
+                      List as open room
+                    </span>
+                    <span className="text-xs text-muted leading-relaxed">
+                      Strangers can find you in the open lobby. Turn off anytime
+                      in Settings.
+                    </span>
+                  </span>
+                </label>
+                {error && <p className="text-sm text-danger">{error}</p>}
+                <button
+                  type="button"
+                  onClick={() => void handleCreate()}
+                  disabled={loading || !isLiveSport(sportId)}
+                  className="w-full py-3.5 min-h-[52px] rounded-xl bg-primary text-black font-extrabold disabled:opacity-50 touch-manipulation"
+                >
+                  {loading
+                    ? "Creating…"
+                    : sportId === "nfl"
+                      ? "Create NFL league →"
+                      : `Create ${getSportPack(sportId).shortLabel} league →`}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setError(null);
+                    setCreateStep("sport");
+                  }}
+                  className="w-full text-sm text-muted min-h-[44px]"
+                >
+                  Back · change sport
+                </button>
+              </>
+            )}
+          </div>
         )}
 
-        {mode === "join" && (
+{mode === "join" && (
           <div className="rounded-xl border border-border bg-card p-5 space-y-4">
       <h2 className="font-semibold">Join league</h2>
             {deepLinkCode ? (
