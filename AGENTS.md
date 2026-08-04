@@ -51,6 +51,23 @@ If the repo is intentionally detached, push is impossible, or the user forbids p
 
 Local-only commits are not backed up, can be lost, hide what is deployed, and make rollback/compare harder. Remote `main` is the single source of truth for War Room launch work.
 
+## Foundry (engineering contract)
+
+**Canonical product definition:** [`docs/WAR-ROOM-FOUNDRY.md`](./docs/WAR-ROOM-FOUNDRY.md)
+
+Foundry is **not** the player product. It is the internal workshop that proves production will work **before** production uses it.
+
+When shipping a major feature, always ask:
+
+> **How do we prove it works in Foundry before we trust it in War Room?**
+
+| Do | Don’t |
+|----|--------|
+| Put creator tools, resets, simulators in Foundry | Add creator convenience to player/commissioner UI |
+| Drive the **real** scoring / standings / Moments / Gazette path | Invent fake standings-only simulators |
+| Allow Foundry to be dense/ugly | Compromise War Room simplicity for lab controls |
+| Isolate permanent side effects to test leagues | Engrave or close real seasons from casual Foundry clicks |
+
 ## P0 navigation stability (SAFE NAV)
 
 Until plain-app navigation is proven stable:

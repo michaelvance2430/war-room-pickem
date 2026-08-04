@@ -1,5 +1,8 @@
 # Foundry Hub Notes
 
+**Philosophy / product contract:** [`docs/WAR-ROOM-FOUNDRY.md`](./WAR-ROOM-FOUNDRY.md)  
+*(Foundry is the validation workshop — not the player product. Real pipelines only.)*
+
 War Room Pick'Em — collected **2026-08-01** (phone session).
 
 ## Navigation & context

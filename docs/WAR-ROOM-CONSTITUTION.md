@@ -6,6 +6,9 @@
 > Source of truth and working agreement: `docs/PRODUCT-ARCHITECTURE-FREEZE.md`  
 > Execute the vision. Do not quietly redefine it.
 
+> **Foundry contract:** `docs/WAR-ROOM-FOUNDRY.md`  
+> Foundry proves production. War Room stays magical. Machinery never leaks into the experience.
+
 ---
 
 ## The War Room Promise

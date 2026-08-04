@@ -2,6 +2,9 @@
 
 **Source of truth for product depth vs simplicity.** Prefer this when “wouldn’t it be cool if…” competes with clarity.
 
+**Foundry (creator workshop / engineering contract):** [`docs/WAR-ROOM-FOUNDRY.md`](./WAR-ROOM-FOUNDRY.md)  
+Foundry gets more powerful so War Room can get simpler. Creator tools never leak into the player experience.
+
 ---
 
 ## The sentence
