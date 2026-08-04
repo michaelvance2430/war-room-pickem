@@ -171,13 +171,19 @@ export function applyLegacyBadgeGrants(player: {
     const pts = getBadgeDef(g.badgeId)?.points ?? legendPts();
     if (known.has(g.badgeId)) {
       bankCareerBadgeId(player.id, g.badgeId, pts);
-      // Already permanent but never saw the unlock modal → still pop once on login
+      // Already permanent but never saw the unlock modal → still pop once on login.
+      // queuePending is idempotent: re-queue of same id does NOT re-fire force-check
+      // (was a feedback loop with BadgeUnlockModal force:true).
       try {
         const {
           readCelebratedIds,
+          readPendingBadgeCelebration,
           queuePendingBadgeCelebration,
         } = require("./badge-celebration") as typeof import("./badge-celebration");
-        if (!readCelebratedIds(player.id).includes(g.badgeId)) {
+        if (
+          !readCelebratedIds(player.id).includes(g.badgeId) &&
+          !readPendingBadgeCelebration(player.id).includes(g.badgeId)
+        ) {
           queuePendingBadgeCelebration(player.id, [g.badgeId]);
         }
       } catch {

@@ -91,19 +91,30 @@ export function readPendingBadgeCelebration(userId: string): string[] {
   }
 }
 
+/**
+ * Queue a one-shot unlock modal. Only notifies BadgeUnlockModal when the
+ * pending set actually grows — re-queueing the same ids must NOT re-fire
+ * warroom-force-badge-check (that was a production feedback loop:
+ * force-check → findUnlocks → applyLegacy → queuePending → force-check…).
+ */
 export function queuePendingBadgeCelebration(
   userId: string,
   badgeIds: string[]
 ): void {
   if (typeof window === "undefined" || !userId || !badgeIds.length) return;
+  let grew = false;
   try {
-    const next = [
-      ...new Set([...readPendingBadgeCelebration(userId), ...badgeIds]),
-    ];
+    const prev = readPendingBadgeCelebration(userId);
+    const prevSet = new Set(prev);
+    const added = badgeIds.filter((id) => id && !prevSet.has(id));
+    if (!added.length) return; // already pending — do not re-dispatch
+    const next = [...new Set([...prev, ...added])];
+    grew = next.length > prev.length;
     localStorage.setItem(`${PENDING_PREFIX}${userId}`, JSON.stringify(next));
   } catch {
     /* ignore */
   }
+  if (!grew) return;
   try {
     window.dispatchEvent(new CustomEvent("warroom-force-badge-check"));
   } catch {
@@ -258,81 +269,107 @@ export function getUncelebratedBadges(
   return sortBadgesForCelebration(fresh);
 }
 
+/** Single-flight — production freeze was 1500× re-entry of this function. */
+let findUnlocksInflight: Promise<{
+  player: Player;
+  newBadges: BadgeStatus[];
+} | null> | null = null;
+
 /** Load me from league list + cheevo sync, then find new unlocks. */
 export async function findNewBadgeUnlocksForSession(): Promise<{
   player: Player;
   newBadges: BadgeStatus[];
 } | null> {
-  const session = getSession();
-  if (!session?.playerId) return null;
+  // Coalesce concurrent / re-entrant calls (force-badge-check feedback loop)
+  if (findUnlocksInflight) return findUnlocksInflight;
 
-  try {
-    const {
-      canShowBadgeCelebrations,
-      canCelebrateStackMultiples,
-      syncFirstWeekFromCloud,
-    } = await import("./first-week");
-    // First week: earn quietly — no popup stack until first lock / scores
-    // Foundry testing can celebrate so the shop can see cheevo UX
-    await syncFirstWeekFromCloud(session.playerId);
-    let foundry = false;
+  findUnlocksInflight = (async () => {
+    const session = getSession();
+    if (!session?.playerId) return null;
+
     try {
-      const { allowFoundryCeremonies } = await import("./foundry-preview");
-      foundry = allowFoundryCeremonies();
+      const {
+        canShowBadgeCelebrations,
+        canCelebrateStackMultiples,
+        syncFirstWeekFromCloud,
+      } = await import("./first-week");
+      // First week: earn quietly — no popup stack until first lock / scores
+      // Foundry testing can celebrate so the shop can see cheevo UX
+      await syncFirstWeekFromCloud(session.playerId);
+      let foundry = false;
+      try {
+        const { allowFoundryCeremonies } = await import("./foundry-preview");
+        foundry = allowFoundryCeremonies();
+      } catch {
+        foundry = false;
+      }
+      // Lore pending (Cavalry Scout etc.) always allowed to pop on login
+      const pendingLore = readPendingBadgeCelebration(session.playerId);
+      if (
+        !canShowBadgeCelebrations(session.playerId) &&
+        !foundry &&
+        pendingLore.length === 0
+      ) {
+        return null;
+      }
+
+      // Ensure name-pinned lore grants land before we scan for uncelebrated
+      // (queuePending no longer re-dispatches if already pending — breaks loop)
+      try {
+        const { applyLegacyBadgeGrants } = await import("./legacy-badge-grants");
+        applyLegacyBadgeGrants({
+          id: session.playerId,
+          name: session.playerName || "",
+        });
+      } catch {
+        /* ok */
+      }
+
+      const { loadLeaguePlayers, loadLeagueActiveWeek } = await import(
+        "./cloud"
+      );
+      // One league load per scan — never re-enter this function while inflight
+      let players = await loadLeaguePlayers("badge-celebration.findUnlocks");
+      players = syncLeagueCheevoKing(
+        players.map((p) => withPermanentBadges(p))
+      );
+      const me = players.find((p) => p.id === session.playerId);
+      if (!me) return null;
+      // Prefer live display name for legacy grants (Tbone / Soulstache match)
+      try {
+        const { applyLegacyBadgeGrants } = await import(
+          "./legacy-badge-grants"
+        );
+        applyLegacyBadgeGrants({
+          id: me.id,
+          name: me.name || session.playerName,
+        });
+      } catch {
+        /* ok */
+      }
+      const tagged = withPermanentBadges(me);
+      // Bank first, then backfill celebrated from bank — kills login re-fires
+      // (pending lore ids are excluded from backfill until dismissed)
+      bankCareerCheevos(tagged.id, getPlayerBadges(tagged));
+      let activeWeek = 0;
+      try {
+        activeWeek = await loadLeagueActiveWeek();
+      } catch {
+        activeWeek = 0;
+      }
+      const newBadges = getUncelebratedBadges(tagged, {
+        allowStackMultiples: canCelebrateStackMultiples(
+          session.playerId,
+          activeWeek
+        ),
+      });
+      return { player: tagged, newBadges };
     } catch {
-      foundry = false;
-    }
-    // Lore pending (Cavalry Scout etc.) always allowed to pop on login
-    const pendingLore = readPendingBadgeCelebration(session.playerId);
-    if (
-      !canShowBadgeCelebrations(session.playerId) &&
-      !foundry &&
-      pendingLore.length === 0
-    ) {
       return null;
     }
+  })().finally(() => {
+    findUnlocksInflight = null;
+  });
 
-    // Ensure name-pinned lore grants land before we scan for uncelebrated
-    try {
-      const { applyLegacyBadgeGrants } = await import("./legacy-badge-grants");
-      applyLegacyBadgeGrants({
-        id: session.playerId,
-        name: session.playerName || "",
-      });
-    } catch {
-      /* ok */
-    }
-
-    const { loadLeaguePlayers, loadLeagueActiveWeek } = await import("./cloud");
-    let players = await loadLeaguePlayers("badge-celebration.findUnlocks");
-    players = syncLeagueCheevoKing(players.map((p) => withPermanentBadges(p)));
-    const me = players.find((p) => p.id === session.playerId);
-    if (!me) return null;
-    // Prefer live display name for legacy grants (Tbone / Soulstache match)
-    try {
-      const { applyLegacyBadgeGrants } = await import("./legacy-badge-grants");
-      applyLegacyBadgeGrants({ id: me.id, name: me.name || session.playerName });
-    } catch {
-      /* ok */
-    }
-    const tagged = withPermanentBadges(me);
-    // Bank first, then backfill celebrated from bank — kills login re-fires
-    // (pending lore ids are excluded from backfill until dismissed)
-    bankCareerCheevos(tagged.id, getPlayerBadges(tagged));
-    let activeWeek = 0;
-    try {
-      activeWeek = await loadLeagueActiveWeek();
-    } catch {
-      activeWeek = 0;
-    }
-    const newBadges = getUncelebratedBadges(tagged, {
-      allowStackMultiples: canCelebrateStackMultiples(
-        session.playerId,
-        activeWeek
-      ),
-    });
-    return { player: tagged, newBadges };
-  } catch {
-    return null;
-  }
+  return findUnlocksInflight;
 }

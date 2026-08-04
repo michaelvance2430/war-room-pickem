@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   EVENT_GAZETTE_DONE,
@@ -27,6 +27,8 @@ const TIER_HEX: Record<BadgeTier, string> = {
 export default function BadgeUnlockModal() {
   const [queue, setQueue] = useState<BadgeStatus[]>([]);
   const [checked, setChecked] = useState(false);
+  /** Blocks force-check re-entry while a scan is in flight (stampede guard). */
+  const scanningRef = useRef(false);
 
   const current = queue[0] ?? null;
   const remaining = Math.max(0, queue.length - 1);
@@ -53,6 +55,8 @@ export default function BadgeUnlockModal() {
 
   const tryCelebrate = useCallback(async (opts?: { force?: boolean }) => {
     if (checked && !opts?.force) return;
+    // force:true used to bypass everything — including in-flight scans → 1500× loop
+    if (scanningRef.current) return;
     if (!getSession()?.playerId) return;
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -62,42 +66,47 @@ export default function BadgeUnlockModal() {
       /* ok */
     }
 
-    // After first lock only for calm first 10 minutes; season-alive still ok later
-    // Foundry testing (not quiet eyes) can celebrate so you can see cheevo UX
-    // Pending lore (Cavalry Scout) always allowed to pop on login
+    scanningRef.current = true;
     try {
-      const {
-        canShowBadgeCelebrations,
-        isPreLockCalm,
-        syncFirstWeekFromCloud,
-      } = await import("@/lib/first-week");
-      const { allowFoundryCeremonies } = await import("@/lib/foundry-preview");
-      const { readPendingBadgeCelebration } = await import(
-        "@/lib/badge-celebration"
-      );
-      await syncFirstWeekFromCloud(getSession()?.playerId);
-      const pid = getSession()?.playerId || "";
-      const pendingLore = readPendingBadgeCelebration(pid);
-      const foundry = allowFoundryCeremonies() || !!opts?.force;
-      if (pendingLore.length === 0) {
-        if (isPreLockCalm(pid) && !foundry) return;
-        if (!canShowBadgeCelebrations(pid) && !foundry) {
-          // Stay unchecked so we re-try after they lock
-          return;
+      // After first lock only for calm first 10 minutes; season-alive still ok later
+      // Foundry testing (not quiet eyes) can celebrate so you can see cheevo UX
+      // Pending lore (Cavalry Scout) always allowed to pop on login
+      try {
+        const {
+          canShowBadgeCelebrations,
+          isPreLockCalm,
+          syncFirstWeekFromCloud,
+        } = await import("@/lib/first-week");
+        const { allowFoundryCeremonies } = await import("@/lib/foundry-preview");
+        const { readPendingBadgeCelebration } = await import(
+          "@/lib/badge-celebration"
+        );
+        await syncFirstWeekFromCloud(getSession()?.playerId);
+        const pid = getSession()?.playerId || "";
+        const pendingLore = readPendingBadgeCelebration(pid);
+        const foundry = allowFoundryCeremonies() || !!opts?.force;
+        if (pendingLore.length === 0) {
+          if (isPreLockCalm(pid) && !foundry) return;
+          if (!canShowBadgeCelebrations(pid) && !foundry) {
+            // Stay unchecked so we re-try after they lock
+            return;
+          }
         }
+      } catch {
+        /* proceed best-effort */
       }
-    } catch {
-      /* proceed best-effort */
-    }
 
-    const result = await findNewBadgeUnlocksForSession();
-    if (!result || result.newBadges.length === 0) {
+      const result = await findNewBadgeUnlocksForSession();
+      if (!result || result.newBadges.length === 0) {
+        setChecked(true);
+        return;
+      }
+
+      setQueue(result.newBadges);
       setChecked(true);
-      return;
+    } finally {
+      scanningRef.current = false;
     }
-
-    setQueue(result.newBadges);
-    setChecked(true);
   }, [checked]);
 
   useEffect(() => {
@@ -119,7 +128,8 @@ export default function BadgeUnlockModal() {
       setChecked(true);
     }
     function onForceCheck() {
-      setChecked(false);
+      // Do NOT setChecked(false) + force while already scanning — that was the loop
+      if (scanningRef.current) return;
       void tryCelebrate({ force: true });
     }
     window.addEventListener(EVENT_GAZETTE_DONE, onGazetteDone);
