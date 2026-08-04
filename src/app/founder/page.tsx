@@ -406,7 +406,7 @@ export default function FounderDashboardPage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <main className="flex-1 max-w-lg mx-auto w-full px-3 sm:px-4 py-6 sm:py-8 space-y-5">
+      <main className="flex-1 max-w-lg mx-auto w-full min-w-0 px-3 sm:px-4 py-6 sm:py-8 space-y-5 overflow-x-hidden">
         <div className="flex items-start justify-between gap-3">
       <div>
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">
@@ -586,7 +586,7 @@ export default function FounderDashboardPage() {
         </section>
 
         {/* ========== THE PLAYGROUND (everything simple) ========== */}
-        <section className="rounded-2xl border-2 border-primary/40 bg-card p-4 space-y-5 shadow-[0_0_40px_rgba(34,197,94,0.08)]">
+        <section className="rounded-2xl border-2 border-primary/40 bg-card p-4 space-y-5 shadow-[0_0_40px_rgba(34,197,94,0.08)] min-w-0 w-full max-w-full overflow-x-hidden">
       <div>
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">
               Playground
@@ -800,11 +800,11 @@ export default function FounderDashboardPage() {
               Every moment lives here. Same MomentHost playback — no orphan
               buttons or separate routes.
             </p>
-      <div className="grid grid-cols-1 gap-2">
+      <div className="flex flex-col gap-2 min-w-0 w-full">
               <button
                 type="button"
                 onClick={() => jumpPopup("season_open")}
-                className="py-2.5 rounded-lg border border-primary/50 bg-primary/15 text-xs font-extrabold hover:bg-primary/20"
+                className="w-full min-w-0 box-border py-3 min-h-[48px] px-3 rounded-lg border border-primary/50 bg-primary/15 text-xs font-extrabold hover:bg-primary/20 text-left touch-manipulation"
               >
                 ▶ Season Opening (tradition preview)
               </button>
@@ -818,13 +818,13 @@ export default function FounderDashboardPage() {
                     );
                   });
                 }}
-                className="py-2.5 rounded-lg border border-border text-xs font-semibold hover:bg-background"
+                className="w-full min-w-0 box-border py-3 min-h-[44px] px-3 rounded-lg border border-border text-xs font-semibold hover:bg-background text-left touch-manipulation"
               >
                 Reset Season Opening claim (local)
               </button>
 
               {/* Creator-only: reset one-time coaching flags (never customer-facing) */}
-              <div className="rounded-xl border border-border bg-background/60 p-3 space-y-2">
+              <div className="rounded-xl border border-border bg-background/60 p-3 space-y-2 min-w-0 w-full">
                 <p className="text-[10px] font-black uppercase tracking-wide text-muted">
                   Coaching flags (admin)
                 </p>
@@ -832,7 +832,7 @@ export default function FounderDashboardPage() {
                   Per-milestone keys — not a global tutorial_completed. Reset
                   for QA only.
                 </p>
-                <div className="grid grid-cols-1 gap-1.5">
+                <div className="flex flex-col gap-1.5 min-w-0 w-full">
                   <button
                     type="button"
                     onClick={() => {
@@ -843,7 +843,7 @@ export default function FounderDashboardPage() {
                         );
                       });
                     }}
-                    className="py-2 rounded-lg border border-border text-xs font-semibold hover:bg-background text-left px-2.5"
+                    className="w-full min-w-0 box-border py-2.5 min-h-[44px] rounded-lg border border-border text-xs font-semibold hover:bg-background text-left px-3 touch-manipulation"
                   >
                     Reset · Commissioner first-card coaching
                   </button>
@@ -857,7 +857,7 @@ export default function FounderDashboardPage() {
                         );
                       });
                     }}
-                    className="py-2 rounded-lg border border-border text-xs font-semibold hover:bg-background text-left px-2.5"
+                    className="w-full min-w-0 box-border py-2.5 min-h-[44px] rounded-lg border border-border text-xs font-semibold hover:bg-background text-left px-3 touch-manipulation"
                   >
                     Reset · Player first-picks coaching
                   </button>
@@ -871,7 +871,7 @@ export default function FounderDashboardPage() {
                         );
                       });
                     }}
-                    className="py-2 rounded-lg border border-warning/40 bg-warning/10 text-xs font-semibold hover:bg-warning/15 text-left px-2.5"
+                    className="w-full min-w-0 box-border py-2.5 min-h-[44px] rounded-lg border border-warning/40 bg-warning/10 text-xs font-semibold hover:bg-warning/15 text-left px-3 touch-manipulation"
                   >
                     Reset · All coaching for this league
                   </button>
@@ -881,17 +881,20 @@ export default function FounderDashboardPage() {
               {/* Season Cold Open — sole War Room Moments test surface */}
               <div
                 id="war-room-moments"
-                className="rounded-xl border border-amber-400/50 bg-amber-500/10 p-3 space-y-2.5 scroll-mt-24"
+                className="rounded-xl border border-amber-400/50 bg-amber-500/10 p-3 sm:p-4 space-y-3 scroll-mt-24 min-w-0 w-full max-w-full overflow-x-hidden"
               >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
+                <div className="flex flex-col gap-2 min-w-0 w-full">
+                  <span className="inline-flex self-start max-w-full rounded-full bg-amber-400/25 text-amber-200 text-[10px] font-black uppercase tracking-wide px-2.5 py-1 whitespace-normal break-words">
+                    Ready for Mike to Test
+                  </span>
+                  <div className="min-w-0 w-full space-y-1">
                     <p className="text-[10px] font-black uppercase tracking-wide text-amber-300">
                       War Room Moments · 01
                     </p>
-                    <p className="text-sm font-extrabold text-foreground leading-tight uppercase tracking-wide">
+                    <p className="text-sm font-extrabold text-foreground leading-snug uppercase tracking-wide break-words">
                       Season Cold Open
                     </p>
-                    <p className="text-[11px] text-muted mt-0.5 leading-snug">
+                    <p className="text-[11px] text-muted leading-relaxed break-words">
                       Heat on last year&apos;s champ — same reader shell for CFB,
                       NFL, and every Foundry room. Uses the{" "}
                       <strong className="text-foreground">active league</strong>
@@ -899,14 +902,11 @@ export default function FounderDashboardPage() {
                       re-open when championship year advances.
                     </p>
                   </div>
-                  <span className="shrink-0 rounded-full bg-amber-400/25 text-amber-200 text-[10px] font-black uppercase tracking-wide px-2 py-0.5">
-                    Ready for Mike to Test
-                  </span>
                 </div>
                 <button
                   type="button"
                   onClick={() => jumpPopup("cold")}
-                  className="w-full py-3 min-h-[48px] rounded-lg bg-amber-400 text-black text-sm font-extrabold touch-manipulation active:scale-[0.99] hover:bg-amber-300"
+                  className="w-full min-w-0 box-border py-3.5 min-h-[52px] px-3 rounded-xl bg-amber-400 text-black text-sm font-extrabold touch-manipulation active:scale-[0.99] hover:bg-amber-300 whitespace-normal break-words text-center"
                 >
                   Test Moment · current league
                 </button>
@@ -951,7 +951,7 @@ export default function FounderDashboardPage() {
                     );
                   });
                 }}
-                className="py-2.5 rounded-lg border border-warning/40 bg-warning/10 text-xs font-semibold hover:bg-warning/15"
+                className="w-full min-w-0 box-border py-3 min-h-[44px] px-3 rounded-lg border border-warning/40 bg-warning/10 text-xs font-semibold hover:bg-warning/15 text-left touch-manipulation"
               >
                 Audit week inventory (orphans · read-only)
               </button>
@@ -969,7 +969,7 @@ export default function FounderDashboardPage() {
                     );
                   });
                 }}
-                className="py-2.5 rounded-lg border-2 border-primary/50 bg-primary/15 text-xs font-bold hover:bg-primary/20 col-span-full sm:col-span-2"
+                className="w-full min-w-0 box-border py-3 min-h-[48px] px-3 rounded-lg border-2 border-primary/50 bg-primary/15 text-xs font-bold hover:bg-primary/20 text-left whitespace-normal break-words touch-manipulation"
               >
                 CFB NATIONAL CHAMPIONSHIP IS FINAL → Trophy Ceremony
               </button>
@@ -981,48 +981,49 @@ export default function FounderDashboardPage() {
                     setLabLog("✅ Cleared CFB championship final simulation.");
                   });
                 }}
-                className="py-2.5 rounded-lg border border-border text-xs font-semibold hover:bg-background"
+                className="w-full min-w-0 box-border py-3 min-h-[44px] px-3 rounded-lg border border-border text-xs font-semibold hover:bg-background text-left touch-manipulation"
               >
                 Clear CFB title sim
-              </button><button
+              </button>
+              <button
                 type="button"
                 onClick={() => jumpPopup("ring")}
-                className="py-2.5 rounded-lg border border-border text-xs font-semibold hover:bg-background"
+                className="w-full min-w-0 box-border py-3 min-h-[44px] px-3 rounded-lg border border-border text-xs font-semibold hover:bg-background text-left touch-manipulation"
               >
                 Ring ceremony
               </button>
       <button
                 type="button"
                 onClick={() => jumpPopup("card")}
-                className="py-2.5 rounded-lg border border-border text-xs font-semibold hover:bg-background"
+                className="w-full min-w-0 box-border py-3 min-h-[44px] px-3 rounded-lg border border-border text-xs font-semibold hover:bg-background text-left touch-manipulation"
               >
                 Card just published
               </button>
       <button
                 type="button"
                 onClick={() => jumpPopup("paper")}
-                className="py-2.5 rounded-lg border border-primary/40 bg-primary/10 text-xs font-semibold hover:bg-primary/15"
+                className="w-full min-w-0 box-border py-3 min-h-[44px] px-3 rounded-lg border border-primary/40 bg-primary/10 text-xs font-semibold hover:bg-primary/15 text-left touch-manipulation"
               >
                 Gazette paper + cheevos (after score)
               </button>
       <button
                 type="button"
                 onClick={() => jumpPopup("gazette")}
-                className="py-2.5 rounded-lg border border-border text-xs font-semibold hover:bg-background"
+                className="w-full min-w-0 box-border py-3 min-h-[44px] px-3 rounded-lg border border-border text-xs font-semibold hover:bg-background text-left touch-manipulation"
               >
                 Week-3 Gazette shelf unlock only
               </button>
       <button
                 type="button"
                 onClick={() => jumpPopup("cut")}
-                className="py-2.5 rounded-lg border border-border text-xs font-semibold hover:bg-background"
+                className="w-full min-w-0 box-border py-3 min-h-[44px] px-3 rounded-lg border border-border text-xs font-semibold hover:bg-background text-left touch-manipulation"
               >
                 Cut line door → Board
               </button>
       <button
                 type="button"
                 onClick={() => jumpPopup("trophy")}
-                className="py-2.5 rounded-lg border border-border text-xs font-semibold hover:bg-background"
+                className="w-full min-w-0 box-border py-3 min-h-[44px] px-3 rounded-lg border border-border text-xs font-semibold hover:bg-background text-left touch-manipulation"
               >
                 Trophy / brackets door
               </button>

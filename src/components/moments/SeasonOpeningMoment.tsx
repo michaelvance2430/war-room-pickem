@@ -239,24 +239,26 @@ export default function SeasonOpeningMoment() {
     >
       {/* Foundry-only duration presets (preview; does not burn claim) */}
       {showDev && payload.preview && (
-        <div className="absolute top-3 right-3 z-30 flex flex-wrap gap-1 max-w-[12rem]">
-          {([6, 8, 10, 12] as SeasonOpenDurationSec[]).map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => {
-                setSeasonOpenDurationSec(s);
-                setDevSec(s);
-              }}
-              className={`min-h-[32px] px-2 rounded text-[10px] font-bold border ${
-                devSec === s
-                  ? "border-primary bg-primary text-black"
-                  : "border-white/30 text-white/80 bg-black/50"
-              }`}
-            >
-              {s}s
-            </button>
-          ))}
+        <div className="absolute top-3 left-3 right-3 z-30 flex flex-wrap gap-1.5 justify-end max-w-full pointer-events-none">
+          <div className="flex flex-wrap gap-1.5 justify-end pointer-events-auto max-w-full">
+            {([6, 8, 10, 12] as SeasonOpenDurationSec[]).map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => {
+                  setSeasonOpenDurationSec(s);
+                  setDevSec(s);
+                }}
+                className={`min-h-[40px] min-w-[44px] px-3 rounded-lg text-[11px] font-bold border touch-manipulation ${
+                  devSec === s
+                    ? "border-primary bg-primary text-black"
+                    : "border-white/30 text-white/80 bg-black/50"
+                }`}
+              >
+                {s}s
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
