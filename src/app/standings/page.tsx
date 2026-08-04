@@ -24,6 +24,7 @@ import {
   lastSeenToneClass,
   touchLastSeen,
 } from "@/lib/last-seen";
+import { hydratePlayersLastSeen } from "@/lib/cloud";
 import { hasOfficialScoredWeek } from "@/lib/season-scored";
 import { markStandingsWarm } from "@/lib/profile-nav-trace";
 
@@ -140,8 +141,38 @@ export default function StandingsPage() {
       }
     }
     load();
+
+    // Live presence: stay Online now while this tab is open; refresh others' pulse
+    const heartbeat = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      void touchLastSeen();
+      setPlayers((prev) => {
+        if (!prev.length) return prev;
+        void hydratePlayersLastSeen(prev).then((next) => {
+          if (!cancelled) setPlayers(next);
+        });
+        return prev;
+      });
+    }, 40_000);
+
+    function onVis() {
+      if (document.visibilityState === "visible") {
+        void touchLastSeen();
+        setPlayers((prev) => {
+          if (!prev.length) return prev;
+          void hydratePlayersLastSeen(prev).then((next) => {
+            if (!cancelled) setPlayers(next);
+          });
+          return prev;
+        });
+      }
+    }
+    document.addEventListener("visibilitychange", onVis);
+
     return () => {
       cancelled = true;
+      window.clearInterval(heartbeat);
+      document.removeEventListener("visibilitychange", onVis);
     };
   }, []);
 

@@ -10,8 +10,12 @@ import { getSession, getLeague } from "@/lib/league";
 import { isAppCreator } from "@/lib/creator";
 
 const LOCAL_TOUCH_KEY = "warroom-last-seen-touch-v1";
-/** Don't write more often than this (ms) */
-const TOUCH_THROTTLE_MS = 3 * 60 * 1000; // 3 minutes
+/**
+ * Throttle between presence writes.
+ * Online now = 15 min window — heartbeats every ~90s keep active viewers green
+ * without spamming Supabase.
+ */
+const TOUCH_THROTTLE_MS = 90 * 1000; // 90 seconds
 
 function canUse() {
   return typeof window !== "undefined" && typeof localStorage !== "undefined";

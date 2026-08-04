@@ -328,6 +328,11 @@ export default function Nav() {
     if (!isGuestMode()) {
       window.setTimeout(() => void touchLastSeen(), 2000);
     }
+    // Heartbeat while app tab is visible — keeps "Online now" honest (~90s throttle)
+    const presenceBeat = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      if (!isGuestMode()) void touchLastSeen();
+    }, 90_000);
     function onVis() {
       if (document.visibilityState === "visible") {
         void loadUnread();
@@ -352,6 +357,7 @@ export default function Nav() {
       window.clearTimeout(unreadTimer);
       window.clearTimeout(staffTimer);
       window.clearTimeout(profileTimer);
+      window.clearInterval(presenceBeat);
       window.removeEventListener("warroom-view-as-player", onPreview);
       window.removeEventListener(SPORT_THEME_EVENT, onSportTheme);
       document.removeEventListener("visibilitychange", onVis);

@@ -292,9 +292,54 @@ export default function HomeWeekHero() {
       }
     }
     void load();
+
+    // Live update when commissioner publishes (same browser or after cache bust)
+    function reloadHero() {
+      try {
+        heroCache = null;
+        const lid = getLeague()?.id;
+        if (lid) {
+          void import("@/lib/cloud").then((m) => {
+            m.invalidateCloudWeekCaches(lid);
+          });
+        }
+      } catch {
+        /* ok */
+      }
+      void load();
+    }
+
+    function onPublished() {
+      reloadHero();
+    }
+    function onVis() {
+      if (document.visibilityState === "visible") reloadHero();
+    }
+    function onFocus() {
+      reloadHero();
+    }
+
+    window.addEventListener("warroom-card-published", onPublished);
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVis);
+
+    // While waiting on a card, soft-poll so players don't need a manual refresh
+    const poll = window.setInterval(() => {
+      if (cancelled) return;
+      setState((prev) => {
+        if (prev && prev.hasCard) return prev;
+        void load();
+        return prev;
+      });
+    }, 20_000);
+
     return () => {
       cancelled = true;
       window.clearTimeout(failSafe);
+      window.clearInterval(poll);
+      window.removeEventListener("warroom-card-published", onPublished);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVis);
     };
   }, []);
 

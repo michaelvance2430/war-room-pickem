@@ -2860,8 +2860,9 @@ function mapStandingsRows(rows: Record<string, unknown>[]): StandingsCloudRow[] 
 /**
  * Direct profiles.last_seen_at hydrate — does not depend on memberships embed.
  * Fixes silent null when embed omits last_seen_at or column was late-added.
+ * Also used for soft presence polls on Standings (no full standings re-score).
  */
-async function hydratePlayersLastSeen(
+export async function hydratePlayersLastSeen(
   players: import("./types").Player[]
 ): Promise<import("./types").Player[]> {
   if (!players.length) return players;
