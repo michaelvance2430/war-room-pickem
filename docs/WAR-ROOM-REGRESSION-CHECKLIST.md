@@ -263,6 +263,7 @@ Ready for freeze tag: YES / NO (requires Mike)
 |-----|---------|
 | `war-room-moments-stable-baseline` | Moments stack freeze |
 | `cfb-pre-commissioner-known-good` | Post Home/Picks/skins cert (only after Mike) |
+| `cfb-profiles-open-known-good` | Profiles reopened; peer freeze fixed (`c83058d`); phone+desktop Mike retest — see `docs/CFB-PROFILES-OPEN-KNOWN-GOOD.md` |
 
 Never create a known-good tag without both legs + Mike product approval.
 
