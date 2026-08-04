@@ -7,8 +7,6 @@ import Avatar from "@/components/Avatar";
 import {
   getSession,
   getLeague,
-  isActuallyCommissioner,
-  isActuallyOps,
 } from "@/lib/league";
 import {
   fetchMyMemberships,
@@ -34,7 +32,7 @@ import {
   hydrateBirthdayFromCloud,
 } from "@/lib/profile";
 import { isAppCreator, withCreatorFlag } from "@/lib/creator";
-import { isViewAsPlayer, setViewAsPlayer } from "@/lib/view-as-player";
+
 import FeedbackForm from "@/components/FeedbackForm";
 import OwnershipNotice from "@/components/OwnershipNotice";
 import { isGuestMode } from "@/lib/guest-mode";
@@ -87,8 +85,6 @@ export default function AccountPage() {
   const [fullRoom, setFullRoom] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [playerView, setPlayerView] = useState(false);
-  const [canPreviewPlayer, setCanPreviewPlayer] = useState(false);
   const [titleOptions, setTitleOptions] = useState<EquipableTitleOption[]>(
     []
   );
@@ -105,7 +101,6 @@ export default function AccountPage() {
     const session = getSession();
     const league = getLeague();
     setUserId(session?.playerId || null);
-    setPlayerView(isViewAsPlayer());
     setActiveId(league?.id || session?.leagueId || null);
     setChaosTitleLock(isChaosTitleLocked(session?.playerId, league?.id));
     try {
@@ -189,18 +184,6 @@ export default function AccountPage() {
         setEarnedBadgeIds(new Set());
       }
     }
-    // Any path that means "you run a league" → can preview player UI
-    const runsALeague =
-      isActuallyCommissioner() ||
-      isActuallyOps() ||
-      !!session?.isCommissioner ||
-      !!session?.isDeputy ||
-      list.some(
-        (m) =>
-          m.role === "commissioner" ||
-          m.commissionerId === session?.playerId
-      );
-    setCanPreviewPlayer(runsALeague);
     setLoading(false);
   }
 
@@ -758,47 +741,6 @@ export default function AccountPage() {
             )}
           </div>
       </section>
-
-        {/* Commish preview next */}
-        {canPreviewPlayer && (
-          <section className="rounded-xl border-2 border-warning bg-warning/15 p-5 mb-6 shadow-[0_0_24px_rgba(234,179,8,0.12)]">
-      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-warning mb-1">
-              Commish only
-            </p>
-      <h2 className="text-lg font-bold mb-1 text-warning">
-              View as player
-            </h2>
-      <p className="text-sm text-foreground/90 mb-3 leading-relaxed">
-              See the app like your 20 friends: no Commish button, no ops tools.
-              Your real powers stay on — this only changes the UI.
-            </p>
-      <button
-              type="button"
-              onClick={() => {
-                const next = !playerView;
-                setViewAsPlayer(next);
-                setPlayerView(next);
-                if (next) {
-                  setMessage(
-                    "Player view ON — go to Home. Yellow bar exits anytime."
-                  );
-                  router.push("/");
-                  router.refresh();
-                } else {
-                  // Match Nav: leave current page → Home as commissioner
-                  window.location.href = "/";
-                }
-              }}
-              className={`w-full sm:w-auto text-base px-5 py-3 rounded-xl font-bold ${
-                playerView
-                  ? "bg-warning text-black"
-                  : "bg-warning text-black hover:opacity-90"
-              }`}
-            >
-              {playerView ? "Exit → Home as Commish" : "Enter player view →"}
-            </button>
-      </section>
-        )}
 
         <section className="rounded-xl border border-primary/35 bg-primary/10 p-5 mb-6">
       <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-1">

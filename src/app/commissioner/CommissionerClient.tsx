@@ -79,7 +79,7 @@ import {
   buildThisWeekViewModel,
   resolveHostHero,
 } from "@/lib/host-dashboard";
-import { setViewAsPlayer } from "@/lib/view-as-player";
+
 import {
   formatKickoff,
   formatCardDateRange,
@@ -2235,16 +2235,13 @@ function CommissionerPageInner() {
       <h1 className="text-xl font-bold mb-2">Ops only</h1>
       <p className="text-sm text-muted mb-3">
               Only the league commissioner or an appointed deputy can open these
-              tools. If you turned on{" "}
-              <span className="text-foreground font-medium">View as player</span>
-              , exit that mode on Account (or the yellow bar) to use Commish
-              again.
+              tools.
             </p>
-      <a
-              href="/account"
+            <a
+              href="/"
               className="text-sm text-primary font-semibold hover:underline"
             >
-              Account → View as player
+              ← Home
             </a>
       </div>
         </main>
@@ -2420,10 +2417,6 @@ function CommissionerPageInner() {
                 onNudgeHoldouts: () => {
                   setCommunityPulseOpen(true);
                   void refreshPickStatus();
-                },
-                onPreviewPlayer: () => {
-                  setViewAsPlayer(true);
-                  router.push("/");
                 },
                 onOpenStandings: () => router.push("/standings"),
                 onOpenGazette: () => router.push("/gazette"),

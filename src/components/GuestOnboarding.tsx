@@ -170,7 +170,7 @@ export default function GuestOnboarding() {
               }}
               className="w-full text-left rounded-xl border-2 border-border hover:border-primary/50 p-4 space-y-1 transition"
             >
-              <p className="font-bold text-foreground">View as player</p>
+              <p className="font-bold text-foreground">Tour as a player</p>
               <p className="text-xs text-muted">
                 Weekly picks, confidence, Best Bet — the friend experience.
               </p>
@@ -184,7 +184,7 @@ export default function GuestOnboarding() {
               }}
               className="w-full text-left rounded-xl border-2 border-primary/40 bg-primary/10 hover:bg-primary/15 p-4 space-y-1 transition"
             >
-              <p className="font-bold text-primary">View as commissioner</p>
+              <p className="font-bold text-primary">Tour as a commissioner</p>
               <p className="text-xs text-muted">
                 Build a card, publish, score — how you run the room.
               </p>

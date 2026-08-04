@@ -15,7 +15,6 @@ import { getLeague, getSession, isActuallyCommissioner } from "@/lib/league";
 import { isGuestMode } from "@/lib/guest-mode";
 import { isAppCreator } from "@/lib/creator";
 import { weekTitle } from "@/lib/dates";
-import { setViewAsPlayer } from "@/lib/view-as-player";
 import InviteFriends from "@/components/InviteFriends";
 
 export default function CardPublishedModal() {
@@ -104,17 +103,6 @@ export default function CardPublishedModal() {
             >
               Done → Home
             </Link>
-            <button
-              type="button"
-              onClick={() => {
-                setViewAsPlayer(true);
-                dismiss();
-                window.location.href = "/";
-              }}
-              className="w-full py-3.5 min-h-[52px] rounded-xl border-2 border-warning bg-warning/15 text-warning font-bold text-sm touch-manipulation"
-            >
-              See what players see
-            </button>
             <Link
               href="/picks"
               onClick={dismiss}

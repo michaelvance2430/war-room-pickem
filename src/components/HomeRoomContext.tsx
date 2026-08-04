@@ -10,7 +10,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { setViewAsPlayer } from "@/lib/view-as-player";
 import HomeSportSwitcher from "@/components/HomeSportSwitcher";
 import {
   markInviteCopied,
@@ -21,7 +20,7 @@ type Props = {
   leagueName: string | null;
   sportId: string;
   isCommish: boolean;
-  /** True host (not view-as-player) — show player-view escape */
+  /** @deprecated Kept for call-site compat — player-view chrome removed from product */
   actuallyCommish?: boolean;
   leagueCode?: string | null;
   /** Any member can share; not host-only. Default true when code present. */
@@ -32,7 +31,6 @@ export default function HomeRoomContext({
   leagueName,
   sportId,
   isCommish,
-  actuallyCommish,
   leagueCode,
   canShare = true,
 }: Props) {
@@ -114,18 +112,6 @@ export default function HomeRoomContext({
               : shareNote
                 ? shareNote
                 : "Share League"}
-          </button>
-        )}
-        {actuallyCommish && isCommish && (
-          <button
-            type="button"
-            onClick={() => {
-              setViewAsPlayer(true);
-              window.location.href = "/";
-            }}
-            className="min-h-[44px] px-3.5 rounded-lg border border-warning/40 text-warning text-xs font-bold touch-manipulation"
-          >
-            Player view
           </button>
         )}
         {isCommish && (

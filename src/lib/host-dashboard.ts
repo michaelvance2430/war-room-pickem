@@ -25,7 +25,6 @@ export type HostHeroAction =
   | "publish_card"
   | "score_week"
   | "nudge_holdouts"
-  | "preview_player"
   | "open_standings"
   | "open_gazette"
   | "none";
@@ -56,7 +55,6 @@ export type ThisWeekViewModel = {
   missingNames: string[];
   allHumansLocked: boolean;
   canEdit: boolean;
-  canPreview: boolean;
   canScore: boolean;
 };
 
@@ -154,7 +152,6 @@ export function buildThisWeekViewModel(input: HostDashboardInput): ThisWeekViewM
     missingNames: missing,
     allHumansLocked: expected > 0 && complete >= expected && missing.length === 0,
     canEdit: !scored,
-    canPreview: published,
     canScore: published && !scored,
   };
 }
@@ -219,8 +216,8 @@ export function resolveHostHero(vm: ThisWeekViewModel, _opts?: {
       tone: "celebrate",
       title: "Everyone is locked.",
       detail: vm.kickoffCountdown || vm.firstKickoffLabel || "The room’s ready.",
-      action: "preview_player",
-      actionLabel: "Preview as player →",
+      action: "open_standings",
+      actionLabel: "Open Standings →",
     };
   }
   if (vm.status === "scored") {

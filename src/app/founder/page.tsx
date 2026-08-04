@@ -41,6 +41,7 @@ import FoundryPlatformApiUsage from "@/components/FoundryPlatformApiUsage";
 import SandboxHopOptIn from "@/components/SandboxHopOptIn";
 import WeeklyColdOpenModal from "@/components/WeeklyColdOpenModal";
 import CreatorSkinPreview from "@/components/CreatorSkinPreview";
+import FoundryPlayerView from "@/components/FoundryPlayerView";
 
 type Light = "green" | "yellow" | "red";
 
@@ -454,6 +455,9 @@ export default function FounderDashboardPage() {
 
         {/* Skin / atmosphere workshop — never on player Home / Picks / Standings */}
         <CreatorSkinPreview />
+
+        {/* Perspective chrome — never Account / Host / publish modals */}
+        <FoundryPlayerView />
 
         {/* ========== Career Integrity · admin cleanup ========== */}
         <section

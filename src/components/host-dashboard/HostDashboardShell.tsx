@@ -17,7 +17,6 @@ export type HostDashboardActions = {
   onPublishCard: () => void;
   onScoreWeek: () => void;
   onNudgeHoldouts: () => void;
-  onPreviewPlayer: () => void;
   onOpenStandings: () => void;
   onOpenGazette: () => void;
   onEditCard: () => void;
@@ -74,9 +73,6 @@ export default function HostDashboardShell({
         break;
       case "nudge_holdouts":
         actions.onNudgeHoldouts();
-        break;
-      case "preview_player":
-        actions.onPreviewPlayer();
         break;
       case "open_standings":
         actions.onOpenStandings();
@@ -185,15 +181,6 @@ export default function HostDashboardShell({
               className="min-h-[44px] px-3.5 py-2 rounded-xl border border-warning/50 text-warning text-xs font-bold touch-manipulation"
             >
               Score week
-            </button>
-          )}
-          {thisWeek.canPreview && (
-            <button
-              type="button"
-              onClick={actions.onPreviewPlayer}
-              className="min-h-[44px] px-3.5 py-2 rounded-xl border border-border text-xs font-semibold text-muted touch-manipulation"
-            >
-              See as player
             </button>
           )}
         </div>

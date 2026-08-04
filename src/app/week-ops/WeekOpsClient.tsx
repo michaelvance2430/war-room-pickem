@@ -349,16 +349,6 @@ export default function WeekOpsClient() {
     router.push("/");
   }
 
-  function seePlayerView() {
-    try {
-      const { setViewAsPlayer } = require("@/lib/view-as-player") as typeof import("@/lib/view-as-player");
-      setViewAsPlayer(true);
-    } catch {
-      /* ignore */
-    }
-    window.location.href = "/";
-  }
-
   if (!getSession()) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
@@ -896,7 +886,7 @@ export default function WeekOpsClient() {
             <p className="text-2xl font-black leading-tight">{doneLabel}</p>
             <p className="text-sm text-muted leading-relaxed max-w-sm mx-auto">
               {/LIVE/i.test(doneLabel)
-                ? "Friends can open My Picks now. Home is your resting place — or peek at the player view once."
+                ? "Friends can open My Picks now. Home is your resting place."
                 : "Standings and the room update from real results. Head Home when you’re ready."}
             </p>
             <button
@@ -906,15 +896,6 @@ export default function WeekOpsClient() {
             >
               Done → Home
             </button>
-            {/LIVE/i.test(doneLabel) && (
-              <button
-                type="button"
-                onClick={seePlayerView}
-                className="w-full min-h-[48px] rounded-xl border-2 border-warning/50 bg-warning/10 text-warning text-sm font-bold touch-manipulation"
-              >
-                See what players see
-              </button>
-            )}
           </div>
         )}
 

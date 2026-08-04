@@ -1,6 +1,7 @@
 /**
- * Commish “see the app as a player” preview.
+ * Foundry / Eyes “see the app as a player” chrome flag.
  * UI-only: hides Commish/Ops/Mod chrome. Server permissions unchanged.
+ * Not a product feature — never expose entry points outside Foundry.
  */
 
 import { reapplySeasonThemeFromLocal } from "./season-theme";
