@@ -33,8 +33,13 @@ import { formatRankedTeam } from "@/lib/rankings";
 import {
   defaultPropPreset,
   propFromPreset,
-  presetFitsSport,
-  PROP_PRESETS,
+  propCategoriesForSport,
+  presetsForCategory,
+  getPropPreset,
+  matchPresetId,
+  categoryForPresetId,
+  CUSTOM_PROP_ID,
+  type PropCategory,
 } from "@/lib/prop-presets";
 import type { GameResult } from "@/lib/scoring";
 
@@ -79,10 +84,16 @@ export default function WeekOpsClient() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [lastSynced, setLastSynced] = useState<Date | null>(null);
-  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [customOpen, setCustomOpen] = useState(false);
 
   const [available, setAvailable] = useState<Game[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [propCategory, setPropCategory] = useState<PropCategory>(() =>
+    defaultPropPreset("cfb").category
+  );
+  const [propPresetId, setPropPresetId] = useState<string>(
+    () => defaultPropPreset("cfb").id
+  );
   const [prop, setProp] = useState<Prop>(() =>
     propFromPreset(defaultPropPreset("cfb"), 0)
   );
@@ -146,7 +157,14 @@ export default function WeekOpsClient() {
       if (card?.games?.length) {
         setAvailable(card.games);
         setSelectedIds(card.games.map((g) => g.id));
-        if (card.prop) setProp(card.prop);
+        if (card.prop) {
+          setProp(card.prop);
+          const pid = matchPresetId(card.prop);
+          setPropPresetId(pid);
+          if (pid !== CUSTOM_PROP_ID) {
+            setPropCategory(categoryForPresetId(pid));
+          }
+        }
         setLastSynced(new Date());
       }
 
@@ -195,12 +213,21 @@ export default function WeekOpsClient() {
     });
   }
 
-  function applyPreset(id: string) {
-    const preset = PROP_PRESETS.find((p) => p.id === id);
+  function applyPreset(preset: ReturnType<typeof getPropPreset>) {
     if (!preset) return;
+    setPropPresetId(preset.id);
+    setPropCategory(preset.category);
     setProp(propFromPreset(preset, week));
     setCustomQ("");
+    setCustomOpen(false);
     setError(null);
+  }
+
+  function applyPropCategory(cat: PropCategory) {
+    setPropCategory(cat);
+    const list = presetsForCategory(cat, sportId);
+    const first = list[0];
+    if (first) applyPreset(first);
   }
 
   function applyCustomProp() {
@@ -209,6 +236,7 @@ export default function WeekOpsClient() {
       setError("Need question + two answers.");
       return;
     }
+    setPropPresetId(CUSTOM_PROP_ID);
     setProp({
       id: "custom",
       question: q,
@@ -602,42 +630,93 @@ export default function WeekOpsClient() {
         {/* ── 3 PROP ──────────────────────────────────────────── */}
         {step === 3 && (
           <div className="space-y-3">
+            {/* Four categories — pick type first */}
+            <div className="grid grid-cols-4 gap-1.5">
+              {propCategoriesForSport(sportId).map((c) => {
+                const on = propCategory === c.id;
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => applyPropCategory(c.id)}
+                    className={`min-h-[44px] rounded-xl text-[11px] font-extrabold uppercase tracking-wide touch-manipulation ${
+                      on
+                        ? "bg-primary text-black"
+                        : "border border-border bg-card text-muted"
+                    }`}
+                  >
+                    {c.label}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[11px] text-muted leading-snug">
+              {
+                propCategoriesForSport(sportId).find(
+                  (c) => c.id === propCategory
+                )?.blurb
+              }
+            </p>
+
             {prop.question && (
               <div className="rounded-xl border border-primary/40 bg-primary/10 px-3 py-3">
                 <p className="text-sm font-semibold">{prop.question}</p>
                 <p className="text-xs text-muted mt-1">
                   {prop.options.join(" · ")}
                 </p>
+                {getPropPreset(propPresetId)?.settle === "manual" && (
+                  <p className="text-xs font-semibold text-warning mt-2">
+                    ⚠️ Manual scoring required
+                  </p>
+                )}
               </div>
             )}
-            <div className="space-y-1.5 max-h-48 overflow-y-auto">
-              {PROP_PRESETS.filter((p) => presetFitsSport(p, sportId))
-                .slice(0, 10)
-                .map((p) => (
+
+            <div className="space-y-1.5 max-h-[42vh] overflow-y-auto">
+              {presetsForCategory(propCategory, sportId).map((p) => {
+                const active = propPresetId === p.id;
+                const manual = p.settle === "manual";
+                return (
                   <button
                     key={p.id}
                     type="button"
-                    onClick={() => applyPreset(p.id)}
-                    className={`w-full text-left rounded-lg border px-3 py-2.5 text-xs min-h-[44px] ${
-                      prop.question === p.question
-                        ? "border-primary bg-primary/10 font-semibold"
-                        : "border-border"
+                    onClick={() => applyPreset(p)}
+                    className={`w-full text-left rounded-xl border px-3 py-3 min-h-[52px] touch-manipulation transition ${
+                      active
+                        ? "border-primary bg-primary/10"
+                        : "border-border bg-card"
                     }`}
                   >
-                    {p.label || p.question}
+                    <span
+                      className={`block text-sm leading-snug ${
+                        active ? "font-semibold" : "font-medium"
+                      }`}
+                    >
+                      {active ? "✓ " : ""}
+                      {p.label || p.question}
+                    </span>
+                    {manual && (
+                      <span className="block text-[11px] font-semibold text-warning mt-1">
+                        ⚠️ Manual scoring required
+                      </span>
+                    )}
                   </button>
-                ))}
+                );
+              })}
             </div>
 
             <button
               type="button"
-              onClick={() => setAdvancedOpen((o) => !o)}
+              onClick={() => setCustomOpen((o) => !o)}
               className="text-xs text-muted font-semibold w-full text-left py-1"
             >
-              {advancedOpen ? "▲" : "▼"} Custom prop
+              {customOpen ? "▲" : "▼"} Custom prop
             </button>
-            {advancedOpen && (
+            {customOpen && (
               <div className="space-y-2 rounded-xl border border-border p-3">
+                <p className="text-[11px] font-semibold text-warning">
+                  ⚠️ Manual scoring required
+                </p>
                 <input
                   value={customQ}
                   onChange={(e) => setCustomQ(e.target.value)}
@@ -746,8 +825,8 @@ export default function WeekOpsClient() {
           </div>
         )}
 
-        {/* Advanced — rare path only */}
-        {step !== "done" && (
+        {/* Advanced — never on Pull Odds (step 1). Mission stays simple. */}
+        {step !== "done" && step !== 1 && (
           <details className="mt-10 group">
             <summary className="text-xs text-muted font-semibold cursor-pointer list-none flex items-center gap-1">
               <span className="group-open:hidden">▼</span>
