@@ -36,12 +36,17 @@ A friend with zero context should be able to:
 
 ---
 
-## Guest mode — RETIRED
+## Guest mode — REMOVED (frozen)
 
-Guest tour created a parallel product (fake league, UUID ghosts, dual Home).  
-**Direction:** Account → Join/Create → play. No `Explore as guest`.  
-Kill-switch: `GUEST_MODE_RETIRED` in `src/lib/guest-mode.ts`.  
-Purge leftover guest localStorage on login / Nav boot.
+Guest tour is **deleted**, not paused. No dormant product.
+
+| Keep | Purpose |
+|------|---------|
+| `src/lib/guest-mode.ts` | `GUEST_MODE_RETIRED` + `purgeRetiredGuestSession` / `bootPurgeLegacyGuest` only |
+| Legacy id constants | Detect stale localStorage → clear → `/login?mode=signup` |
+
+No guest components, seed world, cloud forks, or `isGuestMode()` branches.  
+**Direction:** Account → Join/Create → play. Foundry is the only simulation.
 
 ---
 

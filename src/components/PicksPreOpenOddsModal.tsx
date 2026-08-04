@@ -7,7 +7,6 @@
 
 import { useEffect, useState } from "react";
 import { getLeague } from "@/lib/league";
-import { isGuestMode } from "@/lib/guest-mode";
 import {
   getPicksPreOpenWeekLabel,
   markPicksPreOpenOddsNoticeSeen,
@@ -24,7 +23,6 @@ export default function PicksPreOpenOddsModal() {
   const [weekLabel, setWeekLabel] = useState("Week 0");
 
   useEffect(() => {
-    if (isGuestMode()) return;
 
     // Practice dry-run is not the live picks page
     try {

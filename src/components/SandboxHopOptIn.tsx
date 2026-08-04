@@ -9,7 +9,6 @@
 import { useEffect, useState } from "react";
 import { getLeague, getSession, isOps } from "@/lib/league";
 import { isSandboxMode } from "@/lib/season-mode";
-import { isGuestMode } from "@/lib/guest-mode";
 import { isAppCreator } from "@/lib/creator";
 import {
   EVENT_SANDBOX_HOST_HOP,
@@ -25,11 +24,7 @@ export default function SandboxHopOptIn() {
 
   useEffect(() => {
     function refresh() {
-      if (isGuestMode()) {
-        setShow(false);
-        return;
-      }
-      const uid = getSession()?.playerId;
+            const uid = getSession()?.playerId;
       // Hard creator gate — never for normal hosts
       if (!uid || !isAppCreator(uid) || !isOps() || !isSandboxMode()) {
         setShow(false);

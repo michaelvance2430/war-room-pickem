@@ -20,7 +20,6 @@ import {
 import TrophyShareButton from "@/components/TrophyShareButton";
 import HardwareTrophyIcon from "@/components/HardwareTrophyIcon";
 import type { ProfileTrophyKind } from "@/lib/profile-hardware";
-import { isGuestMode } from "@/lib/guest-mode";
 import {
   hasOpeningWeekStarted,
   isOpeningWeekLive,
@@ -41,7 +40,6 @@ export default function SeasonFinaleModal() {
 
     async function run() {
       try {
-        if (isGuestMode()) return;
         // Don't steal Opening Day ring ceremony
         if (isOpeningWeekLive()) return;
         // First 10 minutes: no multi-slide hardware until they locked once

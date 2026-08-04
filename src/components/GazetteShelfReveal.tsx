@@ -14,14 +14,12 @@ import {
   markGazetteShelfRevealSeen,
 } from "@/lib/progressive-disclosure";
 import { EVENT_FORCE_GAZETTE_SHELF_REVEAL } from "@/lib/creator-sandbox";
-import { isGuestMode } from "@/lib/guest-mode";
 
 export default function GazetteShelfReveal() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    if (isGuestMode()) return;
     let cancelled = false;
 
     async function check() {

@@ -9,7 +9,6 @@
  */
 
 import { getLeague, getSession } from "@/lib/league";
-import { isGuestMode } from "@/lib/guest-mode";
 import { isBoredPracticeActive, isBoredPracticeUrl } from "@/lib/bored-practice";
 import { hasOpeningWeekStarted } from "@/lib/ring-ceremony";
 import { isOnboardingActive } from "@/lib/onboarding/engine";
@@ -179,10 +178,7 @@ export function evaluateSeasonOpenEligibility(
   if (typeof window === "undefined") {
     return { ok: false, reason: "ssr" };
   }
-  if (isGuestMode()) {
-    return { ok: false, reason: "guest" };
-  }
-  if (isBoredPracticeActive() || isBoredPracticeUrl(window.location.search)) {
+    if (isBoredPracticeActive() || isBoredPracticeUrl(window.location.search)) {
     return { ok: false, reason: "practice" };
   }
   try {

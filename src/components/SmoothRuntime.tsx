@@ -19,7 +19,6 @@ import {
   prepareNavigation,
   getBodyLockCount,
 } from "@/lib/smooth";
-import { isGuestMode } from "@/lib/guest-mode";
 import { getSession } from "@/lib/league";
 import {
   recoverNavigation,
@@ -239,7 +238,6 @@ export default function SmoothRuntime() {
       wrLog("[WR-NAV]", "prefetch skipped (smoothPrefetch=false)");
       return;
     }
-    if (isGuestMode()) return;
     if (!getSession()?.playerId) return;
     if (prefetchedOnce.current) {
       wrLog("[WR-NAV]", "prefetch already done this session");

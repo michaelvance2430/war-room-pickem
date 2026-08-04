@@ -22,7 +22,6 @@ import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import RoomDataHydrator from "@/components/RoomDataHydrator";
-import { isGuestMode } from "@/lib/guest-mode";
 import { hasVisibleModal } from "@/lib/smooth";
 import {
   wrMount,
@@ -112,7 +111,6 @@ const MascotSighting = dynamic(() => import("@/components/MascotSighting"), {
 });
 
 export default function RoomDeferredChrome() {
-  const guest = isGuestMode();
   const pathname = usePathname();
   if (pathname?.startsWith("/profile")) {
     wrProfileRoute("RoomDeferredChrome.render", `wave pending path=${pathname}`);
@@ -212,16 +210,16 @@ export default function RoomDeferredChrome() {
   return (
     <>
       {/* Wave 0: nameplates only — never blocks taps */}
-      {!guest && <RoomDataHydrator />}
+      {<RoomDataHydrator />}
 
       {!safeNav && allowWave1 && wave >= 1 && (
         <>
-          {!guest && <LoginWelcomeModal />}
-          {!guest && <RulesOnboardingModal />}
-          {!guest && <CrewWeekEightModal />}
-          {!guest && <LeagueBuildLockReminder />}
-          {!guest && <CardPublishedModal />}
-          {!guest && <BoredPracticeDoneModal />}
+          {<LoginWelcomeModal />}
+          {<RulesOnboardingModal />}
+          {<CrewWeekEightModal />}
+          {<LeagueBuildLockReminder />}
+          {<CardPublishedModal />}
+          {<BoredPracticeDoneModal />}
           <GazetteModal />
           <GazetteShelfReveal />
           <StoryDoorModal />
@@ -231,17 +229,17 @@ export default function RoomDeferredChrome() {
 
       {!safeNav && allowWave2 && wave >= 2 && ceremonyOk && (
         <>
-          {!guest && <SeasonCountdownTicker />}
+          {<SeasonCountdownTicker />}
           {/* Season Opening → MomentHost (layout), not DeferredChrome */}
-          {!guest && <CrewRevealModal />}
-          {!guest && <RingCeremonyModal />}
-          {!guest && <SeasonFinaleModal />}
-          {!guest && <WeeklyColdOpenModal />}
-          {!guest && <BirthdayGazetteModal />}
-          {!guest && <PlatformAnniversaryModal />}
-          {!guest && <EasterEggHost />}
-          {!guest && <EggFlexNewspaper />}
-          {!guest && <MascotSighting />}
+          {<CrewRevealModal />}
+          {<RingCeremonyModal />}
+          {<SeasonFinaleModal />}
+          {<WeeklyColdOpenModal />}
+          {<BirthdayGazetteModal />}
+          {<PlatformAnniversaryModal />}
+          {<EasterEggHost />}
+          {<EggFlexNewspaper />}
+          {<MascotSighting />}
         </>
       )}
     </>

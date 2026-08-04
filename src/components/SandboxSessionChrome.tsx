@@ -12,7 +12,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { isOps, getSession, getLeague, isCommissioner } from "@/lib/league";
 import { isSandboxMode } from "@/lib/season-mode";
-import { isGuestMode } from "@/lib/guest-mode";
 import { isAppCreator } from "@/lib/creator";
 import { getSeasonOpenLabel } from "@/lib/season-countdown";
 import {
@@ -83,11 +82,7 @@ export default function SandboxSessionChrome() {
 
   useEffect(() => {
     function refresh() {
-      if (isGuestMode()) {
-        setShow(false);
-        return;
-      }
-      const session = getSession();
+            const session = getSession();
       const league = getLeague();
       // Customer product: never show hop — clear leftover keys from old builds
       if (!session?.playerId || !isAppCreator(session.playerId)) {

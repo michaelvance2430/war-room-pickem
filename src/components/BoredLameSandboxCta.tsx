@@ -9,7 +9,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSession } from "@/lib/league";
-import { isGuestMode } from "@/lib/guest-mode";
 import { pickRandomFunRoom } from "@/lib/fun-lobby";
 
 export default function BoredLameSandboxCta() {
@@ -18,11 +17,7 @@ export default function BoredLameSandboxCta() {
 
   useEffect(() => {
     // Members + guests (guests can peek, post gated on /bored)
-    if (isGuestMode()) {
-      setShow(true);
-      return;
-    }
-    setShow(!!getSession()?.playerId);
+        setShow(!!getSession()?.playerId);
 
     // Retire sticky Practice Mode if anything left over
     void import("@/lib/bored-practice").then((m) => {

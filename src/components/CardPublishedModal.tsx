@@ -12,7 +12,6 @@ import {
   type CardPublishedDetail,
 } from "@/lib/first-session";
 import { getLeague, getSession, isActuallyCommissioner } from "@/lib/league";
-import { isGuestMode } from "@/lib/guest-mode";
 import { isAppCreator } from "@/lib/creator";
 import { weekTitle } from "@/lib/dates";
 import InviteFriends from "@/components/InviteFriends";
@@ -21,7 +20,6 @@ export default function CardPublishedModal() {
   const [detail, setDetail] = useState<CardPublishedDetail | null>(null);
 
   useEffect(() => {
-    if (isGuestMode()) return;
     // Foundry jump previews + real hosts
     if (
       !isActuallyCommissioner() &&

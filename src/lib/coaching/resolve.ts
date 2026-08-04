@@ -7,7 +7,7 @@ import {
   getLeague,
   isActuallyCommissioner,
 } from "@/lib/league";
-import { isGuestMode } from "@/lib/guest-mode";
+
 import {
   COACH_DEFS,
   COACH_KEYS,
@@ -26,7 +26,6 @@ export type CoachOffer = CoachDefinition & {
 /** Screens / modes where coaching must stay quiet. */
 export function shouldSuppressCoaching(pathname: string | null): boolean {
   if (typeof window === "undefined") return true;
-  if (isGuestMode()) return true;
   if (!getSession()?.playerId) return true;
 
   const path = pathname || window.location.pathname || "";

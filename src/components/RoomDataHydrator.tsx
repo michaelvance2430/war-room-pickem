@@ -22,7 +22,6 @@ import {
 } from "@/lib/profile-border-store";
 import { titleLabelForBadgeId } from "@/lib/equipable-titles";
 import { isAppCreator } from "@/lib/creator";
-import { isGuestMode } from "@/lib/guest-mode";
 
 const ROSTER_REFRESH_MS = 300_000; // 5 min
 const VIS_MIN_GAP_MS = 90_000; // don't re-hit on every app switch
@@ -32,7 +31,6 @@ export default function RoomDataHydrator() {
   const selfSynced = useRef(false);
 
   useEffect(() => {
-    if (isGuestMode()) return;
     let cancelled = false;
 
     async function syncSelfOnce() {
@@ -167,7 +165,7 @@ export default function RoomDataHydrator() {
     // Warm picks card late so Home/Standings first paint wins
     // (also triggers loadLeagueActiveWeek — tagged for profile-nav traces)
     const warmPicks = window.setTimeout(() => {
-      if (cancelled || isGuestMode()) return;
+      if (cancelled) return;
       void (async () => {
         try {
           const session = getSession();

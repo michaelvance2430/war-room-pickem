@@ -17,7 +17,7 @@ import DeferredChromeGate from "@/components/DeferredChromeGate";
 
 import { touchLastSeen } from "@/lib/last-seen";
 import { loadMyProfile } from "@/lib/profile";
-import { isGuestMode, purgeRetiredGuestSession } from "@/lib/guest-mode";
+import { purgeRetiredGuestSession } from "@/lib/guest-mode";
 import {
   isViewAsPlayer,
   setViewAsPlayer,
@@ -107,11 +107,22 @@ export default function Nav() {
     } catch {
       /* ok */
     }
-    // Guest tour retired — clear leftover demo session so Home never forks
+    // Guest tour removed — clear leftover demo residue; send to signup if needed
     try {
-      purgeRetiredGuestSession();
+      const { bootPurgeLegacyGuest } = require("@/lib/guest-mode") as typeof import("@/lib/guest-mode");
+      const { purged, signupHref } = bootPurgeLegacyGuest();
+      if (purged && typeof window !== "undefined") {
+        const path = window.location.pathname || "";
+        if (!path.startsWith("/login") && !path.startsWith("/join")) {
+          window.location.replace(signupHref);
+        }
+      }
     } catch {
-      /* ok */
+      try {
+        purgeRetiredGuestSession();
+      } catch {
+        /* ok */
+      }
     }
     return wrMount("Nav");
   }, []);
@@ -187,13 +198,7 @@ export default function Nav() {
     }
     wrEffect("Nav.progressive");
     function syncProgressive() {
-      if (isGuestMode()) {
-        setShowGazetteNav(true);
-        setShowNewsNav(true);
-        setEarlyNav(false);
-        setEyesLabel("");
-        return;
-      }
+      
       void loadProgressiveSnapshot().then((snap) => {
         setShowGazetteNav(snap.showGazetteShelf);
         setShowNewsNav(snap.showNewsShelf);
@@ -330,18 +335,16 @@ export default function Nav() {
     // Let first paint win — badge network after first second
     const unreadTimer = window.setTimeout(() => void loadUnread(), 1200);
     // Presence: last logged in / last open (throttled write)
-    if (!isGuestMode()) {
-      window.setTimeout(() => void touchLastSeen(), 2000);
-    }
+    window.setTimeout(() => void touchLastSeen(), 2000);
     // Heartbeat while app tab is visible — keeps "Online now" honest (~90s throttle)
     const presenceBeat = window.setInterval(() => {
       if (document.visibilityState !== "visible") return;
-      if (!isGuestMode()) void touchLastSeen();
+      void touchLastSeen();
     }, 90_000);
     function onVis() {
       if (document.visibilityState === "visible") {
         void loadUnread();
-        if (!isGuestMode()) void touchLastSeen();
+        void touchLastSeen();
       }
     }
     function onGazetteSeen() {

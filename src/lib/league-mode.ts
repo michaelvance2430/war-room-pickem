@@ -4,6 +4,8 @@
  * CONSTITUTION: Only production may permanently change a player's legacy.
  * Everything else is theater (rehearsal).
  *
+ * Guest mode was removed from the product. Foundry is the only lab.
+ *
  * Prefer explicit `league.mode`. Until DB column is universal, resolveMode()
  * derives from known signals so one rule stays true:
  *
@@ -14,15 +16,13 @@ export type LeagueMode =
   | "production"
   | "sandbox"
   | "foundry"
-  | "demo"
-  | "guest";
+  | "demo";
 
 export const LEAGUE_MODES: readonly LeagueMode[] = [
   "production",
   "sandbox",
   "foundry",
   "demo",
-  "guest",
 ] as const;
 
 export function isLeagueMode(v: unknown): v is LeagueMode {
@@ -47,13 +47,23 @@ export function resolveLeagueMode(league?: {
     is_test?: unknown;
   } | null;
 } | null): LeagueMode {
-  // Session theater (no league row, or overlay on any room)
+  // Stale guest residue: treat as non-production until purged at boot
   try {
     if (typeof window !== "undefined") {
-      const raw = localStorage.getItem("warroom-guest-mode-v1");
-      if (raw) {
-        const g = JSON.parse(raw) as { active?: boolean };
-        if (g?.active) return "guest";
+      const sessRaw = localStorage.getItem("warroom-session");
+      if (sessRaw) {
+        const sess = JSON.parse(sessRaw) as {
+          playerId?: string;
+          leagueId?: string;
+        };
+        if (
+          sess?.leagueId === "guest-demo-league" ||
+          sess?.playerId === "guest-you" ||
+          (typeof sess?.leagueId === "string" &&
+            sess.leagueId.startsWith("guest-"))
+        ) {
+          return "demo";
+        }
       }
     }
   } catch {
@@ -69,8 +79,10 @@ export function resolveLeagueMode(league?: {
   }
 
   // Explicit on league object (future: leagues.mode column)
-  if (isLeagueMode(league?.mode)) return league.mode;
-  if (isLeagueMode(league?.settings?.mode)) return league.settings.mode;
+  // Map retired "guest" string from any stale storage → demo
+  const rawMode = league?.mode ?? league?.settings?.mode;
+  if (rawMode === "guest") return "demo";
+  if (isLeagueMode(rawMode)) return rawMode;
 
   // Legacy boolean test flags
   if (
@@ -80,9 +92,6 @@ export function resolveLeagueMode(league?: {
   ) {
     return "sandbox";
   }
-
-  // Known guest demo league id
-  if (league?.id === "guest-demo-league") return "guest";
 
   // Active league from storage when caller omitted league
   let active = league;
@@ -100,7 +109,6 @@ export function resolveLeagueMode(league?: {
   }
 
   // Preseason dry-run calendar → sandbox until real season open
-  // (explicit mode: "production" above already short-circuited)
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { isSandboxMode } = require("./season-mode") as typeof import("./season-mode");
@@ -129,8 +137,6 @@ export function leagueModeLabel(mode: LeagueMode): string {
       return "Foundry (lab)";
     case "demo":
       return "Demo";
-    case "guest":
-      return "Guest tour";
     default:
       return mode;
   }

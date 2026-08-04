@@ -20,7 +20,6 @@ import {
   type Crew,
   type CrewChapter,
 } from "@/lib/crew";
-import { isGuestMode } from "@/lib/guest-mode";
 
 export default function CrewRevealModal() {
   const [open, setOpen] = useState(false);
@@ -29,7 +28,6 @@ export default function CrewRevealModal() {
   const [chapterCount, setChapterCount] = useState(1);
 
   function tryOpen() {
-    if (isGuestMode()) return;
     const league = getLeague();
     const session = getSession();
     if (!league?.id || !session?.playerId) return;

@@ -14,7 +14,8 @@ import { purgeRetiredGuestSession } from "@/lib/guest-mode";
 
 function LoginPageInner() {
   const searchParams = useSearchParams();
-  const [mode, setMode] = useState<"login" | "signup">("login");
+  /** Cold traffic defaults to create account — existing users switch to Sign in */
+  const [mode, setMode] = useState<"login" | "signup">("signup");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -29,7 +30,13 @@ function LoginPageInner() {
   // Purge any leftover guest tour so login always starts in the real world.
   useEffect(() => {
     try {
-      purgeRetiredGuestSession();
+      const purged = purgeRetiredGuestSession();
+      if (purged) {
+        setMode("signup");
+        setMessage(
+          "Welcome back — create an account to join a real room (guest tour is gone)."
+        );
+      }
     } catch {
       /* ignore */
     }
@@ -180,11 +187,15 @@ function LoginPageInner() {
               </p>
       </div>
           ) : (
-            <p className="text-sm text-muted mt-2">
-              {mode === "login"
-                ? "Log in to your league"
-                : "Create an account to host or join"}
-            </p>
+            <div className="mt-2 space-y-1">
+              <p className="text-base font-semibold text-foreground">
+                Join War Room in under a minute.
+              </p>
+              <p className="text-sm text-muted leading-relaxed">
+                Weekly pick&apos;em with friends. One card. Confidence. Trash
+                talk optional.
+              </p>
+            </div>
           )}
         </div>
 

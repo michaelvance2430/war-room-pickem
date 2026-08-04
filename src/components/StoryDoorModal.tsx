@@ -16,14 +16,12 @@ import {
   storyDoorCopy,
   type StoryDoorKind,
 } from "@/lib/story-doors";
-import { isGuestMode } from "@/lib/guest-mode";
 
 export default function StoryDoorModal() {
   const pathname = usePathname();
   const [kind, setKind] = useState<StoryDoorKind | null>(null);
 
   useEffect(() => {
-    if (isGuestMode()) return;
     let cancelled = false;
 
     async function check() {

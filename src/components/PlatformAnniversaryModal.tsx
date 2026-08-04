@@ -7,7 +7,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { getSession } from "@/lib/league";
-import { isGuestMode } from "@/lib/guest-mode";
 import {
   EVENT_FORCE_PLATFORM_ANNIVERSARY,
   markPlatformAnniversarySeen,
@@ -25,7 +24,6 @@ export default function PlatformAnniversaryModal() {
   const [open, setOpen] = useState(false);
 
   const tryShow = useCallback(async (force = false) => {
-    if (isGuestMode()) return;
     if (!getSession()?.playerId) return;
     try {
       if (!force) {

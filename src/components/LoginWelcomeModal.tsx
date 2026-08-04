@@ -7,7 +7,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { getLeague, getSession } from "@/lib/league";
-import { isGuestMode } from "@/lib/guest-mode";
 import BrandMark from "@/components/BrandMark";
 import {
   isPlayerTutorialActive,
@@ -107,7 +106,6 @@ export default function LoginWelcomeModal() {
   }
 
   useEffect(() => {
-    if (isGuestMode()) return;
 
     async function tryOpen() {
       if (dismissedRef.current || openRef.current) return;

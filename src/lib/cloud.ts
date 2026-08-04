@@ -438,16 +438,6 @@ export async function loadLeagueActiveWeek(): Promise<number> {
   } catch {
     /* ok */
   }
-  try {
-    const { isGuestMode } = await import("./guest-mode");
-    if (isGuestMode()) {
-      const saved = localStorage.getItem("warroom-active-week");
-      const n = saved != null ? parseInt(saved, 10) : 9;
-      return Number.isNaN(n) ? 9 : n;
-    }
-  } catch {
-    /* ignore */
-  }
   // Creator Eyes: stay on the week you're previewing (no standalone Test Mode)
   try {
     const eyes = await import("./creator-eyes");
@@ -901,35 +891,6 @@ export async function loadWeekCard(weekNumber = 1): Promise<CloudCard | null> {
   const session = getSession();
   if (!session?.leagueId) return null;
 
-  // Guest demo: local cards only
-  try {
-    const { isGuestMode } = await import("./guest-mode");
-    if (isGuestMode()) {
-      const raw = localStorage.getItem(`warroom-card-week-${weekNumber}`);
-      if (!raw) return null;
-      const data = JSON.parse(raw) as {
-        games?: Game[];
-        prop?: Prop;
-        weekNumber?: number;
-      };
-      if (!data.games?.length) return null;
-      return {
-        weekCardId: `guest-card-w${weekNumber}`,
-        weekNumber,
-        publishedAt: new Date().toISOString(),
-        games: data.games,
-        prop: data.prop || {
-          id: `prop-w${weekNumber}`,
-          question: "Demo prop",
-          options: ["Yes", "No"],
-          points: 3,
-        },
-      };
-    }
-  } catch {
-    /* fall through */
-  }
-
   // Creator eyes: local playable demo card for the preview week (no cloud write)
   try {
     const eyes = await import("./creator-eyes");
@@ -1062,17 +1023,6 @@ export async function loadWeekCard(weekNumber = 1): Promise<CloudCard | null> {
  * orphan week_card rows do not count — never ghost "Week 1" before it exists.
  */
 export async function listPublishedWeekNumbers(): Promise<number[]> {
-  try {
-    const { isGuestMode } = await import("./guest-mode");
-    if (isGuestMode()) {
-      const { GUEST_SCORED_WEEKS, GUEST_ACTIVE_WEEK } = await import(
-        "./guest-demo-seed"
-      );
-      return [...GUEST_SCORED_WEEKS, GUEST_ACTIVE_WEEK];
-    }
-  } catch {
-    /* ignore */
-  }
   const session = getSession();
   if (!session?.leagueId) return [];
   const hit = cacheGet(publishedCache, session.leagueId, LIST_TTL_MS);
@@ -1244,13 +1194,11 @@ export async function savePicksToCloud(opts: {
     return { ok: false, error: "Not signed into a league" };
   }
 
-  // Guest demo / creator eyes: local picks only (never write real league board)
+  // Creator eyes: local picks only (never write real league board)
   try {
-    const { isGuestMode } = await import("./guest-mode");
     const eyes = await import("./creator-eyes");
     const eyesOn = eyes.isEyesLocalPlayActive();
-    const localPlay = isGuestMode() || eyesOn;
-    if (localPlay) {
+    if (eyesOn) {
       const pickList = Object.values(opts.picks);
       if (!pickList.length) return { ok: false, error: "No picks to save" };
       const payload = {
@@ -1260,42 +1208,11 @@ export async function savePicksToCloud(opts: {
         lockedAt: new Date().toISOString(),
         isChaos: !!opts.isChaos,
       };
-      const key = eyesOn
-        ? eyes.eyesPicksStorageKey(opts.weekNumber)
-        : `warroom-picks-week-${opts.weekNumber}`;
-      localStorage.setItem(key, JSON.stringify(payload));
-      // Eyes preview must not bank real cheevos / progressive / chaos uses
-      if (!eyesOn) {
-        if (opts.isChaos) {
-          try {
-            const { spendChaosUse, CHAOS_BADGE_ID } = await import(
-              "./chaos-mode"
-            );
-            spendChaosUse(opts.weekNumber, session.leagueId, session.playerId);
-            const { grantPermanentBadgeId } = await import(
-              "./permanent-badges"
-            );
-            grantPermanentBadgeId(session.playerId, CHAOS_BADGE_ID);
-          } catch {
-            /* ignore */
-          }
-        }
-        try {
-          const { markHasLockedPicksOnce } = await import("./first-week");
-          markHasLockedPicksOnce(session.playerId);
-        } catch {
-          /* ignore */
-        }
-        try {
-          const { markEngagement } = await import("./engagement");
-          const hour = new Date().getHours();
-          if (hour >= 22 || hour < 5) {
-            markEngagement(session.playerId, "locked_after_22");
-          }
-        } catch {
-          /* ignore */
-        }
-      }
+      localStorage.setItem(
+        eyes.eyesPicksStorageKey(opts.weekNumber),
+        JSON.stringify(payload)
+      );
+      // Eyes preview must not bank real cheevos
       return { ok: true, firstFinal: "ignored" };
     }
   } catch {
@@ -1529,12 +1446,9 @@ export async function loadMyPicks(weekNumber = 1) {
   if (!session?.leagueId) return null;
 
   try {
-    const { isGuestMode } = await import("./guest-mode");
     const eyes = await import("./creator-eyes");
-    if (isGuestMode() || eyes.isEyesLocalPlayActive()) {
-      const key = eyes.isEyesLocalPlayActive()
-        ? eyes.eyesPicksStorageKey(weekNumber)
-        : `warroom-picks-week-${weekNumber}`;
+    if (eyes.isEyesLocalPlayActive()) {
+      const key = eyes.eyesPicksStorageKey(weekNumber);
       const raw = localStorage.getItem(key);
       if (!raw) return null;
       const data = JSON.parse(raw) as {
@@ -2214,15 +2128,6 @@ export async function clearWeekScoreInCloud(
 export async function listScoredWeekNumbers(): Promise<number[]> {
   const fn0 =
     typeof performance !== "undefined" ? performance.now() : Date.now();
-  try {
-    const { isGuestMode } = await import("./guest-mode");
-    if (isGuestMode()) {
-      const { getGuestScoredWeeks } = await import("./guest-demo-seed");
-      return getGuestScoredWeeks();
-    }
-  } catch {
-    /* ignore */
-  }
   const session = getSession();
   if (!session?.leagueId) return [];
   const hit = cacheGet(scoredCache, session.leagueId, LIST_TTL_MS);
@@ -3053,16 +2958,6 @@ export async function loadLeaguePlayers(
   caller?: string
 ): Promise<import("./types").Player[]> {
   const who = caller || "unknown";
-
-  try {
-    const { isGuestMode } = await import("./guest-mode");
-    if (isGuestMode()) {
-      const { loadPlayers } = await import("./store");
-      return loadPlayers();
-    }
-  } catch {
-    /* fall through */
-  }
 
   const session = getSession();
   if (!session?.leagueId) return [];

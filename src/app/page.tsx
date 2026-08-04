@@ -29,7 +29,6 @@ import HomeSportHeader from "@/components/HomeSportHeader";
 import LeagueMembershipCard from "@/components/LeagueMembershipCard";
 import HomeRoomContext from "@/components/HomeRoomContext";
 import SandboxSimBanner from "@/components/SandboxSimBanner";
-import { isGuestMode } from "@/lib/guest-mode";
 import {
   wantsFullRoom,
   hasSeenGazetteShelfReveal,
@@ -56,25 +55,6 @@ function readLocalHomeShell(): {
   showGazetteShelf: boolean;
 } | null {
   try {
-    if (isGuestMode()) {
-      const session = getSession();
-      const league = getLeague();
-      if (!session || !league) return null;
-      return {
-        leagueCode: league.code,
-        leagueName: league.name,
-        sportId: league.sportId || "cfb",
-        homeTagline: resolveHomeTagline({
-          homeTaglineId: league.settings?.homeTaglineId,
-          homeTaglineCustom: league.settings?.homeTaglineCustom,
-          sportId: league.sportId || "cfb",
-        }),
-        isCommish: isCommissioner(),
-        actuallyCommish: isActuallyCommissioner(),
-        firstWeekChrome: false,
-        showGazetteShelf: true,
-      };
-    }
     const session = getSession();
     const league = getLeague();
     if (!session || !league) return null;
@@ -134,11 +114,6 @@ export default function Home() {
   // Soft: is there a card to pick? (new-player waiting room)
   useEffect(() => {
     if (!ready) return;
-    // Guest tour always has Week 9 — never flash "waiting on the card"
-    if (isGuestMode()) {
-      setLiveCard(true);
-      return;
-    }
     let cancelled = false;
     void (async () => {
       try {
@@ -161,19 +136,11 @@ export default function Home() {
 
   // After hydrate: paint from local session before browser paint (no #418).
   // Soft nav re-mounts also re-run this — restores shell without stuck Loading.
-  // Sacred rule: Home always opens — especially guest tour.
+  // Sacred rule: Home always opens.
   useLayoutEffect(() => {
     try {
       document.body.style.overflow = "";
       document.documentElement.style.overflow = "";
-    } catch {
-      /* ok */
-    }
-    try {
-      if (isGuestMode()) {
-        const { ensureGuestWorld } = require("@/lib/guest-mode") as typeof import("@/lib/guest-mode");
-        ensureGuestWorld();
-      }
     } catch {
       /* ok */
     }
@@ -230,15 +197,6 @@ export default function Home() {
     const bootWatch = window.setTimeout(() => {
       if (cancelled) return;
       try {
-        if (isGuestMode()) {
-          try {
-            const { ensureGuestWorld } =
-              require("@/lib/guest-mode") as typeof import("@/lib/guest-mode");
-            ensureGuestWorld();
-          } catch {
-            /* ok */
-          }
-        }
         const shell = readLocalHomeShell();
         if (shell) {
           setLeagueCode(shell.leagueCode);
@@ -265,39 +223,6 @@ export default function Home() {
 
     async function boot() {
       try {
-        if (isGuestMode()) {
-          try {
-            const { ensureGuestWorld } = await import("@/lib/guest-mode");
-            ensureGuestWorld();
-          } catch {
-            /* ok */
-          }
-          const session = getSession();
-          const league = getLeague();
-          if (!session || !league) {
-            // Re-seed failed? Soft land on login — never hang on Opening Home
-            router.replace("/login");
-            return;
-          }
-          setLeagueCode(league.code);
-          setLeagueName(league.name);
-          setSportId(league.sportId || "cfb");
-          setHomeTagline(
-            resolveHomeTagline({
-              homeTaglineId: league.settings?.homeTaglineId,
-              homeTaglineCustom: league.settings?.homeTaglineCustom,
-              sportId: league.sportId || "cfb",
-            })
-          );
-          setIsCommish(isCommissioner());
-          setActuallyCommish(isActuallyCommissioner());
-          setFirstWeekChrome(false);
-          setShowGazetteShelf(true);
-          setReady(true);
-          setBootError(null);
-          return;
-        }
-
         if (!hasSupabaseConfig()) {
           setBootError("Supabase keys missing on this deployment.");
           return;
@@ -626,11 +551,6 @@ export default function Home() {
               type="button"
               onClick={() => {
                 try {
-                  if (isGuestMode()) {
-                    const { ensureGuestWorld } =
-                      require("@/lib/guest-mode") as typeof import("@/lib/guest-mode");
-                    ensureGuestWorld();
-                  }
                   window.location.assign("/");
                 } catch {
                   window.location.href = "/";
@@ -664,13 +584,11 @@ export default function Home() {
         {/* ── Room name once, then job (hero) first — switcher/flavor after ── */}
         {/*
           Share League: every authenticated member with a code — not ops/commish-only.
-          Hidden for guest tour. firstWeekChrome uses HomeRoomContext (was missing Share).
+          firstWeekChrome uses HomeRoomContext (Share for all members).
         */}
         {(() => {
           const canShareLeague =
-            !isGuestMode() &&
-            !!getSession()?.playerId &&
-            !!leagueCode?.trim();
+            !!getSession()?.playerId && !!leagueCode?.trim();
           return !firstWeekChrome ? (
             <HomeSportHeader
               chrome={homeChrome}

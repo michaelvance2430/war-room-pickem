@@ -1,7 +1,7 @@
 /**
  * Real-account first-login “walk the dog”.
  * Default = picks-only (Crystal Ball is optional power, not onboarding).
- * Guest demo uses guest-mode tutorials.
+ * (Guest tour removed — real members only.)
  */
 
 const KEY = "warroom-player-tutorial-v1";

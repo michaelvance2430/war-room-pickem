@@ -13,7 +13,6 @@ import {
   hasLockedPicksOnce,
 } from "@/lib/first-week";
 import { getSession } from "@/lib/league";
-import { isGuestMode } from "@/lib/guest-mode";
 import { claimSessionDrama, clearSessionDrama } from "@/lib/session-drama";
 
 const KEY = "warroom-soft-unlock-seen-v1";
@@ -46,7 +45,6 @@ export default function SoftUnlockBanner() {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    if (isGuestMode()) return;
     function check() {
       const id = getSession()?.playerId;
       if (!id) return;

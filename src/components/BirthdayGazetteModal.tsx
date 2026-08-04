@@ -7,7 +7,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { getSession } from "@/lib/league";
-import { isGuestMode } from "@/lib/guest-mode";
 import {
   BIRTHDAY_GAZETTE_RITUAL,
   EVENT_FORCE_BIRTHDAY_GAZETTE,
@@ -22,7 +21,6 @@ export default function BirthdayGazetteModal() {
   const [open, setOpen] = useState(false);
 
   const tryShow = useCallback(async (force = false) => {
-    if (isGuestMode()) return;
     if (!getSession()?.playerId) return;
     try {
       // Don’t stack on first-lock calm unless force (Foundry)

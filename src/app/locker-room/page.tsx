@@ -36,14 +36,6 @@ import {
   splitMentions,
   type MentionMember,
 } from "@/lib/locker-mentions";
-import { isGuestMode } from "@/lib/guest-mode";
-import {
-  GUEST_LOCKER_POST_CODE,
-  GUEST_LOCKER_POST_INVITE,
-  GUEST_LOCKER_REACT_CODE,
-  GUEST_LOCKER_REACT_INVITE,
-} from "@/lib/guest-copy";
-import GuestBlockInvitePanel from "@/components/GuestBlockInvite";
 
 export default function LockerRoomPage() {
   const [messages, setMessages] = useState<LockerMessage[]>([]);
@@ -52,8 +44,6 @@ export default function LockerRoomPage() {
   const [body, setBody] = useState("");
   const [posting, setPosting] = useState(false);
   const [postError, setPostError] = useState<string | null>(null);
-  const [guest, setGuest] = useState(false);
-  const [showGuestReactInvite, setShowGuestReactInvite] = useState(false);
   const [selfId, setSelfId] = useState<string | null>(null);
   const [staff, setStaff] = useState(false);
   const [muted, setMuted] = useState(false);
@@ -96,17 +86,9 @@ export default function LockerRoomPage() {
     setSelfId(session?.playerId || null);
     setStaff(isStaff());
     setLeagueName(getLeague()?.name || "");
-    const guestNow = isGuestMode();
-    setGuest(guestNow);
     // Immediate clear on walk-in — don't wait for network or extra taps
     markLockerSeen();
-    // Guest: never load cloud locker (fake league id). Membership invite only.
-    if (guestNow) {
-      setLoading(false);
-      setError(null);
-      setMessages([]);
-      return;
-    }
+    
     // Never leave Locker on Loading… forever (stuck network)
     const failSafe = window.setTimeout(() => setLoading(false), 4_000);
     void refreshStaffSessionFlags().then(() => setStaff(isStaff()));
@@ -131,12 +113,11 @@ export default function LockerRoomPage() {
   }, [reload]);
 
   useEffect(() => {
-    if (guest || isGuestMode()) return;
-    const t = setInterval(() => {
+        const t = setInterval(() => {
       void reload({ quiet: true });
     }, 12000);
     return () => clearInterval(t);
-  }, [reload, guest]);
+  }, [reload]);
 
   useEffect(() => {
     if (cooldownLeft <= 0) return;
@@ -226,10 +207,7 @@ export default function LockerRoomPage() {
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setPostError(null);
-    if (guest || isGuestMode()) {
-      setPostError(GUEST_LOCKER_POST_CODE);
-      return;
-    }
+    
     if (muted) {
       setPostError(
         "You’re muted in Locker Room. Talk to the commissioner if that’s a mistake."
@@ -281,11 +259,7 @@ export default function LockerRoomPage() {
   }
 
   async function onReact(messageId: string, emoji: string) {
-    if (guest || isGuestMode()) {
-      setShowGuestReactInvite(true);
-      setReactError(GUEST_LOCKER_REACT_CODE);
-      return;
-    }
+    
     if (muted) {
       setReactError("You’re muted — reactions are off too.");
       setPostError("You’re muted — reactions are off too.");
@@ -418,15 +392,11 @@ export default function LockerRoomPage() {
           {!loading && messages.length === 0 && !error && (
             <div className="text-center py-12 px-4">
               <div className="text-3xl mb-2" aria-hidden>
-                {guest ? "👀" : "🏈"}
+                🏈
               </div>
-              <p className="text-sm font-medium">
-                {guest ? "You're visiting" : "Quiet in here"}
-              </p>
+              <p className="text-sm font-medium">Quiet in here</p>
               <p className="text-xs text-muted mt-1">
-                {guest
-                  ? "The Locker opens with real league members. Join a league to talk trash here."
-                  : "First take of the week. Don't waste it. Try @someone."}
+                First take of the week. Don&apos;t waste it. Try @someone.
               </p>
             </div>
           )}
@@ -491,7 +461,7 @@ export default function LockerRoomPage() {
                         <button
                           key={`${m.id}-stamp-${r.emoji}`}
                           type="button"
-                          disabled={!!muted || guest || reactBusyId === m.id}
+                          disabled={!!muted || reactBusyId === m.id}
                           onClick={() => {
                             if (muted) return;
                             void onReact(m.id, r.emoji);
@@ -518,7 +488,7 @@ export default function LockerRoomPage() {
                         </button>
                       ))}
 
-                      {!muted && !guest && (
+                      {!muted && (
                         <button
                           type="button"
                           disabled={reactBusyId === m.id}
@@ -576,14 +546,7 @@ export default function LockerRoomPage() {
       <div ref={bottomRef} />
         </div>
 
-        {guest ? (
-          <div className="shrink-0 space-y-3">
-            {showGuestReactInvite && (
-              <GuestBlockInvitePanel invite={GUEST_LOCKER_REACT_INVITE} />
-            )}
-            <GuestBlockInvitePanel invite={GUEST_LOCKER_POST_INVITE} />
-          </div>
-        ) : muted ? (
+        {muted ? (
           <div className="shrink-0 rounded-xl border border-danger/40 bg-danger/10 px-4 py-4 text-sm">
       <p className="font-semibold text-danger mb-1">You’re muted</p>
       <p className="text-muted text-xs leading-relaxed">
@@ -692,14 +655,9 @@ export default function LockerRoomPage() {
             {mentionOpen ? (
               <p className="text-[10px] text-muted">↑↓ Enter to @tag</p>
             ) : null}
-            {postError &&
-              postError !== GUEST_LOCKER_POST_CODE &&
-              postError !== GUEST_LOCKER_REACT_CODE && (
-                <p className="text-xs text-danger">{postError}</p>
-              )}
-            {postError === GUEST_LOCKER_POST_CODE && (
-              <GuestBlockInvitePanel invite={GUEST_LOCKER_POST_INVITE} />
-            )}
+            {postError ? (
+              <p className="text-xs text-danger">{postError}</p>
+            ) : null}
           </form>
         )}
       </main>

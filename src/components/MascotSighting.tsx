@@ -8,7 +8,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import { getSession } from "@/lib/league";
-import { isGuestMode } from "@/lib/guest-mode";
 import {
   EVENT_EASTER_EGG,
   getMascotFindCount,
@@ -76,7 +75,7 @@ export default function MascotSighting() {
     setFoundHere(false);
   }, [pathname, spot]);
 
-  if (isGuestMode() || !spot || !visible || foundHere) return null;
+  if (!spot || !visible || foundHere) return null;
 
   function onFind() {
     const pid = getSession()?.playerId;

@@ -8,7 +8,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { getSession } from "@/lib/league";
-import { isGuestMode } from "@/lib/guest-mode";
 import {
   loadUnseenEggFlexes,
   markEggFlexSeen,
@@ -54,7 +53,6 @@ export default function EggFlexNewspaper() {
   const current = queue[0] ?? null;
 
   const pull = useCallback(async () => {
-    if (isGuestMode()) return;
     if (!getSession()?.playerId) return;
     // Platform-wide — every account, every sport, every league
     const unseen = await loadUnseenEggFlexes();

@@ -10,14 +10,13 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { isSandboxMode } from "@/lib/season-mode";
 import { isOps } from "@/lib/league";
-import { isGuestMode } from "@/lib/guest-mode";
 
 export default function SandboxSimBanner() {
   const [show, setShow] = useState(false);
 
   useEffect(() => {
     try {
-      setShow(!isGuestMode() && isSandboxMode());
+      setShow(isSandboxMode());
     } catch {
       setShow(false);
     }

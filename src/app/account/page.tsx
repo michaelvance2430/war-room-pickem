@@ -35,7 +35,6 @@ import { isAppCreator, withCreatorFlag } from "@/lib/creator";
 
 import FeedbackForm from "@/components/FeedbackForm";
 import OwnershipNotice from "@/components/OwnershipNotice";
-import { isGuestMode } from "@/lib/guest-mode";
 import { getPlayerBadges, withPermanentBadges } from "@/lib/badges";
 import {
   listEquipableTitlesFromBadges,
@@ -260,10 +259,7 @@ export default function AccountPage() {
   }
 
   async function onSaveName() {
-    if (isGuestMode()) {
-      setMessage("Exit guest demo to change a real display name.");
-      return;
-    }
+    
     const next = nameDraft.trim().replace(/\s+/g, " ");
     if (!next || next === name.trim()) {
       setMessage(next === name.trim() ? "That’s already your name." : "Enter a name.");
@@ -602,7 +598,7 @@ export default function AccountPage() {
               maxLength={40}
               autoComplete="nickname"
               placeholder="e.g. Mike V"
-              disabled={nameBusy || isGuestMode()}
+              disabled={nameBusy}
               className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-3 text-base text-foreground font-medium disabled:opacity-50"
             />
           </label>
@@ -611,7 +607,6 @@ export default function AccountPage() {
             onClick={() => void onSaveName()}
             disabled={
               nameBusy ||
-              isGuestMode() ||
               nameDraft.trim().replace(/\s+/g, " ") === name.trim() ||
               !nameDraft.trim()
             }
@@ -700,14 +695,13 @@ export default function AccountPage() {
                     }}
                     maxLength={5}
                     placeholder="MM-DD"
-                    disabled={isGuestMode() || birthdayBusy}
+                    disabled={birthdayBusy}
                     className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-3 text-base text-foreground font-medium disabled:opacity-50 tracking-wide"
                   />
                 </label>
       <button
                   type="button"
                   disabled={
-                    isGuestMode() ||
                     !userId ||
                     birthdayBusy ||
                     !/^\d{2}-\d{2}$/.test(birthdayDraft.trim())
@@ -754,10 +748,7 @@ export default function AccountPage() {
           <button
             type="button"
             onClick={() => {
-              if (isGuestMode()) {
-                setMessage("Exit demo first.");
-                return;
-              }
+              
               router.push("/picks");
             }}
             className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-primary text-black text-sm font-bold"

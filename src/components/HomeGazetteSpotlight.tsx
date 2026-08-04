@@ -21,7 +21,6 @@ import {
   listScoredWeekNumbers,
 } from "@/lib/cloud";
 import { isCardLockDeadlinePassed } from "@/lib/dates";
-import { isGuestMode } from "@/lib/guest-mode";
 import { getLeague } from "@/lib/league";
 
 type Mode =
@@ -34,11 +33,7 @@ export default function HomeGazetteSpotlight() {
   const [mode, setMode] = useState<Mode>({ kind: "loading" });
 
   useEffect(() => {
-    if (isGuestMode()) {
-      setMode({ kind: "quiet" });
-      return;
-    }
-    let cancelled = false;
+        let cancelled = false;
 
     async function load() {
       try {

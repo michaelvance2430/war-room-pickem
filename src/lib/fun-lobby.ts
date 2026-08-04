@@ -171,16 +171,6 @@ export async function postFunLobbyMessage(
   if (!session?.leagueId || !session.playerId) {
     return { ok: false, error: "Not signed in" };
   }
-  try {
-    const { isGuestMode } = await import("./guest-mode");
-    if (isGuestMode()) {
-      const { GUEST_LOCKER_POST_CODE } = await import("./guest-copy");
-      return { ok: false, error: GUEST_LOCKER_POST_CODE };
-    }
-  } catch {
-    /* continue */
-  }
-
   const text = body.trim();
   if (!text) return { ok: false, error: "Say something." };
   if (text.length > LOCKER_MAX_CHARS) {

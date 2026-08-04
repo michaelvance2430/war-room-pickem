@@ -18,7 +18,6 @@ import {
   sportChapterLabel,
 } from "@/lib/crew";
 import { getSportPack } from "@/lib/sports/registry";
-import { isGuestMode } from "@/lib/guest-mode";
 
 export default function HomeCrewWhisper() {
   const [line, setLine] = useState<string | null>(null);
@@ -26,11 +25,7 @@ export default function HomeCrewWhisper() {
   const [cta, setCta] = useState("Crew");
 
   function refresh() {
-    if (isGuestMode()) {
-      setLine(null);
-      return;
-    }
-    const league = getLeague();
+        const league = getLeague();
     const session = getSession();
     if (!league?.id) {
       setLine(null);

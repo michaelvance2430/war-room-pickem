@@ -28,7 +28,6 @@ import {
   type ColdOpenSubject,
 } from "@/lib/weekly-cold-open";
 import { getSession, getLeague } from "@/lib/league";
-import { isGuestMode } from "@/lib/guest-mode";
 import {
   isPlayerTutorialActive,
   needsPlayerTutorial,
@@ -291,7 +290,7 @@ export default function WeeklyColdOpenModal({ forceOnly = false }: Props) {
     window.addEventListener(EVENT_FORCE_WEEKLY_COLD_OPEN, onForce);
 
     // forceOnly (Foundry Test): never auto-launch
-    if (forceOnly || isGuestMode()) {
+    if (forceOnly) {
       return () => {
         window.removeEventListener(EVENT_FORCE_WEEKLY_COLD_OPEN, onForce);
       };

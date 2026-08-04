@@ -10,7 +10,7 @@ export const BIRTHDAY_GAZETTE_RITUAL = "One Year Older";
 import { createClient } from "@/lib/supabase/client";
 import { getLeague, getSession } from "@/lib/league";
 import { loadLeagueRoster } from "@/lib/cloud";
-import { isGuestMode } from "@/lib/guest-mode";
+
 
 const SEEN_PREFIX = "warroom-bday-gazette-seen-v1";
 const ET = "America/New_York";
@@ -500,7 +500,7 @@ export async function shouldOfferBirthdayGazette(opts?: {
   | { show: true; edition: BirthdayGazetteEdition }
   | { show: false; reason?: string }
 > {
-  if (isGuestMode()) return { show: false, reason: "guest" };
+
   const session = getSession();
   const league = getLeague();
   if (!session?.playerId || !league?.id) {

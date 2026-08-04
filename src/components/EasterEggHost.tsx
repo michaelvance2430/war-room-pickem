@@ -15,7 +15,6 @@ import {
   noteSiblingStandings,
   type EasterEggMoment,
 } from "@/lib/easter-eggs";
-import { isGuestMode } from "@/lib/guest-mode";
 
 function Confetti({ active }: { active: boolean }) {
   if (!active) return null;
@@ -65,7 +64,6 @@ export default function EasterEggHost() {
   }, []);
 
   useEffect(() => {
-    if (isGuestMode()) return;
     const session = getSession();
     if (!session?.playerId) return;
 

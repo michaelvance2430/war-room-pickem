@@ -93,16 +93,8 @@ function lid() {
 /**
  * Practice window (offseason).
  * Members: only before official opening week kickoff — then season is the tutorial.
- * Guests: always open (tour only; conversion after practice done).
  */
 export function isBoredPracticeWindowOpen(sportId?: string | null): boolean {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const g = require("./guest-mode") as typeof import("./guest-mode");
-    if (g.isGuestMode()) return true;
-  } catch {
-    /* ok */
-  }
   const sid = sportId ?? getLeague()?.sportId;
   return !hasOpeningWeekStarted(sid);
 }

@@ -5,7 +5,7 @@
  */
 
 import { getLeague, getSession } from "@/lib/league";
-import { isGuestMode } from "@/lib/guest-mode";
+
 
 /** Git day one — first commit “War Room Pick Em” */
 export const WAR_ROOM_FOUNDED_ISO = "2026-07-25";
@@ -439,7 +439,7 @@ export async function shouldOfferPlatformAnniversary(opts?: {
   | { show: true; edition: PlatformAnniversaryEdition }
   | { show: false; reason?: string }
 > {
-  if (isGuestMode()) return { show: false, reason: "guest" };
+
   const session = getSession();
   const league = getLeague();
   if (!session?.playerId || !league?.id) {

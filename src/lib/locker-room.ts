@@ -235,16 +235,7 @@ export async function loadLockerMessages(limit = 100): Promise<{
 }> {
   // Guest tour: never hit Supabase with a fake league id (uuid errors = broken product).
   // Guests observe — membership unlock is the only message.
-  try {
-    const { isGuestMode } = await import("./guest-mode");
-    if (isGuestMode()) {
-      const { startIso, label } = getLockerWeekBounds();
-      void startIso;
-      return { ok: true, messages: [], weekLabel: label };
-    }
-  } catch {
-    /* fall through */
-  }
+  
 
   const session = getSession();
   if (!session?.leagueId) {
@@ -515,15 +506,7 @@ export async function toggleLockerReaction(
     return { ok: false, error: "Invalid message." };
   }
 
-  try {
-    const { isGuestMode } = await import("./guest-mode");
-    if (isGuestMode()) {
-      const { GUEST_LOCKER_REACT_CODE } = await import("./guest-copy");
-      return { ok: false, error: GUEST_LOCKER_REACT_CODE };
-    }
-  } catch {
-    /* continue */
-  }
+  
 
   try {
     const eyes = await import("./creator-eyes");
@@ -822,15 +805,7 @@ export async function postLockerMessage(body: string): Promise<{
   }
 
   // Guest Mode: observe only — never hit Supabase as a fake member
-  try {
-    const { isGuestMode } = await import("./guest-mode");
-    if (isGuestMode()) {
-      const { GUEST_LOCKER_POST_CODE } = await import("./guest-copy");
-      return { ok: false, error: GUEST_LOCKER_POST_CODE };
-    }
-  } catch {
-    /* continue */
-  }
+  
 
   // Creator eyes: never post into the real locker
   try {

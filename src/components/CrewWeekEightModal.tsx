@@ -7,7 +7,6 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { getLeague, getSession } from "@/lib/league";
-import { isGuestMode } from "@/lib/guest-mode";
 import {
   claimSessionDrama,
   clearSessionDrama,
@@ -37,7 +36,6 @@ export default function CrewWeekEightModal() {
   }
 
   useEffect(() => {
-    if (isGuestMode()) return;
 
     function tryOpen() {
       if (openRef.current) return;

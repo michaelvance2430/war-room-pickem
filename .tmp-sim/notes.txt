@@ -1,0 +1,986 @@
+
+=== 1. LOGIN GATE ===
+URL: http://localhost:3000/login
+TEXT:
+War Room Pick'Em
+
+Log in to your league
+
+HOW DO YOU WANT IN?
+
+Commissioner — create league
+Join with code
+Join open room
+Explore as guest · look around first
+
+Guests observe. Members belong. Try the room free — Locker & real leagues unlock when you join or create. Open lobby fills one room at a time.
+
+Email
+Password
+Show
+Remember me on this phone
+Log inNeed an account? Sign up
+
+Back
+
+© 2026 Mike Vance. War Room Pick'Em. All rights reserved.
+Owned by Mike Vance
+
+=== 2. GUEST AS NEW PLAYER ===
+  MISS click: Explore as guest
+After guest enter URL: http://localhost:3000/
+TEXT:
+War Room
+War Room Tour
+Y(
+⌂
+Home
+✓
+Picks
+#
+Standings
+💬
+Locker
+☰
+You
+
+GUEST · EXPLORING
+
+Look around. Real Locker & leagues unlock when you join.
+
+Join a League →
+Sign in
+
+👋 WELCOME TO WAR ROOM
+
+You're checking out as a guest
+
+Look around. Make some practice picks. See what football season feels like here.
+
+The social side—Locker, rivalries, crews, titles, and everything that makes your league yours—unlocks when you join or create a real league.
+
+You're in a tour room (Week 9 vibe) with bots so it feels alive. Nothing here is your friend group yet — that's the point of joining.
+
+Look around →
+Join a League →
+Create My League →
+CFB
+▾
+Share League
+War Room Tour
+
+Where good teams and bad picks come to fight.
+
+YOU'RE IN· CFB
+
+Week 9 · 9 / 18
+You're in — waiting on the card
+
+You're seated. Your commish hasn't published Week 9 yet — there's nothing to pick. Hang in the Locker, poke Standings if you want, or check back when they drop a card. First ten minutes = chill.
+
+Hang in the Locker
+Peek standings
+0 in the room
+·
+Active: Week 9 (Week 9 · 9 / 18)
+·
+Season breathing · no scores yet
+
+THE REST OF THE ROOM
+
+WHO'S WINNING
+Standings
+
+Season points · divisions · cut line · last in
+
+CARD REVEAL
+The Board
+
+Everyone's picks · game by game after kickoff
+
+PLAYBOOK
+How to play
+
+Spreads · confidence · Best Bet · bonus · lock
+
+PULSE
+Stats
+
+Power rankings · season table · league lore
+
+POSTSEASON
+Championship Bracket
+
+Top half. One path. No excuses.
+
+BOTTOM HALF
+Toilet Bowl
+
+Shame bracket. Stil
+  clicked: Look around (button:has-text("Look around"))
+ROLE screen:
+War Room
+War Room Tour
+PL
+⌂
+Home
+✓
+Picks
+#
+Standings
+💬
+Locker
+☰
+You
+
+GUEST · EXPLORING
+
+Look around. Real Locker & leagues unlock when you join.
+
+Join a League →
+Sign in
+
+HOW DO YOU WANT TO TOUR?
+
+Pick a seat
+
+You’ll get a short by-the-numbers tutorial for that role. You can switch later from Account.
+
+View as player
+
+Crystal Ball, weekly picks, Save before kickoff — the friend experience.
+
+View as commissioner
+
+Build a card, publish, score the week — how you run the room.
+
+⚠️ WE'RE ON IT
+
+🛠 WAR ROOM INTELLIGENCE BULLETIN BREAKING: The Profile Goblins have escaped containment. Some player profiles are currently experiencing… creative differences with reality. Missing stats, weird displays, or other questionable life choices may appear. Our highly trained team of caffeinated keyboard warriors is already hunting the bug down, and we’re working on a fix. What you should do: * Panic? ❌ * Spam refresh 847 times? Also ❌ * Sit back and let us squash the gremlin? ✅ Thanks for hanging in ther
+  clicked: View as player (button:has-text("View as player"))
+TUTORIAL:
+War Room
+War Room Tour
+PL
+⌂
+Home
+✓
+Picks
+#
+Standings
+💬
+Locker
+☰
+You
+
+GUEST · EXPLORING · PLAYER TOUR
+
+Look around. Real Locker & leagues unlock when you join.
+
+Switch to host tour
+Join a League →
+Sign in
+
+PLAYER TUTORIAL · 1/3
+
+1 · Open My Picks
+
+This demo is already through Week 9 (Crystal Ball is sealed). Open My Picks for the live card.
+
+Next →
+Open My Picks → (keep tutorial)
+Skip tutorial — explore free
+
+⚠️ WE'RE ON IT
+
+🛠 WAR ROOM INTELLIGENCE BULLETIN BREAKING: The Profile Goblins have escaped containment. Some player profiles are currently experiencing… creative differences with reality. Missing stats, weird displays, or other questionable life choices may appear. Our highly trained team of caffeinated keyboard warriors is already hunting the bug down, and we’re working on a fix. What you should do: * Panic? ❌ * Spam refresh 847 times? Also ❌ * Sit back and let us squash the gremlin? ✅ Thanks for hanging in there while we get everything back in fighting shape. We’ll have the profiles whipped back into formation ASAP.
+
+CFB
+▾
+Share League
+War Room Tour
+
+Where good teams and bad picks come to fight.
+
+DO THIS NOW· CFB
+
+Week 9 · 9 / 18
+Lock in Week 9
+
+LAST WEEK · WEEK 8
+
+You fin
+  clicked: tutorial step 0 (button:has-text("Open My Picks"))
+  clicked: tutorial step 1 (button:has-text("Open My Picks"))
+  clicked: tutorial step 2 (button:has-text("Open My Picks"))
+  clicked: tutorial step 3 (button:has-text("Open My Picks"))
+  clicked: tutorial step 4 (button:has-text("Open My Picks"))
+Post-tutorial URL: http://localhost:3000/
+TABS: ["⌂Home","✓Picks","#Standings","💬Locker","☰You"]
+POST TUTORIAL:
+War Room
+CFB
+YO
+⌂
+Home
+✓
+Picks
+#
+Standings
+💬
+Locker
+☰
+You
+
+Opening Home…
+
+If this hangs, your room cache is empty — try Sign in or refresh.
+
+Refresh
+Sign in
+
+--- HOME (player) ---
+War Room
+CFB
+YO
+⌂
+Home
+✓
+Picks
+#
+Standings
+💬
+Locker
+☰
+You
+
+Opening Home…
+
+If this hangs, your room cache is empty — try Sign in or refresh.
+
+Refresh
+Sign in
+TABS: ["⌂Home","✓Picks","#Standings","💬Locker","☰You"]
+
+--- PICKS ---
+← Home
+War Room Tour
+PL
+⌂
+Home
+✓
+Picks
+#
+Standings
+💬
+Locker
+☰
+You
+
+GUEST · EXPLORING · PLAYER TOUR
+
+Look around. Real Locker & leagues unlock when you join.
+
+Switch to host tour
+Join a League →
+Sign in
+
+PLAYER TUTORIAL · 1/3
+
+1 · Open My Picks
+
+This demo is already through Week 9 (Crystal Ball is sealed). Open My Picks for the live card.
+
+Next →
+Open My Picks → (keep tutorial)
+Skip tutorial — explore free
+
+FIRST LOCK · DON'T OVERTHINK IT
+
+One job, genius: pick every side, slap confidence 1–5 (each once — no freestyling), mark a Best Bet, answer the little bonus, then Lock before first kickoff. That's it. We believe in you. Mostly.
+
+THIS CARD
+
+Left: sides · conf · Best Bet · prop
+
+0/5 sides
+0/5 conf
+Best Bet —
+Prop —
+YOU ARE COOKING
+LIVE SEASON
+Week 9 Picks
+
+War Room Tour · Lock everything before first kickoff (Fri, Aug 7 · 12:05 PM EDT) or cry later.
+
+Fri, Aug 7 – Sat, Aug 8 · Lock deadline: Fri, Aug 7 · 12:05 PM EDT
+
+Week 0 · ✓
+Week 1 · ✓
+Week 2 · ✓
+Week 3 · ✓
+Week 4 · ✓
+Week 5 · ✓
+Week 6 · ✓
+Week 7 · ✓
+Week 8 · ✓
+Week 9 · Live
+See last week's Board →
+Kansas @ Southern Miss
+Fri, Aug 7 · 12:05 PM EDT
+AWAY
+Kansas
++1.5
+HOME
+Southern Miss
+-1.5
+CONFIDENCE
+1
+2
+3
+4
+5
+Set Best Bet
+Louisville @ Eastern Michigan
+Fri, Aug 7 · 3:05 PM EDT
+AWAY
+Louisville
+-12.5
+HOME
+Eastern Michigan
++12.5
+CONFIDENCE
+1
+2
+3
+4
+5
+Set Best Bet
+Ball State @ Georgia Southern
+Fri, Aug 7 · 6:05 PM EDT
+AWAY
+Ball State
++7
+HOME
+Georgia Southern
+-7
+CONFIDENCE
+1
+2
+3
+4
+5
+Set Best Bet
+Washington @ South Alabama
+Fri, Aug 7 · 9:05 PM EDT
+AWAY
+Washington
+-9.5
+HOME
+South Alabama
++9.5
+CONFIDENCE
+1
+2
+3
+4
+5
+Set Best Bet
+Boise State @ Texas A&M
+Sat, Aug 8 · 12:05 AM EDT
+AWAY
+Boise State
+-9
+HOME
+Texas A&M
++9
+CONFIDENCE
+1
+2
+3
+4
+5
+Set Best Bet
+Bonus · 3 pts · needed
+Will ANY kicker in the five games on this week's card make 3 or more field goals?
+Hide
+Yes — at least one kicker ≥ 3 FGs
+No — every kicker ≤ 2
+
+Tap one answer, then Save Picks.
+
+Save Picks
+
+Almost — pick the bonus (prop) answer, then Save Picks.
+
+--- STANDINGS ---
+← Home
+War Room Tour
+PL
+⌂
+Home
+✓
+Picks
+#
+Standings
+💬
+Locker
+☰
+You
+
+GUEST · EXPLORING · PLAYER TOUR
+
+Look around. Real Locker & leagues unlock when you join.
+
+Switch to host tour
+Join a League →
+Sign in
+
+PLAYER TUTORIAL · 1/3
+
+1 · Open My Picks
+
+This demo is already through Week 9 (Crystal Ball is sealed). Open My Picks for the live card.
+
+Next →
+Open My Picks → (keep tutorial)
+Skip tutorial — explore free
+Standings
+
+Live points · Bottom 50% of each division gets flushed · Swing labels after each scored week
+
+Under each name: league pulse (online / last seen). Tap a green name → open their profile.
+
+Crown & Wall of Shame
+LATEST SCORED WEEK
+🐐 THIS WEEK'S CROWN
+You (Guest)
+↗
+16 pts
+
+Biggest haul on the last scored card. Tip the cap.
+
+🛍️ WALL OF SHAME
+ConfidenceQueen
+↗
+4 pts
+
+Lowest total last card. Brown paper bag energy. Bounce back.
+
+Latest scored week · older covers in the archive
+Gazette →
+Board →
+Overall
+SEC
+Big Ten
+ACC
+Big 12
+#	PLAYER	DIV	PTS	STREAK
+1	
+SpreadSlayer
+↗
+○
+Last seen —
+MID AS HELL
+	SEC	117	L1
+2	
+BenchWarmer
+↗
+○
+Last seen —
+MID AS HELL
+	ACC	104	L5
+3	
+DixieDanger
+↗
+○
+Last seen —
+MID AS HELL
+	Big Ten	103	W1
+4	
+You (Guest)
+↗
+YOU
+○
+Last seen —
+ON A HEATER ↑3
+	SEC	102	W2
+5	
+CoastalChaos
+↗
+○
+Last seen —
+CLIMBING ↑1
+	ACC	99	W1
+6	
+NorthStar
+↗
+○
+Last seen —
+ON A HEATER ↑3
+	SEC	99	W1
+7	
+ACCAttack
+↗
+○
+Last seen —
+CLIMBING ↑1
+	ACC	94	—
+8	
+Fader
+↗
+○
+Last seen —
+DROPPED THE BALL ↓4
+	ACC	93	L1
+9	
+LostInTheSauce
+↗
+○
+Last seen —
+DROPPED THE BALL ↓4
+	Big Ten	92	L4
+10	
+BigDawg22
+↗
+○
+Last seen —
+CLIMBING ↑1
+	SEC	87	W2
+11	
+ConfidenceQueen
+↗
+○
+Last seen —
+SLIPPING ↓1
+	Big 12	86	
+
+--- LOCKER ---
+← Home
+War Room Tour
+PL
+⌂
+Home
+✓
+Picks
+#
+Standings
+💬
+Locker
+☰
+You
+
+GUEST · EXPLORING · PLAYER TOUR
+
+Look around. Real Locker & leagues unlock when you join.
+
+Switch to host tour
+Join a League →
+Sign in
+
+PLAYER TUTORIAL · 1/3
+
+1 · Open My Picks
+
+This demo is already through Week 9 (Crystal Ball is sealed). Open My Picks for the live card.
+
+Next →
+Open My Picks → (keep tutorial)
+Skip tutorial — explore free
+Locker Room
+League chat
+
+War Room Tour · This week's trash talk. Board clears Monday ET.
+
+How it works
+invalid input syntax for type uuid: "guest-demo-league"
+
+🔒
+
+The Locker comes alive with real league members.
+
+You're exploring as a guest, so posting is disabled.
+
+What you're missing: Trash talk, crews, and the room that makes a league yours.
+
+Join a league and start the conversation.
+
+Join a League →
+Create My League →
+Already have an account? Sign in
+
+--- YOU MENU ---
+[]
+War Room
+CFB
+YO
+⌂
+Home
+✓
+Picks
+#
+Standings
+💬
+Locker
+☰
+You
+
+Opening Home…
+
+If this hangs, your room cache is empty — try Sign in or refresh.
+
+Refresh
+Sign in
+
+--- BOARD ---
+← Home
+War Room Tour
+PL
+⌂
+Home
+✓
+Picks
+#
+Standings
+💬
+Locker
+☰
+You
+
+GUEST · EXPLORING · PLAYER TOUR
+
+Look around. Real Locker & leagues unlock when you join.
+
+Switch to host tour
+Join a League →
+Sign in
+
+PLAYER TUTORIAL · 1/3
+
+1 · Open My Picks
+
+This demo is already through Week 9 (Crystal Ball is sealed). Open My Picks for the live card.
+
+Next →
+Open My Picks → (keep tutorial)
+Skip tutorial — explore free
+
+WEEKLY REVEAL
+
+The Board
+
+Locked cards go public after kickoff. Truth first — then the commentary.
+
+Nothing to reveal yet.
+
+Cards stay face-down. Drama is scheduled for after kickoff. First kickoff: Thu, Oct 22, 12:00 PM.
+
+Week 0 · done
+Week 1 · done
+Week 2 · done
+Week 3 · done
+Week 4 · done
+Week 5 · done
+Week 6 · done
+Week 7 · done
+Week 8 · done
+
+Nothing to reveal yet.
+
+Cards stay face-down. Drama is scheduled for after kickoff.
+
+=== 3. GUEST AS NEW COMMISSIONER ===
+  clicked: Explore as guest (button:has-text("Explore as guest"))
+  clicked: Look around (button:has-text("Look around"))
+  MISS click: View as commissioner
+COMMISH TUTORIAL:
+War Room Pick'Em
+
+Log in to your league
+
+HOW DO YOU WANT IN?
+
+Commissioner — create league
+Join with code
+Join open room
+Explore as guest · look around first
+
+Guests observe. Members belong. Try the room free — Locker & real leagues unlock when you join or create. Open lobby fills one room at a time.
+
+Email
+Password
+Show
+Remember me on this phone
+Log inNeed an account? Sign up
+
+Back
+
+© 2026 Mike Vance. War Room Pick'Em. All rights reserved.
+Owned by Mike Vance
+  MISS click: Open Build Card
+After build card CTA URL: http://localhost:3000/login
+War Room Pick'Em
+
+Log in to your league
+
+HOW DO YOU WANT IN?
+
+Commissioner — create league
+Join with code
+Join open room
+Explore as guest · look around first
+
+Guests observe. Members belong. Try the room free — Locker & real leagues unlock when you join or create. Open lobby fills one room at a time.
+
+Email
+Password
+Show
+Remember me on this phone
+Log inNeed an account? Sign up
+
+Back
+
+© 2026 Mike Vance. War Room Pick'Em. All rights reserved.
+Owned by Mike Vance
+
+--- LEAGUE BUILD ---
+← Home
+CFB
+YO
+⌂
+Home
+✓
+Picks
+#
+Standings
+💬
+Locker
+☰
+You
+Loading league build…
+
+--- COMMISSIONER ---
+← Home
+CFB
+YO
+⌂
+Home
+✓
+Picks
+#
+Standings
+💬
+Locker
+☰
+You
+Ops only
+
+Only the league commissioner or an appointed deputy can open these tools. If you turned on View as player, exit that mode on Account (or the yellow bar) to use Commish again.
+
+Account → View as player
+
+--- HOME COMMISH ---
+War Room
+CFB
+YO
+⌂
+Home
+✓
+Picks
+#
+Standings
+💬
+Locker
+☰
+You
+
+Opening Home…
+
+If this hangs, your room cache is empty — try Sign in or refresh.
+
+Refresh
+Sign in
+TABS: ["⌂Home","✓Picks","#Standings","💬Locker","☰You"]
+YOU MENU COMMISH: []
+
+=== 4. FIRST-HOUR EYES (local creator seat id=1) ===
+FIRST HOUR PLAYER HOME:
+War Room
+CFB
+YO
+⌂
+Home
+✓
+Picks
+#
+Standings
+💬
+Locker
+☰
+You
+
+Opening Home…
+
+If this hangs, your room cache is empty — try Sign in or refresh.
+
+Refresh
+Sign in
+TABS: ["⌂Home","✓Picks","#Standings","💬Locker","☰You"]
+FIRST HOUR PICKS:
+FOUNDRY SESSION
+
+NEW PLAYER EYES · first-hour / eyes preview
+
+← Foundry
+Exit → Foundry
+NEW PLAYER EYES · PREVIEW (local card · not real standings) · picks · founder · exit → Foundry
+← Home
+Saturday Situation Room
+PL
+⌂
+Home
+✓
+Picks
+#
+Standings
+💬
+Locker
+☰
+You
+
+LEGAL-ISH DISCLAIMER · WEEK 0
+
+Cool your jets, line shopper
+
+Yes — you can mash buttons, fill the card, and lock it right now. We're not stopping you. Frankly we're impressed you found the page.
+
+Just know: these spreads are on a vibes-and-hope schedule until Week 0 OFFICIALLY OPENS. Then the real lines show up and your early masterpiece might look… different. Cute, even. In a tragic way.
+
+Lock anyway if you want. Or wait. Or lock, screenshot it, and blame the oddsmakers when a −3 becomes a −7. We'll be here either way — mostly laughing.
+
+Fine. Let me cook (at my own risk)
+PREVIEW · local card · not your real standings
+Foundry eyes
+Exit → Foundry
+
+FIRST LOCK · DON'T OVERTHINK IT
+
+One job, genius: pick every side, slap confidence 1–5 (each once — no freestyling), mark a Best Bet, answer the little bonus, then Lock before first kickoff. That's it. We believe in you. Mostly.
+
+THIS CARD
+
+Left: sides · conf · Best Bet · prop
+
+0/5 sides
+0/5 conf
+Best Bet —
+Prop —
+YOU ARE COOKING
+LIVE SEASON
+Week 1 Picks
+
+Saturday Situation Room · Lock everything before first kickoff (Fri, Aug 7 · 12:07 PM EDT) or cry later.
+
+Fri, Aug 7 · Lock deadline: Fri, Aug 7 · 12:07 PM EDT
+
+Oklahoma @ South Florida
+Fri, Aug 7 · 12:07 PM EDT
+AWAY
+Oklahoma
++10.5
+HOME
+South Florida
+-10.5
+CONFIDENCE
+1
+2
+3
+4
+5
+Set Best Bet
+USC @ Tulsa
+Fri, Aug 7 · 1:07 PM EDT
+AWAY
+USC
++11
+HOME
+Tulsa
+-11
+CONFIDENCE
+1
+2
+3
+4
+5
+Set Best Bet
+Appalachian State @ San Jose State
+Fri, Aug 7 · 2:07 PM EDT
+AWAY
+Appalachian State
++3
+HOME
+San Jose State
+-3
+CONFIDENCE
+1
+2
+3
+4
+5
+Set Best Bet
+Virginia Tech @ Michigan
+Fri, Aug 7 · 3:07 PM EDT
+AWAY
+Virginia Tech
+-3.5
+HOME
+Michigan
++3.5
+CONFIDENCE
+1
+2
+3
+4
+5
+Set Best Bet
+Houston @ Northern Illinois
+Fri, Aug 7 · 4:07 PM EDT
+AWAY
+Houston
+
+FIRST HOUR LEAGUE BUILD:
+← Home
+CFB
+YO
+⌂
+Home
+✓
+Picks
+#
+Standings
+💬
+Locker
+☰
+You
+Loading league build…
+FIRST HOUR COMMISH:
+← Home
+CFB
+YO
+⌂
+Home
+✓
+Picks
+#
+Standings
+💬
+Locker
+☰
+You
+
+OPS DESK
+
+Commish tools
+
+Opening host tools…
+YOU MENU FIRST HOUR: []

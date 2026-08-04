@@ -18,8 +18,6 @@ import {
   postFunLobbyMessage,
 } from "@/lib/fun-lobby";
 import { LOCKER_MAX_CHARS, type LockerMessage } from "@/lib/locker-room";
-import { isGuestMode } from "@/lib/guest-mode";
-import GuestJoinCtas from "@/components/GuestJoinCtas";
 
 export default function BoredPage() {
   return (
@@ -52,8 +50,6 @@ function BoredLobby() {
   const [error, setError] = useState<string | null>(null);
   const [leagueName, setLeagueName] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
-  const guest = typeof window !== "undefined" && isGuestMode();
-
   const refresh = useCallback(async () => {
     const res = await loadFunLobbyMessages(roomId, 80);
     if (!res.ok) {
@@ -69,7 +65,7 @@ function BoredLobby() {
   useEffect(() => {
     const league = getLeague();
     setLeagueName(league?.name?.trim() || "");
-    if (!getSession()?.playerId && !isGuestMode()) {
+    if (!getSession()?.playerId) {
       router.replace("/login");
       return;
     }
@@ -100,7 +96,6 @@ function BoredLobby() {
   }
 
   async function onPost() {
-    if (guest) return;
     setPosting(true);
     setError(null);
     const res = await postFunLobbyMessage(roomId, body);
@@ -119,7 +114,6 @@ function BoredLobby() {
 
   const remaining = LOCKER_MAX_CHARS - body.length;
   const canPost =
-    !guest &&
     body.trim().length > 0 &&
     body.length <= LOCKER_MAX_CHARS &&
     !posting;
@@ -208,47 +202,38 @@ function BoredLobby() {
           ))}
         </div>
 
-        {guest ? (
-          <div className="rounded-xl border border-border bg-card px-4 py-4 space-y-3">
-            <p className="text-sm text-muted">
-              Guests can look. Members can talk. Join a league to post.
-            </p>
-            <GuestJoinCtas layout="stack" primary="join" />
-          </div>
-        ) : (
-          <div className="shrink-0 space-y-2">
-            <textarea
-              value={body}
-              onChange={(e) => setBody(e.target.value.slice(0, LOCKER_MAX_CHARS))}
-              rows={3}
-              placeholder={`Post in ${room.name}…`}
-              className="w-full rounded-xl border border-border bg-card px-3 py-3 text-sm text-foreground resize-none min-h-[88px]"
-            />
-            <div className="flex items-center justify-between gap-2">
-              <p
-                className={`text-[11px] ${
-                  remaining < 20 ? "text-warning" : "text-muted"
-                }`}
-              >
-                {remaining}
-              </p>
-              <button
-                type="button"
-                disabled={!canPost}
-                onClick={() => void onPost()}
-                className="min-h-[48px] px-5 rounded-xl bg-primary text-black text-sm font-extrabold disabled:opacity-50"
-              >
-                {posting ? "Sending…" : "Send"}
-              </button>
-            </div>
-            <Link
-              href="/"
-              className="block text-center text-xs font-semibold text-muted hover:text-foreground py-2"
+        <div className="shrink-0 space-y-2">
+          <textarea
+            value={body}
+            onChange={(e) => setBody(e.target.value.slice(0, LOCKER_MAX_CHARS))}
+            rows={3}
+            placeholder={`Post in ${room.name}…`}
+            className="w-full rounded-xl border border-border bg-card px-3 py-3 text-sm text-foreground resize-none min-h-[88px]"
+          />
+          <div className="flex items-center justify-between gap-2">
+            <p
+              className={`text-[11px] ${
+                remaining < 20 ? "text-warning" : "text-muted"
+              }`}
             >
-              Leave lobby → Home
-            </Link>
+              {remaining}
+            </p>
+            <button
+              type="button"
+              disabled={!canPost}
+              onClick={() => void onPost()}
+              className="min-h-[48px] px-5 rounded-xl bg-primary text-black text-sm font-extrabold disabled:opacity-50"
+            >
+              {posting ? "Sending…" : "Send"}
+            </button>
           </div>
-        )}
+          <Link
+            href="/"
+            className="block text-center text-xs font-semibold text-muted hover:text-foreground py-2"
+          >
+            Leave lobby → Home
+          </Link>
+        </div>
       </main>
     </div>
   );

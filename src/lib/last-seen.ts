@@ -21,26 +21,12 @@ function canUse() {
   return typeof window !== "undefined" && typeof localStorage !== "undefined";
 }
 
-function isGuestActive(): boolean {
-  try {
-    if (!canUse()) return false;
-    const raw = localStorage.getItem("warroom-guest-mode-v1");
-    if (!raw) return false;
-    const g = JSON.parse(raw) as { active?: boolean };
-    return g?.active === true;
-  } catch {
-    return false;
-  }
-}
-
 /**
  * Bump last_seen_at for the signed-in user.
  * Safe to call often — throttled per device.
- * Skips guest tour. Uses auth.uid() so RLS update succeeds.
+ * Uses auth.uid() so RLS update succeeds.
  */
 export async function touchLastSeen(): Promise<void> {
-  if (isGuestActive()) return;
-
   const local = getSession();
   if (!local?.playerId) return;
 

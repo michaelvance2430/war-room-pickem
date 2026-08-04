@@ -65,18 +65,6 @@ function currentSportId(): string | null {
  * CFB doors Aug 23 · NFL Kickoff Sep 9. After open, resets keep career cheevos.
  */
 export function isSandboxMode(now = Date.now()): boolean {
-  // Guest demo is always sandbox (no career bank from the tour)
-  try {
-    if (typeof window !== "undefined") {
-      const raw = localStorage.getItem("warroom-guest-mode-v1");
-      if (raw) {
-        const g = JSON.parse(raw) as { active?: boolean };
-        if (g?.active) return true;
-      }
-    }
-  } catch {
-    /* ignore */
-  }
   const openAt = getSeasonOpenAtMs(currentSportId());
   if (Number.isNaN(openAt)) return true;
   return now < openAt;
