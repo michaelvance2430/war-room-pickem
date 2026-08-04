@@ -1908,6 +1908,48 @@ export type PickSubmissionStatus = {
 };
 
 /**
+ * Member-safe pulse: how many humans have locked for a week (no sides).
+ * Standings competition cards use this — never invent locks.
+ */
+export async function countLockedPicksForWeek(weekNumber: number): Promise<{
+  locked: number;
+  expected: number;
+} | null> {
+  const session = getSession();
+  if (!session?.leagueId || !Number.isFinite(weekNumber)) return null;
+  try {
+    const supabase = createClient();
+    const leagueId = session.leagueId;
+    const { data: members, error: memErr } = await supabase
+      .from("memberships")
+      .select("user_id, is_bot")
+      .eq("league_id", leagueId);
+    if (memErr || !members?.length) return null;
+    const humanIds = new Set(
+      members
+        .filter((m) => !(m as { is_bot?: boolean }).is_bot)
+        .map((m) => m.user_id as string)
+    );
+    if (!humanIds.size) return null;
+    const { data: pickRows, error: pickErr } = await supabase
+      .from("picks")
+      .select("user_id, locked_at")
+      .eq("league_id", leagueId)
+      .eq("week_number", weekNumber);
+    if (pickErr) return null;
+    let locked = 0;
+    for (const row of pickRows || []) {
+      const uid = row.user_id as string;
+      if (!humanIds.has(uid)) continue;
+      if (row.locked_at) locked += 1;
+    }
+    return { locked, expected: humanIds.size };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Ops only — who has locked picks for a week.
  * Does not return sides/confidence (privacy). Use for "who hasn't picked".
  */

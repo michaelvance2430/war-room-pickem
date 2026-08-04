@@ -1,9 +1,10 @@
 "use client";
 
 /**
- * Standings — two jobs:
- *  1. League pulse (always): who's in the room, divisions, last seen, joined.
- *  2. Competition (after official scored week): PTS, ATS, streak, swing, cut.
+ * Standings — same page; heartbeat evolves with the league:
+ *  preseason  → room pulse (joined / online / seats)
+ *  regular    → competition pulse (crown / streak / locks)
+ *  offseason  → legacy pulse (champ / seasons / next open)
  *
  * Never invent achievement. Preseason practice scores do not unlock competition.
  * Removing competitive columns must never empty the room.
@@ -12,7 +13,11 @@
 import { useState, useEffect, Fragment, useMemo } from "react";
 import SwingBadge from "@/components/SwingBadge";
 import CrownAndShame from "@/components/CrownAndShame";
-import { loadLeaguePlayers } from "@/lib/cloud";
+import {
+  countLockedPicksForWeek,
+  hydratePlayersLastSeen,
+  loadLeaguePlayers,
+} from "@/lib/cloud";
 import { pageLoad } from "@/lib/smooth";
 import { getSession, getLeague } from "@/lib/league";
 import { rankPlayersWithSwings } from "@/lib/fun-board";
@@ -28,11 +33,16 @@ import {
   lastSeenToneClass,
   touchLastSeen,
 } from "@/lib/last-seen";
-import { hydratePlayersLastSeen } from "@/lib/cloud";
 import { hasCompetitiveAchievementData } from "@/lib/season-scored";
 import { markStandingsWarm } from "@/lib/profile-nav-trace";
 import { isProductionMode } from "@/lib/league-mode";
-import { MAX_LEAGUE_PLAYERS } from "@/lib/league-limits";
+import {
+  buildStandingsPulseCards,
+  resolveStandingsPulsePhase,
+  standingsPulsePhaseCopy,
+  type StandingsPulseCard,
+  type StandingsPulsePhase,
+} from "@/lib/standings-pulse";
 
 const divisions: (Division | "Overall")[] = [
   "Overall",
@@ -83,6 +93,17 @@ export default function StandingsPage() {
   /** Competitive crown/PTS table — production + official scores only */
   const [seasonStarted, setSeasonStarted] = useState(false);
   const [preseasonPractice, setPreseasonPractice] = useState(false);
+  const [pulsePhase, setPulsePhase] =
+    useState<StandingsPulsePhase>("preseason");
+  const [picksLocked, setPicksLocked] = useState<{
+    locked: number;
+    expected: number;
+  } | null>(null);
+  const [defendingChamp, setDefendingChamp] = useState<{
+    name: string;
+    userId?: string | null;
+  } | null>(null);
+  const [seasonsPlayed, setSeasonsPlayed] = useState<number | null>(null);
   const [swingById, setSwingById] = useState<
     Record<string, ReturnType<typeof rankPlayersWithSwings>[0]["swing"]>
   >({});
@@ -135,6 +156,25 @@ export default function StandingsPage() {
         setSeasonStarted(competitive);
         setPreseasonPractice(!isProductionMode());
 
+        let latestScored: number | null = null;
+        let liveWeek: number | null = null;
+        try {
+          const { loadLeagueTruth } = await import("@/lib/league-truth");
+          const truth = await loadLeagueTruth();
+          latestScored = truth.latestScoredWeek;
+          liveWeek = truth.trustedLiveWeek;
+        } catch {
+          /* phase falls back to competitive gate only */
+        }
+        const sport = getLeague()?.sportId;
+        const phase = resolveStandingsPulsePhase({
+          seasonHasOfficialScore: competitive,
+          latestScoredWeek: latestScored,
+          sportId: sport,
+        });
+        if (cancelled) return;
+        setPulsePhase(phase);
+
         mark("loadLeaguePlayers-start");
         const list = await pageLoad(
           loadLeaguePlayers("StandingsPage.load"),
@@ -142,12 +182,47 @@ export default function StandingsPage() {
         );
         mark(
           "loadLeaguePlayers-done",
-          `n=${Array.isArray(list) ? list.length : 0} competitive=${competitive}`
+          `n=${Array.isArray(list) ? list.length : 0} phase=${phase}`
         );
         if (cancelled) return;
         setPlayers(Array.isArray(list) ? list : []);
 
-        // Fix: was `scored` (undefined) → ReferenceError wiped roster in catch
+        // Regular-season pulse: pick lock counts (privacy-safe)
+        if (phase === "regular" && liveWeek != null) {
+          try {
+            const locks = await countLockedPicksForWeek(liveWeek);
+            if (!cancelled) setPicksLocked(locks);
+          } catch {
+            if (!cancelled) setPicksLocked(null);
+          }
+        } else {
+          setPicksLocked(null);
+        }
+
+        // Offseason / legacy: trophies
+        if (phase === "offseason" || phase === "regular") {
+          try {
+            const { loadLeagueTrophies } = await import("@/lib/trophies");
+            const trophies = await loadLeagueTrophies();
+            const champs = trophies.filter((t) => t.trophyType === "championship");
+            const years = new Set(trophies.map((t) => t.seasonYear));
+            if (!cancelled) {
+              setSeasonsPlayed(years.size || (competitive ? 1 : null));
+              const top = champs[0];
+              setDefendingChamp(
+                top
+                  ? { name: top.winnerName, userId: top.winnerUserId }
+                  : null
+              );
+            }
+          } catch {
+            if (!cancelled) {
+              setDefendingChamp(null);
+              setSeasonsPlayed(competitive ? 1 : null);
+            }
+          }
+        }
+
         if (competitive) {
           try {
             const ranked = rankPlayersWithSwings(
@@ -210,30 +285,20 @@ export default function StandingsPage() {
     };
   }, []);
 
-  const pulseStats = useMemo(() => {
-    const humans = players.filter((p) => !p.isMock);
-    const roster = humans.length > 0 ? humans : players;
-    let online = 0;
-    let seenRecently = 0; // within 24h
-    const now = Date.now();
-    for (const p of roster) {
-      const pulse = formatLeaguePulse(p.lastSeenAt, now);
-      if (pulse.online) online += 1;
-      if (p.lastSeenAt) {
-        const t = new Date(p.lastSeenAt).getTime();
-        if (!Number.isNaN(t) && now - t < 24 * 60 * 60 * 1000) {
-          seenRecently += 1;
-        }
-      }
-    }
-    return {
-      joined: players.length,
-      humans: humans.length,
-      online,
-      seenRecently,
-      seatsLeft: Math.max(0, MAX_LEAGUE_PLAYERS - players.length),
-    };
-  }, [players]);
+  const sportId = getLeague()?.sportId;
+  const phaseCopy = standingsPulsePhaseCopy(pulsePhase);
+  const pulseCards: StandingsPulseCard[] = useMemo(
+    () =>
+      buildStandingsPulseCards({
+        phase: pulsePhase,
+        players,
+        sportId,
+        picksLocked,
+        defendingChamp,
+        seasonsPlayed,
+      }),
+    [pulsePhase, players, sportId, picksLocked, defendingChamp, seasonsPlayed]
+  );
 
   const pulseRows =
     active === "Overall"
@@ -255,19 +320,16 @@ export default function StandingsPage() {
       ? Math.floor(competitiveRows.length / 2)
       : -1;
 
-  const sportId = getLeague()?.sportId;
-
   return (
     <div className="min-h-screen flex flex-col">
       <main className="flex-1 max-w-5xl mx-auto w-full px-3 sm:px-4 py-5 sm:py-8">
         <div className="mb-6">
           <h1 className="text-2xl font-bold">Standings</h1>
-          <p className="text-sm text-muted">
-            {seasonStarted
-              ? "League pulse + live competition · Bottom 50% of each division gets flushed · Swing after each scored week"
-              : "League pulse — who’s in the room. Competition lights up after the first scored week."}
+          <p className="text-sm text-muted">{phaseCopy.headline}</p>
+          <p className="text-xs text-muted mt-1 leading-relaxed">
+            {phaseCopy.subline}
           </p>
-          {preseasonPractice && !seasonStarted && (
+          {preseasonPractice && pulsePhase === "preseason" && (
             <p className="text-xs text-amber-200/90 mt-1.5 leading-relaxed">
               Practice cards and scores are theater. Crowns, points, and ranks
               wait for the real season — the room stays visible either way.
@@ -278,9 +340,11 @@ export default function StandingsPage() {
               <span className="text-primary font-medium">
                 Tap a green name → open their profile
               </span>
-              {!seasonStarted
+              {pulsePhase === "preseason"
                 ? " · PTS, ATS, Crown, and Shame stay off until Week 1 is scored."
-                : " · Under each name: online / last seen."}
+                : pulsePhase === "regular"
+                  ? " · Bottom 50% of each division gets flushed · swing after each scored week."
+                  : " · History on the board. Next season starts when the doors open."}
             </p>
           )}
         </div>
@@ -292,55 +356,60 @@ export default function StandingsPage() {
           </div>
         )}
 
-        {/* ── League pulse hero (always when people exist) ── */}
+        {/* ── Evolving pulse hero — same slots, different season ── */}
         {!loading && players.length > 0 && (
-          <div className="mb-5 grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <div className="rounded-xl border border-border bg-card px-3 py-2.5">
-              <p className="text-[10px] uppercase tracking-wide text-muted font-bold">
-                Joined
-              </p>
-              <p className="text-lg font-black text-foreground tabular-nums">
-                {pulseStats.joined}
-                <span className="text-sm font-semibold text-muted">
-                  {" "}
-                  / {MAX_LEAGUE_PLAYERS}
-                </span>
-              </p>
-            </div>
-            <div className="rounded-xl border border-border bg-card px-3 py-2.5">
-              <p className="text-[10px] uppercase tracking-wide text-muted font-bold">
-                Online now
-              </p>
-              <p className="text-lg font-black text-emerald-400 tabular-nums">
-                {pulseStats.online}
-              </p>
-            </div>
-            <div className="rounded-xl border border-border bg-card px-3 py-2.5">
-              <p className="text-[10px] uppercase tracking-wide text-muted font-bold">
-                Active today
-              </p>
-              <p className="text-lg font-black text-foreground tabular-nums">
-                {pulseStats.seenRecently}
-              </p>
-            </div>
-            <div className="rounded-xl border border-border bg-card px-3 py-2.5">
-              <p className="text-[10px] uppercase tracking-wide text-muted font-bold">
-                Seats left
-              </p>
-              <p className="text-lg font-black text-foreground tabular-nums">
-                {pulseStats.seatsLeft}
-              </p>
+          <div className="mb-5">
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted mb-2">
+              {pulsePhase === "preseason"
+                ? "Room pulse"
+                : pulsePhase === "regular"
+                  ? "Competition pulse"
+                  : "Legacy pulse"}
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {pulseCards.map((card) => (
+                <div
+                  key={card.key}
+                  className="rounded-xl border border-border bg-card px-3 py-2.5 min-h-[4.5rem]"
+                >
+                  <p className="text-[10px] uppercase tracking-wide text-muted font-bold">
+                    {card.label}
+                  </p>
+                  <p
+                    className={`text-lg font-black tabular-nums mt-0.5 ${
+                      card.valueClass || "text-foreground"
+                    }`}
+                  >
+                    {card.playerId ? (
+                      <PlayerLink id={card.playerId} name={card.value} />
+                    ) : (
+                      card.value
+                    )}
+                    {card.sub && card.key === "joined" ? (
+                      <span className="text-sm font-semibold text-muted">
+                        {" "}
+                        {card.sub}
+                      </span>
+                    ) : null}
+                  </p>
+                  {card.sub && card.key !== "joined" ? (
+                    <p className="text-[11px] text-muted mt-0.5 leading-snug line-clamp-2">
+                      {card.sub}
+                    </p>
+                  ) : null}
+                </div>
+              ))}
             </div>
           </div>
         )}
 
-        {/* Competition chrome only after official score */}
-        {!loading && seasonStarted && (
+        {/* Competition chrome only during live season */}
+        {!loading && seasonStarted && pulsePhase === "regular" && (
           <CrownAndShame className="mb-6" players={players} />
         )}
 
-        {/* Preseason: compact note that competition is waiting — not an empty room */}
-        {!loading && !seasonStarted && players.length > 0 && (
+        {/* Preseason: competition waiting note */}
+        {!loading && pulsePhase === "preseason" && players.length > 0 && (
           <div className="mb-5 rounded-xl border border-dashed border-border bg-card/40 px-4 py-3">
             <p className="text-sm font-semibold text-foreground">
               Season competition starts after the first scored week
@@ -349,6 +418,18 @@ export default function StandingsPage() {
               PTS · ATS% · Streak · Crown · Wall of Shame · Swing stay off so
               preseason never looks competitive. The roster below is the pulse
               of the room.
+            </p>
+          </div>
+        )}
+
+        {!loading && pulsePhase === "offseason" && players.length > 0 && (
+          <div className="mb-5 rounded-xl border border-dashed border-amber-400/30 bg-amber-500/5 px-4 py-3">
+            <p className="text-sm font-semibold text-foreground">
+              Season complete — ranks are history
+            </p>
+            <p className="text-xs text-muted mt-0.5 leading-relaxed">
+              The table below is the final board. Hardware lives in the Trophy
+              Room. Next chapter when the doors open.
             </p>
           </div>
         )}
