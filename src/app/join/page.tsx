@@ -986,9 +986,10 @@ function JoinPageInner() {
       <p className="font-semibold text-foreground text-xs mb-0.5">
                 Season already rolling?
               </p>
-              You start at{" "}
-              <strong className="text-foreground">0 points</strong> for weeks
-              you missed — still pick, earn cheevos, and chase hardware from
+              <strong className="text-foreground">Fair Entry</strong> places
+              late arrivals in a fair starting position based on when you join —
+              early players keep what they earned; you still have room to climb.
+              Missed weeks stay missed. Cheevos and hardware still count from
               here on.
             </div>
       <input
