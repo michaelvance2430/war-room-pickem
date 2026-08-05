@@ -10,6 +10,7 @@ import {
 } from "../src/lib/profile-hardware.ts";
 
 const MIKE_ID = "09544d2b-6eca-4131-a321-c000586c9029";
+const MARIA_ID = "131b404e-db8e-4adf-86f4-f78aacf2a5bc";
 
 let passed = 0;
 let failed = 0;
@@ -47,58 +48,89 @@ test("Mike NFC seed is id-only with exact UUID", () => {
   assert.equal(seed.title, "NFC Championship");
 });
 
-test("No Maria AFC seed until production user_id confirmed", () => {
+test("Maria AFC seed is id-only with exact UUID", () => {
   const seed = LEGACY_PROFILE_HARDWARE.find(
     (s) => s.id === "legacy-maria-afc-championship-2025"
   );
-  assert.equal(seed, undefined);
+  assert.ok(seed);
+  assert.equal(seed.winnerUserId, MARIA_ID);
+  assert.equal(seed.kind, "division");
+  assert.equal(seed.sport, "nfl");
+  assert.equal(seed.title, "AFC Championship");
 });
 
-test("No conference aliases for Mike/Maria NFC-AFC in LEGACY_NAME_ALIASES path", () => {
-  // Ensure NFC seed never matches by name alone (wrong id)
-  const t = titles("other-uuid-1111", "Mike Vance", "nfl");
-  assert.equal(t.includes("NFC Championship"), false);
+test("Name alone does not grant conference hardware", () => {
+  const tMike = titles("other-uuid-1111", "Mike Vance", "nfl");
+  assert.equal(tMike.includes("NFC Championship"), false);
+  const tMaria = titles("other-uuid-2222", "Maria", "nfl");
+  assert.equal(tMaria.includes("AFC Championship"), false);
 });
 
-test("Mike UUID receives NFC Championship regardless of display name", () => {
+test("Mike UUID receives NFC regardless of display name", () => {
   for (const name of ["Totally Different Nick", "Bagz", "x", "Mike"]) {
     const t = titles(MIKE_ID, name, "nfl");
     assert.ok(
       t.includes("NFC Championship"),
       `expected NFC for name=${name}, got ${t.join(",")}`
     );
-  }
-});
-
-test("Random Mike/Michael/Bagz/Maria UUIDs get no NFC", () => {
-  for (const name of ["Mike", "Michael", "Bagz", "Maria", "Mike Vance"]) {
-    const t = titles("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", name, "nfl");
-    assert.equal(
-      t.includes("NFC Championship"),
-      false,
-      `collision for ${name}`
-    );
     assert.equal(t.includes("AFC Championship"), false);
   }
 });
 
-test("CFB desk: Mike UUID gets no NFC (sport gate)", () => {
-  const t = titles(MIKE_ID, "Mike Vance", "cfb");
-  assert.equal(t.includes("NFC Championship"), false);
+test("Maria UUID receives AFC regardless of display name", () => {
+  for (const name of ["New Nickname", "M", "Maria X", "not-maria"]) {
+    const t = titles(MARIA_ID, name, "nfl");
+    assert.ok(
+      t.includes("AFC Championship"),
+      `expected AFC for name=${name}, got ${t.join(",")}`
+    );
+    assert.equal(t.includes("NFC Championship"), false);
+  }
 });
 
-test("Name change does not strip hardware for rightful ID", () => {
-  const a = titles(MIKE_ID, "Old Name", "nfl");
-  const b = titles(MIKE_ID, "New Nickname 2026", "nfl");
-  assert.ok(a.includes("NFC Championship"));
-  assert.ok(b.includes("NFC Championship"));
+test("Random Mike/Michael/Bagz/Maria UUIDs get no conference hardware", () => {
+  for (const name of ["Mike", "Michael", "Bagz", "Maria", "Mike Vance"]) {
+    const t = titles("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", name, "nfl");
+    assert.equal(t.includes("NFC Championship"), false, `collision NFC ${name}`);
+    assert.equal(t.includes("AFC Championship"), false, `collision AFC ${name}`);
+  }
+});
+
+test("CFB desk: conference hardware sport-gated off", () => {
+  const tMike = titles(MIKE_ID, "Mike Vance", "cfb");
+  const tMaria = titles(MARIA_ID, "Maria", "cfb");
+  assert.equal(tMike.includes("NFC Championship"), false);
+  assert.equal(tMaria.includes("AFC Championship"), false);
+});
+
+test("Name change does not strip hardware for rightful IDs", () => {
+  assert.ok(titles(MIKE_ID, "Old Name", "nfl").includes("NFC Championship"));
+  assert.ok(
+    titles(MIKE_ID, "New Nickname 2026", "nfl").includes("NFC Championship")
+  );
+  assert.ok(titles(MARIA_ID, "Old Maria", "nfl").includes("AFC Championship"));
+  assert.ok(
+    titles(MARIA_ID, "Renamed 2026", "nfl").includes("AFC Championship")
+  );
+});
+
+test("IDs do not cross-receive each other's conference hardware", () => {
+  const tMike = titles(MIKE_ID, "Maria", "nfl");
+  const tMaria = titles(MARIA_ID, "Mike Vance", "nfl");
+  assert.ok(tMike.includes("NFC Championship"));
+  assert.equal(tMike.includes("AFC Championship"), false);
+  assert.ok(tMaria.includes("AFC Championship"));
+  assert.equal(tMaria.includes("NFC Championship"), false);
 });
 
 test("kind division is presentation shelf (no conference taxonomy expand)", () => {
-  const seed = LEGACY_PROFILE_HARDWARE.find(
-    (s) => s.id === "legacy-mike-nfc-championship-2025"
-  );
-  assert.equal(seed.kind, "division");
+  for (const id of [
+    "legacy-mike-nfc-championship-2025",
+    "legacy-maria-afc-championship-2025",
+  ]) {
+    const seed = LEGACY_PROFILE_HARDWARE.find((s) => s.id === id);
+    assert.equal(seed.kind, "division");
+  }
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);

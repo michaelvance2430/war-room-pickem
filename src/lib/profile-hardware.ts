@@ -164,12 +164,21 @@ export const LEGACY_PROFILE_HARDWARE: LegacySeed[] = [
     sport: "nfl",
     sportId: "nfl",
   },
-  /**
-   * Maria AFC Championship — ID-only when production profile UUID is confirmed.
-   * Read-only Supabase lookup via anon key returned 0 candidates (RLS).
-   * Do not re-enable display-name matching. Set winnerUserId when known.
-   */
-  // intentionally omitted until Maria's stable user_id is confirmed
+  {
+    id: "legacy-maria-afc-championship-2025",
+    kind: "division",
+    seasonYear: 2025,
+    title: "AFC Championship",
+    subtitle: "AFC Champion · 2025",
+    notes:
+      "2025 AFC Championship. Conference hardware en route to the Super Bowl. Permanent on the shelf.",
+    /** Display only — matching is winnerUserId only */
+    winnerName: "Maria",
+    winnerUserId: "131b404e-db8e-4adf-86f4-f78aacf2a5bc",
+    division: "AFC Championship",
+    sport: "nfl",
+    sportId: "nfl",
+  },
 ];
 
 /**
