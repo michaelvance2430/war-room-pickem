@@ -4,9 +4,9 @@
 **Date:** 2026-08-03 · **Updated:** 2026-08-05 (orchestrator binding fully locked)  
 **Package:** War Room Moments  
 **Parent:** `WAR-ROOM-MOMENTS-ARCHITECTURE.md` · `MOMENT-OBJECT-SCHEMA.md` · `EMOTIONAL-BUDGET.md`  
-**Binding overrides:** `docs/EXPERIENCE-ORCHESTRATOR-BINDING-DECISIONS.md`  
-(Experience Orchestrator — **not implemented yet**.  
-Ring = post-champ 7d “You won.” · Cold Open = sole Season Opening cinematic, pre-kickoff 7d “Now defend it.”)
+**Binding overrides:**  
+- Moments / cinema: `docs/EXPERIENCE-ORCHESTRATOR-BINDING-DECISIONS.md`  
+- Postseason fields / cut freeze: `docs/POSTSEASON-COMPETITION-LAW.md` + `docs/POSTSEASON-SNAPSHOT-DESIGN.md` (Stage PS0)
 
 ---
 
