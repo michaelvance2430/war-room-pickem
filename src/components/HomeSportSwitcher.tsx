@@ -12,7 +12,15 @@
  * Not Account. Not administration. Navigation — Discord/Slack energy.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
   fetchMyMemberships,
@@ -35,6 +43,10 @@ import {
 } from "@/lib/league-hub-actions";
 import NflBrandMark from "@/components/NflBrandMark";
 import BrandMark from "@/components/BrandMark";
+
+/** Match Nav mobile More sheet stacking. */
+const HUB_BACKDROP_Z = 55;
+const HUB_PANEL_Z = 60;
 
 /** Primary sports always on the hub. */
 const HUB_SPORTS: SportId[] = ["nfl", "cfb"];
@@ -73,9 +85,25 @@ export default function HomeSportSwitcher({ className = "" }: Props) {
     normalizeSportId(getLeague()?.sportId || "cfb")
   );
   const [loaded, setLoaded] = useState(false);
+  /** Portal target ready (client only). */
+  const [portalReady, setPortalReady] = useState(false);
+  /**
+   * Fixed positions (viewport coords) for portaled chrome while open.
+   * Trigger stays sharp above the backdrop; panel anchors under it.
+   */
+  const [hubGeom, setHubGeom] = useState<{
+    triggerTop: number;
+    triggerLeft: number;
+    panelTop: number;
+    panelLeft: number;
+  } | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
   const activeId = getSession()?.leagueId || getLeague()?.id || "";
+
+  useEffect(() => {
+    setPortalReady(true);
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -123,19 +151,56 @@ export default function HomeSportSwitcher({ className = "" }: Props) {
 
   useEffect(() => {
     if (!open) return;
-    function onDoc(e: MouseEvent) {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
-    }
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") setOpen(false);
     }
-    document.addEventListener("mousedown", onDoc);
+    // Backdrop owns outside-click dismiss (Nav More sheet pattern).
+    // Escape remains desktop keyboard close.
     document.addEventListener("keydown", onKey);
     return () => {
-      document.removeEventListener("mousedown", onDoc);
       document.removeEventListener("keydown", onKey);
     };
   }, [open]);
+
+  /**
+   * Portal backdrop + panel to document.body so they stack above Home's
+   * `main.relative.z-10` and cover sticky header + bottom nav (same band as
+   * Nav More: backdrop z-55, chrome z-60). In-tree fixed would trap under main.
+   */
+  useLayoutEffect(() => {
+    if (!open) {
+      setHubGeom(null);
+      return;
+    }
+
+    function placeHub() {
+      const trigger = rootRef.current;
+      if (!trigger) return;
+      const r = trigger.getBoundingClientRect();
+      const gutter = 10;
+      const maxW = Math.min(22.5 * 16, window.innerWidth - gutter * 2);
+      let panelLeft = r.left;
+      if (panelLeft + maxW > window.innerWidth - gutter) {
+        panelLeft = Math.max(gutter, window.innerWidth - maxW - gutter);
+      }
+      if (panelLeft < gutter) panelLeft = gutter;
+      setHubGeom({
+        triggerTop: r.top,
+        triggerLeft: r.left,
+        panelTop: r.bottom + 6,
+        panelLeft,
+      });
+    }
+
+    placeHub();
+    window.addEventListener("resize", placeHub);
+    // Capture scroll from any ancestor (Home main, etc.)
+    window.addEventListener("scroll", placeHub, true);
+    return () => {
+      window.removeEventListener("resize", placeHub);
+      window.removeEventListener("scroll", placeHub, true);
+    };
+  }, [open, scope, memberships.length]);
 
   const roomsBySport = useMemo(() => {
     const map = new Map<SportId, LeagueMembership[]>();
@@ -201,169 +266,227 @@ export default function HomeSportSwitcher({ className = "" }: Props) {
   const isNfl = scope === "nfl";
   const roomCount = openRooms.length;
 
-  return (
-    <div ref={rootRef} className={`relative inline-block ${className}`}>
-      {/* Selected sport control — always visible front door */}
-      <button
-        type="button"
-        onClick={toggleHub}
-        aria-expanded={open}
-        aria-haspopup="listbox"
-        aria-label={`${pack.shortLabel} League Hub`}
-        className={`inline-flex items-center gap-1.5 min-h-[40px] px-3 rounded-full text-xs font-extrabold touch-manipulation transition border ${
-          isNfl
-            ? "border-red-500/50 bg-red-500/15 text-red-100 hover:bg-red-500/20"
-            : "border-primary/50 bg-primary/15 text-primary hover:bg-primary/20"
-        }`}
-      >
-        <SportIcon sportId={scope} size={18} />
-        <span>{pack.shortLabel}</span>
-        {loaded && roomCount > 0 ? (
-          <span className="opacity-70 text-[10px] font-semibold tabular-nums">
-            {roomCount}
-          </span>
-        ) : null}
-        <span className="opacity-70 text-[10px]" aria-hidden>
-          {open ? "▴" : "▾"}
-        </span>
-      </button>
+  function closeHub() {
+    setOpen(false);
+  }
 
-      {open && (
-        <div
-          role="listbox"
-          aria-label={`${pack.shortLabel} leagues`}
-          className="absolute left-0 top-full z-50 mt-1.5 w-[min(22.5rem,calc(100vw-1.25rem))] rounded-xl border border-border bg-card shadow-2xl overflow-hidden"
-        >
-          {/* Sport switch inside the hub — one destination selector */}
-          <div className="flex items-center gap-1 px-2 pt-2 pb-1.5 border-b border-border/40">
-            {HUB_SPORTS.map((sid) => {
-              const p = getSportPack(sid);
-              const selected = sid === scope;
-              const n = (roomsBySport.get(sid) || []).length;
-              const nfl = sid === "nfl";
+  const hubPanel = open && hubGeom ? (
+    <div
+      role="listbox"
+      aria-label={`${pack.shortLabel} leagues`}
+      style={{
+        position: "fixed",
+        top: hubGeom.panelTop,
+        left: hubGeom.panelLeft,
+        zIndex: HUB_PANEL_Z,
+      }}
+      className="w-[min(22.5rem,calc(100vw-1.25rem))] max-w-[calc(100vw-1.25rem)] rounded-xl border border-border bg-card shadow-2xl overflow-hidden"
+      onClick={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      {/* Sport switch inside the hub — one destination selector */}
+      <div className="flex items-center gap-1 px-2 pt-2 pb-1.5 border-b border-border/40">
+        {HUB_SPORTS.map((sid) => {
+          const p = getSportPack(sid);
+          const selected = sid === scope;
+          const n = (roomsBySport.get(sid) || []).length;
+          const nfl = sid === "nfl";
+          return (
+            <button
+              key={sid}
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              onClick={() => selectSport(sid)}
+              className={`flex-1 inline-flex items-center justify-center gap-1.5 min-h-[40px] rounded-lg text-xs font-extrabold touch-manipulation transition ${
+                selected
+                  ? nfl
+                    ? "bg-red-500/20 text-red-100 border border-red-500/40"
+                    : "bg-primary/20 text-primary border border-primary/40"
+                  : "text-muted hover:text-foreground border border-transparent"
+              }`}
+            >
+              <SportIcon sportId={sid} size={16} />
+              <span>{p.shortLabel}</span>
+              {loaded ? (
+                <span className="opacity-60 text-[10px] tabular-nums">{n}</span>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+
+      {openRooms.length === 0 ? (
+        <div className="px-4 py-5">
+          <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-muted mb-2">
+            No {pack.shortLabel} leagues yet
+          </p>
+          <p className="text-sm text-foreground/90 leading-relaxed mb-4">
+            Join friends, start your own, or browse open communities.
+          </p>
+          <GrowthActions onNavigate={closeHub} stacked />
+        </div>
+      ) : (
+        <>
+          <div
+            className={`px-2 py-2 space-y-1 ${
+              openRooms.length > 6
+                ? "max-h-[min(52vh,24rem)] overflow-y-auto overscroll-contain"
+                : ""
+            }`}
+          >
+            {openRooms.map((m) => {
+              const isActive = m.leagueId === activeId;
+              const p = pulse[m.leagueId];
+              const busy = busyId === m.leagueId;
+              const action = p?.action || {
+                code: "ENTER" as const,
+                label: "Enter",
+                href: "/",
+              };
+              const weekLine = p?.weekLine || "—";
+              const tone: LeagueHubTone = p?.signal?.tone || "ready";
+              const signalLabel = p?.signal?.label || "Ready — Enter";
+              const signalEmoji = p?.signal?.emoji || "🟢";
+              const tones = leagueHubToneClasses(tone);
+
               return (
-                <button
-                  key={sid}
-                  type="button"
-                  role="tab"
-                  aria-selected={selected}
-                  onClick={() => selectSport(sid)}
-                  className={`flex-1 inline-flex items-center justify-center gap-1.5 min-h-[40px] rounded-lg text-xs font-extrabold touch-manipulation transition ${
-                    selected
-                      ? nfl
-                        ? "bg-red-500/20 text-red-100 border border-red-500/40"
-                        : "bg-primary/20 text-primary border border-primary/40"
-                      : "text-muted hover:text-foreground border border-transparent"
+                <div
+                  key={m.leagueId}
+                  role="option"
+                  aria-selected={isActive}
+                  className={`flex items-stretch gap-2 rounded-lg px-2.5 py-2.5 min-h-[56px] ${
+                    isActive
+                      ? "bg-primary/12 border border-primary/35"
+                      : "bg-background/25 border border-transparent hover:bg-background/40"
                   }`}
                 >
-                  <SportIcon sportId={sid} size={16} />
-                  <span>{p.shortLabel}</span>
-                  {loaded ? (
-                    <span className="opacity-60 text-[10px] tabular-nums">
-                      {n}
-                    </span>
-                  ) : null}
-                </button>
+                  <div className="flex-1 min-w-0 py-0.5">
+                    <p className="text-sm font-bold text-white truncate leading-tight">
+                      <span className="mr-1" aria-hidden>
+                        {sportEmoji(scope)}
+                      </span>
+                      {m.leagueName || "War Room"}
+                      {isActive ? (
+                        <span className="ml-1.5 text-[9px] uppercase tracking-wide text-primary font-extrabold align-middle">
+                          here
+                        </span>
+                      ) : null}
+                    </p>
+                    <p className="text-[11px] text-muted mt-0.5 truncate">
+                      {weekLine}
+                    </p>
+                    <p
+                      className={`text-[11px] mt-0.5 font-semibold truncate ${tones.text}`}
+                    >
+                      <span aria-hidden className="mr-1">
+                        {signalEmoji}
+                      </span>
+                      {signalLabel}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={!!busyId}
+                    onClick={() => void runAction(m.leagueId, action.href)}
+                    className={`self-center shrink-0 min-h-[40px] px-2.5 rounded-lg text-[11px] font-extrabold tracking-wide touch-manipulation disabled:opacity-50 whitespace-nowrap ${tones.button}`}
+                  >
+                    {busy ? "…" : action.label}
+                  </button>
+                </div>
               );
             })}
           </div>
 
-          {openRooms.length === 0 ? (
-            <div className="px-4 py-5">
-              <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-muted mb-2">
-                No {pack.shortLabel} leagues yet
-              </p>
-              <p className="text-sm text-foreground/90 leading-relaxed mb-4">
-                Join friends, start your own, or browse open communities.
-              </p>
-              <GrowthActions
-                onNavigate={() => setOpen(false)}
-                stacked
-              />
-            </div>
-          ) : (
-            <>
-              <div
-                className={`px-2 py-2 space-y-1 ${
-                  openRooms.length > 6
-                    ? "max-h-[min(52vh,24rem)] overflow-y-auto overscroll-contain"
-                    : ""
-                }`}
-              >
-                {openRooms.map((m) => {
-                  const isActive = m.leagueId === activeId;
-                  const p = pulse[m.leagueId];
-                  const busy = busyId === m.leagueId;
-                  const action = p?.action || {
-                    code: "ENTER" as const,
-                    label: "Enter",
-                    href: "/",
-                  };
-                  const weekLine = p?.weekLine || "—";
-                  const tone: LeagueHubTone = p?.signal?.tone || "ready";
-                  const signalLabel =
-                    p?.signal?.label || "Ready — Enter";
-                  const signalEmoji = p?.signal?.emoji || "🟢";
-                  const tones = leagueHubToneClasses(tone);
-
-                  return (
-                    <div
-                      key={m.leagueId}
-                      role="option"
-                      aria-selected={isActive}
-                      className={`flex items-stretch gap-2 rounded-lg px-2.5 py-2.5 min-h-[56px] ${
-                        isActive
-                          ? "bg-primary/12 border border-primary/35"
-                          : "bg-background/25 border border-transparent hover:bg-background/40"
-                      }`}
-                    >
-                      <div className="flex-1 min-w-0 py-0.5">
-                        <p className="text-sm font-bold text-white truncate leading-tight">
-                          <span className="mr-1" aria-hidden>
-                            {sportEmoji(scope)}
-                          </span>
-                          {m.leagueName || "War Room"}
-                          {isActive ? (
-                            <span className="ml-1.5 text-[9px] uppercase tracking-wide text-primary font-extrabold align-middle">
-                              here
-                            </span>
-                          ) : null}
-                        </p>
-                        <p className="text-[11px] text-muted mt-0.5 truncate">
-                          {weekLine}
-                        </p>
-                        <p
-                          className={`text-[11px] mt-0.5 font-semibold truncate ${tones.text}`}
-                        >
-                          <span aria-hidden className="mr-1">
-                            {signalEmoji}
-                          </span>
-                          {signalLabel}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        disabled={!!busyId}
-                        onClick={() =>
-                          void runAction(m.leagueId, action.href)
-                        }
-                        className={`self-center shrink-0 min-h-[40px] px-2.5 rounded-lg text-[11px] font-extrabold tracking-wide touch-manipulation disabled:opacity-50 whitespace-nowrap ${tones.button}`}
-                      >
-                        {busy ? "…" : action.label}
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="border-t border-border/50 px-3 py-2.5">
-                <GrowthActions onNavigate={() => setOpen(false)} />
-              </div>
-            </>
-          )}
-        </div>
+          <div className="border-t border-border/50 px-3 py-2.5">
+            <GrowthActions onNavigate={closeHub} />
+          </div>
+        </>
       )}
     </div>
+  ) : null;
+
+  const hubOverlay =
+    open && portalReady
+      ? createPortal(
+          <>
+            {/*
+              Full-viewport dim + restrained blur — same recipe as Nav More
+              (bg-black/65 + backdrop-blur-[2px], z-55). Portal escapes Home
+              main stacking so nav is covered and clicks cannot leak through.
+            */}
+            <div
+              className="fixed inset-0 bg-black/65 backdrop-blur-[2px]"
+              style={{ zIndex: HUB_BACKDROP_Z }}
+              aria-hidden
+              onClick={closeHub}
+            />
+            {hubPanel}
+          </>,
+          document.body
+        )
+      : null;
+
+  const triggerClass = `inline-flex items-center gap-1.5 min-h-[40px] px-3 rounded-full text-xs font-extrabold touch-manipulation transition border ${
+    isNfl
+      ? "border-red-500/50 bg-red-500/15 text-red-100 hover:bg-red-500/20"
+      : "border-primary/50 bg-primary/15 text-primary hover:bg-primary/20"
+  }`;
+
+  const triggerInner = (
+    <>
+      <SportIcon sportId={scope} size={18} />
+      <span>{pack.shortLabel}</span>
+      {loaded && roomCount > 0 ? (
+        <span className="opacity-70 text-[10px] font-semibold tabular-nums">
+          {roomCount}
+        </span>
+      ) : null}
+      <span className="opacity-70 text-[10px]" aria-hidden>
+        {open ? "▴" : "▾"}
+      </span>
+    </>
+  );
+
+  return (
+    <>
+      <div ref={rootRef} className={`relative inline-block ${className}`}>
+        {/* In-flow trigger (layout anchor). When open, a portaled twin sits above the backdrop. */}
+        <button
+          type="button"
+          onClick={toggleHub}
+          aria-expanded={open}
+          aria-haspopup="listbox"
+          aria-label={`${pack.shortLabel} League Hub`}
+          className={`${triggerClass} ${open ? "invisible" : ""}`}
+          tabIndex={open ? -1 : 0}
+        >
+          {triggerInner}
+        </button>
+      </div>
+      {hubOverlay}
+      {open && portalReady && hubGeom
+        ? createPortal(
+            <button
+              type="button"
+              onClick={toggleHub}
+              aria-expanded
+              aria-haspopup="listbox"
+              aria-label={`${pack.shortLabel} League Hub`}
+              style={{
+                position: "fixed",
+                top: hubGeom.triggerTop,
+                left: hubGeom.triggerLeft,
+                zIndex: HUB_PANEL_Z + 1,
+              }}
+              className={triggerClass}
+            >
+              {triggerInner}
+            </button>,
+            document.body
+          )
+        : null}
+    </>
   );
 }
 
