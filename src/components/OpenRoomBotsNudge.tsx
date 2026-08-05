@@ -13,7 +13,7 @@ type Props = {
 };
 
 /** Deep link: Host → Fill empty seats? */
-export const COMMISH_BOTS_HREF = "/commissioner?tab=settings#commish-bots";
+export const COMMISH_BOTS_HREF = "/commissioner#commish-bots";
 
 export default function OpenRoomBotsNudge({ open, onClose }: Props) {
   if (!open) return null;

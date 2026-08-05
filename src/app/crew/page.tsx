@@ -273,7 +273,7 @@ export default function CrewPage() {
                   </p>
                   {isCommissioner() ? (
                     <Link
-                      href="/commissioner?tab=settings"
+                      href="/commissioner"
                       className="inline-flex text-sm font-bold text-amber-200"
                     >
                       Commish · ask the room / sport pool →

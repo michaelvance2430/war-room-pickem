@@ -77,7 +77,7 @@ export default function HomeCrewWhisper() {
       setLine(
         `Playing ${sport} now. When the group wants ${pack.shortLabel}, keep the same people — sport pool under Commish.`
       );
-      setHref("/commissioner?tab=settings");
+      setHref("/commissioner");
       setCta("Commish");
       return;
     }

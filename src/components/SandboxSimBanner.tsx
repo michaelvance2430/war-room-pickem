@@ -36,7 +36,7 @@ export default function SandboxSimBanner() {
       </p>
       {isOps() && (
         <Link
-          href="/commissioner?tab=card"
+          href="/week-ops"
           className="text-[11px] font-bold text-amber-200 underline shrink-0"
         >
           League tools

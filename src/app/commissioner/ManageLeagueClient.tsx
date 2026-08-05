@@ -1,0 +1,1035 @@
+"use client";
+
+/**
+ * Manage League — Stage 1
+ * Persistent settings only. Weekly ops live on Home → /week-ops.
+ * Foundry/testing tools are not rendered here.
+ */
+
+import { useCallback, useEffect, useMemo, useState, Suspense } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import PlayerLink from "@/components/PlayerLink";
+import {
+  getLeague,
+  getSession,
+  isCommissioner,
+  isOps,
+  resetLeague,
+  type League,
+} from "@/lib/league";
+import { saveLeagueToCloud, syncLeagueFromCloud } from "@/lib/league-sync";
+import {
+  clearTrialBotsInCloud,
+  fillLeagueWithBotsToCap,
+  loadLeagueRoster,
+  listScoredWeekNumbers,
+  refreshStaffSessionFlags,
+  resetSeasonInCloud,
+  setMemberModeration,
+  startNextSeasonInCloud,
+  type LeagueRosterMember,
+} from "@/lib/cloud";
+import {
+  HOME_TAGLINE_MAX_CHARS,
+  DEFAULT_HOME_TAGLINE_ID,
+  homeTaglinePresetsForSport,
+  resolveHomeTagline,
+} from "@/lib/home-tagline";
+import { transferCommissioner, defaultSeasonYear } from "@/lib/trophies";
+import { paintAutomaticSeasonTheme } from "@/lib/season-theme";
+import { DIVISIONS, divisionDisplayLabel } from "@/lib/divisions";
+import {
+  SIMPLE_BOT_FILL_TARGET,
+  areBotsRosterLocked,
+  botsLockedMessage,
+  isSimpleHostSurface,
+} from "@/lib/simple-host";
+
+type SectionId =
+  | "identity"
+  | "rules"
+  | "people"
+  | "season"
+  | "advanced"
+  | null;
+
+function sportLabel(sportId?: string | null) {
+  return sportId === "nfl" ? "NFL" : "CFB";
+}
+
+function ManageLeagueInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const [allowed, setAllowed] = useState<boolean | null>(() => {
+    try {
+      return isOps();
+    } catch {
+      return null;
+    }
+  });
+  const [isOwner, setIsOwner] = useState(() => {
+    try {
+      return isCommissioner();
+    } catch {
+      return false;
+    }
+  });
+
+  const [league, setLeague] = useState<League | null>(() => {
+    try {
+      return getLeague();
+    } catch {
+      return null;
+    }
+  });
+  const [openSection, setOpenSection] = useState<SectionId>(null);
+
+  const [leagueNameEdit, setLeagueNameEdit] = useState("");
+  const [cutPercent, setCutPercent] = useState(50);
+  const [crystalBallEnabled, setCrystalBallEnabled] = useState(true);
+  const [isOpenRoom, setIsOpenRoom] = useState(false);
+  const [openRoomBusy, setOpenRoomBusy] = useState(false);
+  const [openRoomNote, setOpenRoomNote] = useState<string | null>(null);
+  const [homeTaglineId, setHomeTaglineId] = useState(DEFAULT_HOME_TAGLINE_ID);
+  const [homeTaglineCustom, setHomeTaglineCustom] = useState("");
+  const [settingsSaved, setSettingsSaved] = useState(false);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
+
+  const [roster, setRoster] = useState<LeagueRosterMember[]>([]);
+  const [deputyBusyId, setDeputyBusyId] = useState<string | null>(null);
+  const [deputyReport, setDeputyReport] = useState<string | null>(null);
+  const [passToUserId, setPassToUserId] = useState("");
+  const [passBusy, setPassBusy] = useState(false);
+  const [passReport, setPassReport] = useState<string | null>(null);
+
+  const [scoredWeeks, setScoredWeeks] = useState<number[]>([]);
+  const [resettingSeason, setResettingSeason] = useState(false);
+  const [seasonReport, setSeasonReport] = useState<string | null>(null);
+
+  const [botBusy, setBotBusy] = useState(false);
+  const [botReport, setBotReport] = useState<string | null>(null);
+  const [botAddCount, setBotAddCount] = useState(6);
+  const [simpleHost, setSimpleHost] = useState(true);
+
+  const [dangerOpen, setDangerOpen] = useState(false);
+  const [peopleExtrasOpen, setPeopleExtrasOpen] = useState(false);
+
+  // Legacy weekly URLs → week-ops / players (before paint)
+  useEffect(() => {
+    const tab = (searchParams.get("tab") || "").toLowerCase();
+    const first = searchParams.get("first");
+    if (first === "1" && (!tab || tab === "card")) {
+      router.replace("/week-ops?first=1");
+      return;
+    }
+    if (tab === "card" || tab === "build") {
+      router.replace("/week-ops");
+      return;
+    }
+    if (tab === "results" || tab === "score" || tab === "scoring") {
+      router.replace("/week-ops?score=1");
+      return;
+    }
+    if (tab === "picks") {
+      router.replace("/week-ops");
+      return;
+    }
+    if (tab === "players" || tab === "roster" || tab === "alignment") {
+      router.replace("/players");
+      return;
+    }
+    // #commish-bots → people extras
+    if (typeof window !== "undefined") {
+      const hash = window.location.hash.replace("#", "");
+      if (hash === "commish-bots") {
+        setOpenSection("people");
+        setPeopleExtrasOpen(true);
+      }
+    }
+  }, [router, searchParams]);
+
+  const hydrate = useCallback(async () => {
+    await refreshStaffSessionFlags().catch(() => {});
+    setAllowed(isOps());
+    setIsOwner(isCommissioner());
+
+    let lg = getLeague();
+    try {
+      const fresh = (await syncLeagueFromCloud()) || getLeague();
+      if (fresh) lg = fresh;
+    } catch {
+      /* local shell */
+    }
+    if (lg) {
+      setLeague(lg);
+      setLeagueNameEdit(lg.name || "");
+      setCutPercent(lg.settings?.cutPercent ?? 50);
+      setCrystalBallEnabled(lg.settings?.crystalBallEnabled !== false);
+      setHomeTaglineId(lg.settings?.homeTaglineId || DEFAULT_HOME_TAGLINE_ID);
+      setHomeTaglineCustom(lg.settings?.homeTaglineCustom || "");
+      void paintAutomaticSeasonTheme({});
+      try {
+        const { createClient, hasSupabaseConfig } = await import(
+          "@/lib/supabase/client"
+        );
+        if (hasSupabaseConfig() && lg.id) {
+          const sb = createClient();
+          const { data: row } = await sb
+            .from("leagues")
+            .select("is_open")
+            .eq("id", lg.id)
+            .maybeSingle();
+          setIsOpenRoom(!!(row as { is_open?: boolean } | null)?.is_open);
+        }
+      } catch {
+        /* optional column */
+      }
+    }
+
+    let scored: number[] = [];
+    try {
+      const [r, sc] = await Promise.all([
+        loadLeagueRoster(),
+        listScoredWeekNumbers().catch(() => [] as number[]),
+      ]);
+      setRoster(r);
+      scored = sc;
+      setScoredWeeks(sc);
+    } catch {
+      setRoster([]);
+    }
+
+    try {
+      const lid = lg?.id || getSession()?.leagueId || "";
+      setSimpleHost(
+        isSimpleHostSurface({
+          leagueId: lid,
+          scoredWeekCount: scored.length,
+          userId: getSession()?.playerId,
+        })
+      );
+    } catch {
+      setSimpleHost(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    void hydrate();
+  }, [hydrate]);
+
+  const session = getSession();
+  const humans = useMemo(
+    () => roster.filter((m) => !m.isBot),
+    [roster]
+  );
+  const bots = useMemo(() => roster.filter((m) => m.isBot), [roster]);
+  const deputies = useMemo(
+    () => humans.filter((m) => m.isDeputy),
+    [humans]
+  );
+  const passRoster = useMemo(
+    () =>
+      humans
+        .filter((m) => m.userId !== session?.playerId)
+        .sort((a, b) => {
+          if (!!a.isDeputy !== !!b.isDeputy) return a.isDeputy ? -1 : 1;
+          return a.name.localeCompare(b.name);
+        }),
+    [humans, session?.playerId]
+  );
+  const commissioner = humans.find((m) => m.role === "commissioner");
+  const divCounts = useMemo(() => {
+    const c: Record<string, number> = {};
+    for (const d of DIVISIONS) c[d] = 0;
+    for (const m of roster) {
+      const d = m.division || "North";
+      c[d] = (c[d] || 0) + 1;
+    }
+    return c;
+  }, [roster]);
+
+  const seasonYear = defaultSeasonYear();
+  const mottoPreview = resolveHomeTagline({
+    homeTaglineId,
+    homeTaglineCustom,
+    sportId: league?.sportId,
+  });
+
+  async function saveSettings() {
+    setSettingsError(null);
+    const result = await saveLeagueToCloud({
+      name: leagueNameEdit,
+      settings: {
+        cutPercent,
+        gamesPerWeek: 5,
+        crystalBallEnabled,
+        homeTaglineId,
+        homeTaglineCustom: homeTaglineCustom.slice(0, HOME_TAGLINE_MAX_CHARS),
+      },
+    });
+    if (result.ok && result.league) {
+      setLeague(result.league);
+      void paintAutomaticSeasonTheme();
+      setSettingsSaved(true);
+      setTimeout(() => setSettingsSaved(false), 1500);
+    } else {
+      setSettingsError(result.error || "Failed to save settings");
+    }
+  }
+
+  async function toggleOpenRoom() {
+    if (!league?.id || openRoomBusy) return;
+    setOpenRoomBusy(true);
+    setOpenRoomNote(null);
+    try {
+      const { setLeagueOpenListing } = await import("@/lib/open-room");
+      const next = !isOpenRoom;
+      const res = await setLeagueOpenListing(league.id, next);
+      if (!res.ok) {
+        setOpenRoomNote(res.error || "Could not update listing");
+      } else {
+        setIsOpenRoom(next);
+        setOpenRoomNote(next ? "Listed as open room." : "Private — code only.");
+      }
+    } catch (e: unknown) {
+      setOpenRoomNote(e instanceof Error ? e.message : "Failed");
+    }
+    setOpenRoomBusy(false);
+  }
+
+  async function toggleDeputy(m: LeagueRosterMember) {
+    if (!isOwner || m.role === "commissioner" || m.userId === session?.playerId)
+      return;
+    const next = !m.isDeputy;
+    if (
+      !confirm(
+        next
+          ? `Make ${m.name} a deputy?\n\nThey can build cards and score weeks. They cannot change settings, reset, or pass ownership.`
+          : `Remove deputy from ${m.name}?`
+      )
+    ) {
+      return;
+    }
+    setDeputyBusyId(m.userId);
+    setDeputyReport(null);
+    const res = await setMemberModeration({
+      userId: m.userId,
+      isDeputy: next,
+    });
+    setDeputyBusyId(null);
+    if (!res.ok) {
+      setDeputyReport(res.error || "Failed");
+      return;
+    }
+    setDeputyReport(
+      next ? `${m.name} is now a deputy.` : `${m.name} is no longer a deputy.`
+    );
+    void hydrate();
+  }
+
+  async function handlePassCommissioner() {
+    setPassReport(null);
+    if (!passToUserId) {
+      setPassReport("Pick a player.");
+      return;
+    }
+    const target = passRoster.find((m) => m.userId === passToUserId);
+    const name = target?.name || "this player";
+    if (
+      !confirm(
+        `Pass commissioner to ${name}?\n\nYou become a player. Trophy Room stays with the league.`
+      )
+    ) {
+      return;
+    }
+    const typed = window.prompt(`Type PASS to confirm transfer to ${name}.`);
+    if (typed !== "PASS") {
+      setPassReport("Cancelled — type PASS to confirm.");
+      return;
+    }
+    setPassBusy(true);
+    const result = await transferCommissioner(passToUserId);
+    setPassBusy(false);
+    if (!result.ok) {
+      setPassReport(result.error || "Transfer failed");
+      return;
+    }
+    setPassReport(`Done. ${result.newCommissionerName || name} is commissioner.`);
+    setTimeout(() => router.push("/"), 1200);
+  }
+
+  async function handleStartNextSeason() {
+    const typed = window.prompt(
+      "Start next season in this same room?\n\nClears cards, picks, and board. Keeps members, code, trophies.\n\nType NEXT to confirm."
+    );
+    if (typed !== "NEXT") {
+      setSeasonReport("Cancelled.");
+      return;
+    }
+    setResettingSeason(true);
+    setSeasonReport(null);
+    const res = await startNextSeasonInCloud();
+    setResettingSeason(false);
+    if (!res.ok) {
+      setSeasonReport(res.error || "Failed");
+      return;
+    }
+    setSeasonReport(res.message || "Next season board is open.");
+    void hydrate();
+  }
+
+  async function handleResetSeason() {
+    const typed = window.prompt(
+      "Same board wipe as Start next season.\nType RESET to confirm."
+    );
+    if (typed !== "RESET") {
+      setSeasonReport("Cancelled.");
+      return;
+    }
+    setResettingSeason(true);
+    const res = await resetSeasonInCloud();
+    setResettingSeason(false);
+    if (!res.ok) {
+      setSeasonReport(res.error || "Failed");
+      return;
+    }
+    setSeasonReport("Season board cleared. Members kept.");
+    void hydrate();
+  }
+
+  function handleDeleteLeague() {
+    if (!confirm("Permanently delete this league and local data?")) return;
+    resetLeague();
+    router.push("/join");
+  }
+
+  async function handleSimpleFillBots() {
+    try {
+      if (await areBotsRosterLocked()) {
+        setBotReport(botsLockedMessage());
+        return;
+      }
+    } catch {
+      /* allow attempt */
+    }
+    setBotBusy(true);
+    setBotReport(null);
+    try {
+      const res = await fillLeagueWithBotsToCap({
+        targetTotal: SIMPLE_BOT_FILL_TARGET,
+      });
+      setBotReport(
+        res.ok
+          ? `Filled to ~${SIMPLE_BOT_FILL_TARGET} seats (${res.added ?? 0} added).`
+          : res.error || "Failed"
+      );
+      void hydrate();
+    } finally {
+      setBotBusy(false);
+    }
+  }
+
+  async function handleClearBots() {
+    if (!confirm("Remove all trial bots from this league?")) return;
+    setBotBusy(true);
+    const res = await clearTrialBotsInCloud();
+    setBotBusy(false);
+    setBotReport(res.ok ? "Bots cleared." : res.error || "Failed");
+    void hydrate();
+  }
+
+  function toggleSection(id: SectionId) {
+    setOpenSection((cur) => (cur === id ? null : id));
+  }
+
+  if (allowed === null) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-muted text-sm">
+        Loading…
+      </div>
+    );
+  }
+
+  if (!allowed) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <main className="flex-1 flex items-center justify-center px-4">
+          <div className="max-w-md text-center rounded-xl border border-border bg-card p-6">
+            <h1 className="text-xl font-bold mb-2">Ops only</h1>
+            <p className="text-sm text-muted mb-3">
+              Only the commissioner or a deputy can open Manage League.
+            </p>
+            <Link href="/" className="text-sm font-semibold text-primary">
+              ← Home
+            </Link>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // Deputy: management is owner-facing; point them to weekly ops + players
+  if (!isOwner) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <main className="flex-1 max-w-lg mx-auto w-full px-4 py-8 space-y-4">
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
+            Manage League
+          </p>
+          <h1 className="text-2xl font-black">Deputy access</h1>
+          <p className="text-sm text-muted leading-relaxed">
+            Weekly card and scoring are on Home. You can also manage divisions
+            on Players.
+          </p>
+          <div className="flex flex-col gap-2">
+            <Link
+              href="/week-ops"
+              className="py-3 rounded-xl bg-primary text-black text-center font-bold min-h-[48px] flex items-center justify-center"
+            >
+              Open week ops →
+            </Link>
+            <Link
+              href="/players"
+              className="py-3 rounded-xl border border-border text-center font-semibold min-h-[48px] flex items-center justify-center"
+            >
+              People & alignment →
+            </Link>
+            <Link
+              href="/"
+              className="text-center text-sm text-primary font-semibold py-2"
+            >
+              ← Home
+            </Link>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  const roleLabel = "Commissioner";
+  const accessSummary = isOpenRoom
+    ? "Open room · Invite code active"
+    : "Private league · Invite code active";
+  const rulesSummary = [
+    sportLabel(league?.sportId),
+    "Fair Entry on join",
+    crystalBallEnabled ? "Crystal Ball on" : "Crystal Ball off",
+    `Cut ${cutPercent}%`,
+  ].join(" · ");
+  const peopleSummary = `${humans.length} members · ${deputies.length} deput${
+    deputies.length === 1 ? "y" : "ies"
+  } · 4 divisions · ${bots.length} bot${bots.length === 1 ? "" : "s"}`;
+  const historySummary =
+    scoredWeeks.length === 0
+      ? `${seasonYear} season · No scored weeks yet · Rollover quiet`
+      : `${seasonYear} season · ${scoredWeeks.length} week${
+          scoredWeeks.length === 1 ? "" : "s"
+        } scored`;
+
+  return (
+    <div className="min-h-screen flex flex-col bg-background">
+      <main className="flex-1 w-full max-w-[1100px] mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        {/* Header */}
+        <header className="mb-6 sm:mb-8">
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
+            Manage League
+          </p>
+          <h1 className="text-2xl sm:text-3xl font-black mt-0.5 text-foreground">
+            {league?.name || "Your league"}
+          </h1>
+          <p className="text-sm text-muted mt-1">
+            {sportLabel(league?.sportId)} · {seasonYear} · {roleLabel}
+            {league?.code ? (
+              <>
+                {" "}
+                · Code{" "}
+                <span className="font-mono text-foreground">{league.code}</span>
+              </>
+            ) : null}
+          </p>
+          <p className="text-xs text-muted mt-2 max-w-xl">
+            Persistent settings and people. Weekly card and scoring stay on{" "}
+            <Link href="/" className="text-primary font-semibold">
+              Home
+            </Link>
+            .
+          </p>
+        </header>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-5">
+          {/* 1. Identity & Access */}
+          <section className="rounded-xl border border-border bg-card p-4 sm:p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="font-bold text-foreground">Identity & Access</h2>
+                <p className="text-sm text-muted mt-1 leading-snug">
+                  {accessSummary}
+                </p>
+                <p className="text-xs text-muted mt-1 truncate">
+                  Motto: {mottoPreview}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => toggleSection("identity")}
+                className="shrink-0 px-3 py-2 rounded-lg border border-primary/40 bg-primary/10 text-primary text-xs font-bold min-h-[40px]"
+              >
+                {openSection === "identity" ? "Close" : "Edit"}
+              </button>
+            </div>
+            {openSection === "identity" && (
+              <div className="mt-4 pt-4 border-t border-border space-y-3">
+                <label className="block text-xs text-muted">
+                  League name
+                  <input
+                    value={leagueNameEdit}
+                    onChange={(e) => setLeagueNameEdit(e.target.value)}
+                    className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm"
+                  />
+                </label>
+                <div className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2.5">
+                  <div>
+                    <p className="text-sm font-semibold">Open room listing</p>
+                    <p className="text-xs text-muted">
+                      {isOpenRoom ? "Listed in open lobby" : "Code invite only"}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={isOpenRoom}
+                    disabled={openRoomBusy}
+                    onClick={() => void toggleOpenRoom()}
+                    className={`relative shrink-0 w-12 h-7 rounded-full ${
+                      isOpenRoom ? "bg-primary" : "bg-border"
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-black transition ${
+                        isOpenRoom ? "translate-x-5" : ""
+                      }`}
+                    />
+                  </button>
+                </div>
+                {openRoomNote && (
+                  <p className="text-xs text-primary">{openRoomNote}</p>
+                )}
+                <label className="block text-xs text-muted">
+                  Home motto preset
+                  <select
+                    value={homeTaglineId}
+                    onChange={(e) => setHomeTaglineId(e.target.value)}
+                    className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-2 text-sm"
+                  >
+                    {homeTaglinePresetsForSport(league?.sportId).map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {homeTaglineId === "custom" && (
+                  <textarea
+                    value={homeTaglineCustom}
+                    onChange={(e) =>
+                      setHomeTaglineCustom(
+                        e.target.value.slice(0, HOME_TAGLINE_MAX_CHARS)
+                      )
+                    }
+                    rows={2}
+                    maxLength={HOME_TAGLINE_MAX_CHARS}
+                    className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm resize-none"
+                    placeholder="Custom home line"
+                  />
+                )}
+                <p className="text-xs text-muted">
+                  Invite code:{" "}
+                  <span className="font-mono text-foreground">
+                    {league?.code || "—"}
+                  </span>{" "}
+                  (share from Home)
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void saveSettings()}
+                  className="w-full py-3 rounded-xl bg-primary text-black font-bold min-h-[48px]"
+                >
+                  {settingsSaved ? "Saved" : "Save identity"}
+                </button>
+                {settingsError && (
+                  <p className="text-sm text-danger">{settingsError}</p>
+                )}
+              </div>
+            )}
+          </section>
+
+          {/* 2. Rules & Format */}
+          <section className="rounded-xl border border-border bg-card p-4 sm:p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="font-bold text-foreground">Rules & Format</h2>
+                <p className="text-sm text-muted mt-1 leading-snug">
+                  {rulesSummary}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => toggleSection("rules")}
+                className="shrink-0 px-3 py-2 rounded-lg border border-primary/40 bg-primary/10 text-primary text-xs font-bold min-h-[40px]"
+              >
+                {openSection === "rules" ? "Close" : "Review"}
+              </button>
+            </div>
+            {openSection === "rules" && (
+              <div className="mt-4 pt-4 border-t border-border space-y-3">
+                <p className="text-xs text-muted">
+                  Sport:{" "}
+                  <strong className="text-foreground">
+                    {sportLabel(league?.sportId)}
+                  </strong>{" "}
+                  (fixed for this room)
+                </p>
+                <p className="text-xs text-muted">
+                  Fair Entry: mid-season joiners get a banded start — configured
+                  on join, not a separate toggle.
+                </p>
+                <div className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2.5">
+                  <div>
+                    <p className="text-sm font-semibold">Crystal Ball</p>
+                    <p className="text-xs text-muted">
+                      {crystalBallEnabled ? "Tab visible" : "Tab hidden"}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={crystalBallEnabled}
+                    onClick={() => setCrystalBallEnabled((v) => !v)}
+                    className={`relative shrink-0 w-12 h-7 rounded-full ${
+                      crystalBallEnabled ? "bg-primary" : "bg-border"
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-black transition ${
+                        crystalBallEnabled ? "translate-x-5" : ""
+                      }`}
+                    />
+                  </button>
+                </div>
+                <label className="block text-xs text-muted">
+                  Cut line (% to Toilet Bowl)
+                  <input
+                    type="number"
+                    min={10}
+                    max={75}
+                    value={cutPercent}
+                    onChange={(e) =>
+                      setCutPercent(parseInt(e.target.value, 10) || 50)
+                    }
+                    className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-2 text-sm"
+                  />
+                </label>
+                <p className="text-xs text-muted leading-relaxed">
+                  Divisions:{" "}
+                  {DIVISIONS.map((d) => (
+                    <span key={d} className="mr-2">
+                      {divisionDisplayLabel(d, league?.sportId)} (
+                      {divCounts[d] || 0})
+                    </span>
+                  ))}
+                </p>
+                <Link
+                  href="/league-build?review=1"
+                  className="inline-flex text-sm font-semibold text-primary"
+                >
+                  Full League Build review →
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => void saveSettings()}
+                  className="w-full py-3 rounded-xl bg-primary text-black font-bold min-h-[48px]"
+                >
+                  {settingsSaved ? "Saved" : "Save rules"}
+                </button>
+              </div>
+            )}
+          </section>
+
+          {/* 3. People & Permissions */}
+          <section className="rounded-xl border border-border bg-card p-4 sm:p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="font-bold text-foreground">
+                  People & Permissions
+                </h2>
+                <p className="text-sm text-muted mt-1 leading-snug">
+                  {peopleSummary}
+                </p>
+                {commissioner && (
+                  <p className="text-xs text-muted mt-1">
+                    Commissioner:{" "}
+                    <PlayerLink id={commissioner.userId} name={commissioner.name} />
+                  </p>
+                )}
+              </div>
+              <Link
+                href="/players"
+                className="shrink-0 px-3 py-2 rounded-lg border border-primary/40 bg-primary/10 text-primary text-xs font-bold min-h-[40px] flex items-center"
+              >
+                Manage
+              </Link>
+            </div>
+            <p className="text-xs text-muted mt-3">
+              Roster, divisions, Auto-Balance, and removals open on Players.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setPeopleExtrasOpen((o) => !o);
+                setOpenSection("people");
+              }}
+              className="mt-3 text-xs font-semibold text-primary"
+            >
+              {peopleExtrasOpen ? "Hide deputies & bots" : "Deputies & bots"}
+            </button>
+            {peopleExtrasOpen && (
+              <div className="mt-3 pt-3 border-t border-border space-y-4">
+                <div>
+                  <p className="text-sm font-semibold mb-2">Deputies</p>
+                  {passRoster.length === 0 ? (
+                    <p className="text-xs text-muted">
+                      Need another real player to appoint a deputy.
+                    </p>
+                  ) : (
+                    <ul className="space-y-2">
+                      {passRoster.map((m) => (
+                        <li
+                          key={m.userId}
+                          className="flex items-center justify-between gap-2 text-sm"
+                        >
+                          <span className="truncate">
+                            <PlayerLink id={m.userId} name={m.name} />
+                            {m.isDeputy && (
+                              <span className="ml-1 text-[10px] uppercase text-primary">
+                                Deputy
+                              </span>
+                            )}
+                          </span>
+                          <button
+                            type="button"
+                            disabled={deputyBusyId === m.userId}
+                            onClick={() => void toggleDeputy(m)}
+                            className="text-xs px-2 py-1 rounded-lg border border-border shrink-0"
+                          >
+                            {m.isDeputy ? "Remove" : "Make deputy"}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {deputyReport && (
+                    <p className="text-xs text-primary mt-2">{deputyReport}</p>
+                  )}
+                </div>
+                <div>
+                  <p className="text-sm font-semibold mb-1">Pass commissioner</p>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <select
+                      value={passToUserId}
+                      onChange={(e) => setPassToUserId(e.target.value)}
+                      className="flex-1 bg-background border border-border rounded-lg px-2 py-2 text-sm"
+                    >
+                      <option value="">— Select —</option>
+                      {passRoster.map((m) => (
+                        <option key={m.userId} value={m.userId}>
+                          {m.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      disabled={passBusy || !passToUserId}
+                      onClick={() => void handlePassCommissioner()}
+                      className="px-3 py-2 rounded-lg border border-primary text-primary text-xs font-bold disabled:opacity-50"
+                    >
+                      {passBusy ? "…" : "Pass"}
+                    </button>
+                  </div>
+                  {passReport && (
+                    <p className="text-xs mt-1 text-muted">{passReport}</p>
+                  )}
+                </div>
+                {simpleHost && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold">Seat fillers</p>
+                    <p className="text-xs text-muted">
+                      Optional bots to round out the room before friends join.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        disabled={botBusy}
+                        onClick={() => void handleSimpleFillBots()}
+                        className="px-3 py-2 rounded-lg bg-primary text-black text-xs font-bold disabled:opacity-50"
+                      >
+                        Fill seats
+                      </button>
+                      <button
+                        type="button"
+                        disabled={botBusy || bots.length === 0}
+                        onClick={() => void handleClearBots()}
+                        className="px-3 py-2 rounded-lg border border-border text-xs font-semibold disabled:opacity-50"
+                      >
+                        Clear bots
+                      </button>
+                    </div>
+                    {botReport && (
+                      <p className="text-xs text-muted">{botReport}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+
+          {/* 4. Season & History */}
+          <section className="rounded-xl border border-border bg-card p-4 sm:p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="font-bold text-foreground">Season & History</h2>
+                <p className="text-sm text-muted mt-1 leading-snug">
+                  {historySummary}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => toggleSection("season")}
+                className="shrink-0 px-3 py-2 rounded-lg border border-primary/40 bg-primary/10 text-primary text-xs font-bold min-h-[40px]"
+              >
+                {openSection === "season" ? "Close" : "View"}
+              </button>
+            </div>
+            {openSection === "season" && (
+              <div className="mt-4 pt-4 border-t border-border space-y-3">
+                <Link
+                  href="/trophy-room"
+                  className="inline-flex text-sm font-semibold text-primary"
+                >
+                  Trophy Room / history →
+                </Link>
+                <p className="text-xs text-muted leading-relaxed">
+                  Same room, new board: start next season when this year is
+                  done. Type NEXT to confirm.
+                </p>
+                <button
+                  type="button"
+                  disabled={resettingSeason}
+                  onClick={() => void handleStartNextSeason()}
+                  className="w-full py-3 rounded-xl border border-primary/50 text-primary font-bold min-h-[48px] disabled:opacity-50"
+                >
+                  {resettingSeason ? "Working…" : "Start next season"}
+                </button>
+                {seasonReport && (
+                  <p className="text-xs text-muted">{seasonReport}</p>
+                )}
+              </div>
+            )}
+          </section>
+        </div>
+
+        {/* 5. Advanced / Danger — full width, collapsed */}
+        <section className="mt-4 sm:mt-5 rounded-xl border border-border bg-card">
+          <button
+            type="button"
+            onClick={() => setDangerOpen((o) => !o)}
+            className="w-full flex items-center justify-between px-4 sm:px-5 py-4 text-left"
+          >
+            <div>
+              <h2 className="font-bold text-foreground">Advanced</h2>
+              <p className="text-sm text-muted mt-0.5">
+                Result correction path · board reset · delete league
+              </p>
+            </div>
+            <span className="text-xs font-bold text-muted">
+              {dangerOpen ? "Hide" : "Show"}
+            </span>
+          </button>
+          {dangerOpen && (
+            <div className="px-4 sm:px-5 pb-5 space-y-4 border-t border-border pt-4">
+              <div className="rounded-lg border border-border bg-background px-3 py-3">
+                <p className="text-sm font-semibold">Correct results</p>
+                <p className="text-xs text-muted mt-1 leading-relaxed">
+                  Fix a scored week through week ops (same production scoring
+                  path). Not a practice tool.
+                </p>
+                <Link
+                  href="/week-ops?score=1"
+                  className="inline-flex mt-2 text-sm font-bold text-primary"
+                >
+                  Open week ops scoring →
+                </Link>
+              </div>
+              <div className="rounded-lg border border-warning/40 bg-warning/5 px-3 py-3 space-y-2">
+                <p className="text-sm font-semibold text-warning">
+                  Reset season board
+                </p>
+                <p className="text-xs text-muted">
+                  Same wipe as next season (type RESET). Prefer Start next
+                  season above.
+                </p>
+                <button
+                  type="button"
+                  disabled={resettingSeason}
+                  onClick={() => void handleResetSeason()}
+                  className="px-3 py-2 rounded-lg border border-warning/60 text-warning text-xs font-bold disabled:opacity-50"
+                >
+                  Reset season (keep players)
+                </button>
+              </div>
+              <div className="rounded-lg border border-danger/40 px-3 py-3 space-y-2">
+                <p className="text-sm font-semibold text-danger">Danger zone</p>
+                <p className="text-xs text-muted">
+                  Permanently deletes this league for everyone. Not the same as
+                  next season.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleDeleteLeague}
+                  className="px-3 py-2 rounded-lg border border-danger text-danger text-xs font-bold"
+                >
+                  Delete league
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
+
+        <p className="text-center text-xs text-muted mt-8">
+          <Link href="/" className="text-primary font-semibold">
+            ← Home
+          </Link>
+          {" · "}
+          <Link href="/week-ops" className="text-primary font-semibold">
+            Week ops
+          </Link>
+        </p>
+      </main>
+    </div>
+  );
+}
+
+export default function ManageLeagueClient() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center text-muted text-sm">
+          Opening Manage League…
+        </div>
+      }
+    >
+      <ManageLeagueInner />
+    </Suspense>
+  );
+}

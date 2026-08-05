@@ -24,10 +24,10 @@ type Step = {
 };
 
 const TAB_HREF: Record<ActionTab, string> = {
-  settings: "/commissioner?tab=settings",
-  card: "/commissioner?tab=card",
-  picks: "/commissioner?tab=picks",
-  results: "/commissioner?tab=results",
+  settings: "/commissioner",
+  card: "/week-ops",
+  picks: "/week-ops",
+  results: "/week-ops?score=1",
 };
 
 /**
