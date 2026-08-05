@@ -21,8 +21,8 @@ export default function RulesPage() {
           </p>
           <h1 className="text-2xl font-black mb-2">Rules</h1>
           <p className="text-base text-foreground/90 leading-relaxed max-w-xl">
-            War Room exists to make Saturdays (and Sundays) with friends a little
-            more fun.
+            Thursday. Friday. Saturday. Sunday. Monday. Football has declared war
+            on the calendar.
           </p>
           <p className="text-sm text-muted mt-2 leading-relaxed max-w-xl">
             Everything below protects that experience. Culture first. Fine print
