@@ -82,3 +82,24 @@ export function getNflTeamById(id: string): CanonicalTeam | null {
 export function isValidNflTeamId(id: string): boolean {
   return byId.has(id);
 }
+
+/** Resolve catalog team from Crystal Ball display name (exact, then loose). */
+export function getNflTeamByName(name: string | null | undefined): CanonicalTeam | null {
+  if (!name) return null;
+  const exact = NFL_TEAM_CATALOG.find((t) => t.name === name);
+  if (exact) return exact;
+  const n = name.toLowerCase().trim();
+  return (
+    NFL_TEAM_CATALOG.find(
+      (t) =>
+        t.name.toLowerCase() === n ||
+        t.aliases.some((a) => a.toLowerCase() === n)
+    ) || null
+  );
+}
+
+/** Short mark for crest UI, e.g. nfl-dal → DAL. */
+export function nflTeamAbbr(team: CanonicalTeam): string {
+  const raw = team.id.replace(/^nfl-/, "").toUpperCase();
+  return raw.slice(0, 3) || team.name.slice(0, 3).toUpperCase();
+}

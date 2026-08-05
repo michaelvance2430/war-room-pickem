@@ -209,14 +209,17 @@ function phaseForMs(ms: number): LeagueLockPhase {
 }
 
 /**
- * Format remaining time to first kickoff for the League Lock Timer.
- * Quiet urgency — not a generic event countdown.
+ * Format remaining time until an absolute deadline (ms epoch).
+ * Same segments/timezone-neutral math as card-lock countdown — no local TZ display math.
  */
-export function formatLeagueLockCountdown(
-  games: Game[],
+export function formatCountdownToDeadline(
+  lockAtMs: number | null | undefined,
   now = Date.now()
 ): LeagueLockCountdown {
-  const lockAt = firstKickoffOnCardMs(games);
+  const lockAt =
+    typeof lockAtMs === "number" && Number.isFinite(lockAtMs) && lockAtMs > 0
+      ? lockAtMs
+      : 0;
   if (!lockAt) {
     return {
       locked: false,
@@ -305,6 +308,17 @@ export function formatLeagueLockCountdown(
     headline: `${secs}s`,
     segments: [{ value: String(secs), unit: "SEC" }],
   };
+}
+
+/**
+ * Format remaining time to first kickoff for the League Lock Timer.
+ * Quiet urgency — not a generic event countdown.
+ */
+export function formatLeagueLockCountdown(
+  games: Game[],
+  now = Date.now()
+): LeagueLockCountdown {
+  return formatCountdownToDeadline(firstKickoffOnCardMs(games), now);
 }
 
 /**
