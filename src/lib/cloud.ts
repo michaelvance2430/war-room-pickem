@@ -856,6 +856,24 @@ export async function publishWeekCard(opts: {
     /* ignore */
   }
 
+  // Museum Phase 1A: allegiance snapshots at publish (prelock; freeze at first kickoff)
+  // Never generates museum_events. Soft-fails if migration not applied.
+  try {
+    const { rebuildAllegianceSnapshotsAfterPublish } = await import(
+      "./museum/snapshots"
+    );
+    const { getLeague } = await import("./league");
+    await rebuildAllegianceSnapshotsAfterPublish({
+      leagueId,
+      weekNumber: opts.weekNumber,
+      weekCardId,
+      games: gamesWithIds,
+      sportId: getLeague()?.sportId || "cfb",
+    });
+  } catch {
+    /* ignore — scoring/picks must not fail on Museum foundation */
+  }
+
   return { ok: true, weekCardId, games: gamesWithIds };
 }
 
@@ -2526,6 +2544,42 @@ export async function saveResultsAndScoreWeek(opts: {
   {
     const { error } = await supabase.from("game_results").insert(resultRows);
     if (error) return { ok: false, scoredCount: 0, error: error.message };
+  }
+
+  // Museum Phase 1A: durable numeric finals (retry-safe for future generation).
+  // Does not create museum_events. ATS winner path above is unchanged.
+  try {
+    const { persistDurableFinalScores } = await import("./museum/final-scores");
+    const { freezeAllegianceSnapshotsIfLocked } = await import(
+      "./museum/snapshots"
+    );
+    const { getLeague } = await import("./league");
+    await freezeAllegianceSnapshotsIfLocked({
+      leagueId,
+      weekNumber,
+      games: opts.games,
+      forceOpsVerified: true,
+    });
+    await persistDurableFinalScores({
+      leagueId,
+      weekNumber,
+      weekResultId,
+      games: opts.games,
+      finalBoxes: opts.finalBoxes,
+      sportId: getLeague()?.sportId || "cfb",
+      scoreSource: opts.finalBoxes?.length ? "scoring_path_boxes" : "scoring_path",
+    });
+    // Phase 1A generator stub — always no-op (no events)
+    const { tryGenerateFanFavoriteRivalryExhibits } = await import(
+      "./museum/generator-stub"
+    );
+    await tryGenerateFanFavoriteRivalryExhibits({
+      leagueId,
+      weekNumber,
+      weekResultId,
+    });
+  } catch {
+    /* never fail scoring because Museum foundation failed */
   }
 
   const details: { name: string; points: number }[] = [];

@@ -585,6 +585,44 @@ export async function runAutoPublishCards(opts?: {
         continue;
       }
 
+      // Museum Phase 1A: allegiance snapshots (service role RPC). No events.
+      try {
+        const {
+          buildSnapshotGamePayloads,
+        } = await import("@/lib/museum/snapshots");
+        const { underdogSideFromCard } = await import("@/lib/museum/identity");
+        const { defaultSeasonYear } = await import("@/lib/trophies");
+        const { firstKickoffOnCardMs } = await import("@/lib/dates");
+        const payloads = buildSnapshotGamePayloads(games, sport);
+        const firstKickMs = firstKickoffOnCardMs(games);
+        await supabase.rpc("museum_rebuild_allegiance_snapshots", {
+          p_league_id: leagueId,
+          p_week_number: weekNumber,
+          p_season: defaultSeasonYear(),
+          p_sport_id: sport,
+          p_week_card_id: pub.weekCardId,
+          p_games: payloads.map((g) => ({
+            card_game_id: g.cardGameId,
+            provider_game_id: g.providerGameId,
+            game_identity_key: g.gameIdentityKey,
+            away_team_id: g.awayTeamId,
+            home_team_id: g.homeTeamId,
+            away_team_name: g.awayTeamName,
+            home_team_name: g.homeTeamName,
+            card_favorite: g.cardFavorite,
+            card_spread: g.cardSpread,
+            underdog_side: underdogSideFromCard(g.cardFavorite),
+            away_rank: g.awayRank,
+            home_rank: g.homeRank,
+            rank_source: g.rankSource,
+          })),
+          p_first_kickoff_at:
+            firstKickMs > 0 ? new Date(firstKickMs).toISOString() : null,
+        });
+      } catch {
+        /* migration pending or non-production — card still published */
+      }
+
       // Streak: consecutive pick'em weeks
       const prevStreak = Number(league.auto_publish_streak) || 0;
       const lastWeek = league.last_auto_publish_week;

@@ -9,7 +9,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "verify:museum-1a": "node scripts/verify-museum-phase1a.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.6.1",

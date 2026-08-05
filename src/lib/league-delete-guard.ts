@@ -107,6 +107,25 @@ export async function evaluateLeagueDelete(
     scoredWeeks = 0;
   }
 
+  // Permanent Museum history blocks hard-delete (Phase 1A+)
+  let museumEvents = 0;
+  try {
+    const { data: n } = await supabase.rpc("museum_league_event_count", {
+      p_league_id: leagueId,
+    });
+    museumEvents = Number(n) || 0;
+  } catch {
+    try {
+      const { count } = await supabase
+        .from("museum_events")
+        .select("id", { count: "exact", head: true })
+        .eq("league_id", leagueId);
+      museumEvents = count ?? 0;
+    } catch {
+      museumEvents = 0;
+    }
+  }
+
   const anyonePlayed = humans.some(
     (r) =>
       (r.total_points || 0) > 0 ||
@@ -139,8 +158,12 @@ export async function evaluateLeagueDelete(
     : null;
 
   // Disposable = solo + zero history. Not "preseason with friends."
+  // Museum permanent events always block hard-delete (no CASCADE to history).
   const disposable =
-    otherHumans === 0 && scoredWeeks === 0 && !anyonePlayed;
+    otherHumans === 0 &&
+    scoredWeeks === 0 &&
+    !anyonePlayed &&
+    museumEvents === 0;
 
   if (disposable) {
     return {
@@ -154,9 +177,11 @@ export async function evaluateLeagueDelete(
   }
 
   const reason =
-    scoredWeeks > 0 || anyonePlayed
-      ? "This room has real season history. Commissioners cannot erase it. Pass the keys if you need to step down — retirement is a community decision later."
-      : "Other players are in this room. The league belongs to the community. Pass the keys if you need to step down — you cannot delete their seat.";
+    museumEvents > 0
+      ? "This room has permanent Museum history. Commissioners cannot erase it. Pass the keys if you need to step down — retirement is a community decision later."
+      : scoredWeeks > 0 || anyonePlayed
+        ? "This room has real season history. Commissioners cannot erase it. Pass the keys if you need to step down — retirement is a community decision later."
+        : "Other players are in this room. The league belongs to the community. Pass the keys if you need to step down — you cannot delete their seat.";
 
   return {
     canHardDelete: false,
