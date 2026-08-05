@@ -935,6 +935,21 @@ export default function Home() {
       </Link>
 
               <Link
+                href="/museum"
+                className="group rounded-xl border border-stone-500/40 bg-black/40 backdrop-blur-sm p-6 hover:border-amber-700/50 hover:bg-amber-950/20 transition shadow-[0_0_40px_rgba(0,0,0,0.35)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-400"
+              >
+                <div className="text-xs uppercase tracking-wider text-stone-400/90 mb-2">
+                  Archive
+                </div>
+                <div className="text-lg font-semibold text-stone-200 group-hover:text-amber-100/90 transition">
+                  Museum
+                </div>
+                <p className="text-sm text-muted mt-2">
+                  Seasons · champions · rivalries · the room remembers
+                </p>
+              </Link>
+
+              <Link
                 href="/account"
                 className="group rounded-xl border border-sky-400/35 bg-sky-500/10 backdrop-blur-sm p-6 hover:border-sky-300/60 hover:bg-sky-500/15 transition shadow-[0_0_40px_rgba(56,189,248,0.08)] sm:col-span-2 lg:col-span-3"
               >

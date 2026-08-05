@@ -481,10 +481,11 @@ export default function Nav() {
   /**
    * Account menu (hamburger / desktop You) — manage yourself, not the game.
    * Game destinations live on bottom nav, desktop primary, or Home tiles.
+   * Order: Profile → Account Settings → Announcements → How to Play → Feedback
+   * (+ ops/staff). Announcements are Day-1 visible (not Gazette-gated).
    */
   const myProfileHref = playerId ? `/profile/${playerId}` : null;
   const accountLinks: NavLink[] = [
-    { href: "/account", label: "Account" },
     ...(myProfileHref
       ? [
           {
@@ -494,18 +495,14 @@ export default function Nav() {
           } as NavLink,
         ]
       : []),
-    ...(showNewsNav
-      ? [
-          {
-            href: "/announcements",
-            label: "Notifications",
-            badge: unreadCount,
-          } as NavLink,
-        ]
-      : []),
-    { href: "/rules", label: "Help / Rules" },
+    { href: "/account", label: "Account Settings" },
+    {
+      href: "/announcements",
+      label: "Announcements",
+      badge: unreadCount,
+    },
+    { href: "/rules", label: "How to Play" },
     { href: "/account#feedback", label: "Feedback / Report Issue" },
-    { href: "/account#about", label: "About War Room" },
     ...(ops
       ? [
           {
@@ -747,7 +744,8 @@ export default function Nav() {
                   <div className="absolute right-0 top-full mt-2 z-50 w-56 rounded-xl border border-border bg-card shadow-xl py-1">
                     {accountLinks.map((link) => {
                       const path = link.href.split("#")[0] || link.href;
-                      const isAccount = path === "/account" && !link.href.includes("#");
+                      const isAccountSettings =
+                        path === "/account" && !link.href.includes("#");
                       const active =
                         path === "/account"
                           ? pathname === "/account" ||
@@ -760,14 +758,14 @@ export default function Nav() {
                           prefetch={false}
                           onClick={() => setMoreOpen(false)}
                           className={`flex items-center justify-between px-3 py-2 text-sm hover:bg-card-hover transition ${
-                            isAccount
-                              ? "text-sky-200 font-semibold border-b border-border mb-0.5"
+                            isAccountSettings
+                              ? "text-sky-200 font-semibold"
                               : active
                                 ? "text-foreground font-medium"
                                 : "text-muted"
-                          } ${!isAccount ? link.className || "" : ""}`}
+                          } ${!isAccountSettings ? link.className || "" : ""}`}
                         >
-                          <span>{isAccount ? "⚙ Account" : link.label}</span>
+                          <span>{link.label}</span>
                           {link.badge != null && link.badge > 0 && (
                             <UnreadBadge count={link.badge} />
                           )}
@@ -918,7 +916,7 @@ export default function Nav() {
               <ul className="py-1 pb-2">
                 {accountLinks.map((link) => {
                   const path = link.href.split("#")[0] || link.href;
-                  const isAccount =
+                  const isAccountSettings =
                     path === "/account" && !link.href.includes("#");
                   const active =
                     path === "/account"
@@ -932,21 +930,21 @@ export default function Nav() {
                         prefetch={false}
                         onClick={() => closeChrome()}
                         className={`flex items-center justify-between gap-3 px-4 min-h-[48px] text-base transition touch-manipulation ${
-                          isAccount
+                          isAccountSettings
                             ? active
                               ? "bg-sky-500/15 text-sky-200 font-semibold"
                               : "text-sky-200/90 hover:bg-sky-500/10 font-semibold"
                             : active
                               ? "bg-card-hover text-foreground"
                               : "text-muted hover:bg-card-hover hover:text-foreground"
-                        } ${!isAccount ? link.className || "" : ""}`}
+                        } ${!isAccountSettings ? link.className || "" : ""}`}
                       >
                         <span
                           className={
-                            isAccount ? "font-semibold" : "font-medium"
+                            isAccountSettings ? "font-semibold" : "font-medium"
                           }
                         >
-                          {isAccount ? "⚙ Account" : link.label}
+                          {link.label}
                         </span>
                         {link.badge != null && link.badge > 0 && (
                           <UnreadBadge count={link.badge} />
