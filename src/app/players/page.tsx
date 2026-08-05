@@ -6,12 +6,14 @@ import PlayerLink from "@/components/PlayerLink";
 import { getSession, getLeague, isOps, isCommissioner } from "@/lib/league";
 import {
   loadLeagueRoster,
+  loadLeagueRosterFreshForced,
   updateMemberDivision,
   removeLeagueMember,
   autoBalanceDivisions,
   previewAutoBalanceDivisions,
   isDivisionAutoBalanceLocked,
   refreshStaffSessionFlags,
+  EVENT_ROSTER_DIVISIONS_UPDATED,
   LeagueRosterMember,
 } from "@/lib/cloud";
 import { Division } from "@/lib/types";
@@ -44,6 +46,8 @@ export default function PlayersPage() {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
+  /** True while Auto Balance mutation + post-save refresh is in flight */
+  const [balancing, setBalancing] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
   /** userId → Blue Falcon Count for kick risk */
   const [falconByUser, setFalconByUser] = useState<Record<string, number>>({});
@@ -55,9 +59,36 @@ export default function PlayersPage() {
     reason?: string;
   }>({ locked: false });
   const [balanceNote, setBalanceNote] = useState<string | null>(null);
+  /** Writes may have landed; re-read failed — offer Retry Refresh */
+  const [needsRetryRefresh, setNeedsRetryRefresh] = useState(false);
   const preseasonKickOk = isPreseasonCommishToolsAllowed();
 
-  async function reload() {
+  async function hydrateFalcons(roster: LeagueRosterMember[]) {
+    const falcon: Record<string, number> = {};
+    await Promise.all(
+      roster
+        .filter((m) => !m.isBot && m.userId)
+        .map(async (m) => {
+          try {
+            falcon[m.userId] = await hydrateBlueFalconFromCloud(m.userId);
+          } catch {
+            falcon[m.userId] = getBlueFalconCount(m.userId);
+          }
+        })
+    );
+    setFalconByUser(falcon);
+  }
+
+  /**
+   * Replace client roster immediately from an authoritative snapshot
+   * (post Auto Balance). Division columns recompute from this state.
+   */
+  function applyAuthoritativeRoster(roster: LeagueRosterMember[]) {
+    setPlayers(roster);
+    setNeedsRetryRefresh(false);
+  }
+
+  async function reload(opts?: { forceFresh?: boolean }) {
     setError(null);
     await refreshStaffSessionFlags();
     const session = getSession();
@@ -76,34 +107,48 @@ export default function PlayersPage() {
     }
 
     const [roster, scored, balLock] = await Promise.all([
-      loadLeagueRoster(),
+      opts?.forceFresh ? loadLeagueRosterFreshForced() : loadLeagueRoster(),
       hasOfficialScoredWeek(),
       isDivisionAutoBalanceLocked(session.leagueId).catch(() => ({
         locked: false as boolean,
         reason: undefined as string | undefined,
       })),
     ]);
-    setPlayers(roster);
+    applyAuthoritativeRoster(roster);
     setShowSeasonPts(scored);
     setAutoBalanceLock({
       locked: !!balLock.locked,
       reason: balLock.reason,
     });
-    // Blue Falcon counts for preseason kick risk
-    const falcon: Record<string, number> = {};
-    await Promise.all(
-      roster
-        .filter((m) => !m.isBot && m.userId)
-        .map(async (m) => {
-          try {
-            falcon[m.userId] = await hydrateBlueFalconFromCloud(m.userId);
-          } catch {
-            falcon[m.userId] = getBlueFalconCount(m.userId);
-          }
-        })
-    );
-    setFalconByUser(falcon);
+    await hydrateFalcons(roster);
     setLoading(false);
+  }
+
+  async function retryRosterRefresh() {
+    if (busy || balancing) return;
+    setBusy(true);
+    setError(null);
+    setBalanceNote(null);
+    try {
+      const roster = await loadLeagueRosterFreshForced();
+      if (!roster.length) {
+        setError(
+          "Roster refresh returned empty. Check your connection and try again."
+        );
+        setNeedsRetryRefresh(true);
+      } else {
+        applyAuthoritativeRoster(roster);
+        setBalanceNote(
+          `Roster refreshed from cloud (${roster.length} members).`
+        );
+        await hydrateFalcons(roster);
+        flashSaved();
+      }
+    } catch {
+      setError("Roster refresh failed. Tap Retry Refresh again.");
+      setNeedsRetryRefresh(true);
+    }
+    setBusy(false);
   }
 
   useEffect(() => {
@@ -123,6 +168,27 @@ export default function PlayersPage() {
     return () => {
       cancelled = true;
       disarm();
+    };
+  }, []);
+
+  // Same-device: other mounts that emit division updates (defensive)
+  useEffect(() => {
+    function onRosterDivisions(ev: Event) {
+      const detail = (ev as CustomEvent).detail as
+        | { leagueId?: string; roster?: LeagueRosterMember[] | null }
+        | undefined;
+      const lid = getSession()?.leagueId;
+      if (!lid || !detail?.leagueId || detail.leagueId !== lid) return;
+      if (detail.roster && Array.isArray(detail.roster) && detail.roster.length) {
+        applyAuthoritativeRoster(detail.roster);
+      }
+    }
+    window.addEventListener(EVENT_ROSTER_DIVISIONS_UPDATED, onRosterDivisions);
+    return () => {
+      window.removeEventListener(
+        EVENT_ROSTER_DIVISIONS_UPDATED,
+        onRosterDivisions
+      );
     };
   }, []);
 
@@ -190,10 +256,13 @@ export default function PlayersPage() {
   }
 
   async function handleAutoBalance() {
-    if (!canManageDivs || busy) return;
+    // In-flight guard: busy OR balancing blocks double-tap
+    if (!canManageDivs || busy || balancing) return;
     setBusy(true);
+    setBalancing(true);
     setError(null);
     setBalanceNote(null);
+    setNeedsRetryRefresh(false);
 
     const preview = await previewAutoBalanceDivisions();
     if (!preview.ok) {
@@ -201,6 +270,7 @@ export default function PlayersPage() {
       if (preview.locked) {
         setAutoBalanceLock({ locked: true, reason: preview.error });
       }
+      setBalancing(false);
       setBusy(false);
       return;
     }
@@ -209,7 +279,14 @@ export default function PlayersPage() {
       setBalanceNote(
         `Already balanced and verified: ${preview.afterLabel || "—"}. No players moved.`
       );
-      await reload();
+      // Reconcile from cloud without pointless reshuffle
+      try {
+        const fresh = await loadLeagueRosterFreshForced();
+        if (fresh.length) applyAuthoritativeRoster(fresh);
+      } catch {
+        /* keep current */
+      }
+      setBalancing(false);
       setBusy(false);
       return;
     }
@@ -231,28 +308,78 @@ export default function PlayersPage() {
       "Continue?",
     ];
     if (!confirm(confLines.join("\n"))) {
+      setBalancing(false);
       setBusy(false);
       return;
     }
 
     const result = await autoBalanceDivisions();
-    if (!result.ok) {
-      setError(result.error || "Auto-balance failed");
-      await reload();
-    } else if (result.alreadyBalanced) {
-      setBalanceNote(
-        `Already balanced and verified: ${result.verifiedLabel || "—"}.`
-      );
-      await reload();
+
+    if (result.ok) {
+      // Prefer mutation-returned authoritative roster (same as post-save verify).
+      // Never wait for logout / hard refresh / router alone.
+      if (result.roster && result.roster.length > 0) {
+        applyAuthoritativeRoster(result.roster);
+        void hydrateFalcons(result.roster);
+      } else {
+        try {
+          const fresh = await loadLeagueRosterFreshForced();
+          if (fresh.length) {
+            applyAuthoritativeRoster(fresh);
+            void hydrateFalcons(fresh);
+          } else {
+            setNeedsRetryRefresh(true);
+            setError(
+              "Balance saved, but roster refresh returned empty. Tap Retry Refresh."
+            );
+            setBalancing(false);
+            setBusy(false);
+            return;
+          }
+        } catch {
+          setNeedsRetryRefresh(true);
+          setError(
+            "Balance saved, but roster refresh failed. Tap Retry Refresh."
+          );
+          setBalancing(false);
+          setBusy(false);
+          return;
+        }
+      }
+
+      if (result.alreadyBalanced) {
+        setBalanceNote(
+          `Already balanced and verified: ${result.verifiedLabel || "—"}.`
+        );
+      } else {
+        setBalanceNote(
+          `Balanced and verified: ${result.verifiedLabel || "—"}${
+            result.moveCount != null ? ` (${result.moveCount} moved).` : "."
+          }`
+        );
+        flashSaved();
+      }
+    } else if (result.savedButRefreshFailed) {
+      setError(result.error || "Saved, but refresh failed.");
+      setNeedsRetryRefresh(true);
+      // Do not claim balanced; do not invent columns
     } else {
-      setBalanceNote(
-        `Balanced and verified: ${result.verifiedLabel || "—"}${
-          result.moveCount != null ? ` (${result.moveCount} moved).` : "."
-        }`
-      );
-      flashSaved();
-      await reload();
+      setError(result.error || "Auto-balance failed");
+      // Restore / show authoritative truth when available
+      if (result.roster && result.roster.length > 0) {
+        applyAuthoritativeRoster(result.roster);
+        void hydrateFalcons(result.roster);
+      } else {
+        try {
+          const fresh = await loadLeagueRosterFreshForced();
+          if (fresh.length) applyAuthoritativeRoster(fresh);
+        } catch {
+          setNeedsRetryRefresh(true);
+        }
+      }
     }
+
+    setBalancing(false);
     setBusy(false);
   }
 
@@ -385,28 +512,48 @@ export default function PlayersPage() {
 
         {canManageDivs && (
           <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-      <p className="text-xs text-muted max-w-md">
-              {autoBalanceLock.locked
-                ? autoBalanceLock.reason ||
-                  "Divisions are locked because the season has started. Manual moves still work if you must."
-                : "New joiners land in the least-full division automatically. Auto Balance moves the fewest players needed to even the four groups (verified after save)."}
+            <p className="text-xs text-muted max-w-md">
+              {balancing
+                ? "Balancing divisions… saving assignments and refreshing the roster."
+                : autoBalanceLock.locked
+                  ? autoBalanceLock.reason ||
+                    "Divisions are locked because the season has started. Manual moves still work if you must."
+                  : "New joiners land in the least-full division automatically. Auto Balance moves the fewest players needed to even the four groups (verified after save)."}
             </p>
-      <button
-              type="button"
-              onClick={() => void handleAutoBalance()}
-              disabled={
-                busy || players.length === 0 || autoBalanceLock.locked
-              }
-              title={
-                autoBalanceLock.locked
-                  ? autoBalanceLock.reason || "Season started - locked"
-                  : "Minimum-move Auto Balance"
-              }
-              className="text-xs px-3 py-1.5 rounded-lg border border-border text-muted hover:text-foreground disabled:opacity-50"
-            >
-              Auto-balance divisions
-            </button>
-      </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {needsRetryRefresh && (
+                <button
+                  type="button"
+                  onClick={() => void retryRosterRefresh()}
+                  disabled={busy || balancing}
+                  className="text-xs px-3 py-1.5 rounded-lg border border-amber-400/50 text-amber-200 hover:text-foreground disabled:opacity-50"
+                >
+                  Retry Refresh
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => void handleAutoBalance()}
+                disabled={
+                  busy ||
+                  balancing ||
+                  players.length === 0 ||
+                  autoBalanceLock.locked
+                }
+                aria-busy={balancing}
+                title={
+                  autoBalanceLock.locked
+                    ? autoBalanceLock.reason || "Season started - locked"
+                    : balancing
+                      ? "Auto Balance in progress"
+                      : "Minimum-move Auto Balance"
+                }
+                className="text-xs px-3 py-1.5 rounded-lg border border-border text-muted hover:text-foreground disabled:opacity-50"
+              >
+                {balancing ? "Balancing…" : "Auto-balance divisions"}
+              </button>
+            </div>
+          </div>
         )}
 
         {balanceNote && (

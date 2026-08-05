@@ -123,6 +123,12 @@ const playersInflight = new Map<
 // Typed as object[] here — LeagueRosterMember is declared later in this file
 const rosterCache = new Map<string, CacheEntry<object[]>>();
 const rosterInflight = new Map<string, Promise<object[]>>();
+/**
+ * Bumped on every roster invalidation. In-flight fetches capture the gen at
+ * start and must not cacheSet if a newer invalidation landed (Auto Balance
+ * race: stale pre-write read finishing after post-write refresh).
+ */
+const rosterGeneration = new Map<string, number>();
 /** Join times for titles — single-flight + short TTL (avoids 404 spam). */
 const joinedAtCache = new Map<string, CacheEntry<Map<string, string>>>();
 const joinedAtInflight = new Map<string, Promise<Map<string, string>>>();
@@ -266,6 +272,9 @@ export function invalidateCloudWeekCaches(leagueId?: string | null) {
     playersInflight.clear();
     rosterCache.clear();
     rosterInflight.clear();
+    for (const k of [...rosterGeneration.keys()]) {
+      rosterGeneration.set(k, (rosterGeneration.get(k) || 0) + 1);
+    }
     joinedAtCache.clear();
     joinedAtInflight.clear();
     // Do not reset leagueFirstJoinsAvailable — schema does not change mid-session
@@ -286,6 +295,10 @@ export function invalidateCloudWeekCaches(leagueId?: string | null) {
   playersInflight.delete(leagueId);
   rosterCache.delete(leagueId);
   rosterInflight.delete(leagueId);
+  rosterGeneration.set(
+    leagueId,
+    (rosterGeneration.get(leagueId) || 0) + 1
+  );
   joinedAtCache.delete(leagueId);
   joinedAtInflight.delete(leagueId);
 }
@@ -3588,6 +3601,15 @@ async function loadLeagueRosterFresh(
   leagueId: string
 ): Promise<LeagueRosterMember[]> {
   const supabase = createClient();
+  // Capture at start — post-write invalidation must not be overwritten by
+  // this response if it was planned against a pre-write snapshot.
+  const genAtStart = rosterGeneration.get(leagueId) || 0;
+  const commitRoster = (mapped: LeagueRosterMember[]) => {
+    if ((rosterGeneration.get(leagueId) || 0) === genAtStart) {
+      cacheSet(rosterCache, leagueId, mapped);
+    }
+    return mapped;
+  };
 
   // Preferred: security-definer roster (includes bots reliably)
   // Do NOT await league_first_joins first — that was a 2-query waterfall before
@@ -3665,8 +3687,7 @@ async function loadLeagueRosterFresh(
           joinedAt: m.joinedAt || joinedMap.get(m.userId) || null,
         }));
       }
-      cacheSet(rosterCache, leagueId, mapped);
-      return mapped;
+      return commitRoster(mapped);
     }
   }
 
@@ -3704,8 +3725,7 @@ async function loadLeagueRosterFresh(
   }
 
   if (!rows?.length) {
-    cacheSet(rosterCache, leagueId, []);
-    return [];
+    return commitRoster([]);
   }
 
   // Resolve names if embed missing
@@ -3775,8 +3795,7 @@ async function loadLeagueRosterFresh(
       joinedAt: m.joinedAt || joinedMap.get(m.userId) || null,
     }));
   }
-  cacheSet(rosterCache, leagueId, mapped);
-  return mapped;
+  return commitRoster(mapped);
 }
 
 /** Commissioner appoints mods/deputies; staff can mute for Locker Room. */
@@ -4589,25 +4608,84 @@ export async function applyRandomBotChaosForWeek(
 /**
  * Drop roster cache so the next load is authoritative from Supabase.
  * Use after any memberships.division write (manual move or Auto Balance).
+ * Also drops standings players cache for that league (division fields).
  */
 export function invalidateRosterCache(leagueId?: string | null) {
   if (!leagueId) {
     rosterCache.clear();
     rosterInflight.clear();
+    for (const k of [...rosterGeneration.keys()]) {
+      rosterGeneration.set(k, (rosterGeneration.get(k) || 0) + 1);
+    }
+    playersCache.clear();
+    playersInflight.clear();
     return;
   }
   rosterCache.delete(leagueId);
   rosterInflight.delete(leagueId);
+  rosterGeneration.set(
+    leagueId,
+    (rosterGeneration.get(leagueId) || 0) + 1
+  );
+  // Division changes must not leave standings/players views on stale divisions
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { logPlayersCacheInvalidate } =
+      require("./profile-nav-trace") as typeof import("./profile-nav-trace");
+    logPlayersCacheInvalidate(
+      `roster-invalidate league=${String(leagueId).slice(0, 8)}`
+    );
+  } catch {
+    /* ok */
+  }
+  playersCache.delete(leagueId);
+  playersInflight.delete(leagueId);
 }
 
-/** Force a network roster read (bypasses TTL cache). */
+/** Narrow event — same-device remounts can re-read without a global storm. */
+export const EVENT_ROSTER_DIVISIONS_UPDATED =
+  "warroom-roster-divisions-updated";
+
+export function emitRosterDivisionsUpdated(
+  leagueId: string,
+  roster?: LeagueRosterMember[] | null
+) {
+  if (typeof window === "undefined" || !leagueId) return;
+  try {
+    window.dispatchEvent(
+      new CustomEvent(EVENT_ROSTER_DIVISIONS_UPDATED, {
+        detail: { leagueId, roster: roster || null },
+      })
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Seed cache with a verified roster (post Auto Balance). Respects generation. */
+export function seedRosterCache(
+  leagueId: string,
+  roster: LeagueRosterMember[]
+) {
+  if (!leagueId) return;
+  cacheSet(rosterCache, leagueId, roster);
+}
+
+/** Force a network roster read (bypasses TTL cache; ignores stale inflight). */
 export async function loadLeagueRosterFreshForced(): Promise<
   LeagueRosterMember[]
 > {
   const session = getSession();
   if (!session?.leagueId) return [];
-  invalidateRosterCache(session.leagueId);
-  return loadLeagueRoster();
+  const leagueId = session.leagueId;
+  invalidateRosterCache(leagueId);
+  // Call fresh loader directly — do not join a concurrent loadLeagueRoster
+  // inflight that may have started before the write batch.
+  return withTimeout(
+    loadLeagueRosterFresh(leagueId),
+    8_000,
+    [] as LeagueRosterMember[]
+  );
 }
 
 /**
@@ -4842,6 +4920,16 @@ export type AutoBalanceResult = {
   /** True when some row writes may have applied before failure */
   partial?: boolean;
   updated?: number;
+  /**
+   * Authoritative roster after successful balance/verify.
+   * Callers must replace client roster state with this (or a fresh re-fetch).
+   */
+  roster?: LeagueRosterMember[];
+  /**
+   * Writes completed but post-save roster read failed — do not show balanced UI;
+   * offer Retry Refresh.
+   */
+  savedButRefreshFailed?: boolean;
 };
 
 /**
@@ -4955,6 +5043,13 @@ export async function autoBalanceDivisions(): Promise<AutoBalanceResult> {
     // No writes — still verify live state
     invalidateRosterCache(leagueId);
     const check = await loadLeagueRosterFreshForced();
+    if (!check.length) {
+      return {
+        ok: false,
+        error: "Could not re-read roster to verify balance. Tap Retry Refresh.",
+        savedButRefreshFailed: true,
+      };
+    }
     const { counts, invalid } = countByDivisionStrict(
       check.map((m) => ({ division: m.division }))
     );
@@ -4968,8 +5063,11 @@ export async function autoBalanceDivisions(): Promise<AutoBalanceResult> {
         ok: false,
         error: `League is not balanced on re-read (${formatDivisionCounts(counts)}). Try again.`,
         verifiedCounts: counts,
+        roster: check,
       };
     }
+    seedRosterCache(leagueId, check);
+    emitRosterDivisionsUpdated(leagueId, check);
     return {
       ok: true,
       alreadyBalanced: true,
@@ -4977,6 +5075,7 @@ export async function autoBalanceDivisions(): Promise<AutoBalanceResult> {
       updated: 0,
       verifiedCounts: counts,
       verifiedLabel: formatDivisionCounts(counts),
+      roster: check,
     };
   }
 
@@ -5032,8 +5131,22 @@ export async function autoBalanceDivisions(): Promise<AutoBalanceResult> {
       ok: false,
       partial: true,
       updated,
+      savedButRefreshFailed: true,
+      moveCount: plan.moveCount,
       error:
-        "Moves may have been saved but verification reload failed. Review divisions carefully.",
+        "Assignments were saved, but the roster could not be reloaded. Tap Retry Refresh — do not assume the on-screen columns are current.",
+    };
+  }
+
+  if (!verified.length) {
+    return {
+      ok: false,
+      partial: true,
+      updated,
+      savedButRefreshFailed: true,
+      moveCount: plan.moveCount,
+      error:
+        "Assignments were saved, but the roster re-read returned empty. Tap Retry Refresh.",
     };
   }
 
@@ -5042,21 +5155,27 @@ export async function autoBalanceDivisions(): Promise<AutoBalanceResult> {
   );
 
   if (verified.length !== roster.length) {
+    seedRosterCache(leagueId, verified);
+    emitRosterDivisionsUpdated(leagueId, verified);
     return {
       ok: false,
       partial: true,
       updated,
       verifiedCounts: counts,
+      roster: verified,
       error: `Roster size changed during balance (${roster.length} → ${verified.length}). Review divisions.`,
     };
   }
 
   if (invalid > 0) {
+    seedRosterCache(leagueId, verified);
+    emitRosterDivisionsUpdated(leagueId, verified);
     return {
       ok: false,
       partial: true,
       updated,
       verifiedCounts: counts,
+      roster: verified,
       error: `Verification failed: ${invalid} membership(s) still have invalid division. Counts: ${formatDivisionCounts(counts)}.`,
     };
   }
@@ -5067,11 +5186,14 @@ export async function autoBalanceDivisions(): Promise<AutoBalanceResult> {
       invalid,
     })
   ) {
+    seedRosterCache(leagueId, verified);
+    emitRosterDivisionsUpdated(leagueId, verified);
     return {
       ok: false,
       partial: true,
       updated,
       verifiedCounts: counts,
+      roster: verified,
       error: `Verification failed — not balanced. Actual: ${formatDivisionCounts(counts)}.`,
     };
   }
@@ -5081,15 +5203,21 @@ export async function autoBalanceDivisions(): Promise<AutoBalanceResult> {
   for (const m of verified) {
     const want = planned.get(m.membershipId);
     if (!want || m.division !== want) {
+      seedRosterCache(leagueId, verified);
+      emitRosterDivisionsUpdated(leagueId, verified);
       return {
         ok: false,
         partial: true,
         updated,
         verifiedCounts: counts,
+        roster: verified,
         error: `Verification failed — saved assignment does not match the approved plan. Actual: ${formatDivisionCounts(counts)}.`,
       };
     }
   }
+
+  seedRosterCache(leagueId, verified);
+  emitRosterDivisionsUpdated(leagueId, verified);
 
   return {
     ok: true,
@@ -5098,6 +5226,7 @@ export async function autoBalanceDivisions(): Promise<AutoBalanceResult> {
     verifiedCounts: counts,
     verifiedLabel: formatDivisionCounts(counts),
     alreadyBalanced: false,
+    roster: verified,
   };
 }
 
