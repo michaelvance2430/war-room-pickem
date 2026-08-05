@@ -3,11 +3,60 @@
 -- Run once in Supabase → SQL Editor → Run
 --
 -- Creates permanent event tables, allegiance snapshots, durable
--- final scores, RLS, security-definer RPCs, season-reset safety.
+-- final scores, RLS, security-definer RPCs.
 --
--- Does NOT insert any museum_events rows.
+-- Does NOT insert any museum_events / participants rows.
 -- Does NOT enable Phase 1B generation.
+-- Does NOT delete/update competitive production data at apply time.
+--
+-- Transactional: entire script is one BEGIN…COMMIT.
 -- ============================================================
+
+begin;
+
+-- ─── Fail clearly if required dependencies are missing ───────
+do $$
+begin
+  if to_regclass('public.leagues') is null then
+    raise exception 'Museum Phase 1A blocked: public.leagues missing';
+  end if;
+  if to_regclass('public.memberships') is null then
+    raise exception 'Museum Phase 1A blocked: public.memberships missing';
+  end if;
+  if to_regclass('public.profiles') is null then
+    raise exception 'Museum Phase 1A blocked: public.profiles missing';
+  end if;
+  if to_regclass('public.week_cards') is null then
+    raise exception 'Museum Phase 1A blocked: public.week_cards missing';
+  end if;
+  if to_regclass('public.card_games') is null then
+    raise exception 'Museum Phase 1A blocked: public.card_games missing';
+  end if;
+  if to_regclass('public.week_results') is null then
+    raise exception 'Museum Phase 1A blocked: public.week_results missing';
+  end if;
+  if to_regclass('public.game_results') is null then
+    raise exception 'Museum Phase 1A blocked: public.game_results missing';
+  end if;
+  if to_regclass('public.profile_favorite_teams') is null then
+    raise exception
+      'Museum Phase 1A blocked: public.profile_favorite_teams missing — run supabase/profile-favorite-teams.sql first';
+  end if;
+  if not exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'memberships' and column_name = 'is_bot'
+  ) then
+    raise exception
+      'Museum Phase 1A blocked: memberships.is_bot missing — run trial-bots / FIX-PRODUCTION-SCHEMA-DRIFT first';
+  end if;
+  if not exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'memberships' and column_name = 'is_deputy'
+  ) then
+    raise exception
+      'Museum Phase 1A blocked: memberships.is_deputy missing — run deputy-ops / staff-roles-setup first';
+  end if;
+end $$;
 
 -- ─── Helpers ─────────────────────────────────────────────────
 
@@ -46,7 +95,6 @@ as $$
 $$;
 
 -- Production gate (server-side belt). Client also gates via isProductionMode.
--- Schemas vary: mode / is_test / settings columns may be absent.
 create or replace function public.museum_league_is_production(p_league_id uuid)
 returns boolean
 language plpgsql
@@ -67,7 +115,6 @@ begin
     return false;
   end if;
 
-  -- Prefer optional columns when present (dynamic to avoid hard schema deps)
   begin
     execute $q$
       select
@@ -94,7 +141,6 @@ begin
     null;
   end;
 
-  -- settings / sport_settings JSON flags when present
   begin
     execute $q$
       select coalesce(
@@ -124,15 +170,34 @@ begin
 end;
 $$;
 
+-- First kickoff from published card_games.start_time (DB truth, not client claim)
+create or replace function public.museum_card_first_kickoff(
+  p_league_id uuid,
+  p_week_number int
+)
+returns timestamptz
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select min(cg.start_time::timestamptz)
+  from public.week_cards wc
+  join public.card_games cg on cg.week_card_id = wc.id
+  where wc.league_id = p_league_id
+    and wc.week_number = p_week_number
+    and cg.start_time is not null
+    and length(trim(cg.start_time)) > 0
+    and cg.start_time ~ '^\d{4}-\d{2}-\d{2}'
+$$;
+
 -- ─── Durable final scores (survives season reset) ────────────
--- Chosen over extending game_results alone because:
---   * week_results/game_results are wiped on season reset
---   * Museum retry needs provider + team identity independent of card_games UUID
---   * game_results remains ATS-only (winner) — scoring behavior unchanged
+-- Supporting row: ON DELETE CASCADE from leagues so empty test leagues
+-- do not leave orphans. Permanent museum_events use RESTRICT (below).
 
 create table if not exists public.game_final_scores (
   id uuid primary key default gen_random_uuid(),
-  league_id uuid not null,
+  league_id uuid not null references public.leagues (id) on delete cascade,
   sport_id text not null,
   season int not null check (season >= 2000 and season <= 2100),
   week_number int not null check (week_number >= 0 and week_number <= 30),
@@ -154,9 +219,7 @@ create table if not exists public.game_final_scores (
     check (char_length(score_source) between 2 and 64),
   source_timestamp timestamptz null,
   finalized_at timestamptz not null default now(),
-  -- null = unknown (default); true/false only when provider establishes OT
   overtime boolean null,
-  -- Published-card context for Phase 1B (spread upset needs card favorite)
   card_favorite text null check (card_favorite is null or card_favorite in ('home', 'away')),
   card_spread numeric null,
   underdog_side text null check (underdog_side is null or underdog_side in ('home', 'away')),
@@ -177,9 +240,10 @@ create index if not exists game_final_scores_provider_idx
   where provider_game_id is not null;
 
 comment on table public.game_final_scores is
-  'Durable numeric finals for Museum retry. Written only via authorized scoring RPC. Survives season reset. ATS winner remains on game_results.';
+  'Durable numeric finals for Museum retry. Survives season reset. CASCADE with league delete only when museum_events RESTRICT allows (no permanent events). ATS winner remains on game_results.';
 
 -- Optional convenience columns on game_results (nullable; older rows stay null)
+-- Does NOT rewrite existing winner / ATS rows.
 alter table public.game_results
   add column if not exists away_score int null,
   add column if not exists home_score int null,
@@ -191,7 +255,7 @@ alter table public.game_results
 
 create table if not exists public.museum_allegiance_snapshots (
   id uuid primary key default gen_random_uuid(),
-  league_id uuid not null,
+  league_id uuid not null references public.leagues (id) on delete cascade,
   sport_id text not null,
   season int not null check (season >= 2000 and season <= 2100),
   week_number int not null check (week_number >= 0 and week_number <= 30),
@@ -213,7 +277,6 @@ create table if not exists public.museum_allegiance_snapshots (
   status text not null check (status in ('prelock', 'frozen')),
   snapshot_at timestamptz not null default now(),
   frozen_at timestamptz null,
-  -- Card context preserved for Phase 1B templates
   card_favorite text null check (card_favorite is null or card_favorite in ('home', 'away')),
   card_spread numeric null,
   underdog_side text null check (underdog_side is null or underdog_side in ('home', 'away')),
@@ -228,7 +291,6 @@ create table if not exists public.museum_allegiance_snapshots (
     )
 );
 
--- One active row per user per game identity per week (status-aware)
 create unique index if not exists museum_allegiance_prelock_uidx
   on public.museum_allegiance_snapshots (
     league_id, week_number, game_identity_key, user_id
@@ -249,16 +311,17 @@ create index if not exists museum_allegiance_provider_idx
   where provider_game_id is not null;
 
 comment on table public.museum_allegiance_snapshots is
-  'Fan-favorite allegiance frozen at card publish (prelock) then first kickoff (frozen). Never overwrite frozen rows.';
+  'Fan-favorite allegiance: prelock at publish, frozen at first kickoff. CASCADE with league when no museum_events block delete. Never overwrite frozen via publish.';
 
 comment on column public.museum_allegiance_snapshots.status is
   'prelock = published before first kickoff (rebuildable). frozen = immutable after first kickoff. Do not call prelock "locked".';
 
 -- ─── Permanent Museum events (Phase 1A empty) ────────────────
+-- RESTRICT league delete when any permanent event exists.
 
 create table if not exists public.museum_events (
   id uuid primary key default gen_random_uuid(),
-  league_id uuid not null,
+  league_id uuid not null references public.leagues (id) on delete restrict,
   sport_id text not null,
   season int not null check (season >= 2000 and season <= 2100),
   week_number int not null check (week_number >= 0 and week_number <= 30),
@@ -290,12 +353,10 @@ create table if not exists public.museum_events (
   created_at timestamptz not null default now()
 );
 
--- One rivalry event per league + provider game
 create unique index if not exists museum_events_provider_uidx
   on public.museum_events (league_id, event_type, source_provider_game_id)
   where source_provider_game_id is not null;
 
--- Fallback when provider id absent
 create unique index if not exists museum_events_identity_uidx
   on public.museum_events (league_id, event_type, season, week_number, game_identity_key);
 
@@ -306,7 +367,7 @@ create index if not exists museum_events_league_type_idx
   on public.museum_events (league_id, event_type, finalized_at desc);
 
 comment on table public.museum_events is
-  'Permanent Museum history. Phase 1A creates schema only — no generation. Survives season reset. No ON DELETE CASCADE from leagues.';
+  'Permanent Museum history. ON DELETE RESTRICT from leagues. NOT wiped by season reset. Phase 1A inserts zero rows.';
 
 create table if not exists public.museum_event_participants (
   id uuid primary key default gen_random_uuid(),
@@ -335,7 +396,37 @@ create index if not exists museum_event_participants_user_idx
   where user_id is not null;
 
 comment on table public.museum_event_participants is
-  'Queryable historical participants for Museum events. user_id SET NULL on account delete; display_name_snapshot retained.';
+  'Participants cascade with parent event only. user_id SET NULL on account delete; display_name_snapshot retained.';
+
+-- If tables already existed from a prior partial apply without FKs, attach them.
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'museum_events_league_id_fkey'
+  ) then
+    alter table public.museum_events
+      add constraint museum_events_league_id_fkey
+      foreign key (league_id) references public.leagues (id) on delete restrict;
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint where conname = 'museum_allegiance_snapshots_league_id_fkey'
+  ) then
+    alter table public.museum_allegiance_snapshots
+      add constraint museum_allegiance_snapshots_league_id_fkey
+      foreign key (league_id) references public.leagues (id) on delete cascade;
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint where conname = 'game_final_scores_league_id_fkey'
+  ) then
+    alter table public.game_final_scores
+      add constraint game_final_scores_league_id_fkey
+      foreign key (league_id) references public.leagues (id) on delete cascade;
+  end if;
+exception when others then
+  raise exception 'Museum Phase 1A blocked attaching league FKs: %', sqlerrm;
+end $$;
 
 -- ─── RLS ─────────────────────────────────────────────────────
 
@@ -344,7 +435,6 @@ alter table public.museum_allegiance_snapshots enable row level security;
 alter table public.museum_events enable row level security;
 alter table public.museum_event_participants enable row level security;
 
--- Members read own league only
 drop policy if exists "Members read game final scores" on public.game_final_scores;
 create policy "Members read game final scores"
   on public.game_final_scores for select to authenticated
@@ -373,7 +463,6 @@ create policy "Members read museum event participants"
   );
 
 -- NO client insert/update/delete policies on permanent Museum tables.
--- Writes only via security definer functions below.
 
 grant select on public.game_final_scores to authenticated;
 grant select on public.museum_allegiance_snapshots to authenticated;
@@ -381,8 +470,8 @@ grant select on public.museum_events to authenticated;
 grant select on public.museum_event_participants to authenticated;
 
 -- ─── RPC: rebuild pre-lock allegiance snapshots ──────────────
--- Payload: jsonb array of games with resolved canonical team ids (client match),
--- re-validated server-side against profile_favorite_teams + memberships.
+-- Team IDs in JSON are a filter only. Supporter rows come from DB:
+-- memberships ∩ profile_favorite_teams ∩ profiles.display_name.
 
 create or replace function public.museum_rebuild_allegiance_snapshots(
   p_league_id uuid,
@@ -403,6 +492,7 @@ declare
   v_frozen int := 0;
   v_inserted int := 0;
   v_should_freeze boolean := false;
+  v_db_kickoff timestamptz;
   g jsonb;
   v_game_key text;
   v_provider text;
@@ -418,6 +508,7 @@ declare
   v_home_rank int;
   v_rank_source text;
   v_row_count int;
+  v_card_ok boolean := false;
 begin
   if p_league_id is null or p_week_number is null or p_season is null
      or p_sport_id is null or p_week_card_id is null then
@@ -426,7 +517,7 @@ begin
 
   -- Authenticated ops OR service_role (auto-publish cron)
   if coalesce(auth.role(), '') = 'service_role' then
-    null; -- system path
+    null;
   elsif v_uid is null then
     raise exception 'Not authenticated';
   elsif not public.museum_is_league_ops(p_league_id) then
@@ -441,6 +532,19 @@ begin
       'inserted', 0,
       'frozen', false
     );
+  end if;
+
+  -- week_card must belong to this league + week (DB truth)
+  select exists (
+    select 1
+    from public.week_cards wc
+    where wc.id = p_week_card_id
+      and wc.league_id = p_league_id
+      and wc.week_number = p_week_number
+  ) into v_card_ok;
+
+  if not v_card_ok then
+    raise exception 'week_card_id does not belong to league/week';
   end if;
 
   -- Frozen week: never rewrite
@@ -460,12 +564,18 @@ begin
     );
   end if;
 
-  -- If first kickoff already passed, rebuild then freeze (late publish)
-  if p_first_kickoff_at is not null and p_first_kickoff_at <= now() then
+  -- Freeze decision from DB card kickoffs (not client claim alone)
+  v_db_kickoff := public.museum_card_first_kickoff(p_league_id, p_week_number);
+  if v_db_kickoff is not null and v_db_kickoff <= now() then
+    v_should_freeze := true;
+  elsif p_first_kickoff_at is not null
+        and p_first_kickoff_at <= now()
+        and v_db_kickoff is null then
+    -- No parseable start_time on card rows; allow ops late-publish freeze signal
     v_should_freeze := true;
   end if;
 
-  -- Replace all pre-lock snapshots for this week
+  -- Replace ONLY pre-lock snapshots for this league+week (not frozen)
   delete from public.museum_allegiance_snapshots
   where league_id = p_league_id
     and week_number = p_week_number
@@ -493,6 +603,18 @@ begin
     exception when others then
       v_card_game_id := null;
     end;
+
+    -- If card_game_id supplied, it must belong to this week_card
+    if v_card_game_id is not null then
+      if not exists (
+        select 1 from public.card_games cg
+        where cg.id = v_card_game_id
+          and cg.week_card_id = p_week_card_id
+      ) then
+        continue;
+      end if;
+    end if;
+
     v_favorite := nullif(trim(g->>'card_favorite'), '');
     if v_favorite is not null and v_favorite not in ('home', 'away') then
       v_favorite := null;
@@ -518,14 +640,17 @@ begin
     end;
     v_rank_source := nullif(trim(g->>'rank_source'), '');
 
-    -- Require confident canonical both sides (client must send only confident matches)
     if v_away_id is null or v_home_id is null then
       continue;
     end if;
     if v_away_id = 'no-team' or v_home_id = 'no-team' then
       continue;
     end if;
-    if v_game_key is null then
+    if v_away_id = v_home_id then
+      continue;
+    end if;
+    -- Identity key: prefer provider; never invent from untrusted free text alone
+    if v_game_key is null or length(v_game_key) = 0 then
       v_game_key := coalesce(v_provider, v_away_id || '|' || v_home_id);
     end if;
 
@@ -580,7 +705,6 @@ begin
       and f.team_id is not null
       and f.team_id <> 'no-team'
       and f.team_id in (v_away_id, v_home_id)
-      -- Exclude guest-like ids if ever present as text
       and m.user_id::text not like 'guest-%'
       and m.user_id::text not like 'eyes-%';
 
@@ -589,6 +713,7 @@ begin
   end loop;
 
   if v_should_freeze then
+    -- In-place status change; does NOT insert a second row set
     update public.museum_allegiance_snapshots
     set status = 'frozen',
         frozen_at = now()
@@ -607,6 +732,7 @@ end;
 $$;
 
 revoke all on function public.museum_rebuild_allegiance_snapshots(uuid, int, int, text, uuid, jsonb, timestamptz) from public;
+revoke all on function public.museum_rebuild_allegiance_snapshots(uuid, int, int, text, uuid, jsonb, timestamptz) from anon;
 grant execute on function public.museum_rebuild_allegiance_snapshots(uuid, int, int, text, uuid, jsonb, timestamptz) to authenticated;
 
 -- ─── RPC: freeze pre-lock snapshots after first kickoff ──────
@@ -624,32 +750,40 @@ as $$
 declare
   v_uid uuid := auth.uid();
   v_updated int := 0;
+  v_db_kickoff timestamptz;
+  v_may_freeze boolean := false;
 begin
-  if v_uid is null then
+  if v_uid is null and coalesce(auth.role(), '') <> 'service_role' then
     raise exception 'Not authenticated';
   end if;
 
-  if not public.museum_is_league_member(p_league_id) then
+  if coalesce(auth.role(), '') <> 'service_role'
+     and not public.museum_is_league_member(p_league_id) then
     raise exception 'Not authorized for this league';
   end if;
 
-  -- Only freeze when first kickoff has actually passed
-  if p_first_kickoff_at is not null and p_first_kickoff_at > now() then
+  v_db_kickoff := public.museum_card_first_kickoff(p_league_id, p_week_number);
+
+  -- Prefer DB kickoff; client timestamp alone cannot force early freeze
+  if v_db_kickoff is not null then
+    v_may_freeze := v_db_kickoff <= now();
+  elsif public.museum_is_league_ops(p_league_id)
+        and p_first_kickoff_at is not null
+        and p_first_kickoff_at <= now() then
+    -- Ops scoring path when card start_time unparseable
+    v_may_freeze := true;
+  elsif public.museum_is_league_ops(p_league_id)
+        and p_first_kickoff_at is null
+        and v_db_kickoff is null then
+    -- Ops force after authorized score when no kickoff stamps
+    v_may_freeze := true;
+  end if;
+
+  if not v_may_freeze then
     return json_build_object(
       'ok', true,
       'frozen', false,
       'reason', 'kickoff_not_reached',
-      'updated', 0
-    );
-  end if;
-
-  -- If no kickoff timestamp provided, allow freeze only when ops scores / explicit
-  -- path passes null meaning "caller already verified lock" — require ops then.
-  if p_first_kickoff_at is null and not public.museum_is_league_ops(p_league_id) then
-    return json_build_object(
-      'ok', true,
-      'frozen', false,
-      'reason', 'kickoff_required',
       'updated', 0
     );
   end if;
@@ -677,6 +811,7 @@ end;
 $$;
 
 revoke all on function public.museum_freeze_allegiance_snapshots(uuid, int, timestamptz) from public;
+revoke all on function public.museum_freeze_allegiance_snapshots(uuid, int, timestamptz) from anon;
 grant execute on function public.museum_freeze_allegiance_snapshots(uuid, int, timestamptz) to authenticated;
 
 -- ─── RPC: upsert durable final scores (scoring path only) ────
@@ -703,6 +838,7 @@ declare
   v_key text;
   v_away_score int;
   v_home_score int;
+  v_card_game_id uuid;
 begin
   if coalesce(auth.role(), '') = 'service_role' then
     null;
@@ -710,6 +846,36 @@ begin
     raise exception 'Not authenticated';
   elsif not public.museum_is_league_ops(p_league_id) then
     raise exception 'Not authorized for this league';
+  end if;
+
+  -- Only production leagues store durable Museum-facing scores
+  if coalesce(auth.role(), '') <> 'service_role'
+     and not public.museum_league_is_production(p_league_id) then
+    return json_build_object('ok', true, 'upserted', 0, 'skipped', true, 'reason', 'non_production');
+  end if;
+
+  -- week_result must belong to this league+week when provided
+  if p_week_result_id is not null then
+    if not exists (
+      select 1 from public.week_results wr
+      where wr.id = p_week_result_id
+        and wr.league_id = p_league_id
+        and wr.week_number = p_week_number
+    ) then
+      raise exception 'week_result_id does not belong to league/week';
+    end if;
+  end if;
+
+  -- week_card must belong when provided
+  if p_week_card_id is not null then
+    if not exists (
+      select 1 from public.week_cards wc
+      where wc.id = p_week_card_id
+        and wc.league_id = p_league_id
+        and wc.week_number = p_week_number
+    ) then
+      raise exception 'week_card_id does not belong to league/week';
+    end if;
   end if;
 
   if p_scores is null or jsonb_typeof(p_scores) <> 'array' then
@@ -729,6 +895,26 @@ begin
     end if;
     if v_away_score < 0 or v_home_score < 0 then
       continue;
+    end if;
+
+    begin
+      v_card_game_id := nullif(s->>'card_game_id', '')::uuid;
+    exception when others then
+      v_card_game_id := null;
+    end;
+
+    -- card_game must belong to this league's week card when provided
+    if v_card_game_id is not null then
+      if not exists (
+        select 1
+        from public.card_games cg
+        join public.week_cards wc on wc.id = cg.week_card_id
+        where cg.id = v_card_game_id
+          and wc.league_id = p_league_id
+          and wc.week_number = p_week_number
+      ) then
+        continue;
+      end if;
     end if;
 
     v_key := nullif(trim(s->>'game_identity_key'), '');
@@ -761,7 +947,7 @@ begin
       p_week_number,
       p_week_result_id,
       p_week_card_id,
-      nullif(s->>'card_game_id', '')::uuid,
+      v_card_game_id,
       nullif(trim(s->>'provider_game_id'), ''),
       v_key,
       nullif(trim(s->>'away_team_id'), ''),
@@ -775,15 +961,22 @@ begin
       coalesce(nullif(trim(p_score_source), ''), 'scoring_path'),
       nullif(s->>'source_timestamp', '')::timestamptz,
       now(),
-      -- Phase 1A: only store OT when explicitly provided; never invent
       case
         when s ? 'overtime' and jsonb_typeof(s->'overtime') = 'boolean'
           then (s->>'overtime')::boolean
         else null
       end,
-      nullif(trim(s->>'card_favorite'), ''),
+      case
+        when nullif(trim(s->>'card_favorite'), '') in ('home', 'away')
+          then nullif(trim(s->>'card_favorite'), '')
+        else null
+      end,
       nullif(s->>'card_spread', '')::numeric,
-      nullif(trim(s->>'underdog_side'), ''),
+      case
+        when nullif(trim(s->>'underdog_side'), '') in ('home', 'away')
+          then nullif(trim(s->>'underdog_side'), '')
+        else null
+      end,
       nullif(s->>'away_rank', '')::int,
       nullif(s->>'home_rank', '')::int,
       nullif(trim(s->>'rank_source'), ''),
@@ -817,9 +1010,9 @@ begin
 
     v_count := v_count + 1;
 
-    -- Best-effort mirror onto game_results when card_game_id present
+    -- Best-effort mirror onto game_results optional columns only (never winner)
     begin
-      if nullif(s->>'card_game_id', '') is not null and p_week_result_id is not null then
+      if v_card_game_id is not null and p_week_result_id is not null then
         update public.game_results gr
         set
           away_score = v_away_score,
@@ -832,10 +1025,10 @@ begin
           score_source = coalesce(nullif(trim(p_score_source), ''), 'scoring_path'),
           finalized_at = now()
         where gr.week_result_id = p_week_result_id
-          and gr.card_game_id = (s->>'card_game_id')::uuid;
+          and gr.card_game_id = v_card_game_id;
       end if;
     exception when others then
-      null; -- columns may not exist yet; durable table still holds truth
+      null;
     end;
   end loop;
 
@@ -844,6 +1037,7 @@ end;
 $$;
 
 revoke all on function public.museum_upsert_game_final_scores(uuid, int, int, text, uuid, uuid, jsonb, text) from public;
+revoke all on function public.museum_upsert_game_final_scores(uuid, int, int, text, uuid, uuid, jsonb, text) from anon;
 grant execute on function public.museum_upsert_game_final_scores(uuid, int, int, text, uuid, uuid, jsonb, text) to authenticated;
 
 -- ─── RPC: museum event count (delete guard / verification) ───
@@ -855,45 +1049,49 @@ stable
 security definer
 set search_path = public
 as $$
-  select count(*)::int
-  from public.museum_events e
-  where e.league_id = p_league_id
-    and (
-      public.museum_is_league_member(p_league_id)
+  select case
+    when p_league_id is null then 0
+    when public.museum_is_league_member(p_league_id)
       or public.museum_is_league_ops(p_league_id)
-    );
+      or coalesce(auth.role(), '') = 'service_role'
+    then (
+      select count(*)::int
+      from public.museum_events e
+      where e.league_id = p_league_id
+    )
+    else 0
+  end;
 $$;
 
 revoke all on function public.museum_league_event_count(uuid) from public;
+revoke all on function public.museum_league_event_count(uuid) from anon;
 grant execute on function public.museum_league_event_count(uuid) to authenticated;
 
--- ─── Season reset: do NOT wipe Museum permanence ─────────────
--- Patch reset_league_season to document preservation. If a newer
--- reset function exists, it must still skip museum_* and game_final_scores.
-
-do $$
-begin
-  -- No-op deletes that make intent explicit if someone adds cascade later
-  null;
-end $$;
-
 comment on table public.game_final_scores is
-  'Durable numeric finals for Museum retry. NOT wiped by reset_league_season. Written only via museum_upsert_game_final_scores.';
+  'Durable numeric finals for Museum retry. NOT wiped by reset_league_season. Written only via museum_upsert_game_final_scores. CASCADE with league delete only when museum_events RESTRICT allows.';
 
 comment on table public.museum_events is
-  'Permanent Museum history. NOT wiped by reset_league_season. No client writes. Phase 1A inserts zero rows.';
+  'Permanent Museum history. ON DELETE RESTRICT from leagues. NOT wiped by reset_league_season. No client writes. Phase 1A inserts zero rows.';
 
 comment on table public.museum_allegiance_snapshots is
-  'Allegiance snapshots. Survive season reset so frozen history is not rewritten. Pre-lock rows for future weeks can still be managed by publish RPC.';
+  'Allegiance snapshots. Survive season reset. Frozen immutable. CASCADE with empty-league delete; museum_events RESTRICT blocks delete when history exists.';
 
 -- ─── Grants for helpers ──────────────────────────────────────
 
 revoke all on function public.museum_is_league_ops(uuid) from public;
+revoke all on function public.museum_is_league_ops(uuid) from anon;
 revoke all on function public.museum_is_league_member(uuid) from public;
+revoke all on function public.museum_is_league_member(uuid) from anon;
 revoke all on function public.museum_league_is_production(uuid) from public;
--- Keep helpers invokable by authenticated for RPC composition only
+revoke all on function public.museum_league_is_production(uuid) from anon;
+revoke all on function public.museum_card_first_kickoff(uuid, int) from public;
+revoke all on function public.museum_card_first_kickoff(uuid, int) from anon;
+
 grant execute on function public.museum_is_league_ops(uuid) to authenticated;
 grant execute on function public.museum_is_league_member(uuid) to authenticated;
 grant execute on function public.museum_league_is_production(uuid) to authenticated;
+grant execute on function public.museum_card_first_kickoff(uuid, int) to authenticated;
 
 notify pgrst, 'reload schema';
+
+commit;
