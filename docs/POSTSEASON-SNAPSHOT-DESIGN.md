@@ -1,9 +1,10 @@
 # Postseason Snapshot Design — Stage PS0
 
-**Status:** 🔒 Design package · **not implemented**  
+**Status:** 🔒 PS0 design · **PS1 pure engine shipped** (no DB / runtime wiring)  
 **Date:** 2026-08-05  
 **Law:** `docs/POSTSEASON-COMPETITION-LAW.md`  
 **SQL (review only):** `supabase/postseason-snapshots-REVIEW-ONLY.sql`  
+**Pure engine:** `src/lib/postseason/*` · verify: `npx tsx scripts/verify-postseason-ps1.mjs`  
 **Do not execute SQL against production in this stage.**
 
 ---
@@ -250,19 +251,17 @@ else:
 
 ---
 
-## 9. Risks / unresolved decisions
+## 9. Residual decisions — **resolved as binding (PS1)**
 
-| ID | Item | Notes |
-|----|------|--------|
-| R1 | **season_key** vs `season_year` only | Align with `defaultSeasonYear()` / trophies; document single function |
-| R2 | Freeze **exact** trigger moment | First time cut week scored vs end of cut-week scoring transaction |
-| R3 | Deputy may freeze/repair? | Recommend **commish-only repair**; freeze may be system-on-score |
-| R4 | Projected UI before freeze | Keep current projected seeds labeled; never write |
-| R5 | Mid-bracket repair after playoff weeks played | Warn harder; may need “invalidate advancement display” |
-| R6 | Historical seasons without snapshot | Read path falls back to legacy live seed **labeled unreliable** or freeze-on-first-view (prefer **no** freeze-on-view) |
-| R7 | Division winner seed preference | Current code reorders div winners in champ field — keep as seeding rule **inside** freeze builder, not after |
+| ID | Decision |
+|----|----------|
+| **R1** | Canonical season year = season **starting year** via `canonicalSeasonYear` / `seasonKeyFromYear` in `src/lib/postseason/season-identity.ts`. `defaultSeasonYear` in trophies re-exports it. Jan–Jun → previous year; Jul–Dec → current. |
+| **R2** | Freeze must be atomic with cut-week score commit; cut not official if freeze fails. PS1 exposes pure `cutScoreAndFreezeCoupling` + freeze preconditions only — **no** scoring transaction. |
+| **R3** | Deputy may **auto-freeze** as consequence of scoring cut week. Deputy **cannot** manual repair. Repair is commissioner-only. Service/creator emergency audited outside ordinary UI. |
+| **R4** | Never create snapshot on read. No legacy backfill in PS1. |
+| **R5** | Ordinary repair only **before** first authoritative postseason matchup result; then locked. Exceptional rebuild out of PS1. |
 
-**No remaining ambiguity on cutPercent meaning, min 2, toilet ≥4, no bots, bye weekly picks.**
+Open for **PS2** only: wiring freeze into `saveResultsAndScoreWeek`, RPC, pages, optional division-winner seed reorder parity with legacy `seedChampionship`.
 
 ---
 

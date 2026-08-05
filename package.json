@@ -10,7 +10,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "verify:museum-1a": "node scripts/verify-museum-phase1a.mjs"
+    "verify:museum-1a": "node scripts/verify-museum-phase1a.mjs",
+    "verify:postseason-ps1": "npx --yes tsx scripts/verify-postseason-ps1.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.6.1",

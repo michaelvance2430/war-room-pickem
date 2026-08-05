@@ -144,11 +144,10 @@ Joins **after** the freeze **cannot** enter frozen championship or Toilet Bowl f
 
 | Stage | Scope | Status |
 |-------|--------|--------|
-| **PS0** | Laws + durable snapshot design + review-only SQL + PS1 plan | **This package** |
-| **PS1** | Runtime freeze write/read, seeders, closeout optional toilet, tests | **Not authorized yet** |
-| **PS2+** | Repair UI, migration of live seasons if needed | Later |
-
-**Do not implement PS1 without explicit authorization.**
+| **PS0** | Laws + durable snapshot design + review-only SQL + PS1 plan | **Done** |
+| **PS1** | Pure engine + regression tests (no DB/pages) | **Done** — `src/lib/postseason/*` |
+| **PS2** | Schema apply, freeze wired to cut-week score, page readers | **Not authorized** |
+| **PS3+** | Repair UI, exceptional rebuild, legacy backfill | Later |
 
 ---
 

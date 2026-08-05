@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 import { getSession } from "@/lib/league";
+import { canonicalSeasonYear } from "@/lib/postseason/season-identity";
 
 export type TrophyType =
   | "championship"
@@ -123,10 +124,12 @@ function mapRow(r: Record<string, unknown>): LeagueTrophy {
 }
 
 /** Default season year for awards (CFB season spans fall). */
+/**
+ * Canonical season starting year — shared with postseason snapshot season_key.
+ * Implementation: src/lib/postseason/season-identity.ts (R1).
+ */
 export function defaultSeasonYear(now = new Date()): number {
-  // Jan–June → previous fall season still "belongs" to last year until new kickoff culture
-  const m = now.getMonth(); // 0-indexed
-  return m < 6 ? now.getFullYear() - 1 : now.getFullYear();
+  return canonicalSeasonYear(now);
 }
 
 export async function loadLeagueTrophies(): Promise<LeagueTrophy[]> {
