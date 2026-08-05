@@ -4,6 +4,9 @@
  * PRODUCT PIVOT: One giant button on Home for the next host-only job.
  * Not a dashboard. Not a checklist.
  *
+ * Stage 4: host ordering and Score Week readiness come from the shared
+ * resolver in host-ops-mission.ts (same pure rules as League Hub).
+ *
  * INVENTORY (current Commissioner ops → destinations)
  * ───────────────────────────────────────────────────
  * | Operation              | Was                 | New location              | Block retire? |
@@ -28,9 +31,11 @@ import {
   loadWeekCard,
   listScoredWeekNumbers,
 } from "@/lib/cloud";
-import { isCardLockDeadlinePassed } from "@/lib/dates";
-import { weekTitle } from "@/lib/dates";
 import { seasonMaxWeek } from "@/lib/season-calendar";
+import {
+  resolveHostOpsMission,
+  type HostOpsMission,
+} from "@/lib/host-ops-mission";
 
 export type CommishMissionKind =
   | "build"
@@ -52,12 +57,22 @@ export type CommishHomeMission = {
   weekLabel: string;
 };
 
+function toCommishMission(m: HostOpsMission): CommishHomeMission {
+  return {
+    kind: m.kind,
+    label: m.label,
+    href: m.href,
+    weekNumber: m.weekNumber,
+    weekLabel: m.weekLabel,
+  };
+}
+
 /**
- * Resolve the single commissioner-only mission for Home.
+ * Resolve the single commissioner/deputy mission for Home.
  * Returns null if not ops, or no host task (hide the button).
  *
- * Priority: scoring / card work first; then BEGIN TROPHY CEREMONY when
- * CFB title is final + last week scored + season not closed.
+ * Uses shared resolveHostOpsMission for Score Week / build / finish / next week.
+ * Trophy closeout remains Home-loaded (session league only).
  */
 export async function resolveCommishHomeMission(): Promise<CommishHomeMission | null> {
   if (!isOps()) return null;
@@ -71,7 +86,6 @@ export async function resolveCommishHomeMission(): Promise<CommishHomeMission | 
   } catch {
     week = sportId === "nfl" ? 1 : 0;
   }
-  const weekLabel = weekTitle(week, sportId);
 
   let scored: number[] = [];
   try {
@@ -79,119 +93,70 @@ export async function resolveCommishHomeMission(): Promise<CommishHomeMission | 
   } catch {
     scored = [];
   }
+  const weekScored = scored.includes(week);
 
-  /**
-   * Trophy ceremony when closeout readiness is fully ready
-   * (final league week scored + title game final + not already closed).
-   * Beats Build/Finish for stray empty active weeks after the finale.
-   * Score path for an unscored active week only applies when not ready yet.
-   */
-  async function maybeCeremony(): Promise<CommishHomeMission | null> {
-    if (sportId === "nfl") return null;
+  // Trophy ceremony (CFB closeout) — Home-only expensive readiness check
+  let trophyReady = false;
+  if (sportId !== "nfl") {
     try {
       const { resolveSeasonCloseoutReadiness } = await import(
         "./season-closeout"
       );
       const close = await resolveSeasonCloseoutReadiness();
-      if (close.status === "ready") {
-        return {
-          kind: "trophy_ceremony",
-          label: "BEGIN TROPHY CEREMONY",
-          href: "/trophy-ceremony",
-          weekNumber: week,
-          weekLabel,
-        };
-      }
+      trophyReady = close.status === "ready";
     } catch {
-      /* hide ceremony on error */
+      trophyReady = false;
     }
-    return null;
   }
 
-  const ceremonyFirst = await maybeCeremony();
-  if (ceremonyFirst) return ceremonyFirst;
-
-  // Active week already scored → prepare next card if season continues
-  if (scored.includes(week)) {
+  let nextWeek: number | null = null;
+  let nextWeekHasGames = false;
+  if (weekScored) {
     const max = seasonMaxWeek(sportId);
     const next = week + 1;
     if (next <= max) {
-      let nextCard = null as Awaited<ReturnType<typeof loadWeekCard>>;
+      nextWeek = next;
       try {
-        nextCard = await loadWeekCard(next);
+        const nextCard = await loadWeekCard(next);
+        nextWeekHasGames = !!(nextCard?.games?.length);
       } catch {
-        nextCard = null;
-      }
-      if (!nextCard?.games?.length) {
-        const nextLabel = weekTitle(next, sportId);
-        return {
-          kind: "next_week",
-          label: `Build ${nextLabel} Card`,
-          href: `/week-ops?week=${next}&step=1`,
-          weekNumber: next,
-          weekLabel: nextLabel,
-        };
+        nextWeekHasGames = false;
       }
     }
-    return null;
   }
 
-  let card = null as Awaited<ReturnType<typeof loadWeekCard>>;
-  try {
-    card = await loadWeekCard(week);
-  } catch {
-    card = null;
+  let gameCount = 0;
+  let hasProp = false;
+  let gamesForLock: { commenceTime?: string; startTime?: string }[] = [];
+
+  if (!weekScored && !trophyReady) {
+    let card = null as Awaited<ReturnType<typeof loadWeekCard>>;
+    try {
+      card = await loadWeekCard(week);
+    } catch {
+      card = null;
+    }
+    const games = card?.games || [];
+    gameCount = games.length;
+    const propQ = card?.prop?.question?.trim() || "";
+    hasProp = propQ.length > 0;
+    gamesForLock = games.map((g) => ({
+      commenceTime: g.commenceTime,
+      startTime: g.startTime,
+    }));
   }
 
-  const games = card?.games || [];
-  const hasGames = games.length >= 5;
-  const propQ = card?.prop?.question?.trim() || "";
-  const hasProp = propQ.length > 0;
-  // published_at exists when loadWeekCard returns a real card with games
-  const published = hasGames; // card with games is live for player picks
+  const mission = resolveHostOpsMission({
+    sportId,
+    week,
+    weekScored,
+    gameCount,
+    hasProp,
+    gamesForLock,
+    nextWeek,
+    nextWeekHasGames,
+    trophyReady,
+  });
 
-  // Scoring: published + kickoff passed + not scored — one host job
-  if (published && isCardLockDeadlinePassed(games)) {
-    return {
-      kind: "score",
-      label: `Score ${weekLabel}`,
-      href: `/week-ops?week=${week}&step=score`,
-      weekNumber: week,
-      weekLabel,
-    };
-  }
-
-  if (!card || games.length === 0) {
-    return {
-      kind: "build",
-      label: `Build ${weekLabel} Card`,
-      href: `/week-ops?week=${week}&step=1`,
-      weekNumber: week,
-      weekLabel,
-    };
-  }
-
-  if (!hasGames || games.length < 5) {
-    return {
-      kind: "finish",
-      label: `Finish ${weekLabel} Card`,
-      href: `/week-ops?week=${week}&step=1`,
-      weekNumber: week,
-      weekLabel,
-    };
-  }
-
-  if (!hasProp) {
-    return {
-      kind: "finish",
-      label: `Finish ${weekLabel} Card`,
-      href: `/week-ops?week=${week}&step=3`,
-      weekNumber: week,
-      weekLabel,
-    };
-  }
-
-  // Card live, before kickoff — host plays like everyone else (hero owns picks CTA).
-  // No second coaching card. Mission button stays silent.
-  return null;
+  return mission ? toCommishMission(mission) : null;
 }

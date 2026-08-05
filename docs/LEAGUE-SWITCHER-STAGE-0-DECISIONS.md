@@ -91,8 +91,8 @@ Reuse existing pulse TTL / single-flight protections where appropriate.
 |-------|--------|
 | **1** | League switcher backdrop only (visual / client) — shipped |
 | **2** | Weekly hub-task badges only (binary 0/1 per league; no announcements) — shipped |
-| **3** | Combined badges = task bit + durable unread announcements (batched; production gate required) — authorized after Stage 2 visual review |
-| **4** | Score Week parity + deputy authorization alignment — not authorized yet |
+| **3** | Combined badges = task bit + durable unread announcements (batched; production gate required) — shipped |
+| **4** | Shared host-ops resolver: Score Week + deputy isOps parity with Home — authorized after Stage 3 visual review |
 
 ---
 

@@ -13,7 +13,12 @@ import { createClient } from "@/lib/supabase/client";
 import type { LeagueMembership } from "@/lib/session-restore";
 import { normalizeSportId } from "@/lib/sports/registry";
 import type { SportId } from "@/lib/sports/types";
-import { weekTitle } from "@/lib/season-calendar";
+import { weekTitle, seasonMaxWeek } from "@/lib/season-calendar";
+import {
+  membershipIsOps,
+  resolveHostOpsMission,
+  type HostOpsMission,
+} from "@/lib/host-ops-mission";
 
 export type LeagueHubActionCode =
   | "MAKE_PICKS"
@@ -22,6 +27,9 @@ export type LeagueHubActionCode =
   | "LOCK_PICKS"
   | "SET_WEEK"
   | "PUBLISH_WEEK"
+  | "SCORE_WEEK"
+  | "BUILD_CARD"
+  | "TROPHY_CEREMONY"
   | "ENTER";
 
 /**
@@ -73,6 +81,9 @@ const ACTION_META: Record<
   LOCK_PICKS: { label: "Lock Picks", href: "/picks" },
   SET_WEEK: { label: "Set Week", href: "/week-ops" },
   PUBLISH_WEEK: { label: "Publish Week", href: "/week-ops" },
+  SCORE_WEEK: { label: "Score Week", href: "/week-ops?step=score" },
+  BUILD_CARD: { label: "Build Card", href: "/week-ops" },
+  TROPHY_CEREMONY: { label: "Trophy Ceremony", href: "/trophy-ceremony" },
   ENTER: { label: "Enter", href: "/" },
 };
 
@@ -112,9 +123,16 @@ function signalOf(tone: LeagueHubTone, detail = ""): LeagueHubSignal {
 /** Commish FINISH CARD routes to build, player FINISH CARD to picks. */
 function actionOf(
   code: LeagueHubActionCode,
-  opts?: { isHostCard?: boolean }
+  opts?: { isHostCard?: boolean; label?: string; href?: string }
 ): LeagueHubAction {
   const meta = ACTION_META[code];
+  if (opts?.label || opts?.href) {
+    return {
+      code,
+      label: opts.label || meta.label,
+      href: opts.href || meta.href,
+    };
+  }
   if (code === "FINISH_CARD" && opts?.isHostCard) {
     return {
       code,
@@ -123,6 +141,57 @@ function actionOf(
     };
   }
   return { code, label: meta.label, href: meta.href };
+}
+
+/** Map shared host mission → hub action + signal (semantic codes, not display parse). */
+function hubActionFromHostMission(m: HostOpsMission): {
+  action: LeagueHubAction;
+  signal: LeagueHubSignal;
+} {
+  switch (m.kind) {
+    case "score":
+      return {
+        action: actionOf("SCORE_WEEK", {
+          label: "Score Week",
+          href: m.href,
+        }),
+        signal: signalOf("commissioner", "Score Week"),
+      };
+    case "build":
+    case "next_week":
+      return {
+        action: actionOf("BUILD_CARD", {
+          label: m.kind === "next_week" ? m.label : "Build Card",
+          href: m.href,
+        }),
+        signal: signalOf(
+          "commissioner",
+          m.kind === "next_week" ? "Build Next Card" : "Build Card"
+        ),
+      };
+    case "finish":
+      return {
+        action: actionOf("FINISH_CARD", {
+          isHostCard: true,
+          label: "Finish Card",
+          href: m.href,
+        }),
+        signal: signalOf("commissioner", "Finish Card"),
+      };
+    case "trophy_ceremony":
+      return {
+        action: actionOf("TROPHY_CEREMONY", {
+          label: "Trophy Ceremony",
+          href: m.href,
+        }),
+        signal: signalOf("commissioner", "Trophy Ceremony"),
+      };
+    default:
+      return {
+        action: actionOf("ENTER"),
+        signal: signalOf("ready", "Enter"),
+      };
+  }
 }
 
 /**
@@ -143,7 +212,7 @@ export function isCrystalBallOpeningWeek(
 function fallbackPulse(
   leagueId: string,
   sportId: SportId,
-  isHost: boolean
+  isOps: boolean
 ): LeagueHubPulse {
   return {
     leagueId,
@@ -152,19 +221,29 @@ function fallbackPulse(
     weekLine: "—",
     action: actionOf("ENTER"),
     signal: signalOf("ready", "Enter"),
-    isHost,
+    isHost: isOps,
   };
 }
 
 type FactBundle = {
   sportId: SportId;
   liveWeek: number | null;
-  isHost: boolean;
+  /**
+   * Commissioner or deputy for this membership (host ops).
+   * Not owner-only — matches isOps() production model.
+   */
+  isOps: boolean;
   expectedGames: number;
   cardId: string | null;
   publishedAt: string | null;
   gameCount: number;
   hasProp: boolean;
+  /** Kickoff times for Score Week readiness (shared host resolver). */
+  gamesForLock: { commenceTime?: string; startTime?: string }[];
+  /** Trusted scored mark for live week (week_results + game_results). */
+  weekScored: boolean;
+  nextWeek: number | null;
+  nextWeekHasGames: boolean;
   pickId: string | null;
   pickGameCount: number;
   pickHasProp: boolean;
@@ -180,8 +259,8 @@ async function loadFacts(
   uid: string
 ): Promise<FactBundle | null> {
   const supabase = createClient();
-  const isHost =
-    m.role === "commissioner" || m.commissionerId === uid;
+  // Stage 4: deputies are ops for week-ops / score (same as isOps())
+  const isOps = membershipIsOps(m, uid);
 
   try {
     const { data: leagueRow, error: leagueErr } = await supabase
@@ -224,12 +303,16 @@ async function loadFacts(
       return {
         sportId,
         liveWeek: null,
-        isHost,
+        isOps,
         expectedGames,
         cardId: null,
         publishedAt: null,
         gameCount: 0,
         hasProp: false,
+        gamesForLock: [],
+        weekScored: false,
+        nextWeek: null,
+        nextWeekHasGames: false,
         pickId: null,
         pickGameCount: 0,
         pickHasProp: false,
@@ -256,12 +339,65 @@ async function loadFacts(
     const hasProp = propQ.length > 0 && propQ !== "Prop";
 
     let gameCount = 0;
+    let gamesForLock: { commenceTime?: string; startTime?: string }[] = [];
     if (cardId) {
-      const { count } = await supabase
+      // One query: count + kickoff times for Score Week readiness (no N+1)
+      // Production card_games uses start_time (ISO / text kickoff).
+      const { data: gameRows } = await supabase
         .from("card_games")
-        .select("id", { count: "exact", head: true })
+        .select("id, start_time")
         .eq("week_card_id", cardId);
-      gameCount = count ?? 0;
+      const rows =
+        (gameRows as { id: string; start_time?: string | null }[] | null) ||
+        [];
+      gameCount = rows.length;
+      gamesForLock = rows.map((g) => ({
+        commenceTime: g.start_time || undefined,
+        startTime: g.start_time || undefined,
+      }));
+    }
+
+    // Scored? week_results shell with at least one game_results line (trust)
+    let weekScored = false;
+    {
+      const { data: wr } = await supabase
+        .from("week_results")
+        .select("id")
+        .eq("league_id", m.leagueId)
+        .eq("week_number", live)
+        .maybeSingle();
+      const wrId = (wr as { id?: string } | null)?.id;
+      if (wrId) {
+        const { count } = await supabase
+          .from("game_results")
+          .select("id", { count: "exact", head: true })
+          .eq("week_result_id", wrId);
+        weekScored = (count ?? 0) > 0;
+      }
+    }
+
+    let nextWeek: number | null = null;
+    let nextWeekHasGames = false;
+    if (weekScored && isOps) {
+      const max = seasonMaxWeek(sportId);
+      const next = live + 1;
+      if (next <= max) {
+        nextWeek = next;
+        const { data: nextCard } = await supabase
+          .from("week_cards")
+          .select("id")
+          .eq("league_id", m.leagueId)
+          .eq("week_number", next)
+          .maybeSingle();
+        const nextId = (nextCard as { id?: string } | null)?.id;
+        if (nextId) {
+          const { count } = await supabase
+            .from("card_games")
+            .select("id", { count: "exact", head: true })
+            .eq("week_card_id", nextId);
+          nextWeekHasGames = (count ?? 0) > 0;
+        }
+      }
     }
 
     let pickId: string | null = null;
@@ -318,12 +454,16 @@ async function loadFacts(
     return {
       sportId,
       liveWeek: live,
-      isHost,
+      isOps,
       expectedGames,
       cardId,
       publishedAt,
       gameCount,
       hasProp,
+      gamesForLock,
+      weekScored,
+      nextWeek,
+      nextWeekHasGames,
       pickId,
       pickGameCount,
       pickHasProp,
@@ -337,10 +477,6 @@ async function loadFacts(
   }
 }
 
-function cardIsComplete(f: FactBundle): boolean {
-  return f.gameCount >= f.expectedGames && f.hasProp;
-}
-
 function pickIsComplete(f: FactBundle): boolean {
   return (
     !!f.pickId &&
@@ -352,6 +488,9 @@ function pickIsComplete(f: FactBundle): boolean {
 
 /**
  * Resolve sequential first action + scan signal for one membership.
+ *
+ * Host ops (commissioner + deputy): shared resolveHostOpsMission (Home parity).
+ * Then player sequence when no host mission.
  */
 export function resolveLeagueHubAction(f: FactBundle): {
   action: LeagueHubAction;
@@ -361,30 +500,40 @@ export function resolveLeagueHubAction(f: FactBundle): {
   const weekLine =
     f.liveWeek != null ? weekTitle(f.liveWeek, f.sportId) : "Not set";
 
-  // ── Commissioner sequence (earliest blocking task) ──
-  if (f.isHost) {
-    if (f.liveWeek == null || !f.cardId) {
+  // ── Host ops sequence (shared with Home) ──
+  if (f.isOps) {
+    if (f.liveWeek == null) {
       return {
         action: actionOf("SET_WEEK"),
-        weekLine: f.liveWeek == null ? "Commissioner" : weekLine,
+        weekLine: "Commissioner",
         signal: signalOf("commissioner", "Set Week"),
       };
     }
-    if (!cardIsComplete(f)) {
+
+    const host = resolveHostOpsMission({
+      sportId: f.sportId,
+      week: f.liveWeek,
+      weekScored: f.weekScored,
+      gameCount: f.gameCount,
+      hasProp: f.hasProp,
+      gamesForLock: f.gamesForLock,
+      nextWeek: f.nextWeek,
+      nextWeekHasGames: f.nextWeekHasGames,
+      trophyReady: false, // hub does not fan-out season closeout (Home only)
+    });
+
+    if (host) {
+      const mapped = hubActionFromHostMission(host);
       return {
-        action: actionOf("FINISH_CARD", { isHostCard: true }),
-        weekLine,
-        signal: signalOf("commissioner", "Finish Card"),
+        action: mapped.action,
+        weekLine:
+          host.kind === "next_week"
+            ? host.weekLabel
+            : weekLine,
+        signal: mapped.signal,
       };
     }
-    if (!f.publishedAt) {
-      return {
-        action: actionOf("PUBLISH_WEEK"),
-        weekLine,
-        signal: signalOf("publish", "Ready to Publish"),
-      };
-    }
-    // Commish path clear → player sequence
+    // No host mission → player sequence (same as Home silent mission button)
   }
 
   // ── Player sequence ──
@@ -430,27 +579,18 @@ export function resolveLeagueHubAction(f: FactBundle): {
     };
   }
 
-  // Player: no published card yet — nothing to do
-  if (!f.isHost) {
-    return {
-      action: actionOf("ENTER"),
-      weekLine,
-      signal: signalOf("soon", "Coming Soon"),
-    };
-  }
-
-  // Host fallthrough (shouldn't hit if sequence complete)
+  // No published card yet — nothing to do (host already ran shared path above)
   return {
     action: actionOf("ENTER"),
     weekLine,
-    signal: signalOf("ready", "Enter"),
+    signal: signalOf("soon", "Coming Soon"),
   };
 }
 
 /**
- * Stage 2 attention — action codes that are a real weekly hub task.
+ * Stage 2–4 attention — action codes that are a real weekly hub task.
  * ENTER is never actionable (covers Ready / Coming Soon / fail-closed).
- * Score Week is not a hub code yet (Stage 4). Do not invent codes here.
+ * SCORE_WEEK / BUILD_CARD / TROPHY_CEREMONY added Stage 4 (shared host path).
  */
 export const ACTIONABLE_HUB_TASK_CODES: ReadonlySet<LeagueHubActionCode> =
   new Set([
@@ -460,6 +600,9 @@ export const ACTIONABLE_HUB_TASK_CODES: ReadonlySet<LeagueHubActionCode> =
     "LOCK_PICKS",
     "SET_WEEK",
     "PUBLISH_WEEK",
+    "SCORE_WEEK",
+    "BUILD_CARD",
+    "TROPHY_CEREMONY",
   ]);
 
 /** True when the hub's sequential first action requires user work. */
@@ -559,13 +702,12 @@ export async function loadLeagueHubPulses(
   const next: Record<string, LeagueHubPulse> = {};
   await Promise.all(
     memberships.map(async (m) => {
-      const isHost =
-        m.role === "commissioner" || m.commissionerId === uid;
+      const isOps = membershipIsOps(m, uid);
       const sportId = normalizeSportId(m.sportId || "cfb");
       try {
         const facts = await loadFacts(m, uid);
         if (!facts) {
-          next[m.leagueId] = fallbackPulse(m.leagueId, sportId, isHost);
+          next[m.leagueId] = fallbackPulse(m.leagueId, sportId, isOps);
           return;
         }
         const { action, weekLine, signal } = resolveLeagueHubAction(facts);
@@ -576,10 +718,10 @@ export async function loadLeagueHubPulses(
           weekLine,
           action,
           signal,
-          isHost: facts.isHost,
+          isHost: facts.isOps,
         };
       } catch {
-        next[m.leagueId] = fallbackPulse(m.leagueId, sportId, isHost);
+        next[m.leagueId] = fallbackPulse(m.leagueId, sportId, isOps);
       }
     })
   );
