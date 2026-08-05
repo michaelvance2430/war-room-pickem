@@ -76,6 +76,8 @@ type LegacySeed = Omit<ProfileTrophy, "source"> & {
  * Confirmed prior-season hardware only.
  * CFB 2025–26 Excel: Kahmann / Strayer / Big Ball Ben.
  * NFL 2025: Maria Super Bowl (or Vonnagio gold family form).
+ * NFL 2025 conference hardware: Mike NFC Championship · Maria AFC Championship.
+ * (Career shelf — sport-gated; shows in every NFL room for that profile.)
  */
 export const LEGACY_PROFILE_HARDWARE: LegacySeed[] = [
   {
@@ -134,6 +136,32 @@ export const LEGACY_PROFILE_HARDWARE: LegacySeed[] = [
     sport: "nfl",
     sportId: "nfl",
   },
+  {
+    id: "legacy-mike-nfc-championship-2025",
+    kind: "division",
+    seasonYear: 2025,
+    title: "NFC Championship",
+    subtitle: "NFC Champion · 2025",
+    notes:
+      "2025 NFC Championship. Conference hardware — not Super Bowl. Still permanent. Still loud.",
+    winnerName: "Mike Vance",
+    division: "NFC Championship",
+    sport: "nfl",
+    sportId: "nfl",
+  },
+  {
+    id: "legacy-maria-afc-championship-2025",
+    kind: "division",
+    seasonYear: 2025,
+    title: "AFC Championship",
+    subtitle: "AFC Champion · 2025",
+    notes:
+      "2025 AFC Championship. Conference hardware en route to the Super Bowl. Permanent on the shelf.",
+    winnerName: "Maria",
+    division: "AFC Championship",
+    sport: "nfl",
+    sportId: "nfl",
+  },
 ];
 
 /** Also match these name aliases → legacy id */
@@ -157,6 +185,16 @@ const LEGACY_NAME_ALIASES: { pattern: RegExp; legacyId: string }[] = [
   {
     pattern: /\bmaria\b/i,
     legacyId: "legacy-maria-vonnagio-2025",
+  },
+  {
+    // Product owner display names (avoid bare "Mike" matching other Mikes)
+    pattern:
+      /\bmike\s+vance\b|\bmichael\s+vance\b|\bbagz\b|\bmichaelvance2430\b/i,
+    legacyId: "legacy-mike-nfc-championship-2025",
+  },
+  {
+    pattern: /\bmaria\b/i,
+    legacyId: "legacy-maria-afc-championship-2025",
   },
 ];
 
