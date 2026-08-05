@@ -8,8 +8,9 @@
  * SeasonThemeApplier sets data-season-theme; CSS for seasons is loaded
  * AFTER sport skins so holidays win when chosen.
  *
- * Sport stamps: durable per-leagueId memory so logout / cloud default `cfb`
- * cannot make an NFL room vanish from the NFL desk or paint the wrong skin.
+ * Sport stamps: local presentation memory only.
+ * After league creation, Supabase `leagues.sport_id` is authoritative.
+ * Stamps must follow cloud on disagreement — never the reverse via UPDATE.
  */
 
 import { normalizeSportId } from "./registry";
@@ -127,8 +128,14 @@ export function stampCloudConfirmed(
 }
 
 /**
- * Single source of truth for a league's sport.
- * Priority: create pin → cloud non-cfb → durable stamp (non-cfb) → cloud/local → cfb.
+ * Resolve a league’s sport for UI/session.
+ *
+ * PRODUCT LAW: When Supabase `leagues.sport_id` is present (including `cfb`),
+ * it is authoritative. Local stamps / create-pins must never overwrite cloud
+ * merely because they disagree — and this function never writes Supabase.
+ *
+ * Priority when cloud present: cloud (always).
+ * When cloud missing/null: create force-pin → durable stamp → local → cfb.
  */
 export function resolveLeagueSportId(opts: {
   leagueId: string;
@@ -138,67 +145,47 @@ export function resolveLeagueSportId(opts: {
   const leagueId = opts.leagueId;
   if (!leagueId) return "cfb";
 
+  const cloudRaw =
+    typeof opts.cloudSportId === "string" ? opts.cloudSportId.trim() : "";
+  const cloud = cloudRaw ? normalizeSportId(cloudRaw) : null;
+
+  // Cloud present (cfb OR nfl OR other) → always wins; correct stale local stamps.
+  if (cloud) {
+    stampLeagueSport(leagueId, cloud, { cloudConfirmed: true });
+    return cloud;
+  }
+
+  // Cloud unavailable — presentation-only fallbacks. Never invent a cloud write.
   const forced = forcedSportForLeague(leagueId);
   if (forced) {
     stampLeagueSport(leagueId, forced, { cloudConfirmed: false });
     return forced;
   }
 
-  const cloudRaw =
-    typeof opts.cloudSportId === "string" ? opts.cloudSportId.trim() : "";
-  const cloud = cloudRaw ? normalizeSportId(cloudRaw) : null;
-
-  // Cloud has an explicit non-cfb value — trust & stamp forever
-  if (cloud && cloud !== "cfb") {
-    stampLeagueSport(leagueId, cloud, { cloudConfirmed: true });
-    return cloud;
-  }
-
   const stamped = stampedSportForLeague(leagueId);
-  if (stamped && stamped !== "cfb") {
-    // Cloud missing or still default cfb — keep NFL/WWC stamp
-    return stamped;
-  }
+  if (stamped) return stamped;
 
   const localRaw =
     typeof opts.localSportId === "string" ? opts.localSportId.trim() : "";
   const local = localRaw ? normalizeSportId(localRaw) : null;
-  if (local && local !== "cfb") {
+  if (local) {
     stampLeagueSport(leagueId, local, { cloudConfirmed: false });
     return local;
   }
 
-  if (cloud) return cloud;
-  if (local) return local;
   return "cfb";
 }
 
 /**
- * If local stamp says non-cfb but cloud still has cfb, push the stamp up.
- * Best-effort; never blocks UI.
+ * @deprecated Never write league sport from read/restore paths.
+ * Retained as a no-op so accidental callers cannot corrupt production rows.
+ * Explicit create/setup must set sport_id via authorized inserts/updates only.
  */
 export async function reassertLeagueSportToCloud(
-  leagueId: string,
-  sportId: SportId
+  _leagueId: string,
+  _sportId: SportId
 ): Promise<void> {
-  if (!leagueId || sportId === "cfb") return;
-  try {
-    const { createClient } = await import("@/lib/supabase/client");
-    const supabase = createClient();
-    const { error } = await supabase
-      .from("leagues")
-      .update({
-        sport_id: sportId,
-        // Crystal Ball is CFB pride pick; NFL uses Super Bowl pride (still bool column)
-        crystal_ball_enabled: true,
-      })
-      .eq("id", leagueId);
-    if (!error) {
-      stampLeagueSport(leagueId, sportId, { cloudConfirmed: true });
-    }
-  } catch {
-    /* best-effort */
-  }
+  return;
 }
 
 /**

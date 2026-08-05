@@ -81,14 +81,20 @@ export function writeSessionAndLeague(
 
   let sportId = (membership.sportId || "cfb").trim() || "cfb";
   try {
-    const { resolveLeagueSportId, pinLeagueSport } = require("./sports/sport-theme") as typeof import("./sports/sport-theme");
+    const {
+      resolveLeagueSportId,
+      stampLeagueSport,
+    } = require("./sports/sport-theme") as typeof import("./sports/sport-theme");
+    // Membership.sportId is cloud-sourced; local never overwrites cloud.
     sportId = resolveLeagueSportId({
       leagueId: membership.leagueId,
       cloudSportId: membership.sportId,
       localSportId: sportId,
     });
-    // Persist desk stamp whenever we land in a room
-    pinLeagueSport(membership.leagueId, sportId);
+    // Local stamp only — never force-pin / never cloud UPDATE on session land
+    stampLeagueSport(membership.leagueId, sportId, {
+      cloudConfirmed: true,
+    });
   } catch {
     /* keep sportId */
   }
@@ -307,13 +313,11 @@ async function fetchMyMembershipsFresh(
     });
   }
 
-  // Harden sport desks: durable stamps so logout doesn't drop NFL from the desk
+  // Align local stamps to cloud sport only — never UPDATE leagues.sport_id here.
   try {
-    const {
-      resolveLeagueSportId,
-      reassertLeagueSportToCloud,
-    } = require("./sports/sport-theme") as typeof import("./sports/sport-theme");
+    const { resolveLeagueSportId } = require("./sports/sport-theme") as typeof import("./sports/sport-theme");
     for (const m of list) {
+      // Embedded league sport_id is authoritative when present (incl. cfb).
       const cloudSport = m.sportId || "cfb";
       const resolved = resolveLeagueSportId({
         leagueId: m.leagueId,
@@ -330,13 +334,6 @@ async function fetchMyMembershipsFresh(
         if (typeof m.crystalBallEnabled !== "boolean") {
           m.crystalBallEnabled = true;
         }
-      }
-      // Cloud still default cfb while we know better → push stamp up
-      if (resolved !== "cfb" && cloudSport === "cfb") {
-        void reassertLeagueSportToCloud(
-          m.leagueId,
-          resolved as import("./sports/types").SportId
-        );
       }
     }
   } catch {

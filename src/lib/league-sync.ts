@@ -41,13 +41,10 @@ function toLocalLeague(row: {
   const prev = readPrevLocalLeague();
   const sameRoom = !!prev?.id && prev.id === row.id;
 
-  // Durable resolve: create pin → cloud non-cfb → stamp → local (never lose NFL on login)
+  // Cloud sport_id is authoritative when present. Never UPDATE leagues here.
   let sportId = "cfb";
   try {
-    const {
-      resolveLeagueSportId,
-      reassertLeagueSportToCloud,
-    } = require("./sports/sport-theme") as typeof import("./sports/sport-theme");
+    const { resolveLeagueSportId } = require("./sports/sport-theme") as typeof import("./sports/sport-theme");
     const cloudSport =
       typeof row.sport_id === "string" && row.sport_id.trim()
         ? row.sport_id.trim()
@@ -63,13 +60,6 @@ function toLocalLeague(row: {
       cloudSportId: cloudSport,
       localSportId: localSport,
     });
-    // If stamp says NFL but cloud still default cfb, push up so logout stays correct
-    if (
-      sportId !== "cfb" &&
-      (!cloudSport || cloudSport === "cfb")
-    ) {
-      void reassertLeagueSportToCloud(row.id, sportId as import("./sports/types").SportId);
-    }
   } catch {
     if (typeof row.sport_id === "string" && row.sport_id.trim()) {
       sportId = row.sport_id.trim();
@@ -279,50 +269,30 @@ export async function saveLeagueToCloud(opts: {
   if (opts.settings?.seasonThemeId !== undefined) {
     league.settings.seasonThemeId = opts.settings.seasonThemeId;
   }
-  // Settings-only saves must not clobber a just-created NFL (etc.) sport stamp
-  // when PostgREST omits sport_id or the row still has the column default.
-  if (local.sportId && local.id === league.id) {
+  // Cloud sport_id wins when present. Local stamps never overwrite cloud here.
+  {
     const cloudSport =
       typeof (data as { sport_id?: string | null }).sport_id === "string"
         ? String((data as { sport_id?: string }).sport_id).trim()
         : "";
-    if (!cloudSport || (cloudSport === "cfb" && local.sportId !== "cfb")) {
-      league.sportId = local.sportId;
+    if (cloudSport) {
+      try {
+        const { resolveLeagueSportId } = await import("./sports/sport-theme");
+        league.sportId = resolveLeagueSportId({
+          leagueId: league.id,
+          cloudSportId: cloudSport,
+          localSportId: local.sportId,
+        });
+      } catch {
+        league.sportId = cloudSport;
+      }
     }
-  }
-  try {
-    const { forcedSportForLeague } = await import("./sports/sport-theme");
-    const forced = forcedSportForLeague(league.id);
-    if (forced) league.sportId = forced;
-  } catch {
-    /* ignore */
+    // If cloud omitted sport_id from the response, keep prior local presentation only.
   }
   if (canUseStorage()) {
     localStorage.setItem(LEAGUE_KEY, JSON.stringify(league));
   }
-  // Re-assert sport on cloud if local/forced is non-cfb and cloud still cfb
-  if (
-    league.sportId &&
-    league.sportId !== "cfb" &&
-    (data as { sport_id?: string }).sport_id === "cfb"
-  ) {
-    try {
-      // Re-assert sport only — do NOT force crystal_ball_enabled false for NFL.
-      // New NFL leagues default ON at create; commissioner may have set either way.
-      const patch: Record<string, unknown> = { sport_id: league.sportId };
-      if (typeof league.settings?.crystalBallEnabled === "boolean") {
-        patch.crystal_ball_enabled = league.settings.crystalBallEnabled;
-      } else if (league.sportId === "nfl") {
-        patch.crystal_ball_enabled = true;
-      }
-      await supabase
-        .from("leagues")
-        .update(patch)
-        .eq("id", session.leagueId);
-    } catch {
-      /* best-effort */
-    }
-  }
+  // Never UPDATE leagues.sport_id from save settings / sync — create path owns writes.
   return { ok: true, league };
 }
 
