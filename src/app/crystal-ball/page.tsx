@@ -18,7 +18,10 @@ import {
   type LeagueLockCountdown,
 } from "@/lib/dates";
 import { getNflTeamByName, nflTeamAbbr } from "@/lib/teams/nfl-catalog";
-import type { CanonicalTeam } from "@/lib/teams/cfb-catalog";
+import {
+  matchCfbTeamConfident,
+  type CanonicalTeam,
+} from "@/lib/teams/cfb-catalog";
 
 function emptyShell(sportId?: string | null): CrystalBallState {
   const nfl = sportId === "nfl";
@@ -46,22 +49,38 @@ function tickMsFor(lockAt: number | null, now: number): number {
   return 60_000;
 }
 
-function NflTeamCrest({
+function TeamCrest({
   team,
   name,
   large,
+  sportId,
 }: {
   team: CanonicalTeam | null;
   name: string;
   large?: boolean;
+  sportId?: string | null;
 }) {
   const primary = team?.colors.primary || "#22c55e";
   const secondary = team?.colors.secondary || "#0a0a0a";
-  const abbr = team ? nflTeamAbbr(team) : name.slice(0, 3).toUpperCase();
+  const abbr =
+    sportId === "nfl" && team
+      ? nflTeamAbbr(team)
+      : team
+        ? team.name
+            .split(/\s+/)
+            .map((w) => w[0])
+            .join("")
+            .slice(0, 3)
+            .toUpperCase()
+        : name.slice(0, 3).toUpperCase();
   const size = large ? "w-28 h-28 text-2xl" : "w-14 h-14 text-sm";
+  const glow =
+    sportId === "nfl"
+      ? "shadow-[0_0_32px_rgba(193,18,31,0.3)]"
+      : "shadow-[0_0_32px_rgba(34,197,94,0.25)]";
   return (
     <div
-      className={`${size} rounded-full flex items-center justify-center font-black tracking-tight shrink-0 shadow-[0_0_32px_rgba(34,197,94,0.25)] border-2`}
+      className={`${size} rounded-full flex items-center justify-center font-black tracking-tight shrink-0 ${glow} border-2`}
       style={{
         background: `linear-gradient(145deg, ${primary} 0%, ${secondary || primary} 100%)`,
         borderColor: primary,
@@ -73,6 +92,15 @@ function NflTeamCrest({
       {abbr}
     </div>
   );
+}
+
+function resolveTeamCatalog(
+  name: string | null | undefined,
+  sportId: string | null | undefined
+): CanonicalTeam | null {
+  if (!name) return null;
+  if (sportId === "nfl") return getNflTeamByName(name);
+  return matchCfbTeamConfident(name);
 }
 
 export default function CrystalBallPage() {
@@ -104,7 +132,7 @@ export default function CrystalBallPage() {
   const [selfId, setSelfId] = useState<string | null>(null);
   const [crownTeam, setCrownTeam] = useState("");
   const [crowning, setCrowning] = useState(false);
-  /** NFL: expand picker after a sealed pick */
+  /** Change mode after a sealed pick (both sports) — zero mutation until save */
   const [changing, setChanging] = useState(false);
   /** Client clock for countdown — start null to avoid hydration mismatch */
   const [now, setNow] = useState<number | null>(null);
@@ -202,14 +230,23 @@ export default function CrystalBallPage() {
     return formatCountdownToDeadline(state.lockAtMs, now);
   }, [state.lockAtMs, now]);
 
+  // Authoritative lock: server flag OR deadline crossed (fail closed past known deadline)
   const liveLocked =
     state.locked ||
-    (countdown != null && !countdown.unknown && countdown.locked);
+    (countdown != null && !countdown.unknown && countdown.locked) ||
+    (now != null &&
+      state.lockAtMs != null &&
+      state.lockAtMs > 0 &&
+      now >= state.lockAtMs);
 
   async function lockPick() {
     if (!selected || saving) return;
     if (liveLocked) {
-      setErr("Locked at kickoff. No take-backs.");
+      setErr(
+        nfl
+          ? "Locked at kickoff. No take-backs."
+          : `${state.lockLabel || "Crystal Ball is locked"}. No take-backs.`
+      );
       setChanging(false);
       return;
     }
@@ -234,15 +271,15 @@ export default function CrystalBallPage() {
       /* ignore */
     }
     setChanging(false);
-    if (!nfl) {
-      setMsg(
-        res.cloud
-          ? `Sealed: ${selected}. Secret from the room until kickoff freezes Crystal Ball — then it becomes the permanent board. Change it anytime until then.`
-          : `Sealed on this device: ${selected}. Cloud save didn’t stick${
-              res.cloudError ? ` (${res.cloudError.slice(0, 80)})` : ""
-            } — run crystal-ball.sql in Supabase so the league record is shared.`
-      );
-    }
+    setMsg(
+      res.cloud
+        ? `Your pick is in: ${selected}.`
+        : `Saved on this device: ${selected}.${
+            res.cloudError
+              ? ` Cloud: ${res.cloudError.slice(0, 80)}`
+              : " Cloud not confirmed."
+          }`
+    );
     await reload();
   }
 
@@ -314,22 +351,52 @@ export default function CrystalBallPage() {
 
   const myAchievements = state.achievements.filter((a) => a.userId === selfId);
   const sealedTeam = state.myTeam;
-  const sealedCatalog = sealedTeam ? getNflTeamByName(sealedTeam) : null;
-  const showNflSealed = nfl && !!sealedTeam && !changing;
-  const showNflPicker = nfl && !sealedTeam && !changing && !liveLocked;
-  const showCfbPicker = !nfl && !state.locked;
+  const sealedCatalog = resolveTeamCatalog(sealedTeam, sportId);
+  /** A: no pick, window open → full picker */
+  const showOpenPicker = !sealedTeam && !changing && !liveLocked;
+  /** B: pick saved, not locked, not changing → minimal sealed */
+  const showSealedOpen = !!sealedTeam && !changing && !liveLocked;
+  /** C: locked with or without pick */
+  const showLocked = liveLocked;
+  /** Change mode (pre-lock only) */
+  const showChangeMode = !!sealedTeam && changing && !liveLocked;
 
-  function nflLockCopy(): string {
-    if (liveLocked) return "Locked at kickoff.";
-    if (!state.kickoffKnown || !state.lockAtMs) {
-      return "Locks at Week 1's first kickoff. Countdown appears when the slate is published.";
+  function lockCountdownCopy(): string {
+    if (liveLocked) {
+      if (nfl) return "Locked at kickoff.";
+      if (state.lockAtMs && state.lockAtMs > 0) {
+        try {
+          return `Locked ${new Date(state.lockAtMs).toLocaleString(undefined, {
+            month: "short",
+            day: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+          })}.`;
+        } catch {
+          return state.lockLabel || "Crystal Ball is locked.";
+        }
+      }
+      return state.lockLabel || "Crystal Ball is locked.";
     }
+    if (nfl) {
+      if (!state.kickoffKnown || !state.lockAtMs) {
+        return "Locks at Week 1's first kickoff. Countdown appears when the Week 1 card is published.";
+      }
+      if (countdown && !countdown.unknown && countdown.headline) {
+        return `Locks in ${countdown.headline}`;
+      }
+      return "Locks at Week 1's first kickoff.";
+    }
+    // CFB
     if (countdown && !countdown.unknown && countdown.headline) {
       return `Locks in ${countdown.headline}`;
     }
-    // now not hydrated yet
-    return "Locks at Week 1's first kickoff.";
+    return state.lockLabel
+      ? `Locks: ${state.lockLabel}`
+      : "Locks at the Crystal Ball deadline.";
   }
+
+  const prideLabel = nfl ? "Super Bowl pick" : "Crystal Ball pick";
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -357,78 +424,46 @@ export default function CrystalBallPage() {
               </span>
             )}
           </div>
-          {/* Pre-pick / CFB: keep guidance. NFL sealed: stay quiet. */}
-          {!(nfl && sealedTeam && !changing) && (
+          {showOpenPicker && (
             <p className="text-sm text-muted leading-relaxed">
               Pick who wins the{" "}
               <strong className="text-foreground">
                 {nfl ? "Super Bowl" : "national championship"}
               </strong>
-              .{" "}
-              <strong className="text-foreground">Secret until kickoff</strong> —
-              nobody sees your team (or anyone else&apos;s) until Crystal Ball
-              freezes. Then the board is the permanent record. Zero standings
-              points; nail it and you get a sarcastic achievement.
+              . Separate from your favorite team.{" "}
+              <strong className="text-foreground">Secret until freeze</strong>.
+              Zero standings points.
             </p>
           )}
         </div>
 
-        {/* CFB / pre-pick lock notice — not needed on NFL sealed minimal state */}
-        {!(nfl && sealedTeam && !changing) && (
-          <div
-            className={`mb-6 rounded-xl border-2 px-4 py-3 ${
-              liveLocked
-                ? "border-border bg-card"
-                : "border-primary bg-primary/15"
-            }`}
-          >
+        {showOpenPicker && (
+          <div className="mb-6 rounded-xl border-2 border-primary bg-primary/15 px-4 py-3">
             <p className="text-[10px] uppercase tracking-[0.18em] font-bold text-primary mb-1.5">
-              {liveLocked
-                ? "Frozen — board is public record"
-                : "Secret until freeze"}
+              Secret until freeze
             </p>
-            <p className="text-sm sm:text-base font-bold text-foreground leading-snug">
-              {liveLocked ? (
+            <p className="text-sm font-bold text-foreground leading-snug">
+              {nfl ? (
                 <>
-                  {nfl ? "Pride picks" : "Crystal Ball"} is sealed.{" "}
-                  <span className="text-primary">
-                    {nfl ? "Locked at kickoff." : state.lockLabel}
-                  </span>{" "}
-                  No changes. Everyone can see who rode which horse.
+                  Locks at{" "}
+                  <span className="text-primary">Week 1&apos;s first kickoff</span>
+                  — not your NFL team allegiance.
                 </>
               ) : (
                 <>
-                  Lock in your pick anytime.{" "}
-                  <span className="text-primary">It stays private</span> until{" "}
-                  {nfl ? (
-                    <>
-                      <span className="text-primary">
-                        Week 1&apos;s first kickoff
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      the <span className="text-primary">earlier</span> of the
-                      deadline or when{" "}
-                      <span className="text-primary">
-                        Week 0 freezes / scores
-                      </span>
-                    </>
-                  )}
-                  . After that:{" "}
-                  <span className="underline decoration-2">no take-backs</span>,
-                  full room board forever.
+                  Locks at the{" "}
+                  <span className="text-primary">Crystal Ball deadline</span>{" "}
+                  (or Week 0 kickoff/score, whichever is earlier). Not your CFB
+                  team allegiance.
                 </>
               )}
             </p>
-            {!nfl && (
-              <p className="text-xs text-muted mt-2 font-medium">
-                Deadline: {state.lockLabel}.{" "}
-                <Link href="/rules" className="text-primary hover:underline">
-                  Full rules
-                </Link>
-              </p>
-            )}
+            <p
+              className="text-xs text-muted mt-2 font-medium"
+              suppressHydrationWarning
+            >
+              {lockCountdownCopy()}
+            </p>
           </div>
         )}
 
@@ -466,53 +501,107 @@ export default function CrystalBallPage() {
           </div>
         )}
 
-        {/* ── NFL sealed confirmation (minimal) ── */}
-        {showNflSealed && sealedTeam && (
+        {/* ── C: LOCKED permanent result ── */}
+        {showLocked && (
+          <section className="rounded-2xl border border-border bg-card p-6 sm:p-8 mb-6 text-center">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted mb-3">
+              CRYSTAL BALL LOCKED
+            </p>
+            {sealedTeam ? (
+              <>
+                <div className="flex justify-center mb-4">
+                  <TeamCrest
+                    team={sealedCatalog}
+                    name={sealedTeam}
+                    large
+                    sportId={sportId}
+                  />
+                </div>
+                <h2 className="text-xl sm:text-2xl font-black text-foreground leading-tight">
+                  {sealedTeam}
+                </h2>
+                <p className="mt-2 text-base font-semibold text-foreground">
+                  Your pick is locked.
+                </p>
+                <p className="mt-3 text-sm text-muted" suppressHydrationWarning>
+                  {lockCountdownCopy()}
+                </p>
+              </>
+            ) : (
+              <p className="text-sm text-muted">
+                Crystal Ball is locked. You never sealed a pick.
+              </p>
+            )}
+            <Link
+              href="/"
+              className="mt-6 inline-flex items-center justify-center w-full sm:w-auto min-h-[48px] px-6 py-3 rounded-xl bg-primary text-black text-sm font-bold touch-manipulation"
+            >
+              Back to Home
+            </Link>
+          </section>
+        )}
+
+        {/* ── B: saved, unlocked, minimal sealed ── */}
+        {showSealedOpen && sealedTeam && (
           <section className="rounded-2xl border border-primary/30 bg-card p-6 sm:p-8 mb-6 text-center">
             <div className="flex justify-center mb-4">
-              <NflTeamCrest team={sealedCatalog} name={sealedTeam} large />
+              <TeamCrest
+                team={sealedCatalog}
+                name={sealedTeam}
+                large
+                sportId={sportId}
+              />
             </div>
             <h2 className="text-xl sm:text-2xl font-black text-foreground leading-tight">
               {sealedTeam}
             </h2>
             <p className="mt-2 text-sm font-semibold text-primary">
-              Your Super Bowl pick is in.
+              Your pick is in.
             </p>
             <p
-              className={`mt-4 text-sm font-medium tabular-nums ${
-                liveLocked ? "text-muted" : "text-foreground"
-              }`}
+              className="mt-4 text-sm font-medium tabular-nums text-foreground"
               suppressHydrationWarning
             >
-              {nflLockCopy()}
+              {lockCountdownCopy()}
             </p>
-            {!liveLocked && (
+            <div className="mt-6 flex flex-col sm:flex-row gap-2 justify-center">
               <button
                 type="button"
                 onClick={startChange}
-                className="mt-6 text-sm font-semibold text-muted hover:text-primary underline-offset-4 hover:underline touch-manipulation min-h-[44px] px-3"
+                className="min-h-[48px] px-5 py-3 rounded-xl border border-border text-sm font-semibold touch-manipulation"
               >
                 Change My Pick
               </button>
-            )}
+              <Link
+                href="/"
+                className="inline-flex items-center justify-center min-h-[48px] px-5 py-3 rounded-xl bg-primary text-black text-sm font-bold touch-manipulation"
+              >
+                Back to Home
+              </Link>
+            </div>
           </section>
         )}
 
-        {/* ── NFL change flow ── */}
-        {nfl && changing && sealedTeam && !liveLocked && (
+        {/* ── Change mode (pre-lock only) ── */}
+        {showChangeMode && sealedTeam && (
           <section className="rounded-xl border border-border bg-card p-5 mb-6">
             <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary mb-2">
-              Change Super Bowl pick
+              Change {prideLabel}
             </p>
             <div className="flex items-center gap-3 mb-4 rounded-xl border border-primary/25 bg-primary/10 px-3 py-2.5">
-              <NflTeamCrest team={sealedCatalog} name={sealedTeam} />
+              <TeamCrest
+                team={sealedCatalog}
+                name={sealedTeam}
+                sportId={sportId}
+              />
               <div className="min-w-0 text-left">
                 <p className="text-xs text-muted">Current prediction</p>
                 <p className="font-bold text-foreground truncate">{sealedTeam}</p>
               </div>
             </div>
             <p className="text-xs text-muted mb-3">
-              Pick a new champion. Nothing changes until you confirm.
+              Pick a replacement. Nothing changes until you save. Keep Current
+              Pick exits with zero mutation.
             </p>
             <input
               type="search"
@@ -522,8 +611,8 @@ export default function CrystalBallPage() {
               className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm mb-3 min-h-[44px]"
             />
             <div className="max-h-56 overflow-y-auto space-y-1 mb-4 border border-border rounded-lg p-2">
-              {filtered.map((t) => {
-                const cat = getNflTeamByName(t.name);
+              {(nfl ? filtered : filtered.slice(0, 80)).map((t) => {
+                const cat = resolveTeamCatalog(t.name, sportId);
                 return (
                   <button
                     key={t.name}
@@ -578,13 +667,16 @@ export default function CrystalBallPage() {
           </section>
         )}
 
-        {/* ── NFL first pick (no sealed yet) ── */}
-        {showNflPicker && !changing && (
+        {/* ── A: open first pick ── */}
+        {showOpenPicker && (
           <section className="rounded-xl border border-border bg-card p-5 mb-6">
-            <h2 className="font-semibold mb-1">Your Super Bowl pick</h2>
+            <h2 className="font-semibold mb-1">
+              {nfl ? "Your Super Bowl pick" : "Your national champ"}
+            </h2>
             <p className="text-xs text-muted mb-3">
-              Who wins the Super Bowl? Separate from your favorite team. Search
-              teams — one pick.
+              {nfl
+                ? "Who wins the Super Bowl? Separate from your favorite NFL team."
+                : "Who wins the national championship? Separate from your CFB team allegiance."}
             </p>
             <input
               type="search"
@@ -594,8 +686,8 @@ export default function CrystalBallPage() {
               className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm mb-3 min-h-[44px]"
             />
             <div className="max-h-56 overflow-y-auto space-y-1 mb-4 border border-border rounded-lg p-2">
-              {filtered.map((t) => {
-                const cat = getNflTeamByName(t.name);
+              {(nfl ? filtered : filtered.slice(0, 80)).map((t) => {
+                const cat = resolveTeamCatalog(t.name, sportId);
                 return (
                   <button
                     key={t.name}
@@ -640,84 +732,14 @@ export default function CrystalBallPage() {
             >
               {saving
                 ? "Sealing…"
-                : `Lock pick${selected ? `: ${selected}` : ""}`}
+                : `Save pick${selected ? `: ${selected}` : ""}`}
             </button>
-            <p className="text-xs text-muted mt-3 text-center" suppressHydrationWarning>
-              {nflLockCopy()}
+            <p
+              className="text-xs text-muted mt-3 text-center"
+              suppressHydrationWarning
+            >
+              {lockCountdownCopy()}
             </p>
-          </section>
-        )}
-
-        {/* ── CFB pick section (unchanged behavior) ── */}
-        {!nfl && (
-          <section className="rounded-xl border border-border bg-card p-5 mb-6">
-            <h2 className="font-semibold mb-1">Your national champ</h2>
-            <p className="text-xs text-muted mb-3">
-              {state.locked
-                ? state.myTeam
-                  ? `You rode with ${state.myTeam}. The orb is sealed.`
-                  : "You never picked. The witches are disappointed."
-                : "Search teams. One pick. Change anytime until freeze — still secret from the room."}
-            </p>
-
-            {showCfbPicker && (
-              <>
-                <input
-                  type="search"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search team or conference…"
-                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm mb-3"
-                />
-                <div className="max-h-56 overflow-y-auto space-y-1 mb-4 border border-border rounded-lg p-2">
-                  {filtered.slice(0, 80).map((t) => (
-                    <button
-                      key={t.name}
-                      type="button"
-                      onClick={() => {
-                        setSelected(t.name);
-                        try {
-                          sessionStorage.setItem("warroom-tut-cb-selected", "1");
-                        } catch {
-                          /* ignore */
-                        }
-                      }}
-                      className={`w-full text-left px-3 py-2 rounded-md text-sm flex justify-between gap-2 ${
-                        selected === t.name
-                          ? "bg-primary/15 border border-primary/40 text-primary"
-                          : "hover:bg-card-hover border border-transparent"
-                      }`}
-                    >
-                      <span className="font-medium">{t.name}</span>
-                      <span className="text-xs text-muted shrink-0">
-                        {t.conference}
-                      </span>
-                    </button>
-                  ))}
-                  {filtered.length === 0 && (
-                    <p className="text-xs text-muted p-2">No teams match.</p>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  disabled={!selected || saving}
-                  onClick={() => void lockPick()}
-                  className="w-full py-3 rounded-xl bg-primary text-black font-semibold disabled:opacity-50"
-                >
-                  {saving
-                    ? "Sealing…"
-                    : state.myTeam
-                      ? `Update pick${selected ? `: ${selected}` : ""}`
-                      : `Lock pick${selected ? `: ${selected}` : ""}`}
-                </button>
-              </>
-            )}
-
-            {state.locked && state.myTeam && (
-              <p className="text-sm font-semibold text-foreground">
-                {state.myTeam}
-              </p>
-            )}
           </section>
         )}
 

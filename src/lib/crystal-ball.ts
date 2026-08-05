@@ -135,7 +135,7 @@ export async function resolveCrystalBallLock(
   const sport = resolveCbSport(sportId);
   const openWeek = sport === "nfl" ? 1 : 0;
 
-  // ── NFL: Week 1 published slate is the only deadline ──
+  // ── NFL: Week 1 *formally published* slate first kickoff is the only deadline ──
   if (sport === "nfl") {
     try {
       const { listScoredWeekNumbers, loadWeekCard } = await import("./cloud");
@@ -153,9 +153,13 @@ export async function resolveCrystalBallLock(
         };
       }
 
-      // Authoritative slate = Week 1 card with games + parseable start_times.
-      // Product treats "has games" as the published player card (same as week pills).
-      if (card?.games?.length) {
+      // Authoritative slate = formally published Week 1 card (publishedAt + games)
+      const formallyPublished = !!(
+        card?.games?.length &&
+        typeof card.publishedAt === "string" &&
+        card.publishedAt.trim()
+      );
+      if (formallyPublished && card?.games?.length) {
         const { firstKickoffOnCardMs, isCardLockDeadlinePassed } = await import(
           "./dates"
         );
@@ -188,6 +192,8 @@ export async function resolveCrystalBallLock(
         kickoffKnown: false,
       };
     } catch {
+      // Fail closed only when we cannot re-verify after a score mark would apply —
+      // without a known kickoff, stay open (no invented lock).
       return {
         locked: false,
         reason: "no_kickoff",
@@ -198,7 +204,7 @@ export async function resolveCrystalBallLock(
     }
   }
 
-  // ── CFB (unchanged product): calendar OR Week 0 freeze/score ──
+  // ── CFB: calendar OR Week 0 freeze/score ──
   const calendarMs = crystalBallLockMs("cfb");
   const calendarLabel = crystalBallLockLabel("cfb");
   if (now >= calendarMs) {
@@ -227,12 +233,18 @@ export async function resolveCrystalBallLock(
         kickoffKnown: true,
       };
     }
-    if (card?.games?.length) {
+    // Prefer formally published Week 0 for kickoff; fall back to games if present
+    const formallyPublished = !!(
+      card?.games?.length &&
+      typeof card.publishedAt === "string" &&
+      card.publishedAt.trim()
+    );
+    if (formallyPublished || card?.games?.length) {
       const { firstKickoffOnCardMs, isCardLockDeadlinePassed } = await import(
         "./dates"
       );
-      const kickMs = firstKickoffOnCardMs(card.games);
-      if (isCardLockDeadlinePassed(card.games, now)) {
+      const kickMs = firstKickoffOnCardMs(card!.games);
+      if (isCardLockDeadlinePassed(card!.games, now)) {
         return {
           locked: true,
           reason: "week0_frozen",
@@ -254,7 +266,16 @@ export async function resolveCrystalBallLock(
       };
     }
   } catch {
-    /* ignore cloud; fall through open */
+    // Fail closed once calendar deadline is known and has passed
+    if (now >= calendarMs) {
+      return {
+        locked: true,
+        reason: "calendar",
+        lockLabel: calendarLabel,
+        lockAtMs: calendarMs,
+        kickoffKnown: true,
+      };
+    }
   }
 
   return {
