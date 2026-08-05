@@ -24,10 +24,6 @@ export default function RulesPage() {
             Thursday. Friday. Saturday. Sunday. Monday. Football has declared war
             on the calendar.
           </p>
-          <p className="text-sm text-muted mt-2 leading-relaxed max-w-xl">
-            Everything below protects that experience. Culture first. Fine print
-            second.
-          </p>
         </div>
 
         <div className="rounded-xl border border-border bg-card p-5 sm:p-6 mb-6">

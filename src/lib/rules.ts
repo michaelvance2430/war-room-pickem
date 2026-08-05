@@ -1,274 +1,221 @@
-/** Shared league rules — used by onboarding popup + Rules page. */
+/**
+ * Shared league rules — player survival guide (Rules page + short onboarding).
+ * Describes production behavior; does not redefine scoring/locks.
+ */
 
 export type RuleLine =
   | string
   | {
       text: string;
-      /** Extra weight for lock deadlines / must-read lines */
+      /** Extra weight for irreversible consequences only */
       bold?: boolean;
     };
 
 export type RuleSection = {
   title: string;
   body: RuleLine[];
-  /** Draw a highlighted box around this section (Crystal Ball lock, etc.) */
+  /** Highlighted box (lock callout, etc.) */
   callout?: boolean;
+  /** Optional expandable block under the section */
+  expand?: {
+    label: string;
+    body: string[];
+  };
 };
 
 export const RULES_SEEN_KEY = "warroom-rules-seen-v2";
 
-export const RULES_INTRO =
-  "War Room exists to make Saturdays with friends a little more fun. Everything below protects that experience — not corporate fine print.";
+/** Page cold open — binding product copy */
+export const RULES_COLD_OPEN =
+  "Thursday. Friday. Saturday. Sunday. Monday. Football has declared war on the calendar.";
 
-export const RULES_INTRO_NFL =
-  "War Room exists to make Sundays with friends a little more fun. Everything below protects that experience — not corporate fine print.";
-
-export const RULE_SECTIONS: RuleSection[] = [
+/** Shared 30-second north star */
+export const RULES_THIRTY_SECOND: RuleLine[] = [
   {
-    title: "1. Go to My Picks",
-    body: [
-      "Open My Picks once the commissioner publishes the week’s card.",
-      "You’ll see five games plus a weekly prop.",
-      "If the commissioner doesn’t post the card by 48 hours before first kickoff, the system auto-selects five games so the room isn’t stuck. Two weeks in a row of that and the gavel goes to whoever is in 1st place.",
-    ],
+    bold: true,
+    text: "Cover the spread. Rank 5→1 once each. Save Picks before first kickoff—or score nothing.",
   },
-  {
-    title: "2. Pick who covers the spread",
-    body: [
-      "For each game, pick the side you think will cover (win against the posted line).",
-      "Negative odds (e.g. −7.5) mean that team is favored — they’re predicted to win by that many points.",
-      "Positive odds (e.g. +7.5) mean that team is the underdog — they’re predicted to lose (or cover if they stay within the number).",
-      "You’re not just picking the winner — you’re picking against the number locked on the card.",
-    ],
-  },
-  {
-    title: "3. Confidence 1–5",
-    body: [
-      "Assign each game a unique confidence: 1, 2, 3, 4, or 5.",
-      "That number is how many points you earn if that pick is correct.",
-      "Use 5 on the game you’re most sure about; use 1 on your weakest lean.",
-      "You must use each number exactly once per week.",
-    ],
-  },
-  {
-    title: "4. Best Bet (multiplier)",
-    body: [
-      "Choose one game as your Best Bet.",
-      "If that pick hits, those confidence points count double (2×).",
-      "If it misses, you don’t get those points (same as any wrong pick).",
-    ],
-  },
-  {
-    title: "5. Weekly prop",
-    body: [
-      "Answer the binary prop for the week (Yes/No or Over/Under style).",
-      "Correct prop picks earn bonus points (usually 3).",
-    ],
-  },
-  {
-    title: "6. Save your card",
-    body: [
-      "Hit Save Picks when everything is filled in: side + confidence on all five, one Best Bet, and a prop choice.",
-      "Only you can see your weekly picks — league mates cannot spy on your card.",
-    ],
-  },
-  {
-    title: "Lock deadlines — READ THIS",
-    callout: true,
-    body: [
-      {
-        bold: true,
-        text: "ALL PICKS MUST BE LOCKED BEFORE THE FIRST KICKOFF on that week’s slate.",
-      },
-      {
-        bold: true,
-        text: "After first kickoff: the entire card freezes. No more edits for anyone. If you never locked, you cannot lock — you score 0 for the week.",
-      },
-      "No makeups. No partial credit. Lock early. Fair is fair.",
-      {
-        bold: true,
-        text: "NO LOCK, NO POINTS. Gazette may put no-lockers on the milk carton.",
-      },
-    ],
-  },
-  {
-    title: "Scoring & standings",
-    body: [
-      "Weekly score = confidence points for correct ATS picks (+ double for a correct Best Bet) + prop points if you hit the prop.",
-      "Only locked picks are scored. No locked card for the week = zero points for that week.",
-      "Season standings total your weekly points.",
-      "Week 0 (openers) is optional and independent. Real season runs Week 1 → late RS → Conference Championships.",
-      "After Conference Championship week is scored, the cut locks: top half → Championship bracket, bottom → Toilet Bowl.",
-      "CFP weeks (R1 / QF / SF / Final) advance those brackets — higher weekly score wins the matchup.",
-    ],
-  },
-  {
-    title: "Crystal Ball (preseason) — READ THIS",
-    callout: true,
-    body: [
-      "Optional league feature — commissioner can turn it on/off under Settings.",
-      "Before the season starts, pick who you think wins the national championship. Worth zero standings points — pure pride.",
-      {
-        bold: true,
-        text: "LOCK: Crystal Ball picks lock at 12:00 noon ET on Saturday, August 29, 2026 (Week 0). After that, you CANNOT change your pick. No exceptions. No take-backs.",
-      },
-      {
-        bold: true,
-        text: "Do it early. If you skip Crystal Ball and it locks, you are stuck without a pick for the whole season.",
-      },
-      "If you're right when the commissioner crowns the champion, you earn: Village Witch / Wizard Nerd (still zero points).",
-      "Open Crystal Ball from the nav menu while it’s still open.",
-    ],
-  },
-  {
-    title: "Trophy Room",
-    body: [
-      "After the season, the commissioner engraves winners: Championship, Toilet Bowl, and Village Nerd (Crystal Ball).",
-      "History stays with the league year after year — even if players join/leave or the commissioner is passed on.",
-      "Season reset does not wipe the Trophy Room.",
-    ],
-  },
-  {
-    title: "Locker Room",
-    body: [
-      "Optional league chat for short trash talk (280 characters max).",
-      "Tap football emojis, post takes, delete your own. Commissioner can delete any message.",
-      "Not for official rules — use Announcements for that.",
-    ],
-  },
-  {
-    title: "League size",
-    body: [
-      "Leagues cap at 32 players.",
-      "Why: top half → Championship (up to 16), bottom half → Toilet Bowl (up to 16). A 16-team bracket needs 4 rounds — exactly the CFP window (weeks 15–18).",
-      "If your group is bigger, start a second league with its own code.",
-      "Optional: commissioner can pad empty seats with bots up to 32. Bots auto-pick from coded personas (chalk / dogs / sharp). Clear bots anytime — real players stay.",
-    ],
-  },
-  {
-    title: "Profile & tips",
-    body: [
-      "Upload a profile photo under Account so the league knows who’s who.",
-      "Tap a green underlined name on Standings, Board, or Players to open that player’s profile — badges, trophies, the whole flex.",
-      "Your own page is under More → My Profile (or Account → View public profile).",
-      "If the commissioner changes the week’s games, My Picks refreshes automatically — re-check and Save if the slate changed.",
-      "Revisit these rules anytime under Rules in the menu.",
-    ],
-  },
+  "1. Pick who covers the spread on each game.",
+  "2. Rank confidence 5 through 1 — each number once.",
+  "3. Finish the card and hit Save Picks before the first kickoff on that week’s slate — or you score zero.",
 ];
 
-const SCORING_NFL: RuleSection = {
-  title: "Scoring & standings",
+const SPREADS_EXPAND = {
+  label: "How spreads work",
   body: [
-    "Weekly score = confidence points for correct ATS picks (+ double for a correct Best Bet) + prop points if you hit the prop.",
-    "Only locked picks are scored. No locked card for the week = zero points for that week.",
-    "Season standings total your weekly points.",
-    "Real season = official NFL Weeks 1–18 (Thu–Mon). Same numbers as the league.",
-    "After Week 18 is scored, the cut locks: top half → Championship bracket, bottom → Toilet Bowl.",
-    "Then Wild Card / Divisional / Conference / Super Bowl cards advance those brackets — higher weekly score wins the matchup.",
+    "The number on the card is the line.",
+    "−7.5 means that team is favored. They must win by more than 7.5 for that side to cover.",
+    "+7.5 means that team is the underdog. They cover if they win outright or lose by 7 or fewer.",
+    "You’re picking against the spread—not just picking who wins.",
   ],
 };
 
-const LOCK_NFL: RuleSection = {
-  title: "Lock deadlines — READ THIS",
+const THIS_WEEK: RuleSection = {
+  title: "This week’s job",
+  body: [
+    "When the card is live, open My Picks (Home may say Make Picks or Finish Card — same place).",
+    "You’ll get five games plus a weekly prop.",
+    "For each game: pick the side that covers the spread (against the number on the card).",
+    "Give each game unique confidence: 5, 4, 3, 2, 1 — each once. 5 = most sure.",
+    "Mark one game Best Bet (a hit doubles those confidence points).",
+    "Answer the prop.",
+    "Tap Save Picks. Later edits: Update Picks.",
+  ],
+  expand: SPREADS_EXPAND,
+};
+
+const LOCK_OR_ZERO: RuleSection = {
+  title: "Lock or zero",
   callout: true,
   body: [
     {
       bold: true,
-      text: "ALL PICKS MUST BE LOCKED BEFORE THE FIRST KICKOFF on that week’s slate.",
+      text: "The whole card freezes at the first kickoff on that week’s slate — every game and the prop.",
     },
     {
       bold: true,
-      text: "After first kickoff: the entire card freezes. No more edits for anyone. If you never locked, you cannot lock — you score 0 for the week.",
+      text: "No Save Picks before that? Zero points for the week. No makeups. No partial credit.",
     },
-    "No makeups. No partial credit. Lock early. Fair is fair.",
+    "Already saved? You can still Update Picks until first kickoff. After that: frozen for everyone.",
+  ],
+};
+
+const HOW_YOU_SCORE: RuleSection = {
+  title: "How you score",
+  body: [
+    "Correct ATS pick = its confidence points.",
+    "Correct Best Bet = those points ×2. Miss = 0 on that game.",
+    "Correct prop = the points shown on this week’s card.",
+    "Season standings = sum of your weeks. Only submitted cards count.",
+  ],
+};
+
+const SEASON_CFB: RuleSection = {
+  title: "How the season ends",
+  body: [
+    "Week 0 may contain a real scored card. It does not independently trigger the championship cut.",
+    "Chase points through the regular season into Conference Championships (Week 14).",
+    "After that week is scored, the field splits at your league’s cut line — Championship bracket vs Toilet Bowl.",
+    "CFP weeks (15–18): still pick; higher weekly score advances your bracket matchup.",
+    "Hardware lives in the Trophy Room after the season.",
+  ],
+};
+
+const SEASON_NFL: RuleSection = {
+  title: "How the season ends",
+  body: [
+    "Official NFL Weeks 1–18 (Thu–Mon football).",
+    "After Week 18 is scored, the field splits at your league’s cut line — Championship vs Toilet Bowl.",
+    "Playoff weeks: higher weekly score advances the matchup.",
+    "Divisions display as AFC/NFC East–West labels — same four seats under the hood.",
+    "Hardware lives in the Trophy Room after the season.",
+  ],
+};
+
+const CRYSTAL_CFB: RuleSection = {
+  title: "Crystal Ball",
+  callout: true,
+  body: [
+    "Pick who wins the national championship. Zero standings points — pure pride.",
     {
       bold: true,
-      text: "NO LOCK, NO POINTS. Gazette may put no-lockers on the inactive list.",
+      text: "Locks at the earliest of: noon ET Sat Aug 29, 2026; Week 0 first kickoff; or Week 0 scored. No take-backs.",
     },
-  ],
-};
-
-const TROPHY_NFL: RuleSection = {
-  title: "Trophy Room",
-  body: [
-    "After the season, the commissioner engraves winners: Championship and Toilet Bowl (and Village Nerd if pride pick is on).",
-    "History stays with the league year after year — even if players join/leave or the commissioner is passed on.",
-    "Season reset does not wipe the Trophy Room.",
-  ],
-};
-
-const LEAGUE_SIZE_NFL: RuleSection = {
-  title: "League size",
-  body: [
-    "Leagues cap at 32 players.",
-    "Why: top half → Championship (up to 16), bottom half → Toilet Bowl (up to 16). A 16-team bracket needs 4 rounds — Wild Card through Super Bowl (app weeks 19–22).",
-    "Divisions display as AFC East, AFC West, NFC East, NFC West — each division sends a champ into championship seeding.",
-    "If your group is bigger, start a second league with its own code.",
-    "Optional: commissioner can pad empty seats with bots up to 32. Clear bots anytime — real players stay.",
+    "Home may send you to Lock Crystal Ball while it’s open.",
   ],
 };
 
 const CRYSTAL_NFL: RuleSection = {
-  title: "Super Bowl pride pick (optional) — READ THIS",
+  title: "Super Bowl pick",
   callout: true,
   body: [
-    "Optional — commissioner can turn it on under Settings (off by default for NFL).",
-    "Pick who you think wins the Super Bowl. Worth zero standings points — pure flex.",
+    "Your Team = NFL allegiance (who you ride with). Super Bowl Pick = who you think wins it all. Separate answers.",
+    "Super Bowl pick is pride only — zero standings points.",
     {
       bold: true,
-      text: "LOCK: pride pick freezes at noon ET on Kickoff Thursday, Sep 10, 2026, or when Week 1 locks — whichever first. No take-backs.",
+      text: "Locks at the earliest of: noon ET Thu Sep 10, 2026; Week 1 first kickoff; or Week 1 scored. No take-backs.",
     },
-    "If you're right when the commissioner crowns the champ, you earn Village Witch / Wizard Nerd (still zero points).",
+    "Home may say Make Super Bowl Pick / Lock Crystal Ball while it’s open.",
   ],
 };
 
-/**
- * Sport-aware rules for onboarding + Rules page.
- * NFL drops CFB week/Crystal Ball copy and uses pro week map language.
- */
-export function getRulesForSport(sportId?: string | null): {
+const THE_ROOM: RuleSection = {
+  title: "The room",
+  body: [
+    "Announcements = official league word. Read them.",
+    "Locker Room = optional short trash talk — not the rulebook.",
+    "Trophy Room = permanent engraved hardware for the league. Season reset doesn’t wipe it.",
+    "Cap 32 players so both brackets finish clean. Bigger group → second league code.",
+  ],
+};
+
+const FINE_PRINT: RuleSection = {
+  title: "Fine print",
+  body: [
+    "If the commissioner changes the slate, My Picks refreshes — re-check and Save Picks / Update Picks while the card is still open.",
+  ],
+};
+
+/** Full Rules pack for one sport. Crystal section only when enabled. */
+export function getRulesForSport(
+  sportId?: string | null,
+  opts?: { crystalBallEnabled?: boolean; short?: boolean }
+): {
   intro: string;
   sections: RuleSection[];
+  thirtySecond: RuleLine[];
+  coldOpen: string;
 } {
-  if (sportId === "nfl") {
-    const core = RULE_SECTIONS.filter(
-      (s) =>
-        !s.title.startsWith("Crystal Ball") &&
-        s.title !== "Scoring & standings" &&
-        s.title !== "Lock deadlines — READ THIS" &&
-        s.title !== "Trophy Room" &&
-        s.title !== "Locker Room" &&
-        s.title !== "League size" &&
-        s.title !== "Profile & tips"
-    );
-    const tail = RULE_SECTIONS.filter(
-      (s) => s.title === "Locker Room" || s.title === "Profile & tips"
-    );
+  const nfl = sportId === "nfl";
+  const crystalOn = opts?.crystalBallEnabled !== false;
+  const short = !!opts?.short;
+
+  if (short) {
     return {
-      intro: RULES_INTRO_NFL,
-      sections: [
-        ...core,
-        LOCK_NFL,
-        SCORING_NFL,
-        CRYSTAL_NFL,
-        TROPHY_NFL,
-        LEAGUE_SIZE_NFL,
-        ...tail,
-      ],
+      coldOpen: RULES_COLD_OPEN,
+      intro: "",
+      thirtySecond: RULES_THIRTY_SECOND,
+      sections: [LOCK_OR_ZERO],
     };
   }
-  return { intro: RULES_INTRO, sections: RULE_SECTIONS };
+
+  const sections: RuleSection[] = [
+    {
+      title: "The 30-second version",
+      body: RULES_THIRTY_SECOND,
+    },
+    THIS_WEEK,
+    LOCK_OR_ZERO,
+    HOW_YOU_SCORE,
+    nfl ? SEASON_NFL : SEASON_CFB,
+  ];
+
+  if (crystalOn) {
+    sections.push(nfl ? CRYSTAL_NFL : CRYSTAL_CFB);
+  }
+
+  sections.push(THE_ROOM, FINE_PRINT);
+
+  return {
+    coldOpen: RULES_COLD_OPEN,
+    intro: "",
+    thirtySecond: RULES_THIRTY_SECOND,
+    sections,
+  };
 }
 
-
+/** @deprecated Use getRulesForSport — kept for rare imports */
+export const RULES_INTRO =
+  "Cover the spread. Rank 5→1 once each. Save Picks before first kickoff—or score nothing.";
+export const RULES_INTRO_NFL = RULES_INTRO;
+export const RULE_SECTIONS: RuleSection[] = getRulesForSport("cfb").sections;
 
 export function hasSeenRules(): boolean {
   if (typeof window === "undefined") return true;
   try {
     return localStorage.getItem(RULES_SEEN_KEY) === "1";
   } catch {
-    return false;
+    return true;
   }
 }
 
