@@ -177,7 +177,16 @@ export default function ProfilePage() {
   const [player, setPlayer] = useState<Player | null>(null);
   const [ready, setReady] = useState(false);
   const [lightbox, setLightbox] = useState(false);
-  const [favoriteTeam, setFavoriteTeam] = useState<CanonicalTeam | null>(null);
+  /** Sport-keyed allegiance — never collapse CFB/NFL into one field */
+  const [allegianceLoading, setAllegianceLoading] = useState(true);
+  /** When league context is nfl|cfb, only that sport is shown; else both */
+  const [allegianceContext, setAllegianceContext] = useState<
+    "nfl" | "cfb" | "both"
+  >("both");
+  const [cfbFavorite, setCfbFavorite] = useState<CanonicalTeam | null>(null);
+  const [nflFavorite, setNflFavorite] = useState<CanonicalTeam | null>(null);
+  const [cfbAnswered, setCfbAnswered] = useState(false);
+  const [nflAnswered, setNflAnswered] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [joinTitle, setJoinTitle] = useState<string | null>(null);
   const [lastSeenAt, setLastSeenAt] = useState<string | null>(null);
@@ -238,7 +247,11 @@ export default function ProfilePage() {
       setBlueFalconCount(0);
       setDetailsOpen(false);
       setDetailsPanel(null);
-      setFavoriteTeam(null);
+      setCfbFavorite(null);
+      setNflFavorite(null);
+      setCfbAnswered(false);
+      setNflAnswered(false);
+      setAllegianceLoading(true);
 
       const me = readSession()?.playerId || null;
       const isSelf = !!(me && me === id);
@@ -311,13 +324,38 @@ export default function ProfilePage() {
               profileNavUsable(`first-content source=${source}`);
               wrProfile("interactive");
             }
-            // Allegiance (non-blocking)
+            // Allegiance (non-blocking) — sport-aware, no cross-sport fallback
             void import("@/lib/favorite-teams").then(async (m) => {
               try {
-                const t = await m.getUserFavoriteTeam(id, "cfb");
-                if (!cancelled) setFavoriteTeam(t);
+                const lg = readLeague();
+                const raw = (lg?.sportId || "").toString().toLowerCase();
+                const ctx: "nfl" | "cfb" | "both" =
+                  raw === "nfl" ? "nfl" : raw === "cfb" ? "cfb" : "both";
+                if (cancelled) return;
+                setAllegianceContext(ctx);
+                setAllegianceLoading(true);
+                setCfbFavorite(null);
+                setNflFavorite(null);
+                if (ctx === "nfl" || ctx === "both") {
+                  const tid = await m.getUserFavoriteTeamId(id, "nfl");
+                  const t = tid ? await m.getUserFavoriteTeam(id, "nfl") : null;
+                  if (!cancelled) {
+                    setNflAnswered(!!tid);
+                    setNflFavorite(t);
+                  }
+                }
+                if (ctx === "cfb" || ctx === "both") {
+                  const tid = await m.getUserFavoriteTeamId(id, "cfb");
+                  const t = tid ? await m.getUserFavoriteTeam(id, "cfb") : null;
+                  if (!cancelled) {
+                    setCfbAnswered(!!tid);
+                    setCfbFavorite(t);
+                  }
+                }
               } catch {
                 /* ignore */
+              } finally {
+                if (!cancelled) setAllegianceLoading(false);
               }
             });
           }
@@ -435,10 +473,36 @@ export default function ProfilePage() {
 
         void import("@/lib/favorite-teams").then(async (m) => {
           try {
-            const t = await m.getUserFavoriteTeam(found!.id, "cfb");
-            if (!cancelled) setFavoriteTeam(t);
+            const uid = found!.id;
+            const lg = readLeague();
+            const raw = (lg?.sportId || "").toString().toLowerCase();
+            const ctx: "nfl" | "cfb" | "both" =
+              raw === "nfl" ? "nfl" : raw === "cfb" ? "cfb" : "both";
+            if (cancelled) return;
+            setAllegianceContext(ctx);
+            setAllegianceLoading(true);
+            setCfbFavorite(null);
+            setNflFavorite(null);
+            if (ctx === "nfl" || ctx === "both") {
+              const tid = await m.getUserFavoriteTeamId(uid, "nfl");
+              const t = tid ? await m.getUserFavoriteTeam(uid, "nfl") : null;
+              if (!cancelled) {
+                setNflAnswered(!!tid);
+                setNflFavorite(t);
+              }
+            }
+            if (ctx === "cfb" || ctx === "both") {
+              const tid = await m.getUserFavoriteTeamId(uid, "cfb");
+              const t = tid ? await m.getUserFavoriteTeam(uid, "cfb") : null;
+              if (!cancelled) {
+                setCfbAnswered(!!tid);
+                setCfbFavorite(t);
+              }
+            }
           } catch {
             /* optional until migration */
+          } finally {
+            if (!cancelled) setAllegianceLoading(false);
           }
         });
 
@@ -627,24 +691,63 @@ export default function ProfilePage() {
                   </span>
                 )}
                 <h1 className="text-2xl font-bold truncate">{player.name}</h1>
-                {favoriteTeam && !mock && (
-                  <span
-                    className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full border"
-                    style={{
-                      borderColor: `${favoriteTeam.colors.primary}99`,
-                      color: favoriteTeam.colors.primary,
-                      backgroundColor: `${favoriteTeam.colors.primary}14`,
-                    }}
-                    title="CFB allegiance"
-                  >
-                    <span
-                      className="w-2 h-2 rounded-full shrink-0"
-                      style={{ backgroundColor: favoriteTeam.colors.primary }}
-                      aria-hidden
-                    />
-                    {favoriteTeam.name}
+                {!mock && allegianceLoading && (
+                  <span className="text-[10px] text-muted font-medium animate-pulse">
+                    Team…
                   </span>
                 )}
+                {!mock &&
+                  !allegianceLoading &&
+                  (allegianceContext === "cfb" ||
+                    allegianceContext === "both") && (
+                    <AllegianceChip
+                      label="CFB Team"
+                      team={cfbFavorite}
+                      empty={
+                        cfbAnswered
+                          ? "No team declared"
+                          : "No CFB team declared"
+                      }
+                    />
+                  )}
+                {!mock &&
+                  !allegianceLoading &&
+                  (allegianceContext === "nfl" ||
+                    allegianceContext === "both") && (
+                    <AllegianceChip
+                      label="NFL Team"
+                      team={nflFavorite}
+                      empty={
+                        nflAnswered
+                          ? "No team declared"
+                          : "No NFL team declared"
+                      }
+                    />
+                  )}
+                {!mock &&
+                  !allegianceLoading &&
+                  isSelfProfile &&
+                  allegianceContext === "nfl" &&
+                  !nflFavorite && (
+                    <Link
+                      href="/declare-allegiance?sport=nfl&next=/"
+                      className="text-[11px] font-bold text-primary underline-offset-2 hover:underline"
+                    >
+                      Choose NFL Team
+                    </Link>
+                  )}
+                {!mock &&
+                  !allegianceLoading &&
+                  isSelfProfile &&
+                  allegianceContext === "cfb" &&
+                  !cfbAnswered && (
+                    <Link
+                      href="/declare-allegiance?sport=cfb&next=/"
+                      className="text-[11px] font-bold text-primary underline-offset-2 hover:underline"
+                    >
+                      Choose CFB Team
+                    </Link>
+                  )}
                 {!mock && isJustJoined(player.memberSince) && (
                   <span
                     className="text-[10px] uppercase font-extrabold px-2 py-0.5 rounded-full border border-sky-400/50 bg-sky-400/15 text-sky-200"
@@ -754,5 +857,47 @@ export default function ProfilePage() {
         initials={ini}
       />
     </div>
+  );
+}
+
+function AllegianceChip({
+  label,
+  team,
+  empty,
+}: {
+  label: string;
+  team: CanonicalTeam | null;
+  empty: string;
+}) {
+  if (team) {
+    return (
+      <span
+        className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full border"
+        style={{
+          borderColor: `${team.colors.primary}99`,
+          color: team.colors.primary,
+          backgroundColor: `${team.colors.primary}14`,
+        }}
+        title={label}
+      >
+        <span className="text-[9px] opacity-80 normal-case tracking-normal">
+          {label}
+        </span>
+        <span
+          className="w-2 h-2 rounded-full shrink-0"
+          style={{ backgroundColor: team.colors.primary }}
+          aria-hidden
+        />
+        {team.name}
+      </span>
+    );
+  }
+  return (
+    <span
+      className="inline-flex items-center text-[10px] font-semibold text-muted px-2 py-0.5 rounded-full border border-border"
+      title={label}
+    >
+      {empty}
+    </span>
   );
 }
