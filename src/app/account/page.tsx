@@ -13,7 +13,6 @@ import {
   switchToLeague,
   signOutFully,
   leaveLeague,
-  deleteLeague,
   LeagueMembership,
 } from "@/lib/session-restore";
 import {
@@ -553,105 +552,6 @@ export default function AccountPage() {
         router.push("/join");
       }
     }
-  }
-
-  const [deleteModal, setDeleteModal] = useState<{
-    leagueId: string;
-    leagueName: string;
-    eval: import("@/lib/league-delete-guard").LeagueDeleteEval | null;
-    busy: boolean;
-    /** Voluntary handoff target (never forced) */
-    passToUserId: string;
-  } | null>(null);
-
-  async function onDelete(leagueId: string, leagueName: string) {
-    setMessage(null);
-    setBusyId(leagueId);
-    try {
-      const { evaluateLeagueDelete } = await import(
-        "@/lib/league-delete-guard"
-      );
-      const eval_ = await evaluateLeagueDelete(leagueId);
-      setDeleteModal({
-        leagueId,
-        leagueName,
-        eval: eval_,
-        busy: false,
-        // Pre-select 1st as a suggestion only — user must still confirm
-        passToUserId: eval_.firstPlace?.userId || "",
-      });
-    } catch {
-      // Fail closed — never offer hard-delete when status is unknown
-      setDeleteModal({
-        leagueId,
-        leagueName,
-        eval: {
-          canHardDelete: false,
-          reason:
-            "Could not check league status. Rooms with players or history cannot be deleted — pass the keys instead.",
-          otherHumans: 0,
-          scoredWeeks: 0,
-          firstPlace: null,
-          candidates: [],
-        },
-        busy: false,
-        passToUserId: "",
-      });
-    }
-    setBusyId(null);
-  }
-
-  async function confirmHardDelete() {
-    if (!deleteModal?.eval?.canHardDelete) return;
-    if (
-      !confirm(
-        `DELETE "${deleteModal.leagueName}" forever? This removes the league for everyone. This cannot be undone.`
-      )
-    )
-      return;
-    setDeleteModal({ ...deleteModal, busy: true });
-    const result = await deleteLeague(deleteModal.leagueId);
-    if (!result.ok) {
-      setMessage(result.error || "Could not delete");
-      setDeleteModal(null);
-      return;
-    }
-    setMessage("League deleted");
-    setDeleteModal(null);
-    await reload();
-    const list = await fetchMyMemberships();
-    if (list.length === 1) {
-      await switchToLeague(list[0].leagueId);
-      router.push("/");
-    } else if (list.length === 0) {
-      router.push("/join");
-    }
-  }
-
-  async function passKeysVoluntarily() {
-    if (!deleteModal?.passToUserId) return;
-    const pick =
-      deleteModal.eval?.candidates.find(
-        (c) => c.userId === deleteModal.passToUserId
-      ) || deleteModal.eval?.firstPlace;
-    setDeleteModal({ ...deleteModal, busy: true });
-    const { passCommissionerForLeague } = await import(
-      "@/lib/league-delete-guard"
-    );
-    const result = await passCommissionerForLeague(
-      deleteModal.leagueId,
-      deleteModal.passToUserId
-    );
-    if (!result.ok) {
-      setMessage(result.error || "Could not pass commissioner");
-      setDeleteModal({ ...deleteModal, busy: false });
-      return;
-    }
-    setMessage(
-      `Commissioner passed to ${result.newCommissionerName || pick?.name || "player"}. Room stays open — everyone can finish.`
-    );
-    setDeleteModal(null);
-    await reload();
   }
 
   async function onSignOut() {
@@ -1419,8 +1319,6 @@ export default function AccountPage() {
           <div className="space-y-3">
             {scopedMemberships.map((m) => {
               const active = m.leagueId === activeId;
-              const isCommish =
-                m.role === "commissioner" || m.commissionerId === userId;
               const busy = busyId === m.leagueId;
               return (
                 <LeagueMembershipCard
@@ -1451,16 +1349,6 @@ export default function AccountPage() {
                     >
                       Leave
                     </button>
-                    {isCommish && (
-                      <button
-                        type="button"
-                        onClick={() => onDelete(m.leagueId, m.leagueName)}
-                        disabled={busy}
-                        className="text-xs px-3 py-1.5 rounded-lg border border-danger text-danger hover:bg-danger/10 disabled:opacity-50"
-                      >
-                        Delete league
-                      </button>
-                    )}
                   </div>
       </LeagueMembershipCard>
               );
@@ -1635,155 +1523,6 @@ export default function AccountPage() {
                 Stay in the league
               </button>
       </div>
-          </div>
-      </div>
-      )}
-
-      {/* Mid-season delete blocked — keep team; voluntary pass only */}
-      {deleteModal && (
-        <div
-          className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-sm"
-          role="dialog"
-          aria-modal
-          aria-labelledby="delete-league-title"
-        >
-      <div className="w-full sm:max-w-md max-h-[92vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl border border-border bg-card shadow-2xl p-5 space-y-4">
-            <h2 id="delete-league-title" className="text-lg font-bold">
-              {deleteModal.eval?.canHardDelete
-                ? `Delete ${deleteModal.leagueName}?`
-                : "The league stays open"}
-            </h2>
-
-            {deleteModal.eval?.canHardDelete ? (
-              <>
-                <p className="text-sm text-muted leading-relaxed">
-                  This removes <strong className="text-foreground">{deleteModal.leagueName}</strong>{" "}
-                  for everyone — standings, picks, the whole board. Only use this
-                  Only empty solo rooms with no history. Real leagues belong to the community.
-                </p>
-      <div className="flex flex-col gap-2">
-                  <button
-                    type="button"
-                    disabled={deleteModal.busy}
-                    onClick={() => void confirmHardDelete()}
-                    className="w-full min-h-[48px] rounded-xl border border-danger text-danger font-bold text-sm hover:bg-danger/10 disabled:opacity-50"
-                  >
-                    {deleteModal.busy ? "Deleting…" : "Yes, delete empty room"}
-                  </button>
-      <button
-                    type="button"
-                    disabled={deleteModal.busy}
-                    onClick={() => setDeleteModal(null)}
-                    className="w-full min-h-[44px] rounded-xl border border-border text-sm font-semibold"
-                  >
-                    Cancel
-                  </button>
-      </div>
-              </>
-            ) : (
-              <>
-                <p className="text-sm text-foreground/90 leading-relaxed">
-                  {deleteModal.eval?.reason}
-                </p>
-      <p className="text-sm text-muted leading-relaxed">
-                  Getting crushed is not a delete button.{" "}
-                  <strong className="text-foreground">
-                    The league belongs to the community
-                  </strong>
-                  — not the commissioner. Nobody is forced to host. Pass the
-                  keys when someone is ready. History, trophies, and Gazette stay
-                  with the room. League retirement will be a community vote later
-                  — never one click erase.
-                </p>
-
-                {(deleteModal.eval?.candidates?.length ?? 0) > 0 && (
-                  <div className="rounded-xl border border-primary/40 bg-primary/10 px-4 py-3 space-y-2">
-      <p className="text-[10px] font-bold uppercase tracking-wider text-primary">
-                      Voluntary handoff · pick who is ready
-                    </p>
-      <label className="block text-xs text-muted">
-                      Who jumps in?
-                      <select
-                        value={deleteModal.passToUserId}
-                        onChange={(e) =>
-                          setDeleteModal({
-                            ...deleteModal,
-                            passToUserId: e.target.value,
-                          })
-                        }
-                        disabled={deleteModal.busy}
-                        className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground font-medium"
-                      >
-                        <option value="">— Select a player —</option>
-                        {deleteModal.eval!.candidates.map((c, i) => (
-                          <option key={c.userId} value={c.userId}>
-                            {c.name}
-                            {i === 0 ? " · 1st place (suggested)" : ""} ·{" "}
-                            {c.totalPoints} pts
-                          </option>
-                        ))}
-                      </select>
-      </label>
-                    <p className="text-[11px] text-muted leading-relaxed">
-                      1st place is only a suggestion — pick whoever agreed to
-                      host. Or close this and ask the room first.
-                    </p>
-      </div>
-                )}
-
-                <div className="rounded-xl border border-border bg-background/60 px-4 py-3 space-y-2">
-      <p className="text-xs font-bold text-foreground">
-                    Tell the room someone can jump in
-                  </p>
-      <p className="text-xs text-muted leading-relaxed">
-                    Drop a Locker Room note that the keys are available. When
-                    someone says yes, pass them here or in Commissioner tools →{" "}
-                    <strong className="text-foreground">Pass commissioner</strong>
-                    .
-                  </p>
-      <Link
-                    href="/commissioner"
-                    onClick={async () => {
-                      await switchToLeague(deleteModal.leagueId);
-                      setDeleteModal(null);
-                      router.push("/commissioner");
-                    }}
-                    className="inline-flex min-h-[40px] items-center justify-center rounded-lg border border-primary/50 bg-primary/10 px-3 text-xs font-bold text-primary"
-                  >
-                    Open Commissioner tools →
-                  </Link>
-      </div>
-
-                <div className="flex flex-col gap-2">
-                  {(deleteModal.eval?.candidates?.length ?? 0) > 0 && (
-                    <button
-                      type="button"
-                      disabled={deleteModal.busy || !deleteModal.passToUserId}
-                      onClick={() => void passKeysVoluntarily()}
-                      className="w-full min-h-[48px] rounded-xl bg-primary text-black font-bold text-sm disabled:opacity-50"
-                    >
-                      {deleteModal.busy
-                        ? "Passing…"
-                        : deleteModal.passToUserId
-                          ? `Pass keys to ${
-                              deleteModal.eval?.candidates.find(
-                                (c) => c.userId === deleteModal.passToUserId
-                              )?.name || "player"
-                            }`
-                          : "Select who jumps in"}
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    disabled={deleteModal.busy}
-                    onClick={() => setDeleteModal(null)}
-                    className="w-full min-h-[44px] rounded-xl border border-border text-sm font-semibold"
-                  >
-                    Keep my gavel · cancel
-                  </button>
-      </div>
-              </>
-            )}
           </div>
       </div>
       )}

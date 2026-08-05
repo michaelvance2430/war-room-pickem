@@ -15,7 +15,6 @@ import {
   getSession,
   isCommissioner,
   isOps,
-  resetLeague,
   type League,
 } from "@/lib/league";
 import { saveLeagueToCloud, syncLeagueFromCloud } from "@/lib/league-sync";
@@ -371,12 +370,6 @@ function ManageLeagueInner() {
     }
     setSeasonReport("Season board cleared. Members kept.");
     void hydrate();
-  }
-
-  function handleDeleteLeague() {
-    if (!confirm("Permanently delete this league and local data?")) return;
-    resetLeague();
-    router.push("/join");
   }
 
   function toggleSection(id: SectionId) {
@@ -868,7 +861,7 @@ function ManageLeagueInner() {
             <div>
               <h2 className="font-bold text-foreground">Advanced</h2>
               <p className="text-sm text-muted mt-0.5">
-                Result correction path · board reset · delete league
+                Result correction · season board reset
               </p>
             </div>
             <span className="text-xs font-bold text-muted">
@@ -896,7 +889,7 @@ function ManageLeagueInner() {
                 </p>
                 <p className="text-xs text-muted">
                   Same wipe as next season (type RESET). Prefer Start next
-                  season above.
+                  season above. League history and membership stay with the room.
                 </p>
                 <button
                   type="button"
@@ -907,20 +900,9 @@ function ManageLeagueInner() {
                   Reset season (keep players)
                 </button>
               </div>
-              <div className="rounded-lg border border-danger/40 px-3 py-3 space-y-2">
-                <p className="text-sm font-semibold text-danger">Danger zone</p>
-                <p className="text-xs text-muted">
-                  Permanently deletes this league for everyone. Not the same as
-                  next season.
-                </p>
-                <button
-                  type="button"
-                  onClick={handleDeleteLeague}
-                  className="px-3 py-2 rounded-lg border border-danger text-danger text-xs font-bold"
-                >
-                  Delete league
-                </button>
-              </div>
+              <p className="text-xs text-muted leading-relaxed px-0.5">
+                League history is preserved.
+              </p>
             </div>
           )}
         </section>

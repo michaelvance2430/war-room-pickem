@@ -758,56 +758,16 @@ export async function leaveLeague(leagueId: string): Promise<{
 }
 
 /**
- * Commissioner only — hard-delete disposable empty solo rooms only.
- * Constitution: community owns league history; production rooms with people
- * or play cannot be erased by one click (see league-delete-guard).
+ * PRODUCT FREEZE: production league deletion is not offered in the app.
+ * Helper retained only so accidental callers fail closed — no Supabase DELETE.
+ * Future Archive League will be a separate design.
  */
-export async function deleteLeague(leagueId: string): Promise<{ ok: boolean; error?: string }> {
-  const supabase = createClient();
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth.user) return { ok: false, error: "Not signed in" };
-
-  const { data: league } = await supabase
-    .from("leagues")
-    .select("commissioner_id")
-    .eq("id", leagueId)
-    .maybeSingle();
-
-  if (!league || league.commissioner_id !== auth.user.id) {
-    return { ok: false, error: "Only the commissioner can delete this league" };
-  }
-
-  // Belt: never hard-delete when community/history exists — even if UI is bypassed
-  try {
-    const { evaluateLeagueDelete } = await import("./league-delete-guard");
-    const eval_ = await evaluateLeagueDelete(leagueId);
-    if (!eval_.canHardDelete) {
-      return {
-        ok: false,
-        error:
-          eval_.reason ||
-          "This league belongs to the community. Pass the keys — you cannot erase its history.",
-      };
-    }
-  } catch {
-    // Fail closed: if we cannot prove the room is disposable, do not delete
-    return {
-      ok: false,
-      error:
-        "Could not verify league status. Rooms with players or history cannot be deleted.",
-    };
-  }
-
-  const { error } = await supabase.from("leagues").delete().eq("id", leagueId);
-  if (error) return { ok: false, error: error.message };
-
-  if (canUseStorage()) {
-    const active = localStorage.getItem(ACTIVE_LEAGUE_KEY);
-    if (active === leagueId) {
-      localStorage.removeItem(SESSION_KEY);
-      localStorage.removeItem(LEAGUE_KEY);
-      localStorage.removeItem(ACTIVE_LEAGUE_KEY);
-    }
-  }
-  return { ok: true };
+export async function deleteLeague(
+  _leagueId: string
+): Promise<{ ok: boolean; error?: string }> {
+  return {
+    ok: false,
+    error:
+      "League history is preserved. Production leagues cannot be deleted from the app.",
+  };
 }

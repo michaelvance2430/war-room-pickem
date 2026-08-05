@@ -273,42 +273,12 @@ export async function adminScrubLeagueCareer(opts: {
     `Scrubbed local career for ${base.membersScrubbed} member(s); revoked ${base.badgesRevoked} permanent badge grant(s).`
   );
 
-  // Optional league delete (admin path — not commissioner product)
+  // Optional league delete — PRODUCT FREEZE: never delete league rows from app
   if (opts.deleteLeagueAfter) {
-    // Creator must be commissioner for RLS, or use delete as owner
-    const { data: league } = await supabase
-      .from("leagues")
-      .select("commissioner_id, name")
-      .eq("id", opts.leagueId)
-      .maybeSingle();
-
-    if (!league) {
-      notes.push("League row already gone.");
-    } else if (league.commissioner_id !== auth.userId) {
-      notes.push(
-        "Not commissioner of this room — trophies scrubbed, but league row not deleted. Pass keys or delete as host later if empty."
-      );
-    } else {
-      // Prefer normal deleteLeague eval when disposable; creator may still need empty room
-      const { evaluateLeagueDelete } = await import("./league-delete-guard");
-      const eval_ = await evaluateLeagueDelete(opts.leagueId);
-      if (eval_.canHardDelete) {
-        const { deleteLeague } = await import("./session-restore");
-        const del = await deleteLeague(opts.leagueId);
-        if (del.ok) {
-          base.leagueDeleted = true;
-          notes.push(`Deleted league "${league.name}".`);
-        } else {
-          notes.push(`League delete failed: ${del.error}`);
-        }
-      } else {
-        // Creator admin escape for contaminated sim rooms only:
-        // after trophy wipe, if still blocked (other humans), refuse mass delete.
-        notes.push(
-          `League not deleted (${eval_.reason}). History/people remain — only empty solo rooms delete. Pass keys or remove members first.`
-        );
-      }
-    }
+    notes.push(
+      "League not deleted — production freeze: leagues cannot be deleted from the app. Hardware scrub only."
+    );
+    base.leagueDeleted = false;
   }
 
   base.ok = true;
@@ -334,10 +304,10 @@ export async function adminScrubAllCrystalBallContamination(): Promise<{
   const reports: AdminScrubReport[] = [];
 
   for (const t of targets) {
-    // Only auto-delete when solo (no other humans) — never nuke multi-player rooms
+    // PRODUCT FREEZE: never delete leagues from Foundry auto-scrub
     const report = await adminScrubLeagueCareer({
       leagueId: t.leagueId,
-      deleteLeagueAfter: t.otherHumans === 0 && t.isCommissioner,
+      deleteLeagueAfter: false,
     });
     reports.push(report);
   }

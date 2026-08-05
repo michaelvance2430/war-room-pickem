@@ -646,49 +646,7 @@ export default function FounderDashboardPage() {
                     >
                       Scrub hardware only
                     </button>
-                    {row.otherHumans === 0 && row.isCommissioner && (
-                      <button
-                        type="button"
-                        disabled={cleanupBusy}
-                        onClick={() => {
-                          if (
-                            !confirm(
-                              `Scrub + delete empty solo room "${row.name}"?`
-                            )
-                          )
-                            return;
-                          setCleanupBusy(true);
-                          void import("@/lib/admin-test-cleanup")
-                            .then((m) =>
-                              m.adminScrubLeagueCareer({
-                                leagueId: row.leagueId,
-                                deleteLeagueAfter: true,
-                              })
-                            )
-                            .then((r) => {
-                              setCleanupLog(
-                                [
-                                  `Scrub+delete ${row.name}:`,
-                                  ...r.notes,
-                                  r.error || "",
-                                ]
-                                  .filter(Boolean)
-                                  .join("\n")
-                              );
-                              return import("@/lib/admin-test-cleanup").then(
-                                (m) => m.listAdminCleanupLeagues()
-                              );
-                            })
-                            .then((res) => {
-                              if (res.ok) setCleanupRows(res.leagues);
-                            })
-                            .finally(() => setCleanupBusy(false));
-                        }}
-                        className="px-3 py-2 rounded-lg border border-danger/50 text-danger text-xs font-bold"
-                      >
-                        Scrub + delete solo room
-                      </button>
-                    )}
+
                   </div>
                 </li>
               ))}

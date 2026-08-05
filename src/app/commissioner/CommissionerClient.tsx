@@ -43,7 +43,7 @@ import {
   isOps,
   getLeague,
   getSession,
-  resetLeague,
+
   updateLeagueSettings,
   League,
 } from "@/lib/league";
@@ -2104,12 +2104,6 @@ function CommissionerPageInner() {
     }
   }
 
-  function handleReset() {
-    if (!confirm("Delete this league and all local data?")) return;
-    resetLeague();
-    router.push("/join");
-  }
-
   async function handlePassCommissioner() {
     setPassReport(null);
     if (!passToUserId) {
@@ -3527,20 +3521,10 @@ function CommissionerPageInner() {
               </button>
       </div>
 
-            <div className="rounded-xl border border-danger/40 bg-card p-5 space-y-3">
-      <h2 className="font-semibold text-danger">Danger zone</h2>
-      <p className="text-xs text-muted">
-                Permanently deletes the whole league for everyone — kills the
-                decade room. Not the same as starting next season.
-              </p>
-      <button
-                type="button"
-                onClick={handleReset}
-                className="px-4 py-2 rounded-lg border border-danger text-danger text-sm"
-              >
-                Delete league and reset app
-              </button>
-      </div>
+            <p className="text-xs text-muted leading-relaxed px-1">
+              League history is preserved. Production leagues cannot be deleted
+              from the app.
+            </p>
             </>
             )}
           </div>
