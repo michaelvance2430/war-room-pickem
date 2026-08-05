@@ -24,6 +24,10 @@ import { SEASON_MAX_WEEK } from "@/lib/season-calendar";
 
 type HeroState = {
   week: number;
+  /**
+   * True only when a card is *formally published* (publishedAt set).
+   * Draft games without publish never count as a playable card.
+   */
   hasCard: boolean;
   gameCount: number;
   lockLabel: string | null;
@@ -45,6 +49,16 @@ type HeroState = {
     field: number;
   } | null;
 };
+
+/** Authoritative published-card check — not game count alone. */
+function isFormallyPublishedCard(
+  card: { publishedAt?: string | null; games?: unknown[] } | null | undefined
+): boolean {
+  if (!card) return false;
+  const at = card.publishedAt;
+  if (typeof at !== "string" || !at.trim()) return false;
+  return Array.isArray(card.games) && card.games.length > 0;
+}
 
 /**
  * Home hero: one job at a time.
@@ -163,19 +177,22 @@ export default function HomeWeekHero() {
         ]);
         if (cancelled) return;
 
-        // Wrong active-week stamp? Find any published card so Home isn't "empty"
+        // Wrong active-week stamp? Prefer another *published* card (never draft-only)
         let liveWeek = week;
-        if (!card?.games?.length) {
+        if (!isFormallyPublishedCard(card)) {
           const best = await loadBestAvailableWeekCard(week).catch(() => null);
-          if (best?.card?.games?.length) {
+          if (best?.card && isFormallyPublishedCard(best.card)) {
             card = best.card;
             liveWeek = best.week;
             mine = await loadMyPicks(liveWeek).catch(() => null);
+          } else {
+            // Keep local draft out of player "has card" truth
+            card = isFormallyPublishedCard(card) ? card : null;
           }
         }
 
         const games = card?.games || [];
-        const hasCard = games.length > 0;
+        const hasCard = isFormallyPublishedCard(card);
         const now = Date.now();
         const frozen = hasCard && isCardLockDeadlinePassed(games, now);
         const humans = roster.filter((m) => !m.isBot);
@@ -336,53 +353,56 @@ export default function HomeWeekHero() {
   const weekLabel = weekTitle(state.week, sportId);
   const progress = weekProgressLabel(state.week);
 
-  // —— Player / everyone: primary job ——
+  // —— Primary job (never default to /picks without a published card) ——
   let eyebrow = progress;
   let title = weekLabel;
   let body = "";
-  let primaryHref: string | null = "/picks";
-  let primaryLabel = "Open My Picks";
-  let primaryClass =
-    "bg-primary text-black hover:opacity-90";
-  let secondaryHref: string | null = "/standings";
-  let secondaryLabel = "Standings";
+  let primaryHref: string | null = null;
+  let primaryLabel = "";
+  let primaryClass = "bg-primary text-black hover:opacity-90";
+  let secondaryHref: string | null = null;
+  let secondaryLabel = "";
 
   if (!state.hasCard) {
-    if (state.isCommish && state.scoredWeeks === 0) {
-      eyebrow = "You’re the commish";
-      title =
-        state.rosterCount < 2
-          ? "Share the league — fill the room"
-          : "Publish the first card";
-      body =
-        state.rosterCount < 2
-          ? `Use Share League up top — friends open a link (code is built in). Then build a card for ${weekLabel}.`
-          : `${state.rosterCount} in the room. ${weekLabel} has no games yet — open League → First card wizard → publish.`;
-      primaryHref =
-        state.rosterCount < 2
-          ? "/week-ops?step=1"
-          : "/week-ops?step=1";
-      primaryLabel =
-        state.rosterCount < 2 ? "Build first card →" : "Build first card →";
-      secondaryHref = "/locker-room";
-      secondaryLabel =
-        state.rosterCount < 2 ? "Locker while you wait" : "Commish tools";
+    // Host (commish or deputy): build/publish — never the sarcastic player wait
+    if (state.isOps) {
+      if (state.isCommish && state.scoredWeeks === 0) {
+        eyebrow = "You’re the commish";
+        title =
+          state.rosterCount < 2
+            ? "Share the league — fill the room"
+            : "Publish the first card";
+        body =
+          state.rosterCount < 2
+            ? `Use Share League up top — friends open a link (code is built in). Then build a card for ${weekLabel}.`
+            : `${state.rosterCount} in the room. ${weekLabel} has no published card yet — build five games, add a prop, publish.`;
+        primaryHref = "/week-ops?step=1";
+        primaryLabel = "Build first card →";
+        secondaryHref = "/locker-room";
+        secondaryLabel =
+          state.rosterCount < 2 ? "Locker while you wait" : "Locker";
+      } else {
+        eyebrow = "Host · your move";
+        title = "Publish a card so people can pick";
+        body = `One job: build and publish ${weekLabel}. Until then the room has nothing to lock.`;
+        primaryHref = "/week-ops?step=1";
+        primaryLabel = "Build this week's card →";
+        secondaryHref = "/locker-room";
+        secondaryLabel = "Locker";
+      }
     } else {
-      eyebrow = "You're in";
-      title = state.isOps
-        ? "Publish a card so people can pick"
-        : "You're in — waiting on the card";
-      body = state.isOps
-        ? `One job: publish ${weekLabel} (demo week is fine). Then text the crew.`
-        : `You're seated. Your commish hasn't published ${weekLabel} yet — there's nothing to pick. Hang in the Locker, poke Standings if you want, or check back when they drop a card. First ten minutes = chill.`;
-      primaryHref = state.isOps
-        ? "/week-ops?step=1"
-        : "/locker-room";
-      primaryLabel = state.isOps
-        ? "Publish this week's card →"
-        : "Hang in the Locker";
-      secondaryHref = state.isOps ? "/locker-room" : "/standings";
-      secondaryLabel = state.isOps ? "Locker" : "Peek standings";
+      // Regular player: truthful commissioner-wait (not Make Picks / not Step 1)
+      eyebrow = "WAITING ON THE COMMISH";
+      title = "No card. No picks. Outstanding leadership.";
+      body =
+        "Your commissioner hasn’t posted this week’s card yet. Feel free to remind them—in the Locker Room, where everyone can enjoy it.";
+      primaryHref = "/locker-room";
+      primaryLabel = "Call Out the Commish";
+      primaryClass = isNfl
+        ? "bg-primary text-black hover:opacity-90 shadow-[0_0_24px_rgba(193,18,31,0.35)]"
+        : "bg-primary text-black hover:opacity-90 shadow-[0_0_24px_rgba(34,197,94,0.25)]";
+      secondaryHref = null;
+      secondaryLabel = "";
     }
   } else if (state.iLocked) {
     // Caught up — status only. Nav owns destinations (no Board/Locker duplicates).

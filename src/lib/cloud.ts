@@ -1221,18 +1221,26 @@ export async function loadBestAvailableWeekCard(
     })
   );
 
-  // Prefer preferred week if it has games
+  // Prefer preferred week if *formally published* (publishedAt + games)
+  const isPublished = (c: CloudCard | null | undefined) =>
+    !!(
+      c &&
+      typeof c.publishedAt === "string" &&
+      c.publishedAt.trim() &&
+      c.games?.length
+    );
+
   for (const r of results) {
-    if (r.w === preferred && r.card?.games?.length) {
-      return { card: r.card, week: r.w };
+    if (r.w === preferred && isPublished(r.card)) {
+      return { card: r.card!, week: r.w };
     }
   }
-  // Closest trusted week with games (not highest absolute — avoids orphan week 7)
-  const withGames = results
-    .filter((r) => r.card?.games?.length)
+  // Closest trusted *published* week (never draft-only residue)
+  const withPublished = results
+    .filter((r) => isPublished(r.card))
     .sort((a, b) => Math.abs(a.w - preferred) - Math.abs(b.w - preferred));
-  if (withGames[0]?.card) {
-    return { card: withGames[0].card, week: withGames[0].w };
+  if (withPublished[0]?.card) {
+    return { card: withPublished[0].card!, week: withPublished[0].w };
   }
   return null;
 }

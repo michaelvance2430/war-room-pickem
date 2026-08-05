@@ -522,17 +522,29 @@ export default function PicksClient() {
 
         let cloud: CloudCard | null = null;
 
+        const isFormallyPublished = (
+          c: CloudCard | null | undefined
+        ): c is CloudCard =>
+          !!(
+            c &&
+            typeof c.publishedAt === "string" &&
+            c.publishedAt.trim() &&
+            c.games?.length
+          );
+
         if (opts.explicit) {
           // User picked a specific week — load that only
           cloud = await loadWeekCard(target);
-          if (!cloud?.games?.length) {
+          if (!isFormallyPublished(cloud)) {
             bustWeekCardCache(target);
             cloud = await loadWeekCard(target);
           }
+          // Draft-only rows (games without publish) are not playable
+          if (!isFormallyPublished(cloud)) cloud = null;
         } else {
-          // Initial / soft: shotgun any published card (fixes wrong-week hang)
+          // Initial / soft: shotgun formally published cards only
           const best = await loadBestAvailableWeekCard(target);
-          if (best?.card?.games?.length) {
+          if (best?.card && isFormallyPublished(best.card)) {
             cloud = best.card;
             target = best.week;
           } else {
@@ -540,9 +552,11 @@ export default function PicksClient() {
             bustWeekCardCache();
             await new Promise((r) => window.setTimeout(r, 350));
             const retry = await loadBestAvailableWeekCard(target);
-            if (retry?.card?.games?.length) {
+            if (retry?.card && isFormallyPublished(retry.card)) {
               cloud = retry.card;
               target = retry.week;
+            } else {
+              cloud = null;
             }
           }
         }
@@ -555,9 +569,9 @@ export default function PicksClient() {
           /* ok */
         }
 
-        if (!cloud?.games?.length) {
-          // Keep any painted cache; only show empty when we never had games
-          if (!cached?.games?.length) {
+        if (!isFormallyPublished(cloud)) {
+          // Keep any painted cache; only show empty when we never had a published card
+          if (!cached?.games?.length || !(cached as CloudCard).publishedAt) {
             setHasCard(false);
             setGames([]);
             setWeekResults({});
@@ -2357,7 +2371,15 @@ export default function PicksClient() {
                     href={PICKS_EMPTY_LOCKER_HREF}
                     className="px-4 py-2.5 min-h-[44px] rounded-xl bg-primary text-black text-sm font-bold inline-flex items-center touch-manipulation"
                   >
-                    {liveEmpty ? copy.cta : "Go to Locker"}
+                    {liveEmpty ? copy.cta : "Call Out the Commish"}
+                  </Link>
+                )}
+                {!hostCanBuild && (
+                  <Link
+                    href="/"
+                    className="px-4 py-2.5 min-h-[44px] rounded-xl border border-border text-sm font-semibold inline-flex items-center touch-manipulation"
+                  >
+                    Back to Home
                   </Link>
                 )}
                 {hostCanBuild && viewWeek !== activeWeek && (

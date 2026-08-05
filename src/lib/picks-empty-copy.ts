@@ -82,11 +82,10 @@ export const COMMISH_PICKS_EMPTY_OPTIONS: PicksEmptyCopy[] = [
  */
 export const PLAYER_PICKS_EMPTY_OPTIONS: PicksEmptyCopy[] = [
   {
-    eyebrow: "Empty slate",
-    title:
-      "No card yet. Your commissioner appears to be conducting an extensive research project.",
-    body: "You’re fine. The app is fine. The host is somewhere between “almost done” and “forgot football exists.” Hit the Locker and apply friendly pressure.",
-    cta: "Go to Locker",
+    eyebrow: "WAITING ON THE COMMISH",
+    title: "No card. No picks. Outstanding leadership.",
+    body: "Your commissioner hasn’t posted this week’s card yet. Feel free to remind them—in the Locker Room, where everyone can enjoy it.",
+    cta: "Call Out the Commish",
   },
   {
     eyebrow: "Empty slate",

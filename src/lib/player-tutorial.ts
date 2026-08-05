@@ -328,16 +328,16 @@ export function coachCopyForStep(step: PlayerTutorialStep): CoachCopy {
     case "open_picks":
       return picksOnly
         ? {
-            title: "Step 1 of 3 · Open My Picks",
-            body: "This is the job every week. Open My Picks and lock a card before first kickoff. No live card yet? We spin a trial sandbox so you can feel it.",
-            ctaLabel: "Open My Picks →",
-            ctaHref: "/picks",
+            title: "When the card is live · Open My Picks",
+            body: "Every week after your commissioner publishes a card: open My Picks and lock before first kickoff. No published card yet? You’re not behind — wait on Home or call them out in the Locker.",
+            ctaLabel: "Back to Home",
+            ctaHref: "/",
           }
         : {
-            title: "Step 4 of 6 · Open My Picks",
-            body: "Crystal Ball’s done for now. Open My Picks — that’s where you lock this week’s card (trial sandbox if the real card isn’t live).",
-            ctaLabel: "Open My Picks →",
-            ctaHref: "/picks",
+            title: "When the card is live · Open My Picks",
+            body: "Crystal Ball’s done for now. When the commissioner publishes this week’s card, open My Picks and lock it. No published card yet? Home tells the truth — nothing to pick until they post.",
+            ctaLabel: "Back to Home",
+            ctaHref: "/",
           };
     case "fill_picks":
       return picksOnly

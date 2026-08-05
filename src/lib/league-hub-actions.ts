@@ -580,8 +580,10 @@ export function resolveLeagueHubAction(f: FactBundle): {
     };
   }
 
-  // ── Player sequence ──
-  if (f.cardId && f.publishedAt) {
+  // ── Player sequence (only when card is formally published) ──
+  // Draft games without published_at never unlock Make/Finish/Lock Picks.
+  const formallyPublished = !!(f.cardId && f.publishedAt);
+  if (formallyPublished) {
     if (!f.pickId || f.pickGameCount === 0) {
       return {
         action: actionOf("MAKE_PICKS"),
@@ -612,11 +614,15 @@ export function resolveLeagueHubAction(f: FactBundle): {
     };
   }
 
-  // No published card yet — nothing to do (host already ran shared path above)
+  // No published card — player wait (not actionable; no badge).
+  // Host path already returned BUILD/FINISH when ops has work.
   return {
-    action: actionOf("ENTER"),
+    action: actionOf("ENTER", {
+      label: "Waiting on commissioner",
+      href: "/",
+    }),
     weekLine,
-    signal: signalOf("soon", "Coming Soon"),
+    signal: signalOf("soon", "Waiting on commissioner"),
   };
 }
 
