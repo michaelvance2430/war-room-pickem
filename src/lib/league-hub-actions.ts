@@ -447,6 +447,56 @@ export function resolveLeagueHubAction(f: FactBundle): {
   };
 }
 
+/**
+ * Stage 2 attention — action codes that are a real weekly hub task.
+ * ENTER is never actionable (covers Ready / Coming Soon / fail-closed).
+ * Score Week is not a hub code yet (Stage 4). Do not invent codes here.
+ */
+export const ACTIONABLE_HUB_TASK_CODES: ReadonlySet<LeagueHubActionCode> =
+  new Set([
+    "MAKE_PICKS",
+    "FINISH_CARD",
+    "LOCK_CRYSTAL_BALL",
+    "LOCK_PICKS",
+    "SET_WEEK",
+    "PUBLISH_WEEK",
+  ]);
+
+/** True when the hub's sequential first action requires user work. */
+export function isActionableHubTask(
+  action: LeagueHubAction | null | undefined
+): boolean {
+  if (!action?.code) return false;
+  return ACTIONABLE_HUB_TASK_CODES.has(action.code);
+}
+
+/**
+ * Stage 2 per-league count: 0 or 1 from pulse only.
+ * Missing / unknown pulse → 0 (fail closed, no invented urgency).
+ */
+export function weeklyHubTaskAttention(
+  pulse: LeagueHubPulse | null | undefined
+): 0 | 1 {
+  return isActionableHubTask(pulse?.action) ? 1 : 0;
+}
+
+/**
+ * Collapsed control total: sum of Stage 2 task bits for OTHER leagues
+ * (all sports). Active/current league excluded.
+ */
+export function otherLeaguesHubTaskTotal(
+  pulses: Record<string, LeagueHubPulse>,
+  memberships: { leagueId: string }[],
+  activeLeagueId: string
+): number {
+  let n = 0;
+  for (const m of memberships) {
+    if (!m.leagueId || m.leagueId === activeLeagueId) continue;
+    n += weeklyHubTaskAttention(pulses[m.leagueId]);
+  }
+  return n;
+}
+
 /** Load pulse for every membership (parallel, truth-only). */
 export async function loadLeagueHubPulses(
   memberships: LeagueMembership[],

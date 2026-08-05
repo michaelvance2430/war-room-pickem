@@ -38,15 +38,50 @@ import {
 import {
   loadLeagueHubPulses,
   leagueHubToneClasses,
+  otherLeaguesHubTaskTotal,
+  weeklyHubTaskAttention,
   type LeagueHubPulse,
   type LeagueHubTone,
 } from "@/lib/league-hub-actions";
+import { EVENT_CARD_PUBLISHED } from "@/lib/first-session";
 import NflBrandMark from "@/components/NflBrandMark";
 import BrandMark from "@/components/BrandMark";
 
 /** Match Nav mobile More sheet stacking. */
 const HUB_BACKDROP_Z = 55;
 const HUB_PANEL_Z = 60;
+
+/** Stage 2: poll pulse only while hub is open. */
+const OPEN_PULSE_REFRESH_MS = 60_000;
+
+/**
+ * Amber attention pill — number + aria-label (color is not the only cue).
+ * Stage 2 max per league is 1; collapsed total may be >1.
+ */
+function HubAttentionBadge({
+  count,
+  ariaLabel,
+  size = "md",
+}: {
+  count: number;
+  ariaLabel: string;
+  size?: "sm" | "md";
+}) {
+  if (count <= 0) return null;
+  const display = count > 99 ? "99+" : String(count);
+  const sizeCls =
+    size === "sm"
+      ? "min-w-[1.125rem] h-[1.125rem] px-1 text-[9px]"
+      : "min-w-[1.25rem] h-5 px-1.5 text-[11px]";
+  return (
+    <span
+      className={`inline-flex items-center justify-center rounded-full tabular-nums font-extrabold shrink-0 border border-amber-200/90 bg-amber-400 text-black shadow-[0_0_10px_rgba(251,191,36,0.35)] ${sizeCls}`}
+      aria-label={ariaLabel}
+    >
+      {display}
+    </span>
+  );
+}
 
 /** Primary sports always on the hub. */
 const HUB_SPORTS: SportId[] = ["nfl", "cfb"];
@@ -79,6 +114,11 @@ type Props = {
 export default function HomeSportSwitcher({ className = "" }: Props) {
   const [memberships, setMemberships] = useState<LeagueMembership[]>([]);
   const [pulse, setPulse] = useState<Record<string, LeagueHubPulse>>({});
+  /**
+   * Badges only after first pulse resolve finishes (success or fail-closed).
+   * Prevents false “1” while loading; refresh keeps prior pulse (no flicker).
+   */
+  const [pulseReady, setPulseReady] = useState(false);
   const [open, setOpen] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [scope, setScope] = useState<SportId>(() =>
@@ -98,11 +138,39 @@ export default function HomeSportSwitcher({ className = "" }: Props) {
     panelLeft: number;
   } | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  /** Single-flight pulse refresh — no parallel storms. */
+  const pulseInflightRef = useRef<Promise<void> | null>(null);
+  const membershipsRef = useRef(memberships);
+  membershipsRef.current = memberships;
 
   const activeId = getSession()?.leagueId || getLeague()?.id || "";
 
   useEffect(() => {
     setPortalReady(true);
+  }, []);
+
+  const loadPulsesOnly = useCallback(async (ms: LeagueMembership[]) => {
+    if (pulseInflightRef.current) return pulseInflightRef.current;
+    const run = (async () => {
+      try {
+        const uid = getSession()?.playerId;
+        if (!uid || ms.length === 0) {
+          setPulse({});
+          return;
+        }
+        const p = await loadLeagueHubPulses(ms, uid);
+        setPulse(p);
+      } catch {
+        // Fail closed: clear only if we never had a good pulse; else keep prior.
+        setPulse((prev) => (Object.keys(prev).length ? prev : {}));
+      } finally {
+        setPulseReady(true);
+      }
+    })().finally(() => {
+      pulseInflightRef.current = null;
+    });
+    pulseInflightRef.current = run;
+    return run;
   }, []);
 
   const load = useCallback(async () => {
@@ -122,23 +190,59 @@ export default function HomeSportSwitcher({ className = "" }: Props) {
           : "cfb";
       setScope(hubScope);
 
-      const uid = getSession()?.playerId;
-      if (uid && ms.length > 0) {
-        const p = await loadLeagueHubPulses(ms, uid);
-        setPulse(p);
-      } else {
-        setPulse({});
-      }
+      await loadPulsesOnly(ms);
     } catch {
-      /* optional */
+      /* optional — switcher stays usable without pulse badges */
+      setPulseReady(true);
     } finally {
       setLoaded(true);
     }
-  }, []);
+  }, [loadPulsesOnly]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Stage 2 refresh: open → re-resolve pulse (reuse memberships when warm).
+  useEffect(() => {
+    if (!open) return;
+    const ms = membershipsRef.current;
+    if (ms.length > 0) {
+      void loadPulsesOnly(ms);
+    } else {
+      void load();
+    }
+  }, [open, load, loadPulsesOnly]);
+
+  // Stage 2: 60s pulse refresh only while open (no closed polling).
+  useEffect(() => {
+    if (!open) return;
+    const id = window.setInterval(() => {
+      const ms = membershipsRef.current;
+      if (ms.length > 0) void loadPulsesOnly(ms);
+    }, OPEN_PULSE_REFRESH_MS);
+    return () => window.clearInterval(id);
+  }, [open, loadPulsesOnly]);
+
+  // Focus / visibility + card-published invalidation (existing product events).
+  useEffect(() => {
+    function refreshAttention() {
+      const ms = membershipsRef.current;
+      if (ms.length > 0) void loadPulsesOnly(ms);
+      else void load();
+    }
+    function onVis() {
+      if (document.visibilityState === "visible") refreshAttention();
+    }
+    window.addEventListener("focus", refreshAttention);
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener(EVENT_CARD_PUBLISHED, refreshAttention);
+    return () => {
+      window.removeEventListener("focus", refreshAttention);
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener(EVENT_CARD_PUBLISHED, refreshAttention);
+    };
+  }, [load, loadPulsesOnly]);
 
   useEffect(() => {
     function onScope(e: Event) {
@@ -266,6 +370,12 @@ export default function HomeSportSwitcher({ className = "" }: Props) {
   const isNfl = scope === "nfl";
   const roomCount = openRooms.length;
 
+  /** Collapsed badge: OTHER leagues × all sports (Stage 2: 0|1 each). */
+  const otherLeaguesAttention = useMemo(() => {
+    if (!pulseReady) return 0;
+    return otherLeaguesHubTaskTotal(pulse, memberships, activeId);
+  }, [pulseReady, pulse, memberships, activeId]);
+
   function closeHub() {
     setOpen(false);
   }
@@ -349,6 +459,10 @@ export default function HomeSportSwitcher({ className = "" }: Props) {
               const signalLabel = p?.signal?.label || "Ready — Enter";
               const signalEmoji = p?.signal?.emoji || "🟢";
               const tones = leagueHubToneClasses(tone);
+              const leagueName = m.leagueName || "War Room";
+              // Stage 2: binary weekly task only (max 1). No pulse → no badge.
+              const rowAttention =
+                pulseReady && p ? weeklyHubTaskAttention(p) : 0;
 
               return (
                 <div
@@ -362,17 +476,26 @@ export default function HomeSportSwitcher({ className = "" }: Props) {
                   }`}
                 >
                   <div className="flex-1 min-w-0 py-0.5">
-                    <p className="text-sm font-bold text-white truncate leading-tight">
-                      <span className="mr-1" aria-hidden>
-                        {sportEmoji(scope)}
-                      </span>
-                      {m.leagueName || "War Room"}
-                      {isActive ? (
-                        <span className="ml-1.5 text-[9px] uppercase tracking-wide text-primary font-extrabold align-middle">
-                          here
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <p className="text-sm font-bold text-white truncate leading-tight min-w-0 flex-1">
+                        <span className="mr-1" aria-hidden>
+                          {sportEmoji(scope)}
                         </span>
+                        {leagueName}
+                        {isActive ? (
+                          <span className="ml-1.5 text-[9px] uppercase tracking-wide text-primary font-extrabold align-middle">
+                            here
+                          </span>
+                        ) : null}
+                      </p>
+                      {rowAttention > 0 ? (
+                        <HubAttentionBadge
+                          count={rowAttention}
+                          ariaLabel={`1 action required in ${leagueName}`}
+                          size="md"
+                        />
                       ) : null}
-                    </p>
+                    </div>
                     <p className="text-[11px] text-muted mt-0.5 truncate">
                       {weekLine}
                     </p>
@@ -433,6 +556,13 @@ export default function HomeSportSwitcher({ className = "" }: Props) {
       : "border-primary/50 bg-primary/15 text-primary hover:bg-primary/20"
   }`;
 
+  const collapsedAria =
+    otherLeaguesAttention > 0
+      ? `${pack.shortLabel} League Hub, ${otherLeaguesAttention} action${
+          otherLeaguesAttention === 1 ? "" : "s"
+        } required in other leagues`
+      : `${pack.shortLabel} League Hub`;
+
   const triggerInner = (
     <>
       <SportIcon sportId={scope} size={18} />
@@ -441,6 +571,15 @@ export default function HomeSportSwitcher({ className = "" }: Props) {
         <span className="opacity-70 text-[10px] font-semibold tabular-nums">
           {roomCount}
         </span>
+      ) : null}
+      {otherLeaguesAttention > 0 ? (
+        <HubAttentionBadge
+          count={otherLeaguesAttention}
+          ariaLabel={`${otherLeaguesAttention} action${
+            otherLeaguesAttention === 1 ? "" : "s"
+          } required in other leagues`}
+          size="sm"
+        />
       ) : null}
       <span className="opacity-70 text-[10px]" aria-hidden>
         {open ? "▴" : "▾"}
@@ -457,7 +596,7 @@ export default function HomeSportSwitcher({ className = "" }: Props) {
           onClick={toggleHub}
           aria-expanded={open}
           aria-haspopup="listbox"
-          aria-label={`${pack.shortLabel} League Hub`}
+          aria-label={collapsedAria}
           className={`${triggerClass} ${open ? "invisible" : ""}`}
           tabIndex={open ? -1 : 0}
         >
@@ -472,7 +611,7 @@ export default function HomeSportSwitcher({ className = "" }: Props) {
               onClick={toggleHub}
               aria-expanded
               aria-haspopup="listbox"
-              aria-label={`${pack.shortLabel} League Hub`}
+              aria-label={collapsedAria}
               style={{
                 position: "fixed",
                 top: hubGeom.triggerTop,

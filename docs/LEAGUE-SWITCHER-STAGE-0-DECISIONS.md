@@ -89,8 +89,10 @@ Reuse existing pulse TTL / single-flight protections where appropriate.
 
 | Stage | Scope |
 |-------|--------|
-| **1** | League switcher backdrop only (visual / client) |
-| **2+** | Attention badges (after Stage 1 review) — not started until authorized |
+| **1** | League switcher backdrop only (visual / client) — shipped |
+| **2** | Weekly hub-task badges only (binary 0/1 per league; no announcements) — authorized after Stage 1 visual review |
+| **3** | Announcement counts (requires production `announcement_reads` verification) — not authorized until Stage 2 review |
+| **4** | Score Week parity + deputy authorization alignment — not authorized yet |
 
 ---
 
