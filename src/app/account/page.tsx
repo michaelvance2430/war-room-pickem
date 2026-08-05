@@ -1078,26 +1078,6 @@ export default function AccountPage() {
           </div>
         </section>
 
-        <section className="rounded-xl border border-primary/35 bg-primary/10 p-5 mb-6">
-          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-1">
-            First steps
-          </p>
-          <h2 className="font-semibold mb-1">Getting started</h2>
-          <p className="text-xs text-muted mb-3 leading-relaxed">
-            Small one-time tips appear when you need them (invite, first card,
-            first picks). There is no full-screen walkthrough.
-          </p>
-          <button
-            type="button"
-            onClick={() => {
-              
-              router.push("/picks");
-            }}
-            className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-primary text-black text-sm font-bold"
-          >
-            Go to My Picks →
-          </button>
-        </section>
       <section className="rounded-xl border border-amber-400/35 bg-amber-400/10 p-5 mb-6">
           <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-amber-300 mb-1">
             Nameplate
