@@ -1,19 +1,16 @@
 /**
- * Profile trophy case — career hardware across every room the player won,
- * plus legacy engravings.
+ * Profile trophy case — permanent career hardware across the entire product.
  *
- * Identity-bearing career hardware (e.g. AFC/NFC Championship) binds only via
- * stable authenticated profile user_id. Display names, nicknames, and aliases
- * are never used for those seeds.
+ * Binding law:
+ * - Profile Trophy Room is global history (CFB + NFL + future sports together).
+ * - Active league sport must not filter permanent career hardware.
+ * - Each plaque keeps its own sport identity (colors, iconography, labels).
+ * - Identity-bearing seeds (AFC/NFC Championship) bind by stable user_id only.
+ * - Older Excel-era fill-ins still use name/alias matching until UUID-mapped.
+ * - Multi-league: three CFB titles in three rooms → three championship plaques.
  *
- * Older Excel-era CFB/NFL fill-ins still use name/alias matching until those
- * winners are mapped to UUIDs.
- *
- * Multi-league: three CFB titles in three rooms → three championship plaques
- * with the league name under each (not collapsed by year alone).
- *
- * Legacy seeds are sport-gated so Maria Super Bowl doesn’t show in CFB
- * rooms and Kahmann Excel hardware doesn’t show as NFL Super Bowl art.
+ * Optional activeSportOnly is for league standings flair only — not the
+ * default Profile Trophy Room.
  */
 
 import type { LeagueTrophy, TrophyType } from "./trophies";
@@ -89,8 +86,9 @@ type LegacySeed = Omit<ProfileTrophy, "source"> & {
  * Confirmed prior-season hardware only.
  * CFB 2025–26 Excel: Kahmann / Strayer / Big Ball Ben.
  * NFL 2025: Maria Super Bowl (or Vonnagio gold family form).
- * NFL 2025 conference hardware: Mike NFC Championship · Maria AFC Championship.
- * (Career shelf — sport-gated; shows in every NFL room for that profile.)
+ * NFL 2026 conference hardware: Mike NFC Championship · Maria AFC Championship.
+ * Profile Trophy Room is global — seeds keep sport identity but are not
+ * filtered by the active league desk.
  */
 export const LEGACY_PROFILE_HARDWARE: LegacySeed[] = [
   {
@@ -150,13 +148,13 @@ export const LEGACY_PROFILE_HARDWARE: LegacySeed[] = [
     sportId: "nfl",
   },
   {
-    id: "legacy-mike-nfc-championship-2025",
+    id: "legacy-mike-nfc-championship-2026",
     kind: "division",
-    seasonYear: 2025,
+    seasonYear: 2026,
     title: "NFC Championship",
-    subtitle: "NFC Champion · 2025",
+    subtitle: "NFC Champion · 2026",
     notes:
-      "2025 NFC Championship. Conference hardware — not Super Bowl. Still permanent. Still loud.",
+      "2026 NFC Championship. Conference hardware — not Super Bowl. Permanent career history.",
     /** Display only — matching is winnerUserId only */
     winnerName: "Mike Vance",
     winnerUserId: "09544d2b-6eca-4131-a321-c000586c9029",
@@ -165,13 +163,13 @@ export const LEGACY_PROFILE_HARDWARE: LegacySeed[] = [
     sportId: "nfl",
   },
   {
-    id: "legacy-maria-afc-championship-2025",
+    id: "legacy-maria-afc-championship-2026",
     kind: "division",
-    seasonYear: 2025,
+    seasonYear: 2026,
     title: "AFC Championship",
-    subtitle: "AFC Champion · 2025",
+    subtitle: "AFC Champion · 2026",
     notes:
-      "2025 AFC Championship. Conference hardware en route to the Super Bowl. Permanent on the shelf.",
+      "2026 AFC Championship. Conference hardware en route to the Super Bowl. Permanent career history.",
     /** Display only — matching is winnerUserId only */
     winnerName: "Maria",
     winnerUserId: "131b404e-db8e-4adf-86f4-f78aacf2a5bc",
@@ -251,15 +249,26 @@ export function getProfileHardware(opts: {
   playerId: string;
   playerName: string;
   leagueTrophies: LeagueTrophyInput[];
-  /** Active league sport — gates Excel vs Super Bowl legacy seeds */
+  /**
+   * Active league sport — styles room-local presentation (e.g. Vonnagio gold
+   * form) and optional standings flair. Does NOT filter the default Profile
+   * Trophy Room unless activeSportOnly is true.
+   */
   sportId?: string | null;
-  /** Active room name for legacy fill-in */
+  /** Active room name for room-local presentation only */
   activeLeagueName?: string | null;
   activeLeagueId?: string | null;
+  /**
+   * When true, only include hardware whose sport matches the active league.
+   * Default false — Profile Trophy Room shows full career history.
+   * Standings flair may pass true so league boards stay sport-local.
+   */
+  activeSportOnly?: boolean;
 }): ProfileTrophy[] {
   const { playerId, playerName, leagueTrophies } = opts;
   const out: ProfileTrophy[] = [];
   const seen = new Set<string>();
+  const activeSportOnly = !!opts.activeSportOnly;
 
   let activeSport: "cfb" | "nfl" = "cfb";
   let activeVonnagio = false;
@@ -286,34 +295,42 @@ export function getProfileHardware(opts: {
   }
 
   function hardwareDedupeKey(row: {
+    id?: string;
     kind: ProfileTrophyKind;
     seasonYear: number;
     subtitle?: string | null;
     division?: string | null;
     leagueId?: string | null;
     leagueName?: string | null;
+    sportId?: string | null;
   }): string {
     const y =
       typeof row.seasonYear === "number"
         ? row.seasonYear
         : Number.parseInt(String(row.seasonYear ?? ""), 10) || 0;
+    // Prefer stable plaque id so career seeds never duplicate when the
+    // viewer switches active league / sport context.
+    if (row.id && String(row.id).startsWith("legacy-")) {
+      return `legacy:${row.id}`;
+    }
     const room =
       (row.leagueId || "").trim() ||
       (row.leagueName || "").toLowerCase().replace(/\s+/g, "-") ||
       "room";
     if (row.kind === "division") {
-      return `division:${y}:${room}:${row.division || row.subtitle || ""}`;
+      return `division:${y}:${room}:${row.division || row.subtitle || ""}:${row.sportId || ""}`;
     }
-    return `${row.kind}:${y}:${room}`;
+    return `${row.kind}:${y}:${room}:${row.sportId || ""}`;
   }
 
-  // From engraved Trophy Room(s) — multi-league career stack
+  // From engraved Trophy Room(s) — multi-league career stack (all sports)
   for (const t of leagueTrophies) {
     const byId = t.winnerUserId && t.winnerUserId === playerId;
     const byName = namesMatch(t.winnerName, playerName);
     if (!byId && !byName) continue;
     const rowSport =
       t.sportId === "nfl" || t.sportId === "cfb" ? t.sportId : activeSport;
+    if (activeSportOnly && rowSport !== activeSport) continue;
     let row = leagueToProfile(t, rowSport);
     // Vonnagio gold copy when this plaque is from that room (or active desk)
     let rowVonnagio = false;
@@ -359,9 +376,10 @@ export function getProfileHardware(opts: {
     out.push(row);
   }
 
-  // Legacy seeds — fill only if no room already has that kind·year for this sport
+  // Legacy career seeds — default: all sports (Profile Trophy Room is global)
   for (const legacy of LEGACY_PROFILE_HARDWARE) {
-    if (legacy.sport !== activeSport) continue;
+    if (activeSportOnly && legacy.sport !== activeSport) continue;
+    // Room-local gold form of Maria's championship (not a sport desk filter)
     if (legacy.id === "legacy-maria-super-bowl-2025" && activeVonnagio)
       continue;
     if (legacy.id === "legacy-maria-vonnagio-2025" && !activeVonnagio)
@@ -371,10 +389,10 @@ export function getProfileHardware(opts: {
       (p) =>
         p.kind === legacy.kind &&
         p.seasonYear === legacy.seasonYear &&
-        (p.sportId || activeSport) === legacy.sport
+        (p.sportId || legacy.sport) === legacy.sport
     );
-    // Allow multi-room same year; only skip legacy if we already have at least one
-    // real/league plaque for this kind·year (legacy is a single Excel fill-in)
+    // Skip legacy fill-in only when a real/league plaque already covers
+    // this kind·year·sport (multi-room career still stacks by league id)
     if (alreadyFromAnyRoom) continue;
 
     // Identity-bearing seeds: stable user_id only (never display name / nickname)
@@ -394,13 +412,16 @@ export function getProfileHardware(opts: {
       if (!direct && !alias) continue;
     }
     const { sport: _s, winnerUserId: _uid, ...rest } = legacy;
+    // Stable career placement — do not re-key by active league (avoids dupes
+    // and wrong room labels when the profile is opened from another sport).
     const leg: ProfileTrophy = {
       ...rest,
       source: "legacy",
       sportId: legacy.sport,
-      leagueName: activeLeagueName || "Prior season",
-      leagueId: activeLeagueId || `legacy-${legacy.id}`,
-      leagueCode: activeLeagueCode,
+      leagueName:
+        legacy.sport === "nfl" ? "NFL career" : "CFB career",
+      leagueId: `legacy-${legacy.id}`,
+      leagueCode: null,
     };
     const key = hardwareDedupeKey(leg);
     if (seen.has(key)) continue;
@@ -472,7 +493,7 @@ export const BIG_GAME_KINDS: ProfileTrophyKind[] = [
   "crystal_ball",
 ];
 
-/** Tiny standings flair — sport-gated via active league. */
+/** Tiny standings flair — sport-local to the active league board only. */
 export function standingsHardwareFlair(playerName: string): {
   emoji: string;
   title: string;
@@ -490,6 +511,7 @@ export function standingsHardwareFlair(playerName: string): {
     playerName,
     leagueTrophies: [],
     sportId,
+    activeSportOnly: true,
   });
   const flair: { emoji: string; title: string }[] = [];
   const seen = new Set<string>();
