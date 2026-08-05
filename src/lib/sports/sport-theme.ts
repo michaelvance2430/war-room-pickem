@@ -23,9 +23,9 @@ const LEAGUE_KEY = "warroom-league";
 const FORCE_SPORT_KEY = "warroom-force-league-sport-v1";
 const FORCE_SPORT_MS = 120_000;
 /**
- * Durable map: leagueId → last known sport.
- * Survives logout. Cloud non-cfb always wins; cloud cfb cannot clobber a
- * stamped non-cfb until cloud itself returns that non-cfb (or host re-creates).
+ * Durable map: leagueId → last known sport (presentation only).
+ * Survives logout. When cloud sport_id is present it always wins and
+ * overwrites the stamp — never the reverse.
  */
 const STAMPS_KEY = "warroom-league-sport-stamps-v1";
 
@@ -87,8 +87,8 @@ function writeStamps(map: StampMap) {
 }
 
 /**
- * Durable stamp for a league. Call on create, join, switch, and whenever
- * cloud returns a definitive non-cfb sport_id.
+ * Local presentation stamp only. Never writes Supabase.
+ * Call when cloud returns a sport, after create INSERT, or on join/switch.
  */
 export function stampLeagueSport(
   leagueId: string,
@@ -101,14 +101,39 @@ export function stampLeagueSport(
   const prev = map[leagueId];
   map[leagueId] = {
     sportId: id,
-    // Non-cfb stamps are trusted across logout (create/join/switch/cloud)
-    cloudConfirmed:
-      id !== "cfb"
-        ? true
-        : !!(opts?.cloudConfirmed || prev?.cloudConfirmed),
+    cloudConfirmed: !!(opts?.cloudConfirmed || prev?.cloudConfirmed || id !== "cfb"),
     updatedAt: Date.now(),
   };
   writeStamps(map);
+}
+
+/**
+ * Safe diagnostic when cloud and local sport disagree.
+ * Cloud wins; local is corrected by resolveLeagueSportId.
+ * No PII, no Supabase writes, no player-blocking UI.
+ */
+export function logSportMismatch(detail: {
+  leagueId: string;
+  cloudSport: string;
+  localSport?: string | null;
+  source?: string;
+}): void {
+  if (typeof console === "undefined" || !console.info) return;
+  try {
+    const lid =
+      detail.leagueId.length > 12
+        ? `${detail.leagueId.slice(0, 8)}…`
+        : detail.leagueId;
+    console.info("[warroom-sport-mismatch]", {
+      leagueId: lid,
+      cloud: detail.cloudSport,
+      local: detail.localSport || null,
+      source: detail.source || "resolve",
+      action: "cloud_wins_no_write",
+    });
+  } catch {
+    /* ignore */
+  }
 }
 
 export function stampedSportForLeague(
@@ -149,8 +174,24 @@ export function resolveLeagueSportId(opts: {
     typeof opts.cloudSportId === "string" ? opts.cloudSportId.trim() : "";
   const cloud = cloudRaw ? normalizeSportId(cloudRaw) : null;
 
+  const localRaw =
+    typeof opts.localSportId === "string" ? opts.localSportId.trim() : "";
+  const local = localRaw ? normalizeSportId(localRaw) : null;
+  const stampedBefore = stampedSportForLeague(leagueId);
+
   // Cloud present (cfb OR nfl OR other) → always wins; correct stale local stamps.
   if (cloud) {
+    const stale =
+      (local && local !== cloud) ||
+      (stampedBefore && stampedBefore !== cloud);
+    if (stale) {
+      logSportMismatch({
+        leagueId,
+        cloudSport: cloud,
+        localSport: local || stampedBefore,
+        source: "resolveLeagueSportId",
+      });
+    }
     stampLeagueSport(leagueId, cloud, { cloudConfirmed: true });
     return cloud;
   }
@@ -162,12 +203,8 @@ export function resolveLeagueSportId(opts: {
     return forced;
   }
 
-  const stamped = stampedSportForLeague(leagueId);
-  if (stamped) return stamped;
+  if (stampedBefore) return stampedBefore;
 
-  const localRaw =
-    typeof opts.localSportId === "string" ? opts.localSportId.trim() : "";
-  const local = localRaw ? normalizeSportId(localRaw) : null;
   if (local) {
     stampLeagueSport(leagueId, local, { cloudConfirmed: false });
     return local;
@@ -177,21 +214,8 @@ export function resolveLeagueSportId(opts: {
 }
 
 /**
- * @deprecated Never write league sport from read/restore paths.
- * Retained as a no-op so accidental callers cannot corrupt production rows.
- * Explicit create/setup must set sport_id via authorized inserts/updates only.
- */
-export async function reassertLeagueSportToCloud(
-  _leagueId: string,
-  _sportId: SportId
-): Promise<void> {
-  return;
-}
-
-/**
- * Pin sport for a league after create/join so async cloud sync cannot
- * flash CFB green over NFL red (DB default sport_id = cfb).
- * Also writes durable stamp (survives logout).
+ * Pin sport after authorized create INSERT (local only).
+ * Does not UPDATE Supabase — sport must already be correct on the new row.
  */
 export function pinLeagueSport(
   leagueId: string,
@@ -199,7 +223,7 @@ export function pinLeagueSport(
 ): void {
   if (!canUse() || !leagueId) return;
   const id = normalizeSportId(sportId);
-  stampLeagueSport(leagueId, id, { cloudConfirmed: id !== "cfb" });
+  stampLeagueSport(leagueId, id, { cloudConfirmed: true });
   try {
     const payload: ForceSport = {
       leagueId,

@@ -244,46 +244,17 @@ function JoinPageInner() {
         }
       }
 
-      // Last resort: insert bare row, then force sport_id update
+      // Sport is immutable after INSERT — never create a placeholder row then
+      // UPDATE sport_id. Fail clearly if the sport column is missing.
       if (
         leagueError &&
         /sport_id|sport_settings|column|schema cache|PGRST/i.test(
           leagueError.message || ""
         )
       ) {
-        const res = await supabase
-          .from("leagues")
-          .insert(baseRow)
-          .select()
-          .single();
-        league = res.data as Record<string, unknown> | null;
-        leagueError = res.error;
-        if (league?.id && !leagueError) {
-          const { error: sportUpErr } = await supabase
-            .from("leagues")
-            .update({
-              sport_id: selectedSportId,
-              sport_settings: {},
-              crystal_ball_enabled: true,
-              current_week: openingWeek,
-            })
-            .eq("id", league.id as string);
-          if (!sportUpErr) {
-            league = {
-              ...league,
-              sport_id: selectedSportId,
-              crystal_ball_enabled: true,
-            };
-          }
-          if (listAsOpen) {
-            try {
-              const { setLeagueOpenListing } = await import("@/lib/open-room");
-              await setLeagueOpenListing(league.id as string, true);
-            } catch {
-              /* optional */
-            }
-          }
-        }
+        throw new Error(
+          "Your database is missing the sport column (or rejected the create insert). Run supabase/sport-id.sql in the Supabase SQL editor, then create the league again. League sport cannot be patched after insert."
+        );
       }
 
       if (leagueError || !league) {
@@ -293,19 +264,13 @@ function JoinPageInner() {
       const leagueId = league.id as string;
       const createdSportId = selectedSportId;
 
-      // Always re-assert sport on the row and verify (DB default is cfb —
-      // without this, NFL rooms open as CFB after the next cloud sync).
+      // Verify INSERT stored the chosen sport (SELECT only — no sport UPDATE).
       {
         const { data: sportRow, error: sportErr } = await supabase
           .from("leagues")
-          .update({
-            sport_id: createdSportId,
-            crystal_ball_enabled: true,
-            current_week: openingWeek,
-          })
+          .select("sport_id, current_week, crystal_ball_enabled")
           .eq("id", leagueId)
-          .select("sport_id, current_week")
-          .single();
+          .maybeSingle();
         if (
           sportErr &&
           /sport_id|column|schema cache|PGRST/i.test(sportErr.message || "")
@@ -315,18 +280,29 @@ function JoinPageInner() {
           );
         }
         const got =
-          sportRow && typeof (sportRow as { sport_id?: string }).sport_id === "string"
+          sportRow &&
+          typeof (sportRow as { sport_id?: string }).sport_id === "string"
             ? String((sportRow as { sport_id: string }).sport_id).trim()
             : "";
-        if (got && got !== createdSportId) {
+        if (!got) {
           throw new Error(
-            `Could not set sport to ${createdSportId} (database has "${got}"). Check leagues.sport_id, then try again.`
+            "League created without sport_id. Run supabase/sport-id.sql, then try again."
+          );
+        }
+        if (got !== createdSportId) {
+          throw new Error(
+            `Could not create league as ${createdSportId} (database has "${got}"). Sport is set only at insert — check leagues.sport_id.`
           );
         }
         league = {
           ...league,
           sport_id: createdSportId,
-          crystal_ball_enabled: true,
+          crystal_ball_enabled:
+            typeof (sportRow as { crystal_ball_enabled?: boolean })
+              ?.crystal_ball_enabled === "boolean"
+              ? !!(sportRow as { crystal_ball_enabled?: boolean })
+                  .crystal_ball_enabled
+              : true,
         };
       }
 
@@ -446,25 +422,6 @@ function JoinPageInner() {
         /* ignore */
       }
 
-      try {
-        if (createdSportId === "nfl") {
-          // Direct update — avoid saveLeagueToCloud full rehydrate clobber
-          await supabase
-            .from("leagues")
-            .update({
-              sport_id: "nfl",
-              crystal_ball_enabled: true,
-            })
-            .eq("id", leagueId);
-          const { pinLeagueSport, applySportTheme } = await import(
-            "@/lib/sports/sport-theme"
-          );
-          pinLeagueSport(leagueId, "nfl");
-          applySportTheme("nfl");
-        }
-      } catch {
-        /* optional */
-      }
       try {
         const { applySportTheme } = await import("@/lib/sports/sport-theme");
         applySportTheme(createdSportId);

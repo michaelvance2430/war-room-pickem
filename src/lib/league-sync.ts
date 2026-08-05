@@ -203,6 +203,10 @@ export async function saveLeagueToCloud(opts: {
 
   invalidateLeagueCloudCache(session.leagueId);
   const supabase = createClient();
+  /**
+   * Whitelist only — never include sport_id, commissioner_id, current_week,
+   * or other identity/config that must not change via general settings saves.
+   */
   const patch: Record<string, unknown> = {};
   if (opts.name !== undefined) patch.name = opts.name.trim() || local.name;
   if (opts.code !== undefined) patch.code = opts.code;
@@ -220,6 +224,16 @@ export async function saveLeagueToCloud(opts: {
     patch.home_tagline_custom = opts.settings.homeTaglineCustom;
   if (opts.settings?.seasonThemeId !== undefined)
     patch.season_theme_id = opts.settings.seasonThemeId;
+
+  // Defense in depth: strip any accidental sport / identity fields
+  delete patch.sport_id;
+  delete patch.commissioner_id;
+  delete patch.current_week;
+  delete patch.regular_season_weeks;
+
+  if (Object.keys(patch).length === 0) {
+    return { ok: false, error: "Nothing to save" };
+  }
 
   let { data, error } = await supabase
     .from("leagues")

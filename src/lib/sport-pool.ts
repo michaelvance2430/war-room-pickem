@@ -442,6 +442,17 @@ export async function spinUpLeagueFromPoll(opts: {
   const code = generateCode();
   const sportId = poll.targetSportId as SportId;
 
+  let openingWeek = sportId === "nfl" ? 1 : 0;
+  try {
+    const { resolveNewLeagueOpeningWeek } = await import(
+      "@/lib/active-week-storage"
+    );
+    openingWeek = resolveNewLeagueOpeningWeek(sportId);
+  } catch {
+    /* defaults above */
+  }
+
+  // Sport must be on the initial INSERT — never placeholder-then-UPDATE.
   const insertRow: Record<string, unknown> = {
     name,
     code,
@@ -449,6 +460,7 @@ export async function spinUpLeagueFromPoll(opts: {
     sport_id: sportId,
     sport_settings: {},
     crystal_ball_enabled: true,
+    current_week: openingWeek,
   };
 
   let { data: league, error: lErr } = await supabase
@@ -461,13 +473,11 @@ export async function spinUpLeagueFromPoll(opts: {
     lErr &&
     /sport_id|crystal_ball|column|schema cache/i.test(lErr.message || "")
   ) {
-    const res = await supabase
-      .from("leagues")
-      .insert({ name, code, commissioner_id: session.playerId })
-      .select()
-      .single();
-    league = res.data;
-    lErr = res.error;
+    return {
+      ok: false,
+      error:
+        "Database missing sport column or rejected create insert. Run supabase/sport-id.sql, then try again. League sport cannot be patched after insert.",
+    };
   }
   if (lErr || !league) {
     return { ok: false, error: lErr?.message || "Could not create league." };
@@ -475,17 +485,13 @@ export async function spinUpLeagueFromPoll(opts: {
 
   const leagueId = (league as { id: string }).id;
 
-  // Force sport (DB default is cfb — bare insert path would otherwise open CFB)
+  // Verify INSERT (SELECT only — sport is immutable after creation).
   {
     const { data: sportRow, error: sportErr } = await supabase
       .from("leagues")
-      .update({
-        sport_id: sportId,
-        crystal_ball_enabled: sportId === "cfb",
-      })
-      .eq("id", leagueId)
       .select("sport_id")
-      .single();
+      .eq("id", leagueId)
+      .maybeSingle();
     if (
       sportErr &&
       /sport_id|column|schema cache|PGRST/i.test(sportErr.message || "")
@@ -501,10 +507,10 @@ export async function spinUpLeagueFromPoll(opts: {
       typeof (sportRow as { sport_id?: string }).sport_id === "string"
         ? String((sportRow as { sport_id: string }).sport_id).trim()
         : "";
-    if (got && got !== sportId) {
+    if (!got || got !== sportId) {
       return {
         ok: false,
-        error: `Could not set sport to ${sportId} (database has "${got}").`,
+        error: `Could not create league as ${sportId} (database has "${got || "empty"}").`,
       };
     }
   }
