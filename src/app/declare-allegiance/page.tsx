@@ -1,9 +1,10 @@
 "use client";
 
 /**
- * DECLARE YOUR ALLEGIANCE — CFB favorite team (Phase 1).
- * Required to answer; not required to pick a real team.
- * Real auth only. Supabase source of truth.
+ * DECLARE YOUR ALLEGIANCE — favorite team by sport.
+ * CFB: real team or explicit no-team.
+ * NFL: real NFL club required (not Super Bowl pick — separate Crystal Ball).
+ * Real auth only. Supabase profile_favorite_teams (user_id, sport_id).
  */
 
 import { Suspense, useEffect, useState } from "react";
@@ -12,6 +13,7 @@ import BrandMark from "@/components/BrandMark";
 import TeamAllegiancePicker from "@/components/TeamAllegiancePicker";
 import {
   getMyFavoriteTeamId,
+  isRealTeamId,
   NO_TEAM_ID,
   safeNextPath,
   setMyFavoriteTeam,
@@ -19,6 +21,8 @@ import {
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import type { CanonicalTeam } from "@/lib/teams/cfb-catalog";
 import { peekPendingJoinCode } from "@/lib/commish-onboarding";
+import type { SportId } from "@/lib/sports/types";
+import { normalizeSportId } from "@/lib/sports/registry";
 
 type Choice =
   | { kind: "team"; team: CanonicalTeam }
@@ -28,6 +32,10 @@ type Choice =
 function DeclareInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const sportRaw = searchParams.get("sport");
+  const sportId = (normalizeSportId(sportRaw || "cfb") || "cfb") as SportId;
+  const isNfl = sportId === "nfl";
+
   const [checking, setChecking] = useState(true);
   const [choice, setChoice] = useState<Choice>(null);
   const [busy, setBusy] = useState(false);
@@ -63,10 +71,13 @@ function DeclareInner() {
           router.replace("/login?mode=signup");
           return;
         }
-        // Any answer (team or no-team) skips the ceremony
-        const existing = await getMyFavoriteTeamId("cfb");
+        const existing = await getMyFavoriteTeamId(sportId);
         if (cancelled) return;
-        if (existing) {
+        // CFB: any row (team or no-team) skips. NFL: real catalog team only.
+        const done = isNfl
+          ? isRealTeamId(existing)
+          : !!existing;
+        if (done) {
           continueNext();
           return;
         }
@@ -78,15 +89,19 @@ function DeclareInner() {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount
-  }, [router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sport from URL
+  }, [router, sportId, isNfl]);
 
   async function confirm() {
     if (!choice || busy) return;
+    if (isNfl && choice.kind !== "team") {
+      setError("Pick an NFL team you ride with.");
+      return;
+    }
     setBusy(true);
     setError(null);
     const teamId = choice.kind === "no-team" ? NO_TEAM_ID : choice.team.id;
-    const res = await setMyFavoriteTeam("cfb", teamId);
+    const res = await setMyFavoriteTeam(sportId, teamId);
     setBusy(false);
     if (!res.ok) {
       setError(res.error || "Could not save.");
@@ -106,7 +121,10 @@ function DeclareInner() {
 
   const selectedTeam = choice?.kind === "team" ? choice.team : null;
   const noTeamSelected = choice?.kind === "no-team";
-  const canConfirm = choice !== null && !busy;
+  const canConfirm =
+    choice !== null &&
+    !busy &&
+    (!isNfl || choice.kind === "team");
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -130,51 +148,56 @@ function DeclareInner() {
             <p className="text-sm text-muted leading-relaxed">
               {choice?.kind === "no-team"
                 ? "Neutrality noted. You can claim a side later in Account."
-                : "Your objectivity is now officially questionable."}
+                : isNfl
+                  ? "Your team is locked in. Super Bowl pick is a separate question."
+                  : "Your objectivity is now officially questionable."}
             </p>
           </div>
         ) : (
           <>
             <div className="text-center mb-6 space-y-2">
               <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">
-                Declare your allegiance
+                {isNfl ? "Your NFL team" : "Declare your allegiance"}
               </p>
               <h1 className="text-xl sm:text-2xl font-black text-foreground leading-tight">
-                Who do you ride with?
+                {isNfl ? "Who do you ride with?" : "Who do you ride with?"}
               </h1>
               <p className="text-sm text-muted leading-relaxed max-w-sm mx-auto">
-                Every pick tells us what you think. This one tells us who you
-                are. You have to answer — but &quot;no team&quot; is a real
-                answer.
+                {isNfl
+                  ? "Pick the NFL club you identify with. This is not your Super Bowl prediction — that comes next if pride pick is on."
+                  : "Every pick tells us what you think. This one tells us who you are. You have to answer — but \"no team\" is a real answer."}
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setChoice({ kind: "no-team" })}
-              className={`w-full mb-4 rounded-xl border px-4 py-3.5 min-h-[52px] text-left transition touch-manipulation ${
-                noTeamSelected
-                  ? "border-primary bg-primary/10 ring-2 ring-primary/30"
-                  : "border-border bg-card hover:border-muted"
-              }`}
-            >
-              <span className="flex items-center justify-between gap-2">
-                <span className="block text-sm font-bold text-foreground">
-                  No team declared
-                </span>
-                {noTeamSelected && (
-                  <span className="text-primary text-xs font-black shrink-0">
-                    ✓
+            {!isNfl && (
+              <button
+                type="button"
+                onClick={() => setChoice({ kind: "no-team" })}
+                className={`w-full mb-4 rounded-xl border px-4 py-3.5 min-h-[52px] text-left transition touch-manipulation ${
+                  noTeamSelected
+                    ? "border-primary bg-primary/10 ring-2 ring-primary/30"
+                    : "border-border bg-card hover:border-muted"
+                }`}
+              >
+                <span className="flex items-center justify-between gap-2">
+                  <span className="block text-sm font-bold text-foreground">
+                    No team declared
                   </span>
-                )}
-              </span>
-              <span className="block text-xs text-muted mt-0.5 leading-snug">
-                Stay neutral. Picks, leagues, and scores work the same. You can
-                pick a team later in Account.
-              </span>
-            </button>
+                  {noTeamSelected && (
+                    <span className="text-primary text-xs font-black shrink-0">
+                      ✓
+                    </span>
+                  )}
+                </span>
+                <span className="block text-xs text-muted mt-0.5 leading-snug">
+                  Stay neutral. Picks, leagues, and scores work the same. You can
+                  pick a team later in Account.
+                </span>
+              </button>
+            )}
 
             <TeamAllegiancePicker
+              sportId={sportId}
               selectedId={selectedTeam?.id ?? null}
               onSelect={(team) => setChoice({ kind: "team", team })}
             />
@@ -202,7 +225,9 @@ function DeclareInner() {
                   ? "CONFIRM — NO TEAM"
                   : selectedTeam
                     ? "THIS IS MY TEAM"
-                    : "CHOOSE AN ANSWER"}
+                    : isNfl
+                      ? "PICK YOUR TEAM"
+                      : "CHOOSE AN ANSWER"}
             </button>
           </>
         )}

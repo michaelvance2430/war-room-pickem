@@ -234,11 +234,11 @@ export function pridePickWizardCopy(sportId?: string | null): {
   return {
     title: nfl ? "Super Bowl pride pick?" : "Crystal Ball?",
     oneLiner: nfl
-      ? "Pick the Super Bowl winner. No points. Secret until freeze."
+      ? "Players predict the Super Bowl champion before Week 1. Pride only—no standings points."
       : "Pick the national champ. No points. Secret until freeze.",
     body: nfl
-      ? "Optional free brag tab for the room. After freeze, everyone’s pick is a permanent board."
-      : "Optional free brag tab. After freeze, everyone’s pick is a permanent board. Correct picks earn a sarcastic Witch/Wizard badge.",
-    onLabel: nfl ? "On — Super Bowl tab" : "On — Crystal Ball tab",
+      ? "Defaults on for new NFL rooms. After freeze, everyone’s pick is a permanent board. This is not their favorite-team allegiance — that’s separate."
+      : "Optional free brag tab. After freeze, everyone’s pick is a permanent board.",
+    onLabel: nfl ? "On — Super Bowl tab (recommended)" : "On — Crystal Ball tab",
   };
 }

@@ -78,8 +78,10 @@ function toLocalLeague(row: {
     }
   }
 
-  // Prefer cloud flag; if column missing from select, keep prior local value
-  let crystalBallEnabled = sportId === "cfb";
+  // Prefer cloud flag; if column missing from select, keep prior local value.
+  // Product default: CFB + NFL pride pick ON when the column is absent.
+  // Never invent false for NFL solely because sport is non-cfb.
+  let crystalBallEnabled = sportId === "cfb" || sportId === "nfl";
   let homeTaglineId = "good-teams";
   let homeTaglineCustom = "";
   let seasonThemeId = "default";
@@ -305,12 +307,17 @@ export async function saveLeagueToCloud(opts: {
     (data as { sport_id?: string }).sport_id === "cfb"
   ) {
     try {
+      // Re-assert sport only — do NOT force crystal_ball_enabled false for NFL.
+      // New NFL leagues default ON at create; commissioner may have set either way.
+      const patch: Record<string, unknown> = { sport_id: league.sportId };
+      if (typeof league.settings?.crystalBallEnabled === "boolean") {
+        patch.crystal_ball_enabled = league.settings.crystalBallEnabled;
+      } else if (league.sportId === "nfl") {
+        patch.crystal_ball_enabled = true;
+      }
       await supabase
         .from("leagues")
-        .update({
-          sport_id: league.sportId,
-          crystal_ball_enabled: league.sportId === "cfb",
-        })
+        .update(patch)
         .eq("id", session.leagueId);
     } catch {
       /* best-effort */

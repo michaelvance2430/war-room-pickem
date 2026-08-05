@@ -25,6 +25,7 @@ export type LeagueHubActionCode =
   | "FINISH_CARD"
   | "LOCK_CRYSTAL_BALL"
   | "LOCK_PICKS"
+  | "CHOOSE_TEAM"
   | "SET_WEEK"
   | "PUBLISH_WEEK"
   | "SCORE_WEEK"
@@ -79,6 +80,10 @@ const ACTION_META: Record<
   FINISH_CARD: { label: "Finish Card", href: "/picks" },
   LOCK_CRYSTAL_BALL: { label: "Lock Crystal Ball", href: "/crystal-ball" },
   LOCK_PICKS: { label: "Lock Picks", href: "/picks" },
+  CHOOSE_TEAM: {
+    label: "Choose Team",
+    href: "/declare-allegiance",
+  },
   SET_WEEK: { label: "Set Week", href: "/week-ops" },
   PUBLISH_WEEK: { label: "Publish Week", href: "/week-ops" },
   SCORE_WEEK: { label: "Score Week", href: "/week-ops?step=score" },
@@ -252,15 +257,19 @@ type FactBundle = {
   /** crystal_ball_picks row exists (authoritative seal) */
   crystalBallSealed: boolean | null;
   crystalBallEnabled: boolean;
+  /** Profile/sport NFL allegiance missing (does not affect CFB). */
+  needsNflTeam: boolean;
 };
 
 async function loadFacts(
   m: LeagueMembership,
-  uid: string
+  uid: string,
+  opts?: { needsNflTeam?: boolean }
 ): Promise<FactBundle | null> {
   const supabase = createClient();
   // Stage 4: deputies are ops for week-ops / score (same as isOps())
   const isOps = membershipIsOps(m, uid);
+  const needsNflTeam = !!opts?.needsNflTeam;
 
   try {
     const { data: leagueRow, error: leagueErr } = await supabase
@@ -297,7 +306,7 @@ async function loadFacts(
             .crystal_ball_enabled
         : typeof m.crystalBallEnabled === "boolean"
           ? !!m.crystalBallEnabled
-          : sportId === "cfb";
+          : sportId === "cfb" || sportId === "nfl";
 
     if (live == null) {
       return {
@@ -320,6 +329,7 @@ async function loadFacts(
         lockedAt: null,
         crystalBallSealed: null,
         crystalBallEnabled,
+        needsNflTeam: sportId === "nfl" && needsNflTeam,
       };
     }
 
@@ -471,6 +481,7 @@ async function loadFacts(
       lockedAt,
       crystalBallSealed,
       crystalBallEnabled,
+      needsNflTeam: sportId === "nfl" && needsNflTeam,
     };
   } catch {
     return null;
@@ -499,6 +510,18 @@ export function resolveLeagueHubAction(f: FactBundle): {
 } {
   const weekLine =
     f.liveWeek != null ? weekTitle(f.liveWeek, f.sportId) : "Not set";
+
+  // ── NFL team allegiance (profile/sport) before weekly work ──
+  if (f.sportId === "nfl" && f.needsNflTeam) {
+    return {
+      action: actionOf("CHOOSE_TEAM", {
+        label: "Choose Team",
+        href: "/declare-allegiance?sport=nfl&next=/",
+      }),
+      weekLine,
+      signal: signalOf("waiting", "Choose NFL Team"),
+    };
+  }
 
   // ── Host ops sequence (shared with Home) ──
   if (f.isOps) {
@@ -536,6 +559,26 @@ export function resolveLeagueHubAction(f: FactBundle): {
     // No host mission → player sequence (same as Home silent mission button)
   }
 
+  // ── Super Bowl / Crystal Ball before weekly picks when open ──
+  if (
+    f.crystalBallEnabled &&
+    isCrystalBallOpeningWeek(f.sportId, f.liveWeek) &&
+    f.crystalBallSealed === false
+  ) {
+    const nfl = f.sportId === "nfl";
+    return {
+      action: actionOf("LOCK_CRYSTAL_BALL", {
+        label: nfl ? "Make Super Bowl Pick" : "Lock Crystal Ball",
+        href: "/crystal-ball",
+      }),
+      weekLine,
+      signal: signalOf(
+        "prediction",
+        nfl ? "Super Bowl Pick" : "Crystal Ball"
+      ),
+    };
+  }
+
   // ── Player sequence ──
   if (f.cardId && f.publishedAt) {
     if (!f.pickId || f.pickGameCount === 0) {
@@ -550,17 +593,6 @@ export function resolveLeagueHubAction(f: FactBundle): {
         action: actionOf("FINISH_CARD"),
         weekLine,
         signal: signalOf("waiting", "Finish Card"),
-      };
-    }
-    if (
-      f.crystalBallEnabled &&
-      isCrystalBallOpeningWeek(f.sportId, f.liveWeek) &&
-      f.crystalBallSealed === false
-    ) {
-      return {
-        action: actionOf("LOCK_CRYSTAL_BALL"),
-        weekLine,
-        signal: signalOf("prediction", "Crystal Ball"),
       };
     }
     if (pickIsComplete(f) && !f.lockedAt) {
@@ -598,6 +630,7 @@ export const ACTIONABLE_HUB_TASK_CODES: ReadonlySet<LeagueHubActionCode> =
     "FINISH_CARD",
     "LOCK_CRYSTAL_BALL",
     "LOCK_PICKS",
+    "CHOOSE_TEAM",
     "SET_WEEK",
     "PUBLISH_WEEK",
     "SCORE_WEEK",
@@ -700,12 +733,23 @@ export async function loadLeagueHubPulses(
   uid: string
 ): Promise<Record<string, LeagueHubPulse>> {
   const next: Record<string, LeagueHubPulse> = {};
+  // One allegiance check for all NFL rooms (profile/sport — not per league)
+  let needsNflTeam = false;
+  if (memberships.some((m) => normalizeSportId(m.sportId || "cfb") === "nfl")) {
+    try {
+      const { needsNflAllegiance } = await import("@/lib/favorite-teams");
+      needsNflTeam = await needsNflAllegiance();
+    } catch {
+      needsNflTeam = false;
+    }
+  }
+
   await Promise.all(
     memberships.map(async (m) => {
       const isOps = membershipIsOps(m, uid);
       const sportId = normalizeSportId(m.sportId || "cfb");
       try {
-        const facts = await loadFacts(m, uid);
+        const facts = await loadFacts(m, uid, { needsNflTeam });
         if (!facts) {
           next[m.leagueId] = fallbackPulse(m.leagueId, sportId, isOps);
           return;

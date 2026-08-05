@@ -13,6 +13,10 @@ import {
   isValidCfbTeamId,
   type CanonicalTeam,
 } from "@/lib/teams/cfb-catalog";
+import {
+  getNflTeamById,
+  isValidNflTeamId,
+} from "@/lib/teams/nfl-catalog";
 
 export type FavoriteTeamRow = {
   userId: string;
@@ -94,7 +98,14 @@ function validateTeamForSport(
   teamId: string
 ): { ok: true } | { ok: false; error: string } {
   if (isNoTeamId(teamId)) {
+    // CFB allows explicit "no team". NFL requires a real club (product binding).
     if (sportId === "cfb") return { ok: true };
+    if (sportId === "nfl") {
+      return {
+        ok: false,
+        error: "Pick an NFL team you ride with — no neutral answer for the pros.",
+      };
+    }
     return {
       ok: false,
       error: "That sport is not open for allegiance yet.",
@@ -106,7 +117,12 @@ function validateTeamForSport(
     }
     return { ok: true };
   }
-  // Future sports: add catalogs; refuse inventing ids
+  if (sportId === "nfl") {
+    if (!isValidNflTeamId(teamId)) {
+      return { ok: false, error: "Unknown NFL team." };
+    }
+    return { ok: true };
+  }
   return {
     ok: false,
     error: "That sport is not open for allegiance yet.",
@@ -119,6 +135,7 @@ export function resolveFavoriteTeam(
 ): CanonicalTeam | null {
   if (!teamId || isNoTeamId(teamId)) return null;
   if (sportId === "cfb") return getCfbTeamById(teamId);
+  if (sportId === "nfl") return getNflTeamById(teamId);
   return null;
 }
 
@@ -246,6 +263,35 @@ export async function hasAnsweredCfbAllegiance(): Promise<boolean> {
   if (!auth.ok) return false;
   const id = await getUserFavoriteTeamId(auth.userId, "cfb");
   return !!id;
+}
+
+/**
+ * NFL team allegiance — profile/sport level (does not touch CFB).
+ * Required: a real NFL catalog team. No-team is not allowed.
+ * No row → needs selection. Real team id → satisfied.
+ */
+export async function needsNflAllegiance(): Promise<boolean> {
+  const auth = await requireRealAuthUserId();
+  if (!auth.ok) return false;
+  const id = await getUserFavoriteTeamId(auth.userId, "nfl");
+  if (!id) return true;
+  // Legacy/corrupt row without valid catalog id
+  if (isNoTeamId(id) || !isValidNflTeamId(id)) return true;
+  return false;
+}
+
+export async function hasNflAllegiance(): Promise<boolean> {
+  return !(await needsNflAllegiance());
+}
+
+/** Sport-aware: does this user still need allegiance for the active sport? */
+export async function needsAllegianceForSport(
+  sportId: SportId | string | null | undefined
+): Promise<boolean> {
+  const sid = (sportId || "cfb").toString();
+  if (sid === "nfl") return needsNflAllegiance();
+  if (sid === "cfb") return needsCfbAllegiance();
+  return false;
 }
 
 export function safeNextPath(raw: string | null | undefined): string {

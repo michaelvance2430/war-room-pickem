@@ -1,7 +1,8 @@
 "use client";
 
 /**
- * Searchable CFB team picker for declare-allegiance / Account.
+ * Searchable team picker for declare-allegiance / Account.
+ * CFB or NFL catalog via sportId — never mixes sports.
  */
 
 import { useMemo, useState } from "react";
@@ -9,18 +10,26 @@ import {
   listCfbCatalog,
   type CanonicalTeam,
 } from "@/lib/teams/cfb-catalog";
+import { listNflCatalog } from "@/lib/teams/nfl-catalog";
+import type { SportId } from "@/lib/sports/types";
 
 type Props = {
   selectedId: string | null;
   onSelect: (team: CanonicalTeam) => void;
+  /** Default cfb. nfl uses pro catalog only. */
+  sportId?: SportId | string;
 };
 
 export default function TeamAllegiancePicker({
   selectedId,
   onSelect,
+  sportId = "cfb",
 }: Props) {
   const [q, setQ] = useState("");
-  const teams = useMemo(() => listCfbCatalog(), []);
+  const teams = useMemo(
+    () => (sportId === "nfl" ? listNflCatalog() : listCfbCatalog()),
+    [sportId]
+  );
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -43,7 +52,11 @@ export default function TeamAllegiancePicker({
         type="search"
         value={q}
         onChange={(e) => setQ(e.target.value)}
-        placeholder="Search teams or conferences…"
+        placeholder={
+          sportId === "nfl"
+            ? "Search NFL teams or divisions…"
+            : "Search teams or conferences…"
+        }
         className="w-full bg-background border border-border rounded-xl px-4 py-3 text-base min-h-[48px] focus:outline-none focus:border-primary"
         autoComplete="off"
       />

@@ -92,11 +92,12 @@ export function writeSessionAndLeague(
   } catch {
     /* keep sportId */
   }
-  // NFL (and non-CFB packs) default Crystal Ball off unless cloud says otherwise
+  // CFB + NFL pride pick default ON when cloud flag absent.
+  // Other packs stay off unless cloud says true.
   const crystalBallEnabled =
     typeof membership.crystalBallEnabled === "boolean"
       ? membership.crystalBallEnabled
-      : sportId === "cfb";
+      : sportId === "cfb" || sportId === "nfl";
 
   const league: League = {
     id: membership.leagueId,
@@ -319,10 +320,15 @@ async function fetchMyMembershipsFresh(
         cloudSportId: cloudSport,
       });
       m.sportId = resolved;
-      if (resolved === "nfl" || resolved === "soccer_wwc") {
-        // Don't inherit CFB crystal-ball default onto pro/event packs
+      if (resolved === "soccer_wwc") {
+        // Event packs: only honor explicit cloud true
         if (m.crystalBallEnabled !== true) {
           m.crystalBallEnabled = false;
+        }
+      } else if (resolved === "nfl") {
+        // NFL Super Bowl pick defaults ON when membership flag unset
+        if (typeof m.crystalBallEnabled !== "boolean") {
+          m.crystalBallEnabled = true;
         }
       }
       // Cloud still default cfb while we know better → push stamp up
