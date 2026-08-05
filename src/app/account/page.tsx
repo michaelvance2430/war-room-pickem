@@ -41,6 +41,11 @@ import {
 } from "@/lib/favorite-teams";
 import type { CanonicalTeam } from "@/lib/teams/cfb-catalog";
 import TeamAllegiancePicker from "@/components/TeamAllegiancePicker";
+import SportAllegianceCard, {
+  AllegianceTeamStrip,
+  ALLEGIANCE_CTA_CLASS,
+  ALLEGIANCE_SECONDARY_CLASS,
+} from "@/components/SportAllegianceCard";
 
 import FeedbackForm from "@/components/FeedbackForm";
 import OwnershipNotice from "@/components/OwnershipNotice";
@@ -817,264 +822,267 @@ export default function AccountPage() {
           </div>
       </section>
 
-        <section className="rounded-xl border border-border bg-card p-5 mb-6 space-y-6">
+        <section className="mb-6 space-y-4">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-1">
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted mb-1">
               Allegiance
             </p>
             <p className="text-xs text-muted leading-relaxed">
               Sport-specific. CFB and NFL are separate — editing one never
-              changes the other. Identity only, not points.
+              changes the other. Identity only, not points. Each card keeps its
+              own sport look regardless of your active league.
             </p>
           </div>
 
-          {/* ── CFB Team ── */}
-          <div className="space-y-3 border-t border-border pt-4">
-            <h2 className="font-semibold mb-0.5">CFB Team</h2>
-            <p className="text-xs text-muted leading-relaxed">
-              College allegiance. Optional “no team.”
-            </p>
-            {cfbTeamId && allegianceEditSport !== "cfb" ? (
-              <>
-                {cfbTeam ? (
-                  <div
-                    className="rounded-xl border-2 px-3 py-3 flex items-center gap-3"
-                    style={{
-                      borderColor: `${cfbTeam.colors.primary}99`,
-                      backgroundColor: `${cfbTeam.colors.primary}14`,
-                    }}
-                  >
-                    <span
-                      className="w-3 h-10 rounded-full shrink-0"
-                      style={{ backgroundColor: cfbTeam.colors.primary }}
-                      aria-hidden
+          {/* Dual frames: styling from explicit sportId only — not active league */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 min-w-0">
+            {/* ── CFB Team (always CFB green frame) ── */}
+            <SportAllegianceCard
+              sportId="cfb"
+              title="CFB Team"
+              blurb='College allegiance. Optional “no team.”'
+            >
+              {cfbTeamId && allegianceEditSport !== "cfb" ? (
+                <>
+                  {cfbTeam ? (
+                    <AllegianceTeamStrip
+                      team={cfbTeam}
+                      emptyTitle="No team declared"
+                      emptyBlurb="Neutral. Change anytime."
                     />
-                    <div>
-                      <p className="font-bold">{cfbTeam.name}</p>
-                      <p className="text-xs text-muted">{cfbTeam.conference}</p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="rounded-xl border border-border px-3 py-3">
-                    <p className="font-bold">No team declared</p>
-                    <p className="text-xs text-muted">Neutral. Change anytime.</p>
-                  </div>
-                )}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAllegianceEditSport("cfb");
-                    setAllegiancePick(cfbTeam);
-                    setAllegianceNoTeam(isNoTeamId(cfbTeamId));
-                  }}
-                  className="w-full sm:w-auto px-4 py-2.5 min-h-[44px] rounded-xl border border-border text-sm font-semibold"
-                >
-                  Change CFB team
-                </button>
-              </>
-            ) : allegianceEditSport !== "cfb" ? (
-              <>
-                <p className="text-sm text-muted">No CFB team declared yet.</p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAllegianceEditSport("cfb");
-                    setAllegianceNoTeam(false);
-                    setAllegiancePick(null);
-                  }}
-                  className="w-full py-3 min-h-[48px] rounded-xl bg-primary text-black text-sm font-bold"
-                >
-                  CHOOSE CFB TEAM
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAllegianceNoTeam(true);
-                    setAllegiancePick(null);
-                  }}
-                  className={`w-full rounded-xl border px-4 py-3 min-h-[48px] text-left transition ${
-                    allegianceNoTeam
-                      ? "border-primary bg-primary/10 ring-2 ring-primary/30"
-                      : "border-border hover:border-muted"
-                  }`}
-                >
-                  <span className="block text-sm font-bold">
-                    No team declared
-                  </span>
-                  <span className="block text-xs text-muted mt-0.5">
-                    Stay neutral. Change anytime.
-                  </span>
-                </button>
-                <TeamAllegiancePicker
-                  sportId="cfb"
-                  selectedId={allegiancePick?.id ?? null}
-                  onSelect={(t) => {
-                    setAllegiancePick(t);
-                    setAllegianceNoTeam(false);
-                  }}
-                />
-                <div className="flex flex-col sm:flex-row gap-2">
+                  ) : (
+                    <AllegianceTeamStrip
+                      team={null}
+                      emptyTitle="No team declared"
+                      emptyBlurb="Neutral. Change anytime."
+                    />
+                  )}
                   <button
                     type="button"
-                    disabled={
-                      allegianceBusy || (!allegianceNoTeam && !allegiancePick)
-                    }
                     onClick={() => {
-                      const teamId = allegianceNoTeam
-                        ? NO_TEAM_ID
-                        : allegiancePick?.id;
-                      if (!teamId) return;
-                      setAllegianceBusy(true);
-                      void setMyFavoriteTeam("cfb", teamId)
-                        .then((res) => {
-                          if (res.ok) {
-                            setCfbTeamId(teamId);
-                            setCfbTeam(res.team ?? null);
-                            setAllegianceEditSport(null);
-                            setAllegiancePick(null);
-                            setAllegianceNoTeam(false);
-                            setMessage(
-                              res.noTeam
-                                ? "CFB allegiance: no team."
-                                : `CFB team: ${res.team?.name}.`
-                            );
-                          } else {
-                            setMessage(res.error || "Could not update CFB team.");
-                          }
-                        })
-                        .finally(() => setAllegianceBusy(false));
+                      setAllegianceEditSport("cfb");
+                      setAllegiancePick(cfbTeam);
+                      setAllegianceNoTeam(isNoTeamId(cfbTeamId));
                     }}
-                    className="flex-1 py-3 min-h-[48px] rounded-xl bg-primary text-black text-sm font-bold disabled:opacity-40"
+                    className={ALLEGIANCE_SECONDARY_CLASS}
+                    aria-label="Change CFB team"
                   >
-                    {allegianceBusy
-                      ? "…"
-                      : allegianceNoTeam
-                        ? "SAVE — NO TEAM"
-                        : "SAVE CFB TEAM"}
+                    Change CFB team
                   </button>
+                </>
+              ) : allegianceEditSport !== "cfb" ? (
+                <>
+                  <AllegianceTeamStrip
+                    team={null}
+                    emptyTitle="No CFB team declared yet"
+                    emptyBlurb="Choose a college team — or stay neutral."
+                  />
                   <button
                     type="button"
                     onClick={() => {
-                      setAllegianceEditSport(null);
+                      setAllegianceEditSport("cfb");
+                      setAllegianceNoTeam(false);
                       setAllegiancePick(null);
+                    }}
+                    className={ALLEGIANCE_CTA_CLASS}
+                    aria-label="Choose CFB team"
+                  >
+                    CHOOSE CFB TEAM
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAllegianceNoTeam(true);
+                      setAllegiancePick(null);
+                    }}
+                    className={`w-full rounded-xl border px-4 py-3 min-h-[48px] text-left transition touch-manipulation ${
+                      allegianceNoTeam
+                        ? "border-primary bg-primary/10 ring-2 ring-primary/30"
+                        : "border-border hover:border-muted"
+                    }`}
+                  >
+                    <span className="block text-sm font-bold text-foreground">
+                      No team declared
+                    </span>
+                    <span className="block text-xs text-muted mt-0.5">
+                      Stay neutral. Change anytime.
+                    </span>
+                  </button>
+                  <TeamAllegiancePicker
+                    sportId="cfb"
+                    selectedId={allegiancePick?.id ?? null}
+                    onSelect={(t) => {
+                      setAllegiancePick(t);
                       setAllegianceNoTeam(false);
                     }}
-                    className="px-4 py-3 min-h-[48px] rounded-xl border border-border text-sm font-semibold"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
+                  />
+                  <div className="flex flex-col sm:flex-row gap-2 min-w-0">
+                    <button
+                      type="button"
+                      disabled={
+                        allegianceBusy || (!allegianceNoTeam && !allegiancePick)
+                      }
+                      onClick={() => {
+                        const teamId = allegianceNoTeam
+                          ? NO_TEAM_ID
+                          : allegiancePick?.id;
+                        if (!teamId) return;
+                        setAllegianceBusy(true);
+                        void setMyFavoriteTeam("cfb", teamId)
+                          .then((res) => {
+                            if (res.ok) {
+                              setCfbTeamId(teamId);
+                              setCfbTeam(res.team ?? null);
+                              setAllegianceEditSport(null);
+                              setAllegiancePick(null);
+                              setAllegianceNoTeam(false);
+                              setMessage(
+                                res.noTeam
+                                  ? "CFB allegiance: no team."
+                                  : `CFB team: ${res.team?.name}.`
+                              );
+                            } else {
+                              setMessage(
+                                res.error || "Could not update CFB team."
+                              );
+                            }
+                          })
+                          .finally(() => setAllegianceBusy(false));
+                      }}
+                      className={ALLEGIANCE_CTA_CLASS}
+                      aria-label={
+                        allegianceNoTeam
+                          ? "Save CFB allegiance as no team"
+                          : "Save CFB team"
+                      }
+                    >
+                      {allegianceBusy
+                        ? "…"
+                        : allegianceNoTeam
+                          ? "SAVE — NO TEAM"
+                          : "SAVE CFB TEAM"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAllegianceEditSport(null);
+                        setAllegiancePick(null);
+                        setAllegianceNoTeam(false);
+                      }}
+                      className={ALLEGIANCE_SECONDARY_CLASS}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </>
+              )}
+            </SportAllegianceCard>
 
-          {/* ── NFL Team ── */}
-          <div className="space-y-3 border-t border-border pt-4">
-            <h2 className="font-semibold mb-0.5">NFL Team</h2>
-            <p className="text-xs text-muted leading-relaxed">
-              Pro allegiance. Separate from Super Bowl Crystal Ball pick.
-            </p>
-            {nflTeamId && isRealTeamId(nflTeamId) && allegianceEditSport !== "nfl" ? (
-              <>
-                {nflTeam && (
-                  <div
-                    className="rounded-xl border-2 px-3 py-3 flex items-center gap-3"
-                    style={{
-                      borderColor: `${nflTeam.colors.primary}99`,
-                      backgroundColor: `${nflTeam.colors.primary}14`,
-                    }}
-                  >
-                    <span
-                      className="w-3 h-10 rounded-full shrink-0"
-                      style={{ backgroundColor: nflTeam.colors.primary }}
-                      aria-hidden
-                    />
-                    <div>
-                      <p className="font-bold">{nflTeam.name}</p>
-                      <p className="text-xs text-muted">{nflTeam.conference}</p>
-                    </div>
-                  </div>
-                )}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAllegianceEditSport("nfl");
-                    setAllegiancePick(nflTeam);
-                    setAllegianceNoTeam(false);
-                  }}
-                  className="w-full sm:w-auto px-4 py-2.5 min-h-[44px] rounded-xl border border-border text-sm font-semibold"
-                >
-                  Change NFL team
-                </button>
-              </>
-            ) : allegianceEditSport !== "nfl" ? (
-              <>
-                <p className="text-sm text-muted">No NFL team declared yet.</p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAllegianceEditSport("nfl");
-                    setAllegianceNoTeam(false);
-                    setAllegiancePick(null);
-                  }}
-                  className="w-full py-3 min-h-[48px] rounded-xl bg-primary text-black text-sm font-bold"
-                >
-                  CHOOSE NFL TEAM
-                </button>
-              </>
-            ) : (
-              <>
-                <TeamAllegiancePicker
-                  sportId="nfl"
-                  selectedId={allegiancePick?.id ?? null}
-                  onSelect={(t) => {
-                    setAllegiancePick(t);
-                    setAllegianceNoTeam(false);
-                  }}
-                />
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <button
-                    type="button"
-                    disabled={allegianceBusy || !allegiancePick}
-                    onClick={() => {
-                      const teamId = allegiancePick?.id;
-                      if (!teamId) return;
-                      setAllegianceBusy(true);
-                      void setMyFavoriteTeam("nfl", teamId)
-                        .then((res) => {
-                          if (res.ok) {
-                            setNflTeamId(teamId);
-                            setNflTeam(res.team ?? null);
-                            setAllegianceEditSport(null);
-                            setAllegiancePick(null);
-                            setMessage(`NFL team: ${res.team?.name}.`);
-                          } else {
-                            setMessage(res.error || "Could not update NFL team.");
-                          }
-                        })
-                        .finally(() => setAllegianceBusy(false));
-                    }}
-                    className="flex-1 py-3 min-h-[48px] rounded-xl bg-primary text-black text-sm font-bold disabled:opacity-40"
-                  >
-                    {allegianceBusy ? "…" : "SAVE NFL TEAM"}
-                  </button>
+            {/* ── NFL Team (always red/black War Room frame) ── */}
+            <SportAllegianceCard
+              sportId="nfl"
+              title="NFL Team"
+              blurb="Pro allegiance. Separate from Super Bowl Crystal Ball pick."
+            >
+              {nflTeamId &&
+              isRealTeamId(nflTeamId) &&
+              allegianceEditSport !== "nfl" ? (
+                <>
+                  <AllegianceTeamStrip
+                    team={nflTeam}
+                    emptyTitle="NFL team set"
+                    emptyBlurb="Team details loading…"
+                  />
                   <button
                     type="button"
                     onClick={() => {
-                      setAllegianceEditSport(null);
-                      setAllegiancePick(null);
+                      setAllegianceEditSport("nfl");
+                      setAllegiancePick(nflTeam);
                       setAllegianceNoTeam(false);
                     }}
-                    className="px-4 py-3 min-h-[48px] rounded-xl border border-border text-sm font-semibold"
+                    className={ALLEGIANCE_SECONDARY_CLASS}
+                    aria-label="Change NFL team"
                   >
-                    Cancel
+                    Change NFL team
                   </button>
-                </div>
-              </>
-            )}
+                </>
+              ) : allegianceEditSport !== "nfl" ? (
+                <>
+                  <AllegianceTeamStrip
+                    team={null}
+                    emptyTitle="No NFL team declared yet"
+                    emptyBlurb="Choose a pro club — not your Super Bowl pick."
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAllegianceEditSport("nfl");
+                      setAllegianceNoTeam(false);
+                      setAllegiancePick(null);
+                    }}
+                    className={ALLEGIANCE_CTA_CLASS}
+                    aria-label="Choose NFL team"
+                  >
+                    CHOOSE NFL TEAM
+                  </button>
+                </>
+              ) : (
+                <>
+                  <TeamAllegiancePicker
+                    sportId="nfl"
+                    selectedId={allegiancePick?.id ?? null}
+                    onSelect={(t) => {
+                      setAllegiancePick(t);
+                      setAllegianceNoTeam(false);
+                    }}
+                  />
+                  <div className="flex flex-col sm:flex-row gap-2 min-w-0">
+                    <button
+                      type="button"
+                      disabled={allegianceBusy || !allegiancePick}
+                      onClick={() => {
+                        const teamId = allegiancePick?.id;
+                        if (!teamId) return;
+                        setAllegianceBusy(true);
+                        void setMyFavoriteTeam("nfl", teamId)
+                          .then((res) => {
+                            if (res.ok) {
+                              setNflTeamId(teamId);
+                              setNflTeam(res.team ?? null);
+                              setAllegianceEditSport(null);
+                              setAllegiancePick(null);
+                              setMessage(`NFL team: ${res.team?.name}.`);
+                            } else {
+                              setMessage(
+                                res.error || "Could not update NFL team."
+                              );
+                            }
+                          })
+                          .finally(() => setAllegianceBusy(false));
+                      }}
+                      className={ALLEGIANCE_CTA_CLASS}
+                      aria-label="Save NFL team"
+                    >
+                      {allegianceBusy ? "…" : "SAVE NFL TEAM"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAllegianceEditSport(null);
+                        setAllegiancePick(null);
+                        setAllegianceNoTeam(false);
+                      }}
+                      className={ALLEGIANCE_SECONDARY_CLASS}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </>
+              )}
+            </SportAllegianceCard>
           </div>
         </section>
 
