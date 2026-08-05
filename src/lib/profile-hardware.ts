@@ -1,6 +1,13 @@
 /**
  * Profile trophy case — career hardware across every room the player won,
- * plus legacy engravings (seeded for known winners by display name).
+ * plus legacy engravings.
+ *
+ * Identity-bearing career hardware (e.g. AFC/NFC Championship) binds only via
+ * stable authenticated profile user_id. Display names, nicknames, and aliases
+ * are never used for those seeds.
+ *
+ * Older Excel-era CFB/NFL fill-ins still use name/alias matching until those
+ * winners are mapped to UUIDs.
  *
  * Multi-league: three CFB titles in three rooms → three championship plaques
  * with the league name under each (not collapsed by year alone).
@@ -70,6 +77,12 @@ function namesMatch(a: string, b: string) {
 type LegacySeed = Omit<ProfileTrophy, "source"> & {
   /** Which sport desk this seed belongs on */
   sport: "cfb" | "nfl";
+  /**
+   * When set, career hardware attaches ONLY to this auth.users / profiles id.
+   * Display name, nickname, and aliases are never used for matching.
+   * Required for identity-bearing conference hardware (AFC/NFC Championship).
+   */
+  winnerUserId?: string | null;
 };
 
 /**
@@ -144,27 +157,25 @@ export const LEGACY_PROFILE_HARDWARE: LegacySeed[] = [
     subtitle: "NFC Champion · 2025",
     notes:
       "2025 NFC Championship. Conference hardware — not Super Bowl. Still permanent. Still loud.",
+    /** Display only — matching is winnerUserId only */
     winnerName: "Mike Vance",
+    winnerUserId: "09544d2b-6eca-4131-a321-c000586c9029",
     division: "NFC Championship",
     sport: "nfl",
     sportId: "nfl",
   },
-  {
-    id: "legacy-maria-afc-championship-2025",
-    kind: "division",
-    seasonYear: 2025,
-    title: "AFC Championship",
-    subtitle: "AFC Champion · 2025",
-    notes:
-      "2025 AFC Championship. Conference hardware en route to the Super Bowl. Permanent on the shelf.",
-    winnerName: "Maria",
-    division: "AFC Championship",
-    sport: "nfl",
-    sportId: "nfl",
-  },
+  /**
+   * Maria AFC Championship — ID-only when production profile UUID is confirmed.
+   * Read-only Supabase lookup via anon key returned 0 candidates (RLS).
+   * Do not re-enable display-name matching. Set winnerUserId when known.
+   */
+  // intentionally omitted until Maria's stable user_id is confirmed
 ];
 
-/** Also match these name aliases → legacy id */
+/**
+ * Name aliases for *legacy Excel-era* CFB/NFL seeds that predate ID mapping.
+ * Conference AFC/NFC Championship seeds above MUST NOT be listed here.
+ */
 const LEGACY_NAME_ALIASES: { pattern: RegExp; legacyId: string }[] = [
   {
     pattern: /\bkahmann\b/i,
@@ -185,16 +196,6 @@ const LEGACY_NAME_ALIASES: { pattern: RegExp; legacyId: string }[] = [
   {
     pattern: /\bmaria\b/i,
     legacyId: "legacy-maria-vonnagio-2025",
-  },
-  {
-    // Product owner display names (avoid bare "Mike" matching other Mikes)
-    pattern:
-      /\bmike\s+vance\b|\bmichael\s+vance\b|\bbagz\b|\bmichaelvance2430\b/i,
-    legacyId: "legacy-mike-nfc-championship-2025",
-  },
-  {
-    pattern: /\bmaria\b/i,
-    legacyId: "legacy-maria-afc-championship-2025",
   },
 ];
 
@@ -367,12 +368,23 @@ export function getProfileHardware(opts: {
     // real/league plaque for this kind·year (legacy is a single Excel fill-in)
     if (alreadyFromAnyRoom) continue;
 
-    const direct = namesMatch(legacy.winnerName, playerName);
-    const alias = LEGACY_NAME_ALIASES.some(
-      (a) => a.legacyId === legacy.id && a.pattern.test(playerName)
+    // Identity-bearing seeds: stable user_id only (never display name / nickname)
+    const idOnly = !!(
+      legacy.winnerUserId &&
+      String(legacy.winnerUserId).trim().length > 0
     );
-    if (!direct && !alias) continue;
-    const { sport: _s, ...rest } = legacy;
+    if (idOnly) {
+      const want = String(legacy.winnerUserId).trim().toLowerCase();
+      const have = String(playerId || "").trim().toLowerCase();
+      if (!have || have !== want) continue;
+    } else {
+      const direct = namesMatch(legacy.winnerName, playerName);
+      const alias = LEGACY_NAME_ALIASES.some(
+        (a) => a.legacyId === legacy.id && a.pattern.test(playerName)
+      );
+      if (!direct && !alias) continue;
+    }
+    const { sport: _s, winnerUserId: _uid, ...rest } = legacy;
     const leg: ProfileTrophy = {
       ...rest,
       source: "legacy",
