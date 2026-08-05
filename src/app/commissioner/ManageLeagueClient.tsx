@@ -20,8 +20,6 @@ import {
 } from "@/lib/league";
 import { saveLeagueToCloud, syncLeagueFromCloud } from "@/lib/league-sync";
 import {
-  clearTrialBotsInCloud,
-  fillLeagueWithBotsToCap,
   loadLeagueRoster,
   listScoredWeekNumbers,
   refreshStaffSessionFlags,
@@ -39,12 +37,6 @@ import {
 import { transferCommissioner, defaultSeasonYear } from "@/lib/trophies";
 import { paintAutomaticSeasonTheme } from "@/lib/season-theme";
 import { DIVISIONS, divisionDisplayLabel } from "@/lib/divisions";
-import {
-  SIMPLE_BOT_FILL_TARGET,
-  areBotsRosterLocked,
-  botsLockedMessage,
-  isSimpleHostSurface,
-} from "@/lib/simple-host";
 
 type SectionId =
   | "identity"
@@ -107,11 +99,6 @@ function ManageLeagueInner() {
   const [scoredWeeks, setScoredWeeks] = useState<number[]>([]);
   const [resettingSeason, setResettingSeason] = useState(false);
   const [seasonReport, setSeasonReport] = useState<string | null>(null);
-
-  const [botBusy, setBotBusy] = useState(false);
-  const [botReport, setBotReport] = useState<string | null>(null);
-  const [botAddCount, setBotAddCount] = useState(6);
-  const [simpleHost, setSimpleHost] = useState(true);
 
   const [dangerOpen, setDangerOpen] = useState(false);
   const [peopleExtrasOpen, setPeopleExtrasOpen] = useState(false);
@@ -201,18 +188,6 @@ function ManageLeagueInner() {
       setRoster([]);
     }
 
-    try {
-      const lid = lg?.id || getSession()?.leagueId || "";
-      setSimpleHost(
-        isSimpleHostSurface({
-          leagueId: lid,
-          scoredWeekCount: scored.length,
-          userId: getSession()?.playerId,
-        })
-      );
-    } catch {
-      setSimpleHost(true);
-    }
   }, []);
 
   useEffect(() => {
@@ -224,7 +199,6 @@ function ManageLeagueInner() {
     () => roster.filter((m) => !m.isBot),
     [roster]
   );
-  const bots = useMemo(() => roster.filter((m) => m.isBot), [roster]);
   const deputies = useMemo(
     () => humans.filter((m) => m.isDeputy),
     [humans]
@@ -405,41 +379,6 @@ function ManageLeagueInner() {
     router.push("/join");
   }
 
-  async function handleSimpleFillBots() {
-    try {
-      if (await areBotsRosterLocked()) {
-        setBotReport(botsLockedMessage());
-        return;
-      }
-    } catch {
-      /* allow attempt */
-    }
-    setBotBusy(true);
-    setBotReport(null);
-    try {
-      const res = await fillLeagueWithBotsToCap({
-        targetTotal: SIMPLE_BOT_FILL_TARGET,
-      });
-      setBotReport(
-        res.ok
-          ? `Filled to ~${SIMPLE_BOT_FILL_TARGET} seats (${res.added ?? 0} added).`
-          : res.error || "Failed"
-      );
-      void hydrate();
-    } finally {
-      setBotBusy(false);
-    }
-  }
-
-  async function handleClearBots() {
-    if (!confirm("Remove all trial bots from this league?")) return;
-    setBotBusy(true);
-    const res = await clearTrialBotsInCloud();
-    setBotBusy(false);
-    setBotReport(res.ok ? "Bots cleared." : res.error || "Failed");
-    void hydrate();
-  }
-
   function toggleSection(id: SectionId) {
     setOpenSection((cur) => (cur === id ? null : id));
   }
@@ -514,13 +453,13 @@ function ManageLeagueInner() {
     : "Private league · Invite code active";
   const rulesSummary = [
     sportLabel(league?.sportId),
-    "Fair Entry on join",
+    "Fair Entry always on",
     crystalBallEnabled ? "Crystal Ball on" : "Crystal Ball off",
     `Cut ${cutPercent}%`,
   ].join(" · ");
   const peopleSummary = `${humans.length} members · ${deputies.length} deput${
     deputies.length === 1 ? "y" : "ies"
-  } · 4 divisions · ${bots.length} bot${bots.length === 1 ? "" : "s"}`;
+  } · 4 divisions`;
   const historySummary =
     scoredWeeks.length === 0
       ? `${seasonYear} season · No scored weeks yet · Rollover quiet`
@@ -691,10 +630,17 @@ function ManageLeagueInner() {
                   </strong>{" "}
                   (fixed for this room)
                 </p>
-                <p className="text-xs text-muted">
-                  Fair Entry: mid-season joiners get a banded start — configured
-                  on join, not a separate toggle.
-                </p>
+                <div className="rounded-lg border border-border bg-background px-3 py-2.5 space-y-1">
+                  <p className="text-sm font-semibold text-foreground">
+                    Fair Entry
+                  </p>
+                  <p className="text-xs text-muted leading-relaxed">
+                    <strong className="text-foreground">Always on</strong> for
+                    this product. Mid-season joiners receive a banded start from
+                    the existing Fair Entry path on join — there is no owner
+                    off-switch. Early players keep what they earned.
+                  </p>
+                </div>
                 <div className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2.5">
                   <div>
                     <p className="text-sm font-semibold">Crystal Ball</p>
@@ -792,7 +738,9 @@ function ManageLeagueInner() {
               }}
               className="mt-3 text-xs font-semibold text-primary"
             >
-              {peopleExtrasOpen ? "Hide deputies & bots" : "Deputies & bots"}
+              {peopleExtrasOpen
+                ? "Hide deputies & permissions"
+                : "Deputies & Permissions"}
             </button>
             {peopleExtrasOpen && (
               <div className="mt-3 pt-3 border-t border-border space-y-4">
@@ -861,35 +809,6 @@ function ManageLeagueInner() {
                     <p className="text-xs mt-1 text-muted">{passReport}</p>
                   )}
                 </div>
-                {simpleHost && (
-                  <div className="space-y-2">
-                    <p className="text-sm font-semibold">Seat fillers</p>
-                    <p className="text-xs text-muted">
-                      Optional bots to round out the room before friends join.
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        disabled={botBusy}
-                        onClick={() => void handleSimpleFillBots()}
-                        className="px-3 py-2 rounded-lg bg-primary text-black text-xs font-bold disabled:opacity-50"
-                      >
-                        Fill seats
-                      </button>
-                      <button
-                        type="button"
-                        disabled={botBusy || bots.length === 0}
-                        onClick={() => void handleClearBots()}
-                        className="px-3 py-2 rounded-lg border border-border text-xs font-semibold disabled:opacity-50"
-                      >
-                        Clear bots
-                      </button>
-                    </div>
-                    {botReport && (
-                      <p className="text-xs text-muted">{botReport}</p>
-                    )}
-                  </div>
-                )}
               </div>
             )}
           </section>

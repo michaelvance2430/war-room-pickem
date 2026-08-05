@@ -228,7 +228,7 @@ function LeagueBuildInner() {
       }
 
       markLeagueBuildComplete(league.id);
-      // Rule of Closure: room is set → one next job (week-ops, not admin desk)
+      // Room is set → Home owns the next commissioner job (build card, etc.)
       try {
         sessionStorage.setItem(
           "warroom-league-build-just-done",
@@ -240,7 +240,7 @@ function LeagueBuildInner() {
       } catch {
         /* ignore */
       }
-      router.replace("/week-ops?first=1");
+      router.replace("/");
       router.refresh();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Could not save league build");
