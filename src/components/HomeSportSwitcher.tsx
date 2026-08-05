@@ -36,14 +36,19 @@ import {
   resolveSportScope,
 } from "@/lib/sport-room-scope";
 import {
+  attentionAriaLabel,
+  combinedLeagueAttention,
   loadLeagueHubPulses,
   leagueHubToneClasses,
-  otherLeaguesHubTaskTotal,
-  weeklyHubTaskAttention,
+  otherLeaguesCombinedAttentionTotal,
   type LeagueHubPulse,
   type LeagueHubTone,
 } from "@/lib/league-hub-actions";
 import { EVENT_CARD_PUBLISHED } from "@/lib/first-session";
+import {
+  countUnreadAnnouncementsByLeague,
+  EVENT_ANNOUNCEMENTS_SEEN,
+} from "@/lib/room-unseen";
 import NflBrandMark from "@/components/NflBrandMark";
 import BrandMark from "@/components/BrandMark";
 
@@ -51,12 +56,13 @@ import BrandMark from "@/components/BrandMark";
 const HUB_BACKDROP_Z = 55;
 const HUB_PANEL_Z = 60;
 
-/** Stage 2: poll pulse only while hub is open. */
-const OPEN_PULSE_REFRESH_MS = 60_000;
+/** Pulse + announcement attention poll only while hub is open. */
+const OPEN_ATTENTION_REFRESH_MS = 60_000;
 
 /**
  * Amber attention pill — number + aria-label (color is not the only cue).
- * Stage 2 max per league is 1; collapsed total may be >1.
+ * Stage 3: combined weekly task (0|1) + unread commissioner announcements.
+ * Visible badge caps at 99+; aria keeps the exact count.
  */
 function HubAttentionBadge({
   count,
@@ -119,6 +125,12 @@ export default function HomeSportSwitcher({ className = "" }: Props) {
    * Prevents false “1” while loading; refresh keeps prior pulse (no flicker).
    */
   const [pulseReady, setPulseReady] = useState(false);
+  /**
+   * Stage 3: durable unread commissioner announcements by leagueId.
+   * Last successful map is kept on refresh failure (task badges independent).
+   */
+  const [annUnread, setAnnUnread] = useState<Record<string, number>>({});
+  const [annReady, setAnnReady] = useState(false);
   const [open, setOpen] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [scope, setScope] = useState<SportId>(() =>
@@ -140,6 +152,8 @@ export default function HomeSportSwitcher({ className = "" }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
   /** Single-flight pulse refresh — no parallel storms. */
   const pulseInflightRef = useRef<Promise<void> | null>(null);
+  /** Single-flight announcement attention refresh. */
+  const annInflightRef = useRef<Promise<void> | null>(null);
   const membershipsRef = useRef(memberships);
   membershipsRef.current = memberships;
 
@@ -173,6 +187,40 @@ export default function HomeSportSwitcher({ className = "" }: Props) {
     return run;
   }, []);
 
+  /**
+   * Stage 3: batched unread announcements across membership league IDs.
+   * Failure keeps prior map (or zeros on first fail) — never erases pulse tasks.
+   * Opening the switcher never writes announcement_reads.
+   */
+  const loadAnnOnly = useCallback(async (ms: LeagueMembership[]) => {
+    if (annInflightRef.current) return annInflightRef.current;
+    const run = (async () => {
+      try {
+        const uid = getSession()?.playerId;
+        if (!uid || ms.length === 0) {
+          setAnnUnread({});
+          return;
+        }
+        const leagueIds = ms.map((m) => m.leagueId).filter(Boolean);
+        const byLeague = await countUnreadAnnouncementsByLeague(
+          leagueIds,
+          uid
+        );
+        setAnnUnread(byLeague);
+      } catch {
+        setAnnUnread((prev) =>
+          Object.keys(prev).length ? prev : {}
+        );
+      } finally {
+        setAnnReady(true);
+      }
+    })().finally(() => {
+      annInflightRef.current = null;
+    });
+    annInflightRef.current = run;
+    return run;
+  }, []);
+
   const load = useCallback(async () => {
     try {
       const ms = await fetchMyMemberships();
@@ -190,59 +238,74 @@ export default function HomeSportSwitcher({ className = "" }: Props) {
           : "cfb";
       setScope(hubScope);
 
-      await loadPulsesOnly(ms);
+      await Promise.all([loadPulsesOnly(ms), loadAnnOnly(ms)]);
     } catch {
       /* optional — switcher stays usable without pulse badges */
       setPulseReady(true);
+      setAnnReady(true);
     } finally {
       setLoaded(true);
     }
-  }, [loadPulsesOnly]);
+  }, [loadPulsesOnly, loadAnnOnly]);
+
+  /** Coordinated attention refresh (parallel, each single-flight). */
+  const refreshAttention = useCallback(
+    (ms?: LeagueMembership[]) => {
+      const list = ms ?? membershipsRef.current;
+      if (!list.length) {
+        void load();
+        return;
+      }
+      void loadPulsesOnly(list);
+      void loadAnnOnly(list);
+    },
+    [load, loadPulsesOnly, loadAnnOnly]
+  );
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  // Stage 2 refresh: open → re-resolve pulse (reuse memberships when warm).
+  // Open → re-resolve attention (memberships warm when possible).
   useEffect(() => {
     if (!open) return;
     const ms = membershipsRef.current;
-    if (ms.length > 0) {
-      void loadPulsesOnly(ms);
-    } else {
-      void load();
-    }
-  }, [open, load, loadPulsesOnly]);
+    if (ms.length > 0) refreshAttention(ms);
+    else void load();
+  }, [open, load, refreshAttention]);
 
-  // Stage 2: 60s pulse refresh only while open (no closed polling).
+  // 60s attention refresh only while open (no closed polling).
   useEffect(() => {
     if (!open) return;
     const id = window.setInterval(() => {
       const ms = membershipsRef.current;
-      if (ms.length > 0) void loadPulsesOnly(ms);
-    }, OPEN_PULSE_REFRESH_MS);
+      if (ms.length > 0) refreshAttention(ms);
+    }, OPEN_ATTENTION_REFRESH_MS);
     return () => window.clearInterval(id);
-  }, [open, loadPulsesOnly]);
+  }, [open, refreshAttention]);
 
-  // Focus / visibility + card-published invalidation (existing product events).
+  // Focus / visibility + task/announcement invalidation events.
   useEffect(() => {
-    function refreshAttention() {
+    function onRefresh() {
       const ms = membershipsRef.current;
-      if (ms.length > 0) void loadPulsesOnly(ms);
+      if (ms.length > 0) refreshAttention(ms);
       else void load();
     }
     function onVis() {
-      if (document.visibilityState === "visible") refreshAttention();
+      if (document.visibilityState === "visible") onRefresh();
     }
-    window.addEventListener("focus", refreshAttention);
+    window.addEventListener("focus", onRefresh);
     document.addEventListener("visibilitychange", onVis);
-    window.addEventListener(EVENT_CARD_PUBLISHED, refreshAttention);
+    window.addEventListener(EVENT_CARD_PUBLISHED, onRefresh);
+    // Existing News page fires this after durable announcement_reads upsert.
+    window.addEventListener(EVENT_ANNOUNCEMENTS_SEEN, onRefresh);
     return () => {
-      window.removeEventListener("focus", refreshAttention);
+      window.removeEventListener("focus", onRefresh);
       document.removeEventListener("visibilitychange", onVis);
-      window.removeEventListener(EVENT_CARD_PUBLISHED, refreshAttention);
+      window.removeEventListener(EVENT_CARD_PUBLISHED, onRefresh);
+      window.removeEventListener(EVENT_ANNOUNCEMENTS_SEEN, onRefresh);
     };
-  }, [load, loadPulsesOnly]);
+  }, [load, refreshAttention]);
 
   useEffect(() => {
     function onScope(e: Event) {
@@ -370,11 +433,29 @@ export default function HomeSportSwitcher({ className = "" }: Props) {
   const isNfl = scope === "nfl";
   const roomCount = openRooms.length;
 
-  /** Collapsed badge: OTHER leagues × all sports (Stage 2: 0|1 each). */
+  /**
+   * Collapsed badge: OTHER leagues × all sports.
+   * Stage 3: (task 0|1) + unread announcements per league, then sum.
+   * Task contribution waits on pulseReady; announcement uses last success map.
+   */
   const otherLeaguesAttention = useMemo(() => {
-    if (!pulseReady) return 0;
-    return otherLeaguesHubTaskTotal(pulse, memberships, activeId);
-  }, [pulseReady, pulse, memberships, activeId]);
+    if (!pulseReady && !annReady) return 0;
+    // When pulse not ready yet, still allow ann-only collapsed total from warm map
+    if (!pulseReady) {
+      let n = 0;
+      for (const m of memberships) {
+        if (!m.leagueId || m.leagueId === activeId) continue;
+        n += Math.max(0, Math.floor(annUnread[m.leagueId] || 0));
+      }
+      return n;
+    }
+    return otherLeaguesCombinedAttentionTotal(
+      pulse,
+      memberships,
+      activeId,
+      annUnread
+    );
+  }, [pulseReady, annReady, pulse, memberships, activeId, annUnread]);
 
   function closeHub() {
     setOpen(false);
@@ -460,9 +541,11 @@ export default function HomeSportSwitcher({ className = "" }: Props) {
               const signalEmoji = p?.signal?.emoji || "🟢";
               const tones = leagueHubToneClasses(tone);
               const leagueName = m.leagueName || "War Room";
-              // Stage 2: binary weekly task only (max 1). No pulse → no badge.
-              const rowAttention =
-                pulseReady && p ? weeklyHubTaskAttention(p) : 0;
+              // Stage 3: task (0|1 once pulseReady) + durable unread announcements.
+              const rowAttention = combinedLeagueAttention(
+                pulseReady ? p : undefined,
+                annUnread[m.leagueId] || 0
+              );
 
               return (
                 <div
@@ -491,7 +574,9 @@ export default function HomeSportSwitcher({ className = "" }: Props) {
                       {rowAttention > 0 ? (
                         <HubAttentionBadge
                           count={rowAttention}
-                          ariaLabel={`1 action required in ${leagueName}`}
+                          ariaLabel={attentionAriaLabel(rowAttention, {
+                            leagueName,
+                          })}
                           size="md"
                         />
                       ) : null}
@@ -556,11 +641,12 @@ export default function HomeSportSwitcher({ className = "" }: Props) {
       : "border-primary/50 bg-primary/15 text-primary hover:bg-primary/20"
   }`;
 
+  const otherLeaguesAria = attentionAriaLabel(otherLeaguesAttention, {
+    otherLeagues: true,
+  });
   const collapsedAria =
     otherLeaguesAttention > 0
-      ? `${pack.shortLabel} League Hub, ${otherLeaguesAttention} action${
-          otherLeaguesAttention === 1 ? "" : "s"
-        } required in other leagues`
+      ? `${pack.shortLabel} League Hub, ${otherLeaguesAria}`
       : `${pack.shortLabel} League Hub`;
 
   const triggerInner = (
@@ -575,9 +661,7 @@ export default function HomeSportSwitcher({ className = "" }: Props) {
       {otherLeaguesAttention > 0 ? (
         <HubAttentionBadge
           count={otherLeaguesAttention}
-          ariaLabel={`${otherLeaguesAttention} action${
-            otherLeaguesAttention === 1 ? "" : "s"
-          } required in other leagues`}
+          ariaLabel={otherLeaguesAria}
           size="sm"
         />
       ) : null}

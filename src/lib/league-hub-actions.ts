@@ -497,6 +497,60 @@ export function otherLeaguesHubTaskTotal(
   return n;
 }
 
+/**
+ * Stage 3 combined attention for one league:
+ *   (weekly hub task ? 1 : 0) + unread commissioner announcements
+ * Announcement count must come from durable announcement_reads (not locker).
+ */
+export function combinedLeagueAttention(
+  pulse: LeagueHubPulse | null | undefined,
+  unreadAnnouncements: number | null | undefined
+): number {
+  const task = weeklyHubTaskAttention(pulse);
+  const ann =
+    typeof unreadAnnouncements === "number" &&
+    Number.isFinite(unreadAnnouncements) &&
+    unreadAnnouncements > 0
+      ? Math.floor(unreadAnnouncements)
+      : 0;
+  return task + ann;
+}
+
+/**
+ * Collapsed control: sum of combined attention for OTHER leagues (all sports).
+ */
+export function otherLeaguesCombinedAttentionTotal(
+  pulses: Record<string, LeagueHubPulse>,
+  memberships: { leagueId: string }[],
+  activeLeagueId: string,
+  unreadByLeague: Record<string, number>
+): number {
+  let n = 0;
+  for (const m of memberships) {
+    if (!m.leagueId || m.leagueId === activeLeagueId) continue;
+    n += combinedLeagueAttention(pulses[m.leagueId], unreadByLeague[m.leagueId]);
+  }
+  return n;
+}
+
+/** Accessible wording for combined attention (tasks + notices). */
+export function attentionAriaLabel(
+  count: number,
+  opts: { leagueName?: string; otherLeagues?: boolean }
+): string {
+  if (count <= 0) return "";
+  const n = count > 99 ? count : count; // exact in aria even when UI shows 99+
+  const unit =
+    n === 1
+      ? "action or notice requiring attention"
+      : "actions or notices requiring attention";
+  if (opts.otherLeagues) {
+    return `${n} ${unit} in other leagues`;
+  }
+  const name = (opts.leagueName || "this league").trim() || "this league";
+  return `${n} ${unit} in ${name}`;
+}
+
 /** Load pulse for every membership (parallel, truth-only). */
 export async function loadLeagueHubPulses(
   memberships: LeagueMembership[],
