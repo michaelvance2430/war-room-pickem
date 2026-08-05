@@ -37,6 +37,8 @@ These decisions are **product law** for the future Experience Orchestrator and e
 |---------------|------------------------|
 | Category **Season Begins** / system label “Season Opening” | **Cold Open only** — one season-opening cinematic for the player |
 
+**Postseason fields (not this doc):** Cut math, Toilet Bowl eligibility, durable freeze → **`docs/POSTSEASON-COMPETITION-LAW.md`** + **`docs/POSTSEASON-SNAPSHOT-DESIGN.md`**.
+
 ---
 
 ## A. Ring Ceremony
