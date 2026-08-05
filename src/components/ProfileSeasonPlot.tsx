@@ -31,9 +31,10 @@ export default function ProfileSeasonPlot({
   isSelf,
 }: Props) {
   const nfl = sportId === "nfl";
-  const day = nfl ? "Sunday" : "Saturday";
 
   if (!storyStarted || !plot) {
+    // Profile owns identity/history — never route empty season → /picks.
+    // Home owns the next mission (allegiance, Crystal Ball, picks, wait).
     return (
       <section className="rounded-2xl border-2 border-dashed border-primary/30 bg-gradient-to-b from-primary/10 to-card p-5 sm:p-6 mb-6 space-y-4">
         <div>
@@ -58,19 +59,15 @@ export default function ProfileSeasonPlot({
         </ul>
 
         <p className="text-sm font-semibold text-foreground leading-relaxed">
-          Right now… your story hasn&apos;t been written yet.
-        </p>
-        <p className="text-xs text-muted leading-relaxed">
-          Your first great {day} is still ahead.
-          {isSelf ? " Go make your picks." : ""}
+          No scored weeks yet. Your next assignment is waiting on Home.
         </p>
 
         {isSelf && (
           <Link
-            href="/picks"
+            href="/"
             className="inline-flex min-h-[44px] items-center justify-center px-4 rounded-xl bg-primary text-black text-sm font-extrabold"
           >
-            Go make your picks →
+            Back to Home
           </Link>
         )}
       </section>
