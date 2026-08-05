@@ -9,6 +9,8 @@ import {
   updateMemberDivision,
   removeLeagueMember,
   autoBalanceDivisions,
+  previewAutoBalanceDivisions,
+  isDivisionAutoBalanceLocked,
   refreshStaffSessionFlags,
   LeagueRosterMember,
 } from "@/lib/cloud";
@@ -47,6 +49,12 @@ export default function PlayersPage() {
   const [falconByUser, setFalconByUser] = useState<Record<string, number>>({});
   /** Hide season pts until first official score — never invent achievement */
   const [showSeasonPts, setShowSeasonPts] = useState(false);
+  /** Auto Balance locked after first published kickoff */
+  const [autoBalanceLock, setAutoBalanceLock] = useState<{
+    locked: boolean;
+    reason?: string;
+  }>({ locked: false });
+  const [balanceNote, setBalanceNote] = useState<string | null>(null);
   const preseasonKickOk = isPreseasonCommishToolsAllowed();
 
   async function reload() {
@@ -67,12 +75,20 @@ export default function PlayersPage() {
       return;
     }
 
-    const [roster, scored] = await Promise.all([
+    const [roster, scored, balLock] = await Promise.all([
       loadLeagueRoster(),
       hasOfficialScoredWeek(),
+      isDivisionAutoBalanceLocked(session.leagueId).catch(() => ({
+        locked: false as boolean,
+        reason: undefined as string | undefined,
+      })),
     ]);
     setPlayers(roster);
     setShowSeasonPts(scored);
+    setAutoBalanceLock({
+      locked: !!balLock.locked,
+      reason: balLock.reason,
+    });
     // Blue Falcon counts for preseason kick risk
     const falcon: Record<string, number> = {};
     await Promise.all(
@@ -175,20 +191,65 @@ export default function PlayersPage() {
 
   async function handleAutoBalance() {
     if (!canManageDivs || busy) return;
-    if (
-      !confirm(
-        "Reassign all players evenly across North / South / East / West?\n\n" +
-          "This is saved to the league — it sticks when you switch leagues and come back."
-      )
-    ) {
-      return;
-    }
     setBusy(true);
     setError(null);
+    setBalanceNote(null);
+
+    const preview = await previewAutoBalanceDivisions();
+    if (!preview.ok) {
+      setError(preview.error || "Could not preview Auto Balance");
+      if (preview.locked) {
+        setAutoBalanceLock({ locked: true, reason: preview.error });
+      }
+      setBusy(false);
+      return;
+    }
+
+    if (preview.alreadyBalanced || (preview.moveCount ?? 0) === 0) {
+      setBalanceNote(
+        `Already balanced and verified: ${preview.afterLabel || "—"}. No players moved.`
+      );
+      await reload();
+      setBusy(false);
+      return;
+    }
+
+    const confLines = [
+      "Auto Balance (minimum moves)",
+      "",
+      `Roster: ${preview.total ?? "?"} memberships`,
+      `Current: ${preview.beforeLabel}`,
+      `Planned: ${preview.afterLabel}`,
+      `Players who will move: ${preview.moveCount}`,
+      "",
+      "Moves only the fewest memberships needed to balance the four groups.",
+      preview.sportId === "nfl"
+        ? "NFL: AFC/NFC conference totals will also differ by at most 1."
+        : "Each group will differ by at most 1 player.",
+      "Result is verified from Supabase after save — success only if counts prove balanced.",
+      "",
+      "Continue?",
+    ];
+    if (!confirm(confLines.join("\n"))) {
+      setBusy(false);
+      return;
+    }
+
     const result = await autoBalanceDivisions();
     if (!result.ok) {
       setError(result.error || "Auto-balance failed");
+      await reload();
+    } else if (result.alreadyBalanced) {
+      setBalanceNote(
+        `Already balanced and verified: ${result.verifiedLabel || "—"}.`
+      );
+      await reload();
     } else {
+      setBalanceNote(
+        `Balanced and verified: ${result.verifiedLabel || "—"}${
+          result.moveCount != null ? ` (${result.moveCount} moved).` : "."
+        }`
+      );
       flashSaved();
       await reload();
     }
@@ -325,18 +386,33 @@ export default function PlayersPage() {
         {canManageDivs && (
           <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
       <p className="text-xs text-muted max-w-md">
-              New joiners land in the least-full division automatically. You
-              (commish/deputy) can move anyone or rebalance the whole room.
+              {autoBalanceLock.locked
+                ? autoBalanceLock.reason ||
+                  "Divisions are locked because the season has started. Manual moves still work if you must."
+                : "New joiners land in the least-full division automatically. Auto Balance moves the fewest players needed to even the four groups (verified after save)."}
             </p>
       <button
               type="button"
               onClick={() => void handleAutoBalance()}
-              disabled={busy || players.length === 0}
+              disabled={
+                busy || players.length === 0 || autoBalanceLock.locked
+              }
+              title={
+                autoBalanceLock.locked
+                  ? autoBalanceLock.reason || "Season started - locked"
+                  : "Minimum-move Auto Balance"
+              }
               className="text-xs px-3 py-1.5 rounded-lg border border-border text-muted hover:text-foreground disabled:opacity-50"
             >
               Auto-balance divisions
             </button>
       </div>
+        )}
+
+        {balanceNote && (
+          <p className="text-xs text-primary font-semibold mb-3">
+            {balanceNote}
+          </p>
         )}
 
         {!canManageDivs && !loading && (

@@ -2,8 +2,11 @@ import { createClient } from "@/lib/supabase/client";
 import { getSession, getLeague, isOps } from "@/lib/league";
 import {
   countByDivision,
+  countByDivisionStrict,
+  formatDivisionCounts,
+  isLeagueDivisionBalanced,
   pickLeastPopulatedDivision,
-  planAutoBalance,
+  planMinMoveBalance,
   type DivisionName,
 } from "@/lib/divisions";
 import { Game, Prop, UserPick } from "@/lib/types";
@@ -4575,6 +4578,115 @@ export async function applyRandomBotChaosForWeek(
   };
 }
 
+/**
+ * Drop roster cache so the next load is authoritative from Supabase.
+ * Use after any memberships.division write (manual move or Auto Balance).
+ */
+export function invalidateRosterCache(leagueId?: string | null) {
+  if (!leagueId) {
+    rosterCache.clear();
+    rosterInflight.clear();
+    return;
+  }
+  rosterCache.delete(leagueId);
+  rosterInflight.delete(leagueId);
+}
+
+/** Force a network roster read (bypasses TTL cache). */
+export async function loadLeagueRosterFreshForced(): Promise<
+  LeagueRosterMember[]
+> {
+  const session = getSession();
+  if (!session?.leagueId) return [];
+  invalidateRosterCache(session.leagueId);
+  return loadLeagueRoster();
+}
+
+/**
+ * True when the league has a published card whose first game start_time
+ * has already passed (server-authoritative times, client clock for compare).
+ * Auto Balance must not run when locked.
+ */
+export async function isDivisionAutoBalanceLocked(
+  leagueId?: string | null
+): Promise<{
+  locked: boolean;
+  firstKickoffIso?: string | null;
+  reason?: string;
+}> {
+  const session = getSession();
+  const lid = leagueId || session?.leagueId;
+  if (!lid) return { locked: false };
+
+  try {
+    const supabase = createClient();
+    const { data: cards, error: cErr } = await supabase
+      .from("week_cards")
+      .select("id, published_at")
+      .eq("league_id", lid)
+      .not("published_at", "is", null);
+    if (cErr) {
+      // Fail closed for Auto Balance when we cannot prove preseason
+      return {
+        locked: true,
+        reason: "Could not verify season start — Auto Balance locked for safety.",
+      };
+    }
+    const cardIds = (cards || [])
+      .map((c) => (c as { id?: string }).id)
+      .filter(Boolean) as string[];
+    if (!cardIds.length) {
+      return { locked: false };
+    }
+
+    const { data: games, error: gErr } = await supabase
+      .from("card_games")
+      .select("start_time")
+      .in("week_card_id", cardIds);
+    if (gErr) {
+      return {
+        locked: true,
+        reason: "Could not verify kickoff times — Auto Balance locked for safety.",
+      };
+    }
+
+    let earliestMs = Number.POSITIVE_INFINITY;
+    let earliestIso: string | null = null;
+    for (const g of games || []) {
+      const raw = (g as { start_time?: string | null }).start_time;
+      if (!raw) continue;
+      const t = new Date(raw).getTime();
+      if (Number.isNaN(t) || t <= 0) continue;
+      if (t < earliestMs) {
+        earliestMs = t;
+        earliestIso = new Date(t).toISOString();
+      }
+    }
+    if (!Number.isFinite(earliestMs) || earliestMs === Number.POSITIVE_INFINITY) {
+      // Published card but no parseable kicks — do not allow reshuffle
+      return {
+        locked: true,
+        reason:
+          "Published card has no kickoff times — Auto Balance is locked until kickoffs are set.",
+      };
+    }
+    if (Date.now() >= earliestMs) {
+      return {
+        locked: true,
+        firstKickoffIso: earliestIso,
+        reason:
+          "Divisions are locked — the season has started (first published kickoff has passed).",
+      };
+    }
+    return { locked: false, firstKickoffIso: earliestIso };
+  } catch {
+    return {
+      locked: true,
+      reason: "Could not verify season start — Auto Balance locked for safety.",
+    };
+  }
+}
+
 export async function updateMemberDivision(
   userId: string,
   division: "North" | "South" | "East" | "West"
@@ -4595,6 +4707,7 @@ export async function updateMemberDivision(
     .eq("user_id", userId);
 
   if (error) return { ok: false, error: error.message };
+  invalidateRosterCache(session.leagueId);
   return { ok: true };
 }
 
@@ -4709,11 +4822,35 @@ export async function removeLeagueMember(
   return { ok: true };
 }
 
-/** Round-robin assign North/South/East/West by name. Commissioner or deputy. */
-export async function autoBalanceDivisions(): Promise<{
+export type AutoBalanceResult = {
   ok: boolean;
   error?: string;
+  /** Verified post-save counts N/S/E/W */
+  verifiedCounts?: Record<DivisionName, number>;
+  verifiedLabel?: string;
+  moveCount?: number;
+  alreadyBalanced?: boolean;
+  locked?: boolean;
+  /** True when some row writes may have applied before failure */
+  partial?: boolean;
   updated?: number;
+};
+
+/**
+ * Preview min-move Auto Balance (read-only). Fresh roster, no writes.
+ */
+export async function previewAutoBalanceDivisions(): Promise<{
+  ok: boolean;
+  error?: string;
+  locked?: boolean;
+  alreadyBalanced?: boolean;
+  moveCount?: number;
+  beforeLabel?: string;
+  afterLabel?: string;
+  beforeCounts?: Record<DivisionName, number>;
+  afterCounts?: Record<DivisionName, number>;
+  total?: number;
+  sportId?: string;
 }> {
   const session = getSession();
   if (!session?.leagueId || !isOps()) {
@@ -4722,28 +4859,238 @@ export async function autoBalanceDivisions(): Promise<{
       error: "Only the commissioner or a deputy can auto-balance",
     };
   }
-
-  const roster = await loadLeagueRoster();
-  if (!roster.length) return { ok: false, error: "No players in this league" };
-
-  const plan = planAutoBalance(
-    roster.map((m) => ({ id: m.membershipId, name: m.name }))
-  );
-  const supabase = createClient();
-  let updated = 0;
-
-  for (const row of plan) {
-    const member = roster.find((m) => m.membershipId === row.id);
-    if (!member || member.division === row.division) continue;
-    const { error } = await supabase
-      .from("memberships")
-      .update({ division: row.division })
-      .eq("id", member.membershipId);
-    if (error) return { ok: false, error: error.message };
-    updated += 1;
+  const lock = await isDivisionAutoBalanceLocked(session.leagueId);
+  if (lock.locked) {
+    return {
+      ok: false,
+      locked: true,
+      error: lock.reason || "Divisions are locked for the season.",
+    };
   }
 
-  return { ok: true, updated };
+  const roster = await loadLeagueRosterFreshForced();
+  if (!roster.length) return { ok: false, error: "No players in this league" };
+
+  const sportId = getLeague()?.sportId || "cfb";
+  const plan = planMinMoveBalance(
+    roster.map((m) => ({
+      id: m.membershipId,
+      division: m.division,
+    })),
+    { sportId }
+  );
+
+  return {
+    ok: true,
+    alreadyBalanced: plan.alreadyBalanced,
+    moveCount: plan.moveCount,
+    beforeLabel: formatDivisionCounts(plan.beforeCounts),
+    afterLabel: formatDivisionCounts(plan.afterCounts),
+    beforeCounts: plan.beforeCounts,
+    afterCounts: plan.afterCounts,
+    total: roster.length,
+    sportId,
+  };
+}
+
+/**
+ * Min-move Auto Balance with fresh input, optional sequential writes,
+ * cache bust, and post-save verification. Not a DB transaction —
+ * success only when a fresh read proves invariants.
+ */
+export async function autoBalanceDivisions(): Promise<AutoBalanceResult> {
+  const session = getSession();
+  if (!session?.leagueId || !isOps()) {
+    return {
+      ok: false,
+      error: "Only the commissioner or a deputy can auto-balance",
+    };
+  }
+  const leagueId = session.leagueId;
+
+  const lock = await isDivisionAutoBalanceLocked(leagueId);
+  if (lock.locked) {
+    return {
+      ok: false,
+      locked: true,
+      error: lock.reason || "Divisions are locked for the season.",
+    };
+  }
+
+  // A. Fresh authoritative roster
+  let roster: LeagueRosterMember[];
+  try {
+    roster = await loadLeagueRosterFreshForced();
+  } catch {
+    return { ok: false, error: "Could not load roster" };
+  }
+  if (!roster.length) return { ok: false, error: "No players in this league" };
+
+  // Reject missing membership ids (cannot plan safely)
+  if (roster.some((m) => !m.membershipId)) {
+    return {
+      ok: false,
+      error: "Roster is missing membership ids — cannot balance safely.",
+    };
+  }
+
+  const sportId = getLeague()?.sportId || "cfb";
+  const plan = planMinMoveBalance(
+    roster.map((m) => ({
+      id: m.membershipId,
+      division: m.division,
+    })),
+    { sportId }
+  );
+
+  if (plan.alreadyBalanced || plan.moveCount === 0) {
+    // No writes — still verify live state
+    invalidateRosterCache(leagueId);
+    const check = await loadLeagueRosterFreshForced();
+    const { counts, invalid } = countByDivisionStrict(
+      check.map((m) => ({ division: m.division }))
+    );
+    if (
+      !isLeagueDivisionBalanced(counts, check.length, {
+        sportId,
+        invalid,
+      })
+    ) {
+      return {
+        ok: false,
+        error: `League is not balanced on re-read (${formatDivisionCounts(counts)}). Try again.`,
+        verifiedCounts: counts,
+      };
+    }
+    return {
+      ok: true,
+      alreadyBalanced: true,
+      moveCount: 0,
+      updated: 0,
+      verifiedCounts: counts,
+      verifiedLabel: formatDivisionCounts(counts),
+    };
+  }
+
+  const supabase = createClient();
+  let updated = 0;
+  let partial = false;
+
+  // C. Sequential writes (no transactional RPC in production). Stop on first error.
+  for (const move of plan.moves) {
+    const { data, error } = await supabase
+      .from("memberships")
+      .update({ division: move.to })
+      .eq("id", move.id)
+      .eq("league_id", leagueId)
+      .select("id")
+      .maybeSingle();
+
+    if (error) {
+      invalidateRosterCache(leagueId);
+      return {
+        ok: false,
+        partial: updated > 0,
+        updated,
+        error:
+          updated > 0
+            ? `Auto Balance stopped after ${updated} move(s): ${error.message}. Assignments may be partially updated — review divisions before trying again.`
+            : error.message,
+      };
+    }
+    if (!data?.id) {
+      invalidateRosterCache(leagueId);
+      return {
+        ok: false,
+        partial: updated > 0,
+        updated,
+        error:
+          updated > 0
+            ? `Auto Balance stopped after ${updated} move(s): a membership update matched no row. Assignments may be partially updated — review divisions.`
+            : "A membership update matched no row (permission or missing id).",
+      };
+    }
+    updated += 1;
+    partial = true;
+  }
+
+  // D + E. Invalidate, fresh read, verify invariants + plan match
+  invalidateRosterCache(leagueId);
+  let verified: LeagueRosterMember[];
+  try {
+    verified = await loadLeagueRosterFreshForced();
+  } catch {
+    return {
+      ok: false,
+      partial: true,
+      updated,
+      error:
+        "Moves may have been saved but verification reload failed. Review divisions carefully.",
+    };
+  }
+
+  const { counts, invalid } = countByDivisionStrict(
+    verified.map((m) => ({ division: m.division }))
+  );
+
+  if (verified.length !== roster.length) {
+    return {
+      ok: false,
+      partial: true,
+      updated,
+      verifiedCounts: counts,
+      error: `Roster size changed during balance (${roster.length} → ${verified.length}). Review divisions.`,
+    };
+  }
+
+  if (invalid > 0) {
+    return {
+      ok: false,
+      partial: true,
+      updated,
+      verifiedCounts: counts,
+      error: `Verification failed: ${invalid} membership(s) still have invalid division. Counts: ${formatDivisionCounts(counts)}.`,
+    };
+  }
+
+  if (
+    !isLeagueDivisionBalanced(counts, verified.length, {
+      sportId,
+      invalid,
+    })
+  ) {
+    return {
+      ok: false,
+      partial: true,
+      updated,
+      verifiedCounts: counts,
+      error: `Verification failed — not balanced. Actual: ${formatDivisionCounts(counts)}.`,
+    };
+  }
+
+  // Plan match: every membership id at planned division
+  const planned = new Map(plan.assignments.map((a) => [a.id, a.division]));
+  for (const m of verified) {
+    const want = planned.get(m.membershipId);
+    if (!want || m.division !== want) {
+      return {
+        ok: false,
+        partial: true,
+        updated,
+        verifiedCounts: counts,
+        error: `Verification failed — saved assignment does not match the approved plan. Actual: ${formatDivisionCounts(counts)}.`,
+      };
+    }
+  }
+
+  return {
+    ok: true,
+    updated,
+    moveCount: plan.moveCount,
+    verifiedCounts: counts,
+    verifiedLabel: formatDivisionCounts(counts),
+    alreadyBalanced: false,
+  };
 }
 
 export type ResetSeasonResult = {
