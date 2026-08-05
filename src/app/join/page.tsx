@@ -146,14 +146,18 @@ function JoinPageInner() {
       return;
     }
     const room = leagueName.trim();
-    const nick = displayName.trim();
+    const nick = displayName.trim(); // optional league alias — never writes profiles
     if (!room) {
       setError("Name your room — every league starts a new story.");
       return;
     }
-    if (!nick) {
-      setError("Choose how this room will know you.");
-      return;
+    if (nick) {
+      const { validateDisplayNameInput } = await import("@/lib/display-name");
+      const v = validateDisplayNameInput(nick);
+      if (!v.ok) {
+        setError(v.error);
+        return;
+      }
     }
     setLoading(true);
     const supabase = createClient();
@@ -162,10 +166,20 @@ function JoinPageInner() {
     // UI selection is source of truth — never let a DB default flip NFL → CFB
     const selectedSportId = sportId;
     try {
-      await supabase.from("profiles").upsert({
-        id: userId,
-        display_name: nick,
-      });
+      // Ensure profile exists; NEVER overwrite global account name with league alias
+      const { ensureProfileRowExists } = await import(
+        "@/lib/league-display-name"
+      );
+      await ensureProfileRowExists(userId, accountHint || undefined);
+      const { data: profRow } = await supabase
+        .from("profiles")
+        .select("display_name")
+        .eq("id", userId)
+        .maybeSingle();
+      const accountName =
+        (profRow?.display_name as string)?.trim() ||
+        accountHint ||
+        "Player";
 
       const { resolveNewLeagueOpeningWeek } = await import(
         "@/lib/active-week-storage"
@@ -323,6 +337,37 @@ function JoinPageInner() {
         division: "North",
       });
       if (memError) throw memError;
+
+      // Optional league alias only (never profiles.display_name)
+      let resolvedName = accountName;
+      let override: string | null = null;
+      if (nick) {
+        try {
+          const { setMyLeagueDisplayName } = await import(
+            "@/lib/league-display-name"
+          );
+          const aliasRes = await setMyLeagueDisplayName(leagueId, nick);
+          if (aliasRes.ok) {
+            resolvedName = aliasRes.resolved;
+            override = aliasRes.override;
+          } else {
+            // Keep typed alias for retry; do not mutate global profile
+            setError(
+              aliasRes.error ||
+                "Room created, but league name could not be saved. Set it in Account."
+            );
+          }
+        } catch {
+          /* optional until migration applied */
+        }
+      } else {
+        const { resolveLeagueDisplayName } = await import("@/lib/display-name");
+        resolvedName = resolveLeagueDisplayName({
+          membershipOverride: null,
+          profileDisplayName: accountName,
+        });
+      }
+
       try {
         const { recordLeagueFirstJoin } = await import("@/lib/cloud");
         await recordLeagueFirstJoin(leagueId);
@@ -344,7 +389,8 @@ function JoinPageInner() {
           gamesPerWeek:
             (league.games_per_week as number) ?? pack.defaultGamesPerWeek,
           role: "commissioner",
-          displayName: nick,
+          displayName: resolvedName,
+          displayNameOverride: override,
           crystalBallEnabled: true,
           homeTaglineId: "good-teams",
           homeTaglineCustom: "",
@@ -441,18 +487,32 @@ function JoinPageInner() {
   async function handleJoin() {
     if (!userId) return;
     setError(null);
-    const nick = displayName.trim();
-    if (!nick) {
-      setError("Choose how this room will know you.");
-      return;
+    const nick = displayName.trim(); // optional league alias
+    if (nick) {
+      const { validateDisplayNameInput } = await import("@/lib/display-name");
+      const v = validateDisplayNameInput(nick);
+      if (!v.ok) {
+        setError(v.error);
+        return;
+      }
     }
     setLoading(true);
     const supabase = createClient();
     try {
-      await supabase.from("profiles").upsert({
-        id: userId,
-        display_name: nick,
-      });
+      const { ensureProfileRowExists } = await import(
+        "@/lib/league-display-name"
+      );
+      await ensureProfileRowExists(userId, accountHint || undefined);
+      const { data: profRow } = await supabase
+        .from("profiles")
+        .select("display_name")
+        .eq("id", userId)
+        .maybeSingle();
+      const accountName =
+        (profRow?.display_name as string)?.trim() ||
+        accountHint ||
+        "Player";
+
       const { data: league, error: findError } = await supabase
         .from("leagues")
         .select("*")
@@ -576,6 +636,48 @@ function JoinPageInner() {
         joinedSportId === "nfl"
           ? false
           : league.crystal_ball_enabled !== false;
+      // Optional league alias after membership exists
+      let resolvedName = accountName;
+      let override: string | null = null;
+      if (nick) {
+        try {
+          const { setMyLeagueDisplayName } = await import(
+            "@/lib/league-display-name"
+          );
+          const aliasRes = await setMyLeagueDisplayName(
+            league.id as string,
+            nick
+          );
+          if (aliasRes.ok) {
+            resolvedName = aliasRes.resolved;
+            override = aliasRes.override;
+          }
+        } catch {
+          /* migration pending */
+        }
+      } else {
+        try {
+          const { data: mem } = await supabase
+            .from("memberships")
+            .select("display_name_override")
+            .eq("league_id", league.id)
+            .eq("user_id", userId)
+            .maybeSingle();
+          const { resolveLeagueDisplayName } = await import(
+            "@/lib/display-name"
+          );
+          override =
+            (mem as { display_name_override?: string | null } | null)
+              ?.display_name_override ?? null;
+          resolvedName = resolveLeagueDisplayName({
+            membershipOverride: override,
+            profileDisplayName: accountName,
+          });
+        } catch {
+          resolvedName = accountName;
+        }
+      }
+
       writeSessionAndLeague(
         {
           leagueId: league.id as string,
@@ -591,7 +693,8 @@ function JoinPageInner() {
             (league.games_per_week as number) ?? joinPack.defaultGamesPerWeek,
           role:
             league.commissioner_id === userId ? "commissioner" : "player",
-          displayName: nick,
+          displayName: resolvedName,
+          displayNameOverride: override,
           crystalBallEnabled: crystalOn,
           homeTaglineId: (league.home_tagline_id as string) || "good-teams",
           homeTaglineCustom: (league.home_tagline_custom as string) || "",
@@ -928,19 +1031,21 @@ function JoinPageInner() {
                     htmlFor="create-display-name"
                     className="text-[11px] font-semibold uppercase tracking-wide text-muted"
                   >
-                    Your name in this room
+                    Name in this league — optional
                   </label>
                   <input
                     id="create-display-name"
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
-                    placeholder="How will this room know you?"
+                    placeholder="Leave blank for your account name"
                     autoComplete="off"
+                    maxLength={40}
                     className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm"
                   />
                   <p className="text-[11px] text-muted leading-relaxed">
-                    Nickname for this league only. Career, trophies, and
-                    cheevos stay on your War Room account.
+                    Leave blank to use your War Room account name
+                    {accountHint ? ` (${accountHint})` : ""}. This never changes
+                    your account identity or other leagues.
                   </p>
                 </div>
                 <label className="flex items-start gap-3 rounded-xl border border-border bg-background/50 px-3 py-3 cursor-pointer">
@@ -1024,16 +1129,21 @@ function JoinPageInner() {
                 htmlFor="join-display-name"
                 className="text-[11px] font-semibold uppercase tracking-wide text-muted"
               >
-                Your name in this room
+                Name in this league — optional
               </label>
               <input
                 id="join-display-name"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="Choose your league nickname"
+                placeholder="Leave blank for your account name"
                 autoComplete="off"
+                maxLength={40}
                 className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm"
               />
+              <p className="text-[11px] text-muted leading-relaxed">
+                Leave blank to use your War Room account name
+                {accountHint ? ` (${accountHint})` : ""}.
+              </p>
             </div>
             {error && <p className="text-sm text-danger">{error}</p>}
             <button

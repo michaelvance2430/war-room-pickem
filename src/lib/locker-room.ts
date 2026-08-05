@@ -189,17 +189,48 @@ function mapRow(
 
 async function resolveNames(
   supabase: ReturnType<typeof createClient>,
-  ids: string[]
+  ids: string[],
+  leagueId?: string | null
 ): Promise<Map<string, string>> {
   const nameById = new Map<string, string>();
   if (!ids.length) return nameById;
+
+  // Prefer league alias when we know the room
+  if (leagueId) {
+    const { data: mems } = await supabase
+      .from("memberships")
+      .select("user_id, display_name_override, profiles(display_name)")
+      .eq("league_id", leagueId)
+      .in("user_id", ids);
+    if (mems?.length) {
+      const { resolveLeagueDisplayName } = await import("./display-name");
+      for (const m of mems) {
+        const uid = (m as { user_id: string }).user_id;
+        const prof = (m as { profiles?: { display_name?: string } | null })
+          .profiles;
+        const override = (m as { display_name_override?: string | null })
+          .display_name_override;
+        nameById.set(
+          uid,
+          resolveLeagueDisplayName({
+            membershipOverride: override,
+            profileDisplayName: prof?.display_name,
+          })
+        );
+      }
+      if (nameById.size >= ids.length) return nameById;
+    }
+  }
+
   const { data: profiles } = await supabase
     .from("profiles")
     .select("id, display_name")
     .in("id", ids);
   for (const p of profiles || []) {
+    const id = (p as { id: string }).id;
+    if (nameById.has(id)) continue;
     nameById.set(
-      (p as { id: string }).id,
+      id,
       (p as { display_name?: string }).display_name || "Player"
     );
   }
@@ -283,7 +314,7 @@ export async function loadLockerMessages(limit = 100): Promise<{
 
   const rows = (data || []) as Record<string, unknown>[];
   const ids = [...new Set(rows.map((r) => r.user_id as string))];
-  const nameById = await resolveNames(supabase, ids);
+  const nameById = await resolveNames(supabase, ids, session.leagueId);
 
   const chatRows: Record<string, unknown>[] = [];
   const rxRows: {
@@ -859,8 +890,8 @@ export async function postLockerMessage(body: string): Promise<{
     return { ok: false, error: error.message };
   }
 
-  const nameById = await resolveNames(supabase, [uid]);
-  // Prefer live session name if profile row is lagging
+  const nameById = await resolveNames(supabase, [uid], session.leagueId);
+  // Prefer live session name (active-league resolved) if profile row is lagging
   if (session.playerName) {
     nameById.set(uid, session.playerName);
   }

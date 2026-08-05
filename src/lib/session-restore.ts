@@ -25,7 +25,13 @@ export interface LeagueMembership {
   regularSeasonWeeks: number;
   gamesPerWeek: number;
   role: string;
+  /**
+   * Resolved name for this league only:
+   * membership.display_name_override ?? profiles.display_name
+   */
   displayName: string;
+  /** Raw alias stored on membership (null = use account name). */
+  displayNameOverride?: string | null;
   isModerator?: boolean;
   isDeputy?: boolean;
   crystalBallEnabled?: boolean;
@@ -63,6 +69,7 @@ export function writeSessionAndLeague(
     membership.role === "commissioner" ||
     membership.commissionerId === userId;
 
+  // playerName = active-league resolved identity only (never a global cache key)
   const session: Session = {
     playerId: userId,
     playerName: membership.displayName || "Player",
@@ -152,6 +159,17 @@ const membershipsCache = new Map<
 const membershipsInflight = new Map<string, Promise<LeagueMembership[]>>();
 const MEMBERSHIPS_TTL_MS = 20_000;
 
+/** Clear membership list cache (e.g. after league alias change). */
+export function invalidateMembershipsCache(userId?: string | null) {
+  if (userId) {
+    membershipsCache.delete(userId);
+    membershipsInflight.delete(userId);
+    return;
+  }
+  membershipsCache.clear();
+  membershipsInflight.clear();
+}
+
 /** Load all leagues this user belongs to */
 export async function fetchMyMemberships(): Promise<LeagueMembership[]> {
   const supabase = createClient();
@@ -200,10 +218,10 @@ async function fetchMyMembershipsFresh(
     const res = await supabase
       .from("memberships")
       .select(
-        "role, is_moderator, is_deputy, league_id, leagues(id, name, code, commissioner_id, created_at, cut_percent, regular_season_weeks, games_per_week, crystal_ball_enabled, home_tagline_id, home_tagline_custom, season_theme_id, sport_id, is_open)"
+        "role, is_moderator, is_deputy, league_id, display_name_override, leagues(id, name, code, commissioner_id, created_at, cut_percent, regular_season_weeks, games_per_week, crystal_ball_enabled, home_tagline_id, home_tagline_custom, season_theme_id, sport_id, is_open)"
       )
       .eq("user_id", userId);
-    if (res.error && /is_moderator|is_deputy|schema cache|column|season_theme|home_tagline|crystal_ball|sport_id|is_open/i.test(res.error.message || "")) {
+    if (res.error && /is_moderator|is_deputy|display_name_override|schema cache|column|season_theme|home_tagline|crystal_ball|sport_id|is_open/i.test(res.error.message || "")) {
       const res2 = await supabase
         .from("memberships")
         .select(
@@ -238,11 +256,30 @@ async function fetchMyMembershipsFresh(
 
   if (!rows) return [];
 
+  // Account name from profiles (not session meta — session may be a league alias)
+  let accountName = metaName;
+  try {
+    const { data: prof } = await supabase
+      .from("profiles")
+      .select("display_name")
+      .eq("id", userId)
+      .maybeSingle();
+    if (prof?.display_name) {
+      accountName = (prof.display_name as string) || accountName;
+    }
+  } catch {
+    /* keep metaName */
+  }
+
+  const { resolveLeagueDisplayName } = await import("./display-name");
+
   // Build list below; also stamp multi-sport tracker from all memberships
   const list: LeagueMembership[] = [];
   for (const row of rows) {
     const L = row.leagues as Record<string, unknown> | null;
     if (!L) continue;
+    const override =
+      (row.display_name_override as string | null | undefined) ?? null;
     list.push({
       leagueId: L.id as string,
       leagueName: (L.name as string) || "League",
@@ -253,7 +290,11 @@ async function fetchMyMembershipsFresh(
       regularSeasonWeeks: (L.regular_season_weeks as number) ?? 18,
       gamesPerWeek: (L.games_per_week as number) ?? 5,
       role: (row.role as string) || "player",
-      displayName: metaName,
+      displayName: resolveLeagueDisplayName({
+        membershipOverride: override,
+        profileDisplayName: accountName,
+      }),
+      displayNameOverride: override,
       isModerator: !!row.is_moderator,
       isDeputy: !!row.is_deputy,
       crystalBallEnabled: L.crystal_ball_enabled !== false,

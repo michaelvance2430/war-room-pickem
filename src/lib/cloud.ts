@@ -1691,7 +1691,7 @@ export async function loadLeagueWeekBoard(weekNumber: number): Promise<{
 
     const { data: members } = await supabase
       .from("memberships")
-      .select("user_id, is_bot, profiles(display_name)")
+      .select("user_id, is_bot, display_name_override, profiles(display_name)")
       .eq("league_id", leagueId);
     bperf("memberships-done", `n=${members?.length ?? 0}`);
 
@@ -1779,11 +1779,18 @@ export async function loadLeagueWeekBoard(weekNumber: number): Promise<{
 
     // Every member with a seat — humans and bots play the same game.
     // Never skip is_bot on The Board (filler bots must show under teams).
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { resolveLeagueDisplayName } = require("./display-name") as typeof import("./display-name");
     for (const m of members || []) {
       const userId = m.user_id as string;
       const isBot = !!m.is_bot;
       const profile = m.profiles as { display_name?: string } | null;
-      const name = profile?.display_name || (isBot ? "Bot" : "Player");
+      const name = resolveLeagueDisplayName({
+        membershipOverride: (m as { display_name_override?: string | null })
+          .display_name_override,
+        profileDisplayName: profile?.display_name,
+        fallback: isBot ? "Bot" : "Player",
+      });
       const pick = pickByUser.get(userId);
       if (!pick) {
         slips.push({
@@ -1942,7 +1949,7 @@ export async function loadPickSubmissionStatus(
 
   const { data: members, error: memErr } = await supabase
     .from("memberships")
-    .select("user_id, role, division, profiles(display_name)")
+    .select("user_id, role, division, display_name_override, profiles(display_name)")
     .eq("league_id", leagueId);
 
   if (memErr) return { ok: false, rows: [], error: memErr.message };
@@ -1972,6 +1979,8 @@ export async function loadPickSubmissionStatus(
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { resolveLeagueDisplayName } = require("./display-name") as typeof import("./display-name");
   const rows: PickSubmissionStatus[] = (members || []).map((m) => {
     const profile = m.profiles as { display_name?: string } | null;
     const userId = m.user_id as string;
@@ -1987,7 +1996,11 @@ export async function loadPickSubmissionStatus(
 
     return {
       userId,
-      name: profile?.display_name || "Player",
+      name: resolveLeagueDisplayName({
+        membershipOverride: (m as { display_name_override?: string | null })
+          .display_name_override,
+        profileDisplayName: profile?.display_name,
+      }),
       division: (m.division as string) || "North",
       role: m.role === "commissioner" ? "commissioner" : "player",
       submitted: !!pick,
@@ -2027,7 +2040,7 @@ export async function loadWeekNoLockNames(
 
     const { data: members, error: memErr } = await supabase
       .from("memberships")
-      .select("user_id, is_bot, profiles(display_name)")
+      .select("user_id, is_bot, display_name_override, profiles(display_name)")
       .eq("league_id", leagueId);
 
     if (memErr || !members?.length) return [];
@@ -2057,13 +2070,19 @@ export async function loadWeekNoLockNames(
       }
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { resolveLeagueDisplayName } = require("./display-name") as typeof import("./display-name");
     const ghosts: string[] = [];
     for (const m of members) {
       // Bots play like humans — milk carton if they never locked a full card
       const userId = m.user_id as string;
       const profile = m.profiles as { display_name?: string } | null;
-      const name =
-        profile?.display_name || (!!m.is_bot ? "Bot" : "Player");
+      const name = resolveLeagueDisplayName({
+        membershipOverride: (m as { display_name_override?: string | null })
+          .display_name_override,
+        profileDisplayName: profile?.display_name,
+        fallback: m.is_bot ? "Bot" : "Player",
+      });
       const pick = pickByUser.get(userId);
       const gamePickCount = pick
         ? countByPickId.get(pick.id as string) || 0
@@ -2883,13 +2902,19 @@ function mapStandingsRows(rows: Record<string, unknown>[]): StandingsCloudRow[] 
   } catch {
     /* ok */
   }
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { resolveLeagueDisplayName } = require("./display-name") as typeof import("./display-name");
   try {
     return rows
       .map((m: Record<string, unknown>) => {
         const profile = embedProfile(m.profiles);
         return {
           userId: m.user_id as string,
-          name: profile?.display_name || "Player",
+          name: resolveLeagueDisplayName({
+            membershipOverride: m.display_name_override as string | null,
+            profileDisplayName: profile?.display_name,
+            fallback: m.is_bot ? "Bot" : "Player",
+          }),
           division: (m.division as string) || "North",
           totalPoints: (m.total_points as number) || 0,
           weeklyPoints: normalizeWeeklyPointsField(m.weekly_points),
@@ -2998,7 +3023,7 @@ export async function loadLeagueStandings(): Promise<StandingsCloudRow[]> {
     Promise.resolve(
       supabase
         .from("memberships")
-        .select("*, profiles(display_name, last_seen_at)")
+        .select("*, display_name_override, profiles(display_name, last_seen_at)")
         .eq("league_id", session.leagueId)
     ).then((r) => ({
       data: (r.data as Record<string, unknown>[] | null) ?? null,
@@ -3027,7 +3052,7 @@ export async function loadLeagueStandings(): Promise<StandingsCloudRow[]> {
     Promise.resolve(
       supabase
         .from("memberships")
-        .select("*, profiles(display_name)")
+        .select("*, display_name_override, profiles(display_name)")
         .eq("league_id", session.leagueId)
     ).then((r) => ({
       data: (r.data as Record<string, unknown>[] | null) ?? null,
@@ -3581,6 +3606,7 @@ async function loadLeagueRosterFresh(
           const division =
             (m.division as LeagueRosterMember["division"]) || "North";
           const userId = m.user_id as string;
+          // RPC returns already-resolved display_name (alias ?? account)
           return {
             membershipId: m.membership_id as string,
             userId,
@@ -3639,14 +3665,14 @@ async function loadLeagueRosterFresh(
     const res = await supabase
       .from("memberships")
       .select(
-        "id, user_id, role, division, total_points, joined_at, is_bot, is_moderator, locker_muted, is_deputy, profiles(display_name, avatar_url)"
+        "id, user_id, role, division, total_points, joined_at, is_bot, is_moderator, locker_muted, is_deputy, display_name_override, profiles(display_name, avatar_url)"
       )
       .eq("league_id", leagueId);
-    if (res.error && /is_bot|schema cache|column/i.test(res.error.message)) {
+    if (res.error && /is_bot|display_name_override|schema cache|column/i.test(res.error.message || "")) {
       const res2 = await supabase
         .from("memberships")
         .select(
-          "id, user_id, role, division, total_points, joined_at, profiles(display_name, avatar_url)"
+          "id, user_id, role, division, total_points, joined_at, is_bot, is_moderator, locker_muted, is_deputy, profiles(display_name, avatar_url)"
         )
         .eq("league_id", leagueId);
       if (res2.error) {
@@ -3685,6 +3711,8 @@ async function loadLeagueRosterFresh(
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { resolveLeagueDisplayName } = require("./display-name") as typeof import("./display-name");
   let mapped: LeagueRosterMember[] = rows
     .map((m: Record<string, unknown>) => {
       const profile = m.profiles as {
@@ -3699,10 +3727,12 @@ async function loadLeagueRosterFresh(
       return {
         membershipId: m.id as string,
         userId: uid,
-        name:
-          profile?.display_name ||
-          nameById.get(uid) ||
-          "Player",
+        name: resolveLeagueDisplayName({
+          membershipOverride: m.display_name_override as string | null,
+          profileDisplayName:
+            profile?.display_name || nameById.get(uid) || null,
+          fallback: m.is_bot ? "Bot" : "Player",
+        }),
         division,
         role,
         totalPoints: (m.total_points as number) || 0,

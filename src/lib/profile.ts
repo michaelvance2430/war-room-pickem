@@ -109,7 +109,30 @@ export async function updateMyDisplayName(
       /* non-fatal */
     }
 
-    patchSessionPlayerName(name);
+    // Session playerName is active-league resolved name, not always account name
+    try {
+      const { getSession } = await import("@/lib/league");
+      const session = getSession();
+      if (session?.leagueId) {
+        const { data: mem } = await supabase
+          .from("memberships")
+          .select("display_name_override")
+          .eq("league_id", session.leagueId)
+          .eq("user_id", userId)
+          .maybeSingle();
+        const { resolveLeagueDisplayName } = await import("./display-name");
+        const resolved = resolveLeagueDisplayName({
+          membershipOverride: (mem as { display_name_override?: string | null } | null)
+            ?.display_name_override,
+          profileDisplayName: name,
+        });
+        patchSessionPlayerName(resolved);
+      } else {
+        patchSessionPlayerName(name);
+      }
+    } catch {
+      patchSessionPlayerName(name);
+    }
     notifyProfileUpdated({ displayName: name });
     return { ok: true, displayName: name };
   } catch (e: unknown) {

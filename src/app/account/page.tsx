@@ -115,12 +115,21 @@ export default function AccountPage() {
   /** When editing, allow selecting the explicit no-team answer */
   const [allegianceNoTeam, setAllegianceNoTeam] = useState(false);
   const [allegianceBusy, setAllegianceBusy] = useState(false);
+  /** Active-league alias editor */
+  const [activeLeagueName, setActiveLeagueName] = useState("");
+  const [leagueAliasOverride, setLeagueAliasOverride] = useState<
+    string | null
+  >(null);
+  const [leagueAliasDraft, setLeagueAliasDraft] = useState("");
+  const [leagueResolvedName, setLeagueResolvedName] = useState("");
+  const [leagueAliasBusy, setLeagueAliasBusy] = useState(false);
 
   async function reload() {
     const session = getSession();
     const league = getLeague();
     setUserId(session?.playerId || null);
     setActiveId(league?.id || session?.leagueId || null);
+    setActiveLeagueName(league?.name || "");
     setChaosTitleLock(isChaosTitleLocked(session?.playerId, league?.id));
     try {
       const { wantsFullRoom } = await import("@/lib/progressive-disclosure");
@@ -153,9 +162,20 @@ export default function AccountPage() {
     }
     const list = await fetchMyMemberships();
     setMemberships(list);
-    const activeSport =
-      list.find((m) => m.leagueId === (league?.id || session?.leagueId))
-        ?.sportId || league?.sportId;
+    const activeMem = list.find(
+      (m) => m.leagueId === (league?.id || session?.leagueId)
+    );
+    if (activeMem) {
+      setActiveLeagueName(activeMem.leagueName || league?.name || "");
+      setLeagueAliasOverride(activeMem.displayNameOverride ?? null);
+      setLeagueAliasDraft(activeMem.displayNameOverride || "");
+      setLeagueResolvedName(activeMem.displayName || profile?.displayName || "");
+    } else {
+      setLeagueAliasOverride(null);
+      setLeagueAliasDraft("");
+      setLeagueResolvedName(profile?.displayName || "");
+    }
+    const activeSport = activeMem?.sportId || league?.sportId;
     setLeagueSportScope(
       resolveSportScope({
         membershipSportIds: list.map((m) => m.sportId || "cfb"),
@@ -292,10 +312,13 @@ export default function AccountPage() {
   }
 
   async function onSaveName() {
-    
     const next = nameDraft.trim().replace(/\s+/g, " ");
     if (!next || next === name.trim()) {
-      setMessage(next === name.trim() ? "That’s already your name." : "Enter a name.");
+      setMessage(
+        next === name.trim()
+          ? "That’s already your War Room account name."
+          : "Enter a name."
+      );
       return;
     }
     setNameBusy(true);
@@ -309,8 +332,67 @@ export default function AccountPage() {
     setName(res.displayName || next);
     setNameDraft(res.displayName || next);
     setMessage(
-      `Name updated to ${res.displayName || next}. The room will see it on the board.`
+      `War Room account name updated to ${res.displayName || next}. Leagues with their own alias keep that alias.`
     );
+  }
+
+  async function onSaveLeagueAlias() {
+    const league = getLeague();
+    if (!league?.id) {
+      setMessage("No active league — switch into a room first.");
+      return;
+    }
+    setLeagueAliasBusy(true);
+    setMessage(null);
+    try {
+      const { setMyLeagueDisplayName } = await import(
+        "@/lib/league-display-name"
+      );
+      const res = await setMyLeagueDisplayName(
+        league.id,
+        leagueAliasDraft.trim() || null
+      );
+      if (!res.ok) {
+        setMessage(res.error || "Could not save league name");
+        return;
+      }
+      setLeagueAliasOverride(res.override);
+      setLeagueAliasDraft(res.override || "");
+      setLeagueResolvedName(res.resolved);
+      setMessage(
+        res.override
+          ? `Name in ${league.name} is now ${res.resolved}. Other leagues unchanged.`
+          : `${league.name} now uses your War Room account name.`
+      );
+    } finally {
+      setLeagueAliasBusy(false);
+    }
+  }
+
+  async function onUseAccountNameInLeague() {
+    setLeagueAliasDraft("");
+    const league = getLeague();
+    if (!league?.id) return;
+    setLeagueAliasBusy(true);
+    setMessage(null);
+    try {
+      const { setMyLeagueDisplayName } = await import(
+        "@/lib/league-display-name"
+      );
+      const res = await setMyLeagueDisplayName(league.id, null);
+      if (!res.ok) {
+        setMessage(res.error || "Could not clear league name");
+        return;
+      }
+      setLeagueAliasOverride(null);
+      setLeagueAliasDraft("");
+      setLeagueResolvedName(res.resolved);
+      setMessage(
+        `${league.name} now uses your War Room account name (${res.resolved}).`
+      );
+    } finally {
+      setLeagueAliasBusy(false);
+    }
   }
 
   async function onSwitch(leagueId: string) {
@@ -612,30 +694,30 @@ export default function AccountPage() {
           </div>
         )}
 
-        {/* Top of Account — change name (buddy request; don't bury under titles) */}
+        {/* Global account identity + per-league alias */}
         <section className="rounded-xl border-2 border-primary/50 bg-primary/10 p-5 mb-6">
-      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-1">
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-1">
             Identity
           </p>
-      <h2 className="font-semibold text-lg mb-1">Display name</h2>
-      <p className="text-xs text-muted mb-3 leading-relaxed">
-            What the room sees on standings, the board, and the Gazette. Change
-            it anytime.
+          <h2 className="font-semibold text-lg mb-1">War Room account name</h2>
+          <p className="text-xs text-muted mb-3 leading-relaxed">
+            Your global account name. Used on your public Profile and as the
+            default in every league without its own alias.
           </p>
-      <label className="block text-xs text-muted mb-3">
-            Your name
+          <label className="block text-xs text-muted mb-3">
+            Account name
             <input
               type="text"
               value={nameDraft}
               onChange={(e) => setNameDraft(e.target.value)}
               maxLength={40}
               autoComplete="nickname"
-              placeholder="e.g. Mike V"
+              placeholder="e.g. Mike Vance"
               disabled={nameBusy}
               className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-3 text-base text-foreground font-medium disabled:opacity-50"
             />
           </label>
-      <button
+          <button
             type="button"
             onClick={() => void onSaveName()}
             disabled={
@@ -645,9 +727,68 @@ export default function AccountPage() {
             }
             className="w-full py-3 min-h-[48px] rounded-xl bg-primary text-black text-sm font-bold disabled:opacity-40 touch-manipulation"
           >
-            {nameBusy ? "Saving…" : "Save name"}
+            {nameBusy ? "Saving…" : "Save account name"}
           </button>
-      <div className="mt-5 pt-4 border-t border-border/60">
+
+          {activeId ? (
+            <div className="mt-6 pt-5 border-t border-primary/30 space-y-3">
+              <h3 className="font-semibold text-base">Name in this league</h3>
+              <p className="text-xs text-muted leading-relaxed">
+                This name is used only inside{" "}
+                <strong className="text-foreground">
+                  {activeLeagueName || "this room"}
+                </strong>
+                . It will not change your War Room account name
+                {name ? ` (${name})` : ""} or any other league.
+              </p>
+              <p className="text-[11px] text-muted">
+                Currently shows as:{" "}
+                <strong className="text-foreground">
+                  {leagueResolvedName || name || "—"}
+                </strong>
+                {leagueAliasOverride
+                  ? " (league alias)"
+                  : " (account name)"}
+              </p>
+              <label className="block text-xs text-muted">
+                Optional alias
+                <input
+                  type="text"
+                  value={leagueAliasDraft}
+                  onChange={(e) => setLeagueAliasDraft(e.target.value)}
+                  maxLength={40}
+                  autoComplete="off"
+                  placeholder="Leave blank to use account name"
+                  disabled={leagueAliasBusy}
+                  className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-3 text-base text-foreground font-medium disabled:opacity-50"
+                />
+              </label>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <button
+                  type="button"
+                  onClick={() => void onSaveLeagueAlias()}
+                  disabled={leagueAliasBusy}
+                  className="flex-1 py-3 min-h-[48px] rounded-xl bg-primary text-black text-sm font-bold disabled:opacity-40 touch-manipulation"
+                >
+                  {leagueAliasBusy ? "Saving…" : "Save league name"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void onUseAccountNameInLeague()}
+                  disabled={leagueAliasBusy || !leagueAliasOverride}
+                  className="flex-1 py-3 min-h-[48px] rounded-xl border border-border text-sm font-semibold disabled:opacity-40 touch-manipulation"
+                >
+                  Use my account name
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p className="mt-4 text-xs text-muted">
+              Switch into a league to set a name used only in that room.
+            </p>
+          )}
+
+          <div className="mt-5 pt-4 border-t border-border/60">
             <p className="text-xs text-muted mb-2 leading-relaxed">
               Birthday (optional) — private. One quiet Gazette line if you open
               the app that day.{" "}

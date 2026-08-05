@@ -152,10 +152,20 @@ export async function seatPlayerInLeague(opts: {
   const supabase = createClient();
   const { userId, leagueId, displayName } = opts;
 
-  await supabase.from("profiles").upsert({
-    id: userId,
-    display_name: displayName.trim() || "Player",
-  });
+  // Never overwrite global account name with a league alias
+  try {
+    const { ensureProfileRowExists } = await import("@/lib/league-display-name");
+    await ensureProfileRowExists(userId);
+  } catch {
+    /* ignore */
+  }
+  const { data: profRow } = await supabase
+    .from("profiles")
+    .select("display_name")
+    .eq("id", userId)
+    .maybeSingle();
+  const accountName =
+    (profRow?.display_name as string)?.trim() || "Player";
 
   const { data: league, error: lErr } = await supabase
     .from("leagues")
@@ -259,6 +269,47 @@ export async function seatPlayerInLeague(opts: {
     }
   }
 
+  // Optional per-league alias after membership exists
+  let resolvedName = accountName;
+  let override: string | null = null;
+  const nick = (displayName || "").trim();
+  if (nick) {
+    try {
+      const { setMyLeagueDisplayName } = await import(
+        "@/lib/league-display-name"
+      );
+      const aliasRes = await setMyLeagueDisplayName(
+        league.id as string,
+        nick
+      );
+      if (aliasRes.ok) {
+        resolvedName = aliasRes.resolved;
+        override = aliasRes.override;
+      }
+    } catch {
+      /* migration pending — keep account name */
+    }
+  } else {
+    try {
+      const { data: mem } = await supabase
+        .from("memberships")
+        .select("display_name_override")
+        .eq("league_id", league.id)
+        .eq("user_id", userId)
+        .maybeSingle();
+      const { resolveLeagueDisplayName } = await import("./display-name");
+      override =
+        (mem as { display_name_override?: string | null } | null)
+          ?.display_name_override ?? null;
+      resolvedName = resolveLeagueDisplayName({
+        membershipOverride: override,
+        profileDisplayName: accountName,
+      });
+    } catch {
+      resolvedName = accountName;
+    }
+  }
+
   const sportId =
     (league as { sport_id?: string }).sport_id || "cfb";
   const seasonThemeId =
@@ -282,7 +333,8 @@ export async function seatPlayerInLeague(opts: {
         gamesPerWeek: (league.games_per_week as number) ?? 5,
         role:
           league.commissioner_id === userId ? "commissioner" : "player",
-        displayName: displayName.trim() || "Player",
+        displayName: resolvedName,
+        displayNameOverride: override,
         crystalBallEnabled:
           sportId === "nfl"
             ? false
@@ -301,7 +353,7 @@ export async function seatPlayerInLeague(opts: {
       "warroom-session",
       JSON.stringify({
         playerId: userId,
-        playerName: displayName.trim() || "Player",
+        playerName: resolvedName,
         isCommissioner: league.commissioner_id === userId,
         leagueId: league.id,
       })
