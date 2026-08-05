@@ -1,7 +1,8 @@
 # War Room Moments — Pipeline Audit
 
 **Date:** 2026-08-03  
-**Verdict:** Moments are **incomplete as a system**. Season Opening is partial. Ring + Gazette were **stubs** in production (presentation only mounted via DeferredChrome, which is hard-off).
+**Updated:** 2026-08-05 — orchestrator binding **fully locked** (Cold Open = sole Season Opening cinematic; Ring ceremony vs result; plan only; no orchestrator code yet). See `docs/EXPERIENCE-ORCHESTRATOR-BINDING-DECISIONS.md`.  
+**Verdict:** Moments are **incomplete as a system**. Binding law is complete; runtime still partial. Ring + Gazette were **stubs** in production under SAFE NAV / DeferredChrome.
 
 ---
 
@@ -36,9 +37,9 @@ trigger → eligibility → queue → priority → safe screen
 
 | Moment | Trigger | Eligible | Required data | Destination | Presentation | Implemented? | Works in prod? | Failure | Persist | Dedupe | Training conflict |
 |--------|---------|----------|---------------|-------------|--------------|--------------|----------------|---------|---------|--------|-------------------|
-| **Season Opening** | Home + calendar open + unclaimed | Members | Sport, claim key | Stay Home (ceremony) | Full screen | Partial | Yes (MomentHost) | Too fast / weak fade | Claim localStorage | Yes | Skips if onboarding |
-| **Ring Ceremony** | Opening week + defending champ | Members once | Trophy champ | Ceremony overlay | Full modal | Built | **No** — DeferredChrome only | Foundry → `router.push("/")` w/ no host | Seen key | Yes | Session drama claim |
-| **Weekly Cold Open** | Pre-open week | Members | Champ | Overlay | Modal | Built | **No** — DeferredChrome | Same | Seen | Yes | — |
+| **Cold Open** (= sole Season Opening cinematic) | **Binding locked:** kickoff−7d → first kickoff; once/user·league·upcoming season; multi-visit until seen; dies at kickoff; “Now defend it.”; gates first; must not block picks; one slot/session; exit Home; no dual Season Opening queue. *Code window math largely aligned; durability + content + sole-cinematic reconcile not shipped.* | Members after gates | Champ / recap / mission | Overlay → Home | Modal | Built | **No** SAFE NAV / Deferred | Same | local seen (cloud planned) | Yes | Session drama |
+| **Legacy Season Opening Moment** | Separate MomentHost peak (shipped P0.3) | Members | Claim key | Stay Home | Full screen | Partial | SAFE NAV gated | Dual-peak risk | Local claims | Yes | Onboarding |
+| **Ring Ceremony** | **Binding locked:** post-championship **7-day** cinema · “You won.” · max one display · seen vs expired · Home after · **ceremony** does not auto-replay (Account/Gazette/queue/surfaces) · **result never expires** · presentation only (does not grant trophy). *Code still opening-week shaped.* | Members once | Authoritative champ + season | Ceremony overlay → Home | Full modal | Built (legacy timing) | **No** — SAFE NAV / Deferred | Foundry → Home w/ no host | local seen (expired state planned) | Yes | Session drama |
 | **Gazette paper** | Week scored / Foundry force | Members | Edition | Should be paper modal or `/gazette` | Modal + archive page | Built | **No** modal in prod | Foundry → Home | Seen week | Yes | Pre-lock calm |
 | **Gazette shelf unlock** | Week 3 progressive | Members | Progressive | Popup then nav | Modal | Built | **No** DeferredChrome | — | Progressive | — | — |
 | **Card published** | Host publishes | Players | Week | Overlay | Modal | Built | **No** DeferredChrome | — | Session | — | — |

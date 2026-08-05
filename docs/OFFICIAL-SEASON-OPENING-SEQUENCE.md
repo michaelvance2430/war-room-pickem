@@ -1,16 +1,25 @@
 # Official Season Opening Ceremony + First-Login Sequence Control
 
-**Status:** ✅ **P0.3 shipped** · 🔒 **FROZEN as Tier I Tradition**  
-**Date:** 2026-08-03 · Freeze ship: `0b884c0`  
-**Intent:** One Opening Day peak per user · league · sport · season — television for the season, not a login reward.
+**Status:** ⚠️ **SUPERSEDED IN PART by orchestrator binding (2026-08-05)** · prior P0.3 ship remains in code until orchestrator  
+**Date:** 2026-08-03 · Freeze ship: `0b884c0` · **Binding override:** `docs/EXPERIENCE-ORCHESTRATOR-BINDING-DECISIONS.md`  
+**Intent (historical):** One Opening Day peak per user · league · sport · season.
 
-### Freeze rule
+### Binding correction (2026-08-05) — read first
 
-Do **not** keep polishing Season Opening.
+| Law | Detail |
+|-----|--------|
+| **Sole user-facing Season Opening cinematic** | **Cold Open** |
+| **“Season Opening”** | Internal category / system / Foundry lab name — **not** a second automatic fullscreen |
+| **Forbidden queues** | Cold Open → separate Season Opening · **or** Season Opening → Cold Open |
+| **Copy direction** | Cold Open: **“Now defend it.”** (launch / recap / defend / Home mission) |
+| **Ring Ceremony** | Separate post-championship 7-day cinema · **“You won.”** · result never expires |
 
-Change only under Constitution **Tradition protection law** (unanimous approval).  
-Foundry preview and claim-reset for testing remain allowed.  
-Sacred copy stays: *Practice is over. The season is here.* · *The room is open / live.*
+This document’s shipped `SeasonOpeningMoment` path must be **reconciled or retired as an automatic peak** when Experience Orchestrator is implemented. Do not polish a dual-cinematic stack.
+
+### Freeze rule (until orchestrator lands)
+
+Do **not** expand Season Opening as a **second** auto cinematic next to Cold Open.  
+Foundry preview and claim-reset for testing remain allowed.
 
 ### Implementation map
 
@@ -542,6 +551,13 @@ if (justCompletedOnboardingThisSession) → eligible next Home tick
 
 # PART 5 — ExperienceQueue (stair-step coordinator)
 
+> **2026-08-05 binding (orchestrator, not implemented yet):**  
+> Full law: `docs/EXPERIENCE-ORCHESTRATOR-BINDING-DECISIONS.md`.  
+> **Cold Open = sole Season Opening cinematic** (kickoff−7d → kickoff · “Now defend it.”).  
+> Do **not** auto-queue this document’s Season Opening Moment **and** Cold Open.  
+> Ring Ceremony = post-championship · 7-day · “You won.” · ceremony may expire; **result never expires**.  
+> Never stack Ring + Cold Open same session; return Home after either.
+
 ## Concept
 
 `ExperienceQueue` — **small**, known set of first-session experiences.  
@@ -799,7 +815,8 @@ Part 7 + after ship: cold Home with ceremony eligible ×3, reduced-motion ×3, t
 | Existing | Job | Conflict with new ceremony? |
 |----------|-----|------------------------------|
 | **SeasonOpenWelcome** | Calendar doors open splash | Overlaps “season began” — **do not re-enable both** for same job; either retire/rehome or demote |
-| **RingCeremony** | Defending champ walk in opening week | Different job (hardware lore). Can coexist **later** via queue priority *after* opening ceremony, never same session stack |
+| **RingCeremony** | Binding: post-championship 7-day “You won.” (not opening-week) | Different job from Cold Open. Never same session. Result permanent if ceremony missed. |
+| **Cold Open** | Binding: sole Season Opening cinematic | Replaces dual auto Season Opening peak |
 | **WeeklyColdOpen** | Week *before* open wanted poster | Precedes season; separate moment type |
 | **SoftUnlock** | After first lock | Later priority 5; non-blocking |
 | **LoginWelcome** | Forever sarcastic shop welcome | Lower priority / demote if reintroduced |

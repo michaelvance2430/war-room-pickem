@@ -1,9 +1,12 @@
 # Phase 2 — The Season Moment Timeline
 
 **Status:** Design-only reference · **no code**  
-**Date:** 2026-08-03  
+**Date:** 2026-08-03 · **Updated:** 2026-08-05 (orchestrator binding fully locked)  
 **Package:** War Room Moments  
-**Parent:** `WAR-ROOM-MOMENTS-ARCHITECTURE.md` · `MOMENT-OBJECT-SCHEMA.md` · `EMOTIONAL-BUDGET.md`
+**Parent:** `WAR-ROOM-MOMENTS-ARCHITECTURE.md` · `MOMENT-OBJECT-SCHEMA.md` · `EMOTIONAL-BUDGET.md`  
+**Binding overrides:** `docs/EXPERIENCE-ORCHESTRATOR-BINDING-DECISIONS.md`  
+(Experience Orchestrator — **not implemented yet**.  
+Ring = post-champ 7d “You won.” · Cold Open = sole Season Opening cinematic, pre-kickoff 7d “Now defend it.”)
 
 ---
 
@@ -29,9 +32,14 @@ PRESEASON
 │  Anticipation · Practice Mode · invite · build room
 │  (no invented history / achievement)
 │
-├── 🏈 SEASON BEGINS  ·····················  ⭐⭐⭐⭐⭐
-│     CFB Opening  ·or·  NFL Kickoff  ·or·  future sport
-│     once · per user · league · sport · season
+├── 📺 COLD OPEN  ·························  ⭐⭐⭐⭐⭐  🔒 BINDING
+│     = sole user-facing SEASON OPENING cinematic
+│     “Now defend it.” · launch · recap · defending champ · rivalries · Home mission
+│     Window: first_kickoff − 7d → first_kickoff (authoritative kickoff clock)
+│     Once per user·league·upcoming season · multi-visit until seen · dies at kickoff
+│     Gates: auth · join · allegiance first · must not block picks
+│     One automatic fullscreen per session · exit Home · no makeup after kickoff
+│     Do NOT queue a separate “Season Opening” fullscreen with this
 │
 ├── 📣 First Card Goes Live  ··············  ⭐⭐⭐
 │     Weekly Ritual (first instance of the season)
@@ -41,9 +49,6 @@ PRESEASON
 │
 ├── 🚪 First Board Unlock / Board Comes Alive · ⭐⭐
 │     Trust: only after real scored week (never invent)
-│
-├── 💍 Ring Ceremony (if defending champ) · ⭐⭐⭐⭐
-│     Milestone / lore — opening-week family, not every week
 │
 ├── 📅 WEEKLY RITUALS (repeat)  ···········  ⭐⭐ – ⭐⭐⭐
 │     │
@@ -56,12 +61,22 @@ PRESEASON
 ├── 🏆 MILESTONES (earned, scattered)  ····  ⭐ – ⭐⭐⭐⭐
 │     First Cheevo · stacks · trophies · Hall of Fame
 │
-├── 👑 SEASON FINALE  ·····················  ⭐⭐⭐⭐⭐
-│     Crown the Champion · Championship Ceremony
-│     Toilet / wrap · Trophy Presentation
+├── 👑 SEASON FINALE / AUTHORITATIVE RESULT · ⭐⭐⭐⭐⭐
+│     Crown the Champion · hardware / standings / league history
+│     (mutation path — independent of ceremony view)
+│
+├── 💍 RING CEREMONY  ·····················  ⭐⭐⭐⭐  🔒 BINDING 2026-08-05
+│     Close completed season · honor the champion · “You won.”
+│     Window: starts when result is authoritative · exactly 7 days
+│     Once per user · league · completed season · max one display
+│     Seen vs expired; miss = miss cinema only (result never expires)
+│     Winner still via Trophy Room / hardware / Final Gazette / standings /
+│     Home reigning identity / next Cold Open — NOT ceremony auto-replay
+│     Presentation only — does NOT grant trophy
+│     No fullscreen stack immediately after · return Home
 │
 └── OFFSEASON
-      Rest · next season’s Season Begins (new season_key)
+      Rest · next season’s Cold Open (new season_key)
 ```
 
 ---
@@ -71,9 +86,9 @@ PRESEASON
 ```text
 Preseason
 │
-├── 🏈 College Football Opening  ⭐⭐⭐⭐⭐
+├── 📺 Cold Open (= Season Opening cinematic)  ⭐⭐⭐⭐⭐
 │     Identity: GameDay, campuses, rivalries — NOT generic fireworks
-│     Trigger: Week 0 card published
+│     Window: first kickoff − 7d → first kickoff · “Now defend it.”
 │
 ├── 📣 Week 0 Card Live  ⭐⭐⭐
 ├── (optional practice dies at Week 0 kickoff)
@@ -83,14 +98,16 @@ Preseason
 │
 ├── 📰 First Gazette  ⭐⭐⭐
 ├── 🚪 Board comes alive  ⭐⭐
-├── 💍 Ring Ceremony (defending champ)  ⭐⭐⭐⭐
 │
 ├── Weekly rhythm (Week 1–13, Conf, CFP…)
 │     Card · Paper · Board · Cheevos
 │
 ├── Cut week drama (standings matter) — usually ⭐⭐⭐ narrative, not full ceremony
 │
-└── 👑 Championship / Toilet / Season Wrap  ⭐⭐⭐⭐⭐
+├── 👑 Championship / Toilet / Season Wrap  ⭐⭐⭐⭐⭐
+│
+└── 💍 Ring Ceremony (7-day post-result window)  ⭐⭐⭐⭐
+      “You won.” · presentation only · see binding decisions
 ```
 
 ---
@@ -100,18 +117,20 @@ Preseason
 ```text
 Preseason
 │
-├── 🏈 NFL Kickoff  ⭐⭐⭐⭐⭐
+├── 📺 Cold Open (= Season Opening cinematic)  ⭐⭐⭐⭐⭐
 │     Identity: stadium lights, prime time, Opening Weekend
-│     Trigger: Week 1 card published
+│     Window: first kickoff − 7d → first kickoff · “Now defend it.”
 │
 ├── 📣 Week 1 Card Live  ⭐⭐⭐
 ├── 📰 First Gazette  ⭐⭐⭐
 ├── 🚪 Board comes alive  ⭐⭐
-├── 💍 Ring Ceremony (if applicable)  ⭐⭐⭐⭐
 │
 ├── Weekly rhythm (regular season → playoffs)
 │
-└── 👑 Super Bowl / Toilet / Season Wrap  ⭐⭐⭐⭐⭐
+├── 👑 Super Bowl / Toilet / Season Wrap  ⭐⭐⭐⭐⭐
+│
+└── 💍 Ring Ceremony (7-day post-result window)  ⭐⭐⭐⭐
+      “You won.” · presentation only · see binding decisions
 ```
 
 ---
@@ -141,10 +160,12 @@ Ask:
 | First Card Goes Live | Weekly Ritual | ⭐⭐⭐ | Partial (CardPublished exists; Deferred off) |
 | Gazette Reveal | Weekly Ritual | ⭐⭐⭐ | Exists (paper path) |
 | Board Comes Alive | Weekly Ritual / Trust | ⭐⭐ | Empty state when no history |
-| Ring Ceremony | Milestone / Season Begins family | ⭐⭐⭐⭐ | Code exists; Deferred off in prod |
+| Cold Open | Season Begins (**sole** Season Opening cinematic) | ⭐⭐⭐⭐⭐ | **Fully locked 2026-08-05** — see binding decisions; code window mostly aligned |
+| Ring Ceremony | Season Finale family (close / honor) | ⭐⭐⭐⭐ | **Binding:** post-result 7-day cinema · result never expires · not opening-week; code still opening-week-shaped until orchestrator |
+| Separate Season Opening Moment | — | — | **Do not dual-queue** with Cold Open; reconcile/retire auto path at orchestrator |
 | Weekly Cheevos | Milestone | ⭐⭐–⭐⭐⭐ | Badge path |
 | Soft Unlock | Borderline | ⭐⭐ | Banner on Home |
-| Crown Champion / Finale | Season Finale | ⭐⭐⭐⭐⭐ | Finale modal exists; Deferred off |
+| Crown Champion / hardware | Season Finale (mutation + truth) | ⭐⭐⭐⭐⭐ | Authoritative result path; independent of ceremony view; permanent surfaces name champion |
 | First Week Scored peak | Milestone | ⭐⭐⭐⭐ | Not yet designed as Moment |
 
 ---

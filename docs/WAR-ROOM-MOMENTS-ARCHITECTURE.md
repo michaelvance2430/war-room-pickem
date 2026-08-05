@@ -14,6 +14,7 @@
 | 3 | `docs/EMOTIONAL-BUDGET.md` — emotional currency / weights |
 | Sacred | Constitution chapter **War Room Moments** |
 | First Moment | `docs/OFFICIAL-SEASON-OPENING-SEQUENCE.md` |
+| Orchestrator law | `docs/EXPERIENCE-ORCHESTRATOR-BINDING-DECISIONS.md` — fully locked Ring + Cold Open (Cold Open = sole Season Opening cinematic; **not implemented yet**) |
 
 ---
 
@@ -48,11 +49,15 @@ Foundry becomes the studio where every major War Room experience is created, pre
 
 Happen **once** and establish the feeling of a new season.
 
-Examples:
+**User-facing cinematic (binding 2026-08-05):** **Cold Open only.**
 
-- College Football Opening  
-- NFL Kickoff  
-- Future sport openings  
+“Season Opening” may remain an **internal category / system name**. It must **not** be a second automatic fullscreen cinematic competing with Cold Open.
+
+Examples of the **same** tradition (sport-flavored Cold Open):
+
+- CFB Cold Open (campus / Saturday / rivalries)  
+- NFL Cold Open (prime time / Opening Weekend)  
+- Future sport Cold Opens  
 
 **Identity law:** Every opening has its own identity.
 
@@ -60,7 +65,8 @@ Examples:
 - **NFL** → prime time, stadium lights, Opening Weekend  
 
 No generic celebration.  
-The sport should be recognizable **before a single word is read**.
+The sport should be recognizable **before a single word is read**.  
+**Do not queue** Cold Open → separate Season Opening, or the reverse.
 
 ---
 
@@ -84,7 +90,6 @@ Moments players **earn**.
 
 Examples:
 
-- Ring Ceremony  
 - First Cheevo  
 - Trophy Unlock  
 - Hall of Fame additions  
@@ -98,10 +103,12 @@ The emotional close of the season.
 
 Examples:
 
-- Crown the Champion  
-- Championship Ceremony  
-- Season Wrap-up  
-- Trophy Presentation  
+- Crown the Champion (authoritative result + hardware — **mutation path**)  
+- **Ring Ceremony** — close the completed season and honor the champion (presentation; **7-day window**; see binding decisions)  
+- Championship Ceremony / Season Wrap-up  
+- Trophy Presentation (**result and hardware never expire** when ceremony expires)  
+
+**Ceremony vs result:** Missing Ring Ceremony = missing cinema only. Champion identity remains on Trophy Room, hardware, Final Gazette, standings/bracket, Home reigning identity, next Cold Open — never via auto-replay of expired ceremony.
 
 ---
 
@@ -111,10 +118,12 @@ Not every Moment uses full ceremony energy.
 
 **Season-scale fireworks / full-screen ritual** stay rare (≈ four peaks):
 
-1. Season Opening  
+1. **Cold Open** (sole Season Opening cinematic)  
 2. First Week Scored (if treated as a peak)  
-3. Champion Crowned  
-4. New Season Begins Again  
+3. Champion Crowned / Ring Ceremony cinema (post-result window)  
+4. Next season’s Cold Open again  
+
+Do **not** count a separate “Season Opening Moment” as a fifth peak.
 
 Weekly rituals and many milestones may be quieter (paper, banner, short toast).  
 If everything has fireworks, nothing has fireworks.
@@ -171,7 +180,7 @@ Relationships are the product.
 
 | Existing design | How it fits |
 |-----------------|-------------|
-| Official Season Opening Ceremony | First **Season Begins** Moment object (CFB / NFL identities) |
+| Official Season Opening / Cold Open | **One** Season Begins cinematic for the player = **Cold Open** (see orchestrator binding; reconcile legacy SeasonOpeningMoment auto path) |
 | Board empty / never invent history | Trust before drama — Moments never invent achievement |
 | Practice Mode / dual realities | Moments never fire in Practice; Live League only |
 | ExperienceQueue (opening sequence doc) | Runtime orchestrator for Moment priority |
