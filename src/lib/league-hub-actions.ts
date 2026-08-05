@@ -231,7 +231,11 @@ function fallbackPulse(
   };
 }
 
-type FactBundle = {
+/**
+ * Pure fact bundle for hub / mission resolution (no I/O).
+ * Exported for independent CFB/NFL verification without Supabase.
+ */
+export type HubFactBundle = {
   sportId: SportId;
   liveWeek: number | null;
   /**
@@ -261,6 +265,17 @@ type FactBundle = {
   /** Profile/sport NFL allegiance missing (does not affect CFB). */
   needsNflTeam: boolean;
 };
+
+/** @deprecated use HubFactBundle — kept as internal alias */
+type FactBundle = HubFactBundle;
+
+/** True when card is formally published (not draft games alone). */
+export function isFormallyPublishedHubCard(f: {
+  cardId: string | null;
+  publishedAt: string | null;
+}): boolean {
+  return !!(f.cardId && f.publishedAt);
+}
 
 async function loadFacts(
   m: LeagueMembership,
@@ -582,7 +597,8 @@ export function resolveLeagueHubAction(f: FactBundle): {
 
   // ── Player sequence (only when card is formally published) ──
   // Draft games without published_at never unlock Make/Finish/Lock Picks.
-  const formallyPublished = !!(f.cardId && f.publishedAt);
+  // CFB and NFL share this rule; NFL still requires allegiance + Super Bowl first (above).
+  const formallyPublished = isFormallyPublishedHubCard(f);
   if (formallyPublished) {
     if (!f.pickId || f.pickGameCount === 0) {
       return {

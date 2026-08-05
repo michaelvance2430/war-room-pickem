@@ -20,7 +20,8 @@ import {
   resolvePlayerActiveWeek,
   weekProgressLabel,
 } from "@/lib/active-week";
-import { SEASON_MAX_WEEK } from "@/lib/season-calendar";
+import { firstSeasonWeek, SEASON_MAX_WEEK } from "@/lib/season-calendar";
+import { isCrystalBallOpeningWeek } from "@/lib/league-hub-actions";
 
 type HeroState = {
   week: number;
@@ -41,6 +42,13 @@ type HeroState = {
   isOps: boolean;
   leagueCode: string | null;
   advancedFromScored: boolean;
+  /** NFL only: missing real team allegiance (never CFB-required on NFL home). */
+  needsNflTeam: boolean;
+  /**
+   * Crystal Ball / Super Bowl required this opening week and not sealed.
+   * CFB: Week 0 · NFL: Week 1. Null = unknown (fail closed → don't invent picks).
+   */
+  needsPridePick: boolean;
   /** Last scored week recap for this player */
   lastWeekRecap: {
     week: number;
@@ -96,8 +104,12 @@ export default function HomeWeekHero() {
           return week;
         }
       })();
+      const sid = getLeague()?.sportId || "cfb";
+      const first = firstSeasonWeek(sid);
+      let w = localWeek;
+      if (sid === "nfl" && w <= 0) w = first;
       const degraded: HeroState = {
-        week: localWeek,
+        week: w,
         hasCard: false,
         gameCount: 0,
         lockLabel: null,
@@ -110,6 +122,8 @@ export default function HomeWeekHero() {
         isOps: isOps(),
         leagueCode: getLeague()?.code || null,
         advancedFromScored: false,
+        needsNflTeam: false,
+        needsPridePick: false,
         lastWeekRecap: null,
       };
       setState(degraded);
@@ -124,8 +138,12 @@ export default function HomeWeekHero() {
           const s = localStorage.getItem("warroom-active-week");
           const n = s != null ? parseInt(s, 10) : 1;
           const w = Number.isFinite(n) ? n : 1;
+          const sid = getLeague()?.sportId || "cfb";
+          const first = firstSeasonWeek(sid);
+          let ww = w;
+          if (sid === "nfl" && ww <= 0) ww = first;
           return {
-            week: w,
+            week: ww,
             hasCard: false,
             gameCount: 0,
             lockLabel: null,
@@ -138,11 +156,13 @@ export default function HomeWeekHero() {
             isOps: isOps(),
             leagueCode: getLeague()?.code || null,
             advancedFromScored: false,
+            needsNflTeam: false,
+            needsPridePick: false,
             lastWeekRecap: null,
           };
         } catch {
           return {
-            week: 1,
+            week: firstSeasonWeek(getLeague()?.sportId || "cfb"),
             hasCard: false,
             gameCount: 0,
             lockLabel: null,
@@ -155,6 +175,8 @@ export default function HomeWeekHero() {
             isOps: isOps(),
             leagueCode: getLeague()?.code || null,
             advancedFromScored: false,
+            needsNflTeam: false,
+            needsPridePick: false,
             lastWeekRecap: null,
           };
         }
@@ -164,30 +186,95 @@ export default function HomeWeekHero() {
     async function load() {
       try {
         // Active week + scored list (cached loaders)
-        const { week, advanced, scored } = await resolvePlayerActiveWeek({
+        const { week: rawWeek, advanced, scored } = await resolvePlayerActiveWeek({
           persistIfOps: true,
         });
         if (cancelled) return;
 
-        // Parallel: card + roster + picks (all hot-path cached)
-        let [card, roster, mine] = await Promise.all([
+        const sport = getLeague()?.sportId || "cfb";
+        // NFL never lives on Week 0 — clamp stale CFB stamps
+        const first = firstSeasonWeek(sport);
+        const week =
+          sport === "nfl" && rawWeek <= 0 ? first : Math.max(first, rawWeek);
+
+        // Parallel: card + roster + picks + NFL allegiance (sport-specific)
+        let needsNflTeam = false;
+        const loads: [
+          ReturnType<typeof loadWeekCard>,
+          ReturnType<typeof loadLeagueRoster>,
+          ReturnType<typeof loadMyPicks>,
+          Promise<boolean>,
+        ] = [
           loadWeekCard(week),
           loadLeagueRoster().catch(() => []),
           loadMyPicks(week).catch(() => null),
-        ]);
+          sport === "nfl"
+            ? import("@/lib/favorite-teams")
+                .then((m) => m.needsNflAllegiance())
+                .catch(() => false)
+            : Promise.resolve(false),
+        ];
+        let [card, roster, mine, nflNeed] = await Promise.all(loads);
+        needsNflTeam = !!nflNeed;
         if (cancelled) return;
 
         // Wrong active-week stamp? Prefer another *published* card (never draft-only)
+        // Never invent a CFB Week 0 card for NFL rooms.
         let liveWeek = week;
         if (!isFormallyPublishedCard(card)) {
           const best = await loadBestAvailableWeekCard(week).catch(() => null);
-          if (best?.card && isFormallyPublishedCard(best.card)) {
+          if (
+            best?.card &&
+            isFormallyPublishedCard(best.card) &&
+            !(sport === "nfl" && best.week <= 0)
+          ) {
             card = best.card;
             liveWeek = best.week;
             mine = await loadMyPicks(liveWeek).catch(() => null);
           } else {
             // Keep local draft out of player "has card" truth
             card = isFormallyPublishedCard(card) ? card : null;
+          }
+        }
+
+        // Pride pick (Crystal Ball / Super Bowl) on opening week only
+        let needsPridePick = false;
+        const league = getLeague();
+        const crystalOn = league?.settings?.crystalBallEnabled !== false;
+        if (
+          !needsNflTeam &&
+          crystalOn &&
+          isCrystalBallOpeningWeek(sport, liveWeek)
+        ) {
+          try {
+            const { peekLocalCrystalBall } = await import(
+              "@/lib/crystal-ball"
+            );
+            const local = peekLocalCrystalBall();
+            // Fail closed: if we cannot confirm sealed, don't invent Make Picks
+            // Prefer cloud when available (async light check)
+            const { createClient, hasSupabaseConfig } = await import(
+              "@/lib/supabase/client"
+            );
+            const session = getSession();
+            if (hasSupabaseConfig() && session?.playerId && session?.leagueId) {
+              const supabase = createClient();
+              const { data, error } = await supabase
+                .from("crystal_ball_picks")
+                .select("user_id")
+                .eq("league_id", session.leagueId)
+                .eq("user_id", session.playerId)
+                .maybeSingle();
+              if (error) {
+                needsPridePick = true; // fail closed: prefer pride pick over false Make Picks
+              } else {
+                needsPridePick = !data;
+              }
+            } else {
+              needsPridePick = !local?.myTeam;
+            }
+          } catch {
+            needsPridePick = true;
           }
         }
 
@@ -216,6 +303,8 @@ export default function HomeWeekHero() {
           isOps: isOps(),
           leagueCode: getLeague()?.code || null,
           advancedFromScored: advanced,
+          needsNflTeam,
+          needsPridePick,
           lastWeekRecap: state?.lastWeekRecap ?? null,
         };
         setState(next);
@@ -363,7 +452,32 @@ export default function HomeWeekHero() {
   let secondaryHref: string | null = null;
   let secondaryLabel = "";
 
-  if (!state.hasCard) {
+  // —— Priority: NFL allegiance → Super Bowl/Crystal Ball → published card / wait ——
+  // Never invent CFB allegiance on NFL; never invent Make Picks without publish.
+  if (!state.isOps && state.needsNflTeam) {
+    eyebrow = "Required · NFL";
+    title = "Pick your NFL team";
+    body =
+      "Your team is who you identify with — not your Super Bowl prediction. Choose a real club before weekly work.";
+    primaryHref = "/declare-allegiance?sport=nfl&next=/";
+    primaryLabel = "Choose NFL Team";
+    primaryClass = "bg-primary text-black hover:opacity-90 shadow-[0_0_24px_rgba(193,18,31,0.35)]";
+    secondaryHref = null;
+  } else if (!state.isOps && state.needsPridePick) {
+    eyebrow = isNfl ? "Super Bowl pride pick" : "Crystal Ball";
+    title = isNfl
+      ? "Make your Super Bowl prediction"
+      : "Lock your Crystal Ball pick";
+    body = isNfl
+      ? "Separate from your NFL team allegiance. Zero points. Do this before weekly picks when pride pick is on."
+      : "Who wins the national title? Zero points. Answer before the opening card freezes.";
+    primaryHref = "/crystal-ball";
+    primaryLabel = isNfl ? "Make Super Bowl Pick" : "Lock Crystal Ball";
+    primaryClass = isNfl
+      ? "bg-primary text-black hover:opacity-90 shadow-[0_0_24px_rgba(193,18,31,0.35)]"
+      : "bg-primary text-black hover:opacity-90 shadow-[0_0_24px_rgba(34,197,94,0.25)]";
+    secondaryHref = null;
+  } else if (!state.hasCard) {
     // Host (commish or deputy): build/publish — never the sarcastic player wait
     if (state.isOps) {
       if (state.isCommish && state.scoredWeeks === 0) {

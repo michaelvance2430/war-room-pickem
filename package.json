@@ -11,7 +11,8 @@
     "start": "next start",
     "lint": "eslint",
     "verify:museum-1a": "node scripts/verify-museum-phase1a.mjs",
-    "verify:postseason-ps1": "npx --yes tsx scripts/verify-postseason-ps1.mjs"
+    "verify:postseason-ps1": "npx --yes tsx scripts/verify-postseason-ps1.mjs",
+    "verify:home-mission": "npx --yes tsx scripts/verify-nfl-cfb-home-mission.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.6.1",

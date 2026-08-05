@@ -614,7 +614,10 @@ export default function Home() {
 
         <SandboxSimBanner />
 
-        {/* Primary job — always paint first on return from Picks */}
+        {/* Allegiance before weekly job (NFL required team · CFB optional declare) */}
+        <HomeAllegianceCard />
+
+        {/* Primary job — published card / wait / lock (never Make Picks without publish) */}
         <HomeWeekHero />
 
         {/* Commissioner: one mission above player destinations — never for pure players */}
@@ -625,9 +628,6 @@ export default function Home() {
 
         {/* Mid-season join — Fair Entry explanation (no point math) */}
         <FairEntryNotice />
-
-        {/* Existing users without CFB allegiance — primary identity job */}
-        <HomeAllegianceCard />
 
         {firstWeekChrome && (
           <p className="text-xs text-muted mb-4 leading-relaxed max-w-xl -mt-1">
