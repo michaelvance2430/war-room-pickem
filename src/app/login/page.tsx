@@ -58,22 +58,24 @@ function LoginPageInner() {
     }
   }, [searchParams]);
 
-  function afterAuthPath(opts?: { isNewSignup?: boolean }): string {
+  /**
+   * Post-auth land. Sport-aware allegiance is required only after the product
+   * knows the league sport (join restore / hub / league-build) — never force
+   * CFB declare as a universal default on signup.
+   */
+  function afterAuthPath(_opts?: { isNewSignup?: boolean }): string {
     const nextRaw = searchParams.get("next");
     const next =
       nextRaw && nextRaw.startsWith("/") && !nextRaw.startsWith("//")
         ? nextRaw
         : null;
     const code = peekPendingJoinCode();
-    const dest =
+    // Invite/join destination first; no-league users go Home → join/start.
+    // Allegiance (NFL or CFB) is gated when that sport becomes active.
+    return (
       next ||
-      (code ? `/join?code=${encodeURIComponent(code)}` : "/");
-
-    // New accounts: declare allegiance first, then invite/join/Home
-    if (opts?.isNewSignup) {
-      return `/declare-allegiance?next=${encodeURIComponent(dest)}`;
-    }
-    return dest;
+      (code ? `/join?code=${encodeURIComponent(code)}` : "/")
+    );
   }
 
   async function handleForgotPassword() {

@@ -632,10 +632,11 @@ function JoinPageInner() {
         typeof league.season_theme_id === "string" && league.season_theme_id
           ? league.season_theme_id
           : "default";
+      // Honor DB flag; NFL/CFB default ON when unset (do not force NFL off).
       const crystalOn =
-        joinedSportId === "nfl"
-          ? false
-          : league.crystal_ball_enabled !== false;
+        typeof league.crystal_ball_enabled === "boolean"
+          ? !!league.crystal_ball_enabled
+          : joinedSportId === "nfl" || joinedSportId === "cfb";
       // Optional league alias after membership exists
       let resolvedName = accountName;
       let override: string | null = null;
@@ -705,7 +706,21 @@ function JoinPageInner() {
         userId
       );
       saveActiveLeagueId(league.id as string);
-      router.push("/");
+
+      // Sport-aware allegiance only after league sport is known; preserve Home.
+      let landPath = "/";
+      try {
+        const {
+          needsAllegianceForSport,
+          declareAllegianceHref,
+        } = await import("@/lib/favorite-teams");
+        if (await needsAllegianceForSport(joinedSportId)) {
+          landPath = declareAllegianceHref(joinedSportId, "/");
+        }
+      } catch {
+        /* Home hub still gates CHOOSE_TEAM / Super Bowl / weekly */
+      }
+      router.push(landPath);
       router.refresh();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Could not join");

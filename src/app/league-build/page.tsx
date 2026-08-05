@@ -240,7 +240,22 @@ function LeagueBuildInner() {
       } catch {
         /* ignore */
       }
-      router.replace("/");
+
+      // Sport-aware allegiance after sport is known (never CFB-by-default).
+      let landPath = "/";
+      try {
+        const sid = league.sportId || sportId || "cfb";
+        const {
+          needsAllegianceForSport,
+          declareAllegianceHref,
+        } = await import("@/lib/favorite-teams");
+        if (await needsAllegianceForSport(sid)) {
+          landPath = declareAllegianceHref(sid, "/");
+        }
+      } catch {
+        /* Home still shows CHOOSE_TEAM when needed */
+      }
+      router.replace(landPath);
       router.refresh();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Could not save league build");

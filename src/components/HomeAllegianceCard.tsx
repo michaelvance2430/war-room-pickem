@@ -80,7 +80,7 @@ export default function HomeAllegianceCard() {
   const isNfl = sportId === "nfl";
   const href = isNfl
     ? "/declare-allegiance?sport=nfl&next=/"
-    : "/declare-allegiance?next=/";
+    : "/declare-allegiance?sport=cfb&next=/";
 
   return (
     <div className="mb-5 rounded-2xl border-2 border-primary/50 bg-primary/10 p-5 shadow-[0_0_32px_rgba(34,197,94,0.2)]">

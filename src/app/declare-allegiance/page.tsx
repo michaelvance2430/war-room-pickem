@@ -33,8 +33,10 @@ function DeclareInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const sportRaw = searchParams.get("sport");
-  const sportId = (normalizeSportId(sportRaw || "cfb") || "cfb") as SportId;
+  // Require explicit sport — never invent CFB as a universal default.
+  const sportId = (normalizeSportId(sportRaw || "") || "") as SportId | "";
   const isNfl = sportId === "nfl";
+  const sportKnown = sportId === "nfl" || sportId === "cfb";
 
   const [checking, setChecking] = useState(true);
   const [choice, setChoice] = useState<Choice>(null);
@@ -64,6 +66,11 @@ function DeclareInner() {
         router.replace("/login");
         return;
       }
+      // No sport context → join/home; do not force CFB allegiance.
+      if (!sportKnown) {
+        continueNext();
+        return;
+      }
       try {
         const supabase = createClient();
         const { data } = await supabase.auth.getUser();
@@ -71,7 +78,7 @@ function DeclareInner() {
           router.replace("/login?mode=signup");
           return;
         }
-        const existing = await getMyFavoriteTeamId(sportId);
+        const existing = await getMyFavoriteTeamId(sportId as SportId);
         if (cancelled) return;
         // CFB: any row (team or no-team) skips. NFL: real catalog team only.
         const done = isNfl
@@ -90,10 +97,10 @@ function DeclareInner() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sport from URL
-  }, [router, sportId, isNfl]);
+  }, [router, sportId, isNfl, sportKnown]);
 
   async function confirm() {
-    if (!choice || busy) return;
+    if (!choice || busy || !sportKnown) return;
     if (isNfl && choice.kind !== "team") {
       setError("Pick an NFL team you ride with.");
       return;
@@ -101,7 +108,7 @@ function DeclareInner() {
     setBusy(true);
     setError(null);
     const teamId = choice.kind === "no-team" ? NO_TEAM_ID : choice.team.id;
-    const res = await setMyFavoriteTeam(sportId, teamId);
+    const res = await setMyFavoriteTeam(sportId as SportId, teamId);
     setBusy(false);
     if (!res.ok) {
       setError(res.error || "Could not save.");
@@ -197,7 +204,7 @@ function DeclareInner() {
             )}
 
             <TeamAllegiancePicker
-              sportId={sportId}
+              sportId={sportId as SportId}
               selectedId={selectedTeam?.id ?? null}
               onSelect={(team) => setChoice({ kind: "team", team })}
             />

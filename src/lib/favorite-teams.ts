@@ -288,7 +288,8 @@ export async function hasNflAllegiance(): Promise<boolean> {
 export async function needsAllegianceForSport(
   sportId: SportId | string | null | undefined
 ): Promise<boolean> {
-  const sid = (sportId || "cfb").toString();
+  const sid = (sportId || "").toString();
+  // Unknown / missing sport → no allegiance gate (do not invent CFB).
   if (sid === "nfl") return needsNflAllegiance();
   if (sid === "cfb") return needsCfbAllegiance();
   return false;
@@ -300,4 +301,22 @@ export function safeNextPath(raw: string | null | undefined): string {
   if (!t.startsWith("/") || t.startsWith("//")) return "/";
   if (t.includes("://")) return "/";
   return t;
+}
+
+/**
+ * Sport-aware declare URL. Only call when sport context is known.
+ * Never invents CFB merely because it was the first supported sport.
+ * Preserves the post-allegiance return destination (join/home/league).
+ */
+export function declareAllegianceHref(
+  sportId: SportId | string | null | undefined,
+  nextPath: string = "/"
+): string {
+  const sid = (sportId || "").toString().toLowerCase();
+  const next = safeNextPath(nextPath);
+  if (sid !== "nfl" && sid !== "cfb") {
+    // No sport yet — do not force allegiance; stay on intended destination.
+    return next;
+  }
+  return `/declare-allegiance?sport=${encodeURIComponent(sid)}&next=${encodeURIComponent(next)}`;
 }

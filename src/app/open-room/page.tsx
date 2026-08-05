@@ -90,9 +90,24 @@ export default function OpenRoomPage() {
         setPhase("seated");
         setStatusLine(`You’re in · ${res.leagueName}`);
         setShowSwitchOffer(false);
+        const seatedSport = res.sportId || "cfb";
         window.setTimeout(() => {
-          router.push("/");
-          router.refresh();
+          void (async () => {
+            let land = "/";
+            try {
+              const {
+                needsAllegianceForSport,
+                declareAllegianceHref,
+              } = await import("@/lib/favorite-teams");
+              if (await needsAllegianceForSport(seatedSport)) {
+                land = declareAllegianceHref(seatedSport, "/");
+              }
+            } catch {
+              /* Home hub still gates team / Super Bowl / weekly */
+            }
+            router.push(land);
+            router.refresh();
+          })();
         }, 900);
         return;
       }

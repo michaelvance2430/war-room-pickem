@@ -82,6 +82,7 @@ const ACTION_META: Record<
   LOCK_PICKS: { label: "Lock Picks", href: "/picks" },
   CHOOSE_TEAM: {
     label: "Choose Team",
+    // Overridden with ?sport= when resolved for a known league sport
     href: "/declare-allegiance",
   },
   SET_WEEK: { label: "Set Week", href: "/week-ops" },

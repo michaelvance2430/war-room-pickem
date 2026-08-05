@@ -336,9 +336,9 @@ export async function seatPlayerInLeague(opts: {
         displayName: resolvedName,
         displayNameOverride: override,
         crystalBallEnabled:
-          sportId === "nfl"
-            ? false
-            : league.crystal_ball_enabled !== false,
+          typeof league.crystal_ball_enabled === "boolean"
+            ? !!league.crystal_ball_enabled
+            : sportId === "nfl" || sportId === "cfb",
         homeTaglineId: (league.home_tagline_id as string) || "good-teams",
         homeTaglineCustom: (league.home_tagline_custom as string) || "",
         seasonThemeId,
@@ -372,9 +372,9 @@ export async function seatPlayerInLeague(opts: {
           regularSeasonWeeks: 18,
           gamesPerWeek: league.games_per_week ?? 5,
           crystalBallEnabled:
-            sportId === "nfl"
-              ? false
-              : league.crystal_ball_enabled !== false,
+            typeof league.crystal_ball_enabled === "boolean"
+              ? !!league.crystal_ball_enabled
+              : sportId === "nfl" || sportId === "cfb",
           homeTaglineId: league.home_tagline_id || "good-teams",
           homeTaglineCustom: league.home_tagline_custom || "",
           seasonThemeId,
