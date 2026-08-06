@@ -1,5 +1,15 @@
 /**
  * Cross-sport player pool: ask the room “want [sport]?” → spin a new league for yeses.
+ *
+ * D1B-B AUTHORITY (app cutover phase):
+ * - This is NOT an ordinary player join path.
+ * - spinUpLeagueFromPoll still uses direct leagues + multi-user membership INSERT
+ *   for privileged commissioner seating of opted-in humans (and optional new commish).
+ * - Do NOT route this through join_league_by_code / join_open_league_by_id.
+ * - Do NOT expose privileged multi-seat parameters on ordinary create/join RPCs.
+ * - Target: narrow SECURITY DEFINER RPC e.g. spin_up_sport_pool_league
+ *   (auth = poll commissioner; seats only yes-voters + host; server-forced roles).
+ * - See docs/D1B-B-APP-CUTOVER.md § sport-pool.
  */
 
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
@@ -362,6 +372,10 @@ export async function myVoteForPoll(
 
 /**
  * One-click: create target-sport league, seat all yeses (+ host), optional new commissioner.
+ */
+/**
+ * Privileged multi-seat create — not D1B-B ordinary human create/join.
+ * Remains client INSERT until a dedicated DEFINER path is authorized.
  */
 export async function spinUpLeagueFromPoll(opts: {
   pollId: string;

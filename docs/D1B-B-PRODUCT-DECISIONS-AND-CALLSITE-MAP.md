@@ -1,9 +1,10 @@
 # D1B-B — Product decisions locked · Call-site map · RPC contracts · Phased transitions
 
-**Status:** **B1–B6 LOCKED / REVIEW-ONLY ARCHITECTURE / NOT REPAIRED / NO PRODUCTION SQL**  
+**Status:** **B1–B6 LOCKED / APP CUTOVER IN PROGRESS / DATABASE PACKAGE PASS / PRODUCTION UNCHANGED / NOT YET REPAIRED**  
 **Date:** 2026-08-06  
 **Live preflight:** `docs/D1B-B-PREFLIGHT-AND-DESIGN-SCOPE.md` §0  
 **Architecture:** `docs/D1B-B-MEMBERSHIP-JOIN-AUTHORITY.md`  
+**App cutover:** `docs/D1B-B-APP-CUTOVER.md` (authoritative before/after map for this phase)  
 
 ### Explicit non-actions (this package)
 
@@ -86,16 +87,16 @@ A committed league must never lack its commissioner seat.
 2. Complete static app call-site map                ✅ this document
 3. Design RPC signatures, errors, grants, concurrency, rollback  ✅ §3–§5
 4. Author REVIEW-ONLY SQL only                      ✅ `supabase/review-only/D1B-B/` · `docs/D1B-B-REVIEW-ONLY-SQL-PACKAGE.md`
-5. Source and unit verification                     ⏳
-6. Apply RPCs while legacy client paths remain      ⏳ separate auth
-7. Deploy app create/join via RPCs                  ⏳
-8. Disposable-identity behavioral tests             ⏳
+5. Source and unit verification                     ⏳ disposable app still required
+6. Apply RPCs while legacy client paths remain      ⏳ separate auth (prod SQL)
+7. App create/join/open via RPCs in repo            ✅ code cutover (not prod deploy)
+8. Disposable-identity behavioral tests             ⏳ app E2E pending
 9. Confirm production traffic uses RPCs             ⏳
-10. Remove direct membership INSERT                 ⏳
+10. Remove direct membership INSERT                 ⏳ never until 07 auth
 11. Post-verify create/join/rejoin                  ⏳
 12. Replace broad membership UPDATE                 ⏳
-13. Cut over safe league discovery                  ⏳
-14. Tighten league-code visibility                  ⏳
+13. Cut over safe league discovery                  ✅ app list_open (no codes)
+14. Tighten league-code visibility (DB SELECT)      ⏳ after all readers mapped
 15. Re-run structural + behavioral verification     ⏳
 ```
 

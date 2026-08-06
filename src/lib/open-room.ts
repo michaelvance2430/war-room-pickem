@@ -1,27 +1,35 @@
 /**
  * Open-room matchmaking — fill one public league at a time, then the next.
  * Commissioners list rooms with is_open; lobby seats people FIFO into the fullest open room.
+ *
+ * D1B-B: discovery and seating go through list_open_leagues_public +
+ * join_open_league_by_id. Public listings never include join codes (B3).
  */
 
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import {
   MAX_LEAGUE_PLAYERS,
-  isLeagueFull,
   leagueFullMessage,
-  seatsRemaining,
 } from "@/lib/league-limits";
 import { applySportTheme } from "@/lib/sports/sport-theme";
+import {
+  fetchLeagueRowForMember,
+  joinOpenLeagueById,
+  listOpenLeaguesPublic,
+} from "@/lib/d1b-b-membership";
 
+/**
+ * Public open-room card — no join code, no commissioner id (B3 / R5).
+ */
 export type OpenRoomListing = {
   id: string;
   name: string;
-  code: string;
   sportId: string;
-  commissionerId: string;
   memberCount: number;
   seatsLeft: number;
   openListedAt: string | null;
   createdAt: string;
+  maxHumanMembers: number;
 };
 
 /** How long to wait before offering “try a different open league?” */
@@ -37,6 +45,7 @@ export function openRoomsSqlMissingMessage(): string {
 /**
  * List open leagues that still have seats.
  * Prefer fullest rooms first (finish a room fast), then oldest listing.
+ * Codes are never returned (D1B-B B3).
  */
 export async function listOpenRooms(opts?: {
   /** Skip these league ids (already tried / full / user declined) */
@@ -46,69 +55,49 @@ export async function listOpenRooms(opts?: {
   rooms: OpenRoomListing[];
   error?: string;
   sqlMissing?: boolean;
+  rpcMissing?: boolean;
 }> {
   if (!hasSupabaseConfig()) {
     return { rooms: [], error: "Supabase is not configured." };
   }
-  const supabase = createClient();
-  let q = supabase
-    .from("leagues")
-    .select(
-      "id, name, code, sport_id, commissioner_id, created_at, is_open, open_listed_at"
-    )
-    .eq("is_open", true);
 
-  if (opts?.sportId && opts.sportId !== "any") {
-    q = q.eq("sport_id", opts.sportId);
-  }
+  const listed = await listOpenLeaguesPublic({
+    sportId: opts?.sportId,
+    limit: 40,
+  });
 
-  const { data, error } = await q.limit(40);
-  if (error) {
-    if (/is_open|open_listed|column/i.test(error.message || "")) {
+  if (!listed.ok) {
+    if (listed.rpcMissing) {
+      return {
+        rooms: [],
+        error: listed.message,
+        rpcMissing: true,
+        sqlMissing: true,
+      };
+    }
+    if (/is_open|open_listed|column/i.test(listed.message || "")) {
       return {
         rooms: [],
         error: openRoomsSqlMissingMessage(),
         sqlMissing: true,
       };
     }
-    return { rooms: [], error: error.message };
+    return { rooms: [], error: listed.message };
   }
 
   const exclude = new Set(opts?.excludeIds || []);
-  const rows = (data || []).filter(
-    (r) => r && !exclude.has((r as { id: string }).id)
-  );
-
-  const rooms: OpenRoomListing[] = [];
-  for (const raw of rows) {
-    const r = raw as {
-      id: string;
-      name: string;
-      code: string;
-      sport_id?: string;
-      commissioner_id: string;
-      created_at: string;
-      open_listed_at?: string | null;
-    };
-    const { count, error: cErr } = await supabase
-      .from("memberships")
-      .select("id", { count: "exact", head: true })
-      .eq("league_id", r.id);
-    if (cErr) continue;
-    const memberCount = count ?? 0;
-    if (isLeagueFull(memberCount)) continue;
-    rooms.push({
+  const rooms: OpenRoomListing[] = listed.rooms
+    .filter((r) => r && !exclude.has(r.id) && r.seatsLeft > 0)
+    .map((r) => ({
       id: r.id,
       name: r.name || "War Room",
-      code: r.code,
-      sportId: r.sport_id || "cfb",
-      commissionerId: r.commissioner_id,
-      memberCount,
-      seatsLeft: seatsRemaining(memberCount),
-      openListedAt: r.open_listed_at || null,
-      createdAt: r.created_at,
-    });
-  }
+      sportId: r.sportId || "cfb",
+      memberCount: r.humanCount,
+      seatsLeft: r.seatsLeft,
+      openListedAt: r.openListedAt,
+      createdAt: r.createdAt,
+      maxHumanMembers: r.maxHumanMembers || MAX_LEAGUE_PLAYERS,
+    }));
 
   // Fill one room at a time: highest occupancy first, then oldest listing
   rooms.sort((a, b) => {
@@ -121,22 +110,9 @@ export async function listOpenRooms(opts?: {
   return { rooms };
 }
 
-function leastPopulatedDivision(
-  counts: Record<string, number>
-): "North" | "South" | "East" | "West" {
-  let division: "North" | "South" | "East" | "West" = "North";
-  let best = Infinity;
-  for (const d of ["North", "South", "East", "West"] as const) {
-    if ((counts[d] || 0) < best) {
-      best = counts[d] || 0;
-      division = d;
-    }
-  }
-  return division;
-}
-
 /**
- * Seat one player into a league. Returns full:true if no seat (friendly message).
+ * Seat one player into an open league via join_open_league_by_id.
+ * No direct membership INSERT. Fair Entry + first-join run inside the RPC.
  */
 export async function seatPlayerInLeague(opts: {
   leagueId: string;
@@ -167,107 +143,83 @@ export async function seatPlayerInLeague(opts: {
   const accountName =
     (profRow?.display_name as string)?.trim() || "Player";
 
-  const { data: league, error: lErr } = await supabase
-    .from("leagues")
-    .select(
-      "id, name, code, commissioner_id, created_at, cut_percent, games_per_week, crystal_ball_enabled, home_tagline_id, home_tagline_custom, season_theme_id, sport_id, is_open"
-    )
-    .eq("id", leagueId)
-    .maybeSingle();
-
-  if (lErr || !league) {
-    return {
-      ok: false,
-      error: lErr?.message || "That room vanished. Try another open league.",
-    };
+  const joinRes = await joinOpenLeagueById(leagueId);
+  if (!joinRes.ok) {
+    if (joinRes.code === "league_full") {
+      return { ok: false, full: true, error: joinRes.message };
+    }
+    if (joinRes.code === "not_open" || joinRes.code === "not_found") {
+      return { ok: false, full: true, error: joinRes.message };
+    }
+    return { ok: false, error: joinRes.message };
   }
 
-  const { data: existingMem } = await supabase
-    .from("memberships")
-    .select("id")
-    .eq("league_id", league.id)
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (!existingMem) {
-    const { count, error: countErr } = await supabase
-      .from("memberships")
-      .select("id", { count: "exact", head: true })
-      .eq("league_id", league.id);
-    if (countErr) return { ok: false, error: countErr.message };
-    if (isLeagueFull(count ?? 0)) {
-      // Auto-unlist when full so lobby doesn’t keep pointing here
-      try {
-        await supabase
-          .from("leagues")
-          .update({ is_open: false })
-          .eq("id", league.id)
-          .eq("is_open", true);
-      } catch {
-        /* best-effort */
-      }
-      return {
-        ok: false,
-        full: true,
-        error: leagueFullMessage(count ?? MAX_LEAGUE_PLAYERS),
-      };
-    }
-
-    const { data: divRows } = await supabase
-      .from("memberships")
-      .select("division")
-      .eq("league_id", league.id);
-    const counts = { North: 0, South: 0, East: 0, West: 0 } as Record<
-      string,
-      number
-    >;
-    for (const row of divRows || []) {
-      const d = (row as { division?: string }).division || "North";
-      counts[d] = (counts[d] || 0) + 1;
-    }
-    const division = leastPopulatedDivision(counts);
-
-    // Fair Entry: mid-season placement (frozen band), not raw 0.
-    let startPts = 0;
+  // Fair Entry notice only — points already applied server-side
+  const startPts = joinRes.totalPoints ?? 0;
+  if (startPts > 0 && !joinRes.alreadyMember) {
     try {
-      const { resolveFairEntryForJoin, markFairEntryPendingNotice } =
+      const { markFairEntryPendingNotice, bandForLatestScoredWeek } =
         await import("@/lib/fair-entry");
-      const fe = await resolveFairEntryForJoin(league.id as string);
-      startPts = fe.midSeason ? fe.points : 0;
-      if (startPts > 0 && fe.band) {
-        markFairEntryPendingNotice(league.id as string, userId, {
+      const { listScoredWeekNumbers } = await import("@/lib/cloud");
+      const scored = await listScoredWeekNumbers();
+      const latest =
+        scored.length > 0 ? Math.max(...scored.filter((w) => w >= 0)) : null;
+      const band = bandForLatestScoredWeek(latest);
+      if (band) {
+        markFairEntryPendingNotice(leagueId, userId, {
           points: startPts,
-          bandId: fe.band.id,
+          bandId: band.id,
         });
       }
     } catch {
-      startPts = 0;
-    }
-    const { error: memError } = await supabase.from("memberships").insert({
-      league_id: league.id,
-      user_id: userId,
-      role: "player",
-      division,
-      total_points: startPts,
-      weeks_played: 0,
-    });
-    if (memError) {
-      if (/full|max 32|check_violation|duplicate|unique/i.test(memError.message || "")) {
-        return {
-          ok: false,
-          full: true,
-          error: leagueFullMessage(),
-        };
-      }
-      return { ok: false, error: memError.message };
-    }
-    try {
-      const { recordLeagueFirstJoin } = await import("@/lib/cloud");
-      await recordLeagueFirstJoin(league.id);
-    } catch {
-      /* optional */
+      /* notice is optional chrome */
     }
   }
+
+  // Member-scoped hydrate (code OK for own league session / invite — not discovery)
+  const fetched = await fetchLeagueRowForMember(leagueId);
+  if (!fetched.ok) {
+    // Seated but hydrate failed — still success with RPC payload
+    const sportId = joinRes.sportId || "cfb";
+    try {
+      const { writeSessionAndLeague, saveActiveLeagueId } = await import(
+        "@/lib/session-restore"
+      );
+      writeSessionAndLeague(
+        {
+          leagueId,
+          leagueName: joinRes.name || "War Room",
+          code: "",
+          commissionerId: "",
+          createdAt: "",
+          cutPercent: 50,
+          regularSeasonWeeks: 18,
+          gamesPerWeek: 5,
+          role: "player",
+          displayName: accountName,
+          displayNameOverride: null,
+          crystalBallEnabled: sportId === "nfl" || sportId === "cfb",
+          homeTaglineId: "good-teams",
+          homeTaglineCustom: "",
+          seasonThemeId: "default",
+          sportId,
+          isOpen: true,
+        },
+        userId
+      );
+      saveActiveLeagueId(leagueId);
+    } catch {
+      /* best-effort */
+    }
+    return {
+      ok: true,
+      leagueName: joinRes.name || "War Room",
+      code: "",
+      sportId,
+    };
+  }
+
+  const league = fetched.row;
 
   // Optional per-league alias after membership exists
   let resolvedName = accountName;
@@ -278,10 +230,7 @@ export async function seatPlayerInLeague(opts: {
       const { setMyLeagueDisplayName } = await import(
         "@/lib/league-display-name"
       );
-      const aliasRes = await setMyLeagueDisplayName(
-        league.id as string,
-        nick
-      );
+      const aliasRes = await setMyLeagueDisplayName(leagueId, nick);
       if (aliasRes.ok) {
         resolvedName = aliasRes.resolved;
         override = aliasRes.override;
@@ -294,7 +243,7 @@ export async function seatPlayerInLeague(opts: {
       const { data: mem } = await supabase
         .from("memberships")
         .select("display_name_override")
-        .eq("league_id", league.id)
+        .eq("league_id", leagueId)
         .eq("user_id", userId)
         .maybeSingle();
       const { resolveLeagueDisplayName } = await import("./display-name");
@@ -311,11 +260,13 @@ export async function seatPlayerInLeague(opts: {
   }
 
   const sportId =
-    (league as { sport_id?: string }).sport_id || "cfb";
+    (league.sport_id as string) || joinRes.sportId || "cfb";
   const seasonThemeId =
     typeof league.season_theme_id === "string" && league.season_theme_id
-      ? league.season_theme_id
+      ? (league.season_theme_id as string)
       : "default";
+  const leagueCode = (league.code as string) || "";
+  const commissionerId = (league.commissioner_id as string) || "";
 
   try {
     const { writeSessionAndLeague, saveActiveLeagueId } = await import(
@@ -324,15 +275,14 @@ export async function seatPlayerInLeague(opts: {
     writeSessionAndLeague(
       {
         leagueId: league.id as string,
-        leagueName: (league.name as string) || "War Room",
-        code: (league.code as string) || "",
-        commissionerId: league.commissioner_id as string,
+        leagueName: (league.name as string) || joinRes.name || "War Room",
+        code: leagueCode,
+        commissionerId,
         createdAt: (league.created_at as string) || "",
         cutPercent: (league.cut_percent as number) ?? 50,
         regularSeasonWeeks: 18,
         gamesPerWeek: (league.games_per_week as number) ?? 5,
-        role:
-          league.commissioner_id === userId ? "commissioner" : "player",
+        role: commissionerId === userId ? "commissioner" : "player",
         displayName: resolvedName,
         displayNameOverride: override,
         crystalBallEnabled:
@@ -354,7 +304,7 @@ export async function seatPlayerInLeague(opts: {
       JSON.stringify({
         playerId: userId,
         playerName: resolvedName,
-        isCommissioner: league.commissioner_id === userId,
+        isCommissioner: commissionerId === userId,
         leagueId: league.id,
       })
     );
@@ -363,8 +313,8 @@ export async function seatPlayerInLeague(opts: {
       JSON.stringify({
         id: league.id,
         name: league.name,
-        code: league.code,
-        commissionerId: league.commissioner_id,
+        code: leagueCode,
+        commissionerId,
         createdAt: league.created_at,
         sportId,
         settings: {
@@ -396,8 +346,8 @@ export async function seatPlayerInLeague(opts: {
 
   return {
     ok: true,
-    leagueName: league.name,
-    code: league.code,
+    leagueName: (league.name as string) || joinRes.name || "War Room",
+    code: leagueCode,
     sportId,
   };
 }
@@ -426,7 +376,7 @@ export async function claimNextOpenSeat(opts: {
     excludeIds: opts.excludeIds,
     sportId: opts.sportId,
   });
-  if (listed.error && listed.sqlMissing) {
+  if (listed.error && (listed.sqlMissing || listed.rpcMissing)) {
     return { status: "error", error: listed.error };
   }
   if (listed.error) {
@@ -460,10 +410,8 @@ export async function claimNextOpenSeat(opts: {
       };
     }
     if (res.full) {
-      // Next room in the list
       continue;
     }
-    // Hard error on this room — keep trying others
     continue;
   }
 
@@ -503,3 +451,6 @@ export async function setLeagueOpenListing(
   }
   return { ok: true };
 }
+
+/** Re-export for callers that still import full-message helper from this module path */
+export { leagueFullMessage };

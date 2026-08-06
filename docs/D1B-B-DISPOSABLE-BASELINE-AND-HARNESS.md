@@ -1,21 +1,24 @@
 # D1B-B — Disposable baseline, JWT harness, and readiness
 
-**Status:** **DISPOSABLE RUN 2 SEQUENTIAL PASS** / **CONCURRENCY PENDING** / **APP CUTOVER PENDING** / **PRODUCTION NOT AUTHORIZED** / **NOT REPAIRED**  
+**Status:** **DISPOSABLE APP E2E PASS (A1–A12)** / **DATABASE PACKAGE PASS** / **GENUINE TWO-SESSION FINAL-SEAT RACE PASS** / **SPORT-POOL CUTOVER PENDING** / **PRODUCTION UNCHANGED** / **FILE 07 NOT AUTHORIZED** / **NOT YET REPAIRED**  
 **Date:** 2026-08-06  
 **Package commit:** `20cfd5c`  
 **Run 1 archive:** `docs/D1B-B-DISPOSABLE-RUN-1-EVIDENCE.md`  
-**Run 2 archive:** `docs/D1B-B-DISPOSABLE-RUN-2-EVIDENCE.md`
+**Run 2 archive:** `docs/D1B-B-DISPOSABLE-RUN-2-EVIDENCE.md`  
+**Run 3 archive:** `docs/D1B-B-DISPOSABLE-RUN-3-FINAL-SEAT-RACE-EVIDENCE.md`  
+**App cutover:** `docs/D1B-B-APP-CUTOVER.md`
 
 ### Classification
 
 ```text
 D1B-B:
-DISPOSABLE RUN 2 SEQUENTIAL PASS /
-36 PASS / 0 FAIL / 0 ERROR /
-TRUE TWO-SESSION FINAL-SEAT RACE NOT_RUN /
-CONCURRENCY BEHAVIORAL TEST PENDING /
-APP CUTOVER PENDING /
-PRODUCTION NOT AUTHORIZED / NOT REPAIRED
+APP CUTOVER IN PROGRESS /
+DATABASE PACKAGE PASS /
+36 SEQUENTIAL PASS /
+GENUINE TWO-SESSION FINAL-SEAT RACE PASS /
+PRODUCTION UNCHANGED /
+FILE 07 NOT AUTHORIZED /
+NOT YET REPAIRED
 ```
 
 Related parking lot: `docs/DATABASE-SCHEMA-REPRODUCIBILITY-DEFECT.md`
@@ -106,7 +109,8 @@ If 00 aborts on auth.uid: inspect platform definition; do not replace it.
 | Run 1 full harness | **PARTIAL** — 15 PASS, FE blocked (archived) |
 | Run 2 full harness | **SEQUENTIAL PASS** — 36 PASS · 0 FAIL · 0 ERROR · 1 NOT_RUN (`RACE-final-seat`) |
 | Run 2 rollback + branch delete | **PASS** · billing stopped |
-| Two-session final-seat race | **NOT_RUN** (required before prod) |
+| Run 3 genuine two-session final-seat race | **PASS** — no oversubscription · `league_full` loser · branch deleted |
+| Two-session final-seat race | **PASS** (Run 3) |
 
 ---
 
@@ -114,13 +118,14 @@ If 00 aborts on auth.uid: inspect platform definition; do not replace it.
 
 ```text
 SQL PACKAGE: structurally/sequentially sound (Run 2 sequential PASS)
-PRODUCTION: NOT AUTHORIZED / NOT REPAIRED
+CONCURRENCY: genuine two-session final-seat race PASS (Run 3)
+APP CUTOVER: IN PROGRESS (ordinary create/join/open → RPCs in repo)
+PRODUCTION: UNCHANGED / NOT AUTHORIZED / NOT YET REPAIRED
 NEXT GATES:
-  1. Genuine two-session last-seat concurrency on disposable
-  2. App cutover (open-room code privacy · sport-pool seating)
-  3. Season-reset / FE freeze lifecycle
-  4. Staged production proposal + explicit Mike auth per stage
-  5. Never apply file 07 before RPC + app cutover readiness
+  1. Disposable application verification (docs/D1B-B-APP-CUTOVER.md §7)
+  2. Sport-pool privileged RPC (design only until authorized)
+  3. Staged production SQL 01–06 + app deploy — explicit Mike auth each stage
+  4. Never apply file 07 before RPC + app cutover green
 ```
 
 Do **not** apply to production. Do **not** merge baseline into `supabase/migrations/`.

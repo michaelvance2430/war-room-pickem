@@ -1,0 +1,395 @@
+{
+  "meta": {
+    "startedAt": "2026-08-06T22:17:01.225Z",
+    "branch": {
+      "projectRef": "uihlexzpeofaiipcgynw",
+      "url": "https://uihlexzpeofaiipcgynw.supabase.co",
+      "productionDataCopied": "NO",
+      "parent": "dorhjepugsjpmnuzdzck",
+      "name": "disposable-handoff"
+    },
+    "repoCommit": "c21385f0f044ea55f285a00c66a00c4da911cd39",
+    "network": {
+      "rpcs": [
+        "create_league_with_commissioner_seat",
+        "join_league_by_code",
+        "list_open_leagues_public",
+        "join_open_league_by_id",
+        "d1b_b_definitely_missing_rpc_xyz"
+      ],
+      "inserts": []
+    },
+    "classification": "D1B-B DISPOSABLE APP E2E PASS /\nA1–A12 PASS /\nDATABASE PACKAGE PASS /\nSPORT-POOL CUTOVER PENDING /\nPRODUCTION NOT AUTHORIZED /\nFILE 07 NOT AUTHORIZED /\nNOT YET REPAIRED"
+  },
+  "results": [
+    {
+      "id": "A1",
+      "status": "PASS",
+      "detail": "unauth blocked: permission denied for function create_league_with_commissioner_seat"
+    },
+    {
+      "id": "A2",
+      "status": "PASS",
+      "detail": "league=0f301bb1-215a-4e37-9179-5547b25f68aa code=MWDEKX commissioner pts=0; nav→league-build"
+    },
+    {
+      "id": "A3",
+      "status": "PASS",
+      "detail": "empty_name:rej, long_name:rej, bad_sport:rej, cut_9:rej, cut_76:rej, max_1:rej, max_65:rej"
+    },
+    {
+      "id": "A4",
+      "status": "PASS",
+      "detail": "joined; pts=0; first_join; no leagues SELECT on join path"
+    },
+    {
+      "id": "A5",
+      "status": "PASS",
+      "detail": "safe reject (invalid_code); no mem change"
+    },
+    {
+      "id": "A6",
+      "status": "PASS",
+      "detail": "already_member; no dup; first_joined_at stable"
+    },
+    {
+      "id": "A7",
+      "status": "PASS",
+      "detail": "rooms=1; no code/commissioner_id; invite not in payload"
+    },
+    {
+      "id": "A8",
+      "status": "PASS",
+      "detail": "open join ok; membership+first_join; code omitted"
+    },
+    {
+      "id": "A9",
+      "status": "PASS",
+      "detail": "not_open (not_open)"
+    },
+    {
+      "id": "A10",
+      "status": "PASS",
+      "detail": "league_full; humans=2 max=2"
+    },
+    {
+      "id": "A11",
+      "status": "PASS",
+      "detail": "no ordinary membership/league INSERT; missing RPC errors; runtime insert count=0"
+    },
+    {
+      "id": "A12",
+      "status": "PASS",
+      "detail": "nav contracts; member hydrate can see code; discovery never returns invite code"
+    },
+    {
+      "id": "INTEGRITY",
+      "status": "PASS",
+      "detail": "{\"visibleLeagues\":12,\"visibleMemberships\":19,\"duplicateMembershipsVisible\":0,\"oversubscribedVisible\":0,\"ordinaryLeagueOrMembershipInserts\":0,\"rpcsInvoked\":[\"create_league_with_commissioner_seat\",\"join_league_by_code\",\"list_open_leagues_public\",\"join_open_league_by_id\",\"d1b_b_definitely_missing_rpc_xyz\"]}"
+    },
+    {
+      "id": "SPORT-POOL",
+      "status": "PASS",
+      "detail": "residual privileged multi-seat INSERT unchanged (not executed)"
+    },
+    {
+      "id": "NETWORK",
+      "status": "PASS",
+      "detail": "rpcs=create_league_with_commissioner_seat,join_league_by_code,list_open_leagues_public,join_open_league_by_id,d1b_b_definitely_missing_rpc_xyz league/membership inserts=0"
+    }
+  ],
+  "networkLog": [
+    {
+      "kind": "rpc",
+      "who": "anon",
+      "fn": "create_league_with_commissioner_seat"
+    },
+    {
+      "kind": "rpc",
+      "who": "creator",
+      "fn": "create_league_with_commissioner_seat"
+    },
+    {
+      "kind": "rest",
+      "who": "creator",
+      "table": "memberships",
+      "method": "select"
+    },
+    {
+      "kind": "rest",
+      "who": "creator",
+      "table": "leagues",
+      "method": "select"
+    },
+    {
+      "kind": "rpc",
+      "who": "creator",
+      "fn": "create_league_with_commissioner_seat"
+    },
+    {
+      "kind": "rest",
+      "who": "creator",
+      "table": "leagues",
+      "method": "select"
+    },
+    {
+      "kind": "rest",
+      "who": "creator",
+      "table": "leagues",
+      "method": "select"
+    },
+    {
+      "kind": "rpc",
+      "who": "creator",
+      "fn": "create_league_with_commissioner_seat"
+    },
+    {
+      "kind": "rest",
+      "who": "creator",
+      "table": "leagues",
+      "method": "select"
+    },
+    {
+      "kind": "rest",
+      "who": "creator",
+      "table": "leagues",
+      "method": "select"
+    },
+    {
+      "kind": "rpc",
+      "who": "creator",
+      "fn": "create_league_with_commissioner_seat"
+    },
+    {
+      "kind": "rest",
+      "who": "creator",
+      "table": "leagues",
+      "method": "select"
+    },
+    {
+      "kind": "rest",
+      "who": "creator",
+      "table": "leagues",
+      "method": "select"
+    },
+    {
+      "kind": "rpc",
+      "who": "creator",
+      "fn": "create_league_with_commissioner_seat"
+    },
+    {
+      "kind": "rest",
+      "who": "creator",
+      "table": "leagues",
+      "method": "select"
+    },
+    {
+      "kind": "rest",
+      "who": "creator",
+      "table": "leagues",
+      "method": "select"
+    },
+    {
+      "kind": "rpc",
+      "who": "creator",
+      "fn": "create_league_with_commissioner_seat"
+    },
+    {
+      "kind": "rest",
+      "who": "creator",
+      "table": "leagues",
+      "method": "select"
+    },
+    {
+      "kind": "rest",
+      "who": "creator",
+      "table": "leagues",
+      "method": "select"
+    },
+    {
+      "kind": "rpc",
+      "who": "creator",
+      "fn": "create_league_with_commissioner_seat"
+    },
+    {
+      "kind": "rest",
+      "who": "creator",
+      "table": "leagues",
+      "method": "select"
+    },
+    {
+      "kind": "rest",
+      "who": "creator",
+      "table": "leagues",
+      "method": "select"
+    },
+    {
+      "kind": "rpc",
+      "who": "creator",
+      "fn": "create_league_with_commissioner_seat"
+    },
+    {
+      "kind": "rest",
+      "who": "creator",
+      "table": "leagues",
+      "method": "select"
+    },
+    {
+      "kind": "rpc",
+      "who": "joiner",
+      "fn": "join_league_by_code"
+    },
+    {
+      "kind": "rest",
+      "who": "joiner",
+      "table": "memberships",
+      "method": "select"
+    },
+    {
+      "kind": "rest",
+      "who": "joiner",
+      "table": "league_first_joins",
+      "method": "select"
+    },
+    {
+      "kind": "rest",
+      "who": "third",
+      "table": "memberships",
+      "method": "select"
+    },
+    {
+      "kind": "rpc",
+      "who": "third",
+      "fn": "join_league_by_code"
+    },
+    {
+      "kind": "rest",
+      "who": "third",
+      "table": "memberships",
+      "method": "select"
+    },
+    {
+      "kind": "rest",
+      "who": "joiner",
+      "table": "memberships",
+      "method": "select"
+    },
+    {
+      "kind": "rpc",
+      "who": "joiner",
+      "fn": "join_league_by_code"
+    },
+    {
+      "kind": "rest",
+      "who": "joiner",
+      "table": "memberships",
+      "method": "select"
+    },
+    {
+      "kind": "rest",
+      "who": "joiner",
+      "table": "league_first_joins",
+      "method": "select"
+    },
+    {
+      "kind": "rpc",
+      "who": "creator",
+      "fn": "create_league_with_commissioner_seat"
+    },
+    {
+      "kind": "rpc",
+      "who": "joiner",
+      "fn": "list_open_leagues_public"
+    },
+    {
+      "kind": "rpc",
+      "who": "third",
+      "fn": "join_open_league_by_id"
+    },
+    {
+      "kind": "rest",
+      "who": "third",
+      "table": "memberships",
+      "method": "select"
+    },
+    {
+      "kind": "rest",
+      "who": "third",
+      "table": "league_first_joins",
+      "method": "select"
+    },
+    {
+      "kind": "rpc",
+      "who": "creator",
+      "fn": "create_league_with_commissioner_seat"
+    },
+    {
+      "kind": "rpc",
+      "who": "third",
+      "fn": "join_open_league_by_id"
+    },
+    {
+      "kind": "rpc",
+      "who": "creator",
+      "fn": "create_league_with_commissioner_seat"
+    },
+    {
+      "kind": "rpc",
+      "who": "joiner",
+      "fn": "join_league_by_code"
+    },
+    {
+      "kind": "rpc",
+      "who": "third",
+      "fn": "join_league_by_code"
+    },
+    {
+      "kind": "rest",
+      "who": "creator",
+      "table": "memberships",
+      "method": "select"
+    },
+    {
+      "kind": "rpc",
+      "who": "creator",
+      "fn": "d1b_b_definitely_missing_rpc_xyz"
+    },
+    {
+      "kind": "rest",
+      "who": "third",
+      "table": "leagues",
+      "method": "select"
+    },
+    {
+      "kind": "rpc",
+      "who": "joiner",
+      "fn": "list_open_leagues_public"
+    },
+    {
+      "kind": "rest",
+      "who": "creator",
+      "table": "leagues",
+      "method": "select"
+    },
+    {
+      "kind": "rest",
+      "who": "creator",
+      "table": "memberships",
+      "method": "select"
+    }
+  ],
+  "integrity": {
+    "visibleLeagues": 12,
+    "visibleMemberships": 19,
+    "duplicateMembershipsVisible": 0,
+    "oversubscribedVisible": 0,
+    "ordinaryLeagueOrMembershipInserts": 0,
+    "rpcsInvoked": [
+      "create_league_with_commissioner_seat",
+      "join_league_by_code",
+      "list_open_leagues_public",
+      "join_open_league_by_id",
+      "d1b_b_definitely_missing_rpc_xyz"
+    ]
+  }
+}

@@ -373,6 +373,10 @@ export function dismissFairEntryNotice(leagueId: string, userId: string) {
 
 /**
  * Apply Fair Entry points to a just-inserted membership (or update if 0).
+ *
+ * D1B-B: Ordinary join RPCs set total_points server-side via d1b_b_fair_entry_points.
+ * Do not call this from ordinary create/join-by-code/open-join after cutover.
+ * Retained for sport-pool / legacy privileged seating until those paths migrate.
  */
 export async function applyFairEntryToMembership(opts: {
   leagueId: string;

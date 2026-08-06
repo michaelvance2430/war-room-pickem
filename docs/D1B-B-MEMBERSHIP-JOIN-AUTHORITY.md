@@ -1,10 +1,11 @@
 # D1B-B — Membership join authority
 
-**Status:** **B1–B6 LOCKED / REVIEW-ONLY SQL PACKAGE READY / NO PRODUCTION APPLY / NOT REPAIRED**  
+**Status:** **APP CUTOVER IN PROGRESS / DATABASE PACKAGE PASS / PRODUCTION UNCHANGED / NOT YET REPAIRED**  
 **Apply:** **NOT AUTHORIZED** · **no production apply**  
 **Date:** 2026-08-06  
 
 **Canonical freeze + map:** `docs/D1B-B-PRODUCT-DECISIONS-AND-CALLSITE-MAP.md`  
+**App cutover:** `docs/D1B-B-APP-CUTOVER.md`  
 **REVIEW-ONLY SQL:** `docs/D1B-B-REVIEW-ONLY-SQL-PACKAGE.md` · `supabase/review-only/D1B-B/`  
 **Live preflight:** `docs/D1B-B-PREFLIGHT-AND-DESIGN-SCOPE.md` §0  
 

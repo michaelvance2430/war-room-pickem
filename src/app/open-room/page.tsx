@@ -249,7 +249,7 @@ export default function OpenRoomPage() {
                       {r.name}
                     </span>
       <span className="text-xs text-muted shrink-0 tabular-nums">
-                      {r.memberCount}/{MAX_LEAGUE_PLAYERS}
+                      {r.memberCount}/{r.maxHumanMembers || MAX_LEAGUE_PLAYERS}
                       <span className="text-primary ml-1">
                         · {r.seatsLeft} left
                       </span>

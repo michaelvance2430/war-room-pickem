@@ -71,8 +71,9 @@ Canonical sequence executed:
 | ERROR | **0** |
 | NOT_RUN | **1** (`RACE-final-seat`) |
 
-**Only NOT_RUN:** `RACE-final-seat`  
-**Reason:** Harness is sequential capacity simulation only. Genuine two-session last-seat concurrency remains required before production authorization.
+**Only NOT_RUN (at Run 2 close):** `RACE-final-seat`  
+**Reason at the time:** Harness is sequential capacity simulation only. Genuine two-session last-seat concurrency was still required.  
+**Later closed:** Run 3 — `docs/D1B-B-DISPOSABLE-RUN-3-FINAL-SEAT-RACE-EVIDENCE.md` — **PASS** (no oversubscription).
 
 ### PASS coverage (summary)
 
@@ -183,20 +184,22 @@ Zero rows on the purpose-built disposable baseline. Does **not** establish or ch
 
 ## Remaining gates before production
 
-1. Execute a genuine **two-session** last-seat concurrency test on another disposable branch.  
-2. Archive the concurrency result.  
-3. Complete the application cutover mapping and implementation.  
-4. Remove league-code exposure from open-room discovery.  
-5. Resolve the separate privileged sport-pool seating path.  
-6. Verify season-reset / fair-entry freeze lifecycle.  
-7. Prepare a narrowly staged production proposal.  
-8. Obtain **explicit Mike authorization** for each production stage.  
-9. **Never** apply file 07 before RPC and application cutover readiness.  
+| Gate | Status |
+|------|--------|
+| Genuine two-session last-seat concurrency | **CLOSED** — see Run 3 |
+| Archive concurrency result | **CLOSED** — `docs/D1B-B-DISPOSABLE-RUN-3-FINAL-SEAT-RACE-EVIDENCE.md` |
+| Application cutover | **OPEN** |
+| Open-room code privacy | **OPEN** |
+| Privileged sport-pool seating | **OPEN** |
+| Season-reset / FE freeze lifecycle | **OPEN** |
+| Staged production proposal + Mike auth | **OPEN** |
+| Never apply file 07 before RPC + app cutover | **STILL BINDING** |
 
 ---
 
 ## Related archives
 
 - Run 1 (partial / FE blocked): `docs/D1B-B-DISPOSABLE-RUN-1-EVIDENCE.md`  
+- Run 3 (genuine final-seat race PASS): `docs/D1B-B-DISPOSABLE-RUN-3-FINAL-SEAT-RACE-EVIDENCE.md`  
 - Package / harness readiness: `docs/D1B-B-DISPOSABLE-BASELINE-AND-HARNESS.md`  
 - Schema reproducibility parking lot: `docs/DATABASE-SCHEMA-REPRODUCIBILITY-DEFECT.md`  

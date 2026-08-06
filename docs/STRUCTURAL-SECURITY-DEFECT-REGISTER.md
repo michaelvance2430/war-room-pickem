@@ -89,15 +89,20 @@
 | Field | Value |
 |-------|--------|
 | Severity | **High** — broader than join-only (INSERT privilege injection · row-wide UPDATE · public join codes) |
-| Status | **DISPOSABLE RUN 2 SEQUENTIAL PASS / CONCURRENCY PENDING / APP CUTOVER PENDING / PRODUCTION NOT AUTHORIZED / NOT REPAIRED** |
+| Status | **DISPOSABLE APP E2E PASS (A1–A12) / APP CUTOVER IN REPO / DATABASE PACKAGE PASS / SPORT-POOL CUTOVER PENDING / PRODUCTION UNCHANGED / FILE 07 NOT AUTHORIZED / NOT YET REPAIRED** |
 | Design | `docs/D1B-B-MEMBERSHIP-JOIN-AUTHORITY.md` |
 | Product freeze + map | `docs/D1B-B-PRODUCT-DECISIONS-AND-CALLSITE-MAP.md` |
 | REVIEW-ONLY SQL | `supabase/review-only/D1B-B/` · package commit **20cfd5c** |
 | Run 1 evidence | `docs/D1B-B-DISPOSABLE-RUN-1-EVIDENCE.md` (15 PASS; FE blocked; revised) |
 | Run 2 evidence | `docs/D1B-B-DISPOSABLE-RUN-2-EVIDENCE.md` — **36 PASS · 0 FAIL · 0 ERROR · 1 NOT_RUN** (`RACE-final-seat`) |
 | Run 2 branch | `d1b-b-disposable-run2-20260806` · ref `tnabgofiwountwvkdrhq` · **deleted** · billing stopped |
-| Disposable order | **00 → 00b → 01 → 02 → 02b → 03 → 04 → 05 → 06 → 09** (never 07) · rollback 12 **PASS** |
-| Next | Two-session final-seat concurrency on disposable · app cutover (open-room code privacy · sport-pool seating) · freeze lifecycle · staged prod proposal + Mike auth |
+| Run 3 evidence | `docs/D1B-B-DISPOSABLE-RUN-3-FINAL-SEAT-RACE-EVIDENCE.md` — **RACE-final-seat PASS** · no oversubscription |
+| Run 3 branch | `d1b-b-final-seat-race-20260806` · ref `vuigoqusvmeklyggtagb` · **deleted** · billing stopped |
+| Disposable order | **00 → 00b → 01 → 02 → 02b → 03 → 04 → 05 → 06** (+ 09 on Run 2) · never 07 · rollback 12 **PASS** |
+| App cutover | `docs/D1B-B-APP-CUTOVER.md` — ordinary create/join/open wrappers + flows; sport-pool residual |
+| App E2E harness | `scripts/d1b-b-disposable-app-e2e-anon.mjs` · evidence `docs/D1B-B-DISPOSABLE-APP-E2E-EVIDENCE.md` — **A1–A12 PASS** on branch `uihlexzpeofaiipcgynw` |
+| FE lifecycle | `docs/D1B-B-FAIR-ENTRY-LIFECYCLE.md` — retain freezes; no auto-delete |
+| Next | **Delete disposable branch** (billing) · staged prod SQL **01–06 only** with Mike auth · then app deploy · never 07 until green |
 | Scope exclusion | No live apply · no H-01 · no D1C · never 07 before cutover |
 
 #### D1B-C · achievements visibility

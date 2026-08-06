@@ -3,11 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
-import {
-  MAX_LEAGUE_PLAYERS,
-  isLeagueFull,
-  leagueFullMessage,
-} from "@/lib/league-limits";
+import { MAX_LEAGUE_PLAYERS } from "@/lib/league-limits";
 import Link from "next/link";
 import {
   markHostScreenSeen,
@@ -32,13 +28,11 @@ import {
   saveActiveLeagueId,
   writeSessionAndLeague,
 } from "@/lib/session-restore";
-
-function generateCode(): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let code = "";
-  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
-  return code;
-}
+import {
+  createLeagueWithCommissionerSeat,
+  fetchLeagueRowForMember,
+  joinLeagueByCode,
+} from "@/lib/d1b-b-membership";
 
 function JoinPageInner() {
   const router = useRouter();
@@ -161,7 +155,6 @@ function JoinPageInner() {
     }
     setLoading(true);
     const supabase = createClient();
-    const newCode = generateCode();
     const pack = getSportPack(sportId);
     // UI selection is source of truth — never let a DB default flip NFL → CFB
     const selectedSportId = sportId;
@@ -185,134 +178,30 @@ function JoinPageInner() {
         "@/lib/active-week-storage"
       );
       const openingWeek = resolveNewLeagueOpeningWeek(selectedSportId);
-      const baseRow: Record<string, unknown> = {
+
+      // D1B-B: atomic create + commissioner seat (no direct membership INSERT)
+      const created = await createLeagueWithCommissionerSeat({
         name: room,
-        code: newCode,
-        commissioner_id: userId,
-        current_week: openingWeek,
-      };
-      // Crystal Ball / Super Bowl pride pick — default ON; League Build wizard confirms
-      const withSport: Record<string, unknown> = {
-        ...baseRow,
-        sport_id: selectedSportId,
-        sport_settings: {},
-        crystal_ball_enabled: true,
-        current_week: openingWeek,
-      };
-      if (listAsOpen) {
-        withSport.is_open = true;
-        withSport.open_listed_at = new Date().toISOString();
+        sportId: selectedSportId,
+        listAsOpen,
+        crystalBallEnabled: true,
+        currentWeek: openingWeek,
+      });
+      if (!created.ok) {
+        throw new Error(created.message);
       }
 
-      let league: Record<string, unknown> | null = null;
-      let leagueError: { message?: string } | null = null;
-
-      {
-        const res = await supabase
-          .from("leagues")
-          .insert(withSport)
-          .select()
-          .single();
-        league = res.data as Record<string, unknown> | null;
-        leagueError = res.error;
-      }
-
-      // Retry without open-room columns if those fail (keep sport_id)
-      if (
-        leagueError &&
-        /is_open|open_listed|column|schema cache|PGRST/i.test(
-          leagueError.message || ""
-        )
-      ) {
-        const noOpen = { ...withSport };
-        delete noOpen.is_open;
-        delete noOpen.open_listed_at;
-        const res = await supabase
-          .from("leagues")
-          .insert(noOpen)
-          .select()
-          .single();
-        league = res.data as Record<string, unknown> | null;
-        leagueError = res.error;
-        if (listAsOpen && league?.id && !leagueError) {
-          try {
-            const { setLeagueOpenListing } = await import("@/lib/open-room");
-            await setLeagueOpenListing(league.id as string, true);
-          } catch {
-            /* SQL not run yet */
-          }
-        }
-      }
-
-      // Sport is immutable after INSERT — never create a placeholder row then
-      // UPDATE sport_id. Fail clearly if the sport column is missing.
-      if (
-        leagueError &&
-        /sport_id|sport_settings|column|schema cache|PGRST/i.test(
-          leagueError.message || ""
-        )
-      ) {
+      const leagueId = created.leagueId;
+      const createdSportId = created.sportId || selectedSportId;
+      if (createdSportId !== selectedSportId) {
         throw new Error(
-          "Your database is missing the sport column (or rejected the create insert). Run supabase/sport-id.sql in the Supabase SQL editor, then create the league again. League sport cannot be patched after insert."
+          `Could not create league as ${selectedSportId} (database has "${createdSportId}"). Sport is set only at insert — check leagues.sport_id.`
         );
       }
 
-      if (leagueError || !league) {
-        throw new Error(leagueError?.message || "Could not create league");
-      }
-
-      const leagueId = league.id as string;
-      const createdSportId = selectedSportId;
-
-      // Verify INSERT stored the chosen sport (SELECT only — no sport UPDATE).
-      {
-        const { data: sportRow, error: sportErr } = await supabase
-          .from("leagues")
-          .select("sport_id, current_week, crystal_ball_enabled")
-          .eq("id", leagueId)
-          .maybeSingle();
-        if (
-          sportErr &&
-          /sport_id|column|schema cache|PGRST/i.test(sportErr.message || "")
-        ) {
-          throw new Error(
-            "Your database is missing the sport column. Run supabase/sport-id.sql in the Supabase SQL editor, then create the league again."
-          );
-        }
-        const got =
-          sportRow &&
-          typeof (sportRow as { sport_id?: string }).sport_id === "string"
-            ? String((sportRow as { sport_id: string }).sport_id).trim()
-            : "";
-        if (!got) {
-          throw new Error(
-            "League created without sport_id. Run supabase/sport-id.sql, then try again."
-          );
-        }
-        if (got !== createdSportId) {
-          throw new Error(
-            `Could not create league as ${createdSportId} (database has "${got}"). Sport is set only at insert — check leagues.sport_id.`
-          );
-        }
-        league = {
-          ...league,
-          sport_id: createdSportId,
-          crystal_ball_enabled:
-            typeof (sportRow as { crystal_ball_enabled?: boolean })
-              ?.crystal_ball_enabled === "boolean"
-              ? !!(sportRow as { crystal_ball_enabled?: boolean })
-                  .crystal_ball_enabled
-              : true,
-        };
-      }
-
-      const { error: memError } = await supabase.from("memberships").insert({
-        league_id: leagueId,
-        user_id: userId,
-        role: "commissioner",
-        division: "North",
-      });
-      if (memError) throw memError;
+      // Member-scoped hydrate for session fields not in RPC payload
+      const fetched = await fetchLeagueRowForMember(leagueId);
+      const leagueRow = fetched.ok ? fetched.row : null;
 
       // Optional league alias only (never profiles.display_name)
       let resolvedName = accountName;
@@ -327,7 +216,6 @@ function JoinPageInner() {
             resolvedName = aliasRes.resolved;
             override = aliasRes.override;
           } else {
-            // Keep typed alias for retry; do not mutate global profile
             setError(
               aliasRes.error ||
                 "Room created, but league name could not be saved. Set it in Account."
@@ -344,26 +232,23 @@ function JoinPageInner() {
         });
       }
 
-      try {
-        const { recordLeagueFirstJoin } = await import("@/lib/cloud");
-        await recordLeagueFirstJoin(leagueId);
-      } catch {
-        /* optional until join-order.sql is run */
-      }
+      // first-join stamped inside create RPC (R4) — no client membership INSERT
 
-      // Single write path: session + league + active league id (so home
-      // restore does not bounce back to an older CFB room).
       writeSessionAndLeague(
         {
           leagueId,
-          leagueName: (league.name as string) || room,
-          code: (league.code as string) || newCode,
+          leagueName: created.name || room,
+          code: created.code,
           commissionerId: userId,
-          createdAt: (league.created_at as string) || new Date().toISOString(),
-          cutPercent: (league.cut_percent as number) ?? 50,
+          createdAt:
+            (leagueRow?.created_at as string) || new Date().toISOString(),
+          cutPercent:
+            created.cutPercent ??
+            (leagueRow?.cut_percent as number) ??
+            50,
           regularSeasonWeeks: pack.defaultSeasonWeeks,
           gamesPerWeek:
-            (league.games_per_week as number) ?? pack.defaultGamesPerWeek,
+            (leagueRow?.games_per_week as number) ?? pack.defaultGamesPerWeek,
           role: "commissioner",
           displayName: resolvedName,
           displayNameOverride: override,
@@ -372,7 +257,7 @@ function JoinPageInner() {
           homeTaglineCustom: "",
           seasonThemeId: "default",
           sportId: createdSportId,
-          isOpen: listAsOpen,
+          isOpen: listAsOpen || created.isOpen,
         },
         userId
       );
@@ -390,22 +275,20 @@ function JoinPageInner() {
         /* ignore */
       }
       markLeagueBuildNeeded(leagueId);
-      // Silent Crew + first chapter (no day-one lecture — story at finale)
       try {
         const { ensureCrewForLeague } = await import("@/lib/crew");
         ensureCrewForLeague({
           leagueId,
-          leagueName: (league.name as string) || room,
+          leagueName: created.name || room,
           sportId: createdSportId,
           createdBy: userId,
           foundedAt:
-            (league.created_at as string) || new Date().toISOString(),
+            (leagueRow?.created_at as string) || new Date().toISOString(),
         });
       } catch {
         /* local-first optional */
       }
 
-      // Pin sport BEFORE any cloud rehydrate (mobile race: 1s red then CFB green)
       try {
         const { pinLeagueSport, applySportTheme } = await import(
           "@/lib/sports/sport-theme"
@@ -470,131 +353,58 @@ function JoinPageInner() {
         accountHint ||
         "Player";
 
-      const { data: league, error: findError } = await supabase
-        .from("leagues")
-        .select("*")
-        .eq("code", code.trim().toUpperCase())
-        .single();
-      if (findError || !league) throw new Error("Invalid league code");
-
-      // Already in league → re-enter only (do NOT overwrite division/role)
-      const { data: existingMem } = await supabase
-        .from("memberships")
-        .select("id, role, division")
-        .eq("league_id", league.id)
-        .eq("user_id", userId)
-        .maybeSingle();
-
-      if (existingMem) {
-        // Ensure first-join stamp exists (idempotent)
-        try {
-          const { recordLeagueFirstJoin } = await import("@/lib/cloud");
-          await recordLeagueFirstJoin(league.id);
-        } catch {
-          /* optional */
-        }
+      // D1B-B: join by private code only — no browser code SELECT *, no membership INSERT
+      const joined = await joinLeagueByCode(code);
+      if (!joined.ok) {
+        throw new Error(joined.message);
       }
 
+      const leagueId = joined.leagueId;
+      const fetched = await fetchLeagueRowForMember(leagueId);
+      if (!fetched.ok) {
+        throw new Error(fetched.message);
+      }
+      const league = fetched.row;
+
       const joinedSportId =
-        (league as { sport_id?: string }).sport_id ||
-        (league as { sportId?: string }).sportId ||
+        joined.sportId ||
+        (league.sport_id as string) ||
         "cfb";
       const joinPack = getSportPack(joinedSportId);
 
-      if (!existingMem) {
-        const { count, error: countErr } = await supabase
-          .from("memberships")
-          .select("id", { count: "exact", head: true })
-          .eq("league_id", league.id);
-        if (countErr) throw countErr;
-        if (isLeagueFull(count ?? 0)) {
-          throw new Error(leagueFullMessage(count ?? MAX_LEAGUE_PLAYERS));
-        }
-
-        // Auto-balance: put new players in the least-populated division
-        const { data: divRows } = await supabase
-          .from("memberships")
-          .select("division")
-          .eq("league_id", league.id);
-        const counts = { North: 0, South: 0, East: 0, West: 0 } as Record<
-          string,
-          number
-        >;
-        for (const r of divRows || []) {
-          const d = (r as { division?: string }).division || "North";
-          counts[d] = (counts[d] || 0) + 1;
-        }
-        let division: "North" | "South" | "East" | "West" = "North";
-        let best = Infinity;
-        for (const d of ["North", "South", "East", "West"] as const) {
-          if ((counts[d] || 0) < best) {
-            best = counts[d] || 0;
-            division = d;
-          }
-        }
-
-        // Fair Entry: mid-season joiners start at a frozen band percentile (not 0).
-        let startPts = 0;
+      // Fair Entry notice only — server already wrote total_points inside join RPC
+      const startPts = joined.totalPoints ?? 0;
+      if (startPts > 0 && !joined.alreadyMember) {
         try {
-          const { resolveFairEntryForJoin } = await import("@/lib/fair-entry");
-          const fe = await resolveFairEntryForJoin(league.id as string);
-          startPts = fe.midSeason ? fe.points : 0;
-        } catch {
-          startPts = 0;
-        }
-        const { error: memError } = await supabase.from("memberships").insert({
-          league_id: league.id,
-          user_id: userId,
-          role: "player",
-          division,
-          total_points: startPts,
-          weeks_played: 0,
-        });
-        if (memError) {
-          if (/full|max 32|check_violation/i.test(memError.message || "")) {
-            throw new Error(leagueFullMessage());
+          const { markFairEntryPendingNotice, bandForLatestScoredWeek } =
+            await import("@/lib/fair-entry");
+          const { listScoredWeekNumbers } = await import("@/lib/cloud");
+          const scored = await listScoredWeekNumbers();
+          const latest =
+            scored.length > 0
+              ? Math.max(...scored.filter((w) => w >= 0))
+              : null;
+          const band = bandForLatestScoredWeek(latest);
+          if (band) {
+            markFairEntryPendingNotice(leagueId, userId, {
+              points: startPts,
+              bandId: band.id,
+            });
           }
-          throw memError;
-        }
-        // Permanent first-join stamp — leave/rejoin cannot reset title rank
-        try {
-          const { recordLeagueFirstJoin } = await import("@/lib/cloud");
-          await recordLeagueFirstJoin(league.id);
         } catch {
-          /* optional until join-order.sql is run */
-        }
-        // Notice only — never show the point number
-        if (startPts > 0) {
-          try {
-            const { markFairEntryPendingNotice, bandForLatestScoredWeek } =
-              await import("@/lib/fair-entry");
-            const { listScoredWeekNumbers } = await import("@/lib/cloud");
-            const scored = await listScoredWeekNumbers();
-            const latest =
-              scored.length > 0 ? Math.max(...scored.filter((w) => w >= 0)) : null;
-            const band = bandForLatestScoredWeek(latest);
-            if (band) {
-              markFairEntryPendingNotice(league.id as string, userId, {
-                points: startPts,
-                bandId: band.id,
-              });
-            }
-          } catch {
-            /* ignore */
-          }
+          /* ignore */
         }
       }
-      // Full settings from cloud so season theme paints immediately for joiners
+
       const seasonThemeId =
         typeof league.season_theme_id === "string" && league.season_theme_id
-          ? league.season_theme_id
+          ? (league.season_theme_id as string)
           : "default";
-      // Honor DB flag; NFL/CFB default ON when unset (do not force NFL off).
       const crystalOn =
         typeof league.crystal_ball_enabled === "boolean"
           ? !!league.crystal_ball_enabled
           : joinedSportId === "nfl" || joinedSportId === "cfb";
-      // Optional league alias after membership exists
+
       let resolvedName = accountName;
       let override: string | null = null;
       if (nick) {
@@ -602,10 +412,7 @@ function JoinPageInner() {
           const { setMyLeagueDisplayName } = await import(
             "@/lib/league-display-name"
           );
-          const aliasRes = await setMyLeagueDisplayName(
-            league.id as string,
-            nick
-          );
+          const aliasRes = await setMyLeagueDisplayName(leagueId, nick);
           if (aliasRes.ok) {
             resolvedName = aliasRes.resolved;
             override = aliasRes.override;
@@ -618,7 +425,7 @@ function JoinPageInner() {
           const { data: mem } = await supabase
             .from("memberships")
             .select("display_name_override")
-            .eq("league_id", league.id)
+            .eq("league_id", leagueId)
             .eq("user_id", userId)
             .maybeSingle();
           const { resolveLeagueDisplayName } = await import(
@@ -636,12 +443,14 @@ function JoinPageInner() {
         }
       }
 
+      const commissionerId = (league.commissioner_id as string) || "";
       writeSessionAndLeague(
         {
-          leagueId: league.id as string,
-          leagueName: (league.name as string) || "War Room",
-          code: (league.code as string) || "",
-          commissionerId: league.commissioner_id as string,
+          leagueId,
+          leagueName:
+            (league.name as string) || joined.name || "War Room",
+          code: joined.code || (league.code as string) || "",
+          commissionerId,
           createdAt: (league.created_at as string) || "",
           cutPercent: (league.cut_percent as number) ?? 50,
           regularSeasonWeeks:
@@ -649,8 +458,7 @@ function JoinPageInner() {
             joinPack.defaultSeasonWeeks,
           gamesPerWeek:
             (league.games_per_week as number) ?? joinPack.defaultGamesPerWeek,
-          role:
-            league.commissioner_id === userId ? "commissioner" : "player",
+          role: commissionerId === userId ? "commissioner" : "player",
           displayName: resolvedName,
           displayNameOverride: override,
           crystalBallEnabled: crystalOn,
@@ -658,13 +466,12 @@ function JoinPageInner() {
           homeTaglineCustom: (league.home_tagline_custom as string) || "",
           seasonThemeId,
           sportId: joinedSportId,
-          isOpen: (league as { is_open?: boolean }).is_open === true,
+          isOpen: league.is_open === true,
         },
         userId
       );
-      saveActiveLeagueId(league.id as string);
+      saveActiveLeagueId(leagueId);
 
-      // Sport-aware allegiance only after league sport is known; preserve Home.
       let landPath = "/";
       try {
         const {
