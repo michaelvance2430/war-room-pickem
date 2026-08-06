@@ -1,7 +1,12 @@
 -- =============================================================================
--- D-01 — purge_locker_before authorization + retention — REVIEW ONLY
+-- D-01 — purge_locker_before authorization + retention
 -- =============================================================================
--- DO NOT APPLY without Mike explicit authorization for D-01.
+-- APPLIED 2026-08-06 (operator SQL Editor). Structural post-verify PASS.
+-- Archive: docs/D-01-APPLY-VERIFICATION.md
+-- Status: REPAIRED / STRUCTURALLY VERIFIED / BEHAVIORAL TESTS PENDING
+-- Behavioral T7–T11: not claimed; isolated disposable league only.
+--
+-- Historical header: required Mike explicit authorization for D-01 before apply.
 --
 -- Defect: bulk DELETE of locker_messages trusts caller p_before and allows any
 -- league member. Even staff with p_before = now() can erase recent history.

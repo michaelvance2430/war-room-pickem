@@ -38,14 +38,17 @@ Remaining work is **repair design / apply authorization**, not further catalog d
 
 | Field | Value |
 |-------|--------|
-| Severity | **High** |
-| Type | Authorization defect (authenticated member over-privileged) |
-| Effect | Any league member can delete locker messages older than caller-controlled `p_before`; future timestamp can wipe full Locker history |
-| Evidence | P17 Block 2 |
-| Apply status | **REVIEW ONLY — not authorized** |
+| Severity | Was **High** (member/anon bulk wipe) |
+| Type | Authorization defect (authenticated member over-privileged) + unbounded cutoff |
+| Effect (pre-repair) | Any league member could delete locker messages older than caller-controlled `p_before`; future/`now()` cutoff could wipe history including recent board |
+| Evidence | P17 Block 2 · preflight 2026-08-06 |
+| Status | **REPAIRED / STRUCTURALLY VERIFIED / BEHAVIORAL TESTS PENDING** |
+| Applied | 2026-08-06 via SQL Editor — `docs/D-01-APPLY-VERIFICATION.md` |
+| Live body | `is_league_staff`; `v_boundary = now() - interval '7 days'`; reject newer `p_before`; server-capped cutoff |
+| Live EXECUTE | `authenticated`, `postgres`, `service_role` — **not** `anon` / `PUBLIC` |
+| Behavioral T7–T11 | **PENDING** (isolated disposable league only; not claimed passed) |
 | Design | `docs/D-01-PURGE-LOCKER-BEFORE-REMEDIATION.md` |
-| SQL proposal | `supabase/D-01-purge-locker-before-REVIEW-ONLY.sql` |
-| Intended fix | `is_league_staff` (commissioner OR moderator); **server 7-day retention boundary** (`v_cutoff <= now()-7d`; reject newer `p_before` including `now()`); least-privilege EXECUTE; deny regular members and anonymous |
+| SQL | `supabase/D-01-purge-locker-before-REVIEW-ONLY.sql` |
 
 ### D-02 · `record_easter_egg_find` — achievement integrity
 
@@ -131,7 +134,7 @@ Order balances **blast radius**, **product law**, and **dependency**. No stage r
 | Order | Stage | What | Why this order | Risk if skipped |
 |-------|--------|------|----------------|-----------------|
 | **1** | **D1A** | Drop verified `leagues` DELETE policy only | **CLOSED 2026-08-06: VERIFIED NO-OP / ALREADY ABSENT** — see `docs/D1A-VERIFICATION-NO-OP.md` | N/A (desired state satisfied; this session did not DROP) |
-| **2** | **D-01** | `purge_locker_before` commissioner/moderation-only | Next repair candidate; design REVIEW ONLY | Members can wipe locker history |
+| **2** | **D-01** | `purge_locker_before` staff + 7-day retention | **STRUCTURALLY LIVE 2026-08-06**; behavioral T7–T11 still PENDING | Was: members could wipe locker history |
 | **3** | **D-02** | `record_easter_egg_find` allowlist + trusted fields | Confirmed integrity defect; independent | Fake eggs / milestone fraud |
 | **4** | **D-03** | `record_league_first_join` require membership | Smaller integrity fix; independent | Spoofed first-join rows |
 | **5** | **H-01** | Least-privilege EXECUTE (REVOKE anon/PUBLIC where body is sufficient) | Only after body matrix frozen; easy to break clients/triggers | Over-revoke breaks legit RPC/trigger paths |
