@@ -1,212 +1,146 @@
-# D-02 P6 / P7 — App catalog parity + remove upsert fallback
+# D-02 P6 / P7 — App revision (pending-sync + parity)
 
-**Status:** REVIEW ONLY — **not deployed** · **not pushed as app release** · **not claimed complete**  
-**Depends on:** D-02 SQL **LIVE / STRUCTURALLY VERIFIED**  
-**Does not:** D-03 · D1B · D1C · production SQL · real egg history tests  
-
----
-
-## 1. Goals (Mike-approved direction)
-
-| ID | Goal |
-|----|------|
-| **P7** | Remove direct `easter_egg_finds` upsert fallback; honest RPC failure; local grant may still succeed offline |
-| **P6** | Catalog parity: app 20 IDs ≡ approved seed ≡ D-02 SQL seed; fail on drift |
-| **Behavioral** | Disposable-identity plan for live RPC + direct-insert denial (not executed here) |
+**Status:** REVIEW ONLY — **not merged to main as app release** · **not deployed**  
+**Honesty model:** APPROVED in principle + **required pending-sync revision** (this doc)  
+**Merge/deploy:** **NOT YET** — revise, retest, Mike review  
+**Behavioral live suite:** APPROVE LATER (disposable identity only)
 
 ---
 
-## 2. Proposed code changes (local working tree)
+## 1. Revised sync-state design
 
-### 2.1 Files
+### States per `(userId, discoveryId)`
 
-| File | Change |
+| State | Meaning | `cloudSynced` | Flex | Auto-retry |
+|-------|---------|---------------|------|------------|
+| **Local only** | Local grant; never tried or not enqueued | false | no | no |
+| **Pending** | Valid local grant; temporary cloud failure | false | no | **yes** |
+| **Cloud synced** | RPC `ok` + success | true | only if server flexesInserted &gt; 0 | n/a (cleared pending) |
+| **Permanent rejected** | Server/client reject (Unknown discovery, not catalog) | false | no | **no** |
+
+### Flow
+
+```
+grantDiscovery(local) → always local success if catalog def exists
+       ↓
+syncEasterEggFindToCloud(RPC only; never table upsert)
+       ├─ success → clear pending; maybe cache; maybe flex
+       ├─ temporary fail → enqueue pending (durable)
+       └─ permanent reject → mark permanent_rejected (no forever retry)
+       ↓
+flushPendingEggCloudSyncs(userId) on startup / online / session
+       └─ retry pending only; idempotent RPC
+```
+
+### Never
+
+- Claim cloud success without RPC ok  
+- Dispatch flex without `cloudSynced`  
+- Restore direct-table upsert  
+- Trust/resend player name or total as authority (`p_player_name` fixed dummy / `p_total_eggs: 0`)
+
+---
+
+## 2. Storage key and user-scoping
+
+| Item | Value |
 |------|--------|
-| `src/lib/egg-cloud.ts` | **Rewrite sync path:** no upsert; `cloudSynced`; catalog gate; only cache on success |
-| `src/lib/egg-cloud-sync-core.ts` | **New** pure interpret/gates for tests |
-| `src/lib/easter-egg-db-catalog-seed.ts` | **New** frozen 20-ID approved seed (matches SQL) |
-| `src/lib/easter-eggs.ts` | Flex event only via `shouldDispatchEggFlex` (requires cloudSynced) |
-| `scripts/verify-easter-egg-catalog-parity.mjs` | **New** P6 parity |
-| `scripts/verify-easter-egg-cloud.mjs` | **New** P7 unit/source checks |
-| `package.json` | Optional scripts (not required for review) |
+| **Key** | `warroom-egg-cloud-pending-v1` |
+| **Module** | `src/lib/egg-cloud-pending.ts` |
+| **Shape** | `{ version: 1, byUser: { [userId]: { [discoveryId]: PendingEggEntry } } }` |
+| **User id** | Supabase auth UUID (= session `playerId` / `profiles.id`) |
+| **Scoping** | All reads/writes under `byUser[userId]` |
+| **Account switch** | `prunePendingToUser(activeUserId)` drops other users’ maps |
+| **Logout (optional hard)** | `clearPendingForUser(userId)` |
+| **Stale temporary** | Drop pending if `enqueuedAt` older than **90 days** (`EGG_PENDING_STALE_MS`) |
+| **Permanent** | Kept as `status: "permanent_rejected"` so we don’t re-spam; not in retry list |
 
-### 2.2 Diff summary — `syncEasterEggFindToCloud`
+`PendingEggEntry`: `discoveryId`, `status` (`pending` \| `permanent_rejected`), `enqueuedAt`, `updatedAt`, `attempts`, `lastError?`, `lastReason?`.
 
-**Before (defect / bypass):**
-
-```ts
-if (error) {
-  // Fallback: direct insert if RPC missing but table exists
-  await supabase.from("easter_egg_finds").upsert({ user_id, discovery_id, ... });
-  addCloudEggToCache(uid, discoveryId);
-  return { ok: true }; // false cloud success path
-}
-// also cached even when row.ok === false
-```
-
-**After (proposed):**
-
-```ts
-// Client gate: isApprovedEasterEggId(discoveryId)
-const { data, error } = await supabase.rpc("record_easter_egg_find", { ... });
-const result = interpretRecordEggRpcResponse({ data, error, clientCatalogTotal });
-// only if result.cloudSynced && result.ok → addCloudEggToCache
-// never upsert easter_egg_finds
-return result; // { ok, cloudSynced, found?, total?, flexesInserted?, error?, reason? }
-```
-
-**Deprecated:** `playerName` still optional for call-site compat; sent as `p_player_name` but **server ignores** (D-02). Documented deprecated on opts.
-
-### 2.3 Local vs cloud honesty
-
-| Layer | On RPC failure |
-|-------|----------------|
-| Local `grantDiscovery` | **Still succeeds** (offline / curiosity UX) |
-| Permanent badge local | Unchanged |
-| Cloud cache | **Not** updated |
-| `cloudSynced` | `false` |
-| Flex newspaper dispatch | **Not** fired (`shouldDispatchEggFlex`) |
-| Player-facing “cloud saved” | **Must not** claim success (no UI today claims cloud; keep it that way) |
-
-### 2.4 Upsert fallback removed
-
-Direct client insert is already **denied** by D-02 SQL (`egg_finds_insert_self` dropped). Removing upsert:
-
-- Avoids noisy failing requests  
-- Avoids any future policy re-open becoming a bypass  
-- Aligns app with RPC-only product law  
+Only **approved catalog IDs** may enqueue.
 
 ---
 
-## 3. Tests
+## 3. Retry triggers and error handling
 
-### 3.1 P6 — catalog parity
+### Retry triggers
+
+| Trigger | Where |
+|---------|--------|
+| After temporary sync failure | `applyPendingOutcome` → enqueue |
+| Session / host startup | `EasterEggHost` after quiet delay → `flushPendingEggCloudSyncs` |
+| Browser `online` | `EasterEggHost` listener → flush |
+| Future auth recovery | Call `flushPendingEggCloudSyncs` (same API; host online + startup cover most) |
+
+Single-flight: concurrent flushes share one in-flight promise.
+
+### Temporary vs permanent
+
+| Class | `reason` values | Action |
+|-------|-----------------|--------|
+| **Temporary** | `rpc_error`, `cloud_disabled`, `exception`, `unauthenticated` | Enqueue / keep pending; retry |
+| **Permanent** | `rpc_rejected` (e.g. Unknown discovery), `not_in_catalog`, `not_egg_prefix` | `permanent_rejected`; no auto-retry |
+
+Duplicate RPC after success: server idempotent; pending cleared; safe.
+
+---
+
+## 4. Updated file list (local proposal)
+
+| File | Role |
+|------|------|
+| `src/lib/egg-cloud-pending.ts` | Durable pending store |
+| `src/lib/egg-cloud-sync-core.ts` | Pure interpret + temp/permanent + flex/cache gates |
+| `src/lib/egg-cloud.ts` | RPC-only sync, pending apply, flush |
+| `src/lib/easter-egg-db-catalog-seed.ts` | 20-ID seed for parity |
+| `src/lib/easter-eggs.ts` | Sync without playerName; flex gate |
+| `src/components/EasterEggHost.tsx` | Flush on session + online |
+| `scripts/verify-easter-egg-catalog-parity.mjs` | P6 |
+| `scripts/verify-easter-egg-cloud.mjs` | P7 + pending tests |
+| `package.json` | `verify:egg-catalog`, `verify:egg-cloud`, `verify:eggs`, `verify:predeploy` |
+
+---
+
+## 5. Tests and results (re-run after revision)
 
 ```bash
-node scripts/verify-easter-egg-catalog-parity.mjs
+npm run verify:egg-catalog
+npm run verify:egg-cloud
 ```
 
-Asserts:
+**Expected:** all PASS (catalog 20-way parity; no upsert; pending offline→retry→clear; permanent no retry; user prune; predeploy scripts wired).
 
-1. Seed has exactly 20 unique `egg_*`  
-2. App `id: "egg_*"` set equals seed  
-3. D-02 SQL seed equals seed  
-4. `listEasterEggDefs` still filters passport  
+---
 
-**Run result (local):** see command output when executed in review.
+## 6. Deployment / rollback (when Mike authorizes later)
 
-### 3.2 P7 — unit / source
-
-```bash
-node scripts/verify-easter-egg-cloud.mjs
-```
-
-Covers:
-
-| Case | Expect |
+| Step | Action |
 |------|--------|
-| Valid RPC ok | `ok` + `cloudSynced`; cache allowed |
-| Fake / `ok:false` | not cloudSynced; no cache; no flex |
-| Duplicate (`newFind:false`, `ok:true`) | cloudSynced; no flex if flexesInserted=0 |
-| Server total vs spoofed client total | uses server `total: 20` |
-| RPC transport error | not cloudSynced; no cache; no flex |
-| Source | no `.upsert`; uses RPC; grantDiscovery uses flex gate |
+| 1 | D-02 SQL already LIVE |
+| 2 | Merge app proposal to main (explicit auth) |
+| 3 | `npm run verify:predeploy` must pass before deploy |
+| 4 | Deploy app |
+| 5 | Optional later: disposable behavioral suite |
 
-### 3.3 Integration (optional later)
-
-Mock Supabase client inject — not required for first review if pure core + source asserts pass.
+**Rollback:** revert app commit. Pending key harmless. SQL stays hardened.  
+**Risk:** local eggs without cloud until retry succeeds — correct honesty.
 
 ---
 
-## 4. Deployment impact
+## 7. Disposable behavioral suite (later only)
 
-| Item | Impact |
-|------|--------|
-| Requires D-02 SQL live | **Yes** (already) |
-| Requires app deploy | **Yes** for P7 to take effect in production browsers |
-| Schema / grants | **None** |
-| Existing egg history | **Untouched** |
-| Users offline / RPC down | Local eggs still grant; cloud lags until next successful sync (no automatic retry queue — same as today for failed void promise) |
-| Risk | Slightly more “local-only” finds until reconnect; **correct** vs false cloud success |
-| Rollback | Revert app commit; SQL stays hardened |
-
-**Deploy order (when authorized):**
-
-1. Keep D-02 SQL live (already)  
-2. Land app P6/P7  
-3. Run both verify scripts in CI or pre-merge  
-4. Optional: disposable-identity behavioral suite  
+Unchanged constraints: disposable identity, cleanup after, no real egg history.  
+Run only after this revised app is reviewed/merged.
 
 ---
 
-## 5. Safe behavioral-test plan (live RPC — **not executed**)
+## 8. Mike gates
 
-### Constraints (binding)
-
-- **No** real player accounts with career identity  
-- **No** real league Locker / production conversation history  
-- Prefer **new disposable auth user** created for test, then deleted  
-- Or Mike-reviewed throwaway account with zero sentimental egg history  
-- Stop on unexpected flex newspaper visible to other users (milestones 7/10/20 on disposable only)
-
-### Setup
-
-1. Create disposable Supabase Auth user (email+password or magic link throwaway).  
-2. Confirm profile row exists (`display_name` set to e.g. `D02-Test-Disposable`).  
-3. Sign in as that user only (anon key + user JWT).  
-4. Confirm zero rows in `easter_egg_finds` / flexes for that `user_id` before start.
-
-### Cases
-
-| # | Action | Expect |
-|---|--------|--------|
-| B1 | RPC `egg_lucky_seven` + spoof name/total | `ok:true`; find row; `finder_name` = profile not spoof; `total=20` |
-| B2 | RPC same id again | `newFind:false` or equivalent; still one row |
-| B3 | RPC `egg_not_real_xyz` | `ok:false` / Unknown discovery; no row |
-| B4 | RPC `stamp_cfb_season` | rejected |
-| B5 | Client `insert`/`upsert` into `easter_egg_finds` | **Denied** (RLS) |
-| B6 | Anon JWT call RPC | fail / not authenticated |
-| B7 | App `syncEasterEggFindToCloud` after P7 deploy | `cloudSynced:true` on valid; `false` on fake; no upsert in network tab |
-
-### Teardown
-
-1. Delete disposable user’s finds (only that user_id) — **explicit cleanup auth** if needed  
-2. Delete auth user  
-3. Confirm no flex rows left for that user (or accept orphan flex only if milestones hit — prefer avoid by not granting 7 eggs)
-
-### Authorization
-
-Behavioral suite requires **separate Mike go** after app P7 is approved for deploy. This document does **not** authorize live calls.
+- [ ] Approve pending-sync design + storage key  
+- [ ] Approve merge of local app (still **not** done)  
+- [ ] Deploy after `verify:predeploy`  
+- [ ] Later: disposable live suite  
 
 ---
 
-## 6. Explicit non-goals
-
-- Deploy / production app release  
-- Push app code to `main` without Mike auth  
-- D-03, D1B, D1C  
-- Historical egg cleanup  
-- Removing deprecated RPC params from signature  
-
----
-
-## 7. Mike review checklist
-
-- [ ] Approve P7 app behavior (local grant + honest cloud)  
-- [ ] Approve P6 parity script as merge gate  
-- [ ] Approve optional package.json scripts  
-- [ ] Authorize merge/deploy of app changes  
-- [ ] Later: authorize disposable behavioral suite  
-
----
-
-## 8. Suggested package.json scripts (optional)
-
-```json
-"verify:egg-catalog": "node scripts/verify-easter-egg-catalog-parity.mjs",
-"verify:egg-cloud": "node scripts/verify-easter-egg-cloud.mjs"
-```
-
----
-
-*End P6/P7 REVIEW ONLY.*
+*End revised P6/P7 REVIEW ONLY.*
