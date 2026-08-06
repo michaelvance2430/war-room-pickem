@@ -68,4 +68,21 @@ SELECT
     )
   ) AS users_with_orphan_first_joins;
 
+-- ── 5. Existing membership helpers (for RLS-safe INSERT policy) ─────────────
+SELECT
+  p.proname AS function_name,
+  pg_get_function_identity_arguments(p.oid) AS args,
+  p.prosecdef AS security_definer,
+  p.proconfig AS proconfig
+FROM pg_proc p
+JOIN pg_namespace n ON n.oid = p.pronamespace
+WHERE n.nspname = 'public'
+  AND p.proname IN (
+    'is_league_member',
+    'museum_is_league_member',
+    'is_league_ops',
+    'is_league_staff'
+  )
+ORDER BY p.proname;
+
 -- END D-03 PREFLIGHT SELECT ONLY
