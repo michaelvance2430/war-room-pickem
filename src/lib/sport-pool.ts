@@ -1,14 +1,11 @@
 /**
  * Cross-sport player pool: ask the room “want [sport]?” → spin a new league for yeses.
  *
- * D1B-B AUTHORITY (app cutover phase):
+ * D1B-B AUTHORITY:
  * - This is NOT an ordinary player join path.
- * - spinUpLeagueFromPoll still uses direct leagues + multi-user membership INSERT
- *   for privileged commissioner seating of opted-in humans (and optional new commish).
+ * - spinUpLeagueFromPoll uses SECURITY DEFINER RPC spin_up_sport_pool_league only
+ *   (atomic league create + multi-seat + poll close). No direct membership INSERT.
  * - Do NOT route this through join_league_by_code / join_open_league_by_id.
- * - Do NOT expose privileged multi-seat parameters on ordinary create/join RPCs.
- * - Target: narrow SECURITY DEFINER RPC e.g. spin_up_sport_pool_league
- *   (auth = poll commissioner; seats only yes-voters + host; server-forced roles).
  * - See docs/D1B-B-APP-CUTOVER.md § sport-pool.
  */
 
@@ -140,14 +137,6 @@ export async function seedBotSportPoolVotes(
       error: e instanceof Error ? e.message : "Bot vote seed failed",
     };
   }
-}
-
-function generateCode(): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let code = "";
-  for (let i = 0; i < 6; i++)
-    code += chars[Math.floor(Math.random() * chars.length)];
-  return code;
 }
 
 export async function createSportPoolPoll(opts: {
@@ -372,10 +361,7 @@ export async function myVoteForPoll(
 
 /**
  * One-click: create target-sport league, seat all yeses (+ host), optional new commissioner.
- */
-/**
- * Privileged multi-seat create — not D1B-B ordinary human create/join.
- * Remains client INSERT until a dedicated DEFINER path is authorized.
+ * Privileged multi-seat path — atomic via spin_up_sport_pool_league (no direct INSERT).
  */
 export async function spinUpLeagueFromPoll(opts: {
   pollId: string;
@@ -402,10 +388,12 @@ export async function spinUpLeagueFromPoll(opts: {
   }
 
   const supabase = createClient();
+  const pollId = opts.pollId;
+
   const { data: pollRow, error: pErr } = await supabase
     .from("sport_pool_polls")
     .select("*")
-    .eq("id", opts.pollId)
+    .eq("id", pollId)
     .maybeSingle();
   if (pErr || !pollRow) {
     return {
@@ -430,172 +418,115 @@ export async function spinUpLeagueFromPoll(opts: {
     };
   }
 
-  const { votes, error: vErr } = await loadPollVotes(opts.pollId);
+  // Soft UX pre-check only — capacity/seating enforced inside the RPC
+  const { votes, error: vErr } = await loadPollVotes(pollId);
   if (vErr) return { ok: false, error: vErr };
-  const yesIds = new Set(
-    votes.filter((v) => v.response === "yes").map((v) => v.userId)
-  );
-  // Host always in
-  yesIds.add(session.playerId);
-  if (opts.newCommissionerId) yesIds.add(opts.newCommissionerId);
-
-  const seatList = Array.from(yesIds);
-  if (isLeagueFull(seatList.length)) {
-    return {
-      ok: false,
-      error: `Too many yeses (${seatList.length}). Cap is ${MAX_LEAGUE_PLAYERS}. Close the poll or start a second room.`,
-    };
-  }
-  if (seatList.length < 1) {
+  const yesCount =
+    votes.filter((v) => v.response === "yes").length +
+    (votes.some(
+      (v) => v.userId === session.playerId && v.response === "yes"
+    )
+      ? 0
+      : 1);
+  if (yesCount < 1) {
     return { ok: false, error: "Nobody said yes yet." };
   }
-
-  const name =
-    (opts.leagueNameOverride || poll.proposedName || "War Room").trim() ||
-    "War Room";
-  const code = generateCode();
-  const sportId = poll.targetSportId as SportId;
-
-  let openingWeek = sportId === "nfl" ? 1 : 0;
-  try {
-    const { resolveNewLeagueOpeningWeek } = await import(
-      "@/lib/active-week-storage"
-    );
-    openingWeek = resolveNewLeagueOpeningWeek(sportId);
-  } catch {
-    /* defaults above */
-  }
-
-  // Sport must be on the initial INSERT — never placeholder-then-UPDATE.
-  const insertRow: Record<string, unknown> = {
-    name,
-    code,
-    commissioner_id: session.playerId,
-    sport_id: sportId,
-    sport_settings: {},
-    crystal_ball_enabled: true,
-    current_week: openingWeek,
-  };
-
-  let { data: league, error: lErr } = await supabase
-    .from("leagues")
-    .insert(insertRow)
-    .select()
-    .single();
-
-  if (
-    lErr &&
-    /sport_id|crystal_ball|column|schema cache/i.test(lErr.message || "")
-  ) {
+  if (isLeagueFull(yesCount)) {
     return {
       ok: false,
-      error:
-        "Database missing sport column or rejected create insert. Run supabase/sport-id.sql, then try again. League sport cannot be patched after insert.",
+      error: `Too many yeses (${yesCount}). Cap is ${MAX_LEAGUE_PLAYERS}. Close the poll or start a second room.`,
     };
   }
-  if (lErr || !league) {
-    return { ok: false, error: lErr?.message || "Could not create league." };
+
+  // Optional name override on the poll row before atomic spin-up (RPC reads poll)
+  const nameOverride = (opts.leagueNameOverride || "").trim();
+  if (nameOverride && nameOverride !== poll.proposedName) {
+    const { error: nameErr } = await supabase
+      .from("sport_pool_polls")
+      .update({ proposed_name: nameOverride })
+      .eq("id", pollId)
+      .eq("commissioner_id", session.playerId);
+    if (nameErr && !sqlMissing(nameErr.message || "")) {
+      return { ok: false, error: nameErr.message };
+    }
   }
 
-  const leagueId = (league as { id: string }).id;
+  // Live RPC signature is p_poll_id only (PostgREST rejects unknown args).
+  // Optional new commissioner is not a client-supplied multi-seat param; server
+  // seats yes-voters + host under DEFINER authority.
+  void opts.newCommissionerId;
 
-  // Verify INSERT (SELECT only — sport is immutable after creation).
-  {
-    const { data: sportRow, error: sportErr } = await supabase
-      .from("leagues")
-      .select("sport_id")
-      .eq("id", leagueId)
-      .maybeSingle();
+  const { data, error } = await supabase.rpc("spin_up_sport_pool_league", {
+    p_poll_id: pollId,
+  });
+
+  if (error) {
+    const msg = error.message || "";
     if (
-      sportErr &&
-      /sport_id|column|schema cache|PGRST/i.test(sportErr.message || "")
+      /PGRST202|could not find the function|schema cache|does not exist/i.test(
+        msg
+      )
     ) {
       return {
         ok: false,
         error:
-          "Database missing sport column. Run supabase/sport-id.sql, then try again.",
+          "Sport-pool spin-up RPC is not available on this database yet. Apply spin_up_sport_pool_league, then try again.",
       };
     }
-    const got =
-      sportRow &&
-      typeof (sportRow as { sport_id?: string }).sport_id === "string"
-        ? String((sportRow as { sport_id: string }).sport_id).trim()
-        : "";
-    if (!got || got !== sportId) {
-      return {
-        ok: false,
-        error: `Could not create league as ${sportId} (database has "${got || "empty"}").`,
-      };
+    // Surface stable server tokens without raw SQL dumps
+    if (/d1b_b:|league_full|not_authenticated|validation/i.test(msg)) {
+      return { ok: false, error: msg.replace(/^.*?(d1b_b:[a-z_]+).*$/i, "$1") || msg };
     }
-  }
-  const divisions = ["North", "South", "East", "West"] as const;
-  let di = 0;
-  let seated = 0;
-  const finalComm =
-    opts.newCommissionerId?.trim() &&
-    opts.newCommissionerId !== session.playerId &&
-    yesIds.has(opts.newCommissionerId)
-      ? opts.newCommissionerId
-      : session.playerId;
-
-  for (const uid of seatList) {
-    const role = uid === finalComm ? "commissioner" : "player";
-    const { error: mErr } = await supabase.from("memberships").insert({
-      league_id: leagueId,
-      user_id: uid,
-      role,
-      division: divisions[di % 4],
-      total_points: 0,
-      weeks_played: 0,
-    });
-    di++;
-    if (!mErr) seated += 1;
-    else if (!/duplicate|unique/i.test(mErr.message || "")) {
-      console.warn("seat failed", uid, mErr.message);
-    }
+    return { ok: false, error: msg || "Could not spin up the room." };
   }
 
-  if (finalComm !== session.playerId) {
-    await supabase
-      .from("leagues")
-      .update({ commissioner_id: finalComm })
-      .eq("id", leagueId);
+  const row =
+    typeof data === "string"
+      ? (JSON.parse(data) as Record<string, unknown>)
+      : (data as Record<string, unknown> | null);
+
+  if (!row || row.ok === false) {
+    return {
+      ok: false,
+      error: String(row?.error || row?.message || "Spin-up failed."),
+    };
   }
 
-  await supabase
-    .from("sport_pool_polls")
-    .update({
-      status: "spun_up",
-      created_league_id: leagueId,
-      closed_at: new Date().toISOString(),
-    })
-    .eq("id", opts.pollId);
+  const leagueId = String(row.league_id || row.leagueId || "");
+  if (!leagueId) {
+    return {
+      ok: false,
+      error: "Spin-up succeeded without a league id.",
+    };
+  }
 
-  // Same Crew, new chapter (sport 2) — not a second permanent group
+  const leagueName = String(
+    row.name || row.league_name || nameOverride || poll.proposedName || "War Room"
+  );
+  const code = String(row.code || "");
+  const sportId = String(
+    row.sport_id || row.sportId || poll.targetSportId || "cfb"
+  ) as SportId;
+  const seated = Number(row.seated ?? row.member_count ?? row.humans ?? 0);
+
+  // Same Crew, new chapter (sport 2) — local-first optional
   try {
-    const { ensureCrewForLeague, getCrewIdForLeague } = await import(
-      "./crew"
-    );
+    const { ensureCrewForLeague, getCrewIdForLeague } = await import("./crew");
     const sourceLeagueId = poll.sourceLeagueId || session.leagueId;
-    const parentCrewId =
-      getCrewIdForLeague(sourceLeagueId) ||
-      getCrewIdForLeague(session.leagueId);
-    // Ensure source has a crew first
     if (sourceLeagueId) {
       ensureCrewForLeague({
         leagueId: sourceLeagueId,
-        leagueName: getLeague()?.name || name,
+        leagueName: getLeague()?.name || leagueName,
         sportId: getLeague()?.sportId,
         createdBy: session.playerId,
       });
     }
     const prefer =
       getCrewIdForLeague(sourceLeagueId) ||
-      getCrewIdForLeague(session.leagueId) ||
-      parentCrewId;
+      getCrewIdForLeague(session.leagueId);
     ensureCrewForLeague({
       leagueId,
-      leagueName: name,
+      leagueName,
       sportId,
       createdBy: session.playerId,
       preferCrewId: prefer,
@@ -607,9 +538,9 @@ export async function spinUpLeagueFromPoll(opts: {
   return {
     ok: true,
     leagueId,
-    code: (league as { code: string }).code || code,
-    leagueName: name,
-    seated,
+    code,
+    leagueName,
+    seated: Number.isFinite(seated) ? seated : 0,
     sportId,
   };
 }
