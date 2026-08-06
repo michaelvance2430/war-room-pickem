@@ -25,6 +25,18 @@ export const EVENT_FOUNDRY_SESSION = "warroom-foundry-session";
 export function markFoundrySessionActive(): void {
   if (typeof window === "undefined") return;
   try {
+    // E0: do not arm sticky session while Foundry is quarantined
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const q = require("@/lib/foundry-quarantine") as typeof import("@/lib/foundry-quarantine");
+    if (q.isFoundryQuarantined()) {
+      localStorage.removeItem(STICKY_KEY);
+      window.dispatchEvent(new CustomEvent(EVENT_FOUNDRY_SESSION));
+      return;
+    }
+  } catch {
+    /* continue arm if module missing */
+  }
+  try {
     localStorage.setItem(STICKY_KEY, "1");
     window.dispatchEvent(new CustomEvent(EVENT_FOUNDRY_SESSION));
   } catch {

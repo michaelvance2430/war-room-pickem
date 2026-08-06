@@ -438,6 +438,20 @@ export default function FounderDashboardPage() {
         {/* Platform Odds API ops — creator only (this page is already gated) */}
         <FoundryPlatformApiUsage />
 
+        {/* E0 emergency quarantine banner */}
+        <div className="rounded-2xl border-2 border-danger/60 bg-danger/10 px-4 py-3 space-y-1">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-danger">
+            E0 — Foundry quarantined
+          </p>
+          <p className="text-xs text-foreground leading-relaxed">
+            Production incident: Foundry simulation mutated a live league
+            (observed Week 8). Lab tools (randomize &amp; score, auto-score,
+            demo publish, sticky session, drama prep) are disabled until
+            Foundry is proven isolated. Do not run another simulation on a
+            production room. League repair is a separate step.
+          </p>
+        </div>
+
         {/* Foundry hop — never on customer Host Dashboard */}
         <section
           id="hop"

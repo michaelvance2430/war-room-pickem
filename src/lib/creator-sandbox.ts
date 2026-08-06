@@ -278,6 +278,9 @@ export async function jumpCfbChampionshipFinal(opts?: {
   openCeremony?: boolean;
 }): Promise<{ ok: boolean; message: string }> {
   try {
+    const { assertFoundryNotQuarantined } = await import("./foundry-quarantine");
+    const q = assertFoundryNotQuarantined("jumpCfbChampionshipFinal");
+    if (!q.ok) return { ok: false, message: q.reason || "Foundry quarantined" };
     const { isFoundryBackstageUser, isFoundrySessionSticky } = await import(
       "./foundry-preview"
     );

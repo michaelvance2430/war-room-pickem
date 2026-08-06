@@ -1,10 +1,17 @@
 /**
  * Foundry testing — when you’re in the lab, ceremonies must actually fire.
  * First-hour “eyes” sims stay quiet on purpose; Foundry sticky + post/score does not.
+ *
+ * E0: emergency quarantine disables lab tools and sticky arming until Foundry
+ * cannot mutate production-mode leagues (see foundry-quarantine.ts).
  */
 
 import { isAppCreator } from "@/lib/creator";
 import { getSession } from "@/lib/league";
+import {
+  assertFoundryNotQuarantined,
+  isFoundryQuarantined,
+} from "@/lib/foundry-quarantine";
 
 export const EVENT_FORCE_GAZETTE_PAPER = "warroom-force-gazette-paper";
 export const EVENT_FORCE_BADGE_CHECK = "warroom-force-badge-check";
@@ -13,6 +20,7 @@ const FOUNDRY_STICKY = "warroom-foundry-session-v1";
 
 export function isFoundrySessionSticky(): boolean {
   if (typeof window === "undefined") return false;
+  if (isFoundryQuarantined()) return false;
   try {
     return localStorage.getItem(FOUNDRY_STICKY) === "1";
   } catch {
@@ -26,9 +34,11 @@ export function isFoundrySessionSticky(): boolean {
  *
  * Constitution: customers should never know Foundry exists.
  * Only the app creator may see these tools (even when sticky/eyes are on).
+ * E0 quarantine: always off.
  */
 export function showCommishLabTools(): boolean {
   if (typeof window === "undefined") return false;
+  if (isFoundryQuarantined()) return false;
   const uid = getSession()?.playerId;
   // Hard gate: UUID creator only — no sticky/eyes bypass for non-creators
   return isAppCreator(uid);
@@ -39,6 +49,7 @@ export function isFoundryBackstageUser(
   userId?: string | null
 ): boolean {
   if (typeof window === "undefined") return false;
+  // Still identify creator for Foundry hub access; mutating tools stay off
   return isAppCreator(userId ?? getSession()?.playerId);
 }
 
@@ -48,6 +59,7 @@ export function isFoundryBackstageUser(
  */
 export function allowFoundryCeremonies(): boolean {
   if (typeof window === "undefined") return false;
+  if (isFoundryQuarantined()) return false;
   const uid = getSession()?.playerId;
   if (!isAppCreator(uid)) return false;
 
@@ -70,6 +82,10 @@ export function allowFoundryCeremonies(): boolean {
 export async function prepareFoundryDramaAfterScore(
   weekNumber: number
 ): Promise<{ ok: boolean; message: string }> {
+  const blocked = assertFoundryNotQuarantined("prepareFoundryDramaAfterScore");
+  if (!blocked.ok) {
+    return { ok: false, message: blocked.reason || "Foundry quarantined" };
+  }
   const session = getSession();
   if (!session?.playerId || !session.leagueId) {
     return { ok: false, message: "No session" };
@@ -149,6 +165,7 @@ export async function prepareFoundryDramaAfterScore(
 
 /** Force-show paper / cheevos from Foundry “Flash a moment” buttons. */
 export async function forceFoundryGazetteAndCheevos(): Promise<void> {
+  if (!assertFoundryNotQuarantined("forceFoundryGazetteAndCheevos").ok) return;
   const session = getSession();
   if (!session?.playerId) return;
   let week = 1;

@@ -4021,6 +4021,16 @@ export async function seedTrialBotsInCloud(
   avgPoints?: number;
   error?: string;
 }> {
+  try {
+    const { assertFoundryNotQuarantined } = await import("./foundry-quarantine");
+    // Mid-season replacement is a real host tool — allow when not a Foundry sim pad
+    if (!opts?.midSeasonReplacement) {
+      const q = assertFoundryNotQuarantined("seedTrialBotsInCloud");
+      if (!q.ok) return { ok: false, error: q.reason };
+    }
+  } catch {
+    /* continue */
+  }
   const session = getSession();
   if (!session?.leagueId || !session.isCommissioner) {
     return { ok: false, error: "Commissioner only" };
@@ -4507,6 +4517,13 @@ export async function seedBotPicksForWeekInCloud(
   chaosNames?: string[];
   error?: string;
 }> {
+  try {
+    const { assertFoundryNotQuarantined } = await import("./foundry-quarantine");
+    const q = assertFoundryNotQuarantined("seedBotPicksForWeekInCloud");
+    if (!q.ok) return { ok: false, error: q.reason };
+  } catch {
+    /* continue if module missing */
+  }
   const session = getSession();
   if (!session?.leagueId || !session.isCommissioner) {
     return { ok: false, error: "Commissioner only" };
@@ -4568,6 +4585,13 @@ export async function applyRandomBotChaosForWeek(
   names?: string[];
   error?: string;
 }> {
+  try {
+    const { assertFoundryNotQuarantined } = await import("./foundry-quarantine");
+    const q = assertFoundryNotQuarantined("applyRandomBotChaosForWeek");
+    if (!q.ok) return { ok: false, error: q.reason };
+  } catch {
+    /* continue */
+  }
   const session = getSession();
   if (!session?.leagueId || !session.isCommissioner) {
     return { ok: false, error: "Commissioner only" };
