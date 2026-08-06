@@ -57,9 +57,12 @@ Remaining work is **repair design / apply authorization**, not further catalog d
 | Severity | **Medium–High** (integrity / fraud surface) |
 | Type | Untrusted caller input on discovery identity and milestones |
 | Effect | Arbitrary `egg_*` discovery IDs; caller-controlled `player_name` and `p_total_eggs` → fabricated finds / milestone flex |
-| Evidence | P17 Block 2 |
-| Apply status | **REVIEW ONLY — not authorized** |
-| Intended fix | Server-owned allowlist/catalog; derive display name and totals from trusted data |
+| Evidence | P17 Block 2 · call-site map in D-02 design |
+| Status | **REVIEW ONLY — design complete — not applied — not claimed repaired** |
+| Design | `docs/D-02-RECORD-EASTER-EGG-FIND-REMEDIATION.md` |
+| SQL proposal | `supabase/D-02-record-easter-egg-find-REVIEW-ONLY.sql` |
+| Intended fix | Server catalog allowlist; profile `display_name`; server total/milestones; ignore client name/total; REVOKE anon/PUBLIC; RPC-only insert (drop client insert policy) |
+| Blockers | Mike product decisions P1–P7 in design doc before authorize apply |
 
 ### D-03 · `record_league_first_join` — membership correlation
 
