@@ -89,7 +89,7 @@
 | Field | Value |
 |-------|--------|
 | Severity | **High** — broader than join-only (INSERT privilege injection · row-wide UPDATE · public join codes) |
-| Status | **DISPOSABLE APP E2E PASS (A1–A12) / APP CUTOVER IN REPO / DATABASE PACKAGE PASS / SPORT-POOL CUTOVER PENDING / PRODUCTION UNCHANGED / FILE 07 NOT AUTHORIZED / NOT YET REPAIRED** |
+| Status | **DATABASE REPAIRED (RPCs LIVE) / APP CUTOVER DEPLOYED / DISPOSABLE APP E2E PASS / SPORT-POOL PATH SEPARATE / FILE 07 NOT APPLIED / INSERT POLICY STILL OPEN / NOT FULLY CLOSED** |
 | Design | `docs/D1B-B-MEMBERSHIP-JOIN-AUTHORITY.md` |
 | Product freeze + map | `docs/D1B-B-PRODUCT-DECISIONS-AND-CALLSITE-MAP.md` |
 | REVIEW-ONLY SQL | `supabase/review-only/D1B-B/` · package commit **20cfd5c** |
@@ -102,7 +102,8 @@
 | App cutover | `docs/D1B-B-APP-CUTOVER.md` — ordinary create/join/open wrappers + flows; sport-pool residual |
 | App E2E harness | `scripts/d1b-b-disposable-app-e2e-anon.mjs` · evidence `docs/D1B-B-DISPOSABLE-APP-E2E-EVIDENCE.md` — **A1–A12 PASS** on branch `uihlexzpeofaiipcgynw` |
 | FE lifecycle | `docs/D1B-B-FAIR-ENTRY-LIFECYCLE.md` — retain freezes; no auto-delete |
-| Next | **Delete disposable branch** (billing) · staged prod SQL **01–06 only** with Mike auth · then app deploy · never 07 until green |
+| App deploy | Vercel production **122ed28** · aliased `www.war-room-picks.com` · create/join/open → four RPCs |
+| Next | Live smoke create/join/open · delete disposable branch if still open · later Mike auth for file **07** / INSERT deny · sport-pool privileged RPC |
 | Scope exclusion | No live apply · no H-01 · no D1C · never 07 before cutover |
 
 #### D1B-C · achievements visibility
