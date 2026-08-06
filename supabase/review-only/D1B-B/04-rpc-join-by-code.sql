@@ -92,11 +92,8 @@ begin
     false
   );
 
-  begin
-    perform public.record_league_first_join(v_league.id, v_uid);
-  exception when others then
-    null;
-  end;
+  -- D-03 first-join is required history: failure rolls back join (R4).
+  perform public.record_league_first_join(v_league.id, v_uid);
 
   return json_build_object(
     'ok', true,

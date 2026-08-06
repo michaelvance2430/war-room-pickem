@@ -1,12 +1,12 @@
 # Structural / security defect register
 
-**As of:** 2026-08-06 (updated after **schema reproducibility defect** + disposable baseline)  
-**Evidence chain:** … · D1B-B REVIEW-ONLY · **branch MIGRATIONS_FAILED** · disposable baseline authored  
+**As of:** 2026-08-06 (updated after **D1B-B disposable Run 1** + Run-2 package revisions)  
+**Evidence chain:** … · D1B-B REVIEW-ONLY · Run 1 partial (15 PASS / FE ambiguous `v`) · package revised  
 **Mode:** Inspection / authorized repairs only  
 
-**Production confirmation:** Never touched by failed branch or baseline package. D1B-A/C repaired. D1B-B **not applied**.  
-**D1B-B:** **DISPOSABLE BASELINE READY / PRODUCTION NOT AUTHORIZED / NOT REPAIRED**.  
-**New parking lot:** **DATABASE SCHEMA REPRODUCIBILITY DEFECT** — `docs/DATABASE-SCHEMA-REPRODUCIBILITY-DEFECT.md`  
+**Production confirmation:** Never touched by disposable branches or package. D1B-A/C repaired. D1B-B **not applied**.  
+**D1B-B:** **RUN-2 READY / RUN 1 PARTIAL ARCHIVED / PRODUCTION NOT AUTHORIZED / NOT REPAIRED**.  
+**Parking lot:** **DATABASE SCHEMA REPRODUCIBILITY DEFECT** — `docs/DATABASE-SCHEMA-REPRODUCIBILITY-DEFECT.md`  
 **D1C:** parked — **not repaired**.
 
 ---
@@ -20,7 +20,7 @@
 | **D-02** eggs | **REGRESSION PASS** (catalog 20; no direct INSERT; anon EXECUTE false) · behavioral PENDING |
 | **D-03** first join | **REGRESSION PASS** (anon EXECUTE false; INSERT uses `is_league_member`; 73 rows; 0 orphans) · behavioral PENDING |
 | **D1B-A** picks/pick_games | **LIVE / STRUCTURALLY REPAIRED / POST-VERIFY PASS** |
-| **D1B-B** membership join | **DISPOSABLE BASELINE READY** · no prod apply · **not repaired** |
+| **D1B-B** membership join | **RUN-2 READY** · Run 1 15 PASS / FE blocked · no prod apply · **not repaired** |
 | **Schema reproducibility** | **CONFIRMED HIGH** · clean branch MIGRATIONS_FAILED · parked · **not repaired** |
 | **D1B-C** achievements visibility | **LIVE / STRUCTURALLY REPAIRED / POST-VERIFY PASS** |
 | **D1C** Crystal Ball | **DESIGN + NON-PRODUCTION SQL READY / EPHEMERAL TESTS NOT RUN / PRODUCTION APPLY BLOCKED / NOT REPAIRED** (parked) |
@@ -89,17 +89,15 @@
 | Field | Value |
 |-------|--------|
 | Severity | **High** — broader than join-only (INSERT privilege injection · row-wide UPDATE · public join codes) |
-| Status | **DISPOSABLE BASELINE READY / PRODUCTION NOT AUTHORIZED / NOT REPAIRED** |
+| Status | **RUN-2 READY / RUN 1 PARTIAL ARCHIVED / PRODUCTION NOT AUTHORIZED / NOT REPAIRED** |
 | Design | `docs/D1B-B-MEMBERSHIP-JOIN-AUTHORITY.md` |
 | Product freeze + map | `docs/D1B-B-PRODUCT-DECISIONS-AND-CALLSITE-MAP.md` |
-| REVIEW-ONLY SQL | `supabase/review-only/D1B-B/` including **02b-fair-entry.sql** |
-| Source audit | `docs/D1B-B-REVIEW-ONLY-SOURCE-AUDIT.md` |
-| Fair-entry | Server freeze table + percentile parity (no localStorage authority) |
-| Fixes | Sport allowlist live-only · cut_percent **10–75** (live CHECK) · d1b_b_raise VOLATILE · FE freeze table |
-| Disposable | Guide ready; JWT suite **NOT_RUN** |
-| Disposable | `00-disposable-baseline.sql` + `00b` + `09-full-test-runner` + `12-rollback` |
-| Next | Fresh empty branch → baseline → 01–06 → runner → delete branch |
-| Blocker resolved | Clean migration replay not required for D1B-B tests |
+| REVIEW-ONLY SQL | `supabase/review-only/D1B-B/` |
+| Run 1 evidence | `docs/D1B-B-DISPOSABLE-RUN-1-EVIDENCE.md` (15 PASS; FE `v` ambiguous blocked) |
+| Fair-entry | Percentile rename fix · FE points **VOLATILE** · freeze table |
+| Run-2 package | R1 native auth.uid · R3 no schema fail-open · R4 first-join required · R5 no commissioner_id in open list · R6 max_human complete · R7 order |
+| Disposable order | **00 → 00b → 01 → 02 → 02b → 03 → 04 → 05 → 06 → 09** (never 07) |
+| Next | Fresh empty branch → Run 2 full harness → delete branch |
 | Scope exclusion | No live apply · no H-01 · no D1C |
 
 #### D1B-C · achievements visibility

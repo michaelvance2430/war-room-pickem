@@ -37,7 +37,7 @@ begin
       l.id,
       l.name,
       l.sport_id,
-      l.commissioner_id,
+      -- commissioner_id omitted from public discovery (R5): internal profile UUID
       l.created_at,
       l.open_listed_at,
       public.d1b_b_human_member_count(l.id) as human_count,
@@ -60,6 +60,7 @@ begin
     'ok', true,
     'rooms', v_rows
     -- code intentionally omitted (B3)
+    -- commissioner_id intentionally omitted (R5)
   );
 end;
 $$;

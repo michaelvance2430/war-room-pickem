@@ -1,13 +1,15 @@
 # D1B-B — Disposable baseline, JWT harness, and readiness
 
-**Status:** **DISPOSABLE BASELINE AUTHORED / PRODUCTION NOT AUTHORIZED / NOT REPAIRED**  
+**Status:** **RUN-2 READY** (post Run-1 revisions) / **PRODUCTION NOT AUTHORIZED** / **NOT REPAIRED**  
 **Date:** 2026-08-06  
+**Run 1 archive:** `docs/D1B-B-DISPOSABLE-RUN-1-EVIDENCE.md`
 
 ### Classification
 
 ```text
 D1B-B:
-REVIEW-ONLY PACKAGE REVISED / DISPOSABLE BASELINE REQUIRED /
+DISPOSABLE RUN 1 PARTIAL PASS ARCHIVED /
+PACKAGE REVISED FOR RUN 2 /
 PRODUCTION NOT AUTHORIZED / NOT REPAIRED
 ```
 
@@ -15,35 +17,41 @@ Related parking lot: `docs/DATABASE-SCHEMA-REPRODUCIBILITY-DEFECT.md`
 
 ---
 
+## Canonical disposable order (R7 — only)
+
+```text
+00 → 00b → 01 → 02 → 02b → 03 → 04 → 05 → 06 → 09
+optional: 12
+never: 07
+```
+
+---
+
 ## 1. Baseline file paths
 
 | Path | Role |
 |------|------|
-| `supabase/review-only/D1B-B/00-disposable-baseline.sql` | Empty-branch minimal schema + sentinel |
+| `supabase/review-only/D1B-B/00-disposable-baseline.sql` | Empty-branch min schema + sentinel; **native auth.uid assert** |
 | `supabase/review-only/D1B-B/00b-jwt-and-fixtures.sql` | JWT claim helpers + synthetic profiles |
-| `supabase/review-only/D1B-B/01` … `06` | Unchanged D1B-B package (after baseline) |
-| `supabase/review-only/D1B-B/09-full-test-runner.sql` | Executable harness + results table |
-| `supabase/review-only/D1B-B/12-disposable-rollback.sql` | Full disposable teardown (sentinel required) |
-| `07` | **Still excluded** |
+| `01` … `06` | D1B-B package |
+| `09-full-test-runner.sql` | Executable harness |
+| `12-disposable-rollback.sql` | Full disposable teardown |
+| `07` | **Excluded** |
 
 ---
 
-## 2. Static dependency inventory (for 01–06)
+## 2. Run-1 → Run-2 revisions
 
-| Dependency | Why |
-|------------|-----|
-| `pgcrypto` | UUIDs |
-| `auth.uid()` | RPC auth |
-| `member_role`, `division` enums | memberships |
-| `profiles` | FK for leagues/memberships |
-| `leagues` | create/join; `cut_percent` CHECK 10–75; `code` unique; `is_open`; `sport_id`; `crystal_ball_enabled`; `current_week` |
-| `memberships` | unique (league_id,user_id); is_bot; staff flags; stats defaults |
-| `week_results` | fair-entry latest scored week |
-| `league_first_joins` + `record_league_first_join` | create/join integration |
-| `is_league_member` | FE RLS + first-join |
-| Baseline RLS | Disposable permissive policies + live-like insert own |
-
-**Not included:** picks, crystal_ball_*, gazette, etc.
+| ID | Fix |
+|----|-----|
+| Blocker | `d1b_b_percentile_value`: unambiguous `u(value)` / `v_result` (algorithm unchanged) |
+| R1 | No `CREATE OR REPLACE auth.uid()`; assert native claim-based definition |
+| R2 | One-arg (and two-arg) FE points **VOLATILE** |
+| R3 | Create RPC: remove `undefined_column` fail-open |
+| R4 | First-join: hard fail / full transaction rollback |
+| R5 | `list_open_leagues_public`: omit `commissioner_id` |
+| R6 | `01` completes backfill → verify → DEFAULT → NOT NULL |
+| R7 | Single canonical order in all docs |
 
 ---
 
@@ -51,16 +59,11 @@ Related parking lot: `docs/DATABASE-SCHEMA-REPRODUCIBILITY-DEFECT.md`
 
 | Gate | Mechanism |
 |------|-----------|
-| Abort if sentinel exists | Double-baseline refuse |
-| Abort if leagues/memberships/profiles exist | Not empty |
-| Abort if picks/crystal_ball_picks exist | Production-like refuse |
-| No production UUIDs/emails/codes | Synthetic `aaaaaaaa-bbbb-cccc-dddd-*` only |
-| No production project ref embedded | None in SQL |
-| Sentinel required for fixtures/runner/rollback | Explicit checks |
-| Sentinel label fixed string | CHECK constraint |
-
-Sentinel: `public.d1b_b_disposable_environment`  
-Label: `D1B-B DISPOSABLE EMPTY BRANCH ONLY — NEVER PRODUCTION`
+| Empty env | Abort if leagues/memberships/profiles exist |
+| Native auth.uid | Abort if missing or non claim-based |
+| Sentinel | Required for 00b / 09 / 12 |
+| No production identities | Synthetic UUIDs only |
+| No fail-open schema | Create requires `max_human_members` column |
 
 ---
 
@@ -68,30 +71,24 @@ Label: `D1B-B DISPOSABLE EMPTY BRANCH ONLY — NEVER PRODUCTION`
 
 | Item | Design |
 |------|--------|
-| Method | `set_config('request.jwt.claim.sub', uid, true)` + claims JSON |
-| Helper | `d1b_b_disp_set_auth(uuid)` / `d1b_b_disp_clear_auth()` |
-| `auth.uid()` | Disposable `auth.uid()` reads claim.sub / claims JSON |
-| Identities | creator, player A/B, nonmember, bot — synthetic UUIDs |
-| Isolation | Clear auth between cases; each test sets auth explicitly |
-| Production Auth | **Not used** |
+| Method | `set_config('request.jwt.claim.sub' / claims, …, true)` |
+| Native `auth.uid()` | Platform function (not replaced) |
+| Helpers | `d1b_b_disp_set_auth` / `d1b_b_disp_clear_auth` |
+| Run 1 proof | JWT-set-uid / JWT-clear **PASS** with native uid |
 
 ---
 
-## 5. Fresh disposable branch procedure
+## 5. Fresh disposable branch procedure (Run 2)
 
 ```text
-1. Create NEW empty Supabase development branch (do not re-use failed migration state)
-2. Confirm public tables empty / migrations may still fail — IGNORE broken migration chain
-3. SQL Editor (as postgres): run 00-disposable-baseline.sql  → must succeed + sentinel
-4. Run 00b-jwt-and-fixtures.sql
-5. Run 01 → 02 → 02b → 03 → 04 → 05 → 06  (NOT 07)
-6. Run 09-full-test-runner.sql
-7. Export d1b_b_tests.results
-8. Run 12-disposable-rollback.sql (optional) then DELETE the branch
-9. Confirm branch billing stopped
+1. Create NEW empty Supabase development branch
+2. Confirm empty public (ignore MIGRATIONS_FAILED on branch metadata)
+3. 00 → 00b → 01 → 02 → 02b → 03 → 04 → 05 → 06 → 09
+4. Export d1b_b_tests.results
+5. 12 optional → DELETE branch → billing stopped
 ```
 
-If step 3 aborts: environment not empty — delete branch and recreate.
+If 00 aborts on auth.uid: inspect platform definition; do not replace it.
 
 ---
 
@@ -99,33 +96,18 @@ If step 3 aborts: environment not empty — delete branch and recreate.
 
 | Check | Result |
 |-------|--------|
-| Baseline never references production project | **PASS** (static) |
-| Baseline refuses non-empty | **PASS** (source) |
-| File 07 excluded from procedure | **PASS** |
-| Live cut_percent 10–75 in baseline CHECK | **PASS** |
-| Fair-entry TS fixtures | **PASS** (`node scripts/verify-fair-entry-parity.mjs`) |
-| Full disposable runner on branch | **NOT_RUN** (await new empty branch) |
+| Percentile naming unambiguous | **PASS** (source) |
+| Fair-entry TS fixtures | run `node scripts/verify-fair-entry-parity.mjs` |
+| Run 1 full harness | **PARTIAL** — 15 PASS, FE blocked |
+| Run 2 full harness | **NOT_RUN** |
 
 ---
 
-## 7. Readiness verdict — create fresh disposable branch?
+## 7. Readiness verdict — Run 2?
 
 ```text
-YES — READY TO CREATE A FRESH EMPTY BRANCH AND RUN:
+YES — READY FOR DISPOSABLE RUN 2 ON A FRESH EMPTY BRANCH:
   00 → 00b → 01 → 02 → 02b → 03 → 04 → 05 → 06 → 09
 ```
 
-Do **not** rely on Supabase migration replay for this branch.  
-Do **not** apply baseline to production.  
-Do **not** leave the branch running after evidence capture.
-
----
-
-## 8. Confirmations
-
-| Statement | True? |
-|-----------|-------|
-| Production changed | **No** |
-| Failed branch deleted (prior) | **Yes** (operator report) |
-| D1B-B repaired | **No** |
-| D1C / H-01 untouched | **Yes** |
+Do **not** apply to production. Do **not** merge baseline into `supabase/migrations/`.

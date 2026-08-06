@@ -46,23 +46,37 @@ end $$;
 
 create extension if not exists pgcrypto;
 
--- ── auth.uid() for JWT claim simulation (Supabase-compatible) ───────────────
-create schema if not exists auth;
+-- ── Native auth.uid() required (R1 Run-1: platform refuses REPLACE; safer) ──
+-- Do NOT CREATE OR REPLACE auth.uid(). Supabase platform manages it.
+-- Native definition already reads request.jwt.claim.sub / claims JSON sub.
+do $$
+declare
+  v_oid oid;
+  v_src text;
+begin
+  select p.oid into v_oid
+  from pg_proc p
+  join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname = 'auth'
+    and p.proname = 'uid'
+    and pg_get_function_identity_arguments(p.oid) = '';
 
--- Disposable-only auth.uid: prefer claim.sub then claims JSON (Supabase style)
-create or replace function auth.uid()
-returns uuid
-language sql
-stable
-as $$
-  select coalesce(
-    nullif(current_setting('request.jwt.claim.sub', true), ''),
-    nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub'
-  )::uuid;
-$$;
+  if v_oid is null then
+    raise exception
+      'D1B-B disposable baseline: auth.uid() is absent — refuse. Need native Supabase auth.';
+  end if;
 
-comment on function auth.uid() is
-  'D1B-B DISPOSABLE ONLY: JWT claim simulation. Do not deploy as production auth.';
+  v_src := pg_get_functiondef(v_oid);
+  if v_src is null
+     or v_src not ilike '%request.jwt.claim.sub%'
+     or (
+       v_src not ilike '%request.jwt.claims%'
+       and v_src not ilike '%jwt.claims%'
+     ) then
+    raise exception
+      'D1B-B disposable baseline: auth.uid() does not look like Supabase claim-based uid — refuse. Inspect platform definition.';
+  end if;
+end $$;
 
 -- ── Enums (live-compatible) ─────────────────────────────────────────────────
 do $$ begin
@@ -255,5 +269,6 @@ comment on table public.d1b_b_disposable_environment is
 commit;
 
 -- END 00-disposable-baseline.sql
--- NEXT: 01 → 02 → 02b → 03 → 04 → 05 → 06 (never 07)
--- THEN: 00b-jwt-and-fixtures.sql + 09-full-test-runner.sql
+-- CANONICAL DISPOSABLE ORDER (R7):
+--   00 → 00b → 01 → 02 → 02b → 03 → 04 → 05 → 06 → 09
+--   optional: 12-disposable-rollback.sql  (never 07)

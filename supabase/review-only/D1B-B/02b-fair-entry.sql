@@ -112,6 +112,7 @@ as $$
 $$;
 
 -- Percentile nearest-rank + linear interpolate + round (mirror fair-entry.ts)
+-- Variable names must not collide with SQL aliases (Run 1: "v" was ambiguous).
 create or replace function public.d1b_b_percentile_value(p_values integer[], p_percentile numeric)
 returns integer
 language plpgsql
@@ -124,20 +125,20 @@ declare
   rank numeric;
   lo int;
   hi int;
-  v numeric;
+  v_result numeric;
 begin
   if p_values is null or coalesce(array_length(p_values, 1), 0) = 0 then
     return 0;
   end if;
 
-  select array_agg(x order by x)
+  select array_agg(coalesce(u.value, 0) order by coalesce(u.value, 0))
   into s
-  from (
-    select coalesce(v, 0)::integer as x
-    from unnest(p_values) as v
-  ) q;
+  from unnest(p_values) as u(value);
 
   n := array_length(s, 1);
+  if n is null or n = 0 then
+    return 0;
+  end if;
   if n = 1 then
     return s[1];
   end if;
@@ -152,8 +153,8 @@ begin
   if lo = hi then
     return s[lo];
   end if;
-  v := s[lo] + (s[hi] - s[lo]) * (rank - (lo - 1));
-  return round(v)::integer;
+  v_result := s[lo] + (s[hi] - s[lo]) * (rank - (lo - 1));
+  return round(v_result)::integer;
 end;
 $$;
 
@@ -231,6 +232,7 @@ create or replace function public.d1b_b_fair_entry_points(
 )
 returns integer
 language plpgsql
+volatile
 security definer
 set search_path = public
 as $$
@@ -304,10 +306,11 @@ revoke all on function public.d1b_b_freeze_band_if_needed(uuid, integer, text, i
 revoke all on function public.d1b_b_fair_entry_points(uuid, uuid) from public;
 
 -- Keep 1-arg name for join RPCs: exclude auth.uid()
+-- VOLATILE: may INSERT freeze via two-arg resolver (R2 Run-1 finding).
 create or replace function public.d1b_b_fair_entry_points(p_league_id uuid)
 returns integer
 language sql
-stable
+volatile
 security definer
 set search_path = public
 as $$

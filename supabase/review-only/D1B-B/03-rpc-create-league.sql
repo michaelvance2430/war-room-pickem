@@ -59,45 +59,31 @@ begin
 
   v_code := public.d1b_b_generate_league_code();
 
-  begin
-    insert into public.leagues (
-      name,
-      code,
-      commissioner_id,
-      sport_id,
-      crystal_ball_enabled,
-      current_week,
-      cut_percent,
-      is_open,
-      open_listed_at,
-      max_human_members
-    ) values (
-      v_name,
-      v_code,
-      v_uid,
-      v_sport,
-      coalesce(p_crystal_ball_enabled, true),
-      v_week,
-      v_cut,
-      case when p_list_as_open then true else false end,
-      case when p_list_as_open then now() else null end,
-      v_max
-    )
-    returning id into v_league_id;
-  exception
-    when undefined_column then
-      -- Fallback without max_human_members / cut if columns missing (disposable base)
-      insert into public.leagues (
-        name, code, commissioner_id, sport_id,
-        crystal_ball_enabled, current_week, is_open, open_listed_at
-      ) values (
-        v_name, v_code, v_uid, v_sport,
-        coalesce(p_crystal_ball_enabled, true), v_week,
-        case when p_list_as_open then true else false end,
-        case when p_list_as_open then now() else null end
-      )
-      returning id into v_league_id;
-  end;
+  -- Require stage-1 schema (max_human_members). No undefined_column fail-open (R3).
+  insert into public.leagues (
+    name,
+    code,
+    commissioner_id,
+    sport_id,
+    crystal_ball_enabled,
+    current_week,
+    cut_percent,
+    is_open,
+    open_listed_at,
+    max_human_members
+  ) values (
+    v_name,
+    v_code,
+    v_uid,
+    v_sport,
+    coalesce(p_crystal_ball_enabled, true),
+    v_week,
+    v_cut,
+    case when p_list_as_open then true else false end,
+    case when p_list_as_open then now() else null end,
+    v_max
+  )
+  returning id into v_league_id;
 
   insert into public.memberships (
     league_id,
@@ -123,11 +109,8 @@ begin
     false
   );
 
-  begin
-    perform public.record_league_first_join(v_league_id, v_uid);
-  exception when others then
-    null;
-  end;
+  -- D-03 first-join is required history: failure rolls back create (R4).
+  perform public.record_league_first_join(v_league_id, v_uid);
 
   return json_build_object(
     'ok', true,

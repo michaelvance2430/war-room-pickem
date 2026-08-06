@@ -3,25 +3,25 @@
 **DO NOT RUN AGAINST PRODUCTION**  
 **Package:** `supabase/review-only/D1B-B/`  
 
-### Apply order (disposable only)
+### Canonical disposable order (R7 — only)
 
 ```text
-1. Base schema: leagues, memberships, profiles, week_results (optional for FE), enums
-2. 01-schema-max-human-members.sql
-3. UPDATE leagues SET max_human_members = 32 WHERE max_human_members IS NULL;
-4. 02-helpers.sql
-5. 02b-fair-entry.sql   -- requires is_league_member for RLS policy
-6. 03-rpc-create-league.sql
-7. 04-rpc-join-by-code.sql
-8. 05-rpc-join-open.sql
-9. 06-rpc-list-open-leagues.sql
-10. NEVER 07 on first pass
-11. 08-preflight-SELECT-ONLY.sql
-12. node scripts/verify-fair-entry-parity.mjs  (host)
-13. SQL: SELECT d1b_b_percentile_value(ARRAY[0,10,20,40], 75);  -- expect 25
-14. JWT behavioral suite (matrix)
-15. Optional 11 rollback stage-6
+00-disposable-baseline.sql
+00b-jwt-and-fixtures.sql
+01-schema-max-human-members.sql   -- includes backfill + DEFAULT + NOT NULL
+02-helpers.sql
+02b-fair-entry.sql
+03-rpc-create-league.sql
+04-rpc-join-by-code.sql
+05-rpc-join-open.sql
+06-rpc-list-open-leagues.sql
+09-full-test-runner.sql
+optional: 12-disposable-rollback.sql
+NEVER: 07
 ```
+
+Host check: `node scripts/verify-fair-entry-parity.mjs`  
+Smoke after 02b: `SELECT d1b_b_percentile_value(ARRAY[0,10,20,40], 75);` — expect **25**
 
 ### cut_percent create validation (after 03)
 

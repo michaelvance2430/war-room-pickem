@@ -3,6 +3,9 @@
 -- REVIEW ONLY — DISPOSABLE EMPTY BRANCH ONLY — REQUIRES SENTINEL
 -- NEVER APPLY TO PRODUCTION
 -- =============================================================================
+-- Canonical order: 00 → 00b → 01 → 02 → 02b → 03 → 04 → 05 → 06 → 09
+-- Uses native auth.uid() via set_config claims (no auth.uid() replace).
+-- =============================================================================
 
 do $$
 begin
@@ -12,9 +15,17 @@ begin
   if to_regclass('public.leagues') is null then
     raise exception 'D1B-B fixtures: run 00-disposable-baseline.sql first';
   end if;
+  if to_regprocedure('auth.uid()') is null then
+    raise exception 'D1B-B fixtures: auth.uid() missing — native Supabase auth required';
+  end if;
 end $$;
 
--- ── JWT claim helpers (transaction-local) ───────────────────────────────────
+-- ── JWT claim helpers (transaction-local; drives native auth.uid()) ─────────
+-- Behavior:
+--   set_config(..., is_local := true)  → SET LOCAL for current transaction
+--   request.jwt.claim.sub              → preferred by platform auth.uid()
+--   request.jwt.claims JSON {sub,role} → fallback path
+-- Reset between cases via d1b_b_disp_clear_auth() so cases do not contaminate.
 create or replace function public.d1b_b_disp_set_auth(p_uid uuid)
 returns void
 language plpgsql
@@ -29,6 +40,7 @@ begin
   if p_uid is null then
     perform set_config('request.jwt.claim.sub', '', true);
     perform set_config('request.jwt.claims', '', true);
+    -- Optional role reset: leave session role alone; auth.uid null is the gate
     return;
   end if;
   perform set_config('request.jwt.claim.sub', p_uid::text, true);
