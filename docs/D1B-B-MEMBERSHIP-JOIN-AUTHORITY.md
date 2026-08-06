@@ -1,14 +1,12 @@
 # D1B-B — Membership join authority
 
-**Status:** **B1–B6 PRODUCT DECISIONS LOCKED / CALL-SITE MAP COMPLETE / REVIEW-ONLY ARCHITECTURE / NOT REPAIRED**  
-**Apply:** **NOT AUTHORIZED** · **no production SQL**  
+**Status:** **B1–B6 LOCKED / REVIEW-ONLY SQL PACKAGE READY / NO PRODUCTION APPLY / NOT REPAIRED**  
+**Apply:** **NOT AUTHORIZED** · **no production apply**  
 **Date:** 2026-08-06  
 
-**Canonical freeze + map + RPC contracts + test plans:**  
-→ **`docs/D1B-B-PRODUCT-DECISIONS-AND-CALLSITE-MAP.md`**
-
-**Live preflight evidence:**  
-→ **`docs/D1B-B-PREFLIGHT-AND-DESIGN-SCOPE.md`** §0  
+**Canonical freeze + map:** `docs/D1B-B-PRODUCT-DECISIONS-AND-CALLSITE-MAP.md`  
+**REVIEW-ONLY SQL:** `docs/D1B-B-REVIEW-ONLY-SQL-PACKAGE.md` · `supabase/review-only/D1B-B/`  
+**Live preflight:** `docs/D1B-B-PREFLIGHT-AND-DESIGN-SCOPE.md` §0  
 
 ---
 
@@ -17,8 +15,8 @@
 ```text
 D1B-B:
 PRODUCT DECISIONS LOCKED (B1–B6) /
-AUTHORIZATION SURFACE BROADER THAN ORIGINAL JOIN-ONLY DESIGN /
-REVIEW-ONLY ARCHITECTURE READY /
+REVIEW-ONLY SQL PACKAGE READY /
+NO PRODUCTION APPLY /
 NOT REPAIRED
 ```
 
