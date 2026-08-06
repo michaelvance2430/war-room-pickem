@@ -1,10 +1,11 @@
 # Structural / security defect register
 
-**As of:** 2026-08-06 (updated after automated read-only scrub sweep)  
-**Evidence chain:** P15–P18 · D1A · D-01–D-03 apply/regression · **automated Supabase plugin scrub**  
+**As of:** 2026-08-06 (updated after D1C authority map archive + remediation design)  
+**Evidence chain:** P15–P18 · D1A · D-01–D-03 apply/regression · automated Supabase plugin scrub · **D1C static authority map**  
 **Mode:** Inspection / authorized repairs only  
 
 **Production confirmation (automated scrub):** no SQL writes, no Auth/app/deploy changes during that sweep.  
+**D1C docs package:** map + remediation design only — **no executable SQL · no app change · no prod apply · picks/results untouched**.  
 **Archive:** `docs/AUTOMATED-READONLY-SCRUB-SWEEP.md`
 
 ---
@@ -20,7 +21,7 @@
 | **D1B-A** picks/pick_games | **DESIGN READY / APPLY NOT AUTHORIZED** |
 | **D1B-B** membership join | **CONFIRMED HIGH AUTHORIZATION DEFECT / COORDINATED DESIGN REQUIRED** |
 | **D1B-C** achievements visibility | **DESIGN READY / APPLY NOT AUTHORIZED** |
-| **D1C** Crystal Ball | **DEFECT CONFIRMED** · **design required** · no apply |
+| **D1C** Crystal Ball | **CONFIRMED HIGH / MULTI-AUTHORITY LOCK-REVEAL DEFECT / PRODUCT DECISIONS REQUIRED / NOT REPAIRED** · map archived · remediation design REVIEW-ONLY · no apply · no executable SQL |
 | **H-01** DEFINER EXECUTE | **CONFIRMED** · split **H-01A selective design READY** · **H-01B future-default design REQUIRED separately** · no apply |
 
 ---
@@ -95,16 +96,21 @@
 | SQL | `supabase/D1B-C-achievements-select-REVIEW-ONLY.sql` |
 | Rule | SELECT only if `is_league_member(achievements.league_id)` |
 
-### D1C · Crystal Ball lock / reveal / membership
+### D1C · Crystal Ball lock / reveal / multi-authority defect
 
 | Field | Value |
 |-------|--------|
-| Severity | **Medium–High** |
-| Status | **DEFECT CONFIRMED · DESIGN REQUIRED · NOT AUTHORIZED TO REPAIR** |
-| Tautologies | All listed `crystal_ball_picks` / `crystal_ball_result` member policies use `m.league_id = m.league_id` |
-| Authority | No non-internal CB triggers; frozen-read mixes result row · hard-coded `2026-08-29 16:00:00+00` · hard-coded `2026-09-10 16:00:00+00` · week result 0/1 |
+| Severity | **High** (write bypass after UI lock · multi-OR peer reveal · cross-sport hard-coded freezes · bot seed ignores lock) |
+| Status | **CONFIRMED HIGH / MULTI-AUTHORITY LOCK-REVEAL DEFECT / PRODUCT DECISIONS REQUIRED / NOT REPAIRED** |
+| Static map | `docs/D1C-CRYSTAL-BALL-LOCK-REVEAL-AUTHORITY-MAP.md` |
+| Remediation design | `docs/D1C-CRYSTAL-BALL-AUTHORITY-REMEDIATION.md` (REVIEW-ONLY; **no executable SQL**) |
+| Tautologies | All listed `crystal_ball_picks` / `crystal_ball_result` member policies use `m.league_id = m.league_id` (**D1B correlation dependency — separate auth**) |
+| Authority | No non-internal CB triggers; app lock ≠ DB write gate; frozen-read mixes result · hard-coded `2026-08-29 16:00:00+00` · hard-coded `2026-09-10 16:00:00+00` · `week_results` week 0/1 |
 | Extra | `crystal_ball_lock_count` DEFINER; anon+authenticated EXECUTE |
-| Apply | **Do not quick-patch**; single lock/reveal design first |
+| Live data | ~7 `crystal_ball_picks` · 0 `crystal_ball_result` · **no cleanup authorized** |
+| Product | Mike decisions **P1–P12** required before SQL authoring/apply (see remediation design) |
+| Preferred design default | Season-aware `crystal_ball_state` table; DB-only security authority; lock/reveal separate fields; bot obeys lock |
+| Apply | **Not authorized** · no quick-patch · do **not** bundle with D1B / H-01 |
 
 ### D-04 · `leagues` DELETE (product retired)
 
@@ -163,7 +169,7 @@
 | 5 | **D1B-A** | Picks correlation (design ready) |
 | 5b | **D1B-C** | Achievements SELECT (design ready; separate apply) |
 | 5c | **D1B-B** | Join RPCs + drop client INSERT (coordinated design) |
-| 6 | **D1C** | Design single lock/reveal (blocked on design) |
+| 6 | **D1C** | Authority map archived · remediation design REVIEW-ONLY · **product decisions P1–P12** · no SQL/apply |
 | 7 | **H-01A** | Selective live REVOKE (design ready; auth pending) |
 | 7b | **H-01B** | Future default privileges (design required separately) |
 | 8 | H-05 / H-06 / H-07 | Advisor hardening (non-exploit) |
@@ -188,6 +194,8 @@
 | `docs/D1B-A-PICKS-MEMBERSHIP-CORRELATION.md` | D1B-A design ready |
 | `docs/D1B-B-MEMBERSHIP-JOIN-AUTHORITY.md` | D1B-B architecture |
 | `docs/D1B-C-ACHIEVEMENTS-VISIBILITY.md` | D1B-C design ready |
+| `docs/D1C-CRYSTAL-BALL-LOCK-REVEAL-AUTHORITY-MAP.md` | D1C static authority map (archived) |
+| `docs/D1C-CRYSTAL-BALL-AUTHORITY-REMEDIATION.md` | D1C remediation design REVIEW-ONLY (no executable SQL) |
 | `supabase/D1B-A-picks-membership-REVIEW-ONLY.sql` | D1B-A policy SQL |
 | `supabase/D1B-C-achievements-select-REVIEW-ONLY.sql` | D1B-C policy SQL |
 | `docs/D1A-VERIFICATION-NO-OP.md` | D1A closed |
