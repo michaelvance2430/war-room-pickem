@@ -74,9 +74,13 @@ Remaining work is **repair design / apply authorization**, not further catalog d
 | Severity | **Medium** (hardening / integrity) |
 | Type | Missing membership gate |
 | Effect | Self-only identity OK, but no required membership in `p_league_id` before insert; arbitrary first-join rows subject to DB constraints only |
-| Evidence | P17 Block 2 |
-| Apply status | **REVIEW ONLY — not authorized** |
-| Intended fix | Require existing matching membership before insert |
+| Evidence | P17 Block 2 · call-site map in D-03 design |
+| Status | **REVIEW ONLY — design complete — not applied** |
+| Design | `docs/D-03-RECORD-LEAGUE-FIRST-JOIN-REMEDIATION.md` |
+| SQL proposal | `supabase/D-03-record-league-first-join-REVIEW-ONLY.sql` |
+| Preflight | `supabase/D-03-preflight-SELECT-ONLY.sql` (orphan inventory; leavers may be valid) |
+| Intended fix | Require membership for `(league_id, auth.uid())`; keep signature; idempotent first_joined_at; tighten INSERT policy; REVOKE anon/PUBLIC |
+| Historical cleanup | **Not** in D-03 apply — inventory only |
 
 ---
 
