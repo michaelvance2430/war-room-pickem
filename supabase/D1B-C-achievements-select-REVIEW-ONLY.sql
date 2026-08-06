@@ -21,7 +21,7 @@ create policy "Members read achievements"
   on public.achievements
   for select
   to authenticated
-  using (public.is_league_member(league_id));
+  using (public.is_league_member(achievements.league_id));
 
 commit;
 

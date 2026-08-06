@@ -1,13 +1,14 @@
 # Structural / security defect register
 
-**As of:** 2026-08-06 (updated after D1B-A **LIVE / STRUCTURALLY REPAIRED / POST-VERIFY PASS**)  
-**Evidence chain:** P15–P18 · D1A · D-01–D-03 · scrub · D1C parked · D1B-A preflight · **D1B-A production apply**  
+**As of:** 2026-08-06 (updated after D1B-C preflight package queued; D1B-A repaired)  
+**Evidence chain:** P15–P18 · D1A · D-01–D-03 · scrub · D1C parked · **D1B-A LIVE repaired** · **D1B-C next**  
 **Mode:** Inspection / authorized repairs only  
 
-**Production confirmation:** D1B-A migration `d1b_a_picks_membership_correlation` applied on **war-room-pickem**; post-verify **PASS**. No D1B-B/C, D1C, or H-01 apply.  
-**D1C:** parked (unchanged) — **not repaired**.  
+**Production confirmation:** D1B-A structurally repaired on **war-room-pickem**. D1B-C **not applied**. No D1B-B / D1C / H-01 apply.  
 **D1B-A:** **LIVE / STRUCTURALLY REPAIRED / POST-VERIFY PASS**.  
-**Archive:** `docs/D1B-A-APPLY-VERIFICATION.md`
+**D1B-C:** **DESIGN + PREFLIGHT PACKAGE READY / APPLY NOT AUTHORIZED / NOT REPAIRED** (safest next).  
+**D1C:** parked — **not repaired**.  
+**Archive:** `docs/D1B-A-APPLY-VERIFICATION.md` · `docs/D1B-C-PREFLIGHT-AND-APPLY-SCOPE.md`
 
 ---
 
@@ -21,7 +22,7 @@
 | **D-03** first join | **REGRESSION PASS** (anon EXECUTE false; INSERT uses `is_league_member`; 73 rows; 0 orphans) · behavioral PENDING |
 | **D1B-A** picks/pick_games | **LIVE / STRUCTURALLY REPAIRED / POST-VERIFY PASS** |
 | **D1B-B** membership join | **CONFIRMED HIGH AUTHORIZATION DEFECT / COORDINATED DESIGN REQUIRED** |
-| **D1B-C** achievements visibility | **DESIGN READY / APPLY NOT AUTHORIZED** |
+| **D1B-C** achievements visibility | **DESIGN + PREFLIGHT PACKAGE READY / APPLY NOT AUTHORIZED / NOT REPAIRED** (next scrub) |
 | **D1C** Crystal Ball | **DESIGN + NON-PRODUCTION SQL READY / EPHEMERAL TESTS NOT RUN / PRODUCTION APPLY BLOCKED / NOT REPAIRED** (parked) |
 | **H-01** DEFINER EXECUTE | **CONFIRMED** · split **H-01A selective design READY** · **H-01B future-default design REQUIRED separately** · no apply |
 
@@ -97,11 +98,16 @@
 
 | Field | Value |
 |-------|--------|
-| Severity | Medium (read isolation) |
-| Status | **DESIGN READY / APPLY NOT AUTHORIZED** · not claimed repaired |
+| Severity | Medium (read isolation) · **narrowest remaining isolation fix** |
+| Status | **DESIGN + PREFLIGHT PACKAGE READY / APPLY NOT AUTHORIZED / NOT REPAIRED** |
 | Design | `docs/D1B-C-ACHIEVEMENTS-VISIBILITY.md` |
-| SQL | `supabase/D1B-C-achievements-select-REVIEW-ONLY.sql` |
-| Rule | SELECT only if `is_league_member(achievements.league_id)` |
+| Preflight | `docs/D1B-C-PREFLIGHT-AND-APPLY-SCOPE.md` · `supabase/D1B-C-preflight-SELECT-ONLY.sql` |
+| SQL | `supabase/D1B-C-achievements-select-REVIEW-ONLY.sql` (one SELECT policy only) |
+| Defect | `"Members read achievements"` tautology / unqualified `league_id` in membership EXISTS |
+| Rule | `public.is_league_member(achievements.league_id)` |
+| Preserve | `"Commissioner grants achievements"` INSERT |
+| Next | Live SELECT preflight → Mike **D1B-C only** auth → apply |
+| Scope exclusion | No data mutation · no D1B-B · no D1C · no H-01 · no app |
 
 ### D1C · Crystal Ball lock / reveal / multi-authority defect
 
@@ -170,20 +176,22 @@
 | 3 | D-02 | **STRUCTURALLY LIVE** · behavioral PENDING |
 | 4 | D-03 | **STRUCTURALLY LIVE** · behavioral PENDING |
 | 5 | **D1B-A** | **LIVE / STRUCTURALLY REPAIRED / POST-VERIFY PASS** |
-| 5b | **D1B-C** | Achievements SELECT (design ready; separate apply) |
-| 5c | **D1B-B** | Join RPCs + drop client INSERT (coordinated design) |
-| 6 | **D1C** | **Parked** — design + non-prod SQL ready; ephemeral tests not run; prod apply blocked |
-| 7 | **H-01A** | Selective live REVOKE (design ready; auth pending) |
-| 7b | **H-01B** | Future default privileges (design required separately) |
-| 8 | H-05 / H-06 / H-07 | Advisor hardening (non-exploit) |
-| 9 | PS | Postseason snapshots |
+| **5b** | **D1B-C** | **Next scrub** — preflight package ready · await live SELECT + Mike auth |
+| 5c | **D1B-B** | Membership/join authority — coordinated RPC + app (larger) |
+| 6 | **H-01A** | Selective DEFINER EXECUTE cleanup |
+| 6b | **H-01B** | Future default privileges |
+| 7 | **D1C** | **Parked** until disposable testing + dependencies |
+| 8 | Behavioral D-01 / D-02 / D-03 | Disposable identities only |
+| 9 | H-05 / H-06 / H-07 | Advisor hardening (non-exploit) |
+| 10 | PS | Postseason snapshots |
 
 ### Explicit non-goals until authorized
 
 - Mass REVOKE / Auth leaked-password enable  
 - Index drops / policy consolidation for performance advisors  
 - Quick-patch D1C freezes  
-- Behavioral suites on real identities  
+- Behavioral suites on **real** identities  
+- Bundling D1B-C with D1B-B / D1C / H-01  
 
 ---
 
@@ -203,6 +211,8 @@
 | `supabase/D1B-A-postverify-SELECT-ONLY.sql` | D1B-A post-verify SELECT-only |
 | `docs/D1B-B-MEMBERSHIP-JOIN-AUTHORITY.md` | D1B-B architecture |
 | `docs/D1B-C-ACHIEVEMENTS-VISIBILITY.md` | D1B-C design ready |
+| `docs/D1B-C-PREFLIGHT-AND-APPLY-SCOPE.md` | D1B-C preflight + apply-scope (not applied) |
+| `supabase/D1B-C-preflight-SELECT-ONLY.sql` | D1B-C SELECT-only preflight |
 | `docs/D1C-CRYSTAL-BALL-LOCK-REVEAL-AUTHORITY-MAP.md` | D1C static authority map (archived) |
 | `docs/D1C-CRYSTAL-BALL-AUTHORITY-REMEDIATION.md` | D1C remediation design REVIEW-ONLY (P1–P12 locked) |
 | `docs/D1C-S2-EPHEMERAL-SCHEMA-POLICY-DESIGN.md` | D1C-S2 ephemeral/staging schema & policy design (not repaired) |
@@ -220,4 +230,4 @@
 
 ---
 
-*End register — D1B-A LIVE/STRUCTURALLY REPAIRED; D1B-B/C · D1C · H-01 still require separate Mike authorization.*
+*End register — D1B-A LIVE/STRUCTURALLY REPAIRED; next narrow scrub D1B-C; D1B-B · D1C · H-01 still require separate Mike authorization.*
