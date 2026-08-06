@@ -9,17 +9,18 @@ FOR A SPECIFIC STAGE (RPCs vs INSERT drop vs UPDATE vs SELECT tighten)
 | Field | Value |
 |-------|--------|
 | Authorization | **REVIEW-ONLY SQL package authorized — no production apply** |
-| Status | Design SQL authored · **D1B-B NOT REPAIRED** |
+| Status | **REVISED / DISPOSABLE READY** · **D1B-B NOT REPAIRED** · no prod apply |
 | Product freeze | B1–B6 locked — `docs/D1B-B-PRODUCT-DECISIONS-AND-CALLSITE-MAP.md` |
-| Docs | `docs/D1B-B-REVIEW-ONLY-SQL-PACKAGE.md` |
+| Docs | `docs/D1B-B-REVIEW-ONLY-SQL-PACKAGE.md` · source audit · fair-entry parity |
 
 ## Files (apply order when eventually authorized — staged)
 
 | File | Purpose | Typical stage |
 |------|---------|---------------|
 | `01-schema-max-human-members.sql` | Column + default + backfill | Stage 6 prep / with RPCs |
-| `02-helpers.sql` | Human count, division pick, code gen, errors | With RPCs |
-| `03-rpc-create-league.sql` | Atomic create + commissioner seat | Stage 6 |
+| `02-helpers.sql` | VOLATILE errors, sport allowlist, human count, division, code gen | With RPCs |
+| `02b-fair-entry.sql` | Freeze table + Fair Entry points (not division) | With RPCs |
+| `03-rpc-create-league.sql` | Atomic create + commissioner seat (points 0) | Stage 6 |
 | `04-rpc-join-by-code.sql` | Join closed league by code | Stage 6 |
 | `05-rpc-join-open.sql` | Join open league by UUID | Stage 6 |
 | `06-rpc-list-open-leagues.sql` | Safe open discovery (no codes) | Stage 13 prep |
