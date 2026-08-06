@@ -1,25 +1,30 @@
 -- =============================================================================
 -- D-02 — record_easter_egg_find integrity harden — REVIEW ONLY
 -- =============================================================================
--- DO NOT APPLY without Mike explicit authorization for D-02.
+-- DO NOT APPLY without Mike explicit authorization for D-02 AFTER preflight review.
 -- Design: docs/D-02-RECORD-EASTER-EGG-FIND-REMEDIATION.md
+-- Preflight: supabase/D-02-preflight-SELECT-ONLY.sql
 -- Evidence: P17 DEFECT 2 · STRUCTURAL-SECURITY-DEFECT-REGISTER D-02
 --
+-- Product decisions APPROVED: P1 catalog table · P2 RPC-only insert · P3 no
+-- historical delete in this apply · P4 milestones 7/10/full · P5 keep signature
+-- (deprecated untrusted args) · P6 dual catalog + parity · P7 SQL then app.
+--
 -- SCOPE:
---   1) Server-owned catalog table + seed of canonical egg_* ids (repo list)
---   2) Replace record_easter_egg_find body:
+--   1) Server-owned easter_egg_catalog + seed of exactly 20 canonical egg_* ids
+--   2) Catalog: RLS on; authenticated SELECT optional; NO client INSERT/UPDATE/DELETE
+--   3) Replace record_easter_egg_find body (signature kept for compatibility):
+--        - p_player_name, p_total_eggs DEPRECATED — ignored for trust
 --        - auth required; self-only (auth.uid())
 --        - validate discovery_id against catalog (active)
---        - ignore p_player_name / p_total_eggs for trust (signature kept)
 --        - name from profiles.display_name
---        - total + milestones from server catalog
---        - found counts only catalog ids
+--        - total + milestones [7,10,full] from server catalog
+--        - found counts only catalog ids (invalid historical rows left in place)
 --        - idempotent finds + flexes
---   3) REVOKE EXECUTE from PUBLIC + anon; GRANT authenticated
---   4) Drop client INSERT policy on easter_egg_finds (RPC-only writes)
+--   4) REVOKE EXECUTE from PUBLIC + anon; GRANT authenticated
+--   5) Drop client INSERT policy on easter_egg_finds (RPC-only writes)
 --
--- DOES NOT: D-01, D-03, D1B/D1C, other functions, app code.
--- Product decisions P1–P7 must be confirmed before apply (see design doc).
+-- DOES NOT: delete easter_egg_finds / flex history · D-01 · D-03 · D1B/D1C · app code
 -- =============================================================================
 
 begin;
@@ -74,10 +79,14 @@ create policy "egg_catalog_select_authenticated"
 drop policy if exists "egg_finds_insert_self" on public.easter_egg_finds;
 
 -- ── 3. Hardened function (signature preserved for app compatibility) ────────
+-- Signature preserved for PostgREST/app compatibility.
+-- DEPRECATED parameters (ignored; do not trust):
+--   p_player_name  — use profiles.display_name
+--   p_total_eggs   — use count(*) from easter_egg_catalog where is_active
 create or replace function public.record_easter_egg_find(
   p_discovery_id text,
-  p_player_name text,
-  p_total_eggs int
+  p_player_name text,   -- DEPRECATED untrusted
+  p_total_eggs int      -- DEPRECATED untrusted
 )
 returns json
 language plpgsql
@@ -95,7 +104,7 @@ declare
   v_inserted boolean := false;
   v_row_count int;
 begin
-  -- p_player_name and p_total_eggs intentionally unused (untrusted client input)
+  -- Intentionally unused (deprecated untrusted client input)
   perform p_player_name, p_total_eggs;
 
   if v_uid is null then

@@ -4,6 +4,22 @@
 **Defect:** STRUCTURAL-SECURITY-DEFECT-REGISTER **D-02** · P17 Block 2  
 **Severity:** Medium–High (integrity / fabricated discoveries & milestone newspapers)
 
+### Product decisions (Mike — approved)
+
+| ID | Decision | Status |
+|----|----------|--------|
+| **P1** | Catalog **table** is DB authority for valid egg IDs | **APPROVED** |
+| **P2** | Drop client INSERT policy; writes **RPC-only** | **APPROVED** |
+| **P3** | Do **not** delete junk rows in security apply; **SELECT inventory first**; stop counting invalid immediately; historical cleanup needs separate auth | **APPROVED** |
+| **P4** | Milestones **7 / 10 / full catalog** | **APPROVED** |
+| **P5** | Keep RPC signature; **ignore** untrusted name/total; document as **deprecated** | **APPROVED** |
+| **P6** | App + DB catalog updated together; **parity check/test** must fail on drift | **APPROVED** |
+| **P7** | SQL repair first; app remove upsert fallback **after** structural + behavioral verify | **APPROVED** |
+
+**Additional apply constraints:** protect catalog from client write; admin/migration-only catalog mutations; verify exactly 20 intended IDs before apply; direct `easter_egg_finds` insert must fail after repair; **no** historical data delete in D-02 security apply; no bundling.
+
+**Preflight:** `supabase/D-02-preflight-SELECT-ONLY.sql` (blocks one at a time).
+
 ---
 
 ## 1. Findings and call-site map
