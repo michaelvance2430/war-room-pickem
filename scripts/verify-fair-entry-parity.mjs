@@ -47,7 +47,8 @@ export const FIXTURES = [
   { id: "two-p100", values: [10, 90], pct: 100, expect: 90 },
   { id: "multi-p75", values: [0, 10, 20, 40], pct: 75, expect: 25 },
   { id: "all-equal", values: [15, 15, 15, 15], pct: 60, expect: 15 },
-  { id: "ties", values: [5, 5, 20, 20], pct: 50, expect: 12 },
+  // rank=1.5 on [5,5,20,20] → 5 + 15*0.5 = 12.5 → round 13
+  { id: "ties", values: [5, 5, 20, 20], pct: 50, expect: 13 },
   { id: "bot-ignored-input", values: [0, 100], pct: 75, expect: 75 }, // bots already filtered before call
   { id: "negative-coerced", values: [-5, 10], pct: 50, expect: 3 }, // Number(-5)||0 → -5 in TS? Number(-5)||0 is -5 because -5 is truthy
 ];
