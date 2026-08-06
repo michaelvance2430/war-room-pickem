@@ -1,10 +1,12 @@
 # D1B-A — Picks / pick_games membership correlation
 
-**Status:** **LIVE PREFLIGHT PASS / APPLY AUTHORIZED / NOT YET CLAIMED REPAIRED**  
+**Status:** **LIVE / STRUCTURALLY REPAIRED / POST-VERIFY PASS**  
 **Slice:** Isolation of own pick writes to **current** league membership  
 **Date:** 2026-08-06  
-**Preflight + apply-scope:** `docs/D1B-A-PREFLIGHT-AND-APPLY-SCOPE.md` (§0 fresh live production archive)  
+**Apply verification:** `docs/D1B-A-APPLY-VERIFICATION.md`  
+**Preflight + apply-scope:** `docs/D1B-A-PREFLIGHT-AND-APPLY-SCOPE.md` (§0)  
 **Preflight SQL:** `supabase/D1B-A-preflight-SELECT-ONLY.sql`  
+
 
 
 
@@ -89,10 +91,10 @@ Preserved separately (do not drop):
 | Fresh live SELECT-only preflight | **PASS** (archived in preflight doc §0) |
 | Apply-scope MATCH design + REVIEW-ONLY SQL | **Yes** |
 | Mike explicit **D1B-A-only** apply authorization | **Yes** |
-| Production apply | Use `supabase/D1B-A-APPLY-AUTHORIZED.sql` on connected prod |
-| Structural repair claim | Only after post-verify archive PASS |
+| Production apply | **Done** — migration `d1b_a_picks_membership_correlation` |
+| Structural repair claim | **LIVE / STRUCTURALLY REPAIRED / POST-VERIFY PASS** |
 
-See `docs/D1B-A-APPLY-AUTHORIZATION.md`.
+See `docs/D1B-A-APPLY-VERIFICATION.md`.
 
 ---
 

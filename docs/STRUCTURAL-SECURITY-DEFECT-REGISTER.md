@@ -1,13 +1,13 @@
 # Structural / security defect register
 
-**As of:** 2026-08-06 (updated after D1B-A **apply authorized** — execution/post-verify pending archive)  
-**Evidence chain:** P15–P18 · D1A · D-01–D-03 · scrub · D1C parked · D1B-A live preflight PASS · **D1B-A APPLY AUTHORIZED**  
+**As of:** 2026-08-06 (updated after D1B-A **LIVE / STRUCTURALLY REPAIRED / POST-VERIFY PASS**)  
+**Evidence chain:** P15–P18 · D1A · D-01–D-03 · scrub · D1C parked · D1B-A preflight · **D1B-A production apply**  
 **Mode:** Inspection / authorized repairs only  
 
-**Production confirmation:** D1B-A apply package ready; **structural repair not claimed** until post-verify archived. No D1C/H-01/D1B-B/C apply.  
-**D1C:** parked (unchanged).  
-**D1B-A:** **LIVE PREFLIGHT PASS / APPLY-SCOPE MATCH / APPLY AUTHORIZED / NOT YET CLAIMED REPAIRED** (await apply + post-verify).  
-**Archive:** `docs/D1B-A-PREFLIGHT-AND-APPLY-SCOPE.md` §0 · `docs/D1B-A-APPLY-AUTHORIZATION.md`
+**Production confirmation:** D1B-A migration `d1b_a_picks_membership_correlation` applied on **war-room-pickem**; post-verify **PASS**. No D1B-B/C, D1C, or H-01 apply.  
+**D1C:** parked (unchanged) — **not repaired**.  
+**D1B-A:** **LIVE / STRUCTURALLY REPAIRED / POST-VERIFY PASS**.  
+**Archive:** `docs/D1B-A-APPLY-VERIFICATION.md`
 
 ---
 
@@ -19,7 +19,7 @@
 | **D-01** `purge_locker_before` | **REGRESSION PASS** (anon EXECUTE false; structural repair intact) · behavioral PENDING |
 | **D-02** eggs | **REGRESSION PASS** (catalog 20; no direct INSERT; anon EXECUTE false) · behavioral PENDING |
 | **D-03** first join | **REGRESSION PASS** (anon EXECUTE false; INSERT uses `is_league_member`; 73 rows; 0 orphans) · behavioral PENDING |
-| **D1B-A** picks/pick_games | **LIVE PREFLIGHT PASS / APPLY AUTHORIZED / NOT YET CLAIMED REPAIRED** (await post-verify archive) |
+| **D1B-A** picks/pick_games | **LIVE / STRUCTURALLY REPAIRED / POST-VERIFY PASS** |
 | **D1B-B** membership join | **CONFIRMED HIGH AUTHORIZATION DEFECT / COORDINATED DESIGN REQUIRED** |
 | **D1B-C** achievements visibility | **DESIGN READY / APPLY NOT AUTHORIZED** |
 | **D1C** Crystal Ball | **DESIGN + NON-PRODUCTION SQL READY / EPHEMERAL TESTS NOT RUN / PRODUCTION APPLY BLOCKED / NOT REPAIRED** (parked) |
@@ -65,24 +65,23 @@
 
 ### D1B (split) · Picks / join / achievements
 
-**Data (live D1B-A preflight):** picks **7** · pick_games **35** · nonmember picks **0** · nonmember pick_games **0** · orphan pick_games **0** · no cleanup. **Indexes:** existing uniques sufficient — **no new indexes**.
+**Data (post D1B-A apply):** picks **7** · pick_games **35** · nonmember picks **0** · nonmember pick_games **0** · orphan pick_games **0** · no cleanup.
 
 #### D1B-A · picks / pick_games correlation
 
 | Field | Value |
 |-------|--------|
-| Severity | High (write isolation) · low apply risk for honest clients |
-| Status | **LIVE PREFLIGHT PASS / APPLY AUTHORIZED / NOT YET CLAIMED REPAIRED** |
+| Severity | High (write isolation) — **closed structurally** |
+| Status | **LIVE / STRUCTURALLY REPAIRED / POST-VERIFY PASS** |
 | Design | `docs/D1B-A-PICKS-MEMBERSHIP-CORRELATION.md` |
 | Live preflight | `docs/D1B-A-PREFLIGHT-AND-APPLY-SCOPE.md` §0 — **PASS** |
-| Authorization | Mike **D1B-A only** — `docs/D1B-A-APPLY-AUTHORIZATION.md` |
-| Apply SQL | `supabase/D1B-A-APPLY-AUTHORIZED.sql` |
-| Post-verify | `supabase/D1B-A-postverify-SELECT-ONLY.sql` |
-| Live baseline (pre-apply) | manage-own picks ownership only; pick_games parent owner, **WITH CHECK null** |
-| Helper | `is_league_member` — **reuse unchanged** |
-| Integrity (preflight) | picks **7** · pick_games **35** · nonmember **0** · orphan **0** |
-| Next | Run apply on connected prod · post-verify · archive results → claim structural repair if PASS |
-| Scope exclusion | No D1B-B/C · no D1C · no H-01 · no app · no historical mutation · no helper/grant changes |
+| Apply verification | `docs/D1B-A-APPLY-VERIFICATION.md` |
+| Migration | `d1b_a_picks_membership_correlation` on **war-room-pickem** (`success = true`) |
+| Live policies | manage-own picks + pick_games: ownership **and** `is_league_member` on USING + WITH CHECK |
+| Preserved | Commissioner reads league picks / pick_games (SELECT) |
+| Helper | `is_league_member` **unchanged** (definition + grants) |
+| Integrity | picks **7** · pick_games **35** · nonmember **0** · orphan **0** |
+| Not claimed | D1B-B · D1B-C · D1C · H-01 · app · behavioral suite |
 
 #### D1B-B · membership join authority
 
@@ -170,7 +169,7 @@
 | 2 | D-01 | **STRUCTURALLY LIVE** · behavioral PENDING |
 | 3 | D-02 | **STRUCTURALLY LIVE** · behavioral PENDING |
 | 4 | D-03 | **STRUCTURALLY LIVE** · behavioral PENDING |
-| 5 | **D1B-A** | Authorized · apply + post-verify on prod · **await result archive** |
+| 5 | **D1B-A** | **LIVE / STRUCTURALLY REPAIRED / POST-VERIFY PASS** |
 | 5b | **D1B-C** | Achievements SELECT (design ready; separate apply) |
 | 5c | **D1B-B** | Join RPCs + drop client INSERT (coordinated design) |
 | 6 | **D1C** | **Parked** — design + non-prod SQL ready; ephemeral tests not run; prod apply blocked |
@@ -195,9 +194,10 @@
 | `docs/AUTOMATED-READONLY-SCRUB-SWEEP.md` | Full scrub archive |
 | `docs/H-01A-SELECTIVE-DEFINER-EXECUTE-DESIGN.md` | H-01A selective REVOKE design ready |
 | `docs/H-01B-FUTURE-DEFAULT-PRIVILEGES-DESIGN.md` | H-01B future defaults (design required) |
-| `docs/D1B-A-PICKS-MEMBERSHIP-CORRELATION.md` | D1B-A design ready |
+| `docs/D1B-A-PICKS-MEMBERSHIP-CORRELATION.md` | D1B-A design (structurally repaired) |
 | `docs/D1B-A-PREFLIGHT-AND-APPLY-SCOPE.md` | D1B-A live preflight PASS + apply-scope MATCH |
-| `docs/D1B-A-APPLY-AUTHORIZATION.md` | D1B-A apply authorized + post-verify gray box |
+| `docs/D1B-A-APPLY-AUTHORIZATION.md` | D1B-A apply authorization (applied) |
+| `docs/D1B-A-APPLY-VERIFICATION.md` | D1B-A production apply + post-verify archive |
 | `supabase/D1B-A-preflight-SELECT-ONLY.sql` | D1B-A SELECT-only preflight |
 | `supabase/D1B-A-APPLY-AUTHORIZED.sql` | D1B-A authorized apply (two policies) |
 | `supabase/D1B-A-postverify-SELECT-ONLY.sql` | D1B-A post-verify SELECT-only |
@@ -220,4 +220,4 @@
 
 ---
 
-*End register — automated scrub archived; repairs beyond D-01–D-03 require Mike authorization.*
+*End register — D1B-A LIVE/STRUCTURALLY REPAIRED; D1B-B/C · D1C · H-01 still require separate Mike authorization.*

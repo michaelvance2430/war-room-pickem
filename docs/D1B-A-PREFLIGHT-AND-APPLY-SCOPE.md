@@ -1,6 +1,7 @@
 # D1B-A — SELECT-Only Preflight & Final Apply-Scope Review
 
-**Status:** **LIVE PREFLIGHT PASS / APPLY-SCOPE MATCH / APPLY AUTHORIZED / EXECUTION PENDING OR AWAITING POST-VERIFY ARCHIVE / NOT YET CLAIMED REPAIRED**  
+**Status:** **LIVE PREFLIGHT PASS / APPLY-SCOPE MATCH / APPLIED / STRUCTURALLY REPAIRED**  
+**Apply archive:** `docs/D1B-A-APPLY-VERIFICATION.md`  
 **Date:** 2026-08-06  
 **Slice:** `public.picks` + `public.pick_games` manage-own membership correlation only  
 **Design:** `docs/D1B-A-PICKS-MEMBERSHIP-CORRELATION.md`  
@@ -11,7 +12,7 @@
 
 | Action | Status |
 |--------|--------|
-| Apply D1B-A policies | **Authorized** by Mike (D1B-A only) — use `supabase/D1B-A-APPLY-AUTHORIZED.sql`; agent environment cannot run prod DDL without service credentials |
+| Apply D1B-A policies | **Applied** on production (`d1b_a_picks_membership_correlation`) — see verification archive |
 | DELETE / UPDATE / cleanup of historical rows | **No** — not needed and not authorized |
 | Index changes | **No** |
 | App code | **No** |
@@ -317,13 +318,12 @@ Restore prior manage-own (ownership only) from pre-apply archive of `qual`/`with
 - [x] `is_league_member` body correct — reuse unchanged  
 - [ ] Optional: confirm full preserve-list policy names still present immediately before apply  
 - [x] Explicit authorization: **D1B-A apply only** (Mike)  
-- [ ] Apply `supabase/D1B-A-APPLY-AUTHORIZED.sql` on production  
-- [ ] Post-verify via `supabase/D1B-A-postverify-SELECT-ONLY.sql`  
-- [ ] Archive post-verify in docs + register  
-- [ ] Spot-check honest client pick save still works  
+- [x] Apply on production — migration `d1b_a_picks_membership_correlation` (`success = true`)  
+- [x] Post-verify PASS — `docs/D1B-A-APPLY-VERIFICATION.md`  
+- [x] Archive post-verify in docs + register  
+- [ ] Optional: spot-check honest client pick save (behavioral; not required for structural claim)  
 
-**Authorization granted. Structural repair claimed only after post-verify PASS archived.**  
-See `docs/D1B-A-APPLY-AUTHORIZATION.md`.
+**D1B-A: LIVE / STRUCTURALLY REPAIRED / POST-VERIFY PASS.**
 
 ---
 
@@ -331,11 +331,9 @@ See `docs/D1B-A-APPLY-AUTHORIZATION.md`.
 
 | Statement | True? |
 |-----------|-------|
-| Production policies/data unchanged by this docs archive | **Yes** |
 | Fresh live preflight PASS / apply-scope MATCH | **Yes** |
-| D1B-A repaired | **No** |
-| D1B-A apply authorized | **No** |
-| D1B-B / D1B-C untouched | **Yes** |
-| D1C untouched / parked | **Yes** |
-| H-01 untouched | **Yes** |
+| D1B-A structurally repaired (post-verify) | **Yes** |
+| D1B-B / D1B-C repaired | **No** (untouched) |
+| D1C repaired | **No** (parked) |
+| H-01 repaired | **No** (untouched) |
 | Historical invalid-row cleanup | **Not done / not needed (0)** |
