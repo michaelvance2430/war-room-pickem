@@ -58,12 +58,12 @@ Remaining work is **repair design / apply authorization**, not further catalog d
 | Type | Untrusted caller input on discovery identity and milestones |
 | Effect | Arbitrary `egg_*` discovery IDs; caller-controlled `player_name` and `p_total_eggs` → fabricated finds / milestone flex |
 | Evidence | P17 Block 2 · call-site map in D-02 design |
-| Status | **REVIEW ONLY — P1–P7 approved — preflight in progress — not applied — not claimed repaired** |
+| Status | **PREFLIGHT PASS — REVIEW ONLY — not applied — not claimed repaired** |
 | Design | `docs/D-02-RECORD-EASTER-EGG-FIND-REMEDIATION.md` |
 | SQL proposal | `supabase/D-02-record-easter-egg-find-REVIEW-ONLY.sql` |
-| Preflight | `supabase/D-02-preflight-SELECT-ONLY.sql` (SELECT only; junk inventory before any cleanup) |
+| Preflight archive | `docs/D-02-PREFLIGHT-EVIDENCE.md` — **COMPLETE / PASS** (zero invalid finds; zero bad flexes) |
 | Intended fix | Catalog table authority; RPC-only writes; profile name; server total; milestones 7/10/full; deprecated unused args; no historical delete in security apply |
-| Blockers | Complete preflight + Mike authorize D-02 apply; cleanup of junk rows is a **separate** authorization |
+| Blockers | Mike explicit authorize D-02 apply after scope review |
 
 ### D-03 · `record_league_first_join` — membership correlation
 
