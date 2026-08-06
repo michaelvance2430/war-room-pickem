@@ -25,6 +25,7 @@ const out = {
   openUsesJoinOpen: /joinOpenLeagueById/.test(open),
   listingHasCode: /export type OpenRoomListing = \{[^}]*\bcode\b/.test(open),
   sportPoolInsert: ins.test(sp),
+  sportPoolUsesRpc: /spin_up_sport_pool_league/.test(sp),
   createNav: /league-build\?new=1/.test(joinP),
   joinLand: /declareAllegianceHref/.test(joinP),
   openLand: /declareAllegianceHref/.test(opage),
@@ -42,9 +43,9 @@ const pass =
   out.openUsesListRpc &&
   out.openUsesJoinOpen &&
   !out.listingHasCode &&
-  out.sportPoolInsert &&
+  !out.sportPoolInsert &&
+  out.sportPoolUsesRpc &&
   out.createNav &&
   out.rpcUnavailable;
-
 console.log(pass ? "SOURCE_AUDIT_PASS" : "SOURCE_AUDIT_FAIL");
 process.exit(pass ? 0 : 1);
