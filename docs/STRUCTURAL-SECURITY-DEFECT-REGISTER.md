@@ -1,10 +1,25 @@
 # Structural / security defect register
 
-**As of:** 2026-08-06  
-**Evidence chain:** P15 (complete) · P16 (complete) · P17 (complete) · P18 (complete)  
-**Mode:** Inspection only unless Mike explicitly authorizes a stage  
+**As of:** 2026-08-06 (updated after automated read-only scrub sweep)  
+**Evidence chain:** P15–P18 · D1A · D-01–D-03 apply/regression · **automated Supabase plugin scrub**  
+**Mode:** Inspection / authorized repairs only  
 
-**Production confirmation for this register:** no D1A, no REVOKE, no function edits, no other production changes applied from this chain.
+**Production confirmation (automated scrub):** no SQL writes, no Auth/app/deploy changes during that sweep.  
+**Archive:** `docs/AUTOMATED-READONLY-SCRUB-SWEEP.md`
+
+---
+
+## 0. Regression dashboard (automated scrub)
+
+| Item | Status |
+|------|--------|
+| **D1A** leagues DELETE retired | **REGRESSION PASS** (0 DELETE policies; RLS on; sport trigger enabled) |
+| **D-01** `purge_locker_before` | **REGRESSION PASS** (anon EXECUTE false; structural repair intact) · behavioral PENDING |
+| **D-02** eggs | **REGRESSION PASS** (catalog 20; no direct INSERT; anon EXECUTE false) · behavioral PENDING |
+| **D-03** first join | **REGRESSION PASS** (anon EXECUTE false; INSERT uses `is_league_member`; 73 rows; 0 orphans) · behavioral PENDING |
+| **D1B** picks / correlation | **DEFECT CONFIRMED** · **current data CLEAN** · no apply |
+| **D1C** Crystal Ball | **DEFECT CONFIRMED** · **design required** · no apply |
+| **H-01** DEFINER EXECUTE | **CONFIRMED** (14 anon / 27 authenticated callable) · no mass REVOKE |
 
 ---
 
@@ -12,176 +27,140 @@
 
 | Gate | Archive | Verdict |
 |------|---------|---------|
-| P15 Q1 `leagues` RLS enabled / forced | P15 | **PASS** (`true` / `false`) |
-| P15 Q2 sport immutability trigger | P15 | **PASS** (`leagues_sport_id_immutable_trg` = O) |
-| P15 Q3 UNIQUE integrity inventory | P15 | **PASS** (D1A integrity gate) |
-| P15 Q4 postseason tables | P15 | **PASS** (zero live tables) |
-| P16 Block 1 DEFINER inventory + search_path | P16 | **PASS** (27; all configured) |
-| P16 Block 2 EXECUTE grants | P16 | **FINDING** (broad anon/PUBLIC) |
-| P16 Block 3 missing search_path | P16 | **PASS** (zero rows) |
-| P17 Block 1 triage | P17 | **FINDING** (17 anonymously callable) |
-| P17 Block 2 full-body review | P17 | **DEFECTS + protected set** |
-| P17 Blocks 3–4 | P17 | **SKIPPED** (redundant) |
-| P18 Block 1 DEFINER leagues DELETE/UPDATE | P18 | **PASS** (0 delete; 2 safe updates) |
-
-**Last database-guts inspection gate for this chain: CLOSED (P18).**
-
-Remaining work is **repair design / apply authorization**, not further catalog discovery for D1A residual-function risk.
-
-**Optional at apply time only (already in D1A file):** re-SELECT exact `leagues` DELETE policy names immediately before DROP; freeze names from that run. Not a new guts-audit stage.
+| P15–P18 catalog chain | P15–P18 docs | Closed |
+| Automated scrub regression | `AUTOMATED-READONLY-SCRUB-SWEEP.md` | **PASS** on D1A + D-01–D-03 structural |
 
 ---
 
 ## 2. Confirmed defects (authorization / integrity)
 
-### D-01 · `purge_locker_before` — destructive authorization
+### D-01 · `purge_locker_before`
 
 | Field | Value |
 |-------|--------|
-| Severity | Was **High** (member/anon bulk wipe) |
-| Type | Authorization defect (authenticated member over-privileged) + unbounded cutoff |
-| Effect (pre-repair) | Any league member could delete locker messages older than caller-controlled `p_before`; future/`now()` cutoff could wipe history including recent board |
-| Evidence | P17 Block 2 · preflight 2026-08-06 |
-| Status | **REPAIRED / STRUCTURALLY VERIFIED / BEHAVIORAL TESTS PENDING** |
-| Applied | 2026-08-06 via SQL Editor — `docs/D-01-APPLY-VERIFICATION.md` |
-| Live body | `is_league_staff`; `v_boundary = now() - interval '7 days'`; reject newer `p_before`; server-capped cutoff |
-| Live EXECUTE | `authenticated`, `postgres`, `service_role` — **not** `anon` / `PUBLIC` |
-| Behavioral T7–T11 | **PENDING** (isolated disposable league only; not claimed passed) |
-| Design | `docs/D-01-PURGE-LOCKER-BEFORE-REMEDIATION.md` |
-| SQL | `supabase/D-01-purge-locker-before-REVIEW-ONLY.sql` |
+| Status | **REPAIRED / STRUCTURALLY VERIFIED / BEHAVIORAL PENDING** |
+| Regression | anon EXECUTE **false** (scrub) |
+| Design / SQL | D-01 docs + `supabase/D-01-purge-locker-before-REVIEW-ONLY.sql` |
 
-### D-02 · `record_easter_egg_find` — achievement integrity
+### D-02 · `record_easter_egg_find`
 
 | Field | Value |
 |-------|--------|
-| Severity | **Medium–High** (integrity / fraud surface) |
-| Type | Untrusted caller input on discovery identity and milestones |
-| Effect | Arbitrary `egg_*` discovery IDs; caller-controlled `player_name` and `p_total_eggs` → fabricated finds / milestone flex |
-| Evidence | P17 Block 2 · call-site map in D-02 design |
-| Status | **LIVE / STRUCTURALLY VERIFIED / BEHAVIORAL TESTS PENDING** |
-| Design | `docs/D-02-RECORD-EASTER-EGG-FIND-REMEDIATION.md` |
-| SQL | `supabase/D-02-record-easter-egg-find-REVIEW-ONLY.sql` (applied operator SQL Editor) |
-| Preflight | `docs/D-02-PREFLIGHT-EVIDENCE.md` — PASS |
-| Apply archive | `docs/D-02-APPLY-VERIFICATION.md` |
-| Live | Catalog 20 · RPC-only finds · profile name · server total/milestones · no anon/PUBLIC EXECUTE |
-| Behavioral | **PENDING** — disposable identity only; not against real egg history |
-| App fallback | Still present until separate P7 change |
+| Status | **LIVE / STRUCTURALLY VERIFIED / BEHAVIORAL PENDING** |
+| Regression | catalog **20**; INSERT policies **0**; anon EXECUTE **false** |
+| App P6/P7 | LIVE on prod commit `40f4a1f` (pending sync + parity) |
 
-### D-03 · `record_league_first_join` — membership correlation
+### D-03 · `record_league_first_join`
 
 | Field | Value |
 |-------|--------|
-| Severity | **Medium** (hardening / integrity) |
-| Type | Missing membership gate |
-| Effect | Self-only identity OK, but no required membership in `p_league_id` before insert; arbitrary first-join rows subject to DB constraints only |
-| Evidence | P17 Block 2 · call-site map in D-03 design |
-| Status | **REVIEW ONLY — design complete — not applied** |
-| Design | `docs/D-03-RECORD-LEAGUE-FIRST-JOIN-REMEDIATION.md` |
-| SQL proposal | `supabase/D-03-record-league-first-join-REVIEW-ONLY.sql` |
-| Preflight | `supabase/D-03-preflight-SELECT-ONLY.sql` (orphan inventory; leavers may be valid) |
-| Intended fix | Require membership for `(league_id, auth.uid())`; keep signature; idempotent first_joined_at; tighten INSERT policy; REVOKE anon/PUBLIC |
-| Historical cleanup | **Not** in D-03 apply — inventory only |
+| Status | **LIVE / STRUCTURALLY VERIFIED / BEHAVIORAL PENDING** (regression scrub) |
+| Regression | anon EXECUTE **false**; exactly one INSERT policy with `is_league_member`; **73** rows; **0** orphans |
+| Helper | `is_league_member` **unchanged** (shared; H-01 grants separate) |
+| Design / SQL | D-03 docs + narrow `supabase/D-03-record-league-first-join-REVIEW-ONLY.sql` |
 
----
-
-## 3. Known product / RLS defects (prior design — not re-probed as bodies)
-
-### D-04 · `leagues` DELETE policy (product retired) — **VERIFIED ABSENT**
-
-| Field | Value |
-|-------|--------|
-| Severity | Was **High** while policy live |
-| Type | RLS policy that granted commissioner DELETE while product Delete League is retired |
-| Prior evidence (Pass 1.5 / D1A freeze) | Exactly one DELETE policy: `"Commissioner deletes league"` |
-| Live 2026-08-06 (SQL Editor) | **Zero** DELETE policies; policy **already absent** |
-| This session | **VERIFIED NO-OP** — Block B **not** run; **no** production change |
-| Drift | State differs from prior freeze; **timing/cause unknown** — do not attribute without evidence |
-| Archive | `docs/D1A-VERIFICATION-NO-OP.md` |
-| Residual | P18: no SECURITY DEFINER public function deletes leagues; app fail-closed remains |
-
-### D-05 · Membership tautologies / cross-league write paths (D1B)
+### D1B · Picks / membership correlation (+ achievements tautology)
 
 | Field | Value |
 |-------|--------|
 | Severity | **High** (isolation) |
-| Type | RLS correlation bugs (`m.league_id = m.league_id` class); picks manage-own without target-league membership |
-| Evidence | D0 design inventory (STRUCTURAL-HARDENING-D0-RLS.md) |
-| Apply status | **D1B REVIEW-ONLY** — prefer ephemeral/staging; **not authorized** |
-| Note | Not re-executed in P15–P18 guts chain |
+| Status | **DEFECT CONFIRMED · CURRENT DATA CLEAN · NOT AUTHORIZED TO REPAIR** |
+| Live policies | `picks` “Users manage own picks” = `auth.uid() = user_id` only; `pick_games` via parent pick user only; memberships INSERT self-only; memberships UPDATE **no** `with_check` |
+| Tautologies | `achievements.Members read achievements` uses `m.league_id = m.league_id` |
+| Integrity | picks **7** · nonmember picks **0** · pick_games under nonmember **0** · memberships **77** · missing league/user **0** |
+| Cleanup | **None needed** |
+| Apply | Separate design + Mike auth only |
 
-### D-06 · Crystal Ball lock/reveal RLS (D1C)
+### D1C · Crystal Ball lock / reveal / membership
 
 | Field | Value |
 |-------|--------|
-| Severity | **Medium–High** (product integrity) |
-| Type | Hardcoded freezes / multi-authority lock; score-as-reveal risk |
-| Evidence | D0/D1C design |
-| Apply status | **Blocked** until single lock resolver app+DB; **not authorized** |
+| Severity | **Medium–High** |
+| Status | **DEFECT CONFIRMED · DESIGN REQUIRED · NOT AUTHORIZED TO REPAIR** |
+| Tautologies | All listed `crystal_ball_picks` / `crystal_ball_result` member policies use `m.league_id = m.league_id` |
+| Authority | No non-internal CB triggers; frozen-read mixes result row · hard-coded `2026-08-29 16:00:00+00` · hard-coded `2026-09-10 16:00:00+00` · week result 0/1 |
+| Extra | `crystal_ball_lock_count` DEFINER; anon+authenticated EXECUTE |
+| Apply | **Do not quick-patch**; single lock/reveal design first |
+
+### D-04 · `leagues` DELETE (product retired)
+
+| Field | Value |
+|-------|--------|
+| Status | **VERIFIED ABSENT** (D1A) · **REGRESSION PASS** (0 DELETE policies) |
+| Archive | `docs/D1A-VERIFICATION-NO-OP.md` |
 
 ---
 
-## 4. Hardening findings (not confirmed exploits)
+## 3. Hardening findings (not claimed exploits)
 
-| ID | Finding | Notes | Apply |
-|----|---------|-------|-------|
-| H-01 | Broad anon/PUBLIC EXECUTE on many SECURITY DEFINER RPCs | Least-privilege surface even where body guards work | No REVOKE without design + tests |
-| H-02 | `rls_forced = false` on `leagues` | Matches repo; service role bypasses RLS either way | Do not FORCE without product decision |
-| H-03 | Postseason tables absent | Matches REVIEW-ONLY / not applied | Separate PS authorization |
-| H-04 | Protected mutation RPCs (bots, reset, transfer, moderation, …) | Internal commissioner/staff checks present | Grants still H-01 surface |
+| ID | Finding | Live (scrub) | Apply |
+|----|---------|--------------|--------|
+| **H-01** | SECURITY DEFINER client EXECUTE surface | **27** DEFINER · **14** anon · **27** authenticated · **11** PUBLIC · **0** missing proconfig | **No mass REVOKE**; call-site matrix first |
+| **H-02** | `rls_forced = false` on leagues | Expected | No FORCE without product decision |
+| **H-03** | Postseason tables | Still not applied (prior) | Separate PS auth |
+| **H-05** | Mutable function `search_path` | **3** functions: `profiles_birthday_hard_lock`, `profile_favorite_teams_set_updated_at`, `leagues_sport_id_immutable` | Hardening only; separate auth |
+| **H-06** | RLS enabled, no policy | `platform_odds_api_usage` | Classify grants/call sites; **do not** add permissive policy to silence advisor |
+| **H-07** | Leaked-password protection **disabled** | Auth setting | Recommendation only; separate Mike auth before enable |
 
-**Protected by body (P17):**  
-`clear_trial_bots`, `reset_league_season`, `seed_bot_picks_for_week`, `seed_bot_sport_pool_votes`, `seed_trial_bots`, `set_member_moderation`, `transfer_commissioner`, `get_league_favorite_team_counts`
+### H-01 anon-callable DEFINER list (14)
 
-**Low privilege / correct attachment:**  
-`crystal_ball_lock_count`, `is_league_*`; `handle_new_user` → `auth.users` trigger
+`clear_trial_bots`, `crystal_ball_lock_count`, `get_league_favorite_team_counts`, `handle_new_user`, `is_league_commissioner`, `is_league_member`, `is_league_ops`, `is_league_staff`, `reset_league_season`, `seed_bot_picks_for_week`, `seed_bot_sport_pool_votes`, `seed_trial_bots`, `set_member_moderation`, `transfer_commissioner`
+
+**Not on anon list:** D-01 / D-02 / D-03 repaired RPCs.
+
+### Policy tautology inventory (6)
+
+1. `achievements.Members read achievements`  
+2–5. `crystal_ball_picks` (upsert / frozen read / own read / update)  
+6. `crystal_ball_result.Members read crystal result`  
+
+### Global RLS / views (scrub)
+
+- Public tables with RLS disabled: **0**  
+- Public views: **0** · **PASS**
+
+### Advisors summary
+
+- Security notices: **46** (RLS/no-policy 1 · mutable search_path 3 · anon DEFINER 14 · authenticated DEFINER 27 · leaked-password 1)  
+- Performance: unused indexes / multi-permissive policies / duplicate `league_trophies` index — **informational**; do not drop/merge during scrub  
 
 ---
 
-## 5. Recommended repair order
+## 4. Recommended repair order (updated)
 
-Order balances **blast radius**, **product law**, and **dependency**. No stage runs without Mike’s explicit authorization.
-
-| Order | Stage | What | Why this order | Risk if skipped |
-|-------|--------|------|----------------|-----------------|
-| **1** | **D1A** | Drop verified `leagues` DELETE policy only | **CLOSED 2026-08-06: VERIFIED NO-OP / ALREADY ABSENT** — see `docs/D1A-VERIFICATION-NO-OP.md` | N/A (desired state satisfied; this session did not DROP) |
-| **2** | **D-01** | `purge_locker_before` staff + 7-day retention | **STRUCTURALLY LIVE 2026-08-06**; behavioral T7–T11 still PENDING | Was: members could wipe locker history |
-| **3** | **D-02** | `record_easter_egg_find` catalog + trusted fields | **STRUCTURALLY LIVE 2026-08-06**; behavioral PENDING | Was: fake eggs / milestone fraud |
-| **4** | **D-03** | `record_league_first_join` require membership | Smaller integrity fix; independent | Spoofed first-join rows |
-| **5** | **H-01** | Least-privilege EXECUTE (REVOKE anon/PUBLIC where body is sufficient) | Only after body matrix frozen; easy to break clients/triggers | Over-revoke breaks legit RPC/trigger paths |
-| **6** | **D1B** | Membership-correlation RLS repairs | Prefer non-prod first; no staging today | Cross-league read/write isolation bugs remain |
-| **7** | **D1C** | Crystal Ball single lock authority | Blocked on shared resolver design | Wrong reveal/write semantics |
-| **8** | **PS** | Postseason snapshot tables | Separate product authorization | Cut freeze still non-durable |
+| Order | Stage | Status |
+|-------|--------|--------|
+| 1 | D1A | **CLOSED** (absent / regression PASS) |
+| 2 | D-01 | **STRUCTURALLY LIVE** · behavioral PENDING |
+| 3 | D-02 | **STRUCTURALLY LIVE** · behavioral PENDING |
+| 4 | D-03 | **STRUCTURALLY LIVE** · behavioral PENDING |
+| 5 | **D1B** | Next isolation repair candidate (data clean) |
+| 6 | **D1C** | Design single lock/reveal (blocked on design) |
+| 7 | **H-01** | Call-site matrix then selective REVOKE |
+| 8 | H-05 / H-06 / H-07 | Advisor hardening (non-exploit) |
+| 9 | PS | Postseason snapshots |
 
 ### Explicit non-goals until authorized
 
-- Do not enable `FORCE ROW LEVEL SECURITY` casually  
-- Do not modify sport immutability trigger/function  
-- Do not drop UNIQUE constraints  
-- Do not apply combined D0 mega-migration  
-- Do not REVOKE grants without per-function call-site analysis  
-
-### D1A apply checklist (when Mike authorizes)
-
-1. SELECT-only: exact DELETE policy names on `public.leagues`  
-2. Confirm list matches freeze (expected: `"Commissioner deletes league"` only)  
-3. Apply `supabase/D1A-league-delete-lockdown-REVIEW-ONLY.sql` only  
-4. Post-verify: zero DELETE policies; sport trigger still O; create/update still work  
-5. Do **not** bundle D-01–D-03 or H-01 into the same transaction  
+- Mass REVOKE / Auth leaked-password enable  
+- Index drops / policy consolidation for performance advisors  
+- Quick-patch D1C freezes  
+- Behavioral suites on real identities  
 
 ---
 
-## 6. Document index
+## 5. Document index
 
-| Doc / SQL | Role |
-|-----------|------|
-| `docs/P15-STRUCTURAL-SECURITY-EVIDENCE.md` | RLS, trigger, uniques, postseason |
-| `docs/P16-DEFINER-GRANTS-SEARCHPATH-EVIDENCE.md` | DEFINER inventory, grants FINDING, search_path |
-| `docs/P17-DEFINER-BODY-ACL-EVIDENCE.md` | Body review, D-01–D-03, protected set |
-| `docs/P18-DEFINER-LEAGUES-MUTATE-EVIDENCE.md` | No DEFINER league delete; safe updates |
+| Doc | Role |
+|-----|------|
+| `docs/AUTOMATED-READONLY-SCRUB-SWEEP.md` | Full scrub archive (this update) |
+| `docs/D1A-VERIFICATION-NO-OP.md` | D1A closed |
+| `docs/D-01-APPLY-VERIFICATION.md` | D-01 structural |
+| `docs/D-02-APPLY-VERIFICATION.md` | D-02 structural |
+| `docs/D-03-APPLY-SCOPE.md` / preflight / helper gate | D-03 |
 | `docs/STRUCTURAL-HARDENING-D0-RLS.md` | D1A/B/C design |
-| `supabase/D1A-league-delete-lockdown-REVIEW-ONLY.sql` | D1A proposal (not applied) |
-| This file | Master defect register + repair order |
+| This file | Master register |
 
 ---
 
-*End register — inspection chain complete; repair requires Mike authorization.*
+*End register — automated scrub archived; repairs beyond D-01–D-03 require Mike authorization.*
