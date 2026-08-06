@@ -1,256 +1,160 @@
-# D1B-B — REVIEW-ONLY package source audit
+# D1B-B — REVIEW-ONLY package source audit (post fair-entry revision)
 
 **Date:** 2026-08-06  
 **Package:** `supabase/review-only/D1B-B/`  
-**Authorization:** Source audit + disposable design only — **no production apply**  
-**Final classification:** **BLOCKED BY FAIR-ENTRY PARITY**  
+**Prior audit:** blocked by fair-entry stub  
+**This audit:** fair-entry implemented in REVIEW-ONLY SQL + SQL-1/2/3 fixes  
 
-### Explicit non-actions
-
-| Action | Status |
-|--------|--------|
-| Production SQL / live RPCs / schema / policies | **No** |
-| App deploy | **No** |
-| Membership/league mutation | **No** |
-| D1C / H-01 | **No** |
-
-**D1B-B remains NOT REPAIRED.**
-
----
-
-## Executive summary
-
-| Area | Verdict |
-|------|---------|
-| Core join/create security shape (DEFINER, forced defaults, FOR UPDATE capacity, no privileged client columns) | **Largely sound** for disposable exercise |
-| File 07 separation (no early INSERT/UPDATE/SELECT strip) | **PASS** |
-| Concurrency final human seat | **PASS** (with notes) |
-| Open discovery without codes | **PASS** |
-| Fair-entry points vs live browser mid-season | **FAIL / production blocker** — stub returns 0 |
-| App response-shape compatibility | **REVISION REQUIRED** (field names + create args + cut_percent) |
-| Several SQL correctness nits | **REVISION REQUIRED** before any prod stage-6 |
-
-**Overall:** Do **not** authorize production use of join RPCs until fair-entry server parity is implemented and proven. Package is **not** “disposable ready” for full mid-season parity tests without that design landed in SQL.
-
----
-
-## 1. SQL correctness
-
-### 1.1 Signatures & returns
-
-| Function | Signature | Returns | Notes |
-|----------|-----------|---------|--------|
-| `create_league_with_commissioner_seat` | 7 args (name, sport, list_open, cb, week, cut_percent, max_human) | `json` | `p_cut_percent` **unused** in body |
-| `join_league_by_code` | `(text)` | `json` | OK |
-| `join_open_league_by_id` | `(uuid)` | `json` | OK |
-| `list_open_leagues_public` | `(text, int)` | `json` | OK |
-| Helpers | various | int/division/text/void | OK |
-
-PostgREST: app must call with **named parameters** for create (many defaults). Overloads not defined — good.
-
-### 1.2 SECURITY DEFINER / search_path
-
-All create/join/list RPCs and capacity helpers: `SECURITY DEFINER` + `set search_path = public` — **PASS**.
-
-`d1b_b_raise` marked `immutable` but raises exceptions — should be **`volatile`** (nit / revision).
-
-### 1.3 Qualification
-
-Membership inserts use explicit columns. League lock uses `public.leagues`. Helpers use qualified tables. **PASS** for forced inserts.
-
-### 1.4 Grants
-
-RPCs: `REVOKE` public + anon; `GRANT` authenticated — **PASS** intent.  
-Helpers: revoke public only; not granted to authenticated — correct for internal use.  
-Does not touch `is_league_member` grants — **PASS** (H-01 separate).
-
-### 1.5 Transactions
-
-PL/pgSQL function body is a single transaction with caller — **PASS**. Create inserts league then membership; failure after league rolls back both unless autonomous (none). **PASS** for atomic create.
-
-### 1.6 Idempotent rejoin
-
-Join paths: pre-check existing membership → success JSON `already_member: true`. Unique race → re-check membership. **PASS**.
-
-### 1.7 Error contracts
-
-Uses `d1b_b:<code>` via `P0001`. Codes: not_authenticated, invalid_code, not_found, not_open, league_full, validation_failed.  
-**Note:** empty code and unknown code both `invalid_code` — good for not distinguishing existence of short codes; unknown code also `invalid_code` — **does not** distinguish “exists” for invalid vs missing beyond same code (good).
-
-### 1.8 Ambiguous columns / variables
-
-`join_league_by_code` unique_violation handler references `v_league` — only reached after league loaded — **OK**.  
-Create unique_violation does not distinguish code vs other uniques — maps to validation_failed — **OK**.
-
-### 1.9 Sport validation bug — **REVISION REQUIRED**
-
-```sql
-if v_sport not in ('cfb', 'nfl') then
-  if v_sport is null or v_sport = '' then
-    v_sport := 'cfb';
-  end if;
-end if;
-```
-
-Any non-empty sport outside `{cfb,nfl}` (e.g. `soccer_wwc`) is **accepted unchanged**. Should either allowlist all product sports or reject.
-
-### 1.10 Rollback completeness
-
-File 11 covers stage-6 drop RPCs/helpers; stage-10 restore INSERT; stage-12/14 restore policies.  
-**Gap:** does not archive exact live policy text to restore (operator must pre-archive). Document as process requirement.
-
----
-
-## 2. Concurrency
-
-| Requirement | Assessment |
-|-------------|------------|
-| `SELECT … FOR UPDATE` on league before capacity | **PASS** (join-by-code, join-open) |
-| Final seat → one membership | **PASS** under lock + unique (league_id, user_id) |
-| Duplicate/retry → existing membership | **PASS** |
-| Bots excluded from max_human_members | **PASS** (`is_bot = false` count) |
-| Commissioner counts as human | **PASS** (not bot) |
-| Deadlock / lock order | Single league row locked first; no multi-league locks — **low risk** |
-
-Create path does not lock for capacity (new league empty) — **OK**.
-
----
-
-## 3. Forced membership defaults
-
-| Field | Create commissioner | Join player | Client can supply? |
-|-------|---------------------|-------------|-------------------|
-| user_id | auth.uid() | auth.uid() | **No** |
-| role | commissioner | player | **No** |
-| is_bot / is_deputy / is_moderator / locker_muted | false | false | **No** |
-| total_points | 0 | fair-entry helper | **No** (but helper = stub) |
-| weeks_played | 0 | 0 | **No** |
-| division | North (create) | least-populated | **No** |
-| joined_at | DB default `now()` | DB default | **No** (not explicitly set — OK if column default) |
-
-**Other scoring columns** (weekly_points, ats_*, etc.): rely on table defaults — **PASS** if defaults are zero/empty (schema defaults exist).
-
-**Caller privilege spoof:** no RPC params for privileged columns — **PASS**.
-
----
-
-## 4. Atomic creation
-
-| Check | Result |
-|-------|--------|
-| Auth required | **PASS** |
-| Validate name / max | **PASS** |
-| Unique private code | **PASS** (generate + unique constraint) |
-| League + commissioner in one function TX | **PASS** |
-| Force commissioner role | **PASS** |
-| max_human_members range | **PASS** |
-| Rollback both on failure | **PASS** (single TX) |
-| Code collision | Retry in generator; unique_violation → error | **PASS** |
-| cut_percent | **Not applied** — app may expect it — **REVISION** |
-| Opening week | Caller-supplied p_current_week default 0 — app uses sport-specific opening week — **app must pass** |
-
----
-
-## 5. Join-by-code privacy
-
-| Check | Result |
-|-------|--------|
-| Does not use general SELECT of codes | **PASS** (DEFINER lookup) |
-| Normalize upper/trim | **PASS** — matches app `code.trim().toUpperCase()` |
-| Existence oracle | Same `invalid_code` for empty/missing — **PASS** |
-| Locks league | **PASS** |
-| Capacity transactional | **PASS** |
-| Idempotent rejoin | **PASS** |
-| Returns code on success | **OK** for joiner session (not bulk list) |
-
----
-
-## 6. Open-league join
-
-| Check | Result |
-|-------|--------|
-| FOR UPDATE | **PASS** |
-| is_open = true | **PASS** (`is distinct from true`) |
-| Capacity after lock | **PASS** |
-| Closed/not-found/full | **PASS** |
-| Already member | **PASS** (omits code in response — good) |
-| Auto-unlist when full | **PASS** best-effort |
-
----
-
-## 7. Safe discovery
-
-| Check | Result |
-|-------|--------|
-| Never returns code | **PASS** |
-| Approved fields only | **PASS** (id, name, sport, commissioner_id, times, counts) |
-| is_open only | **PASS** |
-| Capacity without identities | **PASS** (aggregates) |
-| Does not rely on unrestricted client SELECT | **PASS** (DEFINER reads leagues) |
-
-**Note:** Still exposes `commissioner_id` — approved as public display field? Mark as product-acceptable for open rooms (matches current open-room list).
-
----
-
-## 8. Fair-entry — **PRODUCTION BLOCKER**
-
-See **`docs/D1B-B-FAIR-ENTRY-SERVER-PARITY.md`**.
-
-Stub `d1b_b_fair_entry_points` always returns **0**. Live app mid-season sets non-zero `total_points` via band percentile of human standings. **Do not approve production join RPC with stub.**
-
-Division assignment is **separate** (least-populated) — implemented; do not conflate with fair-entry points.
-
----
-
-## 9. App compatibility (no implement)
-
-| Flow | Today | RPC package | Required app changes |
-|------|-------|-------------|----------------------|
-| Create `join/page.tsx` | leagues.insert + memberships.insert commissioner | `create_league_with_commissioner_seat` | Map name, sport_id, list_as_open, crystal_ball, **opening week**, max; handle json + `d1b_b:*` errors; then `set_my_league_display_name` nick; `writeSessionAndLeague` from response **code** |
-| Join by code | select leagues by code + insert | `join_league_by_code` | Pass upper code; stop client capacity/division/fair-entry; session from response |
-| Open room | seatPlayerInLeague insert | `join_open_league_by_id` | Stop client insert; list via `list_open_leagues_public` (**no code** — UI must not show code from list; invite code only after join via member fetch) |
-| sport-pool | multi insert | **Out of scope / service path** — not covered by three human RPCs | Separate server seating later |
-| record_league_first_join | client after insert | Called inside RPCs (swallowed if missing) | Remove redundant client call or keep idempotent |
-| Session refresh | select memberships + leagues embed | Unchanged until SELECT tighten | Later: member-scoped league fetch including code |
-
-**Open-room product break if discovery cutover early:** `listOpenRooms` currently returns `code` for display — B3 forbids codes in open discovery; UI must change before Stage 13/14.
-
----
-
-## 10. File 07 — first-stage RPC migration safety
-
-| Must not happen in stage-6 (01–06) | Confirmed |
-|-----------------------------------|-----------|
-| Remove membership INSERT | **Yes** — only in commented 07 stage 10 |
-| Remove broad UPDATE | **Yes** — stage 12 comments |
-| Tighten leagues SELECT | **Yes** — stage 14 comments |
-| Change client behavior | **N/A** until app deploy |
-
-**PASS** for separation.
-
----
-
-## 11. Blocker list
-
-| ID | Severity | Blocker |
-|----|----------|---------|
-| **FE-1** | **P0 production** | Fair-entry stub = 0; mid-season parity unproven |
-| **SQL-1** | Medium | Sport allowlist logic accepts arbitrary non-empty sports |
-| **SQL-2** | Low | `p_cut_percent` unused |
-| **SQL-3** | Low | `d1b_b_raise` should be VOLATILE |
-| **APP-1** | Medium | Create/join response mapping + error parsing |
-| **APP-2** | Medium | Open-room UI uses `code` from list — conflicts with code-free discovery |
-| **APP-3** | Medium | sport-pool multi-seat not in RPC set |
-| **OPS-1** | Low | Rollback needs archived live policy text before stage 10/12/14 |
-
----
-
-## 12. Final classification
+### Final classification
 
 ```text
-BLOCKED BY FAIR-ENTRY PARITY
+REVIEW-ONLY PACKAGE REVISED / DISPOSABLE READY
 ```
 
-Secondary: **REVISION REQUIRED** for SQL-1/SQL-2/SQL-3 and app contracts before production stage-6, even after fair-entry lands.
+**Caveats:** Disposable suite still **NOT_RUN** on a live ephemeral project in this session. Classification means: package is **ready to execute** on disposable after 01→02→02b→03–06; production still **not authorized**. Mid-season FE fixtures require week_results + freezes on disposable.
 
-Disposable early-season-only testing (always 0 points) is possible **only** if explicitly scoped and not treated as mid-season parity certification.
+**D1B-B remains NOT REPAIRED. No production apply.**
+
+---
+
+## 1. Exact fair-entry algorithm
+
+See `docs/D1B-B-FAIR-ENTRY-SERVER-PARITY.md` §1 (line map of `fair-entry.ts`).
+
+**Summary:** If no scored week ≥ 1 → 0. Else band by latest scored week; use frozen points if present; else percentile of human total_points (bots excluded, joiner excluded); freeze idempotently; return max(0, points).
+
+**Division:** independent least-populated (`d1b_b_next_division`).
+
+---
+
+## 2. Server freeze schema and rationale
+
+**Table:** `public.fair_entry_band_freezes` (normalized).  
+
+**Why not sport_settings alone:** atomic insert under league lock, CHECK constraints, provenance columns, season_year PK component, clean RLS.  
+
+**Season year:** `active_competition_season_year` if present else ET calendar year.  
+
+**Reset:** delete freezes on season reset (follow-on ops; not auto in join).
+
+---
+
+## 3. Revised SQL paths
+
+| File | Change |
+|------|--------|
+| `02-helpers.sql` | VOLATILE raise; sport allowlist; cut unused stub FE |
+| `02b-fair-entry.sql` | **New** — freeze table + full FE |
+| `03-rpc-create-league.sql` | Sport allowlist reject; **cut_percent** 0–100 persist default 50; commissioner points 0 |
+| `04` / `05` | FE via `d1b_b_fair_entry_points(league, uid)` under lock |
+| `06` | Unchanged intent (no codes) |
+| `07` | Still future-only |
+| `scripts/verify-fair-entry-parity.mjs` | TS fixtures |
+
+Apply order: **01 → 02 → 02b → 03 → 04 → 05 → 06**.
+
+---
+
+## 4. RPC signatures (final)
+
+### `create_league_with_commissioner_seat`
+
+```
+(p_name text,
+ p_sport_id text default 'cfb',
+ p_list_as_open boolean default false,
+ p_crystal_ball_enabled boolean default true,
+ p_current_week integer default 0,
+ p_cut_percent integer default 50,
+ p_max_human_members integer default 32)
+→ json { ok, league_id, code, sport_id, name, cut_percent, max_human_members, is_open, current_week }
+```
+
+### `join_league_by_code(p_code text)` → json  
+
+### `join_open_league_by_id(p_league_id uuid)` → json  
+
+### `list_open_leagues_public(p_sport_id text, p_limit int)` → json rooms **without code**
+
+---
+
+## 5. Sport allowlist source
+
+**Source:** `src/lib/sports/registry.ts` packs with `status: "live"` → **`cfb`, `nfl` only**.  
+
+`d1b_b_normalize_sport_id`: blank → `cfb`; cfb/nfl (case-insensitive) accepted; else **null** → `validation_failed sport`.  
+
+coming_soon (`soccer_wwc`, `nba`, `nhl`, …) **rejected**.
+
+---
+
+## 6. p_cut_percent resolution
+
+**Keep and persist.** App/settings use cut_percent (default 50, product 0–100).  
+
+Validated 0–100 inclusive; written to `leagues.cut_percent` on create. Fallback insert path if column missing (disposable base).
+
+---
+
+## 7. d1b_b_raise volatility
+
+**VOLATILE.** Allowed codes only. Client message: `d1b_b:<code>` + optional short `[a-z0-9_]+` token. No join codes, UUIDs, or SQL text.
+
+PostgREST: surfaces as error message string; app maps prefix.
+
+---
+
+## 8. App mapping resolution (design only)
+
+| Flow | Mapping |
+|------|---------|
+| join create | `create_league_with_commissioner_seat` with name, sport, list_as_open, crystal_ball, **openingWeek**, cut 50 or settings, max 32 → session from json.code |
+| join code | `join_league_by_code(upper(code))` — drop client capacity/FE/division |
+| open-room seat | `join_open_league_by_id(id)` |
+| open-room list | `list_open_leagues_public` — **UI must not require code**; remove code from OpenRoomListing or fetch after join |
+| sport-pool | **Separate privileged/server seating** — not human self-join RPC; keep Foundry/service for multi-bot seat |
+| first-join | Inside RPCs; client call optional/idempotent |
+| session | writeSessionAndLeague after RPC success (same as today) |
+| errors | parse `d1b_b:league_full` etc. to existing copy helpers |
+| retry | rejoin returns already_member |
+
+No app deploy authorized.
+
+---
+
+## 9. Static / parity test results
+
+| Test | Result |
+|------|--------|
+| File 07 still not in stage-6 | **PASS** |
+| Forced defaults / no privilege params | **PASS** |
+| FOR UPDATE capacity | **PASS** |
+| list_open no code | **PASS** |
+| Fair-entry no longer stub-only | **PASS** (SQL present) |
+| `node scripts/verify-fair-entry-parity.mjs` | Run in package commit / CI |
+| Disposable JWT suite | **NOT_RUN** |
+| SQL↔TS on disposable DB | **NOT_RUN** |
+
+---
+
+## 10. Remaining blockers
+
+| ID | Severity | Item |
+|----|----------|------|
+| DISP-1 | Process | Disposable project execution still required before prod |
+| APP-OPEN | Product/UX | Open-room UI currently shows codes — must change before discovery cutover |
+| SPORT-POOL | Design | Multi-seat not in three human RPCs |
+| RESET-FE | Design | Season reset must clear freezes (explicit follow-on) |
+| NEG | Product quirk | Negative total_points preserved in percentile input (TS) |
+
+**No P0 algorithm blocker remaining for early+mid-season if 02b applied on disposable and FE fixtures pass.**
+
+---
+
+## 11. Disposable readiness verdict
+
+```text
+REVIEW-ONLY PACKAGE REVISED / DISPOSABLE READY
+```
+
+Meaning: package is consistent enough to apply **01–06 including 02b** on a **disposable** project and run the guide. Not a claim that tests already passed. Production stage-6 still needs separate Mike authorization after disposable green.

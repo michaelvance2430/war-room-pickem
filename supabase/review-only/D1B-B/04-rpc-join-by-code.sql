@@ -63,8 +63,10 @@ begin
     perform public.d1b_b_raise('league_full');
   end if;
 
+  -- Division placement (independent of Fair Entry points)
   v_div := public.d1b_b_next_division(v_league.id);
-  v_pts := public.d1b_b_fair_entry_points(v_league.id);
+  -- Fair Entry total_points under same league lock (exclude joiner)
+  v_pts := public.d1b_b_fair_entry_points(v_league.id, v_uid);
 
   insert into public.memberships (
     league_id,

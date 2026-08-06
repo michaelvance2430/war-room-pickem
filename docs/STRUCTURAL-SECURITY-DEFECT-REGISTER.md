@@ -1,14 +1,14 @@
 # Structural / security defect register
 
-**As of:** 2026-08-06 (updated after D1B-B **source audit — blocked by fair-entry parity**)  
-**Evidence chain:** P15–P18 · D1A · D-01–D-03 · scrub · D1C parked · D1B-A/C repaired · D1B-B preflight · B1–B6 · REVIEW-ONLY SQL · **source audit**  
+**As of:** 2026-08-06 (updated after D1B-B **fair-entry revision — disposable ready**)  
+**Evidence chain:** P15–P18 · D1A · D-01–D-03 · scrub · D1C parked · D1B-A/C repaired · D1B-B preflight · B1–B6 · REVIEW-ONLY SQL · **FE parity revision**  
 **Mode:** Inspection / authorized repairs only  
 
 **Production confirmation:** D1B-A + D1B-C repaired. D1B-B **not applied**. No D1C / H-01 apply.  
 **D1B-A / D1B-C:** **LIVE / STRUCTURALLY REPAIRED / POST-VERIFY PASS**.  
-**D1B-B:** **BLOCKED BY FAIR-ENTRY PARITY** (source-audited; no production apply; **not repaired**).  
+**D1B-B:** **REVIEW-ONLY PACKAGE REVISED / DISPOSABLE READY / NO PRODUCTION APPLY / NOT REPAIRED**.  
 **D1C:** parked — **not repaired**.  
-**Archive:** `docs/D1B-B-REVIEW-ONLY-SOURCE-AUDIT.md` · `docs/D1B-B-FAIR-ENTRY-SERVER-PARITY.md`
+**Archive:** `docs/D1B-B-REVIEW-ONLY-SOURCE-AUDIT.md` · `docs/D1B-B-FAIR-ENTRY-SERVER-PARITY.md` · `supabase/review-only/D1B-B/02b-fair-entry.sql`
 
 ---
 
@@ -21,7 +21,7 @@
 | **D-02** eggs | **REGRESSION PASS** (catalog 20; no direct INSERT; anon EXECUTE false) · behavioral PENDING |
 | **D-03** first join | **REGRESSION PASS** (anon EXECUTE false; INSERT uses `is_league_member`; 73 rows; 0 orphans) · behavioral PENDING |
 | **D1B-A** picks/pick_games | **LIVE / STRUCTURALLY REPAIRED / POST-VERIFY PASS** |
-| **D1B-B** membership join | **BLOCKED BY FAIR-ENTRY PARITY** · source-audited · no prod apply · **not repaired** |
+| **D1B-B** membership join | **REVIEW-ONLY REVISED / DISPOSABLE READY** · no prod apply · **not repaired** |
 | **D1B-C** achievements visibility | **LIVE / STRUCTURALLY REPAIRED / POST-VERIFY PASS** |
 | **D1C** Crystal Ball | **DESIGN + NON-PRODUCTION SQL READY / EPHEMERAL TESTS NOT RUN / PRODUCTION APPLY BLOCKED / NOT REPAIRED** (parked) |
 | **H-01** DEFINER EXECUTE | **CONFIRMED** · split **H-01A selective design READY** · **H-01B future-default design REQUIRED separately** · no apply |
@@ -89,15 +89,15 @@
 | Field | Value |
 |-------|--------|
 | Severity | **High** — broader than join-only (INSERT privilege injection · row-wide UPDATE · public join codes) |
-| Status | **BLOCKED BY FAIR-ENTRY PARITY** · source-audited · **NOT REPAIRED** |
+| Status | **REVIEW-ONLY PACKAGE REVISED / DISPOSABLE READY / NOT REPAIRED** |
 | Design | `docs/D1B-B-MEMBERSHIP-JOIN-AUTHORITY.md` |
 | Product freeze + map | `docs/D1B-B-PRODUCT-DECISIONS-AND-CALLSITE-MAP.md` |
-| REVIEW-ONLY SQL | `docs/D1B-B-REVIEW-ONLY-SQL-PACKAGE.md` · `supabase/review-only/D1B-B/` |
+| REVIEW-ONLY SQL | `supabase/review-only/D1B-B/` including **02b-fair-entry.sql** |
 | Source audit | `docs/D1B-B-REVIEW-ONLY-SOURCE-AUDIT.md` |
-| Fair-entry | `docs/D1B-B-FAIR-ENTRY-SERVER-PARITY.md` — stub returns 0; **prod join blocked** |
-| Disposable guide | `docs/D1B-B-DISPOSABLE-EXECUTION-GUIDE.md` · matrix `docs/D1B-B-TEST-MATRIX.md` (NOT_RUN) |
-| Live preflight | `docs/D1B-B-PREFLIGHT-AND-DESIGN-SCOPE.md` §0 |
-| Next | Implement server fair-entry parity in REVIEW-ONLY SQL; revise sport allowlist / cut_percent; then disposable suite |
+| Fair-entry | Server freeze table + percentile parity (no localStorage authority) |
+| Fixes | Sport allowlist live-only · cut_percent persisted · d1b_b_raise VOLATILE |
+| Disposable | Guide ready; JWT suite **NOT_RUN** |
+| Next | Execute disposable suite; then separate Mike auth for prod stage-6 |
 | Scope exclusion | No live apply · no H-01 · no D1C |
 
 #### D1B-C · achievements visibility
@@ -186,7 +186,7 @@
 | 4 | D-03 | **STRUCTURALLY LIVE** · behavioral PENDING |
 | 5 | **D1B-A** | **LIVE / STRUCTURALLY REPAIRED / POST-VERIFY PASS** |
 | 5b | **D1B-C** | **LIVE / STRUCTURALLY REPAIRED / POST-VERIFY PASS** |
-| **5c** | **D1B-B** | Source-audited · **blocked by fair-entry parity** · **not repaired** |
+| **5c** | **D1B-B** | REVIEW-ONLY revised · disposable ready · **not repaired** · no prod |
 | 6 | **H-01A** | Selective live-function EXECUTE cleanup |
 | 6b | **H-01B** | Safe future default privileges |
 | 7 | Behavioral D-01 / D-02 / D-03 | Disposable identities only |

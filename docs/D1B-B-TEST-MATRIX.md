@@ -1,17 +1,19 @@
-# D1B-B — Test matrix
+# D1B-B — Test matrix (post fair-entry revision)
 
-**Status:** Authored · **NOT_RUN** (except static review items)  
-**Date:** 2026-08-06  
-**Classification context:** **BLOCKED BY FAIR-ENTRY PARITY** for production; disposable early-season optional  
+**Classification context:** **REVIEW-ONLY PACKAGE REVISED / DISPOSABLE READY**  
+**Behavioral execution:** **NOT_RUN** unless noted  
 
-| ID | Area | Case | Expect | Executed |
-|----|------|------|--------|----------|
-| S1 | Static audit | File 07 not in stage-6 | No INSERT/UPDATE/SELECT strip | **PASS** (review) |
-| S2 | Static audit | Forced defaults no client privilege params | No privileged args on RPCs | **PASS** (review) |
-| S3 | Static audit | FOR UPDATE on joins | Present | **PASS** (review) |
-| S4 | Static audit | list_open has no code | Absent | **PASS** (review) |
-| S5 | Static audit | Fair-entry stub | Returns 0 | **PASS** (review) / **BLOCKER** |
-| D0–D15 | Disposable | See disposable guide | Per case | **NOT_RUN** |
-| FE-* | Fair-entry | Band parity fixtures | Match TS | **BLOCKED** |
+| ID | Case | Expect | Status |
+|----|------|--------|--------|
+| S-FE-TS | `node scripts/verify-fair-entry-parity.mjs` | All PASS | Run at commit time if node available |
+| S-FE-SQL | percentile SQL smokes | Match TS | **NOT_RUN** (needs disposable) |
+| S1–S4 | Static package structure | PASS | **PASS** (source audit) |
+| D0–D15 | Disposable JWT suite | Per guide | **NOT_RUN** |
+| FE-preseason | no week_results | points 0 | **NOT_RUN** |
+| FE-mid | scored + humans | match band pct | **NOT_RUN** |
+| FE-freeze | second joiner | same frozen points | **NOT_RUN** |
+| FE-exclude-self | exclude joiner from array | no self in sample | **NOT_RUN** |
+| FE-bots | bots in league | bots ignored in pct | **NOT_RUN** |
+| CAP+FE | full capacity + FE | both enforced in TX | **NOT_RUN** |
 
-Do not mark overall disposable suite READY until D0–D15 executed on ephemeral DB and FE unblocked or explicitly scoped out.
+Update status only after genuine disposable execution.

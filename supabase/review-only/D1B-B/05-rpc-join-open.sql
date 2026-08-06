@@ -70,7 +70,7 @@ begin
   end if;
 
   v_div := public.d1b_b_next_division(v_league.id);
-  v_pts := public.d1b_b_fair_entry_points(v_league.id);
+  v_pts := public.d1b_b_fair_entry_points(v_league.id, v_uid);
 
   insert into public.memberships (
     league_id,

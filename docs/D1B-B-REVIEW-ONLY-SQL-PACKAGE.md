@@ -1,12 +1,12 @@
 # D1B-B — REVIEW-ONLY SQL package
 
-**Status:** **REVIEW-ONLY SQL AUTHORED / SOURCE-AUDITED / BLOCKED BY FAIR-ENTRY PARITY / NO PRODUCTION APPLY / NOT REPAIRED**  
+**Status:** **REVIEW-ONLY PACKAGE REVISED / DISPOSABLE READY / NO PRODUCTION APPLY / NOT REPAIRED**  
 **Date:** 2026-08-06  
-**Authorization:** REVIEW-ONLY package + source audit (no production apply)  
+**Authorization:** Fair-entry parity revision (no production apply)  
 **Product freeze:** B1–B6 — `docs/D1B-B-PRODUCT-DECISIONS-AND-CALLSITE-MAP.md`  
-**SQL root:** `supabase/review-only/D1B-B/`  
+**SQL root:** `supabase/review-only/D1B-B/` (includes **02b-fair-entry.sql**)  
 **Source audit:** `docs/D1B-B-REVIEW-ONLY-SOURCE-AUDIT.md`  
-**Fair-entry design:** `docs/D1B-B-FAIR-ENTRY-SERVER-PARITY.md`  
+**Fair-entry:** `docs/D1B-B-FAIR-ENTRY-SERVER-PARITY.md`  
 **Disposable guide:** `docs/D1B-B-DISPOSABLE-EXECUTION-GUIDE.md`  
 **Test matrix:** `docs/D1B-B-TEST-MATRIX.md`  
 
@@ -29,8 +29,9 @@
 |------|----------|
 | `00-README.md` | Gate + stage rules |
 | `01-schema-max-human-members.sql` | Column, check, backfill proposal |
-| `02-helpers.sql` | Errors, human count, division, code gen, fair-entry stub |
-| `03-rpc-create-league.sql` | `create_league_with_commissioner_seat` |
+| `02-helpers.sql` | VOLATILE errors, sport allowlist, human count, division, code gen |
+| `02b-fair-entry.sql` | Freeze table + full Fair Entry points (parity) |
+| `03-rpc-create-league.sql` | create + commissioner; cut_percent; sport allowlist |
 | `04-rpc-join-by-code.sql` | `join_league_by_code` + `FOR UPDATE` capacity |
 | `05-rpc-join-open.sql` | `join_open_league_by_id` + `is_open` |
 | `06-rpc-list-open-leagues.sql` | `list_open_leagues_public` (**no codes**) |
@@ -136,7 +137,7 @@ I. Stage 13–14 discovery + SELECT (separate auth)
 
 ## 7. Fair-entry note
 
-`d1b_b_fair_entry_points` is a **stub returning 0**. Before mid-season production hardening, replace body with server band logic from `fair-entry` product (no client-trusted points).
+Implemented in **02b** with normalized `fair_entry_band_freezes` + percentile parity. See parity doc. Disposable FE fixtures still **NOT_RUN** until executed.
 
 ---
 
@@ -145,8 +146,9 @@ I. Stage 13–14 discovery + SELECT (separate auth)
 | Statement | True? |
 |-----------|-------|
 | REVIEW-ONLY SQL package exists | **Yes** |
-| Source audit complete | **Yes** — **BLOCKED BY FAIR-ENTRY PARITY** |
+| Fair-entry stub removed | **Yes** (full SQL) |
+| Source re-audit | **REVIEW-ONLY PACKAGE REVISED / DISPOSABLE READY** |
 | Production apply | **No** |
 | D1B-B repaired | **No** |
 | B1–B6 still locked | **Yes** |
-| Disposable full suite ready | **No** until fair-entry parity + JWT harness |
+| Disposable suite executed | **No** (NOT_RUN) |

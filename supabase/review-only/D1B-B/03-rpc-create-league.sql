@@ -2,7 +2,9 @@
 -- D1B-B / 03-rpc-create-league.sql
 -- REVIEW ONLY — DO NOT APPLY TO LIVE WITHOUT SEPARATE STAGE AUTH
 -- =============================================================================
--- B5 atomic create + commissioner seat. B1 path 1.
+-- B5 atomic create + commissioner seat. Commissioner total_points = 0 (no FE).
+-- cut_percent: validated 0–100, default 50; persisted when column exists.
+-- Sport: live allowlist only via d1b_b_normalize_sport_id.
 -- =============================================================================
 
 create or replace function public.create_league_with_commissioner_seat(
@@ -11,7 +13,7 @@ create or replace function public.create_league_with_commissioner_seat(
   p_list_as_open boolean default false,
   p_crystal_ball_enabled boolean default true,
   p_current_week integer default 0,
-  p_cut_percent integer default null,
+  p_cut_percent integer default 50,
   p_max_human_members integer default 32
 )
 returns json
@@ -22,11 +24,12 @@ as $$
 declare
   v_uid uuid := auth.uid();
   v_name text := trim(coalesce(p_name, ''));
-  v_sport text := lower(trim(coalesce(p_sport_id, 'cfb')));
+  v_sport text;
   v_code text;
   v_league_id uuid;
   v_max int := coalesce(p_max_human_members, 32);
   v_week int := coalesce(p_current_week, 0);
+  v_cut int := coalesce(p_cut_percent, 50);
 begin
   if v_uid is null then
     perform public.d1b_b_raise('not_authenticated');
@@ -36,43 +39,65 @@ begin
     perform public.d1b_b_raise('validation_failed', 'name');
   end if;
 
-  if v_sport not in ('cfb', 'nfl') then
-    -- extend allowlist as product adds sports
-    if v_sport is null or v_sport = '' then
-      v_sport := 'cfb';
-    end if;
+  v_sport := public.d1b_b_normalize_sport_id(p_sport_id);
+  if v_sport is null then
+    perform public.d1b_b_raise('validation_failed', 'sport');
   end if;
 
   if v_max < 2 or v_max > 64 then
-    perform public.d1b_b_raise('validation_failed', 'max_human_members');
+    perform public.d1b_b_raise('validation_failed', 'max_human');
+  end if;
+
+  if v_cut < 0 or v_cut > 100 then
+    perform public.d1b_b_raise('validation_failed', 'cut_percent');
+  end if;
+
+  if v_week < 0 or v_week > 40 then
+    perform public.d1b_b_raise('validation_failed', 'current_week');
   end if;
 
   v_code := public.d1b_b_generate_league_code();
 
-  insert into public.leagues (
-    name,
-    code,
-    commissioner_id,
-    sport_id,
-    crystal_ball_enabled,
-    current_week,
-    is_open,
-    open_listed_at,
-    max_human_members
-  ) values (
-    v_name,
-    v_code,
-    v_uid,
-    v_sport,
-    coalesce(p_crystal_ball_enabled, true),
-    v_week,
-    case when p_list_as_open then true else false end,
-    case when p_list_as_open then now() else null end,
-    v_max
-  )
-  returning id into v_league_id;
+  begin
+    insert into public.leagues (
+      name,
+      code,
+      commissioner_id,
+      sport_id,
+      crystal_ball_enabled,
+      current_week,
+      cut_percent,
+      is_open,
+      open_listed_at,
+      max_human_members
+    ) values (
+      v_name,
+      v_code,
+      v_uid,
+      v_sport,
+      coalesce(p_crystal_ball_enabled, true),
+      v_week,
+      v_cut,
+      case when p_list_as_open then true else false end,
+      case when p_list_as_open then now() else null end,
+      v_max
+    )
+    returning id into v_league_id;
+  exception
+    when undefined_column then
+      -- Fallback without max_human_members / cut if columns missing (disposable base)
+      insert into public.leagues (
+        name, code, commissioner_id, sport_id,
+        crystal_ball_enabled, current_week, is_open, open_listed_at
+      ) values (
+        v_name, v_code, v_uid, v_sport,
+        coalesce(p_crystal_ball_enabled, true), v_week,
+        case when p_list_as_open then true else false end,
+        case when p_list_as_open then now() else null end
+      )
+      returning id into v_league_id;
+  end;
 
-  -- Commissioner membership — forced role and safe defaults (B1/B5)
   insert into public.memberships (
     league_id,
     user_id,
@@ -97,7 +122,6 @@ begin
     false
   );
 
-  -- First-join history (D-03 function; ignore if unavailable)
   begin
     perform public.record_league_first_join(v_league_id, v_uid);
   exception when others then
@@ -110,18 +134,20 @@ begin
     'code', v_code,
     'sport_id', v_sport,
     'name', v_name,
+    'cut_percent', v_cut,
     'max_human_members', v_max,
-    'is_open', p_list_as_open
+    'is_open', coalesce(p_list_as_open, false),
+    'current_week', v_week
   );
 exception
   when unique_violation then
-    perform public.d1b_b_raise('validation_failed', 'unique_violation');
+    perform public.d1b_b_raise('validation_failed', 'unique');
     return json_build_object('ok', false);
 end;
 $$;
 
 comment on function public.create_league_with_commissioner_seat(text, text, boolean, boolean, integer, integer, integer) is
-  'D1B-B REVIEW-ONLY: atomic league + commissioner seat. Do not apply without stage auth.';
+  'D1B-B REVIEW-ONLY: atomic league + commissioner (points 0). Live sports only.';
 
 revoke all on function public.create_league_with_commissioner_seat(
   text, text, boolean, boolean, integer, integer, integer
