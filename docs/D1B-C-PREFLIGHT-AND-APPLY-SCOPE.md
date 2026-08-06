@@ -2,7 +2,8 @@
 
 # D1B-C — SELECT-Only Preflight & Apply-Scope Review
 
-**Status:** **LIVE PREFLIGHT PASS / APPLY-SCOPE MATCH / APPLY AUTHORIZED / AWAITING POST-VERIFY ARCHIVE / NOT YET CLAIMED REPAIRED**  
+**Status:** **LIVE PREFLIGHT PASS / APPLY-SCOPE MATCH / APPLIED / STRUCTURALLY REPAIRED**  
+**Apply archive:** `docs/D1B-C-APPLY-VERIFICATION.md`  
 **Date:** 2026-08-06  
 **Slice:** Replace **only** `"Members read achievements"` on `public.achievements`  
 **Design:** `docs/D1B-C-ACHIEVEMENTS-VISIBILITY.md`  
@@ -24,7 +25,7 @@
 
 | Action | Status |
 |--------|--------|
-| Apply D1B-C | **Authorized** — `supabase/D1B-C-APPLY-AUTHORIZED.sql`; claim repair only after post-verify archive |
+| Apply D1B-C | **Applied** on production (`d1b_c_achievements_visibility_correlation`) |
 | Change `"Commissioner grants achievements"` | **No** |
 | Mutate achievement rows | **No** |
 | Table grants / indexes | **No** (H-01 separate for grants) |
@@ -188,12 +189,13 @@ File: `supabase/D1B-C-achievements-select-REVIEW-ONLY.sql`
 ## Apply gate (Mike)
 
 1. ~~Live SELECT preflight MATCH~~ **Done** (§0)  
-2. ~~Explicit authorize: **`D1B-C authorized — apply only`**~~ **Done**  
-3. Apply `supabase/D1B-C-APPLY-AUTHORIZED.sql` on production  
-4. Post-verify via `supabase/D1B-C-postverify-SELECT-ONLY.sql`  
-5. Archive verification — do not claim D1B-B / D1C / H-01  
+2. ~~Authorize apply only~~ **Done**  
+3. ~~Apply on production~~ **Done** — `d1b_c_achievements_visibility_correlation`  
+4. ~~Post-verify~~ **PASS** — `docs/D1B-C-APPLY-VERIFICATION.md`  
+5. ~~Archive~~ **Done**  
 
-See `docs/D1B-C-APPLY-AUTHORIZATION.md`.
+**D1B-C: LIVE / STRUCTURALLY REPAIRED / POST-VERIFY PASS.**  
+Do not claim D1B-B / D1C / H-01.
 
 ---
 
@@ -202,7 +204,6 @@ See `docs/D1B-C-APPLY-AUTHORIZATION.md`.
 | Statement | True? |
 |-----------|-------|
 | Live preflight PASS / apply-scope MATCH | **Yes** |
-| D1B-C apply authorized | **Yes** |
-| D1B-C claimed structurally repaired | **No** until post-verify archive |
-| D1B-A still repaired | **Yes** (untouched by design) |
-| D1B-B / D1C / H-01 untouched by design | **Yes** |
+| D1B-C structurally repaired (post-verify) | **Yes** |
+| D1B-A still repaired | **Yes** (untouched) |
+| D1B-B / D1C / H-01 repaired | **No** |

@@ -1,11 +1,13 @@
 # D1B-C — Achievements SELECT visibility
 
-**Status:** **LIVE PREFLIGHT PASS / APPLY AUTHORIZED / NOT YET CLAIMED REPAIRED**  
+**Status:** **LIVE / STRUCTURALLY REPAIRED / POST-VERIFY PASS**  
 **Slice:** Fix membership tautology on achievements read only  
 **Date:** 2026-08-06  
-**Preflight + apply-scope:** `docs/D1B-C-PREFLIGHT-AND-APPLY-SCOPE.md` (§0 fresh live production archive)  
+**Apply verification:** `docs/D1B-C-APPLY-VERIFICATION.md`  
+**Preflight + apply-scope:** `docs/D1B-C-PREFLIGHT-AND-APPLY-SCOPE.md` (§0)  
 **Preflight SQL:** `supabase/D1B-C-preflight-SELECT-ONLY.sql`  
 **SQL proposal:** `supabase/D1B-C-achievements-select-REVIEW-ONLY.sql`  
+
 
 
 ---
@@ -61,10 +63,10 @@ USING: public.is_league_member(achievements.league_id)
 | Fresh live SELECT-only preflight | **PASS** (archived §0) |
 | Apply-scope MATCH design + REVIEW-ONLY SQL | **Yes** |
 | Mike explicit **`D1B-C authorized — apply only`** | **Yes** |
-| Production apply | `supabase/D1B-C-APPLY-AUTHORIZED.sql` |
-| Structural repair claim | After post-verify archive only |
+| Production apply | **Done** — migration `d1b_c_achievements_visibility_correlation` |
+| Structural repair claim | **LIVE / STRUCTURALLY REPAIRED / POST-VERIFY PASS** |
 
-See `docs/D1B-C-APPLY-AUTHORIZATION.md`.
+See `docs/D1B-C-APPLY-VERIFICATION.md`.
 
 ---
 

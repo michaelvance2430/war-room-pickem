@@ -1,14 +1,14 @@
 # Structural / security defect register
 
-**As of:** 2026-08-06 (updated after D1B-C **apply authorized** — post-verify pending)  
-**Evidence chain:** P15–P18 · D1A · D-01–D-03 · scrub · D1C parked · D1B-A repaired · D1B-C preflight · **D1B-C APPLY AUTHORIZED**  
+**As of:** 2026-08-06 (updated after D1B-C **LIVE / STRUCTURALLY REPAIRED / POST-VERIFY PASS**)  
+**Evidence chain:** P15–P18 · D1A · D-01–D-03 · scrub · D1C parked · **D1B-A repaired** · **D1B-C repaired**  
 **Mode:** Inspection / authorized repairs only  
 
-**Production confirmation:** D1B-A repaired. D1B-C apply **authorized**; structural repair **not claimed** until post-verify archived. No D1B-B / D1C / H-01 apply.  
+**Production confirmation:** D1B-A + D1B-C structurally repaired on **war-room-pickem**. No D1B-B / D1C / H-01 apply.  
 **D1B-A:** **LIVE / STRUCTURALLY REPAIRED / POST-VERIFY PASS**.  
-**D1B-C:** **LIVE PREFLIGHT PASS / APPLY AUTHORIZED / NOT YET CLAIMED REPAIRED**.  
+**D1B-C:** **LIVE / STRUCTURALLY REPAIRED / POST-VERIFY PASS**.  
 **D1C:** parked — **not repaired**.  
-**Archive:** `docs/D1B-A-APPLY-VERIFICATION.md` · `docs/D1B-C-PREFLIGHT-AND-APPLY-SCOPE.md` §0 · `docs/D1B-C-APPLY-AUTHORIZATION.md`
+**Archive:** `docs/D1B-A-APPLY-VERIFICATION.md` · `docs/D1B-C-APPLY-VERIFICATION.md`
 
 ---
 
@@ -22,7 +22,7 @@
 | **D-03** first join | **REGRESSION PASS** (anon EXECUTE false; INSERT uses `is_league_member`; 73 rows; 0 orphans) · behavioral PENDING |
 | **D1B-A** picks/pick_games | **LIVE / STRUCTURALLY REPAIRED / POST-VERIFY PASS** |
 | **D1B-B** membership join | **CONFIRMED HIGH AUTHORIZATION DEFECT / COORDINATED DESIGN REQUIRED** |
-| **D1B-C** achievements visibility | **LIVE PREFLIGHT PASS / APPLY AUTHORIZED / NOT YET CLAIMED REPAIRED** |
+| **D1B-C** achievements visibility | **LIVE / STRUCTURALLY REPAIRED / POST-VERIFY PASS** |
 | **D1C** Crystal Ball | **DESIGN + NON-PRODUCTION SQL READY / EPHEMERAL TESTS NOT RUN / PRODUCTION APPLY BLOCKED / NOT REPAIRED** (parked) |
 | **H-01** DEFINER EXECUTE | **CONFIRMED** · split **H-01A selective design READY** · **H-01B future-default design REQUIRED separately** · no apply |
 
@@ -98,18 +98,17 @@
 
 | Field | Value |
 |-------|--------|
-| Severity | Medium (read isolation) · narrow one-policy fix |
-| Status | **LIVE PREFLIGHT PASS / APPLY AUTHORIZED / NOT YET CLAIMED REPAIRED** |
+| Severity | Medium (read isolation) — **closed structurally** |
+| Status | **LIVE / STRUCTURALLY REPAIRED / POST-VERIFY PASS** |
 | Design | `docs/D1B-C-ACHIEVEMENTS-VISIBILITY.md` |
 | Live preflight | `docs/D1B-C-PREFLIGHT-AND-APPLY-SCOPE.md` §0 — **PASS** |
-| Authorization | `docs/D1B-C-APPLY-AUTHORIZATION.md` |
-| Apply SQL | `supabase/D1B-C-APPLY-AUTHORIZED.sql` |
-| Post-verify | `supabase/D1B-C-postverify-SELECT-ONLY.sql` |
-| Live defect (pre-apply) | tautology `m.league_id = m.league_id` |
-| Preserve | Commissioner grants INSERT — **do not touch** |
-| Helper | `is_league_member` — **reuse unchanged** |
-| Next | Apply on prod · post-verify · archive → claim structural repair if PASS |
-| Scope exclusion | No data · helper · grants · indexes · app · D1B-A/B · D1C · H-01 |
+| Apply verification | `docs/D1B-C-APPLY-VERIFICATION.md` |
+| Migration | `d1b_c_achievements_visibility_correlation` on **war-room-pickem** (`success = true`) |
+| Live policy | Members read: `is_league_member(league_id)` — tautology **gone** |
+| Preserved | Commissioner grants INSERT (correlated) |
+| Helper | `is_league_member` **unchanged** (definition + grants; H-01 inventory separate) |
+| Integrity | achievement_rows **0** before/after |
+| Not claimed | D1B-B · D1C · H-01 · app |
 
 ### D1C · Crystal Ball lock / reveal / multi-authority defect
 
@@ -151,11 +150,13 @@
 
 **Not on anon list:** D-01 / D-02 / D-03 repaired RPCs.
 
-### Policy tautology inventory (6)
+### Policy tautology inventory
 
-1. `achievements.Members read achievements`  
-2–5. `crystal_ball_picks` (upsert / frozen read / own read / update)  
-6. `crystal_ball_result.Members read crystal result`  
+| Item | Status |
+|------|--------|
+| `achievements.Members read achievements` | **REPAIRED** (D1B-C — uses `is_league_member`) |
+| `crystal_ball_picks` (upsert / frozen / own / update) | **Open** — D1C / CB correlation later |
+| `crystal_ball_result.Members read crystal result` | **Open** — D1C later |
 
 ### Global RLS / views (scrub)
 
@@ -178,7 +179,7 @@
 | 3 | D-02 | **STRUCTURALLY LIVE** · behavioral PENDING |
 | 4 | D-03 | **STRUCTURALLY LIVE** · behavioral PENDING |
 | 5 | **D1B-A** | **LIVE / STRUCTURALLY REPAIRED / POST-VERIFY PASS** |
-| **5b** | **D1B-C** | Authorized · apply + post-verify on prod · **await result archive** |
+| **5b** | **D1B-C** | **LIVE / STRUCTURALLY REPAIRED / POST-VERIFY PASS** |
 | 5c | **D1B-B** | Membership/join authority — coordinated RPC + app (larger) |
 | 6 | **H-01A** | Selective DEFINER EXECUTE cleanup |
 | 6b | **H-01B** | Future default privileges |
@@ -214,7 +215,8 @@
 | `docs/D1B-B-MEMBERSHIP-JOIN-AUTHORITY.md` | D1B-B architecture |
 | `docs/D1B-C-ACHIEVEMENTS-VISIBILITY.md` | D1B-C design ready |
 | `docs/D1B-C-PREFLIGHT-AND-APPLY-SCOPE.md` | D1B-C live preflight PASS + apply-scope MATCH |
-| `docs/D1B-C-APPLY-AUTHORIZATION.md` | D1B-C apply authorized + gray box |
+| `docs/D1B-C-APPLY-AUTHORIZATION.md` | D1B-C apply authorization (applied) |
+| `docs/D1B-C-APPLY-VERIFICATION.md` | D1B-C production apply + post-verify archive |
 | `supabase/D1B-C-preflight-SELECT-ONLY.sql` | D1B-C SELECT-only preflight |
 | `supabase/D1B-C-APPLY-AUTHORIZED.sql` | D1B-C authorized apply (one SELECT policy) |
 | `supabase/D1B-C-postverify-SELECT-ONLY.sql` | D1B-C post-verify SELECT-only |
@@ -235,4 +237,4 @@
 
 ---
 
-*End register — D1B-A LIVE/STRUCTURALLY REPAIRED; next narrow scrub D1B-C; D1B-B · D1C · H-01 still require separate Mike authorization.*
+*End register — D1B-A + D1B-C LIVE/STRUCTURALLY REPAIRED; D1B-B · D1C · H-01 still require separate Mike authorization.*
