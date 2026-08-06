@@ -55,7 +55,8 @@ None returned PGRST202 (missing function).
 | Open discovery | `list_open_leagues_public` (no codes) |
 | Open join | `join_open_league_by_id` |
 
-**Not cut over:** sport-pool multi-seat (`sport-pool.ts` direct INSERT residual).
+**Sport-pool (follow-up deploy `1a84320`):** `spinUpLeagueFromPoll` → `spin_up_sport_pool_league` only  
+(no direct `leagues`/`memberships` INSERT; poll close atomic in RPC).
 
 **Not applied:** file 07 / membership INSERT policy drop.
 
