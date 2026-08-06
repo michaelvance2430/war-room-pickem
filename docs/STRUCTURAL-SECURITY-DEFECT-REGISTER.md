@@ -89,13 +89,13 @@
 | Field | Value |
 |-------|--------|
 | Severity | **High** — broader than join-only (INSERT privilege injection · row-wide UPDATE · public join codes) |
-| Status | **REVIEW-ONLY PACKAGE REVISED / DISPOSABLE READY / NOT REPAIRED** |
+| Status | **REVIEW-ONLY PACKAGE REVISED / DISPOSABLE READY / PRODUCTION NOT AUTHORIZED / NOT REPAIRED** |
 | Design | `docs/D1B-B-MEMBERSHIP-JOIN-AUTHORITY.md` |
 | Product freeze + map | `docs/D1B-B-PRODUCT-DECISIONS-AND-CALLSITE-MAP.md` |
 | REVIEW-ONLY SQL | `supabase/review-only/D1B-B/` including **02b-fair-entry.sql** |
 | Source audit | `docs/D1B-B-REVIEW-ONLY-SOURCE-AUDIT.md` |
 | Fair-entry | Server freeze table + percentile parity (no localStorage authority) |
-| Fixes | Sport allowlist live-only · cut_percent persisted · d1b_b_raise VOLATILE |
+| Fixes | Sport allowlist live-only · cut_percent **10–75** (live CHECK) · d1b_b_raise VOLATILE · FE freeze table |
 | Disposable | Guide ready; JWT suite **NOT_RUN** |
 | Next | Execute disposable suite; then separate Mike auth for prod stage-6 |
 | Scope exclusion | No live apply · no H-01 · no D1C |

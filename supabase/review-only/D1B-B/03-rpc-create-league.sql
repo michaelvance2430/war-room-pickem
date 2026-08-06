@@ -3,7 +3,7 @@
 -- REVIEW ONLY — DO NOT APPLY TO LIVE WITHOUT SEPARATE STAGE AUTH
 -- =============================================================================
 -- B5 atomic create + commissioner seat. Commissioner total_points = 0 (no FE).
--- cut_percent: validated 0–100, default 50; persisted when column exists.
+-- cut_percent: live DB CHECK 10–75, default 50; do not broaden production constraint.
 -- Sport: live allowlist only via d1b_b_normalize_sport_id.
 -- =============================================================================
 
@@ -48,7 +48,8 @@ begin
     perform public.d1b_b_raise('validation_failed', 'max_human');
   end if;
 
-  if v_cut < 0 or v_cut > 100 then
+  -- Live leagues.cut_percent CHECK (10..75); match product/DB law — do not widen
+  if v_cut < 10 or v_cut > 75 then
     perform public.d1b_b_raise('validation_failed', 'cut_percent');
   end if;
 

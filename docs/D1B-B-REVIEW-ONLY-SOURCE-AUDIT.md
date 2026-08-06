@@ -8,10 +8,11 @@
 ### Final classification
 
 ```text
-REVIEW-ONLY PACKAGE REVISED / DISPOSABLE READY
+REVIEW-ONLY PACKAGE REVISED / DISPOSABLE READY / PRODUCTION NOT AUTHORIZED / NOT REPAIRED
 ```
 
-**Caveats:** Disposable suite still **NOT_RUN** on a live ephemeral project in this session. Classification means: package is **ready to execute** on disposable after 01→02→02b→03–06; production still **not authorized**. Mid-season FE fixtures require week_results + freezes on disposable.
+**Caveats:** Disposable suite still **NOT_RUN** on ephemeral. Ready to execute after 01→02→02b→03–06. Production **not authorized**.  
+**Pre-disposable fix:** `p_cut_percent` validated **10–75** to match live `leagues` CHECK (not 0–100).
 
 **D1B-B remains NOT REPAIRED. No production apply.**
 
@@ -45,7 +46,7 @@ See `docs/D1B-B-FAIR-ENTRY-SERVER-PARITY.md` §1 (line map of `fair-entry.ts`).
 |------|--------|
 | `02-helpers.sql` | VOLATILE raise; sport allowlist; cut unused stub FE |
 | `02b-fair-entry.sql` | **New** — freeze table + full FE |
-| `03-rpc-create-league.sql` | Sport allowlist reject; **cut_percent** 0–100 persist default 50; commissioner points 0 |
+| `03-rpc-create-league.sql` | Sport allowlist; **cut_percent 10–75** (live CHECK); default 50; commissioner points 0 |
 | `04` / `05` | FE via `d1b_b_fair_entry_points(league, uid)` under lock |
 | `06` | Unchanged intent (no codes) |
 | `07` | Still future-only |
@@ -90,9 +91,17 @@ coming_soon (`soccer_wwc`, `nba`, `nhl`, …) **rejected**.
 
 ## 6. p_cut_percent resolution
 
-**Keep and persist.** App/settings use cut_percent (default 50, product 0–100).  
+**Keep and persist.** Live database law (do **not** broaden):
 
-Validated 0–100 inclusive; written to `leagues.cut_percent` on create. Fallback insert path if column missing (disposable base).
+```text
+CHECK (cut_percent >= 10 AND cut_percent <= 75)
+DEFAULT 50
+```
+
+RPC validation: **10–75** inclusive only → else `d1b_b:validation_failed cut_percent`.  
+`NULL`/omitted → **50** via `coalesce(p_cut_percent, 50)`.  
+
+No package SQL alters the production CHECK constraint.
 
 ---
 

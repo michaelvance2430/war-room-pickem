@@ -1,6 +1,6 @@
 # D1B-B — REVIEW-ONLY SQL package
 
-**Status:** **REVIEW-ONLY PACKAGE REVISED / DISPOSABLE READY / NO PRODUCTION APPLY / NOT REPAIRED**  
+**Status:** **REVIEW-ONLY PACKAGE REVISED / DISPOSABLE READY / PRODUCTION NOT AUTHORIZED / NOT REPAIRED**  
 **Date:** 2026-08-06  
 **Authorization:** Fair-entry parity revision (no production apply)  
 **Product freeze:** B1–B6 — `docs/D1B-B-PRODUCT-DECISIONS-AND-CALLSITE-MAP.md`  
@@ -31,7 +31,7 @@
 | `01-schema-max-human-members.sql` | Column, check, backfill proposal |
 | `02-helpers.sql` | VOLATILE errors, sport allowlist, human count, division, code gen |
 | `02b-fair-entry.sql` | Freeze table + full Fair Entry points (parity) |
-| `03-rpc-create-league.sql` | create + commissioner; cut_percent; sport allowlist |
+| `03-rpc-create-league.sql` | create + commissioner; cut_percent **10–75** (live CHECK); sport allowlist |
 | `04-rpc-join-by-code.sql` | `join_league_by_code` + `FOR UPDATE` capacity |
 | `05-rpc-join-open.sql` | `join_open_league_by_id` + `is_open` |
 | `06-rpc-list-open-leagues.sql` | `list_open_leagues_public` (**no codes**) |

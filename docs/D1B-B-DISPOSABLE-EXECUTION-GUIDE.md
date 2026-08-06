@@ -23,6 +23,31 @@
 15. Optional 11 rollback stage-6
 ```
 
+### cut_percent create validation (after 03)
+
+| Input | Expect |
+|-------|--------|
+| omit / null → default 50 | accepted, stored 50 |
+| 10 | accepted |
+| 50 | accepted |
+| 75 | accepted |
+| 9 | `d1b_b:validation_failed` (cut_percent) |
+| 76 | `d1b_b:validation_failed` |
+| negative | `d1b_b:validation_failed` |
+| 100 | `d1b_b:validation_failed` |
+
+Do **not** change live `CHECK (cut_percent >= 10 AND cut_percent <= 75)`.
+
+### Season-scoped freezes (after 02b)
+
+- Disposable tests must prove freezes for `season_year=A` do not apply when season_year=B.
+- Season-reset freeze cleanup is a **required production-design follow-on** (not part of initial disposable SQL pass).
+
+### App cutover (not disposable SQL)
+
+- Open-room UI code removal and sport-pool seating remain **app-cutover blockers**.
+- File **07** remains excluded from disposable stage-6 apply.
+
 ### Fair-entry SQL smoke (after 02b)
 
 ```sql
