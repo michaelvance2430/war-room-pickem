@@ -17,7 +17,9 @@
 | **D-01** `purge_locker_before` | **REGRESSION PASS** (anon EXECUTE false; structural repair intact) · behavioral PENDING |
 | **D-02** eggs | **REGRESSION PASS** (catalog 20; no direct INSERT; anon EXECUTE false) · behavioral PENDING |
 | **D-03** first join | **REGRESSION PASS** (anon EXECUTE false; INSERT uses `is_league_member`; 73 rows; 0 orphans) · behavioral PENDING |
-| **D1B** picks / correlation | **DEFECT CONFIRMED** · **current data CLEAN** · no apply |
+| **D1B-A** picks/pick_games | **DESIGN READY / APPLY NOT AUTHORIZED** |
+| **D1B-B** membership join | **CONFIRMED HIGH AUTHORIZATION DEFECT / COORDINATED DESIGN REQUIRED** |
+| **D1B-C** achievements visibility | **DESIGN READY / APPLY NOT AUTHORIZED** |
 | **D1C** Crystal Ball | **DEFECT CONFIRMED** · **design required** · no apply |
 | **H-01** DEFINER EXECUTE | **CONFIRMED** · split **H-01A selective design READY** · **H-01B future-default design REQUIRED separately** · no apply |
 
@@ -59,17 +61,39 @@
 | Helper | `is_league_member` **unchanged** (shared; H-01 grants separate) |
 | Design / SQL | D-03 docs + narrow `supabase/D-03-record-league-first-join-REVIEW-ONLY.sql` |
 
-### D1B · Picks / membership correlation (+ achievements tautology)
+### D1B (split) · Picks / join / achievements
+
+**Data:** clean (picks 7 · nonmember 0 · memberships 77 · no cleanup). **Indexes:** existing uniques sufficient — **no new indexes**.
+
+#### D1B-A · picks / pick_games correlation
 
 | Field | Value |
 |-------|--------|
-| Severity | **High** (isolation) |
-| Status | **DEFECT CONFIRMED · CURRENT DATA CLEAN · NOT AUTHORIZED TO REPAIR** |
-| Live policies | `picks` “Users manage own picks” = `auth.uid() = user_id` only; `pick_games` via parent pick user only; memberships INSERT self-only; memberships UPDATE **no** `with_check` |
-| Tautologies | `achievements.Members read achievements` uses `m.league_id = m.league_id` |
-| Integrity | picks **7** · nonmember picks **0** · pick_games under nonmember **0** · memberships **77** · missing league/user **0** |
-| Cleanup | **None needed** |
-| Apply | Separate design + Mike auth only |
+| Severity | High (write isolation) · low apply risk for honest clients |
+| Status | **DESIGN READY / APPLY NOT AUTHORIZED** · not claimed repaired |
+| Design | `docs/D1B-A-PICKS-MEMBERSHIP-CORRELATION.md` |
+| SQL | `supabase/D1B-A-picks-membership-REVIEW-ONLY.sql` (policy-only) |
+| Rule | Own pick + `is_league_member(league_id)`; pick_games via parent pick |
+
+#### D1B-B · membership join authority
+
+| Field | Value |
+|-------|--------|
+| Severity | **High** authorization defect |
+| Status | **CONFIRMED HIGH AUTHORIZATION DEFECT / COORDINATED DESIGN REQUIRED** · not claimed repaired |
+| Design | `docs/D1B-B-MEMBERSHIP-JOIN-AUTHORITY.md` (architecture only; no join SQL) |
+| Defect | Direct self INSERT + browser-only code join; open-room UUID without DB `is_open` |
+| Next | Three narrow RPCs then drop/restrict client INSERT — **not now** |
+
+#### D1B-C · achievements visibility
+
+| Field | Value |
+|-------|--------|
+| Severity | Medium (read isolation) |
+| Status | **DESIGN READY / APPLY NOT AUTHORIZED** · not claimed repaired |
+| Design | `docs/D1B-C-ACHIEVEMENTS-VISIBILITY.md` |
+| SQL | `supabase/D1B-C-achievements-select-REVIEW-ONLY.sql` |
+| Rule | SELECT only if `is_league_member(achievements.league_id)` |
 
 ### D1C · Crystal Ball lock / reveal / membership
 
@@ -136,7 +160,9 @@
 | 2 | D-01 | **STRUCTURALLY LIVE** · behavioral PENDING |
 | 3 | D-02 | **STRUCTURALLY LIVE** · behavioral PENDING |
 | 4 | D-03 | **STRUCTURALLY LIVE** · behavioral PENDING |
-| 5 | **D1B** | Next isolation repair candidate (data clean) |
+| 5 | **D1B-A** | Picks correlation (design ready) |
+| 5b | **D1B-C** | Achievements SELECT (design ready; separate apply) |
+| 5c | **D1B-B** | Join RPCs + drop client INSERT (coordinated design) |
 | 6 | **D1C** | Design single lock/reveal (blocked on design) |
 | 7 | **H-01A** | Selective live REVOKE (design ready; auth pending) |
 | 7b | **H-01B** | Future default privileges (design required separately) |
@@ -159,6 +185,11 @@
 | `docs/AUTOMATED-READONLY-SCRUB-SWEEP.md` | Full scrub archive |
 | `docs/H-01A-SELECTIVE-DEFINER-EXECUTE-DESIGN.md` | H-01A selective REVOKE design ready |
 | `docs/H-01B-FUTURE-DEFAULT-PRIVILEGES-DESIGN.md` | H-01B future defaults (design required) |
+| `docs/D1B-A-PICKS-MEMBERSHIP-CORRELATION.md` | D1B-A design ready |
+| `docs/D1B-B-MEMBERSHIP-JOIN-AUTHORITY.md` | D1B-B architecture |
+| `docs/D1B-C-ACHIEVEMENTS-VISIBILITY.md` | D1B-C design ready |
+| `supabase/D1B-A-picks-membership-REVIEW-ONLY.sql` | D1B-A policy SQL |
+| `supabase/D1B-C-achievements-select-REVIEW-ONLY.sql` | D1B-C policy SQL |
 | `docs/D1A-VERIFICATION-NO-OP.md` | D1A closed |
 | `docs/D-01-APPLY-VERIFICATION.md` | D-01 structural |
 | `docs/D-02-APPLY-VERIFICATION.md` | D-02 structural |
