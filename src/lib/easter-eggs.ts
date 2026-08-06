@@ -479,18 +479,16 @@ export function grantDiscovery(
       /* ignore */
     }
     // Cloud + maybe Ready Player One flex (7 / 10 / full)
+    // Local grant already succeeded. Pending queue on temporary RPC failure.
+    // Flex only when cloudSynced. Never trust client name/total (server-derived).
     try {
-      const { getSession } = require("./league") as typeof import("./league");
-      const name =
-        getSession()?.playerName ||
-        opts?.note ||
-        "A player";
-      void import("./egg-cloud").then(({ syncEasterEggFindToCloud }) => {
-        void syncEasterEggFindToCloud({
-          discoveryId,
-          playerName: name,
-        }).then((res) => {
-          if (res.flexesInserted && res.flexesInserted > 0) {
+      void import("./egg-cloud").then(
+        ({ syncEasterEggFindToCloud, shouldDispatchEggFlex }) => {
+          void syncEasterEggFindToCloud({
+            discoveryId,
+            userId: playerId,
+          }).then((res) => {
+            if (!shouldDispatchEggFlex(res)) return;
             try {
               window.dispatchEvent(
                 new CustomEvent("warroom-egg-flex-check", {
@@ -500,9 +498,9 @@ export function grantDiscovery(
             } catch {
               /* ignore */
             }
-          }
-        });
-      });
+          });
+        }
+      );
     } catch {
       /* ignore */
     }

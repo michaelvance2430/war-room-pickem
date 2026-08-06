@@ -131,6 +131,14 @@ export default function EasterEggHost() {
         seasonYear: defaultSeasonYear(),
       });
       if (!cancelled) pushMoments(openMoments);
+
+      // D-02 P7: flush durable pending egg cloud syncs (idempotent RPC)
+      try {
+        const { flushPendingEggCloudSyncs } = await import("@/lib/egg-cloud");
+        if (!cancelled) await flushPendingEggCloudSyncs(playerId);
+      } catch {
+        /* offline ok */
+      }
     }
 
     void run();
@@ -139,10 +147,19 @@ export default function EasterEggHost() {
       const ce = e as CustomEvent<EasterEggMoment>;
       if (ce.detail) pushMoments([ce.detail]);
     }
+    function onOnline() {
+      const pid = getSession()?.playerId;
+      if (!pid) return;
+      void import("@/lib/egg-cloud").then(({ flushPendingEggCloudSyncs }) => {
+        void flushPendingEggCloudSyncs(pid);
+      });
+    }
     window.addEventListener(EVENT_EASTER_EGG, onEgg);
+    window.addEventListener("online", onOnline);
     return () => {
       cancelled = true;
       window.removeEventListener(EVENT_EASTER_EGG, onEgg);
+      window.removeEventListener("online", onOnline);
     };
   }, [pushMoments]);
 
