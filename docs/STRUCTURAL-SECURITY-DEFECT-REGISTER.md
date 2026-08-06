@@ -1,11 +1,11 @@
 # Structural / security defect register
 
-**As of:** 2026-08-06 (updated after D1C-S2 ephemeral/staging design)  
-**Evidence chain:** P15–P18 · D1A · D-01–D-03 · scrub · D1C map · P1–P12 LOCKED · **D1C-S2 design**  
+**As of:** 2026-08-06 (updated after D1C-S2b non-prod REVIEW-ONLY SQL package)  
+**Evidence chain:** P15–P18 · D1A · D-01–D-03 · scrub · D1C map · P1–P12 · S2 design · **S2b review-only SQL (not applied)**  
 **Mode:** Inspection / authorized repairs only  
 
-**Production confirmation (automated scrub):** no SQL writes, no Auth/app/deploy changes during that sweep.  
-**D1C docs package:** map · decisions · **S2 ephemeral schema/policy design** — **no executable SQL · no app change · no prod apply · picks/results untouched · D1B/H-01 untouched**.  
+**Production confirmation:** no live Supabase apply from D1C packages; S2b SQL is **review-only / non-production**.  
+**D1C:** map · decisions · S2 design · **S2b SQL under `supabase/review-only/D1C-S2B/`** — **not applied · tests NOT RUN (no disposable DB) · picks/results untouched · D1B/H-01 untouched · NOT REPAIRED**.  
 **Archive:** `docs/AUTOMATED-READONLY-SCRUB-SWEEP.md`
 
 ---
@@ -21,7 +21,7 @@
 | **D1B-A** picks/pick_games | **DESIGN READY / APPLY NOT AUTHORIZED** |
 | **D1B-B** membership join | **CONFIRMED HIGH AUTHORIZATION DEFECT / COORDINATED DESIGN REQUIRED** |
 | **D1B-C** achievements visibility | **DESIGN READY / APPLY NOT AUTHORIZED** |
-| **D1C** Crystal Ball | **CONFIRMED HIGH / MULTI-AUTHORITY LOCK-REVEAL DEFECT / PRODUCT DECISIONS LOCKED / NOT REPAIRED** · S2 ephemeral design READY · no apply · no executable SQL |
+| **D1C** Crystal Ball | **CONFIRMED HIGH / MULTI-AUTHORITY LOCK-REVEAL DEFECT / PRODUCT DECISIONS LOCKED / NOT REPAIRED** · S2 design READY · **S2b REVIEW-ONLY SQL authored (not applied; tests NOT RUN)** |
 | **H-01** DEFINER EXECUTE | **CONFIRMED** · split **H-01A selective design READY** · **H-01B future-default design REQUIRED separately** · no apply |
 
 ---
@@ -104,15 +104,14 @@
 | Status | **CONFIRMED HIGH / MULTI-AUTHORITY LOCK-REVEAL DEFECT / PRODUCT DECISIONS LOCKED (P1–P12) / NOT REPAIRED** |
 | Static map | `docs/D1C-CRYSTAL-BALL-LOCK-REVEAL-AUTHORITY-MAP.md` |
 | Remediation design | `docs/D1C-CRYSTAL-BALL-AUTHORITY-REMEDIATION.md` (REVIEW-ONLY; **P1–P12 APPROVED**) |
-| S2 design | `docs/D1C-S2-EPHEMERAL-SCHEMA-POLICY-DESIGN.md` (**DESIGN ONLY**; pseudocode appendix **not** executable SQL) |
-| Tautologies | CB policies `m.league_id = m.league_id` (**D1B correlation dependency — separate; risk register in S2 §15**) |
-| Authority | No non-internal CB triggers; app lock ≠ DB write gate; multi-OR frozen-read (result · hard-coded 2026 dates · week_results 0/1) |
-| Extra | `crystal_ball_lock_count` DEFINER; anon+authenticated EXECUTE |
-| Live data | ~7 `crystal_ball_picks` · 0 `crystal_ball_result` · **untouched** |
-| Product | **P1–P12 LOCKED** |
-| Design target | `crystal_ball_state` + helpers + correlated RLS + crown RPC + sticky lock + bot gate |
-| Next | Optional non-prod REVIEW-ONLY SQL from S2 appendix · ephemeral tests · **not** production apply |
-| Apply | **Not authorized** · no quick-patch · do **not** bundle with D1B / H-01 |
+| S2 design | `docs/D1C-S2-EPHEMERAL-SCHEMA-POLICY-DESIGN.md` |
+| S2b package | `docs/D1C-S2B-NONPROD-SQL-DESIGN.md` · `docs/D1C-S2B-TEST-PLAN-AND-RESULTS.md` · `supabase/review-only/D1C-S2B/*` |
+| S2b execution | **NOT RUN** (no disposable DB); **DO NOT APPLY TO LIVE SUPABASE** |
+| Tautologies | Live CB still tautologous until separate apply; S2b policies are correlated **in package only** |
+| Live data | ~7 picks · 0 results · **untouched** |
+| Product | **P1–P12 LOCKED** · T5/T8/sticky engineering locked in S2b design |
+| Next | Disposable ephemeral run of S2b matrix · then prod preflight only with Mike auth |
+| Apply | **Not authorized** · do **not** bundle with D1B / H-01 |
 
 ### D-04 · `leagues` DELETE (product retired)
 
@@ -171,7 +170,7 @@
 | 5 | **D1B-A** | Picks correlation (design ready) |
 | 5b | **D1B-C** | Achievements SELECT (design ready; separate apply) |
 | 5c | **D1B-B** | Join RPCs + drop client INSERT (coordinated design) |
-| 6 | **D1C** | Map · **P1–P12 LOCKED** · **S2 design READY** · next optional non-prod SQL/ephemeral tests · no prod apply |
+| 6 | **D1C** | S2 design · **S2b REVIEW-ONLY SQL authored** · tests NOT RUN · **no prod apply** |
 | 7 | **H-01A** | Selective live REVOKE (design ready; auth pending) |
 | 7b | **H-01B** | Future default privileges (design required separately) |
 | 8 | H-05 / H-06 / H-07 | Advisor hardening (non-exploit) |
@@ -199,6 +198,9 @@
 | `docs/D1C-CRYSTAL-BALL-LOCK-REVEAL-AUTHORITY-MAP.md` | D1C static authority map (archived) |
 | `docs/D1C-CRYSTAL-BALL-AUTHORITY-REMEDIATION.md` | D1C remediation design REVIEW-ONLY (P1–P12 locked) |
 | `docs/D1C-S2-EPHEMERAL-SCHEMA-POLICY-DESIGN.md` | D1C-S2 ephemeral/staging schema & policy design (not repaired) |
+| `docs/D1C-S2B-NONPROD-SQL-DESIGN.md` | D1C-S2b non-prod SQL design |
+| `docs/D1C-S2B-TEST-PLAN-AND-RESULTS.md` | D1C-S2b tests (NOT RUN) |
+| `supabase/review-only/D1C-S2B/` | REVIEW-ONLY SQL package — do not apply live |
 | `supabase/D1B-A-picks-membership-REVIEW-ONLY.sql` | D1B-A policy SQL |
 | `supabase/D1B-C-achievements-select-REVIEW-ONLY.sql` | D1B-C policy SQL |
 | `docs/D1A-VERIFICATION-NO-OP.md` | D1A closed |
