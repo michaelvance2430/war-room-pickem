@@ -1,137 +1,118 @@
 # D1B-B — Membership join authority
 
-**Status:** **CONFIRMED HIGH AUTHORIZATION DEFECT / COORDINATED DESIGN REQUIRED / PREFLIGHT PACKAGE READY / NOT REPAIRED**  
-**Apply:** **NOT AUTHORIZED** · **no production changes** · **no executable join RPC SQL yet**  
+**Status:** **LIVE PREFLIGHT COMPLETE / DEFECT CONFIRMED / SCOPE EXPANDED / PRODUCT + TECHNICAL FREEZE REQUIRED / NOT REPAIRED**  
+**Apply:** **NOT AUTHORIZED** · **no production SQL** · **no executable join RPC package yet**  
 **Date:** 2026-08-06  
-**Preflight + scope:** `docs/D1B-B-PREFLIGHT-AND-DESIGN-SCOPE.md`  
-**Preflight SQL:** `supabase/D1B-B-preflight-SELECT-ONLY.sql`  
+**Live preflight archive:** `docs/D1B-B-PREFLIGHT-AND-DESIGN-SCOPE.md` §0  
+
+---
+
+## Classification
+
+```text
+D1B-B:
+LIVE DEFECT CONFIRMED / AUTHORIZATION SURFACE BROADER THAN ORIGINAL JOIN-ONLY DESIGN /
+PRODUCT + TECHNICAL FREEZE REQUIRED / NOT REPAIRED
+```
+
+**Data:** clean (role/commissioner integrity). **Authorization surface:** broader than join-only.
 
 ---
 
 ## Priority
 
-**Next scrub track after D1B-A + D1B-C** (both structurally repaired).  
-Larger than A/C: coordinates **database RPCs, RLS, and app join flows**.
+After D1B-A + D1B-C (structurally repaired). Larger coordinated track.
 
-| After D1B-B (later) |
+| Later (not bundled) |
 |---------------------|
-| H-01A — selective live-function EXECUTE cleanup |
-| H-01B — safe future default privileges |
-| Disposable behavioral suites D-01–D-03 |
-| D1C remains parked until disposable env + dependencies |
+| H-01A / H-01B |
+| Disposable behavioral D-01–D-03 |
+| D1C parked |
 
-**Connected Supabase:** use for all SELECT-only checks and (later) authorized migrations without manual SQL paste when that path is available.
-
----
-
-## Locked findings
-
-- Direct authenticated `memberships` INSERT is the **product join mechanism**.  
-- Join-by-code validation is **browser-only** (`leagues` by `code`).  
-- Open-room seats by **league UUID** + capacity; **does not enforce `is_open` at DB write**.  
-- Authenticated caller with a UUID can attempt self-INSERT outside intended UI (RLS self-only).  
-- Removing direct INSERT **now** breaks create, join-by-code, open-room, rejoin, sport-pool seating.  
-- No historical membership mutation.  
-- Guarded bot RPCs (`seed_trial_bots`) preserved.
+Connected Supabase for SELECT-only and later authorized migrations (no manual paste when available).
 
 ---
 
-## Architecture — three narrow transactional RPCs (recommended)
+## Live findings (summary)
 
-**Do not** use one mode-switching mega-RPC.  
-**Do not author production RPC SQL until live preflight is archived and B1–B4 frozen.**
+| Surface | Live defect |
+|---------|-------------|
+| `"Memberships insert own"` | `user_id = auth.uid()` only — caller may set role/bot/staff/division/scores |
+| `"Memberships update by commissioner or self"` | Self OR commissioner; **WITH CHECK null** — row-wide self-update |
+| `"Leagues readable authenticated"` | `USING true` — **all join codes** readable to any authenticated user |
+| `"Users create leagues"` | Create not atomic with commissioner seat |
+| Capacity | **No** server max_members column; one league has **33** seats |
+| Join RPCs | **None** (only `record_league_first_join` for history) |
 
-### A. `create_league_with_commissioner_seat` (name TBD)
-
-```
-auth.uid() required
-INPUT: league settings + sport_id (immutable at insert)
-TX:
-  INSERT leagues (…) commissioner_id = auth.uid()
-  INSERT memberships (league_id, auth.uid(), role=commissioner, division=…)
-  optional: record first join (after seat)
-RETURN: league_id, code
-```
-
-| Concern | Rule |
-|---------|------|
-| Auth | Authenticated only |
-| Duplicate | Unique code; fail closed |
-| Rollback | Single transaction |
-| App files | `src/app/join/page.tsx` create path (~200–350) |
-
-### B. `join_league_by_code`
-
-```
-auth.uid() required
-INPUT: p_code text (normalized upper)
-TX:
-  SELECT league FOR keyshare by code
-  IF not found → error
-  IF full → error
-  IF already member → return existing (rejoin/idempotent)
-  ELSE INSERT membership player + division + fair-entry points as today
-  optional first-join stamp
-RETURN: league_id, role, …
-```
-
-| Concern | Rule |
-|---------|------|
-| Code validation | **Server-side only** (not browser alone) |
-| Capacity | Server count vs max 32 |
-| Rejoin | Unique (league_id, user_id) → no-op / return existing |
-| App files | `src/app/join/page.tsx` join path (~473–565) |
-
-### C. `join_open_league_by_id`
-
-```
-auth.uid() required
-INPUT: p_league_id uuid
-TX:
-  SELECT league WHERE id = p_league_id
-  IF not found → error
-  IF is_open is not true → error (server-side closed-league)
-  IF full → error (optionally auto-unlist)
-  IF already member → return existing
-  ELSE INSERT membership …
-RETURN: …
-```
-
-| Concern | Rule |
-|---------|------|
-| UUID bypass | **Blocked** without `is_open` |
-| Capacity | Same as code join |
-| App files | `src/lib/open-room.ts` `seatPlayerInLeague` (~141–270) |
-
-### Sport-pool / multi-seat
-
-- Seating **other** user IDs must be **service_role / security definer server-only** path (cron or edge with service key), **not** browser self-INSERT loop for others.  
-- File: `src/lib/sport-pool.ts` (~529–536).
+Full evidence: preflight scope doc §0.
 
 ---
 
-## After RPCs verified
+## Product + technical decision table (B1–B6)
 
-1. Drop or restrict `"Users insert own membership"` (self INSERT) for clients.  
-2. Keep bot DEFINER seed paths.  
-3. App: replace direct inserts with RPC calls; remove insecure fallbacks only after RPC green.  
-4. Rollback: re-enable self INSERT policy; drop RPCs if needed (prefer leave RPCs).
+| ID | Topic | Recommendation |
+|----|--------|----------------|
+| **B1** | Membership creation | RPC-only after cutover: create+commissioner · join-by-code · join-open-by-id |
+| **B2** | Capacity | Server-owned per-league `max_members` (or explicit global rule); freeze bot vs human accounting; concurrency-safe last seat |
+| **B3** | Code privacy / discovery | Codes not general SELECT; DEFINER join-by-code; safe open list without codes; tighten leagues SELECT only after app map |
+| **B4** | Membership UPDATE | No broad player self-update; narrow preference fields only; role/staff/bot/scores server/commish |
+| **B5** | Atomic create | League + commissioner membership in one TX |
+| **B6** | Cutover order | RPCs → app → drop INSERT → narrow UPDATE → tighten code visibility (see phased plan) |
+
+Mike must freeze these before any REVIEW-ONLY production SQL is authored.
 
 ---
 
-## Compatibility / test matrix (future)
+## Revised architecture (phased)
+
+### Phase 1 — Three creation RPCs (still required)
+
+1. **Create league + commissioner seat** (atomic)  
+2. **Join by code** (DEFINER code resolution; force player defaults)  
+3. **Join open by UUID** (`is_open` + capacity + same defaults)  
+
+Server forces: `role=player` (except create commissioner), `is_bot=false`, staff flags false, controlled stats/division.
+
+### Phase 2 — App cutover
+
+`join/page.tsx`, `open-room.ts`, `sport-pool.ts` (+ any other membership insert/update sites).
+
+### Phase 3 — Restrict INSERT
+
+Remove authenticated self-INSERT; keep bot DEFINER seed.
+
+### Phase 4 — Narrow UPDATE
+
+Separate design/apply OK; do not fold silently into join-only migration.
+
+### Phase 5 — Discovery / code privacy
+
+Safe open listing; then leagues SELECT tighten.
+
+### Phase 6 — Capacity column (if B2 requires)
+
+Backfill + RPC enforcement; interpret 33-seat league under product law.
+
+**Binding:** Never drop membership INSERT before RPCs and app are green.
+
+---
+
+## Compatibility / future test matrix
 
 | Case | Expect |
 |------|--------|
-| Create league | Commissioner seated in TX |
-| Join valid code | Seated |
+| Create league | Commissioner seated atomically |
+| Join valid code | Seated; no privilege self-assign |
 | Join bad code | Error |
-| Join full | Error |
+| Join full | Error per B2 |
 | Rejoin | Idempotent |
 | Open UUID when open | Seated |
 | Open UUID when closed | Error |
-| Capacity race | One fails on unique/capacity |
+| Self-INSERT with role=commissioner | Denied after cutover |
+| Self-UPDATE role/scores | Denied after Phase 4 |
+| List leagues as authenticated | No closed codes after Phase 5 |
 | Bot seed | Still works |
+| Capacity race | Safe under B2 |
 
 ---
 
@@ -140,40 +121,21 @@ RETURN: …
 | File | Change type |
 |------|-------------|
 | `src/app/join/page.tsx` | Create + join-by-code → RPC |
-| `src/lib/open-room.ts` | Seat → RPC with server is_open |
+| `src/lib/open-room.ts` | Seat → open RPC |
 | `src/lib/sport-pool.ts` | Multi-seat → server-only |
-| Possibly `src/lib/session-restore.ts` | Leave stays client delete (or later RPC) |
-| New SQL | Three RPCs + membership INSERT policy change (**not in this package**) |
-
----
-
-## Product decisions (open until design freeze)
-
-| # | Decision |
-|---|----------|
-| B1 | Exact RPC names / arg shapes |
-| B2 | Fair-entry points computed in RPC vs client-passed (prefer server) |
-| B3 | Auto-unlist full open rooms inside RPC? |
-| B4 | Sport-pool seating authority (service only) |
-
----
-
-## Immediate next step
-
-1. Run **SELECT-only** preflight on connected production (`supabase/D1B-B-preflight-SELECT-ONLY.sql` or equivalent connected catalog queries).  
-2. Archive results into `docs/D1B-B-PREFLIGHT-AND-DESIGN-SCOPE.md` §0 (gray box provided).  
-3. Freeze B1–B4 before any REVIEW-ONLY RPC SQL.  
+| League list / discovery callers | Map before SELECT tighten |
+| Membership preference updates | Narrow RPC/policy |
 
 ---
 
 ## Explicit non-actions now
 
-- No executable join SQL  
-- No membership INSERT removal  
+- No executable join/UPDATE/SELECT SQL  
+- No membership INSERT/UPDATE removal  
 - No app deploy  
-- No bundling with H-01 / D1C  
 - No production apply  
+- No H-01 / D1C bundling  
 
 ---
 
-*End D1B-B architecture design.*
+*End D1B-B architecture (reconciled with live preflight).*
