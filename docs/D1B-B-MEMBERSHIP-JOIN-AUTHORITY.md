@@ -1,8 +1,26 @@
 # D1B-B — Membership join authority
 
-**Status:** **CONFIRMED HIGH AUTHORIZATION DEFECT / COORDINATED DESIGN REQUIRED**  
-**Apply:** **NOT AUTHORIZED** · **no executable join SQL in this package**  
+**Status:** **CONFIRMED HIGH AUTHORIZATION DEFECT / COORDINATED DESIGN REQUIRED / PREFLIGHT PACKAGE READY / NOT REPAIRED**  
+**Apply:** **NOT AUTHORIZED** · **no production changes** · **no executable join RPC SQL yet**  
 **Date:** 2026-08-06  
+**Preflight + scope:** `docs/D1B-B-PREFLIGHT-AND-DESIGN-SCOPE.md`  
+**Preflight SQL:** `supabase/D1B-B-preflight-SELECT-ONLY.sql`  
+
+---
+
+## Priority
+
+**Next scrub track after D1B-A + D1B-C** (both structurally repaired).  
+Larger than A/C: coordinates **database RPCs, RLS, and app join flows**.
+
+| After D1B-B (later) |
+|---------------------|
+| H-01A — selective live-function EXECUTE cleanup |
+| H-01B — safe future default privileges |
+| Disposable behavioral suites D-01–D-03 |
+| D1C remains parked until disposable env + dependencies |
+
+**Connected Supabase:** use for all SELECT-only checks and (later) authorized migrations without manual SQL paste when that path is available.
 
 ---
 
@@ -20,7 +38,8 @@
 
 ## Architecture — three narrow transactional RPCs (recommended)
 
-**Do not** use one mode-switching mega-RPC.
+**Do not** use one mode-switching mega-RPC.  
+**Do not author production RPC SQL until live preflight is archived and B1–B4 frozen.**
 
 ### A. `create_league_with_commissioner_seat` (name TBD)
 
@@ -139,12 +158,21 @@ RETURN: …
 
 ---
 
+## Immediate next step
+
+1. Run **SELECT-only** preflight on connected production (`supabase/D1B-B-preflight-SELECT-ONLY.sql` or equivalent connected catalog queries).  
+2. Archive results into `docs/D1B-B-PREFLIGHT-AND-DESIGN-SCOPE.md` §0 (gray box provided).  
+3. Freeze B1–B4 before any REVIEW-ONLY RPC SQL.  
+
+---
+
 ## Explicit non-actions now
 
 - No executable join SQL  
 - No membership INSERT removal  
 - No app deploy  
-- No bundling with D1B-A/C apply  
+- No bundling with H-01 / D1C  
+- No production apply  
 
 ---
 
