@@ -1,11 +1,11 @@
 # Structural / security defect register
 
-**As of:** 2026-08-06 (updated after **D1B-B disposable Run 1** + Run-2 package revisions)  
-**Evidence chain:** … · D1B-B REVIEW-ONLY · Run 1 partial (15 PASS / FE ambiguous `v`) · package revised  
+**As of:** 2026-08-06 (updated after **D1B-B disposable Run 2 sequential PASS**)  
+**Evidence chain:** … · D1B-B Run 1 partial · Run 2 sequential **36 PASS / 0 FAIL** · concurrency still pending  
 **Mode:** Inspection / authorized repairs only  
 
 **Production confirmation:** Never touched by disposable branches or package. D1B-A/C repaired. D1B-B **not applied**.  
-**D1B-B:** **RUN-2 READY / RUN 1 PARTIAL ARCHIVED / PRODUCTION NOT AUTHORIZED / NOT REPAIRED**.  
+**D1B-B:** **DISPOSABLE RUN 2 SEQUENTIAL PASS / CONCURRENCY PENDING / APP CUTOVER PENDING / PRODUCTION NOT AUTHORIZED / NOT REPAIRED**.  
 **Parking lot:** **DATABASE SCHEMA REPRODUCIBILITY DEFECT** — `docs/DATABASE-SCHEMA-REPRODUCIBILITY-DEFECT.md`  
 **D1C:** parked — **not repaired**.
 
@@ -20,7 +20,7 @@
 | **D-02** eggs | **REGRESSION PASS** (catalog 20; no direct INSERT; anon EXECUTE false) · behavioral PENDING |
 | **D-03** first join | **REGRESSION PASS** (anon EXECUTE false; INSERT uses `is_league_member`; 73 rows; 0 orphans) · behavioral PENDING |
 | **D1B-A** picks/pick_games | **LIVE / STRUCTURALLY REPAIRED / POST-VERIFY PASS** |
-| **D1B-B** membership join | **RUN-2 READY** · Run 1 15 PASS / FE blocked · no prod apply · **not repaired** |
+| **D1B-B** membership join | **RUN 2 SEQUENTIAL PASS** (36/0/0) · two-session race **NOT_RUN** · no prod apply · **not repaired** |
 | **Schema reproducibility** | **CONFIRMED HIGH** · clean branch MIGRATIONS_FAILED · parked · **not repaired** |
 | **D1B-C** achievements visibility | **LIVE / STRUCTURALLY REPAIRED / POST-VERIFY PASS** |
 | **D1C** Crystal Ball | **DESIGN + NON-PRODUCTION SQL READY / EPHEMERAL TESTS NOT RUN / PRODUCTION APPLY BLOCKED / NOT REPAIRED** (parked) |
@@ -89,16 +89,16 @@
 | Field | Value |
 |-------|--------|
 | Severity | **High** — broader than join-only (INSERT privilege injection · row-wide UPDATE · public join codes) |
-| Status | **RUN-2 READY / RUN 1 PARTIAL ARCHIVED / PRODUCTION NOT AUTHORIZED / NOT REPAIRED** |
+| Status | **DISPOSABLE RUN 2 SEQUENTIAL PASS / CONCURRENCY PENDING / APP CUTOVER PENDING / PRODUCTION NOT AUTHORIZED / NOT REPAIRED** |
 | Design | `docs/D1B-B-MEMBERSHIP-JOIN-AUTHORITY.md` |
 | Product freeze + map | `docs/D1B-B-PRODUCT-DECISIONS-AND-CALLSITE-MAP.md` |
-| REVIEW-ONLY SQL | `supabase/review-only/D1B-B/` |
-| Run 1 evidence | `docs/D1B-B-DISPOSABLE-RUN-1-EVIDENCE.md` (15 PASS; FE `v` ambiguous blocked) |
-| Fair-entry | Percentile rename fix · FE points **VOLATILE** · freeze table |
-| Run-2 package | R1 native auth.uid · R3 no schema fail-open · R4 first-join required · R5 no commissioner_id in open list · R6 max_human complete · R7 order |
-| Disposable order | **00 → 00b → 01 → 02 → 02b → 03 → 04 → 05 → 06 → 09** (never 07) |
-| Next | Fresh empty branch → Run 2 full harness → delete branch |
-| Scope exclusion | No live apply · no H-01 · no D1C |
+| REVIEW-ONLY SQL | `supabase/review-only/D1B-B/` · package commit **20cfd5c** |
+| Run 1 evidence | `docs/D1B-B-DISPOSABLE-RUN-1-EVIDENCE.md` (15 PASS; FE blocked; revised) |
+| Run 2 evidence | `docs/D1B-B-DISPOSABLE-RUN-2-EVIDENCE.md` — **36 PASS · 0 FAIL · 0 ERROR · 1 NOT_RUN** (`RACE-final-seat`) |
+| Run 2 branch | `d1b-b-disposable-run2-20260806` · ref `tnabgofiwountwvkdrhq` · **deleted** · billing stopped |
+| Disposable order | **00 → 00b → 01 → 02 → 02b → 03 → 04 → 05 → 06 → 09** (never 07) · rollback 12 **PASS** |
+| Next | Two-session final-seat concurrency on disposable · app cutover (open-room code privacy · sport-pool seating) · freeze lifecycle · staged prod proposal + Mike auth |
+| Scope exclusion | No live apply · no H-01 · no D1C · never 07 before cutover |
 
 #### D1B-C · achievements visibility
 

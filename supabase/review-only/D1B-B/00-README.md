@@ -9,9 +9,11 @@ FOR A SPECIFIC STAGE (RPCs vs INSERT drop vs UPDATE vs SELECT tighten)
 | Field | Value |
 |-------|--------|
 | Authorization | **REVIEW-ONLY SQL package authorized — no production apply** |
-| Status | **RUN-2 READY** · Run 1 partial (15 PASS / FE blocked) · **NOT REPAIRED** |
+| Status | **RUN 2 SEQUENTIAL PASS** (36/0/0) · concurrency + app cutover **pending** · **NOT REPAIRED** |
 | Product freeze | B1–B6 locked |
+| Package commit | `20cfd5c` |
 | Run 1 evidence | `docs/D1B-B-DISPOSABLE-RUN-1-EVIDENCE.md` |
+| Run 2 evidence | `docs/D1B-B-DISPOSABLE-RUN-2-EVIDENCE.md` |
 | Empty branch | Migration chain **cannot** rebuild prod schema — use `00-disposable-baseline.sql` only |
 | Docs | `docs/D1B-B-DISPOSABLE-BASELINE-AND-HARNESS.md` · `docs/DATABASE-SCHEMA-REPRODUCIBILITY-DEFECT.md` |
 

@@ -1,15 +1,20 @@
 # D1B-B — Disposable baseline, JWT harness, and readiness
 
-**Status:** **RUN-2 READY** (post Run-1 revisions) / **PRODUCTION NOT AUTHORIZED** / **NOT REPAIRED**  
+**Status:** **DISPOSABLE RUN 2 SEQUENTIAL PASS** / **CONCURRENCY PENDING** / **APP CUTOVER PENDING** / **PRODUCTION NOT AUTHORIZED** / **NOT REPAIRED**  
 **Date:** 2026-08-06  
-**Run 1 archive:** `docs/D1B-B-DISPOSABLE-RUN-1-EVIDENCE.md`
+**Package commit:** `20cfd5c`  
+**Run 1 archive:** `docs/D1B-B-DISPOSABLE-RUN-1-EVIDENCE.md`  
+**Run 2 archive:** `docs/D1B-B-DISPOSABLE-RUN-2-EVIDENCE.md`
 
 ### Classification
 
 ```text
 D1B-B:
-DISPOSABLE RUN 1 PARTIAL PASS ARCHIVED /
-PACKAGE REVISED FOR RUN 2 /
+DISPOSABLE RUN 2 SEQUENTIAL PASS /
+36 PASS / 0 FAIL / 0 ERROR /
+TRUE TWO-SESSION FINAL-SEAT RACE NOT_RUN /
+CONCURRENCY BEHAVIORAL TEST PENDING /
+APP CUTOVER PENDING /
 PRODUCTION NOT AUTHORIZED / NOT REPAIRED
 ```
 
@@ -97,17 +102,25 @@ If 00 aborts on auth.uid: inspect platform definition; do not replace it.
 | Check | Result |
 |-------|--------|
 | Percentile naming unambiguous | **PASS** (source) |
-| Fair-entry TS fixtures | run `node scripts/verify-fair-entry-parity.mjs` |
-| Run 1 full harness | **PARTIAL** — 15 PASS, FE blocked |
-| Run 2 full harness | **NOT_RUN** |
+| Fair-entry TS fixtures | **PASS** (`verify-fair-entry-parity.mjs`) |
+| Run 1 full harness | **PARTIAL** — 15 PASS, FE blocked (archived) |
+| Run 2 full harness | **SEQUENTIAL PASS** — 36 PASS · 0 FAIL · 0 ERROR · 1 NOT_RUN (`RACE-final-seat`) |
+| Run 2 rollback + branch delete | **PASS** · billing stopped |
+| Two-session final-seat race | **NOT_RUN** (required before prod) |
 
 ---
 
-## 7. Readiness verdict — Run 2?
+## 7. Readiness verdict
 
 ```text
-YES — READY FOR DISPOSABLE RUN 2 ON A FRESH EMPTY BRANCH:
-  00 → 00b → 01 → 02 → 02b → 03 → 04 → 05 → 06 → 09
+SQL PACKAGE: structurally/sequentially sound (Run 2 sequential PASS)
+PRODUCTION: NOT AUTHORIZED / NOT REPAIRED
+NEXT GATES:
+  1. Genuine two-session last-seat concurrency on disposable
+  2. App cutover (open-room code privacy · sport-pool seating)
+  3. Season-reset / FE freeze lifecycle
+  4. Staged production proposal + explicit Mike auth per stage
+  5. Never apply file 07 before RPC + app cutover readiness
 ```
 
 Do **not** apply to production. Do **not** merge baseline into `supabase/migrations/`.
