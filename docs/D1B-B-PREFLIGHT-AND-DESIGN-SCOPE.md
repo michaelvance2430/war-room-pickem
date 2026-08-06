@@ -1,8 +1,9 @@
 # D1B-B — Membership/Join Authority: Preflight & Design Scope
 
-**Status:** **LIVE PREFLIGHT COMPLETE / DEFECT CONFIRMED / AUTHORIZATION SURFACE BROADER THAN ORIGINAL JOIN-ONLY DESIGN / PRODUCT + TECHNICAL FREEZE REQUIRED / NOT REPAIRED**  
+**Status:** **LIVE PREFLIGHT COMPLETE / B1–B6 LOCKED / CALL-SITE MAP COMPLETE / NOT REPAIRED / NO PRODUCTION SQL**  
 **Date:** 2026-08-06  
-**Architecture (reconciled):** `docs/D1B-B-MEMBERSHIP-JOIN-AUTHORITY.md`  
+**Architecture:** `docs/D1B-B-MEMBERSHIP-JOIN-AUTHORITY.md`  
+**Product freeze + call-site map + RPC contracts:** `docs/D1B-B-PRODUCT-DECISIONS-AND-CALLSITE-MAP.md`  
 **Preflight SQL:** `supabase/D1B-B-preflight-SELECT-ONLY.sql`  
 
 ### Classification
@@ -294,7 +295,7 @@ These prevent duplicates / support lookups; they **do not** authorize joins or e
 
 ## 7. Next action
 
-1. Mike freezes **B1–B6** (accept recommendations or annotate deltas).  
-2. Complete app call-site map if not already frozen.  
-3. Only then: author **REVIEW-ONLY** RPC/policy SQL (still separate apply auth).  
-4. **Do not** author or apply production SQL until that freeze + authorization.
+1. ~~Freeze B1–B6~~ **Done** — `docs/D1B-B-PRODUCT-DECISIONS-AND-CALLSITE-MAP.md`  
+2. ~~Call-site map~~ **Done** (static)  
+3. Next authorized package: **REVIEW-ONLY** RPC/policy SQL design (still **not** production apply)  
+4. **Do not** apply production SQL until Mike separately authorizes

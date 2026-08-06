@@ -1,14 +1,14 @@
 # Structural / security defect register
 
-**As of:** 2026-08-06 (updated after D1B-B **live preflight complete — scope expanded**)  
-**Evidence chain:** P15–P18 · D1A · D-01–D-03 · scrub · D1C parked · D1B-A/C repaired · **D1B-B live preflight**  
+**As of:** 2026-08-06 (updated after D1B-B **B1–B6 locked + call-site map**)  
+**Evidence chain:** P15–P18 · D1A · D-01–D-03 · scrub · D1C parked · D1B-A/C repaired · D1B-B preflight · **B1–B6 LOCKED**  
 **Mode:** Inspection / authorized repairs only  
 
-**Production confirmation:** D1B-A + D1B-C repaired. D1B-B preflight **SELECT-only** — **no D1B-B apply**. No D1C / H-01 apply.  
+**Production confirmation:** D1B-A + D1B-C repaired. D1B-B **docs only** — **no SQL apply**. No D1C / H-01 apply.  
 **D1B-A / D1B-C:** **LIVE / STRUCTURALLY REPAIRED / POST-VERIFY PASS**.  
-**D1B-B:** **LIVE DEFECT CONFIRMED / AUTHORIZATION SURFACE BROADER THAN JOIN-ONLY / PRODUCT FREEZE REQUIRED / NOT REPAIRED**.  
+**D1B-B:** **B1–B6 LOCKED / CALL-SITE MAP COMPLETE / REVIEW-ONLY ARCHITECTURE / NOT REPAIRED**.  
 **D1C:** parked — **not repaired**.  
-**Archive:** `docs/D1B-A-APPLY-VERIFICATION.md` · `docs/D1B-C-APPLY-VERIFICATION.md` · `docs/D1B-B-PREFLIGHT-AND-DESIGN-SCOPE.md` §0
+**Archive:** `docs/D1B-B-PRODUCT-DECISIONS-AND-CALLSITE-MAP.md` · `docs/D1B-B-PREFLIGHT-AND-DESIGN-SCOPE.md` §0
 
 ---
 
@@ -21,7 +21,7 @@
 | **D-02** eggs | **REGRESSION PASS** (catalog 20; no direct INSERT; anon EXECUTE false) · behavioral PENDING |
 | **D-03** first join | **REGRESSION PASS** (anon EXECUTE false; INSERT uses `is_league_member`; 73 rows; 0 orphans) · behavioral PENDING |
 | **D1B-A** picks/pick_games | **LIVE / STRUCTURALLY REPAIRED / POST-VERIFY PASS** |
-| **D1B-B** membership join | **LIVE PREFLIGHT COMPLETE / SCOPE EXPANDED / PRODUCT FREEZE REQUIRED / NOT REPAIRED** |
+| **D1B-B** membership join | **B1–B6 LOCKED / CALL-SITE MAP COMPLETE / NOT REPAIRED** (no SQL) |
 | **D1B-C** achievements visibility | **LIVE / STRUCTURALLY REPAIRED / POST-VERIFY PASS** |
 | **D1C** Crystal Ball | **DESIGN + NON-PRODUCTION SQL READY / EPHEMERAL TESTS NOT RUN / PRODUCTION APPLY BLOCKED / NOT REPAIRED** (parked) |
 | **H-01** DEFINER EXECUTE | **CONFIRMED** · split **H-01A selective design READY** · **H-01B future-default design REQUIRED separately** · no apply |
@@ -89,19 +89,13 @@
 | Field | Value |
 |-------|--------|
 | Severity | **High** — broader than join-only (INSERT privilege injection · row-wide UPDATE · public join codes) |
-| Status | **LIVE PREFLIGHT COMPLETE / SCOPE EXPANDED / PRODUCT + TECHNICAL FREEZE REQUIRED / NOT REPAIRED** |
-| Design | `docs/D1B-B-MEMBERSHIP-JOIN-AUTHORITY.md` (reconciled) |
+| Status | **B1–B6 LOCKED / CALL-SITE MAP COMPLETE / REVIEW-ONLY ARCHITECTURE / NOT REPAIRED** |
+| Design | `docs/D1B-B-MEMBERSHIP-JOIN-AUTHORITY.md` |
+| Product freeze + map | `docs/D1B-B-PRODUCT-DECISIONS-AND-CALLSITE-MAP.md` |
 | Live preflight | `docs/D1B-B-PREFLIGHT-AND-DESIGN-SCOPE.md` §0 |
-| Live INSERT | `"Memberships insert own"`: `user_id = auth.uid()` only |
-| Live UPDATE | `"Memberships update by commissioner or self"`: self OR commissioner; **WITH CHECK null** |
-| Live leagues SELECT | `"Leagues readable authenticated"`: `true` — codes exposed |
-| Live create | League INSERT separate from commissioner seat (not atomic) |
-| Capacity | No max_members column; max seats observed **33**; open leagues **0** |
-| Join RPCs | **Absent** (`record_league_first_join` is history only) |
-| Data integrity | Role/commissioner consistency **clean**; cleanup not indicated |
-| Decisions | Freeze **B1–B6** before any SQL (create/join/capacity/codes/UPDATE/cutover) |
-| Next | Product freeze → call-site map → REVIEW-ONLY RPCs (still separate apply auth) |
-| Scope exclusion | No prod apply · no INSERT drop yet · no H-01 · no D1C · no D1B-A/C re-touch |
+| Locked law | RPC-only human create after cutover; `max_human_members` 32; bots excluded; codes private; player UPDATE = display_name_override only; atomic create; staged cutover |
+| Next | REVIEW-ONLY RPC/policy SQL package (still **not** production apply until Mike auth) |
+| Scope exclusion | No prod SQL · no INSERT drop · no app deploy · no H-01 · no D1C |
 
 #### D1B-C · achievements visibility
 
@@ -189,7 +183,7 @@
 | 4 | D-03 | **STRUCTURALLY LIVE** · behavioral PENDING |
 | 5 | **D1B-A** | **LIVE / STRUCTURALLY REPAIRED / POST-VERIFY PASS** |
 | 5b | **D1B-C** | **LIVE / STRUCTURALLY REPAIRED / POST-VERIFY PASS** |
-| **5c** | **D1B-B** | Live preflight **complete** · scope **expanded** · freeze **B1–B6** · **no apply SQL** |
+| **5c** | **D1B-B** | **B1–B6 locked** · call-site map done · next REVIEW-ONLY SQL · **not repaired** |
 | 6 | **H-01A** | Selective live-function EXECUTE cleanup |
 | 6b | **H-01B** | Safe future default privileges |
 | 7 | Behavioral D-01 / D-02 / D-03 | Disposable identities only |
@@ -222,7 +216,8 @@
 | `supabase/D1B-A-APPLY-AUTHORIZED.sql` | D1B-A authorized apply (two policies) |
 | `supabase/D1B-A-postverify-SELECT-ONLY.sql` | D1B-A post-verify SELECT-only |
 | `docs/D1B-B-MEMBERSHIP-JOIN-AUTHORITY.md` | D1B-B architecture (coordinated; not repaired) |
-| `docs/D1B-B-PREFLIGHT-AND-DESIGN-SCOPE.md` | D1B-B live preflight §0 + revised phased architecture |
+| `docs/D1B-B-PREFLIGHT-AND-DESIGN-SCOPE.md` | D1B-B live preflight §0 |
+| `docs/D1B-B-PRODUCT-DECISIONS-AND-CALLSITE-MAP.md` | D1B-B B1–B6 + call sites + RPC contracts (not repaired) |
 | `supabase/D1B-B-preflight-SELECT-ONLY.sql` | D1B-B SELECT-only preflight |
 | `docs/D1B-C-ACHIEVEMENTS-VISIBILITY.md` | D1B-C design ready |
 | `docs/D1B-C-PREFLIGHT-AND-APPLY-SCOPE.md` | D1B-C live preflight PASS + apply-scope MATCH |
