@@ -1,11 +1,12 @@
 # D1B-C — Achievements SELECT visibility
 
-**Status:** **DESIGN READY / PREFLIGHT PACKAGE READY / APPLY NOT AUTHORIZED / NOT REPAIRED**  
+**Status:** **LIVE PREFLIGHT PASS / APPLY-SCOPE MATCH / APPLY NOT AUTHORIZED / NOT REPAIRED**  
 **Slice:** Fix membership tautology on achievements read only  
 **Date:** 2026-08-06  
-**Preflight + apply-scope:** `docs/D1B-C-PREFLIGHT-AND-APPLY-SCOPE.md`  
+**Preflight + apply-scope:** `docs/D1B-C-PREFLIGHT-AND-APPLY-SCOPE.md` (§0 fresh live production archive)  
 **Preflight SQL:** `supabase/D1B-C-preflight-SELECT-ONLY.sql`  
 **SQL proposal:** `supabase/D1B-C-achievements-select-REVIEW-ONLY.sql`  
+
 
 ---
 
@@ -55,12 +56,15 @@ USING: public.is_league_member(achievements.league_id)
 
 ## Apply gate
 
-1. Run `supabase/D1B-C-preflight-SELECT-ONLY.sql` (SELECT only) → archive.  
-2. Confirm MATCH vs `docs/D1B-C-PREFLIGHT-AND-APPLY-SCOPE.md`.  
-3. Mike authorizes **D1B-C only**.  
-4. Apply REVIEW-ONLY SQL → post-verify → archive.  
+| Step | Status |
+|------|--------|
+| Fresh live SELECT-only preflight | **PASS** (archived §0) |
+| Apply-scope MATCH design + REVIEW-ONLY SQL | **Yes** |
+| Mike explicit **`D1B-C authorized — apply only`** | **Not yet** |
+| Production apply | **Blocked until that authorization** |
 
-**Not authorized by this design package alone.**
+Live defect confirmed: `m.league_id = m.league_id` tautology on `"Members read achievements"`.  
+Table empty (0 rows); cleanup not needed.
 
 ---
 
