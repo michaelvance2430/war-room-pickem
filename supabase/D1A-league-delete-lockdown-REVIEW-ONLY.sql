@@ -1,9 +1,16 @@
 -- =============================================================================
 -- D1A — League deletion lockdown — REVIEW ONLY (FINAL exact names)
 -- =============================================================================
--- DO NOT APPLY without Mike authorization.
+-- CLOSEOUT 2026-08-06: VERIFIED NO-OP / ALREADY ABSENT
+--   SQL Editor preflight: zero DELETE policies on public.leagues.
+--   "Commissioner deletes league" already absent. Block B was NOT run.
+--   This session made no production change. See docs/D1A-VERIFICATION-NO-OP.md
+--   Prior Pass 1.5 freeze had reported the policy live; drift cause UNKNOWN.
 --
--- Live evidence (Pass 1.5 policy catalog + D0 confirmed findings):
+-- Historical intent (if policy ever reappears — Mike auth required again):
+--   DROP the verified retired DELETE policy only.
+--
+-- Prior live evidence (Pass 1.5 — superseded by 2026-08-06 verify):
 --   Exactly ONE DELETE policy on public.leagues:
 --     policyname = 'Commissioner deletes league'
 --     cmd        = DELETE
