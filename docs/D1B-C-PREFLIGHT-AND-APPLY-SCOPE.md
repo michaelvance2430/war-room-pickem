@@ -2,7 +2,7 @@
 
 # D1B-C — SELECT-Only Preflight & Apply-Scope Review
 
-**Status:** **LIVE PREFLIGHT PASS / APPLY-SCOPE MATCH / APPLY NOT AUTHORIZED / NOT REPAIRED**  
+**Status:** **LIVE PREFLIGHT PASS / APPLY-SCOPE MATCH / APPLY AUTHORIZED / AWAITING POST-VERIFY ARCHIVE / NOT YET CLAIMED REPAIRED**  
 **Date:** 2026-08-06  
 **Slice:** Replace **only** `"Members read achievements"` on `public.achievements`  
 **Design:** `docs/D1B-C-ACHIEVEMENTS-VISIBILITY.md`  
@@ -24,7 +24,7 @@
 
 | Action | Status |
 |--------|--------|
-| Apply D1B-C | **No** — Mike must explicitly authorize **`D1B-C authorized — apply only`** |
+| Apply D1B-C | **Authorized** — `supabase/D1B-C-APPLY-AUTHORIZED.sql`; claim repair only after post-verify archive |
 | Change `"Commissioner grants achievements"` | **No** |
 | Mutate achievement rows | **No** |
 | Table grants / indexes | **No** (H-01 separate for grants) |
@@ -188,12 +188,12 @@ File: `supabase/D1B-C-achievements-select-REVIEW-ONLY.sql`
 ## Apply gate (Mike)
 
 1. ~~Live SELECT preflight MATCH~~ **Done** (§0)  
-2. Explicit authorize: **`D1B-C authorized — apply only`**  
-3. Apply `supabase/D1B-C-achievements-select-REVIEW-ONLY.sql`  
-4. Post-verify: Members read uses `is_league_member`; no tautology; Commissioner grants unchanged  
+2. ~~Explicit authorize: **`D1B-C authorized — apply only`**~~ **Done**  
+3. Apply `supabase/D1B-C-APPLY-AUTHORIZED.sql` on production  
+4. Post-verify via `supabase/D1B-C-postverify-SELECT-ONLY.sql`  
 5. Archive verification — do not claim D1B-B / D1C / H-01  
 
-**This document does not authorize apply.**
+See `docs/D1B-C-APPLY-AUTHORIZATION.md`.
 
 ---
 
@@ -201,9 +201,8 @@ File: `supabase/D1B-C-achievements-select-REVIEW-ONLY.sql`
 
 | Statement | True? |
 |-----------|-------|
-| Production SQL changed by this docs archive | **No** |
 | Live preflight PASS / apply-scope MATCH | **Yes** |
-| D1B-C repaired | **No** |
-| D1B-C apply authorized | **No** |
-| D1B-A still repaired | **Yes** (untouched) |
-| D1B-B / D1C / H-01 untouched | **Yes** |
+| D1B-C apply authorized | **Yes** |
+| D1B-C claimed structurally repaired | **No** until post-verify archive |
+| D1B-A still repaired | **Yes** (untouched by design) |
+| D1B-B / D1C / H-01 untouched by design | **Yes** |

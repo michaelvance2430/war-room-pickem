@@ -1,6 +1,6 @@
 # D1B-C — Achievements SELECT visibility
 
-**Status:** **LIVE PREFLIGHT PASS / APPLY-SCOPE MATCH / APPLY NOT AUTHORIZED / NOT REPAIRED**  
+**Status:** **LIVE PREFLIGHT PASS / APPLY AUTHORIZED / NOT YET CLAIMED REPAIRED**  
 **Slice:** Fix membership tautology on achievements read only  
 **Date:** 2026-08-06  
 **Preflight + apply-scope:** `docs/D1B-C-PREFLIGHT-AND-APPLY-SCOPE.md` (§0 fresh live production archive)  
@@ -60,11 +60,11 @@ USING: public.is_league_member(achievements.league_id)
 |------|--------|
 | Fresh live SELECT-only preflight | **PASS** (archived §0) |
 | Apply-scope MATCH design + REVIEW-ONLY SQL | **Yes** |
-| Mike explicit **`D1B-C authorized — apply only`** | **Not yet** |
-| Production apply | **Blocked until that authorization** |
+| Mike explicit **`D1B-C authorized — apply only`** | **Yes** |
+| Production apply | `supabase/D1B-C-APPLY-AUTHORIZED.sql` |
+| Structural repair claim | After post-verify archive only |
 
-Live defect confirmed: `m.league_id = m.league_id` tautology on `"Members read achievements"`.  
-Table empty (0 rows); cleanup not needed.
+See `docs/D1B-C-APPLY-AUTHORIZATION.md`.
 
 ---
 

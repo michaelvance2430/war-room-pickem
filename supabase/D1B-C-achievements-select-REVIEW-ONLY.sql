@@ -1,7 +1,7 @@
 -- =============================================================================
--- D1B-C — achievements SELECT league correlation — REVIEW ONLY
+-- D1B-C — achievements SELECT league correlation — REVIEW ONLY / APPLY TWIN
 -- =============================================================================
--- DO NOT APPLY without Mike explicit authorization for D1B-C only.
+-- Mike authorized D1B-C-only apply. Prefer: supabase/D1B-C-APPLY-AUTHORIZED.sql
 -- Design: docs/D1B-C-ACHIEVEMENTS-VISIBILITY.md
 --
 -- SCOPE: Replace ONLY "Members read achievements" SELECT policy.
