@@ -36,7 +36,23 @@
 
 ## Query 2 — RLS policies referencing `is_league_member`
 
-**Status:** PENDING
+**Verdict:** archived (operator)
+
+### Direct live consumers of `is_league_member`
+
+| Table | Policy |
+|-------|--------|
+| `card_games` | Members read card games |
+| `memberships` | Memberships select for members |
+| `week_cards` | Members read week cards |
+
+### Regex false positives (`museum_is_league_member`)
+
+`game_final_scores`, `museum_allegiance_snapshots`, `museum_event_participants`, `museum_events`
+
+**Decision:** Helper shared → **unchanged**. D-03 may add helper to first-join INSERT policy only.
+
+**Helper gate:** **COMPLETE**. No production changes.
 
 ---
 

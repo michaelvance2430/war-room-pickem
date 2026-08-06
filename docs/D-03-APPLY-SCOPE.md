@@ -1,78 +1,82 @@
-# D-03 apply scope — final review (not authorized)
+# D-03 apply scope — FINAL (authorization pending)
 
-**Preflight:** `docs/D-03-PREFLIGHT-EVIDENCE.md` — **COMPLETE / PASS**  
+**Preflight:** COMPLETE / PASS  
+**Helper gate:** COMPLETE / PASS — reuse `is_league_member` **unchanged**  
 **SQL file:** `supabase/D-03-record-league-first-join-REVIEW-ONLY.sql`  
-**Status:** Not applied · not claimed repaired  
+**Status:** **NOT APPLIED** · not claimed repaired  
 
 ---
 
-## Preflight summary (closed)
+## End-to-end SQL file audit
 
-| Check | Result |
-|-------|--------|
-| Function vulnerable baseline | MATCH (no membership gate) |
-| EXECUTE includes anon | MATCH (to revoke) |
-| INSERT policy self-only | MATCH (to tighten) |
-| Orphan first-join rows | **0** |
-| Total first-join rows | **73** |
-| `is_league_member(uuid)` exists | **Yes** (DEFINER, search_path=public) |
+| Statement / object | In file? | In D-03 scope? |
+|--------------------|----------|----------------|
+| `CREATE OR REPLACE record_league_first_join(uuid, uuid)` | **Yes** | **Yes** |
+| `COMMENT ON` that function | Yes (metadata) | Yes (same object) |
+| `REVOKE … record_league_first_join … FROM public` | **Yes** | **Yes** |
+| `REVOKE … record_league_first_join … FROM anon` | **Yes** | **Yes** |
+| `GRANT EXECUTE … record_league_first_join … TO authenticated` | **Yes** | **Yes** |
+| `DROP POLICY "Users insert own first join"` | **Yes** | **Yes** |
+| `CREATE POLICY "Users insert own first join"` with self + `is_league_member(league_id)` | **Yes** | **Yes** |
+| `NOTIFY pgrst, 'reload schema'` | **Yes** | **Yes** |
+| `CREATE OR REPLACE is_league_member` | **No** | Must stay **No** |
+| Helper REVOKE/GRANT | **No** | Must stay **No** |
+| `DELETE`/`UPDATE` of `league_first_joins` history rows | **No** | Must stay **No** |
+| Other policies / tables / functions | **No** | Must stay **No** |
+| App code | **No** | Must stay **No** |
+| H-01 / D1B / D1C | **No** | Must stay **No** |
 
----
+### Body behavior (RPC only)
 
-## Exact production objects (when Mike authorizes)
-
-**Helper:** `public.is_league_member(uuid)` — **REUSE UNCHANGED** (no CREATE OR REPLACE, no grant changes; broad grants = H-01 only).
-
-| # | Object | Operation |
-|---|--------|-----------|
-| 1 | `public.record_league_first_join(uuid, uuid)` | `CREATE OR REPLACE` — call existing `is_league_member`; raise if not member; keep signature; idempotent insert; `joined_at` align |
-| 2 | Same function EXECUTE | REVOKE PUBLIC + anon; GRANT authenticated |
-| 3 | Policy `"Users insert own first join"` | DROP + CREATE: `auth.uid() = user_id` **and** `is_league_member(league_id)` |
-| 4 | PostgREST | `NOTIFY pgrst, 'reload schema'` |
-
-### Preserved behavior
-
-| Behavior | |
-|----------|--|
-| Earliest `first_joined_at` | Never overwritten (`ON CONFLICT DO NOTHING`) |
-| Idempotent re-stamp | Yes |
-| `memberships.joined_at` alignment | Only existing membership rows |
-| `p_user_id` | Null → self; else must equal `auth.uid()` |
-| Historical first-join rows | **No DELETE / no UPDATE** of data rows |
+| Behavior | Present |
+|----------|---------|
+| Auth required | Yes |
+| `p_user_id` null → self; else must equal `auth.uid()` | Yes |
+| `if not public.is_league_member(p_league_id)` → raise `Not a member of this league` | Yes |
+| `ON CONFLICT DO NOTHING` (earliest `first_joined_at` preserved) | Yes |
+| `UPDATE memberships.joined_at` only for matching membership | Yes |
 
 ---
 
-## Explicitly out of scope
+## Exact apply scope (for Mike authorization)
+
+When authorized, run **only** `supabase/D-03-record-league-first-join-REVIEW-ONLY.sql`, which does:
+
+1. **`CREATE OR REPLACE FUNCTION public.record_league_first_join(uuid, uuid)`**  
+   - Calls **existing** `public.is_league_member` (no helper redefine)  
+2. **`REVOKE ALL` on that RPC from `PUBLIC` and `anon`**  
+3. **`GRANT EXECUTE` on that RPC to `authenticated`**  
+4. **Replace only** policy `"Users insert own first join"` on `league_first_joins`  
+   - `auth.uid() = user_id AND public.is_league_member(league_id)`  
+5. **`NOTIFY pgrst, 'reload schema'`**
+
+### Explicitly out of scope
 
 | Item |
 |------|
-| App `cloud.ts` direct-insert fallback removal (P4 — separate) |
-| Historical orphan cleanup (none found) |
-| H-01, D1B, D1C, postseason, D-02 |
-| Mutating the 73 legitimate first-join rows |
+| Any change to `is_league_member` definition or grants |
+| Historical first-join row mutation/deletion (73 rows clean) |
+| Other RLS policies (`card_games`, `week_cards`, `memberships` SELECT, etc.) |
+| App `cloud.ts` direct-insert fallback (P4 — later) |
+| H-01 helper grant hardening |
+| D1B / D1C / postseason / D-02 |
 
 ---
 
-## SQL content confirmation (file audit)
+## Confirmations
 
-| Contains | |
-|----------|--|
-| `DELETE FROM league_first_joins` | **No** |
-| `UPDATE league_first_joins` (history) | **No** |
-| Membership gate | **Yes** via `is_league_member` |
-| Raise non-member | **Yes** — `Not a member of this league` |
-
----
-
-## Post-apply verify (one statement at a time, when authorized)
-
-1. Function body contains `is_league_member` + non-member exception  
-2. EXECUTE grantees lack anon/PUBLIC  
-3. INSERT policy with_check includes `is_league_member`  
-4. Behavioral (disposable): non-member denied; member stamp OK; re-stamp same timestamp  
+| Claim | Status |
+|-------|--------|
+| No helper changes | **Confirmed** in revised SQL |
+| No historical row mutation | **Confirmed** |
+| No other policy/function/grant changes | **Confirmed** |
+| No app changes | **Confirmed** |
+| No H-01 / D1B / D1C | **Confirmed** |
+| Production applied | **No** |
 
 ---
 
 ## Authorization gate
 
-Mike must explicitly authorize **D-03 apply** before any executable SQL is run in production.
+Mike must explicitly authorize **D-03 apply** of the audited file only.  
+Until then: **hold**.
