@@ -1,11 +1,12 @@
 # Structural / security defect register
 
-**As of:** 2026-08-06 (updated after D1C-S2b non-prod REVIEW-ONLY SQL package)  
-**Evidence chain:** P15–P18 · D1A · D-01–D-03 · scrub · D1C map · P1–P12 · S2 design · **S2b review-only SQL (not applied)**  
+**As of:** 2026-08-06 (updated after D1B-A preflight package; D1C parked)  
+**Evidence chain:** P15–P18 · D1A · D-01–D-03 · scrub · D1C S2/S2b parked · **D1B-A preflight/apply-scope**  
 **Mode:** Inspection / authorized repairs only  
 
-**Production confirmation:** no live Supabase apply from D1C packages; S2b SQL is **review-only / non-production**.  
-**D1C:** map · decisions · S2 design · **S2b SQL under `supabase/review-only/D1C-S2B/`** — **not applied · tests NOT RUN (no disposable DB) · picks/results untouched · D1B/H-01 untouched · NOT REPAIRED**.  
+**Production confirmation:** no D1B-A apply; no D1C production apply; S2b not run against production.  
+**D1C:** **DESIGN + NON-PRODUCTION SQL READY / EPHEMERAL TESTS NOT RUN / PRODUCTION APPLY BLOCKED / NOT REPAIRED** — further D1C only with separate auth.  
+**D1B-A:** preflight SQL + apply-scope archived · **APPLY NOT AUTHORIZED / NOT REPAIRED**.  
 **Archive:** `docs/AUTOMATED-READONLY-SCRUB-SWEEP.md`
 
 ---
@@ -18,10 +19,10 @@
 | **D-01** `purge_locker_before` | **REGRESSION PASS** (anon EXECUTE false; structural repair intact) · behavioral PENDING |
 | **D-02** eggs | **REGRESSION PASS** (catalog 20; no direct INSERT; anon EXECUTE false) · behavioral PENDING |
 | **D-03** first join | **REGRESSION PASS** (anon EXECUTE false; INSERT uses `is_league_member`; 73 rows; 0 orphans) · behavioral PENDING |
-| **D1B-A** picks/pick_games | **DESIGN READY / APPLY NOT AUTHORIZED** |
+| **D1B-A** picks/pick_games | **DESIGN + PREFLIGHT PACKAGE READY / APPLY NOT AUTHORIZED / NOT REPAIRED** |
 | **D1B-B** membership join | **CONFIRMED HIGH AUTHORIZATION DEFECT / COORDINATED DESIGN REQUIRED** |
 | **D1B-C** achievements visibility | **DESIGN READY / APPLY NOT AUTHORIZED** |
-| **D1C** Crystal Ball | **CONFIRMED HIGH / MULTI-AUTHORITY LOCK-REVEAL DEFECT / PRODUCT DECISIONS LOCKED / NOT REPAIRED** · S2 design READY · **S2b REVIEW-ONLY SQL authored (not applied; tests NOT RUN)** |
+| **D1C** Crystal Ball | **DESIGN + NON-PRODUCTION SQL READY / EPHEMERAL TESTS NOT RUN / PRODUCTION APPLY BLOCKED / NOT REPAIRED** (parked) |
 | **H-01** DEFINER EXECUTE | **CONFIRMED** · split **H-01A selective design READY** · **H-01B future-default design REQUIRED separately** · no apply |
 
 ---
@@ -70,11 +71,14 @@
 
 | Field | Value |
 |-------|--------|
-| Severity | High (write isolation) · low apply risk for honest clients |
-| Status | **DESIGN READY / APPLY NOT AUTHORIZED** · not claimed repaired |
+| Severity | High (write isolation) · low apply risk for honest clients · data clean (scrub: 0 nonmember / 7 picks) |
+| Status | **DESIGN + PREFLIGHT PACKAGE READY / APPLY NOT AUTHORIZED / NOT REPAIRED** |
 | Design | `docs/D1B-A-PICKS-MEMBERSHIP-CORRELATION.md` |
-| SQL | `supabase/D1B-A-picks-membership-REVIEW-ONLY.sql` (policy-only) |
-| Rule | Own pick + `is_league_member(league_id)`; pick_games via parent pick |
+| Preflight | `docs/D1B-A-PREFLIGHT-AND-APPLY-SCOPE.md` · `supabase/D1B-A-preflight-SELECT-ONLY.sql` |
+| SQL | `supabase/D1B-A-picks-membership-REVIEW-ONLY.sql` (two manage-own policies only) |
+| Rule | Own pick + `is_league_member(league_id)`; pick_games via parent pick + `is_league_member(p.league_id)` |
+| Live catalog this session | Operator must re-run preflight before apply (agent had no SQL Editor access) |
+| Scope exclusion | No D1B-B/C · no D1C · no H-01 · no app · no historical mutation |
 
 #### D1B-B · membership join authority
 
@@ -101,17 +105,12 @@
 | Field | Value |
 |-------|--------|
 | Severity | **High** (write bypass after UI lock · multi-OR peer reveal · cross-sport hard-coded freezes · bot seed ignores lock) |
-| Status | **CONFIRMED HIGH / MULTI-AUTHORITY LOCK-REVEAL DEFECT / PRODUCT DECISIONS LOCKED (P1–P12) / NOT REPAIRED** |
+| Status | **DESIGN + NON-PRODUCTION SQL READY / EPHEMERAL TESTS NOT RUN / PRODUCTION APPLY BLOCKED / NOT REPAIRED** (**PARKED**) |
 | Static map | `docs/D1C-CRYSTAL-BALL-LOCK-REVEAL-AUTHORITY-MAP.md` |
-| Remediation design | `docs/D1C-CRYSTAL-BALL-AUTHORITY-REMEDIATION.md` (REVIEW-ONLY; **P1–P12 APPROVED**) |
-| S2 design | `docs/D1C-S2-EPHEMERAL-SCHEMA-POLICY-DESIGN.md` |
-| S2b package | `docs/D1C-S2B-NONPROD-SQL-DESIGN.md` · `docs/D1C-S2B-TEST-PLAN-AND-RESULTS.md` · `supabase/review-only/D1C-S2B/*` |
-| S2b execution | **NOT RUN** (no disposable DB); **DO NOT APPLY TO LIVE SUPABASE** |
-| Tautologies | Live CB still tautologous until separate apply; S2b policies are correlated **in package only** |
-| Live data | ~7 picks · 0 results · **untouched** |
-| Product | **P1–P12 LOCKED** · T5/T8/sticky engineering locked in S2b design |
-| Next | Disposable ephemeral run of S2b matrix · then prod preflight only with Mike auth |
-| Apply | **Not authorized** · do **not** bundle with D1B / H-01 |
+| Remediation design | `docs/D1C-CRYSTAL-BALL-AUTHORITY-REMEDIATION.md` (P1–P12 APPROVED) |
+| S2 / S2b | Design + `supabase/review-only/D1C-S2B/*` — **not applied**; **do not test against production** |
+| Next D1C work | Only if separately authorized: disposable Supabase · ephemeral S2b · platform_staff seed design · dual-read · prod preflight/apply |
+| Apply | **Blocked** · not bundled with D1B-A |
 
 ### D-04 · `leagues` DELETE (product retired)
 
@@ -167,10 +166,10 @@
 | 2 | D-01 | **STRUCTURALLY LIVE** · behavioral PENDING |
 | 3 | D-02 | **STRUCTURALLY LIVE** · behavioral PENDING |
 | 4 | D-03 | **STRUCTURALLY LIVE** · behavioral PENDING |
-| 5 | **D1B-A** | Picks correlation (design ready) |
+| 5 | **D1B-A** | Preflight package ready · **await Mike apply auth** after live SELECT preflight |
 | 5b | **D1B-C** | Achievements SELECT (design ready; separate apply) |
 | 5c | **D1B-B** | Join RPCs + drop client INSERT (coordinated design) |
-| 6 | **D1C** | S2 design · **S2b REVIEW-ONLY SQL authored** · tests NOT RUN · **no prod apply** |
+| 6 | **D1C** | **Parked** — design + non-prod SQL ready; ephemeral tests not run; prod apply blocked |
 | 7 | **H-01A** | Selective live REVOKE (design ready; auth pending) |
 | 7b | **H-01B** | Future default privileges (design required separately) |
 | 8 | H-05 / H-06 / H-07 | Advisor hardening (non-exploit) |
@@ -193,6 +192,8 @@
 | `docs/H-01A-SELECTIVE-DEFINER-EXECUTE-DESIGN.md` | H-01A selective REVOKE design ready |
 | `docs/H-01B-FUTURE-DEFAULT-PRIVILEGES-DESIGN.md` | H-01B future defaults (design required) |
 | `docs/D1B-A-PICKS-MEMBERSHIP-CORRELATION.md` | D1B-A design ready |
+| `docs/D1B-A-PREFLIGHT-AND-APPLY-SCOPE.md` | D1B-A preflight + apply-scope (not applied) |
+| `supabase/D1B-A-preflight-SELECT-ONLY.sql` | D1B-A SELECT-only preflight |
 | `docs/D1B-B-MEMBERSHIP-JOIN-AUTHORITY.md` | D1B-B architecture |
 | `docs/D1B-C-ACHIEVEMENTS-VISIBILITY.md` | D1B-C design ready |
 | `docs/D1C-CRYSTAL-BALL-LOCK-REVEAL-AUTHORITY-MAP.md` | D1C static authority map (archived) |
