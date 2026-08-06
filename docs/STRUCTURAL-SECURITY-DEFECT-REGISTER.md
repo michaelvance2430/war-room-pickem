@@ -19,7 +19,7 @@
 | **D-03** first join | **REGRESSION PASS** (anon EXECUTE false; INSERT uses `is_league_member`; 73 rows; 0 orphans) · behavioral PENDING |
 | **D1B** picks / correlation | **DEFECT CONFIRMED** · **current data CLEAN** · no apply |
 | **D1C** Crystal Ball | **DEFECT CONFIRMED** · **design required** · no apply |
-| **H-01** DEFINER EXECUTE | **CONFIRMED** (14 anon / 27 authenticated callable) · no mass REVOKE |
+| **H-01** DEFINER EXECUTE | **CONFIRMED** · split **H-01A selective design READY** · **H-01B future-default design REQUIRED separately** · no apply |
 
 ---
 
@@ -95,7 +95,9 @@
 
 | ID | Finding | Live (scrub) | Apply |
 |----|---------|--------------|--------|
-| **H-01** | SECURITY DEFINER client EXECUTE surface | **27** DEFINER · **14** anon · **27** authenticated · **11** PUBLIC · **0** missing proconfig | **No mass REVOKE**; call-site matrix first |
+| **H-01** | SECURITY DEFINER client EXECUTE surface | **27** DEFINER · **14** anon · **27** authenticated · **11** PUBLIC · **0** missing proconfig | Split: **H-01A** selective REVOKE (design ready) · **H-01B** future defaults (design required) · **no mass REVOKE** · **no apply** |
+| **H-01A** | Selective REVOKE on **live** functions only | Static matrix + scrub; 8 repo-referenced functions **absent live** | Design ready: `docs/H-01A-SELECTIVE-DEFINER-EXECUTE-DESIGN.md` · **SQL must not name absent functions** |
+| **H-01B** | Auto-GRANT EXECUTE to anon/authenticated/service_role on **new** functions | Public default privileges (postgres / supabase_admin) | Design required: `docs/H-01B-FUTURE-DEFAULT-PRIVILEGES-DESIGN.md` · separate auth |
 | **H-02** | `rls_forced = false` on leagues | Expected | No FORCE without product decision |
 | **H-03** | Postseason tables | Still not applied (prior) | Separate PS auth |
 | **H-05** | Mutable function `search_path` | **3** functions: `profiles_birthday_hard_lock`, `profile_favorite_teams_set_updated_at`, `leagues_sport_id_immutable` | Hardening only; separate auth |
@@ -136,7 +138,8 @@
 | 4 | D-03 | **STRUCTURALLY LIVE** · behavioral PENDING |
 | 5 | **D1B** | Next isolation repair candidate (data clean) |
 | 6 | **D1C** | Design single lock/reveal (blocked on design) |
-| 7 | **H-01** | Call-site matrix then selective REVOKE |
+| 7 | **H-01A** | Selective live REVOKE (design ready; auth pending) |
+| 7b | **H-01B** | Future default privileges (design required separately) |
 | 8 | H-05 / H-06 / H-07 | Advisor hardening (non-exploit) |
 | 9 | PS | Postseason snapshots |
 
@@ -153,7 +156,9 @@
 
 | Doc | Role |
 |-----|------|
-| `docs/AUTOMATED-READONLY-SCRUB-SWEEP.md` | Full scrub archive (this update) |
+| `docs/AUTOMATED-READONLY-SCRUB-SWEEP.md` | Full scrub archive |
+| `docs/H-01A-SELECTIVE-DEFINER-EXECUTE-DESIGN.md` | H-01A selective REVOKE design ready |
+| `docs/H-01B-FUTURE-DEFAULT-PRIVILEGES-DESIGN.md` | H-01B future defaults (design required) |
 | `docs/D1A-VERIFICATION-NO-OP.md` | D1A closed |
 | `docs/D-01-APPLY-VERIFICATION.md` | D-01 structural |
 | `docs/D-02-APPLY-VERIFICATION.md` | D-02 structural |
