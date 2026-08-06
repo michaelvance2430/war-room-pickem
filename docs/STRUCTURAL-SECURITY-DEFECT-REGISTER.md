@@ -45,7 +45,7 @@ Remaining work is **repair design / apply authorization**, not further catalog d
 | Apply status | **REVIEW ONLY — not authorized** |
 | Design | `docs/D-01-PURGE-LOCKER-BEFORE-REMEDIATION.md` |
 | SQL proposal | `supabase/D-01-purge-locker-before-REVIEW-ONLY.sql` |
-| Intended fix | `is_league_staff` (commissioner OR moderator); reject `p_before > now()`; least-privilege EXECUTE; deny regular members and anonymous |
+| Intended fix | `is_league_staff` (commissioner OR moderator); **server 7-day retention boundary** (`v_cutoff <= now()-7d`; reject newer `p_before` including `now()`); least-privilege EXECUTE; deny regular members and anonymous |
 
 ### D-02 · `record_easter_egg_find` — achievement integrity
 
