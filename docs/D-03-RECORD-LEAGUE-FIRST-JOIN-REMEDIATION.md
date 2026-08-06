@@ -4,6 +4,20 @@
 **Defect:** STRUCTURAL-SECURITY-DEFECT-REGISTER **D-03** · P17  
 **Severity:** Medium (integrity / spoofed first-join rows)
 
+### Product decisions (Mike — approved)
+
+| ID | Decision | Status |
+|----|----------|--------|
+| **P1** | Raise `Not a member of this league` | **APPROVED** |
+| **P2** | Keep `p_user_id`; null → `auth.uid()`; supplied must equal `auth.uid()` | **APPROVED** |
+| **P3** | INSERT policy requires self + membership | **APPROVED** |
+| **P3a** | Avoid RLS recursion on policy membership lookup | Prefer **SECURITY DEFINER** helper (see §4) |
+| **P4** | SQL first; app fallback removal later | **APPROVED** |
+| **P5** | No historical delete/mutation | **APPROVED** |
+| **P6** | Left users must rejoin before stamp | **APPROVED** |
+
+**Preflight:** one SELECT at a time — start with function definition only.
+
 ---
 
 ## 1. Findings and call-site map
