@@ -1,10 +1,14 @@
 # D1B-B — REVIEW-ONLY SQL package
 
-**Status:** **REVIEW-ONLY SQL AUTHORED / NO PRODUCTION APPLY / NOT REPAIRED**  
+**Status:** **REVIEW-ONLY SQL AUTHORED / SOURCE-AUDITED / BLOCKED BY FAIR-ENTRY PARITY / NO PRODUCTION APPLY / NOT REPAIRED**  
 **Date:** 2026-08-06  
-**Authorization:** `D1B-B REVIEW-ONLY SQL package authorized — no production apply`  
+**Authorization:** REVIEW-ONLY package + source audit (no production apply)  
 **Product freeze:** B1–B6 — `docs/D1B-B-PRODUCT-DECISIONS-AND-CALLSITE-MAP.md`  
 **SQL root:** `supabase/review-only/D1B-B/`  
+**Source audit:** `docs/D1B-B-REVIEW-ONLY-SOURCE-AUDIT.md`  
+**Fair-entry design:** `docs/D1B-B-FAIR-ENTRY-SERVER-PARITY.md`  
+**Disposable guide:** `docs/D1B-B-DISPOSABLE-EXECUTION-GUIDE.md`  
+**Test matrix:** `docs/D1B-B-TEST-MATRIX.md`  
 
 ### Explicit non-actions
 
@@ -141,6 +145,8 @@ I. Stage 13–14 discovery + SELECT (separate auth)
 | Statement | True? |
 |-----------|-------|
 | REVIEW-ONLY SQL package exists | **Yes** |
+| Source audit complete | **Yes** — **BLOCKED BY FAIR-ENTRY PARITY** |
 | Production apply | **No** |
 | D1B-B repaired | **No** |
 | B1–B6 still locked | **Yes** |
+| Disposable full suite ready | **No** until fair-entry parity + JWT harness |
