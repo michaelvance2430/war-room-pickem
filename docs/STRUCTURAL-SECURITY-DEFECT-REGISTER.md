@@ -58,12 +58,14 @@ Remaining work is **repair design / apply authorization**, not further catalog d
 | Type | Untrusted caller input on discovery identity and milestones |
 | Effect | Arbitrary `egg_*` discovery IDs; caller-controlled `player_name` and `p_total_eggs` → fabricated finds / milestone flex |
 | Evidence | P17 Block 2 · call-site map in D-02 design |
-| Status | **PREFLIGHT PASS — REVIEW ONLY — not applied — not claimed repaired** |
+| Status | **LIVE / STRUCTURALLY VERIFIED / BEHAVIORAL TESTS PENDING** |
 | Design | `docs/D-02-RECORD-EASTER-EGG-FIND-REMEDIATION.md` |
-| SQL proposal | `supabase/D-02-record-easter-egg-find-REVIEW-ONLY.sql` |
-| Preflight archive | `docs/D-02-PREFLIGHT-EVIDENCE.md` — **COMPLETE / PASS** (zero invalid finds; zero bad flexes) |
-| Intended fix | Catalog table authority; RPC-only writes; profile name; server total; milestones 7/10/full; deprecated unused args; no historical delete in security apply |
-| Blockers | Mike explicit authorize D-02 apply after scope review |
+| SQL | `supabase/D-02-record-easter-egg-find-REVIEW-ONLY.sql` (applied operator SQL Editor) |
+| Preflight | `docs/D-02-PREFLIGHT-EVIDENCE.md` — PASS |
+| Apply archive | `docs/D-02-APPLY-VERIFICATION.md` |
+| Live | Catalog 20 · RPC-only finds · profile name · server total/milestones · no anon/PUBLIC EXECUTE |
+| Behavioral | **PENDING** — disposable identity only; not against real egg history |
+| App fallback | Still present until separate P7 change |
 
 ### D-03 · `record_league_first_join` — membership correlation
 
@@ -139,7 +141,7 @@ Order balances **blast radius**, **product law**, and **dependency**. No stage r
 |-------|--------|------|----------------|-----------------|
 | **1** | **D1A** | Drop verified `leagues` DELETE policy only | **CLOSED 2026-08-06: VERIFIED NO-OP / ALREADY ABSENT** — see `docs/D1A-VERIFICATION-NO-OP.md` | N/A (desired state satisfied; this session did not DROP) |
 | **2** | **D-01** | `purge_locker_before` staff + 7-day retention | **STRUCTURALLY LIVE 2026-08-06**; behavioral T7–T11 still PENDING | Was: members could wipe locker history |
-| **3** | **D-02** | `record_easter_egg_find` allowlist + trusted fields | Confirmed integrity defect; independent | Fake eggs / milestone fraud |
+| **3** | **D-02** | `record_easter_egg_find` catalog + trusted fields | **STRUCTURALLY LIVE 2026-08-06**; behavioral PENDING | Was: fake eggs / milestone fraud |
 | **4** | **D-03** | `record_league_first_join` require membership | Smaller integrity fix; independent | Spoofed first-join rows |
 | **5** | **H-01** | Least-privilege EXECUTE (REVOKE anon/PUBLIC where body is sufficient) | Only after body matrix frozen; easy to break clients/triggers | Over-revoke breaks legit RPC/trigger paths |
 | **6** | **D1B** | Membership-correlation RLS repairs | Prefer non-prod first; no staging today | Cross-league read/write isolation bugs remain |

@@ -1,7 +1,12 @@
 -- =============================================================================
 -- D-02 — record_easter_egg_find integrity harden — REVIEW ONLY
 -- =============================================================================
--- DO NOT APPLY without Mike explicit authorization for D-02 AFTER preflight review.
+-- APPLIED 2026-08-06 (operator SQL Editor). Structural post-verify PASS.
+-- Status: LIVE / STRUCTURALLY VERIFIED / BEHAVIORAL TESTS PENDING
+-- Archive: docs/D-02-APPLY-VERIFICATION.md
+-- Behavioral: disposable identity only; not claimed passed.
+--
+-- Historical: required Mike explicit authorization for D-02 AFTER preflight review.
 -- Design: docs/D-02-RECORD-EASTER-EGG-FIND-REMEDIATION.md
 -- Preflight: supabase/D-02-preflight-SELECT-ONLY.sql
 -- Evidence: P17 DEFECT 2 · STRUCTURAL-SECURITY-DEFECT-REGISTER D-02
