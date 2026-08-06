@@ -9,11 +9,23 @@ FOR A SPECIFIC STAGE (RPCs vs INSERT drop vs UPDATE vs SELECT tighten)
 | Field | Value |
 |-------|--------|
 | Authorization | **REVIEW-ONLY SQL package authorized — no production apply** |
-| Status | **REVISED / DISPOSABLE READY** · **D1B-B NOT REPAIRED** · no prod apply |
-| Product freeze | B1–B6 locked — `docs/D1B-B-PRODUCT-DECISIONS-AND-CALLSITE-MAP.md` |
-| Docs | `docs/D1B-B-REVIEW-ONLY-SQL-PACKAGE.md` · source audit · fair-entry parity |
+| Status | **DISPOSABLE BASELINE READY** · **NOT REPAIRED** · no prod apply |
+| Product freeze | B1–B6 locked |
+| Empty branch | Migration chain **cannot** rebuild prod schema — use `00-disposable-baseline.sql` only |
+| Docs | `docs/D1B-B-DISPOSABLE-BASELINE-AND-HARNESS.md` · `docs/DATABASE-SCHEMA-REPRODUCIBILITY-DEFECT.md` |
 
-## Files (apply order when eventually authorized — staged)
+## Disposable empty branch order (NOT production migrations)
+
+| File | Purpose |
+|------|---------|
+| `00-disposable-baseline.sql` | **Empty branch only** — min schema + sentinel |
+| `00b-jwt-and-fixtures.sql` | JWT harness + synthetic profiles |
+| `01` → `02` → `02b` → `03` → `04` → `05` → `06` | D1B-B package |
+| `09-full-test-runner.sql` | Results harness |
+| `12-disposable-rollback.sql` | Teardown (sentinel required) |
+| `07` | **Never** in disposable stage-6 |
+
+## Production stage files (future — separate auth)
 
 | File | Purpose | Typical stage |
 |------|---------|---------------|

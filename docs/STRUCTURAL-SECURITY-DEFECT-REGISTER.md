@@ -1,14 +1,13 @@
 # Structural / security defect register
 
-**As of:** 2026-08-06 (updated after D1B-B **fair-entry revision — disposable ready**)  
-**Evidence chain:** P15–P18 · D1A · D-01–D-03 · scrub · D1C parked · D1B-A/C repaired · D1B-B preflight · B1–B6 · REVIEW-ONLY SQL · **FE parity revision**  
+**As of:** 2026-08-06 (updated after **schema reproducibility defect** + disposable baseline)  
+**Evidence chain:** … · D1B-B REVIEW-ONLY · **branch MIGRATIONS_FAILED** · disposable baseline authored  
 **Mode:** Inspection / authorized repairs only  
 
-**Production confirmation:** D1B-A + D1B-C repaired. D1B-B **not applied**. No D1C / H-01 apply.  
-**D1B-A / D1B-C:** **LIVE / STRUCTURALLY REPAIRED / POST-VERIFY PASS**.  
-**D1B-B:** **REVIEW-ONLY PACKAGE REVISED / DISPOSABLE READY / NO PRODUCTION APPLY / NOT REPAIRED**.  
-**D1C:** parked — **not repaired**.  
-**Archive:** `docs/D1B-B-REVIEW-ONLY-SOURCE-AUDIT.md` · `docs/D1B-B-FAIR-ENTRY-SERVER-PARITY.md` · `supabase/review-only/D1B-B/02b-fair-entry.sql`
+**Production confirmation:** Never touched by failed branch or baseline package. D1B-A/C repaired. D1B-B **not applied**.  
+**D1B-B:** **DISPOSABLE BASELINE READY / PRODUCTION NOT AUTHORIZED / NOT REPAIRED**.  
+**New parking lot:** **DATABASE SCHEMA REPRODUCIBILITY DEFECT** — `docs/DATABASE-SCHEMA-REPRODUCIBILITY-DEFECT.md`  
+**D1C:** parked — **not repaired**.
 
 ---
 
@@ -21,7 +20,8 @@
 | **D-02** eggs | **REGRESSION PASS** (catalog 20; no direct INSERT; anon EXECUTE false) · behavioral PENDING |
 | **D-03** first join | **REGRESSION PASS** (anon EXECUTE false; INSERT uses `is_league_member`; 73 rows; 0 orphans) · behavioral PENDING |
 | **D1B-A** picks/pick_games | **LIVE / STRUCTURALLY REPAIRED / POST-VERIFY PASS** |
-| **D1B-B** membership join | **REVIEW-ONLY REVISED / DISPOSABLE READY** · no prod apply · **not repaired** |
+| **D1B-B** membership join | **DISPOSABLE BASELINE READY** · no prod apply · **not repaired** |
+| **Schema reproducibility** | **CONFIRMED HIGH** · clean branch MIGRATIONS_FAILED · parked · **not repaired** |
 | **D1B-C** achievements visibility | **LIVE / STRUCTURALLY REPAIRED / POST-VERIFY PASS** |
 | **D1C** Crystal Ball | **DESIGN + NON-PRODUCTION SQL READY / EPHEMERAL TESTS NOT RUN / PRODUCTION APPLY BLOCKED / NOT REPAIRED** (parked) |
 | **H-01** DEFINER EXECUTE | **CONFIRMED** · split **H-01A selective design READY** · **H-01B future-default design REQUIRED separately** · no apply |
@@ -89,7 +89,7 @@
 | Field | Value |
 |-------|--------|
 | Severity | **High** — broader than join-only (INSERT privilege injection · row-wide UPDATE · public join codes) |
-| Status | **REVIEW-ONLY PACKAGE REVISED / DISPOSABLE READY / PRODUCTION NOT AUTHORIZED / NOT REPAIRED** |
+| Status | **DISPOSABLE BASELINE READY / PRODUCTION NOT AUTHORIZED / NOT REPAIRED** |
 | Design | `docs/D1B-B-MEMBERSHIP-JOIN-AUTHORITY.md` |
 | Product freeze + map | `docs/D1B-B-PRODUCT-DECISIONS-AND-CALLSITE-MAP.md` |
 | REVIEW-ONLY SQL | `supabase/review-only/D1B-B/` including **02b-fair-entry.sql** |
@@ -97,7 +97,9 @@
 | Fair-entry | Server freeze table + percentile parity (no localStorage authority) |
 | Fixes | Sport allowlist live-only · cut_percent **10–75** (live CHECK) · d1b_b_raise VOLATILE · FE freeze table |
 | Disposable | Guide ready; JWT suite **NOT_RUN** |
-| Next | Execute disposable suite; then separate Mike auth for prod stage-6 |
+| Disposable | `00-disposable-baseline.sql` + `00b` + `09-full-test-runner` + `12-rollback` |
+| Next | Fresh empty branch → baseline → 01–06 → runner → delete branch |
+| Blocker resolved | Clean migration replay not required for D1B-B tests |
 | Scope exclusion | No live apply · no H-01 · no D1C |
 
 #### D1B-C · achievements visibility
@@ -186,7 +188,8 @@
 | 4 | D-03 | **STRUCTURALLY LIVE** · behavioral PENDING |
 | 5 | **D1B-A** | **LIVE / STRUCTURALLY REPAIRED / POST-VERIFY PASS** |
 | 5b | **D1B-C** | **LIVE / STRUCTURALLY REPAIRED / POST-VERIFY PASS** |
-| **5c** | **D1B-B** | REVIEW-ONLY revised · disposable ready · **not repaired** · no prod |
+| **5c** | **D1B-B** | Disposable baseline ready · **not repaired** · no prod |
+| **5d** | **Schema reproducibility** | Parked high defect · migration reconciliation plan only |
 | 6 | **H-01A** | Selective live-function EXECUTE cleanup |
 | 6b | **H-01B** | Safe future default privileges |
 | 7 | Behavioral D-01 / D-02 / D-03 | Disposable identities only |
@@ -226,7 +229,9 @@
 | `docs/D1B-B-FAIR-ENTRY-SERVER-PARITY.md` | Fair-entry server parity design (blocker) |
 | `docs/D1B-B-DISPOSABLE-EXECUTION-GUIDE.md` | Disposable test guide |
 | `docs/D1B-B-TEST-MATRIX.md` | Test matrix NOT_RUN |
-| `supabase/review-only/D1B-B/` | D1B-B REVIEW-ONLY SQL files |
+| `supabase/review-only/D1B-B/` | D1B-B REVIEW-ONLY SQL + disposable baseline |
+| `docs/D1B-B-DISPOSABLE-BASELINE-AND-HARNESS.md` | Disposable baseline readiness |
+| `docs/DATABASE-SCHEMA-REPRODUCIBILITY-DEFECT.md` | Clean-branch migration failure parking lot |
 | `supabase/D1B-B-preflight-SELECT-ONLY.sql` | D1B-B SELECT-only preflight |
 | `docs/D1B-C-ACHIEVEMENTS-VISIBILITY.md` | D1B-C design ready |
 | `docs/D1B-C-PREFLIGHT-AND-APPLY-SCOPE.md` | D1B-C live preflight PASS + apply-scope MATCH |
