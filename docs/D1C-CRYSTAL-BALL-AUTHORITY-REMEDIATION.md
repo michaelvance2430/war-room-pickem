@@ -12,7 +12,7 @@
 | Action | Status |
 |--------|--------|
 | Executable production SQL authoring | **No** |
-| Ephemeral/staging SQL authoring in this commit | **No** — next phase proposed only |
+| Ephemeral/staging SQL authoring | **No** in decision package · see **S2 design** `docs/D1C-S2-EPHEMERAL-SCHEMA-POLICY-DESIGN.md` (still no executable SQL unless separately authorized) |
 | RLS / trigger / schema apply on production | **No** |
 | App code changes | **No** |
 | Deploy | **No** |
@@ -312,7 +312,8 @@ supabase/D1C-S2-ephemeral-crystal-ball-REVIEW-ONLY.sql  (when authoring allowed;
 |-------|------|--------|
 | **S0** | Archive authority map | Done |
 | **S1** | Freeze P1–P12 | **Done (this update)** |
-| **S2** | Ephemeral/staging schema & policy design + non-prod SQL when authorized | **Next** |
+| **S2** | Ephemeral/staging schema & policy design | **Done** — `docs/D1C-S2-EPHEMERAL-SCHEMA-POLICY-DESIGN.md` |
+| **S2b** | Optional non-prod REVIEW-ONLY SQL from S2 appendix | **Next** (not authored yet) |
 | **S3** | Ephemeral Supabase behavioral tests | Pending |
 | **S4** | App dual-read PR | Pending |
 | **S5** | Production SELECT-only preflight | Pending |
@@ -387,7 +388,7 @@ supabase/D1C-S2-ephemeral-crystal-ball-REVIEW-ONLY.sql  (when authoring allowed;
 1. Archive authority map                          ✅
 2. Freeze Mike’s product decisions (P1–P12)       ✅ LOCKED
 3. Prepare schema/RLS/RPC design                  ✅ this doc (reconciled)
-4. Ephemeral/staging schema & policy design       ⏳ NEXT (still non-prod; no SQL in this commit)
+4. Ephemeral/staging schema & policy design       ✅ D1C-S2 doc
 5. Author non-prod REVIEW-ONLY SQL when authorized ⏳
 6. Ephemeral database tests                       ⏳
 7. App dual-read support                          ⏳
