@@ -1,13 +1,13 @@
 # Structural / security defect register
 
-**As of:** 2026-08-06 (updated after D1B-A preflight package; D1C parked)  
-**Evidence chain:** P15–P18 · D1A · D-01–D-03 · scrub · D1C S2/S2b parked · **D1B-A preflight/apply-scope**  
+**As of:** 2026-08-06 (updated after D1B-A **fresh live preflight PASS**)  
+**Evidence chain:** P15–P18 · D1A · D-01–D-03 · scrub · D1C parked · **D1B-A live preflight PASS / apply-scope MATCH**  
 **Mode:** Inspection / authorized repairs only  
 
-**Production confirmation:** no D1B-A apply; no D1C production apply; S2b not run against production.  
-**D1C:** **DESIGN + NON-PRODUCTION SQL READY / EPHEMERAL TESTS NOT RUN / PRODUCTION APPLY BLOCKED / NOT REPAIRED** — further D1C only with separate auth.  
-**D1B-A:** preflight SQL + apply-scope archived · **APPLY NOT AUTHORIZED / NOT REPAIRED**.  
-**Archive:** `docs/AUTOMATED-READONLY-SCRUB-SWEEP.md`
+**Production confirmation:** D1B-A preflight was SELECT-only — **no D1B-A policy apply**; no D1C production apply; S2b not run against production.  
+**D1C:** **DESIGN + NON-PRODUCTION SQL READY / EPHEMERAL TESTS NOT RUN / PRODUCTION APPLY BLOCKED / NOT REPAIRED** (parked).  
+**D1B-A:** **LIVE PREFLIGHT PASS / APPLY-SCOPE MATCH / APPLY NOT YET AUTHORIZED / NOT REPAIRED**.  
+**Archive:** `docs/AUTOMATED-READONLY-SCRUB-SWEEP.md` · `docs/D1B-A-PREFLIGHT-AND-APPLY-SCOPE.md` §0
 
 ---
 
@@ -19,7 +19,7 @@
 | **D-01** `purge_locker_before` | **REGRESSION PASS** (anon EXECUTE false; structural repair intact) · behavioral PENDING |
 | **D-02** eggs | **REGRESSION PASS** (catalog 20; no direct INSERT; anon EXECUTE false) · behavioral PENDING |
 | **D-03** first join | **REGRESSION PASS** (anon EXECUTE false; INSERT uses `is_league_member`; 73 rows; 0 orphans) · behavioral PENDING |
-| **D1B-A** picks/pick_games | **DESIGN + PREFLIGHT PACKAGE READY / APPLY NOT AUTHORIZED / NOT REPAIRED** |
+| **D1B-A** picks/pick_games | **LIVE PREFLIGHT PASS / APPLY-SCOPE MATCH / APPLY NOT YET AUTHORIZED / NOT REPAIRED** |
 | **D1B-B** membership join | **CONFIRMED HIGH AUTHORIZATION DEFECT / COORDINATED DESIGN REQUIRED** |
 | **D1B-C** achievements visibility | **DESIGN READY / APPLY NOT AUTHORIZED** |
 | **D1C** Crystal Ball | **DESIGN + NON-PRODUCTION SQL READY / EPHEMERAL TESTS NOT RUN / PRODUCTION APPLY BLOCKED / NOT REPAIRED** (parked) |
@@ -65,20 +65,23 @@
 
 ### D1B (split) · Picks / join / achievements
 
-**Data:** clean (picks 7 · nonmember 0 · memberships 77 · no cleanup). **Indexes:** existing uniques sufficient — **no new indexes**.
+**Data (live D1B-A preflight):** picks **7** · pick_games **35** · nonmember picks **0** · nonmember pick_games **0** · orphan pick_games **0** · no cleanup. **Indexes:** existing uniques sufficient — **no new indexes**.
 
 #### D1B-A · picks / pick_games correlation
 
 | Field | Value |
 |-------|--------|
-| Severity | High (write isolation) · low apply risk for honest clients · data clean (scrub: 0 nonmember / 7 picks) |
-| Status | **DESIGN + PREFLIGHT PACKAGE READY / APPLY NOT AUTHORIZED / NOT REPAIRED** |
+| Severity | High (write isolation) · low apply risk for honest clients |
+| Status | **LIVE PREFLIGHT PASS / APPLY-SCOPE MATCH / APPLY NOT YET AUTHORIZED / NOT REPAIRED** |
 | Design | `docs/D1B-A-PICKS-MEMBERSHIP-CORRELATION.md` |
-| Preflight | `docs/D1B-A-PREFLIGHT-AND-APPLY-SCOPE.md` · `supabase/D1B-A-preflight-SELECT-ONLY.sql` |
+| Live preflight | `docs/D1B-A-PREFLIGHT-AND-APPLY-SCOPE.md` §0 — production SELECT-only |
+| Live baseline | manage-own picks: `auth.uid()=user_id` only; manage-own pick_games: parent owner only, **WITH CHECK null** |
+| Helper | `is_league_member` DEFINER STABLE — **reuse unchanged** |
+| Integrity | picks **7** · pick_games **35** · nonmember picks **0** · orphan pick_games **0** |
 | SQL | `supabase/D1B-A-picks-membership-REVIEW-ONLY.sql` (two manage-own policies only) |
-| Rule | Own pick + `is_league_member(league_id)`; pick_games via parent pick + `is_league_member(p.league_id)` |
-| Live catalog this session | Operator must re-run preflight before apply (agent had no SQL Editor access) |
-| Scope exclusion | No D1B-B/C · no D1C · no H-01 · no app · no historical mutation |
+| Rule | Own pick + `is_league_member(league_id)`; pick_games via parent + `is_league_member(p.league_id)` |
+| Next | Mike explicit **D1B-A-only** apply auth — not granted by preflight |
+| Scope exclusion | No D1B-B/C · no D1C · no H-01 · no app · no historical mutation · no helper/grant changes |
 
 #### D1B-B · membership join authority
 
@@ -166,7 +169,7 @@
 | 2 | D-01 | **STRUCTURALLY LIVE** · behavioral PENDING |
 | 3 | D-02 | **STRUCTURALLY LIVE** · behavioral PENDING |
 | 4 | D-03 | **STRUCTURALLY LIVE** · behavioral PENDING |
-| 5 | **D1B-A** | Preflight package ready · **await Mike apply auth** after live SELECT preflight |
+| 5 | **D1B-A** | Live preflight **PASS** · apply-scope **MATCH** · **await Mike apply auth only** |
 | 5b | **D1B-C** | Achievements SELECT (design ready; separate apply) |
 | 5c | **D1B-B** | Join RPCs + drop client INSERT (coordinated design) |
 | 6 | **D1C** | **Parked** — design + non-prod SQL ready; ephemeral tests not run; prod apply blocked |
@@ -192,7 +195,7 @@
 | `docs/H-01A-SELECTIVE-DEFINER-EXECUTE-DESIGN.md` | H-01A selective REVOKE design ready |
 | `docs/H-01B-FUTURE-DEFAULT-PRIVILEGES-DESIGN.md` | H-01B future defaults (design required) |
 | `docs/D1B-A-PICKS-MEMBERSHIP-CORRELATION.md` | D1B-A design ready |
-| `docs/D1B-A-PREFLIGHT-AND-APPLY-SCOPE.md` | D1B-A preflight + apply-scope (not applied) |
+| `docs/D1B-A-PREFLIGHT-AND-APPLY-SCOPE.md` | D1B-A live preflight PASS + apply-scope MATCH (not applied) |
 | `supabase/D1B-A-preflight-SELECT-ONLY.sql` | D1B-A SELECT-only preflight |
 | `docs/D1B-B-MEMBERSHIP-JOIN-AUTHORITY.md` | D1B-B architecture |
 | `docs/D1B-C-ACHIEVEMENTS-VISIBILITY.md` | D1B-C design ready |

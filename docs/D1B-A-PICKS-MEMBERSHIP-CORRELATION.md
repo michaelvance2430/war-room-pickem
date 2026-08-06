@@ -1,10 +1,11 @@
 # D1B-A — Picks / pick_games membership correlation
 
-**Status:** **DESIGN READY / SELECT-ONLY PREFLIGHT PACKAGE READY / APPLY NOT AUTHORIZED / NOT REPAIRED**  
+**Status:** **LIVE PREFLIGHT PASS / APPLY-SCOPE MATCH / APPLY NOT YET AUTHORIZED / NOT REPAIRED**  
 **Slice:** Isolation of own pick writes to **current** league membership  
 **Date:** 2026-08-06  
-**Preflight + apply-scope:** `docs/D1B-A-PREFLIGHT-AND-APPLY-SCOPE.md`  
+**Preflight + apply-scope:** `docs/D1B-A-PREFLIGHT-AND-APPLY-SCOPE.md` (§0 fresh live production archive)  
 **Preflight SQL:** `supabase/D1B-A-preflight-SELECT-ONLY.sql`  
+
 
 
 ---
@@ -83,11 +84,12 @@ Preserved separately (do not drop):
 
 ## Apply gate
 
-Mike must:
-
-1. Run `supabase/D1B-A-preflight-SELECT-ONLY.sql` (SELECT only) and archive results.  
-2. Confirm match vs `docs/D1B-A-PREFLIGHT-AND-APPLY-SCOPE.md`.  
-3. Explicitly authorize **D1B-A only** before applying `supabase/D1B-A-picks-membership-REVIEW-ONLY.sql`.  
+| Step | Status |
+|------|--------|
+| Fresh live SELECT-only preflight | **PASS** (archived in preflight doc §0) |
+| Apply-scope MATCH design + REVIEW-ONLY SQL | **Yes** |
+| Mike explicit **D1B-A-only** apply authorization | **Not yet** |
+| Production apply of `supabase/D1B-A-picks-membership-REVIEW-ONLY.sql` | **Blocked until authorization** |
 
 **Not authorized by design or preflight alone.**
 
