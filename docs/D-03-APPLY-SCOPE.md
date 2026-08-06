@@ -21,14 +21,14 @@
 
 ## Exact production objects (when Mike authorizes)
 
+**Helper:** `public.is_league_member(uuid)` — **REUSE UNCHANGED** (no CREATE OR REPLACE, no grant changes; broad grants = H-01 only).
+
 | # | Object | Operation |
 |---|--------|-----------|
-| 1 | `public.is_league_member(uuid)` | `CREATE OR REPLACE` (align with approved DEFINER body; already live) |
-| 2 | Same | REVOKE PUBLIC/anon; GRANT authenticated |
-| 3 | `public.record_league_first_join(uuid, uuid)` | `CREATE OR REPLACE` — membership via `is_league_member`; raise if not member; keep signature; idempotent insert; `joined_at` align |
-| 4 | Same function EXECUTE | REVOKE PUBLIC + anon; GRANT authenticated |
-| 5 | Policy `"Users insert own first join"` | DROP + CREATE: `auth.uid() = user_id` **and** `is_league_member(league_id)` |
-| 6 | PostgREST | `NOTIFY pgrst, 'reload schema'` |
+| 1 | `public.record_league_first_join(uuid, uuid)` | `CREATE OR REPLACE` — call existing `is_league_member`; raise if not member; keep signature; idempotent insert; `joined_at` align |
+| 2 | Same function EXECUTE | REVOKE PUBLIC + anon; GRANT authenticated |
+| 3 | Policy `"Users insert own first join"` | DROP + CREATE: `auth.uid() = user_id` **and** `is_league_member(league_id)` |
+| 4 | PostgREST | `NOTIFY pgrst, 'reload schema'` |
 
 ### Preserved behavior
 
