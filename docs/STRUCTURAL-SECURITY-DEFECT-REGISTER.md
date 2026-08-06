@@ -1,11 +1,11 @@
 # Structural / security defect register
 
-**As of:** 2026-08-06 (updated after D1C authority map archive + remediation design)  
-**Evidence chain:** P15–P18 · D1A · D-01–D-03 apply/regression · automated Supabase plugin scrub · **D1C static authority map**  
+**As of:** 2026-08-06 (updated after D1C P1–P12 product decisions locked)  
+**Evidence chain:** P15–P18 · D1A · D-01–D-03 apply/regression · automated Supabase plugin scrub · D1C static authority map · **D1C P1–P12 LOCKED**  
 **Mode:** Inspection / authorized repairs only  
 
 **Production confirmation (automated scrub):** no SQL writes, no Auth/app/deploy changes during that sweep.  
-**D1C docs package:** map + remediation design only — **no executable SQL · no app change · no prod apply · picks/results untouched**.  
+**D1C docs package:** map + remediation design (decisions locked) — **no executable SQL · no app change · no prod apply · picks/results untouched · D1B/H-01 untouched**.  
 **Archive:** `docs/AUTOMATED-READONLY-SCRUB-SWEEP.md`
 
 ---
@@ -21,7 +21,7 @@
 | **D1B-A** picks/pick_games | **DESIGN READY / APPLY NOT AUTHORIZED** |
 | **D1B-B** membership join | **CONFIRMED HIGH AUTHORIZATION DEFECT / COORDINATED DESIGN REQUIRED** |
 | **D1B-C** achievements visibility | **DESIGN READY / APPLY NOT AUTHORIZED** |
-| **D1C** Crystal Ball | **CONFIRMED HIGH / MULTI-AUTHORITY LOCK-REVEAL DEFECT / PRODUCT DECISIONS REQUIRED / NOT REPAIRED** · map archived · remediation design REVIEW-ONLY · no apply · no executable SQL |
+| **D1C** Crystal Ball | **CONFIRMED HIGH / MULTI-AUTHORITY LOCK-REVEAL DEFECT / PRODUCT DECISIONS LOCKED (P1–P12) / NOT REPAIRED** · map archived · remediation design REVIEW-ONLY · no apply · no executable SQL |
 | **H-01** DEFINER EXECUTE | **CONFIRMED** · split **H-01A selective design READY** · **H-01B future-default design REQUIRED separately** · no apply |
 
 ---
@@ -101,15 +101,16 @@
 | Field | Value |
 |-------|--------|
 | Severity | **High** (write bypass after UI lock · multi-OR peer reveal · cross-sport hard-coded freezes · bot seed ignores lock) |
-| Status | **CONFIRMED HIGH / MULTI-AUTHORITY LOCK-REVEAL DEFECT / PRODUCT DECISIONS REQUIRED / NOT REPAIRED** |
+| Status | **CONFIRMED HIGH / MULTI-AUTHORITY LOCK-REVEAL DEFECT / PRODUCT DECISIONS LOCKED (P1–P12) / NOT REPAIRED** |
 | Static map | `docs/D1C-CRYSTAL-BALL-LOCK-REVEAL-AUTHORITY-MAP.md` |
-| Remediation design | `docs/D1C-CRYSTAL-BALL-AUTHORITY-REMEDIATION.md` (REVIEW-ONLY; **no executable SQL**) |
-| Tautologies | All listed `crystal_ball_picks` / `crystal_ball_result` member policies use `m.league_id = m.league_id` (**D1B correlation dependency — separate auth**) |
+| Remediation design | `docs/D1C-CRYSTAL-BALL-AUTHORITY-REMEDIATION.md` (REVIEW-ONLY; **P1–P12 APPROVED**; **no executable SQL**) |
+| Tautologies | All listed `crystal_ball_picks` / `crystal_ball_result` member policies use `m.league_id = m.league_id` (**D1B correlation dependency — separate auth; not bundled**) |
 | Authority | No non-internal CB triggers; app lock ≠ DB write gate; frozen-read mixes result · hard-coded `2026-08-29 16:00:00+00` · hard-coded `2026-09-10 16:00:00+00` · `week_results` week 0/1 |
 | Extra | `crystal_ball_lock_count` DEFINER; anon+authenticated EXECUTE |
-| Live data | ~7 `crystal_ball_picks` · 0 `crystal_ball_result` · **no cleanup authorized** |
-| Product | Mike decisions **P1–P12** required before SQL authoring/apply (see remediation design) |
-| Preferred design default | Season-aware `crystal_ball_state` table; DB-only security authority; lock/reveal separate fields; bot obeys lock |
+| Live data | ~7 `crystal_ball_picks` · 0 `crystal_ball_result` · **no cleanup authorized** · **picks/results untouched** |
+| Product | **P1–P12 LOCKED** (same-instant lock+reveal; crown permanent reveal backstop; no score reveal; CFB calendar+kickoff; NFL fail-open writes/fail-closed peers; hard-deny bots; immutable crown via RPC; state table; retain leavers; season_year versioning later; parse fail rules) |
+| Design target | Season-aware `crystal_ball_state`; DB-only security; narrow crown RPC; no year literals in RLS |
+| Next | **D1C-S2** ephemeral/staging schema & policy design (still non-prod; not yet authored) |
 | Apply | **Not authorized** · no quick-patch · do **not** bundle with D1B / H-01 |
 
 ### D-04 · `leagues` DELETE (product retired)
@@ -169,7 +170,7 @@
 | 5 | **D1B-A** | Picks correlation (design ready) |
 | 5b | **D1B-C** | Achievements SELECT (design ready; separate apply) |
 | 5c | **D1B-B** | Join RPCs + drop client INSERT (coordinated design) |
-| 6 | **D1C** | Authority map archived · remediation design REVIEW-ONLY · **product decisions P1–P12** · no SQL/apply |
+| 6 | **D1C** | Map archived · **P1–P12 LOCKED** · remediation design REVIEW-ONLY · next S2 ephemeral design · no SQL/apply |
 | 7 | **H-01A** | Selective live REVOKE (design ready; auth pending) |
 | 7b | **H-01B** | Future default privileges (design required separately) |
 | 8 | H-05 / H-06 / H-07 | Advisor hardening (non-exploit) |

@@ -1,25 +1,60 @@
 # D1C — Crystal Ball Authority Remediation
 
-**Status:** REVIEW-ONLY DESIGN · **NOT AUTHORIZED TO APPLY**  
-**Date:** 2026-08-06  
-**Classification:** **CONFIRMED HIGH / MULTI-AUTHORITY LOCK-REVEAL DEFECT / PRODUCT DECISIONS REQUIRED / NOT REPAIRED**  
+**Status:** REVIEW-ONLY DESIGN · **PRODUCT DECISIONS P1–P12 LOCKED** · **NOT AUTHORIZED TO APPLY**  
+**Date:** 2026-08-06 (updated: Mike decisions locked)  
+**Classification:** **CONFIRMED HIGH / MULTI-AUTHORITY LOCK-REVEAL DEFECT / PRODUCT DECISIONS LOCKED / NOT REPAIRED**  
 **Evidence map:** `docs/D1C-CRYSTAL-BALL-LOCK-REVEAL-AUTHORITY-MAP.md`  
 **Prior design notes:** `docs/STRUCTURAL-HARDENING-D0-RLS.md` § Crystal Ball · blocked stub `supabase/D1C-crystal-ball-lock-REVIEW-ONLY.sql`  
 **Register:** `docs/STRUCTURAL-SECURITY-DEFECT-REGISTER.md`
 
-### Explicit non-actions (this document)
+### Explicit non-actions (this document / this package)
 
 | Action | Status |
 |--------|--------|
-| Executable SQL creation | **No** — design only; no apply file in this package |
+| Executable production SQL authoring | **No** |
+| Ephemeral/staging SQL authoring in this commit | **No** — next phase proposed only |
 | RLS / trigger / schema apply on production | **No** |
 | App code changes | **No** |
 | Deploy | **No** |
 | Mutate live `crystal_ball_picks` / `crystal_ball_result` | **No** (~7 picks left untouched) |
-| Bundle D1B-A / D1B-B / D1B-C / H-01A / H-01B | **No** |
+| Bundle or apply D1B-A / D1B-B / D1B-C / H-01A / H-01B | **No** · **untouched** |
 | Claim D1C repaired | **No** |
 
 **Production remains unchanged until a later, separately authorized apply.**
+
+---
+
+## 0. P1–P12 decision table — APPROVED (LOCKED)
+
+| ID | Topic | Status | Approved product law |
+|----|-------|--------|----------------------|
+| **P1** | Lock versus reveal | **APPROVED** | Lock and **peer reveal occur at the same instant by default**. Keep separate `lock_at` and `reveal_at` fields so delayed reveal remains possible later; initially set **`reveal_at = lock_at`**. Before lock: own pick only. At lock: submissions close **and** league members see everyone’s picks. Countdown and reveal feel like **one coordinated event**. |
+| **P2** | Crown as permanent reveal | **APPROVED** | Crowning permanently reveals the board as a **backstop**, not the normal seasonal lock. Crown **must not** reopen writes or change original `lock_at`. |
+| **P3** | Opening week scored | **APPROVED** | Scored opening week is **not** an ordinary lock/reveal authority. Remove `week_results` week 0/1 from eventual CB RLS. Scoring may be an **operational warning** only; never independently reveal private picks. |
+| **P4** | CFB scheduling authority | **APPROVED** | Server-owned, **season-specific** CFB calendar deadline **combined with** persisted opening-week first kickoff. Authoritative CFB lock = **earlier valid instant** of (1) season CFB CB deadline (2) first valid kickoff on formally published Week 0 card. Normalize and persist as `timestamptz` before policies rely on it. **No yearly date literals in RLS**. |
+| **P5** | NFL without published Week 1 slate | **APPROVED** | Keep **submissions open** and **peer picks private** when no valid Week 1 slate / persisted lock exists. Emit **operational warning** (commish/platform). Never reveal because schedule is missing. Once valid `lock_at` is **persisted**, it is authoritative and **must not drift** with later client calculations. |
+| **P6** | Bot behavior after lock | **APPROVED** | **Hard-deny** production bot CB writes after lock. Bots and humans share the same deadline. Commish tools, padding, Founder tools, service functions, and bot RPCs must not silently insert/replace production picks after lock. Simulation overrides only in **isolated Foundry/test** with separate design + authorization. |
+| **P7** | Crown immutability | **APPROVED** | **First crown immutable** via ordinary commissioner/client paths. No silent re-crown by upsert. Corrections require a separate narrow **audited repair** with explicit reason — **separately designed and authorized**. |
+| **P8** | Crown authority | **APPROVED** | **Commissioner + authorized platform ops** may crown through **one narrow server-controlled RPC**. League commissioner crowns own league. Platform ops may complete closeout when necessary; server verifies and records actor. **No** broad direct table-write privileges to ops or clients. |
+| **P9** | Storage model | **APPROVED** | Dedicated season-aware **`public.crystal_ball_state`** keyed by `(league_id, season_year)`. Not leagues-only authority. Supports `lock_at`, `reveal_at`, source/reason, audit timestamps, actor fields, historical seasons, one row per league×season. Clients may **read** permitted state; may **not invent or directly alter** authoritative timestamps. |
+| **P10** | Removed members’ picks | **APPROVED** | **Retain** submitted picks as season history when a member leaves/is removed. Leave removes access/mutation; does **not** erase historical prediction. Privacy/moderation/account-deletion removal is separately authorized and auditable. |
+| **P11** | Multi-season history | **APPROVED** | Version picks and results by **`season_year`**. Do not rely solely on destructive resets. Preserve each season’s picks, lock/reveal state, crown, winner/achievement relationships. **Do not migrate** ~7 current production picks until separate migration plan, preflight, and authorization. |
+| **P12** | Invalid / unparseable schedule | **APPROVED** | **Fail open for submissions**, **fail closed for peer reveal** when no valid persisted authority exists. Never compute security from malformed free-text schedule values. If prior valid `lock_at` exists, **retain and use it**. If none: writes open temporarily, peers private, operational warning, never reveal on parse fail, never replace valid timestamp with invalid value. |
+
+### Additional product law (binding)
+
+| # | Law |
+|---|-----|
+| 1 | The **database** is the final security authority. |
+| 2 | Browser countdowns and UI locks **display** database state; they do **not** create authority. |
+| 3 | A direct authenticated API call must **not** bypass the lock. |
+| 4 | Human and production bot picks obey the **same** deadline. |
+| 5 | Locked picks cannot be replaced through normal upsert behavior. |
+| 6 | One sport or league cannot lock or reveal another. |
+| 7 | No hard-coded season dates belong in permanent RLS policies. |
+| 8 | No scored-week shortcut independently reveals Crystal Ball picks. |
+| 9 | Own-pick privacy remains intact before reveal. |
+| 10 | Existing production picks/results remain **untouched** during design. |
 
 ---
 
@@ -36,201 +71,219 @@ Crystal Ball currently has **multiple competing authorities** for lock and revea
 
 **Security consequence:** An authenticated client can change their own pick after the UI claims lock. Peers may be revealed by global dates or score events independent of the app. Sports can cross-contaminate via hard-coded freezes.
 
-**Goal:** One **server-owned** source of truth for lock and reveal, enforced by the database. Browser clocks and UI are advisory only.
+**Goal (now decision-locked):** One **server-owned** source of truth for lock and reveal, enforced by the database, implementing P1–P12. Browser clocks and UI are advisory only.
 
 ---
 
-## 2. Recommended design defaults
+## 2. Schema design reconciled to P1–P12
 
-### 2.1 Storage — dedicated season-aware state table (preferred over `leagues` columns)
-
-**Table (conceptual name):** `public.crystal_ball_state`
+### 2.1 `public.crystal_ball_state` (P9) — conceptual
 
 | Field | Type (intent) | Role |
 |-------|---------------|------|
 | `league_id` | uuid FK → leagues | Scope |
-| `season_year` | int | Multi-season history key |
-| `lock_at` | timestamptz nullable | Authoritative write-close instant |
-| `reveal_at` | timestamptz nullable | Authoritative peer-read instant |
-| `locked_at` | timestamptz nullable | When explicit/manual lock was recorded (if supported) |
-| `revealed_at` | timestamptz nullable | When explicit/manual reveal was recorded (if supported) |
-| `lock_reason` / `lock_source` | text | e.g. `kickoff_proposed` · `cfb_calendar` · `manual` · `automation` |
-| `reveal_reason` / `reveal_source` | text optional | If reveal differs from lock |
+| `season_year` | int | Multi-season history key (P11) |
+| `lock_at` | timestamptz **nullable** | Authoritative write-close (P1, P5, P12) |
+| `reveal_at` | timestamptz **nullable** | Authoritative peer-read; default **`= lock_at`** (P1) |
+| `lock_source` / `lock_reason` | text | e.g. `cfb_calendar_and_kickoff` · `nfl_w1_kickoff` · `manual` · `automation` (P4, P9) |
+| `reveal_source` / `reveal_reason` | text optional | Normally mirrors lock; crown permanent reveal is separate path (P2) |
+| `schedule_warning` | boolean or text optional | Ops warning when no valid slate / parse fail (P5, P12) |
 | `created_at` / `updated_at` | timestamptz | Audit |
 | `created_by` / `updated_by` | uuid nullable | Audit where useful |
+| Optional: `locked_at` / `revealed_at` | timestamptz | Explicit event stamps if automation records “crossed” separately from deadline |
 
-**Primary key:** `(league_id, season_year)`  
-**Why not only columns on `leagues`:** preserves multi-season history; avoids destructive reset as the only historical model; keeps CB authority out of the general league settings row.
+**Primary key:** `(league_id, season_year)` — one authoritative record per league and season.
 
-**Not in this phase:** create table SQL, backfill of live rows, or migration of the ~7 picks.
+**Client privileges (target):** SELECT permitted rows for members; **no** direct INSERT/UPDATE of `lock_at` / `reveal_at` by ordinary clients. Timestamp writes only via automation / service DEFINER / narrow ops RPC (P9).
 
-### 2.2 Authority law
+**Not in this phase:** create table SQL, backfill, or migration of ~7 picks (P11).
 
-| Law | Statement |
-|-----|-----------|
-| A1 | **Database is the only security authority** for write-open and peer-reveal. |
-| A2 | Browser-calculated dates and UI state are **advisory displays only**. |
-| A3 | Human INSERT/UPDATE of picks **must be rejected** when authoritative lock has passed. |
-| A4 | Direct PostgREST writes must **not** bypass the lock. |
-| A5 | Peer picks remain private until authoritative **reveal**. |
-| A6 | Own pick remains readable to the submitting **league member**. |
-| A7 | Membership checks must correlate to the **row’s** `league_id` (not tautology). |
-| A8 | Eventual RLS: **remove** hard-coded 2026 dates and `week_results` OR branches. |
-| A9 | **No** score event independently reveals picks through RLS. |
-| A10 | Crown/result existence may permanently reveal — **subject to P2**. |
+### 2.2 Future picks / results versioning (P11) — design intent only
 
-### 2.3 Lock and reveal as separate concepts
+| Object | Future shape (not migrating now) |
+|--------|----------------------------------|
+| `crystal_ball_picks` | Eventually include `season_year`; uniqueness `(league_id, season_year, user_id)` |
+| `crystal_ball_result` | Eventually include `season_year`; uniqueness `(league_id, season_year)`; first crown immutable (P7) |
+| Achievements / trophies links | Preserve season association for Village Nerd / `crystal_ball_correct` |
 
-- Schema keeps **both** `lock_at` and `reveal_at` even if initially equal.
-- **Recommended initial product behavior (P1 default):** `reveal_at = lock_at` unless Mike chooses delayed reveal.
-- Do **not** collapse the data model because initial values may match.
+**Current production ~7 picks:** leave as-is until separate migration plan + preflight + Mike auth.
 
-### 2.4 Scheduling
+### 2.3 Authority law (mapped to decisions)
 
-| Input | Role |
-|-------|------|
-| Opening-week first kickoff | May **propose** lock time |
-| Persistence | Must be normalized and stored as **`timestamptz`** on `crystal_ball_state` **before** RLS relies on it |
-| Policies | Must **not** parse free-form `card_games.start_time` text |
-| CFB calendar | Season-aware, **server-owned** (table or approved function), not app `Date.parse("2026-…")` in security path |
-| Missing schedule | Fail-open vs fail-closed is **P5 / P12** — document explicitly; do not invent in policy |
+| Law | Statement | Decision |
+|-----|-----------|----------|
+| A1 | Database is final security authority | Additional law 1 |
+| A2 | Browser/UI are display only | Additional law 2 |
+| A3 | Human INSERT/UPDATE rejected after lock | P1, law 3/5 |
+| A4 | Direct PostgREST cannot bypass lock | Law 3/5 |
+| A5 | Peers private until reveal | P1, P5, P12 |
+| A6 | Own pick readable to submitting member | Law 9 |
+| A7 | Membership correlates to row `league_id` | D1B dependency |
+| A8 | No hard-coded years in permanent RLS | P4, law 7 |
+| A9 | No score-based independent reveal | P3, law 8 |
+| A10 | Crown permanently reveals; does not reopen writes or move lock | P2 |
+| A11 | Bots same deadline; hard-deny after lock | P6, law 4 |
+| A12 | First crown immutable via normal paths; repair separate | P7 |
+| A13 | Crown via narrow server RPC; commish + verified ops | P8 |
+| A14 | Fail open writes / fail closed peers without valid `lock_at` | P5, P12 |
+| A15 | Persisted valid `lock_at` never replaced by invalid / client drift | P5, P12 |
+| A16 | Removed-member picks retained as history | P10 |
 
-### 2.5 Bot and privileged writes
+### 2.4 Lock and reveal behavior (P1)
 
-| Rule | Statement |
-|------|-----------|
-| Production bot seed | Obeys **same** lock as human picks |
-| After lock | No commissioner, bot, Founder, or service function may **silently** rewrite picks |
-| Foundry / test override | Must be **explicitly isolated** from production leagues and **separately authorized** |
-| Emergency repair | Auditable, narrow, **not** a normal write path |
+```text
+BEFORE lock_at (or lock_at IS NULL per P5/P12):
+  is_write_open = true (if member + feature on + not crowned-closed if ever applicable)
+  is_peers_revealed = false  (unless P2 crown already exists)
+  member sees own pick only
 
-### 2.6 Result / crown
+AT/AFTER lock_at (= reveal_at initially):
+  is_write_open = false
+  is_peers_revealed = true
+  one coordinated event: close submissions + show room board
 
-| Recommendation | Statement |
-|----------------|-----------|
-| First crown | Immutable through **normal client** paths |
-| Corrections | Narrowly authorized, auditable repair only |
-| Ops vs commissioner | **Do not change** crown authority in apply until **P8** decided; design documents the live mismatch (ops closeout expects write; RLS commissioner-only) |
-| Permanent reveal | Depends on **P2** |
+IF crystal_ball_result exists for that league/season (P2):
+  is_peers_revealed = true (permanent backstop)
+  is_write_open remains false; lock_at unchanged
+```
 
-### 2.7 Picks and seasons
+### 2.5 Scheduling (P4, P5, P12)
 
-| Recommendation | Statement |
-|----------------|-----------|
-| Eventually | Version `crystal_ball_picks` by `season_year` rather than wipe-only history |
-| This design phase | **No** migration or mutation of ~7 current picks |
-| Removed members | **Default:** retain picks as historical records; membership controls visibility and normal mutation (**P10**) |
-| Delete on remove | Separate product decision — not default |
+| Sport | How `lock_at` is **proposed then persisted** |
+|-------|-----------------------------------------------|
+| **CFB** | `min(valid season CFB calendar deadline, first valid kickoff on formally published Week 0)` when each arm is valid; write earlier to `crystal_ball_state` as `timestamptz` with reason (P4) |
+| **NFL** | First valid kickoff on formally published Week 1; if missing → `lock_at` null, writes open, peers private, **ops warning** (P5) |
+| **Policies** | Read **only** persisted state (and crown for P2); **never** parse free-text `start_time` / `lock_time` in RLS (P12) |
+| **Drift** | After valid persist, automation must not overwrite with weaker/invalid values (P5, P12) |
+| **Parse fail** | Keep prior valid `lock_at` if any; else open writes + private peers + warning (P12) |
+
+Server-owned CFB calendar: season-keyed table or approved function — **not** literals inside policy text.
+
+### 2.6 Bot and privileged writes (P6)
+
+| Path | After lock |
+|------|------------|
+| Human upsert | Denied (DB) |
+| `seed_bot_crystal_ball_picks` | Denied (same production gate) |
+| Pad bots / founder one-click / commish seed UI | Must surface error; no silent local “success” that implies cloud write |
+| Foundry / test override | Isolated env only; separate design + auth — not production path |
+| Emergency pick repair | Auditable, separate authorization — not normal RPC |
+
+### 2.7 Crown / result (P2, P7, P8)
+
+| Topic | Design target |
+|-------|----------------|
+| Normal crown | **One** narrow SECURITY DEFINER (or equivalent) RPC: verifies commissioner of that league **or** authorized platform ops; inserts first result; records actor; may grant achievements |
+| Re-crown | Denied on ordinary path (no client upsert rewrite) |
+| Repair | Separate RPC: reason required, audit log, separate auth package |
+| Direct `crystal_ball_result` client ALL | **Remove / restrict** broad table-write; prefer RPC-only writes |
+| Permanent reveal | Helper: peers revealed if `now() >= reveal_at` **OR** result exists (P2); writes still closed |
+| Closeout | Ops uses same crown RPC (server-verified), not raw table privileges |
+
+### 2.8 Removed members (P10)
+
+- No automatic DELETE of `crystal_ball_picks` on leave/remove.
+- Membership loss → no SELECT peers (nonmember), no own mutation; historical row remains for season board after reveal / crown / Village Nerd ranking.
+- Account deletion / privacy wipe: separate authorized process.
 
 ---
 
 ## 3. Target resolver contract (design only — not created)
 
-Conceptual RPC / SQL function: `public.crystal_ball_lock_state(p_league_id uuid, p_season_year int default <current>)`
-
-Returns (shape):
+Conceptual: `public.crystal_ball_lock_state(p_league_id uuid, p_season_year int default <current>)`
 
 ```text
 sport_id
 season_year
 lock_at
 reveal_at
-is_locked          -- now() >= lock_at OR explicit locked_at OR (optional) crowned write-close
-is_write_open      -- NOT is_locked (and feature enabled / member)
-is_peers_revealed  -- now() >= reveal_at OR (P2) result exists OR explicit revealed_at
-lock_reason
-reveal_reason
-kickoff_known      -- whether lock_at was derived from schedule
-crowned            -- crystal_ball_result present for league[/season]
+is_locked              -- now() >= lock_at when lock_at IS NOT NULL; never invent lock from free text
+is_write_open          -- member may write own pick: NOT locked AND no stronger close rule
+is_peers_revealed      -- (reveal_at IS NOT NULL AND now() >= reveal_at) OR (P2: result exists)
+lock_source / reason
+schedule_warning       -- no slate / unparseable / missing authority (P5, P12)
+kickoff_known          -- whether lock_at derived from schedule
+crowned
 ```
 
-**Invariants (target):**
+**Invariants:**
 
 ```text
-is_write_open  ⇔  member may INSERT/UPDATE own pick for that season
-is_peers_revealed  ⇔  members may SELECT peer team_name rows
-UI and Home tasks consume the same RPC facts — never a third clock
+Default product: reveal_at = lock_at when both set (P1)
+is_write_open false when is_locked or crowned-closed for writes
+is_peers_revealed true when reveal time passed OR crown exists (P2)
+UI / Home / save / bot tools consume THIS only (display + optimistic UX); DB enforces
 ```
 
-RLS (eventual) uses **only** this state / helper — no year literals, no `week_results` reveal branch.
+---
+
+## 4. D1B membership-correlation dependency (reference only — not bundled)
+
+| Dependency | Why D1C needs it | How it stays separate |
+|------------|------------------|------------------------|
+| Fix `m.league_id = m.league_id` on CB own/frozen/insert/update/result-read policies | Without correlation, “member of **this** league” is not trustworthy; peer privacy and write scope leak across leagues | D1B-style membership fix is a **separate authorization and apply**; D1C policy rewrite should assume correlated checks but **must not** ship D1B SQL in a D1C transaction |
+| Prefer `is_league_member(crystal_ball_picks.league_id)` (or equivalent) | Shared helper already used by D-03; H-01 grants are separate | D1C docs reference helper; H-01A REVOKE list not applied here |
+| D1B-A picks / D1B-C achievements / D1B-B join | Adjacent integrity, not CB lock authority | **Untouched** by this package |
+
+**Recommended order (still two auths):**  
+1) Membership correlation on CB (and related) policies when Mike authorizes D1B slice for CB tautologies **or** as first half of a D1C apply window with **explicit dual auth** — prefer **fully separate applies**.  
+2) D1C state table + lock/reveal enforcement after ephemeral proof.
+
+**This package does not apply D1B.**
 
 ---
 
-## 4. Mike decision table (P1–P12)
+## 5. Remaining technical questions (no product judgment required)
 
-| ID | Decision | Recommended default | Alternatives / tradeoffs |
-|----|----------|---------------------|---------------------------|
-| **P1** | Lock and reveal same time, or delayed reveal? | **Same time initially:** set `reveal_at = lock_at` at write of state; keep columns separate | Delayed reveal: better drama, more complex UI and dual gates; risk of “locked but secret forever” if reveal never set |
-| **P2** | Does crown permanently reveal the board? | **Yes** — crown ⇒ `is_peers_revealed` forever for that season | No: reveal only via `reveal_at`; crown can be private until calendar — surprises for trophy ceremony |
-| **P3** | Is opening-week **scored** an ordinary lock/reveal authority? | **No** — lagging signal only if ever used; **not** RLS reveal | Yes: matches some current app behavior but couples scoring mistakes to privacy leaks |
-| **P4** | CFB: server calendar vs persisted first kickoff | **Both inputs, one persisted winner:** automation computes `min(server_calendar_at, kickoff_at)` when known and **writes** `lock_at` | Kickoff-only: simple but drops noon product law; calendar-only: ignores early Thursday openers |
-| **P5** | No published slate: fail open or fail closed? | **Writes fail-open** (no invented lock); **peers fail-closed** (private) — matches current NFL app intent | Fail-closed writes: freezes entire preseason if slate late; fail-open peers: privacy risk |
-| **P6** | Production bot writes after lock? | **Hard-denied** same as humans | Soft-allow for commish “fix”: becomes production bypass |
-| **P7** | First crown immutable vs commissioner corrections? | **Immutable** on normal client path; correction = auditable repair RPC | Always-editable crown: re-crown races and achievement thrash |
-| **P8** | Crown authority: commissioner only or commissioner + ops? | **Document only until decided** — live RLS = commissioner only; ops closeout currently mismatches | +ops: unblocks closeout automation; expands write surface — needs explicit grant design |
-| **P9** | Dedicated season-aware state table? | **Yes** (`crystal_ball_state`) | Columns on `leagues`: simpler v1, poor multi-season |
-| **P10** | Retain removed-member picks as history? | **Yes** (default) | Delete on leave: cleaner privacy; loses prophet history for Village Nerd edge cases |
-| **P11** | Season-version picks vs reset-only model? | **Eventually version by `season_year`**; no migrate now | Reset-only: simpler now; destroys history on `reset_league_season` |
-| **P12** | Unparseable schedule fail mode? | Align with **P5**: do not set `lock_at` from bad text; log; peers stay private; writes stay open until calendar or manual authority | Fail-closed on parse error: may lock room on data quality bug |
+These can be resolved by engineering design / ephemeral prototyping without reopening P1–P12:
 
-**Freeze required** before ephemeral SQL authoring or production preflight.
-
----
-
-## 5. Dependency on D1B (reference only — do not apply here)
-
-| Dependency | Why |
-|------------|-----|
-| Membership correlation on CB policies | Tautologies make “member of target league” unenforceable as intended |
-| `is_league_member(league_id)` helper | Prefer shared helper after D-03/H-01 grant posture is clear |
-
-**D1C design may assume correlated membership in the *target* RLS text but must not ship D1B SQL in a D1C transaction.**  
-Order recommendation: **D1B membership correlation (separate auth) before or as a pre-step to D1C policy rewrite** — still two authorizations, two rollbacks.
+| # | Technical question | Notes |
+|---|--------------------|-------|
+| T1 | Exact name/shape of server CFB calendar source table or function | Season-keyed; no year literals in RLS |
+| T2 | Definition of “formally published” card in SQL | Align with app: `published_at` present + games with valid kickoff |
+| T3 | Kickoff validation rules when promoting text → `timestamptz` | ISO-only? regex + `AT TIME ZONE`? reject ambiguous local strings |
+| T4 | Who runs automation that persists `lock_at` | Cron, publish-card hook, or one-shot backfill job — implementation choice |
+| T5 | `season_year` derivation for a league | Align with existing `defaultSeasonYear()` / sport season boundaries |
+| T6 | Whether crown RPC also writes `revealed_at` stamp for audit | Optional; P2 does not require mutating `lock_at`/`reveal_at` |
+| T7 | Audit storage for crown repair (table vs log) | Required before P7 repair package |
+| T8 | Platform ops identity check in crown RPC | Reuse `is_league_ops` / staff helper vs platform allowlist |
+| T9 | Dual-read feature flag mechanism | Env, league flag, or release train |
+| T10 | Whether interim state exists with `season_year` only on state table while picks remain unversioned | Likely yes until P11 migration auth |
+| T11 | Operational warning channel | Commish checklist, Founder health, or `schedule_warning` column + UI |
+| T12 | Interaction with `reset_league_season` | Must not silently destroy multi-season history once P11 lands — redesign wipe scope later |
 
 ---
 
-## 6. Schema / RLS / RPC design (REVIEW ONLY — no SQL file)
+## 6. Next proposed phase (NOT production SQL)
 
-### 6.1 Schema stages (conceptual)
+**Phase name:** D1C-S2 — **Ephemeral / staging schema & policy design**  
+**Still design + non-prod experiment only until Mike authorizes.**  
+**This commit does not create the SQL files.**
 
-1. Create `crystal_ball_state` (+ indexes, RLS deny client write of authority columns by default).  
-2. Optional later: add `season_year` to picks/result (migration deferred; **not** this phase).  
-3. Optional: server calendar table `crystal_ball_season_deadlines(sport_id, season_year, lock_at)` for CFB.
+### 6.1 Goals of S2 (when authorized to author non-prod SQL)
 
-### 6.2 Who may write state rows
+1. Create `crystal_ball_state` + RLS (client cannot invent timestamps).  
+2. Create `crystal_ball_lock_state` helper reading **only** state (+ crown for P2).  
+3. Draft pick policies: own read; peer read on reveal; insert/update only when write open; **no** week_results; **no** 2026 literals.  
+4. Draft bot seed body gate = same write-open check.  
+5. Draft crown RPC (P8) with immutable first insert (P7).  
+6. Unit/ephemeral tests for behavioral matrix §11.  
+7. Document publish-hook / backfill **proposal** for CFB min(calendar, W0 kickoff) and NFL W1 kickoff.  
 
-| Actor | Allowed writes |
-|-------|----------------|
-| Ordinary members | **None** on `crystal_ball_state` |
-| Commissioner / ops (product) | Manual lock/reveal only if P1/E supports and is audited |
-| Automation / service DEFINER | Propose/set `lock_at`/`reveal_at` from published kickoff + calendar |
-| Foundry | Isolated leagues only (P6) |
+### 6.2 Explicitly out of S2
 
-### 6.3 Eventual policy sketch (not executable)
+- Production apply  
+- Migration of ~7 live picks  
+- App dual-read PR (S4 later)  
+- D1B / H-01 applies  
+- Crown repair RPC full design (follow-on package after P7)
 
-**`crystal_ball_picks` SELECT own:**  
-`user_id = auth.uid()` AND `is_league_member(crystal_ball_picks.league_id)`
+### 6.3 Suggested artifact names (future, not created now)
 
-**SELECT peers:**  
-member AND `crystal_ball_lock_state(...).is_peers_revealed`  
-(+ optional P2 crown short-circuit inside helper)
-
-**INSERT / UPDATE own:**  
-owner AND member AND `is_write_open`  
-**No** unlock via UI.
-
-**`seed_bot_crystal_ball_picks`:** same `is_write_open` (or stricter) inside body; reject after lock.
-
-**`crystal_ball_result`:**  
-- INSERT first crown: commissioner (or P8).  
-- UPDATE/DELETE: deny for normal roles; repair RPC only if P7.
-
-### 6.4 Explicit non-goals of first apply (when later authorized)
-
-- Mutating existing ~7 picks  
-- Mass REVOKE unrelated DEFINER grants (H-01)  
-- Changing Foundry quarantine product-wide  
-- Bundling picks/join/achievements D1B applies  
+```text
+docs/D1C-S2-EPHEMERAL-SCHEMA-POLICY-DESIGN.md   (optional narrative)
+supabase/D1C-S2-ephemeral-crystal-ball-REVIEW-ONLY.sql  (when authoring allowed; still non-apply)
+```
 
 ---
 
@@ -238,51 +291,56 @@ owner AND member AND `is_write_open`
 
 | Step | Work |
 |------|------|
-| 1 | Expose `crystal_ball_lock_state` to the browser (RPC) |
-| 2 | Dual-read: new RPC primary; keep `resolveCrystalBallLock` fallback behind feature/flag for one release |
-| 3 | `saveCrystalBallPick` still calls RPC but **relies on DB rejection** as enforcement |
-| 4 | `loadCrystalBall` uses `is_peers_revealed` for full board query (not local calendar) |
-| 5 | Home / hub / checklist: locked/complete from same facts |
-| 6 | Bot tools + founder one-click: show error when write denied |
-| 7 | Crown + closeout: honor P2/P7/P8 once decided |
-| 8 | Remove hard-coded CFB/NFL date branches from security-critical paths |
-| 9 | UI never presented as the enforcement boundary (copy + architecture comments) |
+| 1 | Expose `crystal_ball_lock_state` to the browser |
+| 2 | Dual-read: RPC primary; old `resolveCrystalBallLock` fallback for display only |
+| 3 | `saveCrystalBallPick` optimistic UI from RPC; **DB rejection is enforcement** |
+| 4 | `loadCrystalBall` full board only when `is_peers_revealed` |
+| 5 | Home / hub / checklist consume same facts |
+| 6 | Bot / founder tools: hard error after lock (P6) |
+| 7 | Crown UI → crown RPC only (P7/P8); closeout uses same RPC |
+| 8 | Remove security-critical hard-coded 2026 / scored-week paths |
+| 9 | Ops warning UI for missing slate / schedule_warning (P5, P12) |
 
-**Affected app inventory (eventual):**  
+**Affected inventory (eventual):**  
 `src/lib/crystal-ball.ts`, `src/app/crystal-ball/page.tsx`, `src/lib/dates.ts`, `src/lib/cloud.ts`, `src/lib/league-hub-actions.ts`, `HomeWeekHero.tsx`, `PicksClient.tsx`, `PlayerWeekChecklist.tsx`, `auto-trophies.ts`, `season-closeout.ts`, `gazette.ts`, `CommissionerClient.tsx`, `ManageLeagueClient.tsx`, league-build, `founder-one-click.ts`, `league-sync.ts`, `session-restore.ts`, `scripts/verify-crystal-ball-states.mjs`
 
 ---
 
-## 8. Migration stages (authorized separately, in order)
+## 8. Migration stages (authorized separately)
 
-| Stage | Name | Production? | Notes |
-|-------|------|-------------|-------|
-| **S0** | Archive map + this design | Docs only | **This package** |
-| **S1** | Freeze P1–P12 | Decision log | Blocker for SQL authoring |
-| **S2** | Author REVIEW-ONLY SQL (schema + policies + RPC) | Repo only | Still no prod execute |
-| **S3** | Ephemeral Supabase tests | Non-prod | Full behavioral matrix |
-| **S4** | App dual-read PR | Staging/prod deploy separate | No enforcement removal yet |
-| **S5** | Production SELECT-only preflight | Read-only | Policy names, grants, row counts |
-| **S6** | Apply schema + state table | **Mike auth** | Empty/backfillable; picks untouched |
-| **S7** | Backfill `crystal_ball_state` | **Mike auth** | Compute lock/reveal; **do not** modify picks |
-| **S8** | Enable write/reveal enforcement policies | **Mike auth** | Hard cutover; dual-read still ok |
-| **S9** | Remove legacy RLS dates / week_results reveal / browser-only authority | **Mike auth** | After app consumes RPC |
-| **S10** | Disposable behavioral tests on prod (or clone) | Controlled | No mass identity tests |
+| Stage | Name | Status |
+|-------|------|--------|
+| **S0** | Archive authority map | Done |
+| **S1** | Freeze P1–P12 | **Done (this update)** |
+| **S2** | Ephemeral/staging schema & policy design + non-prod SQL when authorized | **Next** |
+| **S3** | Ephemeral Supabase behavioral tests | Pending |
+| **S4** | App dual-read PR | Pending |
+| **S5** | Production SELECT-only preflight | Pending |
+| **S6** | Apply schema + state table (Mike auth) | Pending |
+| **S7** | Backfill state **without** modifying picks | Pending |
+| **S8** | Enable write/reveal enforcement | Pending |
+| **S9** | Remove legacy dates / score-reveal / browser-only authority | Pending |
+| **S10** | Disposable behavioral tests | Pending |
+| **Later** | P11 picks/results `season_year` migration (own plan + auth) | Not now |
+| **Later** | P7 crown repair RPC package | Not now |
+| **Later** | Foundry isolation for bot overrides (P6) | Not now |
 
 **Never combine S6–S9 with D1B/H-01 applies in one transaction for convenience.**
 
 ---
 
-## 9. Backfill rules (design)
+## 9. Backfill rules (when S7 authorized)
 
 | Rule | Statement |
 |------|-----------|
-| Picks | **Unchanged** (~7 rows remain as-is) |
+| Picks | **Unchanged** (~7 rows) |
 | Results | **Unchanged** (0 rows today) |
-| State rows | Insert one per active league × current `season_year` |
-| Sources | Sport-specific proposal: NFL from published W1 kickoff if parseable; CFB from server calendar and/or W0 kickoff per **P4** |
-| If unknown | `lock_at` / `reveal_at` null → P5/P12 behavior |
-| Idempotent | Re-run backfill updates only null or automation-owned fields; never silent overwrite of manual locks without audit |
+| State rows | One per active league × current `season_year` |
+| CFB | Persist earlier of season calendar vs W0 kickoff when valid (P4) |
+| NFL | Persist W1 kickoff when valid; else null + warning (P5) |
+| `reveal_at` | Set equal to `lock_at` when lock set (P1) |
+| Invalid | Never write invalid over valid (P12) |
+| Idempotent | Re-run safe; automation-owned fields only |
 
 ---
 
@@ -290,19 +348,17 @@ owner AND member AND `is_write_open`
 
 | Layer | Rollback |
 |-------|----------|
-| Policies | Restore archived pre-apply policy definitions (select-only export before apply) |
-| State table | Leave table inert (policies ignore it) or drop if never depended on by app |
-| App dual-read | Feature flag off → old resolver (display only; security still DB if policies remain) |
-| Bot RPC | Prior function definition from repo history |
-| Crown immutability | Re-enable update policy only if emergency and authorized |
+| Policies | Restore archived pre-apply policy definitions |
+| State table | Leave inert or drop if app never required it |
+| App dual-read | Flag off → old resolver (display only) |
+| Bot RPC | Prior definition from repo history |
+| Crown RPC | Revert to prior commissioner table policy only if emergency **and** authorized (avoid reopening silent re-crown) |
 
-**Rollback does not re-introduce hard-coded 2026 dates** unless Mike explicitly accepts that regression.
+**Rollback should not re-introduce hard-coded 2026 RLS dates** unless Mike explicitly accepts that regression.
 
 ---
 
 ## 11. Required behavioral matrix (acceptance)
-
-Must pass before claiming repair:
 
 | # | Behavior |
 |---|----------|
@@ -311,81 +367,68 @@ Must pass before claiming repair:
 | B3 | Update/upsert cannot overwrite a locked pick |
 | B4 | Nonmember cannot read or write league picks |
 | B5 | Member sees only own pick before reveal |
-| B6 | League members see peer picks after reveal |
+| B6 | League members see peer picks after reveal (same instant as lock by default) |
 | B7 | One league/sport cannot reveal another |
-| B8 | No hard-coded year appears in **live** policy definitions |
+| B8 | No hard-coded year in **live** policy definitions |
 | B9 | No `week_results` branch independently reveals picks |
-| B10 | Bot seed is denied after production lock |
-| B11 | Crown produces the approved permanent-reveal behavior (P2) |
-| B12 | Result cannot be silently re-crowned under P7 |
-| B13 | Invalid/unparseable schedule matches P5/P12 |
-| B14 | Existing ~7 picks remain unchanged by D1C apply/backfill |
+| B10 | Bot seed denied after production lock |
+| B11 | Crown permanently reveals; does not reopen writes or change `lock_at` |
+| B12 | Result cannot be silently re-crowned under ordinary paths |
+| B13 | No valid lock_at: writes open, peers private, ops warning |
+| B14 | Invalid schedule never reveals; never clobbers valid `lock_at` |
+| B15 | Existing ~7 picks unchanged by design/backfill |
+| B16 | Removed member’s pick retained as history (P10) |
 
 ---
 
 ## 12. Sequencing (binding)
 
 ```text
-1. Archive authority map                          ✅ (docs/D1C-CRYSTAL-BALL-LOCK-REVEAL-AUTHORITY-MAP.md)
-2. Freeze Mike’s product decisions (P1–P12)       ⏳
-3. Prepare schema/RLS/RPC design                  ✅ this doc (no SQL yet)
-4. Author REVIEW-ONLY SQL (later package)         ⏳ not this commit
-5. Test in ephemeral database                     ⏳
-6. Build app dual-read support                    ⏳
-7. Production SELECT-only preflight               ⏳
-8. Apply only with separate explicit authorization ⏳
-9. Backfill state without modifying picks         ⏳
-10. Enable database write/reveal enforcement      ⏳
-11. Remove legacy dates / score-reveal / browser-only authority ⏳
-12. Run disposable behavioral tests               ⏳
+1. Archive authority map                          ✅
+2. Freeze Mike’s product decisions (P1–P12)       ✅ LOCKED
+3. Prepare schema/RLS/RPC design                  ✅ this doc (reconciled)
+4. Ephemeral/staging schema & policy design       ⏳ NEXT (still non-prod; no SQL in this commit)
+5. Author non-prod REVIEW-ONLY SQL when authorized ⏳
+6. Ephemeral database tests                       ⏳
+7. App dual-read support                          ⏳
+8. Production SELECT-only preflight               ⏳
+9. Apply only with separate explicit authorization ⏳
+10. Backfill state without modifying picks        ⏳
+11. Enable database write/reveal enforcement      ⏳
+12. Remove legacy dates / score-reveal / browser-only authority ⏳
+13. Disposable behavioral tests                   ⏳
 ```
 
 ---
 
 ## 13. Keep workstreams separate
 
-| Stream | Relationship to D1C |
-|--------|---------------------|
-| **D1B-A** picks correlation | Separate auth / apply |
-| **D1B-C** achievements visibility | Separate |
-| **D1B-B** membership join RPCs | Separate |
-| **H-01A** selective DEFINER REVOKE | Separate (`crystal_ball_lock_count` may appear later) |
-| **H-01B** future default privileges | Separate |
-| **D1B membership on CB policies** | Referenced dependency; **not** applied by this design package |
+| Stream | Relationship |
+|--------|----------------|
+| **D1B-A / D1B-B / D1B-C** | Separate · **untouched** |
+| **H-01A / H-01B** | Separate · **untouched** |
+| **D1B CB membership tautology fix** | Referenced dependency only |
+| **D1C** | This track — decisions locked; not repaired |
 
 ---
 
-## 14. Option comparison (storage & authority)
-
-| Option | Security | Multi-sport | Commish UX | Automation | Migration | App | DB | Rollback |
-|--------|----------|-------------|------------|------------|-----------|-----|-----|----------|
-| **A** columns on leagues | Strong | OK single season | Simple | Easy | Low | Medium | Policies on columns | Easy |
-| **B** `crystal_ball_state` (**preferred**) | Strong | Best multi-season | Slightly more | Best audit | Medium | Medium | Policies on state + picks | Drop/ignore table |
-| **C** kickoff derive only | Partial | Weak CFB | Low | Fragile text | Low | Low | Bad if parses text in RLS | Easy |
-| **D** result-only reveal | Partial | OK | Late board | Low | Low | Medium | Simple | Easy |
-| **E** manual only | Operator-dependent | Flexible | High burden | Weak | Low | Medium | Flags | Too easy to flip |
-| **F** server automation + B | Strongest | Strong | Low | Highest | Medium | Medium | DEFINER writers | Audit trail |
-
-**Preferred package:** **B + F inputs (kickoff/calendar propose) + A3/A4 enforcement**, with P1 default equal timestamps.
-
----
-
-## 15. Status declarations
+## 14. Status declarations
 
 | Statement | True? |
 |-----------|-------|
-| Production unchanged by this design package | **Yes** |
+| Production unchanged | **Yes** |
 | D1C repaired | **No** |
-| Executable SQL created for D1C apply | **No** |
-| App code changed | **No** |
-| Live picks/results mutated | **No** |
-| Product decisions frozen | **No** — table ready for Mike |
+| Executable production SQL authored | **No** |
+| Application code changed | **No** |
+| Current picks/results mutated | **No** |
+| D1B and H-01 untouched | **Yes** |
+| P1–P12 product decisions frozen | **Yes — APPROVED** |
 
 ---
 
-## 16. Next authorized action (suggested)
+## 15. Next authorized action (suggested)
 
-1. Mike completes **P1–P12** (accept defaults or annotate deltas).  
-2. Only then: author `supabase/D1C-*-REVIEW-ONLY.sql` (still non-apply until explicit auth).  
-3. Ephemeral test run against behavioral matrix.  
-4. Separate apply authorization — never bundled with D1B/H-01.
+1. ~~Mike completes P1–P12~~ **Done.**  
+2. Authorize **D1C-S2**: ephemeral/staging schema & policy **design document and/or non-prod REVIEW-ONLY SQL** (still no production apply).  
+3. Optionally schedule **separate** D1B membership-correlation apply for CB tautologies before production D1C enforcement.  
+4. Production D1C apply only after S3–S5 gates and explicit Mike auth.
