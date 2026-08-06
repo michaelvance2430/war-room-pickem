@@ -1,7 +1,8 @@
 -- =============================================================================
--- D1B-A — picks / pick_games membership correlation — REVIEW ONLY
+-- D1B-A — picks / pick_games membership correlation — REVIEW ONLY / APPLY TWIN
 -- =============================================================================
--- DO NOT APPLY without Mike explicit authorization for D1B-A only.
+-- Mike authorized D1B-A-only apply. Prefer: supabase/D1B-A-APPLY-AUTHORIZED.sql
+-- (identical policy body). DO NOT expand scope beyond these two policies.
 -- Design: docs/D1B-A-PICKS-MEMBERSHIP-CORRELATION.md
 --
 -- SCOPE (policy-only on two policies):

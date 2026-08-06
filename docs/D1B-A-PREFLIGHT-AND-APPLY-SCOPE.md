@@ -1,6 +1,6 @@
 # D1B-A — SELECT-Only Preflight & Final Apply-Scope Review
 
-**Status:** **LIVE PREFLIGHT PASS / APPLY-SCOPE MATCH / APPLY NOT YET AUTHORIZED / NOT REPAIRED**  
+**Status:** **LIVE PREFLIGHT PASS / APPLY-SCOPE MATCH / APPLY AUTHORIZED / EXECUTION PENDING OR AWAITING POST-VERIFY ARCHIVE / NOT YET CLAIMED REPAIRED**  
 **Date:** 2026-08-06  
 **Slice:** `public.picks` + `public.pick_games` manage-own membership correlation only  
 **Design:** `docs/D1B-A-PICKS-MEMBERSHIP-CORRELATION.md`  
@@ -11,7 +11,7 @@
 
 | Action | Status |
 |--------|--------|
-| Apply D1B-A policies | **No** — requires Mike’s separate explicit authorization for **D1B-A only** |
+| Apply D1B-A policies | **Authorized** by Mike (D1B-A only) — use `supabase/D1B-A-APPLY-AUTHORIZED.sql`; agent environment cannot run prod DDL without service credentials |
 | DELETE / UPDATE / cleanup of historical rows | **No** — not needed and not authorized |
 | Index changes | **No** |
 | App code | **No** |
@@ -316,12 +316,14 @@ Restore prior manage-own (ownership only) from pre-apply archive of `qual`/`with
 - [x] Nonmember counts **0**; orphan pick_games **0**  
 - [x] `is_league_member` body correct — reuse unchanged  
 - [ ] Optional: confirm full preserve-list policy names still present immediately before apply  
-- [ ] Explicit chat/message: **authorize D1B-A apply only**  
-- [ ] Apply `supabase/D1B-A-picks-membership-REVIEW-ONLY.sql`  
-- [ ] Post-verify manage-own quals/with_check contain `is_league_member`  
+- [x] Explicit authorization: **D1B-A apply only** (Mike)  
+- [ ] Apply `supabase/D1B-A-APPLY-AUTHORIZED.sql` on production  
+- [ ] Post-verify via `supabase/D1B-A-postverify-SELECT-ONLY.sql`  
+- [ ] Archive post-verify in docs + register  
 - [ ] Spot-check honest client pick save still works  
 
-**This document does not authorize apply.**
+**Authorization granted. Structural repair claimed only after post-verify PASS archived.**  
+See `docs/D1B-A-APPLY-AUTHORIZATION.md`.
 
 ---
 
