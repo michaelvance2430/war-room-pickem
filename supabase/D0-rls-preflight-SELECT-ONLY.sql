@@ -75,8 +75,17 @@ WHERE schemaname = 'public'
   )
 ORDER BY policyname;
 
--- ── P4. League DELETE policies (must include commissioner delete if live) ───
+-- ── P4. League DELETE policies (ARCHIVE NAMES for D1A — exact list) ────────
+-- D1A may DROP only these verified names. No wildcards.
 SELECT policyname, cmd, roles, qual, with_check
+FROM pg_policies
+WHERE schemaname = 'public'
+  AND tablename = 'leagues'
+  AND cmd = 'DELETE'
+ORDER BY policyname;
+
+-- Machine-friendly name list for D1A freeze:
+SELECT policyname AS d1a_delete_policy_to_drop
 FROM pg_policies
 WHERE schemaname = 'public'
   AND tablename = 'leagues'
@@ -162,6 +171,23 @@ FROM pg_proc p
 JOIN pg_namespace n ON n.oid = p.pronamespace
 WHERE n.nspname = 'public'
   AND p.prosecdef = true
+ORDER BY p.proname;
+
+-- ── P9b. SECURITY DEFINER functions that mention leagues DELETE/UPDATE ───
+-- Residual risk outside RLS (service-style RPCs). Catalog only.
+SELECT
+  p.proname,
+  pg_get_function_identity_arguments(p.oid) AS args,
+  pg_get_functiondef(p.oid) AS def
+FROM pg_proc p
+JOIN pg_namespace n ON n.oid = p.pronamespace
+WHERE n.nspname = 'public'
+  AND p.prosecdef = true
+  AND pg_get_functiondef(p.oid) ~* 'leagues'
+  AND (
+    pg_get_functiondef(p.oid) ~* 'delete\s+from\s+public\.leagues'
+    OR pg_get_functiondef(p.oid) ~* 'update\s+public\.leagues'
+  )
 ORDER BY p.proname;
 
 -- ── P10. EXECUTE grants to anon / authenticated (public functions) ──────────

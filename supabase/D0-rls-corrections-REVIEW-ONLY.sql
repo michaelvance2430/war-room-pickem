@@ -1,7 +1,15 @@
 -- =============================================================================
+-- SUPERSEDED — DO NOT APPLY
+-- =============================================================================
+-- This combined migration is SUPERSEDED by split stages:
+--   D1A-league-delete-lockdown-REVIEW-ONLY.sql
+--   D1B-membership-correlation-REVIEW-ONLY.sql
+--   D1C-crystal-ball-lock-REVIEW-ONLY.sql (blocked until lock design proven)
+-- See docs/STRUCTURAL-HARDENING-D0-RLS.md (revised).
+-- =============================================================================
 -- D0 RLS CORRECTIONS — REVIEW ONLY — DO NOT APPLY WITHOUT MIKE AUTHORIZATION
 -- =============================================================================
--- Structural Hardening D0
+-- Structural Hardening D0 (legacy combined draft)
 --
 -- INTENT:
 --   1) Remove authenticated commissioner DELETE on public.leagues

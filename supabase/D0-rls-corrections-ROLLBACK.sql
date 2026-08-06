@@ -1,25 +1,32 @@
 -- =============================================================================
--- D0 RLS CORRECTIONS — ROLLBACK (restores pre-D0 policy shapes from repo)
+-- D0 / D1 ROLLBACK FRAGMENTS — EMERGENCY REFERENCE ONLY
 -- =============================================================================
--- REVIEW ONLY until authorized. Prefer restoring from preflight pg_policies
--- dump if live names/definitions differed from repo archaeology.
+-- Prefer stage-specific rollbacks. Combined file is historical.
 --
--- Restores:
---   - Commissioner DELETE on leagues
---   - Prior crystal ball / achievements / picks manage-own shapes (repo)
---   - Hardcoded 2026 freezes (undesirable but matches pre-D0)
--- Does NOT drop crystal_ball_board_is_revealed (harmless leftover) unless noted.
+-- ★★★ CRITICAL WARNING — LEAGUES DELETE ★★★
+-- Restoring "Commissioner deletes league" REOPENS a known DESTRUCTIVE
+-- capability: authenticated clients can DELETE entire leagues via PostgREST
+-- (CASCADE memberships, cards, picks, results, etc.).
+--
+-- Product law: Delete League is INTENTIONALLY RETIRED permanently.
+-- No Delete League RPC is planned. Future direction: Archive League.
+-- Do NOT restore DELETE policy except true emergency, with Mike approval.
 -- =============================================================================
 
 begin;
 
--- ── leagues DELETE (pre-D0 leave-delete-policies.sql) ───────────────────────
-drop policy if exists "Commissioner deletes league" on public.leagues;
-create policy "Commissioner deletes league"
-  on public.leagues
-  for delete
-  to authenticated
-  using (commissioner_id = auth.uid());
+-- ── leagues DELETE (EMERGENCY ONLY — see warning above) ─────────────────────
+-- UNCOMMENT ONLY FOR EMERGENCY ROLLBACK OF D1A:
+-- drop policy if exists "Commissioner deletes league" on public.leagues;
+-- create policy "Commissioner deletes league"
+--   on public.leagues
+--   for delete
+--   to authenticated
+--   using (commissioner_id = auth.uid());
+
+-- Default: leave DELETE locked (D1A permanent intent).
+select 'D1A rollback of DELETE is commented out by design — Delete League is retired'
+  as rollback_notice;
 
 -- ── achievements (crystal-ball.sql style; unqualified league_id as before) ──
 drop policy if exists "Members read achievements" on public.achievements;

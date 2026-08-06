@@ -1,0 +1,83 @@
+-- =============================================================================
+-- D1C — Crystal Ball deadline / reveal enforcement — REVIEW ONLY / BLOCKED
+-- =============================================================================
+-- DO NOT APPLY until cross-layer design is proven and Mike authorizes.
+--
+-- PRODUCT LAW (binding):
+--   - One authoritative lock drives: write gate, peer reveal, Home task state
+--   - At lock: writes forbidden AND peers readable (eligible members)
+--   - Crown/result => permanent reveal
+--   - Commissioner scoring is NOT the ordinary reveal trigger
+--   - NFL: Week 1 formally published card first kickoff; no CFB fallback;
+--     no published kickoff => peers private (fail closed for reveal)
+--   - CFB: authoritative calendar +/or published Week 0 kickoff via season resolver
+--   - NO hardcoded year timestamps in policy text
+--
+-- APP ALIGNMENT TARGET:
+--   src/lib/crystal-ball.ts → resolveCrystalBallLock()
+--
+-- =============================================================================
+-- BLOCKER (D1C cannot be truthful in SQL-only form today)
+-- =============================================================================
+-- 1) CFB calendar deadline still lives in app as crystalBallLockMs() with
+--    year-specific Date.parse("2026-08-29T12:00:00-04:00"). There is no
+--    public.season_calendar / crystal_ball_deadlines table for SQL to read.
+-- 2) Canonical multi-year season resolver is not in Postgres.
+-- 3) App also treats opening-week SCORED as locked; product law rejects scoring
+--    as ordinary reveal — app + DB must be updated together.
+-- 4) Home task completion must call the same facts (not a third clock).
+--
+-- REQUIRED BEFORE APPLY:
+--   [ ] Design + implement public.crystal_ball_lock_state(p_league_id) (or name TBD)
+--   [ ] Canonical CFB deadline source (season-keyed table or approved function)
+--   [ ] App resolveCrystalBallLock consumes same rules (shared tests)
+--   [ ] Home CB task uses same locked/complete signal
+--   [ ] Ephemeral DB test of NFL no-slate / W1 kickoff / CFB calendar / crown
+--   [ ] Mike authorization
+--
+-- =============================================================================
+-- TARGET FUNCTION SHAPE (not created until unblocked)
+-- =============================================================================
+-- create or replace function public.crystal_ball_lock_state(p_league_id uuid)
+-- returns table (
+--   sport_id text,
+--   opening_week int,
+--   lock_at timestamptz,
+--   is_locked boolean,
+--   is_write_open boolean,
+--   is_peers_revealed boolean,
+--   reason text,
+--   kickoff_known boolean
+-- )
+-- language sql stable security invoker set search_path = public
+-- as $$
+--   -- Pseudocode only — DO NOT CREATE until calendar source exists:
+--   -- crowned => locked, write_open=false, peers=true, reason=crowned
+--   -- nfl + published W1 min(start_time):
+--   --   now>=lock_at => locked/peers; else open
+--   -- nfl + no published kickoff:
+--   --   peers=false, write_open=true (no invented lock), reason=no_kickoff
+--   -- cfb: lock_at = min(canonical_calendar_at(season), week0_first_kickoff?)
+--   --   NEVER encode 2026 literals in policies; read canonical source
+--   -- is_write_open = not is_locked
+--   -- is_peers_revealed = is_locked
+-- $$;
+--
+-- RLS would then be ONLY:
+--   SELECT own: member + user_id = auth.uid()
+--   SELECT peers: member + crystal_ball_lock_state(...).is_peers_revealed
+--   INSERT/UPDATE: member + owner + is_write_open
+--   NO week_results scored branch as ordinary reveal
+--   NO timestamptz '2026-...' in policy strings
+--
+-- =============================================================================
+-- PLACEHOLDER — intentionally empty apply body
+-- =============================================================================
+
+-- This file intentionally performs no DDL when run, so accidental execute is safe.
+do $$
+begin
+  raise notice 'D1C BLOCKED: Crystal Ball lock_state not authorized for apply. See docs/STRUCTURAL-HARDENING-D0-RLS.md';
+end $$;
+
+-- END D1C REVIEW-ONLY (BLOCKED)

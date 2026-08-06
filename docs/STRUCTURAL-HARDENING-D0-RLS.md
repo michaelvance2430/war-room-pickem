@@ -1,308 +1,340 @@
-# Structural Hardening D0 — Live RLS Correction Design
+# Structural Hardening D0 — Live RLS Correction Design (REVISED)
 
-**Status:** DESIGN + REVIEW-ONLY SQL PROPOSAL — **not applied to production**  
-**Date:** 2026-08-06  
-**Scope:** Policy design, catalog evidence checklist, migration proposal, regression & deploy plans  
-**Out of scope:** Executing SQL · mutating production · app runtime changes · Foundry rebuild · trophy/profile discovery narrowing · full write inventory  
+**Status:** REVISED DESIGN + SPLIT REVIEW-ONLY PROPOSALS — **not applied**  
+**Date:** 2026-08-06 (revision)  
+**Supersedes:** combined D0 migration approach in first draft  
 
 ### Explicit non-actions
 
 | Action | Status |
 |--------|--------|
-| Execute migration on production | **No** |
+| Execute any correction SQL on production | **No** |
+| Apply D1A / D1B / D1C | **No** |
 | Mutation probes on production | **No** |
-| Alter `league_trophies` visibility | **No (D0)** |
-| Narrow broad profile/league SELECTs | **No (D0)** |
+| App runtime changes | **No** |
 | Foundry rebuild / lift quarantine | **No** |
-| Application code changes | **No** |
+| Alter `league_trophies` / broad profile discovery | **No** |
+
+**Production remained unchanged throughout D0/D1 proposal work.**
 
 ---
 
-## 0. Confirmed live defects (Mike-supplied)
+## Product laws (binding — revised)
 
-| # | Defect | Risk |
-|---|--------|------|
-| 1 | `public.leagues` has DELETE policy `commissioner_id = auth.uid()` | Commissioner can destroy entire league + CASCADE children via PostgREST |
-| 2 | Live policies contain tautology `m.league_id = m.league_id` (unqualified `league_id` bound to memberships alias) | Membership gate becomes always-true for any membership row → **cross-league read/write inflation** |
-| 3 | Domains with tautology include **achievements**, **crystal_ball_picks**, **crystal_ball_result** | Cross-league cultural data exposure / write path weakness |
-| 4 | `picks` / `pick_games` “manage own” by `user_id` without clear **target-league membership** | User could write pick rows for a `league_id` they do not belong to (if FK allows league id) |
-| 5 | Crystal Ball RLS embeds **hardcoded 2026** freeze timestamps | Year rollover failure; wrong sport freeze |
-| 6 | `league_trophies` broad linked-winner SELECT | **Do not change in D0** (Profile Trophy Room product) |
-| 7 | Broad authenticated profile/league discovery reads | **Do not change in D0** without product decision |
+### Delete League
 
-### Repo origin of defects (source archaeology)
+| Law | Statement |
+|-----|-----------|
+| Intent | **Delete League is intentionally retired.** |
+| Client DELETE | Removing the live `leagues` DELETE policy is the **desired permanent** behavior. |
+| Future RPC | **No** future “Delete League” RPC is planned. |
+| Successor | **Archive League** — separate product design, not D0/D1. |
+| Rollback docs | May preserve prior DELETE policy SQL for emergency reference only, with a **prominent warning** that restore reopens a known destructive capability. |
 
-| Artifact | Path | Note |
-|----------|------|------|
-| Commissioner DELETE league | `supabase/leave-delete-policies.sql` | Explicit product at time of write |
-| Unqualified `m.league_id = league_id` | `crystal-ball.sql`, `crystal-ball-privacy.sql`, `crystal-ball-full.sql`, others | Live planner can collapse to `m.league_id = m.league_id` |
-| Hardcoded CB freeze | `crystal-ball-privacy.sql` L37–40 | `2026-08-29` / `2026-09-10` |
-| Own picks without membership | `schema.sql` “Users manage own picks” | `using (auth.uid() = user_id)` only |
-| Sport immutability | `supabase/league-sport-immutable.sql` | Trigger `leagues_sport_id_immutable_trg` — **preserve** |
-| Deputy ops | `supabase/deputy-ops.sql` | `is_league_ops()` + Ops policies — **do not break** |
-| Postseason snapshots | `supabase/postseason-snapshots-REVIEW-ONLY.sql` | Table may be **absent** live — catalog only |
-| Trophy career read | `supabase/trophy-career-read.sql` | Out of D0 |
+### Crystal Ball lock / reveal / write (single authority)
 
----
+| State | Own pick readable | Peer picks readable | Own write (create/update) |
+|-------|-------------------|---------------------|---------------------------|
+| **OPEN** (before lock) | Yes (member) | **No** | **Yes** (member) |
+| **LOCKED** (at/after authoritative deadline) | Yes (member) | **Yes** (eligible members) | **No** |
+| **CROWNED** (`crystal_ball_result` exists) | Yes | **Yes** (members) | **No** |
 
-## A. Read-only catalog evidence (complete via preflight SQL)
+**Binding rules:**
 
-**File:** `supabase/D0-rls-preflight-SELECT-ONLY.sql`  
+1. Writes allowed only while the **authoritative lock window is open**.  
+2. At the **same** lock boundary: writes become forbidden **and** peer predictions may become readable.  
+3. **Commissioner scoring is not** the ordinary reveal trigger.  
+4. Crown/result may prove the board is **permanently** revealable.  
+5. **One** authoritative resolver must drive: write gate · peer reveal · Home “locked/complete” task UI.  
+6. **No** three conflicting deadline systems (app vs RLS vs ad-hoc).  
+7. **No** hardcoded year-specific timestamps inside RLS policy text.
 
-Mike (or ops) runs this **SELECT-only** pack against production to fill live truth. Agent cannot see live `pg_policies` without that paste.
+#### Authoritative lock semantics (must match app `resolveCrystalBallLock`)
 
-### A1. Checklist (every item is SELECT-only)
+App source of truth today: `src/lib/crystal-ball.ts` → `resolveCrystalBallLock`.
 
-| Probe | Purpose |
-|-------|---------|
-| `pg_class.relrowsecurity` / `relforcerowsecurity` | RLS enabled / forced per table |
-| `pg_policies` for target tables | Live policy names, cmd, qual, with_check |
-| Detect `m.league_id = m.league_id` or uncorrelated patterns in `qual`/`with_check` | Confirm tautologies |
-| `pg_proc` + `pg_trigger` for `leagues_sport_id_immutable` | Function body + trigger enabled |
-| Unique constraints on picks, memberships, crystal_ball, achievements | Integrity |
-| `to_regclass('public.league_postseason_snapshots')` | Presence/absence |
-| `SECURITY DEFINER` routines in `public` | Inventory |
-| `information_schema.routine_privileges` EXECUTE for `anon`/`authenticated` | Over-grant risk |
-| `prosecdef` + `proconfig` search_path | search_path safety |
-| Multiple UPDATE policies on `leagues` | Duplicate commissioner/ops UPDATE |
-| Policies mentioning `is_deputy` / `is_league_ops` | **Deputy authorization map before any change** |
+| Sport | Opening week | Lock deadline | Fail-closed when |
+|-------|--------------|---------------|------------------|
+| **NFL** | Week **1** | First kickoff on a **formally published** Week 1 card (`published_at` set + games with start times) | No formally published Week 1 kickoff → **private peers**, countdown unknown; do **not** invent CFB calendar fallback |
+| **CFB** | Week **0** | Existing authoritative CFB CB deadline: calendar **and/or** first kickoff on formally published Week 0 card (app: earlier of calendar vs kickoff for countdown; lock when either path passes) | Derive season identity via **canonical season resolver** — not raw `2026-…` literals in policy SQL |
 
-### A2. Expected deputy authorization (from repo — verify live)
+**Rejected for D1C:** “Reveal after opening week is scored” as the ordinary path.
 
-| Capability | Repo mechanism | D0 impact |
-|------------|----------------|-----------|
-| Week cards / card games / results | `is_league_ops(league_id)` policies | **Unchanged** |
-| Update league settings / active week | `"Ops update league"` | **Unchanged** (preserve) |
-| Update membership stats (scoring) | `"Ops update memberships"` | **Unchanged** |
-| Read all picks / pick_games for scoring | `"Ops read league picks"` / pick_games | **Unchanged** |
-| Score pick totals | `"Ops score picks"` UPDATE | **Unchanged** |
-| Appoint deputies / reset season / transfer commissioner | App + commish-only RPCs | **Out of D0** |
-| DELETE league | `"Commissioner deletes league"` | **Removed** (commish should not delete via client) |
-
-**Deputy report requirement:** Before apply, paste preflight section `D0_deputy_policies` listing every policy whose qual references `is_league_ops` or `is_deputy`. D0 must not drop those.
+**App note (future runtime alignment, not D0 execute):** `resolveCrystalBallLock` currently also locks on `listScoredWeekNumbers()` including opening week. Product law says scoring must not be the ordinary reveal trigger. D1C requires **cross-layer** agreement: DB function + app Home/task UI + `resolveCrystalBallLock` share one definition; scoring-as-lock may be demoted to “already locked” lagging signal only after product sign-off.
 
 ---
 
-## B. Proposed policy corrections (summary)
+## Confirmed live defects (unchanged inventory)
 
-| # | Change | Tables |
-|---|--------|--------|
-| 1 | **DROP** `"Commissioner deletes league"` | `leagues` |
-| 2 | Ensure **no** authenticated DELETE policy remains on `leagues` | `leagues` |
-| 3 | Keep INSERT `"Users create leagues"`; keep UPDATE via `"Ops update league"` / equivalent | `leagues` |
-| 4 | Do **not** drop sport immutability trigger | `leagues` |
-| 5 | Replace membership EXISTS with **correlated** `m.league_id = <table>.league_id` | achievements, crystal_ball_* |
-| 6 | Own pick write requires **membership in picks.league_id** | `picks`, `pick_games` |
-| 7 | Keep ops read/score policies | `picks`, `pick_games` |
-| 8 | Crystal Ball read/write use correlated membership + **no hardcoded years** | crystal_ball_* |
-| 9 | Introduce `crystal_ball_board_is_revealed(league_id)` (season/sport-safe, fail-closed on calendar) | function |
-| 10 | No changes to trophies, profiles discovery, gazette, locker | — |
-
-### Crystal Ball freeze design (D0)
-
-**Removed:** `timestamptz '2026-08-29…'` / `'2026-09-10…'`.
-
-**Reveal (SELECT peers’ picks) when ANY of:**
-
-1. Row exists in `crystal_ball_result` for that league (crowned), **or**  
-2. Opening week scored: `week_results` for  
-   - `sport_id = 'nfl'` → `week_number = 1`  
-   - else (cfb/default) → `week_number = 0`
-
-**Not in D0 (document gap):** authoritative multi-year calendar freeze (“noon ET Saturday of week 0”) requires a dedicated function (e.g. future `season_crystal_ball_freeze_at(league_id)`) fed by War Room calendar tables. Until that exists, **calendar-only freeze is fail-closed (absent)** — board reveals on crown or opening-week score only.
-
-**Write (insert/update own pick):** member of league + `user_id = auth.uid()` + board **not** revealed.
-
-### League DELETE product note
-
-Removing client DELETE does **not** remove service-role or dashboard SQL delete. Product “delete room” must use a **SECURITY DEFINER RPC** with audit (future) or support ticket — out of D0.
+| # | Defect | Stage |
+|---|--------|-------|
+| 1 | `leagues` DELETE `commissioner_id = auth.uid()` | **D1A** |
+| 2 | Membership tautologies (`m.league_id = m.league_id`) on achievements / crystal_ball_* | **D1B** |
+| 3 | picks/pick_games manage-own without target-league membership | **D1B** |
+| 4 | Crystal Ball hardcoded 2026 freezes + wrong “score = reveal” proposal | **D1C** (design first) |
+| 5 | Trophy / broad discovery | **Out of scope** |
 
 ---
 
-## C. Authorization matrix (intended after D0)
+## Split deployment (mandatory)
 
-Legend: **Y** allow · **N** deny · **—** N/A · **RO** read-only · **\*** service role bypasses RLS when using service key
+| Stage | Name | Contents | Production readiness |
+|-------|------|----------|----------------------|
+| **D1A** | League deletion lockdown | Drop **verified** DELETE policies on `public.leagues` only | May be considered for careful production apply after exact preflight |
+| **D1B** | Membership-correlation repairs | Achievements tautology; picks/pick_games membership; CB membership correlation only | Prefer staging/ephemeral DB; **no** proven staging Supabase today |
+| **D1C** | CB deadline/reveal enforcement | Single lock resolver in DB aligned with app; no hardcoded policy years; no score-as-reveal | **Blocked** until authoritative cross-layer design proven |
 
-### `public.leagues`
+**Do not** combine D1A + D1B + D1C into one production transaction for convenience.
+
+### Non-production limitation (honest)
+
+The project currently has **no proven staging Supabase**.
+
+| Guidance | |
+|----------|--|
+| “Test non-prod first” | **Not currently available** as a standing environment |
+| D1A | Smallest blast radius (remove retired DELETE only); production apply possible after preflight + Mike auth |
+| D1B / D1C | Prefer ephemeral Supabase / isolated clone before production; do not pretend otherwise |
+
+---
+
+## A. Preflight dependency (SELECT-only — before final D1A SQL)
+
+**File:** `supabase/D0-rls-preflight-SELECT-ONLY.sql` (expanded)
+
+Must run and **archive** before final D1A DROP list is frozen:
+
+| Archive item | Why |
+|--------------|-----|
+| Exact live `leagues` **DELETE** policy **names** | D1A drops only those names |
+| RLS enabled/forced on `leagues` | Safety |
+| Sport immutability function def + trigger enabled state | Must remain |
+| All `leagues` **UPDATE** policies | Confirm create/settings path |
+| Deputy functions/policies (`is_league_ops`, `is_deputy`) | D1B must not break |
+| SECURITY DEFINER functions that can DELETE/UPDATE `leagues` | Residual risk outside RLS |
+
+**D1A rule:** Drop **explicit verified policy names** from preflight — **no** uncontrolled `DROP POLICY` wildcards over unknown future names beyond the known retired set documented after preflight.
+
+Template known from repo: `"Commissioner deletes league"`. Live may add variants — only drop names proven in preflight.
+
+---
+
+## B. Stage proposals
+
+### D1A — League deletion lockdown
+
+**File:** `supabase/D1A-league-delete-lockdown-REVIEW-ONLY.sql`
+
+| Include | Exclude |
+|---------|---------|
+| DROP verified DELETE policies on `leagues` | Any UPDATE/INSERT policy rewrite |
+| Comments: Delete retired; Archive later | Crystal Ball, picks, achievements |
+| Post-verify: no DELETE policies remain | Sport trigger changes |
+
+**Tests (D1A):**
+
+- Preflight DELETE name list matches drops  
+- Commish PostgREST DELETE league → denied; row remains  
+- Create league still works  
+- Commish/ops settings UPDATE still works  
+- `sport_id` UPDATE still rejected by immutability trigger  
+- Deputy `is_league_ops` UPDATE still works  
+
+**Rollback:** Emergency-only recreate of prior DELETE policy — **WARN: reopens destructive client delete**. Prefer leave locked.
+
+---
+
+### D1B — Membership-correlation repairs
+
+**File:** `supabase/D1B-membership-correlation-REVIEW-ONLY.sql`
+
+| Include | Exclude |
+|---------|---------|
+| Qualify `achievements` membership EXISTS | CB reveal/write deadline rules |
+| Qualify `crystal_ball_*` membership EXISTS | Hardcoded freezes / score reveal |
+| picks/pick_games: own + membership in `picks.league_id` | Trophy / profile / gazette / locker |
+| Preserve Ops/deputy pick read/score policies | League DELETE (D1A) |
+
+**Crystal Ball in D1B:** membership correlation only — **do not** change when peers become visible or when writes close (that is D1C).
+
+**Tests (D1B):**
+
+- Zero `m.league_id = m.league_id` in live policies  
+- Member manages own picks in own league  
+- Member cannot insert picks into another league  
+- Non/former member cannot mutate  
+- Cross-league achievement/CB **membership** gate holds  
+- Deputy scoring paths still work  
+- No change to public trophy/profile discovery  
+
+---
+
+### D1C — Crystal Ball deadline / reveal (design; apply later)
+
+**File:** `supabase/D1C-crystal-ball-lock-REVIEW-ONLY.sql` (design stub + blocker)  
+**Design detail:** § “Crystal Ball state model” below  
+
+**Tests (D1C — when unblocked):**
+
+- Own write while open  
+- Own write rejected after lock  
+- Peers unreadable before lock; readable after lock  
+- NFL without published W1 kickoff: peers private; no CFB fallback  
+- Crown forces permanent reveal  
+- Scoring alone does **not** flip reveal if lock not reached (if app aligned)  
+- Zero hardcoded `2026-` in policy quals  
+- Home task locked/complete uses **same** resolver facts  
+
+---
+
+## C. Crystal Ball state model (canonical)
+
+### Single function contract (target)
+
+```text
+crystal_ball_lock_state(p_league_id uuid)
+  → {
+      sport_id text,           -- from leagues.sport_id
+      opening_week int,        -- nfl=1, cfb=0
+      lock_at timestamptz,     -- null if unknown (NFL no published kickoff)
+      is_locked boolean,       -- now() >= lock_at OR crowned
+      is_write_open boolean,   -- member may write own pick
+      is_peers_revealed boolean, -- members may read peer picks
+      reason text,             -- open | nfl_kickoff | cfb_calendar | cfb_kickoff | crowned | no_kickoff
+      kickoff_known boolean
+    }
+```
+
+**Invariant:**
+
+```text
+is_write_open  ⇔  NOT is_locked  (and not crowned)
+is_peers_revealed  ⇔  is_locked OR crowned
+```
+
+Same facts for Home task completion UI (future app: call one shared definition).
+
+### Resolution algorithm (DB + app must match)
+
+```text
+IF crystal_ball_result exists for league:
+  locked=true, write_open=false, peers_revealed=true, reason=crowned
+ELSE IF sport = nfl:
+  opening_week = 1
+  IF formally published week_card(week=1) with games:
+    lock_at = min(valid start_time of card_games)
+    IF now >= lock_at: locked=true, peers=true, write=false, reason=nfl_kickoff
+    ELSE: locked=false, peers=false, write=true, reason=open
+  ELSE:
+    locked=false, peers=false, write=true?, reason=no_kickoff
+    -- Product: fail-closed for PEERS (private). Own pick still readable.
+    -- Writes: app today allows open until kickoff known; keep write open
+    -- until lock_at known and passed (do not invent lock).
+ELSE IF sport = cfb (default):
+  opening_week = 0
+  calendar_at = canonical_cfb_crystal_ball_deadline(season)  -- NOT literal in policy
+  kickoff_at = min start_time if formally published week 0 card else null
+  lock_at = earliest of {calendar_at, kickoff_at} when defined
+  IF now >= lock_at: locked=true, peers=true, write=false
+  ELSE: open
+```
+
+### D1C blocker report (truthful)
+
+| Requirement | Status |
+|-------------|--------|
+| NFL kickoff from `week_cards` + `card_games` | **Expressible in SQL** today |
+| Formally published = `published_at IS NOT NULL` + games | **Expressible** |
+| CFB calendar without hardcoded year in policy | **Blocked** for pure SQL today: app still uses `crystalBallLockMs` → `2026-08-29T12:00:00-04:00`; `season-calendar.ts` is year-scoped client data, **not** a DB table |
+| Canonical season resolver in DB | **Missing** — no `public.season_calendar` / `crystal_ball_deadlines` table |
+| Single function used by RLS + app + Home | **Not yet** — requires app refactor to call RPC or shared package + DB function |
+
+**D1C recommendation:** Do **not** ship incomplete DB freezes. Sequence:
+
+1. Define `public.crystal_ball_lock_state(league_id)` (or equivalent) in a design PR.  
+2. Land **canonical CFB deadline** source (table or security definer reading approved calendar, season-keyed).  
+3. Refactor app `resolveCrystalBallLock` to consume the same rules (or generate both from one TS module + SQL mirror tests).  
+4. Then apply D1C RLS using **only** that function (no score-as-reveal).  
+
+Until then: D1B may fix membership correlation only; live CB freezes remain app-enforced + imperfect RLS (documented risk).
+
+---
+
+## D. Authorization matrix (intended end-state)
+
+### `leagues` (after D1A)
 
 | Actor | SELECT | INSERT | UPDATE | DELETE |
 |-------|--------|--------|--------|--------|
-| anon | N (typical; live may vary — catalog) | N | N | N |
-| authenticated non-member | Y if broad discovery policy remains (unchanged D0) | N | N | **N** |
-| member | Y | N | N | **N** |
-| commissioner | Y | Y (create as self) | Y (settings; not sport_id) | **N** (D0 removes client delete) |
-| deputy | Y | N | Y via `is_league_ops` (active week etc.) | **N** |
-| service role | * | * | * | * |
+| anon | per live discovery | N | N | **N** |
+| authenticated | per live discovery | Y create as self | N unless ops/commish | **N permanent** |
+| commissioner | Y | Y | Y settings (not sport) | **N** |
+| deputy | Y | N | Y via `is_league_ops` | **N** |
+| service role | * | * | * | * (ops only; not product Delete) |
 
-### `public.achievements`
+### `picks` / `pick_games` (after D1B)
 
-| Actor | SELECT | INSERT | UPDATE | DELETE |
-|-------|--------|--------|--------|--------|
-| anon | N | N | N | N |
-| non-member | **N** (correlated membership) | N | N | N |
-| member | Y (own league only) | N | N | N |
-| row “owner” (user_id) | Y if member | N | N | N |
-| commissioner | Y if member/commish path | Y (grant) | N unless policy | N unless policy |
-| deputy | Y if member | N (unless separate) | N | N |
-| service role | * | * | * | * |
+| Actor | Own manage | Cross-league insert | Ops read/score |
+|-------|------------|---------------------|----------------|
+| member | Y if membership in row league | N | — |
+| non-member | N | N | N |
+| deputy/commish | as member for own | N | Y via existing ops policies |
 
-### `public.crystal_ball_picks`
+### `achievements` / `crystal_ball_*` membership (after D1B)
 
-| Actor | SELECT own | SELECT peers | INSERT/UPDATE own | DELETE |
-|-------|------------|--------------|------------------|--------|
-| non-member | N | N | N | N |
-| member pre-reveal | Y | N | Y until reveal | N (no policy) |
-| member post-reveal | Y | Y | **N** (fail closed) | N |
-| commissioner | as member + crown elsewhere | as member | as member | N |
-| deputy | as member | as member | as member | N |
-| service role | * | * | * | * |
+Correlated `m.league_id = <table>.league_id` only.
 
-### `public.crystal_ball_result`
+### Crystal Ball write/reveal (after D1C)
 
-| Actor | SELECT | INSERT/UPDATE/DELETE |
-|-------|--------|----------------------|
-| non-member | N | N |
-| member | Y (correlated) | N |
-| commissioner | Y | Y (crown) |
-| deputy | Y if member | N (commish-only crown in D0) |
-| service role | * | * |
-
-### `public.picks`
-
-| Actor | SELECT | INSERT | UPDATE | DELETE |
-|-------|--------|--------|--------|--------|
-| non-member | N | **N** (membership required) | **N** | **N** |
-| member own row | Y | Y | Y | Y (if FOR ALL) |
-| member others | N (privacy) unless ops | N | N | N |
-| commissioner/deputy (ops) | Y all league | N | Y score fields via Ops score | N |
-| service role | * | * | * | * |
-
-### `public.pick_games`
-
-| Actor | SELECT | INSERT/UPDATE/DELETE |
-|-------|--------|----------------------|
-| non-member | N | N |
-| member own slip | Y | Y (via own pick + membership) |
-| ops | Y league | N (score via picks update / results) |
-| service role | * | * |
+Per state machine above — not score-triggered.
 
 ---
 
-## D. Regression plan (prove after apply — non-prod first)
+## E. Rollout / rollback warnings
 
-| # | Test | Pass criteria |
-|---|------|----------------|
-| R1 | Commish `DELETE /rest/v1/leagues?id=eq.…` | **403/empty** — row remains |
-| R2 | Authenticated create league INSERT | **201** — row with sport_id |
-| R3 | Commish UPDATE name/cut_percent | **204** — changed |
-| R4 | Commish UPDATE `sport_id` | **Error** immutability trigger |
-| R5 | Member upsert own pick in own league | **OK** |
-| R6 | Member INSERT pick `league_id` = other league | **Fail** RLS |
-| R7 | Former member (removed) mutate old league picks | **Fail** |
-| R8 | Deputy/commish publish card + score week | **OK** (ops policies) |
-| R9 | Member CB write while unrevealed | **OK** |
-| R10 | Member CB write after opening week scored / crowned | **Fail** |
-| R11 | Cross-league CB read | **Fail** / empty |
-| R12 | `pg_policies` scan for `m.league_id = m.league_id` | **Zero hits** |
-| R13 | No hardcoded `2026-08-29` / `2026-09-10` in CB policies | **Zero hits** |
-| R14 | Profile trophy / broad league SELECT smoke | **Unchanged behavior** |
-| R15 | Deputy still `is_league_ops` for week_cards | **OK** |
+### Rollout order
 
-**Environment:** Sandbox Supabase or local clone — **not** production mutation tests.
+1. Run and archive **preflight** (production SELECT-only).  
+2. Freeze D1A DROP list from exact DELETE policy names.  
+3. **D1A** only (Mike auth) → verify.  
+4. Plan ephemeral DB for **D1B** → apply D1B → verify.  
+5. Complete CB cross-layer design → **D1C** → verify.  
+
+### Rollback warnings
+
+| Stage | Rollback | Warning |
+|-------|----------|---------|
+| D1A | Re-create DELETE policy | **EMERGENCY ONLY — reopens known destructive client delete of entire leagues + CASCADE** |
+| D1B | Restore prior policy text from preflight dump | May reintroduce tautologies / cross-league write risk |
+| D1C | Restore prior CB policies | May reintroduce hardcoded years / wrong reveal |
 
 ---
 
-## E. Deployment plan
-
-### E1. Preflight
-
-1. Run `supabase/D0-rls-preflight-SELECT-ONLY.sql` on target DB.  
-2. Archive result CSVs (policy dump, triggers, definer funcs).  
-3. Confirm deputy policy list.  
-4. Confirm sport immutability trigger enabled.
-
-### E2. Review-only migration
-
-**File:** `supabase/D0-rls-corrections-REVIEW-ONLY.sql`  
-
-- Header: DO NOT APPLY without Mike authorization  
-- Idempotent `DROP POLICY IF EXISTS` / `CREATE POLICY`  
-- Comments on every policy  
-- No trophy/profile/gazette/locker changes  
-
-### E3. Post-apply verification SELECT
-
-Included at bottom of migration as commented SELECTs + `D0-rls-preflight` re-run sections.
-
-### E4. Behavioral tests
-
-Non-production project with fixture league + two users + deputy.
-
-### E5. Production rollout order
-
-1. Announce maintenance window (low risk, policy-only).  
-2. Preflight SELECT archive.  
-3. Apply migration as postgres/supabase admin.  
-4. Post-apply SELECT verification.  
-5. Smoke: create league, join, pick, CB, score as ops.  
-6. Confirm Foundry still quarantined (unrelated).  
-
-### E6. Rollback
-
-**File:** `supabase/D0-rls-corrections-ROLLBACK.sql`  
-
-Restores prior policy shapes (including commissioner DELETE and prior CB/picks definitions as known from repo). Prefer restore from preflight `pg_policies` dump if live names differ.
-
-### E7. Application compatibility
-
-| App path | Expected |
-|----------|----------|
-| Create league | OK |
-| Commish settings / active week | OK via Ops update |
-| Delete league button (if any) | **Breaks** client delete — product must hide or use future RPC |
-| Player picks | OK if member |
-| Cross-league pick bugs | Fixed (denied) |
-| Crystal Ball pre-score | OK for members |
-| Crystal Ball after W0/W1 score | Peer board readable; writes stop |
-| Calendar-only freeze before any score | **Board stays private** until score/crown (documented product change vs hardcoded 2026 dates) |
-| Sport change | Still rejected by trigger |
-
-### E8. Risks / Mike decisions
-
-| Risk | Decision needed |
-|------|-----------------|
-| Removing league DELETE | Is there a product “delete room” path? Schedule RPC later? |
-| CB calendar freeze removed | Accept score/crown-only reveal until calendar function exists? |
-| Tautology may have allowed accidental cross-league reads | Anyone relying on broken visibility? |
-| Live policy names differ from repo | Preflight must drive final DROP list |
-| Duplicate UPDATE policies | Prefer single `"Ops update league"` — don’t leave orphan `"Commissioner updates league"` if both exist |
-| `pick_games` DELETE on leave | Membership-required manage may block orphan cleanup — acceptable |
-
----
-
-## Files created (D0)
+## F. Files
 
 | File | Role |
 |------|------|
-| `docs/STRUCTURAL-HARDENING-D0-RLS.md` | This design |
-| `supabase/D0-rls-preflight-SELECT-ONLY.sql` | Catalog evidence |
-| `supabase/D0-rls-corrections-REVIEW-ONLY.sql` | Migration proposal |
-| `supabase/D0-rls-corrections-ROLLBACK.sql` | Rollback proposal |
+| `docs/STRUCTURAL-HARDENING-D0-RLS.md` | This revised design |
+| `supabase/D0-rls-preflight-SELECT-ONLY.sql` | Preflight (required before final D1A) |
+| `supabase/D1A-league-delete-lockdown-REVIEW-ONLY.sql` | D1A proposal |
+| `supabase/D1B-membership-correlation-REVIEW-ONLY.sql` | D1B proposal |
+| `supabase/D1C-crystal-ball-lock-REVIEW-ONLY.sql` | D1C design stub + blocker |
+| `supabase/D0-rls-corrections-REVIEW-ONLY.sql` | **SUPERSEDED** — do not apply combined |
+| `supabase/D0-rls-corrections-ROLLBACK.sql` | Legacy combined rollback; D1A section warns |
 
 ---
 
-## Production status
+## G. Production confirmation
 
 | Claim | Status |
 |-------|--------|
-| Production DB mutated by D0 work | **No** |
-| Migration executed | **No** |
-| App runtime changed | **No** |
-| Foundry quarantine | **Still active** |
+| Production DB mutated | **No** |
+| Correction SQL executed | **No** |
+| Runtime changed | **No** |
+| Foundry quarantine | **Active** |
 
 ---
 
 ## Stop
 
-**D0 complete** as design + review-only SQL.  
-Next phase (D1 apply) requires explicit Mike authorization after preflight paste review.
+D0 revision complete. **No SQL executed.** Next: run preflight SELECT archive → Mike authorizes **D1A only** when ready.
