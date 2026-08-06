@@ -9,8 +9,9 @@
 
 | Action | Status |
 |--------|--------|
-| Production SQL / RPC creation | **No** |
-| `max_human_members` schema / backfill | **No** |
+| Production SQL / RPC creation on live | **No** |
+| REVIEW-ONLY SQL package (repo) | **Yes** — not applied |
+| Live `max_human_members` schema / backfill | **No** |
 | Policy remove/replace | **No** |
 | App deploy | **No** |
 | Membership mutation | **No** |
@@ -84,7 +85,7 @@ A committed league must never lack its commissioner seat.
 1. Archive B1–B6 decisions                          ✅ this document
 2. Complete static app call-site map                ✅ this document
 3. Design RPC signatures, errors, grants, concurrency, rollback  ✅ §3–§5
-4. Author REVIEW-ONLY SQL only                      ⏳ next package (not now)
+4. Author REVIEW-ONLY SQL only                      ✅ `supabase/review-only/D1B-B/` · `docs/D1B-B-REVIEW-ONLY-SQL-PACKAGE.md`
 5. Source and unit verification                     ⏳
 6. Apply RPCs while legacy client paths remain      ⏳ separate auth
 7. Deploy app create/join via RPCs                  ⏳
@@ -353,4 +354,6 @@ Prefer reverse order of B6.
 
 ## 8. Next authorized work (when Mike says so)
 
-Author **REVIEW-ONLY** SQL package only (RPCs + future policy sketches + max_human_members design) — still **not** production apply until separate authorization.
+~~Author REVIEW-ONLY SQL package~~ **Done** — `docs/D1B-B-REVIEW-ONLY-SQL-PACKAGE.md`.  
+
+Next: disposable DB apply of 01–06 + harness; or source/unit verification; **production stage-6 apply only with separate Mike auth**.
