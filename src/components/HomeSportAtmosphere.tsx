@@ -10,15 +10,8 @@ export default function HomeSportAtmosphere({
 }) {
   return (
     <>
-      {atmosphere.backgroundImage ? (
-        <div
-          className="home-war-art pointer-events-none absolute inset-0 -z-10"
-          style={{ backgroundImage: `url(${atmosphere.backgroundImage})` }}
-          aria-hidden
-        />
-      ) : null}
       <div
-        className="home-war-base pointer-events-none absolute inset-0 -z-10 opacity-70"
+        className="home-war-base pointer-events-none absolute inset-0 -z-10"
         style={{ background: atmosphere.baseGradient }}
       />
       <div

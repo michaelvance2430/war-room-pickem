@@ -14,8 +14,6 @@ export type SportAtmosphere = {
   scanline: string;
   titleGlow: string;
   accentHex: string;
-  /** Optional original full-bleed art plate. UI remains live above it. */
-  backgroundImage?: string;
 };
 
 export type SportHomeChrome = {
@@ -46,7 +44,6 @@ const CFB_ATMO: SportAtmosphere = {
     "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.35) 3px)",
   titleGlow: "drop-shadow-[0_0_30px_rgba(34,197,94,0.15)]",
   accentHex: "#22c55e",
-  backgroundImage: "/skins/cfb-saturday-situation-room.webp",
 };
 
 /** CFB · Saturday Turf — brighter campus Saturday */
@@ -62,7 +59,6 @@ const CFB_SATURDAY_ATMO: SportAtmosphere = {
     "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.3) 3px)",
   titleGlow: "drop-shadow-[0_0_32px_rgba(34,197,94,0.28)]",
   accentHex: "#22c55e",
-  backgroundImage: "/skins/cfb-saturday-situation-room.webp",
 };
 
 /** CFB · Night Game — cooler floodlights */
@@ -78,7 +74,6 @@ const CFB_NIGHT_ATMO: SportAtmosphere = {
     "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.42) 3px)",
   titleGlow: "drop-shadow-[0_0_26px_rgba(52,211,153,0.22)]",
   accentHex: "#34d399",
-  backgroundImage: "/skins/cfb-saturday-situation-room.webp",
 };
 
 /** CFB · Rivalry Week — green with crimson heat */
@@ -94,7 +89,6 @@ const CFB_RIVALRY_ATMO: SportAtmosphere = {
     "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.36) 3px)",
   titleGlow: "drop-shadow-[0_0_28px_rgba(34,197,94,0.2)] drop-shadow-[0_0_16px_rgba(185,28,28,0.15)]",
   accentHex: "#22c55e",
-  backgroundImage: "/skins/cfb-saturday-situation-room.webp",
 };
 
 function cfbAtmosphereForTheme(
