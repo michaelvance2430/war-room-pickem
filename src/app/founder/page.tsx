@@ -27,6 +27,7 @@ import {
   founderPostAndScoreWeek,
   founderPostWeek,
   founderScoreWeek,
+  founderSimFirstWeeksAsNewPlayer,
 } from "@/lib/founder-one-click";
 import { useRouter } from "next/navigation";
 import { markFoundrySessionActive } from "@/components/FoundrySessionChrome";
@@ -247,6 +248,35 @@ export default function FounderDashboardPage() {
     setEyes("new_commissioner");
     // Same as real create: League Build constitution first, then ops
     router.push("/league-build?eyes=1&new=1");
+  }
+
+  /** LAB only: post+score first 6 weeks, then new-player eyes at week 6. */
+  async function runSimFirstSixAsNewPlayer() {
+    setLabBusy(true);
+    setLabLog(null);
+    setLabSteps([]);
+    markFoundrySessionActive();
+    try {
+      const res = await founderSimFirstWeeksAsNewPlayer({
+        weekCount: 6,
+        onProgress: (p) => {
+          setLabLog(`⏳ Week ${p.week}: ${p.step}`);
+        },
+      });
+      setLabSteps(res.steps);
+      setLabLog(res.ok ? `✅ ${res.message}` : `❌ ${res.message}`);
+      void refresh();
+      if (res.ok) {
+        setEyes("new_player");
+        if (res.toWeek != null) setWeek(res.toWeek);
+        window.setTimeout(() => {
+          router.push("/");
+        }, 500);
+      }
+    } catch (e) {
+      setLabLog(e instanceof Error ? e.message : "Six-week sim failed");
+    }
+    setLabBusy(false);
   }
 
   async function runLab(
@@ -692,6 +722,22 @@ export default function FounderDashboardPage() {
       </button>
           <button
             type="button"
+            disabled={labBusy}
+            onClick={() => void runSimFirstSixAsNewPlayer()}
+            className="w-full py-3.5 min-h-[52px] rounded-xl border-2 border-amber-400/55 bg-amber-500/15 text-left px-3.5 touch-manipulation disabled:opacity-50"
+          >
+            <span className="block text-sm font-extrabold text-amber-100">
+              {labBusy
+                ? "Simming first 6 weeks…"
+                : "Sim first 6 weeks as new player →"}
+            </span>
+            <span className="block text-[11px] text-muted mt-0.5 leading-snug">
+              LAB room only · post+score weeks 0–5 (CFB) or 1–6 (NFL) · then
+              NEW PLAYER eyes at the last scored week with standings history
+            </span>
+          </button>
+          <button
+            type="button"
             onClick={runFirstHourCommish}
             className="w-full py-3.5 min-h-[52px] rounded-xl border-2 border-primary/45 bg-primary/10 text-left px-3.5 touch-manipulation"
           >
@@ -711,6 +757,30 @@ export default function FounderDashboardPage() {
             >
               Exit eyes · back to normal creator view
             </button>
+          )}
+          {(labLog || labSteps.length > 0) && (
+            <div className="rounded-xl border border-border/60 bg-background/50 px-3 py-2 space-y-1">
+              {labLog && (
+                <p
+                  className={`text-xs font-semibold ${
+                    labLog.startsWith("✅")
+                      ? "text-primary"
+                      : labLog.startsWith("⏳")
+                        ? "text-amber-200"
+                        : "text-danger"
+                  }`}
+                >
+                  {labLog}
+                </p>
+              )}
+              {labSteps.length > 0 && (
+                <ul className="text-[10px] text-muted space-y-0.5 max-h-28 overflow-y-auto font-mono">
+                  {labSteps.slice(-10).map((s, i) => (
+                    <li key={`${i}-${s.slice(0, 24)}`}>{s}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
           )}
         </section>
 

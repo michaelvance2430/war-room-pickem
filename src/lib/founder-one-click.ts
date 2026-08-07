@@ -499,3 +499,137 @@ export async function founderPostAndScoreWeek(
     steps,
   };
 }
+
+export type SimNewPlayerWeeksResult = OneClickLog & {
+  fromWeek?: number;
+  toWeek?: number;
+  finished?: number[];
+};
+
+/**
+ * LAB only: post+score the first N season weeks, then drop into new-player eyes
+ * at the last week so progressive chrome matches “I’ve lived this far.”
+ *
+ * CFB: weeks 0…N-1 (default N=6 → 0–5).
+ * NFL: weeks 1…N (default N=6 → 1–6).
+ */
+export async function founderSimFirstWeeksAsNewPlayer(opts?: {
+  /** How many weeks to run (default 6). */
+  weekCount?: number;
+  onProgress?: (p: { week: number; step: string }) => void;
+}): Promise<SimNewPlayerWeeksResult> {
+  const steps: string[] = [];
+  const gate = assertFoundryLabRun("founderSimFirstWeeksAsNewPlayer");
+  if (gate) return { ok: false, message: gate, steps };
+
+  const weekCount = Math.max(1, Math.min(18, opts?.weekCount ?? 6));
+  const s = sport();
+  const { firstSeasonWeek } = await import("./season-calendar");
+  const fromWeek = firstSeasonWeek(s);
+  const toWeek = fromWeek + weekCount - 1;
+
+  steps.push(
+    `Range: ${weekTitle(fromWeek, s)} → ${weekTitle(toWeek, s)} (${weekCount} weeks) · ${s.toUpperCase()}`
+  );
+  opts?.onProgress?.({
+    week: fromWeek,
+    step: `Starting ${weekCount}-week new-player sim…`,
+  });
+
+  await exitEyesIfNeeded(steps);
+
+  // Full bot field so standings / Board / Gazette have bodies
+  const pad = await founderEnsureFullBotRoster();
+  steps.push(...pad.steps.map((x) => `roster: ${x}`));
+  if (!pad.ok) {
+    return {
+      ok: false,
+      message: pad.message,
+      steps,
+      fromWeek,
+      toWeek,
+      finished: [],
+    };
+  }
+
+  const finished: number[] = [];
+  for (let w = fromWeek; w <= toWeek; w++) {
+    opts?.onProgress?.({
+      week: w,
+      step: `Post + score ${weekTitle(w, s)}…`,
+    });
+    const run = await founderPostAndScoreWeek(w);
+    steps.push(...run.steps.map((x) => `w${w}: ${x}`));
+    if (!run.ok) {
+      return {
+        ok: false,
+        message: `Stopped at ${weekTitle(w, s)}: ${run.message}`,
+        steps,
+        fromWeek,
+        toWeek,
+        finished,
+      };
+    }
+    finished.push(w);
+  }
+
+  // Progressive + first-week flags: lived past week 1, locked, season alive
+  try {
+    const sess = getSession();
+    const pid = sess?.playerId;
+    if (pid) {
+      const fw = await import("./first-week");
+      fw.markHasLockedPicksOnce(pid);
+      fw.markSeasonComeAlive(pid);
+    }
+    const pd = await import("./progressive-disclosure");
+    if (toWeek >= 3 && pid) {
+      pd.markGazetteShelfRevealSeen(pid);
+    }
+    pd.invalidateProgressiveSnapshot();
+  } catch {
+    steps.push("Progressive flags: skipped");
+  }
+
+  // Drama on the last week so Gazette path is warm
+  try {
+    const { prepareFoundryDramaAfterScore } = await import("./foundry-preview");
+    const drama = await prepareFoundryDramaAfterScore(toWeek);
+    steps.push(drama.ok ? drama.message : `Drama: ${drama.message}`);
+  } catch (e) {
+    steps.push(
+      `Drama skip: ${e instanceof Error ? e.message : "failed"}`
+    );
+  }
+
+  // Enter new-player eyes at the last scored week (local progressive chrome)
+  try {
+    const eyes = await import("./creator-eyes");
+    eyes.setCreatorEyesMode("new_player", {
+      weekNumber: toWeek,
+      sportId: s,
+    });
+    steps.push(
+      `NEW PLAYER EYES on · week ${toWeek} (lived ${finished.length} weeks)`
+    );
+  } catch (e) {
+    steps.push(
+      `Eyes enter skip: ${e instanceof Error ? e.message : "failed"}`
+    );
+  }
+
+  try {
+    localStorage.setItem("warroom-active-week", String(toWeek));
+  } catch {
+    /* ignore */
+  }
+
+  return {
+    ok: true,
+    message: `Simmed ${finished.length} week(s) · now in new-player eyes at ${weekTitle(toWeek, s)}. Walk Home → Picks → Board → Standings.`,
+    steps,
+    fromWeek,
+    toWeek,
+    finished,
+  };
+}
