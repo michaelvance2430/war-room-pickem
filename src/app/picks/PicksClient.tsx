@@ -437,13 +437,25 @@ export default function PicksClient() {
           );
           const restored = await Promise.race([
             restoreSessionFromCloud(),
-            new Promise<{ status: "no_auth" }>((r) =>
-              window.setTimeout(() => r({ status: "no_auth" }), 3_500)
+            new Promise<{ status: "network_error" }>((r) =>
+              window.setTimeout(() => r({ status: "network_error" }), 3_500)
             ),
           ]);
           if (restored.status === "restored") {
             session = getSession();
             league = getLeague();
+          } else if (restored.status === "no_auth") {
+            window.location.replace("/login");
+            return null;
+          } else if (restored.status === "no_leagues") {
+            window.location.replace("/join");
+            return null;
+          } else if (restored.status === "pick_league") {
+            window.location.replace("/");
+            return null;
+          } else if (restored.status === "network_error") {
+            window.location.replace("/");
+            return null;
           }
         } catch {
           /* keep null */
@@ -3091,4 +3103,3 @@ export default function PicksClient() {
       </div>
   );
 }
-
