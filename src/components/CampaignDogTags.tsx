@@ -21,9 +21,24 @@ const MIKE_CAMPAIGNS: CampaignTag[] = [
   },
 ];
 
+const MARIA_PLAYER_ID = "131b404e-db8e-4adf-86f4-f78aacf2a5bc";
+const MARIA_CAMPAIGNS: CampaignTag[] = [
+  {
+    year: 2025,
+    league: "Vonnaggio Fantasy",
+    record: "9–9",
+    finish: "Super Bowl Champion",
+    honor: "NFC Champion",
+  },
+];
+
 export default function CampaignDogTags({ playerId }: { playerId: string }) {
   const [open, setOpen] = useState<number | null>(null);
-  const campaigns = isAppCreator(playerId) ? MIKE_CAMPAIGNS : [];
+  const campaigns = isAppCreator(playerId)
+    ? MIKE_CAMPAIGNS
+    : playerId === MARIA_PLAYER_ID
+      ? MARIA_CAMPAIGNS
+      : [];
   if (!campaigns.length) return null;
 
   return (
