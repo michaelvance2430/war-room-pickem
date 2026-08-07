@@ -122,11 +122,7 @@ async function fetchLiveOdds(
   const hit = oddsCache.get(cacheKey);
   if (hit && Date.now() - hit.at < 10 * 60 * 1000) return hit.games;
 
-  const apiKey = (
-    process.env.ODDS_API_KEY ||
-    process.env.NEXT_PUBLIC_ODDS_API_KEY ||
-    ""
-  ).trim();
+  const apiKey = (process.env.ODDS_API_KEY || "").trim();
   if (!apiKey) return [];
 
   const path =
