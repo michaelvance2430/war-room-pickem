@@ -37,6 +37,35 @@ import {
   type MentionMember,
 } from "@/lib/locker-mentions";
 
+const LOCKER_GIF_PREFIX = "WR_GIF|";
+
+function normalizeLockerGif(raw: string): string | null {
+  const value = raw.trim();
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:") return null;
+    const host = url.hostname.toLowerCase();
+    if (host === "giphy.com" || host === "www.giphy.com") {
+      const id = url.pathname.split("-").pop()?.replace(/[^a-zA-Z0-9]/g, "");
+      return id ? `https://media.giphy.com/media/${id}/giphy.gif` : null;
+    }
+    const trusted =
+      host === "media.giphy.com" ||
+      host === "i.giphy.com" ||
+      host === "media.tenor.com" ||
+      host === "c.tenor.com";
+    return trusted ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+function lockerGifUrl(body: string): string | null {
+  if (!body.startsWith(LOCKER_GIF_PREFIX)) return null;
+  return normalizeLockerGif(body.slice(LOCKER_GIF_PREFIX.length));
+}
+
 export default function LockerRoomPage() {
   const [messages, setMessages] = useState<LockerMessage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,6 +87,8 @@ export default function LockerRoomPage() {
   const [reactPickerFor, setReactPickerFor] = useState<string | null>(null);
   const [reactBusyId, setReactBusyId] = useState<string | null>(null);
   const [reactError, setReactError] = useState<string | null>(null);
+  const [composerTray, setComposerTray] = useState<"emoji" | "gif" | null>(null);
+  const [gifInput, setGifInput] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
   const lastPostAt = useRef(0);
   const listTopRef = useRef<HTMLDivElement>(null);
@@ -166,6 +197,19 @@ export default function LockerRoomPage() {
       });
       return next;
     });
+    setComposerTray(null);
+  }
+
+  function attachGif() {
+    const url = normalizeLockerGif(gifInput);
+    if (!url) {
+      setPostError("Paste a GIPHY or Tenor GIF link.");
+      return;
+    }
+    setBody(`${LOCKER_GIF_PREFIX}${url}`);
+    setGifInput("");
+    setComposerTray(null);
+    setPostError(null);
   }
 
   function pickMention(member: MentionMember) {
@@ -312,6 +356,7 @@ export default function LockerRoomPage() {
   }
 
   const remaining = LOCKER_MAX_CHARS - body.length;
+  const attachedGif = lockerGifUrl(body);
   const canPost =
     !muted &&
     body.trim().length > 0 &&
@@ -324,19 +369,12 @@ export default function LockerRoomPage() {
     <div className={`min-h-screen flex flex-col ${isCfbSkin ? "cfb-locker-page" : ""}`}>
       <main className="cfb-locker-main flex-1 max-w-2xl mx-auto w-full px-4 py-6 flex flex-col min-h-0">
         <div className="cfb-locker-header mb-4 shrink-0">
-      <div className="flex items-center gap-2 flex-wrap mb-1">
-            <h1 className="text-2xl font-bold">Locker Room</h1>
-      <span className="text-xs px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-300 border border-orange-400/30">
-              League chat
-            </span>
-      </div>
+          <div className="cfb-locker-nameplate">
+            <span>Home Locker</span>
+            <h1>Locker Room</h1>
+            <strong>{leagueName || "War Room"}</strong>
+          </div>
           <p className="text-sm text-muted">
-            {leagueName ? (
-              <>
-                <span className="text-foreground font-medium">{leagueName}</span>
-                {" · "}
-              </>
-            ) : null}
             This week&apos;s trash talk
             {weekLabel ? (
               <>
@@ -404,7 +442,8 @@ export default function LockerRoomPage() {
           <ul className="divide-y divide-border/60">
             {messages.map((m) => {
               const mine = isSelfPlayer(m.userId, selfId);
-              const parts = splitMentions(m.body, roster);
+              const gifUrl = lockerGifUrl(m.body);
+              const parts = gifUrl ? [] : splitMentions(m.body, roster);
               const rx = m.reactions || [];
               const pickerOpen = reactPickerFor === m.id;
               return (
@@ -426,14 +465,21 @@ export default function LockerRoomPage() {
 
                   {/* Chat box: body + stamps bottom-left, stack L→R */}
                   <div
-                    className={`relative mt-1 rounded-2xl border px-3 pt-2.5 pb-2 ${
+                    className={`locker-message-card relative mt-1 border px-3 pt-2.5 pb-2 ${
                       mine
-                        ? "border-primary/30 bg-primary/10"
+                        ? "is-mine border-primary/30 bg-primary/10"
                         : "border-border bg-background/60"
                     }`}
                   >
-      <p className="text-sm text-foreground/95 whitespace-pre-wrap break-words leading-relaxed">
-                      {parts.map((p, i) =>
+                    {gifUrl ? (
+                      <div className="locker-gif-frame">
+                        {/* Trusted GIPHY/Tenor media only; remote dimensions are unknown. */}
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={gifUrl} alt="GIF shared in the locker room" loading="lazy" />
+                      </div>
+                    ) : (
+                      <p className="text-sm text-foreground/95 whitespace-pre-wrap break-words leading-relaxed">
+                        {parts.map((p, i) =>
                         p.type === "mention" ? (
                           p.userId ? (
                             <PlayerLink
@@ -453,8 +499,9 @@ export default function LockerRoomPage() {
                         ) : (
                           <span key={`${m.id}-t-${i}`}>{p.value}</span>
                         )
-                      )}
-                    </p>
+                        )}
+                      </p>
+                    )}
 
                     {/* Bottom of bubble: stamps L→R, then + */}
                     <div className="mt-2 flex flex-wrap items-center justify-start gap-1 min-h-[28px]">
@@ -596,6 +643,20 @@ export default function LockerRoomPage() {
                     No one named “{mentionQuery}” in this league
                   </div>
                 )}
+              {attachedGif ? (
+                <div className="locker-gif-draft">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={attachedGif} alt="GIF ready to send" />
+                  <button
+                    type="button"
+                    onClick={() => setBody("")}
+                    aria-label="Remove GIF"
+                  >
+                    ×
+                  </button>
+                  <span>GIF ready</span>
+                </div>
+              ) : (
               <textarea
                 ref={textareaRef}
                 value={body}
@@ -614,11 +675,12 @@ export default function LockerRoomPage() {
                   syncMention(el.value, el.selectionStart ?? el.value.length);
                 }}
                 onKeyDown={onTextareaKeyDown}
-                rows={3}
+                rows={2}
                 maxLength={LOCKER_MAX_CHARS}
                 placeholder="Talk your shit… @someone to call them out"
                 className="w-full bg-background border border-border rounded-lg px-3 pt-2 pb-7 text-sm text-foreground resize-none focus:outline-none focus:ring-1 focus:ring-primary/50"
               />
+              )}
               {/* Char count: bottom-right of chat box, above emoji row */}
               <span
                 className={`pointer-events-none absolute bottom-2 right-2.5 text-[11px] font-semibold tabular-nums ${
@@ -630,27 +692,71 @@ export default function LockerRoomPage() {
                 {cooldownLeft > 0 ? ` · ${cooldownLeft}s` : ""}
               </span>
             </div>
-            <div className="flex flex-wrap items-center gap-1.5">
-              {LOCKER_EMOJIS.map((em) => (
-                <button
-                  key={em}
-                  type="button"
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                  }}
-                  onClick={() => insertEmoji(em)}
-                  className="w-9 h-9 sm:w-8 sm:h-8 rounded-lg bg-background border border-border hover:border-primary/50 hover:bg-primary/10 text-base leading-none touch-manipulation"
-                  title="Add emoji to your message"
-                >
-                  {em}
-                </button>
-              ))}
+            {composerTray && (
+              <div className="locker-gear-tray">
+                <div className="locker-gear-tabs" role="tablist" aria-label="Message extras">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={composerTray === "emoji"}
+                    onClick={() => setComposerTray("emoji")}
+                  >
+                    Emoji
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={composerTray === "gif"}
+                    onClick={() => setComposerTray("gif")}
+                  >
+                    GIF
+                  </button>
+                </div>
+                {composerTray === "emoji" ? (
+                  <div className="locker-emoji-grid">
+                    {LOCKER_EMOJIS.map((em) => (
+                      <button
+                        key={em}
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => insertEmoji(em)}
+                        title="Add emoji"
+                      >
+                        {em}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="locker-gif-tool">
+                    <input
+                      value={gifInput}
+                      onChange={(e) => setGifInput(e.target.value)}
+                      placeholder="Paste GIPHY or Tenor link"
+                      inputMode="url"
+                    />
+                    <button type="button" onClick={attachGif}>Attach</button>
+                    <p>Find a GIF in GIPHY or Tenor, copy its link, then paste it here.</p>
+                  </div>
+                )}
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setComposerTray((cur) => (cur ? null : "emoji"))}
+                className={`locker-plus-button ${composerTray ? "is-open" : ""}`}
+                aria-label="Add emoji or GIF"
+                aria-expanded={!!composerTray}
+              >
+                +
+              </button>
+              <span className="text-xs text-muted">Message the room</span>
               <button
                 type="submit"
                 disabled={!canPost}
-                className="ml-auto min-h-[36px] px-4 py-2 rounded-lg bg-primary text-black text-sm font-semibold disabled:opacity-40 touch-manipulation"
+                className="ml-auto min-h-[42px] px-5 py-2 rounded-lg bg-primary text-black text-sm font-bold disabled:opacity-40 touch-manipulation"
               >
-                {posting ? "Sending…" : "Post"}
+                {posting ? "Sending…" : "Send"}
               </button>
             </div>
             {mentionOpen ? (
