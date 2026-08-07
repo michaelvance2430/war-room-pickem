@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Multi-league scan card — sport, role, open/private, bots, seats.
+ * Multi-league scan card — sport, role, access, and real-player count.
  * Used on Account “Your leagues” and home league picker.
  */
 
@@ -25,7 +25,7 @@ function Chip({
   tone = "default",
 }: {
   children: React.ReactNode;
-  tone?: "default" | "sport" | "role" | "open" | "private" | "bots" | "humans" | "active";
+  tone?: "default" | "sport" | "role" | "open" | "private" | "humans" | "active";
 }) {
   const tones: Record<string, string> = {
     default: "border-border bg-background/60 text-muted",
@@ -33,7 +33,6 @@ function Chip({
     role: "border-amber-400/40 bg-amber-400/10 text-amber-200",
     open: "border-sky-400/40 bg-sky-400/10 text-sky-200",
     private: "border-border bg-background/80 text-muted",
-    bots: "border-violet-400/35 bg-violet-500/10 text-violet-200",
     humans: "border-emerald-400/35 bg-emerald-500/10 text-emerald-200",
     active: "border-primary bg-primary/15 text-primary font-bold",
   };
@@ -57,9 +56,7 @@ export default function LeagueMembershipCard({
   const pack = getSportPack(m.sportId || "cfb");
   const role = membershipRoleLabel(m, userId);
   const isCommish = role === "Commissioner";
-  const bots = m.botCount ?? 0;
   const humans = m.humanCount;
-  const hasBotCount = typeof m.botCount === "number";
 
   const body = (
     <>
@@ -84,13 +81,6 @@ export default function LeagueMembershipCard({
         {typeof humans === "number" && (
           <Chip tone="humans">
             {humans} player{humans === 1 ? "" : "s"}
-          </Chip>
-        )}
-        {hasBotCount && (
-          <Chip tone="bots">
-            {bots > 0
-              ? `${bots} bot${bots === 1 ? "" : "s"}`
-              : "No bots"}
           </Chip>
         )}
         {active && <Chip tone="active">Active</Chip>}
