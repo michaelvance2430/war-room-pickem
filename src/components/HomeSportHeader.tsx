@@ -82,13 +82,17 @@ export default function HomeSportHeader({
     <section className={`mb-3 sm:mb-4 ${isCfb ? "cfb-situation-masthead" : ""}`}>
       {/* Identity row: crest · Sport Hub · Share */}
       <div className="home-identity-row flex flex-wrap items-center gap-2 mb-2">
-        <BrandMark size={isCfb ? 46 : 40} variant="force" className="rounded-lg shrink-0" />
         {isCfb ? (
-          <div className="cfb-wordmark">
-            <span>War Room</span>
-            <small>Saturday Situation Room</small>
+          <div className="cfb-hero-brand">
+            <BrandMark size={46} variant="force" className="rounded-lg shrink-0" />
+            <div className="cfb-wordmark">
+              <span>War Room</span>
+              <small>Saturday Situation Room</small>
+            </div>
           </div>
-        ) : null}
+        ) : (
+          <BrandMark size={40} variant="force" className="rounded-lg shrink-0" />
+        )}
         {isWwc ? (
           <div
             className="shrink-0 rounded-lg p-0.5 border"
