@@ -5323,122 +5323,11 @@ export async function startNextSeasonInCloud(): Promise<ResetSeasonResult> {
 }
 
 /**
- * Client-side wipe when RPC is missing or incomplete.
- * Deletes results/cards/picks and zeroes membership stats.
- */
-async function resetSeasonClientFallback(
-  leagueId: string
-): Promise<ResetSeasonResult> {
-  const supabase = createClient();
-  let picksDeleted = 0;
-  let cardsDeleted = 0;
-  let resultsDeleted = 0;
-
-  {
-    const { data, error } = await supabase
-      .from("week_results")
-      .delete()
-      .eq("league_id", leagueId)
-      .select("id");
-    if (!error) resultsDeleted = data?.length ?? 0;
-  }
-  {
-    const { data, error } = await supabase
-      .from("picks")
-      .delete()
-      .eq("league_id", leagueId)
-      .select("id");
-    if (!error) picksDeleted = data?.length ?? 0;
-  }
-  {
-    const { data, error } = await supabase
-      .from("week_cards")
-      .delete()
-      .eq("league_id", leagueId)
-      .select("id");
-    if (!error) cardsDeleted = data?.length ?? 0;
-  }
-
-  try {
-    await supabase.from("announcements").delete().eq("league_id", leagueId);
-  } catch {
-    /* optional */
-  }
-  try {
-    await supabase.from("gazette_editions").delete().eq("league_id", leagueId);
-  } catch {
-    /* optional */
-  }
-  try {
-    await supabase.from("crystal_ball_picks").delete().eq("league_id", leagueId);
-  } catch {
-    /* optional */
-  }
-  try {
-    await supabase
-      .from("crystal_ball_result")
-      .delete()
-      .eq("league_id", leagueId);
-  } catch {
-    /* optional */
-  }
-
-  const { data: members, error: memErr } = await supabase
-    .from("memberships")
-    .update({
-      total_points: 0,
-      weekly_points: [],
-      ats_correct: 0,
-      ats_total: 0,
-      current_streak: 0,
-      best_week: 0,
-      worst_week: 0,
-      perfect_weeks: 0,
-      best_bet_hits: 0,
-      best_bet_total: 0,
-      prop_hits: 0,
-      prop_total: 0,
-      weeks_played: 0,
-    })
-    .eq("league_id", leagueId)
-    .select("id");
-
-  if (memErr) {
-    return {
-      ok: false,
-      error:
-        memErr.message ||
-        "Could not zero scores. You may need commissioner RLS / reset-season.sql.",
-    };
-  }
-
-  await supabase.from("leagues").update({ current_week: 0 }).eq("id", leagueId);
-  try {
-    const { writeScopedActiveWeek } = await import("./active-week-storage");
-    const sess = getSession();
-    writeScopedActiveWeek(0, {
-      userId: sess?.playerId,
-      leagueId,
-      sportId: getLeague()?.sportId || "cfb",
-    });
-  } catch {
-    /* ignore */
-  }
-  cacheSet(activeWeekCache, leagueId, 0);
-  activeWeekInflight.delete(leagueId);
-
-  return {
-    ok: true,
-    membersKept: members?.length ?? 0,
-    picksDeleted,
-    cardsDeleted,
-    resultsDeleted,
-  };
-}
-
-/**
- * Wipe season data (picks, cards, results, scores) but KEEP all members.
- * Commissioner only. Prefers reset_league_season RPC; falls back to direct deletes.
+ * Wipe season data (picks, cards, results, scores, Crystal Ball, etc.) but KEEP all members.
+ * Commissioner only. **Single authority:** SECURITY DEFINER `reset_league_season`.
+ *
+ * No client-side DELETE fallback (H-08B revoked authenticated DELETE on crystal_ball_picks;
+ * partial client wipes produced fake success). On RPC failure → honest error only.
  */
 export async function resetSeasonInCloud(): Promise<ResetSeasonResult> {
   const session = getSession();
@@ -5448,100 +5337,119 @@ export async function resetSeasonInCloud(): Promise<ResetSeasonResult> {
 
   const supabase = createClient();
   const leagueId = session.leagueId;
-  let result: ResetSeasonResult | null = null;
 
   const { data, error } = await supabase.rpc("reset_league_season", {
     p_league_id: leagueId,
   });
 
-  if (!error) {
-    const row = (data || {}) as {
-      ok?: boolean;
-      membersKept?: number;
-      picksDeleted?: number;
-      cardsDeleted?: number;
-      resultsDeleted?: number;
-    };
-    result = {
-      ok: true,
-      membersKept: row.membersKept,
-      picksDeleted: row.picksDeleted,
-      cardsDeleted: row.cardsDeleted,
-      resultsDeleted: row.resultsDeleted,
-    };
-  } else {
+  if (error) {
     const msg = error.message || "";
-    // Always try client wipe so a stale/missing RPC can't leave week_results behind
-    result = await resetSeasonClientFallback(leagueId);
-    if (!result.ok && /function|does not exist|schema cache/i.test(msg)) {
+    if (
+      error.code === "PGRST202" ||
+      /could not find the function|schema cache|does not exist/i.test(msg)
+    ) {
       return {
         ok: false,
         error:
-          "Reset function missing and direct wipe failed. Run supabase/reset-season.sql (or gazette-archive.sql) in Supabase, then try again. " +
-          (result.error || msg),
+          "Season reset is not available on this database (reset_league_season missing). Run supabase/reset-season.sql in Supabase, then try again. No partial wipe was applied.",
       };
     }
-    if (!result.ok) {
-      return { ok: false, error: result.error || msg || "Failed to reset season" };
+    if (/not authenticated/i.test(msg)) {
+      return { ok: false, error: "Sign in to reset the season." };
     }
+    if (/only the commissioner/i.test(msg)) {
+      return {
+        ok: false,
+        error: "Only the commissioner can reset the season",
+      };
+    }
+    return {
+      ok: false,
+      error: msg || "Failed to reset season. No partial wipe was applied.",
+    };
   }
 
-  // Belt-and-suspenders: if RPC "succeeded" but results remain, force-delete them
-  try {
-    const leftover = await listScoredWeekNumbers();
-    if (leftover.length > 0) {
-      const wipe = await resetSeasonClientFallback(leagueId);
-      if (wipe.ok) {
-        result = {
-          ...result,
-          resultsDeleted: Math.max(
-            result.resultsDeleted || 0,
-            wipe.resultsDeleted || 0
-          ),
-          picksDeleted: Math.max(
-            result.picksDeleted || 0,
-            wipe.picksDeleted || 0
-          ),
-          cardsDeleted: Math.max(
-            result.cardsDeleted || 0,
-            wipe.cardsDeleted || 0
-          ),
-          membersKept: wipe.membersKept ?? result.membersKept,
-        };
-      }
-    }
-  } catch {
-    /* ignore */
+  const row = (typeof data === "string"
+    ? (JSON.parse(data) as Record<string, unknown>)
+    : (data as Record<string, unknown> | null)) || {};
+
+  if (row.ok === false) {
+    return {
+      ok: false,
+      error:
+        String(row.error || row.message || "Season reset was rejected by the server."),
+    };
   }
 
-  // Always wipe pride picks + league achievements + re-zero memberships.
-  // RPC may be an older version that only deleted picks/cards — profile stats
-  // (ATS, weeks played, streaks) must not survive trial runs.
+  // Read-only post-check: if board/CB rows remain, do not claim success
+  // (older RPC / partial failure). Never client-DELETE to "finish" the job.
   try {
-    const wipeExtras = await resetSeasonClientFallback(leagueId);
-    if (wipeExtras.ok) {
-      result = {
-        ...result,
-        membersKept: wipeExtras.membersKept ?? result.membersKept,
-        picksDeleted: Math.max(
-          result.picksDeleted || 0,
-          wipeExtras.picksDeleted || 0
-        ),
-        cardsDeleted: Math.max(
-          result.cardsDeleted || 0,
-          wipeExtras.cardsDeleted || 0
-        ),
-        resultsDeleted: Math.max(
-          result.resultsDeleted || 0,
-          wipeExtras.resultsDeleted || 0
-        ),
+    const leftoverWeeks = await listScoredWeekNumbers();
+    const { count: cbPicksLeft, error: cbErr } = await supabase
+      .from("crystal_ball_picks")
+      .select("id", { count: "exact", head: true })
+      .eq("league_id", leagueId);
+    let cbResultsLeft = 0;
+    const { count: cbResCount, error: cbResErr } = await supabase
+      .from("crystal_ball_result")
+      .select("id", { count: "exact", head: true })
+      .eq("league_id", leagueId);
+    if (!cbResErr) cbResultsLeft = cbResCount ?? 0;
+    // Missing CB tables: treat as cleared (RPC already no-op'd via undefined_table)
+    const cbUnreadable =
+      (cbErr &&
+        !/schema cache|does not exist|PGRST|42P01/i.test(cbErr.message || "")) ||
+      (cbResErr &&
+        !/schema cache|does not exist|PGRST|42P01/i.test(
+          cbResErr.message || ""
+        ));
+    if (cbUnreadable) {
+      return {
+        ok: false,
+        error:
+          "Season reset returned success but Crystal Ball could not be verified. Refresh and check the board before continuing.",
+      };
+    }
+    if (
+      leftoverWeeks.length > 0 ||
+      (cbPicksLeft ?? 0) > 0 ||
+      cbResultsLeft > 0
+    ) {
+      return {
+        ok: false,
+        error:
+          "Season reset did not fully clear this league (scored weeks or Crystal Ball data remain). No client wipe was applied — re-run reset or check the reset_league_season function on the server.",
       };
     }
   } catch {
-    /* best-effort */
+    return {
+      ok: false,
+      error:
+        "Season reset could not be verified after the server call. Refresh and confirm the board is clear before continuing.",
+    };
   }
 
-  // Clear local week caches so this device matches cloud (NFL through week 22)
+  const result: ResetSeasonResult = {
+    ok: true,
+    membersKept:
+      typeof row.membersKept === "number"
+        ? row.membersKept
+        : Number(row.membersKept) || undefined,
+    picksDeleted:
+      typeof row.picksDeleted === "number"
+        ? row.picksDeleted
+        : Number(row.picksDeleted) || undefined,
+    cardsDeleted:
+      typeof row.cardsDeleted === "number"
+        ? row.cardsDeleted
+        : Number(row.cardsDeleted) || undefined,
+    resultsDeleted:
+      typeof row.resultsDeleted === "number"
+        ? row.resultsDeleted
+        : Number(row.resultsDeleted) || undefined,
+  };
+
+  // Local device caches only — no cloud DELETEs
   try {
     for (let w = 0; w <= 22; w++) {
       localStorage.removeItem(`warroom-card-week-${w}`);
@@ -5555,15 +5463,15 @@ export async function resetSeasonInCloud(): Promise<ResetSeasonResult> {
       writeScopedActiveWeek(0, {
         userId: getSession()?.playerId,
         leagueId,
-        sportId: "cfb",
+        sportId: getLeague()?.sportId || "cfb",
       });
       localStorage.removeItem(LEGACY_ACTIVE_WEEK_KEY);
     } catch {
       /* ignore */
     }
-    // Crystal Ball / Super Bowl pride picks (device fallback board)
+    cacheSet(activeWeekCache, leagueId, 0);
+    activeWeekInflight.delete(leagueId);
     localStorage.removeItem(`warroom-crystal-ball-${leagueId}`);
-    // Stale local roster stats (guest/demo residue)
     try {
       const { savePlayers } = await import("./store");
       savePlayers([]);
@@ -5581,7 +5489,6 @@ export async function resetSeasonInCloud(): Promise<ResetSeasonResult> {
       if (!k) continue;
       if (prefixes.some((p) => k.startsWith(p))) localStorage.removeItem(k);
     }
-    // Gazette copy uniqueness memory — new season gets a fresh bank pass
     try {
       const { clearGazetteCopyForLeague } = await import(
         "./gazette-copy-engine"
@@ -5594,8 +5501,6 @@ export async function resetSeasonInCloud(): Promise<ResetSeasonResult> {
     /* ignore */
   }
 
-  // Sandbox: wipe sim trophies + local cheevo banks that should not stick.
-  // Real season: career permanent cheevos stay (Legend / creator only protected in sandbox).
   try {
     const { afterSeasonResetLocalCleanup } = await import("./sandbox-wipe");
     const roster = await loadLeagueRoster();
@@ -5604,11 +5509,9 @@ export async function resetSeasonInCloud(): Promise<ResetSeasonResult> {
       playerIds: roster.map((m) => m.userId),
     });
   } catch {
-    /* best-effort */
+    /* best-effort local only */
   }
 
-  // Drop standings/roster/card caches so Museum / Standings cannot show trial points
-  // after a wipe (playersCache TTL was keeping 5-pt museum records alive).
   try {
     invalidateCloudWeekCaches(leagueId);
   } catch {
