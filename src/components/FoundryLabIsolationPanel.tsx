@@ -83,6 +83,13 @@ export default function FoundryLabIsolationPanel() {
           disabled={!id || lab}
           onClick={() => {
             if (!id) return;
+            const proof = window.prompt(
+              `Mark “${name || "this room"}” as disposable LAB data?\n\nType LAB to allow simulations that write cards, picks, results, standings, bots, and Gazette history.`
+            );
+            if (proof !== "LAB") {
+              setNote("LAB mark cancelled. Type LAB exactly to arm simulations.");
+              return;
+            }
             markLeagueAsFoundryLab(id);
             refresh();
             setNote(
