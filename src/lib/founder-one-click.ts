@@ -500,26 +500,27 @@ export async function founderPostAndScoreWeek(
   };
 }
 
-export type SimNewPlayerWeeksResult = OneClickLog & {
+export type BuildLabHistoryResult = OneClickLog & {
   fromWeek?: number;
   toWeek?: number;
   finished?: number[];
 };
 
 /**
- * LAB only: post+score the first N season weeks, then drop into new-player eyes
- * at the last week so progressive chrome matches “I’ve lived this far.”
+ * LAB only: post+score the first N season weeks to build cloud history for
+ * Standings / Board / Gazette QA. This is a season factory, not onboarding:
+ * it never enters eyes mode or forges player-progress flags.
  *
  * CFB: weeks 0…N-1 (default N=6 → 0–5).
  * NFL: weeks 1…N (default N=6 → 1–6).
  */
-export async function founderSimFirstWeeksAsNewPlayer(opts?: {
+export async function founderBuildFirstWeeksHistory(opts?: {
   /** How many weeks to run (default 6). */
   weekCount?: number;
   onProgress?: (p: { week: number; step: string }) => void;
-}): Promise<SimNewPlayerWeeksResult> {
+}): Promise<BuildLabHistoryResult> {
   const steps: string[] = [];
-  const gate = assertFoundryLabRun("founderSimFirstWeeksAsNewPlayer");
+  const gate = assertFoundryLabRun("founderBuildFirstWeeksHistory");
   if (gate) return { ok: false, message: gate, steps };
 
   const weekCount = Math.max(1, Math.min(18, opts?.weekCount ?? 6));
@@ -533,7 +534,7 @@ export async function founderSimFirstWeeksAsNewPlayer(opts?: {
   );
   opts?.onProgress?.({
     week: fromWeek,
-    step: `Starting ${weekCount}-week new-player sim…`,
+    step: `Starting ${weekCount}-week LAB history build…`,
   });
 
   await exitEyesIfNeeded(steps);
@@ -573,24 +574,6 @@ export async function founderSimFirstWeeksAsNewPlayer(opts?: {
     finished.push(w);
   }
 
-  // Progressive + first-week flags: lived past week 1, locked, season alive
-  try {
-    const sess = getSession();
-    const pid = sess?.playerId;
-    if (pid) {
-      const fw = await import("./first-week");
-      fw.markHasLockedPicksOnce(pid);
-      fw.markSeasonComeAlive(pid);
-    }
-    const pd = await import("./progressive-disclosure");
-    if (toWeek >= 3 && pid) {
-      pd.markGazetteShelfRevealSeen(pid);
-    }
-    pd.invalidateProgressiveSnapshot();
-  } catch {
-    steps.push("Progressive flags: skipped");
-  }
-
   // Drama on the last week so Gazette path is warm
   try {
     const { prepareFoundryDramaAfterScore } = await import("./foundry-preview");
@@ -602,22 +585,6 @@ export async function founderSimFirstWeeksAsNewPlayer(opts?: {
     );
   }
 
-  // Enter new-player eyes at the last scored week (local progressive chrome)
-  try {
-    const eyes = await import("./creator-eyes");
-    eyes.setCreatorEyesMode("new_player", {
-      weekNumber: toWeek,
-      sportId: s,
-    });
-    steps.push(
-      `NEW PLAYER EYES on · week ${toWeek} (lived ${finished.length} weeks)`
-    );
-  } catch (e) {
-    steps.push(
-      `Eyes enter skip: ${e instanceof Error ? e.message : "failed"}`
-    );
-  }
-
   try {
     localStorage.setItem("warroom-active-week", String(toWeek));
   } catch {
@@ -626,7 +593,7 @@ export async function founderSimFirstWeeksAsNewPlayer(opts?: {
 
   return {
     ok: true,
-    message: `Simmed ${finished.length} week(s) · now in new-player eyes at ${weekTitle(toWeek, s)}. Walk Home → Picks → Board → Standings.`,
+    message: `Built ${finished.length} week(s) of LAB history through ${weekTitle(toWeek, s)}. Stayed in the real LAB room with ceremonies available.`,
     steps,
     fromWeek,
     toWeek,
