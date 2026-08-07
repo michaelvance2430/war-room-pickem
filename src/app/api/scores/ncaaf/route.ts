@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { scheduleUsageFromRequest } from "@/lib/platform-odds-usage";
+import { authenticateApiRequest } from "@/lib/server-api-auth";
 
 /**
  * NCAAF final / live scores from The Odds API.
@@ -8,18 +9,22 @@ import { scheduleUsageFromRequest } from "@/lib/platform-odds-usage";
  * Optional leagueId is attributed only after server-side membership check.
  */
 export async function GET(req: NextRequest) {
+  const identity = await authenticateApiRequest(req);
+  if (!identity.ok) {
+    return NextResponse.json(
+      { error: identity.error },
+      { status: identity.status, headers: { "Cache-Control": "no-store" } }
+    );
+  }
   const startedAt = Date.now();
   const endpoint = "/api/scores/ncaaf";
-  const apiKey = (
-    process.env.ODDS_API_KEY ||
-    process.env.NEXT_PUBLIC_ODDS_API_KEY ||
-    ""
-  ).trim();
+  const apiKey = (process.env.ODDS_API_KEY || "").trim();
 
-  const daysFrom = Math.min(
-    3,
-    Math.max(1, Number(req.nextUrl.searchParams.get("daysFrom") || 3))
-  );
+  const requestedDays = Number(req.nextUrl.searchParams.get("daysFrom") || 3);
+  if (!Number.isFinite(requestedDays)) {
+    return NextResponse.json({ error: "Invalid daysFrom" }, { status: 400 });
+  }
+  const daysFrom = Math.min(3, Math.max(1, Math.trunc(requestedDays)));
 
   if (!apiKey) {
     scheduleUsageFromRequest({
@@ -52,7 +57,7 @@ export async function GET(req: NextRequest) {
   url.searchParams.set("dateFormat", "iso");
 
   try {
-    const res = await fetch(url.toString(), { next: { revalidate: 0 } });
+    const res = await fetch(url.toString(), { next: { revalidate: 60 } });
     const remaining = res.headers.get("x-requests-remaining");
     const used = res.headers.get("x-requests-used");
     const last = res.headers.get("x-requests-last");
