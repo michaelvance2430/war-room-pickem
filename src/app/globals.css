@@ -709,6 +709,13 @@ body {
   min-height: 5.9rem;
 }
 
+@media (max-width: 559px) {
+  .home-mission-clock-slot {
+    right: 5.15rem;
+    width: auto;
+  }
+}
+
 .home-mission-countdown {
   --clock-tone: #35ef62;
   position: relative;
