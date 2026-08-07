@@ -18,6 +18,7 @@ import {
   setLeagueActiveWeek,
   loadWeekCard,
   loadLeagueRoster,
+  listScoredWeekNumbers,
   fillLeagueWithBotsToCap,
   applyRandomBotChaosForWeek,
 } from "@/lib/cloud";
@@ -606,7 +607,15 @@ export async function founderBuildFirstWeeksHistory(opts?: {
   }
 
   const finished: number[] = [];
+  const alreadyScored = new Set(
+    await listScoredWeekNumbers().catch(() => [] as number[])
+  );
   for (let w = fromWeek; w <= toWeek; w++) {
+    if (alreadyScored.has(w)) {
+      steps.push(`w${w}: already scored — kept existing history`);
+      finished.push(w);
+      continue;
+    }
     opts?.onProgress?.({
       week: w,
       step: `Post + score ${weekTitle(w, s)}…`,
