@@ -279,7 +279,7 @@ function LoginPageInner() {
                 id="warroom-password"
                 type={showPassword ? "text" : "password"}
                 required
-                minLength={6}
+                minLength={8}
                 autoComplete={
                   mode === "login" ? "current-password" : "new-password"
                 }
@@ -299,7 +299,7 @@ function LoginPageInner() {
             </div>
             {mode === "signup" && (
               <p className="text-[11px] text-muted mt-1">
-                At least 6 characters
+                At least 8 characters
               </p>
             )}
           </div>
