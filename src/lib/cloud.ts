@@ -1310,23 +1310,7 @@ export async function savePicksToCloud(opts: {
   const pickList = Object.values(opts.picks);
   if (!pickList.length) return { ok: false, error: "No picks to save" };
 
-  const existing = await withTimeout(
-    (async () => {
-      const { data } = await supabase
-        .from("picks")
-        .select("id, locked_at")
-        .eq("league_id", leagueId)
-        .eq("user_id", uid)
-        .eq("week_number", opts.weekNumber)
-        .maybeSingle();
-      return data;
-    })(),
-    8_000,
-    null
-  );
-
-  const isFirstSave = !existing?.id;
-  let pickId: string;
+  let isFirstSave = false;
   // Chaos spend + badge before write (so flames fire even if column missing)
   if (opts.isChaos) {
     try {
@@ -1340,79 +1324,25 @@ export async function savePicksToCloud(opts: {
     }
   }
 
-  if (existing?.id) {
-    pickId = existing.id;
-    // Keep original locked_at — first successful submission stamp only.
-    // Not kickoff freeze time; re-save updates pick_games + updated_at only.
-    // Once Chaos, stay Chaos (no silent un-chaos on edit — use already spent)
-    const updatePayload: Record<string, unknown> = {
-      prop_choice: opts.propChoice,
-      best_bet_game_id: opts.bestBetId,
-      updated_at: new Date().toISOString(),
-    };
-    if (opts.isChaos) updatePayload.is_chaos = true;
-    const { error } = await supabase
-      .from("picks")
-      .update(updatePayload)
-      .eq("id", pickId);
-    if (error) {
-      // Column missing: retry without is_chaos
-      if (/is_chaos|column/i.test(error.message || "")) {
-        const { error: e2 } = await supabase
-          .from("picks")
-          .update({
-            prop_choice: opts.propChoice,
-            best_bet_game_id: opts.bestBetId,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", pickId);
-        if (e2) return { ok: false, error: e2.message };
-      } else {
-        return { ok: false, error: error.message };
-      }
+  const { data: savedPick, error: saveError } = await supabase.rpc(
+    "save_week_picks_atomic",
+    {
+      p_league_id: leagueId,
+      p_week_number: opts.weekNumber,
+      p_picks: pickList.map((p) => ({
+        game_id: p.gameId,
+        side: p.pick,
+        confidence: p.confidence,
+        locked_spread: p.lockedSpread,
+        locked_favorite: p.lockedFavorite,
+      })),
+      p_best_bet_game_id: opts.bestBetId,
+      p_prop_choice: opts.propChoice,
+      p_is_chaos: !!opts.isChaos,
     }
-    await supabase.from("pick_games").delete().eq("pick_id", pickId);
-  } else {
-    const insertPayload: Record<string, unknown> = {
-      league_id: leagueId,
-      user_id: uid,
-      week_number: opts.weekNumber,
-      prop_choice: opts.propChoice,
-      best_bet_game_id: opts.bestBetId,
-      locked_at: new Date().toISOString(),
-    };
-    if (opts.isChaos) insertPayload.is_chaos = true;
-    let { data: row, error } = await supabase
-      .from("picks")
-      .insert(insertPayload)
-      .select("id")
-      .single();
-    if (error && /is_chaos|column/i.test(error.message || "")) {
-      delete insertPayload.is_chaos;
-      const retry = await supabase
-        .from("picks")
-        .insert(insertPayload)
-        .select("id")
-        .single();
-      row = retry.data;
-      error = retry.error;
-    }
-    if (error || !row) return { ok: false, error: error?.message || "Failed to save picks" };
-    pickId = row.id as string;
-  }
-
-  const { error: pgError } = await supabase.from("pick_games").insert(
-    pickList.map((p) => ({
-      pick_id: pickId,
-      card_game_id: p.gameId,
-      side: p.pick,
-      confidence: p.confidence,
-      is_best_bet: !!(opts.bestBetId === p.gameId || p.isBestBet),
-      locked_spread: p.lockedSpread,
-      locked_favorite: p.lockedFavorite,
-    }))
   );
-  if (pgError) return { ok: false, error: pgError.message };
+  if (saveError) return { ok: false, error: saveError.message };
+  isFirstSave = !!(savedPick as { first_save?: boolean } | null)?.first_save;
 
   // —— First & Final rare: first human lock + never change the slip ——
   let firstFinal: "earned" | "held" | "forfeit" | "not_first" | "ignored" =
