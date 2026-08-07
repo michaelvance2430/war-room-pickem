@@ -79,6 +79,7 @@ import {
   type CanonicalTeam,
 } from "@/lib/teams/cfb-catalog";
 import PicksCompletedSummary from "@/components/PicksCompletedSummary";
+import PicksCrystalBallSummary from "@/components/PicksCrystalBallSummary";
 
 function formatSpread(
   spread: number,
@@ -147,7 +148,7 @@ export default function PicksClient() {
   const [propChoice, setPropChoice] = useState<string | null>(null);
   const [usedConfidence, setUsedConfidence] = useState<number[]>([]);
   const [saved, setSaved] = useState(false);
-  /** Saved vs Edit: saved+!editing=readonly; editing=Save Picks; frozen=Picks Locked */
+  /** Saved vs Edit: saved+!editing=readonly; editing=Save Changes; frozen=Picks Locked */
   const [editing, setEditing] = useState(false);
   /**
    * Shell always ready — never full-page "Loading…" forever.
@@ -1875,9 +1876,9 @@ export default function PicksClient() {
         />
       )}
 
-      <main className="flex-1 max-w-3xl mx-auto w-full px-3 sm:px-4 py-5 sm:py-8 phone-picks-main cfb-picks-main">
+      <main className="picks-main-flow flex-1 max-w-3xl mx-auto w-full px-3 sm:px-4 py-5 sm:py-8 phone-picks-main cfb-picks-main">
         {eyesPreview && (
-          <div className="mb-4 rounded-lg border border-sky-400/50 bg-sky-500/15 px-3 py-2 text-xs font-bold text-sky-100 flex flex-wrap items-center gap-x-2 gap-y-1">
+          <div className="picks-eyes-preview mb-4 rounded-lg border border-sky-400/50 bg-sky-500/15 px-3 py-2 text-xs font-bold text-sky-100 flex flex-wrap items-center gap-x-2 gap-y-1">
       <span>PREVIEW · local card · not your real standings</span>
       <Link href="/founder#eyes" className="underline">
               Foundry eyes
@@ -1907,9 +1908,9 @@ export default function PicksClient() {
         )}
 
         {quietPicks && !practiceMode && weekEditable && hasCard && !cardFrozen && (
-          <div className="mb-4 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-xs text-muted leading-relaxed">
+          <div className="picks-quiet-intro mb-4 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-xs text-muted leading-relaxed">
       <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary mb-1">
-              First lock · don&apos;t overthink it
+              First card · don&apos;t overthink it
             </p>
       <p className="text-foreground/90">{quietPicksIntro()}</p>
       </div>
@@ -1918,7 +1919,7 @@ export default function PicksClient() {
         {/* Progress bubble — sticky under nav so it stays visible while picking */}
         {hasCard && canMutatePicks && games.length > 0 && (
           <div
-            className="sticky z-[45] mb-4 -mx-1 px-1"
+            className="picks-card-progress sticky z-[45] mb-4 -mx-1 px-1"
             style={{
               // Sit just under sticky Nav header (+ safe area)
               top: "calc(env(safe-area-inset-top, 0px) + 3.35rem)",
@@ -1937,7 +1938,7 @@ export default function PicksClient() {
                 </p>
                 {allGamesPicked ? (
                   <p className="text-[10px] font-bold uppercase tracking-wider text-primary">
-                    Ready to lock ↓
+                    Ready to finish ↓
                   </p>
                 ) : (
                   <p className="text-[10px] font-medium text-muted/90 truncate">
@@ -2025,7 +2026,7 @@ export default function PicksClient() {
               })()}
               {allGamesPicked && (
                 <p className="text-[11px] text-primary font-semibold mt-1.5">
-                  Card full — hit Save Picks at the bottom.
+                  Card full — hit Finish Card at the bottom.
                 </p>
               )}
             </div>
@@ -2061,7 +2062,7 @@ export default function PicksClient() {
             {(chaosArmed || chaosLockedWeek) && (
               <p className="text-xs font-bold text-orange-300 mt-2">
                 🔥 Chaos is live — no undo. Card frozen to the robots. Title
-                locked as Chaos Agent. Hit Save/lock so the room sees it.
+                locked as Chaos Agent. Hit Finish Card so the room sees it.
               </p>
             )}
             {weekEditable &&
@@ -2222,14 +2223,6 @@ export default function PicksClient() {
           {games.length > 0 && (
             <p className="text-xs text-muted mt-1">
               {formatCardDateRange(games) || weekSubtitle(viewWeek)}
-              {weekEditable &&
-                !cardFrozen &&
-                !!formatCardLockDeadline(games) && (
-                  <>
-                    {" · "}
-                    Lock deadline: {formatCardLockDeadline(games)}
-                  </>
-                )}
             </p>
           )}
 
@@ -2495,6 +2488,8 @@ export default function PicksClient() {
               );
             })()}
 
+            <PicksCrystalBallSummary weekNumber={viewWeek} />
+
             {showCompletedSummary && (
               <div className="mb-6">
                 <PicksCompletedSummary
@@ -2570,9 +2565,9 @@ export default function PicksClient() {
             )}
             {!showCompletedSummary && saved && weekEditable && !cardFrozen && !editing && (
               <div className="mb-4 rounded-lg border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary">
-                Picks Saved
+                Card Is In
                 <span className="block text-xs font-normal text-primary/80 mt-0.5">
-                  Your card is on file. Tap Update Picks to change anything
+                  Your card is on file. Tap Change Picks to update anything
                   before
                   {formatCardLockDeadline(games)
                     ? ` first kickoff (${formatCardLockDeadline(games)}).`
@@ -2582,7 +2577,7 @@ export default function PicksClient() {
             )}
             {!showCompletedSummary && saved && weekEditable && !cardFrozen && editing && (
               <div className="mb-4 rounded-lg border border-amber-400/40 bg-amber-500/10 px-4 py-2 text-sm text-amber-100">
-                Editing — changes are not saved until you tap Save Picks.
+                Editing — changes are not saved until you tap Save Changes.
               </div>
             )}
 
@@ -2983,7 +2978,7 @@ export default function PicksClient() {
                   )}
                   {weekEditable && canEditProp && !propChoice && (
                     <p className="text-[11px] text-warning mt-2">
-                      Tap one answer, then Save Picks.
+                      Tap one answer, then Finish Card.
                     </p>
                   )}
                 </>
@@ -3016,7 +3011,7 @@ export default function PicksClient() {
                 ) : saved && !editing ? (
                   <>
                     <p className="text-center text-sm font-semibold text-primary">
-                      Picks Saved
+                      Card Is In
                     </p>
                     <button
                       type="button"
@@ -3024,7 +3019,7 @@ export default function PicksClient() {
                       disabled={saving || chaosLockedWeek || chaosArmed}
                       className="w-full py-3.5 sm:py-3 rounded-xl bg-primary text-black text-base font-bold disabled:opacity-50 min-h-[52px] touch-manipulation shadow-lg shadow-primary/20"
                     >
-                      Update Picks
+                      Change Picks
                     </button>
                   </>
                 ) : (
@@ -3043,8 +3038,10 @@ export default function PicksClient() {
                       {saving
                         ? "Saving…"
                         : chaosArmed || chaosLockedWeek
-                          ? "Save Picks 🔥"
-                          : "Save Picks"}
+                          ? "Finish Card 🔥"
+                          : saved && editing
+                            ? "Save Changes"
+                            : "Finish Card"}
                     </button>
                     {saved && editing && (
                       <button
@@ -3074,9 +3071,9 @@ export default function PicksClient() {
                   !allGamesPicked && (
                   <p className="text-xs text-muted text-center mt-1 px-1">
                     {!propChoice
-                      ? "Almost — pick the bonus (prop) answer, then Save Picks."
+                      ? "Almost — pick the bonus (prop) answer, then Finish Card."
                       : !bestBetId
-                        ? "Almost — mark one Best Bet, then Save Picks."
+                        ? "Almost — mark one Best Bet, then Finish Card."
                         : quietPicks || practiceMode
                           ? "Need: side + confidence on every game, one Best Bet, and the bonus."
                           : "Need: side + unique confidence on every open game, one Best Bet, and a bonus pick."}
