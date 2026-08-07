@@ -608,7 +608,7 @@ export default function HomeWeekHero() {
   return (
     <section className={`mb-5 sm:mb-8 ${!isNfl && sportId !== "soccer_wwc" ? "cfb-week-hero" : ""}`}>
       <div
-        className="home-week-hero-card rounded-2xl border-2 border-primary/40 bg-gradient-to-br from-primary/15 via-black/50 to-black/70 p-4 sm:p-6"
+        className={`home-week-hero-card rounded-2xl border-2 border-primary/40 bg-gradient-to-br from-primary/15 via-black/50 to-black/70 p-4 sm:p-6 ${state.iLocked ? "is-locked" : ""}`}
         style={{ boxShadow: `0 0 50px ${glow}` }}
       >
         <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
@@ -680,6 +680,18 @@ export default function HomeWeekHero() {
         <p className="text-sm text-muted max-w-xl leading-relaxed mb-4">
           {body}
         </p>
+
+        {!isNfl && sportId !== "soccer_wwc" && state.iLocked && (
+          <div className="cfb-lock-seal" aria-label="Picks locked">
+            <svg viewBox="0 0 88 112" aria-hidden="true">
+              <path className="cfb-lock-shackle-glow" d="M20 49V35C20 15 30 5 44 5s24 10 24 30v14" />
+              <path className="cfb-lock-shackle" d="M24 49V35C24 18 32 10 44 10s20 8 20 25v14" />
+              <rect className="cfb-lock-body" x="10" y="45" width="68" height="58" rx="13" />
+              <path className="cfb-lock-key" d="M44 62a8 8 0 0 0-4 15v12h8V77a8 8 0 0 0-4-15Z" />
+            </svg>
+            <span>Locked</span>
+          </div>
+        )}
 
         {/* Actions only when there is a real job — never duplicate global nav */}
         {primaryHref && (
