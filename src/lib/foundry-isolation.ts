@@ -20,6 +20,7 @@
 
 import { isAppCreator } from "@/lib/creator";
 import { getLeague, getSession, updateLeagueSettings } from "@/lib/league";
+import { createClient } from "@/lib/supabase/client";
 import type { LeagueMode } from "@/lib/league-mode";
 
 const LAB_LEAGUE_IDS_KEY = "warroom-foundry-lab-league-ids-v1";
@@ -69,35 +70,69 @@ export function isLeagueIdMarkedFoundryLab(leagueId: string | null | undefined):
   return readLabIdSet().has(leagueId);
 }
 
-/** Persist local LAB mark + mirror into league.settings.isTest when possible. */
-export function markLeagueAsFoundryLab(leagueId: string): void {
-  if (!leagueId) return;
+/** Persist the server-authoritative LAB mark, then mirror it locally. */
+export async function markLeagueAsFoundryLab(
+  leagueId: string
+): Promise<{ ok: boolean; error?: string }> {
+  if (!leagueId) return { ok: false, error: "No active league" };
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("leagues")
+    .update({ mode: "foundry" })
+    .eq("id", leagueId)
+    .select("id, mode")
+    .maybeSingle();
+  if (error || data?.mode !== "foundry") {
+    return {
+      ok: false,
+      error: error?.message || "Database did not confirm LAB mode",
+    };
+  }
   const ids = readLabIdSet();
   ids.add(leagueId);
   writeLabIdSet(ids);
   try {
     const league = getLeague();
     if (league?.id === leagueId) {
-      updateLeagueSettings({ isTest: true, mode: "foundry" });
+      const updated = updateLeagueSettings({ isTest: true, mode: "foundry" });
+      if (updated) updated.mode = "foundry";
     }
   } catch {
     /* local settings optional */
   }
+  return { ok: true };
 }
 
-export function unmarkLeagueAsFoundryLab(leagueId: string): void {
-  if (!leagueId) return;
+export async function unmarkLeagueAsFoundryLab(
+  leagueId: string
+): Promise<{ ok: boolean; error?: string }> {
+  if (!leagueId) return { ok: false, error: "No active league" };
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("leagues")
+    .update({ mode: "production" })
+    .eq("id", leagueId)
+    .select("id, mode")
+    .maybeSingle();
+  if (error || data?.mode !== "production") {
+    return {
+      ok: false,
+      error: error?.message || "Database did not confirm production mode",
+    };
+  }
   const ids = readLabIdSet();
   ids.delete(leagueId);
   writeLabIdSet(ids);
   try {
     const league = getLeague();
     if (league?.id === leagueId) {
-      updateLeagueSettings({ isTest: false, mode: "production" });
+      const updated = updateLeagueSettings({ isTest: false, mode: "production" });
+      if (updated) updated.mode = "production";
     }
   } catch {
     /* ok */
   }
+  return { ok: true };
 }
 
 export type LabLeagueInput = {
@@ -129,12 +164,8 @@ export function isExplicitLabLeague(league?: LabLeagueInput): boolean {
 
   const id = typeof lg.id === "string" ? lg.id : "";
   if (id === "guest-demo-league" || id.startsWith("guest-")) return true;
-  if (id && isLeagueIdMarkedFoundryLab(id)) return true;
-
   const rawMode = lg.mode ?? lg.settings?.mode;
-  if (rawMode === "foundry" || rawMode === "sandbox" || rawMode === "demo") {
-    return true;
-  }
+  if (rawMode === "foundry") return true;
   if (rawMode === "guest") return true;
 
   if (
