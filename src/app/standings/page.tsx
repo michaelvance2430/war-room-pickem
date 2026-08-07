@@ -347,8 +347,10 @@ export default function StandingsPage() {
 
   const cutIndex =
     seasonStarted && active !== "Overall"
-      ? Math.floor(competitiveRows.length / 2)
+      ? Math.ceil(competitiveRows.length / 2)
       : -1;
+  const activeConferenceLabel =
+    active === "Overall" ? null : divisionTabLabel(active, sportId);
 
   const overallCompetitive = seasonStarted
     ? [...players].sort(compareForSeed)
@@ -715,8 +717,10 @@ export default function StandingsPage() {
                               <div className="cfb-cut-line-inner">
                                 <span aria-hidden>▼</span>
                                 <div>
-                                  <strong>The Drop Zone</strong>
-                                  <small>Below this line → Toilet Bowl</small>
+                                  <strong>
+                                    {activeConferenceLabel} Survival Line
+                                  </strong>
+                                  <small>Above survives · below gets flushed</small>
                                 </div>
                                 <span aria-hidden>▼</span>
                               </div>
