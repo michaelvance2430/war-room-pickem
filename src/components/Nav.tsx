@@ -662,7 +662,8 @@ export default function Nav() {
         className={`${
           !sportIsWwc &&
           !sportIsNfl &&
-          (pathname === "/picks" ||
+          (pathname === "/" ||
+            pathname === "/picks" ||
             pathname.startsWith("/picks/") ||
             pathname === "/standings" ||
             pathname.startsWith("/standings/") ||
