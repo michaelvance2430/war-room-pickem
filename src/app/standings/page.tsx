@@ -614,17 +614,34 @@ export default function StandingsPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {pulseRows.map((player) => {
+                      {pulseRows.map((player, idx) => {
                         const pulse = formatLeaguePulse(player.lastSeenAt);
                         const showPulse = !player.isMock;
                         return (
+                          <Fragment key={player.id}>
+                          {active !== "Overall" && idx === 3 && (
+                            <tr
+                              className="cfb-cut-line is-preseason"
+                              aria-label="Conference advancement boundary. Top three advance when competitive standings begin."
+                            >
+                              <td colSpan={5} className="px-3 py-0">
+                                <div className="cfb-cut-line-inner">
+                                  <span aria-hidden>▼</span>
+                                  <div>
+                                    <strong>{activeConferenceLabel} Cut Line</strong>
+                                    <small>Top 3 advance · Rankings activate after Week 1</small>
+                                  </div>
+                                  <span aria-hidden>▼</span>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
                           <tr
-                            key={player.id}
-                            className={selfRowClass(
-                              isSelfPlayer(player.id, selfId),
-                              "border-t border-border hover:bg-card-hover transition"
-                            )}
-                          >
+                              className={selfRowClass(
+                                isSelfPlayer(player.id, selfId),
+                                "border-t border-border hover:bg-card-hover transition"
+                              )}
+                            >
                             <td className="px-3 sm:px-4 py-3.5 font-medium">
                               <span
                                 className={selfNameClass(
@@ -673,8 +690,26 @@ export default function StandingsPage() {
                               Week 1
                             </td>
                           </tr>
+                          </Fragment>
                         );
                       })}
+                      {active !== "Overall" && pulseRows.length <= 3 && (
+                        <tr
+                          className="cfb-cut-line is-preseason"
+                          aria-label="Conference advancement boundary. Top three advance when competitive standings begin."
+                        >
+                          <td colSpan={5} className="px-3 py-0">
+                            <div className="cfb-cut-line-inner">
+                              <span aria-hidden>▼</span>
+                              <div>
+                                <strong>{activeConferenceLabel} Cut Line</strong>
+                                <small>Top 3 advance · Rankings activate after Week 1</small>
+                              </div>
+                              <span aria-hidden>▼</span>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -828,6 +863,23 @@ export default function StandingsPage() {
                         </tr>
                       </Fragment>
                     ))}
+                    {active !== "Overall" && competitiveRows.length <= 3 && (
+                      <tr
+                        className="cfb-cut-line"
+                        aria-label="Playoff cut. Top three advance; players below enter the Toilet Bowl."
+                      >
+                        <td colSpan={6} className="px-3 py-0">
+                          <div className="cfb-cut-line-inner">
+                            <span aria-hidden>▼</span>
+                            <div>
+                              <strong>{activeConferenceLabel} Survival Line</strong>
+                              <small>Top 3 survive · Below gets flushed</small>
+                            </div>
+                            <span aria-hidden>▼</span>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>

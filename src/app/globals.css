@@ -312,6 +312,7 @@ html[data-sport="nfl"] select:focus {
 .cfb-cut-line-inner>span { color:#ff3d3d; font-size:.85rem; filter:drop-shadow(0 0 .35rem rgba(255,0,0,.7)); }
 .cfb-cut-line-inner strong { display:block; font-family:Impact,Haettenschweiler,"Arial Narrow Bold",sans-serif; font-size:1rem; font-weight:500; letter-spacing:.13em; line-height:1; }
 .cfb-cut-line-inner small { display:block; margin-top:.18rem; color:rgba(255,210,210,.72); font-size:.47rem; font-weight:900; letter-spacing:.12em; }
+.cfb-cut-line.is-preseason .cfb-cut-line-inner { border-style:dashed; background:linear-gradient(90deg,rgba(0,0,0,.72),rgba(82,9,9,.82),rgba(0,0,0,.72)); }
 .cfb-standings-page .cfb-division-tabs button { border-radius:.65rem; text-transform:uppercase; letter-spacing:.06em; font-size:.7rem; }
 @media (min-width:640px) { .cfb-scoreboard-hero { min-height:29rem; margin-inline:-1rem; padding:13.2rem 6.3rem 0; } .cfb-scoreboard-screen { max-width:24.5rem; height:10.2rem; } .cfb-scoreboard-matchup { height:6.8rem; } .cfb-scoreboard-title-lockup { bottom:1.8rem; } }
 
