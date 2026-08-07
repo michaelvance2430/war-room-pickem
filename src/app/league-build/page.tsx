@@ -2,7 +2,7 @@
 
 /**
  * League Build wizard — runs right after create (any sport).
- * Sets Crystal Ball, cut line, open room, bots. Editable until opening week.
+ * Sets Crystal Ball, cut line, and room access once after creation.
  *
  * Polish: skip name/open if already set · hero Use recommended · invite finish.
  */
@@ -35,7 +35,6 @@ type Step =
   | "crystal"
   | "cut"
   | "open"
-  | "bots"
   | "confirm";
 
 function buildStepList(opts: {
@@ -49,7 +48,7 @@ function buildStepList(opts: {
   if (!opts.skipName) steps.push("name");
   steps.push("crystal", "cut");
   if (!opts.skipOpen) steps.push("open");
-  steps.push("bots", "confirm");
+  steps.push("confirm");
   return steps;
 }
 
@@ -58,7 +57,6 @@ function LeagueBuildInner() {
   const searchParams = useSearchParams();
   const isNew = searchParams.get("new") === "1";
   const isEyes = searchParams.get("eyes") === "1" || isEyesLeagueBuildForced();
-  const isReview = searchParams.get("review") === "1";
 
   const [ready, setReady] = useState(false);
   const [step, setStep] = useState<Step>("welcome");
@@ -66,14 +64,12 @@ function LeagueBuildInner() {
     "welcome",
     "crystal",
     "cut",
-    "bots",
     "confirm",
   ]);
   const [name, setName] = useState("War Room");
   const [crystalBall, setCrystalBall] = useState(true);
   const [cutPercent, setCutPercent] = useState(50);
   const [openRoom, setOpenRoom] = useState(false);
-  const [fillBots, setFillBots] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sportId, setSportId] = useState<string>("cfb");
@@ -118,17 +114,16 @@ function LeagueBuildInner() {
     }
     setOpenRoom(openPrefill);
 
-    // Skip re-asking when create already set these (not on full review)
+    // Skip re-asking when create already set these.
     // Name: always set on create → skip on new / first build
     // Open: decided on create form → skip on new / first build
     const firstBuild = isNew || needsLeagueBuild(league.id) || isEyes;
-    const doSkipName =
-      !isReview && firstBuild && !!leagueName && leagueName.length > 0;
-    const doSkipOpen = !isReview && firstBuild;
+    const doSkipName = firstBuild && !!leagueName && leagueName.length > 0;
+    const doSkipOpen = firstBuild;
     setSkipName(doSkipName);
     setSkipOpen(doSkipOpen);
 
-    const showWelcome = !isReview && !lock;
+    const showWelcome = !lock;
     const list = buildStepList({
       skipName: doSkipName,
       skipOpen: doSkipOpen,
@@ -138,18 +133,15 @@ function LeagueBuildInner() {
     setStep(list[0] || "crystal");
 
     if (
-      !isReview &&
       !isEyes &&
       !needsLeagueBuild(league.id) &&
       !isNew
     ) {
-      if (lock) {
-        router.replace("/commissioner");
-        return;
-      }
+      router.replace("/commissioner");
+      return;
     }
     setReady(true);
-  }, [router, isNew, isReview, isEyes, searchParams]);
+  }, [router, isNew, isEyes, searchParams]);
 
   const pride = useMemo(() => pridePickWizardCopy(sportId), [sportId]);
   const stepIndex = Math.max(0, steps.indexOf(step));
@@ -162,7 +154,6 @@ function LeagueBuildInner() {
     if (!skipOpen) {
       setOpenRoom(LEAGUE_BUILD_RECOMMENDED.openRoom);
     }
-    setFillBots(LEAGUE_BUILD_RECOMMENDED.fillBots);
     setStep("confirm");
   }
 
@@ -215,16 +206,6 @@ function LeagueBuildInner() {
           /* open-rooms.sql may be missing */
         }
 
-        if (fillBots) {
-          try {
-            const { simpleFillEmptySeatsWithBots } = await import(
-              "@/lib/simple-host"
-            );
-            await simpleFillEmptySeatsWithBots({ targetTotal: 16 });
-          } catch {
-            /* optional */
-          }
-        }
       }
 
       markLeagueBuildComplete(league.id);
@@ -289,11 +270,7 @@ function LeagueBuildInner() {
             {isEyes ? "Foundry · new commish eyes" : "League build"}
           </p>
       <h1 className="text-xl sm:text-2xl font-bold text-foreground mt-1">
-            {isReview
-              ? "Review your room"
-              : step === "welcome"
-                ? "Set up your league"
-                : "Set up your league"}
+            Set up your league
           </h1>
           {step !== "welcome" && (
             <p className="text-sm text-muted mt-1.5 leading-relaxed">
@@ -381,7 +358,6 @@ function LeagueBuildInner() {
                   ? "open lobby (your choice)"
                   : "private (your choice)"
                 : "private"}{" "}
-              · no bots
             </p>
       <button
               type="button"
@@ -538,54 +514,6 @@ function LeagueBuildInner() {
       </div>
         )}
 
-        {step === "bots" && (
-          <div className="space-y-3">
-      <h2 className="text-base font-bold text-foreground">
-              Fill empty seats with bots?
-            </h2>
-      <p className="text-sm font-semibold text-foreground leading-snug">
-              Fake players for practice. Friends replace them. You can delete
-              anytime before kickoff.
-            </p>
-      <p className="text-sm text-muted leading-relaxed">
-              Optional so the room doesn&apos;t feel empty while you wait on the
-              group chat. Real people always take priority.
-            </p>
-      <div className="grid grid-cols-1 gap-2">
-              <button
-                type="button"
-                disabled={locked && !isEyes}
-                onClick={() => setFillBots(false)}
-                className={`w-full py-3.5 min-h-[52px] rounded-xl border-2 text-left px-4 ${
-                  !fillBots
-                    ? "border-primary bg-primary/15 text-foreground"
-                    : "border-border bg-background text-muted"
-                }`}
-              >
-                <span className="font-bold block">No bots (recommended)</span>
-      <span className="text-xs opacity-80">
-                  Wait for real humans
-                </span>
-      </button>
-              <button
-                type="button"
-                disabled={locked && !isEyes}
-                onClick={() => setFillBots(true)}
-                className={`w-full py-3.5 min-h-[52px] rounded-xl border-2 text-left px-4 ${
-                  fillBots
-                    ? "border-primary bg-primary/15 text-foreground"
-                    : "border-border bg-background text-muted"
-                }`}
-              >
-                <span className="font-bold block">Yes — pad empty seats</span>
-      <span className="text-xs opacity-80">
-                  Toward ~16 seats for practice energy
-                </span>
-      </button>
-            </div>
-      </div>
-        )}
-
         {step === "confirm" && (
           <div className="space-y-3">
       <h2 className="text-base font-bold text-foreground">
@@ -609,10 +537,6 @@ function LeagueBuildInner() {
               <li>
       <span className="text-muted">Listing · </span>
       <strong>{openRoom ? "Open lobby" : "Private"}</strong>
-      </li>
-              <li>
-      <span className="text-muted">Bots · </span>
-      <strong>{fillBots ? "Pad empty seats" : "None"}</strong>
       </li>
             </ul>
       <p className="text-sm text-muted leading-relaxed">
