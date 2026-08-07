@@ -49,8 +49,8 @@ export const GAZETTE_STATION = {
 /** Foundry / creator: open broadcast without leaving the page. */
 export const EVENT_FORCE_WEEKLY_COLD_OPEN = "warroom-force-weekly-cold-open";
 
-/** Seven days before opening week start → opening week start (exclusive). */
-const PRESEASON_LEAD_MS = 7 * 24 * 60 * 60 * 1000;
+/** Founder-approved 2026 production release: Aug 17 at midnight Eastern. */
+export const COLD_OPEN_RELEASE_MS = Date.parse("2026-08-17T00:00:00-04:00");
 
 export type ColdOpenSubject = {
   year: number;
@@ -123,7 +123,7 @@ export function coldOpenSeasonOpenMs(sportId?: string | null): number | null {
 }
 
 /**
- * Preseason cold-open window: week before season starts only.
+ * Preseason cold-open window: founder release date until season starts.
  * Ends when opening week begins (ring ceremony takes the stage).
  */
 export function isWeeklyColdOpenWindowOpen(
@@ -134,8 +134,7 @@ export function isWeeklyColdOpenWindowOpen(
   if (hasOpeningWeekStarted(sid, nowMs)) return false;
   const openMs = coldOpenSeasonOpenMs(sid);
   if (openMs == null) return false;
-  const startMs = openMs - PRESEASON_LEAD_MS;
-  return nowMs >= startMs && nowMs < openMs;
+  return nowMs >= COLD_OPEN_RELEASE_MS && nowMs < openMs;
 }
 
 /**
