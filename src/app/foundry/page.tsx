@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import FoundryGazetteStudio from "@/components/FoundryGazetteStudio";
 import FoundryLabIsolationPanel from "@/components/FoundryLabIsolationPanel";
+import CreatorSkinPreview from "@/components/CreatorSkinPreview";
 import WeeklyColdOpenModal from "@/components/WeeklyColdOpenModal";
 import { markFoundrySessionActive } from "@/components/FoundrySessionChrome";
 import { isAppCreator } from "@/lib/creator";
@@ -197,6 +198,7 @@ export default function FoundryPage() {
               <Action title="Ring Ceremony" note="The championship hardware reveal." onClick={() => previewMoment("ring")} />
             </div>
           </section>
+          <CreatorSkinPreview />
           <FoundryGazetteStudio />
           <WeeklyColdOpenModal forceOnly />
         </div>

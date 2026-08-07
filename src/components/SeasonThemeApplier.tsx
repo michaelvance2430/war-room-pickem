@@ -12,7 +12,6 @@ import {
   CREATOR_SKIN_SIM_EVENT,
   DEFAULT_SEASON_THEME_ID,
   installCreatorSkinConsoleRecovery,
-  isHolidayThemeId,
   paintAutomaticSeasonTheme,
   reapplySeasonThemeFromLocal,
   SEASON_THEME_EVENT,
@@ -20,10 +19,6 @@ import {
   type SeasonThemeId,
 } from "@/lib/season-theme";
 import { stripHolidayBordersIfThemeEnded } from "@/lib/profile-border-store";
-import ChristmasLights from "@/components/ChristmasLights";
-import HalloweenDecor from "@/components/HalloweenDecor";
-import ThanksgivingDecor from "@/components/ThanksgivingDecor";
-import NewYearDecor from "@/components/NewYearDecor";
 import { isAppCreator } from "@/lib/creator";
 
 export default function SeasonThemeApplier() {
@@ -114,14 +109,6 @@ export default function SeasonThemeApplier() {
   if (theme === "default") return null;
 
   return (
-    <>
-      <div className="season-theme-overlay" data-theme={theme} aria-hidden />
-      {isHolidayThemeId(theme) && theme === "christmas" && <ChristmasLights />}
-      {isHolidayThemeId(theme) && theme === "halloween" && <HalloweenDecor />}
-      {isHolidayThemeId(theme) && theme === "thanksgiving" && (
-        <ThanksgivingDecor />
-      )}
-      {isHolidayThemeId(theme) && theme === "newyear" && <NewYearDecor />}
-    </>
+    <div className="season-theme-overlay" data-theme={theme} aria-hidden />
   );
 }

@@ -208,6 +208,26 @@ export default function CreatorSkinPreview() {
     }
   }
 
+  async function previewPreset(preset: (typeof PRESETS)[number]) {
+    if (busy) return;
+    setBusy(true);
+    setMode("simulated");
+    setEtDate(preset.etDate);
+    setEtTime(preset.etTime);
+    setWeek(preset.week);
+    try {
+      setCreatorSkinSim({
+        etDate: preset.etDate,
+        etTime: preset.etTime,
+        week: preset.week,
+      });
+      await paintAutomaticSeasonTheme();
+      refreshIndicator();
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <section
       id="skin-tester"
@@ -313,13 +333,9 @@ export default function CreatorSkinPreview() {
                 <button
                   key={p.label}
                   type="button"
-                  onClick={() => {
-                    setEtDate(p.etDate);
-                    setEtTime(p.etTime);
-                    setWeek(p.week);
-                    setMode("simulated");
-                  }}
-                  className="min-h-[32px] px-2 rounded-md border border-border/70 text-[10px] font-semibold text-foreground hover:border-amber-400/50"
+                  disabled={busy}
+                  onClick={() => void previewPreset(p)}
+                  className="min-h-[32px] px-2 rounded-md border border-border/70 text-[10px] font-semibold text-foreground hover:border-amber-400/50 disabled:opacity-50"
                 >
                   {p.label}
                 </button>

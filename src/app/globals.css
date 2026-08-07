@@ -1261,31 +1261,67 @@ html[data-season-theme] .home-war-room .home-war-base {
 
 .season-theme-overlay[data-theme="halloween"] {
   background:
-    radial-gradient(ellipse 85% 55% at 8% 0%, rgba(249, 115, 22, 0.28), transparent 55%),
-    radial-gradient(ellipse 70% 50% at 95% 100%, rgba(168, 85, 247, 0.22), transparent 52%),
-    radial-gradient(ellipse 60% 40% at 50% 40%, rgba(249, 115, 22, 0.06), transparent 60%);
-  mix-blend-mode: soft-light;
+    linear-gradient(180deg, rgba(4, 1, 8, 0.12), rgba(4, 1, 8, 0.48)),
+    url("/skins/holidays/halloween-war-room.webp") center top / cover no-repeat;
 }
 .season-theme-overlay[data-theme="thanksgiving"] {
   background:
-    radial-gradient(ellipse 80% 50% at 10% 0%, rgba(234, 88, 12, 0.2), transparent 55%),
-    radial-gradient(ellipse 70% 45% at 90% 100%, rgba(180, 83, 9, 0.18), transparent 50%),
-    radial-gradient(ellipse 50% 35% at 50% 60%, rgba(251, 191, 36, 0.08), transparent 55%);
-  mix-blend-mode: soft-light;
+    linear-gradient(180deg, rgba(12, 5, 1, 0.14), rgba(12, 5, 1, 0.5)),
+    url("/skins/holidays/thanksgiving-war-room.webp") center top / cover no-repeat;
 }
 .season-theme-overlay[data-theme="christmas"] {
   background:
-    radial-gradient(ellipse 70% 45% at 12% 0%, rgba(220, 38, 38, 0.18), transparent 52%),
-    radial-gradient(ellipse 70% 45% at 88% 0%, rgba(34, 197, 94, 0.2), transparent 52%),
-    radial-gradient(ellipse 90% 40% at 50% 100%, rgba(234, 179, 8, 0.1), transparent 48%);
-  mix-blend-mode: soft-light;
+    linear-gradient(180deg, rgba(1, 8, 10, 0.1), rgba(1, 8, 10, 0.48)),
+    url("/skins/holidays/christmas-war-room.webp") center top / cover no-repeat;
 }
 .season-theme-overlay[data-theme="newyear"] {
   background:
-    radial-gradient(ellipse 75% 50% at 50% 0%, rgba(56, 189, 248, 0.16), transparent 55%),
-    radial-gradient(ellipse 60% 45% at 15% 90%, rgba(244, 114, 182, 0.14), transparent 50%),
-    radial-gradient(ellipse 60% 45% at 90% 80%, rgba(250, 204, 21, 0.12), transparent 50%);
-  mix-blend-mode: soft-light;
+    linear-gradient(180deg, rgba(1, 3, 12, 0.1), rgba(1, 3, 12, 0.5)),
+    url("/skins/holidays/newyear-war-room.webp") center top / cover no-repeat;
+}
+
+/* Holiday art is a full War Room takeover, not a layer of novelty props. */
+.season-theme-overlay:is(
+  [data-theme="halloween"],
+  [data-theme="thanksgiving"],
+  [data-theme="christmas"],
+  [data-theme="newyear"]
+) {
+  z-index: 0;
+  opacity: 0;
+  background-attachment: fixed;
+}
+html[data-season-theme] .season-theme-overlay:is(
+  [data-theme="halloween"],
+  [data-theme="thanksgiving"],
+  [data-theme="christmas"],
+  [data-theme="newyear"]
+) {
+  opacity: 0.82;
+}
+html[data-season-theme="halloween"] .home-war-room > .home-war-art,
+html[data-season-theme="thanksgiving"] .home-war-room > .home-war-art,
+html[data-season-theme="christmas"] .home-war-room > .home-war-art,
+html[data-season-theme="newyear"] .home-war-room > .home-war-art {
+  opacity: 0.12;
+}
+html[data-season-theme="halloween"] .home-war-room > .home-war-base,
+html[data-season-theme="thanksgiving"] .home-war-room > .home-war-base,
+html[data-season-theme="christmas"] .home-war-room > .home-war-base,
+html[data-season-theme="newyear"] .home-war-room > .home-war-base {
+  opacity: 0.3;
+}
+
+@media (max-width: 640px) {
+  .season-theme-overlay:is(
+    [data-theme="halloween"],
+    [data-theme="thanksgiving"],
+    [data-theme="christmas"],
+    [data-theme="newyear"]
+  ) {
+    background-position: center top;
+    background-attachment: scroll;
+  }
 }
 
 /* CFB room skins — campus backgrounds (host picker) */
@@ -1413,6 +1449,7 @@ html[data-season-theme="halloween"] body {
     radial-gradient(ellipse 90% 60% at 10% 0%, rgba(249, 115, 22, 0.22), transparent 55%),
     radial-gradient(ellipse 70% 50% at 90% 100%, rgba(168, 85, 247, 0.18), transparent 50%),
     radial-gradient(circle at 50% 120%, rgba(34, 0, 20, 0.9), transparent 40%),
+    url("/skins/holidays/halloween-war-room.webp") center top / cover no-repeat,
     var(--background);
 }
 html[data-season-theme="halloween"] body::before {
@@ -1576,6 +1613,7 @@ html[data-season-theme="thanksgiving"] body {
     radial-gradient(ellipse 80% 55% at 50% -10%, rgba(217, 119, 6, 0.28), transparent 55%),
     radial-gradient(ellipse 60% 45% at 0% 80%, rgba(153, 27, 27, 0.15), transparent 50%),
     radial-gradient(ellipse 50% 40% at 100% 60%, rgba(120, 53, 15, 0.25), transparent 45%),
+    url("/skins/holidays/thanksgiving-war-room.webp") center top / cover no-repeat,
     var(--background);
 }
 html[data-season-theme="thanksgiving"] body::before {
@@ -1602,6 +1640,7 @@ html[data-season-theme="christmas"] body {
     radial-gradient(ellipse 70% 50% at 15% 10%, rgba(220, 38, 38, 0.16), transparent 50%),
     radial-gradient(ellipse 70% 50% at 85% 15%, rgba(34, 197, 94, 0.18), transparent 50%),
     radial-gradient(ellipse 90% 40% at 50% 100%, rgba(234, 179, 8, 0.1), transparent 45%),
+    url("/skins/holidays/christmas-war-room.webp") center top / cover no-repeat,
     var(--background);
 }
 /* Soft snow sparkle under the real bulbs */
@@ -2130,7 +2169,30 @@ html[data-season-theme="newyear"] body {
     radial-gradient(ellipse 60% 45% at 50% 0%, rgba(234, 179, 8, 0.2), transparent 55%),
     radial-gradient(ellipse 50% 40% at 0% 100%, rgba(99, 102, 241, 0.2), transparent 50%),
     radial-gradient(ellipse 50% 40% at 100% 80%, rgba(236, 72, 153, 0.12), transparent 45%),
+    url("/skins/holidays/newyear-war-room.webp") center top / cover no-repeat,
     var(--background);
+}
+
+html[data-season-theme="halloween"] .home-war-room > .home-war-art {
+  background-image: url("/skins/holidays/halloween-war-room.webp") !important;
+}
+html[data-season-theme="thanksgiving"] .home-war-room > .home-war-art {
+  background-image: url("/skins/holidays/thanksgiving-war-room.webp") !important;
+}
+html[data-season-theme="christmas"] .home-war-room > .home-war-art {
+  background-image: url("/skins/holidays/christmas-war-room.webp") !important;
+}
+html[data-season-theme="newyear"] .home-war-room > .home-war-art {
+  background-image: url("/skins/holidays/newyear-war-room.webp") !important;
+}
+html[data-season-theme="halloween"] .home-war-room > .home-war-art,
+html[data-season-theme="thanksgiving"] .home-war-room > .home-war-art,
+html[data-season-theme="christmas"] .home-war-room > .home-war-art,
+html[data-season-theme="newyear"] .home-war-room > .home-war-art {
+  background-position: center top;
+  background-size: cover;
+  filter: saturate(1.08) contrast(1.04);
+  opacity: 0.9;
 }
 html[data-season-theme="newyear"] body::before {
   opacity: 1;
