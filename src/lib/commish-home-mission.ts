@@ -17,7 +17,7 @@
  * | Who's locked           | Community Pulse     | Pulse on Manage League    | NO           |
  * | Invite/share           | (removed) Home      | Home Share League         | NO           |
  * | League name/settings   | settings tab        | /commissioner (Manage)    | YES (secondary)|
- * | Open room / bots       | settings            | /commissioner Manage      | NO           |
+ * | Open room              | settings            | /commissioner Manage      | NO           |
  * | Pass gavel / deputies  | settings            | /commissioner Manage      | YES (secondary)|
  * | Season reset / next    | settings            | /commissioner Manage      | YES (secondary)|
  * | Demo/Foundry tools     | lab                 | Foundry only              | NO           |
