@@ -3,8 +3,9 @@
 /**
  * Production-safe War Room Moments runtime host.
  *
- * SAFE NAV MODE (default ON): mounts nothing — auto Moments / cinematics
- * cannot intercept navigation while we prove base app stability.
+ * SAFE NAV MODE (default ON): mounts only founder-graduated Moments.
+ * Season Cold Open is approved for one-time production playback beginning
+ * Aug 17, 2026. Every other auto Moment remains frozen.
  * Creator override: localStorage warroom-safe-nav-off=1
  */
 
@@ -32,9 +33,9 @@ const WeeklyColdOpenModal = dynamic(
 );
 
 export default function MomentHost() {
-  // P0: no auto moments / full-screen cinematics until nav is proven stable
+  // Founder-graduated exception: Cold Open owns its release + seen gates.
   if (isSafeNavMode()) {
-    return null;
+    return <WeeklyColdOpenModal />;
   }
 
   return (
