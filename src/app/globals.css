@@ -263,22 +263,22 @@ html[data-sport="nfl"] select:focus {
 .cfb-standings-page { --scoreboard-green:#48f06a; --scoreboard-gold:#e5bb2a; position:relative; overflow-x:hidden; background:radial-gradient(ellipse 45rem 28rem at 50% 8rem,rgba(24,111,54,.18),transparent 72%),#020503; }
 .cfb-standings-page::before { content:""; position:absolute; inset:0 0 auto; height:50rem; pointer-events:none; background:linear-gradient(180deg,transparent 56%,#020503 98%); z-index:1; }
 .cfb-standings-page main { position:relative; z-index:2; max-width:42rem; padding-top:0; }
-.cfb-scoreboard-hero { min-height:40.5rem; margin:0 -.75rem .9rem; padding:10.2rem 1.6rem 0; display:flex; align-items:flex-start; background:linear-gradient(180deg,rgba(0,0,0,.02),rgba(0,0,0,.04) 63%,#020503 100%),url("/skins/cfb-standings/jumbotron.webp") 50% 0/min(100%,48rem) auto no-repeat; }
-.cfb-scoreboard-screen { width:100%; max-width:30rem; min-height:17.6rem; margin:0 auto; padding:.9rem 1.05rem .8rem; overflow:hidden; color:#f4f5ef; background:repeating-linear-gradient(0deg,transparent 0 3px,rgba(74,255,111,.035) 4px),radial-gradient(ellipse at 50% 36%,rgba(29,93,45,.24),transparent 65%),rgba(0,7,3,.92); border:1px solid rgba(223,185,42,.72); box-shadow:inset 0 0 1.8rem rgba(23,250,74,.07),0 0 1.8rem rgba(0,0,0,.8); clip-path:polygon(2% 0,98% 0,100% 4%,100% 96%,98% 100%,2% 100%,0 96%,0 4%); }
+.cfb-scoreboard-hero { min-height:24rem; margin:0 -.75rem .65rem; padding:7.3rem 1.45rem 0; display:flex; align-items:flex-start; background:linear-gradient(180deg,rgba(0,0,0,.02),rgba(0,0,0,.04) 58%,#020503 100%),url("/skins/cfb-standings/jumbotron.webp") 50% 0/min(100%,48rem) auto no-repeat; }
+.cfb-scoreboard-screen { width:100%; max-width:30rem; min-height:13.4rem; margin:0 auto; padding:.72rem .9rem .65rem; overflow:hidden; color:#f4f5ef; background:repeating-linear-gradient(0deg,transparent 0 3px,rgba(74,255,111,.035) 4px),radial-gradient(ellipse at 50% 36%,rgba(29,93,45,.24),transparent 65%),rgba(0,7,3,.92); border:1px solid rgba(223,185,42,.72); box-shadow:inset 0 0 1.8rem rgba(23,250,74,.07),0 0 1.8rem rgba(0,0,0,.8); clip-path:polygon(2% 0,98% 0,100% 4%,100% 96%,98% 100%,2% 100%,0 96%,0 4%); }
 .cfb-scoreboard-topline { display:flex; justify-content:space-between; gap:1rem; padding-bottom:.45rem; border-bottom:1px solid rgba(255,255,255,.13); color:rgba(255,255,255,.58); font-size:.52rem; font-weight:900; letter-spacing:.15em; text-transform:uppercase; }
 .cfb-scoreboard-live { display:inline-flex; align-items:center; color:var(--scoreboard-green); }
 .cfb-scoreboard-live i { width:.38rem; height:.38rem; margin-right:.32rem; border-radius:999px; background:currentColor; box-shadow:0 0 .65rem currentColor; }
-.cfb-scoreboard-kicker { margin-top:.7rem; color:var(--scoreboard-gold); font-size:.54rem; font-weight:900; letter-spacing:.24em; text-transform:uppercase; }
-.cfb-scoreboard-screen h1 { margin-top:.05rem; color:#f2f1e9; font-family:Impact,Haettenschweiler,"Arial Narrow Bold",sans-serif; font-size:clamp(3.1rem,14vw,5.4rem); font-weight:500; letter-spacing:.035em; line-height:.96; text-transform:uppercase; text-shadow:0 0 1rem rgba(255,255,255,.17); }
-.cfb-scoreboard-leader,.cfb-scoreboard-waiting { min-height:6rem; display:flex; align-items:center; margin-top:.55rem; padding:.62rem .7rem; border-left:2px solid var(--scoreboard-gold); background:linear-gradient(90deg,rgba(229,187,42,.12),transparent 78%); }
-.cfb-scoreboard-crown { margin-right:.7rem; color:var(--scoreboard-gold); font-size:3rem; filter:drop-shadow(0 0 .65rem rgba(229,187,42,.42)); }
+.cfb-scoreboard-kicker { margin-top:.5rem; color:var(--scoreboard-gold); font-size:.49rem; font-weight:900; letter-spacing:.22em; text-transform:uppercase; }
+.cfb-scoreboard-screen h1 { margin-top:0; color:#f2f1e9; font-family:Impact,Haettenschweiler,"Arial Narrow Bold",sans-serif; font-size:clamp(2.45rem,11.5vw,4.2rem); font-weight:500; letter-spacing:.035em; line-height:.92; text-transform:uppercase; text-shadow:0 0 1rem rgba(255,255,255,.17); }
+.cfb-scoreboard-leader,.cfb-scoreboard-waiting { min-height:4.25rem; display:flex; align-items:center; margin-top:.38rem; padding:.45rem .6rem; border-left:2px solid var(--scoreboard-gold); background:linear-gradient(90deg,rgba(229,187,42,.12),transparent 78%); }
+.cfb-scoreboard-crown { margin-right:.6rem; color:var(--scoreboard-gold); font-size:2.25rem; filter:drop-shadow(0 0 .65rem rgba(229,187,42,.42)); }
 .cfb-scoreboard-leader p,.cfb-scoreboard-waiting span { color:var(--scoreboard-gold); font-size:.52rem; font-weight:900; letter-spacing:.16em; text-transform:uppercase; }
 .cfb-scoreboard-leader strong { display:block; color:#fff; font-size:clamp(1.15rem,5vw,1.7rem); line-height:1.05; }
 .cfb-scoreboard-leader>div>span { color:rgba(255,255,255,.6); font-size:.66rem; }
 .cfb-scoreboard-waiting { display:grid; grid-template-columns:auto 1fr; column-gap:.65rem; }
-.cfb-scoreboard-waiting strong { grid-row:1/3; color:var(--scoreboard-green); font-family:Impact,sans-serif; font-size:3.8rem; font-weight:500; line-height:.9; }
+.cfb-scoreboard-waiting strong { grid-row:1/3; color:var(--scoreboard-green); font-family:Impact,sans-serif; font-size:2.8rem; font-weight:500; line-height:.9; }
 .cfb-scoreboard-waiting p { color:rgba(255,255,255,.65); font-size:.69rem; }
-.cfb-scoreboard-digits { display:grid; grid-template-columns:repeat(3,1fr); gap:.35rem; margin-top:.55rem; }
+.cfb-scoreboard-digits { display:grid; grid-template-columns:repeat(3,1fr); gap:.3rem; margin-top:.38rem; }
 .cfb-scoreboard-digits div { min-width:0; padding:.35rem .45rem; border:1px solid rgba(72,240,106,.18); background:rgba(1,12,5,.72); }
 .cfb-scoreboard-digits span { display:block; overflow:hidden; color:rgba(255,255,255,.45); font-size:.44rem; font-weight:800; letter-spacing:.1em; text-overflow:ellipsis; text-transform:uppercase; white-space:nowrap; }
 .cfb-scoreboard-digits strong { display:block; overflow:hidden; color:var(--scoreboard-green); font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.86rem; text-overflow:ellipsis; white-space:nowrap; }
@@ -295,7 +295,7 @@ html[data-sport="nfl"] select:focus {
 .cfb-standings-page .cfb-rank-board tbody tr { background:rgba(3,8,4,.72); }
 .cfb-standings-page .cfb-rank-board tbody tr:hover { background:rgba(29,83,41,.35); }
 .cfb-standings-page .cfb-division-tabs button { border-radius:.65rem; text-transform:uppercase; letter-spacing:.06em; font-size:.7rem; }
-@media (min-width:640px) { .cfb-scoreboard-hero { min-height:47rem; margin-inline:-1rem; padding-top:12.5rem; } }
+@media (min-width:640px) { .cfb-scoreboard-hero { min-height:31rem; margin-inline:-1rem; padding-top:9.3rem; } }
 
 body {
   background: var(--background);
@@ -375,7 +375,7 @@ body {
 }
 
 .cfb-situation-masthead {
-  min-height: clamp(35rem, 76svh, 42rem);
+  min-height: clamp(20rem, 40svh, 23rem);
   display: flex;
   flex-direction: column;
   position: relative;
@@ -418,19 +418,19 @@ body {
 
 .cfb-situation-title-wrap {
   margin-top: auto;
-  padding: 9rem 0.15rem 0.4rem;
+  padding: 1.5rem 0.15rem 0.25rem;
   text-shadow: 0 4px 16px rgba(0, 0, 0, 0.98);
 }
 
 .cfb-room-ribbon {
   display: inline-flex;
   max-width: 100%;
-  margin-bottom: 0.6rem;
-  padding: 0.28rem 0.58rem;
+  margin-bottom: 0.38rem;
+  padding: 0.2rem 0.48rem;
   border-left: 3px solid #55c65d;
   background: rgba(0, 0, 0, 0.78);
   color: rgba(255, 255, 255, 0.88);
-  font-size: 0.63rem;
+  font-size: 0.52rem;
   font-weight: 900;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -441,7 +441,7 @@ body {
   flex-direction: column;
   color: #efeee8;
   font-family: Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif;
-  font-size: clamp(4.05rem, 19vw, 6.6rem);
+  font-size: clamp(3.05rem, 14.5vw, 4.6rem);
   font-stretch: condensed;
   font-weight: 900;
   letter-spacing: -0.045em;
@@ -459,14 +459,14 @@ body {
 
 .cfb-situation-tagline {
   display: inline-block;
-  margin-top: 0.95rem;
-  padding: 0.3rem 0.55rem;
+  margin-top: 0.55rem;
+  padding: 0.22rem 0.45rem;
   border-left: 3px solid #55c65d;
   border-right: 3px solid #55c65d;
   background: rgba(0, 0, 0, 0.72);
   color: #55c65d;
   font-family: Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif;
-  font-size: clamp(0.82rem, 3.8vw, 1.15rem);
+  font-size: clamp(0.66rem, 3vw, 0.88rem);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -535,15 +535,15 @@ body {
 }
 
 .home-war-room[data-home-sport="cfb"] .cfb-week-hero .home-week-hero-card.is-locked {
-  min-height: 13.6rem;
-  padding-right: 7.35rem;
+  min-height: 10.9rem;
+  padding-right: 6.45rem;
 }
 
 .cfb-lock-seal {
   position: absolute;
-  top: 3.55rem;
-  right: 1rem;
-  width: 5.7rem;
+  top: 2.75rem;
+  right: 0.7rem;
+  width: 5.1rem;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -553,8 +553,8 @@ body {
 }
 
 .cfb-lock-seal svg {
-  width: 5.15rem;
-  height: 6.6rem;
+  width: 4.5rem;
+  height: 5.65rem;
   overflow: visible;
 }
 
@@ -711,7 +711,7 @@ body {
     grid-template-columns: 5.6rem minmax(0, 1fr) 1.1rem;
   }
   .cfb-situation-title {
-    font-size: 3.7rem;
+    font-size: 2.85rem;
   }
   .home-war-room[data-home-sport="cfb"] .cfb-week-hero .home-week-hero-card.is-locked {
     padding-right: 6.1rem;
@@ -732,6 +732,12 @@ body {
   }
   .home-war-room[data-home-sport="cfb"] main {
     padding-inline: 1rem;
+  }
+  .cfb-situation-masthead {
+    min-height: clamp(23rem, 47svh, 29rem);
+  }
+  .cfb-situation-title {
+    font-size: clamp(3.8rem, 11vw, 5.4rem);
   }
 }
 
