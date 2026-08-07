@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { createPortal } from "react-dom";
 import {
   loadWeekCard,
   loadBestAvailableWeekCard,
@@ -83,9 +84,11 @@ let heroCache: { at: number; leagueId: string; state: HeroState } | null = null;
 function HomeMissionCountdown({
   lockAtMs,
   complete,
+  weekLabel,
 }: {
   lockAtMs: number;
   complete: boolean;
+  weekLabel: string;
 }) {
   const [now, setNow] = useState(() => Date.now());
 
@@ -104,11 +107,20 @@ function HomeMissionCountdown({
   const days = Math.floor(totalMinutes / 1_440);
   const hours = Math.floor((totalMinutes % 1_440) / 60);
   const minutes = totalMinutes % 60;
+  const urgent = remaining > 0 && remaining <= 12 * 60 * 60_000;
 
   return (
-    <div className="home-mission-countdown" role="timer" aria-live="polite">
-      <span>{remaining <= 0 ? "Kickoff" : complete ? "Kickoff in" : "Locks in"}</span>
-      <strong>
+    <div
+      className={`home-mission-countdown ${complete ? "is-complete" : "is-action"} ${urgent ? "is-urgent" : ""} ${remaining <= 0 ? "is-live" : ""}`}
+      role="timer"
+      aria-live="polite"
+    >
+      <div className="home-mission-countdown-topline">
+        <span>{remaining <= 0 ? "Game feed" : complete ? "Card secured" : "Lock control"}</span>
+        <i aria-hidden />
+        <span>{weekLabel}</span>
+      </div>
+      <strong aria-label={remaining <= 0 ? "Live" : `${days} days, ${hours} hours, ${minutes} minutes`}>
         {remaining <= 0 ? (
           "LIVE"
         ) : (
@@ -119,6 +131,7 @@ function HomeMissionCountdown({
           </>
         )}
       </strong>
+      <p>{remaining <= 0 ? "Games underway" : complete ? "Kickoff sequence" : "Card freezes at zero"}</p>
     </div>
   );
 }
@@ -135,6 +148,11 @@ export default function HomeWeekHero() {
     }
     return null;
   });
+  const [clockSlot, setClockSlot] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    setClockSlot(document.getElementById("home-mission-clock-slot"));
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -670,6 +688,21 @@ export default function HomeWeekHero() {
               : "open";
 
   return (
+    <>
+    {clockSlot &&
+      !isNfl &&
+      sportId !== "soccer_wwc" &&
+      state.hasCard &&
+      state.lockAtMs
+        ? createPortal(
+            <HomeMissionCountdown
+              lockAtMs={state.lockAtMs}
+              complete={state.iLocked}
+              weekLabel={weekLabel}
+            />,
+            clockSlot
+          )
+        : null}
     <section className={`mb-5 sm:mb-8 ${!isNfl && sportId !== "soccer_wwc" ? "cfb-week-hero" : ""}`}>
       <div
         className={`home-week-hero-card home-week-state-${visualState} rounded-2xl border-2 border-primary/40 bg-gradient-to-br from-primary/15 via-black/50 to-black/70 p-4 sm:p-6 ${state.iLocked ? "is-locked" : ""} ${state.hasCard && !state.iLocked ? "is-open" : ""}`}
@@ -745,16 +778,6 @@ export default function HomeWeekHero() {
         <p className="text-sm text-muted max-w-xl leading-relaxed mb-4">
           {body}
         </p>
-
-        {!isNfl &&
-          sportId !== "soccer_wwc" &&
-          state.hasCard &&
-          state.lockAtMs && (
-            <HomeMissionCountdown
-              lockAtMs={state.lockAtMs}
-              complete={state.iLocked}
-            />
-          )}
 
         {!isNfl && sportId !== "soccer_wwc" && state.hasCard && (
           <div
@@ -857,5 +880,6 @@ export default function HomeWeekHero() {
 
       </div>
     </section>
+    </>
   );
 }
