@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { authenticateApiRequest } from "@/lib/server-api-auth";
 
 export const runtime = "nodejs";
 
@@ -22,6 +23,13 @@ const KINDS = new Set(["issue", "recommendation", "discussion", "other"]);
  *  3) FEEDBACK_TO_EMAIL only               → returns mailto: for the client
  */
 export async function POST(req: Request) {
+  const identity = await authenticateApiRequest(req);
+  if (!identity.ok) {
+    return NextResponse.json(
+      { ok: false, error: identity.error },
+      { status: identity.status, headers: { "Cache-Control": "no-store" } }
+    );
+  }
   let body: Body;
   try {
     body = (await req.json()) as Body;
@@ -34,7 +42,7 @@ export async function POST(req: Request) {
   const name = (body.name || "Player").trim().slice(0, 80);
   const contactEmail = (body.contactEmail || "").trim().slice(0, 120);
   const leagueName = (body.leagueName || "").trim().slice(0, 120);
-  const userId = (body.userId || "").trim().slice(0, 80);
+  const userId = identity.userId;
 
   if (!message || message.length < 5) {
     return NextResponse.json(
