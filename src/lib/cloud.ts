@@ -717,59 +717,36 @@ export async function publishWeekCard(opts: {
   const supabase = createClient();
   const leagueId = session.leagueId;
 
-  const { data: existing } = await supabase
-    .from("week_cards")
-    .select("id")
-    .eq("league_id", leagueId)
-    .eq("week_number", opts.weekNumber)
-    .maybeSingle();
-
-  let weekCardId: string;
-
-  const publishedAt = new Date().toISOString();
-
-  if (existing?.id) {
-    weekCardId = existing.id;
-    const { error: propErr } = await supabase
-      .from("week_cards")
-      .update({
-        prop_question: opts.prop.question,
-        prop_option_a: opts.prop.options[0],
-        prop_option_b: opts.prop.options[1],
-        prop_points: opts.prop.points,
-        // Bump so every client can detect a card refresh
-        published_at: publishedAt,
-      })
-      .eq("id", weekCardId);
-    if (propErr) {
-      return { ok: false, error: propErr.message || "Failed to update prop on week card" };
+  const rows = opts.games.map((g, i) => ({
+    sort_order: i,
+    away_team: g.awayTeam,
+    home_team: g.homeTeam,
+    spread: g.spread,
+    favorite: g.favorite,
+    start_time: g.commenceTime || g.startTime || null,
+    bookmaker: g.bookmaker || null,
+    away_rank: g.awayRank ?? null,
+    home_rank: g.homeRank ?? null,
+  }));
+  const { data: published, error: publishError } = await supabase.rpc(
+    "publish_week_card_atomic",
+    {
+      p_league_id: leagueId,
+      p_week_number: opts.weekNumber,
+      p_games: rows,
+      p_prop_question: opts.prop.question,
+      p_prop_option_a: opts.prop.options[0],
+      p_prop_option_b: opts.prop.options[1],
+      p_prop_points: opts.prop.points,
     }
-    await supabase.from("card_games").delete().eq("week_card_id", weekCardId);
-  } else {
-    const { data: card, error } = await supabase
-      .from("week_cards")
-      .insert({
-        league_id: leagueId,
-        week_number: opts.weekNumber,
-        prop_question: opts.prop.question,
-        prop_option_a: opts.prop.options[0],
-        prop_option_b: opts.prop.options[1],
-        prop_points: opts.prop.points,
-        published_at: publishedAt,
-      })
-      .select("id")
-      .single();
-    if (error || !card) {
-      return { ok: false, error: error?.message || "Failed to create week card" };
-    }
-    weekCardId = card.id;
-  }
-
-  // Broadcast active week so My Picks / all devices follow this card
-  await supabase
-    .from("leagues")
-    .update({ current_week: opts.weekNumber })
-    .eq("id", leagueId);
+  );
+  if (publishError) return { ok: false, error: publishError.message };
+  const publishRow = published as {
+    week_card_id?: string;
+    games?: { id: string; sort_order: number }[];
+  } | null;
+  const weekCardId = publishRow?.week_card_id;
+  if (!weekCardId) return { ok: false, error: "Card publish returned no id" };
   try {
     const { writeScopedActiveWeek } = await import("./active-week-storage");
     const { getLeague } = await import("./league");
@@ -784,54 +761,8 @@ export async function publishWeekCard(opts: {
   cacheSet(activeWeekCache, leagueId, opts.weekNumber);
   activeWeekInflight.delete(leagueId);
 
-  const rows = opts.games.map((g, i) => ({
-    week_card_id: weekCardId,
-    sort_order: i,
-    away_team: g.awayTeam,
-    home_team: g.homeTeam,
-    spread: g.spread,
-    favorite: g.favorite,
-    // Prefer ISO commenceTime so dates survive reload
-    start_time: g.commenceTime || g.startTime || null,
-    bookmaker: g.bookmaker || null,
-    away_rank: g.awayRank ?? null,
-    home_rank: g.homeRank ?? null,
-    // Best-effort: only works after card-game-odds-id.sql is run
-    odds_event_id: g.oddsEventId || g.id || null,
-  }));
-
-  let inserted: { id: string; sort_order: number }[] | null = null;
-  let gamesError: { message: string } | null = null;
-
-  {
-    const first = await supabase
-      .from("card_games")
-      .insert(rows)
-      .select("id, sort_order");
-    if (
-      first.error &&
-      /odds_event_id|column/i.test(first.error.message || "")
-    ) {
-      // Column not added yet — retry without odds_event_id
-      const slim = rows.map(({ odds_event_id: _o, ...rest }) => rest);
-      const second = await supabase
-        .from("card_games")
-        .insert(slim)
-        .select("id, sort_order");
-      inserted = second.data;
-      gamesError = second.error;
-    } else {
-      inserted = first.data;
-      gamesError = first.error;
-    }
-  }
-
-  if (gamesError) {
-    return { ok: false, error: gamesError.message };
-  }
-
   const gamesWithIds = opts.games.map((g, i) => {
-    const row = inserted?.find((r) => r.sort_order === i);
+    const row = publishRow?.games?.find((r) => r.sort_order === i);
     return row
       ? { ...g, id: row.id, oddsEventId: g.oddsEventId || g.id }
       : g;
