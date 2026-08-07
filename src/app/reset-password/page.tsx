@@ -66,7 +66,7 @@ function ResetPasswordInner() {
           hash.includes("type=recovery") ||
           search.includes("type=recovery") ||
           sessionStorage.getItem("warroom-password-recovery") === "1";
-        if (looksLikeRecovery || event === "PASSWORD_RECOVERY") {
+        if (looksLikeRecovery) {
           try {
             sessionStorage.setItem("warroom-password-recovery", "1");
           } catch {
