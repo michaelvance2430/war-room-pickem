@@ -214,7 +214,9 @@ export function derivePlayerTitles(
 }
 
 /**
- * Closest rival this season: nearest total points among peers with games played.
+ * Current rival: the nearest active, real competitor in live season points.
+ * This is intentionally dynamic—not a permanent pairing. As the standings
+ * move, a fading rival drops away and the closest chase replaces them.
  */
 export function findSeasonRival(
   player: Player,
@@ -236,8 +238,8 @@ export function findSeasonRival(
     diff === 0
       ? `Tied with ${r.name} at ${player.totalPoints} pts — pure chaos.`
       : diff > 0
-        ? `Leads ${r.name} by ${diff} pt${diff === 1 ? "" : "s"} this season.`
-        : `Chasing ${r.name} — down ${Math.abs(diff)} pt${Math.abs(diff) === 1 ? "" : "s"}.`;
+        ? `${r.name} is ${diff} pt${diff === 1 ? "" : "s"} back — your closest threat right now.`
+        : `${Math.abs(diff)} pt${Math.abs(diff) === 1 ? "" : "s"} behind ${r.name} — your closest target right now.`;
   return { name: r.name, userId: r.id, blurb };
 }
 
