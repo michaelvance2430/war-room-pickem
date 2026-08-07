@@ -138,6 +138,8 @@ export default function HomeSportHeader({
         ) : null}
       </div>
 
+      {isCfb && <div id="home-mission-clock-slot" className="home-mission-clock-slot" />}
+
       {isCfb ? (
         <div className="cfb-situation-title-wrap">
           <span className="cfb-room-ribbon">{room}</span>
