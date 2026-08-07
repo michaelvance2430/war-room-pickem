@@ -22,7 +22,6 @@ import {
   loadLeagueRoster,
   listScoredWeekNumbers,
   refreshStaffSessionFlags,
-  resetSeasonInCloud,
   setMemberModeration,
   startNextSeasonInCloud,
   type LeagueRosterMember,
@@ -36,13 +35,13 @@ import {
 import { transferCommissioner, defaultSeasonYear } from "@/lib/trophies";
 import { paintAutomaticSeasonTheme } from "@/lib/season-theme";
 import { DIVISIONS, divisionDisplayLabel } from "@/lib/divisions";
+import { isLeagueBuildLocked, openingWeekLockLabel } from "@/lib/league-build";
 
 type SectionId =
   | "identity"
   | "rules"
   | "people"
   | "season"
-  | "advanced"
   | null;
 
 function sportLabel(sportId?: string | null) {
@@ -85,7 +84,10 @@ function ManageLeagueInner() {
   const [openRoomNote, setOpenRoomNote] = useState<string | null>(null);
   const [homeTaglineId, setHomeTaglineId] = useState(DEFAULT_HOME_TAGLINE_ID);
   const [homeTaglineCustom, setHomeTaglineCustom] = useState("");
-  const [settingsSaved, setSettingsSaved] = useState(false);
+  const [settingsBusy, setSettingsBusy] = useState(false);
+  const [settingsSavedFor, setSettingsSavedFor] = useState<
+    "identity" | "rules" | null
+  >(null);
   const [settingsError, setSettingsError] = useState<string | null>(null);
 
   const [roster, setRoster] = useState<LeagueRosterMember[]>([]);
@@ -99,7 +101,6 @@ function ManageLeagueInner() {
   const [resettingSeason, setResettingSeason] = useState(false);
   const [seasonReport, setSeasonReport] = useState<string | null>(null);
 
-  const [dangerOpen, setDangerOpen] = useState(false);
   const [peopleExtrasOpen, setPeopleExtrasOpen] = useState(false);
 
   // Legacy weekly URLs → week-ops / players (before paint)
@@ -125,14 +126,6 @@ function ManageLeagueInner() {
     if (tab === "players" || tab === "roster" || tab === "alignment") {
       router.replace("/players");
       return;
-    }
-    // #commish-bots → people extras
-    if (typeof window !== "undefined") {
-      const hash = window.location.hash.replace("#", "");
-      if (hash === "commish-bots") {
-        setOpenSection("people");
-        setPeopleExtrasOpen(true);
-      }
     }
   }, [router, searchParams]);
 
@@ -224,31 +217,61 @@ function ManageLeagueInner() {
   }, [roster]);
 
   const seasonYear = defaultSeasonYear();
+  const rulesLocked = isLeagueBuildLocked(league?.sportId);
   const mottoPreview = resolveHomeTagline({
     homeTaglineId,
     homeTaglineCustom,
     sportId: league?.sportId,
   });
 
-  async function saveSettings() {
+  async function saveIdentity() {
     setSettingsError(null);
+    const cleanName = leagueNameEdit.trim();
+    if (!cleanName) {
+      setSettingsError("League name cannot be blank.");
+      return;
+    }
+    setSettingsBusy(true);
     const result = await saveLeagueToCloud({
-      name: leagueNameEdit,
+      name: cleanName,
       settings: {
-        cutPercent,
-        gamesPerWeek: 5,
-        crystalBallEnabled,
         homeTaglineId,
         homeTaglineCustom: homeTaglineCustom.slice(0, HOME_TAGLINE_MAX_CHARS),
       },
     });
+    setSettingsBusy(false);
     if (result.ok && result.league) {
       setLeague(result.league);
       void paintAutomaticSeasonTheme();
-      setSettingsSaved(true);
-      setTimeout(() => setSettingsSaved(false), 1500);
+      setSettingsSavedFor("identity");
+      setTimeout(() => setSettingsSavedFor(null), 1500);
     } else {
       setSettingsError(result.error || "Failed to save settings");
+    }
+  }
+
+  async function saveRules() {
+    setSettingsError(null);
+    if (rulesLocked) {
+      setSettingsError(`Rules locked at ${openingWeekLockLabel(league?.sportId)}.`);
+      return;
+    }
+    const safeCut = Math.min(75, Math.max(10, cutPercent));
+    setCutPercent(safeCut);
+    setSettingsBusy(true);
+    const result = await saveLeagueToCloud({
+      settings: {
+        cutPercent: safeCut,
+        crystalBallEnabled,
+      },
+    });
+    setSettingsBusy(false);
+    if (result.ok && result.league) {
+      setLeague(result.league);
+      setSettingsSavedFor("rules");
+      setTimeout(() => setSettingsSavedFor(null), 1500);
+    } else {
+      setSettingsError(result.error || "Failed to save rules");
     }
   }
 
@@ -353,25 +376,6 @@ function ManageLeagueInner() {
     void hydrate();
   }
 
-  async function handleResetSeason() {
-    const typed = window.prompt(
-      "Same board wipe as Start next season.\nType RESET to confirm."
-    );
-    if (typed !== "RESET") {
-      setSeasonReport("Cancelled.");
-      return;
-    }
-    setResettingSeason(true);
-    const res = await resetSeasonInCloud();
-    setResettingSeason(false);
-    if (!res.ok) {
-      setSeasonReport(res.error || "Failed");
-      return;
-    }
-    setSeasonReport("Season board cleared. Members kept.");
-    void hydrate();
-  }
-
   function toggleSection(id: SectionId) {
     setOpenSection((cur) => (cur === id ? null : id));
   }
@@ -473,13 +477,6 @@ function ManageLeagueInner() {
           </h1>
           <p className="text-sm text-muted mt-1">
             {sportLabel(league?.sportId)} · {seasonYear} · {roleLabel}
-            {league?.code ? (
-              <>
-                {" "}
-                · Code{" "}
-                <span className="font-mono text-foreground">{league.code}</span>
-              </>
-            ) : null}
           </p>
           <p className="text-xs text-muted mt-2 max-w-xl">
             Persistent settings and people. Weekly card and scoring stay on{" "}
@@ -585,10 +582,15 @@ function ManageLeagueInner() {
                 </p>
                 <button
                   type="button"
-                  onClick={() => void saveSettings()}
+                  disabled={settingsBusy}
+                  onClick={() => void saveIdentity()}
                   className="w-full py-3 rounded-xl bg-primary text-black font-bold min-h-[48px]"
                 >
-                  {settingsSaved ? "Saved" : "Save identity"}
+                  {settingsBusy
+                    ? "Saving…"
+                    : settingsSavedFor === "identity"
+                      ? "Saved"
+                      : "Save identity"}
                 </button>
                 {settingsError && (
                   <p className="text-sm text-danger">{settingsError}</p>
@@ -616,6 +618,14 @@ function ManageLeagueInner() {
             </div>
             {openSection === "rules" && (
               <div className="mt-4 pt-4 border-t border-border space-y-3">
+                {rulesLocked && (
+                  <div className="rounded-lg border border-warning/40 bg-warning/5 px-3 py-2.5">
+                    <p className="text-sm font-semibold text-warning">Rules locked</p>
+                    <p className="text-xs text-muted mt-1">
+                      Opening week has started. Existing league rules now stay fixed.
+                    </p>
+                  </div>
+                )}
                 <p className="text-xs text-muted">
                   Sport:{" "}
                   <strong className="text-foreground">
@@ -645,6 +655,7 @@ function ManageLeagueInner() {
                     type="button"
                     role="switch"
                     aria-checked={crystalBallEnabled}
+                    disabled={rulesLocked || settingsBusy}
                     onClick={() => setCrystalBallEnabled((v) => !v)}
                     className={`relative shrink-0 w-12 h-7 rounded-full ${
                       crystalBallEnabled ? "bg-primary" : "bg-border"
@@ -663,6 +674,7 @@ function ManageLeagueInner() {
                     type="number"
                     min={10}
                     max={75}
+                    disabled={rulesLocked || settingsBusy}
                     value={cutPercent}
                     onChange={(e) =>
                       setCutPercent(parseInt(e.target.value, 10) || 50)
@@ -670,28 +682,23 @@ function ManageLeagueInner() {
                     className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-2 text-sm"
                   />
                 </label>
-                <p className="text-xs text-muted leading-relaxed">
-                  Divisions:{" "}
-                  {DIVISIONS.map((d) => (
-                    <span key={d} className="mr-2">
-                      {divisionDisplayLabel(d, league?.sportId)} (
-                      {divCounts[d] || 0})
-                    </span>
-                  ))}
-                </p>
-                <Link
-                  href="/league-build?review=1"
-                  className="inline-flex text-sm font-semibold text-primary"
-                >
-                  Full League Build review →
-                </Link>
                 <button
                   type="button"
-                  onClick={() => void saveSettings()}
-                  className="w-full py-3 rounded-xl bg-primary text-black font-bold min-h-[48px]"
+                  disabled={rulesLocked || settingsBusy}
+                  onClick={() => void saveRules()}
+                  className="w-full py-3 rounded-xl bg-primary text-black font-bold min-h-[48px] disabled:opacity-50"
                 >
-                  {settingsSaved ? "Saved" : "Save rules"}
+                  {settingsBusy
+                    ? "Saving…"
+                    : settingsSavedFor === "rules"
+                      ? "Saved"
+                      : rulesLocked
+                        ? "Rules locked"
+                        : "Save rules"}
                 </button>
+                {settingsError && (
+                  <p className="text-sm text-danger">{settingsError}</p>
+                )}
               </div>
             )}
           </section>
@@ -705,6 +712,11 @@ function ManageLeagueInner() {
                 </h2>
                 <p className="text-sm text-muted mt-1 leading-snug">
                   {peopleSummary}
+                </p>
+                <p className="text-xs text-muted mt-1 leading-relaxed">
+                  {DIVISIONS.map(
+                    (d) => `${divisionDisplayLabel(d, league?.sportId)} ${divCounts[d] || 0}`
+                  ).join(" · ")}
                 </p>
                 {commissioner && (
                   <p className="text-xs text-muted mt-1">
@@ -831,18 +843,27 @@ function ManageLeagueInner() {
                 >
                   Trophy Room / history →
                 </Link>
-                <p className="text-xs text-muted leading-relaxed">
-                  Same room, new board: start next season when this year is
-                  done. Type NEXT to confirm.
-                </p>
-                <button
-                  type="button"
-                  disabled={resettingSeason}
-                  onClick={() => void handleStartNextSeason()}
-                  className="w-full py-3 rounded-xl border border-primary/50 text-primary font-bold min-h-[48px] disabled:opacity-50"
-                >
-                  {resettingSeason ? "Working…" : "Start next season"}
-                </button>
+                {scoredWeeks.length > 0 ? (
+                  <>
+                    <p className="text-xs text-muted leading-relaxed">
+                      When the season is finished, open a clean board for the same
+                      room. Members, code, and trophies stay. Type NEXT to confirm.
+                    </p>
+                    <button
+                      type="button"
+                      disabled={resettingSeason}
+                      onClick={() => void handleStartNextSeason()}
+                      className="w-full py-3 rounded-xl border border-primary/50 text-primary font-bold min-h-[48px] disabled:opacity-50"
+                    >
+                      {resettingSeason ? "Working…" : "Start next season"}
+                    </button>
+                  </>
+                ) : (
+                  <p className="text-xs text-muted leading-relaxed">
+                    Season rollover becomes available after this room records an
+                    official scored week.
+                  </p>
+                )}
                 {seasonReport && (
                   <p className="text-xs text-muted">{seasonReport}</p>
                 )}
@@ -851,69 +872,9 @@ function ManageLeagueInner() {
           </section>
         </div>
 
-        {/* 5. Advanced / Danger — full width, collapsed */}
-        <section className="mt-4 sm:mt-5 rounded-xl border border-border bg-card">
-          <button
-            type="button"
-            onClick={() => setDangerOpen((o) => !o)}
-            className="w-full flex items-center justify-between px-4 sm:px-5 py-4 text-left"
-          >
-            <div>
-              <h2 className="font-bold text-foreground">Advanced</h2>
-              <p className="text-sm text-muted mt-0.5">
-                Result correction · season board reset
-              </p>
-            </div>
-            <span className="text-xs font-bold text-muted">
-              {dangerOpen ? "Hide" : "Show"}
-            </span>
-          </button>
-          {dangerOpen && (
-            <div className="px-4 sm:px-5 pb-5 space-y-4 border-t border-border pt-4">
-              <div className="rounded-lg border border-border bg-background px-3 py-3">
-                <p className="text-sm font-semibold">Correct results</p>
-                <p className="text-xs text-muted mt-1 leading-relaxed">
-                  Fix a scored week through week ops (same production scoring
-                  path). Not a practice tool.
-                </p>
-                <Link
-                  href="/week-ops?score=1"
-                  className="inline-flex mt-2 text-sm font-bold text-primary"
-                >
-                  Open week ops scoring →
-                </Link>
-              </div>
-              <div className="rounded-lg border border-warning/40 bg-warning/5 px-3 py-3 space-y-2">
-                <p className="text-sm font-semibold text-warning">
-                  Reset season board
-                </p>
-                <p className="text-xs text-muted">
-                  Same wipe as next season (type RESET). Prefer Start next
-                  season above. League history and membership stay with the room.
-                </p>
-                <button
-                  type="button"
-                  disabled={resettingSeason}
-                  onClick={() => void handleResetSeason()}
-                  className="px-3 py-2 rounded-lg border border-warning/60 text-warning text-xs font-bold disabled:opacity-50"
-                >
-                  Reset season (keep players)
-                </button>
-              </div>
-              <p className="text-xs text-muted leading-relaxed px-0.5">
-                League history is preserved.
-              </p>
-            </div>
-          )}
-        </section>
-
         <p className="text-center text-xs text-muted mt-8">
           <Link href="/" className="text-primary font-semibold">
             ← Home
-          </Link>
-          {" · "}
-          <Link href="/week-ops" className="text-primary font-semibold">
-            Week ops
           </Link>
         </p>
       </main>
