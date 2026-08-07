@@ -32,6 +32,7 @@ export const LOCKER_EMOJIS = [
   "🧙",
   "😈",
   "🤮",
+  "🍆",
   "🫡",
 ] as const;
 
