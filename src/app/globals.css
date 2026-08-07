@@ -354,11 +354,6 @@ html[data-sport="nfl"] select:focus {
 .locker-gif-draft button { width:2rem; height:2rem; position:absolute; top:.4rem; right:.4rem; border-radius:999px; background:rgba(0,0,0,.8); color:#fff; font-size:1.25rem; }
 .locker-gif-draft span { position:absolute; left:.55rem; bottom:.4rem; padding:.18rem .4rem; border-radius:.3rem; background:rgba(0,0,0,.78); color:#fff; font-size:.58rem; font-weight:900; letter-spacing:.1em; text-transform:uppercase; }
 .locker-gear-tray { padding:.55rem; border:1px solid rgba(255,255,255,.13); border-radius:.7rem; background:rgba(0,0,0,.35); }
-.locker-gear-tabs { display:flex; gap:.35rem; margin-bottom:.5rem; }
-.locker-gear-tabs button { min-height:2rem; padding:0 .75rem; border:1px solid var(--border); border-radius:.5rem; color:var(--muted); font-size:.7rem; font-weight:800; }
-.locker-gear-tabs button[aria-selected="true"] { border-color:rgba(72,240,106,.5); background:rgba(72,240,106,.12); color:var(--primary); }
-.locker-emoji-grid { display:grid; grid-template-columns:repeat(8,1fr); gap:.28rem; }
-.locker-emoji-grid button { min-width:0; aspect-ratio:1; border:1px solid var(--border); border-radius:.5rem; background:var(--background); font-size:1rem; }
 .locker-gif-tool { display:grid; grid-template-columns:1fr auto; gap:.45rem; }
 .locker-gif-tool input { min-width:0; min-height:2.55rem; padding:0 .7rem; border:1px solid var(--border); border-radius:.55rem; background:var(--background); color:var(--foreground); font-size:.75rem; }
 .locker-gif-tool>button { min-height:2.55rem; padding:0 .85rem; border-radius:.55rem; background:var(--primary); color:#000; font-size:.75rem; font-weight:900; }

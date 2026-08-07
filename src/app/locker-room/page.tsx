@@ -15,7 +15,6 @@ import { getSession, getLeague, isStaff } from "@/lib/league";
 import { isSelfPlayer, selfNameClass } from "@/lib/self-highlight";
 import {
   LOCKER_COOLDOWN_SEC,
-  LOCKER_EMOJIS,
   LOCKER_MAX_CHARS,
   LOCKER_REACTION_EMOJIS,
   amILockerMuted,
@@ -87,7 +86,7 @@ export default function LockerRoomPage() {
   const [reactPickerFor, setReactPickerFor] = useState<string | null>(null);
   const [reactBusyId, setReactBusyId] = useState<string | null>(null);
   const [reactError, setReactError] = useState<string | null>(null);
-  const [composerTray, setComposerTray] = useState<"emoji" | "gif" | null>(null);
+  const [gifTrayOpen, setGifTrayOpen] = useState(false);
   const [gifInput, setGifInput] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
   const lastPostAt = useRef(0);
@@ -177,29 +176,6 @@ export default function LockerRoomPage() {
     setMentionIndex(0);
   }
 
-  function insertEmoji(emoji: string) {
-    const el = textareaRef.current;
-    const start = el?.selectionStart ?? caretRef.current ?? body.length;
-    const end = el?.selectionEnd ?? start;
-    setBody((prev) => {
-      if (prev.length >= LOCKER_MAX_CHARS) return prev;
-      const next = (prev.slice(0, start) + emoji + prev.slice(end)).slice(
-        0,
-        LOCKER_MAX_CHARS
-      );
-      const pos = Math.min(start + emoji.length, next.length);
-      caretRef.current = pos;
-      requestAnimationFrame(() => {
-        const ta = textareaRef.current;
-        if (!ta) return;
-        ta.focus();
-        ta.setSelectionRange(pos, pos);
-      });
-      return next;
-    });
-    setComposerTray(null);
-  }
-
   function attachGif() {
     const url = normalizeLockerGif(gifInput);
     if (!url) {
@@ -208,7 +184,7 @@ export default function LockerRoomPage() {
     }
     setBody(`${LOCKER_GIF_PREFIX}${url}`);
     setGifInput("");
-    setComposerTray(null);
+    setGifTrayOpen(false);
     setPostError(null);
   }
 
@@ -382,7 +358,7 @@ export default function LockerRoomPage() {
                 · <span className="text-foreground/80">{weekLabel}</span>
               </>
             ) : null}
-            . Board clears Monday ET.
+            . Room resets Monday ET.
             {staff && (
               <>
                 {" "}
@@ -682,75 +658,42 @@ export default function LockerRoomPage() {
               />
               )}
               {/* Char count: bottom-right of chat box, above emoji row */}
-              <span
-                className={`pointer-events-none absolute bottom-2 right-2.5 text-[11px] font-semibold tabular-nums ${
-                  remaining < 30 ? "text-warning" : "text-muted"
-                }`}
-                aria-live="polite"
-              >
-                {remaining}
-                {cooldownLeft > 0 ? ` · ${cooldownLeft}s` : ""}
-              </span>
+              {!attachedGif && (
+                <span
+                  className={`pointer-events-none absolute bottom-2 right-2.5 text-[11px] font-semibold tabular-nums ${
+                    remaining < 30 ? "text-warning" : "text-muted"
+                  }`}
+                  aria-live="polite"
+                >
+                  {remaining}
+                  {cooldownLeft > 0 ? ` · ${cooldownLeft}s` : ""}
+                </span>
+              )}
             </div>
-            {composerTray && (
+            {gifTrayOpen && (
               <div className="locker-gear-tray">
-                <div className="locker-gear-tabs" role="tablist" aria-label="Message extras">
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={composerTray === "emoji"}
-                    onClick={() => setComposerTray("emoji")}
-                  >
-                    Emoji
-                  </button>
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={composerTray === "gif"}
-                    onClick={() => setComposerTray("gif")}
-                  >
-                    GIF
-                  </button>
+                <div className="locker-gif-tool">
+                  <input
+                    value={gifInput}
+                    onChange={(e) => setGifInput(e.target.value)}
+                    placeholder="Paste GIPHY or Tenor link"
+                    inputMode="url"
+                  />
+                  <button type="button" onClick={attachGif}>Attach</button>
+                  <p>Find a GIF in GIPHY or Tenor, copy its link, then paste it here.</p>
                 </div>
-                {composerTray === "emoji" ? (
-                  <div className="locker-emoji-grid">
-                    {LOCKER_EMOJIS.map((em) => (
-                      <button
-                        key={em}
-                        type="button"
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => insertEmoji(em)}
-                        title="Add emoji"
-                      >
-                        {em}
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="locker-gif-tool">
-                    <input
-                      value={gifInput}
-                      onChange={(e) => setGifInput(e.target.value)}
-                      placeholder="Paste GIPHY or Tenor link"
-                      inputMode="url"
-                    />
-                    <button type="button" onClick={attachGif}>Attach</button>
-                    <p>Find a GIF in GIPHY or Tenor, copy its link, then paste it here.</p>
-                  </div>
-                )}
               </div>
             )}
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => setComposerTray((cur) => (cur ? null : "emoji"))}
-                className={`locker-plus-button ${composerTray ? "is-open" : ""}`}
-                aria-label="Add emoji or GIF"
-                aria-expanded={!!composerTray}
+                onClick={() => setGifTrayOpen((open) => !open)}
+                className={`locker-plus-button ${gifTrayOpen ? "is-open" : ""}`}
+                aria-label="Attach GIF"
+                aria-expanded={gifTrayOpen}
               >
                 +
               </button>
-              <span className="text-xs text-muted">Message the room</span>
               <button
                 type="submit"
                 disabled={!canPost}

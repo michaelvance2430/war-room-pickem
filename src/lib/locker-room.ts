@@ -7,40 +7,12 @@ export const LOCKER_MAX_CHARS = 280;
 /** Min seconds between posts (client + soft server courtesy). */
 export const LOCKER_COOLDOWN_SEC = 8;
 
-/** Quick-tap football / shit-talk emojis for the composer. */
-export const LOCKER_EMOJIS = [
-  "🏈",
-  "🏆",
-  "🚽",
-  "🔥",
-  "💀",
-  "🤡",
-  "😭",
-  "😤",
-  "💰",
-  "🎯",
-  "🧊",
-  "🧨",
-  "👀",
-  "🙏",
-  "💪",
-  "🚫",
-  "📉",
-  "📈",
-  "🐶",
-  "👑",
-  "🧙",
-  "😈",
-  "🤮",
-  "🍆",
-  "🫡",
-] as const;
-
 /**
  * One-tap reactions on a message (no full reply needed).
  * Witty room energy — keep the set short and phone-fat-finger friendly.
  */
 export const LOCKER_REACTION_EMOJIS = [
+  "❤️", // love it
   "😂", // laugh-cry
   "🔥", // heat
   "😭", // pain
