@@ -1,9 +1,6 @@
 "use client";
 
-/**
- * Picks success — celebrate, reassure, exit.
- * Home owns navigation. Only advertise another page when a required task remains.
- */
+/** Picks success — one truthful state, one visible next action. */
 
 import Link from "next/link";
 
@@ -40,7 +37,7 @@ export default function PicksSavedModal({ detail, onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-[110] flex items-center justify-center px-3 pt-3 pb-[calc(4.75rem+env(safe-area-inset-bottom,0px))] sm:p-4"
+      className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center px-0 pt-3 pb-[var(--mobile-chrome-bottom)] sm:p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="picks-saved-title"
@@ -51,27 +48,27 @@ export default function PicksSavedModal({ detail, onClose }: Props) {
         aria-label="Close"
         onClick={onClose}
       />
-      <div className="relative w-full sm:max-w-md max-h-[calc(100dvh-6.5rem-env(safe-area-inset-bottom,0px))] overflow-y-auto rounded-2xl border-2 border-primary/55 bg-card shadow-2xl">
+      <div className="relative w-full sm:max-w-md max-h-[calc(100dvh-var(--mobile-chrome-bottom)-0.75rem)] sm:max-h-[calc(100dvh-2rem)] flex flex-col overflow-hidden rounded-t-2xl sm:rounded-2xl border-2 border-primary/55 bg-card shadow-2xl">
         <div className="h-1.5 w-full bg-gradient-to-r from-primary via-emerald-400 to-primary" />
-        <div className="p-5 sm:p-6 space-y-4">
+        <div className="min-h-0 overflow-y-auto p-5 sm:p-6 space-y-4">
           <div className="text-center">
             <div
-              className="mx-auto mb-3 w-14 h-14 rounded-full bg-primary/20 border-2 border-primary flex items-center justify-center"
+              className="mx-auto mb-2.5 w-12 h-12 rounded-full bg-primary/20 border-2 border-primary flex items-center justify-center"
               aria-hidden
             >
               <span className="text-2xl font-black text-primary">✓</span>
             </div>
             <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-primary">
-              Picks Saved
+              {isUpdate ? "Changes saved" : "Card submitted"}
             </p>
             <h2
               id="picks-saved-title"
               className="text-2xl sm:text-3xl font-black mt-1.5 text-white leading-tight"
             >
-              You&apos;re ready for {weekLabel}
+              {isUpdate ? "Your card is updated" : "Your card is in"}
             </h2>
             <p className="text-sm text-muted mt-3 leading-relaxed max-w-sm mx-auto">
-              You can edit your picks until first kickoff
+              {weekLabel} is saved—not frozen. You can change it until first kickoff
               {lockDeadlineLabel ? (
                 <>
                   {" "}
@@ -82,7 +79,7 @@ export default function PicksSavedModal({ detail, onClose }: Props) {
                   )
                 </>
               ) : null}
-              .
+              . After that, it locks automatically.
             </p>
           </div>
 
@@ -112,8 +109,10 @@ export default function PicksSavedModal({ detail, onClose }: Props) {
             </div>
           )}
 
-          <div className="flex flex-col gap-2 pt-1">
-            {nextAction ? (
+        </div>
+        <div className="shrink-0 border-t border-border bg-card/95 p-3 sm:p-4 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] sm:pb-4">
+          {nextAction ? (
+            <div className="flex flex-col gap-1.5">
               <Link
                 href={nextAction.href}
                 onClick={onClose}
@@ -121,33 +120,23 @@ export default function PicksSavedModal({ detail, onClose }: Props) {
               >
                 {nextAction.label}
               </Link>
-            ) : (
-              <button
-                type="button"
-                onClick={onClose}
-                className="w-full min-h-[52px] rounded-xl bg-primary text-black text-base font-extrabold touch-manipulation"
-              >
-                Done
-              </button>
-            )}
-            {!nextAction ? (
-              <Link
-                href="/"
-                onClick={onClose}
-                className="w-full min-h-[44px] rounded-xl text-sm font-semibold flex items-center justify-center text-muted hover:text-foreground touch-manipulation"
-              >
-                Home
-              </Link>
-            ) : (
               <button
                 type="button"
                 onClick={onClose}
                 className="w-full min-h-[44px] rounded-xl text-sm font-semibold text-muted hover:text-foreground touch-manipulation"
               >
-                Done
+                Review saved card
               </button>
-            )}
-          </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-full min-h-[52px] rounded-xl bg-primary text-black text-base font-extrabold touch-manipulation"
+            >
+              Review saved card
+            </button>
+          )}
         </div>
       </div>
     </div>
