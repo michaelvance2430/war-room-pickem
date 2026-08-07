@@ -23,6 +23,7 @@ import {
   getWeeklyColdOpenCopy,
   hasSeenWeeklyColdOpen,
   isWeeklyColdOpenWindowOpen,
+  coldOpenSeasonOpenMs,
   markWeeklyColdOpenSeen,
   resolveColdOpenSubject,
   type ColdOpenSubject,
@@ -440,6 +441,14 @@ export default function WeeklyColdOpenModal({ forceOnly = false }: Props) {
     hour: "numeric",
     minute: "2-digit",
   });
+  const openMs = coldOpenSeasonOpenMs(sportId ?? league?.sportId);
+  const remainingMs = openMs != null ? Math.max(0, openMs - Date.now()) : null;
+  const countdownLabel =
+    remainingMs == null
+      ? "OPENING WEEK APPROACHES"
+      : remainingMs >= 24 * 60 * 60 * 1000
+        ? `T−${Math.max(1, Math.ceil(remainingMs / (24 * 60 * 60 * 1000)))} DAYS`
+        : `T−${Math.max(1, Math.ceil(remainingMs / (60 * 60 * 1000)))} HOURS`;
 
   return (
     <div
@@ -535,71 +544,97 @@ export default function WeeklyColdOpenModal({ forceOnly = false }: Props) {
             </div>
           </div>
 
-          {/* Wanted carton */}
-          <div className="relative bg-gradient-to-b from-amber-950/50 via-black to-black border-b border-amber-400/25 px-4 pt-5 pb-4">
-            <div className="absolute inset-0 opacity-[0.1] pointer-events-none bg-[repeating-linear-gradient(0deg,transparent,transparent_2px,rgba(0,0,0,0.5)_2px,rgba(0,0,0,0.5)_4px)]" />
-            <div className="relative mx-auto max-w-sm rounded-xl border-2 border-amber-400/55 bg-[#0c0a06] shadow-[0_0_40px_rgba(251,191,36,0.12)] overflow-hidden">
-              <div className="bg-amber-400 text-black px-3 py-2 text-center">
-                <p className="text-[11px] sm:text-xs font-black uppercase tracking-[0.22em]">
-                  {copy.wanted}
-                </p>
-              </div>
-              <div className="flex flex-col items-center gap-3 px-4 py-5">
-                <div className="rounded-full ring-4 ring-amber-400/70 ring-offset-4 ring-offset-black shadow-[0_0_28px_rgba(251,191,36,0.35)]">
-                  <Avatar
-                    name={subject.name}
-                    avatarUrl={subject.avatarUrl}
-                    userId={subject.userId}
-                    size="xl"
-                  />
-                </div>
-                <div className="text-center space-y-1">
-                  <p
-                    className="text-xl sm:text-2xl font-black text-amber-50 tracking-tight"
-                    style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
-                  >
-                    {subject.name}
-                  </p>
-                  {copy.phonetic && (
-                    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-amber-300">
-                      {copy.phonetic}
-                    </p>
-                  )}
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-200/70">
-                    {copy.hardwareLabel}
-                  </p>
-                </div>
-              </div>
-              <div className="bg-amber-400/15 border-t border-amber-400/30 px-3 py-2 text-center space-y-0.5">
-                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-amber-200">
-                  {copy.cartonBanner}
-                </p>
-                <p className="text-[11px] font-black uppercase tracking-[0.12em] text-amber-100">
-                  Competition is brewing · load your card
-                </p>
-              </div>
-            </div>
-          </div>
+          {/* Broadcast reveal — the emotional center of the Cold Open */}
+          <section className="relative isolate overflow-hidden border-b border-amber-400/30 bg-black px-4 pb-6 pt-5 text-center">
+            <div
+              className="absolute inset-0 -z-20"
+              style={{
+                background:
+                  "radial-gradient(circle at 50% 35%, rgba(251,191,36,.28), transparent 28%), radial-gradient(circle at 50% 90%, rgba(127,29,29,.45), transparent 42%), #050505",
+              }}
+            />
+            <div className="absolute inset-0 -z-10 opacity-[0.16] bg-[repeating-linear-gradient(0deg,transparent,transparent_3px,rgba(255,255,255,0.16)_3px,rgba(255,255,255,0.16)_4px)]" />
+            <div className="pointer-events-none absolute -left-16 top-4 h-72 w-28 rotate-[18deg] bg-gradient-to-b from-amber-200/20 to-transparent blur-xl" />
+            <div className="pointer-events-none absolute -right-16 top-4 h-72 w-28 -rotate-[18deg] bg-gradient-to-b from-amber-200/20 to-transparent blur-xl" />
 
-          {/* Full article — stay open to read */}
-          <div className="px-4 py-4 space-y-3 text-sm text-muted leading-relaxed">
-            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-primary">
-              The room is awake · the chase is the product
+            <p className="cold-open-rise text-[10px] font-black uppercase tracking-[0.32em] text-amber-300">
+              Last season ended with one name
             </p>
+            <p className="cold-open-rise cold-open-delay-1 mt-2 text-[11px] font-black uppercase tracking-[0.22em] text-stone-400">
+              {countdownLabel} · {copy.sportTag} SEASON
+            </p>
+
+            <div className="cold-open-champ cold-open-delay-2 relative mx-auto mt-5 w-fit">
+              <div className="absolute -inset-4 rounded-full border border-amber-300/30 shadow-[0_0_70px_rgba(251,191,36,0.38)]" />
+              <div className="relative rounded-full ring-4 ring-amber-300 ring-offset-[6px] ring-offset-black">
+                <Avatar
+                  name={subject.name}
+                  avatarUrl={subject.avatarUrl}
+                  userId={subject.userId}
+                  size="xl"
+                />
+              </div>
+              <span
+                className="absolute -right-5 -top-7 rotate-12 text-5xl drop-shadow-[0_4px_10px_rgba(0,0,0,0.9)]"
+                aria-hidden
+              >
+                👑
+              </span>
+            </div>
+
+            <p className="cold-open-rise cold-open-delay-3 mt-6 text-[10px] font-black uppercase tracking-[0.26em] text-amber-400">
+              Defending champion
+            </p>
+            <h2
+              className="cold-open-name cold-open-delay-3 mt-1 break-words text-4xl font-black uppercase leading-[0.95] tracking-[-0.04em] text-white sm:text-5xl"
+              style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
+            >
+              {subject.name}
+            </h2>
+            {copy.phonetic && (
+              <p className="cold-open-rise cold-open-delay-4 mt-2 text-[11px] font-black uppercase tracking-[0.16em] text-amber-300">
+                {copy.phonetic}
+              </p>
+            )}
+            <div className="cold-open-rise cold-open-delay-4 mx-auto mt-4 max-w-sm border-y border-amber-400/45 bg-amber-400/10 px-3 py-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-200">
+                {copy.hardwareLabel}
+              </p>
+              <p className="mt-1 text-xs font-black uppercase tracking-[0.12em] text-white">
+                The trophy is theirs. The target is too.
+              </p>
+            </div>
+            <p className="cold-open-rise cold-open-delay-5 mt-5 text-xl font-black uppercase leading-tight text-red-400 sm:text-2xl">
+              Everyone else is coming.
+            </p>
+            <p className="cold-open-rise cold-open-delay-5 mt-1 text-[10px] font-bold uppercase tracking-[0.2em] text-stone-400">
+              {copy.wanted} · {copy.cartonBanner}
+            </p>
+          </section>
+
+          {/* Case file — story after the reveal */}
+          <div className="px-4 py-5 space-y-4 text-sm text-muted leading-relaxed bg-gradient-to-b from-[#100d07] to-black">
+            <div className="flex items-center gap-3">
+              <span className="h-px flex-1 bg-amber-400/35" />
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-300">
+                The case against the champ
+              </p>
+              <span className="h-px flex-1 bg-amber-400/35" />
+            </div>
             <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber-300">
               From the Gazette newsroom
               {copy.phonetic ? ` · ${copy.phonetic}` : ""}
             </p>
             <h3
-              className="text-base sm:text-lg font-black text-amber-50 leading-snug"
+              className="text-xl sm:text-2xl font-black text-amber-50 leading-[1.08]"
               style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
             >
               {copy.headline}
             </h3>
-            <p className="text-foreground font-medium leading-relaxed">
+            <p className="text-[14px] text-stone-200 font-medium leading-relaxed first-letter:float-left first-letter:mr-2 first-letter:text-5xl first-letter:font-black first-letter:leading-[0.8] first-letter:text-amber-400">
               {copy.body}
             </p>
-            <p className="text-amber-100/95 font-semibold border-l-2 border-amber-400/60 pl-2.5 leading-relaxed">
+            <p className="rounded-r-lg border-l-4 border-red-500 bg-red-950/35 px-3 py-3 text-amber-50 font-semibold leading-relaxed">
               {copy.kalshi}
             </p>
             <p className="text-[11px] text-muted leading-relaxed">{copy.foot}</p>
@@ -637,6 +672,34 @@ export default function WeeklyColdOpenModal({ forceOnly = false }: Props) {
           </div>
         </div>
       </div>
+      <style jsx>{`
+        @keyframes coldOpenRise {
+          from { opacity: 0; transform: translateY(12px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes coldOpenChamp {
+          0% { opacity: 0; transform: scale(.72); filter: blur(5px); }
+          70% { opacity: 1; transform: scale(1.06); filter: blur(0); }
+          100% { opacity: 1; transform: scale(1); filter: blur(0); }
+        }
+        @keyframes coldOpenName {
+          from { opacity: 0; transform: scaleX(.84); letter-spacing: .08em; }
+          to { opacity: 1; transform: scaleX(1); letter-spacing: -.04em; }
+        }
+        .cold-open-rise { animation: coldOpenRise .55s ease-out both; }
+        .cold-open-champ { animation: coldOpenChamp .8s cubic-bezier(.2,.8,.2,1) both; }
+        .cold-open-name { animation: coldOpenName .6s ease-out both; }
+        .cold-open-delay-1 { animation-delay: .15s; }
+        .cold-open-delay-2 { animation-delay: .3s; }
+        .cold-open-delay-3 { animation-delay: .55s; }
+        .cold-open-delay-4 { animation-delay: .75s; }
+        .cold-open-delay-5 { animation-delay: .95s; }
+        @media (prefers-reduced-motion: reduce) {
+          .cold-open-rise, .cold-open-champ, .cold-open-name {
+            animation: none;
+          }
+        }
+      `}</style>
     </div>
   );
 }
