@@ -638,7 +638,7 @@ export default function Nav() {
             picks
           </Link>
           {" · "}
-          <Link href="/founder" className="underline">
+          <Link href="/foundry" className="underline">
             founder
           </Link>
           {" · "}

@@ -1323,10 +1323,10 @@ export default function AccountPage() {
                     the person who built the app).
                   </p>
       <Link
-                    href="/founder"
+                    href="/foundry"
                     className="inline-block text-xs font-semibold text-primary hover:underline"
                   >
-                    Founder Dashboard (cockpit) →
+                    Enter Foundry →
                   </Link>
       </div>
               )}

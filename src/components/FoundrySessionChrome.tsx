@@ -77,7 +77,11 @@ export default function FoundrySessionChrome() {
       }
       const e = getCreatorEyesMode();
       setEyes(e);
-      const onFoundry = pathname === "/founder" || pathname?.startsWith("/founder/");
+      const onFoundry =
+        pathname === "/foundry" ||
+        pathname?.startsWith("/foundry/") ||
+        pathname === "/founder" ||
+        pathname?.startsWith("/founder/");
       // Hide on Foundry itself; show everywhere else while testing
       setShow(
         !onFoundry && (isCreatorEyesActive() || isFoundrySessionSticky())
@@ -130,7 +134,7 @@ export default function FoundrySessionChrome() {
             </p>
           </div>
           <Link
-            href="/founder"
+            href="/foundry"
             className="shrink-0 min-h-[44px] px-3.5 rounded-xl bg-sky-400 text-black text-xs font-extrabold inline-flex items-center touch-manipulation"
           >
             ← Foundry
