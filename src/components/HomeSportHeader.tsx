@@ -127,13 +127,18 @@ export default function HomeSportHeader({
             type="button"
             disabled={shareBusy}
             onClick={() => void onShareLeague()}
-            className="ml-auto sm:ml-0 min-h-[40px] px-3 rounded-full border border-border text-xs font-bold text-foreground hover:border-primary/40 touch-manipulation disabled:opacity-50"
+            className="home-share-button ml-auto sm:ml-0 min-h-[40px] px-3 rounded-full border border-border text-xs font-bold text-foreground hover:border-primary/40 touch-manipulation disabled:opacity-50"
           >
             {shareBusy
               ? "…"
               : shareNote
                 ? shareNote
-                : "Share League"}
+                : (
+                    <>
+                      <span className="sm:hidden">Share</span>
+                      <span className="hidden sm:inline">Share League</span>
+                    </>
+                  )}
           </button>
         ) : null}
       </div>
