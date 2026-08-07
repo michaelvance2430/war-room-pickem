@@ -337,7 +337,7 @@ export default function LockerRoomPage() {
                 {" · "}
               </>
             ) : null}
-            This week's trash talk
+            This week&apos;s trash talk
             {weekLabel ? (
               <>
                 {" "}
