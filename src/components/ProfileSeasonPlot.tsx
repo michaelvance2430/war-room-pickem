@@ -134,7 +134,7 @@ export default function ProfileSeasonPlot({
       {rival && (
         <div className="rounded-xl border border-border bg-background/70 px-3 py-3">
           <p className="text-[10px] uppercase tracking-wider text-muted font-bold">
-            Season rival
+            Current rival
           </p>
           <p className="text-sm font-semibold mt-0.5">
             <Link
@@ -146,6 +146,9 @@ export default function ProfileSeasonPlot({
           </p>
           <p className="text-xs text-muted mt-0.5 leading-relaxed">
             {rival.blurb}
+          </p>
+          <p className="text-[10px] text-muted/70 mt-1.5">
+            Updates automatically as the standings move.
           </p>
         </div>
       )}
