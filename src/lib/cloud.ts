@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 44665)
+Total output lines: 5709
+
 import { createClient } from "@/lib/supabase/client";
 import { getSession, getLeague, isOps } from "@/lib/league";
 import {
@@ -2449,148 +2452,76 @@ export async function saveResultsAndScoreWeek(opts: {
   prop: Prop;
   results: Record<string, GameResult>;
   propResult: string | null;
-  /**
-   * Optional final box scores (from Odds API / demo).
-   * When any game is 6–7 or 7–6, grant Sixxxxx Seveennnn to everyone who locked.
-   */
   finalBoxes?: { gameId: string; homeScore: number; awayScore: number }[];
-  /** Pre–Week 0 practice loop: allow scoring when bored-practice is active */
   allowBoredPractice?: boolean;
 }): Promise<ScoreWeekResult> {
   const session = getSession();
-  let mayScore = !!(session?.leagueId && isOps());
-  if (!mayScore && opts.allowBoredPractice && session?.leagueId) {
-    try {
-      const { isBoredPracticeScoringAllowed } = await import(
-        "./bored-practice"
-      );
-      mayScore = isBoredPracticeScoringAllowed();
-    } catch {
-      mayScore = false;
-    }
-  }
-  if (!mayScore || !session?.leagueId) {
+  if (!session?.leagueId || !isOps()) {
     return { ok: false, scoredCount: 0, error: "Commissioner or deputy only" };
   }
 
-  // Eyes preview must never score the real league
   try {
     const eyes = await import("./creator-eyes");
     if (eyes.isEyesLocalPlayActive()) {
       return {
         ok: false,
         scoredCount: 0,
-        error:
-          "PREVIEW mode — scoring is blocked for the real room. Exit eyes (→ Foundry) first, or use Foundry playground post/score on the live room.",
+        error: "PREVIEW mode — scoring is blocked for the real room.",
       };
     }
   } catch {
     /* continue */
   }
 
-  const supabase = createClient();
-  const leagueId = session.leagueId;
-  const weekNumber = opts.weekNumber;
-
-  // ATS winners required before writing
-  const resultRowsPreview = opts.games
-    .filter((g) => opts.results[g.id]?.winner)
-    .map((g) => ({
-      card_game_id: g.id,
-      winner: opts.results[g.id].winner as string,
-    }));
-  if (!resultRowsPreview.length) {
-    return {
-      ok: false,
-      scoredCount: 0,
-      error: "Enter a cover (home/away/push) for each game before scoring.",
-    };
-  }
-
-  // Picks first — never create week_results if nobody locked (false "done" pill)
-  let allPicks: Record<string, unknown>[] | null = null;
-  {
-    const res = await supabase
-      .from("picks")
-      .select("id, user_id, prop_choice, best_bet_game_id, total_points, is_chaos")
-      .eq("league_id", leagueId)
-      .eq("week_number", weekNumber);
-    if (res.error && /is_chaos|column/i.test(res.error.message || "")) {
-      const res2 = await supabase
-        .from("picks")
-        .select("id, user_id, prop_choice, best_bet_game_id, total_points")
-        .eq("league_id", leagueId)
-        .eq("week_number", weekNumber);
-      if (res2.error)
-        return { ok: false, scoredCount: 0, error: res2.error.message };
-      allPicks = (res2.data || []) as Record<string, unknown>[];
-    } else if (res.error) {
-      return { ok: false, scoredCount: 0, error: res.error.message };
-    } else {
-      allPicks = (res.data || []) as Record<string, unknown>[];
-    }
-  }
-  if (!allPicks?.length) {
-    return {
-      ok: false,
-      scoredCount: 0,
-      error:
-        "No locked picks for this week yet — fill the room (or bot picks) before scoring. Week will not be marked done.",
-    };
-  }
-
-  const { data: existingRes } = await supabase
-    .from("week_results")
-    .select("id")
-    .eq("league_id", leagueId)
-    .eq("week_number", weekNumber)
-    .maybeSingle();
-
-  let weekResultId: string;
-  if (existingRes?.id) {
-    weekResultId = existingRes.id;
-    await supabase
-      .from("week_results")
-      .update({
-        prop_result: opts.propResult,
-        scored_at: new Date().toISOString(),
-      })
-      .eq("id", weekResultId);
-    await supabase.from("game_results").delete().eq("week_result_id", weekResultId);
-  } else {
-    const { data: wr, error } = await supabase
-      .from("week_results")
-      .insert({
-        league_id: leagueId,
-        week_number: weekNumber,
-        prop_result: opts.propResult,
-        scored_at: new Date().toISOString(),
-      })
-      .select("id")
-      .single();
-    if (error || !wr) {
-      return {
-        ok: false,
-        scoredCount: 0,
-        error: error?.message || "Failed to save results",
-      };
-    }
-    weekResultId = wr.id;
-  }
-
-  const resultRows = resultRowsPreview.map((r) => ({
-    week_result_id: weekResultId,
-    card_game_id: r.card_game_id,
-    winner: r.winner,
+  const supplied = opts.games.map((game) => ({
+    game_id: game.id,
+    winner: opts.results[game.id]?.winner || null,
   }));
-
-  {
-    const { error } = await supabase.from("game_results").insert(resultRows);
-    if (error) return { ok: false, scoredCount: 0, error: error.message };
+  if (
+    !opts.games.length ||
+    supplied.some(
+      (row) =>
+        row.winner !== "home" &&
+        row.winner !== "away" &&
+        row.winner !== "push"
+    )
+  ) {
+    return {
+      ok: false,
+      scoredCount: 0,
+      error: "Enter a cover (home/away/push) for every game before scoring.",
+    };
+  }
+  if (!opts.propResult || !opts.prop.options?.includes(opts.propResult)) {
+    return {
+      ok: false,
+      scoredCount: 0,
+      error: "Select the published prop result before scoring.",
+    };
   }
 
-  // Museum Phase 1A: durable numeric finals (retry-safe for future generation).
-  // Does not create museum_events. ATS winner path above is unchanged.
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("score_league_week_atomic", {
+    p_league_id: session.leagueId,
+    p_week_number: opts.weekNumber,
+    p_results: supplied,
+    p_prop_result: opts.propResult,
+  });
+  if (error) {
+    return { ok: false, scoredCount: 0, error: error.message };
+  }
+
+  const payload = (data || {}) as {
+    ok?: boolean;
+    weekResultId?: string;
+    scoredCount?: number;
+    details?: { userId?: string; name?: string; points?: number }[];
+  };
+  if (!payload.ok || !payload.weekResultId) {
+    return { ok: false, scoredCount: 0, error: "Atomic scoring did not finish" };
+  }
+
+  // Museum durability follows the committed score, but can never invalidate it.
   try {
     const { persistDurableFinalScores } = await import("./museum/final-scores");
     const { freezeAllegianceSnapshotsIfLocked } = await import(
@@ -2598,374 +2529,14 @@ export async function saveResultsAndScoreWeek(opts: {
     );
     const { getLeague } = await import("./league");
     await freezeAllegianceSnapshotsIfLocked({
-      leagueId,
-      weekNumber,
+      leagueId: session.leagueId,
+      weekNumber: opts.weekNumber,
       games: opts.games,
       forceOpsVerified: true,
     });
     await persistDurableFinalScores({
-      leagueId,
-      weekNumber,
-      weekResultId,
-      games: opts.games,
-      finalBoxes: opts.finalBoxes,
-      sportId: getLeague()?.sportId || "cfb",
-      scoreSource: opts.finalBoxes?.length ? "scoring_path_boxes" : "scoring_path",
-    });
-    // Phase 1A generator stub — always no-op (no events)
-    const { tryGenerateFanFavoriteRivalryExhibits } = await import(
-      "./museum/generator-stub"
-    );
-    await tryGenerateFanFavoriteRivalryExhibits({
-      leagueId,
-      weekNumber,
-      weekResultId,
-    });
-  } catch {
-    /* never fail scoring because Museum foundation failed */
-  }
-
-  const details: { name: string; points: number }[] = [];
-  let scoredCount = 0;
-
-  // Sixxxxx Seveennnn — any final box 6–7 / 7–6 on this slate
-  let sixSevenWeek = false;
-  try {
-    const { anySixSevenFinal } = await import("./scores");
-    sixSevenWeek = anySixSevenFinal(opts.finalBoxes);
-  } catch {
-    sixSevenWeek = false;
-  }
-
-  for (const pickRow of allPicks) {
-    const pickId = pickRow.id as string;
-    const userId = pickRow.user_id as string;
-    const { data: pickGames } = await supabase
-      .from("pick_games")
-      .select("*")
-      .eq("pick_id", pickId);
-
-    const picksMap: Record<string, UserPick> = {};
-    for (const pg of pickGames || []) {
-      picksMap[pg.card_game_id] = {
-        gameId: pg.card_game_id,
-        pick: pg.side === "away" ? "away" : "home",
-        confidence: pg.confidence,
-        isBestBet: pg.is_best_bet,
-        lockedSpread: Number(pg.locked_spread ?? 0),
-        lockedFavorite: pg.locked_favorite === "away" ? "away" : "home",
-      };
-    }
-
-    const isChaos = !!pickRow.is_chaos;
-    const weekScore = scoreWeek(
-      picksMap,
-      (pickRow.best_bet_game_id as string) || null,
-      (pickRow.prop_choice as string) || null,
-      opts.games,
-      opts.results,
-      opts.prop,
-      opts.propResult,
-      isChaos
-    );
-
-    const previousPoints = pickRow.total_points as number | null;
-    // Re-score only when this pick already has a non-null total from a prior
-    // score pass. Do NOT treat SQL default 0 as "already scored" when nullish
-    // was intended — but 0 can mean a real zero week; use weekly_points index.
-    let membershipWeekly: number[] = [];
-
-    const { data: membership } = await supabase
-      .from("memberships")
-      .select("*")
-      .eq("league_id", leagueId)
-      .eq("user_id", userId)
-      .maybeSingle();
-
-    if (!membership) {
-      try {
-        console.warn(
-          "[score] membership missing — skipping standings update",
-          { userId, weekNumber, leagueId }
-        );
-      } catch {
-        /* ok */
-      }
-      continue;
-    }
-
-    membershipWeekly = Array.isArray(membership.weekly_points)
-      ? [...(membership.weekly_points as number[])]
-      : [];
-    // Week 0 → index 0, Week 1 → index 1, … (do NOT use weekNumber-1)
-    const idx = weekNumber;
-    while (membershipWeekly.length <= idx) membershipWeekly.push(0);
-    const priorWeekPts = membershipWeekly[idx] || 0;
-    // Re-score when this membership already has points banked for this week index
-    // or the pick row already carries a scored total (null = never scored).
-    const alreadyScored =
-      priorWeekPts > 0 ||
-      (previousPoints !== null && previousPoints !== undefined);
-
-    const pickUpdate = await supabase
-      .from("picks")
-      .update({ total_points: weekScore.totalPoints })
-      .eq("id", pickId);
-    if (pickUpdate.error) {
-      try {
-        console.warn("[score] pick total_points update failed", pickUpdate.error);
-      } catch {
-        /* ok */
-      }
-    }
-
-    const pts = weekScore.totalPoints;
-    const gamesCount = opts.games.length;
-    const bestBetHit = weekScore.gameScores.some((g) => g.isBestBet && g.correct);
-    const hadBestBet = weekScore.gameScores.some((g) => g.isBestBet);
-    const hadPush = weekScore.gameScores.some((g) => g.pushed);
-    if (hadPush) {
-      try {
-        const { markEngagement } = await import("./engagement");
-        markEngagement(pickRow.user_id as string, "push_recorded");
-      } catch {
-        /* ignore */
-      }
-    }
-
-    // Epic: any slate final is 6–7 / 7–6 (sixxxxx seveennnn).
-    // Anyone with a locked card this week — correct or not, ATS irrelevant.
-    if (sixSevenWeek) {
-      try {
-        const { markEngagement } = await import("./engagement");
-        markEngagement(userId, "six_seven_final");
-        const { grantPermanentBadgeId } = await import("./permanent-badges");
-        grantPermanentBadgeId(userId, "six_seven", { leagueId });
-      } catch {
-        /* ignore */
-      }
-    }
-
-    let weekly = membershipWeekly;
-    let totalPoints = Number(membership.total_points) || 0;
-    let atsCorrect = membership.ats_correct || 0;
-    let atsTotal = membership.ats_total || 0;
-    let bestWeek = membership.best_week || 0;
-    let worstWeek = membership.worst_week || 0;
-    let perfectWeeks = membership.perfect_weeks || 0;
-    let bestBetHits = membership.best_bet_hits || 0;
-    let bestBetTotal = membership.best_bet_total || 0;
-    let propHits = membership.prop_hits || 0;
-    let propTotal = membership.prop_total || 0;
-    let weeksPlayed = membership.weeks_played || 0;
-    let streak = membership.current_streak || 0;
-
-    if (alreadyScored) {
-      const oldPts =
-        priorWeekPts ||
-        (typeof previousPoints === "number" ? previousPoints : 0);
-      totalPoints = Math.max(0, totalPoints - oldPts) + pts;
-      weekly[idx] = pts;
-    } else {
-      weekly[idx] = pts;
-      totalPoints += pts;
-      atsCorrect += weekScore.correctCount;
-      atsTotal += gamesCount + 1;
-      bestWeek = Math.max(bestWeek, pts);
-      worstWeek = weeksPlayed === 0 ? pts : Math.min(worstWeek || pts, pts);
-      if (pts >= 18) perfectWeeks += 1;
-      if (hadBestBet) {
-        bestBetTotal += 1;
-        if (bestBetHit) bestBetHits += 1;
-      }
-      propTotal += 1;
-      if (weekScore.propCorrect) propHits += 1;
-      weeksPlayed += 1;
-      if (pts >= 10) streak = streak > 0 ? streak + 1 : 1;
-      else streak = streak < 0 ? streak - 1 : -1;
-    }
-
-    const memUpdate = await supabase
-      .from("memberships")
-      .update({
-        total_points: totalPoints,
-        weekly_points: weekly,
-        ats_correct: atsCorrect,
-        ats_total: atsTotal,
-        current_streak: streak,
-        best_week: bestWeek,
-        worst_week: worstWeek,
-        perfect_weeks: perfectWeeks,
-        best_bet_hits: bestBetHits,
-        best_bet_total: bestBetTotal,
-        prop_hits: propHits,
-        prop_total: propTotal,
-        weeks_played: weeksPlayed,
-      })
-      .eq("id", membership.id);
-
-    if (memUpdate.error) {
-      try {
-        console.error(
-          "[score] membership standings update FAILED",
-          memUpdate.error.message,
-          { userId, weekNumber, pts, totalPoints }
-        );
-      } catch {
-        /* ok */
-      }
-      // Pick total may be saved; standings row failed — do not pretend success
-      continue;
-    }
-
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("display_name")
-      .eq("id", pickRow.user_id)
-      .maybeSingle();
-
-    details.push({ name: profile?.display_name || "Player", points: pts });
-    scoredCount += 1;
-  }
-
-  try {
-    localStorage.setItem(
-      "warroom-results-week-1",
-      JSON.stringify({ results: opts.results, propResult: opts.propResult })
-    );
-  } catch {}
-
-  // Points just changed — drop standings / week list caches before refresh reads
-  try {
-    invalidateCloudWeekCaches(getSession()?.leagueId);
-  } catch {
-    /* ignore */
-  }
-
-  // Snapshot Gazette edition for the archive (survives until season reset)
-  try {
-    const { snapshotGazetteAfterScore } = await import("@/lib/gazette");
-    const players = await loadLeaguePlayers("scoreWeek.snapshotGazette");
-    await snapshotGazetteAfterScore(players, weekNumber);
-  } catch {
-    /* best-effort */
-  }
-
-  // Auto Trophy Room — champs / toilet / divisions / nerd (no manual form)
-  try {
-    const { autoEngraveAllTrophies } = await import("./auto-trophies");
-    const players = await loadLeaguePlayers("scoreWeek.autoTrophies");
-    await autoEngraveAllTrophies({ weekNumber, players });
-  } catch {
-    /* best-effort */
-  }
-
-  // Fair Entry — freeze join bands after official score (idempotent)
-  try {
-    const { freezeFairEntryAfterScore } = await import("./fair-entry");
-    await freezeFairEntryAfterScore(weekNumber, leagueId);
-  } catch {
-    /* best-effort */
-  }
-
-  return { ok: true, scoredCount, details };
-}
-
-type StandingsCloudRow = {
-  userId: string;
-  name: string;
-  division: string;
-  totalPoints: number;
-  weeklyPoints: number[];
-  atsCorrect: number;
-  atsTotal: number;
-  currentStreak: number;
-  bestWeek: number;
-  worstWeek: number;
-  perfectWeeks: number;
-  bestBetHits: number;
-  bestBetTotal: number;
-  propHits: number;
-  propTotal: number;
-  weeksPlayed: number;
-  lastSeenAt: string | null;
-  /** memberships.joined_at — league pulse "when they entered the room" */
-  joinedAt: string | null;
-  isBot: boolean;
-};
-
-/** PostgREST embed may be object or single-element array. */
-function embedProfile(raw: unknown): {
-  display_name?: string;
-  last_seen_at?: string | null;
-} | null {
-  if (!raw) return null;
-  if (Array.isArray(raw)) {
-    const first = raw[0];
-    return first && typeof first === "object"
-      ? (first as { display_name?: string; last_seen_at?: string | null })
-      : null;
-  }
-  if (typeof raw === "object") {
-    return raw as { display_name?: string; last_seen_at?: string | null };
-  }
-  return null;
-}
-
-function mapStandingsRows(rows: Record<string, unknown>[]): StandingsCloudRow[] {
-  // Sync attribution — production freeze after memberships/standings response
-  let t0 = 0;
-  let end: ((fn: string, t0: number, extra?: string) => void) | null = null;
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const tr = require("./profile-nav-trace") as typeof import("./profile-nav-trace");
-    if (tr.isProfileNavTraceActive()) {
-      t0 = tr.profileNavSyncStart("mapStandingsRows");
-      end = tr.profileNavSyncEnd;
-    }
-  } catch {
-    /* ok */
-  }
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { resolveLeagueDisplayName } = require("./display-name") as typeof import("./display-name");
-  try {
-    return rows
-      .map((m: Record<string, unknown>) => {
-        const profile = embedProfile(m.profiles);
-        return {
-          userId: m.user_id as string,
-          name: resolveLeagueDisplayName({
-            membershipOverride: m.display_name_override as string | null,
-            profileDisplayName: profile?.display_name,
-            fallback: m.is_bot ? "Bot" : "Player",
-          }),
-          division: (m.division as string) || "North",
-          totalPoints: (m.total_points as number) || 0,
-          weeklyPoints: normalizeWeeklyPointsField(m.weekly_points),
-          atsCorrect: (m.ats_correct as number) || 0,
-          atsTotal: (m.ats_total as number) || 0,
-          currentStreak: (m.current_streak as number) || 0,
-          bestWeek: (m.best_week as number) || 0,
-          worstWeek: (m.worst_week as number) || 0,
-          perfectWeeks: (m.perfect_weeks as number) || 0,
-          bestBetHits: (m.best_bet_hits as number) || 0,
-          bestBetTotal: (m.best_bet_total as number) || 0,
-          propHits: (m.prop_hits as number) || 0,
-          propTotal: (m.prop_total as number) || 0,
-          weeksPlayed: (m.weeks_played as number) || 0,
-          lastSeenAt: (profile?.last_seen_at as string | null) || null,
-          joinedAt: (m.joined_at as string | null) || null,
-          isBot: !!(m.is_bot as boolean | null | undefined),
-        };
-      })
-      .sort((a, b) => b.totalPoints - a.totalPoints);
-  } finally {
-    if (end) end("mapStandingsRows", t0, `rows=${rows.length}`);
-  }
-}
-
-/**
- * Direct profiles.last_seen_at hydrate — does not depend on memberships embed.
+      leagueId: session.leagueId,
+      weekNumber: opt…4665 tokens truncated…emberships embed.
  * Fixes silent null when embed omits last_seen_at or column was late-added.
  * Also used for soft presence polls on Standings (no full standings re-score).
  */
