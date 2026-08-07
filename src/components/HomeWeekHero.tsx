@@ -12,6 +12,7 @@ import {
 import { getLeague, isOps, isCommissioner, getSession } from "@/lib/league";
 import {
   formatCardLockDeadline,
+  firstKickoffOnCardMs,
   isCardLockDeadlinePassed,
   weekTitle,
   weekDateRangeLabel,
@@ -32,6 +33,7 @@ type HeroState = {
   hasCard: boolean;
   gameCount: number;
   lockLabel: string | null;
+  lockAtMs: number | null;
   frozen: boolean;
   iLocked: boolean;
   rosterCount: number;
@@ -78,6 +80,49 @@ function isFormallyPublishedCard(
 const HERO_TTL_MS = 20_000;
 let heroCache: { at: number; leagueId: string; state: HeroState } | null = null;
 
+function HomeMissionCountdown({
+  lockAtMs,
+  complete,
+}: {
+  lockAtMs: number;
+  complete: boolean;
+}) {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const remaining = lockAtMs - Date.now();
+    if (remaining <= 0) return;
+    const interval = window.setInterval(
+      () => setNow(Date.now()),
+      remaining < 60 * 60_000 ? 1_000 : 30_000
+    );
+    return () => window.clearInterval(interval);
+  }, [lockAtMs]);
+
+  const remaining = Math.max(0, lockAtMs - now);
+  const totalMinutes = Math.floor(remaining / 60_000);
+  const days = Math.floor(totalMinutes / 1_440);
+  const hours = Math.floor((totalMinutes % 1_440) / 60);
+  const minutes = totalMinutes % 60;
+
+  return (
+    <div className="home-mission-countdown" role="timer" aria-live="polite">
+      <span>{remaining <= 0 ? "Kickoff" : complete ? "Kickoff in" : "Locks in"}</span>
+      <strong>
+        {remaining <= 0 ? (
+          "LIVE"
+        ) : (
+          <>
+            {days > 0 && <b>{days}<small>D</small></b>}
+            <b>{hours}<small>H</small></b>
+            <b>{minutes}<small>M</small></b>
+          </>
+        )}
+      </strong>
+    </div>
+  );
+}
+
 export default function HomeWeekHero() {
   const lid = getLeague()?.id || "";
   const [state, setState] = useState<HeroState | null>(() => {
@@ -113,6 +158,7 @@ export default function HomeWeekHero() {
         hasCard: false,
         gameCount: 0,
         lockLabel: null,
+        lockAtMs: null,
         frozen: false,
         iLocked: false,
         rosterCount: 0,
@@ -147,6 +193,7 @@ export default function HomeWeekHero() {
             hasCard: false,
             gameCount: 0,
             lockLabel: null,
+            lockAtMs: null,
             frozen: false,
             iLocked: false,
             rosterCount: 0,
@@ -166,6 +213,7 @@ export default function HomeWeekHero() {
             hasCard: false,
             gameCount: 0,
             lockLabel: null,
+            lockAtMs: null,
             frozen: false,
             iLocked: false,
             rosterCount: 0,
@@ -292,6 +340,7 @@ export default function HomeWeekHero() {
           hasCard,
           gameCount: games.length,
           lockLabel: hasCard ? formatCardLockDeadline(games) : null,
+          lockAtMs: hasCard ? firstKickoffOnCardMs(games) || null : null,
           frozen,
           iLocked,
           rosterCount:
@@ -604,11 +653,27 @@ export default function HomeWeekHero() {
     : "rgba(34,197,94,0.12)";
 
   const sportShort = isNfl ? "NFL" : sportId === "soccer_wwc" ? "WWC" : "CFB";
+  const visualState = state.weekScored
+    ? "scored"
+    : state.iLocked && state.frozen
+      ? "live"
+      : state.iLocked
+        ? "locked"
+        : state.frozen
+          ? "missed"
+          : state.needsNflTeam || state.needsPridePick
+            ? "required"
+            : !state.hasCard
+              ? state.isOps
+                ? "build"
+                : "waiting"
+              : "open";
 
   return (
     <section className={`mb-5 sm:mb-8 ${!isNfl && sportId !== "soccer_wwc" ? "cfb-week-hero" : ""}`}>
       <div
-        className={`home-week-hero-card rounded-2xl border-2 border-primary/40 bg-gradient-to-br from-primary/15 via-black/50 to-black/70 p-4 sm:p-6 ${state.iLocked ? "is-locked" : ""}`}
+        className={`home-week-hero-card home-week-state-${visualState} rounded-2xl border-2 border-primary/40 bg-gradient-to-br from-primary/15 via-black/50 to-black/70 p-4 sm:p-6 ${state.iLocked ? "is-locked" : ""} ${state.hasCard && !state.iLocked ? "is-open" : ""}`}
+        data-week-state={visualState}
         style={{ boxShadow: `0 0 50px ${glow}` }}
       >
         <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
@@ -681,15 +746,58 @@ export default function HomeWeekHero() {
           {body}
         </p>
 
-        {!isNfl && sportId !== "soccer_wwc" && state.iLocked && (
-          <div className="cfb-lock-seal" aria-label="Picks locked">
+        {!isNfl &&
+          sportId !== "soccer_wwc" &&
+          state.hasCard &&
+          state.lockAtMs && (
+            <HomeMissionCountdown
+              lockAtMs={state.lockAtMs}
+              complete={state.iLocked}
+            />
+          )}
+
+        {!isNfl && sportId !== "soccer_wwc" && state.hasCard && (
+          <div
+            className={`cfb-lock-seal ${state.iLocked ? "is-sealed" : "is-open"} ${state.frozen ? (state.iLocked ? "is-live" : "is-missed") : ""}`}
+            aria-label={
+              state.iLocked
+                ? state.frozen
+                  ? "Picks locked and games live"
+                  : "Picks locked"
+                : state.frozen
+                  ? "Lock window missed"
+                  : "Picks unlocked"
+            }
+          >
             <svg viewBox="0 0 88 112" aria-hidden="true">
-              <path className="cfb-lock-shackle-glow" d="M20 49V35C20 15 30 5 44 5s24 10 24 30v14" />
-              <path className="cfb-lock-shackle" d="M24 49V35C24 18 32 10 44 10s20 8 20 25v14" />
+              <path
+                className="cfb-lock-shackle-glow"
+                d={
+                  state.iLocked
+                    ? "M20 49V35C20 15 30 5 44 5s24 10 24 30v14"
+                    : "M20 49V35C20 15 30 5 44 5s24 10 24 30"
+                }
+              />
+              <path
+                className="cfb-lock-shackle"
+                d={
+                  state.iLocked
+                    ? "M24 49V35C24 18 32 10 44 10s20 8 20 25v14"
+                    : "M24 49V35C24 18 32 10 44 10s20 8 20 25"
+                }
+              />
               <rect className="cfb-lock-body" x="10" y="45" width="68" height="58" rx="13" />
               <path className="cfb-lock-key" d="M44 62a8 8 0 0 0-4 15v12h8V77a8 8 0 0 0-4-15Z" />
             </svg>
-            <span>Locked</span>
+            <span>
+              {state.iLocked
+                ? state.frozen
+                  ? "Live"
+                  : "Locked"
+                : state.frozen
+                  ? "Missed"
+                  : "Open"}
+            </span>
           </div>
         )}
 
