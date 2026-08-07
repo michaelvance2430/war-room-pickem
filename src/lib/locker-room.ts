@@ -6,6 +6,9 @@ export const LOCKER_MAX_CHARS = 280;
 
 /** Min seconds between posts (client + soft server courtesy). */
 export const LOCKER_COOLDOWN_SEC = 8;
+export const LOCKER_MEDIA_BUCKET = "locker-media";
+export const LOCKER_MEDIA_MAX_BYTES = 6 * 1024 * 1024;
+const LOCKER_IMAGE_PREFIX = "WR_IMG|";
 
 /**
  * One-tap reactions on a message (no full reply needed).
@@ -39,8 +42,18 @@ export type LockerMessage = {
   body: string;
   createdAt: string;
   authorName: string;
+  imagePath?: string;
+  imageUrl?: string;
   reactions?: LockerReactionSummary[];
 };
+
+function lockerImagePath(body: string): string | null {
+  if (!body.startsWith(LOCKER_IMAGE_PREFIX)) return null;
+  const path = body.slice(LOCKER_IMAGE_PREFIX.length).trim();
+  return /^[0-9a-f-]{36}\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.(jpe?g|png|webp|gif|heic|heif)$/i.test(path)
+    ? path
+    : null;
+}
 
 /**
  * Football chat week: Monday 00:00 → Sunday night (America/New_York).
@@ -157,7 +170,23 @@ function mapRow(
     body: (r.body as string) || "",
     createdAt: (r.created_at as string) || new Date().toISOString(),
     authorName: nameById.get(uid) || "Player",
+    imagePath: lockerImagePath((r.body as string) || "") || undefined,
   };
+}
+
+async function attachLockerImageUrls(
+  supabase: ReturnType<typeof createClient>,
+  messages: LockerMessage[]
+): Promise<LockerMessage[]> {
+  return Promise.all(messages.map(async (message) => {
+    if (!message.imagePath) return message;
+    const { data, error } = await supabase.storage
+      .from(LOCKER_MEDIA_BUCKET)
+      .createSignedUrl(message.imagePath, 60 * 60);
+    return error || !data?.signedUrl
+      ? message
+      : { ...message, imageUrl: data.signedUrl };
+  }));
 }
 
 async function resolveNames(
@@ -320,9 +349,10 @@ export async function loadLockerMessages(limit = 100): Promise<{
     .reverse();
 
   // Prefer table when present; always merge marker rows too (legacy + fallback)
+  const withMedia = await attachLockerImageUrls(supabase, messages);
   const withRx = await attachReactions(
     supabase,
-    messages,
+    withMedia,
     session.playerId,
     rxRows
   );
@@ -883,6 +913,66 @@ export async function postLockerMessage(body: string): Promise<{
   return { ok: true, message };
 }
 
+export async function postLockerPhoto(file: File): Promise<{
+  ok: boolean;
+  message?: LockerMessage;
+  error?: string;
+}> {
+  const session = getSession();
+  if (!session?.leagueId || !session.playerId) {
+    return { ok: false, error: "Not signed in" };
+  }
+  const mime = file.type.toLowerCase();
+  const extensions: Record<string, string> = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+    "image/gif": "gif",
+    "image/heic": "heic",
+    "image/heif": "heif",
+  };
+  if (!extensions[mime]) {
+    return { ok: false, error: "Choose a JPEG, PNG, WebP, GIF, or iPhone photo." };
+  }
+  if (file.size > LOCKER_MEDIA_MAX_BYTES) {
+    return { ok: false, error: "Picture is too large. Maximum size is 6 MB." };
+  }
+
+  const supabase = createClient();
+  const { data: auth } = await supabase.auth.getUser();
+  const uid = auth.user?.id || session.playerId;
+  const path = `${session.leagueId}/${uid}/${crypto.randomUUID()}.${extensions[mime]}`;
+  const { error: uploadError } = await supabase.storage
+    .from(LOCKER_MEDIA_BUCKET)
+    .upload(path, file, {
+      cacheControl: "3600",
+      contentType: mime,
+      upsert: false,
+    });
+  if (uploadError) {
+    return {
+      ok: false,
+      error: /bucket|not found|policy|row-level/i.test(uploadError.message || "")
+        ? "Picture sharing is still being connected. Try again shortly."
+        : uploadError.message || "Could not upload picture.",
+    };
+  }
+
+  const posted = await postLockerMessage(`${LOCKER_IMAGE_PREFIX}${path}`);
+  if (!posted.ok) {
+    await supabase.storage.from(LOCKER_MEDIA_BUCKET).remove([path]);
+    return posted;
+  }
+  const { data: signed } = await supabase.storage
+    .from(LOCKER_MEDIA_BUCKET)
+    .createSignedUrl(path, 60 * 60);
+  if (posted.message) {
+    posted.message.imagePath = path;
+    posted.message.imageUrl = signed?.signedUrl;
+  }
+  return posted;
+}
+
 export async function deleteLockerMessage(id: string): Promise<{
   ok: boolean;
   error?: string;
@@ -891,6 +981,15 @@ export async function deleteLockerMessage(id: string): Promise<{
   if (!session?.leagueId) return { ok: false, error: "No league" };
 
   const supabase = createClient();
+  const { data: existing } = await supabase
+    .from("locker_messages")
+    .select("body")
+    .eq("id", id)
+    .eq("league_id", session.leagueId)
+    .maybeSingle();
+  const imagePath = lockerImagePath(
+    (existing as { body?: string } | null)?.body || ""
+  );
   const { error } = await supabase
     .from("locker_messages")
     .delete()
@@ -898,6 +997,9 @@ export async function deleteLockerMessage(id: string): Promise<{
     .eq("league_id", session.leagueId);
 
   if (error) return { ok: false, error: error.message };
+  if (imagePath) {
+    await supabase.storage.from(LOCKER_MEDIA_BUCKET).remove([imagePath]);
+  }
   return { ok: true };
 }
 

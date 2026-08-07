@@ -5,6 +5,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type ChangeEvent,
   type FormEvent,
   type KeyboardEvent,
 } from "react";
@@ -22,6 +23,7 @@ import {
   formatLockerTime,
   loadLockerMessages,
   postLockerMessage,
+  postLockerPhoto,
   toggleLockerReaction,
   type LockerMessage,
 } from "@/lib/locker-room";
@@ -88,10 +90,13 @@ export default function LockerRoomPage() {
   const [reactError, setReactError] = useState<string | null>(null);
   const [gifTrayOpen, setGifTrayOpen] = useState(false);
   const [gifInput, setGifInput] = useState("");
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const lastPostAt = useRef(0);
   const listTopRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const caretRef = useRef(0);
 
   const reload = useCallback(async (opts?: { quiet?: boolean }) => {
@@ -188,6 +193,31 @@ export default function LockerRoomPage() {
     setPostError(null);
   }
 
+  function clearPhoto() {
+    setPhoto(null);
+    setPhotoPreview((current) => {
+      if (current) URL.revokeObjectURL(current);
+      return null;
+    });
+    if (photoInputRef.current) photoInputRef.current.value = "";
+  }
+
+  function choosePhoto(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] || null;
+    if (!file) return;
+    if (file.size > 6 * 1024 * 1024) {
+      setPostError("Picture is too large. Maximum size is 6 MB.");
+      e.target.value = "";
+      return;
+    }
+    clearPhoto();
+    setBody("");
+    setGifTrayOpen(false);
+    setPhoto(file);
+    setPhotoPreview(URL.createObjectURL(file));
+    setPostError(null);
+  }
+
   function pickMention(member: MentionMember) {
     const caret = caretRef.current;
     const { text, caret: nextCaret } = applyMention(body, caret, member);
@@ -243,7 +273,9 @@ export default function LockerRoomPage() {
     }
     setPosting(true);
     const text = body;
-    const res = await postLockerMessage(text);
+    const res = photo
+      ? await postLockerPhoto(photo)
+      : await postLockerMessage(text);
     setPosting(false);
     if (!res.ok) {
       setPostError(res.error || "Failed to post");
@@ -253,6 +285,7 @@ export default function LockerRoomPage() {
     lastPostAt.current = Date.now();
     setCooldownLeft(LOCKER_COOLDOWN_SEC);
     setBody("");
+    clearPhoto();
     setMentionOpen(false);
     if (selfId) {
       void import("@/lib/engagement").then((m) =>
@@ -335,7 +368,7 @@ export default function LockerRoomPage() {
   const attachedGif = lockerGifUrl(body);
   const canPost =
     !muted &&
-    body.trim().length > 0 &&
+    (body.trim().length > 0 || !!photo) &&
     body.length <= LOCKER_MAX_CHARS &&
     !posting &&
     cooldownLeft === 0;
@@ -380,6 +413,7 @@ export default function LockerRoomPage() {
               <strong className="text-foreground">+</strong> on a post to react
               (stamps stack bottom-left) · type{" "}
               <strong className="text-foreground">@name</strong> to tag ·{" "}
+              <strong className="text-foreground">+</strong> by Send to drop a picture or GIF ·{" "}
               this week only · staff can delete or mute.
             </p>
       </details>
@@ -419,7 +453,7 @@ export default function LockerRoomPage() {
             {messages.map((m) => {
               const mine = isSelfPlayer(m.userId, selfId);
               const gifUrl = lockerGifUrl(m.body);
-              const parts = gifUrl ? [] : splitMentions(m.body, roster);
+              const parts = gifUrl || m.imagePath ? [] : splitMentions(m.body, roster);
               const rx = m.reactions || [];
               const pickerOpen = reactPickerFor === m.id;
               return (
@@ -447,7 +481,29 @@ export default function LockerRoomPage() {
                         : "border-border bg-background/60"
                     }`}
                   >
-                    {gifUrl ? (
+                    {m.imagePath ? (
+                      m.imageUrl ? (
+                        <button
+                          type="button"
+                          className="locker-photo-frame"
+                          onClick={() =>
+                            window.open(m.imageUrl!, "_blank", "noopener,noreferrer")
+                          }
+                          aria-label="Open shared picture"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={m.imageUrl}
+                            alt={`Picture shared by ${m.authorName}`}
+                            loading="lazy"
+                          />
+                        </button>
+                      ) : (
+                        <div className="locker-photo-unavailable">
+                          Picture unavailable
+                        </div>
+                      )
+                    ) : gifUrl ? (
                       <div className="locker-gif-frame">
                         {/* Trusted GIPHY/Tenor media only; remote dimensions are unknown. */}
                         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -619,7 +675,16 @@ export default function LockerRoomPage() {
                     No one named “{mentionQuery}” in this league
                   </div>
                 )}
-              {attachedGif ? (
+              {photoPreview ? (
+                <div className="locker-gif-draft">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={photoPreview} alt="Picture ready to send" />
+                  <button type="button" onClick={clearPhoto} aria-label="Remove picture">
+                    ×
+                  </button>
+                  <span>Picture ready</span>
+                </div>
+              ) : attachedGif ? (
                 <div className="locker-gif-draft">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={attachedGif} alt="GIF ready to send" />
@@ -658,7 +723,7 @@ export default function LockerRoomPage() {
               />
               )}
               {/* Char count: bottom-right of chat box, above emoji row */}
-              {!attachedGif && (
+              {!attachedGif && !photoPreview && (
                 <span
                   className={`pointer-events-none absolute bottom-2 right-2.5 text-[11px] font-semibold tabular-nums ${
                     remaining < 30 ? "text-warning" : "text-muted"
@@ -672,6 +737,15 @@ export default function LockerRoomPage() {
             </div>
             {gifTrayOpen && (
               <div className="locker-gear-tray">
+                <div className="locker-attach-actions">
+                  <button
+                    type="button"
+                    onClick={() => photoInputRef.current?.click()}
+                  >
+                    Photo
+                  </button>
+                  <span>or paste a GIF link</span>
+                </div>
                 <div className="locker-gif-tool">
                   <input
                     value={gifInput}
@@ -685,6 +759,13 @@ export default function LockerRoomPage() {
               </div>
             )}
             <div className="flex items-center gap-2">
+              <input
+                ref={photoInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif"
+                onChange={choosePhoto}
+                className="sr-only"
+              />
               <button
                 type="button"
                 onClick={() => setGifTrayOpen((open) => !open)}
