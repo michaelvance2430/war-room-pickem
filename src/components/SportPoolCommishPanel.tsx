@@ -21,7 +21,8 @@ import { switchToLeague } from "@/lib/session-restore";
 
 /**
  * Commish: soft invite for a next-sport chapter (community-led).
- * Only yeses get seats. No pressure, no auto-transfer, source room stays.
+ * Only yeses get seats. Host of this poll is commissioner of the new desk
+ * (spin_up_sport_pool_league seats host + yes-voters only — no handoff picker).
  */
 export default function SportPoolCommishPanel() {
   const router = useRouter();
@@ -40,7 +41,6 @@ export default function SportPoolCommishPanel() {
   const [votes, setVotes] = useState<SportPoolVote[]>([]);
   const [voterTotal, setVoterTotal] = useState(0);
   const [botCount, setBotCount] = useState(0);
-  const [newCommId, setNewCommId] = useState<string>("");
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -164,7 +164,8 @@ export default function SportPoolCommishPanel() {
     const pack = getSportPack(poll.targetSportId);
     const ok = confirm(
       `Open a ${pack.shortLabel} chapter for people who opted in?\n\n` +
-        `• ${yeses.length} interested → get a seat\n` +
+        `• You stay commissioner of the new desk\n` +
+        `• ${yeses.length} interested → get a player seat\n` +
         `• Pass / no answer → stay only in this room (no move, no shame)\n` +
         `• This ${getSportPack(currentSport).shortLabel} room keeps going\n\n` +
         `Community-led — only yeses join the new desk.`
@@ -176,7 +177,6 @@ export default function SportPoolCommishPanel() {
     setNote(null);
     const res = await spinUpLeagueFromPoll({
       pollId: poll.id,
-      newCommissionerId: newCommId || null,
       leagueNameOverride: proposedName.trim() || poll.proposedName,
     });
     setBusy(false);
@@ -350,10 +350,11 @@ export default function SportPoolCommishPanel() {
           {yeses.length > 0 && (
             <div>
               <p className="text-[10px] font-bold uppercase tracking-wide text-muted mb-1.5">
-                Interested · would get a seat ({yeses.length})
+                Interested · player seats ({yeses.length})
               </p>
-              <p className="text-[11px] text-muted mb-1.5">
-                Host-only list. We don&apos;t publish who passed.
+              <p className="text-[11px] text-muted mb-1.5 leading-relaxed">
+                You stay commissioner of the new desk. These people get player
+                seats. Host-only list — we don&apos;t publish who passed.
               </p>
               <ul className="text-sm space-y-1 max-h-32 overflow-y-auto">
                 {yeses.map((v) => (
@@ -364,22 +365,6 @@ export default function SportPoolCommishPanel() {
               </ul>
             </div>
           )}
-
-          <label className="block text-xs text-muted">
-            Commissioner for the new desk (optional)
-            <select
-              value={newCommId}
-              onChange={(e) => setNewCommId(e.target.value)}
-              className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground"
-            >
-              <option value="">Keep me as commissioner</option>
-              {yeses.map((v) => (
-                <option key={v.userId} value={v.userId}>
-                  {v.displayName || "Player"} — hand them the gavel
-                </option>
-              ))}
-            </select>
-          </label>
 
           <button
             type="button"
@@ -428,7 +413,7 @@ export default function SportPoolCommishPanel() {
             {spun.code}
           </p>
           <p className="text-xs text-muted leading-relaxed">
-            {spun.seated} people who opted in are seated ·{" "}
+            {spun.seated} opted-in seated · you&apos;re commissioner ·{" "}
             {getSportPack(spun.sportId).shortLabel}. Everyone else stays only in
             this room — nothing was forced.
           </p>

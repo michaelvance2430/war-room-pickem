@@ -365,8 +365,11 @@ export async function myVoteForPoll(
  */
 export async function spinUpLeagueFromPoll(opts: {
   pollId: string;
-  /** Keep current host if omitted / self */
-  newCommissionerId?: string | null;
+  /**
+   * Optional room name before spin-up (writes poll.proposed_name).
+   * Commissioner of the new desk is always the poll host — live RPC is
+   * spin_up_sport_pool_league(p_poll_id) only (no handoff parameter).
+   */
   leagueNameOverride?: string;
 }): Promise<
   | {
@@ -451,11 +454,7 @@ export async function spinUpLeagueFromPoll(opts: {
     }
   }
 
-  // Live RPC signature is p_poll_id only (PostgREST rejects unknown args).
-  // Optional new commissioner is not a client-supplied multi-seat param; server
-  // seats yes-voters + host under DEFINER authority.
-  void opts.newCommissionerId;
-
+  // Live RPC: p_poll_id only — host + yes-voters; host is commissioner.
   const { data, error } = await supabase.rpc("spin_up_sport_pool_league", {
     p_poll_id: pollId,
   });
