@@ -9,7 +9,7 @@ import { runAutoPublishCards } from "@/lib/auto-publish-card";
  *
  * Vercel cron: every 6 hours (see vercel.json).
  * Auth: Authorization: Bearer <CRON_SECRET>
- * Test: ?force=1&secret=CRON_SECRET  (force skips the 48h wait)
+ * Manual test: send Authorization: Bearer <CRON_SECRET> with ?force=1.
  * Optional: ?leagueId=<uuid> to target one room
  */
 function authorized(req: NextRequest): boolean {
@@ -17,8 +17,7 @@ function authorized(req: NextRequest): boolean {
   if (!secret) return false;
   const header = req.headers.get("authorization") || "";
   const bearer = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
-  const query = req.nextUrl.searchParams.get("secret") || "";
-  return bearer === secret || query === secret;
+  return bearer === secret;
 }
 
 export async function GET(req: NextRequest) {
