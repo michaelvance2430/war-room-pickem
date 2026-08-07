@@ -181,7 +181,9 @@ export default function StandingsPage() {
       }, 3_500);
       try {
         // Competitive UI only in production reality — preseason scores stay theater
-        const competitive = await hasCompetitiveAchievementData();
+        const competitive = await hasCompetitiveAchievementData({
+          allowFoundryDisplay: true,
+        });
         if (cancelled) return;
         setSeasonStarted(competitive);
         setPreseasonPractice(!isProductionMode());

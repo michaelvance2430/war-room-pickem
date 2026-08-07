@@ -11,7 +11,7 @@ import { isAppCreator } from "@/lib/creator";
 import {
   founderBuildFirstWeeksHistory,
   founderEnsureFullBotRoster,
-  founderPostAndScoreWeek,
+  founderScoreAndOpenNextWeek,
 } from "@/lib/founder-one-click";
 import {
   loadFounderLeagueFleetHealth,
@@ -96,7 +96,7 @@ export default function FoundryPage() {
           ? await founderEnsureFullBotRoster()
           : kind === "six"
             ? await founderBuildFirstWeeksHistory({ weekCount: 6 })
-            : await founderPostAndScoreWeek(activeWeek);
+            : await founderScoreAndOpenNextWeek(activeWeek);
       setLog(`${result.ok ? "✅" : "❌"} ${result.message}`);
       if (result.ok) void refresh();
     } catch (cause) {
@@ -213,8 +213,8 @@ export default function FoundryPage() {
             </p>
             <div className="mt-3 grid gap-2 sm:grid-cols-3">
               <Action disabled={!!busy} title={busy === "roster" ? "Working…" : "Fill test roster"} note="Adds LAB bots so standings and stories have a full cast." onClick={() => void runSandbox("roster")} />
-              <Action disabled={!!busy} title={busy === "week" ? "Scoring…" : "Play one week"} note="Publishes and scores the active week through the real pipeline." onClick={() => void runSandbox("week")} />
-              <Action disabled={!!busy} title={busy === "six" ? "Building…" : "Build six weeks"} note="Creates enough history to test standings, rivalries, and Gazette progression." onClick={() => void runSandbox("six")} />
+              <Action disabled={!!busy} title={busy === "week" ? "Scoring…" : "Score & advance"} note="Scores the active card, publishes the next unlocked card, and moves the season forward." onClick={() => void runSandbox("week")} />
+              <Action disabled={!!busy} title={busy === "six" ? "Building…" : "Build six weeks"} note="Scores six weeks, then opens the next unlocked card so you can continue as a player." onClick={() => void runSandbox("six")} />
             </div>
             {log && <pre className="mt-3 whitespace-pre-wrap rounded-lg border border-border bg-background p-3 text-[11px] text-muted">{log}</pre>}
           </section>

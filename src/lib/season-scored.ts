@@ -99,10 +99,19 @@ export async function hasOfficialScoredWeek(): Promise<boolean> {
  * Use this for Standings hero + competitive columns.
  * Use hasOfficialScoredWeek only when you need "did any week_results exist?"
  */
-export async function hasCompetitiveAchievementData(): Promise<boolean> {
+export async function hasCompetitiveAchievementData(opts?: {
+  /**
+   * Standings QA only: an explicitly marked Foundry room may render the real
+   * competitive board without granting permanent career credit.
+   */
+  allowFoundryDisplay?: boolean;
+}): Promise<boolean> {
   try {
-    const { isProductionMode } = await import("./league-mode");
-    if (!isProductionMode()) return false;
+    const { resolveLeagueMode } = await import("./league-mode");
+    const mode = resolveLeagueMode();
+    const displayOnlyFoundry =
+      opts?.allowFoundryDisplay === true && mode === "foundry";
+    if (mode !== "production" && !displayOnlyFoundry) return false;
   } catch {
     /* if mode helper missing, fall through to scored-only gate */
   }

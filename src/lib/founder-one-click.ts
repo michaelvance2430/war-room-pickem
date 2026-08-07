@@ -511,6 +511,47 @@ export async function founderPostAndScoreWeek(
   };
 }
 
+/**
+ * Score the already-playable LAB card, then publish the next one. This is the
+ * normal Foundry season loop after a history factory has handed the creator an
+ * unlocked card.
+ */
+export async function founderScoreAndOpenNextWeek(
+  weekNumber: number
+): Promise<OneClickLog> {
+  const steps: string[] = [];
+  const score = await founderScoreWeek(weekNumber);
+  steps.push(...score.steps.map((step) => `score: ${step}`));
+  if (!score.ok) return { ok: false, message: score.message, steps };
+
+  const s = sport();
+  const { seasonMaxWeek } = await import("./season-calendar");
+  const nextWeek = weekNumber + 1;
+  if (nextWeek > seasonMaxWeek(s)) {
+    return {
+      ok: true,
+      message: `${score.message} · season limit reached`,
+      steps,
+    };
+  }
+
+  const next = await founderPostWeek(nextWeek);
+  steps.push(...next.steps.map((step) => `next: ${step}`));
+  if (!next.ok) {
+    return {
+      ok: false,
+      message: `${score.message}, but ${weekTitle(nextWeek, s)} did not open: ${next.message}`,
+      steps,
+    };
+  }
+
+  return {
+    ok: true,
+    message: `${weekTitle(weekNumber, s)} scored. ${weekTitle(nextWeek, s)} is now published, unlocked, and ready to play.`,
+    steps,
+  };
+}
+
 export type BuildLabHistoryResult = OneClickLog & {
   fromWeek?: number;
   toWeek?: number;
@@ -585,6 +626,34 @@ export async function founderBuildFirstWeeksHistory(opts?: {
     finished.push(w);
   }
 
+  // Leave the LAB room in a genuinely playable state. Scored history alone
+  // is not enough: Home correctly refuses to invent an unpublished next card
+  // and may fall back to an older published week. Publish the next real card
+  // and make it the room's active week so the creator can walk Home → Picks →
+  // score → Gazette exactly as a player would.
+  const { seasonMaxWeek } = await import("./season-calendar");
+  const nextWeek = toWeek + 1;
+  if (nextWeek <= seasonMaxWeek(s)) {
+    opts?.onProgress?.({
+      week: nextWeek,
+      step: `Opening playable ${weekTitle(nextWeek, s)}…`,
+    });
+    const next = await founderPostWeek(nextWeek);
+    steps.push(...next.steps.map((x) => `next: ${x}`));
+    if (!next.ok) {
+      return {
+        ok: false,
+        message: `History built through ${weekTitle(toWeek, s)}, but the next playable card failed: ${next.message}`,
+        steps,
+        fromWeek,
+        toWeek,
+        finished,
+      };
+    }
+    await setLeagueActiveWeek(nextWeek);
+    steps.push(`${weekTitle(nextWeek, s)} published and set active for player walkthrough`);
+  }
+
   // Drama on the last week so Gazette path is warm
   try {
     const { prepareFoundryDramaAfterScore } = await import("./foundry-preview");
@@ -597,14 +666,20 @@ export async function founderBuildFirstWeeksHistory(opts?: {
   }
 
   try {
-    localStorage.setItem("warroom-active-week", String(toWeek));
+    localStorage.setItem(
+      "warroom-active-week",
+      String(nextWeek <= seasonMaxWeek(s) ? nextWeek : toWeek)
+    );
   } catch {
     /* ignore */
   }
 
   return {
     ok: true,
-    message: `Built ${finished.length} week(s) of LAB history through ${weekTitle(toWeek, s)}. Stayed in the real LAB room with ceremonies available.`,
+    message:
+      nextWeek <= seasonMaxWeek(s)
+        ? `Built ${finished.length} scored week(s) through ${weekTitle(toWeek, s)}. ${weekTitle(nextWeek, s)} is now published, unlocked, and ready to play.`
+        : `Built ${finished.length} week(s) of LAB history through ${weekTitle(toWeek, s)}. Season limit reached.`,
     steps,
     fromWeek,
     toWeek,
