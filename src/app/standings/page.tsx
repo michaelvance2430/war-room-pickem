@@ -558,7 +558,7 @@ export default function StandingsPage() {
                         <th className="text-left px-3 sm:px-4 py-3 font-medium">
                           Division
                         </th>
-                        <th className="text-left px-3 sm:px-4 py-3 font-medium">
+                        <th className="text-left px-3 sm:px-4 py-3 font-medium hidden sm:table-cell">
                           Last seen
                         </th>
                         <th className="text-left px-3 sm:px-4 py-3 font-medium hidden sm:table-cell">
@@ -592,11 +592,23 @@ export default function StandingsPage() {
                                   <YouBadge />
                                 )}
                               </span>
+                              <span
+                                className={`sm:hidden mt-0.5 text-[11px] font-normal flex items-center gap-1 ${
+                                  showPulse
+                                    ? lastSeenToneClass(player.lastSeenAt)
+                                    : "text-muted"
+                                }`}
+                              >
+                                <span aria-hidden>
+                                  {showPulse ? (pulse.online ? "🟢" : "○") : "•"}
+                                </span>
+                                {showPulse ? pulse.label : "Bot"}
+                              </span>
                             </td>
                             <td className="px-3 sm:px-4 py-3.5 text-muted text-xs sm:text-sm">
                               {divisionTabLabel(player.division, sportId)}
                             </td>
-                            <td className="px-3 sm:px-4 py-3.5">
+                            <td className="px-3 sm:px-4 py-3.5 hidden sm:table-cell">
                               {showPulse ? (
                                 <span
                                   className={`text-xs sm:text-sm inline-flex items-center gap-1 ${lastSeenToneClass(player.lastSeenAt)}`}
