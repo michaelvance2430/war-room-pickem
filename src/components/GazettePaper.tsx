@@ -1,13 +1,13 @@
 "use client";
 
 /**
- * Shared War Room Gazette layout — modal + archive.
- * Phone-first newspaper energy: big A1, weather, movers, classifieds, share.
+ * The War Room Gazette — a four-page, phone-first weekly newspaper.
+ * One component powers the production modal, archive, and Foundry preview.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import type { GazetteEdition } from "@/lib/gazette";
+import type { GazetteEdition, GazetteStory } from "@/lib/gazette";
 import GazetteShareSheet from "@/components/GazetteShareSheet";
 import { getSession } from "@/lib/league";
 import {
@@ -19,19 +19,26 @@ import {
 
 type Props = {
   edition: GazetteEdition;
-  /** Modal: sticky actions. Archive: inline. */
   variant?: "modal" | "archive";
   onDismiss?: () => void;
   className?: string;
+  /** Read-only Foundry rendering: exact pages, no personal local claims. */
+  foundryPreview?: boolean;
 };
 
-/** Backfill older archived payloads missing new fields. */
+const PAGE_META = [
+  { name: "Front Page", short: "Front", next: "Sports" },
+  { name: "Sports", short: "Sports", next: "Standings & Rivalries" },
+  { name: "Standings & Rivalries", short: "Rivalries", next: "Back Page" },
+  { name: "Back Page", short: "Back", next: "" },
+] as const;
+
+/** Backfill older archived payloads without inventing competitive events. */
 export function normalizeEdition(raw: GazetteEdition): GazetteEdition {
   const wwc = raw.sportId === "soccer_wwc";
   return {
     ...raw,
-    ritualName:
-      raw.ritualName || (wwc ? "World Cup Extra" : "War Room Edition"),
+    ritualName: raw.ritualName || (wwc ? "World Cup Extra" : "War Room Edition"),
     tagline:
       raw.tagline ||
       (wwc
@@ -46,24 +53,20 @@ export function normalizeEdition(raw: GazetteEdition): GazetteEdition {
         ? "High: emerald heat. Low: royal-blue despair."
         : "High confidence. Low dignity. Pack a paper bag.",
     },
-    // Empty arrays are intentional (slim early editions) — don't invent filler
-    classifieds: Array.isArray(raw.classifieds)
-      ? raw.classifieds
-      : ["Classifieds ran long. See Locker Room."],
+    classifieds: Array.isArray(raw.classifieds) ? raw.classifieds : [],
     pullQuote: raw.pullQuote || {
       text: `"Trust the process."`,
       by: "Someone mid-process",
     },
     sideStories: Array.isArray(raw.sideStories) ? raw.sideStories : [],
     swing: raw.swing ?? null,
+    rivalryWatch: raw.rivalryWatch ?? null,
     chaosDetonation: raw.chaosDetonation ?? null,
     crystalBallMiss: raw.crystalBallMiss ?? null,
     standingsDeadlock: raw.standingsDeadlock ?? null,
     noLock: raw.noLock ?? null,
     shame: raw.shame ?? null,
-    sportId: raw.sportId,
     stampLine: raw.stampLine || (wwc ? "EXTRA!" : "Extra · Extra"),
-    eventLine: raw.eventLine,
     rareEgg: raw.rareEgg ?? null,
     secretLetter: raw.secretLetter ?? null,
     conferenceChampions: Array.isArray(raw.conferenceChampions)
@@ -77,510 +80,364 @@ export default function GazettePaper({
   variant = "archive",
   onDismiss,
   className = "",
+  foundryPreview = false,
 }: Props) {
   const edition = normalizeEdition(raw);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const pageTitleRef = useRef<HTMLHeadingElement | null>(null);
+  const [page, setPage] = useState(0);
   const [shareOpen, setShareOpen] = useState(false);
-  const [personal, setPersonal] = useState<{
-    headline: string;
-    deck: string;
-  } | null>(null);
+  const [personal, setPersonal] = useState<{ headline: string; deck: string } | null>(null);
+
+  useEffect(() => setPage(0), [edition.weekIndex]);
 
   useEffect(() => {
+    if (foundryPreview) return;
     const pid = getSession()?.playerId;
     if (!pid) return;
     setPersonal(getPersonalGazetteOverlay(pid));
-    if (edition.rareEgg) {
-      noteRareHeadlineSeen(pid);
-    }
+    if (edition.rareEgg) noteRareHeadlineSeen(pid);
     const moment = collectGazetteSecretLetter(pid, edition.weekIndex);
     if (moment) {
       try {
-        window.dispatchEvent(
-          new CustomEvent(EVENT_EASTER_EGG, { detail: moment })
-        );
+        window.dispatchEvent(new CustomEvent(EVENT_EASTER_EGG, { detail: moment }));
       } catch {
         /* ignore */
       }
     }
-  }, [edition.weekIndex, edition.rareEgg]);
+  }, [edition.weekIndex, edition.rareEgg, foundryPreview]);
 
-  // Modal: no outer overflow trap — parent .gazette-scroll-body is the scrollport.
-  // Archive: normal card overflow.
+  function turnPage(next: number) {
+    const target = Math.max(0, Math.min(PAGE_META.length - 1, next));
+    if (target === page) return;
+    setPage(target);
+    window.requestAnimationFrame(() => {
+      rootRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+      pageTitleRef.current?.focus({ preventScroll: true });
+    });
+  }
+
   return (
     <div
+      ref={rootRef}
       className={`bg-[#f4f0e6] text-stone-900 ${
         variant === "modal"
           ? "overflow-visible rounded-none border-0 shadow-none"
           : "overflow-hidden rounded-sm border-2 border-stone-600 shadow-lg"
       } ${className}`}
     >
-      {/* EXTRA stamp strip — CFB red · NFL navy/crimson · WWC Brazil */}
-      {edition.sportId === "soccer_wwc" ? (
-        <div
-          className="relative px-3 py-1.5 flex items-center justify-between gap-2 text-white"
-          style={{
-            background:
-              "linear-gradient(90deg, #009C3B 0%, #002776 55%, #009C3B 100%)",
-          }}
-        >
-          <span
-            className="text-[12px] font-black uppercase tracking-[0.28em]"
-            style={{ color: "#FFDF00" }}
-          >
-            {edition.stampLine || "EXTRA!"}
-          </span>
-          <span className="text-[10px] font-bold uppercase tracking-wider opacity-95">
-            {edition.ritualName || "World Cup Extra"}
-          </span>
-        </div>
-      ) : edition.sportId === "nfl" ? (
-        <div
-          className="relative px-3 py-1.5 flex items-center justify-between gap-2 text-white"
-          style={{
-            background:
-              "linear-gradient(90deg, #0B1426 0%, #C1121F 55%, #0B1426 100%)",
-          }}
-        >
-          <span
-            className="text-[11px] font-black uppercase tracking-[0.25em]"
-            style={{ color: "#C5CCD3" }}
-          >
-            {edition.stampLine || "Extra · Extra"}
-          </span>
-          <span className="text-[10px] font-bold uppercase tracking-wider opacity-95">
-            {edition.ritualName || "Sunday Night Extra"}
-          </span>
-        </div>
-      ) : (
-        <div className="relative bg-red-700 text-[#f4f0e6] px-3 py-1.5 flex items-center justify-between gap-2">
-          <span className="text-[11px] font-black uppercase tracking-[0.25em]">
-            {edition.stampLine || "Extra · Extra"}
-          </span>
-          <span className="text-[10px] font-bold uppercase tracking-wider opacity-90">
-            {edition.ritualName || "Read all about it"}
-          </span>
-        </div>
-      )}
+      <EditionStrip edition={edition} />
+      <Masthead edition={edition} />
 
-      {/* Masthead */}
-      <div
-        className={`border-b-4 border-double px-4 pt-4 pb-3 text-center ${
-          edition.sportId === "soccer_wwc"
-            ? "border-[#002776] bg-gradient-to-b from-[#009C3B]/10 to-transparent"
-            : "border-stone-900"
-        }`}
+      <nav
+        aria-label="Gazette pages"
+        className="border-b border-stone-400 bg-[#e8e1d2] px-2 py-2"
       >
-        <p
-          className={`text-[10px] font-black uppercase tracking-[0.28em] mb-1 ${
-            edition.sportId === "soccer_wwc" ? "text-[#009C3B]" : "text-red-800"
-          }`}
-        >
-          {edition.ritualName}
-        </p>
-        {edition.eventLine && (
-          <p
-            className="text-[10px] font-black uppercase tracking-[0.16em] mb-1"
-            style={{ color: "#002776" }}
-          >
-            {edition.eventLine}
-          </p>
-        )}
-        <p className="text-[10px] uppercase tracking-[0.2em] text-stone-500 mb-1 leading-snug px-1">
-          {edition.printedLine}
+        <div className="grid grid-cols-4 gap-1">
+          {PAGE_META.map((item, index) => (
+            <button
+              key={item.name}
+              type="button"
+              onClick={() => turnPage(index)}
+              aria-current={page === index ? "page" : undefined}
+              className={`min-h-[40px] rounded px-1 py-1.5 text-[9px] font-black uppercase tracking-wide touch-manipulation ${
+                page === index
+                  ? "bg-stone-900 text-[#f4f0e6]"
+                  : "text-stone-600 hover:bg-stone-200"
+              }`}
+            >
+              <span className="block text-[8px] opacity-70">{index + 1}</span>
+              {item.short}
+            </button>
+          ))}
+        </div>
+      </nav>
+
+      <main className="px-4 pb-3 pt-4 min-h-[420px]">
+        <p className="mb-1 text-[9px] font-black uppercase tracking-[0.22em] text-red-800">
+          Page {page + 1} of {PAGE_META.length}
         </p>
         <h2
-          className={`font-serif text-2xl sm:text-3xl font-black tracking-tight leading-none ${
-            edition.sportId === "soccer_wwc"
-              ? "text-[#002776]"
-              : "text-stone-950"
-          }`}
+          ref={pageTitleRef}
+          tabIndex={-1}
+          className="mb-4 border-b-4 border-double border-stone-900 pb-2 font-serif text-2xl font-black leading-none outline-none"
         >
-          {edition.masthead || "THE WAR ROOM GAZETTE"}
+          {PAGE_META[page].name}
         </h2>
-        {edition.sportId === "soccer_wwc" && (
-          <p
-            className="text-[11px] font-extrabold uppercase tracking-[0.2em] mt-2"
-            style={{ color: "#009C3B" }}
+
+        {page === 0 && <FrontPage edition={edition} />}
+        {page === 1 && <SportsPage edition={edition} />}
+        {page === 2 && <RivalryPage edition={edition} />}
+        {page === 3 && <BackPage edition={edition} personal={personal} />}
+      </main>
+
+      <PageTurner page={page} onTurn={turnPage} />
+
+      {page === PAGE_META.length - 1 && (
+        <div className="border-t-4 border-double border-stone-900 px-4 pb-4 pt-4">
+          <button
+            type="button"
+            onClick={() => setShareOpen(true)}
+            className="w-full min-h-[52px] rounded-xl bg-red-700 py-3.5 text-sm font-black uppercase tracking-wide text-[#f4f0e6] touch-manipulation active:scale-[0.99]"
           >
-            Women&apos;s World Cup · Brazil 2027
+            Share this edition
+          </button>
+          <p className="mt-1 text-center text-[10px] leading-snug text-stone-500">
+            Newspaper graphic · IG / FB / chat · War Room flex
           </p>
-        )}
-        <p className="text-[11px] italic text-stone-600 mt-2">
-          {edition.tagline}
-          {edition.secretLetter ? (
-            <span
-              className="ml-1 font-serif font-black text-stone-800 underline decoration-dotted decoration-stone-400"
-              title=""
-            >
-              {edition.secretLetter}
-            </span>
-          ) : null}
-        </p>
-        <p className="text-[11px] uppercase tracking-widest text-stone-700 mt-2 border-t border-b border-stone-400 py-1.5 font-semibold">
-          {edition.volumeLabel}
-        </p>
-      </div>
-
-      <div className="px-4 py-4 space-y-4">
-        {/* Personal / rare egg lines — zero points, pure desk energy */}
-        {(personal || edition.rareEgg) && (
-          <div className="rounded border border-stone-400 bg-stone-100/80 px-3 py-2">
-            <p className="text-[9px] uppercase tracking-[0.2em] text-stone-500 font-bold mb-1">
-              Desk note
-            </p>
-            {personal && (
-              <>
-                <p className="font-serif font-black text-sm text-stone-900 leading-snug">
-                  {personal.headline}
-                </p>
-                <p className="text-[11px] text-stone-600 mt-0.5">
-                  {personal.deck}
-                </p>
-              </>
-            )}
-            {edition.rareEgg && (
-              <>
-                <p
-                  className={`font-serif font-black text-sm text-stone-900 leading-snug ${
-                    personal ? "mt-2 pt-2 border-t border-stone-300" : ""
-                  }`}
-                >
-                  {edition.rareEgg.headline}
-                </p>
-                <p className="text-[11px] text-stone-600 mt-0.5">
-                  {edition.rareEgg.deck}
-                </p>
-              </>
-            )}
-          </div>
-        )}
-        {/* Conference / division clinch — cut-lock week only */}
-        {edition.conferenceChampions &&
-          edition.conferenceChampions.length > 0 && (
-            <div className="rounded-lg border-4 border-amber-800 bg-gradient-to-br from-amber-100 via-yellow-50 to-amber-50 px-3 py-3 space-y-3 shadow-md">
-              <div className="flex items-center gap-2 border-b-2 border-amber-900/30 pb-2">
-                <span className="text-2xl" aria-hidden>
-                  🛡️
-                </span>
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-950">
-                    {edition.sportId === "nfl"
-                      ? "★ Division clinch night"
-                      : "★ Conference title night"}
-                  </p>
-                  <p className="text-[11px] font-bold text-amber-900/80">
-                    Engraved in the Trophy Room · not a drill
-                  </p>
-                </div>
-              </div>
-              {edition.conferenceChampions.map((story, i) => (
-                <article
-                  key={`${story.names[0]}-${i}`}
-                  className={
-                    i > 0 ? "pt-2 border-t border-amber-800/25" : undefined
-                  }
-                >
-                  <h3 className="font-serif text-lg sm:text-xl font-black leading-[1.2] text-stone-950">
-                    {story.headline}
-                  </h3>
-                  {story.deck && (
-                    <p className="text-sm text-stone-800 mt-1.5 leading-snug font-medium">
-                      {story.deck}
-                    </p>
-                  )}
-                  <p className="text-xs text-amber-950/70 mt-1.5 font-bold">
-                    {story.names.join(" · ")} · {story.pts} season pts
-                  </p>
-                </article>
-              ))}
-            </div>
-          )}
-
-        {/* A1 Crown */}
-        <article className="relative">
-          <div className="flex items-start gap-3">
-            <div
-              className="shrink-0 w-14 h-14 sm:w-16 sm:h-16 rounded-full border-2 border-emerald-800 bg-emerald-100 flex items-center justify-center text-3xl shadow-inner"
-              aria-hidden
-            >
-              👑
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-800 mb-1">
-                ★ A1 · This week&apos;s card
-              </p>
-              <h3 className="font-serif text-xl sm:text-2xl font-black leading-[1.15] text-stone-950">
-                {edition.crown?.headline}
-              </h3>
-            </div>
-          </div>
-          {edition.crown?.deck && (
-            <p className="text-sm sm:text-[15px] text-stone-800 mt-2.5 leading-snug font-medium">
-              {edition.crown.deck}
-            </p>
-          )}
-          <p className="text-xs text-stone-600 mt-2 font-bold">
-            {edition.crown?.names?.join(" · ")} · {edition.crown?.pts} pts ·{" "}
-            {edition.weekLabel}
-          </p>
-        </article>
-
-        {/* Chaos lock-in — high on the page; Monday Morning Edition energy */}
-        {edition.chaosDetonation && (
-          <div className="space-y-1.5">
-            <StoryBlock
-              kicker="💥 First thing · Chaos desk"
-              kickerClass="text-orange-900"
-              story={edition.chaosDetonation}
-              footer={`${edition.chaosDetonation.names.join(" · ")} · locked Chaos this week${
-                edition.chaosDetonation.pts
-                  ? ` · finished at ${edition.chaosDetonation.pts} pts`
-                  : ""
-              }`}
-              avatar="☢️"
-              avatarClass="border-orange-800 bg-orange-100"
-            />
-            <p className="text-[11px] text-stone-600 leading-snug px-0.5">
-              New here?{" "}
-              <span className="font-semibold text-stone-800">
-                Chaos = random card · 2× week · limited uses · no undo.
-              </span>{" "}
-              That&apos;s why the paper is yelling.
-            </p>
-          </div>
-        )}
-
-        {/* Pull quote */}
-        <blockquote className="border-l-4 border-stone-900 pl-3 py-1 my-1">
-          <p className="font-serif text-base sm:text-lg italic text-stone-900 leading-snug">
-            {edition.pullQuote.text}
-          </p>
-          <footer className="text-[11px] text-stone-600 mt-1 font-semibold">
-            — {edition.pullQuote.by}
-          </footer>
-        </blockquote>
-
-        {/* Weather */}
-        <div className="rounded border-2 border-stone-800 bg-sky-50/90 px-3 py-2.5">
-          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-sky-900">
-            ⛅ {edition.weather.kicker}
-          </p>
-          <p className="text-sm text-stone-800 mt-1 leading-snug">
-            {edition.weather.body}
-          </p>
-        </div>
-
-        {edition.standingsDeadlock && (
-          <StoryBlock
-            kicker="★ Season standings · Who pulls ahead?"
-            kickerClass="text-amber-900"
-            story={edition.standingsDeadlock}
-            footer={`${edition.standingsDeadlock.names.join(" · ")} · ${edition.standingsDeadlock.pts} pts overall`}
+          <GazetteShareSheet
+            edition={edition}
+            open={shareOpen}
+            onClose={() => setShareOpen(false)}
           />
-        )}
-
-        {edition.swing && (
-          <StoryBlock
-            kicker="📈 Movers · Standings drama"
-            kickerClass="text-teal-900"
-            story={edition.swing}
-            footer={`${edition.swing.names[0]} · ${edition.swing.pts} this week`}
-            avatar="🚀"
-            avatarClass="border-teal-800 bg-teal-100"
-          />
-        )}
-
-        {edition.shame && (
-          <StoryBlock
-            kicker="🚽 Wall of shame"
-            kickerClass="text-purple-900"
-            story={edition.shame}
-            footer={`${edition.shame.names[0]} · ${edition.shame.pts} pts this week`}
-            avatar="🚽"
-            avatarClass="border-purple-800 bg-purple-100"
-          />
-        )}
-
-        {edition.noLock && (
-          <div className="border-2 border-dashed border-amber-700 rounded-lg bg-amber-50 px-3 py-3">
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-900 mb-1">
-              🥛 Missing persons · No lock
-            </p>
-            <h3 className="font-serif text-lg font-black leading-snug">
-              {edition.noLock.headline}
-            </h3>
-            <p className="text-sm text-stone-800 mt-1.5 leading-snug">
-              {edition.noLock.deck}
-            </p>
-            <p className="text-xs text-stone-600 mt-2 font-bold">
-              {edition.noLock.names?.join(" · ")} · 0 pts · never locked
-            </p>
-          </div>
-        )}
-
-        {edition.crystalBallMiss && (
-          <div className="border-2 border-dashed border-indigo-500 rounded-lg bg-indigo-50 px-3 py-3">
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-indigo-900 mb-1">
-              🔮 Crystal Ball · No pick
-            </p>
-            <h3 className="font-serif text-lg font-black leading-snug">
-              {edition.crystalBallMiss.headline}
-            </h3>
-            <p className="text-sm text-stone-800 mt-1.5 leading-snug">
-              {edition.crystalBallMiss.deck}
-            </p>
-            <p className="text-xs text-stone-600 mt-2 font-bold">
-              {edition.crystalBallMiss.names?.join(" · ")} · blank orb
-            </p>
-          </div>
-        )}
-
-        {/* Funny non-football (and barely-football) sub-stories */}
-        {edition.sideStories?.length > 0 && (
-          <div className="border-t-4 border-double border-stone-900 pt-3 space-y-3">
-            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-stone-800 text-center">
-              Also in this paper · totally real news
-            </p>
-            {edition.sideStories.map((s, i) => (
-              <article
-                key={i}
-                className="rounded-lg border border-stone-400 bg-stone-50/90 px-3 py-2.5"
+          {variant === "modal" && (
+            <div className="mt-3 grid gap-2 sm:grid-cols-3">
+              <button
+                type="button"
+                onClick={onDismiss}
+                className="min-h-[48px] rounded-xl bg-stone-900 px-3 py-3 text-sm font-bold text-[#f4f0e6]"
               >
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-stone-500 mb-0.5">
-                  {s.kicker}
-                </p>
-                <h3 className="font-serif text-[15px] sm:text-base font-black leading-snug text-stone-950">
-                  {s.headline}
-                </h3>
-                <p className="text-[13px] text-stone-700 mt-1.5 leading-snug">
-                  {s.body}
-                </p>
-              </article>
-            ))}
-          </div>
-        )}
-
-        {/* Classifieds — skip section if empty (slim editions) */}
-        {edition.classifieds.length > 0 && (
-          <div className="border-t-2 border-stone-900 pt-3">
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-stone-800 mb-2 text-center">
-              Classifieds
-            </p>
-            <ul className="space-y-2">
-              {edition.classifieds.map((line, i) => (
-                <li
-                  key={i}
-                  className="text-[12px] sm:text-[13px] text-stone-800 leading-snug border-b border-stone-300 pb-2 last:border-0"
-                >
-                  <span className="font-bold text-stone-500 mr-1.5">
-                    {String.fromCharCode(65 + i)}.
-                  </span>
-                  {line}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        <p className="text-[10px] text-stone-500 text-center italic">
-          {variant === "modal"
-            ? "You only see this splash once per scored week. Archive lives under Gazette anytime."
-            : "Filed forever in the archive. Share it. Frame it. Deny it."}
-        </p>
-      </div>
-
-      {/* Actions */}
-      <div
-        className={`px-4 pb-4 flex flex-col gap-2 ${
-          variant === "modal"
-            ? "pb-[max(1rem,env(safe-area-inset-bottom))]"
-            : ""
-        }`}
-      >
-        <button
-          type="button"
-          onClick={() => setShareOpen(true)}
-          className="w-full py-3.5 min-h-[52px] rounded-xl bg-red-700 text-[#f4f0e6] text-sm font-black uppercase tracking-wide touch-manipulation active:scale-[0.99]"
-        >
-          Share this edition
-        </button>
-        <p className="text-[10px] text-stone-500 text-center leading-snug -mt-0.5">
-          Newspaper graphic · IG / FB / chat · War Room flex
-        </p>
-        <GazetteShareSheet
-          edition={edition}
-          open={shareOpen}
-          onClose={() => setShareOpen(false)}
-        />
-        {variant === "modal" && (
-          <div className="flex flex-col sm:flex-row gap-2">
-            <button
-              type="button"
-              onClick={onDismiss}
-              className="flex-1 py-3 min-h-[48px] rounded-xl bg-stone-900 text-[#f4f0e6] text-sm font-bold touch-manipulation"
-            >
-              Return to War Room
-            </button>
-            <Link
-              href="/standings"
-              onClick={onDismiss}
-              className="flex-1 py-3 min-h-[48px] rounded-xl border-2 border-stone-900 text-stone-900 text-sm font-bold text-center flex items-center justify-center touch-manipulation"
-            >
-              Standings
-            </Link>
-            <Link
-              href="/locker-room"
-              onClick={onDismiss}
-              className="flex-1 py-3 min-h-[48px] rounded-xl border-2 border-stone-700 text-stone-800 text-sm font-bold text-center flex items-center justify-center touch-manipulation"
-            >
-              Locker
-            </Link>
-          </div>
-        )}
-      </div>
+                Return to War Room
+              </button>
+              <Link href="/standings" onClick={onDismiss} className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-stone-900 px-3 py-3 text-center text-sm font-bold">
+                Standings
+              </Link>
+              <Link href="/locker-room" onClick={onDismiss} className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-stone-700 px-3 py-3 text-center text-sm font-bold">
+                Locker Room
+              </Link>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
-function StoryBlock({
-  kicker,
-  kickerClass,
-  story,
-  footer,
-  avatar,
-  avatarClass,
-}: {
-  kicker: string;
-  kickerClass: string;
-  story: { headline: string; deck: string };
-  footer: string;
-  avatar?: string;
-  avatarClass?: string;
-}) {
+function EditionStrip({ edition }: { edition: GazetteEdition }) {
+  const bg =
+    edition.sportId === "soccer_wwc"
+      ? "linear-gradient(90deg,#009C3B,#002776,#009C3B)"
+      : edition.sportId === "nfl"
+        ? "linear-gradient(90deg,#0B1426,#C1121F,#0B1426)"
+        : undefined;
   return (
-    <article className="border-t border-stone-400 pt-3">
-      <div className="flex items-start gap-2.5">
-        {avatar && (
-          <div
-            className={`shrink-0 w-11 h-11 rounded-full border-2 flex items-center justify-center text-xl ${avatarClass || "border-stone-700 bg-stone-100"}`}
-            aria-hidden
-          >
-            {avatar}
-          </div>
-        )}
-        <div className="min-w-0">
-          <p
-            className={`text-[10px] font-black uppercase tracking-[0.18em] mb-1 ${kickerClass}`}
-          >
-            {kicker}
+    <div
+      className={`flex items-center justify-between gap-2 px-3 py-1.5 text-[#f4f0e6] ${bg ? "" : "bg-red-700"}`}
+      style={bg ? { background: bg } : undefined}
+    >
+      <span className="text-[11px] font-black uppercase tracking-[0.25em]">
+        {edition.stampLine}
+      </span>
+      <span className="text-[10px] font-bold uppercase tracking-wider opacity-90">
+        {edition.ritualName}
+      </span>
+    </div>
+  );
+}
+
+function Masthead({ edition }: { edition: GazetteEdition }) {
+  return (
+    <header className="border-b-4 border-double border-stone-900 px-4 pb-3 pt-4 text-center">
+      <p className="mb-1 text-[9px] font-black uppercase tracking-[0.24em] text-red-800">
+        {edition.eventLine || edition.printedLine}
+      </p>
+      <h1 className="font-serif text-2xl font-black leading-none tracking-tight sm:text-3xl">
+        {edition.masthead || "THE WAR ROOM GAZETTE"}
+      </h1>
+      <p className="mt-2 text-[11px] italic text-stone-600">
+        {edition.tagline}
+        {edition.secretLetter ? (
+          <span className="ml-1 font-serif font-black text-stone-800 underline decoration-dotted decoration-stone-400">
+            {edition.secretLetter}
+          </span>
+        ) : null}
+      </p>
+      <p className="mt-2 border-y border-stone-400 py-1 text-[10px] font-semibold uppercase tracking-widest text-stone-700">
+        {edition.volumeLabel}
+      </p>
+    </header>
+  );
+}
+
+function FrontPage({ edition }: { edition: GazetteEdition }) {
+  const [lead, ...briefs] = edition.sideStories;
+  return (
+    <div className="space-y-4">
+      {lead ? (
+        <article>
+          <p className="mb-1 text-[10px] font-black uppercase tracking-[0.18em] text-red-800">
+            {lead.kicker} · Above the fold
           </p>
-          <h3 className="font-serif text-lg sm:text-xl font-black leading-snug text-stone-950">
-            {story.headline}
+          <h3 className="font-serif text-3xl font-black leading-[1.02] text-stone-950">
+            {lead.headline}
           </h3>
-        </div>
+          <p className="mt-3 text-[15px] font-medium leading-relaxed text-stone-800">
+            {lead.body}
+          </p>
+        </article>
+      ) : (
+        <article>
+          <p className="mb-1 text-[10px] font-black uppercase tracking-[0.18em] text-red-800">Room desk · Above the fold</p>
+          <h3 className="font-serif text-3xl font-black leading-[1.02]">THE ROOM SURVIVED ANOTHER WEEK</h3>
+          <p className="mt-3 text-[15px] leading-relaxed text-stone-800">The official record is still being assembled. The Locker Room has already reached several conclusions.</p>
+        </article>
+      )}
+
+      <blockquote className="border-y-4 border-double border-stone-900 py-3 text-center">
+        <p className="font-serif text-xl font-black italic leading-snug">{edition.pullQuote.text}</p>
+        <footer className="mt-1 text-[11px] font-semibold text-stone-600">— {edition.pullQuote.by}</footer>
+      </blockquote>
+
+      <div className="rounded border-2 border-stone-800 bg-sky-50/90 px-3 py-3">
+        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-sky-900">War Room forecast · {edition.weather.kicker}</p>
+        <p className="mt-1 text-sm leading-snug text-stone-800">{edition.weather.body}</p>
       </div>
-      <p className="text-sm text-stone-800 mt-1.5 leading-snug">{story.deck}</p>
-      <p className="text-xs text-stone-600 mt-1.5 font-bold">{footer}</p>
+
+      {briefs.map((story, index) => (
+        <article key={`${story.headline}-${index}`} className="border-t border-stone-400 pt-3">
+          <p className="text-[9px] font-black uppercase tracking-[0.16em] text-stone-500">{story.kicker}</p>
+          <h3 className="mt-1 font-serif text-lg font-black leading-snug">{story.headline}</h3>
+          <p className="mt-1 text-[13px] leading-snug text-stone-700">{story.body}</p>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function SportsPage({ edition }: { edition: GazetteEdition }) {
+  return (
+    <div className="space-y-4">
+      <StoryCard kicker="A1 · Week winner" story={edition.crown} tone="crown" large />
+      {edition.conferenceChampions?.map((story, index) => (
+        <StoryCard key={`${story.headline}-${index}`} kicker="Title desk · Clinched" story={story} tone="title" />
+      ))}
+      {edition.chaosDetonation && <StoryCard kicker="Chaos desk · Lock confirmed" story={edition.chaosDetonation} tone="chaos" />}
+      {edition.shame && <StoryCard kicker="Wall of shame" story={edition.shame} tone="shame" />}
+      {edition.noLock && <StoryCard kicker="Missing persons · No lock" story={edition.noLock} tone="warning" />}
+      {edition.crystalBallMiss && <StoryCard kicker="Crystal Ball · No pick" story={edition.crystalBallMiss} tone="crystal" />}
+    </div>
+  );
+}
+
+function RivalryPage({ edition }: { edition: GazetteEdition }) {
+  return (
+    <div className="space-y-4">
+      {edition.rivalryWatch ? (
+        <StoryCard kicker="Rivalry watch · Closest live race" story={edition.rivalryWatch} tone="rivalry" large />
+      ) : (
+        <EmptyDesk title="Rivalry desk awaiting a real race" body="No rivalry was manufactured. Once two active players have scored cards, the closest season race earns this space." />
+      )}
+      {edition.standingsDeadlock && <StoryCard kicker="Top of the table · Deadlock" story={edition.standingsDeadlock} tone="title" />}
+      {edition.swing && <StoryCard kicker="Standings wire · Biggest move" story={edition.swing} tone="mover" />}
+      {!edition.standingsDeadlock && !edition.swing && edition.rivalryWatch && (
+        <EmptyDesk title="The rest of the table held steady" body="No fake movement, no invented drama. The next scored card will rewrite this page if the standings actually move." />
+      )}
+      <p className="border-t border-stone-400 pt-3 text-[11px] italic leading-snug text-stone-600">
+        Rivalry Watch follows the closest active real players. It changes as the standings change; dead rivalries do not receive lifetime appointments.
+      </p>
+    </div>
+  );
+}
+
+function BackPage({ edition, personal }: { edition: GazetteEdition; personal: { headline: string; deck: string } | null }) {
+  return (
+    <div className="space-y-4">
+      {(personal || edition.rareEgg) && (
+        <section className="border-2 border-stone-800 bg-stone-100 px-3 py-3">
+          <p className="mb-2 text-[9px] font-black uppercase tracking-[0.2em] text-stone-500">From the editor&apos;s desk</p>
+          {personal && <DeskNote headline={personal.headline} deck={personal.deck} />}
+          {edition.rareEgg && <DeskNote headline={edition.rareEgg.headline} deck={edition.rareEgg.deck} divided={Boolean(personal)} />}
+        </section>
+      )}
+
+      <section>
+        <p className="mb-2 text-center text-[10px] font-black uppercase tracking-[0.2em]">Classifieds · Notices · Questionable commerce</p>
+        {edition.classifieds.length ? (
+          <ul className="divide-y divide-stone-400 border-y-2 border-stone-900">
+            {edition.classifieds.map((line, index) => (
+              <li key={`${line}-${index}`} className="py-3 text-[13px] leading-snug text-stone-800">
+                <span className="mr-2 font-black text-red-800">{String.fromCharCode(65 + index)}.</span>{line}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <EmptyDesk title="Classified desk closed early" body="No notice was filed for this edition. The Locker Room remains dangerously available." />
+        )}
+      </section>
+
+      <section className="bg-stone-900 px-4 py-5 text-center text-[#f4f0e6]">
+        <p className="text-[9px] font-black uppercase tracking-[0.24em] text-red-300">Final word</p>
+        <h3 className="mt-2 font-serif text-2xl font-black leading-tight">THE NEXT CARD WRITES THE NEXT PAPER.</h3>
+        <p className="mt-2 text-xs leading-relaxed text-stone-300">Nothing here is permanent except the archive—and screenshots in the group chat.</p>
+      </section>
+
+      <p className="text-center text-[10px] italic text-stone-500">Filed forever in the archive. Share it. Frame it. Deny it.</p>
+    </div>
+  );
+}
+
+function StoryCard({ kicker, story, tone, large = false }: { kicker: string; story: GazetteStory; tone: "crown" | "title" | "chaos" | "shame" | "warning" | "crystal" | "rivalry" | "mover"; large?: boolean }) {
+  const tones = {
+    crown: "border-emerald-800 bg-emerald-50",
+    title: "border-amber-800 bg-amber-50",
+    chaos: "border-orange-800 bg-orange-50",
+    shame: "border-purple-800 bg-purple-50",
+    warning: "border-amber-700 bg-[#fff8df]",
+    crystal: "border-indigo-700 bg-indigo-50",
+    rivalry: "border-red-800 bg-red-50",
+    mover: "border-teal-800 bg-teal-50",
+  } as const;
+  return (
+    <article className={`border-l-4 px-3 py-3 ${tones[tone]}`}>
+      <p className="text-[9px] font-black uppercase tracking-[0.18em] text-stone-600">{kicker}</p>
+      <h3 className={`mt-1 font-serif font-black leading-[1.08] text-stone-950 ${large ? "text-2xl" : "text-lg"}`}>{story.headline}</h3>
+      {story.deck && <p className="mt-2 text-sm leading-snug text-stone-800">{story.deck}</p>}
+      <p className="mt-2 text-[11px] font-bold text-stone-600">{story.names.join(" · ")}{tone !== "rivalry" ? ` · ${story.pts} pts` : ""}</p>
     </article>
+  );
+}
+
+function EmptyDesk({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="border border-dashed border-stone-500 bg-stone-100/70 px-3 py-4">
+      <h3 className="font-serif text-lg font-black">{title}</h3>
+      <p className="mt-1 text-[13px] leading-snug text-stone-600">{body}</p>
+    </div>
+  );
+}
+
+function DeskNote({ headline, deck, divided = false }: { headline: string; deck: string; divided?: boolean }) {
+  return (
+    <div className={divided ? "mt-3 border-t border-stone-400 pt-3" : ""}>
+      <h3 className="font-serif text-base font-black leading-snug">{headline}</h3>
+      <p className="mt-1 text-[12px] leading-snug text-stone-600">{deck}</p>
+    </div>
+  );
+}
+
+function PageTurner({ page, onTurn }: { page: number; onTurn: (page: number) => void }) {
+  const meta = PAGE_META[page];
+  return (
+    <div className="border-t-2 border-stone-900 bg-[#e8e1d2] px-3 py-3">
+      {meta.next && <p className="mb-2 text-center text-[10px] font-black uppercase tracking-[0.2em] text-stone-600">Next page · {meta.next}</p>}
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={() => onTurn(page - 1)}
+          disabled={page === 0}
+          className="min-h-[48px] rounded-lg border-2 border-stone-900 px-3 py-2 text-sm font-black disabled:cursor-not-allowed disabled:opacity-25"
+        >
+          ← Previous
+        </button>
+        <button
+          type="button"
+          onClick={() => onTurn(page + 1)}
+          disabled={page === PAGE_META.length - 1}
+          className="min-h-[48px] rounded-lg bg-stone-900 px-3 py-2 text-sm font-black text-[#f4f0e6] disabled:cursor-not-allowed disabled:opacity-25"
+        >
+          Next →
+        </button>
+      </div>
+    </div>
   );
 }
