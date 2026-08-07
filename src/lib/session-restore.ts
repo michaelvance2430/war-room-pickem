@@ -42,6 +42,8 @@ export interface LeagueMembership {
   sportId?: string;
   /** Open room lobby listing (public matchmaking) */
   isOpen?: boolean;
+  /** Server-authoritative career-integrity mode. */
+  mode?: "production" | "foundry";
   /** Humans in the room (non-bot memberships) */
   humanCount?: number;
   /** Trial / padding bots in the room */
@@ -112,6 +114,7 @@ export function writeSessionAndLeague(
     commissionerId: membership.commissionerId,
     createdAt: membership.createdAt,
     sportId,
+    mode: membership.mode || "production",
     settings: {
       cutPercent: membership.cutPercent ?? 50,
       regularSeasonWeeks: membership.regularSeasonWeeks ?? 18,
@@ -225,10 +228,10 @@ async function fetchMyMembershipsFresh(
     const res = await supabase
       .from("memberships")
       .select(
-        "role, is_moderator, is_deputy, league_id, display_name_override, leagues(id, name, code, commissioner_id, created_at, cut_percent, regular_season_weeks, games_per_week, crystal_ball_enabled, home_tagline_id, home_tagline_custom, season_theme_id, sport_id, is_open)"
+        "role, is_moderator, is_deputy, league_id, display_name_override, leagues(id, name, code, commissioner_id, created_at, cut_percent, regular_season_weeks, games_per_week, crystal_ball_enabled, home_tagline_id, home_tagline_custom, season_theme_id, sport_id, is_open, mode)"
       )
       .eq("user_id", userId);
-    if (res.error && /is_moderator|is_deputy|display_name_override|schema cache|column|season_theme|home_tagline|crystal_ball|sport_id|is_open/i.test(res.error.message || "")) {
+    if (res.error && /is_moderator|is_deputy|display_name_override|schema cache|column|season_theme|home_tagline|crystal_ball|sport_id|is_open|mode/i.test(res.error.message || "")) {
       const res2 = await supabase
         .from("memberships")
         .select(
@@ -310,6 +313,7 @@ async function fetchMyMembershipsFresh(
       seasonThemeId: (L.season_theme_id as string) || "default",
       sportId: (L.sport_id as string) || "cfb",
       isOpen: L.is_open === true,
+      mode: L.mode === "foundry" ? "foundry" : "production",
     });
   }
 
