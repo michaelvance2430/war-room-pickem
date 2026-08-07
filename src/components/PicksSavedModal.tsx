@@ -40,7 +40,7 @@ export default function PicksSavedModal({ detail, onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-0 sm:p-4"
+      className="fixed inset-0 z-[110] flex items-center justify-center px-3 pt-3 pb-[calc(4.75rem+env(safe-area-inset-bottom,0px))] sm:p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="picks-saved-title"
@@ -51,7 +51,7 @@ export default function PicksSavedModal({ detail, onClose }: Props) {
         aria-label="Close"
         onClick={onClose}
       />
-      <div className="relative w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl border-2 border-primary/55 bg-card shadow-2xl">
+      <div className="relative w-full sm:max-w-md max-h-[calc(100dvh-6.5rem-env(safe-area-inset-bottom,0px))] overflow-y-auto rounded-2xl border-2 border-primary/55 bg-card shadow-2xl">
         <div className="h-1.5 w-full bg-gradient-to-r from-primary via-emerald-400 to-primary" />
         <div className="p-5 sm:p-6 space-y-4">
           <div className="text-center">
