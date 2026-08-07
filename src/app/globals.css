@@ -822,6 +822,11 @@ body {
   text-transform: uppercase;
 }
 
+.picks-lock-control {
+  width: 100%;
+  margin-bottom: 1rem;
+}
+
 .cfb-lock-seal.is-live {
   color: #58a8ff;
   filter: drop-shadow(0 0 10px rgba(65, 157, 255, 0.3));
