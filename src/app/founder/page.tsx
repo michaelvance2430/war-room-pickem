@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { getSession, getLeague } from "@/lib/league";
 import { isAppCreator } from "@/lib/creator";
+import { createClient } from "@/lib/supabase/client";
 import { loadLeaguePlayers, loadLeagueActiveWeek } from "@/lib/cloud";
 import {
   DEFAULT_INCIDENT_MESSAGE,
@@ -117,7 +118,12 @@ export default function FounderDashboardPage() {
 
     const t0 = performance.now();
     try {
-      const res = await fetch("/api/health", { cache: "no-store" });
+      const { data: auth } = await createClient().auth.getSession();
+      const token = auth.session?.access_token;
+      const res = await fetch("/api/health", {
+        cache: "no-store",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       const json = (await res.json()) as HealthPayload;
       setHealth(json);
       setHealthError(null);
