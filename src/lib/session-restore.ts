@@ -406,18 +406,11 @@ export function membershipScanLine(
   const pack = getSportPack(m.sportId || "cfb");
   const role = membershipRoleLabel(m, userId);
   const room = m.isOpen ? "Open room" : "Private";
-  const bots =
-    typeof m.botCount === "number"
-      ? m.botCount > 0
-        ? `${m.botCount} bot${m.botCount === 1 ? "" : "s"}`
-        : "No bots"
-      : null;
   const humans =
     typeof m.humanCount === "number"
       ? `${m.humanCount} player${m.humanCount === 1 ? "" : "s"}`
       : null;
-  const seats = [humans, bots].filter(Boolean).join(" · ");
-  return [`${pack.emoji} ${pack.shortLabel}`, role, room, seats || null, m.code]
+  return [`${pack.emoji} ${pack.shortLabel}`, role, room, humans, m.code]
     .filter(Boolean)
     .join(" · ");
 }
