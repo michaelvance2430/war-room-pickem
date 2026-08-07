@@ -2,8 +2,8 @@
 
 /**
  * Password recovery landing — email link from Supabase lands here.
- * detectSessionInUrl on the browser client exchanges the token;
- * we listen for PASSWORD_RECOVERY / session, then updateUser({ password }).
+ * The browser client does not auto-detect auth codes because league invites
+ * also use ?code=. This page alone exchanges password-recovery credentials.
  */
 
 import { FormEvent, Suspense, useEffect, useState } from "react";
@@ -77,51 +77,62 @@ function ResetPasswordInner() {
       }
     });
 
-    // After detectSessionInUrl finishes, session may already exist
+    // Exchange recovery credentials only on this dedicated route. Never treat
+    // an unrelated existing login session as proof of password recovery.
     void (async () => {
       try {
-        // Give the client a beat to parse the URL / exchange code
-        await new Promise((r) => setTimeout(r, 500));
-        const { data, error: sessErr } = await supabase.auth.getSession();
-        if (sessErr) {
-          markFailed(
-            "This reset link is invalid or expired. Request a new one from Log in."
-          );
-          return;
-        }
-        const url = typeof window !== "undefined" ? window.location.href : "";
-        const fromEmailLink =
-          url.includes("code=") ||
-          url.includes("access_token") ||
-          url.includes("type=recovery") ||
-          sessionStorage.getItem("warroom-password-recovery") === "1";
+        const currentUrl = new URL(window.location.href);
+        const recoveryCode = currentUrl.searchParams.get("code");
+        const hash = new URLSearchParams(currentUrl.hash.replace(/^#/, ""));
+        const accessToken = hash.get("access_token");
+        const refreshToken = hash.get("refresh_token");
 
-        if (data.session && fromEmailLink) {
-          try {
-            sessionStorage.setItem("warroom-password-recovery", "1");
-          } catch {
-            /* ignore */
+        if (recoveryCode) {
+          const { data, error: exchangeError } =
+            await supabase.auth.exchangeCodeForSession(recoveryCode);
+          if (exchangeError || !data.session) {
+            markFailed(
+              "This reset link is invalid or expired. Request a new one from Log in."
+            );
+            return;
           }
+          sessionStorage.setItem("warroom-password-recovery", "1");
+          window.history.replaceState({}, "", "/reset-password");
           markReady();
           return;
         }
-        // No session yet — wait longer for hash / PKCE exchange
-        await new Promise((r) => setTimeout(r, 1000));
-        const second = await supabase.auth.getSession();
-        if (second.data.session) {
-          try {
-            sessionStorage.setItem("warroom-password-recovery", "1");
-          } catch {
-            /* ignore */
+
+        if (accessToken && refreshToken && hash.get("type") === "recovery") {
+          const { data, error: sessionError } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+          if (sessionError || !data.session) {
+            markFailed(
+              "This reset link is invalid or expired. Request a new one from Log in."
+            );
+            return;
           }
+          sessionStorage.setItem("warroom-password-recovery", "1");
+          window.history.replaceState({}, "", "/reset-password");
           markReady();
           return;
         }
-        if (!settled) {
+
+        const { data, error: sessErr } = await supabase.auth.getSession();
+        if (sessErr || !data.session) {
           markFailed(
             "This reset link is invalid or expired. Request a new one from Log in."
           );
+          return;
         }
+        if (sessionStorage.getItem("warroom-password-recovery") === "1") {
+          markReady();
+          return;
+        }
+        markFailed(
+          "This reset link is invalid or expired. Request a new one from Log in."
+        );
       } catch {
         markFailed(
           "Could not open the reset link. Request a new one from Log in."
@@ -138,8 +149,8 @@ function ResetPasswordInner() {
     e.preventDefault();
     setError(null);
 
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters.");
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
       return;
     }
     if (password !== confirm) {
@@ -201,7 +212,7 @@ function ResetPasswordInner() {
           </div>
           <h1 className="text-2xl font-bold">Set a new password</h1>
           <p className="text-sm text-muted mt-2 leading-relaxed">
-            Choose something you&apos;ll remember — at least 6 characters.
+            Choose something you&apos;ll remember — at least 8 characters.
           </p>
         </div>
 
@@ -250,7 +261,7 @@ function ResetPasswordInner() {
                   id="new-password"
                   type={showPassword ? "text" : "password"}
                   required
-                  minLength={6}
+                  minLength={8}
                   autoComplete="new-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -278,7 +289,7 @@ function ResetPasswordInner() {
                 id="confirm-password"
                 type={showPassword ? "text" : "password"}
                 required
-                minLength={6}
+                minLength={8}
                 autoComplete="new-password"
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
