@@ -243,6 +243,16 @@ export default function WeeklyColdOpenModal({ forceOnly = false }: Props) {
         previewRef.current = !!opts?.preview;
         setSubject(sub);
         setPreview(!!opts?.preview);
+        // "Viewed once" means the broadcast successfully reached the player.
+        // Burn the player · league · champ-year key at open so alternate exits
+        // (backdrop, Escape, or route change) cannot replay it on a later login.
+        if (!opts?.preview) {
+          const session = getSession();
+          const league = getLeague();
+          if (session?.playerId && league?.id) {
+            markWeeklyColdOpenSeen(session.playerId, league.id, sub.year);
+          }
+        }
         setOpen(true);
         openRef.current = true;
         closingRef.current = false;
