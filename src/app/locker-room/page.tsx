@@ -318,11 +318,12 @@ export default function LockerRoomPage() {
     body.length <= LOCKER_MAX_CHARS &&
     !posting &&
     cooldownLeft === 0;
+  const isCfbSkin = (getLeague()?.sportId || "cfb") === "cfb";
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-6 flex flex-col min-h-0">
-        <div className="mb-4 shrink-0">
+    <div className={`min-h-screen flex flex-col ${isCfbSkin ? "cfb-locker-page" : ""}`}>
+      <main className="cfb-locker-main flex-1 max-w-2xl mx-auto w-full px-4 py-6 flex flex-col min-h-0">
+        <div className="cfb-locker-header mb-4 shrink-0">
       <div className="flex items-center gap-2 flex-wrap mb-1">
             <h1 className="text-2xl font-bold">Locker Room</h1>
       <span className="text-xs px-2 py-0.5 rounded-full bg-orange-500/15 text-orange-300 border border-orange-400/30">
@@ -384,7 +385,7 @@ export default function LockerRoomPage() {
 
         <div
           ref={listTopRef}
-          className="flex-1 min-h-[280px] max-h-[min(55vh,520px)] overflow-y-auto rounded-xl border border-border bg-card mb-4"
+          className="cfb-locker-thread flex-1 min-h-[280px] max-h-[min(55vh,520px)] overflow-y-auto rounded-xl border border-border bg-card mb-4"
         >
           {loading && (
             <p className="text-sm text-muted text-center py-12">Loading…</p>
@@ -558,7 +559,7 @@ export default function LockerRoomPage() {
         ) : (
           <form
             onSubmit={(e) => void onSubmit(e)}
-            className="shrink-0 rounded-xl border border-border bg-card p-3 space-y-2 relative"
+            className="cfb-locker-composer shrink-0 rounded-xl border border-border bg-card p-3 space-y-2 relative"
           >
             <div className="relative">
               {mentionOpen && mentionSuggestions.length > 0 && (

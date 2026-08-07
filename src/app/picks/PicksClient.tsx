@@ -1844,8 +1844,10 @@ export default function PicksClient() {
         )
       : null;
 
+  const isCfbSkin = (getLeague()?.sportId || "cfb") === "cfb";
+
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className={`min-h-screen flex flex-col ${isCfbSkin ? "cfb-picks-page" : ""}`}>
       {!practiceMode && <PicksPreOpenOddsModal />}
       <PicksHowToModal />
       <PicksSavedModal
@@ -1861,7 +1863,7 @@ export default function PicksClient() {
         />
       )}
 
-      <main className="flex-1 max-w-3xl mx-auto w-full px-3 sm:px-4 py-5 sm:py-8 phone-picks-main">
+      <main className="flex-1 max-w-3xl mx-auto w-full px-3 sm:px-4 py-5 sm:py-8 phone-picks-main cfb-picks-main">
         {eyesPreview && (
           <div className="mb-4 rounded-lg border border-sky-400/50 bg-sky-500/15 px-3 py-2 text-xs font-bold text-sky-100 flex flex-wrap items-center gap-x-2 gap-y-1">
       <span>PREVIEW · local card · not your real standings</span>
@@ -2147,7 +2149,7 @@ export default function PicksClient() {
 
         {/* Week banner — practice uses normal card chrome; identity lives in PracticeModeChrome only */}
         <div
-          className={`rounded-xl border px-4 py-3 mb-4 ${
+          className={`cfb-picks-briefing rounded-xl border px-4 py-3 mb-4 ${
             weekEditable
               ? chaosArmed || chaosLockedWeek
                 ? "border-orange-500/50 bg-orange-500/10"
@@ -2610,7 +2612,7 @@ export default function PicksClient() {
                 return (
                   <div
                     key={game.id}
-                    className={`rounded-xl border bg-card p-4 transition ${rankedMatchupShellClass(
+                    className={`cfb-matchup-dossier rounded-xl border bg-card p-4 transition ${rankedMatchupShellClass(
                       rankTier,
                       { bestBet: isBest }
                     )} ${locked && !rankTier ? "opacity-95" : ""} ${
@@ -3089,5 +3091,4 @@ export default function PicksClient() {
       </div>
   );
 }
-
 
