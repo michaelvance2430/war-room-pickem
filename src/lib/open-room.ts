@@ -119,7 +119,13 @@ export async function seatPlayerInLeague(opts: {
   userId: string;
   displayName: string;
 }): Promise<
-  | { ok: true; leagueName: string; code: string; sportId: string }
+  | {
+      ok: true;
+      leagueName: string;
+      code: string;
+      sportId: string;
+      alreadyMember?: boolean;
+    }
   | { ok: false; full?: boolean; error: string }
 > {
   if (!hasSupabaseConfig()) {
@@ -349,6 +355,7 @@ export async function seatPlayerInLeague(opts: {
     leagueName: (league.name as string) || joinRes.name || "War Room",
     code: leagueCode,
     sportId,
+    alreadyMember: joinRes.alreadyMember === true,
   };
 }
 
@@ -368,16 +375,29 @@ export async function claimNextOpenSeat(opts: {
       code: string;
       sportId: string;
       roomId: string;
+      alreadyMember?: boolean;
     }
-  | { status: "waiting"; roomsSeen: number; message: string }
-  | { status: "error"; error: string; full?: boolean }
+  | {
+      status: "waiting";
+      roomsSeen: number;
+      message: string;
+      /** True when discovery returned zero open rooms */
+      empty?: boolean;
+      /** League ids that filled while we tried (caller may exclude) */
+      filledIds?: string[];
+    }
+  | { status: "error"; error: string; full?: boolean; rpcMissing?: boolean }
 > {
   const listed = await listOpenRooms({
     excludeIds: opts.excludeIds,
     sportId: opts.sportId,
   });
   if (listed.error && (listed.sqlMissing || listed.rpcMissing)) {
-    return { status: "error", error: listed.error };
+    return {
+      status: "error",
+      error: listed.error,
+      rpcMissing: !!listed.rpcMissing,
+    };
   }
   if (listed.error) {
     return { status: "error", error: listed.error };
@@ -386,13 +406,16 @@ export async function claimNextOpenSeat(opts: {
     return {
       status: "waiting",
       roomsSeen: 0,
+      empty: true,
       message:
-        "No open seats right now. Hang tight — or host an open room so others can find you.",
+        "No open rooms with free seats right now. Hang tight — or host an open room so others can find you.",
     };
   }
 
   // Try rooms in fill order until one seats us
   const tried: string[] = [];
+  const filledIds: string[] = [];
+  let hardError: string | null = null;
   for (const room of listed.rooms) {
     tried.push(room.id);
     const res = await seatPlayerInLeague({
@@ -407,20 +430,38 @@ export async function claimNextOpenSeat(opts: {
         code: res.code,
         sportId: res.sportId,
         roomId: room.id,
+        alreadyMember: res.alreadyMember,
       };
     }
     if (res.full) {
+      filledIds.push(room.id);
       continue;
     }
-    continue;
+    // Hard error on this room — remember but keep trying others
+    hardError = res.error;
+  }
+
+  if (tried.length > 0 && filledIds.length === tried.length) {
+    return {
+      status: "waiting",
+      roomsSeen: tried.length,
+      filledIds,
+      message:
+        "Those open rooms just filled up. Looking for the next free seat…",
+    };
+  }
+
+  if (hardError && filledIds.length === 0) {
+    return { status: "error", error: hardError };
   }
 
   return {
     status: "waiting",
     roomsSeen: tried.length,
+    filledIds,
     message:
       tried.length > 0
-        ? "Those rooms just filled up. Looking for the next open seat…"
+        ? "Still matching you to an open seat…"
         : "Still looking for an open seat…",
   };
 }

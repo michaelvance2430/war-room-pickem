@@ -58,6 +58,8 @@ function JoinPageInner() {
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  /** Join-path status line under the button (rejoin / navigating) */
+  const [joinStatus, setJoinStatus] = useState<string | null>(null);
   const [createdCode, setCreatedCode] = useState<string | null>(null);
   const [checking, setChecking] = useState(true);
   const [hostCopied, setHostCopied] = useState<string | null>(null);
@@ -327,6 +329,7 @@ function JoinPageInner() {
   async function handleJoin() {
     if (!userId) return;
     setError(null);
+    setJoinStatus(null);
     const nick = displayName.trim(); // optional league alias
     if (nick) {
       const { validateDisplayNameInput } = await import("@/lib/display-name");
@@ -336,7 +339,13 @@ function JoinPageInner() {
         return;
       }
     }
+    const rawCode = code.trim().toUpperCase();
+    if (!rawCode || rawCode.length < 4) {
+      setError("Enter the full league code from your host.");
+      return;
+    }
     setLoading(true);
+    setJoinStatus("Checking code…");
     const supabase = createClient();
     try {
       const { ensureProfileRowExists } = await import(
@@ -354,15 +363,25 @@ function JoinPageInner() {
         "Player";
 
       // D1B-B: join by private code only — no browser code SELECT *, no membership INSERT
-      const joined = await joinLeagueByCode(code);
+      setJoinStatus("Joining room…");
+      const joined = await joinLeagueByCode(rawCode);
       if (!joined.ok) {
         throw new Error(joined.message);
+      }
+
+      if (joined.alreadyMember) {
+        setJoinStatus("You’re already in — opening your room…");
+      } else {
+        setJoinStatus("Seat confirmed — loading your room…");
       }
 
       const leagueId = joined.leagueId;
       const fetched = await fetchLeagueRowForMember(leagueId);
       if (!fetched.ok) {
-        throw new Error(fetched.message);
+        throw new Error(
+          fetched.message ||
+            "Joined, but couldn’t load the room. Open Home or try the code again."
+        );
       }
       const league = fetched.row;
 
@@ -480,14 +499,34 @@ function JoinPageInner() {
         } = await import("@/lib/favorite-teams");
         if (await needsAllegianceForSport(joinedSportId)) {
           landPath = declareAllegianceHref(joinedSportId, "/");
+          setJoinStatus("Almost there — choose your team…");
+        } else {
+          setJoinStatus(
+            joined.alreadyMember
+              ? "Welcome back — taking you home…"
+              : "You’re in — taking you home…"
+          );
         }
       } catch {
-        /* Home hub still gates CHOOSE_TEAM / Super Bowl / weekly */
+        setJoinStatus(
+          joined.alreadyMember
+            ? "Welcome back — taking you home…"
+            : "You’re in — taking you home…"
+        );
       }
       router.push(landPath);
       router.refresh();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Could not join");
+      setJoinStatus(null);
+      const msg = err instanceof Error ? err.message : "Could not join";
+      // Never surface raw SQL / stack to players
+      if (/permission denied|PGRST|schema cache|SQLSTATE/i.test(msg)) {
+        setError(
+          "Couldn’t join right now. Check the code and your connection, then try again."
+        );
+      } else {
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }
@@ -881,9 +920,10 @@ function JoinPageInner() {
                 hit Join.
               </p>
             ) : (
-              <p className="text-xs text-muted">
-                If the league already has {MAX_LEAGUE_PLAYERS} players, you&apos;ll
-                need another code or a free seat.
+              <p className="text-xs text-muted leading-relaxed">
+                Enter the private code from your host. Rooms cap at{" "}
+                {MAX_LEAGUE_PLAYERS} humans — if it&apos;s full, ask for another
+                code or try the open lobby.
               </p>
             )}
             <div className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-2.5 text-xs text-muted leading-relaxed">
@@ -924,17 +964,51 @@ function JoinPageInner() {
                 {accountHint ? ` (${accountHint})` : ""}.
               </p>
             </div>
-            {error && <p className="text-sm text-danger">{error}</p>}
+            {error && (
+              <div className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2.5">
+                <p className="text-sm text-danger leading-relaxed">{error}</p>
+              </div>
+            )}
+            {joinStatus && !error && (
+              <p className="text-sm text-primary font-medium text-center">
+                {joinStatus}
+              </p>
+            )}
             <button
-              onClick={handleJoin}
+              type="button"
+              onClick={() => void handleJoin()}
               disabled={loading || !code.trim()}
-              className="w-full py-3 rounded-xl bg-primary text-black font-semibold disabled:opacity-50 min-h-[48px]"
+              className="w-full py-3 rounded-xl bg-primary text-black font-semibold disabled:opacity-50 min-h-[48px] touch-manipulation"
             >
-              {loading ? "Joining…" : deepLinkCode ? "Join this league" : "Join"}
+              {loading
+                ? joinStatus?.includes("already") ||
+                  joinStatus?.includes("Welcome back")
+                  ? "Opening..."
+                  : "Joining..."
+                : deepLinkCode
+                  ? "Join this league"
+                  : "Join"}
             </button>
-      <button onClick={() => setMode("choose")} className="w-full text-sm text-muted">
+            <p className="text-[11px] text-muted text-center leading-relaxed">
+              Already a member? Enter the same code - you&apos;ll re-open the room without a second seat.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setMode("choose");
+                setError(null);
+                setJoinStatus(null);
+              }}
+              className="w-full text-sm text-muted min-h-[44px]"
+            >
               Back
             </button>
+            <Link
+              href="/open-room"
+              className="block w-full text-center text-sm text-primary font-medium py-2"
+            >
+              No code? Try the open room lobby
+            </Link>
       </div>
         )}
       </div>

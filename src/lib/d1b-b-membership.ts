@@ -167,7 +167,8 @@ export function mapD1bBError(
       ok: false,
       code,
       detail,
-      message: "Invalid league code",
+      message:
+        "That code didn’t match any league. Check the six characters and try again — codes are case-insensitive.",
     };
   }
   if (code === "league_full") {
@@ -175,7 +176,10 @@ export function mapD1bBError(
       ok: false,
       code,
       detail,
-      message: leagueFullMessage(),
+      message:
+        ctx === "join_open"
+          ? "That open room just filled up. We’ll look for another seat."
+          : leagueFullMessage(),
     };
   }
   if (code === "not_open") {
@@ -184,7 +188,7 @@ export function mapD1bBError(
       code,
       detail,
       message:
-        "That room isn’t open for matchmaking right now. Try another open room or join with a code.",
+        "That room isn’t open for matchmaking right now. Try another open room or join with a private code.",
     };
   }
   if (code === "not_found") {
@@ -194,8 +198,8 @@ export function mapD1bBError(
       detail,
       message:
         ctx === "join_open"
-          ? "That room vanished. Try another open league."
-          : "League not found.",
+          ? "That room vanished from the open list. Trying the next one…"
+          : "We couldn’t find that league. Double-check the code with your host.",
     };
   }
   if (code === "validation_failed") {
@@ -263,14 +267,21 @@ function asRecord(data: unknown): Record<string, unknown> | null {
 function rpcUnavailable(
   context: "create" | "join_code" | "join_open" | "list_open"
 ): D1bBAppError {
+  const byCtx: Record<typeof context, string> = {
+    list_open:
+      "Open-room matching isn’t available right now. Join with a private code, or try again in a moment.",
+    create:
+      "Couldn’t create a league right now. Check your connection and try again — if it keeps failing, the host tools may need a refresh.",
+    join_code:
+      "Couldn’t join with that code right now. Check your connection and try again.",
+    join_open:
+      "Couldn’t claim an open seat right now. Try again, or join with a private code.",
+  };
   return {
     ok: false,
     code: "rpc_unavailable",
     rpcMissing: true,
-    message:
-      context === "list_open"
-        ? "Open-room discovery isn’t available on this database yet (D1B-B RPCs not installed)."
-        : "League create/join isn’t available on this database yet (D1B-B RPCs not installed). Apply review-only package 01–06 on a disposable branch — not production without Mike auth.",
+    message: byCtx[context],
   };
 }
 

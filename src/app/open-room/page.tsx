@@ -69,15 +69,18 @@ export default function OpenRoomPage() {
   }, [router]);
 
   const refreshPreview = useCallback(async () => {
-    const { rooms } = await listOpenRooms({ excludeIds });
-    setPreview(rooms.slice(0, 5));
+    const listed = await listOpenRooms({ excludeIds });
+    setPreview(listed.rooms.slice(0, 5));
+    return listed;
   }, [excludeIds]);
 
   const tryClaim = useCallback(async () => {
     if (!userId || busy.current) return;
+    if (seatedRef.current) return;
     busy.current = true;
+    setError(null);
     setPhase((p) => (p === "seated" ? p : "seating"));
-    setStatusLine("Found a room — claiming your seat…");
+    setStatusLine("Looking for an open seat…");
     try {
       const res = await claimNextOpenSeat({
         userId,
@@ -88,7 +91,11 @@ export default function OpenRoomPage() {
         seatedRef.current = true;
         setSeatedName(res.leagueName);
         setPhase("seated");
-        setStatusLine(`You’re in · ${res.leagueName}`);
+        setStatusLine(
+          res.alreadyMember
+            ? `Welcome back · ${res.leagueName}`
+            : `You’re in · ${res.leagueName}`
+        );
         setShowSwitchOffer(false);
         const seatedSport = res.sportId || "cfb";
         window.setTimeout(() => {
@@ -114,12 +121,24 @@ export default function OpenRoomPage() {
       if (res.status === "error") {
         setError(res.error);
         setPhase("error");
+        setStatusLine(
+          res.rpcMissing
+            ? "Matching isn’t available"
+            : "Couldn’t claim a seat"
+        );
         return;
       }
-      // waiting
+      // waiting — empty list or rooms filled mid-claim
+      if (res.filledIds?.length) {
+        setExcludeIds((prev) => [...new Set([...prev, ...res.filledIds!])]);
+      }
       setPhase("waiting");
       setStatusLine(res.message);
-      await refreshPreview();
+      if (res.empty) {
+        setPreview([]);
+      } else {
+        await refreshPreview();
+      }
     } finally {
       busy.current = false;
     }
@@ -224,17 +243,17 @@ export default function OpenRoomPage() {
       </div>
 
           {error && (
-            <div className="rounded-lg border border-border bg-background/60 px-3 py-2.5">
-      <p className="text-sm text-foreground leading-relaxed">{error}</p>
-      </div>
+            <div className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2.5">
+              <p className="text-sm text-danger leading-relaxed">{error}</p>
+            </div>
           )}
 
-          {preview.length > 0 && phase !== "seated" && (
+          {preview.length > 0 && phase !== "seated" && phase !== "error" && (
             <div>
-      <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted mb-2">
+              <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted mb-2">
                 Open rooms filling now
               </p>
-      <ul className="space-y-2">
+              <ul className="space-y-2">
                 {preview.map((r, i) => (
                   <li
                     key={r.id}
@@ -244,40 +263,69 @@ export default function OpenRoomPage() {
                         : "border-border bg-background/40"
                     }`}
                   >
-      <span className="font-medium text-foreground truncate">
+                    <span className="font-medium text-foreground truncate">
                       {i === 0 ? "→ " : ""}
                       {r.name}
                     </span>
-      <span className="text-xs text-muted shrink-0 tabular-nums">
+                    <span className="text-xs text-muted shrink-0 tabular-nums">
                       {r.memberCount}/{r.maxHumanMembers || MAX_LEAGUE_PLAYERS}
                       <span className="text-primary ml-1">
                         · {r.seatsLeft} left
                       </span>
-      </span>
+                    </span>
                   </li>
                 ))}
               </ul>
-      <p className="text-[11px] text-muted mt-2 leading-relaxed">
+              <p className="text-[11px] text-muted mt-2 leading-relaxed">
                 First in line is the fullest open room — we pack that one before
-                starting the next.
+                starting the next. Codes stay private.
               </p>
-      </div>
+            </div>
           )}
+
+          {preview.length === 0 &&
+            (phase === "waiting" || phase === "searching") && (
+              <div className="rounded-lg border border-border bg-background/50 px-3 py-3 text-sm text-muted leading-relaxed space-y-1.5">
+                <p className="font-semibold text-foreground text-sm">
+                  No open seats right now
+                </p>
+                <p>
+                  Hang tight while we poll for a free chair — or join with a
+                  private code, or host an open room for others.
+                </p>
+              </div>
+            )}
 
           {phase === "seated" && seatedName && (
             <p className="text-sm text-primary font-semibold text-center">
-              Welcome to {seatedName}. Taking you home…
+              Welcome to {seatedName}. Taking you home...
             </p>
           )}
 
           <div className="flex flex-col gap-2 pt-1">
-            {phase !== "seated" && (
+            {phase !== "seated" && phase !== "error" && (
               <button
                 type="button"
                 onClick={() => void tryClaim()}
                 className="w-full py-3.5 min-h-[52px] rounded-xl bg-primary text-black font-bold touch-manipulation"
               >
-                Try seat again
+                {phase === "seating" ? "Claiming seat..." : "Try seat again"}
+              </button>
+            )}
+            {phase === "error" && (
+              <button
+                type="button"
+                onClick={() => {
+                  setError(null);
+                  setPhase("searching");
+                  setStatusLine("Looking for an open seat...");
+                  startedAt.current = Date.now();
+                  offerShown.current = false;
+                  void tryClaim();
+                }}
+                className="w-full py-3.5 min-h-[52px] rounded-xl bg-primary text-black font-bold touch-manipulation"
+              >
+                Try again
               </button>
             )}
             <Link
@@ -286,19 +334,19 @@ export default function OpenRoomPage() {
             >
               Join with a code instead
             </Link>
-      <Link
+            <Link
               href="/join?mode=create&open=1"
               className="w-full py-3 min-h-[48px] rounded-xl border border-primary/30 text-center text-sm font-medium text-primary touch-manipulation flex items-center justify-center"
             >
               Commish an open room
             </Link>
-      <Link
-              href="/login"
+            <Link
+              href="/"
               className="text-center text-xs text-muted py-2"
             >
-              Back
+              Back home
             </Link>
-      </div>
+          </div>
         </div>
       <OwnershipNotice className="mt-8" />
       </div>
