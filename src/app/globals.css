@@ -716,9 +716,34 @@ body {
 }
 
 @media (max-width: 559px) {
+  .cfb-situation-masthead .home-identity-row {
+    flex-wrap: nowrap;
+  }
+
+  .cfb-situation-masthead .cfb-hero-brand {
+    margin-right: 0;
+  }
+
+  .cfb-situation-masthead .cfb-wordmark {
+    display: none;
+  }
+
+  .cfb-situation-masthead .home-share-button {
+    flex-shrink: 0;
+  }
+
   .home-mission-clock-slot {
-    right: 5.85rem;
+    right: 5.15rem;
     width: auto;
+  }
+
+  .home-mission-countdown {
+    padding: 0.55rem 0.62rem 0.58rem;
+  }
+
+  .home-mission-countdown > strong {
+    gap: 0.5rem;
+    font-size: clamp(1.45rem, 6.5vw, 1.9rem);
   }
 }
 
