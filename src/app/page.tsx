@@ -181,10 +181,12 @@ export default function Home() {
     };
     let idleId: number | undefined;
     let t: ReturnType<typeof setTimeout> | undefined;
+    // Secondary chrome after first paint — short timeout so Home feels complete
+    // without competing with hero network on the same tick.
     if (typeof w.requestIdleCallback === "function") {
-      idleId = w.requestIdleCallback(arm, { timeout: 2_500 });
+      idleId = w.requestIdleCallback(arm, { timeout: 1_400 });
     } else {
-      t = setTimeout(arm, 1_800);
+      t = setTimeout(arm, 900);
     }
     return () => {
       cancelled = true;
@@ -376,36 +378,44 @@ export default function Home() {
         );
         setIsCommish(isCommissioner());
         setActuallyCommish(isActuallyCommissioner());
-        try {
-          const { sanitizeLegacyLegendsOnBoot } = await import(
-            "@/lib/legacy-badge-grants"
-          );
-          const sess = getSession();
-          sanitizeLegacyLegendsOnBoot({
-            playerId: sess?.playerId,
-            playerName: sess?.playerName,
-          });
-        } catch {
-          /* ignore */
-        }
-        try {
-          const { nukeAccumulatedSandboxCareersOnce } = await import(
-            "@/lib/sandbox-wipe"
-          );
-          nukeAccumulatedSandboxCareersOnce();
-        } catch {
-          /* ignore */
-        }
-        try {
-          const pd = await import("@/lib/progressive-disclosure");
-          const snap = await pd.loadProgressiveSnapshot(getSession()?.playerId);
-          setFirstWeekChrome(snap.firstWeekChrome);
-          setShowGazetteShelf(snap.showGazetteShelf);
-        } catch {
-          setFirstWeekChrome(false);
-          setShowGazetteShelf(true);
-        }
+        // Paint Home shell now — progressive flags + sanitizers in background
         setReady(true);
+        void (async () => {
+          try {
+            const { sanitizeLegacyLegendsOnBoot } = await import(
+              "@/lib/legacy-badge-grants"
+            );
+            const sess = getSession();
+            sanitizeLegacyLegendsOnBoot({
+              playerId: sess?.playerId,
+              playerName: sess?.playerName,
+            });
+          } catch {
+            /* ignore */
+          }
+          try {
+            const { nukeAccumulatedSandboxCareersOnce } = await import(
+              "@/lib/sandbox-wipe"
+            );
+            nukeAccumulatedSandboxCareersOnce();
+          } catch {
+            /* ignore */
+          }
+          try {
+            const pd = await import("@/lib/progressive-disclosure");
+            const snap = await pd.loadProgressiveSnapshot(
+              getSession()?.playerId
+            );
+            if (cancelled) return;
+            setFirstWeekChrome(snap.firstWeekChrome);
+            setShowGazetteShelf(snap.showGazetteShelf);
+          } catch {
+            if (!cancelled) {
+              setFirstWeekChrome(false);
+              setShowGazetteShelf(true);
+            }
+          }
+        })();
       } catch (e: unknown) {
         if (!cancelled) {
           setBootError(e instanceof Error ? e.message : "Failed to start");

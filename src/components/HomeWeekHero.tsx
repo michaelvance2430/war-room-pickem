@@ -197,24 +197,17 @@ export default function HomeWeekHero() {
         const week =
           sport === "nfl" && rawWeek <= 0 ? first : Math.max(first, rawWeek);
 
-        // Parallel: card + roster + picks + NFL allegiance (sport-specific)
+        // First paint: card + picks + NFL allegiance only (no full roster wait)
         let needsNflTeam = false;
-        const loads: [
-          ReturnType<typeof loadWeekCard>,
-          ReturnType<typeof loadLeagueRoster>,
-          ReturnType<typeof loadMyPicks>,
-          Promise<boolean>,
-        ] = [
+        let [card, mine, nflNeed] = await Promise.all([
           loadWeekCard(week),
-          loadLeagueRoster().catch(() => []),
           loadMyPicks(week).catch(() => null),
           sport === "nfl"
             ? import("@/lib/favorite-teams")
                 .then((m) => m.needsNflAllegiance())
                 .catch(() => false)
             : Promise.resolve(false),
-        ];
-        let [card, roster, mine, nflNeed] = await Promise.all(loads);
+        ]);
         needsNflTeam = !!nflNeed;
         if (cancelled) return;
 
@@ -237,7 +230,7 @@ export default function HomeWeekHero() {
           }
         }
 
-        // Pride pick (Crystal Ball / Super Bowl) on opening week only
+        // Pride pick: local seal first; cloud only if still unknown (opening week)
         let needsPridePick = false;
         const league = getLeague();
         const crystalOn = league?.settings?.crystalBallEnabled !== false;
@@ -251,27 +244,33 @@ export default function HomeWeekHero() {
               "@/lib/crystal-ball"
             );
             const local = peekLocalCrystalBall();
-            // Fail closed: if we cannot confirm sealed, don't invent Make Picks
-            // Prefer cloud when available (async light check)
-            const { createClient, hasSupabaseConfig } = await import(
-              "@/lib/supabase/client"
-            );
-            const session = getSession();
-            if (hasSupabaseConfig() && session?.playerId && session?.leagueId) {
-              const supabase = createClient();
-              const { data, error } = await supabase
-                .from("crystal_ball_picks")
-                .select("user_id")
-                .eq("league_id", session.leagueId)
-                .eq("user_id", session.playerId)
-                .maybeSingle();
-              if (error) {
-                needsPridePick = true; // fail closed: prefer pride pick over false Make Picks
-              } else {
-                needsPridePick = !data;
-              }
+            if (local?.myTeam) {
+              needsPridePick = false;
             } else {
-              needsPridePick = !local?.myTeam;
+              const { createClient, hasSupabaseConfig } = await import(
+                "@/lib/supabase/client"
+              );
+              const session = getSession();
+              if (
+                hasSupabaseConfig() &&
+                session?.playerId &&
+                session?.leagueId
+              ) {
+                const supabase = createClient();
+                const { data, error } = await supabase
+                  .from("crystal_ball_picks")
+                  .select("user_id")
+                  .eq("league_id", session.leagueId)
+                  .eq("user_id", session.playerId)
+                  .maybeSingle();
+                if (error) {
+                  needsPridePick = true;
+                } else {
+                  needsPridePick = !data;
+                }
+              } else {
+                needsPridePick = true;
+              }
             }
           } catch {
             needsPridePick = true;
@@ -282,13 +281,12 @@ export default function HomeWeekHero() {
         const hasCard = isFormallyPublishedCard(card);
         const now = Date.now();
         const frozen = hasCard && isCardLockDeadlinePassed(games, now);
-        const humans = roster.filter((m) => !m.isBot);
         if (cancelled) return;
         const iLocked = !!(
           mine?.lockedAt && Object.keys(mine.picks || {}).length
         );
 
-        // Paint hero immediately — last-week recap can fill in after
+        // Paint CTA runway now — roster count + recap fill in after
         const next: HeroState = {
           week: liveWeek,
           hasCard,
@@ -296,7 +294,10 @@ export default function HomeWeekHero() {
           lockLabel: hasCard ? formatCardLockDeadline(games) : null,
           frozen,
           iLocked,
-          rosterCount: humans.length,
+          rosterCount:
+            heroCache?.leagueId === (getLeague()?.id || "")
+              ? heroCache.state.rosterCount
+              : 0,
           scoredWeeks: scored.length,
           weekScored: scored.includes(liveWeek),
           isCommish: isCommissioner(),
@@ -305,7 +306,10 @@ export default function HomeWeekHero() {
           advancedFromScored: advanced,
           needsNflTeam,
           needsPridePick,
-          lastWeekRecap: state?.lastWeekRecap ?? null,
+          lastWeekRecap:
+            heroCache?.leagueId === (getLeague()?.id || "")
+              ? heroCache.state.lastWeekRecap
+              : null,
         };
         setState(next);
         window.clearTimeout(failSafe);
@@ -315,15 +319,33 @@ export default function HomeWeekHero() {
           state: next,
         };
 
+        // Secondary: roster headcount (does not block Make Picks / lock CTA)
+        void loadLeagueRoster()
+          .then((roster) => {
+            if (cancelled) return;
+            const humans = roster.filter((m) => !m.isBot);
+            setState((prev) => {
+              if (!prev) return prev;
+              const merged = { ...prev, rosterCount: humans.length };
+              heroCache = {
+                at: Date.now(),
+                leagueId: getLeague()?.id || "",
+                state: merged,
+              };
+              return merged;
+            });
+          })
+          .catch(() => {
+            /* roster optional for first paint */
+          });
+
         // Last scored week recap — only a week *before* the card you're on.
-        // Deferred so loadLeaguePlayers doesn't block the hero.
         try {
           const selfId = getSession()?.playerId;
           const priorScored = scored
             .filter((w) => Number.isFinite(w) && w < week)
             .sort((a, b) => b - a);
           const lastScoredWeek = priorScored[0];
-          // Official results only — never membership residue without weeksPlayed
           if (selfId != null && lastScoredWeek != null && scored.length > 0) {
             const players = await loadLeaguePlayers();
             if (cancelled) return;
