@@ -131,6 +131,36 @@ export default function StandingsPage() {
         }
       };
       mark("effect-start");
+      // Direct links can arrive before the local room session is hydrated.
+      // Restore it before rendering a fake empty league.
+      if (!getSession()?.leagueId) {
+        try {
+          const { restoreSessionFromCloud } = await import(
+            "@/lib/session-restore"
+          );
+          const restored = await restoreSessionFromCloud();
+          if (cancelled) return;
+          if (restored.status === "no_auth") {
+            window.location.replace("/login");
+            return;
+          }
+          if (restored.status === "no_leagues") {
+            window.location.replace("/join");
+            return;
+          }
+          if (restored.status === "pick_league") {
+            window.location.replace("/");
+            return;
+          }
+          if (restored.status === "network_error") {
+            throw new Error("Could not restore league session");
+          }
+        } catch {
+          // Home owns the retry UI and can distinguish auth from network state.
+          window.location.replace("/");
+          return;
+        }
+      }
       const sid = getSession()?.playerId || null;
       setSelfId(sid);
       if (sid) {
