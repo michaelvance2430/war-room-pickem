@@ -347,6 +347,12 @@ export default function StandingsPage() {
                   <i aria-hidden /> {pulsePhase === "regular" ? "Live season" : pulsePhase}
                 </span>
               </div>
+              <div className="cfb-scoreboard-brag" aria-label="War Room house scoreboard joke">
+                <span>War Room <strong>63</strong></span>
+                <small>Final*</small>
+                <span><strong>3</strong> Other Pools</span>
+              </div>
+              <p className="cfb-scoreboard-brag-note">*Source: us. Very independent.</p>
               <p className="cfb-scoreboard-kicker">Saturday command board</p>
               <h1 id="standings-title">Standings</h1>
 
