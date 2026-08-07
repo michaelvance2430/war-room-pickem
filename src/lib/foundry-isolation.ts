@@ -145,10 +145,6 @@ export function isExplicitLabLeague(league?: LabLeagueInput): boolean {
     return true;
   }
 
-  // Name cue — only when intentionally tagged (not a production room name)
-  const name = (lg.name || "").trim();
-  if (/^\[LAB\]/i.test(name) || /\bFOUNDRY\b/i.test(name)) return true;
-
   return false;
 }
 
