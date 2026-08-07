@@ -5019,6 +5019,12 @@ export async function previewAutoBalanceDivisions(): Promise<{
   afterCounts?: Record<DivisionName, number>;
   total?: number;
   sportId?: string;
+  moves?: Array<{
+    userId: string;
+    name: string;
+    from: DivisionName | null;
+    to: DivisionName;
+  }>;
 }> {
   const session = getSession();
   if (!session?.leagueId || !isOps()) {
@@ -5038,6 +5044,12 @@ export async function previewAutoBalanceDivisions(): Promise<{
 
   const roster = await loadLeagueRosterFreshForced();
   if (!roster.length) return { ok: false, error: "No players in this league" };
+  if (roster.some((m) => m.isBot)) {
+    return {
+      ok: false,
+      error: "Remove legacy bot seats before balancing the real roster.",
+    };
+  }
 
   const sportId = getLeague()?.sportId || "cfb";
   const plan = planMinMoveBalance(
@@ -5047,6 +5059,7 @@ export async function previewAutoBalanceDivisions(): Promise<{
     })),
     { sportId }
   );
+  const byMembershipId = new Map(roster.map((m) => [m.membershipId, m]));
 
   return {
     ok: true,
@@ -5058,6 +5071,15 @@ export async function previewAutoBalanceDivisions(): Promise<{
     afterCounts: plan.afterCounts,
     total: roster.length,
     sportId,
+    moves: plan.moves.map((move) => {
+      const member = byMembershipId.get(move.id);
+      return {
+        userId: member?.userId || "",
+        name: member?.name || "Player",
+        from: move.from,
+        to: move.to,
+      };
+    }),
   };
 }
 
@@ -5093,6 +5115,12 @@ export async function autoBalanceDivisions(): Promise<AutoBalanceResult> {
     return { ok: false, error: "Could not load roster" };
   }
   if (!roster.length) return { ok: false, error: "No players in this league" };
+  if (roster.some((m) => m.isBot)) {
+    return {
+      ok: false,
+      error: "Remove legacy bot seats before balancing the real roster.",
+    };
+  }
 
   // Reject missing membership ids (cannot plan safely)
   if (roster.some((m) => !m.membershipId)) {
