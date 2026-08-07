@@ -6,8 +6,8 @@
  * No mock edition builder and no score/achievement/engraving writes.
  */
 
-import { useCallback, useEffect, useState } from "react";
-import GazettePaper from "@/components/GazettePaper";
+import { Component, type ErrorInfo, type ReactNode, useCallback, useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import {
   loadGazetteArchive,
   type ArchivedGazette,
@@ -16,6 +16,47 @@ import {
   buildFoundryGazetteFixture,
   FOUNDRY_GAZETTE_VERSION_COUNT,
 } from "@/lib/foundry-gazette-fixtures";
+
+const GazettePaper = dynamic(
+  () => import("@/components/GazettePaper").then((module) => module.default),
+  {
+    ssr: false,
+    loading: () => (
+      <p className="bg-[#f4f0e6] px-4 py-10 text-center text-xs font-bold text-stone-600">
+        Printing Foundry edition…
+      </p>
+    ),
+  }
+);
+
+class GazettePreviewBoundary extends Component<
+  { children: ReactNode },
+  { failed: boolean }
+> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error("[WR-FOUNDRY-GAZETTE] preview contained", error, info);
+  }
+
+  render() {
+    if (this.state.failed) {
+      return (
+        <div className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-4 text-center">
+          <p className="text-sm font-black text-danger">Preview renderer contained</p>
+          <p className="mt-1 text-[11px] leading-snug text-muted">
+            Foundry remains operational. Reload this page to retry the Gazette preview.
+          </p>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 type Proof = { label: string; ok: boolean; detail: string };
 
@@ -58,6 +99,7 @@ export default function FoundryGazetteStudio() {
   const [lane, setLane] = useState<"simulator" | "proof">("simulator");
   const [fixtureVersion, setFixtureVersion] = useState(1);
   const [fixtureNonce, setFixtureNonce] = useState(0);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [editions, setEditions] = useState<ArchivedGazette[]>([]);
   const [selected, setSelected] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -102,6 +144,15 @@ export default function FoundryGazetteStudio() {
       current >= FOUNDRY_GAZETTE_VERSION_COUNT ? 1 : current + 1
     );
     setFixtureNonce(Date.now());
+    setPreviewOpen(true);
+  }
+
+  function openPreview() {
+    setFixtureVersion(
+      1 + Math.floor(Math.random() * FOUNDRY_GAZETTE_VERSION_COUNT)
+    );
+    setFixtureNonce(Date.now());
+    setPreviewOpen(true);
   }
 
   return (
@@ -178,14 +229,26 @@ export default function FoundryGazetteStudio() {
               Generate next
             </button>
           </div>
-          <div className="mx-auto max-w-2xl overflow-hidden rounded-lg border border-red-500/40">
-            <GazettePaper
-              key={`fixture-${fixtureVersion}-${fixtureNonce}`}
-              edition={fixture}
-              variant="archive"
-              foundryPreview
-            />
-          </div>
+          {!previewOpen ? (
+            <button
+              type="button"
+              onClick={openPreview}
+              className="min-h-[52px] w-full rounded-xl bg-red-700 px-4 py-3 text-sm font-black text-white"
+            >
+              Open generated Foundry Gazette
+            </button>
+          ) : (
+            <GazettePreviewBoundary>
+              <div className="mx-auto max-w-2xl overflow-hidden rounded-lg border border-red-500/40">
+                <GazettePaper
+                  key={`fixture-${fixtureVersion}-${fixtureNonce}`}
+                  edition={fixture}
+                  variant="archive"
+                  foundryPreview
+                />
+              </div>
+            </GazettePreviewBoundary>
+          )}
         </>
       )}
 
@@ -228,14 +291,16 @@ export default function FoundryGazetteStudio() {
             ))}
           </div>
 
-          <div className="mx-auto max-w-2xl overflow-hidden rounded-lg border border-border">
-            <GazettePaper
-              key={row.id || row.weekNumber}
-              edition={row.edition}
-              variant="archive"
-              foundryPreview
-            />
-          </div>
+          <GazettePreviewBoundary>
+            <div className="mx-auto max-w-2xl overflow-hidden rounded-lg border border-border">
+              <GazettePaper
+                key={row.id || row.weekNumber}
+                edition={row.edition}
+                variant="archive"
+                foundryPreview
+              />
+            </div>
+          </GazettePreviewBoundary>
         </>
       )}
     </section>
