@@ -81,7 +81,7 @@ export default function FoundryLabIsolationPanel() {
         <button
           type="button"
           disabled={!id || lab}
-          onClick={() => {
+          onClick={async () => {
             if (!id) return;
             const proof = window.prompt(
               `Mark “${name || "this room"}” as disposable LAB data?\n\nType LAB to allow simulations that write cards, picks, results, standings, bots, and Gazette history.`
@@ -90,7 +90,11 @@ export default function FoundryLabIsolationPanel() {
               setNote("LAB mark cancelled. Type LAB exactly to arm simulations.");
               return;
             }
-            markLeagueAsFoundryLab(id);
+            const result = await markLeagueAsFoundryLab(id);
+            if (!result.ok) {
+              setNote(`LAB mark failed: ${result.error || "database rejected it"}`);
+              return;
+            }
             refresh();
             setNote(
               "Room marked LAB. Demo slate, randomize & score, bots, and drama prep may run here only."
@@ -103,9 +107,13 @@ export default function FoundryLabIsolationPanel() {
         <button
           type="button"
           disabled={!id || !lab}
-          onClick={() => {
+          onClick={async () => {
             if (!id) return;
-            unmarkLeagueAsFoundryLab(id);
+            const result = await unmarkLeagueAsFoundryLab(id);
+            if (!result.ok) {
+              setNote(`Unmark failed: ${result.error || "database rejected it"}`);
+              return;
+            }
             refresh();
             setNote(
               "LAB mark removed. Simulations hard-blocked on this room."
