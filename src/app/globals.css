@@ -445,6 +445,20 @@ body {
   box-shadow: inset 0 0 24px rgba(208, 169, 31, 0.05);
 }
 
+.home-war-room[data-home-sport="cfb"] .preseason-room-strip { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:.6rem; min-height:4.15rem; padding:.72rem .85rem; border-color:rgba(240,196,27,.86); background:linear-gradient(100deg,rgba(38,31,2,.92),rgba(9,9,3,.95)); box-shadow:inset 0 0 26px rgba(240,196,27,.045),0 8px 24px rgba(0,0,0,.24); }
+.home-war-room[data-home-sport="cfb"] .preseason-room-copy { min-width:0; color:rgba(255,255,255,.83); font-size:.67rem; line-height:1.42; }
+.home-war-room[data-home-sport="cfb"] .preseason-league-tools { display:inline-flex; align-items:center; gap:.28rem; padding:.45rem .1rem .45rem .55rem; color:#f1c81e; font-size:.65rem; font-weight:900; letter-spacing:.04em; text-transform:uppercase; text-decoration:none; white-space:nowrap; }
+.home-war-room[data-home-sport="cfb"] .preseason-league-tools span { font-family:Georgia,serif; font-size:1.35rem; line-height:0; }
+.home-war-room[data-home-sport="cfb"] .cfb-week-hero .home-week-hero-card { position:relative; }
+.home-war-room[data-home-sport="cfb"] .cfb-week-hero .home-week-hero-card.is-locked { min-height:13.6rem; padding-right:7.35rem; }
+.cfb-lock-seal { position:absolute; top:3.55rem; right:1rem; width:5.7rem; display:flex; flex-direction:column; align-items:center; color:#35ef62; filter:drop-shadow(0 0 10px rgba(37,255,91,.35)); pointer-events:none; }
+.cfb-lock-seal svg { width:5.15rem; height:6.6rem; overflow:visible; }
+.cfb-lock-shackle-glow { fill:none; stroke:rgba(54,255,99,.25); stroke-width:13; stroke-linecap:round; }
+.cfb-lock-shackle { fill:none; stroke:#35ef62; stroke-width:4.5; stroke-linecap:round; }
+.cfb-lock-body { fill:rgba(4,29,10,.95); stroke:#35ef62; stroke-width:4; }
+.cfb-lock-key { fill:#35ef62; }
+.cfb-lock-seal span { margin-top:-.2rem; font-family:Impact,Haettenschweiler,"Arial Narrow Bold",sans-serif; font-size:.78rem; letter-spacing:.1em; text-transform:uppercase; }
+@media (max-width:370px) { .home-war-room[data-home-sport="cfb"] .cfb-week-hero .home-week-hero-card.is-locked { padding-right:6.1rem; } .cfb-lock-seal { right:.55rem; width:4.9rem; transform:scale(.88); transform-origin:top right; } }
 .home-war-room[data-home-sport="cfb"] .cfb-week-hero .home-week-hero-card {
   border-radius: 1rem;
   border-color: rgba(61, 211, 83, 0.72);
