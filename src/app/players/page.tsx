@@ -33,6 +33,8 @@ import { isPreseasonCommishToolsAllowed } from "@/lib/season-mode";
 import { getBlueFalconCount, hydrateBlueFalconFromCloud } from "@/lib/blue-falcon";
 import { hasOfficialScoredWeek } from "@/lib/season-scored";
 
+type BalancePreview = Awaited<ReturnType<typeof previewAutoBalanceDivisions>>;
+
 export default function PlayersPage() {
   const [players, setPlayers] = useState<LeagueRosterMember[]>([]);
   const [isCommish, setIsCommish] = useState(false);
@@ -57,6 +59,7 @@ export default function PlayersPage() {
     reason?: string;
   }>({ locked: false });
   const [balanceNote, setBalanceNote] = useState<string | null>(null);
+  const [balancePreview, setBalancePreview] = useState<BalancePreview | null>(null);
   /** Writes may have landed; re-read failed — offer Retry Refresh */
   const [needsRetryRefresh, setNeedsRetryRefresh] = useState(false);
   const preseasonKickOk = isPreseasonCommishToolsAllowed();
@@ -252,13 +255,13 @@ export default function PlayersPage() {
     setBusy(false);
   }
 
-  async function handleAutoBalance() {
-    // In-flight guard: busy OR balancing blocks double-tap
+  async function previewBalance() {
     if (!canManageDivs || busy || balancing) return;
     setBusy(true);
     setBalancing(true);
     setError(null);
     setBalanceNote(null);
+    setBalancePreview(null);
     setNeedsRetryRefresh(false);
 
     const preview = await previewAutoBalanceDivisions();
@@ -288,23 +291,33 @@ export default function PlayersPage() {
       return;
     }
 
-    const confLines = [
-      "Auto Balance (minimum moves)",
-      "",
-      `Roster: ${preview.total ?? "?"} memberships`,
-      `Current: ${preview.beforeLabel}`,
-      `Planned: ${preview.afterLabel}`,
-      `Players who will move: ${preview.moveCount}`,
-      "",
-      "Moves only the fewest memberships needed to balance the four groups.",
-      preview.sportId === "nfl"
-        ? "NFL: AFC/NFC conference totals will also differ by at most 1."
-        : "Each group will differ by at most 1 player.",
-      "Result is verified from Supabase after save — success only if counts prove balanced.",
-      "",
-      "Continue?",
-    ];
-    if (!confirm(confLines.join("\n"))) {
+    setBalancePreview(preview);
+    setBalancing(false);
+    setBusy(false);
+  }
+
+  async function applyAutoBalance() {
+    if (!canManageDivs || busy || balancing || !balancePreview?.ok) return;
+    setBusy(true);
+    setBalancing(true);
+    setError(null);
+    setBalanceNote(null);
+    setNeedsRetryRefresh(false);
+
+    const freshPreview = await previewAutoBalanceDivisions();
+    if (
+      !freshPreview.ok ||
+      freshPreview.total !== balancePreview.total ||
+      freshPreview.beforeLabel !== balancePreview.beforeLabel ||
+      freshPreview.afterLabel !== balancePreview.afterLabel ||
+      freshPreview.moveCount !== balancePreview.moveCount
+    ) {
+      setBalancePreview(freshPreview.ok ? freshPreview : null);
+      setError(
+        freshPreview.ok
+          ? "Roster changed. Review the updated preview before applying."
+          : freshPreview.error || "Could not refresh the balance preview."
+      );
       setBalancing(false);
       setBusy(false);
       return;
@@ -313,6 +326,7 @@ export default function PlayersPage() {
     const result = await autoBalanceDivisions();
 
     if (result.ok) {
+      setBalancePreview(null);
       // Prefer mutation-returned authoritative roster (same as post-save verify).
       // Never wait for logout / hard refresh / router alone.
       if (result.roster && result.roster.length > 0) {
@@ -386,7 +400,7 @@ export default function PlayersPage() {
 
   const byDivision = DIVISIONS.map((d) => ({
     division: d,
-    list: players
+    list: humans
       .filter((p) => p.division === d)
       .sort((a, b) => {
         // Humans first, then bots; alpha within
@@ -404,7 +418,7 @@ export default function PlayersPage() {
       <p className="text-sm text-muted">
               {loading
                 ? "Loading…"
-                : `${capacityLabel(players.length)} · ${humans.length} real · ${bots.length} bot${bots.length === 1 ? "" : "s"} · ${openSeats} open`}
+                : `${capacityLabel(players.length)} · ${openSeats} open`}
               {leagueName ? ` • ${leagueName}` : ""}
             </p>
       </div>
@@ -418,16 +432,13 @@ export default function PlayersPage() {
         )}
 
         {isCommish && preseasonKickOk && !loading && (
-          <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 mb-4">
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 mb-4">
       <p className="text-[10px] font-bold uppercase tracking-wider text-amber-300 mb-1">
-              Preseason · high-risk kick window
+              Preseason roster window
             </p>
       <p className="text-xs text-muted leading-relaxed">
-              Before kickoff you can remove anyone who looks like a{" "}
-              <strong className="text-foreground">Blue Falcon</strong> (quit
-              other leagues mid-season). Check their count on their profile or
-              next to their name. Protect the room — once the season is live,
-              kicks should be rare.
+              Divisions and roster changes are open until kickoff. After that,
+              alignment locks and removals should be rare.
             </p>
       </div>
         )}
@@ -521,7 +532,7 @@ export default function PlayersPage() {
               )}
               <button
                 type="button"
-                onClick={() => void handleAutoBalance()}
+                  onClick={() => void previewBalance()}
                 disabled={
                   busy ||
                   balancing ||
@@ -534,11 +545,11 @@ export default function PlayersPage() {
                     ? autoBalanceLock.reason || "Season started - locked"
                     : balancing
                       ? "Auto Balance in progress"
-                      : "Minimum-move Auto Balance"
+                      : "Preview minimum-move Auto Balance"
                 }
                 className="text-xs px-3 py-1.5 rounded-lg border border-border text-muted hover:text-foreground disabled:opacity-50"
               >
-                {balancing ? "Balancing…" : "Auto-balance divisions"}
+                {balancing ? "Checking…" : "Preview Auto-Balance"}
               </button>
             </div>
           </div>
@@ -548,6 +559,53 @@ export default function PlayersPage() {
           <p className="text-xs text-primary font-semibold mb-3">
             {balanceNote}
           </p>
+        )}
+
+        {balancePreview?.ok && (balancePreview.moveCount ?? 0) > 0 && (
+          <div className="rounded-xl border border-primary/40 bg-primary/5 p-4 mb-4 space-y-3">
+            <div>
+              <p className="text-sm font-bold text-foreground">Auto-Balance preview</p>
+              <p className="text-xs text-muted mt-1">
+                {balancePreview.beforeLabel} → {balancePreview.afterLabel} ·{" "}
+                {balancePreview.moveCount} move{balancePreview.moveCount === 1 ? "" : "s"}
+              </p>
+            </div>
+            <ul className="space-y-1.5 text-xs">
+              {(balancePreview.moves || []).map((move) => (
+                <li key={move.userId} className="flex items-center justify-between gap-3">
+                  <span className="truncate text-foreground">{move.name}</span>
+                  <span className="shrink-0 text-muted">
+                    {move.from
+                      ? divisionDisplayLabel(move.from, getLeague()?.sportId)
+                      : "Unassigned"}{" "}
+                    → {divisionDisplayLabel(move.to, getLeague()?.sportId)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="text-[11px] text-muted leading-relaxed">
+              New players are assigned to the smallest group automatically. This
+              plan moves only the fewest existing players needed to balance all four.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setBalancePreview(null)}
+                disabled={busy || balancing}
+                className="min-h-[44px] rounded-lg border border-border text-sm font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void applyAutoBalance()}
+                disabled={busy || balancing}
+                className="min-h-[44px] rounded-lg bg-primary text-black text-sm font-bold disabled:opacity-50"
+              >
+                {balancing ? "Applying…" : "Apply moves"}
+              </button>
+            </div>
+          </div>
         )}
 
         {!canManageDivs && !loading && (
@@ -619,13 +677,12 @@ export default function PlayersPage() {
                         </div>
       <div className="text-xs text-muted flex flex-wrap items-center gap-x-1.5">
                           {showSeasonPts ? (
-                            <span>{p.totalPoints} pts</span>
-                          ) : (
-                            <span>Joined · undefeated</span>
-                          )}
-                          {!p.isBot && (
                             <>
+                              <span>{p.totalPoints} pts</span>
                               <span className="text-border">·</span>
+                            </>
+                          ) : null}
+                          {!p.isBot && (
       <span
                                 className={lastSeenToneClass(p.lastSeenAt)}
                                 title={
@@ -634,38 +691,43 @@ export default function PlayersPage() {
                                     : "Not seen in the app yet"
                                 }
                               >
-                                {formatLastSeen(p.lastSeenAt)}
+                                Last seen {formatLastSeen(p.lastSeenAt)}
                               </span>
-                            </>
                           )}
                         </div>
       </div>
                       {canManageDivs ? (
-                        <select
-                          value={p.division}
-                          disabled={busy || autoBalanceLock.locked}
-                          onChange={(e) =>
-                            void changeDivision(
-                              p.userId,
-                              e.target.value as Division
-                            )
-                          }
-                          className="text-xs bg-background border border-border rounded px-1 py-0.5 max-w-[6.5rem]"
-                          title={
-                            autoBalanceLock.locked
-                              ? autoBalanceLock.reason || "Alignment locked"
-                              : "Change division (ops only)"
-                          }
-                        >
-                          {DIVISIONS.map((d) => (
-                            <option key={d} value={d}>
-                              {divisionDisplayLabel(
-                                d,
-                                getLeague()?.sportId
-                              )}
-                            </option>
-                          ))}
-                        </select>
+                        <label className="shrink-0 max-w-[7rem] flex flex-col items-end gap-0.5">
+                          <span className="max-w-full truncate text-[9px] font-bold uppercase tracking-wide text-muted">
+                            Move {p.name} to
+                          </span>
+                          <select
+                            aria-label={`Move ${p.name} to division`}
+                            value={p.division}
+                            disabled={busy || autoBalanceLock.locked}
+                            onChange={(e) =>
+                              void changeDivision(
+                                p.userId,
+                                e.target.value as Division
+                              )
+                            }
+                            className="text-xs bg-background border border-border rounded px-1.5 py-1 max-w-[7rem]"
+                            title={
+                              autoBalanceLock.locked
+                                ? autoBalanceLock.reason || "Alignment locked"
+                                : `Move ${p.name} to another division`
+                            }
+                          >
+                            {DIVISIONS.map((d) => (
+                              <option key={d} value={d}>
+                                {divisionDisplayLabel(
+                                  d,
+                                  getLeague()?.sportId
+                                )}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
                       ) : (
                         <span className="text-[10px] text-muted shrink-0">
                           {p.division}
@@ -687,7 +749,7 @@ export default function PlayersPage() {
                               p.isBot
                                 ? "Remove bot"
                                 : preseasonKickOk
-                                  ? "Kick before season (check Blue Falcon Count)"
+                                  ? "Remove before the season"
                                   : "Remove player"
                             }
                           >
@@ -696,7 +758,7 @@ export default function PlayersPage() {
                                 ? "…"
                                 : "Remove"
                               : preseasonKickOk
-                                ? "Kick"
+                                ? "Remove"
                                 : "✕"}
                           </button>
                         )}
