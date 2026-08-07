@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import PlayerLink from "@/components/PlayerLink";
 import FirstCardWizard from "@/components/FirstCardWizard";
 import {
@@ -2322,12 +2323,12 @@ function CommissionerPageInner() {
               Only the league commissioner or an appointed deputy can open these
               tools.
             </p>
-            <a
+            <Link
               href="/"
               className="text-sm text-primary font-semibold hover:underline"
             >
               ← Home
-            </a>
+            </Link>
       </div>
         </main>
       </div>
