@@ -9,6 +9,8 @@ import {
 } from "@/lib/season-calendar";
 import type { OddsApiGame } from "@/lib/types";
 import { scheduleUsageFromRequest } from "@/lib/platform-odds-usage";
+import { authenticateApiRequest } from "@/lib/server-api-auth";
+import { isAppCreator } from "@/lib/creator";
 
 /**
  * Server-side odds fetch so the API key is never exposed in the browser.
@@ -18,13 +20,16 @@ import { scheduleUsageFromRequest } from "@/lib/platform-odds-usage";
  * Optional leagueId is attributed only after server-side membership check.
  */
 export async function GET(req: Request) {
+  const identity = await authenticateApiRequest(req);
+  if (!identity.ok) {
+    return NextResponse.json(
+      { error: identity.error },
+      { status: identity.status, headers: { "Cache-Control": "no-store" } }
+    );
+  }
   const startedAt = Date.now();
   const endpoint = "/api/odds/ncaaf";
-  const apiKey = (
-    process.env.ODDS_API_KEY ||
-    process.env.NEXT_PUBLIC_ODDS_API_KEY ||
-    ""
-  ).trim();
+  const apiKey = (process.env.ODDS_API_KEY || "").trim();
 
   const { searchParams } = new URL(req.url);
   const dryRun =
@@ -37,6 +42,13 @@ export async function GET(req: Request) {
       : Number.NaN;
   const filterByWeek = !dryRun && !Number.isNaN(weekNumber);
   const weekForLog = filterByWeek ? weekNumber : null;
+
+  if (dryRun && !isAppCreator(identity.userId)) {
+    return NextResponse.json({ error: "Creator only" }, { status: 403 });
+  }
+  if (filterByWeek && (weekNumber < 0 || weekNumber > 18)) {
+    return NextResponse.json({ error: "Invalid CFB week" }, { status: 400 });
+  }
 
   if (!apiKey) {
     scheduleUsageFromRequest({
@@ -72,7 +84,7 @@ export async function GET(req: Request) {
   url.searchParams.set("oddsFormat", "american");
 
   try {
-    const res = await fetch(url.toString(), { next: { revalidate: 0 } });
+    const res = await fetch(url.toString(), { next: { revalidate: 300 } });
     const remaining = res.headers.get("x-requests-remaining");
     const used = res.headers.get("x-requests-used");
     const last = res.headers.get("x-requests-last");
