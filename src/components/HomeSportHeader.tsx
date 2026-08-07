@@ -78,7 +78,7 @@ export default function HomeSportHeader({
   }
 
   return (
-    <section className="mb-3 sm:mb-4">
+    <section className={`mb-3 sm:mb-4 ${!isNfl && !isWwc ? "cfb-situation-masthead" : ""}`}>
       {/* Identity row: crest · Sport Hub · Share */}
       <div className="flex flex-wrap items-center gap-2 mb-2">
         <BrandMark size={40} variant="force" className="rounded-lg shrink-0" />
@@ -127,15 +127,30 @@ export default function HomeSportHeader({
         ) : null}
       </div>
 
-      <h1
-        className={`text-3xl sm:text-5xl font-black tracking-tight leading-[1.08] text-white break-words ${chrome.atmosphere.titleGlow}`}
-      >
-        {room}
-      </h1>
-
-      <p className="mt-2 text-muted max-w-xl text-sm sm:text-base leading-relaxed">
-        {tagline || chrome.defaultTagline}
-      </p>
+      {!isNfl && !isWwc ? (
+        <div className="cfb-situation-title-wrap">
+          <p className="cfb-situation-room-name">{room}</p>
+          <p className="cfb-situation-kicker">War Room · Saturday Situation Room</p>
+          <h1 className={`cfb-situation-title ${chrome.atmosphere.titleGlow}`}>
+            <span>Saturday</span>
+            <span>Situation Room</span>
+          </h1>
+          <p className="cfb-situation-tagline">
+            Good teams show up. Bad picks don&apos;t.
+          </p>
+        </div>
+      ) : (
+        <>
+          <h1
+            className={`text-3xl sm:text-5xl font-black tracking-tight leading-[1.08] text-white break-words ${chrome.atmosphere.titleGlow}`}
+          >
+            {room}
+          </h1>
+          <p className="mt-2 text-muted max-w-xl text-sm sm:text-base leading-relaxed">
+            {tagline || chrome.defaultTagline}
+          </p>
+        </>
+      )}
     </section>
   );
 }
