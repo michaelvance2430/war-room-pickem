@@ -528,7 +528,7 @@ export default function Home() {
           <h1 className="text-xl font-bold mb-2">Choose a league</h1>
       <p className="text-sm text-muted mb-4 leading-relaxed">
             You belong to more than one. Sport, your seat, open vs private, and
-            bots — pick the room you want.
+            player count — pick the room you want.
           </p>
       <div className="space-y-2">
             {pickList.map((m) => (
