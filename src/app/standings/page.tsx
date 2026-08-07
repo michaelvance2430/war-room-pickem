@@ -320,11 +320,83 @@ export default function StandingsPage() {
       ? Math.floor(competitiveRows.length / 2)
       : -1;
 
+  const overallCompetitive = seasonStarted
+    ? [...players].sort(compareForSeed)
+    : [];
+  const leader = overallCompetitive[0] || null;
+  const selfOverallIndex = overallCompetitive.findIndex((p) => p.id === selfId);
+  const selfOverall = selfOverallIndex >= 0 ? overallCompetitive[selfOverallIndex] : null;
+  const pointsBack =
+    leader && selfOverall
+      ? Math.max(0, leader.totalPoints - selfOverall.totalPoints)
+      : null;
+  const isCfb = (sportId || "cfb") === "cfb";
+
   return (
-    <div className="min-h-screen flex flex-col">
+    <div
+      className={`min-h-screen flex flex-col ${isCfb ? "cfb-standings-page" : ""}`}
+      data-standings-phase={pulsePhase}
+    >
       <main className="flex-1 max-w-5xl mx-auto w-full px-3 sm:px-4 py-5 sm:py-8">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold">Standings</h1>
+        {isCfb && (
+          <section className="cfb-scoreboard-hero" aria-labelledby="standings-title">
+            <div className="cfb-scoreboard-screen">
+              <div className="cfb-scoreboard-topline">
+                <span>War Room Network</span>
+                <span className="cfb-scoreboard-live">
+                  <i aria-hidden /> {pulsePhase === "regular" ? "Live season" : pulsePhase}
+                </span>
+              </div>
+              <p className="cfb-scoreboard-kicker">Saturday command board</p>
+              <h1 id="standings-title">Standings</h1>
+
+              {seasonStarted && leader ? (
+                <div className="cfb-scoreboard-leader">
+                  <span className="cfb-scoreboard-crown" aria-hidden>♛</span>
+                  <div>
+                    <p>Holding the crown</p>
+                    <strong><PlayerLink id={leader.id} name={leader.name} /></strong>
+                    <span>{leader.totalPoints} season points</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="cfb-scoreboard-waiting">
+                  <strong>{players.length}</strong>
+                  <span>players seated</span>
+                  <p>Ranks ignite after the first official score.</p>
+                </div>
+              )}
+
+              <div className="cfb-scoreboard-digits" aria-label="League snapshot">
+                {pulseCards.slice(0, 3).map((card) => (
+                  <div key={card.key}>
+                    <span>{card.label}</span>
+                    <strong>{card.value}</strong>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {isCfb && seasonStarted && selfOverall && (
+          <section className="cfb-your-position" aria-label="Your position">
+            <div>
+              <span>Your position</span>
+              <strong>#{selfOverallIndex + 1}</strong>
+            </div>
+            <p>
+              <strong>{selfOverall.name}</strong>
+              {pointsBack === 0
+                ? " · You own the board. Everybody else is chasing."
+                : ` · ${pointsBack} point${pointsBack === 1 ? "" : "s"} behind the leader.`}
+            </p>
+            <span className="cfb-position-arrow" aria-hidden>↗</span>
+          </section>
+        )}
+
+        <div className={`mb-6 ${isCfb ? "cfb-standings-intro" : ""}`}>
+          {!isCfb && <h1 className="text-2xl font-bold">Standings</h1>}
           <p className="text-sm text-muted">{phaseCopy.headline}</p>
           <p className="text-xs text-muted mt-1 leading-relaxed">
             {phaseCopy.subline}
@@ -366,11 +438,11 @@ export default function StandingsPage() {
                   ? "Competition pulse"
                   : "Legacy pulse"}
             </p>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="cfb-pulse-grid grid grid-cols-2 sm:grid-cols-4 gap-2">
               {pulseCards.map((card) => (
                 <div
                   key={card.key}
-                  className="rounded-xl border border-border bg-card px-3 py-2.5 min-h-[4.5rem]"
+                  className="cfb-pulse-card rounded-xl border border-border bg-card px-3 py-2.5 min-h-[4.5rem]"
                 >
                   <p className="text-[10px] uppercase tracking-wide text-muted font-bold">
                     {card.label}
@@ -446,7 +518,7 @@ export default function StandingsPage() {
 
         {!loading && players.length > 0 && (
           <>
-            <div className="phone-h-scroll sm:flex-wrap sm:overflow-visible mb-4">
+            <div className="cfb-division-tabs phone-h-scroll sm:flex-wrap sm:overflow-visible mb-4">
               {divisions.map((d) => (
                 <button
                   key={d}
@@ -470,7 +542,7 @@ export default function StandingsPage() {
                   Room pulse · {pulseRows.length}
                   {active !== "Overall" ? ` in ${active}` : " members"}
                 </p>
-                <div className="rounded-xl border border-border overflow-hidden overflow-x-auto">
+                <div className="cfb-rank-board rounded-xl border border-border overflow-hidden overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead className="bg-card text-muted text-xs uppercase tracking-wide">
                       <tr>
@@ -551,7 +623,7 @@ export default function StandingsPage() {
               </div>
             ) : (
               /* ── Competitive table ── */
-              <div className="rounded-xl border border-border overflow-hidden overflow-x-auto">
+              <div className="cfb-rank-board rounded-xl border border-border overflow-hidden overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-card text-muted text-xs uppercase tracking-wide">
                     <tr>

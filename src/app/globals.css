@@ -259,6 +259,44 @@ html[data-sport="nfl"] select:focus {
   }
 }
 
+/* CFB STANDINGS · stadium jumbotron; spectacle above, scanability below. */
+.cfb-standings-page { --scoreboard-green:#48f06a; --scoreboard-gold:#e5bb2a; position:relative; overflow-x:hidden; background:radial-gradient(ellipse 45rem 28rem at 50% 8rem,rgba(24,111,54,.18),transparent 72%),#020503; }
+.cfb-standings-page::before { content:""; position:absolute; inset:0 0 auto; height:50rem; pointer-events:none; background:linear-gradient(180deg,transparent 56%,#020503 98%); z-index:1; }
+.cfb-standings-page main { position:relative; z-index:2; max-width:42rem; padding-top:0; }
+.cfb-scoreboard-hero { min-height:40.5rem; margin:0 -.75rem .9rem; padding:10.2rem 1.6rem 0; display:flex; align-items:flex-start; background:linear-gradient(180deg,rgba(0,0,0,.02),rgba(0,0,0,.04) 63%,#020503 100%),url("/skins/cfb-standings/jumbotron.webp") 50% 0/min(100%,48rem) auto no-repeat; }
+.cfb-scoreboard-screen { width:100%; max-width:30rem; min-height:17.6rem; margin:0 auto; padding:.9rem 1.05rem .8rem; overflow:hidden; color:#f4f5ef; background:repeating-linear-gradient(0deg,transparent 0 3px,rgba(74,255,111,.035) 4px),radial-gradient(ellipse at 50% 36%,rgba(29,93,45,.24),transparent 65%),rgba(0,7,3,.92); border:1px solid rgba(223,185,42,.72); box-shadow:inset 0 0 1.8rem rgba(23,250,74,.07),0 0 1.8rem rgba(0,0,0,.8); clip-path:polygon(2% 0,98% 0,100% 4%,100% 96%,98% 100%,2% 100%,0 96%,0 4%); }
+.cfb-scoreboard-topline { display:flex; justify-content:space-between; gap:1rem; padding-bottom:.45rem; border-bottom:1px solid rgba(255,255,255,.13); color:rgba(255,255,255,.58); font-size:.52rem; font-weight:900; letter-spacing:.15em; text-transform:uppercase; }
+.cfb-scoreboard-live { display:inline-flex; align-items:center; color:var(--scoreboard-green); }
+.cfb-scoreboard-live i { width:.38rem; height:.38rem; margin-right:.32rem; border-radius:999px; background:currentColor; box-shadow:0 0 .65rem currentColor; }
+.cfb-scoreboard-kicker { margin-top:.7rem; color:var(--scoreboard-gold); font-size:.54rem; font-weight:900; letter-spacing:.24em; text-transform:uppercase; }
+.cfb-scoreboard-screen h1 { margin-top:.05rem; color:#f2f1e9; font-family:Impact,Haettenschweiler,"Arial Narrow Bold",sans-serif; font-size:clamp(3.1rem,14vw,5.4rem); font-weight:500; letter-spacing:.035em; line-height:.96; text-transform:uppercase; text-shadow:0 0 1rem rgba(255,255,255,.17); }
+.cfb-scoreboard-leader,.cfb-scoreboard-waiting { min-height:6rem; display:flex; align-items:center; margin-top:.55rem; padding:.62rem .7rem; border-left:2px solid var(--scoreboard-gold); background:linear-gradient(90deg,rgba(229,187,42,.12),transparent 78%); }
+.cfb-scoreboard-crown { margin-right:.7rem; color:var(--scoreboard-gold); font-size:3rem; filter:drop-shadow(0 0 .65rem rgba(229,187,42,.42)); }
+.cfb-scoreboard-leader p,.cfb-scoreboard-waiting span { color:var(--scoreboard-gold); font-size:.52rem; font-weight:900; letter-spacing:.16em; text-transform:uppercase; }
+.cfb-scoreboard-leader strong { display:block; color:#fff; font-size:clamp(1.15rem,5vw,1.7rem); line-height:1.05; }
+.cfb-scoreboard-leader>div>span { color:rgba(255,255,255,.6); font-size:.66rem; }
+.cfb-scoreboard-waiting { display:grid; grid-template-columns:auto 1fr; column-gap:.65rem; }
+.cfb-scoreboard-waiting strong { grid-row:1/3; color:var(--scoreboard-green); font-family:Impact,sans-serif; font-size:3.8rem; font-weight:500; line-height:.9; }
+.cfb-scoreboard-waiting p { color:rgba(255,255,255,.65); font-size:.69rem; }
+.cfb-scoreboard-digits { display:grid; grid-template-columns:repeat(3,1fr); gap:.35rem; margin-top:.55rem; }
+.cfb-scoreboard-digits div { min-width:0; padding:.35rem .45rem; border:1px solid rgba(72,240,106,.18); background:rgba(1,12,5,.72); }
+.cfb-scoreboard-digits span { display:block; overflow:hidden; color:rgba(255,255,255,.45); font-size:.44rem; font-weight:800; letter-spacing:.1em; text-overflow:ellipsis; text-transform:uppercase; white-space:nowrap; }
+.cfb-scoreboard-digits strong { display:block; overflow:hidden; color:var(--scoreboard-green); font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.86rem; text-overflow:ellipsis; white-space:nowrap; }
+.cfb-your-position { min-height:5.25rem; display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:.8rem; margin:-3.4rem .2rem 1.4rem; padding:.72rem .9rem; position:relative; border:1px solid rgba(72,240,106,.7); border-radius:.85rem; background:linear-gradient(110deg,rgba(12,58,25,.96),rgba(2,12,6,.97)); box-shadow:0 1rem 2.4rem rgba(0,0,0,.5),0 0 1.4rem rgba(72,240,106,.1); }
+.cfb-your-position>div span { display:block; color:var(--scoreboard-green); font-size:.48rem; font-weight:900; letter-spacing:.12em; text-transform:uppercase; }
+.cfb-your-position>div strong { color:white; font-family:Impact,sans-serif; font-size:2.4rem; font-weight:500; line-height:1; }
+.cfb-your-position p { color:rgba(255,255,255,.7); font-size:.68rem; line-height:1.35; }
+.cfb-your-position p strong { color:white; }
+.cfb-position-arrow { color:var(--scoreboard-green); font-size:1.3rem; }
+.cfb-standings-intro { padding:0 .3rem; }
+.cfb-standings-page .cfb-pulse-card,.cfb-standings-page .cfb-rank-board { border-color:rgba(255,255,255,.16); background:linear-gradient(150deg,rgba(13,24,16,.96),rgba(4,7,5,.96)); box-shadow:0 .8rem 2rem rgba(0,0,0,.22); }
+.cfb-standings-page .cfb-rank-board { border-radius:1rem; }
+.cfb-standings-page .cfb-rank-board thead { background:linear-gradient(90deg,rgba(25,67,35,.82),rgba(10,17,11,.96)); }
+.cfb-standings-page .cfb-rank-board tbody tr { background:rgba(3,8,4,.72); }
+.cfb-standings-page .cfb-rank-board tbody tr:hover { background:rgba(29,83,41,.35); }
+.cfb-standings-page .cfb-division-tabs button { border-radius:.65rem; text-transform:uppercase; letter-spacing:.06em; font-size:.7rem; }
+@media (min-width:640px) { .cfb-scoreboard-hero { min-height:47rem; margin-inline:-1rem; padding-top:12.5rem; } }
+
 body {
   background: var(--background);
   color: var(--foreground);
@@ -445,21 +483,46 @@ body {
   box-shadow: inset 0 0 24px rgba(208, 169, 31, 0.05);
 }
 
-.home-war-room[data-home-sport="cfb"] .preseason-room-strip { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:.6rem; min-height:4.15rem; padding:.72rem .85rem; border-color:rgba(240,196,27,.86); background:linear-gradient(100deg,rgba(38,31,2,.92),rgba(9,9,3,.95)); box-shadow:inset 0 0 26px rgba(240,196,27,.045),0 8px 24px rgba(0,0,0,.24); }
-.home-war-room[data-home-sport="cfb"] .preseason-room-copy { min-width:0; color:rgba(255,255,255,.83); font-size:.67rem; line-height:1.42; }
-.home-war-room[data-home-sport="cfb"] .preseason-league-tools { display:inline-flex; align-items:center; gap:.28rem; padding:.45rem .1rem .45rem .55rem; color:#f1c81e; font-size:.65rem; font-weight:900; letter-spacing:.04em; text-transform:uppercase; text-decoration:none; white-space:nowrap; }
-.home-war-room[data-home-sport="cfb"] .preseason-league-tools span { font-family:Georgia,serif; font-size:1.35rem; line-height:0; }
-.home-war-room[data-home-sport="cfb"] .cfb-week-hero .home-week-hero-card { position:relative; }
-.home-war-room[data-home-sport="cfb"] .cfb-week-hero .home-week-hero-card.is-locked { min-height:13.6rem; padding-right:7.35rem; }
-.cfb-lock-seal { position:absolute; top:3.55rem; right:1rem; width:5.7rem; display:flex; flex-direction:column; align-items:center; color:#35ef62; filter:drop-shadow(0 0 10px rgba(37,255,91,.35)); pointer-events:none; }
-.cfb-lock-seal svg { width:5.15rem; height:6.6rem; overflow:visible; }
-.cfb-lock-shackle-glow { fill:none; stroke:rgba(54,255,99,.25); stroke-width:13; stroke-linecap:round; }
-.cfb-lock-shackle { fill:none; stroke:#35ef62; stroke-width:4.5; stroke-linecap:round; }
-.cfb-lock-body { fill:rgba(4,29,10,.95); stroke:#35ef62; stroke-width:4; }
-.cfb-lock-key { fill:#35ef62; }
-.cfb-lock-seal span { margin-top:-.2rem; font-family:Impact,Haettenschweiler,"Arial Narrow Bold",sans-serif; font-size:.78rem; letter-spacing:.1em; text-transform:uppercase; }
-@media (max-width:370px) { .home-war-room[data-home-sport="cfb"] .cfb-week-hero .home-week-hero-card.is-locked { padding-right:6.1rem; } .cfb-lock-seal { right:.55rem; width:4.9rem; transform:scale(.88); transform-origin:top right; } }
+.home-war-room[data-home-sport="cfb"] .preseason-room-strip {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.6rem;
+  min-height: 4.15rem;
+  padding: 0.72rem 0.85rem;
+  border-color: rgba(240, 196, 27, 0.86);
+  background: linear-gradient(100deg, rgba(38, 31, 2, 0.92), rgba(9, 9, 3, 0.95));
+  box-shadow: inset 0 0 26px rgba(240, 196, 27, 0.045), 0 8px 24px rgba(0, 0, 0, 0.24);
+}
+
+.home-war-room[data-home-sport="cfb"] .preseason-room-copy {
+  min-width: 0;
+  color: rgba(255, 255, 255, 0.83);
+  font-size: 0.67rem;
+  line-height: 1.42;
+}
+
+.home-war-room[data-home-sport="cfb"] .preseason-league-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  padding: 0.45rem 0.1rem 0.45rem 0.55rem;
+  color: #f1c81e;
+  font-size: 0.65rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.home-war-room[data-home-sport="cfb"] .preseason-league-tools span {
+  font-family: Georgia, serif;
+  font-size: 1.35rem;
+  line-height: 0;
+}
+
 .home-war-room[data-home-sport="cfb"] .cfb-week-hero .home-week-hero-card {
+  position: relative;
   border-radius: 1rem;
   border-color: rgba(61, 211, 83, 0.72);
   background:
@@ -469,6 +532,62 @@ body {
     0 0 0 1px rgba(61, 211, 83, 0.08),
     0 0 32px rgba(34, 197, 94, 0.13) !important;
   backdrop-filter: blur(16px);
+}
+
+.home-war-room[data-home-sport="cfb"] .cfb-week-hero .home-week-hero-card.is-locked {
+  min-height: 13.6rem;
+  padding-right: 7.35rem;
+}
+
+.cfb-lock-seal {
+  position: absolute;
+  top: 3.55rem;
+  right: 1rem;
+  width: 5.7rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: #35ef62;
+  filter: drop-shadow(0 0 10px rgba(37, 255, 91, 0.35));
+  pointer-events: none;
+}
+
+.cfb-lock-seal svg {
+  width: 5.15rem;
+  height: 6.6rem;
+  overflow: visible;
+}
+
+.cfb-lock-shackle-glow {
+  fill: none;
+  stroke: rgba(54, 255, 99, 0.25);
+  stroke-width: 13;
+  stroke-linecap: round;
+}
+
+.cfb-lock-shackle {
+  fill: none;
+  stroke: #35ef62;
+  stroke-width: 4.5;
+  stroke-linecap: round;
+}
+
+.cfb-lock-body {
+  fill: rgba(4, 29, 10, 0.95);
+  stroke: #35ef62;
+  stroke-width: 4;
+}
+
+.cfb-lock-key {
+  fill: #35ef62;
+}
+
+.cfb-lock-seal span {
+  margin-top: -0.2rem;
+  font-family: Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif;
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
 .home-war-room[data-home-sport="cfb"] .cfb-week-hero h2 {
@@ -593,6 +712,15 @@ body {
   }
   .cfb-situation-title {
     font-size: 3.7rem;
+  }
+  .home-war-room[data-home-sport="cfb"] .cfb-week-hero .home-week-hero-card.is-locked {
+    padding-right: 6.1rem;
+  }
+  .cfb-lock-seal {
+    right: 0.55rem;
+    width: 4.9rem;
+    transform: scale(0.88);
+    transform-origin: top right;
   }
 }
 
