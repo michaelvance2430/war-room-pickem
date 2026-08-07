@@ -658,7 +658,20 @@ export default function Nav() {
           </button>
         </div>
       ) : null}
-      <header className="border-b border-border bg-card/80 backdrop-blur sticky top-0 z-50">
+      <header
+        className={`${
+          !sportIsWwc &&
+          !sportIsNfl &&
+          (pathname === "/picks" ||
+            pathname.startsWith("/picks/") ||
+            pathname === "/standings" ||
+            pathname.startsWith("/standings/") ||
+            pathname === "/locker-room" ||
+            pathname.startsWith("/locker-room/"))
+            ? "hidden md:block "
+            : ""
+        }border-b border-border bg-card/80 backdrop-blur sticky top-0 z-50`}
+      >
         <div className="max-w-6xl mx-auto px-3 sm:px-4 h-14 flex items-center gap-2 min-w-0">
           <Link
             href="/"
