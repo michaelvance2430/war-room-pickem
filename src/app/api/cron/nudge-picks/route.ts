@@ -11,15 +11,14 @@ import { runFridayPickNudge } from "@/lib/nudge-picks";
  * (so a wrong-time fire at e.g. 9pm ET will no-op).
  *
  * Auth: Authorization: Bearer <CRON_SECRET>
- * Test: ?force=1&secret=CRON_SECRET
+ * Manual test: send Authorization: Bearer <CRON_SECRET> with ?force=1.
  */
 function authorized(req: NextRequest): boolean {
   const secret = (process.env.CRON_SECRET || "").trim();
   if (!secret) return false;
   const header = req.headers.get("authorization") || "";
   const bearer = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
-  const query = req.nextUrl.searchParams.get("secret") || "";
-  return bearer === secret || query === secret;
+  return bearer === secret;
 }
 
 export async function GET(req: NextRequest) {
