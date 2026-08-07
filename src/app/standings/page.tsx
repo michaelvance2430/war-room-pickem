@@ -345,9 +345,12 @@ export default function StandingsPage() {
           .sort(compareForSeed)
     : pulseRows;
 
+  // War Room postseason truth: the top three in every conference advance.
+  // Do not derive this from roster size — a temporarily uneven conference
+  // must not move the line or falsely promote a fourth-place player.
   const cutIndex =
-    seasonStarted && active !== "Overall"
-      ? Math.ceil(competitiveRows.length / 2)
+    seasonStarted && active !== "Overall" && competitiveRows.length > 3
+      ? 3
       : -1;
   const activeConferenceLabel =
     active === "Overall" ? null : divisionTabLabel(active, sportId);
@@ -709,7 +712,10 @@ export default function StandingsPage() {
                     {competitiveRows.map((player, idx) => (
                       <Fragment key={player.id}>
                         {idx === cutIndex && (
-                          <tr className="cfb-cut-line">
+                          <tr
+                            className="cfb-cut-line"
+                            aria-label="Playoff cut. Top three advance; players below enter the Toilet Bowl."
+                          >
                             <td
                               colSpan={active === "Overall" ? 7 : 6}
                               className="px-3 py-0"
@@ -720,7 +726,7 @@ export default function StandingsPage() {
                                   <strong>
                                     {activeConferenceLabel} Survival Line
                                   </strong>
-                                  <small>Above survives · below gets flushed</small>
+                                  <small>Top 3 survive · Below gets flushed</small>
                                 </div>
                                 <span aria-hidden>▼</span>
                               </div>
