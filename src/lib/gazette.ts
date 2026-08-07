@@ -78,6 +78,8 @@ export type GazetteEdition = {
   crystalBallMiss: GazetteStory | null;
   /** Biggest standings mover this week (climb or freefall). */
   swing: GazetteStory | null;
+  /** Closest live season race between two active, real players. */
+  rivalryWatch?: GazetteStory | null;
   /**
    * Someone confirmed Chaos lock this week — one headline (multi-name if several).
    * Trigger is lock-in, not final score. All sports.
@@ -134,6 +136,56 @@ export type GazetteSideStory = {
   headline: string;
   body: string;
 };
+
+/**
+ * Shared league-wide rivalry lead for the standings page of the paper.
+ * This is deliberately dynamic: the closest live points race gets the ink,
+ * and a stale pairing disappears as soon as the standings move away from it.
+ */
+export function buildGazetteRivalryWatch(
+  players: Player[]
+): GazetteStory | null {
+  const active = players
+    .filter(
+      (p) =>
+        !p.isMock &&
+        p.weeksPlayed > 0 &&
+        p.weeklyPoints.some((points) => Number.isFinite(points))
+    )
+    .sort(
+      (a, b) =>
+        b.totalPoints - a.totalPoints ||
+        a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+    );
+  if (active.length < 2) return null;
+
+  let pair: [Player, Player] = [active[0], active[1]];
+  let gap = Math.abs(active[0].totalPoints - active[1].totalPoints);
+  for (let i = 0; i < active.length; i += 1) {
+    for (let j = i + 1; j < active.length; j += 1) {
+      const nextGap = Math.abs(active[i].totalPoints - active[j].totalPoints);
+      if (nextGap < gap) {
+        gap = nextGap;
+        pair = [active[i], active[j]];
+      }
+    }
+  }
+
+  const [leader, chaser] = pair;
+  return {
+    names: [leader.name, chaser.name],
+    pts: gap,
+    kind: gap === 0 ? "tie" : "clear",
+    headline:
+      gap === 0
+        ? `${leader.name.toUpperCase()} AND ${chaser.name.toUpperCase()} REFUSE TO BLINK`
+        : `${leader.name.toUpperCase()} HAS ${chaser.name.toUpperCase()} IN THE REARVIEW`,
+    deck:
+      gap === 0
+        ? `Dead even at ${leader.totalPoints} season points. This rivalry has no adult supervision.`
+        : `Only ${gap} ${gap === 1 ? "point" : "points"} separate the room's closest live race. One good card changes the headline.`,
+  };
+}
 
 function storageKey(leagueId: string, weekIndex: number): string {
   return `${SEEN_PREFIX}:${leagueId}:w${weekIndex}`;
@@ -1108,6 +1160,8 @@ export async function buildGazetteEdition(
     swing = null;
   }
 
+  const rivalryWatch = buildGazetteRivalryWatch(players);
+
   const leagueName = getLeague()?.name || "War Room";
   const year = defaultSeasonYear();
   const sportId = getLeague()?.sportId || "cfb";
@@ -1278,6 +1332,7 @@ export async function buildGazetteEdition(
       noLock: nflNoLock,
       crystalBallMiss: null, // no Crystal Ball in NFL packs by default
       swing: nflSwing,
+      rivalryWatch,
       chaosDetonation,
       conferenceChampions,
       sportId: "nfl",
@@ -1361,6 +1416,7 @@ export async function buildGazetteEdition(
       noLock,
       crystalBallMiss,
       swing,
+      rivalryWatch,
       chaosDetonation,
       conferenceChampions: null,
       sportId: "soccer_wwc",
@@ -1389,7 +1445,8 @@ export async function buildGazetteEdition(
     pts: cp,
   });
 
-  // Sub-stories: full paper only (week 2+). Slim editions skip the joke pile.
+  // The front page is community-first, so even a slim early edition needs one
+  // contextual non-sports lead. Full editions add the absurd second column.
   const sideCtx: SideStoryCtx = {
     crown: cn,
     shame: sn,
@@ -1399,7 +1456,7 @@ export async function buildGazetteEdition(
   };
   const sideStories: GazetteSideStory[] =
     flavor === "slim"
-      ? []
+      ? [byWeek(SIDE_STORIES_NAMED, weekIndex, 0, "side_stories_named")(sideCtx)]
       : [
           byWeek(SIDE_STORIES_NAMED, weekIndex, 0, "side_stories_named")(sideCtx),
           byWeek(SIDE_STORIES_ABSURD, weekIndex, 1, "side_stories_absurd")(sideCtx),
@@ -1433,6 +1490,7 @@ export async function buildGazetteEdition(
     noLock,
     crystalBallMiss,
     swing,
+    rivalryWatch,
     chaosDetonation,
     conferenceChampions,
     sportId: "cfb",
