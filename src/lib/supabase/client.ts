@@ -34,7 +34,10 @@ export function createClient(): SupabaseClient {
       auth: {
         persistSession: true,
         autoRefreshToken: true,
-        detectSessionInUrl: true,
+        // League invites intentionally use ?code=XXXXXX. Automatic URL
+        // detection mistakes those invite codes for PKCE auth codes. Recovery
+        // is exchanged explicitly on /reset-password instead.
+        detectSessionInUrl: false,
         storage: window.localStorage,
         storageKey: "warroom-auth",
       },
