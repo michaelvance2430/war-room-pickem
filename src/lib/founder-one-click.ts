@@ -2,6 +2,10 @@
  * Founder one-click heaven — stay on Founder, drive a full bot room.
  * Creator only. Operates on the REAL active league (cloud) so Gazette / Board
  * update. Does not require navigating Commissioner.
+ *
+ * Isolation: every entry path hard-stops unless the active room is an
+ * explicitly marked LAB league (foundry-isolation). No soft fallback to
+ * production / unmarked rooms.
  */
 
 import { isAppCreator } from "@/lib/creator";
@@ -20,6 +24,8 @@ import {
 import { propFromPreset, rotatingPropPreset } from "@/lib/prop-presets";
 import { weekTitle } from "@/lib/dates";
 import { SIMPLE_BOT_FILL_TARGET } from "@/lib/simple-host";
+import { assertFoundryNotQuarantined } from "@/lib/foundry-quarantine";
+import { FOUNDRY_LAB_BLOCK_REASON } from "@/lib/foundry-isolation";
 
 export type OneClickLog = {
   ok: boolean;
@@ -27,13 +33,21 @@ export type OneClickLog = {
   steps: string[];
 };
 
-function assertCreator(): string | null {
+/**
+ * Creator + ops + explicit LAB room. Failed boundary → hard stop.
+ */
+function assertFoundryLabRun(source: string): string | null {
   const uid = getSession()?.playerId;
   if (!isAppCreator(uid)) return "Creator only";
   if (!isActuallyOps()) {
     return "Be commissioner (or deputy) of a league first — one-click drives that room.";
   }
   if (!getSession()?.leagueId) return "No active league";
+
+  const gate = assertFoundryNotQuarantined(source);
+  if (!gate.ok) {
+    return gate.reason || FOUNDRY_LAB_BLOCK_REASON;
+  }
   return null;
 }
 
@@ -62,7 +76,7 @@ export async function founderEnsureFullBotRoster(opts?: {
   targetTotal?: number;
 }): Promise<OneClickLog> {
   const steps: string[] = [];
-  const gate = assertCreator();
+  const gate = assertFoundryLabRun("founderEnsureFullBotRoster");
   if (gate) return { ok: false, message: gate, steps };
 
   await exitEyesIfNeeded(steps);
@@ -140,7 +154,7 @@ export async function founderEnsureFullBotRoster(opts?: {
  */
 export async function founderPostWeek(weekNumber: number): Promise<OneClickLog> {
   const steps: string[] = [];
-  const gate = assertCreator();
+  const gate = assertFoundryLabRun("founderPostWeek");
   if (gate) return { ok: false, message: gate, steps };
 
   await exitEyesIfNeeded(steps);
@@ -228,7 +242,7 @@ export async function founderPostWeek(weekNumber: number): Promise<OneClickLog> 
  */
 export async function founderScoreWeek(weekNumber: number): Promise<OneClickLog> {
   const steps: string[] = [];
-  const gate = assertCreator();
+  const gate = assertFoundryLabRun("founderScoreWeek");
   if (gate) return { ok: false, message: gate, steps };
 
   await exitEyesIfNeeded(steps);
@@ -372,7 +386,7 @@ export async function founderOpenLockedBoard(
   weekNumber: number
 ): Promise<OneClickLog> {
   const steps: string[] = [];
-  const gate = assertCreator();
+  const gate = assertFoundryLabRun("founderOpenLockedBoard");
   if (gate) return { ok: false, message: gate, steps };
 
   await exitEyesIfNeeded(steps);

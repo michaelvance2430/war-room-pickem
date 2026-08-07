@@ -1026,10 +1026,32 @@ function CommissionerPageInner() {
    * When lab is open but season is live, explain pre-season lock.
    */
   function requirePreseasonTools(): boolean {
-    if (!showCommishLabTools()) return false;
-    if (isPreseasonCommishToolsAllowed()) return true;
-    setPreseasonToolsPopup(true);
-    return false;
+    // Hard LAB isolation — never soft-fall back to calendar preseason on production.
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const q = require("@/lib/foundry-quarantine") as typeof import("@/lib/foundry-quarantine");
+      const gate = q.assertFoundryNotQuarantined("requirePreseasonTools");
+      if (!gate.ok) {
+        setScoreReport(
+          gate.reason ||
+            "LAB only: mark this room as Foundry LAB on the Foundry hub before running simulations."
+        );
+        return false;
+      }
+    } catch {
+      /* if gate module missing, refuse lab tools rather than open production */
+      setScoreReport(
+        "LAB isolation check unavailable — simulation blocked on this room."
+      );
+      return false;
+    }
+    if (!showCommishLabTools()) {
+      setScoreReport(
+        "Lab tools only on explicitly marked LAB rooms (Foundry hub → mark LAB)."
+      );
+      return false;
+    }
+    return true;
   }
 
   /** Fake 5-game card for season simulation — no Odds API. */

@@ -108,13 +108,25 @@ export default function FoundrySessionChrome() {
       <div className="pointer-events-auto max-w-lg mx-auto px-3 pb-3">
         <div className="rounded-2xl border-2 border-sky-400/50 bg-sky-950/95 backdrop-blur-md shadow-[0_0_40px_rgba(56,189,248,0.25)] px-3 py-2.5 flex items-center gap-2">
           <div className="flex-1 min-w-0">
-            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-sky-300">
-              Foundry session
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-300">
+              LAB · Foundry
             </p>
             <p className="text-xs text-sky-100/90 truncate font-semibold">
-              {eyesOn
-                ? `${creatorEyesLabel(eyes)} · first-hour / eyes preview`
-                : "Testing — one tap back to Foundry"}
+              {(() => {
+                try {
+                  // eslint-disable-next-line @typescript-eslint/no-require-imports
+                  const iso = require("@/lib/foundry-isolation") as typeof import("@/lib/foundry-isolation");
+                  const lab = iso.isFoundryLabActiveOnCurrentRoom();
+                  if (!lab) {
+                    return "Not a LAB room — simulations blocked on production";
+                  }
+                } catch {
+                  /* ok */
+                }
+                return eyesOn
+                  ? `${creatorEyesLabel(eyes)} · first-hour / eyes preview`
+                  : "LAB room — one tap back to Foundry";
+              })()}
             </p>
           </div>
           <Link

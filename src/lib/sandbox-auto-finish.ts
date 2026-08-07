@@ -67,6 +67,36 @@ export async function autoFinishRemainingWeeks(opts?: {
     };
   }
 
+  // Hard LAB isolation — full-season sim must never run on production rooms
+  try {
+    const { assertFoundryNotQuarantined } = await import(
+      "./foundry-quarantine"
+    );
+    const gate = assertFoundryNotQuarantined("autoFinishRemainingWeeks");
+    if (!gate.ok) {
+      return {
+        ok: false,
+        finished: [],
+        skipped: [],
+        errors: [gate.reason || "LAB only"],
+        message:
+          gate.reason ||
+          "LAB boundary: mark this room as Foundry LAB before auto-finishing weeks.",
+      };
+    }
+  } catch (e) {
+    return {
+      ok: false,
+      finished: [],
+      skipped: [],
+      errors: ["LAB isolation unavailable"],
+      message:
+        e instanceof Error
+          ? e.message
+          : "LAB isolation unavailable — auto-finish blocked",
+    };
+  }
+
   if (!isPreseasonCommishToolsAllowed()) {
     return {
       ok: false,

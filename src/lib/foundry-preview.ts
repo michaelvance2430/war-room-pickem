@@ -41,7 +41,15 @@ export function showCommishLabTools(): boolean {
   if (isFoundryQuarantined()) return false;
   const uid = getSession()?.playerId;
   // Hard gate: UUID creator only — no sticky/eyes bypass for non-creators
-  return isAppCreator(uid);
+  if (!isAppCreator(uid)) return false;
+  // Lab tools UI only on explicitly marked LAB rooms (never production)
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const iso = require("./foundry-isolation") as typeof import("./foundry-isolation");
+    return iso.isExplicitLabLeague();
+  } catch {
+    return false;
+  }
 }
 
 /** True only for the app creator — customer product never treats this as on. */
@@ -56,12 +64,21 @@ export function isFoundryBackstageUser(
 /**
  * Allow Gazette / cheevo / ceremony popups while testing Foundry.
  * Quiet first-hour eyes (new player / new host) stay calm.
+ * Requires explicit LAB room — never production ceremonies from sticky alone.
  */
 export function allowFoundryCeremonies(): boolean {
   if (typeof window === "undefined") return false;
   if (isFoundryQuarantined()) return false;
   const uid = getSession()?.playerId;
   if (!isAppCreator(uid)) return false;
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const iso = require("./foundry-isolation") as typeof import("./foundry-isolation");
+    if (!iso.isExplicitLabLeague()) return false;
+  } catch {
+    return false;
+  }
 
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -93,6 +110,8 @@ export async function prepareFoundryDramaAfterScore(
   if (!isAppCreator(session.playerId)) {
     return { ok: false, message: "Creator only" };
   }
+  // Boundary already checked by assertFoundryNotQuarantined above.
+  // Gazette / moments prep must never run on production rooms.
 
   try {
     // Sticky Foundry session (← Foundry bar)

@@ -4022,14 +4022,23 @@ export async function seedTrialBotsInCloud(
   error?: string;
 }> {
   try {
-    const { assertFoundryNotQuarantined } = await import("./foundry-quarantine");
-    // Mid-season replacement is a real host tool — allow when not a Foundry sim pad
-    if (!opts?.midSeasonReplacement) {
-      const q = assertFoundryNotQuarantined("seedTrialBotsInCloud");
-      if (!q.ok) return { ok: false, error: q.reason };
+    // Host preseason/mid-season bot pad is a real commissioner tool.
+    // Full LAB isolation lives on Foundry entry (one-click / lab UI).
+    // Emergency kill switch still blocks everything.
+    const { isFoundryQuarantined, FOUNDRY_QUARANTINE_REASON } = await import(
+      "./foundry-quarantine"
+    );
+    if (isFoundryQuarantined()) {
+      return { ok: false, error: FOUNDRY_QUARANTINE_REASON };
     }
-  } catch {
-    /* continue */
+  } catch (e) {
+    return {
+      ok: false,
+      error:
+        e instanceof Error
+          ? e.message
+          : "Foundry boundary unavailable — trial bot pad blocked",
+    };
   }
   const session = getSession();
   if (!session?.leagueId || !session.isCommissioner) {
@@ -4429,6 +4438,20 @@ export async function clearTrialBotsInCloud(): Promise<{
 export async function seedSelfSimPicksIfEmpty(
   weekNumber: number
 ): Promise<{ ok: boolean; filled: boolean; error?: string }> {
+  try {
+    const { assertFoundryNotQuarantined } = await import("./foundry-quarantine");
+    const q = assertFoundryNotQuarantined("seedSelfSimPicksIfEmpty");
+    if (!q.ok) return { ok: false, filled: false, error: q.reason };
+  } catch (e) {
+    return {
+      ok: false,
+      filled: false,
+      error:
+        e instanceof Error
+          ? e.message
+          : "LAB isolation unavailable — self sim pick blocked",
+    };
+  }
   const session = getSession();
   if (!session?.leagueId || !session.playerId) {
     return { ok: false, filled: false, error: "Not signed into a league" };
@@ -4518,11 +4541,23 @@ export async function seedBotPicksForWeekInCloud(
   error?: string;
 }> {
   try {
-    const { assertFoundryNotQuarantined } = await import("./foundry-quarantine");
-    const q = assertFoundryNotQuarantined("seedBotPicksForWeekInCloud");
-    if (!q.ok) return { ok: false, error: q.reason };
-  } catch {
-    /* continue if module missing */
+    // Dual-use: mid-season host replacement bots need this on production rooms.
+    // Foundry post/score still hard-gated at one-click + lab UI.
+    // Emergency kill switch blocks; self-sim + chaos stay LAB-only below.
+    const { isFoundryQuarantined, FOUNDRY_QUARANTINE_REASON } = await import(
+      "./foundry-quarantine"
+    );
+    if (isFoundryQuarantined()) {
+      return { ok: false, error: FOUNDRY_QUARANTINE_REASON };
+    }
+  } catch (e) {
+    return {
+      ok: false,
+      error:
+        e instanceof Error
+          ? e.message
+          : "Foundry boundary unavailable — bot pick seed blocked",
+    };
   }
   const session = getSession();
   if (!session?.leagueId || !session.isCommissioner) {
@@ -4589,8 +4624,15 @@ export async function applyRandomBotChaosForWeek(
     const { assertFoundryNotQuarantined } = await import("./foundry-quarantine");
     const q = assertFoundryNotQuarantined("applyRandomBotChaosForWeek");
     if (!q.ok) return { ok: false, error: q.reason };
-  } catch {
-    /* continue */
+  } catch (e) {
+    // Fail closed — never soft-fall through isolation
+    return {
+      ok: false,
+      error:
+        e instanceof Error
+          ? e.message
+          : "LAB isolation unavailable — bot chaos blocked",
+    };
   }
   const session = getSession();
   if (!session?.leagueId || !session.isCommissioner) {

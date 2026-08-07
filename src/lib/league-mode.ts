@@ -93,6 +93,18 @@ export function resolveLeagueMode(league?: {
     return "sandbox";
   }
 
+  // Device-local Foundry LAB mark (explicit — not calendar)
+  try {
+    const id = typeof league?.id === "string" ? league.id : "";
+    if (id) {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const iso = require("./foundry-isolation") as typeof import("./foundry-isolation");
+      if (iso.isLeagueIdMarkedFoundryLab(id)) return "foundry";
+    }
+  } catch {
+    /* ignore */
+  }
+
   // Active league from storage when caller omitted league
   let active = league;
   if (!active) {
@@ -108,7 +120,8 @@ export function resolveLeagueMode(league?: {
     }
   }
 
-  // Preseason dry-run calendar → sandbox until real season open
+  // Preseason dry-run calendar → sandbox for *career* (no permanent engraving).
+  // Foundry board mutations still require isExplicitLabLeague (foundry-isolation).
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { isSandboxMode } = require("./season-mode") as typeof import("./season-mode");

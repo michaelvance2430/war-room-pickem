@@ -38,6 +38,7 @@ import {
   type RoomLight,
 } from "@/lib/founder-league-health";
 import FoundryPlatformApiUsage from "@/components/FoundryPlatformApiUsage";
+import FoundryLabIsolationPanel from "@/components/FoundryLabIsolationPanel";
 import SandboxHopOptIn from "@/components/SandboxHopOptIn";
 import WeeklyColdOpenModal from "@/components/WeeklyColdOpenModal";
 import CreatorSkinPreview from "@/components/CreatorSkinPreview";
@@ -417,13 +418,14 @@ export default function FounderDashboardPage() {
       <main className="flex-1 max-w-lg mx-auto w-full min-w-0 px-3 sm:px-4 py-6 sm:py-8 space-y-5 overflow-x-hidden">
         <div className="flex items-start justify-between gap-3">
       <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">
-              Foundry Hub
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-300">
+              LAB · Foundry Hub
             </p>
       <h1 className="text-xl font-bold mt-0.5">Founder Dashboard</h1>
       <p className="text-xs text-muted mt-1 leading-relaxed">
-              First hour first. Then playground. Sticky ← Foundry bar stays on
-              while you walk the app.
+              Simulations only on rooms marked LAB below. Production leagues
+              hard-blocked — no soft fallback. Sticky ← Foundry bar stays on
+              while you walk a LAB room.
             </p>
       </div>
           <button
@@ -438,19 +440,8 @@ export default function FounderDashboardPage() {
         {/* Platform Odds API ops — creator only (this page is already gated) */}
         <FoundryPlatformApiUsage />
 
-        {/* E0 emergency quarantine banner */}
-        <div className="rounded-2xl border-2 border-danger/60 bg-danger/10 px-4 py-3 space-y-1">
-          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-danger">
-            E0 — Foundry quarantined
-          </p>
-          <p className="text-xs text-foreground leading-relaxed">
-            Production incident: Foundry simulation mutated a live league
-            (observed Week 8). Lab tools (randomize &amp; score, auto-score,
-            demo publish, sticky session, drama prep) are disabled until
-            Foundry is proven isolated. Do not run another simulation on a
-            production room. League repair is a separate step.
-          </p>
-        </div>
+        {/* LAB isolation — hard boundary for simulations */}
+        <FoundryLabIsolationPanel />
 
         {/* Foundry hop — never on customer Host Dashboard */}
         <section
@@ -811,8 +802,8 @@ export default function FounderDashboardPage() {
         {/* ========== THE PLAYGROUND (everything simple) ========== */}
         <section className="rounded-2xl border-2 border-primary/40 bg-card p-4 space-y-5 shadow-[0_0_40px_rgba(34,197,94,0.08)] min-w-0 w-full max-w-full overflow-x-hidden">
       <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">
-              Playground
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-300">
+              LAB · Playground
             </p>
       <h2 className="text-base font-bold text-foreground mt-0.5">
               Play the whole product
@@ -825,7 +816,7 @@ export default function FounderDashboardPage() {
                   {activeWeek != null ? ` · cloud week ${activeWeek}` : ""}
                 </>
               ) : (
-                "Be commissioner of a league first, then use these buttons."
+                "Be commissioner of a disposable room, mark it LAB above, then use these buttons."
               )}
             </p>
       </div>
@@ -865,7 +856,7 @@ export default function FounderDashboardPage() {
           <div className="space-y-2">
       <p className="text-[10px] font-bold uppercase tracking-wide text-muted">
               2 · Run week {week} ·{" "}
-              <span className="text-amber-300">REAL ROOM</span> (writes standings)
+              <span className="text-amber-300">LAB ROOM ONLY</span> (blocked on production)
             </p>
       <button
               type="button"

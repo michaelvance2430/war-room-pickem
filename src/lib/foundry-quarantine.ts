@@ -1,24 +1,26 @@
 /**
- * E0 — Emergency Foundry quarantine (production incident).
+ * E0 — Foundry boundary (was emergency quarantine).
  *
- * Foundry simulation advanced a production league's live week (observed Week 8)
- * by driving the real scoring + setLeagueActiveWeek pipeline on a production room.
+ * Blanket kill switch retired in favor of hard LAB isolation:
+ * simulations may run only on explicitly marked test leagues.
+ * Production rooms and real identities hard-blocked (see foundry-isolation.ts).
  *
- * While QUARANTINED:
- * - Lab tools (demo slate, randomize & score, auto-score range, bot seed chaos) OFF
- * - Foundry sticky session cannot arm
- * - Foundry ceremony/drama prep refused
- * - Creator eyes may still browse locally where already isolated
- *
- * Does NOT repair production data. Does NOT change RLS. Lift only after
- * Foundry is proven isolated from production-mode leagues.
+ * FOUNDRY_EMERGENCY_QUARANTINE remains available as a master kill if needed.
  */
 
-/** Master kill switch — keep true until isolation is proven. */
-export const FOUNDRY_EMERGENCY_QUARANTINE = true;
+import {
+  assertFoundryMutationAllowed,
+  FOUNDRY_LAB_BLOCK_REASON,
+} from "@/lib/foundry-isolation";
+
+/**
+ * Master kill switch — set true only for emergency full Foundry blackout.
+ * Isolation is the normal production control.
+ */
+export const FOUNDRY_EMERGENCY_QUARANTINE = false;
 
 export const FOUNDRY_QUARANTINE_REASON =
-  "E0 emergency quarantine: Foundry must not run production scoring, week advance, publish, bots, or drama on live leagues. Lab tools disabled until isolation is proven.";
+  "E0 emergency quarantine: Foundry fully disabled. Clear FOUNDRY_EMERGENCY_QUARANTINE only after ops approval.";
 
 export function isFoundryQuarantined(): boolean {
   if (FOUNDRY_EMERGENCY_QUARANTINE) return true;
@@ -35,16 +37,30 @@ export function isFoundryQuarantined(): boolean {
   return false;
 }
 
-/** Call before any Foundry path that can mutate production crown-jewel tables. */
+/**
+ * Call before any Foundry path that can mutate crown-jewel data.
+ * Hard stop on failure — no soft fallback to production.
+ */
 export function assertFoundryNotQuarantined(source: string): {
   ok: boolean;
   reason?: string;
 } {
-  if (!isFoundryQuarantined()) return { ok: true };
-  try {
-    console.warn("[FOUNDRY-QUARANTINE] blocked", source, FOUNDRY_QUARANTINE_REASON);
-  } catch {
-    /* ok */
+  if (isFoundryQuarantined()) {
+    try {
+      console.warn(
+        "[FOUNDRY-QUARANTINE] blocked",
+        source,
+        FOUNDRY_QUARANTINE_REASON
+      );
+    } catch {
+      /* ok */
+    }
+    return { ok: false, reason: FOUNDRY_QUARANTINE_REASON };
   }
-  return { ok: false, reason: FOUNDRY_QUARANTINE_REASON };
+
+  const gate = assertFoundryMutationAllowed(source);
+  if (!gate.ok) {
+    return { ok: false, reason: gate.reason || FOUNDRY_LAB_BLOCK_REASON };
+  }
+  return { ok: true };
 }
