@@ -222,6 +222,7 @@ export async function seatPlayerInLeague(opts: {
       leagueName: joinRes.name || "War Room",
       code: "",
       sportId,
+      alreadyMember: joinRes.alreadyMember === true,
     };
   }
 
