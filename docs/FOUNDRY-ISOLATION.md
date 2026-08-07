@@ -57,3 +57,25 @@ node scripts/verify-foundry-isolation.mjs
 
 Set `FOUNDRY_EMERGENCY_QUARANTINE = true` in `foundry-quarantine.ts` or
 `NEXT_PUBLIC_FOUNDRY_QUARANTINE=1` for a full Foundry blackout.
+
+## Production closeout (2026-08-07)
+
+| Step | Result |
+|------|--------|
+| Push `0192748` | `origin/main` @ `019274810bdc9c0ea56b7be6bca8f4b2d7f032d0` |
+| Vercel production | `dpl_2FuCNZhFejnXypf43if9rkd3LkYZ` · aliased **https://www.war-room-picks.com** |
+| Prod JS isolation markers | `FOUNDRY_LAB_BLOCK`, `isExplicitLabLeague`, `assertFoundryMutationAllowed`, device LAB key |
+| Real league sim hard-block | `founderPostWeek` / `founderScoreWeek` / `founderPostAndScoreWeek` → LAB boundary refuse |
+| Marked LAB allow | gate ok; roster path past isolation (RPC auth denied without live session — expected) |
+| Host bot pad dual-use | `seedBotPicksForWeekInCloud` on production shape → **not** LAB boundary (RPC permission only) |
+| Sim spice still gated | `applyRandomBotChaos` + `seedSelfSimPicksIfEmpty` LAB-blocked on production |
+| Crown jewels | score/post refused before standings/Gazette/Moments write path |
+
+Verify scripts:
+
+```bash
+node scripts/verify-foundry-isolation.mjs
+node scripts/smoke-foundry-isolation-prod.mjs
+npx tsx scripts/smoke-foundry-isolation-runtime.mjs
+npx tsx scripts/smoke-foundry-isolation-entry.mjs
+```
