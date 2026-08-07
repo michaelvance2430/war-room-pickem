@@ -27,7 +27,7 @@ import {
   founderPostAndScoreWeek,
   founderPostWeek,
   founderScoreWeek,
-  founderSimFirstWeeksAsNewPlayer,
+  founderBuildFirstWeeksHistory,
 } from "@/lib/founder-one-click";
 import { useRouter } from "next/navigation";
 import { markFoundrySessionActive } from "@/components/FoundrySessionChrome";
@@ -250,14 +250,20 @@ export default function FounderDashboardPage() {
     router.push("/league-build?eyes=1&new=1");
   }
 
-  /** LAB only: post+score first 6 weeks, then new-player eyes at week 6. */
-  async function runSimFirstSixAsNewPlayer() {
+  /** LAB only: build six scored weeks of real cloud history for QA. */
+  async function runFirstSixHistoryFactory() {
+    const sportId = getLeague()?.sportId === "nfl" ? "NFL" : "CFB";
+    const range = sportId === "NFL" ? "Weeks 1–6" : "Weeks 0–5";
+    const confirmed = window.confirm(
+      `Build six weeks of LAB history?\n\nRoom: ${leagueName || "Active LAB room"}\nSport: ${sportId}\nRange: ${range}\n\nThis writes cards, scores, standings, Board, and Gazette history to this LAB room. It will not simulate a new player.`
+    );
+    if (!confirmed) return;
     setLabBusy(true);
     setLabLog(null);
     setLabSteps([]);
     markFoundrySessionActive();
     try {
-      const res = await founderSimFirstWeeksAsNewPlayer({
+      const res = await founderBuildFirstWeeksHistory({
         weekCount: 6,
         onProgress: (p) => {
           setLabLog(`⏳ Week ${p.week}: ${p.step}`);
@@ -266,15 +272,9 @@ export default function FounderDashboardPage() {
       setLabSteps(res.steps);
       setLabLog(res.ok ? `✅ ${res.message}` : `❌ ${res.message}`);
       void refresh();
-      if (res.ok) {
-        setEyes("new_player");
-        if (res.toWeek != null) setWeek(res.toWeek);
-        window.setTimeout(() => {
-          router.push("/");
-        }, 500);
-      }
+      if (res.ok && res.toWeek != null) setWeek(res.toWeek);
     } catch (e) {
-      setLabLog(e instanceof Error ? e.message : "Six-week sim failed");
+      setLabLog(e instanceof Error ? e.message : "LAB history build failed");
     }
     setLabBusy(false);
   }
@@ -723,17 +723,17 @@ export default function FounderDashboardPage() {
           <button
             type="button"
             disabled={labBusy}
-            onClick={() => void runSimFirstSixAsNewPlayer()}
+            onClick={() => void runFirstSixHistoryFactory()}
             className="w-full py-3.5 min-h-[52px] rounded-xl border-2 border-amber-400/55 bg-amber-500/15 text-left px-3.5 touch-manipulation disabled:opacity-50"
           >
             <span className="block text-sm font-extrabold text-amber-100">
               {labBusy
-                ? "Simming first 6 weeks…"
-                : "Sim first 6 weeks as new player →"}
+                ? "Building six weeks of LAB history…"
+                : "Build six weeks of LAB history →"}
             </span>
             <span className="block text-[11px] text-muted mt-0.5 leading-snug">
-              LAB room only · post+score weeks 0–5 (CFB) or 1–6 (NFL) · then
-              NEW PLAYER eyes at the last scored week with standings history
+              Season factory · writes real LAB standings / Board / Gazette ·
+              stays in Foundry with ceremonies available
             </span>
           </button>
           <button
