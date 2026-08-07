@@ -570,6 +570,63 @@ body {
   padding-right: 6.45rem;
 }
 
+.home-war-room[data-home-sport="cfb"] .cfb-week-hero .home-week-hero-card.is-open {
+  min-height: 10.9rem;
+  padding-right: 6.45rem;
+}
+
+.home-war-room[data-home-sport="cfb"] .cfb-week-hero :is(.home-week-state-open, .home-week-state-required, .home-week-state-build) {
+  border-color: rgba(255, 90, 31, 0.82);
+  background: linear-gradient(145deg, rgba(91, 29, 6, 0.78), rgba(13, 5, 2, 0.96) 64%), #0b0301;
+  box-shadow: 0 0 0 1px rgba(255, 90, 31, 0.1), 0 0 34px rgba(255, 90, 31, 0.15) !important;
+}
+
+.home-war-room[data-home-sport="cfb"] .cfb-week-hero .home-week-state-waiting {
+  border-color: rgba(203, 170, 77, 0.46);
+  background: linear-gradient(145deg, rgba(45, 36, 16, 0.68), rgba(7, 7, 5, 0.95) 64%), #070704;
+  box-shadow: 0 0 0 1px rgba(203, 170, 77, 0.06), 0 0 28px rgba(203, 170, 77, 0.08) !important;
+}
+
+.home-war-room[data-home-sport="cfb"] .cfb-week-hero .home-week-state-live {
+  border-color: rgba(65, 157, 255, 0.72);
+  background: linear-gradient(145deg, rgba(8, 43, 78, 0.78), rgba(2, 8, 14, 0.96) 64%), #02070c;
+  box-shadow: 0 0 0 1px rgba(65, 157, 255, 0.08), 0 0 34px rgba(45, 135, 255, 0.13) !important;
+}
+
+.home-war-room[data-home-sport="cfb"] .cfb-week-hero .home-week-state-scored {
+  border-color: rgba(229, 187, 42, 0.72);
+  background: linear-gradient(145deg, rgba(72, 52, 8, 0.76), rgba(10, 8, 2, 0.96) 64%), #080602;
+  box-shadow: 0 0 0 1px rgba(229, 187, 42, 0.09), 0 0 34px rgba(229, 187, 42, 0.13) !important;
+}
+
+.home-war-room[data-home-sport="cfb"] .cfb-week-hero .home-week-state-missed {
+  border-color: rgba(239, 68, 68, 0.7);
+  background: linear-gradient(145deg, rgba(79, 13, 13, 0.75), rgba(13, 3, 3, 0.96) 64%), #0a0202;
+  box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.08), 0 0 34px rgba(239, 68, 68, 0.12) !important;
+}
+
+.home-war-room[data-home-sport="cfb"] .cfb-week-hero :is(.home-week-state-open, .home-week-state-required, .home-week-state-build) .text-primary {
+  color: #ff7a45;
+}
+
+.home-war-room[data-home-sport="cfb"] .cfb-week-hero :is(.home-week-state-open, .home-week-state-required, .home-week-state-build) a.bg-primary {
+  background: #ff5a1f;
+  color: #120400;
+  box-shadow: 0 0 24px rgba(255, 90, 31, 0.3);
+}
+
+.home-war-room[data-home-sport="cfb"] .cfb-week-hero .home-week-state-live .text-primary {
+  color: #58a8ff;
+}
+
+.home-war-room[data-home-sport="cfb"] .cfb-week-hero .home-week-state-scored .text-primary {
+  color: #e5bb2a;
+}
+
+.home-war-room[data-home-sport="cfb"] .cfb-week-hero .home-week-state-missed .text-primary {
+  color: #f87171;
+}
+
 .cfb-lock-seal {
   position: absolute;
   top: 2.75rem;
@@ -619,6 +676,122 @@ body {
   font-size: 0.78rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
+}
+
+.cfb-lock-seal.is-open {
+  color: #ff6a31;
+  filter: drop-shadow(0 0 10px rgba(255, 90, 31, 0.3));
+}
+
+.cfb-lock-seal.is-open .cfb-lock-shackle-glow {
+  stroke: rgba(255, 90, 31, 0.22);
+}
+
+.cfb-lock-seal.is-open .cfb-lock-shackle,
+.cfb-lock-seal.is-open .cfb-lock-body {
+  stroke: #ff6a31;
+}
+
+.cfb-lock-seal.is-open .cfb-lock-body {
+  fill: rgba(45, 12, 2, 0.96);
+}
+
+.cfb-lock-seal.is-open .cfb-lock-key {
+  fill: #ff6a31;
+}
+
+.home-mission-countdown {
+  width: fit-content;
+  min-width: 10.5rem;
+  margin: -0.1rem 0 0.95rem;
+  padding: 0.48rem 0.65rem;
+  border-left: 2px solid currentColor;
+  color: #ff6a31;
+  background: linear-gradient(90deg, rgba(255, 90, 31, 0.11), transparent);
+}
+
+.home-week-state-locked .home-mission-countdown {
+  color: #35ef62;
+  background: linear-gradient(90deg, rgba(53, 239, 98, 0.1), transparent);
+}
+
+.home-week-state-live .home-mission-countdown {
+  color: #58a8ff;
+  background: linear-gradient(90deg, rgba(65, 157, 255, 0.1), transparent);
+}
+
+.home-mission-countdown > span {
+  display: block;
+  margin-bottom: 0.18rem;
+  font-size: 0.5rem;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.home-mission-countdown > strong {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  color: #f7f5ee;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 1.15rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.home-mission-countdown b {
+  font: inherit;
+}
+
+.home-mission-countdown small {
+  margin-left: 0.12rem;
+  color: currentColor;
+  font-size: 0.52rem;
+}
+
+.cfb-lock-seal.is-live {
+  color: #58a8ff;
+  filter: drop-shadow(0 0 10px rgba(65, 157, 255, 0.3));
+}
+
+.cfb-lock-seal.is-live .cfb-lock-shackle-glow {
+  stroke: rgba(65, 157, 255, 0.22);
+}
+
+.cfb-lock-seal.is-live .cfb-lock-shackle,
+.cfb-lock-seal.is-live .cfb-lock-body {
+  stroke: #58a8ff;
+}
+
+.cfb-lock-seal.is-live .cfb-lock-body {
+  fill: rgba(3, 24, 45, 0.96);
+}
+
+.cfb-lock-seal.is-live .cfb-lock-key {
+  fill: #58a8ff;
+}
+
+.cfb-lock-seal.is-missed {
+  color: #f87171;
+  filter: drop-shadow(0 0 10px rgba(239, 68, 68, 0.28));
+}
+
+.cfb-lock-seal.is-missed .cfb-lock-shackle-glow {
+  stroke: rgba(239, 68, 68, 0.2);
+}
+
+.cfb-lock-seal.is-missed .cfb-lock-shackle,
+.cfb-lock-seal.is-missed .cfb-lock-body {
+  stroke: #f87171;
+}
+
+.cfb-lock-seal.is-missed .cfb-lock-body {
+  fill: rgba(45, 3, 3, 0.96);
+}
+
+.cfb-lock-seal.is-missed .cfb-lock-key {
+  fill: #f87171;
 }
 
 .home-war-room[data-home-sport="cfb"] .cfb-week-hero h2 {
