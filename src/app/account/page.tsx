@@ -682,7 +682,7 @@ export default function AccountPage() {
                   disabled={leagueAliasBusy}
                   className="flex-1 py-3 min-h-[48px] rounded-xl bg-primary text-black text-sm font-bold disabled:opacity-40 touch-manipulation"
                 >
-                  {leagueAliasBusy ? "Saving…" : "Save league name"}
+                  {leagueAliasBusy ? "Saving…" : "Save league alias"}
                 </button>
                 <button
                   type="button"
