@@ -415,6 +415,13 @@ body {
   box-shadow: 0 12px 38px rgba(0, 0, 0, 0.48);
 }
 
+.cfb-hero-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-right: auto;
+}
+
 .cfb-wordmark {
   display: flex;
   flex-direction: column;
@@ -766,6 +773,20 @@ body {
 }
 
 @media (min-width: 768px) {
+  .cfb-situation-masthead .home-identity-row {
+    width: fit-content;
+    margin-left: auto;
+    padding: 0.4rem;
+    border-color: rgba(85, 198, 93, 0.24);
+    border-radius: 999px;
+    background: rgba(2, 8, 4, 0.7);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.34);
+  }
+
+  .cfb-situation-masthead .cfb-hero-brand {
+    display: none;
+  }
+
   body {
     background-attachment: fixed;
   }
