@@ -7,12 +7,10 @@ import { MAX_LEAGUE_PLAYERS } from "@/lib/league-limits";
 import Link from "next/link";
 import {
   markHostScreenSeen,
-  markInviteCopied,
   stashPendingJoinCode,
   takePendingJoinCode,
 } from "@/lib/commish-onboarding";
 import { markLeagueBuildNeeded } from "@/lib/league-build";
-import InviteFriends from "@/components/InviteFriends";
 import {
   getSportPack,
   isLiveSport,
@@ -23,7 +21,6 @@ import OwnershipNotice from "@/components/OwnershipNotice";
 import WwcTrophyLogo from "@/components/WwcTrophyLogo";
 import NflBrandMark from "@/components/NflBrandMark";
 import BrandMark from "@/components/BrandMark";
-import OpenRoomBotsNudge from "@/components/OpenRoomBotsNudge";
 import {
   saveActiveLeagueId,
   writeSessionAndLeague,
@@ -62,10 +59,7 @@ function JoinPageInner() {
   const [joinStatus, setJoinStatus] = useState<string | null>(null);
   const [createdCode, setCreatedCode] = useState<string | null>(null);
   const [checking, setChecking] = useState(true);
-  const [hostCopied, setHostCopied] = useState<string | null>(null);
   const [deepLinkCode, setDeepLinkCode] = useState<string | null>(null);
-  /** Host created as open room — offer bot pad deep link */
-  const [showOpenRoomBotsNudge, setShowOpenRoomBotsNudge] = useState(false);
 
   useEffect(() => {
     // Deep link: /join?code=ABC123 (or stashed from login)
@@ -550,12 +544,6 @@ function JoinPageInner() {
 
     return (
       <div className="min-h-screen flex items-center justify-center px-4 py-10">
-        {listAsOpen && (
-          <OpenRoomBotsNudge
-            open={showOpenRoomBotsNudge}
-            onClose={() => setShowOpenRoomBotsNudge(false)}
-          />
-        )}
         <div className="max-w-md w-full rounded-xl border-2 border-primary/40 bg-card p-6">
       <div className="flex justify-center mb-3">
             <BrandMark size={72} variant="force" />
@@ -565,80 +553,13 @@ function JoinPageInner() {
           </p>
       <h1 className="text-2xl font-bold mb-1 text-center">League created</h1>
       <p className="text-sm text-muted mb-4 text-center">
-            {leagueLabel} — next: set up the room, then publish the first card.
+            {leagueLabel} is ready. Set the permanent rules once, then Home will
+            give you the first weekly job.
             {listAsOpen ? " Listed in the open room lobby." : ""}
           </p>
       <div className="text-3xl font-bold tracking-[0.3em] text-primary text-center mb-4 font-mono">
             {createdCode}
           </div>
-      <div id="invite-friends-root">
-            <InviteFriends
-              leagueName={leagueLabel}
-              code={createdCode}
-              leagueId={leagueId}
-              sportId={
-                // Prefer what we just wrote to session storage
-                (() => {
-                  try {
-                    const raw = localStorage.getItem("warroom-league");
-                    if (raw) {
-                      const j = JSON.parse(raw) as { sportId?: string };
-                      if (j.sportId) return j.sportId;
-                    }
-                  } catch {
-                    /* ignore */
-                  }
-                  return undefined;
-                })()
-              }
-              className="mb-4 !border-primary/30"
-            />
-          </div>
-
-          {hostCopied && (
-            <p className="text-xs text-primary text-center mb-3">{hostCopied}</p>
-          )}
-
-          {listAsOpen && (
-            <button
-              type="button"
-              onClick={() => setShowOpenRoomBotsNudge(true)}
-              className="w-full py-3 min-h-[48px] rounded-xl border border-primary/40 bg-primary/10 text-primary text-sm font-bold mb-3 touch-manipulation"
-            >
-              Round out with bots? →
-            </button>
-          )}
-
-          <ol className="text-left text-sm space-y-2 mb-6 rounded-lg border border-border bg-background/50 px-4 py-3">
-      <li>
-              <span className="font-semibold text-primary">1.</span> Share the
-              invite (empty room is the #1 fail)
-            </li>
-      <li>
-              <span className="font-semibold text-primary">2.</span> Publish a
-              card (demo slate is fine first time)
-            </li>
-      <li>
-              <span className="font-semibold text-primary">3.</span> Score the
-              week (practice is fine)
-            </li>
-      </ol>
-
-                    <p className="text-[11px] text-muted text-center mb-3 leading-relaxed">
-            You can invite from Home anytime. First job: publish a card so
-            people can pick.
-          </p>
-          <button
-            type="button"
-            onClick={() => {
-              if (leagueId) markHostScreenSeen(leagueId);
-              router.push("/week-ops?first=1");
-              router.refresh();
-            }}
-            className="w-full py-4 min-h-[56px] rounded-xl bg-primary text-black text-base font-extrabold mb-2 touch-manipulation"
-          >
-            Build first card →
-          </button>
           <button
             type="button"
             onClick={() => {
@@ -646,9 +567,9 @@ function JoinPageInner() {
               router.push("/league-build?new=1");
               router.refresh();
             }}
-            className="w-full py-3 min-h-[48px] rounded-xl border border-border text-sm font-semibold text-muted hover:text-foreground touch-manipulation"
+            className="w-full py-4 min-h-[56px] rounded-xl bg-primary text-black text-base font-extrabold touch-manipulation"
           >
-            Finish room setup first
+            Set up league →
           </button>
 
       </div>
@@ -824,8 +745,8 @@ function JoinPageInner() {
                   <p className="text-xs text-muted mt-1 leading-relaxed">
                     Fresh names invite a new story — not a copy of last league.
                     Best with{" "}
-                    <strong className="text-foreground">8–16 friends</strong>{" "}
-                    (bots can fill empty seats later). Cap {MAX_LEAGUE_PLAYERS}.
+                    <strong className="text-foreground">8–16 friends</strong>.
+                    Cap {MAX_LEAGUE_PLAYERS}.
                   </p>
                 </div>
                 <div className="space-y-1.5">
