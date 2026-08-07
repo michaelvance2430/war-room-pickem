@@ -337,9 +337,34 @@ html[data-sport="nfl"] select:focus {
 .cfb-locker-page::after { content:""; position:absolute; z-index:-1; inset:0; pointer-events:none; background:linear-gradient(180deg,rgba(1,2,1,.08),rgba(2,3,2,.56) 12rem,#030302 43rem); }
 .cfb-locker-page .cfb-locker-main { padding-top:.75rem; }
 .cfb-locker-page .cfb-locker-header { margin-bottom:.75rem; padding:.55rem .25rem .72rem; border-width:0 0 1px; border-style:solid; border-color:rgba(229,187,42,.3); border-radius:0; background:linear-gradient(180deg,rgba(10,7,3,.2),rgba(2,5,3,.62)); box-shadow:none; backdrop-filter:blur(5px); }
-.cfb-locker-page .cfb-locker-header h1 { font-family:Impact,Haettenschweiler,"Arial Narrow Bold",sans-serif; font-size:2rem; font-weight:500; letter-spacing:.03em; text-transform:uppercase; }
-.cfb-locker-page .cfb-locker-thread { border-color:rgba(229,187,42,.25); background:rgba(3,7,4,.88); box-shadow:inset 0 0 2.2rem rgba(0,0,0,.48),0 1rem 2.2rem rgba(0,0,0,.25); backdrop-filter:blur(14px); }
+.cfb-locker-nameplate { position:relative; margin-bottom:.65rem; padding:.58rem .82rem .65rem; overflow:hidden; border:1px solid rgba(229,187,42,.48); border-radius:.35rem; background:linear-gradient(180deg,rgba(48,48,43,.92),rgba(13,15,13,.97)); box-shadow:inset 0 1px rgba(255,255,255,.12),inset 0 -1rem 2rem rgba(0,0,0,.3),0 .55rem 1.4rem rgba(0,0,0,.28); text-align:center; text-transform:uppercase; }
+.cfb-locker-nameplate::before,.cfb-locker-nameplate::after { content:""; position:absolute; top:.45rem; width:.35rem; height:.35rem; border-radius:999px; background:#090a09; box-shadow:inset 0 1px 2px #000,0 0 0 1px rgba(255,255,255,.08); }
+.cfb-locker-nameplate::before { left:.5rem; } .cfb-locker-nameplate::after { right:.5rem; }
+.cfb-locker-nameplate span { display:block; color:rgba(255,255,255,.42); font-size:.42rem; font-weight:900; letter-spacing:.26em; }
+.cfb-locker-nameplate h1 { color:#f5f3e8; font-family:Impact,Haettenschweiler,"Arial Narrow Bold",sans-serif; font-size:2.35rem; font-weight:500; letter-spacing:.055em; line-height:.95; }
+.cfb-locker-nameplate strong { display:block; margin-top:.25rem; color:#e5bb2a; font-size:.62rem; letter-spacing:.16em; }
+.cfb-locker-page .cfb-locker-thread { position:relative; border-color:rgba(229,187,42,.3); background:repeating-linear-gradient(90deg,rgba(255,255,255,.018) 0 1px,transparent 1px 4.25rem),linear-gradient(180deg,rgba(17,21,17,.94),rgba(3,7,4,.92)); box-shadow:inset 0 0 2.2rem rgba(0,0,0,.48),0 1rem 2.2rem rgba(0,0,0,.25); backdrop-filter:blur(14px); }
 .cfb-locker-page .cfb-locker-composer { border-color:rgba(72,240,106,.38); background:rgba(4,10,6,.94); box-shadow:0 -.7rem 2rem rgba(0,0,0,.34); backdrop-filter:blur(14px); }
+.locker-message-card { border-radius:.35rem .85rem .85rem .85rem; background:linear-gradient(135deg,rgba(34,37,32,.92),rgba(6,9,7,.9)); box-shadow:inset .18rem 0 rgba(229,187,42,.35),0 .35rem .85rem rgba(0,0,0,.18); }
+.locker-message-card.is-mine { border-radius:.85rem .35rem .85rem .85rem; background:linear-gradient(225deg,rgba(13,58,27,.74),rgba(5,14,8,.92)); box-shadow:inset -.18rem 0 rgba(72,240,106,.55),0 .35rem .85rem rgba(0,0,0,.18); }
+.locker-gif-frame { overflow:hidden; border:1px solid rgba(255,255,255,.14); border-radius:.75rem; background:#000; }
+.locker-gif-frame img { display:block; width:100%; max-height:18rem; object-fit:contain; }
+.locker-gif-draft { min-height:7rem; position:relative; display:flex; align-items:center; justify-content:center; overflow:hidden; border:1px solid rgba(72,240,106,.35); border-radius:.7rem; background:#000; }
+.locker-gif-draft img { width:100%; max-height:12rem; object-fit:contain; }
+.locker-gif-draft button { width:2rem; height:2rem; position:absolute; top:.4rem; right:.4rem; border-radius:999px; background:rgba(0,0,0,.8); color:#fff; font-size:1.25rem; }
+.locker-gif-draft span { position:absolute; left:.55rem; bottom:.4rem; padding:.18rem .4rem; border-radius:.3rem; background:rgba(0,0,0,.78); color:#fff; font-size:.58rem; font-weight:900; letter-spacing:.1em; text-transform:uppercase; }
+.locker-gear-tray { padding:.55rem; border:1px solid rgba(255,255,255,.13); border-radius:.7rem; background:rgba(0,0,0,.35); }
+.locker-gear-tabs { display:flex; gap:.35rem; margin-bottom:.5rem; }
+.locker-gear-tabs button { min-height:2rem; padding:0 .75rem; border:1px solid var(--border); border-radius:.5rem; color:var(--muted); font-size:.7rem; font-weight:800; }
+.locker-gear-tabs button[aria-selected="true"] { border-color:rgba(72,240,106,.5); background:rgba(72,240,106,.12); color:var(--primary); }
+.locker-emoji-grid { display:grid; grid-template-columns:repeat(8,1fr); gap:.28rem; }
+.locker-emoji-grid button { min-width:0; aspect-ratio:1; border:1px solid var(--border); border-radius:.5rem; background:var(--background); font-size:1rem; }
+.locker-gif-tool { display:grid; grid-template-columns:1fr auto; gap:.45rem; }
+.locker-gif-tool input { min-width:0; min-height:2.55rem; padding:0 .7rem; border:1px solid var(--border); border-radius:.55rem; background:var(--background); color:var(--foreground); font-size:.75rem; }
+.locker-gif-tool>button { min-height:2.55rem; padding:0 .85rem; border-radius:.55rem; background:var(--primary); color:#000; font-size:.75rem; font-weight:900; }
+.locker-gif-tool p { grid-column:1/-1; color:var(--muted); font-size:.62rem; line-height:1.3; }
+.locker-plus-button { width:2.65rem; height:2.65rem; flex:none; border:1px solid var(--border); border-radius:.65rem; background:var(--background); color:var(--foreground); font-size:1.4rem; line-height:1; }
+.locker-plus-button.is-open { border-color:rgba(72,240,106,.55); background:rgba(72,240,106,.14); color:var(--primary); transform:rotate(45deg); }
 @media (min-width:640px) {
   .cfb-picks-page::before,.cfb-locker-page::before { background-size:46rem auto; }
   .cfb-picks-page .cfb-picks-main,.cfb-locker-page .cfb-locker-main { padding-top:1.25rem; }
