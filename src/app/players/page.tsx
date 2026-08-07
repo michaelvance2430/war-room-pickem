@@ -29,7 +29,6 @@ import {
   divisionFullLabel,
 } from "@/lib/divisions";
 import { formatLastSeen, lastSeenToneClass } from "@/lib/last-seen";
-import InviteFriends from "@/components/InviteFriends";
 import { isPreseasonCommishToolsAllowed } from "@/lib/season-mode";
 import { getBlueFalconCount, hydrateBlueFalconFromCloud } from "@/lib/blue-falcon";
 import { hasOfficialScoredWeek } from "@/lib/season-scored";
@@ -40,7 +39,6 @@ export default function PlayersPage() {
   /** Commissioner or deputy — can move people between divisions */
   const [canManageDivs, setCanManageDivs] = useState(false);
   const [selfId, setSelfId] = useState<string | null>(null);
-  const [leagueCode, setLeagueCode] = useState("");
   const [leagueName, setLeagueName] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -96,7 +94,6 @@ export default function PlayersPage() {
     setIsCommish(isCommissioner());
     setCanManageDivs(isOps());
     setSelfId(session?.playerId || null);
-    setLeagueCode(league?.code || "");
     setLeagueName(league?.name || "");
 
     if (!session?.leagueId) {
@@ -198,7 +195,7 @@ export default function PlayersPage() {
   }
 
   async function changeDivision(userId: string, division: Division) {
-    if (!canManageDivs || busy) return;
+    if (!canManageDivs || busy || autoBalanceLock.locked) return;
     setBusy(true);
     setError(null);
     setPlayers((prev) =>
@@ -443,15 +440,6 @@ export default function PlayersPage() {
               : " Remove a player or start a second league."}
           </p>
         )}
-        {leagueCode && (
-          <InviteFriends
-            leagueName={leagueName || "War Room"}
-            code={leagueCode}
-            leagueId={getLeague()?.id}
-            className="mb-6"
-          />
-        )}
-
         {/* Commissioner: kick bots one-by-one to free seats */}
         {isCommish && !loading && bots.length > 0 && (
           <div className="rounded-xl border border-primary/30 bg-primary/5 p-5 mb-6">
@@ -517,7 +505,7 @@ export default function PlayersPage() {
                 ? "Balancing divisions… saving assignments and refreshing the roster."
                 : autoBalanceLock.locked
                   ? autoBalanceLock.reason ||
-                    "Divisions are locked because the season has started. Manual moves still work if you must."
+                    "Alignment is locked because the season has started."
                   : "New joiners land in the least-full division automatically. Auto Balance moves the fewest players needed to even the four groups (verified after save)."}
             </p>
             <div className="flex flex-wrap items-center gap-2">
@@ -655,7 +643,7 @@ export default function PlayersPage() {
                       {canManageDivs ? (
                         <select
                           value={p.division}
-                          disabled={busy}
+                          disabled={busy || autoBalanceLock.locked}
                           onChange={(e) =>
                             void changeDivision(
                               p.userId,
@@ -663,7 +651,11 @@ export default function PlayersPage() {
                             )
                           }
                           className="text-xs bg-background border border-border rounded px-1 py-0.5 max-w-[6.5rem]"
-                          title="Change division (ops only)"
+                          title={
+                            autoBalanceLock.locked
+                              ? autoBalanceLock.reason || "Alignment locked"
+                              : "Change division (ops only)"
+                          }
                         >
                           {DIVISIONS.map((d) => (
                             <option key={d} value={d}>
