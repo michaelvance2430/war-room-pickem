@@ -372,62 +372,83 @@ export default function StandingsPage() {
           <section className="cfb-scoreboard-hero" aria-labelledby="standings-title">
             <div className="cfb-scoreboard-screen">
               <div className="cfb-scoreboard-topline">
-                <span>War Room Network</span>
+                <span>War Room Stadium</span>
                 <span className="cfb-scoreboard-live">
-                  <i aria-hidden /> {pulsePhase === "regular" ? "Live season" : pulsePhase}
+                  <i aria-hidden /> House scoreboard
                 </span>
               </div>
-              <div className="cfb-scoreboard-brag" aria-label="War Room house scoreboard joke">
-                <span>War Room <strong>63</strong></span>
-                <small>Final*</small>
-                <span><strong>3</strong> Other Pools</span>
+              <div
+                className="cfb-scoreboard-matchup"
+                aria-label="War Room 42, Everyone Else 3. Final."
+              >
+                <div className="cfb-scoreboard-team cfb-scoreboard-team-home">
+                  <span className="cfb-scoreboard-side">Home</span>
+                  <strong>War Room</strong>
+                  <b>42</b>
+                </div>
+                <div className="cfb-scoreboard-game-state">
+                  <span>Final</span>
+                  <i aria-hidden />
+                  <small>We remain humble.</small>
+                </div>
+                <div className="cfb-scoreboard-team cfb-scoreboard-team-away">
+                  <span className="cfb-scoreboard-side">Away</span>
+                  <strong>Everyone Else</strong>
+                  <b>03</b>
+                </div>
               </div>
-              <p className="cfb-scoreboard-brag-note">*Source: us. Very independent.</p>
-              <p className="cfb-scoreboard-kicker">Saturday command board</p>
+              <div className="cfb-scoreboard-footer">
+                <span>{pulsePhase === "regular" ? "Season live" : pulsePhase}</span>
+                <span>Saturday command board</span>
+              </div>
+            </div>
+            <div className="cfb-scoreboard-title-lockup">
+              <p>War Room Pick&apos;Em</p>
               <h1 id="standings-title">Standings</h1>
-
-              {seasonStarted && leader ? (
-                <div className="cfb-scoreboard-leader">
-                  <span className="cfb-scoreboard-crown" aria-hidden>♛</span>
-                  <div>
-                    <p>Holding the crown</p>
-                    <strong><PlayerLink id={leader.id} name={leader.name} /></strong>
-                    <span>{leader.totalPoints} season points</span>
-                  </div>
-                </div>
-              ) : (
-                <div className="cfb-scoreboard-waiting">
-                  <strong>{players.length}</strong>
-                  <span>players seated</span>
-                  <p>Ranks ignite after the first official score.</p>
-                </div>
-              )}
-
-              <div className="cfb-scoreboard-digits" aria-label="League snapshot">
-                {pulseCards.slice(0, 3).map((card) => (
-                  <div key={card.key}>
-                    <span>{card.label}</span>
-                    <strong>{card.value}</strong>
-                  </div>
-                ))}
-              </div>
             </div>
           </section>
         )}
 
-        {isCfb && seasonStarted && selfOverall && (
-          <section className="cfb-your-position" aria-label="Your position">
-            <div>
-              <span>Your position</span>
-              <strong>#{selfOverallIndex + 1}</strong>
-            </div>
-            <p>
-              <strong>{selfOverall.name}</strong>
-              {pointsBack === 0
-                ? " · You own the board. Everybody else is chasing."
-                : ` · ${pointsBack} point${pointsBack === 1 ? "" : "s"} behind the leader.`}
-            </p>
-            <span className="cfb-position-arrow" aria-hidden>↗</span>
+        {isCfb && (
+          <section className="cfb-command-strip" aria-label="Standings snapshot">
+            {seasonStarted && selfOverall ? (
+              <>
+                <div className="cfb-command-rank">
+                  <span>Your rank</span>
+                  <strong>#{selfOverallIndex + 1}</strong>
+                </div>
+                <div className="cfb-command-copy">
+                  <span>{selfOverall.name}</span>
+                  <p>
+                    {pointsBack === 0
+                      ? "You own the board. Everybody else is chasing."
+                      : `${pointsBack} point${pointsBack === 1 ? "" : "s"} behind the leader.`}
+                  </p>
+                </div>
+                {leader && (
+                  <div className="cfb-command-leader">
+                    <span>Leader</span>
+                    <strong><PlayerLink id={leader.id} name={leader.name} /></strong>
+                    <small>{leader.totalPoints} pts</small>
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="cfb-command-rank">
+                  <span>Status</span>
+                  <strong>PRE</strong>
+                </div>
+                <div className="cfb-command-copy">
+                  <span>Room systems online</span>
+                  <p>Activity board below. Competition wakes with Week 1.</p>
+                </div>
+                <div className="cfb-command-status">
+                  <i aria-hidden />
+                  <span>{loading ? "Loading" : "Ready"}</span>
+                </div>
+              </>
+            )}
           </section>
         )}
 
@@ -437,13 +458,13 @@ export default function StandingsPage() {
           <p className="text-xs text-muted mt-1 leading-relaxed">
             {phaseCopy.subline}
           </p>
-          {preseasonPractice && pulsePhase === "preseason" && (
+          {preseasonPractice && pulsePhase === "preseason" && !isCfb && (
             <p className="text-xs text-amber-200/90 mt-1.5 leading-relaxed">
               Practice cards and scores are theater. Crowns, points, and ranks
               wait for the real season — the room stays visible either way.
             </p>
           )}
-          {players.length > 0 && (
+          {players.length > 0 && !isCfb && (
             <p className="text-xs text-muted mt-1.5 leading-relaxed">
               <span className="text-primary font-medium">
                 Tap a green name → open their profile
@@ -514,20 +535,6 @@ export default function StandingsPage() {
         {/* Competition chrome only during live season */}
         {!loading && seasonStarted && pulsePhase === "regular" && (
           <CrownAndShame className="mb-6" players={players} />
-        )}
-
-        {/* Preseason: competition waiting note */}
-        {!loading && pulsePhase === "preseason" && players.length > 0 && (
-          <div className="mb-5 rounded-xl border border-dashed border-border bg-card/40 px-4 py-3">
-            <p className="text-sm font-semibold text-foreground">
-              Season competition starts after the first scored week
-            </p>
-            <p className="text-xs text-muted mt-0.5 leading-relaxed">
-              PTS · ATS% · Streak · Crown · Wall of Shame · Swing stay off so
-              preseason never looks competitive. The roster below is the pulse
-              of the room.
-            </p>
-          </div>
         )}
 
         {!loading && pulsePhase === "offseason" && players.length > 0 && (
@@ -700,19 +707,28 @@ export default function StandingsPage() {
                     {competitiveRows.map((player, idx) => (
                       <Fragment key={player.id}>
                         {idx === cutIndex && (
-                          <tr className="bg-danger/10">
+                          <tr className="cfb-cut-line">
                             <td
                               colSpan={active === "Overall" ? 7 : 6}
-                              className="px-4 py-1.5 text-center text-xs text-danger font-medium"
+                              className="px-3 py-0"
                             >
-                              — Cut Line (bottom 50% → Toilet Bowl) —
+                              <div className="cfb-cut-line-inner">
+                                <span aria-hidden>▼</span>
+                                <div>
+                                  <strong>The Drop Zone</strong>
+                                  <small>Below this line → Toilet Bowl</small>
+                                </div>
+                                <span aria-hidden>▼</span>
+                              </div>
                             </td>
                           </tr>
                         )}
                         <tr
                           className={selfRowClass(
                             isSelfPlayer(player.id, selfId),
-                            `border-t border-border hover:bg-card-hover transition ${
+                            `cfb-rank-row border-t border-border hover:bg-card-hover transition ${
+                              idx < 3 ? `cfb-rank-row-top cfb-rank-row-${idx + 1}` : ""
+                            } ${
                               cutIndex >= 0 &&
                               idx >= cutIndex &&
                               !isSelfPlayer(player.id, selfId)
@@ -722,7 +738,9 @@ export default function StandingsPage() {
                           )}
                         >
                           <td className="px-3 sm:px-4 py-3.5 text-muted align-middle">
-                            {idx + 1}
+                            <span className="cfb-rank-number">
+                              {idx === 0 ? "♛" : idx + 1}
+                            </span>
                           </td>
                           <td className="px-3 sm:px-4 py-3.5 font-medium align-middle">
                             <div className="flex flex-col gap-0.5 min-w-0">
