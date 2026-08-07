@@ -700,54 +700,119 @@ body {
   fill: #ff6a31;
 }
 
+.home-mission-clock-slot {
+  position: absolute;
+  z-index: 3;
+  top: 4.35rem;
+  left: 0.15rem;
+  width: min(19.5rem, calc(100% - 0.3rem));
+  min-height: 5.9rem;
+}
+
 .home-mission-countdown {
-  width: fit-content;
-  min-width: 10.5rem;
-  margin: -0.1rem 0 0.95rem;
-  padding: 0.48rem 0.65rem;
-  border-left: 2px solid currentColor;
-  color: #ff6a31;
-  background: linear-gradient(90deg, rgba(255, 90, 31, 0.11), transparent);
+  --clock-tone: #35ef62;
+  position: relative;
+  width: min(18.5rem, 100%);
+  padding: 0.62rem 0.72rem 0.68rem;
+  overflow: hidden;
+  color: var(--clock-tone);
+  border: 1px solid color-mix(in srgb, var(--clock-tone) 76%, transparent);
+  border-radius: 0.45rem;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 3px, rgba(255, 255, 255, 0.025) 4px),
+    radial-gradient(ellipse at 35% 40%, color-mix(in srgb, var(--clock-tone) 12%, transparent), transparent 68%),
+    rgba(4, 5, 3, 0.9);
+  box-shadow:
+    inset 0 0 1.3rem color-mix(in srgb, var(--clock-tone) 9%, transparent),
+    0 0 0 1px rgba(0, 0, 0, 0.82),
+    0 0 1.35rem color-mix(in srgb, var(--clock-tone) 23%, transparent);
+  clip-path: polygon(0.35rem 0, calc(100% - 0.35rem) 0, 100% 0.35rem, 100% calc(100% - 0.35rem), calc(100% - 0.35rem) 100%, 0.35rem 100%, 0 calc(100% - 0.35rem), 0 0.35rem);
+  backdrop-filter: blur(9px);
 }
 
-.home-week-state-locked .home-mission-countdown {
-  color: #35ef62;
-  background: linear-gradient(90deg, rgba(53, 239, 98, 0.1), transparent);
+.home-mission-countdown.is-complete {
+  --clock-tone: #35ef62;
 }
 
-.home-week-state-live .home-mission-countdown {
-  color: #58a8ff;
-  background: linear-gradient(90deg, rgba(65, 157, 255, 0.1), transparent);
+.home-mission-countdown.is-urgent {
+  --clock-tone: #ff5a1f;
 }
 
-.home-mission-countdown > span {
-  display: block;
-  margin-bottom: 0.18rem;
-  font-size: 0.5rem;
-  font-weight: 900;
-  letter-spacing: 0.18em;
+.home-mission-countdown.is-live {
+  --clock-tone: #58a8ff;
+}
+
+.home-mission-countdown::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(105deg, transparent 32%, rgba(255,255,255,.055) 48%, transparent 62%);
+}
+
+.home-mission-countdown-topline {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.42rem;
+  color: color-mix(in srgb, var(--clock-tone) 88%, white 12%);
+  font-size: 0.48rem;
+  font-weight: 950;
+  letter-spacing: 0.17em;
+  line-height: 1;
   text-transform: uppercase;
 }
 
+.home-mission-countdown-topline i {
+  width: 0.3rem;
+  height: 0.3rem;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 0.6rem currentColor;
+}
+
+.home-mission-countdown-topline span:last-child {
+  margin-left: auto;
+  color: rgba(255, 255, 255, 0.55);
+}
+
 .home-mission-countdown > strong {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: baseline;
-  gap: 0.6rem;
-  color: #f7f5ee;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 1.15rem;
-  font-weight: 900;
-  line-height: 1;
+  gap: 0.72rem;
+  color: var(--clock-tone);
+  font-family: "Courier New", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: clamp(1.72rem, 7vw, 2.35rem);
+  font-weight: 950;
+  letter-spacing: -0.075em;
+  line-height: 0.88;
+  text-shadow: 0 0 0.35rem currentColor, 0 0 1rem color-mix(in srgb, currentColor 55%, transparent);
 }
 
 .home-mission-countdown b {
+  display: inline-flex;
+  align-items: baseline;
   font: inherit;
 }
 
 .home-mission-countdown small {
-  margin-left: 0.12rem;
-  color: currentColor;
-  font-size: 0.52rem;
+  margin-left: 0.18rem;
+  color: color-mix(in srgb, var(--clock-tone) 72%, white 28%);
+  font-size: 0.53rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-shadow: none;
+}
+
+.home-mission-countdown > p {
+  margin-top: 0.42rem;
+  color: rgba(255, 255, 255, 0.56);
+  font-size: 0.48rem;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
 }
 
 .cfb-lock-seal.is-live {
