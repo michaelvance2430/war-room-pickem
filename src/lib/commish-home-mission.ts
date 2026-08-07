@@ -38,6 +38,7 @@ import {
 } from "@/lib/host-ops-mission";
 
 export type CommishMissionKind =
+  | "choose_trophy"
   | "build"
   | "finish"
   | "publish"
@@ -80,6 +81,16 @@ export async function resolveCommishHomeMission(): Promise<CommishHomeMission | 
   if (!session?.leagueId) return null;
 
   const sportId = getLeague()?.sportId || "cfb";
+  const selectedTrophy = getLeague()?.settings?.championshipTrophyId;
+  if (!selectedTrophy && getSession()?.isCommissioner) {
+    return {
+      kind: "choose_trophy",
+      label: "Choose Championship Trophy",
+      href: "/championship-trophy",
+      weekNumber: sportId === "nfl" ? 1 : 0,
+      weekLabel: "Preseason",
+    };
+  }
   let week = 0;
   try {
     week = await loadLeagueActiveWeek();

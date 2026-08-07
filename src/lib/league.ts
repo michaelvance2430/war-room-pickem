@@ -17,6 +17,8 @@ export interface LeagueSettings {
   homeTaglineCustom: string;
   /** Holiday / season background for the whole league (see season-theme.ts). */
   seasonThemeId: string;
+  /** Commissioner-selected season championship hardware; null until chosen. */
+  championshipTrophyId?: string | null;
   /**
    * Career integrity mode (prefer top-level league.mode when present).
    * Only production may engrave permanent legacy.
@@ -68,6 +70,7 @@ const DEFAULT_SETTINGS: LeagueSettings = {
   homeTaglineId: "good-teams",
   homeTaglineCustom: "",
   seasonThemeId: "default",
+  championshipTrophyId: null,
 };
 
 function canUseStorage() {

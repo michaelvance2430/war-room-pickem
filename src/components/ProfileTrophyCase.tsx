@@ -95,11 +95,12 @@ function Plaque({
           <HardwareTrophyIcon
             kind={item.kind}
             sportId={plaqueSport}
-            size={item.kind === "championship" ? 52 : 48}
+            size={item.kind === "championship" ? 96 : item.kind === "division" ? 84 : 64}
             animate={false}
             leagueName={plaqueLeague}
             leagueId={item.leagueId || leagueId}
             leagueCode={item.leagueCode || leagueCode}
+            trophyDesignId={item.trophyDesignId}
           />
         </button>
         {canShare && (
@@ -167,6 +168,7 @@ function Plaque({
         leagueName={plaqueLeague}
         leagueId={item.leagueId || leagueId}
         leagueCode={item.leagueCode || leagueCode}
+        trophyDesignId={item.trophyDesignId}
       />
     </div>
   );

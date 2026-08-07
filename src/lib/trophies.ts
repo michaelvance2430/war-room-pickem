@@ -22,6 +22,7 @@ export type LeagueTrophy = {
   subtitle: string | null;
   notes: string | null;
   awardedAt: string;
+  trophyDesignId?: string | null;
 };
 
 export const TROPHY_META: Record<
@@ -120,6 +121,7 @@ function mapRow(r: Record<string, unknown>): LeagueTrophy {
     subtitle: (r.subtitle as string) || null,
     notes: (r.notes as string) || null,
     awardedAt: (r.awarded_at as string) || new Date().toISOString(),
+    trophyDesignId: (r.trophy_design_id as string) || null,
   };
 }
 
@@ -139,7 +141,7 @@ export async function loadLeagueTrophies(): Promise<LeagueTrophy[]> {
   const { data, error } = await supabase
     .from("league_trophies")
     .select(
-      "id, league_id, season_year, trophy_type, winner_name, winner_user_id, subtitle, notes, awarded_at"
+      "id, league_id, season_year, trophy_type, winner_name, winner_user_id, subtitle, notes, awarded_at, trophy_design_id"
     )
     .eq("league_id", session.leagueId)
     .order("season_year", { ascending: false });
@@ -210,7 +212,7 @@ export async function loadCareerTrophiesWonByUser(
     const { data, error } = await supabase
       .from("league_trophies")
       .select(
-        "id, league_id, season_year, trophy_type, winner_name, winner_user_id, subtitle, notes, awarded_at, leagues(id, name, sport_id, code)"
+        "id, league_id, season_year, trophy_type, winner_name, winner_user_id, subtitle, notes, awarded_at, trophy_design_id, leagues(id, name, sport_id, code)"
       )
       .eq("winner_user_id", userId)
       .order("season_year", { ascending: false });
@@ -235,7 +237,7 @@ export async function loadCareerTrophiesWonByUser(
           const { data, error } = await supabase
             .from("league_trophies")
             .select(
-              "id, league_id, season_year, trophy_type, winner_name, winner_user_id, subtitle, notes, awarded_at"
+              "id, league_id, season_year, trophy_type, winner_name, winner_user_id, subtitle, notes, awarded_at, trophy_design_id"
             )
             .eq("league_id", m.leagueId)
             .order("season_year", { ascending: false });
@@ -360,6 +362,10 @@ export async function awardTrophy(opts: {
     notes: opts.notes?.trim() || null,
     awarded_at: new Date().toISOString(),
     awarded_by: session.playerId,
+    trophy_design_id:
+      opts.trophyType === "championship"
+        ? (await import("./league")).getLeague()?.settings?.championshipTrophyId || "command_cup"
+        : null,
   };
   const { error } = await supabase.from("league_trophies").upsert(payload, {
     onConflict: "league_id,season_year,trophy_type",

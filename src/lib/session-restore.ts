@@ -38,6 +38,7 @@ export interface LeagueMembership {
   homeTaglineId?: string;
   homeTaglineCustom?: string;
   seasonThemeId?: string;
+  championshipTrophyId?: string | null;
   /** Sport pack id (cfb, soccer_wwc, …) */
   sportId?: string;
   /** Open room lobby listing (public matchmaking) */
@@ -123,6 +124,7 @@ export function writeSessionAndLeague(
       homeTaglineId: membership.homeTaglineId || "good-teams",
       homeTaglineCustom: membership.homeTaglineCustom || "",
       seasonThemeId: membership.seasonThemeId || "default",
+      championshipTrophyId: membership.championshipTrophyId || null,
     },
   };
 
@@ -311,6 +313,7 @@ async function fetchMyMembershipsFresh(
       homeTaglineId: (L.home_tagline_id as string) || "good-teams",
       homeTaglineCustom: (L.home_tagline_custom as string) || "",
       seasonThemeId: (L.season_theme_id as string) || "default",
+      championshipTrophyId: (L.championship_trophy_id as string) || null,
       sportId: (L.sport_id as string) || "cfb",
       isOpen: L.is_open === true,
       mode: L.mode === "foundry" ? "foundry" : "production",

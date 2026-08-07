@@ -649,6 +649,16 @@ export default function StandingsPage() {
                                 )}
                               >
                                 <PlayerLink id={player.id} name={player.name} />
+                                {standingsHardwareFlair(player.name).map((f) => (
+                                  <span
+                                    key={f.title}
+                                    className="ml-1 inline-block text-sm align-middle"
+                                    title={f.title}
+                                    aria-label={f.title}
+                                  >
+                                    {f.emoji}
+                                  </span>
+                                ))}
                                 {isSelfPlayer(player.id, selfId) && (
                                   <YouBadge />
                                 )}

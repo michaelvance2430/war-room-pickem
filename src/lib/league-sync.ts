@@ -36,6 +36,7 @@ function toLocalLeague(row: {
   home_tagline_id?: string | null;
   home_tagline_custom?: string | null;
   season_theme_id?: string | null;
+  championship_trophy_id?: string | null;
   sport_id?: string | null;
 }): League {
   const prev = readPrevLocalLeague();
@@ -120,6 +121,7 @@ function toLocalLeague(row: {
       homeTaglineId,
       homeTaglineCustom,
       seasonThemeId,
+      championshipTrophyId: row.championship_trophy_id || null,
     },
   };
 }

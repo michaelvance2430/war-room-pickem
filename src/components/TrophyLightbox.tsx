@@ -39,6 +39,7 @@ type Props = {
   leagueCode?: string | null;
   /** When true, only SportChampionshipTrophy (champ art) */
   championshipOnly?: boolean;
+  trophyDesignId?: string | null;
 };
 
 export default function TrophyLightbox({
@@ -53,6 +54,7 @@ export default function TrophyLightbox({
   leagueId,
   leagueCode,
   championshipOnly = false,
+  trophyDesignId,
 }: Props) {
   // Stable owner id — do not re-acquire on every parent re-render
   const reactId = useId();
@@ -154,6 +156,7 @@ export default function TrophyLightbox({
                 leagueName={leagueName}
                 leagueId={leagueId}
                 leagueCode={leagueCode}
+                trophyDesignId={trophyDesignId}
               />
             ) : (
               <HardwareTrophyIcon
@@ -165,6 +168,7 @@ export default function TrophyLightbox({
                 leagueName={leagueName}
                 leagueId={leagueId}
                 leagueCode={leagueCode}
+                trophyDesignId={trophyDesignId}
               />
             )}
           </div>

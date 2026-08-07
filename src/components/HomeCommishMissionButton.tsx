@@ -66,14 +66,15 @@ export default function HomeCommishMissionButton() {
   }, []);
 
   if (!ready || !mission || !isOps()) return null;
+  const missingTrophy = mission.kind === "choose_trophy";
 
   return (
     <div className="mb-4 w-full">
       <Link
         href={mission.href}
-        className="flex w-full items-center justify-center min-h-[56px] sm:min-h-[52px] px-4 py-4 rounded-2xl bg-primary text-black text-base sm:text-lg font-black tracking-tight touch-manipulation shadow-[0_0_32px_rgba(34,197,94,0.35)] border-2 border-primary hover:brightness-110 active:scale-[0.99] transition"
+        className={`flex w-full items-center justify-center min-h-[56px] sm:min-h-[52px] px-4 py-4 rounded-2xl text-base sm:text-lg font-black tracking-tight touch-manipulation hover:brightness-110 active:scale-[0.99] transition ${missingTrophy ? "bg-red-600 text-white border-2 border-red-300 shadow-[0_0_32px_rgba(220,38,38,0.5)]" : "bg-primary text-black border-2 border-primary shadow-[0_0_32px_rgba(34,197,94,0.35)]"}`}
       >
-        {mission.label}
+        {missingTrophy ? "CHAMPIONSHIP TROPHY NOT SELECTED · Choose Hardware" : mission.label}
       </Link>
     </div>
   );

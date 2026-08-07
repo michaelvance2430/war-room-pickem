@@ -15,6 +15,7 @@ import {
   NFL_LOMBARDI_IMG,
   resolveLeagueChampionshipOverride,
 } from "@/lib/league-trophy-override";
+import { getChampionshipTrophyDesign } from "@/lib/championship-trophy-catalog";
 
 export type TrophySport = "cfb" | "nfl" | "soccer_wwc" | "other";
 
@@ -37,6 +38,7 @@ type Props = {
   leagueName?: string | null;
   leagueId?: string | null;
   leagueCode?: string | null;
+  trophyDesignId?: string | null;
 };
 
 export function resolveTrophySport(sportId?: string | null): TrophySport {
@@ -90,6 +92,7 @@ export default function SportChampionshipTrophy({
   leagueName,
   leagueId,
   leagueCode,
+  trophyDesignId,
 }: Props) {
   const live = typeof window !== "undefined" ? getLeague() : null;
   // Prefer explicit props, else active room (name + code so HAT42A always hits)
@@ -106,6 +109,8 @@ export default function SportChampionshipTrophy({
     leagueId: resolvedId,
     leagueCode: resolvedCode,
   });
+  const selectedDesignId = trophyDesignId || live?.settings?.championshipTrophyId || "command_cup";
+  const selectedDesign = getChampionshipTrophyDesign(selectedDesignId);
 
   // Vonnagio ALWAYS uses the gold photo — never Lombardi SVG/photo
   const forceGoldPhoto = !!override;
@@ -139,7 +144,16 @@ export default function SportChampionshipTrophy({
       />
       <div
         className={animate ? "champ-trophy-float" : undefined}
-        style={{ width: size, height: size }}
+        style={{
+          width: size,
+          height: size,
+          filter:
+            selectedDesignId === "brass_football"
+              ? "sepia(.72) saturate(1.65)"
+              : selectedDesignId === "last_one_standing"
+                ? "contrast(1.18) saturate(.75)"
+                : undefined,
+        }}
       >
         {forceGoldPhoto ? (
           <NflTrophyPhoto
@@ -165,8 +179,24 @@ export default function SportChampionshipTrophy({
           <GoldCupSvg id={id} size={size} threePeat={threePeat} />
         )}
       </div>
+      <TrophyDesignMark id={selectedDesignId} size={size} colors={selectedDesign.colors} />
     </div>
   );
+}
+
+function TrophyDesignMark({ id, size, colors }: { id: string; size: number; colors: [string, string, string] }) {
+  if (id === "command_cup") return null;
+  const common = "absolute z-[3] left-1/2 -translate-x-1/2 flex items-center justify-center font-black drop-shadow-[0_3px_4px_rgba(0,0,0,.65)]";
+  if (id === "insufferable_crown") {
+    return <div aria-hidden className={`${common} top-[2%] text-amber-300`} style={{ fontSize: size * .28 }}>♛</div>;
+  }
+  if (id === "the_receipt") {
+    return <div aria-hidden className={`${common} bottom-[3%] w-[70%] border-y-2 border-dashed bg-zinc-100 py-1 text-zinc-900`} style={{ fontSize: Math.max(7, size * .065) }}>RECEIPTS VERIFIED</div>;
+  }
+  if (id === "last_one_standing") {
+    return <div aria-hidden className={`${common} bottom-[2%] -rotate-3 border-2 border-red-500 bg-zinc-950/90 px-2 py-1 text-red-400`} style={{ fontSize: Math.max(7, size * .065) }}>LAST ONE STANDING</div>;
+  }
+  return <div aria-hidden className={`${common} bottom-[4%] rounded-full border-2 px-2 py-1`} style={{ color: colors[0], borderColor: colors[1], background: colors[2], fontSize: Math.max(7, size * .065) }}>{id === "golden_gut" ? "TRUST THE GUT" : "BIG BRASS"}</div>;
 }
 
 /** NFL championship photo — Lombardi default, or league override (Vonnaggio gold). */

@@ -40,6 +40,7 @@ export type ProfileTrophy = {
   leagueName?: string | null;
   leagueId?: string | null;
   leagueCode?: string | null;
+  trophyDesignId?: string | null;
 };
 
 /** Trophy input may carry room meta from multi-league career load */
@@ -109,7 +110,7 @@ export const LEGACY_PROFILE_HARDWARE: LegacySeed[] = [
     title: "Toilet Bowl",
     subtitle: "Bottom-half crown · 2025–26",
     notes: "2025–26 Toilet Bowl. Still a crown. Wear it proudly.",
-    winnerName: "Justin Strayer",
+    winnerName: "Jstray",
     sport: "cfb",
     sportId: "cfb",
   },
@@ -235,6 +236,7 @@ function leagueToProfile(
     leagueName: t.leagueName || null,
     leagueId: t.leagueId || null,
     leagueCode: t.leagueCode || null,
+    trophyDesignId: t.trophyDesignId || null,
   };
 }
 

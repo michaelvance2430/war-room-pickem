@@ -27,6 +27,7 @@ type Props = {
   leagueName?: string | null;
   leagueId?: string | null;
   leagueCode?: string | null;
+  trophyDesignId?: string | null;
 };
 
 export default function HardwareTrophyIcon({
@@ -40,6 +41,7 @@ export default function HardwareTrophyIcon({
   leagueName,
   leagueId,
   leagueCode,
+  trophyDesignId,
 }: Props) {
   const wrap = empty ? "opacity-40 grayscale" : "";
 
@@ -54,6 +56,7 @@ export default function HardwareTrophyIcon({
           leagueName={leagueName}
           leagueId={leagueId}
           leagueCode={leagueCode}
+          trophyDesignId={trophyDesignId}
         />
       </div>
     );
@@ -318,25 +321,31 @@ function DivisionShieldSvg({ size }: { size: number }) {
     <svg
       width={size}
       height={size}
-      viewBox="0 0 64 64"
+      viewBox="0 0 120 120"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       role="img"
       aria-label="Division title"
     >
       <defs>
-        <linearGradient id={`${id}-s`} x1="16" y1="8" x2="48" y2="56" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#6ee7b7" />
-          <stop offset="1" stopColor="#047857" />
+        <linearGradient id={`${id}-s`} x1="24" y1="8" x2="94" y2="105" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#fff7c2" />
+          <stop offset=".35" stopColor="#fbbf24" />
+          <stop offset="1" stopColor="#92400e" />
         </linearGradient>
+        <radialGradient id={`${id}-g`}><stop stopColor="#fbbf24" stopOpacity=".45"/><stop offset="1" stopColor="#fbbf24" stopOpacity="0"/></radialGradient>
+        <filter id={`${id}-sh`} x="-30%" y="-20%" width="160%" height="160%"><feDropShadow dx="0" dy="4" stdDeviation="3" floodColor="#000" floodOpacity=".55"/></filter>
       </defs>
-      <path
-        d="M32 6 L52 14 V32 C52 44 40 54 32 58 C24 54 12 44 12 32 V14 Z"
-        fill={`url(#${id}-s)`}
-        stroke="#34d399"
-        strokeWidth="1.5"
-      />
-      <path d="M32 16 V48 M22 28 H42" stroke="#ecfdf5" strokeWidth="2" opacity="0.7" />
+      <circle cx="60" cy="48" r="46" fill={`url(#${id}-g)`}/>
+      <g filter={`url(#${id}-sh)`}>
+        <path d="M34 20 H86 V47 C86 68 74 78 60 84 C46 78 34 68 34 47 Z" fill={`url(#${id}-s)`} stroke="#fde68a" strokeWidth="2"/>
+        <path d="M34 29 C20 24 16 34 20 48 C24 61 35 63 43 61 M86 29 C100 24 104 34 100 48 C96 61 85 63 77 61" stroke="#fbbf24" strokeWidth="6" fill="none"/>
+        <path d="M60 84 V94" stroke="#d97706" strokeWidth="10"/>
+        <rect x="36" y="94" width="48" height="9" rx="2" fill="#b45309"/>
+        <rect x="27" y="103" width="66" height="12" rx="3" fill={`url(#${id}-s)`}/>
+        <path d="M48 45 L56 53 L73 35" stroke="#fff7c2" strokeWidth="5" fill="none" strokeLinecap="round"/>
+      </g>
+      <text x="60" y="111" textAnchor="middle" fill="#fff7c2" fontSize="7" fontWeight="900">WON THIS SIDE</text>
     </svg>
   );
 }
