@@ -10,23 +10,30 @@ export default function HomeSportAtmosphere({
 }) {
   return (
     <>
+      {atmosphere.backgroundImage ? (
+        <div
+          className="home-war-art pointer-events-none absolute inset-0"
+          style={{ backgroundImage: `url(${atmosphere.backgroundImage})` }}
+          aria-hidden
+        />
+      ) : null}
       <div
-        className="home-war-base pointer-events-none absolute inset-0 -z-10"
+        className="home-war-base pointer-events-none absolute inset-0"
         style={{ background: atmosphere.baseGradient }}
       />
       <div
-        className="home-war-base pointer-events-none absolute inset-0 -z-10 opacity-[0.35]"
+        className="home-war-grid pointer-events-none absolute inset-0 opacity-[0.35]"
         style={{
           backgroundImage: `linear-gradient(${atmosphere.gridLine} 1px, transparent 1px), linear-gradient(90deg, ${atmosphere.gridLine} 1px, transparent 1px)`,
           backgroundSize: "48px 48px",
         }}
       />
       <div
-        className="home-war-base pointer-events-none absolute inset-0 -z-10"
+        className="home-war-vignette pointer-events-none absolute inset-0"
         style={{ background: atmosphere.vignette }}
       />
       <div
-        className="home-war-base pointer-events-none absolute inset-0 -z-10 opacity-[0.07]"
+        className="home-war-scan pointer-events-none absolute inset-0 opacity-[0.07]"
         style={{ backgroundImage: atmosphere.scanline }}
       />
     </>

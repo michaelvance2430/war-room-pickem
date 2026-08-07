@@ -41,6 +41,7 @@ export default function HomeSportHeader({
 }: Props) {
   const isWwc = chrome.sportId === "soccer_wwc";
   const isNfl = chrome.sportId === "nfl";
+  const isCfb = !isWwc && !isNfl;
   const { emerald, gold, royal } = WWC_BRAZIL_COLORS;
   const nfl = NFL_SUNDAY_COLORS;
   const room = (leagueName || "").trim() || "War Room";
@@ -78,10 +79,16 @@ export default function HomeSportHeader({
   }
 
   return (
-    <section className="mb-3 sm:mb-4">
+    <section className={`mb-3 sm:mb-4 ${isCfb ? "cfb-situation-masthead" : ""}`}>
       {/* Identity row: crest · Sport Hub · Share */}
-      <div className="flex flex-wrap items-center gap-2 mb-2">
-        <BrandMark size={40} variant="force" className="rounded-lg shrink-0" />
+      <div className="home-identity-row flex flex-wrap items-center gap-2 mb-2">
+        <BrandMark size={isCfb ? 46 : 40} variant="force" className="rounded-lg shrink-0" />
+        {isCfb ? (
+          <div className="cfb-wordmark">
+            <span>War Room</span>
+            <small>Saturday Situation Room</small>
+          </div>
+        ) : null}
         {isWwc ? (
           <div
             className="shrink-0 rounded-lg p-0.5 border"
@@ -127,15 +134,30 @@ export default function HomeSportHeader({
         ) : null}
       </div>
 
-      <h1
-        className={`text-3xl sm:text-5xl font-black tracking-tight leading-[1.08] text-white break-words ${chrome.atmosphere.titleGlow}`}
-      >
-        {room}
-      </h1>
+      {isCfb ? (
+        <div className="cfb-situation-title-wrap">
+          <span className="cfb-room-ribbon">{room}</span>
+          <h1 className={`cfb-situation-title ${chrome.atmosphere.titleGlow}`}>
+            <span>Saturday</span>
+            <span>Situation Room</span>
+          </h1>
+          <p className="cfb-situation-tagline">
+            Good teams show up. Bad picks don&apos;t.
+          </p>
+        </div>
+      ) : (
+        <>
+          <h1
+            className={`text-3xl sm:text-5xl font-black tracking-tight leading-[1.08] text-white break-words ${chrome.atmosphere.titleGlow}`}
+          >
+            {room}
+          </h1>
 
-      <p className="mt-2 text-muted max-w-xl text-sm sm:text-base leading-relaxed">
-        {tagline || chrome.defaultTagline}
-      </p>
+          <p className="mt-2 text-muted max-w-xl text-sm sm:text-base leading-relaxed">
+            {tagline || chrome.defaultTagline}
+          </p>
+        </>
+      )}
     </section>
   );
 }

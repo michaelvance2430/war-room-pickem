@@ -36,6 +36,7 @@ import {
 import { isFirstWeekChrome } from "@/lib/first-week";
 import FairEntryNotice from "@/components/FairEntryNotice";
 import HomeAllegianceCard from "@/components/HomeAllegianceCard";
+import CfbSituationDestinations from "@/components/CfbSituationDestinations";
 
 const HomeGazetteSpotlight = dynamic(
   () => import("@/components/HomeGazetteSpotlight"),
@@ -585,7 +586,10 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col relative overflow-x-hidden crt-frame scan-sweep home-war-room">
+    <div
+      className="min-h-screen flex flex-col relative overflow-x-hidden crt-frame scan-sweep home-war-room"
+      data-home-sport={homeChrome.sportId}
+    >
       <HomeSportAtmosphere atmosphere={homeChrome.atmosphere} />
 
       {/* Phone-first: less chrome padding, job-first stack (most users are on phones) */}
@@ -766,6 +770,8 @@ export default function Home() {
               </>
             )}
           </section>
+        ) : homeChrome.sportId === "cfb" ? (
+          <CfbSituationDestinations showGazette={showGazetteShelf} />
         ) : (
           <>
             <p className="text-[10px] uppercase tracking-[0.18em] text-muted mb-3 font-semibold">
@@ -978,7 +984,7 @@ export default function Home() {
         )}
 
         {/* ── BOTTOM: recruiting (after the job + room) ── */}
-        {showSecondary && !firstWeekChrome && (
+        {showSecondary && !firstWeekChrome && homeChrome.sportId !== "cfb" && (
           <div className="mt-5 mb-2">
       <InviteFriends />
           </div>

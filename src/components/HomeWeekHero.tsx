@@ -606,9 +606,9 @@ export default function HomeWeekHero() {
   const sportShort = isNfl ? "NFL" : sportId === "soccer_wwc" ? "WWC" : "CFB";
 
   return (
-    <section className="mb-5 sm:mb-8">
+    <section className={`mb-5 sm:mb-8 ${!isNfl && sportId !== "soccer_wwc" ? "cfb-week-hero" : ""}`}>
       <div
-        className="rounded-2xl border-2 border-primary/40 bg-gradient-to-br from-primary/15 via-black/50 to-black/70 p-4 sm:p-6"
+        className="home-week-hero-card rounded-2xl border-2 border-primary/40 bg-gradient-to-br from-primary/15 via-black/50 to-black/70 p-4 sm:p-6"
         style={{ boxShadow: `0 0 50px ${glow}` }}
       >
         <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
