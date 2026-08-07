@@ -2880,6 +2880,7 @@ export async function saveResultsAndScoreWeekLegacyUnsafe(opts: {
 type StandingsCloudRow = {
   userId: string;
   name: string;
+  avatarUrl: string | null;
   division: string;
   totalPoints: number;
   weeklyPoints: number[];
@@ -2903,17 +2904,26 @@ type StandingsCloudRow = {
 /** PostgREST embed may be object or single-element array. */
 function embedProfile(raw: unknown): {
   display_name?: string;
+  avatar_url?: string | null;
   last_seen_at?: string | null;
 } | null {
   if (!raw) return null;
   if (Array.isArray(raw)) {
     const first = raw[0];
     return first && typeof first === "object"
-      ? (first as { display_name?: string; last_seen_at?: string | null })
+      ? (first as {
+          display_name?: string;
+          avatar_url?: string | null;
+          last_seen_at?: string | null;
+        })
       : null;
   }
   if (typeof raw === "object") {
-    return raw as { display_name?: string; last_seen_at?: string | null };
+    return raw as {
+      display_name?: string;
+      avatar_url?: string | null;
+      last_seen_at?: string | null;
+    };
   }
   return null;
 }
@@ -2945,6 +2955,7 @@ function mapStandingsRows(rows: Record<string, unknown>[]): StandingsCloudRow[] 
             profileDisplayName: profile?.display_name,
             fallback: m.is_bot ? "Bot" : "Player",
           }),
+          avatarUrl: (profile?.avatar_url as string | null) || null,
           division: (m.division as string) || "North",
           totalPoints: (m.total_points as number) || 0,
           weeklyPoints: normalizeWeeklyPointsField(m.weekly_points),
@@ -3053,7 +3064,7 @@ export async function loadLeagueStandings(): Promise<StandingsCloudRow[]> {
     Promise.resolve(
       supabase
         .from("memberships")
-        .select("*, display_name_override, profiles(display_name, last_seen_at)")
+        .select("*, display_name_override, profiles(display_name, avatar_url, last_seen_at)")
         .eq("league_id", session.leagueId)
     ).then((r) => ({
       data: (r.data as Record<string, unknown>[] | null) ?? null,
@@ -3082,7 +3093,7 @@ export async function loadLeagueStandings(): Promise<StandingsCloudRow[]> {
     Promise.resolve(
       supabase
         .from("memberships")
-        .select("*, display_name_override, profiles(display_name)")
+        .select("*, display_name_override, profiles(display_name, avatar_url)")
         .eq("league_id", session.leagueId)
     ).then((r) => ({
       data: (r.data as Record<string, unknown>[] | null) ?? null,
@@ -3233,6 +3244,7 @@ async function fetchLeaguePlayersNetwork(
       players = cloud.map((c) => ({
         id: c.userId,
         name: c.name,
+        avatarUrl: c.avatarUrl,
         division:
           (c.division as import("./types").Player["division"]) || "North",
         totalPoints: c.totalPoints,
@@ -3332,7 +3344,7 @@ async function attachEquippedTitles(
     if (!ids.length) return members;
     const { data, error } = await supabase
       .from("profiles")
-      .select("id, equipped_title_id, equipped_border_id, last_seen_at")
+      .select("id, avatar_url, equipped_title_id, equipped_border_id, last_seen_at")
       .in("id", ids);
     if (error || !data?.length) {
       // Columns may be partial — try smaller selects
@@ -3369,7 +3381,9 @@ async function attachEquippedTitles(
     const titleMap = new Map<string, string | null>();
     const borderMap = new Map<string, string | null>();
     const seenMap = new Map<string, string | null>();
+    const avatarMap = new Map<string, string | null>();
     for (const row of data) {
+      avatarMap.set(row.id as string, (row.avatar_url as string | null) || null);
       titleMap.set(
         row.id as string,
         (row.equipped_title_id as string | null) || null
@@ -3385,6 +3399,7 @@ async function attachEquippedTitles(
     }
     return members.map((m) => ({
       ...m,
+      avatarUrl: avatarMap.get(m.userId) ?? m.avatarUrl ?? null,
       equippedTitleId: titleMap.get(m.userId) ?? m.equippedTitleId ?? null,
       equippedBorderId: borderMap.get(m.userId) ?? m.equippedBorderId ?? null,
       lastSeenAt: seenMap.get(m.userId) ?? m.lastSeenAt ?? null,

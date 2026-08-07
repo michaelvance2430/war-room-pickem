@@ -21,7 +21,7 @@ import {
 import { pageLoad } from "@/lib/smooth";
 import { getSession, getLeague } from "@/lib/league";
 import { rankPlayersWithSwings } from "@/lib/fun-board";
-import { compareForSeed } from "@/lib/brackets";
+import { compareForSeed, seedChampionship } from "@/lib/brackets";
 import { isSelfPlayer, selfNameClass, selfRowClass } from "@/lib/self-highlight";
 import YouBadge from "@/components/YouBadge";
 import PlayerLink from "@/components/PlayerLink";
@@ -347,12 +347,12 @@ export default function StandingsPage() {
           .sort(compareForSeed)
     : pulseRows;
 
-  // War Room postseason truth: the top three in every conference advance.
-  // Do not derive this from roster size — a temporarily uneven conference
-  // must not move the line or falsely promote a fourth-place player.
+  const preseasonCutIndex =
+    active === "Overall" ? -1 : Math.ceil(pulseRows.length / 2);
+  const championshipIds = new Set(seedChampionship(players).map((p) => p.id));
   const cutIndex =
-    seasonStarted && active !== "Overall" && competitiveRows.length > 3
-      ? 3
+    seasonStarted && active !== "Overall"
+      ? competitiveRows.filter((p) => championshipIds.has(p.id)).length
       : -1;
   const activeConferenceLabel =
     active === "Overall" ? null : divisionTabLabel(active, sportId);
@@ -619,7 +619,7 @@ export default function StandingsPage() {
                         const showPulse = !player.isMock;
                         return (
                           <Fragment key={player.id}>
-                          {active !== "Overall" && idx === 3 && (
+                          {idx === preseasonCutIndex && (
                             <tr
                               className="cfb-cut-line is-preseason"
                               aria-label="Conference advancement boundary. Top three advance when competitive standings begin."
@@ -629,7 +629,7 @@ export default function StandingsPage() {
                                   <span aria-hidden>▼</span>
                                   <div>
                                     <strong>{activeConferenceLabel} Cut Line</strong>
-                                    <small>Top 3 advance · Rankings activate after Week 1</small>
+                                    <small>Top half advance · Rankings activate after Week 1</small>
                                   </div>
                                   <span aria-hidden>▼</span>
                                 </div>
@@ -693,7 +693,7 @@ export default function StandingsPage() {
                           </Fragment>
                         );
                       })}
-                      {active !== "Overall" && pulseRows.length <= 3 && (
+                      {active !== "Overall" && preseasonCutIndex >= pulseRows.length && (
                         <tr
                           className="cfb-cut-line is-preseason"
                           aria-label="Conference advancement boundary. Top three advance when competitive standings begin."
@@ -703,7 +703,7 @@ export default function StandingsPage() {
                               <span aria-hidden>▼</span>
                               <div>
                                 <strong>{activeConferenceLabel} Cut Line</strong>
-                                <small>Top 3 advance · Rankings activate after Week 1</small>
+                                <small>Top half advance · Rankings activate after Week 1</small>
                               </div>
                               <span aria-hidden>▼</span>
                             </div>
@@ -763,7 +763,7 @@ export default function StandingsPage() {
                                   <strong>
                                     {activeConferenceLabel} Survival Line
                                   </strong>
-                                  <small>Top 3 survive · Below gets flushed</small>
+                                  <small>Above advances · Below gets flushed</small>
                                 </div>
                                 <span aria-hidden>▼</span>
                               </div>
@@ -863,7 +863,7 @@ export default function StandingsPage() {
                         </tr>
                       </Fragment>
                     ))}
-                    {active !== "Overall" && competitiveRows.length <= 3 && (
+                    {active !== "Overall" && cutIndex >= competitiveRows.length && (
                       <tr
                         className="cfb-cut-line"
                         aria-label="Playoff cut. Top three advance; players below enter the Toilet Bowl."
@@ -873,7 +873,7 @@ export default function StandingsPage() {
                             <span aria-hidden>▼</span>
                             <div>
                               <strong>{activeConferenceLabel} Survival Line</strong>
-                              <small>Top 3 survive · Below gets flushed</small>
+                              <small>Above advances · Below gets flushed</small>
                             </div>
                             <span aria-hidden>▼</span>
                           </div>

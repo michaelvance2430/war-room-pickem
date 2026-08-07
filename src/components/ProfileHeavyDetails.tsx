@@ -11,6 +11,7 @@ import Link from "next/link";
 import BadgeShelf from "@/components/BadgeShelf";
 import WwcPassportShelf from "@/components/WwcPassportShelf";
 import DiscoveryPassportShelf from "@/components/DiscoveryPassportShelf";
+import CampaignDogTags from "@/components/CampaignDogTags";
 import EasterEggTracker from "@/components/EasterEggTracker";
 import ProfileTrophyCase from "@/components/ProfileTrophyCase";
 import FootballResume from "@/components/FootballResume";
@@ -389,6 +390,8 @@ export default function ProfileHeavyDetails({
       />
 
       <DiscoveryPassportShelf playerId={player.id} isSelf={isSelf} />
+
+      <CampaignDogTags playerId={player.id} />
 
       <EasterEggTracker playerId={player.id} isSelf={isSelf} />
 

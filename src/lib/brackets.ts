@@ -47,31 +47,45 @@ function nextPow2(n: number): number {
 
 export function seedChampionship(allPlayers: Player[]): Player[] {
   const sorted = [...allPlayers].sort(comparePlayers);
-  const half = Math.max(4, Math.ceil(sorted.length / 2));
-  const survivors = sorted.slice(0, half);
-
+  const fieldSize = Math.min(
+    sorted.length,
+    Math.max(4, Math.ceil(sorted.length / 2))
+  );
   const divs = ["North", "South", "East", "West"] as const;
-  const winners: Player[] = [];
+  const qualifiers: Player[] = [];
   for (const d of divs) {
-    const inDiv = survivors
+    const inDiv = sorted
       .filter((p) => p.division === d)
       .sort(comparePlayers);
-    if (inDiv[0]) winners.push(inDiv[0]);
+    qualifiers.push(...inDiv.slice(0, Math.floor(inDiv.length / 2)));
   }
-  winners.sort(comparePlayers);
+  const qualifierIds = new Set(qualifiers.map((p) => p.id));
+  for (const player of sorted) {
+    if (qualifiers.length >= fieldSize) break;
+    if (qualifierIds.has(player.id)) continue;
+    qualifiers.push(player);
+    qualifierIds.add(player.id);
+  }
 
-  const winnerIds = new Set(winners.map((w) => w.id));
-  const rest = survivors
-    .filter((p) => !winnerIds.has(p.id))
+  // Put conference leaders first, then preserve authoritative overall order.
+  const leaders = divs
+    .map(
+      (d) => qualifiers.filter((p) => p.division === d).sort(comparePlayers)[0]
+    )
+    .filter((p): p is Player => !!p)
     .sort(comparePlayers);
-
-  return [...winners, ...rest];
+  const leaderIds = new Set(leaders.map((p) => p.id));
+  return [
+    ...leaders,
+    ...qualifiers.filter((p) => !leaderIds.has(p.id)).sort(comparePlayers),
+  ];
 }
 
 export function seedToiletBowl(allPlayers: Player[]): Player[] {
-  const sorted = [...allPlayers].sort(comparePlayersToilet);
-  const half = Math.max(4, Math.ceil(sorted.length / 2));
-  return sorted.slice(0, half);
+  const championshipIds = new Set(seedChampionship(allPlayers).map((p) => p.id));
+  return allPlayers
+    .filter((p) => !championshipIds.has(p.id))
+    .sort(comparePlayersToilet);
 }
 
 export function buildBracket(

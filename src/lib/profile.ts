@@ -15,7 +15,10 @@ export type Profile = {
 
 export const EVENT_PROFILE_UPDATED = "warroom-profile-updated";
 
-function notifyProfileUpdated(detail?: { displayName?: string }) {
+function notifyProfileUpdated(detail?: {
+  displayName?: string;
+  avatarUrl?: string | null;
+}) {
   if (typeof window === "undefined") return;
   try {
     window.dispatchEvent(
@@ -578,6 +581,13 @@ export async function uploadMyAvatar(
       }
     }
 
+    try {
+      const { invalidateRosterCache } = await import("./cloud");
+      invalidateRosterCache();
+    } catch {
+      /* the saved cloud profile remains authoritative */
+    }
+    notifyProfileUpdated({ avatarUrl });
     return { ok: true, avatarUrl };
   } catch (e: unknown) {
     return {
@@ -604,6 +614,13 @@ export async function removeMyAvatar(): Promise<{
     .eq("id", auth.user.id);
 
   if (error) return { ok: false, error: error.message };
+  try {
+    const { invalidateRosterCache } = await import("./cloud");
+    invalidateRosterCache();
+  } catch {
+    /* the saved cloud profile remains authoritative */
+  }
+  notifyProfileUpdated({ avatarUrl: null });
   return { ok: true };
 }
 

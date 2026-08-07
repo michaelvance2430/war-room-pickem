@@ -7,6 +7,7 @@ import FoundryGazetteStudio from "@/components/FoundryGazetteStudio";
 import FoundryLabIsolationPanel from "@/components/FoundryLabIsolationPanel";
 import CreatorSkinPreview from "@/components/CreatorSkinPreview";
 import WeeklyColdOpenModal from "@/components/WeeklyColdOpenModal";
+import FinalDispatchPreview from "@/components/FinalDispatchPreview";
 import { markFoundrySessionActive } from "@/components/FoundrySessionChrome";
 import { isAppCreator } from "@/lib/creator";
 import {
@@ -192,10 +193,11 @@ export default function FoundryPage() {
           <Intro title="Moments · Player Experience" text="Use this desk to preview the emotional beats players see. These previews do not score games or change standings." />
           <section className="rounded-xl border border-border bg-card p-4">
             <h2 className="text-sm font-bold">Quick previews</h2>
-            <div className="mt-3 grid gap-2 sm:grid-cols-3">
+            <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
               <Action title="Season Opening" note="The first welcome into a new season." onClick={() => previewMoment("season")} />
               <Action title="Cold Open" note="The returning-champion season reveal." onClick={() => previewMoment("cold")} />
               <Action title="Ring Ceremony" note="The championship hardware reveal." onClick={() => previewMoment("ring")} />
+              <FinalDispatchPreview />
             </div>
           </section>
           <CreatorSkinPreview />
