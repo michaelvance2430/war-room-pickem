@@ -356,16 +356,7 @@ html[data-sport="nfl"] select:focus {
 .locker-gif-draft img { width:100%; max-height:12rem; object-fit:contain; }
 .locker-gif-draft button { width:2rem; height:2rem; position:absolute; top:.4rem; right:.4rem; border-radius:999px; background:rgba(0,0,0,.8); color:#fff; font-size:1.25rem; }
 .locker-gif-draft span { position:absolute; left:.55rem; bottom:.4rem; padding:.18rem .4rem; border-radius:.3rem; background:rgba(0,0,0,.78); color:#fff; font-size:.58rem; font-weight:900; letter-spacing:.1em; text-transform:uppercase; }
-.locker-gear-tray { padding:.55rem; border:1px solid rgba(255,255,255,.13); border-radius:.7rem; background:rgba(0,0,0,.35); }
-.locker-attach-actions { display:flex; align-items:center; gap:.65rem; margin-bottom:.55rem; }
-.locker-attach-actions button { min-height:2.55rem; padding:0 1rem; border-radius:.55rem; background:var(--primary); color:#000; font-size:.75rem; font-weight:900; }
-.locker-attach-actions span { color:var(--muted); font-size:.65rem; }
-.locker-gif-tool { display:grid; grid-template-columns:1fr auto; gap:.45rem; }
-.locker-gif-tool input { min-width:0; min-height:2.55rem; padding:0 .7rem; border:1px solid var(--border); border-radius:.55rem; background:var(--background); color:var(--foreground); font-size:.75rem; }
-.locker-gif-tool>button { min-height:2.55rem; padding:0 .85rem; border-radius:.55rem; background:var(--primary); color:#000; font-size:.75rem; font-weight:900; }
-.locker-gif-tool p { grid-column:1/-1; color:var(--muted); font-size:.62rem; line-height:1.3; }
 .locker-plus-button { width:2.65rem; height:2.65rem; flex:none; border:1px solid var(--border); border-radius:.65rem; background:var(--background); color:var(--foreground); font-size:1.4rem; line-height:1; }
-.locker-plus-button.is-open { border-color:rgba(72,240,106,.55); background:rgba(72,240,106,.14); color:var(--primary); transform:rotate(45deg); }
 @media (min-width:640px) {
   .cfb-picks-page::before,.cfb-locker-page::before { background-size:46rem auto; }
   .cfb-picks-page .cfb-picks-main,.cfb-locker-page .cfb-locker-main { padding-top:1.25rem; }

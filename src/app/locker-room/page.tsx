@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
   type ChangeEvent,
+  type ClipboardEvent,
   type FormEvent,
   type KeyboardEvent,
 } from "react";
@@ -88,8 +89,6 @@ export default function LockerRoomPage() {
   const [reactPickerFor, setReactPickerFor] = useState<string | null>(null);
   const [reactBusyId, setReactBusyId] = useState<string | null>(null);
   const [reactError, setReactError] = useState<string | null>(null);
-  const [gifTrayOpen, setGifTrayOpen] = useState(false);
-  const [gifInput, setGifInput] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -181,18 +180,6 @@ export default function LockerRoomPage() {
     setMentionIndex(0);
   }
 
-  function attachGif() {
-    const url = normalizeLockerGif(gifInput);
-    if (!url) {
-      setPostError("Paste a GIPHY or Tenor GIF link.");
-      return;
-    }
-    setBody(`${LOCKER_GIF_PREFIX}${url}`);
-    setGifInput("");
-    setGifTrayOpen(false);
-    setPostError(null);
-  }
-
   function clearPhoto() {
     setPhoto(null);
     setPhotoPreview((current) => {
@@ -202,20 +189,31 @@ export default function LockerRoomPage() {
     if (photoInputRef.current) photoInputRef.current.value = "";
   }
 
-  function choosePhoto(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0] || null;
-    if (!file) return;
+  function attachPhotoFile(file: File) {
     if (file.size > 6 * 1024 * 1024) {
       setPostError("Picture is too large. Maximum size is 6 MB.");
-      e.target.value = "";
       return;
     }
     clearPhoto();
     setBody("");
-    setGifTrayOpen(false);
     setPhoto(file);
     setPhotoPreview(URL.createObjectURL(file));
     setPostError(null);
+  }
+
+  function choosePhoto(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] || null;
+    if (!file) return;
+    attachPhotoFile(file);
+  }
+
+  function pastePhoto(e: ClipboardEvent<HTMLTextAreaElement>) {
+    const file = Array.from(e.clipboardData.files).find((item) =>
+      item.type.startsWith("image/")
+    );
+    if (!file) return;
+    e.preventDefault();
+    attachPhotoFile(file);
   }
 
   function pickMention(member: MentionMember) {
@@ -716,6 +714,7 @@ export default function LockerRoomPage() {
                   syncMention(el.value, el.selectionStart ?? el.value.length);
                 }}
                 onKeyDown={onTextareaKeyDown}
+                onPaste={pastePhoto}
                 rows={2}
                 maxLength={LOCKER_MAX_CHARS}
                 placeholder="Talk your shit… @someone to call them out"
@@ -735,43 +734,19 @@ export default function LockerRoomPage() {
                 </span>
               )}
             </div>
-            {gifTrayOpen && (
-              <div className="locker-gear-tray">
-                <div className="locker-attach-actions">
-                  <button
-                    type="button"
-                    onClick={() => photoInputRef.current?.click()}
-                  >
-                    Photo
-                  </button>
-                  <span>or paste a GIF link</span>
-                </div>
-                <div className="locker-gif-tool">
-                  <input
-                    value={gifInput}
-                    onChange={(e) => setGifInput(e.target.value)}
-                    placeholder="Paste GIPHY or Tenor link"
-                    inputMode="url"
-                  />
-                  <button type="button" onClick={attachGif}>Attach</button>
-                  <p>Find a GIF in GIPHY or Tenor, copy its link, then paste it here.</p>
-                </div>
-              </div>
-            )}
             <div className="flex items-center gap-2">
               <input
                 ref={photoInputRef}
                 type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif"
+                accept="image/*"
                 onChange={choosePhoto}
                 className="sr-only"
               />
               <button
                 type="button"
-                onClick={() => setGifTrayOpen((open) => !open)}
-                className={`locker-plus-button ${gifTrayOpen ? "is-open" : ""}`}
-                aria-label="Attach GIF"
-                aria-expanded={gifTrayOpen}
+                onClick={() => photoInputRef.current?.click()}
+                className="locker-plus-button"
+                aria-label="Attach picture or GIF"
               >
                 +
               </button>
