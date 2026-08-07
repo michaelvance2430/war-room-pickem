@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { authenticateCreatorApiRequest } from "@/lib/server-api-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,10 +15,17 @@ type Check = {
 };
 
 /**
- * Public, non-secret health snapshot for Founder Dashboard.
+ * Creator-only health snapshot for Founder Dashboard.
  * Never returns API keys or tokens.
  */
-export async function GET() {
+export async function GET(req: Request) {
+  const identity = await authenticateCreatorApiRequest(req);
+  if (!identity.ok) {
+    return NextResponse.json(
+      { error: identity.error },
+      { status: identity.status, headers: { "Cache-Control": "no-store" } }
+    );
+  }
   const checks: Check[] = [];
   const started = Date.now();
 
@@ -110,11 +118,7 @@ export async function GET() {
   });
 
   // Odds API key present (does not burn a credit)
-  const oddsKey = (
-    process.env.ODDS_API_KEY ||
-    process.env.NEXT_PUBLIC_ODDS_API_KEY ||
-    ""
-  ).trim();
+  const oddsKey = (process.env.ODDS_API_KEY || "").trim();
   checks.push({
     id: "api",
     label: "API (Odds)",
