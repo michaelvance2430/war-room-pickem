@@ -868,12 +868,11 @@ export default function HomeWeekHero() {
           <span>
             Active:{" "}
             <span className="text-foreground/80 font-medium">{weekLabel}</span>
-            <span className="text-muted"> ({progress})</span>
           </span>
           <span className="text-border">·</span>
           <span>
             {state.scoredWeeks === 0
-              ? "Season breathing · no scores yet"
+              ? "Preseason · no official scores yet"
               : `${state.scoredWeeks} of ${SEASON_MAX_WEEK + 1} slots scored`}
           </span>
         </div>
