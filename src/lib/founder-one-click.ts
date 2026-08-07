@@ -26,6 +26,7 @@ import { weekTitle } from "@/lib/dates";
 import { SIMPLE_BOT_FILL_TARGET } from "@/lib/simple-host";
 import { assertFoundryNotQuarantined } from "@/lib/foundry-quarantine";
 import { FOUNDRY_LAB_BLOCK_REASON } from "@/lib/foundry-isolation";
+import { canWritePermanentCareer } from "@/lib/career-integrity";
 
 export type OneClickLog = {
   ok: boolean;
@@ -47,6 +48,16 @@ function assertFoundryLabRun(source: string): string | null {
   const gate = assertFoundryNotQuarantined(source);
   if (!gate.ok) {
     return gate.reason || FOUNDRY_LAB_BLOCK_REASON;
+  }
+
+  // Independent fail-closed proof: the mutation boundary and the permanent
+  // career boundary must agree this is not production before any write starts.
+  const careerGate = canWritePermanentCareer({
+    source: `${source}.preflight`,
+    league: getLeague(),
+  });
+  if (careerGate.ok) {
+    return "LAB boundary mismatch: this room is marked LAB, but Career Integrity still resolves it as production. No Foundry writes were applied.";
   }
   return null;
 }
