@@ -11,6 +11,7 @@ import {
   type CanonicalTeam,
 } from "@/lib/teams/cfb-catalog";
 import { listNflCatalog } from "@/lib/teams/nfl-catalog";
+import { listCbbCatalog } from "@/lib/teams/cbb-catalog";
 import type { SportId } from "@/lib/sports/types";
 
 type Props = {
@@ -27,7 +28,12 @@ export default function TeamAllegiancePicker({
 }: Props) {
   const [q, setQ] = useState("");
   const teams = useMemo(
-    () => (sportId === "nfl" ? listNflCatalog() : listCfbCatalog()),
+    () =>
+      sportId === "nfl"
+        ? listNflCatalog()
+        : sportId === "march_madness"
+          ? listCbbCatalog()
+          : listCfbCatalog(),
     [sportId]
   );
 
