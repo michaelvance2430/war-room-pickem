@@ -36,7 +36,7 @@ function DeclareInner() {
   // Require explicit sport — never invent CFB as a universal default.
   const sportId = (normalizeSportId(sportRaw || "") || "") as SportId | "";
   const isNfl = sportId === "nfl";
-  const isCbb = sportId === "march_madness";
+  const isCbb = sportId === "cbb";
   const sportKnown = sportId === "nfl" || sportId === "cfb" || isCbb;
 
   const [checking, setChecking] = useState(true);
