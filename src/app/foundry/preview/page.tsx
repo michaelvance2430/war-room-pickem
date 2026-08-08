@@ -1,15 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import GazettePaper from "@/components/GazettePaper";
 import { buildFoundryGazetteFixture } from "@/lib/foundry-gazette-fixtures";
 import {
+  createFoundryWalkthrough,
   FOUNDRY_WALKTHROUGH_EVENT,
   loadFoundryWalkthrough,
   PREVIEW_SPORTS,
   saveFoundryWalkthrough,
   setFoundryWalkthroughRole,
+  simulateFoundrySeason,
   simulateNextFoundryWeek,
   type FoundryWalkthrough,
   type PreviewRole,
@@ -24,6 +26,7 @@ const NAV: { id: View; label: string }[] = [
 export default function FoundryPreviewPage() {
   const [state, setState] = useState<FoundryWalkthrough | null>(null);
   const [view, setView] = useState<View>("home");
+  const [simulation, setSimulation] = useState<{ kind: "week" | "season"; step: number } | null>(null);
   useEffect(() => {
     const refresh = () => setState(loadFoundryWalkthrough());
     refresh(); window.addEventListener(FOUNDRY_WALKTHROUGH_EVENT, refresh);
@@ -31,6 +34,21 @@ export default function FoundryPreviewPage() {
   }, []);
 
   function update(next: FoundryWalkthrough) { saveFoundryWalkthrough(next); setState(next); }
+  useEffect(() => {
+    if (!simulation || !state) return;
+    const last = simulation.kind === "week" ? 3 : 4;
+    const timer = window.setTimeout(() => {
+      if (simulation.step < last) {
+        setSimulation({ ...simulation, step: simulation.step + 1 });
+        return;
+      }
+      const next = simulation.kind === "week" ? simulateNextFoundryWeek(state) : simulateFoundrySeason(state);
+      update(next);
+      setSimulation(null);
+      setView(simulation.kind === "week" ? "gazette" : "home");
+    }, simulation.step === 0 ? 500 : 850);
+    return () => window.clearTimeout(timer);
+  }, [simulation, state]);
   if (!state) return <main className="mx-auto min-h-screen max-w-lg px-4 py-12"><h1 className="text-xl font-black">No preview season yet</h1><p className="mt-2 text-sm text-muted">Build one in Foundry first.</p><Link href="/foundry" className="mt-5 inline-flex min-h-11 items-center rounded-xl bg-primary px-4 text-sm font-black text-black">Open Foundry</Link></main>;
   const meta = PREVIEW_SPORTS[state.sport];
   const visibleNav = state.role === "commissioner" ? [...NAV, { id: "commissioner" as View, label: "Commish" }] : NAV;
@@ -49,7 +67,8 @@ export default function FoundryPreviewPage() {
       {view === "profile" && <Profile state={state} />}
       {view === "commissioner" && <Commissioner state={state} onAdvance={() => update(simulateNextFoundryWeek(state))} />}
     </div>
-    <PreviewChrome state={state} onAdvance={() => { update(simulateNextFoundryWeek(state)); setView("home"); }} onRole={(role) => update(setFoundryWalkthroughRole(state, role))} />
+    {simulation && <SimulationPulse kind={simulation.kind} step={simulation.step} />}
+    <PreviewChrome state={state} busy={!!simulation} onWeek={() => setSimulation({ kind: "week", step: 0 })} onSeason={() => setSimulation({ kind: "season", step: 0 })} onRole={(role) => update(setFoundryWalkthroughRole(state, role))} onGazette={() => setView("gazette")} onHome={() => setView("home")} onReset={() => { update(createFoundryWalkthrough(state.sport, 1, state.role)); setView("home"); }} />
   </main>;
 }
 
@@ -82,7 +101,37 @@ function Profile({ state }: { state: FoundryWalkthrough }) { const me = state.pl
 
 function Commissioner({ state, onAdvance }: { state: FoundryWalkthrough; onAdvance: () => void }) { return <Page title="Commissioner" note="Preview controls operate only on the local fictional room."><div className="space-y-3"><Feature kicker="Card status" title="Published and locked" body={`${state.games.length} games · ${state.players.filter((p) => p.locked).length} of ${state.players.length} cards locked.`} /><Feature kicker="Scoring" title="Week ready" body="Final results, standings movement, and Gazette edition are generated." /><button onClick={onAdvance} className="min-h-12 w-full rounded-xl bg-primary text-sm font-black text-black">Score this week & open next</button><button className="min-h-12 w-full rounded-xl border border-border text-sm font-bold">Edit next card (preview)</button></div></Page>; }
 
-function PreviewChrome({ state, onAdvance, onRole }: { state: FoundryWalkthrough; onAdvance: () => void; onRole: (r: PreviewRole) => void }) { return <div className="fixed inset-x-0 bottom-0 z-50 border-t border-emerald-400/40 bg-emerald-950/95 px-3 pb-[max(10px,env(safe-area-inset-bottom))] pt-2 backdrop-blur"><div className="mx-auto flex max-w-3xl items-center gap-2"><div className="min-w-0 flex-1"><p className="text-[9px] font-black uppercase tracking-wide text-emerald-300">Local Foundry session</p><p className="truncate text-xs font-bold">{PREVIEW_SPORTS[state.sport].room} · {PREVIEW_SPORTS[state.sport].weekLabel(state.week)}</p></div><button onClick={() => onRole(state.role === "player" ? "commissioner" : "player")} className="min-h-10 rounded-lg border border-emerald-400/40 px-2 text-[10px] font-bold">View as {state.role === "player" ? "Commish" : "Player"}</button><button onClick={onAdvance} className="min-h-10 rounded-lg bg-emerald-300 px-3 text-[10px] font-black text-emerald-950">Sim next week</button></div></div>; }
+function PreviewChrome({ state, busy, onWeek, onSeason, onRole, onGazette, onHome, onReset }: { state: FoundryWalkthrough; busy: boolean; onWeek: () => void; onSeason: () => void; onRole: (r: PreviewRole) => void; onGazette: () => void; onHome: () => void; onReset: () => void }) {
+  const root = useRef<HTMLDivElement | null>(null);
+  const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
+  const [collapsed, setCollapsed] = useState(false);
+  const [more, setMore] = useState(false);
+  const drag = useRef<{ dx: number; dy: number } | null>(null);
+  function startDrag(event: React.PointerEvent<HTMLButtonElement>) {
+    const rect = root.current?.getBoundingClientRect(); if (!rect) return;
+    drag.current = { dx: event.clientX - rect.left, dy: event.clientY - rect.top };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+  function moveDrag(event: React.PointerEvent<HTMLButtonElement>) {
+    if (!drag.current || !root.current) return;
+    const rect = root.current.getBoundingClientRect();
+    setPosition({ left: Math.max(6, Math.min(window.innerWidth - rect.width - 6, event.clientX - drag.current.dx)), top: Math.max(6, Math.min(window.innerHeight - rect.height - 6, event.clientY - drag.current.dy)) });
+  }
+  function endDrag() { drag.current = null; }
+  if (collapsed) return <div ref={root} className="fixed z-50 rounded-full border border-emerald-400/50 bg-emerald-950/95 p-1 shadow-2xl" style={position ? { left: position.left, top: position.top } : { left: 12, bottom: "max(10px, env(safe-area-inset-bottom))" }}><button type="button" onClick={() => setCollapsed(false)} className="min-h-11 rounded-full px-4 text-[10px] font-black text-emerald-200">FOUNDRY · OPEN</button></div>;
+  return <div ref={root} className="fixed z-50 w-[min(94vw,430px)] rounded-2xl border border-emerald-400/50 bg-emerald-950/95 p-2 shadow-2xl backdrop-blur" style={position ? { left: position.left, top: position.top } : { left: "3vw", bottom: "max(10px, env(safe-area-inset-bottom))" }}>
+    <button type="button" aria-label="Drag Foundry controls" onPointerDown={startDrag} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag} className="mb-2 flex min-h-7 w-full touch-none items-center justify-center rounded-lg border border-emerald-400/20 text-[9px] font-black uppercase tracking-[.18em] text-emerald-300"><span className="mr-2 text-base leading-none">≡</span> Drag Foundry bar</button>
+    <div className="grid grid-cols-[1fr_auto_auto] items-center gap-2"><div className="min-w-0"><p className="truncate text-[10px] font-black">{PREVIEW_SPORTS[state.sport].room} · {PREVIEW_SPORTS[state.sport].weekLabel(state.week)}</p><button onClick={() => onRole(state.role === "player" ? "commissioner" : "player")} className="text-[9px] font-bold text-emerald-300">Viewing as {state.role} · switch</button></div><button disabled={busy} onClick={onWeek} className="min-h-10 rounded-lg bg-emerald-300 px-3 text-[10px] font-black text-emerald-950 disabled:opacity-40">Sim Week</button><button disabled={busy} onClick={onSeason} className="min-h-10 rounded-lg border border-emerald-300/50 px-2 text-[10px] font-black text-emerald-200 disabled:opacity-40">Sim Season</button></div>
+    <div className="mt-2 grid grid-cols-2 gap-2"><button type="button" onClick={() => setCollapsed(true)} className="min-h-9 rounded-lg border border-emerald-400/20 text-[9px] font-bold">Collapse</button><button type="button" onClick={() => setMore((v) => !v)} className="min-h-9 rounded-lg border border-emerald-400/20 text-[9px] font-bold">{more ? "Close tools" : "More tools"}</button></div>
+    {more && <div className="mt-2 grid grid-cols-2 gap-2 border-t border-emerald-400/20 pt-2"><button type="button" onClick={onHome} className="min-h-9 rounded-lg border border-emerald-400/20 text-[9px] font-bold">Sandbox Home</button><button type="button" onClick={onGazette} className="min-h-9 rounded-lg border border-emerald-400/20 text-[9px] font-bold">Replay Gazette</button><button type="button" onClick={onReset} className="min-h-9 rounded-lg border border-red-400/30 text-[9px] font-bold text-red-200">Reset this sport</button><Link href="/foundry" className="flex min-h-9 items-center justify-center rounded-lg border border-emerald-400/20 text-[9px] font-bold">Change sport / Exit</Link></div>}
+  </div>;
+}
+function SimulationPulse({ kind, step }: { kind: "week" | "season"; step: number }) {
+  const weekSteps = ["Locking every card…", "Playing and scoring the slate…", "Moving standings and the cut line…", "Printing the Gazette…"];
+  const seasonSteps = ["Building the full schedule…", "Playing every weekly card…", "Writing the rivalry history…", "Setting the postseason field…", "Opening the season archive…"];
+  const steps = kind === "week" ? weekSteps : seasonSteps;
+  return <div className="pointer-events-none fixed inset-x-3 top-[max(12px,env(safe-area-inset-top))] z-[60] mx-auto max-w-sm rounded-2xl border border-amber-300/50 bg-black/95 p-4 text-center shadow-2xl"><p className="text-[9px] font-black uppercase tracking-[.2em] text-amber-300">Simulating {kind}</p><p className="mt-2 text-sm font-black">{steps[Math.min(step, steps.length - 1)]}</p><div className="mt-3 flex gap-1">{steps.map((_, i) => <span key={i} className={`h-1 flex-1 rounded ${i <= step ? "bg-amber-300" : "bg-white/15"}`} />)}</div></div>;
+}
 function Page({ title, note, children }: { title: string; note: string; children: React.ReactNode }) { return <section><h2 className="text-2xl font-black">{title}</h2><p className="mb-4 mt-1 text-xs text-muted">{note}</p>{children}</section>; }
 function Stat({ label, value, note }: { label: string; value: string; note?: string }) { return <div className="rounded-xl border border-border bg-card p-3"><span className="block text-[9px] font-black uppercase tracking-wide text-muted">{label}</span><strong className="mt-1 block text-xl">{value}</strong>{note && <span className="text-[10px] text-muted">{note}</span>}</div>; }
 function Feature({ kicker, title, body }: { kicker: string; title: string; body: string }) { return <article className="rounded-2xl border border-border bg-card p-4"><p className="text-[9px] font-black uppercase tracking-[.16em] text-primary">{kicker}</p><h3 className="mt-1 text-lg font-black">{title}</h3><p className="mt-1 text-xs leading-relaxed text-muted">{body}</p></article>; }
