@@ -12,6 +12,7 @@ import { stackCelebrationKey } from "@/lib/badge-stacks";
 import type { BadgeStatus, BadgeTier } from "@/lib/types";
 import { getSession } from "@/lib/league";
 import CavalryScoutTrophy from "@/components/CavalryScoutTrophy";
+import OlympianTrophy from "@/components/OlympianTrophy";
 
 const TIER_HEX: Record<BadgeTier, string> = {
   legendary: "#eab308",
@@ -256,6 +257,8 @@ export default function BadgeUnlockModal() {
           >
             {current.def.id === "worlds_greatest_cavalry_scout" ? (
               <CavalryScoutTrophy size={72} />
+            ) : current.def.id === "built_different_olympian" ? (
+              <OlympianTrophy size={76} />
             ) : (
               current.def.icon
             )}

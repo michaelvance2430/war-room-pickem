@@ -5,6 +5,7 @@ import { TIER_LABEL, TIER_ORDER } from "@/lib/badges";
 import { getBadgeRewards } from "@/lib/badge-rewards";
 import { BadgeStatus, BadgeTier } from "@/lib/types";
 import CavalryScoutTrophy from "@/components/CavalryScoutTrophy";
+import OlympianTrophy from "@/components/OlympianTrophy";
 
 /** Hex colors so shelves always show even if Tailwind theme tokens miss */
 const TIER_HEX: Record<BadgeTier, string> = {
@@ -26,6 +27,7 @@ function BadgeTile({
   const { def, earned } = status;
   const rewards = getBadgeRewards(def);
   const cavalry = def.id === "worlds_greatest_cavalry_scout";
+  const olympian = def.id === "built_different_olympian";
 
   return (
     <button
@@ -45,6 +47,8 @@ function BadgeTile({
       >
         {cavalry ? (
           <CavalryScoutTrophy size={40} muted={!earned} />
+        ) : olympian ? (
+          <OlympianTrophy size={42} muted={!earned} />
         ) : (
           <span aria-hidden>{def.icon}</span>
         )}

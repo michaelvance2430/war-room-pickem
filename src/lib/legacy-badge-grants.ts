@@ -12,6 +12,9 @@
  *  - Maria → The Dr. (doctorate at ~24 · legendary nerd flex · +200 career)
  *  - Marilynnsmum → House Dragon (legendary family lore · +200 career only)
  *  - Andrew Visconti / Andy → The Hodor of Hodors (one-bit lore · +200 career only)
+ *  - Prestige Worldwide → The Two Wolves of Prestige (ΦΒΣ lore · +200 career only)
+ *  - Rob Harbison → Built Different (1996 Olympian lore · +200 career only)
+ *  - Kahmann → The 816 Archivist (Kansas City sports lore · +200 career only)
  *
  * Mistaken (hard-revoked whenever we see the name / on every app boot):
  *  - Andrew Visconti / Andy — was incorrectly given Kahmann’s champ seed
@@ -33,6 +36,9 @@ export const CAVALRY_SCOUT_BADGE_ID = "worlds_greatest_cavalry_scout";
 export const THE_DR_BADGE_ID = "the_dr";
 export const HOUSE_DRAGON_BADGE_ID = "house_dragon_legendary";
 export const HODOR_OF_HODORS_BADGE_ID = "hodor_of_hodors";
+export const TWO_WOLVES_OF_PRESTIGE_BADGE_ID = "two_wolves_of_prestige";
+export const BUILT_DIFFERENT_OLYMPIAN_BADGE_ID = "built_different_olympian";
+export const THE_816_ARCHIVIST_BADGE_ID = "the_816_archivist";
 
 /**
  * Optional hard UUID pins for House Dragon (preferred over name alone).
@@ -114,6 +120,27 @@ export const LEGACY_BADGE_GRANTS: LegacyBadgeGrant[] = [
       "andy",
       "andrew",
     ],
+  },
+  {
+    // Prestige Worldwide only — exact account display-name match after normalize.
+    pattern: /^prestigeworldwide$/i,
+    badgeId: TWO_WOLVES_OF_PRESTIGE_BADGE_ID,
+    reason: "The Two Wolves of Prestige — ΦΒΣ, Super Bowl Ed, terminally overqualified",
+    exactNormalizedNames: ["prestigeworldwide"],
+  },
+  {
+    // Rob Harbison only — exact account display-name match after normalize.
+    pattern: /^robharbison$/i,
+    badgeId: BUILT_DIFFERENT_OLYMPIAN_BADGE_ID,
+    reason: "Built Different — NCAA champion, 1996 Olympian, immortal Tundra",
+    exactNormalizedNames: ["robharbison"],
+  },
+  {
+    // Kahmann only — separate from his earned prior-season championship hardware.
+    pattern: /^kahmann$/i,
+    badgeId: THE_816_ARCHIVIST_BADGE_ID,
+    reason: "The 816 Archivist — Kansas City knows; title still pending",
+    exactNormalizedNames: ["kahmann"],
   },
 ];
 

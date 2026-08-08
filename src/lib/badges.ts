@@ -213,6 +213,45 @@ export const BADGE_CATALOG: BadgeDef[] = [
     icon: "🚪",
   },
   {
+    id: "two_wolves_of_prestige",
+    name: "The Two Wolves of Prestige",
+    description:
+      "Inside Prestige Worldwide are two wolves. One is Super Bowl Ed, desperately trying to break out. The other has 17 master’s degrees, has accomplished nearly everything a human being can accomplish, and is still somehow trapped in a football pool with us. Both wolves are overqualified. Neither submitted picks early. “Culture for Service and Service for Humanity.”",
+    howToEarn:
+      "Commissioner-issued lore. One of one. Account-wide. Seeded for Prestige Worldwide alone.",
+    lockedLabel: "Hard locked — Prestige Worldwide only",
+    tier: "legendary",
+    points: 200,
+    careerOnly: true,
+    icon: "ΦΒΣ",
+  },
+  {
+    id: "built_different_olympian",
+    name: "Built Different",
+    description:
+      "NCAA National Champion. 1996 Olympian. Has accomplished more than most people could fit into three lifetimes. Still drives a 2002 Toyota Tundra with 899,725 miles—because apparently Olympic greatness does not include knowing when to let a truck die. Proof that you can have the cake, eat the cake, win a national championship, represent your country—and still pull into the parking lot sounding like loose change in a clothes dryer.",
+    howToEarn:
+      "Commissioner-issued lore. One of one. Account-wide. Seeded for Rob Harbison alone.",
+    lockedLabel: "Hard locked — Olympians only",
+    tier: "legendary",
+    points: 200,
+    careerOnly: true,
+    icon: "1996",
+  },
+  {
+    id: "the_816_archivist",
+    name: "The 816 Archivist",
+    description:
+      "Every Royals stat. Every Chiefs fact. Every obscure piece of Kansas City sports history nobody asked for—but everyone eventually needs. A man of few words because the numbers already said enough. Unfortunately, all that knowledge still hasn’t explained how to lock down the title. The library is open. The trophy case remains under construction.",
+    howToEarn:
+      "Commissioner-issued lore. One of one. Account-wide. Seeded for Kahmann alone.",
+    lockedLabel: "Hard locked — the 816 keeps its own records",
+    tier: "legendary",
+    points: 200,
+    careerOnly: true,
+    icon: "816",
+  },
+  {
     id: CAREER_CELLAR_ID,
     name: "Sad Little Brains Forever",
     description:
@@ -1529,6 +1568,21 @@ function evaluateBadge(
         earned: hasPermanentBadge(player, "hodor_of_hodors"),
       };
 
+    case "two_wolves_of_prestige":
+      return {
+        earned: hasPermanentBadge(player, "two_wolves_of_prestige"),
+      };
+
+    case "built_different_olympian":
+      return {
+        earned: hasPermanentBadge(player, "built_different_olympian"),
+      };
+
+    case "the_816_archivist":
+      return {
+        earned: hasPermanentBadge(player, "the_816_archivist"),
+      };
+
     case "immortal_streak":
       return progress(streak, 30);
 
@@ -2247,6 +2301,9 @@ export function getPlayerBadges(
   const LORE_HIDE_LOCKED = new Set([
     "house_dragon_legendary",
     "hodor_of_hodors",
+    "two_wolves_of_prestige",
+    "built_different_olympian",
+    "the_816_archivist",
   ]);
   const visible = statuses.filter((b) => {
     if (LORE_HIDE_LOCKED.has(b.def.id) && !b.earned) return false;

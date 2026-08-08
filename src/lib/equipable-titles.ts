@@ -88,6 +88,20 @@ export const EQUIPABLE_TITLE_CATALOG: EquipableTitleDef[] = [
       "One word. One bit. Holds the door. Ask the room for the story.",
   },
   {
+    badgeId: "built_different_olympian",
+    title: "Olympian",
+    vibe: "brag",
+    blurb:
+      "NCAA champion. 1996 Olympian. The Tundra has also completed several endurance events.",
+  },
+  {
+    badgeId: "the_816_archivist",
+    title: "BBQ Sauce",
+    vibe: "chaos",
+    blurb:
+      "Every Kansas City fact ever recorded. Still searching the archives for another title.",
+  },
+  {
     badgeId: "sad_little_brains",
     title: "Sad Little Brain",
     vibe: "roast",
