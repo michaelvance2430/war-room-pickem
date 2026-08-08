@@ -73,7 +73,7 @@ function toLocalLeague(row: {
   // Product default: CFB + NFL pride pick ON when the column is absent.
   // Never invent false for NFL solely because sport is non-cfb.
   let crystalBallEnabled =
-    sportId === "cfb" || sportId === "nfl" || sportId === "march_madness";
+    sportId === "cfb" || sportId === "nfl" || sportId === "cbb";
   let homeTaglineId = "good-teams";
   let homeTaglineCustom = "";
   let seasonThemeId = "default";
