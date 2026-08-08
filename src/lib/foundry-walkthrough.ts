@@ -2,6 +2,8 @@ import type { SportId } from "@/lib/sports/types";
 
 export type PreviewSport = Extract<SportId, "cfb" | "nfl" | "cbb">;
 export type PreviewRole = "player" | "commissioner";
+export type FieldhouseRegion = "East" | "West" | "South" | "Midwest";
+export const FIELDHOUSE_REGIONS: readonly FieldhouseRegion[] = ["East", "West", "South", "Midwest"];
 export type PreviewPlayer = {
   id: string;
   name: string;
@@ -10,6 +12,7 @@ export type PreviewPlayer = {
   correct: number;
   locked: boolean;
   streak: number;
+  region: FieldhouseRegion;
 };
 export type PreviewGame = {
   id: string;
@@ -79,7 +82,7 @@ export function createFoundryWalkthrough(sport: PreviewSport, week = 1, role: Pr
   const seed = week + (sport === "nfl" ? 31 : sport === "cbb" ? 67 : 11);
   const players = PEOPLE.map((name, index) => {
     const weekPoints = 5 + (hash(seed, index) % 21);
-    return { id: `preview-${index}`, name, weekPoints, points: week * 12 + weekPoints + (hash(seed, index, 4) % 42), correct: 2 + (hash(seed, index, 7) % 4), locked: index !== 10 || week % 2 === 0, streak: (hash(seed, index, 9) % 7) - 2 };
+    return { id: `preview-${index}`, name, weekPoints, points: week * 12 + weekPoints + (hash(seed, index, 4) % 42), correct: 2 + (hash(seed, index, 7) % 4), locked: index !== 10 || week % 2 === 0, streak: (hash(seed, index, 9) % 7) - 2, region: FIELDHOUSE_REGIONS[index % FIELDHOUSE_REGIONS.length] };
   }).sort((a, b) => b.points - a.points).map((player) => ({ ...player }));
   const games = MATCHUPS[sport].map(([away, home], index) => {
     const homeLine = ((hash(seed, index) % 13) - 7) / 2;
@@ -101,7 +104,16 @@ export function loadFoundryWalkthrough(): FoundryWalkthrough | null {
   if (typeof window === "undefined") return null;
   try {
     const parsed = JSON.parse(localStorage.getItem(FOUNDRY_WALKTHROUGH_KEY) || "null") as FoundryWalkthrough | null;
-    return parsed?.version === 1 ? { ...parsed, gazetteWeeks: Array.isArray(parsed.gazetteWeeks) ? parsed.gazetteWeeks : [] } : null;
+    return parsed?.version === 1 ? {
+      ...parsed,
+      players: parsed.players.map((player, index) => ({
+        ...player,
+        region: FIELDHOUSE_REGIONS.includes(player.region as FieldhouseRegion)
+          ? player.region
+          : FIELDHOUSE_REGIONS[index % FIELDHOUSE_REGIONS.length],
+      })),
+      gazetteWeeks: Array.isArray(parsed.gazetteWeeks) ? parsed.gazetteWeeks : [],
+    } : null;
   } catch { return null; }
 }
 
