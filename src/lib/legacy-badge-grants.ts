@@ -41,6 +41,21 @@ export const BUILT_DIFFERENT_OLYMPIAN_BADGE_ID = "built_different_olympian";
 export const THE_816_ARCHIVIST_BADGE_ID = "the_816_archivist";
 
 /**
+ * One-of-one account pins resolved from production profiles.
+ * These are identity assignments, not unlock rules and not public catalog seeds.
+ * UUID remains authoritative if the member later changes their display name.
+ */
+export const PRESTIGE_WORLDWIDE_USER_IDS: readonly string[] = [
+  "463700da-a4cd-4e82-a0a5-f46ee08acff2",
+];
+export const ROB_HARBISON_USER_IDS: readonly string[] = [
+  "c2b807c8-eb6d-4a15-8acc-0872af50f85a",
+];
+export const KAHMANN_USER_IDS: readonly string[] = [
+  "9e579623-23b7-4f0b-9ae6-683e50bae1dc",
+];
+
+/**
  * Optional hard UUID pins for House Dragon (preferred over name alone).
  * Filled when Supabase service lookup is available — empty means name match only.
  * Never grant House Dragon to an unknown random “Marilyn” without exact key.
@@ -126,6 +141,7 @@ export const LEGACY_BADGE_GRANTS: LegacyBadgeGrant[] = [
     pattern: /^prestigeworldwide$/i,
     badgeId: TWO_WOLVES_OF_PRESTIGE_BADGE_ID,
     reason: "The Two Wolves of Prestige — ΦΒΣ, Super Bowl Ed, terminally overqualified",
+    userIds: PRESTIGE_WORLDWIDE_USER_IDS,
     exactNormalizedNames: ["prestigeworldwide"],
   },
   {
@@ -133,6 +149,7 @@ export const LEGACY_BADGE_GRANTS: LegacyBadgeGrant[] = [
     pattern: /^robharbison$/i,
     badgeId: BUILT_DIFFERENT_OLYMPIAN_BADGE_ID,
     reason: "Built Different — NCAA champion, 1996 Olympian, immortal Tundra",
+    userIds: ROB_HARBISON_USER_IDS,
     exactNormalizedNames: ["robharbison"],
   },
   {
@@ -140,6 +157,7 @@ export const LEGACY_BADGE_GRANTS: LegacyBadgeGrant[] = [
     pattern: /^kahmann$/i,
     badgeId: THE_816_ARCHIVIST_BADGE_ID,
     reason: "The 816 Archivist — Kansas City knows; title still pending",
+    userIds: KAHMANN_USER_IDS,
     exactNormalizedNames: ["kahmann"],
   },
 ];
