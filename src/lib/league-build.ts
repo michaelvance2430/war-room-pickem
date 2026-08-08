@@ -127,7 +127,7 @@ export function openingWeekStartMs(sportId?: string | null): number | null {
 /** Human label for the lock moment. */
 export function openingWeekLockLabel(sportId?: string | null): string {
   const sid = sportId ?? getLeague()?.sportId;
-  if (sid === "march_madness") return "Fieldhouse Window 1 · first tip";
+  if (sid === "cbb") return "Fieldhouse Window 1 · first tip";
   const first = firstSeasonWeek(sid);
   const range = weekDateRangeLabel(first, sid);
   const sport = sid === "nfl" ? "NFL Week 1" : "CFB Week 0";
@@ -232,7 +232,7 @@ export function pridePickWizardCopy(sportId?: string | null): {
   onLabel: string;
 } {
   const nfl = sportId === "nfl";
-  const hoops = sportId === "march_madness";
+  const hoops = sportId === "cbb";
   return {
     title: nfl ? "Super Bowl pride pick?" : hoops ? "National champion Crystal Ball?" : "Crystal Ball?",
     oneLiner: nfl
