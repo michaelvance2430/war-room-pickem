@@ -181,12 +181,14 @@ export default function ProfilePage() {
   const [allegianceLoading, setAllegianceLoading] = useState(true);
   /** When league context is nfl|cfb, only that sport is shown; else both */
   const [allegianceContext, setAllegianceContext] = useState<
-    "nfl" | "cfb" | "both"
+    "nfl" | "cfb" | "march_madness" | "both"
   >("both");
   const [cfbFavorite, setCfbFavorite] = useState<CanonicalTeam | null>(null);
   const [nflFavorite, setNflFavorite] = useState<CanonicalTeam | null>(null);
+  const [cbbFavorite, setCbbFavorite] = useState<CanonicalTeam | null>(null);
   const [cfbAnswered, setCfbAnswered] = useState(false);
   const [nflAnswered, setNflAnswered] = useState(false);
+  const [cbbAnswered, setCbbAnswered] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [joinTitle, setJoinTitle] = useState<string | null>(null);
   const [lastSeenAt, setLastSeenAt] = useState<string | null>(null);
@@ -249,8 +251,10 @@ export default function ProfilePage() {
       setDetailsPanel(null);
       setCfbFavorite(null);
       setNflFavorite(null);
+      setCbbFavorite(null);
       setCfbAnswered(false);
       setNflAnswered(false);
+      setCbbAnswered(false);
       setAllegianceLoading(true);
 
       const me = readSession()?.playerId || null;
@@ -329,13 +333,14 @@ export default function ProfilePage() {
               try {
                 const lg = readLeague();
                 const raw = (lg?.sportId || "").toString().toLowerCase();
-                const ctx: "nfl" | "cfb" | "both" =
-                  raw === "nfl" ? "nfl" : raw === "cfb" ? "cfb" : "both";
+                const ctx: "nfl" | "cfb" | "march_madness" | "both" =
+                  raw === "nfl" ? "nfl" : raw === "cfb" ? "cfb" : raw === "march_madness" ? "march_madness" : "both";
                 if (cancelled) return;
                 setAllegianceContext(ctx);
                 setAllegianceLoading(true);
                 setCfbFavorite(null);
                 setNflFavorite(null);
+                setCbbFavorite(null);
                 if (ctx === "nfl" || ctx === "both") {
                   const tid = await m.getUserFavoriteTeamId(id, "nfl");
                   const t = tid ? await m.getUserFavoriteTeam(id, "nfl") : null;
@@ -351,6 +356,11 @@ export default function ProfilePage() {
                     setCfbAnswered(!!tid);
                     setCfbFavorite(t);
                   }
+                }
+                if (ctx === "march_madness" || ctx === "both") {
+                  const tid = await m.getUserFavoriteTeamId(id, "march_madness");
+                  const t = tid ? await m.getUserFavoriteTeam(id, "march_madness") : null;
+                  if (!cancelled) { setCbbAnswered(!!tid); setCbbFavorite(t); }
                 }
               } catch {
                 /* ignore */
@@ -476,13 +486,14 @@ export default function ProfilePage() {
             const uid = found!.id;
             const lg = readLeague();
             const raw = (lg?.sportId || "").toString().toLowerCase();
-            const ctx: "nfl" | "cfb" | "both" =
-              raw === "nfl" ? "nfl" : raw === "cfb" ? "cfb" : "both";
+            const ctx: "nfl" | "cfb" | "march_madness" | "both" =
+              raw === "nfl" ? "nfl" : raw === "cfb" ? "cfb" : raw === "march_madness" ? "march_madness" : "both";
             if (cancelled) return;
             setAllegianceContext(ctx);
             setAllegianceLoading(true);
             setCfbFavorite(null);
             setNflFavorite(null);
+            setCbbFavorite(null);
             if (ctx === "nfl" || ctx === "both") {
               const tid = await m.getUserFavoriteTeamId(uid, "nfl");
               const t = tid ? await m.getUserFavoriteTeam(uid, "nfl") : null;
@@ -498,6 +509,11 @@ export default function ProfilePage() {
                 setCfbAnswered(!!tid);
                 setCfbFavorite(t);
               }
+            }
+            if (ctx === "march_madness" || ctx === "both") {
+              const tid = await m.getUserFavoriteTeamId(uid, "march_madness");
+              const t = tid ? await m.getUserFavoriteTeam(uid, "march_madness") : null;
+              if (!cancelled) { setCbbAnswered(!!tid); setCbbFavorite(t); }
             }
           } catch {
             /* optional until migration */
@@ -722,6 +738,11 @@ export default function ProfilePage() {
                   )}
                 {!mock &&
                   !allegianceLoading &&
+                  (allegianceContext === "march_madness" || allegianceContext === "both") && (
+                    <AllegianceChip label="College Basketball Team" team={cbbFavorite} empty={cbbAnswered ? "No team declared" : "No college basketball team declared"} />
+                  )}
+                {!mock &&
+                  !allegianceLoading &&
                   (allegianceContext === "nfl" ||
                     allegianceContext === "both") && (
                     <AllegianceChip
@@ -733,6 +754,13 @@ export default function ProfilePage() {
                           : "No NFL team declared"
                       }
                     />
+                  )}
+                {!mock &&
+                  !allegianceLoading &&
+                  isSelfProfile &&
+                  allegianceContext === "march_madness" &&
+                  !cbbAnswered && (
+                    <Link href="/declare-allegiance?sport=march_madness&next=/" className="text-[11px] font-bold text-primary underline-offset-2 hover:underline">Choose College Basketball Team</Link>
                   )}
                 {!mock &&
                   !allegianceLoading &&
