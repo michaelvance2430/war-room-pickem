@@ -6,6 +6,7 @@ import GazettePaper from "@/components/GazettePaper";
 import { buildFoundryGazetteFixture } from "@/lib/foundry-gazette-fixtures";
 import {
   createFoundryWalkthrough,
+  FIELDHOUSE_REGIONS,
   FOUNDRY_WALKTHROUGH_EVENT,
   foundryWeekStartDate,
   isFoundrySeasonFinal,
@@ -17,6 +18,7 @@ import {
   simulateFoundryRegularSeason,
   simulateNextFoundryWeek,
   type FoundryWalkthrough,
+  type FieldhouseRegion,
   type PreviewRole,
 } from "@/lib/foundry-walkthrough";
 import { applySeasonTheme, DEFAULT_SEASON_THEME_ID, paintAutomaticSeasonTheme, resolveCfbSeasonSkin, resolveHolidaySkinInEasternTime, seasonThemeDisplayName } from "@/lib/season-theme";
@@ -124,6 +126,13 @@ function Home({ state, go }: { state: FoundryWalkthrough; go: (v: View) => void 
 function Picks({ state }: { state: FoundryWalkthrough }) { return <Page title="My Picks" note={`${PREVIEW_SPORTS[state.sport].weekLabel(state.week)} · saved locally for preview`}><div className="space-y-3">{state.games.map((g) => <article key={g.id} className="rounded-xl border border-border bg-card p-4"><div className="flex justify-between gap-3"><div><p className="text-[10px] font-black uppercase text-muted">{g.status === "final" ? "Final" : "Upcoming"}</p><h3 className="mt-1 font-black">{g.away} at {g.home}</h3><p className="text-xs text-muted">{g.spread}{g.result ? ` · ${g.result}` : ""}</p></div><span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary font-black text-black">{g.confidence}</span></div><div className="mt-3 rounded-lg border border-primary/30 bg-primary/10 p-3 text-sm">Pick: <strong>{g.pick}</strong></div></article>)}</div><p className="mt-4 rounded-xl border border-emerald-400/30 bg-emerald-400/10 p-3 text-xs font-bold text-emerald-200">Card locked · preview picks cannot reach a live league.</p></Page>; }
 
 function Standings({ state }: { state: FoundryWalkthrough }) {
+  if (state.sport === "cbb") {
+    return <Page title="Regional Standings" note="East, West, South, and Midwest each carry their own cut line into the Fieldhouse postseason."><div className="grid gap-4 sm:grid-cols-2">{FIELDHOUSE_REGIONS.map((region) => {
+      const players = state.players.filter((player) => player.region === region).sort((a, b) => b.points - a.points);
+      const middle = Math.ceil(players.length / 2);
+      return <section key={region} className="overflow-hidden rounded-2xl border border-orange-300/30 bg-card"><div className="border-b border-orange-300/20 bg-orange-300/10 px-3 py-2"><p className="text-[9px] font-black uppercase tracking-[.18em] text-orange-300">Fieldhouse region</p><h3 className="text-lg font-black">{region}</h3></div>{players.map((player, index) => <div key={player.id}><div className={`grid grid-cols-[28px_1fr_48px] items-center gap-2 px-3 py-3 text-xs ${player.name === "Mike V" ? "bg-primary/15" : ""}`}><span className="text-muted">{index + 1}</span><span className="truncate font-bold">{player.name}{player.name === "Mike V" ? " · YOU" : ""}<small className="block font-normal text-muted">{player.locked ? "Locked" : "No card"} · {player.streak > 0 ? `W${player.streak}` : player.streak < 0 ? `L${Math.abs(player.streak)}` : "—"}</small></span><strong className="text-right">{player.points}</strong></div>{index + 1 === middle && <div className="flex items-center gap-2 bg-red-950 px-2 py-1.5 text-[8px] font-black uppercase tracking-[.13em] text-red-300"><span className="h-px flex-1 bg-red-400" />Championship cut<span className="h-px flex-1 bg-red-400" /></div>}</div>)}</section>;
+    })}</div></Page>;
+  }
   const middle = Math.ceil(state.players.length / 2);
   return <Page title="Standings" note="The cut moves with the field; before scored games it rests in the middle."><div className="overflow-hidden rounded-xl border border-border">{state.players.map((p, i) => <div key={p.id}><div className={`grid grid-cols-[32px_1fr_52px_46px] items-center gap-2 px-3 py-3 text-sm ${p.name === "Mike V" ? "bg-primary/15" : "bg-card"}`}><span className="text-muted">{i + 1}</span><span className="truncate font-bold">{p.name}{p.name === "Mike V" ? " · YOU" : ""}<small className="block font-normal text-muted">{p.locked ? "Locked" : "No card"} · {p.streak > 0 ? `W${p.streak}` : p.streak < 0 ? `L${Math.abs(p.streak)}` : "—"}</small></span><strong className="text-right">{p.points}</strong><span className="text-right text-xs text-muted">+{p.weekPoints}</span></div>{i + 1 === middle && <div className="flex items-center gap-2 bg-red-950 px-3 py-2 text-[10px] font-black uppercase tracking-[.16em] text-red-300"><span className="h-px flex-1 bg-red-400" />Championship cut<span className="h-px flex-1 bg-red-400" /></div>}</div>)}</div></Page>;
 }
@@ -132,10 +141,38 @@ function Postseason({ state }: { state: FoundryWalkthrough }) {
   const finalWeek = state.sport === "cbb" ? 22 : state.sport === "nfl" ? 18 : 16;
   const cutWeek = finalWeek - 3;
   const stage = state.week < cutWeek ? -1 : Math.min(3, state.week - cutWeek);
-  const top = state.players.slice(0, 8);
-  const bottom = state.players.slice(8, 16);
+  const regionalFields = FIELDHOUSE_REGIONS.map((region) => {
+    const ranked = state.players.filter((player) => player.region === region).sort((a, b) => b.points - a.points);
+    const cut = Math.ceil(ranked.length / 2);
+    return { region, championship: ranked.slice(0, cut), toilet: ranked.slice(cut) };
+  });
+  const top = state.sport === "cbb" ? regionalFields.flatMap((field) => field.championship) : state.players.slice(0, 8);
+  const bottom = state.sport === "cbb" ? regionalFields.flatMap((field) => field.toilet) : state.players.slice(8, 16);
   const phase = stage < 0 ? `Projected fields · cut locks after ${PREVIEW_SPORTS[state.sport].weekLabel(cutWeek - 1)}` : stage === 0 ? "Fields locked · quarterfinals ready" : stage === 1 ? "Quarterfinals complete · semifinals ready" : stage === 2 ? "Semifinals complete · championship matchups ready" : "Postseason complete · winners crowned";
-  return <Page title="The Postseason" note={phase}><div className="mb-4 grid grid-cols-2 gap-2"><Stat label="Championship field" value="8" note={stage < 0 ? "projected" : "locked"} /><Stat label="Toilet Bowl field" value="8" note={stage < 0 ? "projected" : "locked"} /></div><div className="grid gap-5 lg:grid-cols-2"><TournamentBracket title="Championship" tone="gold" players={top} stage={stage} /><TournamentBracket title="Toilet Bowl" tone="purple" players={bottom} stage={stage} /></div></Page>;
+  return <Page title="The Postseason" note={phase}><div className="mb-4 grid grid-cols-2 gap-2"><Stat label="Championship field" value={String(top.length)} note={stage < 0 ? "projected" : "locked"} /><Stat label="Toilet Bowl field" value={String(bottom.length)} note={stage < 0 ? "projected" : "locked"} /></div><div className="grid gap-5">{state.sport === "cbb" ? <><RegionalTournamentBracket title="Fieldhouse Championship" tone="gold" fields={regionalFields.map((field) => ({ region: field.region, players: field.championship }))} stage={stage} /><RegionalTournamentBracket title="Toilet Bowl" tone="purple" fields={regionalFields.map((field) => ({ region: field.region, players: field.toilet }))} stage={stage} /></> : <><TournamentBracket title="Championship" tone="gold" players={top} stage={stage} /><TournamentBracket title="Toilet Bowl" tone="purple" players={bottom} stage={stage} /></>}</div></Page>;
+}
+
+function RegionalTournamentBracket({ title, tone, fields, stage }: { title: string; tone: "gold" | "purple"; fields: Array<{ region: FieldhouseRegion; players: FoundryWalkthrough["players"] }>; stage: number }) {
+  const color = tone === "gold" ? "border-amber-300/45 bg-amber-300/5 text-amber-200" : "border-purple-400/45 bg-purple-400/5 text-purple-200";
+  const winner = fields[0]?.players[0];
+  const left = fields.filter((field) => field.region === "East" || field.region === "West");
+  const right = fields.filter((field) => field.region === "South" || field.region === "Midwest");
+  return <section className={`rounded-2xl border p-3 sm:p-4 ${color}`}><div className="flex items-center justify-between gap-2"><div><p className="text-[9px] font-black uppercase tracking-[.18em]">Mini March Madness · four regions</p><h3 className="text-xl font-black">{title}</h3></div><span className="rounded-full border border-current/30 px-2 py-1 text-[8px] font-black">{stage < 0 ? "LIVE PROJECTION" : stage >= 3 ? "FINAL" : "IN PROGRESS"}</span></div>
+    <div className="mt-4 grid grid-cols-[1fr_72px_1fr] items-center gap-2 sm:grid-cols-[1fr_120px_1fr]">
+      <RegionSide fields={left} stage={stage} side="left" />
+      <div className="space-y-3 text-center"><div className={`rounded-xl border border-current/35 bg-black/35 p-2 ${stage < 2 ? "opacity-40" : ""}`}><p className="text-[7px] font-black uppercase tracking-[.13em]">Final Four</p><p className="mt-1 text-[9px] font-bold">East/West</p><p className="text-[9px]">vs</p><p className="text-[9px] font-bold">South/Midwest</p></div><div className={`rounded-xl border-2 border-current bg-black/50 p-2 ${stage < 3 ? "opacity-35" : ""}`}><p className="text-[7px] font-black uppercase">Champion</p><p className="mt-1 truncate text-[10px] font-black">{stage >= 3 ? winner?.name : "TBD"}</p></div></div>
+      <RegionSide fields={right} stage={stage} side="right" />
+    </div>
+    <p className="mt-4 text-center text-[9px] font-bold opacity-70">Every regional winner advances toward the center. Final Four winners meet for the hardware.</p>
+  </section>;
+}
+
+function RegionSide({ fields, stage, side }: { fields: Array<{ region: FieldhouseRegion; players: FoundryWalkthrough["players"] }>; stage: number; side: "left" | "right" }) {
+  return <div className="space-y-3">{fields.map((field) => {
+    const players = [...field.players].sort((a, b) => b.points - a.points);
+    const regionWinner = players[0];
+    return <div key={field.region} className={`rounded-xl border border-current/25 bg-black/25 p-2 ${side === "right" ? "text-right" : "text-left"}`}><p className="text-[8px] font-black uppercase tracking-[.14em]">{field.region} Region</p><div className="mt-2 space-y-1">{players.length ? players.map((player, index) => <div key={player.id} className={`flex items-center justify-between gap-1 rounded bg-white/5 px-2 py-1.5 text-[9px] ${stage >= 1 && index === 0 ? "bg-white/15 font-black" : ""}`}><span className="truncate">{index + 1} · {player.name}</span><span>{stage >= 1 ? index === 0 ? "ADV" : "OUT" : "—"}</span></div>) : <div className="rounded bg-white/5 px-2 py-2 text-[9px] opacity-50">BYE / TBD</div>}</div><p className={`mt-2 text-[8px] font-black ${stage >= 1 ? "" : "opacity-35"}`}>{stage >= 1 ? `${regionWinner?.name || "TBD"} → center` : "Regional winner → center"}</p></div>;
+  })}</div>;
 }
 
 function TournamentBracket({ title, tone, players, stage }: { title: string; tone: "gold" | "purple"; players: FoundryWalkthrough["players"]; stage: number }) {
