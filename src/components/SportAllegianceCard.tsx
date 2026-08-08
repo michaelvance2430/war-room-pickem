@@ -15,7 +15,7 @@ import NflBrandMark from "@/components/NflBrandMark";
 import { getSportPack } from "@/lib/sports/registry";
 import type { CanonicalTeam } from "@/lib/teams/cfb-catalog";
 
-export type AllegianceSportId = "cfb" | "nfl" | "march_madness";
+export type AllegianceSportId = "cfb" | "nfl" | "cbb";
 
 type Props = {
   /** Explicit sport — sole source of frame styling */
