@@ -72,6 +72,16 @@ function slotWinner(region: NcaaRegion, slot: NcaaSlot, picks: NcaaPicks): strin
   return picks[playInId(region, slot)] || null;
 }
 
+/** Tournament seed follows a team for the life of the bracket. */
+export function ncaaTeamSeed(team: string | null): number | undefined {
+  if (!team) return undefined;
+  for (const region of NCAA_REGIONS) {
+    const slot = NCAA_FIELD[region].find((candidate) => candidate.teams.includes(team));
+    if (slot) return slot.seed;
+  }
+  return undefined;
+}
+
 export function regionRoundGames(region: NcaaRegion, round: 1 | 2 | 3 | 4, picks: NcaaPicks): NcaaGame[] {
   if (round === 1) {
     const slots = NCAA_FIELD[region];
@@ -86,6 +96,8 @@ export function regionRoundGames(region: NcaaRegion, round: 1 | 2 | 3 | 4, picks
     label: round === 2 ? "Round of 32" : round === 3 ? "Sweet 16" : "Elite Eight",
     teamA: picks[prior[index * 2].id] || null,
     teamB: picks[prior[index * 2 + 1].id] || null,
+    seedA: ncaaTeamSeed(picks[prior[index * 2].id] || null),
+    seedB: ncaaTeamSeed(picks[prior[index * 2 + 1].id] || null),
   }));
 }
 
@@ -94,15 +106,21 @@ export function regionChampion(region: NcaaRegion, picks: NcaaPicks): string | n
 }
 
 export function finalFourGames(picks: NcaaPicks): NcaaGame[] {
+  const east = regionChampion("East", picks);
+  const west = regionChampion("West", picks);
+  const south = regionChampion("South", picks);
+  const midwest = regionChampion("Midwest", picks);
   return [
-    { id: "national:semifinal:0", label: "Final Four", teamA: regionChampion("East", picks), teamB: regionChampion("West", picks) },
-    { id: "national:semifinal:1", label: "Final Four", teamA: regionChampion("South", picks), teamB: regionChampion("Midwest", picks) },
+    { id: "national:semifinal:0", label: "Final Four", teamA: east, teamB: west, seedA: ncaaTeamSeed(east), seedB: ncaaTeamSeed(west) },
+    { id: "national:semifinal:1", label: "Final Four", teamA: south, teamB: midwest, seedA: ncaaTeamSeed(south), seedB: ncaaTeamSeed(midwest) },
   ];
 }
 
 export function nationalChampionshipGame(picks: NcaaPicks): NcaaGame {
   const semis = finalFourGames(picks);
-  return { id: "national:championship", label: "National Championship", teamA: picks[semis[0].id] || null, teamB: picks[semis[1].id] || null };
+  const teamA = picks[semis[0].id] || null;
+  const teamB = picks[semis[1].id] || null;
+  return { id: "national:championship", label: "National Championship", teamA, teamB, seedA: ncaaTeamSeed(teamA), seedB: ncaaTeamSeed(teamB) };
 }
 
 export function sanitizeNcaaPicks(picks: NcaaPicks): NcaaPicks {
