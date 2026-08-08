@@ -52,13 +52,13 @@ export type CrystalBallState = {
   cloudError?: string | null;
 };
 
-function resolveCbSport(sportId?: string | null): "cfb" | "nfl" | "march_madness" {
+function resolveCbSport(sportId?: string | null): "cfb" | "nfl" | "cbb" {
   if (sportId === "nfl") return "nfl";
   if (sportId === "cfb") return "cfb";
-  if (sportId === "march_madness") return "march_madness";
+  if (sportId === "cbb") return "cbb";
   try {
     const sid = getLeague()?.sportId;
-    return sid === "nfl" || sid === "march_madness" ? sid : "cfb";
+    return sid === "nfl" || sid === "cbb" ? sid : "cfb";
   } catch {
     return "cfb";
   }
@@ -93,7 +93,7 @@ export function isCrystalBallLocked(
 
 export function crystalBallLockLabel(sportId?: string | null): string {
   if (resolveCbSport(sportId) !== "cfb") {
-    return resolveCbSport(sportId) === "march_madness"
+    return resolveCbSport(sportId) === "cbb"
       ? "Locks at Window 1's first tip. Countdown appears when the slate is published."
       : "Locks at Week 1's first kickoff. Countdown appears when the slate is published.";
   }
@@ -143,9 +143,9 @@ export async function resolveCrystalBallLock(
   const openWeek = sport === "cfb" ? 0 : 1;
 
   // ── NFL: Week 1 *formally published* slate first kickoff is the only deadline ──
-  if (sport === "nfl" || sport === "march_madness") {
-    const noSlateLabel = sport === "march_madness" ? CBB_NO_SLATE_LABEL : NFL_NO_SLATE_LABEL;
-    const eventLabel = sport === "march_madness" ? "tip" : "kickoff";
+  if (sport === "nfl" || sport === "cbb") {
+    const noSlateLabel = sport === "cbb" ? CBB_NO_SLATE_LABEL : NFL_NO_SLATE_LABEL;
+    const eventLabel = sport === "cbb" ? "tip" : "kickoff";
     try {
       const { listScoredWeekNumbers, loadWeekCard } = await import("./cloud");
       const [scored, card] = await Promise.all([
@@ -186,7 +186,7 @@ export async function resolveCrystalBallLock(
           return {
             locked: false,
             reason: "open",
-            lockLabel: sport === "march_madness" ? "Window 1 first tip" : "Week 1 first kickoff",
+            lockLabel: sport === "cbb" ? "Window 1 first tip" : "Week 1 first kickoff",
             lockAtMs: lockAt,
             kickoffKnown: true,
           };
@@ -314,7 +314,7 @@ export function crystalBallTeams(sportId?: string | null): {
       }
     })();
   if (sid === "nfl") return listNflPrideTeams();
-  if (sid === "march_madness") {
+  if (sid === "cbb") {
     return listCbbCatalog().map((team) => ({
       name: team.name,
       conference: team.conference,
