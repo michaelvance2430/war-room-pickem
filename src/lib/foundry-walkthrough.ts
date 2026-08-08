@@ -1,4 +1,5 @@
 import type { SportId } from "@/lib/sports/types";
+import type { NcaaPicks } from "@/lib/ncaa-bracket";
 
 export type PreviewSport = Extract<SportId, "cfb" | "nfl" | "cbb">;
 export type PreviewRole = "player" | "commissioner";
@@ -36,6 +37,7 @@ export type FoundryWalkthrough = {
   unreadGazette: boolean;
   /** Scored weekly editions retained for the walkable Gazette archive. */
   gazetteWeeks: number[];
+  ncaaPicks: NcaaPicks;
 };
 
 export const FOUNDRY_WALKTHROUGH_KEY = "warroom-foundry-walkthrough-v1";
@@ -91,7 +93,7 @@ export function createFoundryWalkthrough(sport: PreviewSport, week = 1, role: Pr
     const final = index < 3;
     return { id: `${sport}-${week}-${index}`, away, home, spread: `${home} ${homeLine > 0 ? "+" : ""}${homeLine}`, status: final ? "final" as const : "upcoming" as const, result: final ? `${away} ${awayScore} · ${home} ${homeScore}` : undefined, pick: index % 2 ? away : home, confidence: 5 - index };
   });
-  return { version: 1, sport, role, week, seasonLabel: "2026 Foundry Season", generatedAt: Date.now(), players, games, unreadGazette: false, gazetteWeeks: [] };
+  return { version: 1, sport, role, week, seasonLabel: "2026 Foundry Season", generatedAt: Date.now(), players, games, unreadGazette: false, gazetteWeeks: [], ncaaPicks: {} };
 }
 
 export function saveFoundryWalkthrough(state: FoundryWalkthrough) {
@@ -113,6 +115,7 @@ export function loadFoundryWalkthrough(): FoundryWalkthrough | null {
           : FIELDHOUSE_REGIONS[index % FIELDHOUSE_REGIONS.length],
       })),
       gazetteWeeks: Array.isArray(parsed.gazetteWeeks) ? parsed.gazetteWeeks : [],
+      ncaaPicks: parsed.ncaaPicks && typeof parsed.ncaaPicks === "object" ? parsed.ncaaPicks : {},
     } : null;
   } catch { return null; }
 }
@@ -123,13 +126,13 @@ export function simulateNextFoundryWeek(state: FoundryWalkthrough): FoundryWalkt
   // a fictional Window 23 / Week 19 when Sim Week is pressed again.
   if (nextWeek === state.week) return state;
   const next = createFoundryWalkthrough(state.sport, nextWeek, state.role);
-  return { ...next, gazetteWeeks: Array.from(new Set([...(state.gazetteWeeks || []), state.week])).sort((a, b) => a - b), unreadGazette: true };
+  return { ...next, gazetteWeeks: Array.from(new Set([...(state.gazetteWeeks || []), state.week])).sort((a, b) => a - b), ncaaPicks: state.ncaaPicks || {}, unreadGazette: true };
 }
 
 export function simulateFoundrySeason(state: FoundryWalkthrough): FoundryWalkthrough {
   const finalWeek = foundryFinalWeek(state.sport);
   const next = createFoundryWalkthrough(state.sport, finalWeek, state.role);
-  return { ...next, gazetteWeeks: Array.from({ length: finalWeek }, (_, index) => index + 1), unreadGazette: true };
+  return { ...next, gazetteWeeks: Array.from({ length: finalWeek }, (_, index) => index + 1), ncaaPicks: state.ncaaPicks || {}, unreadGazette: true };
 }
 
 export function simulateFoundryRegularSeason(state: FoundryWalkthrough): FoundryWalkthrough {
@@ -138,6 +141,7 @@ export function simulateFoundryRegularSeason(state: FoundryWalkthrough): Foundry
   return {
     ...next,
     gazetteWeeks: Array.from({ length: postseasonWeek }, (_, index) => index + 1),
+    ncaaPicks: state.ncaaPicks || {},
     unreadGazette: true,
   };
 }
