@@ -191,7 +191,7 @@ export default function GazettePaper({
             onClose={() => setShareOpen(false)}
           />
           {variant === "modal" && (
-            <div className="mt-3 grid gap-2 sm:grid-cols-3">
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
               <button
                 type="button"
                 onClick={onDismiss}
@@ -199,9 +199,6 @@ export default function GazettePaper({
               >
                 Return to War Room
               </button>
-              <Link href="/standings" onClick={onDismiss} className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-stone-900 px-3 py-3 text-center text-sm font-bold">
-                Standings
-              </Link>
               <Link href="/locker-room" onClick={onDismiss} className="flex min-h-[48px] items-center justify-center rounded-xl border-2 border-stone-700 px-3 py-3 text-center text-sm font-bold">
                 Locker Room
               </Link>
