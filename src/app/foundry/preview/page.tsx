@@ -8,11 +8,13 @@ import {
   createFoundryWalkthrough,
   FOUNDRY_WALKTHROUGH_EVENT,
   foundryWeekStartDate,
+  isFoundrySeasonFinal,
   loadFoundryWalkthrough,
   PREVIEW_SPORTS,
   saveFoundryWalkthrough,
   setFoundryWalkthroughRole,
   simulateFoundrySeason,
+  simulateFoundryRegularSeason,
   simulateNextFoundryWeek,
   type FoundryWalkthrough,
   type PreviewRole,
@@ -29,7 +31,7 @@ const NAV: { id: View; label: string }[] = [
 export default function FoundryPreviewPage() {
   const [state, setState] = useState<FoundryWalkthrough | null>(null);
   const [view, setView] = useState<View>("home");
-  const [simulation, setSimulation] = useState<{ kind: "week" | "season"; step: number } | null>(null);
+  const [simulation, setSimulation] = useState<{ kind: "week" | "regular" | "season"; step: number } | null>(null);
   const [ringCeremony, setRingCeremony] = useState<FoundryWalkthrough | null>(null);
   const [gazetteWeek, setGazetteWeek] = useState<number | null>(null);
   const [calendarLabel, setCalendarLabel] = useState("");
@@ -49,12 +51,18 @@ export default function FoundryPreviewPage() {
         setSimulation({ ...simulation, step: simulation.step + 1 });
         return;
       }
-      const next = simulation.kind === "week" ? simulateNextFoundryWeek(state) : simulateFoundrySeason(state);
+      const next = simulation.kind === "week"
+        ? simulateNextFoundryWeek(state)
+        : simulation.kind === "regular"
+          ? simulateFoundryRegularSeason(state)
+          : simulateFoundrySeason(state);
       update(next);
       setSimulation(null);
       setGazetteWeek(simulation.kind === "week" ? state.week : next.gazetteWeeks[next.gazetteWeeks.length - 1] || null);
-      if (simulation.kind === "season") setRingCeremony(next);
-      setView(simulation.kind === "week" ? "gazette" : "home");
+      // The finale belongs to the championship result, regardless of whether
+      // Mike arrived one week at a time or used Sim Season.
+      if (isFoundrySeasonFinal(next)) setRingCeremony(next);
+      setView(simulation.kind === "week" ? "gazette" : simulation.kind === "regular" ? "postseason" : "home");
     }, simulation.step === 0 ? 500 : 850);
     return () => window.clearTimeout(timer);
   }, [simulation, state]);
@@ -101,7 +109,7 @@ export default function FoundryPreviewPage() {
     </div>
     {simulation && <SimulationPulse kind={simulation.kind} step={simulation.step} />}
     {ringCeremony && <PreviewRingCeremony state={ringCeremony} onClose={() => setRingCeremony(null)} />}
-    <PreviewChrome state={state} busy={!!simulation} onWeek={() => setSimulation({ kind: "week", step: 0 })} onSeason={() => setSimulation({ kind: "season", step: 0 })} onRole={(role) => update(setFoundryWalkthroughRole(state, role))} onGazette={() => { setGazetteWeek(state.gazetteWeeks[state.gazetteWeeks.length - 1] || null); setView("gazette"); }} onBrackets={() => setView("postseason")} onHome={() => setView("home")} onReset={() => { update(createFoundryWalkthrough(state.sport, 1, state.role)); setGazetteWeek(null); setView("home"); }} />
+    <PreviewChrome state={state} busy={!!simulation} onWeek={() => isFoundrySeasonFinal(state) ? setRingCeremony(state) : setSimulation({ kind: "week", step: 0 })} onRegular={() => setSimulation({ kind: "regular", step: 0 })} onSeason={() => isFoundrySeasonFinal(state) ? setRingCeremony(state) : setSimulation({ kind: "season", step: 0 })} onRole={(role) => update(setFoundryWalkthroughRole(state, role))} onGazette={() => { setGazetteWeek(state.gazetteWeeks[state.gazetteWeeks.length - 1] || null); setView("gazette"); }} onBrackets={() => setView("postseason")} onHome={() => setView("home")} onReset={() => { update(createFoundryWalkthrough(state.sport, 1, state.role)); setGazetteWeek(null); setView("home"); }} />
   </main>;
 }
 
@@ -162,7 +170,7 @@ function Profile({ state }: { state: FoundryWalkthrough }) { const me = state.pl
 
 function Commissioner({ state, onAdvance }: { state: FoundryWalkthrough; onAdvance: () => void }) { return <Page title="Commissioner" note="Preview controls operate only on the local fictional room."><div className="space-y-3"><Feature kicker="Card status" title="Published and locked" body={`${state.games.length} games · ${state.players.filter((p) => p.locked).length} of ${state.players.length} cards locked.`} /><Feature kicker="Scoring" title="Week ready" body="Final results, standings movement, and Gazette edition are generated." /><button onClick={onAdvance} className="min-h-12 w-full rounded-xl bg-primary text-sm font-black text-black">Score this week & open next</button><button className="min-h-12 w-full rounded-xl border border-border text-sm font-bold">Edit next card (preview)</button></div></Page>; }
 
-function PreviewChrome({ state, busy, onWeek, onSeason, onRole, onGazette, onBrackets, onHome, onReset }: { state: FoundryWalkthrough; busy: boolean; onWeek: () => void; onSeason: () => void; onRole: (r: PreviewRole) => void; onGazette: () => void; onBrackets: () => void; onHome: () => void; onReset: () => void }) {
+function PreviewChrome({ state, busy, onWeek, onRegular, onSeason, onRole, onGazette, onBrackets, onHome, onReset }: { state: FoundryWalkthrough; busy: boolean; onWeek: () => void; onRegular: () => void; onSeason: () => void; onRole: (r: PreviewRole) => void; onGazette: () => void; onBrackets: () => void; onHome: () => void; onReset: () => void }) {
   const root = useRef<HTMLDivElement | null>(null);
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
   const [collapsed, setCollapsed] = useState(false);
@@ -185,17 +193,20 @@ function PreviewChrome({ state, busy, onWeek, onSeason, onRole, onGazette, onBra
   }
   function endDrag() { drag.current = null; }
   if (collapsed) return <div ref={root} className="fixed z-50 rounded-full border border-emerald-400/50 bg-emerald-950/95 p-1 shadow-2xl" style={position ? { left: position.left, top: position.top } : { left: 12, bottom: "max(10px, env(safe-area-inset-bottom))" }}><button type="button" onClick={() => setCollapsed(false)} className="min-h-11 rounded-full px-4 text-[10px] font-black text-emerald-200">FOUNDRY · OPEN</button></div>;
+  const seasonFinal = isFoundrySeasonFinal(state);
   return <div ref={root} className="fixed z-50 w-[92vw] max-w-[360px] rounded-2xl border border-emerald-400/50 bg-emerald-950/95 p-2 shadow-2xl backdrop-blur" style={position ? { left: position.left, top: position.top } : { right: 12, bottom: "max(10px, env(safe-area-inset-bottom))" }}>
     <button type="button" aria-label="Drag Foundry controls" onPointerDown={startDrag} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag} className="mb-1 flex min-h-6 w-full touch-none items-center justify-center rounded-lg border border-emerald-400/20 text-[8px] font-black uppercase tracking-[.16em] text-emerald-300"><span className="mr-2 text-sm leading-none">≡</span> Drag controller</button>
-    <div className="grid grid-cols-[1fr_auto_auto] items-center gap-2"><div className="min-w-0"><p className="truncate text-[10px] font-black">{PREVIEW_SPORTS[state.sport].room} · {PREVIEW_SPORTS[state.sport].weekLabel(state.week)}</p><button onClick={() => onRole(state.role === "player" ? "commissioner" : "player")} className="text-[9px] font-bold text-emerald-300">Viewing as {state.role} · switch</button></div><button disabled={busy} onClick={onWeek} className="min-h-10 rounded-lg bg-emerald-300 px-3 text-[10px] font-black text-emerald-950 disabled:opacity-40">Sim Week</button><button disabled={busy} onClick={onSeason} className="min-h-10 rounded-lg border border-emerald-300/50 px-2 text-[10px] font-black text-emerald-200 disabled:opacity-40">Sim Season</button></div>
+    <div className="flex items-center justify-between gap-2"><div className="min-w-0"><p className="truncate text-[10px] font-black">{PREVIEW_SPORTS[state.sport].room} · {PREVIEW_SPORTS[state.sport].weekLabel(state.week)}{seasonFinal ? " · FINAL" : ""}</p><button onClick={() => onRole(state.role === "player" ? "commissioner" : "player")} className="text-[9px] font-bold text-emerald-300">Viewing as {state.role} · switch</button></div></div>
+    <div className="mt-2 grid grid-cols-3 gap-2"><button disabled={busy} onClick={onWeek} className="min-h-10 rounded-lg bg-emerald-300 px-2 text-[9px] font-black text-emerald-950 disabled:opacity-40">{seasonFinal ? "Ring Ceremony" : "Sim Week"}</button><button disabled={busy || seasonFinal} onClick={onRegular} className="min-h-10 rounded-lg border border-amber-300/50 px-1 text-[9px] font-black text-amber-200 disabled:opacity-40">Sim Regular Season</button><button disabled={busy} onClick={onSeason} className="min-h-10 rounded-lg border border-emerald-300/50 px-2 text-[9px] font-black text-emerald-200 disabled:opacity-40">{seasonFinal ? "Replay Rings" : "Sim Season"}</button></div>
     <div className="mt-2 grid grid-cols-2 gap-2"><button type="button" onClick={() => setCollapsed(true)} className="min-h-9 rounded-lg border border-emerald-400/20 text-[9px] font-bold">Collapse</button><button type="button" onClick={() => setMore((v) => !v)} className="min-h-9 rounded-lg border border-emerald-400/20 text-[9px] font-bold">{more ? "Close tools" : "More tools"}</button></div>
     {more && <div className="mt-2 grid grid-cols-2 gap-2 border-t border-emerald-400/20 pt-2"><button type="button" onClick={onHome} className="min-h-9 rounded-lg border border-emerald-400/20 text-[9px] font-bold">Sandbox Home</button><button type="button" onClick={onBrackets} className="min-h-9 rounded-lg border border-amber-300/40 text-[9px] font-bold text-amber-200">View Brackets</button><button type="button" onClick={onGazette} className="min-h-9 rounded-lg border border-emerald-400/20 text-[9px] font-bold">Replay Gazette</button><button type="button" onClick={onReset} className="min-h-9 rounded-lg border border-red-400/30 text-[9px] font-bold text-red-200">Reset this sport</button><Link href="/foundry" className="col-span-2 flex min-h-9 items-center justify-center rounded-lg border border-emerald-400/20 text-[9px] font-bold">Change sport / Exit</Link></div>}
   </div>;
 }
-function SimulationPulse({ kind, step }: { kind: "week" | "season"; step: number }) {
+function SimulationPulse({ kind, step }: { kind: "week" | "regular" | "season"; step: number }) {
   const weekSteps = ["Locking every card…", "Playing and scoring the slate…", "Moving standings and the cut line…", "Printing the Gazette…"];
   const seasonSteps = ["Building the full schedule…", "Playing every weekly card…", "Writing the rivalry history…", "Setting the postseason field…", "Opening the season archive…"];
-  const steps = kind === "week" ? weekSteps : seasonSteps;
+  const regularSteps = ["Building the regular season…", "Playing every weekly card…", "Moving standings and cut lines…", "Locking both postseason fields…", "Opening the brackets…"];
+  const steps = kind === "week" ? weekSteps : kind === "regular" ? regularSteps : seasonSteps;
   return <div className="pointer-events-none fixed inset-x-3 top-[max(12px,env(safe-area-inset-top))] z-[60] mx-auto max-w-sm rounded-2xl border border-amber-300/50 bg-black/95 p-4 text-center shadow-2xl"><p className="text-[9px] font-black uppercase tracking-[.2em] text-amber-300">Simulating {kind}</p><p className="mt-2 text-sm font-black">{steps[Math.min(step, steps.length - 1)]}</p><div className="mt-3 flex gap-1">{steps.map((_, i) => <span key={i} className={`h-1 flex-1 rounded ${i <= step ? "bg-amber-300" : "bg-white/15"}`} />)}</div></div>;
 }
 function PreviewRingCeremony({ state, onClose }: { state: FoundryWalkthrough; onClose: () => void }) {
