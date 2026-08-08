@@ -21,6 +21,7 @@ function isBareRoute(pathname: string | null): boolean {
   if (pathname === "/open-room" || pathname.startsWith("/open-room/")) {
     return true;
   }
+  if (pathname === "/foundry/preview" || pathname.startsWith("/foundry/preview/")) return true;
   return false;
 }
 
