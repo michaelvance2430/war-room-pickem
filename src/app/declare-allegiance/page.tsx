@@ -36,7 +36,8 @@ function DeclareInner() {
   // Require explicit sport — never invent CFB as a universal default.
   const sportId = (normalizeSportId(sportRaw || "") || "") as SportId | "";
   const isNfl = sportId === "nfl";
-  const sportKnown = sportId === "nfl" || sportId === "cfb";
+  const isCbb = sportId === "march_madness";
+  const sportKnown = sportId === "nfl" || sportId === "cfb" || isCbb;
 
   const [checking, setChecking] = useState(true);
   const [choice, setChoice] = useState<Choice>(null);
@@ -164,7 +165,7 @@ function DeclareInner() {
           <>
             <div className="text-center mb-6 space-y-2">
               <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">
-                {isNfl ? "Your NFL team" : "Declare your allegiance"}
+                {isNfl ? "Your NFL team" : isCbb ? "Your college hoops team" : "Declare your allegiance"}
               </p>
               <h1 className="text-xl sm:text-2xl font-black text-foreground leading-tight">
                 {isNfl ? "Who do you ride with?" : "Who do you ride with?"}
@@ -172,7 +173,9 @@ function DeclareInner() {
               <p className="text-sm text-muted leading-relaxed max-w-sm mx-auto">
                 {isNfl
                   ? "Pick the NFL club you identify with. This is not your Super Bowl prediction — that comes next if pride pick is on."
-                  : "Every pick tells us what you think. This one tells us who you are. You have to answer — but \"no team\" is a real answer."}
+                  : isCbb
+                    ? "Pick the college basketball program you ride with. This is your allegiance — your Crystal Ball national champion pick is separate."
+                    : "Every pick tells us what you think. This one tells us who you are. You have to answer — but \"no team\" is a real answer."}
               </p>
             </div>
 
