@@ -118,3 +118,78 @@ export function sanitizeNcaaPicks(picks: NcaaPicks): NcaaPicks {
 export function ncaaPickCount(picks: NcaaPicks): number {
   return Object.keys(sanitizeNcaaPicks(picks)).length;
 }
+
+export function ncaaGameWeight(gameId: string): number {
+  if (gameId.startsWith("first-four:")) return 1;
+  if (gameId.includes(":r1:")) return 1;
+  if (gameId.includes(":r2:")) return 2;
+  if (gameId.includes(":r3:")) return 4;
+  if (gameId.includes(":r4:")) return 8;
+  if (gameId.startsWith("national:semifinal:")) return 16;
+  if (gameId === "national:championship") return 32;
+  return 0;
+}
+
+export function ncaaScore(picks: NcaaPicks, results: NcaaPicks): number {
+  const validPicks = sanitizeNcaaPicks(picks);
+  return Object.entries(results).reduce(
+    (total, [gameId, winner]) => total + (validPicks[gameId] === winner ? ncaaGameWeight(gameId) : 0),
+    0
+  );
+}
+
+function deterministicWinner(game: NcaaGame, salt: number): string | null {
+  if (!game.teamA || !game.teamB) return null;
+  const hash = [...`${game.id}:${salt}`].reduce((sum, char) => (sum * 33 + char.charCodeAt(0)) >>> 0, 5381);
+  return hash % 5 === 0 ? game.teamB : game.teamA;
+}
+
+/** Build a coherent full bracket, useful for fictional Foundry players. */
+export function generateNcaaPicks(salt: number): NcaaPicks {
+  let picks: NcaaPicks = {};
+  const choose = (game: NcaaGame) => {
+    const winner = deterministicWinner(game, salt);
+    if (winner) picks = sanitizeNcaaPicks({ ...picks, [game.id]: winner });
+  };
+  firstFourGames().forEach(choose);
+  for (const region of NCAA_REGIONS) {
+    for (const round of [1, 2, 3, 4] as const) regionRoundGames(region, round, picks).forEach(choose);
+  }
+  finalFourGames(picks).forEach(choose);
+  choose(nationalChampionshipGame(picks));
+  return picks;
+}
+
+/**
+ * Reveal real (fictional Foundry) results through one postseason window.
+ * 0 = none, 1 = First Four/R64, 2 = R32, 3 = S16/E8, 4 = Final Four/title.
+ */
+export function simulateNcaaResultsThroughWindow(window: number, salt = 2026): NcaaPicks {
+  let results: NcaaPicks = {};
+  const choose = (game: NcaaGame) => {
+    const winner = deterministicWinner(game, salt);
+    if (winner) results = sanitizeNcaaPicks({ ...results, [game.id]: winner });
+  };
+  if (window >= 1) {
+    firstFourGames().forEach(choose);
+    for (const region of NCAA_REGIONS) regionRoundGames(region, 1, results).forEach(choose);
+  }
+  if (window >= 2) for (const region of NCAA_REGIONS) regionRoundGames(region, 2, results).forEach(choose);
+  if (window >= 3) for (const region of NCAA_REGIONS) {
+    regionRoundGames(region, 3, results).forEach(choose);
+    regionRoundGames(region, 4, results).forEach(choose);
+  }
+  if (window >= 4) {
+    finalFourGames(results).forEach(choose);
+    choose(nationalChampionshipGame(results));
+  }
+  return results;
+}
+
+export function ncaaResultsWindow(results: NcaaPicks): number {
+  if (results["national:championship"]) return 4;
+  if (NCAA_REGIONS.some((region) => results[`${region}:r4:0`])) return 3;
+  if (NCAA_REGIONS.some((region) => results[`${region}:r2:0`])) return 2;
+  if (NCAA_REGIONS.some((region) => results[`${region}:r1:0`])) return 1;
+  return 0;
+}
