@@ -146,14 +146,23 @@ html[data-sport="nfl"][data-nfl-scene="toilet"] body { background-image: linear-
 html[data-sport="nfl"][data-nfl-scene="profile"] body { background-image: linear-gradient(180deg, rgba(3,3,5,.18), rgba(3,3,5,.78)), url("/skins/nfl-sunday/profile-mobile.webp"); }
 
 /* Home has its own absolute atmosphere layers; replace only its NFL art. */
+.home-war-room[data-home-sport="nfl"] {
+  background-color: #03060c;
+  background-image: url("/skins/nfl-sunday/home-mobile.webp") !important;
+  background-position: center top !important;
+  background-repeat: no-repeat !important;
+  background-size: cover !important;
+}
 .home-war-room[data-home-sport="nfl"] > .home-war-art {
   background-image: url("/skins/nfl-sunday/home-mobile.webp") !important;
   background-position: center top;
+  background-repeat: no-repeat;
   background-size: cover;
-  opacity: .86;
+  opacity: 1;
 }
-.home-war-room[data-home-sport="nfl"] > .home-war-base { opacity: .52; }
+.home-war-room[data-home-sport="nfl"] > .home-war-base { opacity: .2; }
 .home-war-room[data-home-sport="nfl"] > .home-war-grid { opacity: .08 !important; }
+.home-war-room[data-home-sport="nfl"] > .home-war-vignette { opacity: .55; }
 
 @media (min-width: 768px) {
   html[data-sport="nfl"][data-nfl-scene="home"] body { background-image: linear-gradient(180deg, rgba(3,6,12,.16), rgba(3,6,12,.7)), url("/skins/nfl-sunday/home-desktop.webp"); }
@@ -165,6 +174,7 @@ html[data-sport="nfl"][data-nfl-scene="profile"] body { background-image: linear
   html[data-sport="nfl"][data-nfl-scene="championship"] body { background-image: linear-gradient(180deg, rgba(3,3,6,.1), rgba(3,3,6,.7)), url("/skins/nfl-sunday/championship-desktop.webp"); }
   html[data-sport="nfl"][data-nfl-scene="toilet"] body { background-image: linear-gradient(180deg, rgba(5,2,8,.16), rgba(5,2,8,.74)), url("/skins/nfl-sunday/toilet-desktop.webp"); }
   html[data-sport="nfl"][data-nfl-scene="profile"] body { background-image: linear-gradient(180deg, rgba(3,3,5,.16), rgba(3,3,5,.74)), url("/skins/nfl-sunday/profile-desktop.webp"); }
+  .home-war-room[data-home-sport="nfl"] { background-image: url("/skins/nfl-sunday/home-desktop.webp") !important; }
   .home-war-room[data-home-sport="nfl"] > .home-war-art { background-image: url("/skins/nfl-sunday/home-desktop.webp") !important; }
 }
 
