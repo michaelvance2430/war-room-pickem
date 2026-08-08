@@ -100,7 +100,7 @@ function validateTeamForSport(
 ): { ok: true } | { ok: false; error: string } {
   if (isNoTeamId(teamId)) {
     // CFB allows explicit "no team". NFL requires a real club (product binding).
-    if (sportId === "cfb" || sportId === "march_madness") return { ok: true };
+    if (sportId === "cfb" || sportId === "cbb") return { ok: true };
     if (sportId === "nfl") {
       return {
         ok: false,
@@ -124,7 +124,7 @@ function validateTeamForSport(
     }
     return { ok: true };
   }
-  if (sportId === "march_madness") {
+  if (sportId === "cbb") {
     if (!isValidCbbTeamId(teamId)) {
       return { ok: false, error: "Unknown college basketball team." };
     }
@@ -143,7 +143,7 @@ export function resolveFavoriteTeam(
   if (!teamId || isNoTeamId(teamId)) return null;
   if (sportId === "cfb") return getCfbTeamById(teamId);
   if (sportId === "nfl") return getNflTeamById(teamId);
-  if (sportId === "march_madness") return getCbbTeamById(teamId);
+  if (sportId === "cbb") return getCbbTeamById(teamId);
   return null;
 }
 
@@ -300,10 +300,10 @@ export async function needsAllegianceForSport(
   // Unknown / missing sport → no allegiance gate (do not invent CFB).
   if (sid === "nfl") return needsNflAllegiance();
   if (sid === "cfb") return needsCfbAllegiance();
-  if (sid === "march_madness") {
+  if (sid === "cbb") {
     const auth = await requireRealAuthUserId();
     if (!auth.ok) return false;
-    return !(await getUserFavoriteTeamId(auth.userId, "march_madness"));
+    return !(await getUserFavoriteTeamId(auth.userId, "cbb"));
   }
   return false;
 }
@@ -327,7 +327,7 @@ export function declareAllegianceHref(
 ): string {
   const sid = (sportId || "").toString().toLowerCase();
   const next = safeNextPath(nextPath);
-  if (sid !== "nfl" && sid !== "cfb" && sid !== "march_madness") {
+  if (sid !== "nfl" && sid !== "cfb" && sid !== "cbb") {
     // No sport yet — do not force allegiance; stay on intended destination.
     return next;
   }
