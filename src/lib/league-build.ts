@@ -127,6 +127,7 @@ export function openingWeekStartMs(sportId?: string | null): number | null {
 /** Human label for the lock moment. */
 export function openingWeekLockLabel(sportId?: string | null): string {
   const sid = sportId ?? getLeague()?.sportId;
+  if (sid === "march_madness") return "Fieldhouse Window 1 · first tip";
   const first = firstSeasonWeek(sid);
   const range = weekDateRangeLabel(first, sid);
   const sport = sid === "nfl" ? "NFL Week 1" : "CFB Week 0";
@@ -231,14 +232,19 @@ export function pridePickWizardCopy(sportId?: string | null): {
   onLabel: string;
 } {
   const nfl = sportId === "nfl";
+  const hoops = sportId === "march_madness";
   return {
-    title: nfl ? "Super Bowl pride pick?" : "Crystal Ball?",
+    title: nfl ? "Super Bowl pride pick?" : hoops ? "National champion Crystal Ball?" : "Crystal Ball?",
     oneLiner: nfl
       ? "Players predict the Super Bowl champion before Week 1. Pride only—no standings points."
+      : hoops
+        ? "Players predict the national champion before Window 1. Pride only—no standings points."
       : "Pick the national champ. No points. Secret until freeze.",
     body: nfl
       ? "Defaults on for new NFL rooms. After freeze, everyone’s pick is a permanent board. This is not their favorite-team allegiance — that’s separate."
+      : hoops
+        ? "After the first tip, everyone’s pick becomes a permanent board. This is separate from the college basketball team they ride with."
       : "Optional free brag tab. After freeze, everyone’s pick is a permanent board.",
-    onLabel: nfl ? "On — Super Bowl tab (recommended)" : "On — Crystal Ball tab",
+    onLabel: nfl ? "On — Super Bowl tab (recommended)" : hoops ? "On — National Champion tab (recommended)" : "On — Crystal Ball tab",
   };
 }
