@@ -72,7 +72,8 @@ function toLocalLeague(row: {
   // Prefer cloud flag; if column missing from select, keep prior local value.
   // Product default: CFB + NFL pride pick ON when the column is absent.
   // Never invent false for NFL solely because sport is non-cfb.
-  let crystalBallEnabled = sportId === "cfb" || sportId === "nfl";
+  let crystalBallEnabled =
+    sportId === "cfb" || sportId === "nfl" || sportId === "march_madness";
   let homeTaglineId = "good-teams";
   let homeTaglineCustom = "";
   let seasonThemeId = "default";
@@ -226,6 +227,8 @@ export async function saveLeagueToCloud(opts: {
     patch.home_tagline_custom = opts.settings.homeTaglineCustom;
   if (opts.settings?.seasonThemeId !== undefined)
     patch.season_theme_id = opts.settings.seasonThemeId;
+  if (opts.settings?.championshipTrophyId !== undefined)
+    patch.championship_trophy_id = opts.settings.championshipTrophyId;
 
   // Defense in depth: strip any accidental sport / identity fields
   delete patch.sport_id;
@@ -250,6 +253,7 @@ export async function saveLeagueToCloud(opts: {
     (error.message.includes("crystal_ball_enabled") ||
       error.message.includes("home_tagline") ||
       error.message.includes("season_theme") ||
+      error.message.includes("championship_trophy_id") ||
       error.message.includes("schema cache") ||
       error.code === "PGRST204")
   ) {
@@ -257,6 +261,7 @@ export async function saveLeagueToCloud(opts: {
     delete patch.home_tagline_id;
     delete patch.home_tagline_custom;
     delete patch.season_theme_id;
+    delete patch.championship_trophy_id;
     const retry = await supabase
       .from("leagues")
       .update(patch)
@@ -284,6 +289,9 @@ export async function saveLeagueToCloud(opts: {
   }
   if (opts.settings?.seasonThemeId !== undefined) {
     league.settings.seasonThemeId = opts.settings.seasonThemeId;
+  }
+  if (opts.settings?.championshipTrophyId !== undefined) {
+    league.settings.championshipTrophyId = opts.settings.championshipTrophyId;
   }
   // Cloud sport_id wins when present. Local stamps never overwrite cloud here.
   {
