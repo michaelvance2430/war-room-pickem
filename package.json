@@ -14,6 +14,7 @@
     "verify:postseason-ps1": "npx --yes tsx scripts/verify-postseason-ps1.mjs",
     "verify:home-mission": "node --import tsx scripts/verify-nfl-cfb-home-mission.mjs",
     "verify:season-rival": "node --import tsx scripts/verify-season-rival.mjs",
+    "verify:cbb-contract": "node --import tsx scripts/verify-cbb-contract.mjs",
     "verify:foundry-gazette": "node --import tsx scripts/verify-foundry-gazette.mjs",
     "verify:egg-catalog": "node scripts/verify-easter-egg-catalog-parity.mjs",
     "verify:egg-cloud": "node scripts/verify-easter-egg-cloud.mjs",

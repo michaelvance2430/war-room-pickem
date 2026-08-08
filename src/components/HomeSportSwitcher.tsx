@@ -507,6 +507,17 @@ export default function HomeSportSwitcher({ className = "" }: Props) {
         })}
       </div>
 
+      <div className="mx-2 mt-2 rounded-lg border border-amber-300/35 bg-amber-300/[0.06] px-3 py-2.5" aria-label="The Fieldhouse under construction">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[9px] font-black uppercase tracking-[0.2em] text-amber-300">Under Construction</p>
+            <p className="mt-0.5 text-sm font-black text-white">The Fieldhouse</p>
+            <p className="mt-0.5 text-[10px] leading-snug text-muted">College Basketball · Saturdays build the résumé. March destroys it.</p>
+          </div>
+          <span className="shrink-0 rounded-full border border-amber-300/30 px-2 py-1 text-[9px] font-black uppercase tracking-wide text-amber-200">Locked</span>
+        </div>
+      </div>
+
       {openRooms.length === 0 ? (
         <div className="px-4 py-5">
           <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-muted mb-2">

@@ -6,9 +6,9 @@
 export type SportId =
   | "cfb"
   | "nfl"
+  | "cbb"
   | "nba"
   | "nhl"
-  | "march_madness"
   | "nascar"
   | "mlb"
   | "soccer"
