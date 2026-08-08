@@ -38,6 +38,20 @@ export type FoundryWalkthrough = {
 export const FOUNDRY_WALKTHROUGH_KEY = "warroom-foundry-walkthrough-v1";
 export const FOUNDRY_WALKTHROUGH_EVENT = "warroom-foundry-walkthrough";
 
+/** Last playable preview window. The simulator may never advance beyond it. */
+export function foundryFinalWeek(sport: PreviewSport): number {
+  return sport === "cbb" ? 22 : sport === "nfl" ? 18 : 16;
+}
+
+/** First official postseason window; regular-season simulation stops here. */
+export function foundryPostseasonStartWeek(sport: PreviewSport): number {
+  return foundryFinalWeek(sport) - 3;
+}
+
+export function isFoundrySeasonFinal(state: Pick<FoundryWalkthrough, "sport" | "week">): boolean {
+  return state.week >= foundryFinalWeek(state.sport);
+}
+
 export const PREVIEW_SPORTS: Record<PreviewSport, {
   room: string;
   sport: string;
@@ -92,14 +106,28 @@ export function loadFoundryWalkthrough(): FoundryWalkthrough | null {
 }
 
 export function simulateNextFoundryWeek(state: FoundryWalkthrough): FoundryWalkthrough {
-  const next = createFoundryWalkthrough(state.sport, state.week + 1, state.role);
+  const nextWeek = Math.min(state.week + 1, foundryFinalWeek(state.sport));
+  // A completed season is immutable. Preserve its archive instead of creating
+  // a fictional Window 23 / Week 19 when Sim Week is pressed again.
+  if (nextWeek === state.week) return state;
+  const next = createFoundryWalkthrough(state.sport, nextWeek, state.role);
   return { ...next, gazetteWeeks: Array.from(new Set([...(state.gazetteWeeks || []), state.week])).sort((a, b) => a - b), unreadGazette: true };
 }
 
 export function simulateFoundrySeason(state: FoundryWalkthrough): FoundryWalkthrough {
-  const finalWeek = state.sport === "cbb" ? 22 : state.sport === "nfl" ? 18 : 16;
+  const finalWeek = foundryFinalWeek(state.sport);
   const next = createFoundryWalkthrough(state.sport, finalWeek, state.role);
   return { ...next, gazetteWeeks: Array.from({ length: finalWeek }, (_, index) => index + 1), unreadGazette: true };
+}
+
+export function simulateFoundryRegularSeason(state: FoundryWalkthrough): FoundryWalkthrough {
+  const postseasonWeek = foundryPostseasonStartWeek(state.sport);
+  const next = createFoundryWalkthrough(state.sport, postseasonWeek, state.role);
+  return {
+    ...next,
+    gazetteWeeks: Array.from({ length: postseasonWeek }, (_, index) => index + 1),
+    unreadGazette: true,
+  };
 }
 
 /** Monday start for each sport's 2026 season window. */
