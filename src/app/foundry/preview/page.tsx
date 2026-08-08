@@ -10,6 +10,7 @@ import {
   FOUNDRY_WALKTHROUGH_EVENT,
   foundryWeekStartDate,
   foundryPostseasonStartWeek,
+  foundryPostseasonRounds,
   isFoundrySeasonFinal,
   loadFoundryWalkthrough,
   PREVIEW_SPORTS,
@@ -162,10 +163,12 @@ function Postseason({ state, onUpdate }: { state: FoundryWalkthrough; onUpdate: 
   const regionalFields = FIELDHOUSE_REGIONS.map((region) => {
     const ranked = state.players.filter((player) => player.region === region).sort((a, b) => b.points - a.points);
     const cut = Math.ceil(ranked.length / 2);
+    const frozenChampionship = state.postseasonFields?.championship || [];
+    const frozenToilet = state.postseasonFields?.toilet || [];
     return {
       region,
-      championship: state.postseasonFields ? ranked.filter((player) => championshipIds.has(player.id)) : ranked.slice(0, cut),
-      toilet: state.postseasonFields ? ranked.filter((player) => toiletIds.has(player.id)) : ranked.slice(cut),
+      championship: state.postseasonFields ? ranked.filter((player) => championshipIds.has(player.id)).sort((a, b) => frozenChampionship.indexOf(a.id) - frozenChampionship.indexOf(b.id)) : ranked.slice(0, cut),
+      toilet: state.postseasonFields ? ranked.filter((player) => toiletIds.has(player.id)).sort((a, b) => frozenToilet.indexOf(a.id) - frozenToilet.indexOf(b.id)) : ranked.slice(cut),
     };
   });
   const top = state.sport === "cbb" ? regionalFields.flatMap((field) => field.championship) : state.players.slice(0, 8);
@@ -175,8 +178,8 @@ function Postseason({ state, onUpdate }: { state: FoundryWalkthrough; onUpdate: 
   return <Page title="March Madness Command Center" note="Three separate competitions. NCAA picks never alter the player Championship or Toilet Bowl fields."><nav className="mb-4 grid grid-cols-3 gap-2">{([[
     "ncaa", "NCAA Bracket"], ["championship", "Championship"], ["toilet", "Toilet Bowl"]] as const).map(([id, label]) => <button key={id} type="button" onClick={() => setCompetition(id)} className={`min-h-11 rounded-xl border px-2 text-[10px] font-black ${competition === id ? "border-orange-300 bg-orange-300 text-black" : "border-border bg-card"}`}>{label}</button>)}</nav>
     {competition === "ncaa" && <NcaaBracketPicker state={state} onUpdate={onUpdate} />}
-    {competition === "championship" && <RegionalTournamentBracket title="Fieldhouse Championship" tone="gold" fields={regionalFields.map((field) => ({ region: field.region, players: field.championship }))} stage={stage} />}
-    {competition === "toilet" && <RegionalTournamentBracket title="Toilet Bowl" tone="purple" fields={regionalFields.map((field) => ({ region: field.region, players: field.toilet }))} stage={stage} />}
+    {competition === "championship" && <RegionalTournamentBracket title="Fieldhouse Championship" tone="gold" fields={regionalFields.map((field) => ({ region: field.region, players: field.championship }))} stage={stage} rounds={foundryPostseasonRounds(state, "championship")} />}
+    {competition === "toilet" && <RegionalTournamentBracket title="Toilet Bowl" tone="purple" fields={regionalFields.map((field) => ({ region: field.region, players: field.toilet }))} stage={stage} rounds={foundryPostseasonRounds(state, "toilet")} />}
   </Page>;
 }
 
@@ -227,31 +230,32 @@ function NcaaPickGame({ game, selected, result, bracketLocked, onChoose }: { gam
   return <article className={`overflow-hidden rounded-xl border ${ready ? "border-orange-300/25 bg-black/25" : "border-border bg-card opacity-45"}`}><div className="flex items-center justify-between border-b border-white/10 px-3 py-1.5"><span className="text-[8px] font-black uppercase tracking-wide text-muted">{game.label}</span>{result ? <span className={`text-[8px] font-black ${selected === result ? "text-emerald-300" : "text-red-300"}`}>{selected === result ? "CORRECT" : "FINAL"}</span> : selected && <span className="text-[8px] font-black text-orange-300">PICKED</span>}</div>{teams.map(({ team, seed }, index) => <button key={`${game.id}:${index}`} type="button" disabled={!team || !!result || bracketLocked} onClick={() => team && onChoose(team)} className={`flex min-h-11 w-full items-center justify-between border-b border-white/5 px-3 text-left text-xs last:border-0 disabled:cursor-not-allowed ${team && selected === team ? "bg-orange-300 font-black text-black" : ""} ${team && result === team ? "ring-1 ring-inset ring-emerald-300" : ""}`}><span className="flex min-w-0 items-center gap-2">{team && seed ? <strong className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border text-[10px] ${selected === team ? "border-black/30 bg-black/10" : "border-orange-300/35 bg-orange-300/10 text-orange-200"}`}>{seed}</strong> : null}<span className="truncate">{team || "Winner of prior game"}</span></span>{team && <span className="ml-2 shrink-0 text-[9px]">{result === team ? "WINNER" : selected === team ? result ? "WRONG" : bracketLocked ? "LOCKED" : "ADVANCES" : result ? "FINAL" : bracketLocked ? "" : "PICK"}</span>}</button>)}</article>;
 }
 
-function RegionalTournamentBracket({ title, tone, fields, stage }: { title: string; tone: "gold" | "purple"; fields: Array<{ region: FieldhouseRegion; players: FoundryWalkthrough["players"] }>; stage: number }) {
+function RegionalTournamentBracket({ title, tone, fields, stage, rounds }: { title: string; tone: "gold" | "purple"; fields: Array<{ region: FieldhouseRegion; players: FoundryWalkthrough["players"] }>; stage: number; rounds: ReturnType<typeof foundryPostseasonRounds> }) {
   const color = tone === "gold" ? "border-amber-300/45 bg-amber-300/5 text-amber-200" : "border-purple-400/45 bg-purple-400/5 text-purple-200";
-  const regionWinners = fields.map((field) => [...field.players].sort((a, b) => b.madnessWindowPoints - a.madnessWindowPoints || b.madnessPoints - a.madnessPoints || b.points - a.points)[0]).filter(Boolean);
-  const leftWinner = regionWinners.filter((player) => player.region === "East" || player.region === "West").sort((a, b) => b.madnessWindowPoints - a.madnessWindowPoints || b.madnessPoints - a.madnessPoints)[0];
-  const rightWinner = regionWinners.filter((player) => player.region === "South" || player.region === "Midwest").sort((a, b) => b.madnessWindowPoints - a.madnessWindowPoints || b.madnessPoints - a.madnessPoints)[0];
-  const winner = [leftWinner, rightWinner].filter(Boolean).sort((a, b) => b.madnessWindowPoints - a.madnessWindowPoints || b.madnessPoints - a.madnessPoints)[0];
+  const playersById = new Map(fields.flatMap((field) => field.players).map((player) => [player.id, player]));
+  const leftWinner = playersById.get(rounds.semifinalWinners[0]);
+  const rightWinner = playersById.get(rounds.semifinalWinners[1]);
+  const winner = rounds.champion ? playersById.get(rounds.champion) : undefined;
   const left = fields.filter((field) => field.region === "East" || field.region === "West");
   const right = fields.filter((field) => field.region === "South" || field.region === "Midwest");
   return <section className={`rounded-2xl border p-3 sm:p-4 ${color}`}><div className="flex items-center justify-between gap-2"><div><p className="text-[9px] font-black uppercase tracking-[.18em]">Mini March Madness · four regions</p><h3 className="text-xl font-black">{title}</h3></div><span className="rounded-full border border-current/30 px-2 py-1 text-[8px] font-black">{stage < 0 ? "LIVE PROJECTION" : stage >= 3 ? "FINAL" : "IN PROGRESS"}</span></div>
     <div className="mt-4 grid grid-cols-[1fr_72px_1fr] items-center gap-2 sm:grid-cols-[1fr_120px_1fr]">
-      <RegionSide fields={left} stage={stage} side="left" />
+      <RegionSide fields={left} stage={stage} side="left" regionalWinners={new Set(rounds.regionalWinners)} seedOrder={rounds.field} />
       <div className="space-y-3 text-center"><div className={`rounded-xl border border-current/35 bg-black/35 p-2 ${stage < 2 ? "opacity-40" : ""}`}><p className="text-[7px] font-black uppercase tracking-[.13em]">Final Four</p><p className="mt-1 truncate text-[9px] font-bold">{stage >= 2 ? leftWinner?.name : "East/West"}</p><p className="text-[9px]">vs</p><p className="truncate text-[9px] font-bold">{stage >= 2 ? rightWinner?.name : "South/Midwest"}</p></div><div className={`rounded-xl border-2 border-current bg-black/50 p-2 ${stage < 3 ? "opacity-35" : ""}`}><p className="text-[7px] font-black uppercase">Champion</p><p className="mt-1 truncate text-[10px] font-black">{stage >= 3 ? winner?.name : "TBD"}</p></div></div>
-      <RegionSide fields={right} stage={stage} side="right" />
+      <RegionSide fields={right} stage={stage} side="right" regionalWinners={new Set(rounds.regionalWinners)} seedOrder={rounds.field} />
     </div>
     <p className="mt-4 text-center text-[9px] font-bold opacity-70">Every regional winner advances toward the center. Final Four winners meet for the hardware.</p>
   </section>;
 }
 
-function RegionSide({ fields, stage, side }: { fields: Array<{ region: FieldhouseRegion; players: FoundryWalkthrough["players"] }>; stage: number; side: "left" | "right" }) {
+function RegionSide({ fields, stage, side, regionalWinners, seedOrder }: { fields: Array<{ region: FieldhouseRegion; players: FoundryWalkthrough["players"] }>; stage: number; side: "left" | "right"; regionalWinners: Set<string>; seedOrder: string[] }) {
   return <div className="space-y-3">{fields.map((field) => {
-    const players = [...field.players].sort((a, b) => b.madnessWindowPoints - a.madnessWindowPoints || b.madnessPoints - a.madnessPoints || b.points - a.points);
-    const regionWinner = players[0];
-    return <div key={field.region} className={`rounded-xl border border-current/25 bg-black/25 p-2 ${side === "right" ? "text-right" : "text-left"}`}><p className="text-[8px] font-black uppercase tracking-[.14em]">{field.region} Region</p><div className="mt-2 space-y-1">{players.length ? players.map((player, index) => <div key={player.id} className={`flex items-center justify-between gap-1 rounded bg-white/5 px-2 py-1.5 text-[9px] ${stage >= 1 && index === 0 ? "bg-white/15 font-black" : ""}`}><span className="truncate">{index + 1} · {player.name}</span><span>{stage >= 1 ? index === 0 ? "ADV" : "OUT" : `+${player.madnessWindowPoints}`}</span></div>) : <div className="rounded bg-white/5 px-2 py-2 text-[9px] opacity-50">BYE / TBD</div>}</div><p className={`mt-2 text-[8px] font-black ${stage >= 1 ? "" : "opacity-35"}`}>{stage >= 1 ? `${regionWinner?.name || "TBD"} → center` : "Round points decide who advances"}</p></div>;
+    const players = field.players;
+    const regionWinner = players.find((player) => regionalWinners.has(player.id));
+    return <div key={field.region} className={`rounded-xl border border-current/25 bg-black/25 p-2 ${side === "right" ? "text-right" : "text-left"}`}><p className="text-[8px] font-black uppercase tracking-[.14em]">{field.region} Region</p><div className="mt-2 space-y-1">{players.length ? players.map((player) => <div key={player.id} className={`flex items-center justify-between gap-1 rounded bg-white/5 px-2 py-1.5 text-[9px] ${stage >= 1 && regionalWinners.has(player.id) ? "bg-white/15 font-black" : ""}`}><span className="truncate">{seedOrder.indexOf(player.id) + 1} · {player.name}</span><span>{stage >= 1 ? regionalWinners.has(player.id) ? "ADV" : "OUT" : `+${player.madnessWindowPoints}`}</span></div>) : <div className="rounded bg-white/5 px-2 py-2 text-[9px] opacity-50">BYE / TBD</div>}</div><p className={`mt-2 text-[8px] font-black ${stage >= 1 ? "" : "opacity-35"}`}>{stage >= 1 ? `${regionWinner?.name || "TBD"} → center` : "Round points decide who advances"}</p></div>;
   })}</div>;
 }
+
 
 function TournamentBracket({ title, tone, players, stage }: { title: string; tone: "gold" | "purple"; players: FoundryWalkthrough["players"]; stage: number }) {
   const color = tone === "gold" ? "border-amber-300/45 bg-amber-300/5 text-amber-200" : "border-purple-400/45 bg-purple-400/5 text-purple-200";

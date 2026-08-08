@@ -45,6 +45,13 @@ export type FoundryWalkthrough = {
   postseasonFields: { championship: string[]; toilet: string[] } | null;
 };
 
+export type FoundryPostseasonRounds = {
+  field: string[];
+  regionalWinners: string[];
+  semifinalWinners: string[];
+  champion: string | null;
+};
+
 export const FOUNDRY_WALKTHROUGH_KEY = "warroom-foundry-walkthrough-v1";
 export const FOUNDRY_WALKTHROUGH_EVENT = "warroom-foundry-walkthrough";
 
@@ -188,6 +195,42 @@ export function simulateFoundryRegularSeason(state: FoundryWalkthrough): Foundry
     },
     unreadGazette: true,
   };
+}
+
+/**
+ * Resolve the frozen Fieldhouse bracket without ever reseeding. Each matchup
+ * uses only the NCAA points earned in that tournament window. A tie advances
+ * the player with the better frozen regular-season seed.
+ */
+export function foundryPostseasonRounds(state: FoundryWalkthrough, competition: "championship" | "toilet"): FoundryPostseasonRounds {
+  const field = [...(state.postseasonFields?.[competition] || [])];
+  if (state.sport !== "cbb" || field.length < 2) return { field, regionalWinners: [], semifinalWinners: [], champion: null };
+  const byId = new Map(state.players.map((player) => [player.id, player]));
+  const bracketFor = (id: string) => {
+    const player = byId.get(id);
+    const playerIndex = Number(id.replace("preview-", ""));
+    return player?.name === "Mike V" ? state.ncaaPicks || {} : generateNcaaPicks((Number.isFinite(playerIndex) ? playerIndex : 0) + 91);
+  };
+  const scoreWindow = (id: string, through: number, prior: number) => {
+    const bracket = bracketFor(id);
+    return ncaaScore(bracket, simulateNcaaResultsThroughWindow(through)) - ncaaScore(bracket, simulateNcaaResultsThroughWindow(prior));
+  };
+  const seededWinner = (a: string | undefined, b: string | undefined, through: number, prior: number) => {
+    if (!a) return b;
+    if (!b) return a;
+    const aScore = scoreWindow(a, through, prior);
+    const bScore = scoreWindow(b, through, prior);
+    return bScore > aScore ? b : a;
+  };
+  const window = foundryNcaaWindowForWeek(state.week);
+  const regionalWinners = window >= 1
+    ? Array.from({ length: Math.ceil(field.length / 2) }, (_, index) => seededWinner(field[index * 2], field[index * 2 + 1], 1, 0)).filter((id): id is string => !!id)
+    : [];
+  const semifinalWinners = window >= 3
+    ? [seededWinner(regionalWinners[0], regionalWinners[1], 3, 1), seededWinner(regionalWinners[2], regionalWinners[3], 3, 1)].filter((id): id is string => !!id)
+    : [];
+  const champion = window >= 4 ? seededWinner(semifinalWinners[0], semifinalWinners[1], 4, 3) || null : null;
+  return { field, regionalWinners, semifinalWinners, champion };
 }
 
 /** Monday start for each sport's 2026 season window. */
