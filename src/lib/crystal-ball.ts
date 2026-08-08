@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { getSession, getLeague } from "@/lib/league";
 import { listFbsTeams } from "@/lib/fbs-teams";
 import { listNflPrideTeams } from "@/lib/nfl-teams";
+import { listCbbCatalog } from "@/lib/teams/cbb-catalog";
 
 export type CrystalBallPick = {
   userId: string;
@@ -51,11 +52,13 @@ export type CrystalBallState = {
   cloudError?: string | null;
 };
 
-function resolveCbSport(sportId?: string | null): "cfb" | "nfl" {
+function resolveCbSport(sportId?: string | null): "cfb" | "nfl" | "march_madness" {
   if (sportId === "nfl") return "nfl";
   if (sportId === "cfb") return "cfb";
+  if (sportId === "march_madness") return "march_madness";
   try {
-    return getLeague()?.sportId === "nfl" ? "nfl" : "cfb";
+    const sid = getLeague()?.sportId;
+    return sid === "nfl" || sid === "march_madness" ? sid : "cfb";
   } catch {
     return "cfb";
   }
@@ -68,7 +71,7 @@ function resolveCbSport(sportId?: string | null): "cfb" | "nfl" {
  * (see resolveCrystalBallLock).
  */
 export function crystalBallLockMs(sportId?: string | null): number {
-  if (resolveCbSport(sportId) === "nfl") {
+  if (resolveCbSport(sportId) !== "cfb") {
     // Never lock NFL from calendar alone (sync callers).
     return Number.POSITIVE_INFINITY;
   }
@@ -84,13 +87,15 @@ export function isCrystalBallLocked(
   now = Date.now(),
   sportId?: string | null
 ): boolean {
-  if (resolveCbSport(sportId) === "nfl") return false;
+  if (resolveCbSport(sportId) !== "cfb") return false;
   return now >= crystalBallLockMs("cfb");
 }
 
 export function crystalBallLockLabel(sportId?: string | null): string {
-  if (resolveCbSport(sportId) === "nfl") {
-    return "Locks at Week 1's first kickoff. Countdown appears when the slate is published.";
+  if (resolveCbSport(sportId) !== "cfb") {
+    return resolveCbSport(sportId) === "march_madness"
+      ? "Locks at Window 1's first tip. Countdown appears when the slate is published."
+      : "Locks at Week 1's first kickoff. Countdown appears when the slate is published.";
   }
   const t = crystalBallLockMs("cfb");
   return new Date(t).toLocaleString("en-US", {
@@ -122,6 +127,8 @@ export type CrystalBallLockInfo = {
 
 const NFL_NO_SLATE_LABEL =
   "Locks at Week 1's first kickoff. Countdown appears when the slate is published.";
+const CBB_NO_SLATE_LABEL =
+  "Locks at Window 1's first tip. Countdown appears when the slate is published.";
 
 /**
  * Pride-pick freezes:
@@ -133,10 +140,12 @@ export async function resolveCrystalBallLock(
   sportId?: string | null
 ): Promise<CrystalBallLockInfo> {
   const sport = resolveCbSport(sportId);
-  const openWeek = sport === "nfl" ? 1 : 0;
+  const openWeek = sport === "cfb" ? 0 : 1;
 
   // ── NFL: Week 1 *formally published* slate first kickoff is the only deadline ──
-  if (sport === "nfl") {
+  if (sport === "nfl" || sport === "march_madness") {
+    const noSlateLabel = sport === "march_madness" ? CBB_NO_SLATE_LABEL : NFL_NO_SLATE_LABEL;
+    const eventLabel = sport === "march_madness" ? "tip" : "kickoff";
     try {
       const { listScoredWeekNumbers, loadWeekCard } = await import("./cloud");
       const [scored, card] = await Promise.all([
@@ -147,7 +156,7 @@ export async function resolveCrystalBallLock(
         return {
           locked: true,
           reason: "week0_scored",
-          lockLabel: "Locked at kickoff.",
+          lockLabel: `Locked at first ${eventLabel}.`,
           lockAtMs: null,
           kickoffKnown: false,
         };
@@ -169,7 +178,7 @@ export async function resolveCrystalBallLock(
             return {
               locked: true,
               reason: "week0_frozen",
-              lockLabel: "Locked at kickoff.",
+              lockLabel: `Locked at first ${eventLabel}.`,
               lockAtMs: lockAt,
               kickoffKnown: true,
             };
@@ -177,7 +186,7 @@ export async function resolveCrystalBallLock(
           return {
             locked: false,
             reason: "open",
-            lockLabel: "Week 1 first kickoff",
+            lockLabel: sport === "march_madness" ? "Window 1 first tip" : "Week 1 first kickoff",
             lockAtMs: lockAt,
             kickoffKnown: true,
           };
@@ -187,7 +196,7 @@ export async function resolveCrystalBallLock(
       return {
         locked: false,
         reason: "no_kickoff",
-        lockLabel: NFL_NO_SLATE_LABEL,
+        lockLabel: noSlateLabel,
         lockAtMs: null,
         kickoffKnown: false,
       };
@@ -197,7 +206,7 @@ export async function resolveCrystalBallLock(
       return {
         locked: false,
         reason: "no_kickoff",
-        lockLabel: NFL_NO_SLATE_LABEL,
+        lockLabel: noSlateLabel,
         lockAtMs: null,
         kickoffKnown: false,
       };
@@ -305,6 +314,12 @@ export function crystalBallTeams(sportId?: string | null): {
       }
     })();
   if (sid === "nfl") return listNflPrideTeams();
+  if (sid === "march_madness") {
+    return listCbbCatalog().map((team) => ({
+      name: team.name,
+      conference: team.conference,
+    }));
+  }
   return listFbsTeams();
 }
 
@@ -366,9 +381,9 @@ export function peekLocalCrystalBall(): CrystalBallState {
   const lockLabel = crystalBallLockLabel(sport);
   // NFL lock is async (Week 1 kickoff) — never invent locked from local calendar.
   const locked =
-    sport === "nfl" ? false : isCrystalBallLocked(Date.now(), "cfb");
+    sport !== "cfb" ? false : isCrystalBallLocked(Date.now(), "cfb");
   const lockAtMs =
-    sport === "nfl" ? null : crystalBallLockMs("cfb");
+    sport !== "cfb" ? null : crystalBallLockMs("cfb");
   const empty: CrystalBallState = {
     myTeam: null,
     picks: [],
@@ -378,7 +393,7 @@ export function peekLocalCrystalBall(): CrystalBallState {
     locked,
     lockLabel,
     lockAtMs,
-    kickoffKnown: sport !== "nfl" && lockAtMs != null,
+    kickoffKnown: sport === "cfb" && lockAtMs != null,
     cloud: false,
   };
   if (!session?.leagueId) return empty;
@@ -405,7 +420,7 @@ export function peekLocalCrystalBall(): CrystalBallState {
     locked,
     lockLabel,
     lockAtMs,
-    kickoffKnown: sport !== "nfl" && lockAtMs != null,
+    kickoffKnown: sport === "cfb" && lockAtMs != null,
     cloud: false,
   };
 }
