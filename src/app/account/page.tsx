@@ -114,9 +114,11 @@ export default function AccountPage() {
   const [cfbTeamId, setCfbTeamId] = useState<string | null>(null);
   const [nflTeam, setNflTeam] = useState<CanonicalTeam | null>(null);
   const [nflTeamId, setNflTeamId] = useState<string | null>(null);
+  const [cbbTeam, setCbbTeam] = useState<CanonicalTeam | null>(null);
+  const [cbbTeamId, setCbbTeamId] = useState<string | null>(null);
   /** Which sport is in edit mode (null = none) */
   const [allegianceEditSport, setAllegianceEditSport] = useState<
-    "cfb" | "nfl" | null
+    "cfb" | "nfl" | "march_madness" | null
   >(null);
   const [allegiancePick, setAllegiancePick] = useState<CanonicalTeam | null>(
     null
@@ -147,19 +149,24 @@ export default function AccountPage() {
       setFullRoom(false);
     }
     try {
-      const [cfbId, nflId] = await Promise.all([
+      const [cfbId, nflId, cbbId] = await Promise.all([
         getMyFavoriteTeamId("cfb"),
         getMyFavoriteTeamId("nfl"),
+        getMyFavoriteTeamId("march_madness"),
       ]);
       setCfbTeamId(cfbId);
       setNflTeamId(nflId);
       setCfbTeam(isRealTeamId(cfbId) ? await getMyFavoriteTeam("cfb") : null);
       setNflTeam(isRealTeamId(nflId) ? await getMyFavoriteTeam("nfl") : null);
+      setCbbTeamId(cbbId);
+      setCbbTeam(isRealTeamId(cbbId) ? await getMyFavoriteTeam("march_madness") : null);
     } catch {
       setCfbTeamId(null);
       setCfbTeam(null);
       setNflTeamId(null);
       setNflTeam(null);
+      setCbbTeamId(null);
+      setCbbTeam(null);
     }
     const profile = await loadMyProfile();
     if (profile) {
@@ -828,7 +835,7 @@ export default function AccountPage() {
               Allegiance
             </p>
             <p className="text-xs text-muted leading-relaxed">
-              Sport-specific. CFB and NFL are separate — editing one never
+              Sport-specific. CFB, NFL, and college basketball are separate — editing one never
               changes the other. Identity only, not points. Each card keeps its
               own sport look regardless of your active league.
             </p>
@@ -976,6 +983,46 @@ export default function AccountPage() {
                     >
                       Cancel
                     </button>
+                  </div>
+                </>
+              )}
+            </SportAllegianceCard>
+
+            <SportAllegianceCard
+              sportId="march_madness"
+              title="College Basketball Team"
+              blurb="Fieldhouse allegiance. Separate from your national champion pick."
+            >
+              {cbbTeamId && allegianceEditSport !== "march_madness" ? (
+                <>
+                  <AllegianceTeamStrip team={cbbTeam} emptyTitle="No team declared" emptyBlurb="Neutral. Change anytime." />
+                  <button type="button" onClick={() => { setAllegianceEditSport("march_madness"); setAllegiancePick(cbbTeam); setAllegianceNoTeam(isNoTeamId(cbbTeamId)); }} className={ALLEGIANCE_SECONDARY_CLASS}>Change college basketball team</button>
+                </>
+              ) : allegianceEditSport !== "march_madness" ? (
+                <>
+                  <AllegianceTeamStrip team={null} emptyTitle="No college basketball team declared yet" emptyBlurb="Choose your program — or stay neutral." />
+                  <button type="button" onClick={() => { setAllegianceEditSport("march_madness"); setAllegianceNoTeam(false); setAllegiancePick(null); }} className={ALLEGIANCE_CTA_CLASS}>CHOOSE COLLEGE BASKETBALL TEAM</button>
+                </>
+              ) : (
+                <>
+                  <button type="button" onClick={() => { setAllegianceNoTeam(true); setAllegiancePick(null); }} className={`w-full rounded-xl border px-4 py-3 text-left ${allegianceNoTeam ? "border-primary bg-primary/10" : "border-border"}`}>
+                    <span className="block text-sm font-bold">No team declared</span>
+                    <span className="block text-xs text-muted">Stay neutral. Change anytime.</span>
+                  </button>
+                  <TeamAllegiancePicker sportId="march_madness" selectedId={allegiancePick?.id ?? null} onSelect={(team) => { setAllegiancePick(team); setAllegianceNoTeam(false); }} />
+                  <div className="flex gap-2">
+                    <button type="button" disabled={allegianceBusy || (!allegianceNoTeam && !allegiancePick)} onClick={() => {
+                      const teamId = allegianceNoTeam ? NO_TEAM_ID : allegiancePick?.id;
+                      if (!teamId) return;
+                      setAllegianceBusy(true);
+                      void setMyFavoriteTeam("march_madness", teamId).then((res) => {
+                        if (res.ok) {
+                          setCbbTeamId(teamId); setCbbTeam(res.team ?? null); setAllegianceEditSport(null); setAllegiancePick(null); setAllegianceNoTeam(false);
+                          setMessage(res.noTeam ? "College basketball allegiance: no team." : `College basketball team: ${res.team?.name}.`);
+                        } else setMessage(res.error || "Could not update college basketball team.");
+                      }).finally(() => setAllegianceBusy(false));
+                    }} className={ALLEGIANCE_CTA_CLASS}>{allegianceBusy ? "…" : "SAVE TEAM"}</button>
+                    <button type="button" onClick={() => { setAllegianceEditSport(null); setAllegiancePick(null); setAllegianceNoTeam(false); }} className={ALLEGIANCE_SECONDARY_CLASS}>Cancel</button>
                   </div>
                 </>
               )}
