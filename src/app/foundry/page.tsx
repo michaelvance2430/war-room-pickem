@@ -8,7 +8,7 @@ import FoundryLabIsolationPanel from "@/components/FoundryLabIsolationPanel";
 import CreatorSkinPreview from "@/components/CreatorSkinPreview";
 import WeeklyColdOpenModal from "@/components/WeeklyColdOpenModal";
 import FinalDispatchPreview from "@/components/FinalDispatchPreview";
-import FoundryCbbSeasonLab from "@/components/FoundryCbbSeasonLab";
+import FoundryRoomSimulator from "@/components/FoundryRoomSimulator";
 import { markFoundrySessionActive } from "@/components/FoundrySessionChrome";
 import { isAppCreator } from "@/lib/creator";
 import {
@@ -210,7 +210,7 @@ export default function FoundryPage() {
       {desk === "sandbox" && (
         <div className="space-y-4">
           <Intro title="Sandbox · Live Season Simulation" text="Use this desk to create disposable league history, then walk the real Home, Picks, Standings, Board, and Gazette pages exactly as a player would." />
-          <FoundryCbbSeasonLab />
+          <FoundryRoomSimulator />
           <FoundryLabIsolationPanel />
           <section className="rounded-xl border border-border bg-card p-4">
             <h2 className="text-sm font-bold">Active sandbox</h2>
