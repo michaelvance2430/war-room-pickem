@@ -91,6 +91,27 @@ This is non-negotiable product DNA across every sport pack.
 
 ---
 
+## Crew transfer into another sport (parking lot)
+
+When a commissioner asks the existing crew whether they want to play another
+sport, treat it as a roster handoff—not a disposable chat poll.
+
+- Members receive a prominent **Next Season?** card on Home plus a Locker Room
+  notice. They answer **Yes / Maybe / No** and select interested sports.
+- The commissioner sees a **Crew Interest** dashboard with response totals,
+  named responses, non-responders, and sport-by-sport demand.
+- **Start [sport] with these members** creates a draft league for the selected
+  sport and carries over only the opted-in roster.
+- The commissioner reviews settings and sends the new-room invitation before
+  anything becomes active.
+- Account identity and account-wide achievements follow the people. Standings,
+  points, trophies, season records, and sport-specific competitive history do
+  not transfer into the new league.
+- Keep the original league intact and provide a clear link between sibling rooms
+  so the crew can move without losing its history.
+
+---
+
 ## Out of scope until explicitly pulled in
 
 - Multi-sport packs (see `docs/MULTI_SPORT.md`)  
