@@ -93,7 +93,11 @@ export function simulateNextFoundryWeek(state: FoundryWalkthrough): FoundryWalkt
   return createFoundryWalkthrough(state.sport, state.week + 1, state.role);
 }
 
+export function simulateFoundrySeason(state: FoundryWalkthrough): FoundryWalkthrough {
+  const finalWeek = state.sport === "cbb" ? 18 : 14;
+  return createFoundryWalkthrough(state.sport, finalWeek, state.role);
+}
+
 export function setFoundryWalkthroughRole(state: FoundryWalkthrough, role: PreviewRole): FoundryWalkthrough {
   return { ...state, role };
 }
-
