@@ -181,7 +181,7 @@ export default function ProfilePage() {
   const [allegianceLoading, setAllegianceLoading] = useState(true);
   /** When league context is nfl|cfb, only that sport is shown; else both */
   const [allegianceContext, setAllegianceContext] = useState<
-    "nfl" | "cfb" | "march_madness" | "both"
+    "nfl" | "cfb" | "cbb" | "both"
   >("both");
   const [cfbFavorite, setCfbFavorite] = useState<CanonicalTeam | null>(null);
   const [nflFavorite, setNflFavorite] = useState<CanonicalTeam | null>(null);
@@ -333,8 +333,8 @@ export default function ProfilePage() {
               try {
                 const lg = readLeague();
                 const raw = (lg?.sportId || "").toString().toLowerCase();
-                const ctx: "nfl" | "cfb" | "march_madness" | "both" =
-                  raw === "nfl" ? "nfl" : raw === "cfb" ? "cfb" : raw === "march_madness" ? "march_madness" : "both";
+                const ctx: "nfl" | "cfb" | "cbb" | "both" =
+                  raw === "nfl" ? "nfl" : raw === "cfb" ? "cfb" : raw === "cbb" ? "cbb" : "both";
                 if (cancelled) return;
                 setAllegianceContext(ctx);
                 setAllegianceLoading(true);
@@ -357,9 +357,9 @@ export default function ProfilePage() {
                     setCfbFavorite(t);
                   }
                 }
-                if (ctx === "march_madness" || ctx === "both") {
-                  const tid = await m.getUserFavoriteTeamId(id, "march_madness");
-                  const t = tid ? await m.getUserFavoriteTeam(id, "march_madness") : null;
+                if (ctx === "cbb" || ctx === "both") {
+                  const tid = await m.getUserFavoriteTeamId(id, "cbb");
+                  const t = tid ? await m.getUserFavoriteTeam(id, "cbb") : null;
                   if (!cancelled) { setCbbAnswered(!!tid); setCbbFavorite(t); }
                 }
               } catch {
@@ -486,8 +486,8 @@ export default function ProfilePage() {
             const uid = found!.id;
             const lg = readLeague();
             const raw = (lg?.sportId || "").toString().toLowerCase();
-            const ctx: "nfl" | "cfb" | "march_madness" | "both" =
-              raw === "nfl" ? "nfl" : raw === "cfb" ? "cfb" : raw === "march_madness" ? "march_madness" : "both";
+            const ctx: "nfl" | "cfb" | "cbb" | "both" =
+              raw === "nfl" ? "nfl" : raw === "cfb" ? "cfb" : raw === "cbb" ? "cbb" : "both";
             if (cancelled) return;
             setAllegianceContext(ctx);
             setAllegianceLoading(true);
@@ -510,9 +510,9 @@ export default function ProfilePage() {
                 setCfbFavorite(t);
               }
             }
-            if (ctx === "march_madness" || ctx === "both") {
-              const tid = await m.getUserFavoriteTeamId(uid, "march_madness");
-              const t = tid ? await m.getUserFavoriteTeam(uid, "march_madness") : null;
+            if (ctx === "cbb" || ctx === "both") {
+              const tid = await m.getUserFavoriteTeamId(uid, "cbb");
+              const t = tid ? await m.getUserFavoriteTeam(uid, "cbb") : null;
               if (!cancelled) { setCbbAnswered(!!tid); setCbbFavorite(t); }
             }
           } catch {
@@ -738,7 +738,7 @@ export default function ProfilePage() {
                   )}
                 {!mock &&
                   !allegianceLoading &&
-                  (allegianceContext === "march_madness" || allegianceContext === "both") && (
+                  (allegianceContext === "cbb" || allegianceContext === "both") && (
                     <AllegianceChip label="College Basketball Team" team={cbbFavorite} empty={cbbAnswered ? "No team declared" : "No college basketball team declared"} />
                   )}
                 {!mock &&
@@ -758,9 +758,9 @@ export default function ProfilePage() {
                 {!mock &&
                   !allegianceLoading &&
                   isSelfProfile &&
-                  allegianceContext === "march_madness" &&
+                  allegianceContext === "cbb" &&
                   !cbbAnswered && (
-                    <Link href="/declare-allegiance?sport=march_madness&next=/" className="text-[11px] font-bold text-primary underline-offset-2 hover:underline">Choose College Basketball Team</Link>
+                    <Link href="/declare-allegiance?sport=cbb&next=/" className="text-[11px] font-bold text-primary underline-offset-2 hover:underline">Choose College Basketball Team</Link>
                   )}
                 {!mock &&
                   !allegianceLoading &&
