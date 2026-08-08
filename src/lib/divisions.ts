@@ -25,6 +25,15 @@ const CFB_DIVISION_LABELS: Record<DivisionName, string> = {
   West: "Big 12",
 };
 
+// Stored values remain compatible with every existing league. Fieldhouse only
+// changes the public labels to the four-region language used by March Madness.
+const CBB_REGION_LABELS: Record<DivisionName, string> = {
+  North: "Midwest",
+  South: "South",
+  East: "East",
+  West: "West",
+};
+
 export function isDivisionName(v: unknown): v is DivisionName {
   return typeof v === "string" && (DIVISIONS as string[]).includes(v);
 }
@@ -36,6 +45,7 @@ export function divisionDisplayLabel(
 ): string {
   const d = isDivisionName(division) ? division : "North";
   if (sportId === "nfl") return NFL_DIVISION_LABELS[d];
+  if (sportId === "cbb") return CBB_REGION_LABELS[d];
   if (sportId === "cfb" || sportId == null || sportId === "") {
     // Default / classic War Room pack = CFB conference flavor
     return CFB_DIVISION_LABELS[d];
@@ -63,7 +73,7 @@ export function divisionFullLabel(
   sportId?: string | null
 ): string {
   const short = divisionDisplayLabel(division, sportId);
-  if (sportId === "nfl" || sportId === "cfb" || sportId == null || sportId === "") {
+  if (sportId === "nfl" || sportId === "cfb" || sportId === "cbb" || sportId == null || sportId === "") {
     return short;
   }
   return `${short} Division`;
