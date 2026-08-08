@@ -31,7 +31,7 @@ export default function TeamAllegiancePicker({
     () =>
       sportId === "nfl"
         ? listNflCatalog()
-        : sportId === "march_madness"
+        : sportId === "cbb"
           ? listCbbCatalog()
           : listCfbCatalog(),
     [sportId]
