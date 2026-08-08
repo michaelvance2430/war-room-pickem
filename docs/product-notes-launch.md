@@ -112,6 +112,35 @@ sport, treat it as a roster handoff—not a disposable chat poll.
 
 ---
 
+## Recruiting Board / matchup scouting (parking lot)
+
+Give players an optional side-by-side team comparison before they make a pick.
+The feature should feel like a recruiting/scouting board inside War Room—not a
+spreadsheet dump and not a required extra step.
+
+- Open directly from a matchup on the Picks page and return to that same pick.
+- Compare both teams in parallel with the same stat categories and clearly
+  show which team leads each category.
+- **CFB:** national rank, record, conference record, strength of schedule,
+  scoring offense/defense, turnover margin, ATS record, home/road split, and
+  recent form.
+- **NFL:** record, division standing, points for/against, offensive/defensive
+  rank, turnover margin, ATS record, home/road split, recent form, and material
+  injury status when reliable data is available.
+- **March Madness:** tournament seed, record, NET/résumé indicators, strength
+  of schedule, quality wins, offense/defense, rebounding, turnover margin,
+  free-throw shooting, recent form, and relevant injuries.
+- Preserve each sport's decision language: rankings for CFB, pro performance
+  for NFL, and seeds/résumé/upset signals for March Madness.
+- Show data source and freshness. Never invent or silently estimate a team stat.
+- Keep the core weekly flow fast: scouting is available for players who want
+  help, while confident players can still pick immediately.
+
+Foundry should prove normal comparisons, missing data, stale data, ties,
+unranked teams, First Four teams, and mobile layout before production release.
+
+---
+
 ## Out of scope until explicitly pulled in
 
 - Multi-sport packs (see `docs/MULTI_SPORT.md`)  
