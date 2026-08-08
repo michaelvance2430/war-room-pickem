@@ -28,11 +28,17 @@ import {
 } from "@/lib/league-build";
 import { saveLeagueToCloud } from "@/lib/league-sync";
 import BrandMark from "@/components/BrandMark";
+import {
+  CHAMPIONSHIP_TROPHIES,
+  DEFAULT_CHAMPIONSHIP_TROPHY_ID,
+  getChampionshipTrophyDesign,
+} from "@/lib/championship-trophy-catalog";
 
 type Step =
   | "welcome"
   | "name"
   | "crystal"
+  | "trophy"
   | "cut"
   | "open"
   | "confirm";
@@ -46,7 +52,7 @@ function buildStepList(opts: {
   const steps: Step[] = [];
   if (opts.showWelcome) steps.push("welcome");
   if (!opts.skipName) steps.push("name");
-  steps.push("crystal", "cut");
+  steps.push("crystal", "trophy", "cut");
   if (!opts.skipOpen) steps.push("open");
   steps.push("confirm");
   return steps;
@@ -69,6 +75,7 @@ function LeagueBuildInner() {
   const [name, setName] = useState("War Room");
   const [crystalBall, setCrystalBall] = useState(true);
   const [cutPercent, setCutPercent] = useState(50);
+  const [trophyId, setTrophyId] = useState(DEFAULT_CHAMPIONSHIP_TROPHY_ID);
   const [openRoom, setOpenRoom] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -97,6 +104,7 @@ function LeagueBuildInner() {
     setName(leagueName);
     setCrystalBall(league.settings?.crystalBallEnabled !== false);
     setCutPercent(league.settings?.cutPercent ?? 50);
+    setTrophyId(league.settings?.championshipTrophyId || DEFAULT_CHAMPIONSHIP_TROPHY_ID);
 
     // Open room from create (?open=1) or local league flag
     let openPrefill = false;
@@ -184,6 +192,7 @@ function LeagueBuildInner() {
       updateLeagueSettings({
         crystalBallEnabled: crystalBall,
         cutPercent,
+        championshipTrophyId: trophyId,
       });
 
       if (!isEyes) {
@@ -193,6 +202,7 @@ function LeagueBuildInner() {
             crystalBallEnabled: crystalBall,
             cutPercent,
             gamesPerWeek: 5,
+            championshipTrophyId: trophyId,
           },
         });
         if (!save.ok) {
@@ -470,6 +480,33 @@ function LeagueBuildInner() {
       </div>
         )}
 
+        {step === "trophy" && (
+          <div className="space-y-3">
+            <h2 className="text-base font-bold text-foreground">Choose the championship trophy</h2>
+            <p className="text-sm text-muted leading-relaxed">
+              This is the hardware your champion receives at the ring ceremony. Pick it before the season; it locks with the rest of the room.
+            </p>
+            <div className="grid grid-cols-1 gap-2 max-h-[22rem] overflow-y-auto pr-1">
+              {CHAMPIONSHIP_TROPHIES.map((trophy) => (
+                <button
+                  key={trophy.id}
+                  type="button"
+                  disabled={locked && !isEyes}
+                  onClick={() => setTrophyId(trophy.id)}
+                  className={`w-full rounded-xl border-2 px-4 py-3 text-left ${
+                    trophyId === trophy.id
+                      ? "border-primary bg-primary/15"
+                      : "border-border bg-background"
+                  }`}
+                >
+                  <span className="font-bold text-foreground block">{trophy.name}</span>
+                  <span className="text-xs text-muted block mt-0.5">{trophy.short}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {step === "open" && (
           <div className="space-y-3">
       <h2 className="text-base font-bold text-foreground">
@@ -520,6 +557,10 @@ function LeagueBuildInner() {
               Your room is set
             </h2>
       <ul className="rounded-xl border border-border bg-background px-4 py-3 text-sm space-y-2">
+              <li>
+      <span className="text-muted">Championship trophy · </span>
+      <strong>{getChampionshipTrophyDesign(trophyId).name}</strong>
+      </li>
               <li>
       <span className="text-muted">Name · </span>
       <strong>{name.trim() || "War Room"}</strong>
