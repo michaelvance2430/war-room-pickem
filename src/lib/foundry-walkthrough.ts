@@ -15,6 +15,7 @@ export type PreviewPlayer = {
   streak: number;
   region: FieldhouseRegion;
   madnessPoints: number;
+  madnessWindowPoints: number;
 };
 export type PreviewGame = {
   id: string;
@@ -40,6 +41,8 @@ export type FoundryWalkthrough = {
   gazetteWeeks: number[];
   ncaaPicks: NcaaPicks;
   ncaaResults: NcaaPicks;
+  ncaaBracketLocked: boolean;
+  postseasonFields: { championship: string[]; toilet: string[] } | null;
 };
 
 export const FOUNDRY_WALKTHROUGH_KEY = "warroom-foundry-walkthrough-v1";
@@ -95,7 +98,7 @@ export function createFoundryWalkthrough(sport: PreviewSport, week = 1, role: Pr
   const seed = week + (sport === "nfl" ? 31 : sport === "cbb" ? 67 : 11);
   const players = PEOPLE.map((name, index) => {
     const weekPoints = 5 + (hash(seed, index) % 21);
-    return { id: `preview-${index}`, name, weekPoints, points: week * 12 + weekPoints + (hash(seed, index, 4) % 42), correct: 2 + (hash(seed, index, 7) % 4), locked: index !== 10 || week % 2 === 0, streak: (hash(seed, index, 9) % 7) - 2, region: FIELDHOUSE_REGIONS[index % FIELDHOUSE_REGIONS.length], madnessPoints: 0 };
+    return { id: `preview-${index}`, name, weekPoints, points: week * 12 + weekPoints + (hash(seed, index, 4) % 42), correct: 2 + (hash(seed, index, 7) % 4), locked: index !== 10 || week % 2 === 0, streak: (hash(seed, index, 9) % 7) - 2, region: FIELDHOUSE_REGIONS[index % FIELDHOUSE_REGIONS.length], madnessPoints: 0, madnessWindowPoints: 0 };
   }).sort((a, b) => b.points - a.points).map((player) => ({ ...player }));
   const games = MATCHUPS[sport].map(([away, home], index) => {
     const homeLine = ((hash(seed, index) % 13) - 7) / 2;
@@ -104,7 +107,7 @@ export function createFoundryWalkthrough(sport: PreviewSport, week = 1, role: Pr
     const final = index < 3;
     return { id: `${sport}-${week}-${index}`, away, home, spread: `${home} ${homeLine > 0 ? "+" : ""}${homeLine}`, status: final ? "final" as const : "upcoming" as const, result: final ? `${away} ${awayScore} · ${home} ${homeScore}` : undefined, pick: index % 2 ? away : home, confidence: 5 - index };
   });
-  return { version: 1, sport, role, week, seasonLabel: "2026 Foundry Season", generatedAt: Date.now(), players, games, unreadGazette: false, gazetteWeeks: [], ncaaPicks: {}, ncaaResults: {} };
+  return { version: 1, sport, role, week, seasonLabel: "2026 Foundry Season", generatedAt: Date.now(), players, games, unreadGazette: false, gazetteWeeks: [], ncaaPicks: {}, ncaaResults: {}, ncaaBracketLocked: false, postseasonFields: null };
 }
 
 export function saveFoundryWalkthrough(state: FoundryWalkthrough) {
@@ -125,10 +128,13 @@ export function loadFoundryWalkthrough(): FoundryWalkthrough | null {
           ? player.region
           : FIELDHOUSE_REGIONS[index % FIELDHOUSE_REGIONS.length],
         madnessPoints: Number(player.madnessPoints) || 0,
+        madnessWindowPoints: Number(player.madnessWindowPoints) || 0,
       })),
       gazetteWeeks: Array.isArray(parsed.gazetteWeeks) ? parsed.gazetteWeeks : [],
       ncaaPicks: parsed.ncaaPicks && typeof parsed.ncaaPicks === "object" ? parsed.ncaaPicks : {},
       ncaaResults: parsed.ncaaResults && typeof parsed.ncaaResults === "object" ? parsed.ncaaResults : {},
+      ncaaBracketLocked: !!parsed.ncaaBracketLocked,
+      postseasonFields: parsed.postseasonFields && Array.isArray(parsed.postseasonFields.championship) && Array.isArray(parsed.postseasonFields.toilet) ? parsed.postseasonFields : null,
     } : null;
   } catch { return null; }
 }
@@ -144,9 +150,10 @@ export function simulateNextFoundryWeek(state: FoundryWalkthrough): FoundryWalkt
   const players = next.players.map((player, index) => {
     const bracket = player.name === "Mike V" ? state.ncaaPicks || {} : generateNcaaPicks(index + 91);
     const madnessPoints = ncaaScore(bracket, ncaaResults);
-    return { ...player, madnessPoints, points: player.points + madnessPoints };
+    const priorMadnessPoints = ncaaScore(bracket, state.ncaaResults || {});
+    return { ...player, madnessPoints, madnessWindowPoints: madnessPoints - priorMadnessPoints, points: player.points + madnessPoints };
   }).sort((a, b) => b.points - a.points);
-  return { ...next, players, gazetteWeeks: Array.from(new Set([...(state.gazetteWeeks || []), state.week])).sort((a, b) => a - b), ncaaPicks: state.ncaaPicks || {}, ncaaResults, unreadGazette: true };
+  return { ...next, players, gazetteWeeks: Array.from(new Set([...(state.gazetteWeeks || []), state.week])).sort((a, b) => a - b), ncaaPicks: state.ncaaPicks || {}, ncaaResults, ncaaBracketLocked: state.ncaaBracketLocked, postseasonFields: state.postseasonFields, unreadGazette: true };
 }
 
 export function simulateFoundrySeason(state: FoundryWalkthrough): FoundryWalkthrough {
@@ -156,19 +163,29 @@ export function simulateFoundrySeason(state: FoundryWalkthrough): FoundryWalkthr
   const players = next.players.map((player, index) => {
     const bracket = player.name === "Mike V" ? state.ncaaPicks || {} : generateNcaaPicks(index + 91);
     const madnessPoints = ncaaScore(bracket, ncaaResults);
-    return { ...player, madnessPoints, points: player.points + madnessPoints };
+    return { ...player, madnessPoints, madnessWindowPoints: madnessPoints, points: player.points + madnessPoints };
   }).sort((a, b) => b.points - a.points);
-  return { ...next, players, gazetteWeeks: Array.from({ length: finalWeek }, (_, index) => index + 1), ncaaPicks: state.ncaaPicks || {}, ncaaResults, unreadGazette: true };
+  return { ...next, players, gazetteWeeks: Array.from({ length: finalWeek }, (_, index) => index + 1), ncaaPicks: state.ncaaPicks || {}, ncaaResults, ncaaBracketLocked: state.ncaaBracketLocked, postseasonFields: state.postseasonFields, unreadGazette: true };
 }
 
 export function simulateFoundryRegularSeason(state: FoundryWalkthrough): FoundryWalkthrough {
   const postseasonWeek = foundryPostseasonStartWeek(state.sport);
   const next = createFoundryWalkthrough(state.sport, postseasonWeek, state.role);
+  const fields = FIELDHOUSE_REGIONS.map((region) => {
+    const ranked = next.players.filter((player) => player.region === region).sort((a, b) => b.points - a.points);
+    const cut = Math.ceil(ranked.length / 2);
+    return { championship: ranked.slice(0, cut).map((player) => player.id), toilet: ranked.slice(cut).map((player) => player.id) };
+  });
   return {
     ...next,
     gazetteWeeks: Array.from({ length: postseasonWeek }, (_, index) => index + 1),
     ncaaPicks: state.ncaaPicks || {},
     ncaaResults: {},
+    ncaaBracketLocked: false,
+    postseasonFields: {
+      championship: fields.flatMap((field) => field.championship),
+      toilet: fields.flatMap((field) => field.toilet),
+    },
     unreadGazette: true,
   };
 }
