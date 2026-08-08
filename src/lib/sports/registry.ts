@@ -80,7 +80,7 @@ const PACKS: SportPack[] = [
     rulesOneLiner: "Puck line / ML · Best Bet · prop",
   },
   {
-    id: "march_madness",
+    id: "cbb",
     label: "College D1 Basketball — The Fieldhouse",
     shortLabel: "Fieldhouse",
     emoji: "🌪️",
