@@ -13,6 +13,7 @@ import LeagueBuildGate from "@/components/LeagueBuildGate";
 import SmoothRuntime from "@/components/SmoothRuntime";
 import AppShell from "@/components/AppShell";
 import ThemeDecorGate from "@/components/ThemeDecorGate";
+import NflRouteSkin from "@/components/NflRouteSkin";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -86,6 +87,7 @@ export default function RootLayout({
         <SmoothRuntime />
         <ThemeDecorGate>
           <SportThemeApplier />
+          <NflRouteSkin />
           <SeasonThemeApplier />
           <FoundrySessionChrome />
           <SandboxSessionChrome />

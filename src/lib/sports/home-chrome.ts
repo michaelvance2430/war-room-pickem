@@ -134,6 +134,7 @@ const NFL_ATMO: SportAtmosphere = {
     "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.4) 3px)",
   titleGlow: "drop-shadow-[0_0_28px_rgba(193,18,31,0.35)]",
   accentHex: NFL_SUNDAY_COLORS.crimson,
+  backgroundImage: "/skins/nfl-sunday/home-mobile.webp",
 };
 
 /** FIFA WWC Brazil 2027™ — Brazilian flag palette (green / gold / blue / white) */
