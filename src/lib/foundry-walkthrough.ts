@@ -31,6 +31,8 @@ export type FoundryWalkthrough = {
   players: PreviewPlayer[];
   games: PreviewGame[];
   unreadGazette: boolean;
+  /** Scored weekly editions retained for the walkable Gazette archive. */
+  gazetteWeeks: number[];
 };
 
 export const FOUNDRY_WALKTHROUGH_KEY = "warroom-foundry-walkthrough-v1";
@@ -72,7 +74,7 @@ export function createFoundryWalkthrough(sport: PreviewSport, week = 1, role: Pr
     const final = index < 3;
     return { id: `${sport}-${week}-${index}`, away, home, spread: `${home} ${homeLine > 0 ? "+" : ""}${homeLine}`, status: final ? "final" as const : "upcoming" as const, result: final ? `${away} ${awayScore} · ${home} ${homeScore}` : undefined, pick: index % 2 ? away : home, confidence: 5 - index };
   });
-  return { version: 1, sport, role, week, seasonLabel: "2026 Foundry Season", generatedAt: Date.now(), players, games, unreadGazette: true };
+  return { version: 1, sport, role, week, seasonLabel: "2026 Foundry Season", generatedAt: Date.now(), players, games, unreadGazette: false, gazetteWeeks: [] };
 }
 
 export function saveFoundryWalkthrough(state: FoundryWalkthrough) {
@@ -85,17 +87,25 @@ export function loadFoundryWalkthrough(): FoundryWalkthrough | null {
   if (typeof window === "undefined") return null;
   try {
     const parsed = JSON.parse(localStorage.getItem(FOUNDRY_WALKTHROUGH_KEY) || "null") as FoundryWalkthrough | null;
-    return parsed?.version === 1 ? parsed : null;
+    return parsed?.version === 1 ? { ...parsed, gazetteWeeks: Array.isArray(parsed.gazetteWeeks) ? parsed.gazetteWeeks : [] } : null;
   } catch { return null; }
 }
 
 export function simulateNextFoundryWeek(state: FoundryWalkthrough): FoundryWalkthrough {
-  return createFoundryWalkthrough(state.sport, state.week + 1, state.role);
+  const next = createFoundryWalkthrough(state.sport, state.week + 1, state.role);
+  return { ...next, gazetteWeeks: Array.from(new Set([...(state.gazetteWeeks || []), state.week])).sort((a, b) => a - b), unreadGazette: true };
 }
 
 export function simulateFoundrySeason(state: FoundryWalkthrough): FoundryWalkthrough {
-  const finalWeek = state.sport === "cbb" ? 18 : 14;
-  return createFoundryWalkthrough(state.sport, finalWeek, state.role);
+  const finalWeek = state.sport === "cbb" ? 22 : state.sport === "nfl" ? 18 : 16;
+  const next = createFoundryWalkthrough(state.sport, finalWeek, state.role);
+  return { ...next, gazetteWeeks: Array.from({ length: finalWeek }, (_, index) => index + 1), unreadGazette: true };
+}
+
+/** Monday start for each sport's 2026 season window. */
+export function foundryWeekStartDate(sport: PreviewSport, week: number): Date {
+  const start = sport === "cfb" ? Date.UTC(2026, 7, 24, 16) : sport === "nfl" ? Date.UTC(2026, 8, 7, 16) : Date.UTC(2026, 10, 2, 16);
+  return new Date(start + Math.max(0, week - 1) * 7 * 24 * 60 * 60 * 1000);
 }
 
 export function setFoundryWalkthroughRole(state: FoundryWalkthrough, role: PreviewRole): FoundryWalkthrough {
