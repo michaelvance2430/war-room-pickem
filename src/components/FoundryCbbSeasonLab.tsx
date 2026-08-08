@@ -20,9 +20,9 @@ const DEFAULT_CONFIG: CbbSimConfig = {
 
 export default function FoundryCbbSeasonLab() {
   const [draft, setDraft] = useState<CbbSimConfig>(DEFAULT_CONFIG);
-  const [state, setState] = useState(() => createCbbSimState(DEFAULT_CONFIG));
+  const [state, setState] = useState<ReturnType<typeof createCbbSimState> | null>(null);
   const errors = useMemo(() => validateCbbSimConfig(draft), [draft]);
-  const snap = cbbSimSnapshot(state);
+  const snap = state ? cbbSimSnapshot(state) : null;
 
   function toggleTakeover(id: CbbTakeoverId) {
     setDraft((current) => ({
@@ -63,9 +63,18 @@ export default function FoundryCbbSeasonLab() {
       </div>
 
       {errors.length > 0 && <p className="mt-3 rounded-lg border border-red-400/30 bg-red-500/10 p-2 text-[11px] text-red-200">{errors.join(" ")}</p>}
-      <button type="button" disabled={errors.length > 0} onClick={() => setState(createCbbSimState(draft))} className="mt-3 min-h-11 w-full rounded-lg bg-amber-300 px-3 text-xs font-black text-black disabled:opacity-40">Generate this season</button>
+      <button type="button" disabled={errors.length > 0} onClick={() => setState(createCbbSimState(draft))} className="mt-3 min-h-11 w-full rounded-lg bg-amber-300 px-3 text-xs font-black text-black disabled:opacity-40">{state ? "Rebuild with these settings" : "Generate this season"}</button>
 
-      <div className="mt-4 rounded-xl border border-border bg-background p-4">
+      {!state || !snap ? (
+        <div className="mt-4 rounded-xl border border-dashed border-border bg-background/60 p-4 text-xs leading-relaxed text-muted">
+          <strong className="block text-foreground">Nothing generated yet.</strong>
+          Choose the league settings above, press <span className="font-bold text-amber-200">Generate this season</span>, then use the advance button to walk through every pick window.
+        </div>
+      ) : (
+      <div className="mt-4 rounded-xl border border-emerald-400/35 bg-background p-4">
+        <p className="mb-3 rounded-lg bg-emerald-500/10 px-3 py-2 text-[11px] font-bold text-emerald-200">
+          Season generated · {state.steps.length} total steps · {state.config.regularWeeks} regular windows · {state.config.takeoverIds.length} Takeover{state.config.takeoverIds.length === 1 ? "" : "s"}
+        </p>
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-[9px] font-black uppercase tracking-[0.18em] text-muted">Step {snap.progress}</p>
@@ -80,8 +89,9 @@ export default function FoundryCbbSeasonLab() {
           <Stat label="Total byes" value={String(snap.split.championshipByes + snap.split.toiletBowlByes)} />
           <Stat label="Cut" value={snap.standingsFrozen ? "FROZEN" : "MOVING"} />
         </div>
-        <button type="button" disabled={snap.remaining === 0} onClick={() => setState((current) => advanceCbbSim(current))} className="mt-3 min-h-11 w-full rounded-lg border border-amber-300/45 text-xs font-black text-amber-200 disabled:opacity-35">{snap.remaining === 0 ? "Season complete" : "Score this window & advance"}</button>
+        <button type="button" disabled={snap.remaining === 0} onClick={() => setState((current) => current ? advanceCbbSim(current) : current)} className="mt-3 min-h-11 w-full rounded-lg border border-amber-300/45 text-xs font-black text-amber-200 disabled:opacity-35">{snap.remaining === 0 ? "Season complete" : "Score this window & advance"}</button>
       </div>
+      )}
     </section>
   );
 }
@@ -93,4 +103,3 @@ function NumberField({ label, value, min, max, onChange }: { label: string; valu
 function Stat({ label, value }: { label: string; value: string }) {
   return <div className="rounded-lg border border-border p-2"><span className="block text-[9px] uppercase tracking-wide text-muted">{label}</span><strong className="mt-0.5 block text-sm">{value}</strong></div>;
 }
-
