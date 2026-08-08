@@ -7,6 +7,12 @@ import {
   CBB_PROFILE_CONTRACT,
   splitCbbTournamentField,
 } from "../src/lib/sports/cbb-contract.ts";
+import {
+  advanceCbbSim,
+  buildCbbSimulationPlan,
+  createCbbSimState,
+  validateCbbSimConfig,
+} from "../src/lib/sports/cbb-foundry-sim.ts";
 
 assert.equal(
   CBB_NATIONAL_TOURNAMENT_ROUNDS.reduce((sum, round) => sum + round.games, 0),
@@ -35,4 +41,15 @@ assert.equal(thirtyOne.championshipPlayers, 16);
 assert.equal(thirtyOne.toiletBowlPlayers, 15);
 assert.equal(thirtyOne.toiletBowlByes, 1);
 
-console.log("CBB contract verified: 67 games · phases · profiles · fields 8–32");
+const config = { playerCount: 31, regularWeeks: 14, conferenceChampionPicks: 6, takeoverIds: ["maui"] };
+assert.deepEqual(validateCbbSimConfig(config), []);
+const plan = buildCbbSimulationPlan(config);
+assert.equal(plan.filter((step) => step.phase === "tournament_takeover").length, 1);
+assert.equal(plan.find((step) => step.id === "round-64")?.games, 32);
+assert.equal(plan.find((step) => step.id === "sweet-16")?.elimination, true);
+let simulation = createCbbSimState(config);
+for (let index = 1; index < simulation.steps.length; index += 1) simulation = advanceCbbSim(simulation);
+assert.equal(simulation.steps[simulation.cursor]?.phase, "season_complete");
+assert.ok(validateCbbSimConfig({ ...config, takeoverIds: ["maui", "atlantis"] }).length > 0);
+
+console.log("CBB contract verified: 67 games · phases · profiles · fields 8–32 · isolated simulation");
