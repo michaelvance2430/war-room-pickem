@@ -9,6 +9,7 @@ import {
   FIELDHOUSE_REGIONS,
   FOUNDRY_WALKTHROUGH_EVENT,
   foundryWeekStartDate,
+  foundryPostseasonStartWeek,
   isFoundrySeasonFinal,
   loadFoundryWalkthrough,
   PREVIEW_SPORTS,
@@ -31,6 +32,7 @@ import {
   ncaaPickCount,
   ncaaResultsWindow,
   ncaaScore,
+  generateNcaaPicks,
   regionRoundGames,
   sanitizeNcaaPicks,
   type NcaaGame,
@@ -124,7 +126,7 @@ export default function FoundryPreviewPage() {
     </div>
     {simulation && <SimulationPulse kind={simulation.kind} step={simulation.step} />}
     {ringCeremony && <PreviewRingCeremony state={ringCeremony} onClose={() => setRingCeremony(null)} />}
-    <PreviewChrome state={state} busy={!!simulation} onWeek={() => isFoundrySeasonFinal(state) ? setRingCeremony(state) : setSimulation({ kind: "week", step: 0 })} onRegular={() => setSimulation({ kind: "regular", step: 0 })} onSeason={() => isFoundrySeasonFinal(state) ? setRingCeremony(state) : setSimulation({ kind: "season", step: 0 })} onRole={(role) => update(setFoundryWalkthroughRole(state, role))} onGazette={() => { setGazetteWeek(state.gazetteWeeks[state.gazetteWeeks.length - 1] || null); setView("gazette"); }} onBrackets={() => setView("postseason")} onHome={() => setView("home")} onReset={() => { update(createFoundryWalkthrough(state.sport, 1, state.role)); setGazetteWeek(null); setView("home"); }} />
+    <PreviewChrome state={state} busy={!!simulation} onWeek={() => isFoundrySeasonFinal(state) ? setRingCeremony(state) : state.sport === "cbb" && state.week >= foundryPostseasonStartWeek("cbb") && !state.ncaaBracketLocked ? setView("postseason") : setSimulation({ kind: "week", step: 0 })} onRegular={() => setSimulation({ kind: "regular", step: 0 })} onSeason={() => isFoundrySeasonFinal(state) ? setRingCeremony(state) : state.sport === "cbb" && state.week >= foundryPostseasonStartWeek("cbb") && !state.ncaaBracketLocked ? setView("postseason") : setSimulation({ kind: "season", step: 0 })} onRole={(role) => update(setFoundryWalkthroughRole(state, role))} onGazette={() => { setGazetteWeek(state.gazetteWeeks[state.gazetteWeeks.length - 1] || null); setView("gazette"); }} onBrackets={() => setView("postseason")} onHome={() => setView("home")} onReset={() => { update(createFoundryWalkthrough(state.sport, 1, state.role)); setGazetteWeek(null); setView("home"); }} />
   </main>;
 }
 
@@ -155,10 +157,16 @@ function Postseason({ state, onUpdate }: { state: FoundryWalkthrough; onUpdate: 
   const finalWeek = state.sport === "cbb" ? 22 : state.sport === "nfl" ? 18 : 16;
   const cutWeek = finalWeek - 3;
   const stage = state.week < cutWeek ? -1 : Math.min(3, state.week - cutWeek);
+  const championshipIds = new Set(state.postseasonFields?.championship || []);
+  const toiletIds = new Set(state.postseasonFields?.toilet || []);
   const regionalFields = FIELDHOUSE_REGIONS.map((region) => {
     const ranked = state.players.filter((player) => player.region === region).sort((a, b) => b.points - a.points);
     const cut = Math.ceil(ranked.length / 2);
-    return { region, championship: ranked.slice(0, cut), toilet: ranked.slice(cut) };
+    return {
+      region,
+      championship: state.postseasonFields ? ranked.filter((player) => championshipIds.has(player.id)) : ranked.slice(0, cut),
+      toilet: state.postseasonFields ? ranked.filter((player) => toiletIds.has(player.id)) : ranked.slice(cut),
+    };
   });
   const top = state.sport === "cbb" ? regionalFields.flatMap((field) => field.championship) : state.players.slice(0, 8);
   const bottom = state.sport === "cbb" ? regionalFields.flatMap((field) => field.toilet) : state.players.slice(8, 16);
@@ -182,33 +190,39 @@ function NcaaBracketPicker({ state, onUpdate }: { state: FoundryWalkthrough; onU
   const resultWindow = ncaaResultsWindow(results);
   const games: NcaaGame[] = round === "first-four" ? firstFourGames() : round === "final-four" ? [...finalFourGames(picks), nationalChampionshipGame(picks)] : regionRoundGames(region, round, picks);
   function choose(game: NcaaGame, team: string) {
+    if (state.ncaaBracketLocked) return;
     const nextPicks = sanitizeNcaaPicks({ ...picks, [game.id]: team });
     onUpdate({ ...state, ncaaPicks: nextPicks });
   }
   const roundName = round === "first-four" ? "First Four" : round === "final-four" ? "Final Four + Title" : round === 1 ? "Round of 64" : round === 2 ? "Round of 32" : round === 3 ? "Sweet 16" : "Elite Eight";
-  return <section className="rounded-2xl border border-orange-300/40 bg-orange-950/20 p-3 sm:p-4"><div className="flex items-start justify-between gap-3"><div><p className="text-[9px] font-black uppercase tracking-[.18em] text-orange-300">68 teams · 67 decisions</p><h3 className="text-xl font-black">NCAA Tournament</h3><p className="mt-1 text-[10px] text-muted">Foundry projection · the real field populates after Selection Sunday.</p></div><div className="grid grid-cols-2 gap-1"><div className="rounded-xl border border-orange-300/30 bg-black/30 px-2 py-2 text-center"><strong className="block text-lg text-orange-200">{count}/67</strong><span className="text-[8px] uppercase text-muted">picked</span></div><div className="rounded-xl border border-emerald-300/30 bg-black/30 px-2 py-2 text-center"><strong className="block text-lg text-emerald-200">{score}</strong><span className="text-[8px] uppercase text-muted">points</span></div></div></div>
+  return <section className="rounded-2xl border border-orange-300/40 bg-orange-950/20 p-3 sm:p-4"><div className="flex items-start justify-between gap-3"><div><p className="text-[9px] font-black uppercase tracking-[.18em] text-orange-300">Selection Sunday · 68 teams · 67 decisions</p><h3 className="text-xl font-black">The Bracket Drop</h3><p className="mt-1 text-[10px] text-muted">Fill the entire bracket once. Lock it before the First Four. Then watch the evidence accumulate.</p></div><div className="grid grid-cols-2 gap-1"><div className="rounded-xl border border-orange-300/30 bg-black/30 px-2 py-2 text-center"><strong className="block text-lg text-orange-200">{count}/67</strong><span className="text-[8px] uppercase text-muted">picked</span></div><div className="rounded-xl border border-emerald-300/30 bg-black/30 px-2 py-2 text-center"><strong className="block text-lg text-emerald-200">{score}</strong><span className="text-[8px] uppercase text-muted">points</span></div></div></div>
+    {!state.ncaaBracketLocked && resultWindow === 0 && <div className="mt-3 grid grid-cols-2 gap-2"><button type="button" onClick={() => onUpdate({ ...state, ncaaPicks: generateNcaaPicks(777) })} className="min-h-11 rounded-xl border border-orange-300/40 text-[10px] font-black text-orange-200">Foundry autofill 67</button><button type="button" disabled={count !== 67} onClick={() => onUpdate({ ...state, ncaaBracketLocked: true })} className="min-h-11 rounded-xl bg-orange-300 text-[10px] font-black text-black disabled:opacity-35">Lock entire bracket</button></div>}
+    {state.ncaaBracketLocked && <div className="mt-3 rounded-xl border border-emerald-300/40 bg-emerald-300/10 px-3 py-2 text-center text-[10px] font-black text-emerald-200">BRACKET LOCKED · No changes after first tip</div>}
     <div className="mt-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-[9px] text-muted"><strong className="text-foreground">Scoring:</strong> R64 1 · R32 2 · Sweet 16 4 · Elite Eight 8 · Final Four 16 · Title 32. {resultWindow ? `Results posted through postseason stage ${resultWindow}.` : "No tournament results posted yet."}</div>
     <div className="mt-4 flex gap-2 overflow-x-auto pb-1"><button type="button" onClick={() => setRound("first-four")} className={`min-h-9 shrink-0 rounded-lg px-3 text-[9px] font-black ${round === "first-four" ? "bg-orange-300 text-black" : "border border-border"}`}>First Four</button>{([1, 2, 3, 4] as const).map((value) => <button key={value} type="button" onClick={() => setRound(value)} className={`min-h-9 shrink-0 rounded-lg px-3 text-[9px] font-black ${round === value ? "bg-orange-300 text-black" : "border border-border"}`}>{value === 1 ? "R64" : value === 2 ? "R32" : value === 3 ? "Sweet 16" : "Elite 8"}</button>)}<button type="button" onClick={() => setRound("final-four")} className={`min-h-9 shrink-0 rounded-lg px-3 text-[9px] font-black ${round === "final-four" ? "bg-orange-300 text-black" : "border border-border"}`}>Final Four</button></div>
     {typeof round === "number" && <div className="mt-3 grid grid-cols-4 gap-1">{NCAA_REGIONS.map((name) => <button key={name} type="button" onClick={() => setRegion(name)} className={`min-h-9 rounded-lg text-[9px] font-black ${region === name ? "bg-white text-black" : "border border-border"}`}>{name}</button>)}</div>}
-    <div className="mt-4"><p className="mb-2 text-[9px] font-black uppercase tracking-[.16em] text-orange-200">{typeof round === "number" ? `${region} · ` : ""}{roundName}</p><div className="space-y-2">{games.map((game) => <NcaaPickGame key={game.id} game={game} selected={picks[game.id] || null} result={results[game.id] || null} onChoose={(team) => choose(game, team)} />)}</div></div>
+    <div className="mt-4"><p className="mb-2 text-[9px] font-black uppercase tracking-[.16em] text-orange-200">{typeof round === "number" ? `${region} · ` : ""}{roundName}</p><div className="space-y-2">{games.map((game) => <NcaaPickGame key={game.id} game={game} selected={picks[game.id] || null} result={results[game.id] || null} bracketLocked={state.ncaaBracketLocked} onChoose={(team) => choose(game, team)} />)}</div></div>
     {count === 67 && <div className="mt-4 rounded-xl border border-emerald-300/40 bg-emerald-300/10 p-3 text-center"><p className="text-[9px] font-black uppercase tracking-[.18em] text-emerald-200">Bracket locked and loaded</p><p className="mt-1 text-sm font-black">Champion: {picks["national:championship"]}</p></div>}
   </section>;
 }
 
-function NcaaPickGame({ game, selected, result, onChoose }: { game: NcaaGame; selected: string | null; result: string | null; onChoose: (team: string) => void }) {
+function NcaaPickGame({ game, selected, result, bracketLocked, onChoose }: { game: NcaaGame; selected: string | null; result: string | null; bracketLocked: boolean; onChoose: (team: string) => void }) {
   const ready = !!game.teamA && !!game.teamB;
-  return <article className={`overflow-hidden rounded-xl border ${ready ? "border-orange-300/25 bg-black/25" : "border-border bg-card opacity-45"}`}><div className="flex items-center justify-between border-b border-white/10 px-3 py-1.5"><span className="text-[8px] font-black uppercase tracking-wide text-muted">{game.label}</span>{result ? <span className={`text-[8px] font-black ${selected === result ? "text-emerald-300" : "text-red-300"}`}>{selected === result ? "CORRECT" : "FINAL"}</span> : selected && <span className="text-[8px] font-black text-orange-300">PICKED</span>}</div>{[game.teamA, game.teamB].map((team, index) => <button key={`${game.id}:${index}`} type="button" disabled={!team || !!result} onClick={() => team && onChoose(team)} className={`flex min-h-11 w-full items-center justify-between border-b border-white/5 px-3 text-left text-xs last:border-0 disabled:cursor-not-allowed ${team && selected === team ? "bg-orange-300 font-black text-black" : ""} ${team && result === team ? "ring-1 ring-inset ring-emerald-300" : ""}`}><span>{team || "Winner of prior game"}</span>{team && <span className="text-[9px]">{result === team ? "WINNER" : selected === team ? result ? "WRONG" : "ADVANCES" : result ? "FINAL" : "PICK"}</span>}</button>)}</article>;
+  return <article className={`overflow-hidden rounded-xl border ${ready ? "border-orange-300/25 bg-black/25" : "border-border bg-card opacity-45"}`}><div className="flex items-center justify-between border-b border-white/10 px-3 py-1.5"><span className="text-[8px] font-black uppercase tracking-wide text-muted">{game.label}</span>{result ? <span className={`text-[8px] font-black ${selected === result ? "text-emerald-300" : "text-red-300"}`}>{selected === result ? "CORRECT" : "FINAL"}</span> : selected && <span className="text-[8px] font-black text-orange-300">PICKED</span>}</div>{[game.teamA, game.teamB].map((team, index) => <button key={`${game.id}:${index}`} type="button" disabled={!team || !!result || bracketLocked} onClick={() => team && onChoose(team)} className={`flex min-h-11 w-full items-center justify-between border-b border-white/5 px-3 text-left text-xs last:border-0 disabled:cursor-not-allowed ${team && selected === team ? "bg-orange-300 font-black text-black" : ""} ${team && result === team ? "ring-1 ring-inset ring-emerald-300" : ""}`}><span>{team || "Winner of prior game"}</span>{team && <span className="text-[9px]">{result === team ? "WINNER" : selected === team ? result ? "WRONG" : bracketLocked ? "LOCKED" : "ADVANCES" : result ? "FINAL" : bracketLocked ? "" : "PICK"}</span>}</button>)}</article>;
 }
 
 function RegionalTournamentBracket({ title, tone, fields, stage }: { title: string; tone: "gold" | "purple"; fields: Array<{ region: FieldhouseRegion; players: FoundryWalkthrough["players"] }>; stage: number }) {
   const color = tone === "gold" ? "border-amber-300/45 bg-amber-300/5 text-amber-200" : "border-purple-400/45 bg-purple-400/5 text-purple-200";
-  const winner = fields[0]?.players[0];
+  const regionWinners = fields.map((field) => [...field.players].sort((a, b) => b.madnessWindowPoints - a.madnessWindowPoints || b.madnessPoints - a.madnessPoints || b.points - a.points)[0]).filter(Boolean);
+  const leftWinner = regionWinners.filter((player) => player.region === "East" || player.region === "West").sort((a, b) => b.madnessWindowPoints - a.madnessWindowPoints || b.madnessPoints - a.madnessPoints)[0];
+  const rightWinner = regionWinners.filter((player) => player.region === "South" || player.region === "Midwest").sort((a, b) => b.madnessWindowPoints - a.madnessWindowPoints || b.madnessPoints - a.madnessPoints)[0];
+  const winner = [leftWinner, rightWinner].filter(Boolean).sort((a, b) => b.madnessWindowPoints - a.madnessWindowPoints || b.madnessPoints - a.madnessPoints)[0];
   const left = fields.filter((field) => field.region === "East" || field.region === "West");
   const right = fields.filter((field) => field.region === "South" || field.region === "Midwest");
   return <section className={`rounded-2xl border p-3 sm:p-4 ${color}`}><div className="flex items-center justify-between gap-2"><div><p className="text-[9px] font-black uppercase tracking-[.18em]">Mini March Madness · four regions</p><h3 className="text-xl font-black">{title}</h3></div><span className="rounded-full border border-current/30 px-2 py-1 text-[8px] font-black">{stage < 0 ? "LIVE PROJECTION" : stage >= 3 ? "FINAL" : "IN PROGRESS"}</span></div>
     <div className="mt-4 grid grid-cols-[1fr_72px_1fr] items-center gap-2 sm:grid-cols-[1fr_120px_1fr]">
       <RegionSide fields={left} stage={stage} side="left" />
-      <div className="space-y-3 text-center"><div className={`rounded-xl border border-current/35 bg-black/35 p-2 ${stage < 2 ? "opacity-40" : ""}`}><p className="text-[7px] font-black uppercase tracking-[.13em]">Final Four</p><p className="mt-1 text-[9px] font-bold">East/West</p><p className="text-[9px]">vs</p><p className="text-[9px] font-bold">South/Midwest</p></div><div className={`rounded-xl border-2 border-current bg-black/50 p-2 ${stage < 3 ? "opacity-35" : ""}`}><p className="text-[7px] font-black uppercase">Champion</p><p className="mt-1 truncate text-[10px] font-black">{stage >= 3 ? winner?.name : "TBD"}</p></div></div>
+      <div className="space-y-3 text-center"><div className={`rounded-xl border border-current/35 bg-black/35 p-2 ${stage < 2 ? "opacity-40" : ""}`}><p className="text-[7px] font-black uppercase tracking-[.13em]">Final Four</p><p className="mt-1 truncate text-[9px] font-bold">{stage >= 2 ? leftWinner?.name : "East/West"}</p><p className="text-[9px]">vs</p><p className="truncate text-[9px] font-bold">{stage >= 2 ? rightWinner?.name : "South/Midwest"}</p></div><div className={`rounded-xl border-2 border-current bg-black/50 p-2 ${stage < 3 ? "opacity-35" : ""}`}><p className="text-[7px] font-black uppercase">Champion</p><p className="mt-1 truncate text-[10px] font-black">{stage >= 3 ? winner?.name : "TBD"}</p></div></div>
       <RegionSide fields={right} stage={stage} side="right" />
     </div>
     <p className="mt-4 text-center text-[9px] font-bold opacity-70">Every regional winner advances toward the center. Final Four winners meet for the hardware.</p>
@@ -217,9 +231,9 @@ function RegionalTournamentBracket({ title, tone, fields, stage }: { title: stri
 
 function RegionSide({ fields, stage, side }: { fields: Array<{ region: FieldhouseRegion; players: FoundryWalkthrough["players"] }>; stage: number; side: "left" | "right" }) {
   return <div className="space-y-3">{fields.map((field) => {
-    const players = [...field.players].sort((a, b) => b.points - a.points);
+    const players = [...field.players].sort((a, b) => b.madnessWindowPoints - a.madnessWindowPoints || b.madnessPoints - a.madnessPoints || b.points - a.points);
     const regionWinner = players[0];
-    return <div key={field.region} className={`rounded-xl border border-current/25 bg-black/25 p-2 ${side === "right" ? "text-right" : "text-left"}`}><p className="text-[8px] font-black uppercase tracking-[.14em]">{field.region} Region</p><div className="mt-2 space-y-1">{players.length ? players.map((player, index) => <div key={player.id} className={`flex items-center justify-between gap-1 rounded bg-white/5 px-2 py-1.5 text-[9px] ${stage >= 1 && index === 0 ? "bg-white/15 font-black" : ""}`}><span className="truncate">{index + 1} · {player.name}</span><span>{stage >= 1 ? index === 0 ? "ADV" : "OUT" : "—"}</span></div>) : <div className="rounded bg-white/5 px-2 py-2 text-[9px] opacity-50">BYE / TBD</div>}</div><p className={`mt-2 text-[8px] font-black ${stage >= 1 ? "" : "opacity-35"}`}>{stage >= 1 ? `${regionWinner?.name || "TBD"} → center` : "Regional winner → center"}</p></div>;
+    return <div key={field.region} className={`rounded-xl border border-current/25 bg-black/25 p-2 ${side === "right" ? "text-right" : "text-left"}`}><p className="text-[8px] font-black uppercase tracking-[.14em]">{field.region} Region</p><div className="mt-2 space-y-1">{players.length ? players.map((player, index) => <div key={player.id} className={`flex items-center justify-between gap-1 rounded bg-white/5 px-2 py-1.5 text-[9px] ${stage >= 1 && index === 0 ? "bg-white/15 font-black" : ""}`}><span className="truncate">{index + 1} · {player.name}</span><span>{stage >= 1 ? index === 0 ? "ADV" : "OUT" : `+${player.madnessWindowPoints}`}</span></div>) : <div className="rounded bg-white/5 px-2 py-2 text-[9px] opacity-50">BYE / TBD</div>}</div><p className={`mt-2 text-[8px] font-black ${stage >= 1 ? "" : "opacity-35"}`}>{stage >= 1 ? `${regionWinner?.name || "TBD"} → center` : "Round points decide who advances"}</p></div>;
   })}</div>;
 }
 
