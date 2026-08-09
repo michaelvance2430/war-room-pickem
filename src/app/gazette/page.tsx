@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import GazettePaper from "@/components/GazettePaper";
 import {
   loadGazetteArchive,
@@ -111,12 +110,6 @@ export default function GazetteArchivePage() {
               Monday appointment the room waits for. Lock picks. Wait for blood.
               Come back.
             </p>
-      <Link
-              href="/standings"
-              className="inline-flex mt-4 text-primary font-bold text-sm min-h-[44px] items-center"
-            >
-              Standings →
-            </Link>
       </div>
         )}
 
