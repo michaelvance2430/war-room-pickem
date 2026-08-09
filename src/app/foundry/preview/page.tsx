@@ -17,6 +17,7 @@ import {
   foundryPostseasonRounds,
   foundryTacticalNukesRemaining,
   isFoundrySeasonFinal,
+  launchFoundryHellfire,
   loadFoundryWalkthrough,
   PREVIEW_SPORTS,
   saveFoundryWalkthrough,
@@ -206,6 +207,7 @@ function Postseason({ state, onUpdate }: { state: FoundryWalkthrough; onUpdate: 
 
 function NcaaBracketPicker({ state, onUpdate }: { state: FoundryWalkthrough; onUpdate: (next: FoundryWalkthrough) => void }) {
   const [guidedPick, setGuidedPick] = useState<number | null>(null);
+  const [hellfireStep, setHellfireStep] = useState(0);
   const picks = state.ncaaPicks || {};
   const results = state.ncaaResults || {};
   const count = ncaaPickCount(picks);
@@ -218,12 +220,32 @@ function NcaaBracketPicker({ state, onUpdate }: { state: FoundryWalkthrough; onU
     onUpdate({ ...state, ncaaPicks: nextPicks });
   }
   return <section className="rounded-2xl border border-orange-300/40 bg-orange-950/20 p-3 sm:p-4"><div className="flex items-start justify-between gap-3"><div><p className="text-[9px] font-black uppercase tracking-[.18em] text-orange-300">Selection Sunday · 68 teams · 67 decisions</p><h3 className="text-xl font-black">The Bracket Drop</h3><p className="mt-1 text-[10px] text-muted">Fill the entire bracket once. Lock it before the First Four. Then watch the evidence accumulate.</p></div><div className="grid grid-cols-2 gap-1"><div className="rounded-xl border border-orange-300/30 bg-black/30 px-2 py-2 text-center"><strong className="block text-lg text-orange-200">{count}/67</strong><span className="text-[8px] uppercase text-muted">picked</span></div><div className="rounded-xl border border-emerald-300/30 bg-black/30 px-2 py-2 text-center"><strong className="block text-lg text-emerald-200">{score}</strong><span className="text-[8px] uppercase text-muted">points</span></div></div></div>
-    {!state.ncaaBracketLocked && resultWindow === 0 && <div className="mt-3 grid grid-cols-2 gap-2"><button type="button" onClick={() => onUpdate({ ...state, ncaaPicks: generateNcaaPicks(777) })} className="min-h-11 rounded-xl border border-orange-300/40 text-[10px] font-black text-orange-200">Foundry autofill 67</button><button type="button" disabled={count !== 67} onClick={() => onUpdate({ ...state, ncaaBracketLocked: true })} className="min-h-11 rounded-xl bg-orange-300 text-[10px] font-black text-black disabled:opacity-35">Lock entire bracket</button></div>}
+    {!state.ncaaBracketLocked && resultWindow === 0 && <><div className="mt-3 grid grid-cols-2 gap-2"><button type="button" onClick={() => onUpdate({ ...state, ncaaPicks: generateNcaaPicks(777) })} className="min-h-11 rounded-xl border border-orange-300/40 text-[10px] font-black text-orange-200">Foundry autofill 67</button><button type="button" disabled={count !== 67} onClick={() => onUpdate({ ...state, ncaaBracketLocked: true })} className="min-h-11 rounded-xl bg-orange-300 text-[10px] font-black text-black disabled:opacity-35">Lock entire bracket</button></div>{count === 67 && <button type="button" onClick={() => onUpdate(launchFoundryHellfire(state))} className="mt-3 flex min-h-16 w-full items-center justify-center gap-3 rounded-2xl border-2 border-red-500 bg-[repeating-linear-gradient(135deg,#2a0802_0,#2a0802_12px,#050505_12px,#050505_24px)] px-4 text-sm font-black text-orange-100 shadow-[0_0_34px_rgba(249,115,22,.45)]"><WarRoomArsenalIcon kind="hellfire" size={52}/><span><small className="block text-[8px] uppercase tracking-[.2em] text-orange-300">M.A.P.’s · Mutually Assured Picks</small>AUTHORIZE HELLFIRE MODE</span></button>}</>}
     {state.ncaaBracketLocked && <div className="mt-3 rounded-xl border border-emerald-300/40 bg-emerald-300/10 px-3 py-2 text-center text-[10px] font-black text-emerald-200">BRACKET LOCKED · No changes after first tip</div>}
     <div className="mt-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-[9px] text-muted"><strong className="text-foreground">Scoring:</strong> R64 1 · R32 2 · Sweet 16 4 · Elite Eight 8 · Final Four 16 · Title 32. {resultWindow ? `Results posted through postseason stage ${resultWindow}.` : "No tournament results posted yet."}</div>
     {guidedPick === null ? <FullBracketMap picks={picks} onBegin={() => setGuidedPick(Math.min(guidedGames.findIndex((game) => !picks[game.id]) < 0 ? 66 : guidedGames.findIndex((game) => !picks[game.id]), 66))} /> : <GuidedBracketPick game={guidedGames[guidedPick]} index={guidedPick} total={guidedGames.length} selected={picks[guidedGames[guidedPick].id] || null} result={results[guidedGames[guidedPick].id] || null} bracketLocked={state.ncaaBracketLocked} onChoose={(team) => { choose(guidedGames[guidedPick], team); window.setTimeout(() => setGuidedPick((current) => current === null || current >= guidedGames.length - 1 ? null : current + 1), 180); }} onBack={() => setGuidedPick((current) => current === null || current === 0 ? null : current - 1)} onMap={() => setGuidedPick(null)} />}
     {count === 67 && <div className="mt-4 rounded-xl border border-emerald-300/40 bg-emerald-300/10 p-3 text-center"><p className="text-[9px] font-black uppercase tracking-[.18em] text-emerald-200">Bracket locked and loaded</p><p className="mt-1 text-sm font-black">Champion: {picks["national:championship"]}</p></div>}
+    {state.mapsEvent?.protocol === "hellfire" && state.mapsEvent.reviewed && <HellfireDamageAssessment state={state} />}
+    {state.mapsEvent?.protocol === "hellfire" && !state.mapsEvent.reviewed && <HellfireStrikeReview state={state} step={hellfireStep} onNext={() => setHellfireStep((value) => Math.min(value + 1, state.mapsEvent!.targetIds.length))} onComplete={() => onUpdate({ ...state, mapsEvent: state.mapsEvent ? { ...state.mapsEvent, reviewed: true } : null })} />}
   </section>;
+}
+
+function HellfireStrikeReview({ state, step, onNext, onComplete }: { state: FoundryWalkthrough; step: number; onNext: () => void; onComplete: () => void }) {
+  const event = state.mapsEvent!;
+  const complete = step >= event.targetIds.length;
+  const id = event.targetIds[Math.min(step, event.targetIds.length - 1)];
+  return <div className="fixed inset-0 z-[85] flex items-end justify-center overflow-y-auto bg-[#160300]/95 p-4 backdrop-blur-sm sm:items-center" role="dialog" aria-modal="true" aria-label="Hellfire targeting review"><section className="w-full max-w-md rounded-3xl border-2 border-orange-500 bg-[radial-gradient(circle_at_top,#7c2d12,#130301_62%)] p-5 text-center shadow-[0_0_100px_rgba(249,115,22,.55)]"><div className="mx-auto flex justify-center"><WarRoomArsenalIcon kind={complete ? "maps" : "hellfire"} size={92}/></div><p className="mt-3 text-[9px] font-black uppercase tracking-[.24em] text-orange-300">M.A.P.’s · Hellfire Mode</p>{complete ? <><h3 className="mt-2 text-3xl font-black">STRIKE PACKAGE COMPLETE</h3><p className="mt-3 text-sm text-white/70">The targeting computer changed {event.changedCount} of 67 decisions. Your original bracket remains preserved as evidence.</p><button type="button" onClick={onComplete} className="mt-5 min-h-14 w-full rounded-xl bg-orange-500 text-sm font-black text-black">I HAVE SEEN THE DAMAGE</button></> : <><p className="mt-4 text-xs font-black text-orange-200">TARGET {step + 1} OF {event.targetIds.length}</p><h3 className="mt-2 text-2xl font-black">{event.originalPicks[id] || "ORIGINAL PICK"}</h3><div className="my-3 text-3xl text-orange-400">↓</div><h3 className="text-2xl font-black text-orange-200">{state.ncaaPicks[id] || "COMPUTER PICK"}</h3><p className="mt-3 text-[10px] font-bold text-white/45">Game file: {id}</p><button type="button" onClick={onNext} className="mt-5 min-h-14 w-full rounded-xl bg-orange-500 text-sm font-black text-black">{step + 1 === event.targetIds.length ? "RUN DAMAGE ASSESSMENT" : "VIEW NEXT STRIKE"}</button></>}</section></div>;
+}
+
+function HellfireDamageAssessment({ state }: { state: FoundryWalkthrough }) {
+  const event = state.mapsEvent!;
+  const championChanged = event.originalPicks["national:championship"] !== state.ncaaPicks["national:championship"];
+  async function share() {
+    const text = `I authorized M.A.P.’s Hellfire Mode. ${event.changedCount} bracket decisions changed. Champion affected: ${championChanged ? "YES" : "NO"}. My bracket no longer reflects my personal beliefs.`;
+    if (navigator.share) await navigator.share({ title: "War Room M.A.P.’s Damage Assessment", text });
+    else await navigator.clipboard?.writeText(text);
+  }
+  return <section className="mt-4 rounded-2xl border-2 border-orange-500/70 bg-orange-950/30 p-4 text-center"><div className="mx-auto flex justify-center"><WarRoomArsenalIcon kind="maps" size={72}/></div><p className="mt-2 text-[9px] font-black uppercase tracking-[.2em] text-orange-300">Official damage assessment</p><h4 className="mt-1 text-xl font-black">THIS BRACKET NO LONGER REFLECTS YOUR PERSONAL BELIEFS.</h4><div className="mt-4 grid grid-cols-2 gap-2"><Stat label="Picks altered" value={String(event.changedCount)} /><Stat label="Champion hit" value={championChanged ? "YES" : "NO"} /></div><button type="button" onClick={() => void share()} className="mt-3 min-h-12 w-full rounded-xl border border-orange-400/60 text-xs font-black text-orange-200">SHARE THE EVIDENCE ↗</button></section>;
 }
 
 function guidedNcaaGames(picks: Record<string, string>): NcaaGame[] {

@@ -48,6 +48,13 @@ export type FoundryWalkthrough = {
   /** Regular-season Tactical Nuclear Button: two irreversible uses per season. */
   tacticalNukeWeeks: number[];
   tacticalNukeActive: boolean;
+  mapsEvent: {
+    protocol: "hellfire";
+    originalPicks: NcaaPicks;
+    targetIds: string[];
+    changedCount: number;
+    reviewed: boolean;
+  } | null;
 };
 
 export type FoundryPostseasonRounds = {
@@ -126,7 +133,7 @@ export function createFoundryWalkthrough(sport: PreviewSport, week = 1, role: Pr
     return { id: `${sport}-${week}-${index}`, away, home, spread: `${home} ${homeLine > 0 ? "+" : ""}${homeLine}`, status: final ? "final" as const : "upcoming" as const, result: final ? `${away} ${awayScore} · ${home} ${homeScore}` : undefined, pick: index % 2 ? away : home, confidence: 5 - index };
   });
   const preseasonChampionPicks = createPreseasonChampionPicks(players, sport);
-  return { version: 1, sport, role, week, seasonLabel: "2026 Foundry Season", generatedAt: Date.now(), players, games, unreadGazette: false, gazetteWeeks: [], ncaaPicks: {}, ncaaResults: {}, ncaaBracketLocked: false, preseasonChampionPicks, postseasonFields: null, tacticalNukeWeeks: [], tacticalNukeActive: false };
+  return { version: 1, sport, role, week, seasonLabel: "2026 Foundry Season", generatedAt: Date.now(), players, games, unreadGazette: false, gazetteWeeks: [], ncaaPicks: {}, ncaaResults: {}, ncaaBracketLocked: false, preseasonChampionPicks, postseasonFields: null, tacticalNukeWeeks: [], tacticalNukeActive: false, mapsEvent: null };
 }
 
 export function saveFoundryWalkthrough(state: FoundryWalkthrough) {
@@ -159,6 +166,7 @@ export function loadFoundryWalkthrough(): FoundryWalkthrough | null {
         ? parsed.tacticalNukeWeeks.filter((week) => Number.isInteger(week) && week > 0).slice(0, 2)
         : [],
       tacticalNukeActive: !!parsed.tacticalNukeActive,
+      mapsEvent: parsed.mapsEvent?.protocol === "hellfire" ? parsed.mapsEvent : null,
     } : null;
   } catch { return null; }
 }
@@ -177,7 +185,7 @@ export function simulateNextFoundryWeek(state: FoundryWalkthrough): FoundryWalkt
     const priorMadnessPoints = ncaaScore(bracket, state.ncaaResults || {});
     return { ...player, madnessPoints, madnessWindowPoints: madnessPoints - priorMadnessPoints, points: player.points + madnessPoints };
   }).sort((a, b) => b.points - a.points);
-  return { ...next, players, gazetteWeeks: Array.from(new Set([...(state.gazetteWeeks || []), state.week])).sort((a, b) => a - b), ncaaPicks: state.ncaaPicks || {}, ncaaResults, ncaaBracketLocked: state.ncaaBracketLocked, preseasonChampionPicks: state.preseasonChampionPicks || {}, postseasonFields: state.postseasonFields, tacticalNukeWeeks: state.tacticalNukeWeeks || [], tacticalNukeActive: false, unreadGazette: true };
+  return { ...next, players, gazetteWeeks: Array.from(new Set([...(state.gazetteWeeks || []), state.week])).sort((a, b) => a - b), ncaaPicks: state.ncaaPicks || {}, ncaaResults, ncaaBracketLocked: state.ncaaBracketLocked, preseasonChampionPicks: state.preseasonChampionPicks || {}, postseasonFields: state.postseasonFields, tacticalNukeWeeks: state.tacticalNukeWeeks || [], tacticalNukeActive: false, mapsEvent: state.mapsEvent || null, unreadGazette: true };
 }
 
 export function simulateFoundrySeason(state: FoundryWalkthrough): FoundryWalkthrough {
@@ -189,7 +197,7 @@ export function simulateFoundrySeason(state: FoundryWalkthrough): FoundryWalkthr
     const madnessPoints = ncaaScore(bracket, ncaaResults);
     return { ...player, madnessPoints, madnessWindowPoints: madnessPoints, points: player.points + madnessPoints };
   }).sort((a, b) => b.points - a.points);
-  return { ...next, players, gazetteWeeks: Array.from({ length: finalWeek }, (_, index) => index + 1), ncaaPicks: state.ncaaPicks || {}, ncaaResults, ncaaBracketLocked: state.ncaaBracketLocked, preseasonChampionPicks: state.preseasonChampionPicks || {}, postseasonFields: state.postseasonFields, tacticalNukeWeeks: state.tacticalNukeWeeks || [], tacticalNukeActive: false, unreadGazette: true };
+  return { ...next, players, gazetteWeeks: Array.from({ length: finalWeek }, (_, index) => index + 1), ncaaPicks: state.ncaaPicks || {}, ncaaResults, ncaaBracketLocked: state.ncaaBracketLocked, preseasonChampionPicks: state.preseasonChampionPicks || {}, postseasonFields: state.postseasonFields, tacticalNukeWeeks: state.tacticalNukeWeeks || [], tacticalNukeActive: false, mapsEvent: state.mapsEvent || null, unreadGazette: true };
 }
 
 export function simulateFoundryRegularSeason(state: FoundryWalkthrough): FoundryWalkthrough {
@@ -213,6 +221,7 @@ export function simulateFoundryRegularSeason(state: FoundryWalkthrough): Foundry
     },
     tacticalNukeWeeks: state.tacticalNukeWeeks || [],
     tacticalNukeActive: false,
+    mapsEvent: null,
     unreadGazette: true,
   };
 }
@@ -244,6 +253,26 @@ export function armFoundryTacticalNuke(state: FoundryWalkthrough): FoundryWalkth
     games,
     tacticalNukeWeeks: [...new Set([...(state.tacticalNukeWeeks || []), state.week])].slice(0, FOUNDRY_TACTICAL_NUKE_LIMIT),
     tacticalNukeActive: true,
+  };
+}
+
+/** Fieldhouse M.A.P.'s proof: preserve the human bracket, then replace it with
+ * a deterministic complete computer bracket and retain the four primary
+ * opening-round strikes for the mandatory reveal. Downstream changes are
+ * reported as collateral damage, never hidden. */
+export function launchFoundryHellfire(state: FoundryWalkthrough): FoundryWalkthrough {
+  if (state.sport !== "cbb" || state.ncaaBracketLocked || state.mapsEvent) return state;
+  if (Object.keys(state.ncaaPicks || {}).length !== 67) return state;
+  const originalPicks = { ...state.ncaaPicks };
+  const computerPicks = generateNcaaPicks(state.week * 991 + 1776);
+  const changed = Object.keys(originalPicks).filter((id) => originalPicks[id] !== computerPicks[id]);
+  const openingTargets = changed.filter((id) => id.includes(":r1:")).slice(0, 4);
+  const targetIds = [...openingTargets, ...changed.filter((id) => !openingTargets.includes(id))].slice(0, 4);
+  return {
+    ...state,
+    ncaaPicks: computerPicks,
+    ncaaBracketLocked: true,
+    mapsEvent: { protocol: "hellfire", originalPicks, targetIds, changedCount: changed.length, reviewed: false },
   };
 }
 
