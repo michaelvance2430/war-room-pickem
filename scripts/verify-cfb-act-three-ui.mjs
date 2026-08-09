@@ -24,6 +24,7 @@ assert.match(component, /Lock CFP Bracket/);
 assert.match(component, /Sim CFP Results/);
 assert.match(component, /\{score\}\/28/);
 assert.match(component, /champion pick worth 8/);
+assert.doesNotMatch(component, /Sicko Results/);
 assert.match(component, /min-h-12/);
 assert.match(component, /min-h-11 min-w-11/);
 assert.doesNotMatch(component, /supabase|fetch\(|\/api\//);
