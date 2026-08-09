@@ -543,13 +543,13 @@ export default function HomeSportSwitcher({ className = "" }: Props) {
               const busy = busyId === m.leagueId;
               const action = p?.action || {
                 code: "ENTER" as const,
-                label: "Enter",
+                label: "Open",
                 href: "/",
               };
-              const weekLine = p?.weekLine || "—";
-              const tone: LeagueHubTone = p?.signal?.tone || "ready";
-              const signalLabel = p?.signal?.label || "Ready — Enter";
-              const signalEmoji = p?.signal?.emoji || "🟢";
+              const weekLine = p?.weekLine || "Checking status";
+              const tone: LeagueHubTone = p?.signal?.tone || "waiting";
+              const signalLabel = p?.signal?.label || "Verifying room";
+              const signalEmoji = p?.signal?.emoji || "⚪";
               const tones = leagueHubToneClasses(tone);
               const leagueName = m.leagueName || "War Room";
               // Stage 3: task (0|1 once pulseReady) + durable unread announcements.

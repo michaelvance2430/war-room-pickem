@@ -27,6 +27,8 @@ import { isCrystalBallOpeningWeek } from "@/lib/league-hub-actions";
 
 type HeroState = {
   week: number;
+  /** False only when cloud truth could not be verified. Never infer zeros. */
+  truthTrusted: boolean;
   /**
    * True only when a card is *formally published* (publishedAt set).
    * Draft games without publish never count as a playable card.
@@ -173,6 +175,7 @@ export default function HomeWeekHero() {
       if (sid === "nfl" && w <= 0) w = first;
       const degraded: HeroState = {
         week: w,
+        truthTrusted: false,
         hasCard: false,
         gameCount: 0,
         lockLabel: null,
@@ -208,6 +211,7 @@ export default function HomeWeekHero() {
           if (sid === "nfl" && ww <= 0) ww = first;
           return {
             week: ww,
+            truthTrusted: false,
             hasCard: false,
             gameCount: 0,
             lockLabel: null,
@@ -228,6 +232,7 @@ export default function HomeWeekHero() {
         } catch {
           return {
             week: firstSeasonWeek(getLeague()?.sportId || "cfb"),
+            truthTrusted: false,
             hasCard: false,
             gameCount: 0,
             lockLabel: null,
@@ -355,6 +360,7 @@ export default function HomeWeekHero() {
         // Paint CTA runway now — roster count + recap fill in after
         const next: HeroState = {
           week: liveWeek,
+          truthTrusted: true,
           hasCard,
           gameCount: games.length,
           lockLabel: hasCard ? formatCardLockDeadline(games) : null,
@@ -543,7 +549,15 @@ export default function HomeWeekHero() {
 
   // —— Priority: NFL allegiance → Super Bowl/Crystal Ball → published card / wait ——
   // Never invent CFB allegiance on NFL; never invent Make Picks without publish.
-  if (!state.isOps && state.needsNflTeam) {
+  if (!state.truthTrusted) {
+    eyebrow = "Status check";
+    title = "Room status unavailable";
+    body =
+      "We couldn’t verify this league’s live card, roster, or scores. Nothing has been changed—refresh to pull the room’s real status.";
+    primaryHref = "/";
+    primaryLabel = "Refresh status";
+    secondaryHref = null;
+  } else if (!state.isOps && state.needsNflTeam) {
     eyebrow = "Required · NFL";
     title = "Pick your NFL team";
     body =
@@ -725,7 +739,7 @@ export default function HomeWeekHero() {
         </div>
 
         {/* NFL: fan-familiar week chrome (sport · week · dates · lock) */}
-        {isNfl && (
+        {isNfl && state.truthTrusted && (
           <div className="mb-3 rounded-xl border border-primary/25 bg-black/40 px-3 py-2.5">
             <p className="text-[11px] font-black uppercase tracking-[0.18em] text-primary">
               🏈 NFL
@@ -733,9 +747,11 @@ export default function HomeWeekHero() {
             <p className="text-lg sm:text-xl font-bold text-white leading-tight mt-0.5">
               {weekLabel}
             </p>
-            <p className="text-sm text-muted mt-0.5">
-              {weekDateRangeLabel(state.week, "nfl") || "Dates TBD"}
-            </p>
+            {weekDateRangeLabel(state.week, "nfl") ? (
+              <p className="text-sm text-muted mt-0.5">
+                {weekDateRangeLabel(state.week, "nfl")}
+              </p>
+            ) : null}
             <p className="text-sm text-foreground/90 mt-1.5 font-medium">
               Lock:{" "}
               {state.lockLabel
@@ -832,6 +848,9 @@ export default function HomeWeekHero() {
               onClick={() => {
                 try {
                   document.body.style.overflow = "";
+                  if (!state.truthTrusted) {
+                    window.location.assign("/");
+                  }
                 } catch {
                   /* ignore */
                 }
@@ -859,6 +878,7 @@ export default function HomeWeekHero() {
         )}
 
         {/* League pulse — honesty, not clutter */}
+        {state.truthTrusted ? (
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted border-t border-border/50 pt-3">
           <span>
             <span className="text-foreground/80 font-medium">{state.rosterCount}</span>{" "}
@@ -876,6 +896,7 @@ export default function HomeWeekHero() {
               : `${state.scoredWeeks} of ${SEASON_MAX_WEEK + 1} slots scored`}
           </span>
         </div>
+        ) : null}
 
       </div>
     </section>
