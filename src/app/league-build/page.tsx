@@ -30,6 +30,8 @@ import { saveLeagueToCloud } from "@/lib/league-sync";
 import BrandMark from "@/components/BrandMark";
 import {
   CHAMPIONSHIP_TROPHIES,
+  championshipTrophiesForSport,
+  DEFAULT_CHAMPIONSHIP_TROPHY_BY_SPORT,
   DEFAULT_CHAMPIONSHIP_TROPHY_ID,
   getChampionshipTrophyDesign,
 } from "@/lib/championship-trophy-catalog";
@@ -104,7 +106,7 @@ function LeagueBuildInner() {
     setName(leagueName);
     setCrystalBall(league.settings?.crystalBallEnabled !== false);
     setCutPercent(league.settings?.cutPercent ?? 50);
-    setTrophyId(league.settings?.championshipTrophyId || DEFAULT_CHAMPIONSHIP_TROPHY_ID);
+    setTrophyId(getChampionshipTrophyDesign(league.settings?.championshipTrophyId || DEFAULT_CHAMPIONSHIP_TROPHY_BY_SPORT[league.sportId === "nfl" ? "nfl" : league.sportId === "cbb" ? "cbb" : "cfb"], league.sportId).id);
 
     // Open room from create (?open=1) or local league flag
     let openPrefill = false;
@@ -487,7 +489,7 @@ function LeagueBuildInner() {
               This is the hardware your champion receives at the ring ceremony. Pick it before the season; it locks with the rest of the room.
             </p>
             <div className="grid grid-cols-1 gap-2 max-h-[22rem] overflow-y-auto pr-1">
-              {CHAMPIONSHIP_TROPHIES.map((trophy) => (
+              {championshipTrophiesForSport(sportId).map((trophy) => (
                 <button
                   key={trophy.id}
                   type="button"

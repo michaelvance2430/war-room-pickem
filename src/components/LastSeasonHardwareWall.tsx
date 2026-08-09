@@ -61,6 +61,7 @@ export default function LastSeasonHardwareWall({
     kind: "championship" | "toilet_bowl" | "crystal_ball";
     title: string;
     subtitle?: string;
+    trophyDesignId?: string | null;
   } | null>(null);
 
   const lastYear = plaques
@@ -180,6 +181,7 @@ export default function LastSeasonHardwareWall({
                   kind,
                   title: meta?.title || t.trophyType,
                   subtitle,
+                  trophyDesignId: t.trophyDesignId,
                 })
               }
               onKeyDown={(e) => {
@@ -189,6 +191,7 @@ export default function LastSeasonHardwareWall({
                     kind,
                     title: meta?.title || t.trophyType,
                     subtitle,
+                    trophyDesignId: t.trophyDesignId,
                   });
                 }
               }}
@@ -223,6 +226,7 @@ export default function LastSeasonHardwareWall({
                     leagueName={league?.name}
                     leagueId={league?.id}
                     leagueCode={league?.code}
+                    trophyDesignId={t.trophyDesignId}
                   />
                 </button>
                 <span
@@ -279,6 +283,7 @@ export default function LastSeasonHardwareWall({
         leagueName={league?.name}
         leagueId={league?.id}
         leagueCode={league?.code}
+        trophyDesignId={inspect?.trophyDesignId}
       />
     </section>
   );

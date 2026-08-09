@@ -73,7 +73,7 @@ export type LeagueRecordRow = {
 
 export type LeagueHistoryYear = {
   year: number;
-  champion: { name: string; userId: string | null } | null;
+  champion: { name: string; userId: string | null; trophyDesignId: string | null } | null;
   toilet: { name: string; userId: string | null } | null;
   nerd: { name: string; userId: string | null } | null;
 };
@@ -425,7 +425,7 @@ export function buildLeagueHistory(
       return {
         year,
         champion: champ
-          ? { name: champ.winnerName, userId: champ.winnerUserId }
+          ? { name: champ.winnerName, userId: champ.winnerUserId, trophyDesignId: champ.trophyDesignId || null }
           : null,
         toilet: toilet
           ? { name: toilet.winnerName, userId: toilet.winnerUserId }

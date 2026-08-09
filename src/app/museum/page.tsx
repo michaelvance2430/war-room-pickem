@@ -25,6 +25,7 @@ import {
 } from "@/lib/prior-season-seed";
 import { resolveLiveTrophyHolder } from "@/lib/trophy-share";
 import LastSeasonHardwareWall from "@/components/LastSeasonHardwareWall";
+import HardwareTrophyIcon from "@/components/HardwareTrophyIcon";
 import {
   completedChapterCount,
   crewFoundedLabel,
@@ -396,6 +397,9 @@ function MuseumInner() {
                             emoji="🏆"
                             name={h.champion ? c.name : null}
                             userId={c.userId || h.champion?.userId}
+                            championship
+                            trophyDesignId={h.champion?.trophyDesignId}
+                            sportId={getLeague()?.sportId}
                           />
       <HistCell
                             label="Toilet Bowl"
@@ -490,17 +494,21 @@ function HistCell({
   emoji,
   name,
   userId,
+  championship = false,
+  trophyDesignId,
+  sportId,
 }: {
   label: string;
   emoji: string;
   name?: string | null;
   userId?: string | null;
+  championship?: boolean;
+  trophyDesignId?: string | null;
+  sportId?: string | null;
 }) {
   return (
     <div className="rounded-lg border border-border bg-background px-3 py-2">
-      <p className="text-[10px] uppercase tracking-wider text-muted">
-        {emoji} {label}
-      </p>
+      <div className="flex items-center gap-2"><span className="shrink-0">{championship && name ? <HardwareTrophyIcon kind="championship" sportId={sportId} size={44} animate={false} trophyDesignId={trophyDesignId} /> : emoji}</span><p className="text-[10px] uppercase tracking-wider text-muted">{label}</p></div>
       {name ? (
         userId ? (
           <PlayerLink

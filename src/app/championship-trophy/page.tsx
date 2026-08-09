@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import HardwareTrophyIcon from "@/components/HardwareTrophyIcon";
 import TrophyLightbox from "@/components/TrophyLightbox";
-import { CHAMPIONSHIP_TROPHIES, type ChampionshipTrophyId } from "@/lib/championship-trophy-catalog";
+import { CHAMPIONSHIP_TROPHIES, championshipTrophiesForSport, type ChampionshipTrophyId } from "@/lib/championship-trophy-catalog";
 import { getLeague, getSession, isActuallyCommissioner } from "@/lib/league";
 import { invalidateLeagueCloudCache, syncLeagueFromCloud } from "@/lib/league-sync";
 import { createClient } from "@/lib/supabase/client";
@@ -15,6 +15,7 @@ export default function ChampionshipTrophyPage() {
   const [inspect, setInspect] = useState<ChampionshipTrophyId | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const collection = championshipTrophiesForSport(getLeague()?.sportId);
 
   useEffect(() => {
     void syncLeagueFromCloud().then((league) => {
@@ -49,7 +50,7 @@ export default function ChampionshipTrophyPage() {
       <h1 className="mt-1 text-3xl font-black">Choose the hardware</h1>
       <p className="mt-2 max-w-2xl text-sm text-muted">This is what your league chases all season. Tap any trophy to inspect it. Choose one before opening kickoff; then it becomes permanent for the season.</p>
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {CHAMPIONSHIP_TROPHIES.map((design) => (
+        {collection.map((design) => (
           <section key={design.id} className={`relative rounded-2xl border p-5 text-center ${selected === design.id ? "border-amber-300 bg-amber-300/10 shadow-[0_0_30px_rgba(251,191,36,.2)]" : "border-border bg-card"}`}>
             <button type="button" onClick={() => setInspect(design.id)} className="mx-auto block" aria-label={`Inspect ${design.name}`}>
               <HardwareTrophyIcon kind="championship" sportId={getLeague()?.sportId} size={150} trophyDesignId={design.id} />
