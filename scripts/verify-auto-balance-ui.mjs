@@ -78,7 +78,8 @@ test("Players page applies authoritative roster immediately", () => {
 test("Double-submit blocked while balancing", () => {
   assert.match(players, /if \(!canManageDivs \|\| busy \|\| balancing\) return/);
   assert.match(players, /disabled=\{\s*busy \|\|\s*balancing/);
-  assert.match(players, /\{balancing \? "Balancing…"/);
+  assert.match(players, /\{balancing \? "Checking…" : "Preview Auto-Balance"\}/);
+  assert.match(players, /\{balancing \? "Applying…" : "Apply moves"\}/);
 });
 
 test("Minimum-move planner still owns Auto Balance", () => {
