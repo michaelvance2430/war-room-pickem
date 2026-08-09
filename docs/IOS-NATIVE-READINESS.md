@@ -24,7 +24,7 @@ iOS accounts. Supabase remains the source of truth.
 | Runtime boundary | Prepared | `src/lib/native-contract.ts`; no Capacitor dependency in web runtime |
 | Universal/deep links | Contract only | Configure Associated Domains, AASA file, Capacitor App listener, Supabase redirects |
 | Password recovery | Web only | Current reset uses `window.location.origin`; route through universal-link contract |
-| Account deletion | **App Review blocker** | No obvious in-app deletion path found |
+| Account deletion | **App Review blocker** | Product contract and cascade safety gate added; schema/server implementation remains gated |
 | User reporting/blocking | **App Review blocker** | Staff moderation exists; player report/block controls were not found |
 | Privacy / Terms / Support | **Submission blocker** | Publish final, non-placeholder public pages and support contact |
 | Plus entitlements | Inactive contract | `src/lib/plus-contract.ts`; no UI, checkout, or client grants |
@@ -50,6 +50,9 @@ iOS accounts. Supabase remains the source of truth.
 7. Create App Review demo credentials and a fictional, fully populated review league.
 8. Build a native regression matrix for login, invites, picks, lock, scoring,
    Locker, uploads, Moments, background/resume, offline/error states, and logout.
+
+The binding MIA/deletion behavior and current cascade blocker are defined in
+[`ACCOUNT-LIFECYCLE.md`](./ACCOUNT-LIFECYCLE.md).
 
 ## Mac / Xcode handoff
 

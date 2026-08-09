@@ -18,10 +18,11 @@
     "verify:account-legendaries": "node scripts/verify-account-legendaries.mjs",
     "verify:foundry-gazette": "node --import tsx scripts/verify-foundry-gazette.mjs",
     "verify:native-readiness": "node scripts/verify-native-readiness.mjs",
+    "verify:account-lifecycle": "node scripts/verify-account-lifecycle.mjs",
     "verify:egg-catalog": "node scripts/verify-easter-egg-catalog-parity.mjs",
     "verify:egg-cloud": "node scripts/verify-easter-egg-cloud.mjs",
     "verify:eggs": "npm run verify:egg-catalog && npm run verify:egg-cloud",
-    "verify:predeploy": "npm run verify:egg-catalog && npm run verify:egg-cloud && npm run verify:home-mission && npm run verify:native-readiness"
+    "verify:predeploy": "npm run verify:egg-catalog && npm run verify:egg-cloud && npm run verify:home-mission && npm run verify:native-readiness && npm run verify:account-lifecycle"
   },
   "dependencies": {
     "@supabase/ssr": "^0.6.1",
