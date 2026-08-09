@@ -45,6 +45,9 @@ export type FoundryWalkthrough = {
   /** Frozen before Window 1; separate from the Selection Sunday bracket. */
   preseasonChampionPicks: Record<string, string>;
   postseasonFields: { championship: string[]; toilet: string[] } | null;
+  /** Regular-season Tactical Nuclear Button: two irreversible uses per season. */
+  tacticalNukeWeeks: number[];
+  tacticalNukeActive: boolean;
 };
 
 export type FoundryPostseasonRounds = {
@@ -123,7 +126,7 @@ export function createFoundryWalkthrough(sport: PreviewSport, week = 1, role: Pr
     return { id: `${sport}-${week}-${index}`, away, home, spread: `${home} ${homeLine > 0 ? "+" : ""}${homeLine}`, status: final ? "final" as const : "upcoming" as const, result: final ? `${away} ${awayScore} · ${home} ${homeScore}` : undefined, pick: index % 2 ? away : home, confidence: 5 - index };
   });
   const preseasonChampionPicks = createPreseasonChampionPicks(players, sport);
-  return { version: 1, sport, role, week, seasonLabel: "2026 Foundry Season", generatedAt: Date.now(), players, games, unreadGazette: false, gazetteWeeks: [], ncaaPicks: {}, ncaaResults: {}, ncaaBracketLocked: false, preseasonChampionPicks, postseasonFields: null };
+  return { version: 1, sport, role, week, seasonLabel: "2026 Foundry Season", generatedAt: Date.now(), players, games, unreadGazette: false, gazetteWeeks: [], ncaaPicks: {}, ncaaResults: {}, ncaaBracketLocked: false, preseasonChampionPicks, postseasonFields: null, tacticalNukeWeeks: [], tacticalNukeActive: false };
 }
 
 export function saveFoundryWalkthrough(state: FoundryWalkthrough) {
@@ -152,6 +155,10 @@ export function loadFoundryWalkthrough(): FoundryWalkthrough | null {
       ncaaBracketLocked: !!parsed.ncaaBracketLocked,
       preseasonChampionPicks: parsed.preseasonChampionPicks && typeof parsed.preseasonChampionPicks === "object" && Object.keys(parsed.preseasonChampionPicks).length ? parsed.preseasonChampionPicks : createPreseasonChampionPicks(parsed.players, parsed.sport),
       postseasonFields: parsed.postseasonFields && Array.isArray(parsed.postseasonFields.championship) && Array.isArray(parsed.postseasonFields.toilet) ? parsed.postseasonFields : null,
+      tacticalNukeWeeks: Array.isArray(parsed.tacticalNukeWeeks)
+        ? parsed.tacticalNukeWeeks.filter((week) => Number.isInteger(week) && week > 0).slice(0, 2)
+        : [],
+      tacticalNukeActive: !!parsed.tacticalNukeActive,
     } : null;
   } catch { return null; }
 }
@@ -170,7 +177,7 @@ export function simulateNextFoundryWeek(state: FoundryWalkthrough): FoundryWalkt
     const priorMadnessPoints = ncaaScore(bracket, state.ncaaResults || {});
     return { ...player, madnessPoints, madnessWindowPoints: madnessPoints - priorMadnessPoints, points: player.points + madnessPoints };
   }).sort((a, b) => b.points - a.points);
-  return { ...next, players, gazetteWeeks: Array.from(new Set([...(state.gazetteWeeks || []), state.week])).sort((a, b) => a - b), ncaaPicks: state.ncaaPicks || {}, ncaaResults, ncaaBracketLocked: state.ncaaBracketLocked, preseasonChampionPicks: state.preseasonChampionPicks || {}, postseasonFields: state.postseasonFields, unreadGazette: true };
+  return { ...next, players, gazetteWeeks: Array.from(new Set([...(state.gazetteWeeks || []), state.week])).sort((a, b) => a - b), ncaaPicks: state.ncaaPicks || {}, ncaaResults, ncaaBracketLocked: state.ncaaBracketLocked, preseasonChampionPicks: state.preseasonChampionPicks || {}, postseasonFields: state.postseasonFields, tacticalNukeWeeks: state.tacticalNukeWeeks || [], tacticalNukeActive: false, unreadGazette: true };
 }
 
 export function simulateFoundrySeason(state: FoundryWalkthrough): FoundryWalkthrough {
@@ -182,7 +189,7 @@ export function simulateFoundrySeason(state: FoundryWalkthrough): FoundryWalkthr
     const madnessPoints = ncaaScore(bracket, ncaaResults);
     return { ...player, madnessPoints, madnessWindowPoints: madnessPoints, points: player.points + madnessPoints };
   }).sort((a, b) => b.points - a.points);
-  return { ...next, players, gazetteWeeks: Array.from({ length: finalWeek }, (_, index) => index + 1), ncaaPicks: state.ncaaPicks || {}, ncaaResults, ncaaBracketLocked: state.ncaaBracketLocked, preseasonChampionPicks: state.preseasonChampionPicks || {}, postseasonFields: state.postseasonFields, unreadGazette: true };
+  return { ...next, players, gazetteWeeks: Array.from({ length: finalWeek }, (_, index) => index + 1), ncaaPicks: state.ncaaPicks || {}, ncaaResults, ncaaBracketLocked: state.ncaaBracketLocked, preseasonChampionPicks: state.preseasonChampionPicks || {}, postseasonFields: state.postseasonFields, tacticalNukeWeeks: state.tacticalNukeWeeks || [], tacticalNukeActive: false, unreadGazette: true };
 }
 
 export function simulateFoundryRegularSeason(state: FoundryWalkthrough): FoundryWalkthrough {
@@ -204,7 +211,39 @@ export function simulateFoundryRegularSeason(state: FoundryWalkthrough): Foundry
       championship: fields.flatMap((field) => field.championship),
       toilet: fields.flatMap((field) => field.toilet),
     },
+    tacticalNukeWeeks: state.tacticalNukeWeeks || [],
+    tacticalNukeActive: false,
     unreadGazette: true,
+  };
+}
+
+export const FOUNDRY_TACTICAL_NUKE_LIMIT = 2;
+
+export function foundryTacticalNukesRemaining(
+  state: Pick<FoundryWalkthrough, "tacticalNukeWeeks">
+): number {
+  return Math.max(0, FOUNDRY_TACTICAL_NUKE_LIMIT - new Set(state.tacticalNukeWeeks || []).size);
+}
+
+/**
+ * Foundry-only proof of the real regular-season behavior: the targeting
+ * computer fills a legal five-card confidence ladder and permanently spends
+ * one of two season uses. No cloud writes and no production side effects.
+ */
+export function armFoundryTacticalNuke(state: FoundryWalkthrough): FoundryWalkthrough {
+  if (state.tacticalNukeActive || foundryTacticalNukesRemaining(state) <= 0) return state;
+  if (state.week >= foundryPostseasonStartWeek(state.sport)) return state;
+  const confidences = [2, 5, 1, 4, 3];
+  const games = state.games.map((game, index) => ({
+    ...game,
+    pick: (hash(state.week + 809, index, 13) % 2 === 0 ? game.away : game.home),
+    confidence: confidences[index] || index + 1,
+  }));
+  return {
+    ...state,
+    games,
+    tacticalNukeWeeks: [...new Set([...(state.tacticalNukeWeeks || []), state.week])].slice(0, FOUNDRY_TACTICAL_NUKE_LIMIT),
+    tacticalNukeActive: true,
   };
 }
 

@@ -4,14 +4,18 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import GazettePaper from "@/components/GazettePaper";
 import FoundryCfbActThree from "@/components/FoundryCfbActThree";
+import WarRoomArsenalIcon from "@/components/WarRoomArsenalIcon";
 import { buildFoundryGazetteFixture } from "@/lib/foundry-gazette-fixtures";
 import {
   createFoundryWalkthrough,
+  armFoundryTacticalNuke,
+  FOUNDRY_TACTICAL_NUKE_LIMIT,
   FIELDHOUSE_REGIONS,
   FOUNDRY_WALKTHROUGH_EVENT,
   foundryWeekStartDate,
   foundryPostseasonStartWeek,
   foundryPostseasonRounds,
+  foundryTacticalNukesRemaining,
   isFoundrySeasonFinal,
   loadFoundryWalkthrough,
   PREVIEW_SPORTS,
@@ -118,7 +122,7 @@ export default function FoundryPreviewPage() {
     </header>
     <div className="mx-auto max-w-3xl px-3 py-4">
       {view === "home" && <Home state={state} go={setView} />}
-      {view === "picks" && <Picks state={state} />}
+      {view === "picks" && <Picks state={state} onUpdate={update} />}
       {view === "standings" && <Standings state={state} />}
       {view === "postseason" && <Postseason state={state} onUpdate={update} />}
       {view === "gazette" && <Gazette state={state} selectedWeek={gazetteWeek} onSelectWeek={setGazetteWeek} />}
@@ -142,7 +146,20 @@ function Home({ state, go }: { state: FoundryWalkthrough; go: (v: View) => void 
     <section className="rounded-2xl border border-border bg-card p-4"><h3 className="font-black">Room pulse</h3><div className="mt-3 space-y-2">{state.players.slice(0, 3).map((p, i) => <div key={p.id} className="flex items-center justify-between text-sm"><span>{i + 1}. {p.name}</span><strong>{p.points}</strong></div>)}</div><button onClick={() => go("standings")} className="mt-3 text-xs font-bold text-primary">Full standings →</button></section></div>;
 }
 
-function Picks({ state }: { state: FoundryWalkthrough }) { return <Page title="My Picks" note={`${PREVIEW_SPORTS[state.sport].weekLabel(state.week)} · saved locally for preview`}><div className="space-y-3">{state.games.map((g) => <article key={g.id} className="rounded-xl border border-border bg-card p-4"><div className="flex justify-between gap-3"><div><p className="text-[10px] font-black uppercase text-muted">{g.status === "final" ? "Final" : "Upcoming"}</p><h3 className="mt-1 font-black">{g.away} at {g.home}</h3><p className="text-xs text-muted">{g.spread}{g.result ? ` · ${g.result}` : ""}</p></div><span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary font-black text-black">{g.confidence}</span></div><div className="mt-3 rounded-lg border border-primary/30 bg-primary/10 p-3 text-sm">Pick: <strong>{g.pick}</strong></div></article>)}</div><p className="mt-4 rounded-xl border border-emerald-400/30 bg-emerald-400/10 p-3 text-xs font-bold text-emerald-200">Card locked · preview picks cannot reach a live league.</p></Page>; }
+function Picks({ state, onUpdate }: { state: FoundryWalkthrough; onUpdate: (next: FoundryWalkthrough) => void }) {
+  const [confirmNuke, setConfirmNuke] = useState(false);
+  const remaining = foundryTacticalNukesRemaining(state);
+  const regularSeason = state.week < foundryPostseasonStartWeek(state.sport);
+  return <Page title="My Picks" note={`${PREVIEW_SPORTS[state.sport].weekLabel(state.week)} · saved locally for preview`}>
+    {regularSeason && <section className={`mb-4 overflow-hidden rounded-2xl border-2 p-4 ${state.tacticalNukeActive ? "border-lime-300 bg-lime-950/25 shadow-[0_0_30px_rgba(190,242,100,.2)]" : "border-red-500/80 bg-[repeating-linear-gradient(135deg,#250303_0,#250303_12px,#050505_12px,#050505_24px)] shadow-[0_0_34px_rgba(239,68,68,.3)]"}`}>
+      <div className="flex items-center gap-3"><WarRoomArsenalIcon kind="nuke" size={52}/><div className="min-w-0 flex-1"><p className="text-[9px] font-black uppercase tracking-[.2em] text-red-300">Regular season weapon</p><h3 className="text-xl font-black">TACTICAL NUCLEAR BUTTON</h3></div><strong className="rounded-full border-2 border-red-300 bg-black/70 px-3 py-2 text-lg tabular-nums text-red-100">{remaining}/{FOUNDRY_TACTICAL_NUKE_LIMIT}</strong></div>
+      {state.tacticalNukeActive ? <div className="mt-3 rounded-xl border border-lime-300/40 bg-black/35 p-3 text-center"><p className="text-sm font-black text-lime-200">☢ NUCLEAR CARD ARMED · 2× WEEK</p><p className="mt-1 text-[10px] text-white/60">The targeting computer made every pick. No edits. No undo.</p></div> : <button type="button" disabled={remaining <= 0} onClick={() => setConfirmNuke(true)} className="mt-3 min-h-14 w-full rounded-xl bg-red-600 text-sm font-black text-white shadow-[0_0_24px_rgba(239,68,68,.45)] disabled:bg-zinc-800 disabled:text-zinc-500 disabled:shadow-none">{remaining > 0 ? `GO NUCLEAR · ${remaining}/${FOUNDRY_TACTICAL_NUKE_LIMIT}` : "ARSENAL EMPTY · 0/2"}</button>}
+    </section>}
+    <div className="space-y-3">{state.games.map((g) => <article key={g.id} className={`rounded-xl border bg-card p-4 ${state.tacticalNukeActive ? "border-lime-300/35" : "border-border"}`}><div className="flex justify-between gap-3"><div><p className="text-[10px] font-black uppercase text-muted">{g.status === "final" ? "Final" : "Upcoming"}</p><h3 className="mt-1 font-black">{g.away} at {g.home}</h3><p className="text-xs text-muted">{g.spread}{g.result ? ` · ${g.result}` : ""}</p></div><span className={`flex h-9 w-9 items-center justify-center rounded-full font-black text-black ${state.tacticalNukeActive ? "bg-lime-300" : "bg-primary"}`}>{g.confidence}</span></div><div className={`mt-3 rounded-lg border p-3 text-sm ${state.tacticalNukeActive ? "border-lime-300/30 bg-lime-300/10" : "border-primary/30 bg-primary/10"}`}>Pick: <strong>{g.pick}</strong></div></article>)}</div>
+    <p className="mt-4 rounded-xl border border-emerald-400/30 bg-emerald-400/10 p-3 text-xs font-bold text-emerald-200">Card locked · preview picks cannot reach a live league.</p>
+    {confirmNuke && <div className="fixed inset-0 z-[75] flex items-end justify-center bg-red-950/90 p-4 backdrop-blur-sm sm:items-center" role="dialog" aria-modal="true" aria-label="Confirm Tactical Nuclear Button"><section className="w-full max-w-md rounded-3xl border-2 border-red-500 bg-black p-5 text-center shadow-[0_0_80px_rgba(239,68,68,.55)]"><WarRoomArsenalIcon kind="nuke" size={78}/><p className="mt-3 text-[10px] font-black uppercase tracking-[.24em] text-red-300">Tactical authorization required</p><h3 className="mt-2 text-3xl font-black">GO NUCLEAR?</h3><p className="mt-3 text-sm leading-relaxed text-white/70">The computer takes the entire weekly card. If it cooks, every point doubles. This spends one of your two season uses immediately.</p><p className="mt-3 text-xs font-black text-red-300">NO EDITS · NO REROLLS · NO REFUNDS</p><div className="mt-5 grid grid-cols-2 gap-2"><button type="button" onClick={() => setConfirmNuke(false)} className="min-h-12 rounded-xl border border-white/25 text-xs font-bold">Keep control</button><button type="button" onClick={() => { onUpdate(armFoundryTacticalNuke(state)); setConfirmNuke(false); }} className="min-h-12 rounded-xl bg-red-600 text-xs font-black text-white">AUTHORIZE ☢</button></div></section></div>}
+  </Page>;
+}
 
 function Standings({ state }: { state: FoundryWalkthrough }) {
   if (state.sport === "cbb") {
