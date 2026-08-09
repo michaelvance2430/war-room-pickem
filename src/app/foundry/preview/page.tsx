@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import GazettePaper from "@/components/GazettePaper";
 import FoundryCfbActThree from "@/components/FoundryCfbActThree";
+import FoundryNflActThree from "@/components/FoundryNflActThree";
 import WarRoomArsenalIcon from "@/components/WarRoomArsenalIcon";
 import { buildFoundryGazetteFixture } from "@/lib/foundry-gazette-fixtures";
 import {
@@ -196,6 +197,7 @@ function Postseason({ state, onUpdate }: { state: FoundryWalkthrough; onUpdate: 
   const bottom = state.sport === "cbb" ? regionalFields.flatMap((field) => field.toilet) : state.players.slice(8, 16);
   const phase = stage < 0 ? `Projected fields · cut locks after ${PREVIEW_SPORTS[state.sport].weekLabel(cutWeek - 1)}` : stage === 0 ? "Fields locked · quarterfinals ready" : stage === 1 ? "Quarterfinals complete · semifinals ready" : stage === 2 ? "Semifinals complete · championship matchups ready" : "Postseason complete · winners crowned";
   if (state.sport === "cfb") return <Page title={state.week < cutWeek ? "Regular Season Command" : "CFB Act III Lab"} note={state.week < cutWeek ? `Act III remains sealed until ${PREVIEW_SPORTS.cfb.weekLabel(cutWeek)}.` : "Bowl Mania and the CFP are isolated Foundry previews. Nothing here writes to a live league."}><FoundryCfbActThree seasonWeek={state.week} postseasonWeek={cutWeek} /></Page>;
+  if (state.sport === "nfl") return <Page title={state.week < cutWeek ? "Regular Season Command" : "NFL Act III Lab"} note={state.week < cutWeek ? `The Road to the Bowl remains sealed until ${PREVIEW_SPORTS.nfl.weekLabel(cutWeek)}.` : "The playoff bracket and JDAM Protocol are isolated Foundry previews. Nothing here writes to a live league."}>{state.week < cutWeek ? <section className="rounded-2xl border border-sky-300/25 bg-card p-6 text-center"><h3 className="text-xl font-black">PLAYOFF OPERATIONS SEALED</h3><p className="mt-2 text-xs text-muted">Finish the regular season before the field exists.</p></section> : <FoundryNflActThree />}</Page>;
   if (state.sport !== "cbb") return <Page title="The Postseason" note={phase}><div className="mb-4 grid grid-cols-2 gap-2"><Stat label="Championship field" value={String(top.length)} note={stage < 0 ? "projected" : "locked"} /><Stat label="Toilet Bowl field" value={String(bottom.length)} note={stage < 0 ? "projected" : "locked"} /></div><div className="grid gap-5"><TournamentBracket title="Championship" tone="gold" players={top} stage={stage} /><TournamentBracket title="Toilet Bowl" tone="purple" players={bottom} stage={stage} /></div></Page>;
   return <Page title="March Madness Command Center" note="Three separate competitions. NCAA picks never alter the player Championship or Toilet Bowl fields."><nav className="mb-4 grid grid-cols-3 gap-2">{([[
     "ncaa", "NCAA Bracket"], ["championship", "Championship"], ["toilet", "Toilet Bowl"]] as const).map(([id, label]) => <button key={id} type="button" onClick={() => setCompetition(id)} className={`min-h-11 rounded-xl border px-2 text-[10px] font-black ${competition === id ? "border-orange-300 bg-orange-300 text-black" : "border-border bg-card"}`}>{label}</button>)}</nav>

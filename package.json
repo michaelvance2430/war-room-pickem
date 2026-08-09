@@ -23,6 +23,7 @@
     "verify:foundry-tactical-nuke": "node --import tsx scripts/verify-foundry-tactical-nuke.mjs",
     "verify:profile-arsenal": "node scripts/verify-profile-arsenal.mjs",
     "verify:fieldhouse-hellfire": "node --import tsx scripts/verify-fieldhouse-hellfire.mjs",
+    "verify:nfl-jdam": "node --import tsx scripts/verify-nfl-jdam.mjs",
     "verify:trophy-shapes": "node scripts/verify-championship-trophy-shapes.mjs",
     "verify:account-legendaries": "node scripts/verify-account-legendaries.mjs",
     "verify:foundry-gazette": "node --import tsx scripts/verify-foundry-gazette.mjs",
