@@ -9,6 +9,7 @@ import {
 } from "@/lib/commish-onboarding";
 import BrandMark from "@/components/BrandMark";
 import { purgeRetiredGuestSession } from "@/lib/guest-mode";
+import { safeWarRoomPath, warRoomAuthReturnUrl } from "@/lib/native-contract";
 
 function LoginPageInner() {
   const searchParams = useSearchParams();
@@ -65,10 +66,7 @@ function LoginPageInner() {
    */
   function afterAuthPath(_opts?: { isNewSignup?: boolean }): string {
     const nextRaw = searchParams.get("next");
-    const next =
-      nextRaw && nextRaw.startsWith("/") && !nextRaw.startsWith("//")
-        ? nextRaw
-        : null;
+    const next = nextRaw ? safeWarRoomPath(nextRaw, "") : null;
     const code = peekPendingJoinCode();
     // Invite/join destination first; no-league users go Home → join/start.
     // Allegiance (NFL or CFB) is gated when that sport becomes active.
@@ -93,12 +91,8 @@ function LoginPageInner() {
     setResetBusy(true);
     try {
       const supabase = createClient();
-      const origin =
-        typeof window !== "undefined" ? window.location.origin : "";
       // Must be allow-listed in Supabase Auth → URL configuration
-      const redirectTo = origin
-        ? `${origin}/reset-password`
-        : undefined;
+      const redirectTo = warRoomAuthReturnUrl("/reset-password");
       try {
         sessionStorage.setItem("warroom-password-recovery", "1");
       } catch {

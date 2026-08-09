@@ -1,12 +1,15 @@
 {
   "name": "War Room Pick'Em",
   "short_name": "War Room",
-  "description": "College football pick'em with your people — confidence, Best Bets, props, Championship + Toilet Bowl.",
+  "id": "/",
+  "description": "CFB and NFL pick'em with your people — confidence, Best Bets, props, Championship + Toilet Bowl.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#0f0f0f",
   "theme_color": "#0f0f0f",
   "orientation": "portrait-primary",
+  "categories": ["sports", "games", "social"],
   "icons": [
     {
       "src": "/favicon-32.png",
