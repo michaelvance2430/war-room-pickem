@@ -342,14 +342,27 @@ function SimulationPulse({ kind, step }: { kind: "week" | "regular" | "season"; 
 }
 function PreviewRingCeremony({ state, onClose }: { state: FoundryWalkthrough; onClose: () => void }) {
   const [slide, setSlide] = useState(0);
-  const champion = state.players[0];
+  const championship = foundryPostseasonRounds(state, "championship");
+  const toilet = foundryPostseasonRounds(state, "toilet");
+  const champion = state.players.find((player) => player.id === championship.champion) || state.players[0];
+  const toiletChampion = state.players.find((player) => player.id === toilet.champion) || state.players[state.players.length - 1];
+  const bracketWinner = [...state.players].sort((a, b) => b.madnessPoints - a.madnessPoints || b.points - a.points)[0];
+  const ncaaChampion = state.ncaaResults?.["national:championship"];
+  const nerds = state.players.filter((player) => ncaaChampion && state.preseasonChampionPicks?.[player.id] === ncaaChampion);
   const meta = PREVIEW_SPORTS[state.sport];
   useEffect(() => {
     const escape = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
     window.addEventListener("keydown", escape);
     return () => window.removeEventListener("keydown", escape);
   }, [onClose]);
-  const slides = [
+  const slides = state.sport === "cbb" ? [
+    { kicker: "The season is final", title: "THREE RACES. ONE PROPHECY.", body: `${meta.room} has a Fieldhouse Champion, a Toilet Bowl survivor, one bracket crown, and preseason receipts from the people who somehow knew.` },
+    { kicker: "2026 Fieldhouse Champion", title: champion.name.toUpperCase(), body: `Survived the regional matchup, the semifinal, and the title game. The final standings did not award this ring. The bracket did.` },
+    { kicker: "2026 Toilet Bowl Champion", title: toiletChampion.name.toUpperCase(), body: "Entered through the wrong side of the cut. Left carrying porcelain hardware and an alarming amount of confidence." },
+    { kicker: "NCAA bracket crown", title: bracketWinner.name.toUpperCase(), body: `${bracketWinner.madnessPoints} bracket points. Sixty-seven decisions entered into evidence. Most of them survived cross-examination.` },
+    { kicker: "Village Nerd · preseason prophecy", title: nerds.length ? nerds.map((player) => player.name).join(" · ").toUpperCase() : "NO SURVIVING PROPHETS", body: nerds.length ? `${ncaaChampion} was called before Window 1. This is not the Selection Sunday bracket prize. These receipts are months older and considerably more annoying.` : `Nobody named ${ncaaChampion} before the season. The crystal ball has been placed on administrative leave.` },
+    { kicker: "The ring", title: "HISTORY DOESN’T ASK HOW", body: "It remembers who survived the Fieldhouse bracket when everybody else ran out of rounds." },
+  ] : [
     { kicker: "The season is final", title: "ONE NAME REMAINS", body: `${meta.room} has receipts, casualties, and a champion.` },
     { kicker: "2026 champion", title: champion.name.toUpperCase(), body: `${champion.points} points. ${state.gazetteWeeks.length} windows survived. Every excuse has been entered into evidence.` },
     { kicker: "The ring", title: "HISTORY DOESN’T ASK HOW", body: "It only remembers whose name was engraved when everybody else ran out of weeks." },
@@ -358,7 +371,7 @@ function PreviewRingCeremony({ state, onClose }: { state: FoundryWalkthrough; on
   return <div className="fixed inset-0 z-[80] overflow-y-auto bg-[radial-gradient(circle_at_top,#78350f_0%,#111827_38%,#020617_100%)] px-4 py-[max(24px,env(safe-area-inset-top))] text-white" role="dialog" aria-modal="true" aria-label="Foundry Ring Ceremony">
     <div className="mx-auto flex min-h-[calc(100vh-48px)] max-w-md flex-col justify-between text-center">
       <button type="button" onClick={onClose} className="ml-auto min-h-11 rounded-full border border-white/25 px-4 text-xs font-bold">Skip</button>
-      <section className="py-8"><p className="text-[10px] font-black uppercase tracking-[.3em] text-amber-300">{current.kicker}</p>{slide === 2 && <div className="mx-auto my-7 flex h-36 w-36 items-center justify-center rounded-full border-[10px] border-amber-300 bg-gradient-to-br from-yellow-100 via-amber-400 to-amber-800 text-5xl font-black text-black shadow-[0_0_70px_rgba(251,191,36,.65)]">WR</div>}<h2 className="mt-5 text-4xl font-black leading-none">{current.title}</h2><p className="mx-auto mt-5 max-w-sm text-sm leading-relaxed text-white/75">{current.body}</p>{slide === 1 && <p className="mt-6 text-xs font-black uppercase tracking-[.2em] text-amber-300">{meta.sport} · Foundry Season</p>}</section>
+      <section className="py-8"><p className="text-[10px] font-black uppercase tracking-[.3em] text-amber-300">{current.kicker}</p>{slide === slides.length - 1 && <div className="mx-auto my-7 flex h-36 w-36 items-center justify-center rounded-full border-[10px] border-amber-300 bg-gradient-to-br from-yellow-100 via-amber-400 to-amber-800 text-5xl font-black text-black shadow-[0_0_70px_rgba(251,191,36,.65)]">WR</div>}<h2 className="mt-5 text-4xl font-black leading-none">{current.title}</h2><p className="mx-auto mt-5 max-w-sm text-sm leading-relaxed text-white/75">{current.body}</p>{slide === 1 && <p className="mt-6 text-xs font-black uppercase tracking-[.2em] text-amber-300">{meta.sport} · Foundry Season</p>}</section>
       <div className="pb-[max(12px,env(safe-area-inset-bottom))]"><div className="mb-4 flex justify-center gap-2">{slides.map((_, i) => <span key={i} className={`h-1.5 w-10 rounded-full ${i <= slide ? "bg-amber-300" : "bg-white/20"}`} />)}</div><button type="button" onClick={() => slide < slides.length - 1 ? setSlide(slide + 1) : onClose()} className="min-h-12 w-full rounded-xl bg-amber-300 text-sm font-black text-black">{slide < slides.length - 1 ? "Continue" : "Enter completed season"}</button><p className="mt-3 text-[9px] uppercase tracking-wide text-white/40">Foundry preview · no trophy engraved · no cloud writes</p></div>
     </div>
   </div>;
