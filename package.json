@@ -17,6 +17,7 @@
     "verify:season-rival": "node --import tsx scripts/verify-season-rival.mjs",
     "verify:cbb-contract": "node --import tsx scripts/verify-cbb-contract.mjs",
     "verify:fieldhouse-v1": "npm run verify:cbb-contract && npm run verify:postseason-ps1 && node --import tsx scripts/verify-fieldhouse-v1.mjs && npm run verify:foundry-gazette",
+    "verify:act-three": "node --import tsx scripts/verify-act-three-contract.mjs",
     "verify:account-legendaries": "node scripts/verify-account-legendaries.mjs",
     "verify:foundry-gazette": "node --import tsx scripts/verify-foundry-gazette.mjs",
     "verify:native-readiness": "node scripts/verify-native-readiness.mjs",
