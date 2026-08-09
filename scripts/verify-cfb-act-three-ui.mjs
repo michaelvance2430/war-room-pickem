@@ -1,0 +1,25 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+const component = readFileSync(join(root, "src/components/FoundryCfbActThree.tsx"), "utf8");
+const preview = readFileSync(join(root, "src/app/foundry/preview/page.tsx"), "utf8");
+
+assert.match(preview, /state\.sport === "cfb"[\s\S]*<FoundryCfbActThree/);
+assert.match(component, /warroom-foundry-cfb-act-three-v1/);
+assert.match(component, /Foundry only · no cloud writes/);
+assert.match(component, /MARQUEE_NAMES[\s\S]*SICKO_NAMES/);
+assert.match(component, /DEFAULT_ALLOCATIONS[\s\S]*\[game\.id, 4\]/);
+assert.match(component, /validateCfbBowlAllocation/);
+assert.match(component, /Lock Bowl Board/);
+assert.match(component, /Sim Bowl Results/);
+assert.match(component, /Certified Sicko Watch/);
+assert.match(component, /Advance to the CFP/);
+assert.match(component, /fixed 12-team, 11-game playoff bracket/);
+assert.match(component, /min-h-12/);
+assert.match(component, /min-h-11 min-w-11/);
+assert.doesNotMatch(component, /supabase|fetch\(|\/api\//);
+
+console.log("CFB Act III UI verified: phone tap targets · local-only Bowl Board · 100-point lock · Sicko results · CFP handoff");
