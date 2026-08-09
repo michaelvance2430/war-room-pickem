@@ -21,7 +21,10 @@ import {
   switchToLeague,
   LeagueMembership,
 } from "@/lib/session-restore";
-import { resolveHomeTagline } from "@/lib/home-tagline";
+import {
+  resolveHomeTagline,
+  resolveRotatingHomeTagline,
+} from "@/lib/home-tagline";
 import { syncLeagueFromCloud } from "@/lib/league-sync";
 import { resolveHomeChrome } from "@/lib/sports/home-chrome";
 import HomeSportAtmosphere from "@/components/HomeSportAtmosphere";
@@ -68,10 +71,11 @@ function readLocalHomeShell(): {
       leagueCode: league.code,
       leagueName: league.name,
       sportId: league.sportId || "cfb",
-      homeTagline: resolveHomeTagline({
+      homeTagline: resolveRotatingHomeTagline({
         homeTaglineId: league.settings?.homeTaglineId,
         homeTaglineCustom: league.settings?.homeTaglineCustom,
         sportId: league.sportId || "cfb",
+        roomKey: league.id,
       }),
       isCommish: isCommissioner(),
       actuallyCommish: isActuallyCommissioner(),
@@ -288,10 +292,11 @@ export default function Home() {
               setLeagueName(fresh.name);
               setSportId(sport);
               setHomeTagline(
-                resolveHomeTagline({
+                resolveRotatingHomeTagline({
                   homeTaglineId: fresh.settings?.homeTaglineId,
                   homeTaglineCustom: fresh.settings?.homeTaglineCustom,
                   sportId: sport,
+                  roomKey: fresh.id,
                 })
               );
               setIsCommish(isCommissioner());
@@ -371,10 +376,11 @@ export default function Home() {
         setLeagueName(fresh.name);
         setSportId(sport);
         setHomeTagline(
-          resolveHomeTagline({
+          resolveRotatingHomeTagline({
             homeTaglineId: fresh.settings?.homeTaglineId,
             homeTaglineCustom: fresh.settings?.homeTaglineCustom,
             sportId: sport,
+            roomKey: fresh.id,
           })
         );
         setIsCommish(isCommissioner());
@@ -467,10 +473,11 @@ export default function Home() {
     setLeagueName(league.name);
     setSportId(league.sportId || "cfb");
     setHomeTagline(
-      resolveHomeTagline({
+      resolveRotatingHomeTagline({
         homeTaglineId: league.settings?.homeTaglineId,
         homeTaglineCustom: league.settings?.homeTaglineCustom,
         sportId: league.sportId || "cfb",
+        roomKey: league.id,
       })
     );
     setIsCommish(isCommissioner());

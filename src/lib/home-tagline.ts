@@ -78,3 +78,48 @@ export function resolveHomeTagline(opts: {
   const preset = presets.find((p) => p.id === id);
   return preset?.text || defaultText;
 }
+
+/** Home motto cadence: stable during a visit, fresh often enough to feel alive. */
+export const HOME_TAGLINE_ROTATION_DAYS = 3;
+
+/** Small deterministic hash so different rooms do not rotate in lockstep. */
+function rotationSeed(value: string): number {
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = (hash * 31 + value.charCodeAt(i)) >>> 0;
+  }
+  return hash;
+}
+
+/**
+ * Rotating Home-only motto.
+ *
+ * Commissioner-written custom copy is a deliberate room identity and remains
+ * pinned. Presets rotate every three UTC days; the saved preset is the
+ * starting point, while the room key keeps leagues from changing in lockstep.
+ */
+export function resolveRotatingHomeTagline(opts: {
+  homeTaglineId?: string | null;
+  homeTaglineCustom?: string | null;
+  sportId?: string | null;
+  roomKey?: string | null;
+  /** Injectable clock for verification. */
+  now?: number;
+}): string {
+  const id = opts.homeTaglineId || DEFAULT_HOME_TAGLINE_ID;
+  if (id === "custom") return resolveHomeTagline(opts);
+
+  const presets = homeTaglinePresetsForSport(opts.sportId || "cfb").filter(
+    (preset) => preset.id !== "custom" && !!preset.text
+  );
+  if (presets.length === 0) return resolveHomeTagline(opts);
+
+  const selectedIndex = Math.max(
+    0,
+    presets.findIndex((preset) => preset.id === id)
+  );
+  const cadenceMs = HOME_TAGLINE_ROTATION_DAYS * 24 * 60 * 60 * 1000;
+  const bucket = Math.floor((opts.now ?? Date.now()) / cadenceMs);
+  const roomOffset = rotationSeed(opts.roomKey || "war-room") % presets.length;
+  return presets[(selectedIndex + roomOffset + bucket) % presets.length].text;
+}
