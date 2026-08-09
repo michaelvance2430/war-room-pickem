@@ -162,22 +162,62 @@ function Results({ score, sickoCorrect, onCfp, onReset }: { score: number; sicko
 
 function CfpHandoff({ onBack, onReset }: { onBack: () => void; onReset: () => void }) {
   const seeds = Array.from({ length: 12 }, (_, index) => `Seed ${index + 1}`);
+  const [picks, setPicks] = useState<Record<string, string>>({});
+  const [mode, setMode] = useState<"picking" | "locked" | "results">("picking");
   const trophyId = getLeague()?.settings?.championshipTrophyId || "command_cup";
   const trophy = getChampionshipTrophyDesign(trophyId);
+  const winner = (id: string) => picks[id] || "TBD";
+  const games = {
+    r1a: [seeds[4], seeds[11]], r1b: [seeds[7], seeds[8]], r1c: [seeds[6], seeds[9]], r1d: [seeds[5], seeds[10]],
+    q1: [seeds[3], winner("r1a")], q2: [seeds[0], winner("r1b")], q3: [seeds[1], winner("r1c")], q4: [seeds[2], winner("r1d")],
+    s1: [winner("q1"), winner("q2")], s2: [winner("q3"), winner("q4")], final: [winner("s1"), winner("s2")],
+  } as const;
+  const order = ["r1a", "r1b", "r1c", "r1d", "q1", "q2", "q3", "q4", "s1", "s2", "final"] as const;
+  const choose = (id: string, team: string) => {
+    if (mode !== "picking" || team === "TBD") return;
+    setPicks((current) => {
+      const next = { ...current, [id]: team };
+      // Earlier changes invalidate every downstream selection that no longer appears.
+      for (let pass = 0; pass < 3; pass++) {
+        const w = (key: string) => next[key] || "TBD";
+        const legal: Record<string, readonly string[]> = { r1a: games.r1a, r1b: games.r1b, r1c: games.r1c, r1d: games.r1d, q1: [seeds[3], w("r1a")], q2: [seeds[0], w("r1b")], q3: [seeds[1], w("r1c")], q4: [seeds[2], w("r1d")], s1: [w("q1"), w("q2")], s2: [w("q3"), w("q4")], final: [w("s1"), w("s2")] };
+        for (const key of order) if (next[key] && !legal[key].includes(next[key])) delete next[key];
+      }
+      return next;
+    });
+  };
+  const complete = order.every((id) => !!picks[id]);
+  const actual = (() => {
+    const result: Record<string, string> = { r1a: seeds[4], r1b: seeds[8], r1c: seeds[6], r1d: seeds[10] };
+    result.q1 = result.r1a; result.q2 = seeds[0]; result.q3 = seeds[1]; result.q4 = result.r1d;
+    result.s1 = result.q2; result.s2 = result.q3; result.final = result.s2;
+    return result;
+  })();
+  const weights: Record<string, number> = { r1a: 1, r1b: 1, r1c: 1, r1d: 1, q1: 2, q2: 2, q3: 2, q4: 2, s1: 4, s2: 4, final: 8 };
+  const score = order.reduce((sum, id) => sum + (picks[id] === actual[id] ? weights[id] : 0), 0);
   return <section className="space-y-4" aria-label="Foundry CFP handoff"><header className="rounded-2xl border border-sky-300/40 bg-[radial-gradient(circle_at_top,#0c4a6e,transparent_60%)] p-5"><p className="text-[9px] font-black uppercase tracking-[.2em] text-sky-300">Separate scoring · same Act III</p><h3 className="mt-1 text-2xl font-black">Road Through the CFP</h3><p className="mt-2 text-xs text-muted">The Bowl Bankroll is closed. Now fill the fixed 12-team, 11-game playoff bracket. No reseeding.</p></header>
     <div className="overflow-x-auto rounded-2xl border border-sky-300/25 bg-[linear-gradient(90deg,rgba(15,23,42,.96),rgba(12,74,110,.32),rgba(15,23,42,.96))] p-3 pb-5" aria-label="CFP bracket fighting toward the selected trophy">
       <div className="grid min-w-[1130px] grid-cols-[170px_145px_125px_190px_125px_145px_170px] items-center gap-4">
-        <BracketColumn label="First Round" games={[[seeds[4], seeds[11]], [seeds[7], seeds[8]]]} />
-        <BracketColumn label="Quarterfinals" games={[[seeds[3], "5/12 winner"], [seeds[0], "8/9 winner"]]} inward="right" />
-        <BracketColumn label="Semifinal" games={[["QF winner", "QF winner"]]} inward="right" centered />
-        <section className="relative flex min-h-[360px] flex-col items-center justify-center text-center"><div className="absolute inset-y-12 left-0 w-px bg-gradient-to-b from-transparent via-amber-300/60 to-transparent" /><div className="absolute inset-y-12 right-0 w-px bg-gradient-to-b from-transparent via-amber-300/60 to-transparent" /><p className="text-[9px] font-black uppercase tracking-[.2em] text-amber-300">National Championship</p><SportChampionshipTrophy sport="cfb" size={150} trophyDesignId={trophy.id} animate /><h4 className="-mt-2 text-lg font-black">{trophy.name}</h4><p className="mt-1 max-w-[170px] text-[9px] italic text-muted">“{trophy.inscription}”</p><span className="mt-3 rounded-full border border-amber-300/35 bg-amber-300/10 px-3 py-1 text-[8px] font-black text-amber-200">EVERY PATH ENDS HERE</span></section>
-        <BracketColumn label="Semifinal" games={[["QF winner", "QF winner"]]} inward="left" centered />
-        <BracketColumn label="Quarterfinals" games={[[seeds[1], "7/10 winner"], [seeds[2], "6/11 winner"]]} inward="left" />
-        <BracketColumn label="First Round" games={[[seeds[6], seeds[9]], [seeds[5], seeds[10]]]} />
+        <PlayableColumn label="First Round" entries={[["r1a", games.r1a], ["r1b", games.r1b]]} picks={picks} choose={choose} locked={mode !== "picking"} />
+        <PlayableColumn label="Quarterfinals" entries={[["q1", games.q1], ["q2", games.q2]]} picks={picks} choose={choose} locked={mode !== "picking"} />
+        <PlayableColumn label="Semifinal" entries={[["s1", games.s1]]} picks={picks} choose={choose} locked={mode !== "picking"} centered />
+        <section className="relative flex min-h-[360px] flex-col items-center justify-center text-center"><p className="text-[9px] font-black uppercase tracking-[.2em] text-amber-300">National Championship</p><CfpGame id="final" teams={games.final} selected={picks.final} choose={choose} locked={mode !== "picking"} /><SportChampionshipTrophy sport="cfb" size={130} trophyDesignId={trophy.id} animate /><h4 className="-mt-2 text-lg font-black">{mode === "results" ? actual.final : picks.final || trophy.name}</h4><p className="mt-1 max-w-[170px] text-[9px] italic text-muted">{picks.final ? `Your champion · ${trophy.name}` : `“${trophy.inscription}”`}</p></section>
+        <PlayableColumn label="Semifinal" entries={[["s2", games.s2]]} picks={picks} choose={choose} locked={mode !== "picking"} centered />
+        <PlayableColumn label="Quarterfinals" entries={[["q3", games.q3], ["q4", games.q4]]} picks={picks} choose={choose} locked={mode !== "picking"} />
+        <PlayableColumn label="First Round" entries={[["r1c", games.r1c], ["r1d", games.r1d]]} picks={picks} choose={choose} locked={mode !== "picking"} />
       </div>
       <p className="mt-3 text-center text-[9px] font-bold text-sky-200">Swipe the bracket · both sides fight toward the commissioner’s trophy</p>
     </div>
-    <section className="rounded-2xl border border-primary/30 bg-card p-4"><p className="text-[9px] font-black uppercase text-primary">Crystal Ball receipt</p><h4 className="mt-1 font-black">Your Week 0 champion stays on the wall.</h4><p className="mt-2 text-xs text-muted">The preseason prophecy remains visible beside the playoff bracket until the national champion is decided.</p></section><p className="rounded-xl border border-dashed border-border p-3 text-center text-[10px] text-muted">Foundry structure preview: official 12-team bracket mathematics with original War Room hardware, cards, and presentation.</p><div className="grid grid-cols-2 gap-2"><button type="button" onClick={onBack} className="min-h-12 rounded-xl border border-border text-xs font-bold">← Sicko Results</button><button type="button" onClick={onReset} className="min-h-12 rounded-xl border border-red-400/30 text-xs font-bold text-red-200">Reset Lab</button></div></section>;
+    {mode === "results" && <section className="rounded-2xl border border-emerald-300/35 bg-emerald-950/15 p-5 text-center"><p className="text-[9px] font-black uppercase text-emerald-300">CFP bracket final</p><strong className="block text-5xl">{score}/28</strong><p className="text-xs text-muted">separate playoff points · champion pick worth 8</p></section>}
+    <div className="grid grid-cols-2 gap-2">{mode === "picking" ? <button type="button" disabled={!complete} onClick={() => setMode("locked")} className="col-span-2 min-h-12 rounded-xl bg-sky-300 font-black text-sky-950 disabled:opacity-35">Lock CFP Bracket</button> : mode === "locked" ? <><button type="button" onClick={() => setMode("picking")} className="min-h-12 rounded-xl border border-border text-xs font-bold">Unlock Preview</button><button type="button" onClick={() => setMode("results")} className="min-h-12 rounded-xl bg-emerald-300 text-xs font-black text-emerald-950">Sim CFP Results</button></> : <button type="button" onClick={() => { setPicks({}); setMode("picking"); }} className="col-span-2 min-h-12 rounded-xl border border-border text-xs font-bold">Pick Another Bracket</button>}<button type="button" onClick={onBack} className="min-h-12 rounded-xl border border-border text-xs font-bold">← Sicko Results</button><button type="button" onClick={onReset} className="min-h-12 rounded-xl border border-red-400/30 text-xs font-bold text-red-200">Reset Lab</button></div></section>;
+}
+
+function PlayableColumn({ label, entries, picks, choose, locked, centered = false }: { label: string; entries: readonly (readonly [string, readonly string[]])[]; picks: Record<string, string>; choose: (id: string, team: string) => void; locked: boolean; centered?: boolean }) {
+  return <section className={centered ? "flex min-h-[360px] flex-col justify-center" : ""}><p className="mb-4 text-center text-[8px] font-black uppercase tracking-[.16em] text-sky-300">{label}</p><div className="space-y-16">{entries.map(([id, teams]) => <CfpGame key={id} id={id} teams={teams} selected={picks[id]} choose={choose} locked={locked} />)}</div></section>;
+}
+
+function CfpGame({ id, teams, selected, choose, locked }: { id: string; teams: readonly string[]; selected?: string; choose: (id: string, team: string) => void; locked: boolean }) {
+  return <div className="rounded-xl border border-sky-300/25 bg-black/35 shadow-lg">{teams.map((team) => <button type="button" key={team} disabled={locked || team === "TBD"} onClick={() => choose(id, team)} className={`flex min-h-11 w-full items-center gap-2 border-b border-white/10 px-3 text-left text-[10px] font-bold last:border-0 disabled:opacity-40 ${selected === team ? "bg-sky-300 text-sky-950" : ""}`}><span>{team.match(/\d+/)?.[0] || "→"}</span><span>{team}</span></button>)}</div>;
 }
 
 function BracketColumn({ label, games, inward, centered = false }: { label: string; games: string[][]; inward?: "left" | "right"; centered?: boolean }) {
