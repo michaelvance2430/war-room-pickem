@@ -18,6 +18,7 @@ for (const chapter of chapters) {
 
 assert.equal(ACT_THREE_CHAPTERS.cbb.status, "reference_implemented");
 assert.match(ACT_THREE_CHAPTERS.cbb.game.signature, /67 decisions/);
+assert.match(ACT_THREE_CHAPTERS.cfb.game.signature, /Marquee 15 \+ Sicko 10/);
 assert.match(ACT_THREE_CHAPTERS.cfb.game.strategy, /100-point bowl bankroll/);
 assert.match(ACT_THREE_CHAPTERS.cfb.foundryProof.join(" "), /Certified Sicko/);
 assert.match(ACT_THREE_CHAPTERS.nfl.game.strategy, /limited consumable confidence arsenal/);
