@@ -53,6 +53,7 @@ type Champ = {
   year: number;
   name: string;
   userId: string | null;
+  trophyDesignId?: string | null;
 };
 
 function ConfettiField({ colors }: { colors: string[] }) {
@@ -384,6 +385,7 @@ export default function RingCeremonyModal() {
               size={168}
               threePeat={threePeat}
               animate
+              trophyDesignId={champ.trophyDesignId}
             />
             <p className="text-[10px] uppercase tracking-[0.16em] text-white/45 font-semibold mt-1">
               {hardware}
@@ -476,6 +478,7 @@ export default function RingCeremonyModal() {
                   winnerUserId:
                     liveChamp?.userId || champ.userId || undefined,
                   winnerAvatarUrl: liveChamp?.avatarUrl || undefined,
+                  trophyDesignId: champ.trophyDesignId,
                 }}
                 label={pack.ctaShare}
                 className="!bg-white !text-black !border-0 !font-extrabold min-h-[48px] px-6 w-full sm:w-auto justify-center"

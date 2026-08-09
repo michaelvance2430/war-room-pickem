@@ -4,6 +4,7 @@
  */
 
 import type { ProfileTrophyKind } from "./profile-hardware";
+import { getChampionshipTrophyDesign } from "./championship-trophy-catalog";
 
 export type ShareableTrophy = {
   kind: ProfileTrophyKind;
@@ -18,6 +19,8 @@ export type ShareableTrophy = {
   winnerAvatarUrl?: string | null;
   /** Optional user id for roster lookup by callers */
   winnerUserId?: string | null;
+  /** Permanent selected hardware snapshot — never infer from the current season. */
+  trophyDesignId?: string | null;
 };
 
 type RosterAvatarHit = {
@@ -622,7 +625,8 @@ export async function renderTrophyShareCanvas(
       268 * s,
       140 * s,
       t.sportId,
-      champTrophyImg
+      champTrophyImg,
+      t.trophyDesignId
     );
   } else if (t.kind === "toilet_bowl") {
     drawToiletTrophyArt(ctx, size / 2, 268 * s, 130 * s);
@@ -804,9 +808,11 @@ function drawChampionshipTrophyArt(
   cy: number,
   h: number,
   sportId?: string | null,
-  photo?: HTMLImageElement | null
+  photo?: HTMLImageElement | null,
+  trophyDesignId?: string | null
 ) {
   const sport = resolveShareSport(sportId);
+  const selected = getChampionshipTrophyDesign(trophyDesignId, sportId);
   const scale = h / 200;
   ctx.save();
   ctx.translate(cx, cy);
@@ -824,7 +830,19 @@ function drawChampionshipTrophyArt(
     return;
   }
 
-  if (sport === "nfl") {
+  if (trophyDesignId) {
+    // Share cards preserve the exact permanent hardware identity. The large
+    // central medallion uses its founding-collection metal and engraved name.
+    const g = ctx.createLinearGradient(-55 * scale, -75 * scale, 55 * scale, 70 * scale);
+    g.addColorStop(0, selected.colors[0]); g.addColorStop(.5, selected.colors[1]); g.addColorStop(1, selected.colors[2]);
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.moveTo(0, -78 * scale); ctx.lineTo(48 * scale, -40 * scale); ctx.lineTo(34 * scale, 52 * scale); ctx.lineTo(-34 * scale, 52 * scale); ctx.lineTo(-48 * scale, -40 * scale); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = selected.colors[0]; ctx.lineWidth = 3 * scale; ctx.stroke();
+    ctx.fillStyle = selected.colors[2]; ctx.fillRect(-52 * scale, 56 * scale, 104 * scale, 24 * scale);
+    ctx.fillStyle = selected.colors[0]; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.font = `900 ${10 * scale}px system-ui`;
+    const label = selected.name.toUpperCase();
+    ctx.fillText(label.length > 24 ? label.slice(0, 24) : label, 0, 68 * scale);
+  } else if (sport === "nfl") {
     // Silver football on three-leg tripod (default Super Bowl hardware)
     const g = ctx.createLinearGradient(-40 * scale, -70 * scale, 40 * scale, 10 * scale);
     g.addColorStop(0, "#ffffff");

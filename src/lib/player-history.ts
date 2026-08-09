@@ -713,7 +713,7 @@ export function buildMuseumTimeline(opts: {
 
 export function getDefendingChampion(
   trophies: LeagueTrophy[]
-): { year: number; name: string; userId: string | null } | null {
+): { year: number; name: string; userId: string | null; trophyDesignId: string | null } | null {
   const champs = trophies
     .filter((t) => t.trophyType === "championship")
     .sort((a, b) => {
@@ -725,5 +725,6 @@ export function getDefendingChampion(
     year: champs[0].seasonYear,
     name: champs[0].winnerName,
     userId: champs[0].winnerUserId,
+    trophyDesignId: champs[0].trophyDesignId || null,
   };
 }

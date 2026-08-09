@@ -19,6 +19,7 @@ export type FinaleSlide = {
   body: string;
   winnerName?: string;
   winnerUserId?: string | null;
+  trophyDesignId?: string | null;
   accent: string;
   border: string;
   /** Self-flex when viewer is the winner */
@@ -197,6 +198,7 @@ export function buildFinaleSlides(opts: {
           : pick(bodiesThem, `${name}-${year}-c-them`),
         winnerName: name,
         winnerUserId: t.winnerUserId,
+        trophyDesignId: t.trophyDesignId || null,
         accent: meta.accent,
         border: meta.border,
         isYou: you,

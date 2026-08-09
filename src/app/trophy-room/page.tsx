@@ -336,6 +336,7 @@ export default function TrophyRoomPage() {
       division: divKey || undefined,
       winnerUserId: live.userId || item.winnerUserId || undefined,
       winnerAvatarUrl: live.avatarUrl || undefined,
+      trophyDesignId: item.trophyDesignId,
     };
     const title = item.subtitle || m.title;
     return (
@@ -364,6 +365,7 @@ export default function TrophyRoomPage() {
               sportId={sportId}
               size={76}
               animate={!spinning && isChamp}
+              trophyDesignId={item.trophyDesignId}
             />
       </button>
           <div className="flex items-center gap-1.5">

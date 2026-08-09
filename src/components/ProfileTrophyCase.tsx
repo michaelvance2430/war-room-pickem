@@ -59,6 +59,7 @@ function Plaque({
     subtitle: item.subtitle,
     sportId: plaqueSport || undefined,
     winnerAvatarUrl: winnerAvatarUrl || undefined,
+    trophyDesignId: item.trophyDesignId,
   };
   const inspectTitle = `${item.seasonYear} · ${item.title}`;
   const inspectSub =

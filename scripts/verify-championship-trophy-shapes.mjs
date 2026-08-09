@@ -10,6 +10,10 @@ const bracket = readFileSync(join(root, "src/app/championship/page.tsx"), "utf8"
 const catalog = readFileSync(join(root, "src/lib/championship-trophy-catalog.ts"), "utf8");
 const museum = readFileSync(join(root, "src/app/museum/page.tsx"), "utf8");
 const wall = readFileSync(join(root, "src/components/LastSeasonHardwareWall.tsx"), "utf8");
+const ring = readFileSync(join(root, "src/components/RingCeremonyModal.tsx"), "utf8");
+const finale = readFileSync(join(root, "src/components/SeasonFinaleModal.tsx"), "utf8");
+const share = readFileSync(join(root, "src/lib/trophy-share.ts"), "utf8");
+const trophyCase = readFileSync(join(root, "src/components/ProfileTrophyCase.tsx"), "utf8");
 const ids = ["command_cup", "golden_gut", "the_receipt", "insufferable_crown", "brass_football", "last_one_standing", "nfl_sunday_crown", "nfl_fourth_and_regret", "nfl_red_zone_throne", "nfl_monday_expert", "nfl_clipboard_destiny", "nfl_very_legal_football", "cbb_busted_bracket", "cbb_chalk_goblet", "cbb_glass_slipper", "cbb_net_results", "cbb_full_court_oracle", "cbb_last_bracket_breathing"];
 for (const id of ids) { assert.match(art, new RegExp(id)); assert.match(catalog, new RegExp(id)); }
 assert.equal((catalog.match(/sport: "cfb"/g) || []).length, 6);
@@ -21,5 +25,7 @@ assert.match(bracket, /The object at the middle/);
 assert.match(bracket, /championshipTrophyId/);
 assert.match(museum, /trophyDesignId/);
 assert.match(wall, /trophyDesignId=\{t\.trophyDesignId\}/);
+for (const consumer of [ring, finale, share, trophyCase]) assert.match(consumer, /trophyDesignId/);
+assert.match(share, /getChampionshipTrophyDesign\(trophyDesignId, sportId\)/);
 assert.doesNotMatch(art, /CFP|NCAA|Lombardi/);
 console.log("Championship trophy system verified: 6 CFB + 6 NFL + 6 Fieldhouse silhouettes · bracket, case, and Museum preserve selected hardware");

@@ -259,6 +259,7 @@ export default function SeasonFinaleModal() {
                   sportId={getLeague()?.sportId}
                   size={slide.kind === "championship" ? 140 : 128}
                   animate
+                  trophyDesignId={slide.trophyDesignId}
                 />
               </div>
             ) : (
@@ -336,6 +337,7 @@ export default function SeasonFinaleModal() {
                       slide.winnerUserId ||
                       undefined,
                     winnerAvatarUrl: liveWinner?.avatarUrl || undefined,
+                    trophyDesignId: slide.trophyDesignId,
                   }}
                   label={slide.isYou ? "Share my win" : "Share this win"}
                   className="min-h-[48px] px-5 font-bold"
