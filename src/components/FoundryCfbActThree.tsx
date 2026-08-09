@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import SportChampionshipTrophy from "@/components/SportChampionshipTrophy";
 import { getChampionshipTrophyDesign } from "@/lib/championship-trophy-catalog";
 import { getLeague } from "@/lib/league";
+import WarRoomArsenalIcon from "@/components/WarRoomArsenalIcon";
 import {
   buildCfbBowlBoard,
   cfbSickoGameIds,
@@ -18,10 +19,11 @@ type SavedLab = {
   stage: Stage;
   allocations: CfbBowlAllocation;
   picks: Record<string, string>;
+  nuclear?: { active: boolean; reviewStartedAt: number; acknowledged: boolean };
 };
 
 // v2 intentionally clears the old preview that could reopen directly at CFP.
-const STORAGE_KEY = "warroom-foundry-cfb-act-three-v2";
+const STORAGE_KEY = "warroom-foundry-cfb-act-three-v3";
 const MARQUEE_NAMES = [
   "Citrus Bowl", "Alamo Bowl", "Music City Bowl", "Gator Bowl", "Texas Bowl",
   "ReliaQuest Bowl", "Las Vegas Bowl", "Sun Bowl", "Pop-Tarts Bowl", "Holiday Bowl",
@@ -71,6 +73,9 @@ export default function FoundryCfbActThree({ seasonWeek = 16, postseasonWeek = 1
   const [hydrated, setHydrated] = useState(false);
   const [tier, setTier] = useState<"marquee" | "sicko">("marquee");
   const [actEntered, setActEntered] = useState(false);
+  const [nuclearWarning, setNuclearWarning] = useState(false);
+  const [nuclearJolt, setNuclearJolt] = useState({ x: 0, y: 0, r: 0 });
+  const [reviewedTiers, setReviewedTiers] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     try {
@@ -84,6 +89,11 @@ export default function FoundryCfbActThree({ seasonWeek = 16, postseasonWeek = 1
   useEffect(() => {
     if (hydrated) localStorage.setItem(STORAGE_KEY, JSON.stringify(lab));
   }, [hydrated, lab]);
+  useEffect(() => {
+    if (lab.nuclear?.active || lab.stage !== "board") return;
+    const timer = window.setInterval(() => setNuclearJolt({ x: Math.round(Math.random() * 12 - 6), y: Math.round(Math.random() * 8 - 4), r: Math.round(Math.random() * 6 - 3) }), 620);
+    return () => window.clearInterval(timer);
+  }, [lab.nuclear?.active, lab.stage]);
 
   const total = BOARD.games.reduce((sum, game) => sum + (lab.allocations[game.id] || 0), 0);
   const remaining = 100 - total;
@@ -96,6 +106,7 @@ export default function FoundryCfbActThree({ seasonWeek = 16, postseasonWeek = 1
   })), []);
   const correctIds = BOARD.games.filter((game) => lab.picks[game.id] === results[game.id]).map((game) => game.id);
   const score = correctIds.reduce((sum, id) => sum + (lab.allocations[id] || 0), 0);
+  const finalScore = lab.nuclear?.active ? Math.round(score >= 60 ? score * 1.5 : score * 0.5) : score;
   const sickoIds = new Set(cfbSickoGameIds(BOARD));
   const sickoCorrect = correctIds.filter((id) => sickoIds.has(id)).length;
 
@@ -109,6 +120,43 @@ export default function FoundryCfbActThree({ seasonWeek = 16, postseasonWeek = 1
   function choose(id: string, team: string) {
     if (lab.stage !== "board") return;
     setLab((current) => ({ ...current, picks: { ...current.picks, [id]: team } }));
+  }
+  function moveTier(next: "marquee" | "sicko") {
+    setTier(next);
+    if (lab.nuclear?.active) setReviewedTiers((current) => new Set([...current, next]));
+    window.requestAnimationFrame(() => document.getElementById("bowl-tier-top")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }
+  function detonate() {
+    const allocations: Record<string, number> = {};
+    const picks: Record<string, string> = {};
+    let remainingPoints = 100;
+    BOARD.games.forEach((game, index) => {
+      const fixture = BY_ID.get(game.id)!;
+      const seed = [...game.id].reduce((sum, char) => sum + char.charCodeAt(0), 0) + Date.now();
+      picks[game.id] = seed % 2 === 0 ? fixture.away : fixture.home;
+      const gamesLeft = BOARD.games.length - index;
+      const points = gamesLeft === 1 ? remainingPoints : Math.max(1, Math.min(9, 1 + (seed % Math.max(1, Math.min(9, remainingPoints - (gamesLeft - 1))))));
+      allocations[game.id] = points;
+      remainingPoints -= points;
+    });
+    setTier("marquee");
+    setReviewedTiers(new Set(["marquee"]));
+    setNuclearWarning(false);
+    setLab({ stage: "locked", allocations, picks, nuclear: { active: true, reviewStartedAt: Date.now(), acknowledged: false } });
+  }
+  async function shareNuclearBoard() {
+    const canvas = document.createElement("canvas"); canvas.width = 1080; canvas.height = 1080;
+    const ctx = canvas.getContext("2d"); if (!ctx) return;
+    const gradient = ctx.createLinearGradient(0, 0, 1080, 1080); gradient.addColorStop(0, "#2b0303"); gradient.addColorStop(1, "#030101"); ctx.fillStyle = gradient; ctx.fillRect(0, 0, 1080, 1080);
+    ctx.strokeStyle = "#ef4444"; ctx.lineWidth = 8; ctx.strokeRect(28, 28, 1024, 1024); ctx.textAlign = "center"; ctx.fillStyle = "#fb923c"; ctx.font = "900 70px system-ui"; ctx.fillText("DEAD HAND PROTOCOL", 540, 105);
+    ctx.fillStyle = "#ffffff"; ctx.font = "900 34px system-ui"; ctx.fillText("THE MACHINE HAS IDENTIFIED SOMETHING IN BOISE", 540, 157);
+    ctx.textAlign = "left"; ctx.font = "700 23px system-ui";
+    BOARD.games.forEach((game, index) => { const col = index < 13 ? 0 : 1; const row = index < 13 ? index : index - 13; const x = 70 + col * 510; const y = 220 + row * 58; ctx.fillStyle = game.tier === "sicko" ? "#fb923c" : "#ef4444"; ctx.fillText(`${lab.allocations[game.id]} PTS`, x, y); ctx.fillStyle = "#fff"; ctx.fillText(`${lab.picks[game.id]} · ${game.name}`.slice(0, 39), x + 85, y); });
+    ctx.textAlign = "center"; ctx.fillStyle = "#94a3b8"; ctx.font = "700 24px system-ui"; ctx.fillText("NO EDITS · NO APPEALS · FURTHER QUESTIONS DISCOURAGED", 540, 1020);
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png")); if (!blob) return;
+    const file = new File([blob], "war-room-dead-hand-board.png", { type: "image/png" });
+    if (navigator.share && navigator.canShare?.({ files: [file] })) await navigator.share({ files: [file], title: "My Dead Hand Bowl Board", text: "I removed myself from the chain of command. The machine has identified something in Boise." });
+    else { const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = file.name; link.click(); URL.revokeObjectURL(url); }
   }
   function reset() {
     localStorage.removeItem(STORAGE_KEY);
@@ -136,11 +184,13 @@ export default function FoundryCfbActThree({ seasonWeek = 16, postseasonWeek = 1
       </div>
     </header>
 
-    {lab.stage === "results" ? <Results score={score} sickoCorrect={sickoCorrect} onCfp={() => setLab((current) => ({ ...current, stage: "cfp" }))} onReset={reset} /> : <>
-      <nav className="grid grid-cols-2 gap-2" aria-label="Bowl Board sections">
-        <button type="button" onClick={() => setTier("marquee")} className={`min-h-12 rounded-xl border text-xs font-black ${tier === "marquee" ? "border-amber-300 bg-amber-300 text-black" : "border-border bg-card"}`}>THE MARQUEE 15</button>
-        <button type="button" onClick={() => setTier("sicko")} className={`min-h-12 rounded-xl border text-xs font-black ${tier === "sicko" ? "border-lime-300 bg-lime-300 text-black" : "border-border bg-card"}`}>THE SICKO 10</button>
+    {lab.stage === "results" ? <Results score={finalScore} rawScore={score} deadHand={!!lab.nuclear?.active} sickoCorrect={sickoCorrect} onCfp={() => setLab((current) => ({ ...current, stage: "cfp" }))} onReset={reset} /> : <>
+      <nav id="bowl-tier-top" className="scroll-mt-4 grid grid-cols-2 gap-2" aria-label="Bowl Board sections">
+        <button type="button" onClick={() => moveTier("marquee")} className={`min-h-12 rounded-xl border text-xs font-black ${tier === "marquee" ? "border-amber-300 bg-amber-300 text-black" : "border-border bg-card"}`}>THE MARQUEE 15</button>
+        <button type="button" onClick={() => moveTier("sicko")} className={`min-h-12 rounded-xl border text-xs font-black ${tier === "sicko" ? "border-lime-300 bg-lime-300 text-black" : "border-border bg-card"}`}>THE SICKO 10</button>
       </nav>
+      {lab.stage === "board" && <button type="button" onClick={() => setNuclearWarning(true)} className="flex min-h-16 w-full items-center justify-center gap-3 rounded-2xl border-2 border-red-500 bg-[repeating-linear-gradient(135deg,#240303_0,#240303_12px,#050505_12px,#050505_24px)] px-4 text-sm font-black text-red-100 shadow-[0_0_34px_rgba(239,68,68,.42)] transition-transform duration-300" style={{ transform: `translate(${nuclearJolt.x}px,${nuclearJolt.y}px) rotate(${nuclearJolt.r}deg)` }}><WarRoomArsenalIcon kind="dead_hand" size={48}/>INITIATE DEAD HAND</button>}
+      {lab.nuclear?.active && <section className="rounded-2xl border-2 border-red-500/70 bg-red-950/30 p-4 text-center shadow-[0_0_30px_rgba(239,68,68,.18)]"><p className="text-[9px] font-black uppercase tracking-[.22em] text-red-300">Critical system override · irreversible</p><h4 className="mt-1 text-xl font-black">THE MACHINE HAS IDENTIFIED SOMETHING IN BOISE.</h4><p className="mt-2 text-xs text-muted">Review both files. There are no edits, appeals, or commissioner overrides.</p><button type="button" onClick={() => void shareNuclearBoard()} className="mt-3 min-h-12 w-full rounded-xl border border-red-400/60 text-xs font-black text-red-200">SHARE THE EVIDENCE ↗</button></section>}
       <div className="space-y-3">{visible.map((game, index) => {
         const fixture = BY_ID.get(game.id)!;
         const locked = lab.stage === "locked";
@@ -149,15 +199,19 @@ export default function FoundryCfbActThree({ seasonWeek = 16, postseasonWeek = 1
           <div className="mt-3 grid grid-cols-2 gap-2">{[fixture.away, fixture.home].map((team) => <button key={team} type="button" disabled={locked} onClick={() => choose(game.id, team)} className={`min-h-12 rounded-xl border px-2 text-left text-[11px] font-bold disabled:opacity-80 ${lab.picks[game.id] === team ? "border-primary bg-primary text-black" : "border-border"}`}>{team}</button>)}</div>
         </article>;
       })}</div>
+      <div className="grid grid-cols-2 gap-2" aria-label="Continue through Bowl Board">
+        {tier === "marquee" ? <button type="button" onClick={() => moveTier("sicko")} className="col-span-2 min-h-14 rounded-2xl bg-lime-300 text-sm font-black text-lime-950 shadow-[0_0_24px_rgba(190,242,100,.18)]">NEXT: THE SICKO 10 →</button> : <><button type="button" onClick={() => moveTier("marquee")} className="min-h-12 rounded-xl border border-amber-300/35 text-xs font-black text-amber-200">← MARQUEE 15</button><div className="flex min-h-12 items-center justify-center rounded-xl border border-lime-300/25 bg-lime-300/10 px-2 text-center text-[9px] font-black text-lime-200">SICKO FILES COMPLETE · {pickedCount}/25 TOTAL</div></>}
+      </div>
       <div className="sticky bottom-3 z-20 rounded-2xl border border-amber-300/50 bg-black/95 p-3 shadow-2xl backdrop-blur">
         {errors.length > 0 && lab.stage === "board" ? <p className="mb-2 text-[10px] font-bold text-amber-200">{remaining > 0 ? `${remaining} points still need orders.` : remaining < 0 ? `${Math.abs(remaining)} points over budget.` : errors[0]}</p> : <p className="mb-2 text-[10px] font-bold text-emerald-300">All 100 points assigned. Bowl Board ready.</p>}
-        {lab.stage === "board" ? <button type="button" disabled={errors.length > 0 || pickedCount !== 25} onClick={() => setLab((current) => ({ ...current, stage: "locked" }))} className="min-h-12 w-full rounded-xl bg-amber-300 text-sm font-black text-black disabled:opacity-35">{pickedCount !== 25 ? `Pick ${25 - pickedCount} More Bowl${25 - pickedCount === 1 ? "" : "s"}` : "Lock Bowl Board"}</button> : <div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => setLab((current) => ({ ...current, stage: "board" }))} className="min-h-12 rounded-xl border border-border text-xs font-bold">Unlock Preview</button><button type="button" onClick={() => setLab((current) => ({ ...current, stage: "results" }))} className="min-h-12 rounded-xl bg-emerald-300 text-xs font-black text-emerald-950">Sim Bowl Results</button></div>}
+        {lab.stage === "board" ? <button type="button" disabled={errors.length > 0 || pickedCount !== 25} onClick={() => setLab((current) => ({ ...current, stage: "locked" }))} className="min-h-12 w-full rounded-xl bg-amber-300 text-sm font-black text-black disabled:opacity-35">{pickedCount !== 25 ? `Pick ${25 - pickedCount} More Bowl${25 - pickedCount === 1 ? "" : "s"}` : "Lock Bowl Board"}</button> : lab.nuclear?.active ? (!lab.nuclear.acknowledged ? <button type="button" disabled={!reviewedTiers.has("marquee") || !reviewedTiers.has("sicko")} onClick={() => setLab((current) => ({ ...current, nuclear: current.nuclear ? { ...current.nuclear, acknowledged: true } : undefined }))} className="min-h-12 w-full rounded-xl bg-red-600 text-xs font-black text-white disabled:opacity-35">{reviewedTiers.has("marquee") && reviewedTiers.has("sicko") ? "I HAVE SEEN THE DAMAGE" : "REVIEW MARQUEE + SICKO FILES"}</button> : <button type="button" onClick={() => setLab((current) => ({ ...current, stage: "results" }))} className="min-h-12 w-full rounded-xl bg-red-600 text-xs font-black text-white">Sim Dead Hand Fallout</button>) : <div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => setLab((current) => ({ ...current, stage: "board" }))} className="min-h-12 rounded-xl border border-border text-xs font-bold">Unlock Preview</button><button type="button" onClick={() => setLab((current) => ({ ...current, stage: "results" }))} className="min-h-12 rounded-xl bg-emerald-300 text-xs font-black text-emerald-950">Sim Bowl Results</button></div>}
       </div>
+      {nuclearWarning && <div className="fixed inset-0 z-[100] flex items-end justify-center bg-red-950/90 p-4 backdrop-blur-sm sm:items-center" role="dialog" aria-modal="true"><section className="w-full max-w-md rounded-3xl border-2 border-red-500 bg-[repeating-linear-gradient(135deg,#220303_0,#220303_16px,#050505_16px,#050505_32px)] p-5 text-center shadow-[0_0_90px_rgba(239,68,68,.5)]"><p className="text-5xl">☢️</p><p className="mt-3 text-[10px] font-black uppercase tracking-[.24em] text-red-300">Critical system override</p><h3 className="mt-2 text-2xl font-black">THIS IS NOT YOUR UNCLE&apos;S NUCLEAR BUTTON</h3><p className="mt-3 text-sm leading-relaxed text-white/70">Tactical Nukes reward conviction. Dead Hand removes you from the chain of command. The machine chooses all 25 winners, spends all 100 points, and locks the board permanently.</p><p className="mt-3 text-xs font-black text-orange-300">60+ RAW: 1.5× DAMAGE · BELOW 60: SCORE CUT IN HALF</p><p className="mt-2 text-xs font-black text-red-300">HISTORY DOES NOT HAVE AN UNDO BUTTON.</p><div className="mt-5 grid grid-cols-2 gap-2"><button type="button" onClick={() => setNuclearWarning(false)} className="min-h-12 rounded-xl border border-white/25 text-xs font-bold">Retain free will</button><button type="button" onClick={detonate} className="min-h-12 rounded-xl bg-red-600 text-xs font-black text-white shadow-[0_0_25px_rgba(239,68,68,.5)]">REMOVE ME FROM COMMAND</button></div></section></div>}
     </>}
   </section>;
 }
 
-function Results({ score, sickoCorrect, onCfp, onReset }: { score: number; sickoCorrect: number; onCfp: () => void; onReset: () => void }) {
+function Results({ score, rawScore, deadHand, sickoCorrect, onCfp, onReset }: { score: number; rawScore: number; deadHand: boolean; sickoCorrect: number; onCfp: () => void; onReset: () => void }) {
   const standings = [
     { name: "Kahmann", correct: Math.min(10, sickoCorrect + 2) },
     { name: "Mike V", correct: sickoCorrect },

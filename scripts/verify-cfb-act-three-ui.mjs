@@ -8,7 +8,7 @@ const component = readFileSync(join(root, "src/components/FoundryCfbActThree.tsx
 const preview = readFileSync(join(root, "src/app/foundry/preview/page.tsx"), "utf8");
 
 assert.match(preview, /state\.sport === "cfb"[\s\S]*<FoundryCfbActThree/);
-assert.match(component, /warroom-foundry-cfb-act-three-v2/);
+assert.match(component, /warroom-foundry-cfb-act-three-v3/);
 assert.match(component, /Foundry only · no cloud writes/);
 assert.match(component, /MARQUEE_NAMES[\s\S]*SICKO_NAMES/);
 assert.match(component, /DEFAULT_ALLOCATIONS[\s\S]*\[game\.id, 4\]/);
@@ -33,6 +33,15 @@ assert.match(component, /pickedCount !== 25/);
 assert.match(component, /Pick \$\{25 - pickedCount\} More Bowl/);
 assert.match(preview, /Season status" value="ACT III/);
 assert.match(preview, /<FoundryCfbActThree seasonWeek=\{state\.week\}/);
+assert.match(component, /NEXT: THE SICKO 10/);
+assert.match(component, /moveTier\("sicko"\)/);
+assert.match(component, /scrollIntoView/);
+assert.match(component, /INITIATE DEAD HAND/);
+assert.match(component, /THIS IS NOT YOUR UNCLE/);
+assert.match(component, /REMOVE ME FROM COMMAND/);
+assert.match(component, /I HAVE SEEN THE DAMAGE/);
+assert.match(component, /shareNuclearBoard/);
+assert.match(component, /WarRoomArsenalIcon/);
 assert.match(component, /min-h-12/);
 assert.match(component, /min-h-11 min-w-11/);
 assert.doesNotMatch(component, /supabase|fetch\(|\/api\//);
