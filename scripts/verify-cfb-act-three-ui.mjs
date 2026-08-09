@@ -8,7 +8,7 @@ const component = readFileSync(join(root, "src/components/FoundryCfbActThree.tsx
 const preview = readFileSync(join(root, "src/app/foundry/preview/page.tsx"), "utf8");
 
 assert.match(preview, /state\.sport === "cfb"[\s\S]*<FoundryCfbActThree/);
-assert.match(component, /warroom-foundry-cfb-act-three-v1/);
+assert.match(component, /warroom-foundry-cfb-act-three-v2/);
 assert.match(component, /Foundry only · no cloud writes/);
 assert.match(component, /MARQUEE_NAMES[\s\S]*SICKO_NAMES/);
 assert.match(component, /DEFAULT_ALLOCATIONS[\s\S]*\[game\.id, 4\]/);
@@ -28,6 +28,11 @@ assert.doesNotMatch(component, /Sicko Results/);
 assert.match(component, /THE DOORS ARE STILL LOCKED/);
 assert.match(component, /THE REGULAR/);
 assert.match(component, /ENTER ACT III/);
+assert.match(component, /DEFAULT_PICKS: Record<string, string> = \{\}/);
+assert.match(component, /pickedCount !== 25/);
+assert.match(component, /Pick \$\{25 - pickedCount\} More Bowl/);
+assert.match(preview, /Season status" value="ACT III/);
+assert.match(preview, /<FoundryCfbActThree seasonWeek=\{state\.week\}/);
 assert.match(component, /min-h-12/);
 assert.match(component, /min-h-11 min-w-11/);
 assert.doesNotMatch(component, /supabase|fetch\(|\/api\//);

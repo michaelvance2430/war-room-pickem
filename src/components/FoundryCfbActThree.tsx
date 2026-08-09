@@ -20,7 +20,8 @@ type SavedLab = {
   picks: Record<string, string>;
 };
 
-const STORAGE_KEY = "warroom-foundry-cfb-act-three-v1";
+// v2 intentionally clears the old preview that could reopen directly at CFP.
+const STORAGE_KEY = "warroom-foundry-cfb-act-three-v2";
 const MARQUEE_NAMES = [
   "Citrus Bowl", "Alamo Bowl", "Music City Bowl", "Gator Bowl", "Texas Bowl",
   "ReliaQuest Bowl", "Las Vegas Bowl", "Sun Bowl", "Pop-Tarts Bowl", "Holiday Bowl",
@@ -59,7 +60,7 @@ const FIXTURES: Fixture[] = [...MARQUEE_NAMES, ...SICKO_NAMES].map((name, index)
 const BOARD = buildCfbBowlBoard(FIXTURES);
 const BY_ID = new Map(FIXTURES.map((game) => [game.id, game]));
 const DEFAULT_ALLOCATIONS = Object.fromEntries(BOARD.games.map((game) => [game.id, 4]));
-const DEFAULT_PICKS = Object.fromEntries(BOARD.games.map((game) => [game.id, BY_ID.get(game.id)!.away]));
+const DEFAULT_PICKS: Record<string, string> = {};
 
 function defaultLab(): SavedLab {
   return { stage: "board", allocations: DEFAULT_ALLOCATIONS, picks: DEFAULT_PICKS };
@@ -87,6 +88,7 @@ export default function FoundryCfbActThree({ seasonWeek = 16, postseasonWeek = 1
   const total = BOARD.games.reduce((sum, game) => sum + (lab.allocations[game.id] || 0), 0);
   const remaining = 100 - total;
   const errors = validateCfbBowlAllocation(BOARD, lab.allocations);
+  const pickedCount = BOARD.games.filter((game) => !!lab.picks[game.id]).length;
   const visible = tier === "marquee" ? BOARD.marquee : BOARD.sicko;
   const results = useMemo(() => Object.fromEntries(BOARD.games.map((game, index) => {
     const fixture = BY_ID.get(game.id)!;
@@ -130,7 +132,7 @@ export default function FoundryCfbActThree({ seasonWeek = 16, postseasonWeek = 1
       <div className="mt-4 grid grid-cols-3 gap-2">
         <Metric label="Allocated" value={String(total)} />
         <Metric label="Remaining" value={String(remaining)} alert={remaining !== 0} />
-        <Metric label="Games" value="25" />
+        <Metric label="Picks" value={`${pickedCount}/25`} alert={pickedCount !== 25} />
       </div>
     </header>
 
@@ -149,7 +151,7 @@ export default function FoundryCfbActThree({ seasonWeek = 16, postseasonWeek = 1
       })}</div>
       <div className="sticky bottom-3 z-20 rounded-2xl border border-amber-300/50 bg-black/95 p-3 shadow-2xl backdrop-blur">
         {errors.length > 0 && lab.stage === "board" ? <p className="mb-2 text-[10px] font-bold text-amber-200">{remaining > 0 ? `${remaining} points still need orders.` : remaining < 0 ? `${Math.abs(remaining)} points over budget.` : errors[0]}</p> : <p className="mb-2 text-[10px] font-bold text-emerald-300">All 100 points assigned. Bowl Board ready.</p>}
-        {lab.stage === "board" ? <button type="button" disabled={errors.length > 0} onClick={() => setLab((current) => ({ ...current, stage: "locked" }))} className="min-h-12 w-full rounded-xl bg-amber-300 text-sm font-black text-black disabled:opacity-35">Lock Bowl Board</button> : <div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => setLab((current) => ({ ...current, stage: "board" }))} className="min-h-12 rounded-xl border border-border text-xs font-bold">Unlock Preview</button><button type="button" onClick={() => setLab((current) => ({ ...current, stage: "results" }))} className="min-h-12 rounded-xl bg-emerald-300 text-xs font-black text-emerald-950">Sim Bowl Results</button></div>}
+        {lab.stage === "board" ? <button type="button" disabled={errors.length > 0 || pickedCount !== 25} onClick={() => setLab((current) => ({ ...current, stage: "locked" }))} className="min-h-12 w-full rounded-xl bg-amber-300 text-sm font-black text-black disabled:opacity-35">{pickedCount !== 25 ? `Pick ${25 - pickedCount} More Bowl${25 - pickedCount === 1 ? "" : "s"}` : "Lock Bowl Board"}</button> : <div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => setLab((current) => ({ ...current, stage: "board" }))} className="min-h-12 rounded-xl border border-border text-xs font-bold">Unlock Preview</button><button type="button" onClick={() => setLab((current) => ({ ...current, stage: "results" }))} className="min-h-12 rounded-xl bg-emerald-300 text-xs font-black text-emerald-950">Sim Bowl Results</button></div>}
       </div>
     </>}
   </section>;
