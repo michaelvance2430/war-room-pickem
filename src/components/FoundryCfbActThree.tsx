@@ -65,10 +65,11 @@ function defaultLab(): SavedLab {
   return { stage: "board", allocations: DEFAULT_ALLOCATIONS, picks: DEFAULT_PICKS };
 }
 
-export default function FoundryCfbActThree() {
+export default function FoundryCfbActThree({ seasonWeek = 16, postseasonWeek = 13 }: { seasonWeek?: number; postseasonWeek?: number }) {
   const [lab, setLab] = useState<SavedLab>(defaultLab);
   const [hydrated, setHydrated] = useState(false);
   const [tier, setTier] = useState<"marquee" | "sicko">("marquee");
+  const [actEntered, setActEntered] = useState(false);
 
   useEffect(() => {
     try {
@@ -114,6 +115,10 @@ export default function FoundryCfbActThree() {
   }
 
   if (!hydrated) return <p className="rounded-2xl border border-border bg-card p-6 text-center text-sm text-muted">Opening the Bowl Board…</p>;
+
+  if (seasonWeek < postseasonWeek) return <section className="relative overflow-hidden rounded-3xl border border-white/10 bg-[radial-gradient(circle_at_top,rgba(56,189,248,.12),transparent_52%),linear-gradient(180deg,#07111f,#020617)] px-5 py-12 text-center"><div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-transparent via-sky-300 to-transparent"/><p className="text-[10px] font-black uppercase tracking-[.28em] text-sky-300">Act II · Regular Season</p><h3 className="mt-4 text-3xl font-black">THE DOORS ARE STILL LOCKED</h3><p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-muted">Standings are moving. Conference races are alive. Bowl Mania and the CFP do not exist yet.</p><div className="mx-auto mt-7 max-w-xs rounded-2xl border border-white/10 bg-black/35 p-4"><p className="text-[9px] font-black uppercase tracking-[.18em] text-muted">Act III opens</p><strong className="mt-1 block text-xl">Conference Championship Week</strong><p className="mt-1 text-xs text-sky-200">{postseasonWeek - seasonWeek} week{postseasonWeek - seasonWeek === 1 ? "" : "s"} away</p></div><p className="mt-6 text-[10px] italic text-white/40">No fake results. No premature buttons. The postseason earns its entrance.</p></section>;
+
+  if (!actEntered) return <section className="relative overflow-hidden rounded-3xl border-2 border-amber-300/45 bg-[radial-gradient(circle_at_center,rgba(251,191,36,.22),transparent_58%),linear-gradient(180deg,#1c1304,#030712)] px-5 py-12 text-center shadow-[0_0_70px_rgba(251,191,36,.12)]"><div className="absolute inset-x-0 top-0 h-2 bg-gradient-to-r from-red-500 via-amber-300 to-sky-400"/><p className="text-[10px] font-black uppercase tracking-[.3em] text-amber-300">Conference Championships</p><h3 className="mt-4 text-4xl font-black leading-none">THE REGULAR<br/>SEASON IS OVER</h3><p className="mx-auto mt-4 max-w-sm text-sm leading-relaxed text-amber-100/70">The standings have spoken. The arguments have not. Twenty-five bowls, twelve playoff teams, and one piece of commissioner-selected hardware are waiting behind this door.</p><div className="my-7 flex items-center gap-3"><span className="h-px flex-1 bg-amber-300/30"/><span className="text-xl">✦</span><span className="h-px flex-1 bg-amber-300/30"/></div><button type="button" onClick={() => setActEntered(true)} className="min-h-14 w-full rounded-2xl bg-amber-300 text-base font-black text-black shadow-[0_0_30px_rgba(251,191,36,.3)]">ENTER ACT III →</button></section>;
 
   if (lab.stage === "cfp") return <CfpHandoff onReset={reset} />;
 
