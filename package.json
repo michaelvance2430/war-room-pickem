@@ -20,6 +20,7 @@
     "verify:act-three": "node --import tsx scripts/verify-act-three-contract.mjs",
     "verify:cfb-act-three": "node --import tsx scripts/verify-cfb-act-three.mjs",
     "verify:cfb-act-three-ui": "node scripts/verify-cfb-act-three-ui.mjs",
+    "verify:trophy-shapes": "node scripts/verify-championship-trophy-shapes.mjs",
     "verify:account-legendaries": "node scripts/verify-account-legendaries.mjs",
     "verify:foundry-gazette": "node --import tsx scripts/verify-foundry-gazette.mjs",
     "verify:native-readiness": "node scripts/verify-native-readiness.mjs",

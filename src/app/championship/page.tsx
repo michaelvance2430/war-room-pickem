@@ -17,6 +17,8 @@ import {
 import { cutLockWeek } from "@/lib/season-calendar";
 import { weekTitle } from "@/lib/dates";
 import { isSelfPlayer, selfNameClass, selfRowClass } from "@/lib/self-highlight";
+import HardwareTrophyIcon from "@/components/HardwareTrophyIcon";
+import { getChampionshipTrophyDesign } from "@/lib/championship-trophy-catalog";
 
 export default function ChampionshipPage() {
   const [bracket, setBracket] = useState<Bracket | null>(null);
@@ -243,6 +245,7 @@ export default function ChampionshipPage() {
 
         {!loading && playerCount >= 2 && bracket && (
           <>
+            {(() => { const trophy = getChampionshipTrophyDesign(getLeague()?.settings?.championshipTrophyId); return <section className="mb-5 rounded-2xl border border-amber-300/35 bg-[radial-gradient(circle_at_center,rgba(251,191,36,.16),transparent_62%)] p-4 text-center"><p className="text-[9px] font-black uppercase tracking-[.2em] text-amber-300">The object at the middle</p><HardwareTrophyIcon kind="championship" sportId={getLeague()?.sportId} size={130} trophyDesignId={trophy.id} animate className="mx-auto" /><h2 className="text-lg font-black">{trophy.name}</h2><p className="mt-1 text-xs italic text-muted">Every surviving path ends here.</p></section>; })()}
             <p className="text-xs text-muted mb-3">
               {playerCount} in league → {fieldSize} projected in Championship
               field

@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import SportChampionshipTrophy from "@/components/SportChampionshipTrophy";
+import { getChampionshipTrophyDesign } from "@/lib/championship-trophy-catalog";
+import { getLeague } from "@/lib/league";
 import {
   buildCfbBowlBoard,
   cfbSickoGameIds,
@@ -159,7 +162,26 @@ function Results({ score, sickoCorrect, onCfp, onReset }: { score: number; sicko
 
 function CfpHandoff({ onBack, onReset }: { onBack: () => void; onReset: () => void }) {
   const seeds = Array.from({ length: 12 }, (_, index) => `Seed ${index + 1}`);
-  return <section className="space-y-4" aria-label="Foundry CFP handoff"><header className="rounded-2xl border border-sky-300/40 bg-[radial-gradient(circle_at_top,#0c4a6e,transparent_60%)] p-5"><p className="text-[9px] font-black uppercase tracking-[.2em] text-sky-300">Separate scoring · same Act III</p><h3 className="mt-1 text-2xl font-black">Road Through the CFP</h3><p className="mt-2 text-xs text-muted">The Bowl Bankroll is closed. Now fill the fixed 12-team, 11-game playoff bracket. No reseeding.</p></header><div className="grid grid-cols-2 gap-3"><section className="rounded-2xl border border-border bg-card p-3"><p className="text-[9px] font-black uppercase text-muted">First-round byes</p>{seeds.slice(0, 4).map((seed) => <p key={seed} className="mt-2 rounded-lg bg-sky-300/10 px-3 py-2 text-xs font-bold">{seed}</p>)}</section><section className="rounded-2xl border border-border bg-card p-3"><p className="text-[9px] font-black uppercase text-muted">Campus games</p>{["5 vs 12", "6 vs 11", "7 vs 10", "8 vs 9"].map((game) => <p key={game} className="mt-2 rounded-lg bg-amber-300/10 px-3 py-2 text-xs font-bold">{game}</p>)}</section></div><section className="rounded-2xl border border-primary/30 bg-card p-4"><p className="text-[9px] font-black uppercase text-primary">Crystal Ball receipt</p><h4 className="mt-1 font-black">Your Week 0 champion stays on the wall.</h4><p className="mt-2 text-xs text-muted">The preseason prophecy remains visible beside the playoff bracket until the national champion is decided.</p></section><p className="rounded-xl border border-dashed border-border p-3 text-center text-[10px] text-muted">Interactive CFP bracket is the next Foundry increment. This handoff proves Bowl Mania and the CFP remain separate games.</p><div className="grid grid-cols-2 gap-2"><button type="button" onClick={onBack} className="min-h-12 rounded-xl border border-border text-xs font-bold">← Sicko Results</button><button type="button" onClick={onReset} className="min-h-12 rounded-xl border border-red-400/30 text-xs font-bold text-red-200">Reset Lab</button></div></section>;
+  const trophyId = getLeague()?.settings?.championshipTrophyId || "command_cup";
+  const trophy = getChampionshipTrophyDesign(trophyId);
+  return <section className="space-y-4" aria-label="Foundry CFP handoff"><header className="rounded-2xl border border-sky-300/40 bg-[radial-gradient(circle_at_top,#0c4a6e,transparent_60%)] p-5"><p className="text-[9px] font-black uppercase tracking-[.2em] text-sky-300">Separate scoring · same Act III</p><h3 className="mt-1 text-2xl font-black">Road Through the CFP</h3><p className="mt-2 text-xs text-muted">The Bowl Bankroll is closed. Now fill the fixed 12-team, 11-game playoff bracket. No reseeding.</p></header>
+    <div className="overflow-x-auto rounded-2xl border border-sky-300/25 bg-[linear-gradient(90deg,rgba(15,23,42,.96),rgba(12,74,110,.32),rgba(15,23,42,.96))] p-3 pb-5" aria-label="CFP bracket fighting toward the selected trophy">
+      <div className="grid min-w-[1130px] grid-cols-[170px_145px_125px_190px_125px_145px_170px] items-center gap-4">
+        <BracketColumn label="First Round" games={[[seeds[4], seeds[11]], [seeds[7], seeds[8]]]} />
+        <BracketColumn label="Quarterfinals" games={[[seeds[3], "5/12 winner"], [seeds[0], "8/9 winner"]]} inward="right" />
+        <BracketColumn label="Semifinal" games={[["QF winner", "QF winner"]]} inward="right" centered />
+        <section className="relative flex min-h-[360px] flex-col items-center justify-center text-center"><div className="absolute inset-y-12 left-0 w-px bg-gradient-to-b from-transparent via-amber-300/60 to-transparent" /><div className="absolute inset-y-12 right-0 w-px bg-gradient-to-b from-transparent via-amber-300/60 to-transparent" /><p className="text-[9px] font-black uppercase tracking-[.2em] text-amber-300">National Championship</p><SportChampionshipTrophy sport="cfb" size={150} trophyDesignId={trophy.id} animate /><h4 className="-mt-2 text-lg font-black">{trophy.name}</h4><p className="mt-1 max-w-[170px] text-[9px] italic text-muted">“{trophy.inscription}”</p><span className="mt-3 rounded-full border border-amber-300/35 bg-amber-300/10 px-3 py-1 text-[8px] font-black text-amber-200">EVERY PATH ENDS HERE</span></section>
+        <BracketColumn label="Semifinal" games={[["QF winner", "QF winner"]]} inward="left" centered />
+        <BracketColumn label="Quarterfinals" games={[[seeds[1], "7/10 winner"], [seeds[2], "6/11 winner"]]} inward="left" />
+        <BracketColumn label="First Round" games={[[seeds[6], seeds[9]], [seeds[5], seeds[10]]]} />
+      </div>
+      <p className="mt-3 text-center text-[9px] font-bold text-sky-200">Swipe the bracket · both sides fight toward the commissioner’s trophy</p>
+    </div>
+    <section className="rounded-2xl border border-primary/30 bg-card p-4"><p className="text-[9px] font-black uppercase text-primary">Crystal Ball receipt</p><h4 className="mt-1 font-black">Your Week 0 champion stays on the wall.</h4><p className="mt-2 text-xs text-muted">The preseason prophecy remains visible beside the playoff bracket until the national champion is decided.</p></section><p className="rounded-xl border border-dashed border-border p-3 text-center text-[10px] text-muted">Foundry structure preview: official 12-team bracket mathematics with original War Room hardware, cards, and presentation.</p><div className="grid grid-cols-2 gap-2"><button type="button" onClick={onBack} className="min-h-12 rounded-xl border border-border text-xs font-bold">← Sicko Results</button><button type="button" onClick={onReset} className="min-h-12 rounded-xl border border-red-400/30 text-xs font-bold text-red-200">Reset Lab</button></div></section>;
+}
+
+function BracketColumn({ label, games, inward, centered = false }: { label: string; games: string[][]; inward?: "left" | "right"; centered?: boolean }) {
+  return <section className={centered ? "flex min-h-[360px] flex-col justify-center" : ""}><p className="mb-4 text-center text-[8px] font-black uppercase tracking-[.16em] text-sky-300">{label}</p><div className="space-y-16">{games.map((game, index) => <div key={`${label}-${index}`} className="relative rounded-xl border border-sky-300/25 bg-black/35 shadow-lg">{game.map((team) => <div key={team} className="flex min-h-11 items-center gap-2 border-b border-white/10 px-3 text-[10px] font-bold last:border-0"><span className="text-sky-300">{team.match(/\d+/)?.[0] || "→"}</span><span>{team}</span></div>)}{inward && <span aria-hidden className={`absolute top-1/2 h-px w-4 bg-amber-300 ${inward === "right" ? "-right-4" : "-left-4"}`} />}</div>)}</div></section>;
 }
 
 function Metric({ label, value, alert = false }: { label: string; value: string; alert?: boolean }) {

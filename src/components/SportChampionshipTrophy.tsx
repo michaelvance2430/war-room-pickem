@@ -16,6 +16,7 @@ import {
   resolveLeagueChampionshipOverride,
 } from "@/lib/league-trophy-override";
 import { getChampionshipTrophyDesign } from "@/lib/championship-trophy-catalog";
+import ChampionshipTrophySilhouette from "@/components/ChampionshipTrophySilhouette";
 
 export type TrophySport = "cfb" | "nfl" | "soccer_wwc" | "other";
 
@@ -162,24 +163,10 @@ export default function SportChampionshipTrophy({
             src={override!.championshipImg}
             label="Vonnagio championship trophy"
           />
-        ) : useNflPhoto && sid === "nfl" ? (
-          <NflTrophyPhoto
-            size={size}
-            threePeat={threePeat}
-            src={nflSrc}
-            label="Super Bowl championship trophy"
-          />
-        ) : sid === "nfl" ? (
-          <NflLombardiSvg id={id} size={size} threePeat={threePeat} />
-        ) : sid === "soccer_wwc" ? (
-          <WwcCupSvg id={id} size={size} threePeat={threePeat} />
-        ) : sid === "cfb" ? (
-          <CfbCrystalSvg id={id} size={size} threePeat={threePeat} />
         ) : (
-          <GoldCupSvg id={id} size={size} threePeat={threePeat} />
+          <ChampionshipTrophySilhouette design={selectedDesign} size={size} threePeat={threePeat} />
         )}
       </div>
-      <TrophyDesignMark id={selectedDesignId} size={size} colors={selectedDesign.colors} />
     </div>
   );
 }

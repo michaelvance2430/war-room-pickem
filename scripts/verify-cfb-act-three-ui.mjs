@@ -18,6 +18,8 @@ assert.match(component, /Sim Bowl Results/);
 assert.match(component, /Certified Sicko Watch/);
 assert.match(component, /Advance to the CFP/);
 assert.match(component, /fixed 12-team, 11-game playoff bracket/);
+assert.match(component, /both sides fight toward the commissioner’s trophy/);
+assert.match(component, /SportChampionshipTrophy/);
 assert.match(component, /min-h-12/);
 assert.match(component, /min-h-11 min-w-11/);
 assert.doesNotMatch(component, /supabase|fetch\(|\/api\//);
