@@ -650,7 +650,7 @@ export default function Nav() {
                 m.setCreatorEyesMode("off");
                 setEyesLabel("");
                 // Land on Foundry eyes desk so you can switch previews quickly
-                window.location.href = "/founder#eyes";
+                window.location.href = "/foundry";
               });
             }}
           >
