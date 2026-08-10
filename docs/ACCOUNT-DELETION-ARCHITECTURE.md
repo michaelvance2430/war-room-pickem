@@ -126,3 +126,25 @@ remain cryptographically valid until expiry. Therefore deletion cannot ship unti
 the review-only migration is approved, all seven Foundry scenarios pass, security
 and performance advisors are clean for the new objects, and a physical-iPhone
 test completes after the native shell exists.
+
+## Disposable proof — 2026-08-10
+
+Supabase branch `account-deletion-foundry-20260810` (`ivahanchngmcnxclzfat`)
+was created without production data. The branch exposed that the project has no
+reproducible production migration history, so the repository core schema plus an
+explicit production-drift fixture were installed before lifecycle testing.
+
+The rollback-only harness passed after proving:
+
+- commissioner deletion is blocked until ownership transfers;
+- the `authenticated` database role cannot change lifecycle fields;
+- `deletion_in_progress` immediately makes `is_active_account()` false;
+- restrictive RLS prevents an old, still-cryptographically-valid JWT from
+  changing a pick;
+- profile identity is replaced with `[REDACTED]` and private profile fields clear;
+- picks, pick details, standings totals, the room, and successor ownership survive.
+
+Supabase advisors reported no error introduced by the lifecycle objects. Remaining
+branch errors belong to the deliberately old core baseline (`announcements` RLS and
+the legacy public `handle_new_user` grant), not the deletion overlay; they reinforce
+the separate requirement to convert production's loose SQL history into migrations.
