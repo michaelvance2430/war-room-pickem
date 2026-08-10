@@ -13,6 +13,7 @@ const nativeContract = read("src/lib/native-contract.ts");
 const plusContract = read("src/lib/plus-contract.ts");
 const login = read("src/app/login/page.tsx");
 const layout = read("src/app/layout.tsx");
+const browserSupabase = read("src/lib/supabase/client.ts");
 
 assert(manifest.name === "War Room Pick'Em", "manifest app name drifted");
 assert(manifest.id === "/" && manifest.scope === "/", "manifest identity/scope missing");
@@ -21,6 +22,11 @@ assert(manifest.icons?.some((icon) => icon.sizes === "512x512"), "512px app icon
 assert(nativeContract.includes('bundleId: "com.warroompicks.app"'), "bundle ID contract missing");
 assert(nativeContract.includes('canonicalOrigin: "https://www.war-room-picks.com"'), "canonical origin drifted");
 assert(login.includes('warRoomAuthReturnUrl("/reset-password")'), "password reset bypasses native-safe return contract");
+assert(!login.includes("warroom-remember"), "login contains a cosmetic remember-me flag");
+assert(!login.includes("Remember me"), "login promises a session option it cannot honor");
+assert(browserSupabase.includes('storageKey: "warroom-auth"'), "browser/native auth storage key drifted");
+assert(browserSupabase.includes("persistSession: true"), "browser/native session persistence disabled");
+assert(!fs.existsSync(new URL("../src/lib/supabase/server.ts", import.meta.url)), "dead cookie auth client can reintroduce storage mismatch");
 assert(layout.includes('viewportFit: "cover"'), "iOS safe-area viewport coverage missing");
 assert(plusContract.includes("export const WAR_ROOM_PLUS_PUBLIC = false"), "Plus must remain inactive for free 1.0");
 assert(plusContract.includes('"competitive_fairness"'), "free competitive fairness boundary missing");
