@@ -167,6 +167,7 @@ export default function PicksClient() {
   const [cardBusy, setCardBusy] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [validationTarget, setValidationTarget] = useState<string | null>(null);
   const [leagueName, setLeagueName] = useState("");
   const [cardNotice, setCardNotice] = useState<string | null>(null);
   /** Tooltip / flash when confidence tapped before a winner side */
@@ -1218,6 +1219,8 @@ export default function PicksClient() {
     const game = games.find((g) => g.id === gameId);
     if (!game || isGameLocked(game, now, games)) return;
 
+    setValidationTarget(null);
+    setSaveError(null);
     setConfTipGameId(null);
     setPicks((prev) => ({
       ...prev,
@@ -1243,6 +1246,8 @@ export default function PicksClient() {
       return;
     }
 
+    setValidationTarget(null);
+    setSaveError(null);
     setConfTipGameId(null);
 
     // Tap selected number again → deselect (free that confidence for another game)
@@ -1339,6 +1344,51 @@ export default function PicksClient() {
     if (saving || !hasCard) return;
     if (!practiceMode && !weekEditable) return;
     if (practiceMode && !canPracticeLock) return;
+    const firstIncomplete = games.find((game) => {
+      const pick = picksRef.current[game.id];
+      return !pick?.pick || !pick.confidence;
+    });
+    if (firstIncomplete) {
+      const pick = picksRef.current[firstIncomplete.id];
+      const target = `game:${firstIncomplete.id}`;
+      setValidationTarget(target);
+      setSaveError(
+        !pick?.pick
+          ? "Required: pick a winner for the highlighted game."
+          : "Required: assign a confidence number to the highlighted game."
+      );
+      window.requestAnimationFrame(() =>
+        document.getElementById(`pick-game-${firstIncomplete.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" })
+      );
+      return;
+    }
+    const confidenceValues = games.map((game) => picksRef.current[game.id]?.confidence || 0);
+    if (new Set(confidenceValues).size !== games.length) {
+      setValidationTarget("confidence");
+      setSaveError("Required: use every confidence number once. Duplicates are highlighted.");
+      window.requestAnimationFrame(() =>
+        document.getElementById("picks-card-start")?.scrollIntoView({ behavior: "smooth", block: "start" })
+      );
+      return;
+    }
+    if (!bestBetRef.current) {
+      setValidationTarget("bestBet");
+      setSaveError("Required: mark one game as your Best Bet.");
+      window.requestAnimationFrame(() =>
+        document.getElementById(`pick-game-${games[0]?.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" })
+      );
+      return;
+    }
+    if (!propChoiceRef.current) {
+      setBonusOpen(true);
+      setValidationTarget("prop");
+      setSaveError("Required: choose one answer for the weekly bonus.");
+      window.requestAnimationFrame(() =>
+        document.getElementById("weekly-prop-card")?.scrollIntoView({ behavior: "smooth", block: "center" })
+      );
+      return;
+    }
+    setValidationTarget(null);
     setSaving(true);
     setSaveError(null);
 
@@ -2581,7 +2631,7 @@ export default function PicksClient() {
               </div>
             )}
 
-            <div className="space-y-4 mb-8">
+            <div id="picks-card-start" className="space-y-4 mb-8">
               {games.map((game) => {
                 const pick = picks[game.id];
                 const isBest = bestBetId === game.id;
@@ -2619,6 +2669,7 @@ export default function PicksClient() {
                 return (
                   <div
                     key={game.id}
+                    id={`pick-game-${game.id}`}
                     className={`cfb-matchup-dossier rounded-xl border bg-card p-4 transition ${rankedMatchupShellClass(
                       rankTier,
                       { bestBet: isBest }
@@ -2628,7 +2679,7 @@ export default function PicksClient() {
                         : gameScore && cover && !gameScore.pushed
                           ? "ring-1 ring-danger/30"
                           : ""
-                    }`}
+                    } ${validationTarget === `game:${game.id}` || validationTarget === "confidence" ? "border-danger ring-2 ring-danger/60 bg-danger/5" : ""}`}
                   >
       <div className="mb-3">
                       <div className="flex items-center justify-between gap-2">
@@ -2700,6 +2751,12 @@ export default function PicksClient() {
                         {kick.label}
                       </div>
       </div>
+
+                    {validationTarget === `game:${game.id}` && (
+                      <p className="mb-3 rounded-lg border border-danger/50 bg-danger/10 px-3 py-2 text-xs font-bold text-danger">
+                        * Required — {!pick?.pick ? "pick a winner for this game." : "assign this game a confidence number."}
+                      </p>
+                    )}
 
                     <div className="grid grid-cols-2 gap-2 sm:gap-3 mb-4">
                       <button
@@ -2878,14 +2935,16 @@ export default function PicksClient() {
       <button
                         type="button"
                         disabled={locked}
-                        onClick={() => toggleBestBet(game.id)}
+                        onClick={() => { setValidationTarget(null); setSaveError(null); toggleBestBet(game.id); }}
                         className={`min-h-[44px] text-sm px-4 py-2.5 rounded-xl border font-semibold transition touch-manipulation disabled:cursor-not-allowed disabled:opacity-60 self-stretch sm:self-auto ${
                           isBest
                             ? "border-primary bg-primary/20 text-primary"
-                            : "border-border text-muted"
+                            : validationTarget === "bestBet"
+                              ? "border-danger bg-danger/15 text-danger ring-2 ring-danger/50"
+                              : "border-border text-muted"
                         }`}
                       >
-                        {isBest ? "★ Best Bet" : "Set Best Bet"}
+                        {isBest ? "★ Best Bet" : validationTarget === "bestBet" ? "* Set Best Bet — required" : "Set Best Bet"}
                       </button>
       </div>
 
@@ -2903,10 +2962,12 @@ export default function PicksClient() {
                 );
               })}
             </div>
-      <div
+            <div
               id="weekly-prop-card"
               className={`rounded-xl border bg-card p-4 mb-8 ${
-                !canEditProp ? "border-border opacity-95" : "border-border"
+                validationTarget === "prop"
+                  ? "border-danger ring-2 ring-danger/60 bg-danger/5"
+                  : !canEditProp ? "border-border opacity-95" : "border-border"
               }`}
             >
               <button
@@ -2958,6 +3019,8 @@ export default function PicksClient() {
                           if (!canMutatePicks || !canEditProp) return;
                           setPropChoice(opt);
                           propChoiceRef.current = opt;
+                          setValidationTarget(null);
+                          setSaveError(null);
                           setBonusOpen(true);
                         }}
                         className={`min-h-[52px] p-3.5 rounded-lg border text-base sm:text-sm transition touch-manipulation disabled:cursor-not-allowed ${
@@ -2999,7 +3062,7 @@ export default function PicksClient() {
                   <button
                     type="button"
                     onClick={() => void savePicks()}
-                    disabled={!allGamesPicked || saving || fullyLocked}
+                    disabled={saving || fullyLocked}
                     className="w-full py-3.5 sm:py-3 rounded-xl bg-primary text-black text-base font-bold disabled:opacity-50 min-h-[52px] touch-manipulation shadow-lg shadow-primary/20"
                   >
                     {saving ? "Grading…" : "Save Picks"}
@@ -3028,7 +3091,6 @@ export default function PicksClient() {
                       type="button"
                       onClick={() => void savePicks()}
                       disabled={
-                        !allGamesPicked ||
                         saving ||
                         fullyLocked ||
                         (chaosLockedWeek && saved)
