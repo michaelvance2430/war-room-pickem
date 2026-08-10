@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { isAppCreator } from "@/lib/creator";
+import { isFoundryOwnerUserId } from "@/lib/foundry-owner.server";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -58,8 +58,8 @@ async function requireCreator(req: Request): Promise<
   if (error || !data?.user?.id) {
     return { ok: false, status: 401, error: "Invalid session" };
   }
-  if (!isAppCreator(data.user.id)) {
-    return { ok: false, status: 403, error: "Creator only" };
+  if (!isFoundryOwnerUserId(data.user.id)) {
+    return { ok: false, status: 403, error: "Forbidden" };
   }
   return { ok: true, userId: data.user.id };
 }
