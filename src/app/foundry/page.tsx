@@ -8,6 +8,8 @@ import CreatorSkinPreview from "@/components/CreatorSkinPreview";
 import WeeklyColdOpenModal from "@/components/WeeklyColdOpenModal";
 import FinalDispatchPreview from "@/components/FinalDispatchPreview";
 import FoundryRoomSimulator from "@/components/FoundryRoomSimulator";
+import FoundryPlatformApiUsage from "@/components/FoundryPlatformApiUsage";
+import FoundryIncidentControl from "@/components/FoundryIncidentControl";
 import { markFoundrySessionActive } from "@/components/FoundrySessionChrome";
 import { isAppCreator } from "@/lib/creator";
 import {
@@ -145,6 +147,8 @@ export default function FoundryPage() {
               </ul>
             )}
           </section>
+          <FoundryIncidentControl />
+          <FoundryPlatformApiUsage />
           <section className="rounded-xl border border-border bg-card p-4">
             <h2 className="text-sm font-bold">Leagues</h2>
             <p className="mt-1 text-xs text-muted">Every league you belong to. Entering a room changes which league the Sandbox controls.</p>
