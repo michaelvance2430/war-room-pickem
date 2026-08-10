@@ -181,8 +181,7 @@ function Standings({ state }: { state: FoundryWalkthrough }) {
 
 function Postseason({ state, onUpdate }: { state: FoundryWalkthrough; onUpdate: (next: FoundryWalkthrough) => void }) {
   const [competition, setCompetition] = useState<"ncaa" | "championship" | "toilet">("ncaa");
-  const finalWeek = state.sport === "cbb" ? 22 : state.sport === "nfl" ? 18 : 16;
-  const cutWeek = finalWeek - 3;
+  const cutWeek = foundryPostseasonStartWeek(state.sport);
   const stage = state.week < cutWeek ? -1 : Math.min(3, state.week - cutWeek);
   const championshipIds = new Set(state.postseasonFields?.championship || []);
   const toiletIds = new Set(state.postseasonFields?.toilet || []);
