@@ -21,7 +21,8 @@ function isBareRoute(pathname: string | null): boolean {
   if (pathname === "/open-room" || pathname.startsWith("/open-room/")) {
     return true;
   }
-  if (pathname === "/foundry/preview" || pathname.startsWith("/foundry/preview/")) return true;
+  // Creator-only Foundry is operator chrome, not part of the player app shell.
+  if (pathname === "/foundry" || pathname.startsWith("/foundry/")) return true;
   return false;
 }
 
