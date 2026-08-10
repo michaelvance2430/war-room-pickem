@@ -94,4 +94,29 @@ memberships. It proved the complete transfer gate:
 
 All fixtures and lifecycle changes from this proof were rolled back. Production
 was inspected only to distinguish its non-recursive membership helpers from the
-disposable legacy-baseline policy; production was not mutated.
+disposable legacy-baseline policy; production was not mutated.\n
+## Foundry visual and deployment proof — 2026-08-10
+
+The production Foundry preview was inspected in the signed-in creator session
+after deployment. All three dark states rendered correctly:
+
+- eligible: destructive copy, disabled password/confirmation inputs, and a
+  disabled 52px delete action;
+- blocked: **Pass the Keys first**, two blocking-room fixtures, and an explicit
+  statement that nothing was deleted; and
+- repair: the fixture operation ID, `deleting_storage` stop point,
+  `fail-closed` identity state, and no hidden retry.
+
+At a 1363x936 viewport, the 822px-wide lifecycle panel and the document had no
+horizontal overflow. The public Account entry remained sealed, and the Foundry
+copy continued to identify the lifecycle UI as preview-only.
+
+The first connector-authored deployment contained two literal `\\n` sequences
+in TSX and failed to compile. Those exact artifacts were removed from the
+Account and Foundry pages. The repaired remote source passed
+`npm run verify:account-lifecycle` and `npm run build` (44 routes), and Vercel
+reported the final `main` deployment successful at commit
+`44d7b31bbb48fb292f216cb9421019fabc1ee5dc`.
+
+This remains a dark proof only. It does not authorize the public Account entry,
+the production deletion endpoint, or a production database mutation.
