@@ -50,6 +50,8 @@ export type FoundryWalkthrough = {
   tacticalNukeActive: boolean;
   mapsEvent: {
     protocol: "hellfire";
+    /** Gazette edition that owns the emergency front page. */
+    authorizationWeek: number;
     originalPicks: NcaaPicks;
     targetIds: string[];
     changedCount: number;
@@ -168,7 +170,7 @@ export function loadFoundryWalkthrough(): FoundryWalkthrough | null {
         ? parsed.tacticalNukeWeeks.filter((week) => Number.isInteger(week) && week > 0).slice(0, 2)
         : [],
       tacticalNukeActive: !!parsed.tacticalNukeActive,
-      mapsEvent: parsed.mapsEvent?.protocol === "hellfire" ? parsed.mapsEvent : null,
+      mapsEvent: parsed.mapsEvent?.protocol === "hellfire" && Number.isInteger(parsed.mapsEvent.authorizationWeek) ? parsed.mapsEvent : null,
     } : null;
   } catch { return null; }
 }
@@ -273,7 +275,7 @@ export function launchFoundryHellfire(state: FoundryWalkthrough): FoundryWalkthr
     ...state,
     ncaaPicks: computerPicks,
     ncaaBracketLocked: true,
-    mapsEvent: { protocol: "hellfire", originalPicks, targetIds, changedCount: changed.length, humanPickCount: Object.keys(originalPicks).length, reviewed: false },
+    mapsEvent: { protocol: "hellfire", authorizationWeek: state.week, originalPicks, targetIds, changedCount: changed.length, humanPickCount: Object.keys(originalPicks).length, reviewed: false },
   };
 }
 
