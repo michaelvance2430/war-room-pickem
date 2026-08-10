@@ -11,10 +11,8 @@ assert.match(foundryPage, /auth\.getSession\(\)/, "Foundry must read the authent
 assert.match(foundryPage, /isAppCreator\(uid\)/, "Foundry must require the creator UUID before rendering");
 assert.doesNotMatch(foundryPage, /getSession\(\)\?\.playerId/, "local league identity must never authorize Foundry");
 
-const founderLayout = read("src/app/founder/layout.tsx");
-assert.match(founderLayout, /auth\.getUser\(\)/, "legacy founder route must validate the Supabase user on the server");
-assert.match(founderLayout, /isFoundryOwnerUserId/, "legacy founder route must require the exact owner UUID");
-assert.match(founderLayout, /redirect\("\/"\)/, "legacy founder route must silently redirect every non-owner");
+const founderPage = read("src/app/founder/page.tsx");
+assert.match(founderPage, /redirect\("\/foundry"\)/, "retired founder route must converge on the protected Foundry");
 
 const owner = read("src/lib/foundry-owner.server.ts");
 assert.match(owner, /import "server-only"/, "owner authorization must never become client code");
