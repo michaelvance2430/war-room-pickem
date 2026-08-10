@@ -9,6 +9,7 @@ assert.equal(state.ncaaBracketLocked, true, "Hellfire must fire before any human
 assert.equal(ncaaPickCount(state.ncaaPicks), 67);
 assert.equal(state.mapsEvent?.changedCount, 67);
 assert.equal(state.mapsEvent?.humanPickCount, 0);
+assert.equal(state.mapsEvent?.authorizationWeek, 19);
 assert.deepEqual(state.mapsEvent?.originalPicks, {});
 state = createFoundryWalkthrough("cbb", 19, "player");
 state = { ...state, ncaaPicks: generateNcaaPicks(777) };
@@ -17,6 +18,7 @@ state = launchFoundryHellfire(state);
 assert.equal(state.ncaaBracketLocked, true);
 assert.equal(ncaaPickCount(state.ncaaPicks), 67);
 assert.equal(state.mapsEvent?.protocol, "hellfire");
+assert.equal(state.mapsEvent?.authorizationWeek, 19);
 assert.deepEqual(state.mapsEvent?.originalPicks, original);
 assert.equal(state.mapsEvent?.humanPickCount, 67);
 assert.equal(state.mapsEvent?.targetIds.length, 4);
