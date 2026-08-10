@@ -3,12 +3,18 @@ import { readFileSync } from "node:fs";
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 
-for (const route of ["foundry", "founder"]) {
-  const layout = read(`src/app/${route}/layout.tsx`);
-  assert.match(layout, /auth\.getUser\(\)/, `${route} must validate the Supabase user on the server`);
-  assert.match(layout, /isFoundryOwnerUserId/, `${route} must require the exact owner UUID`);
-  assert.match(layout, /redirect\("\/"\)/, `${route} must silently redirect every non-owner`);
-}
+const foundryLayout = read("src/app/foundry/layout.tsx");
+assert.doesNotMatch(foundryLayout, /redirect\("\/"\)/, "browser-stored auth must not be rejected by a cookie-only layout");
+
+const foundryPage = read("src/app/foundry/page.tsx");
+assert.match(foundryPage, /auth\.getSession\(\)/, "Foundry must read the authenticated Supabase session");
+assert.match(foundryPage, /isAppCreator\(uid\)/, "Foundry must require the creator UUID before rendering");
+assert.doesNotMatch(foundryPage, /getSession\(\)\?\.playerId/, "local league identity must never authorize Foundry");
+
+const founderLayout = read("src/app/founder/layout.tsx");
+assert.match(founderLayout, /auth\.getUser\(\)/, "legacy founder route must validate the Supabase user on the server");
+assert.match(founderLayout, /isFoundryOwnerUserId/, "legacy founder route must require the exact owner UUID");
+assert.match(founderLayout, /redirect\("\/"\)/, "legacy founder route must silently redirect every non-owner");
 
 const owner = read("src/lib/foundry-owner.server.ts");
 assert.match(owner, /import "server-only"/, "owner authorization must never become client code");
