@@ -79,7 +79,9 @@ import LeagueMembershipCard from "@/components/LeagueMembershipCard";
 import { FEEDBACK_TO_EMAIL } from "@/components/FeedbackForm";
 import { resolveCareerRank } from "@/lib/career-ranks";
 import { listLeagueSeasonCounts } from "@/lib/league-seasons";
-import { getSportsPlayed } from "@/lib/sports-played";\nimport AccountDeletionPanel from "@/components/AccountDeletionPanel";\nimport { ACCOUNT_LIFECYCLE_PUBLIC } from "@/lib/account-lifecycle-contract";
+import { getSportsPlayed } from "@/lib/sports-played";
+import AccountDeletionPanel from "@/components/AccountDeletionPanel";
+import { ACCOUNT_LIFECYCLE_PUBLIC } from "@/lib/account-lifecycle-contract";
 
 export default function AccountPage() {
   const router = useRouter();
@@ -1569,7 +1571,11 @@ export default function AccountPage() {
           </button>
       </section>
 
-        {ACCOUNT_LIFECYCLE_PUBLIC && (\n          <AccountDeletionPanel memberships={memberships} userId={userId} />\n        )}\n\n        <OwnershipNotice variant="full" className="mt-8 mb-4 px-2" />
+        {ACCOUNT_LIFECYCLE_PUBLIC && (
+          <AccountDeletionPanel memberships={memberships} userId={userId} />
+        )}
+
+        <OwnershipNotice variant="full" className="mt-8 mb-4 px-2" />
       </main>
 
       {/* Leave league — forfeit warning popup */}
