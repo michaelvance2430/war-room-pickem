@@ -18,7 +18,8 @@ import {
   type RoomHealth,
 } from "@/lib/founder-league-health";
 import { switchToLeague } from "@/lib/session-restore";
-import { createClient } from "@/lib/supabase/client";\nimport AccountDeletionFoundryProof from "@/components/AccountDeletionFoundryProof";
+import { createClient } from "@/lib/supabase/client";
+import AccountDeletionFoundryProof from "@/components/AccountDeletionFoundryProof";
 
 type Desk = "command" | "moments" | "sandbox";
 type HealthPayload = {
@@ -148,7 +149,8 @@ export default function FoundryPage() {
             )}
           </section>
           <FoundryIncidentControl />
-          <FoundryPlatformApiUsage />\n          <AccountDeletionFoundryProof />
+          <FoundryPlatformApiUsage />
+          <AccountDeletionFoundryProof />
           <section className="rounded-xl border border-border bg-card p-4">
             <h2 className="text-sm font-bold">Leagues</h2>
             <p className="mt-1 text-xs text-muted">Every league you belong to. Entering a room changes which league the Sandbox controls.</p>
