@@ -113,7 +113,6 @@ import {
   PRESEASON_COMMISH_TOOLS_TITLE,
   preseasonCommishToolsBody,
 } from "@/lib/season-mode";
-import { showCommishLabTools } from "@/lib/foundry-preview";
 import { getSeasonOpenLabel } from "@/lib/season-countdown";
 import {
   SIMPLE_BOT_FILL_TARGET,
@@ -333,8 +332,8 @@ function CommissionerPageInner() {
   /** Real season: explain why demo/bot/auto-score tools are locked. */
   const [preseasonToolsPopup, setPreseasonToolsPopup] = useState(false);
   const preseasonToolsOk = isPreseasonCommishToolsAllowed();
-  /** Foundry / app creator only — regular commiss never see fake-week toys */
-  const [labTools, setLabTools] = useState(false);
+  /** Simulators live only in the private workshop, never on commissioner pages. */
+  const labTools = false;
   /** Lab + preseason: randomize/demo/auto-score allowed to run */
   const practiceTools = labTools && preseasonToolsOk;
   /** How many bots to add (not total roster). Default 6 = common “round out to ~16”. */
@@ -393,12 +392,6 @@ function CommissionerPageInner() {
       const opsNow = isOps();
       setIsOwner(ownerNow);
       setAllowed(opsNow);
-      try {
-        setLabTools(showCommishLabTools());
-      } catch {
-        setLabTools(false);
-      }
-
       // 2) Staff flags in background (deputies) — do not block paint
       void refreshStaffSessionFlags()
         .then(() => {
@@ -1027,32 +1020,8 @@ function CommissionerPageInner() {
    * When lab is open but season is live, explain pre-season lock.
    */
   function requirePreseasonTools(): boolean {
-    // Hard LAB isolation — never soft-fall back to calendar preseason on production.
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const q = require("@/lib/foundry-quarantine") as typeof import("@/lib/foundry-quarantine");
-      const gate = q.assertFoundryNotQuarantined("requirePreseasonTools");
-      if (!gate.ok) {
-        setScoreReport(
-          gate.reason ||
-            "LAB only: mark this room as Foundry LAB on the Foundry hub before running simulations."
-        );
-        return false;
-      }
-    } catch {
-      /* if gate module missing, refuse lab tools rather than open production */
-      setScoreReport(
-        "LAB isolation check unavailable — simulation blocked on this room."
-      );
-      return false;
-    }
-    if (!showCommishLabTools()) {
-      setScoreReport(
-        "Lab tools only on explicitly marked LAB rooms (Foundry hub → mark LAB)."
-      );
-      return false;
-    }
-    return true;
+    setScoreReport("Simulation is unavailable from commissioner pages.");
+    return false;
   }
 
   /** Fake 5-game card for season simulation — no Odds API. */
