@@ -49,7 +49,7 @@ import SportAllegianceCard, {
 
 import FeedbackForm from "@/components/FeedbackForm";
 import OwnershipNotice from "@/components/OwnershipNotice";
-import { getPlayerBadges, withPermanentBadges } from "@/lib/badges";
+import { getAchievementPoints, getPlayerBadges, withPermanentBadges } from "@/lib/badges";
 import {
   listEquipableTitlesFromBadges,
   titleVibeLabel,
@@ -77,6 +77,9 @@ import type { Player } from "@/lib/types";
 import { getPlayerBirthday } from "@/lib/easter-eggs";
 import LeagueMembershipCard from "@/components/LeagueMembershipCard";
 import { FEEDBACK_TO_EMAIL } from "@/components/FeedbackForm";
+import { resolveCareerRank } from "@/lib/career-ranks";
+import { listLeagueSeasonCounts } from "@/lib/league-seasons";
+import { getSportsPlayed } from "@/lib/sports-played";
 
 export default function AccountPage() {
   const router = useRouter();
@@ -245,7 +248,13 @@ export default function AccountPage() {
           } as Player);
         me = withPermanentBadges(withCreatorFlag(me));
         const badges = getPlayerBadges(me, peers.length ? peers : undefined);
-        setTitleOptions(listEquipableTitlesFromBadges(badges));
+        const careerRank = resolveCareerRank({
+          achievementPoints: getAchievementPoints(me),
+          seasons: listLeagueSeasonCounts(me.id).reduce((sum, room) => sum + room.seasons, 0),
+          sports: Math.max(1, getSportsPlayed(me.id).length),
+        });
+        const rankTitles: EquipableTitleOption[] = careerRank.unlocked.map((rank) => ({ badgeId: rank.id, label: rank.abbreviation === "★★★★★" ? rank.name : rank.abbreviation, vibe: "brag", blurb: `${rank.name}. Promotion orders are permanent.`, tier: rank.grade === "officer" ? "legendary" : "epic" }));
+        setTitleOptions([...rankTitles.reverse(), ...listEquipableTitlesFromBadges(badges)]);
         setEarnedBadgeIds(
           new Set(badges.filter((b) => b.earned).map((b) => b.def.id))
         );

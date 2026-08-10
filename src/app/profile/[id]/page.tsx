@@ -17,6 +17,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import Avatar from "@/components/Avatar";
 import AvatarLightbox from "@/components/AvatarLightbox";
+import ProfileRankPlacard from "@/components/ProfileRankPlacard";
 import { divisionFullLabel } from "@/lib/divisions";
 import { withCreatorFlag } from "@/lib/creator";
 import {
@@ -689,8 +690,9 @@ export default function ProfilePage() {
           </div>
         )}
 
-        <section className="rounded-2xl border border-border bg-card p-5 sm:p-6 mb-6">
-          <div className="flex flex-col sm:flex-row gap-5 items-start">
+        <section className="relative rounded-2xl border border-border bg-card p-5 sm:p-6 mb-6">
+          <ProfileRankPlacard player={player} />
+          <div className="flex min-h-[132px] flex-col gap-5 items-start sm:min-h-0 sm:flex-row sm:pr-[150px]">
             <button
               type="button"
               onClick={() => setLightbox(true)}

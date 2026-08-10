@@ -12,6 +12,7 @@
  */
 
 import type { BadgeStatus, BadgeTier } from "./types";
+import { CAREER_RANKS } from "./career-ranks";
 
 /** Lazy — never static-import badges (profile route freeze). */
 function getBadgeDefLazy(badgeId: string) {
@@ -498,6 +499,13 @@ export const EQUIPABLE_TITLE_CATALOG: EquipableTitleDef[] = [
     blurb: "Cashed the double enough times.",
   },
 ];
+
+EQUIPABLE_TITLE_CATALOG.push(...CAREER_RANKS.map((rank) => ({
+  badgeId: rank.id,
+  title: rank.abbreviation === "★★★★★" ? rank.name : rank.abbreviation,
+  vibe: "brag" as const,
+  blurb: `${rank.name}. Promotion orders are permanent.`,
+})));
 
 const byBadgeId = new Map(
   EQUIPABLE_TITLE_CATALOG.map((t) => [t.badgeId, t] as const)

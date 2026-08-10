@@ -163,6 +163,20 @@ export async function setMyEquippedTitle(
   ) {
     return { ok: false, error: "That achievement doesn’t come with a nameplate title." };
   }
+  if (badgeId?.startsWith("rank_")) {
+    try {
+      const [{ careerRankByTitleId, resolveCareerRank }, { getAchievementPoints, withPermanentBadges }, { loadLeaguePlayers }, { listLeagueSeasonCounts }, { getSportsPlayed }] = await Promise.all([
+        import("./career-ranks"), import("./badges"), import("./cloud"), import("./league-seasons"), import("./sports-played"),
+      ]);
+      const requested = careerRankByTitleId(badgeId);
+      const player = (await loadLeaguePlayers("setMyEquippedTitle.rank")).find((entry) => entry.id === userId);
+      if (!requested || !player) return { ok: false, error: "That rank has not been earned." };
+      const unlocked = resolveCareerRank({ achievementPoints: getAchievementPoints(withPermanentBadges(player)), seasons: listLeagueSeasonCounts(userId).reduce((sum, room) => sum + room.seasons, 0), sports: Math.max(1, getSportsPlayed(userId).length) }).unlocked;
+      if (!unlocked.some((rank) => rank.id === requested.id)) return { ok: false, error: "Promotion orders denied. That rank has not been earned." };
+    } catch {
+      return { ok: false, error: "Could not verify promotion orders." };
+    }
+  }
   const label = badgeId ? titleLabelForBadgeId(badgeId) : null;
   if (badgeId && !label) {
     return { ok: false, error: "That badge can’t be used as a title." };

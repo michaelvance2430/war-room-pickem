@@ -63,6 +63,7 @@ export function normalizeEdition(raw: GazetteEdition): GazetteEdition {
     swing: raw.swing ?? null,
     rivalryWatch: raw.rivalryWatch ?? null,
     chaosDetonation: raw.chaosDetonation ?? null,
+    promotionOrders: Array.isArray(raw.promotionOrders) ? raw.promotionOrders : [],
     crystalBallMiss: raw.crystalBallMiss ?? null,
     standingsDeadlock: raw.standingsDeadlock ?? null,
     noLock: raw.noLock ?? null,
@@ -387,6 +388,7 @@ function RivalryPage({ edition }: { edition: GazetteEdition }) {
 function BackPage({ edition, personal }: { edition: GazetteEdition; personal: { headline: string; deck: string } | null }) {
   return (
     <div className="space-y-4">
+      {!!edition.promotionOrders?.length && <section className="border-4 border-double border-stone-900 bg-amber-50 px-4 py-4"><p className="text-center text-[10px] font-black uppercase tracking-[.24em] text-red-800">Department of the War Room · Promotion Orders</p>{edition.promotionOrders.map((order) => <article key={`${order.name}-${order.to}`} className="mt-3 border-t border-stone-500 pt-3 first:border-t-0 first:pt-0"><h3 className="font-serif text-xl font-black leading-tight">{order.name.toUpperCase()} PROMOTED: {order.from} → {order.to}</h3><p className="mt-2 text-[13px] leading-snug text-stone-700">{order.deck}</p></article>)}</section>}
       {(personal || edition.rareEgg) && (
         <section className="border-2 border-stone-800 bg-stone-100 px-3 py-3">
           <p className="mb-2 text-[9px] font-black uppercase tracking-[0.2em] text-stone-500">From the editor&apos;s desk</p>

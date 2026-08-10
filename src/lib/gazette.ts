@@ -87,6 +87,8 @@ export type GazetteEdition = {
   chaosDetonation: GazetteStory | null;
   /** Emergency front-page art direction for an authorized War Room weapon. */
   emergencyProtocol?: "tactical_nuke" | "hellfire" | "jdam";
+  /** Career promotions earned when this edition was filed. Back-page orders. */
+  promotionOrders?: { name: string; from: string; to: string; deck: string }[];
   samePerson: boolean;
   masthead: string;
   /** Under the masthead — one-line sizzle */
@@ -1082,6 +1084,21 @@ export async function buildGazetteEdition(
     chaosDetonation = null;
   }
 
+  let promotionOrders: NonNullable<GazetteEdition["promotionOrders"]> = [];
+  try {
+    const [{ getAchievementPoints, withPermanentBadges }, { resolveCareerRank }, { observeCareerPromotion, promotionGazetteDeck }, { listLeagueSeasonCounts }, { getSportsPlayed }] = await Promise.all([
+      import("./badges"), import("./career-ranks"), import("./career-rank-promotions"), import("./league-seasons"), import("./sports-played"),
+    ]);
+    promotionOrders = players.flatMap((player) => {
+      if (player.isMock) return [];
+      const resolved = resolveCareerRank({ achievementPoints: getAchievementPoints(withPermanentBadges(player)), seasons: listLeagueSeasonCounts(player.id).reduce((sum, room) => sum + room.seasons, 0), sports: Math.max(1, getSportsPlayed(player.id).length) });
+      const promotion = observeCareerPromotion({ playerId: player.id, playerName: player.name, rank: resolved.current, weekIndex });
+      return promotion ? [{ name: promotion.name, from: promotion.from.abbreviation, to: promotion.to.abbreviation, deck: promotionGazetteDeck(promotion.name, promotion.from, promotion.to) }] : [];
+    });
+  } catch {
+    promotionOrders = [];
+  }
+
   // Cut-lock week: conference / division champs — Gazette splash + Trophy Room
   let conferenceChampions: GazetteStory[] | null = null;
   try {
@@ -1336,6 +1353,7 @@ export async function buildGazetteEdition(
       swing: nflSwing,
       rivalryWatch,
       chaosDetonation,
+      promotionOrders,
       conferenceChampions,
       sportId: "nfl",
       stampLine: conferenceChampions?.length
@@ -1420,6 +1438,7 @@ export async function buildGazetteEdition(
       swing,
       rivalryWatch,
       chaosDetonation,
+      promotionOrders,
       conferenceChampions: null,
       sportId: "soccer_wwc",
       stampLine: "EXTRA!",
@@ -1494,6 +1513,7 @@ export async function buildGazetteEdition(
     swing,
     rivalryWatch,
     chaosDetonation,
+    promotionOrders,
     conferenceChampions,
     sportId: "cfb",
     stampLine: conferenceChampions?.length
