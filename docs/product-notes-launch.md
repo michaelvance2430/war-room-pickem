@@ -141,6 +141,25 @@ unranked teams, First Four teams, and mobile layout before production release.
 
 ---
 
+## Commissioner unlock + odds telemetry (parking lot)
+
+- Before first kickoff, let the commissioner deliberately **Unlock Week** when a
+  card was locked too early. Require confirmation and an audit reason.
+- Unlocking must clear affected locked-pick state safely, preserve an audit
+  receipt, and automatically publish a league announcement explaining that the
+  week reopened and players may need to confirm picks again.
+- The commissioner can then pull a fresh odds snapshot (for example, Monday of
+  Week 0) and republish under the normal lock rules. Never silently replace a
+  spread underneath a locked pick.
+- Scrub the odds-provider key and request path end to end. Foundry must show
+  configuration health, last successful request, latest HTTP/error status,
+  provider-reported requests/credits used and remaining, and whether the shown
+  balance is current or stale.
+- Foundry must distinguish **key missing**, **provider unreachable**, **provider
+  response lacks quota headers**, and **telemetry table/service-role missing**.
+
+---
+
 ## Out of scope until explicitly pulled in
 
 - Multi-sport packs (see `docs/MULTI_SPORT.md`)  
