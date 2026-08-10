@@ -4,11 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import WarRoomArsenalIcon from "@/components/WarRoomArsenalIcon";
 import { authorizeFoundryJdam, generateNflPlayoffPicks, nflBracketComplete, nflPlayoffGames, sanitizeNflPlayoffPicks, type NflPlayoffPicks } from "@/lib/postseason/nfl-maps";
 
-type Lab = { picks: NflPlayoffPicks; locked: boolean; original: NflPlayoffPicks | null; targets: string[]; changedCount: number; humanPickCount: number; reviewed: boolean };
+type Lab = { picks: NflPlayoffPicks; locked: boolean; original: NflPlayoffPicks | null; authorizationWeek: number | null; targets: string[]; changedCount: number; humanPickCount: number; reviewed: boolean };
 const KEY = "warroom-foundry-nfl-maps-v1";
-const fresh = (): Lab => ({ picks: {}, locked: false, original: null, targets: [], changedCount: 0, humanPickCount: 0, reviewed: false });
+const fresh = (): Lab => ({ picks: {}, locked: false, original: null, authorizationWeek: null, targets: [], changedCount: 0, humanPickCount: 0, reviewed: false });
 
-export default function FoundryNflActThree() {
+export default function FoundryNflActThree({ seasonWeek }: { seasonWeek: number }) {
   const [lab, setLab] = useState<Lab>(fresh);
   const [ready, setReady] = useState(false);
   const [step, setStep] = useState(0);
@@ -20,7 +20,7 @@ export default function FoundryNflActThree() {
   const champion = games.find((game) => game.id === "super-bowl")?.teams.find((team) => team.id === lab.picks["super-bowl"]);
   const names = useMemo(() => new Map(nflPlayoffGames(generateNflPlayoffPicks(1)).flatMap((game) => game.teams.map((team) => [team.id, team.name]))), []);
   function choose(id: string, teamId: string) { if (lab.locked) return; setLab((current) => ({ ...current, picks: sanitizeNflPlayoffPicks({ ...current.picks, [id]: teamId }) })); }
-  function jdam() { const result = authorizeFoundryJdam(lab.picks); if (!result.targets.length) return; setStep(0); setLab({ picks: result.picks, locked: true, original: { ...lab.picks }, targets: result.targets, changedCount: result.changedCount, humanPickCount: Object.keys(lab.picks).length, reviewed: false }); }
+  function jdam() { const result = authorizeFoundryJdam(lab.picks); if (!result.targets.length) return; setStep(0); setLab({ picks: result.picks, locked: true, original: { ...lab.picks }, authorizationWeek: seasonWeek, targets: result.targets, changedCount: result.changedCount, humanPickCount: Object.keys(lab.picks).length, reviewed: false }); }
   async function share() { const text = `I authorized M.A.P.’s JDAM Protocol. ${lab.changedCount} NFL playoff decisions changed. My bracket no longer reflects my personal beliefs.`; if (navigator.share) await navigator.share({ title: "War Room JDAM Damage Assessment", text }); else await navigator.clipboard?.writeText(text); }
   if (!ready) return <p className="rounded-2xl border border-border p-5 text-center text-xs">Opening the playoff operations center…</p>;
   const reviewDone = step >= lab.targets.length;
