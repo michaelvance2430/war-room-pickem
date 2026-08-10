@@ -18,6 +18,7 @@ import { useParams } from "next/navigation";
 import Avatar from "@/components/Avatar";
 import AvatarLightbox from "@/components/AvatarLightbox";
 import ProfileRankPlacard from "@/components/ProfileRankPlacard";
+import ProfileArsenal from "@/components/ProfileArsenal";
 import { divisionFullLabel } from "@/lib/divisions";
 import { withCreatorFlag } from "@/lib/creator";
 import {
@@ -692,7 +693,7 @@ export default function ProfilePage() {
 
         <section className="relative rounded-2xl border border-border bg-card p-5 sm:p-6 mb-6">
           <ProfileRankPlacard player={player} />
-          <div className="flex min-h-[132px] flex-col gap-5 items-start sm:min-h-0 sm:flex-row sm:pr-[150px]">
+          <div className="flex min-h-[132px] min-w-0 flex-col gap-5 items-start pr-[126px] sm:min-h-0 sm:flex-row sm:pr-[150px]">
             <button
               type="button"
               onClick={() => setLightbox(true)}
@@ -709,16 +710,16 @@ export default function ProfilePage() {
             </button>
 
             <div className="flex-1 min-w-0">
-              <div className="flex flex-wrap items-center gap-2 mb-1">
+              <div className="flex min-w-0 flex-col items-start gap-1.5 mb-1 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2">
                 {equipped && (
                   <span
-                    className="text-xs sm:text-sm font-black uppercase tracking-wide text-amber-300 shrink-0"
+                    className="max-w-full break-words text-xs font-black uppercase tracking-wide text-amber-300 sm:text-sm"
                     title="Equipped on Account"
                   >
                     {equipped}
                   </span>
                 )}
-                <h1 className="text-2xl font-bold truncate">{player.name}</h1>
+                <h1 className="max-w-full break-words text-2xl font-bold leading-tight">{player.name}</h1>
                 {!mock && allegianceLoading && (
                   <span className="text-[10px] text-muted font-medium animate-pulse">
                     Team…
@@ -869,6 +870,8 @@ export default function ProfilePage() {
             </div>
           </div>
         </section>
+
+        {!mock && <ProfileArsenal isSelf={isSelfProfile} />}
 
         {!detailsOpen && (
           <HeavyDetailsPlaceholder

@@ -8,7 +8,9 @@ assert.equal(CAREER_RANKS.find((rank) => rank.abbreviation === "2LT")?.grade, "o
 assert.equal(CAREER_RANKS[CAREER_RANKS.findIndex((rank) => rank.abbreviation === "CSM") + 1]?.abbreviation, "2LT", "CSM commissions directly to 2LT");
 assert.equal(CAREER_RANKS.at(-1)?.name, "Five-Star Field General");
 assert.equal(resolveCareerRank({ achievementPoints: 20000, seasons: 0, sports: 5 }).current.abbreviation, "SGT", "senior ranks require seasons");
-assert.equal(resolveCareerRank({ achievementPoints: 20000, seasons: 20, sports: 5 }).current.name, "Five-Star Field General");
+assert.equal(resolveCareerRank({ achievementPoints: 20000, seasons: 20, sports: 5, tacticalNukes: 1 }).current.name, "Five-Star Field General");
+assert.equal(resolveCareerRank({ achievementPoints: 6000, seasons: 8, sports: 3 }).current.abbreviation, "LTC", "COL requires a Tactical Nuke call");
+assert.equal(resolveCareerRank({ achievementPoints: 6000, seasons: 8, sports: 3, tacticalNukes: 1 }).current.abbreviation, "COL", "one Tactical Nuke qualifies COL");
 assert.equal(careerRankByTitleId("rank_sgt")?.abbreviation, "SGT");
 assert.match(promotionGazetteDeck("Mike", careerRankByTitleId("rank_csm"), careerRankByTitleId("rank_2lt")), /adult supervision and a map/);
 assert.match(promotionGazetteDeck("Mike", careerRankByTitleId("rank_sgm"), careerRankByTitleId("rank_csm")), /grass has been placed on notice/);

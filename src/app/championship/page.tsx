@@ -45,6 +45,7 @@ export default function ChampionshipPage() {
     async function load() {
       setSelfId(getSession()?.playerId || null);
       const league = getLeague();
+      const isNfl = league?.sportId === "nfl";
       setLeagueName(league?.name || "");
       const cut = league?.settings?.cutPercent ?? 50;
       setCutPercent(cut);
@@ -96,7 +97,7 @@ export default function ChampionshipPage() {
       setBracket(advanced);
 
       const totalRounds = advanced.rounds.length;
-      const cfpScored = scoredWeeks.filter((w) => w >= 15);
+      const playoffScored = scoredWeeks.filter((w) => w >= (isNfl ? 19 : 15));
       const qfFilled = advanced.rounds[1]?.some(
         (m) => m.slotA.player || m.slotB.player
       );
@@ -106,11 +107,10 @@ export default function ChampionshipPage() {
       });
       if (nextUnscored == null && qfFilled) {
         setProgressNote("All bracket rounds scored — champion is final.");
-      } else if (!cfpScored.length) {
-        const playoffWord =
-          getLeague()?.sportId === "nfl" ? "playoff" : "CFP";
+      } else if (!playoffScored.length) {
+        const playoffWord = isNfl ? "playoff" : "CFP";
         setProgressNote(
-          `Round 1 is seeded from standings. Score ${playoffWord} weeks 15–18 (or use Commish → finish remaining weeks) to fill Quarterfinals → Final. Higher weekly score advances.`
+          `Round 1 is seeded from standings. Score ${playoffWord} weeks ${isNfl ? "19–22" : "15–18"} (or use Commish → finish remaining weeks) to fill Quarterfinals → Final. Higher weekly score advances.`
         );
       } else if (nextUnscored != null) {
         const w = cfpWeekForRound(
@@ -121,13 +121,13 @@ export default function ChampionshipPage() {
         const playoffWord =
           getLeague()?.sportId === "nfl" ? "Playoff" : "CFP";
         setProgressNote(
-          `${playoffWord} weeks scored: ${cfpScored.join(", ") || "none"}. Next: score ${weekTitle(w)} to keep advancing.`
+          `${playoffWord} weeks scored: ${playoffScored.join(", ") || "none"}. Next: score ${weekTitle(w)} to keep advancing.`
         );
       } else {
         const playoffWord =
           getLeague()?.sportId === "nfl" ? "Playoff" : "CFP";
         setProgressNote(
-          `${playoffWord} weeks ${cfpScored.join(", ")} scored — winners should show with weekly points.`
+          `${playoffWord} weeks ${playoffScored.join(", ")} scored — winners should show with weekly points.`
         );
       }
 
@@ -183,11 +183,9 @@ export default function ChampionshipPage() {
       <span className="font-medium text-primary">Not locked yet.</span>
       <span className="text-muted">
                 {" "}
-                Seeds update with standings until{" "}
-                <strong className="text-foreground">
-                  Conference Championship week (14)
-                </strong>{" "}
-                is scored.
+                {getLeague()?.sportId === "nfl"
+                  ? " Seeds update with standings until the regular season is complete. After Week 18, seeds lock and the War Room playoffs begin."
+                  : " Seeds update with standings until Conference Championship week (14) is scored."}
               </span>
       </p>
           )}
