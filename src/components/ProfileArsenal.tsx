@@ -15,7 +15,7 @@ export default function ProfileArsenal({ playerId }: { playerId: string }) {
   return <section className="mb-6 overflow-hidden rounded-2xl border-2 border-slate-500/50 bg-[radial-gradient(circle_at_top,#172033,#05070b_70%)] p-4 shadow-[0_18px_60px_rgba(0,0,0,.35)]" aria-label="Profile Arsenal">
     <div className="flex min-w-0 items-center justify-between gap-3"><div className="min-w-0"><p className="text-[9px] font-black uppercase tracking-[.22em] text-amber-300">Profile Arsenal</p><h2 className="break-words text-xl font-black">WEAPONS SERVICE RECORD</h2><p className="mt-1 text-[9px] font-bold text-slate-400">{loading ? "Pulling permanent orders…" : `${service.total} career authorization${service.total === 1 ? "" : "s"} · ${service.campaigns} campaign${service.campaigns === 1 ? "" : "s"}`}</p></div><div className="shrink-0"><WarRoomArsenalIcon kind="maps" size={58}/></div></div>
     <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4"><System kind="nuke" name="Tactical Nuke" count={service.tacticalNukes}/><System kind="dead_hand" name="Dead Hand" count={service.deadHands}/><System kind="jdam" name="JDAM" count={service.jdams}/><System kind="hellfire" name="Hellfire" count={service.hellfires}/></div>
-    <p className="mt-3 text-center text-[9px] font-bold uppercase tracking-[.12em] text-slate-400">Foundry is rehearsal. Production becomes history.</p>
+    <p className="mt-3 text-center text-[9px] font-bold uppercase tracking-[.12em] text-slate-400">Rehearsal is temporary. Production becomes history.</p>
   </section>;
 }
 
