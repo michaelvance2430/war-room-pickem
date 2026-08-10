@@ -35,5 +35,7 @@ const walkthrough = readFileSync("src/lib/foundry-walkthrough.ts", "utf8");
 assert.match(walkthrough, /sport === "nfl" \? 22/);
 assert.match(preview, /REGULAR SEASON COMPLETE → PHASE II · SEEDS LOCKED/);
 assert.match(preview, /jdam\.authorizationWeek === active/);
+assert.match(preview, /const cutWeek = foundryPostseasonStartWeek\(state\.sport\)/);
+assert.doesNotMatch(preview, /state\.sport === "nfl" \? 18/);
 
 console.log("NFL JDAM verified: available at decision zero · partial picks preserved · 14-team field · divisional reseeding · three-impact reveal · complete computer bracket");
