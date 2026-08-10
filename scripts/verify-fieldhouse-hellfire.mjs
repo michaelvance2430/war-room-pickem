@@ -24,6 +24,7 @@ assert.equal(launchFoundryHellfire(state), state, "M.A.P.'s cannot reroll");
 const previewSource = fs.readFileSync("src/app/foundry/preview/page.tsx", "utf8");
 assert.match(previewSource, /Computer assumes command/);
 assert.match(previewSource, /onHellfire/);
+assert.match(previewSource, /weapon-unstable/);
 assert.match(previewSource, /state\.sport === "cbb"[\s\S]*Season status" value="PHASE III"[\s\S]*NcaaBracketPicker/);
 const dirtyPreview = launchFoundryHellfire(createFoundryWalkthrough("cbb", 19, "player"));
 const cleanActThree = simulateFoundryRegularSeason(dirtyPreview);

@@ -322,6 +322,23 @@ html[data-sport="nfl"] select:focus {
   }
 }
 
+/* Postseason weapons should feel unstable without running away from a tap. */
+.weapon-unstable {
+  animation: weapon-unstable-jolt 4.8s steps(1, end) infinite;
+  transform-origin: center;
+}
+@keyframes weapon-unstable-jolt {
+  0%, 72%, 100% { transform: translate(0, 0) rotate(0); }
+  74% { transform: translate(-3px, 1px) rotate(-0.7deg); }
+  76% { transform: translate(4px, -1px) rotate(0.8deg); }
+  78% { transform: translate(-2px, 0) rotate(-0.4deg); }
+  80% { transform: translate(2px, 1px) rotate(0.35deg); }
+  82% { transform: translate(0, 0) rotate(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .weapon-unstable { animation: none !important; }
+}
+
 /* CFB STANDINGS · stadium jumbotron; spectacle above, scanability below. */
 .cfb-standings-page { --scoreboard-green:#48f06a; --scoreboard-gold:#e5bb2a; position:relative; overflow-x:hidden; background:radial-gradient(ellipse 45rem 28rem at 50% 8rem,rgba(24,111,54,.18),transparent 72%),#020503; }
 .cfb-standings-page::before { content:""; position:absolute; inset:0 0 auto; height:42rem; pointer-events:none; background:linear-gradient(180deg,transparent 48%,#020503 96%); z-index:1; }
