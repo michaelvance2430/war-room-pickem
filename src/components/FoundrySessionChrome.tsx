@@ -10,6 +10,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { isAppCreator } from "@/lib/creator";
 import { getSession } from "@/lib/league";
+import { createClient } from "@/lib/supabase/client";
 import {
   creatorEyesLabel,
   EVENT_CREATOR_EYES,
@@ -69,8 +70,13 @@ export default function FoundrySessionChrome() {
   const [eyes, setEyes] = useState<CreatorEyesMode>("off");
 
   useEffect(() => {
-    function refresh() {
-      const uid = getSession()?.playerId;
+    let cancelled = false;
+
+    async function refresh() {
+      const supabase = createClient();
+      const { data: authData } = await supabase.auth.getSession();
+      const uid = authData.session?.user.id || getSession()?.playerId || null;
+      if (cancelled) return;
       if (!isAppCreator(uid)) {
         setShow(false);
         return;
@@ -87,16 +93,22 @@ export default function FoundrySessionChrome() {
         !onFoundry && (isCreatorEyesActive() || isFoundrySessionSticky())
       );
     }
-    refresh();
-    window.addEventListener(EVENT_CREATOR_EYES, refresh);
-    window.addEventListener(EVENT_FOUNDRY_SESSION, refresh);
-    window.addEventListener("warroom-view-as-player", refresh);
-    window.addEventListener("storage", refresh);
+
+    const handleRefresh = () => {
+      void refresh();
+    };
+
+    void refresh();
+    window.addEventListener(EVENT_CREATOR_EYES, handleRefresh);
+    window.addEventListener(EVENT_FOUNDRY_SESSION, handleRefresh);
+    window.addEventListener("warroom-view-as-player", handleRefresh);
+    window.addEventListener("storage", handleRefresh);
     return () => {
-      window.removeEventListener(EVENT_CREATOR_EYES, refresh);
-      window.removeEventListener(EVENT_FOUNDRY_SESSION, refresh);
-      window.removeEventListener("warroom-view-as-player", refresh);
-      window.removeEventListener("storage", refresh);
+      cancelled = true;
+      window.removeEventListener(EVENT_CREATOR_EYES, handleRefresh);
+      window.removeEventListener(EVENT_FOUNDRY_SESSION, handleRefresh);
+      window.removeEventListener("warroom-view-as-player", handleRefresh);
+      window.removeEventListener("storage", handleRefresh);
     };
   }, [pathname]);
 
