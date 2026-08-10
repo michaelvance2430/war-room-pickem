@@ -145,8 +145,8 @@ export default function FoundryPage() {
               Check the system, test the moments, or run a disposable season. Choose one job below.
             </p>
           </div>
-          <button type="button" onClick={() => void refresh()} className="min-h-10 rounded-lg border border-border px-3 text-xs font-bold">
-            Refresh
+          <button type="button" onClick={() => void refresh().then(() => setLog("✅ Foundry status refreshed. Sandbox state was not reset."))} className="min-h-10 rounded-lg border border-border px-3 text-xs font-bold">
+            Refresh status
           </button>
         </div>
       </header>
