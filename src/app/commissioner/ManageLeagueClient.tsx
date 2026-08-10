@@ -36,6 +36,7 @@ import { transferCommissioner, defaultSeasonYear } from "@/lib/trophies";
 import { paintAutomaticSeasonTheme } from "@/lib/season-theme";
 import { DIVISIONS, divisionDisplayLabel } from "@/lib/divisions";
 import { isLeagueBuildLocked, openingWeekLockLabel } from "@/lib/league-build";
+import SportPoolCommishPanel from "@/components/SportPoolCommishPanel";
 
 type SectionId =
   | "identity"
@@ -870,6 +871,13 @@ function ManageLeagueInner() {
               </div>
             )}
           </section>
+
+          {/* Commissioner-only cross-sport opt-in and one-touch seating. */}
+          {isOwner && (
+            <div className="lg:col-span-2">
+              <SportPoolCommishPanel />
+            </div>
+          )}
         </div>
 
         <p className="text-center text-xs text-muted mt-8">
