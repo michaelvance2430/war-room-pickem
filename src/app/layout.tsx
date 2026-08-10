@@ -85,11 +85,12 @@ export default function RootLayout({
           route prefetch. No global PullToRefresh (that froze touch).
         */}
         <SmoothRuntime />
+        {/* Creator operator chrome must not disappear with optional theme/decor isolation. */}
+        <FoundrySessionChrome />
         <ThemeDecorGate>
           <SportThemeApplier />
           <NflRouteSkin />
           <SeasonThemeApplier />
-          <FoundrySessionChrome />
           <SandboxSessionChrome />
           <LeagueBuildGate />
         </ThemeDecorGate>
