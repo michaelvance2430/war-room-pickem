@@ -1,9 +1,10 @@
 "use client";
 
 /**
- * Creator-only one-tap access to Foundry.
- * The access control itself is always visible to the authenticated app creator
- * so a cleared LAB/sticky session can never strand the creator outside Foundry.
+ * Creator-only one-tap return to Foundry while actively testing.
+ * Normal gameplay stays clean: the permanent Foundry doorway lives on the
+ * creator's own Profile. This chrome appears only for an active Foundry
+ * session or Creator Eyes preview.
  */
 
 import { useEffect, useState } from "react";
@@ -16,6 +17,7 @@ import {
   creatorEyesLabel,
   EVENT_CREATOR_EYES,
   getCreatorEyesMode,
+  isCreatorEyesActive,
   setCreatorEyesMode,
   type CreatorEyesMode,
 } from "@/lib/creator-eyes";
@@ -88,17 +90,10 @@ export default function FoundrySessionChrome() {
         pathname?.startsWith("/foundry/") ||
         pathname === "/founder" ||
         pathname?.startsWith("/founder/");
-
-      // Creator escape hatch: always visible outside Foundry itself.
-      // Previously this depended on creator-eyes/sticky state; clearing a LAB
-      // session could therefore make the only creator entry point disappear.
-      setShow(!onFoundry);
+      setShow(!onFoundry && (isCreatorEyesActive() || isFoundrySessionSticky()));
     }
 
-    const handleRefresh = () => {
-      void refresh();
-    };
-
+    const handleRefresh = () => void refresh();
     void refresh();
     window.addEventListener(EVENT_CREATOR_EYES, handleRefresh);
     window.addEventListener(EVENT_FOUNDRY_SESSION, handleRefresh);
@@ -116,56 +111,22 @@ export default function FoundrySessionChrome() {
   if (!show) return null;
 
   const eyesOn = eyes !== "off";
-  const sticky = isFoundrySessionSticky();
 
   return (
-    <div
-      className="fixed bottom-0 inset-x-0 z-[95] pointer-events-none"
-      style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
-    >
+    <div className="fixed bottom-0 inset-x-0 z-[95] pointer-events-none" style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
       <div className="pointer-events-auto max-w-lg mx-auto px-3 pb-3">
         <div className="rounded-2xl border-2 border-sky-400/50 bg-sky-950/95 backdrop-blur-md shadow-[0_0_40px_rgba(56,189,248,0.25)] px-3 py-2.5 flex items-center gap-2">
           <div className="flex-1 min-w-0">
-            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-300">
-              CREATOR · Foundry
-            </p>
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-300">LAB · Foundry</p>
             <p className="text-xs text-sky-100/90 truncate font-semibold">
-              {(() => {
-                if (!sticky && !eyesOn) return "Creator access";
-                try {
-                  // eslint-disable-next-line @typescript-eslint/no-require-imports
-                  const iso = require("@/lib/foundry-isolation") as typeof import("@/lib/foundry-isolation");
-                  const lab = iso.isFoundryLabActiveOnCurrentRoom();
-                  if (!lab) {
-                    return "Not a LAB room — simulations blocked on production";
-                  }
-                } catch {
-                  /* ok */
-                }
-                return eyesOn
-                  ? `${creatorEyesLabel(eyes)} · first-hour / eyes preview`
-                  : "LAB room — one tap back to Foundry";
-              })()}
+              {eyesOn ? `${creatorEyesLabel(eyes)} · first-hour / eyes preview` : "LAB testing · one tap back to Foundry"}
             </p>
           </div>
-          <Link
-            href="/foundry"
-            className="shrink-0 min-h-[44px] px-3.5 rounded-xl bg-sky-400 text-black text-xs font-extrabold inline-flex items-center touch-manipulation"
-          >
-            Foundry →
-          </Link>
-          {eyesOn && (
-            <button
-              type="button"
-              onClick={() => {
-                setCreatorEyesMode("off");
-                setEyes("off");
-                window.location.href = "/founder#eyes";
-              }}
-              className="shrink-0 min-h-[44px] px-2.5 rounded-xl border border-sky-400/50 text-sky-100 text-[11px] font-bold touch-manipulation"
-            >
-              Exit eyes
-            </button>
+          <Link href="/foundry" className="shrink-0 min-h-[44px] px-3.5 rounded-xl bg-sky-400 text-black text-xs font-extrabold inline-flex items-center touch-manipulation">← Foundry</Link>
+          {eyesOn ? (
+            <button type="button" onClick={() => { setCreatorEyesMode("off"); setEyes("off"); window.location.href = "/founder#eyes"; }} className="shrink-0 min-h-[44px] px-2.5 rounded-xl border border-sky-400/50 text-sky-100 text-[11px] font-bold touch-manipulation">Exit eyes</button>
+          ) : (
+            <button type="button" onClick={() => { clearFoundrySession(); setShow(false); }} className="shrink-0 min-h-[44px] px-2.5 rounded-xl border border-sky-400/40 text-sky-200/80 text-[11px] font-bold touch-manipulation">End</button>
           )}
         </div>
       </div>
