@@ -17,3 +17,8 @@ alter table public.memberships
   add column if not exists is_deputy boolean not null default false,
   add column if not exists display_name_override text null;
 
+alter table public.leagues
+  add column if not exists open_room_nudge_pending boolean not null default false,
+  add column if not exists open_room_nudge_left_name text null,
+  add column if not exists open_room_nudge_at timestamptz null;
+
