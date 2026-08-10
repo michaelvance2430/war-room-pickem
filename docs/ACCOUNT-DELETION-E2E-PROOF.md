@@ -79,3 +79,19 @@ Account deletion must stay dark until the Foundry-facing transfer flow, exact
 confirmation UI, retry/repair surface, and physical-device tests pass. This proof
 authorizes that next UI checkpoint; it does not authorize a production migration
 or opening the public feature flag.
+
+## Pass the Keys proof — 2026-08-10
+
+A second rollback-only branch test created a commissioner, successor, room, and
+memberships. It proved the complete transfer gate:
+
+- deletion was blocked with exactly one owned room;
+- the blocked commissioner's profile remained `active`;
+- room and membership leadership transferred to the successor;
+- a new deletion operation then began successfully; and
+- the former commissioner immediately entered `deletion_in_progress` so access
+  failed closed.
+
+All fixtures and lifecycle changes from this proof were rolled back. Production
+was inspected only to distinguish its non-recursive membership helpers from the
+disposable legacy-baseline policy; production was not mutated.
