@@ -1930,7 +1930,7 @@ export default function PicksClient() {
         {eyesPreview && (
           <div className="picks-eyes-preview mb-4 rounded-lg border border-sky-400/50 bg-sky-500/15 px-3 py-2 text-xs font-bold text-sky-100 flex flex-wrap items-center gap-x-2 gap-y-1">
       <span>PREVIEW · local card · not your real standings</span>
-      <Link href="/founder#eyes" className="underline">
+      <Link href="/foundry" className="underline">
               Foundry eyes
             </Link>
       <button
@@ -1939,7 +1939,7 @@ export default function PicksClient() {
               onClick={() => {
                 void import("@/lib/creator-eyes").then((m) => {
                   m.setCreatorEyesMode("off");
-                  window.location.href = "/founder#eyes";
+                  window.location.href = "/foundry";
                 });
               }}
             >
