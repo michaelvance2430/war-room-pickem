@@ -14,6 +14,8 @@ const driftBaseline = read("supabase/review-only/account-deletion/00b-disposable
 const lifecycleSchema = read("supabase/review-only/account-deletion/01-lifecycle-schema-REVIEW-ONLY.sql");
 const disposableHarness = read("supabase/review-only/account-deletion/02-disposable-test-harness.sql");
 const policyOverlay = read("supabase/review-only/account-deletion/03-active-account-policy-overlay-REVIEW-ONLY.sql");
+const serverRpcs = read("supabase/review-only/account-deletion/04-server-rpcs-REVIEW-ONLY.sql");
+const serverRpcHarness = read("supabase/review-only/account-deletion/05-server-rpc-test-harness.sql");
 const lifecycle = read("src/lib/account-lifecycle-contract.ts");
 
 assert(design.includes("No production mutation is authorized"), "review-only boundary missing");
@@ -50,5 +52,11 @@ assert(policyOverlay.includes("as restrictive"), "active-account policy is not m
 assert(policyOverlay.includes("c.relrowsecurity"), "policy overlay is not limited to RLS tables");
 assert(policyOverlay.includes("on storage.objects"), "storage access is not gated after deletion");
 assert(disposableHarness.includes("revoked JWT changed a protected row"), "old-JWT RLS mutation is not tested");
+assert(serverRpcs.includes("private.redact_jsonb_text"), "Gazette JSON redaction is missing");
+assert(serverRpcs.includes("to service_role"), "deletion RPCs are not service-role-only");
+assert(serverRpcs.includes("blocked_commissioner"), "server commissioner gate is missing");
+assert(serverRpcs.includes("deleting_auth_user"), "Auth deletion handoff stage is missing");
+assert(serverRpcHarness.includes("authenticated role executed service-only deletion RPC"), "RPC privilege boundary is untested");
+assert(serverRpcHarness.includes("completed operation is not idempotent"), "RPC retry safety is untested");
 
 console.log("[account-deletion-architecture] PASS — tombstone identity, inventory, revocation, and Foundry gates verified");
