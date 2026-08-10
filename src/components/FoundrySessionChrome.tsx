@@ -124,7 +124,7 @@ export default function FoundrySessionChrome() {
           </div>
           <Link href="/foundry" className="shrink-0 min-h-[44px] px-3.5 rounded-xl bg-sky-400 text-black text-xs font-extrabold inline-flex items-center touch-manipulation">← Foundry</Link>
           {eyesOn ? (
-            <button type="button" onClick={() => { setCreatorEyesMode("off"); setEyes("off"); window.location.href = "/founder#eyes"; }} className="shrink-0 min-h-[44px] px-2.5 rounded-xl border border-sky-400/50 text-sky-100 text-[11px] font-bold touch-manipulation">Exit eyes</button>
+            <button type="button" onClick={() => { setCreatorEyesMode("off"); setEyes("off"); window.location.href = "/foundry"; }} className="shrink-0 min-h-[44px] px-2.5 rounded-xl border border-sky-400/50 text-sky-100 text-[11px] font-bold touch-manipulation">Exit eyes</button>
           ) : (
             <button type="button" onClick={() => { clearFoundrySession(); setShow(false); }} className="shrink-0 min-h-[44px] px-2.5 rounded-xl border border-sky-400/40 text-sky-200/80 text-[11px] font-bold touch-manipulation">End</button>
           )}
