@@ -50,7 +50,7 @@ export default function FoundryPlayerView() {
     setViewAsPlayer(false);
     setOn(false);
     setNote("Player chrome OFF — full host UI restored.");
-    window.location.href = "/founder#player-view";
+    window.location.href = "/foundry";
   }
 
   return (
