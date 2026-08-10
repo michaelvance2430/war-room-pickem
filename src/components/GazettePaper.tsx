@@ -264,11 +264,13 @@ function FrontPage({ edition }: { edition: GazetteEdition }) {
     const operators = launch.names.length > 1 ? "THEY HAVE" : "THIS PERSON HAS";
     const protocol = edition.emergencyProtocol || "tactical_nuke";
     const art = protocol === "hellfire" ? "/gazette/hellfire-extra.png" : protocol === "jdam" ? "/gazette/jdam-extra.png" : "/gazette/tactical-nuclear-extra.png";
-    const authorization = protocol === "hellfire" ? "Hellfire strike confirmed" : protocol === "jdam" ? "JDAM release confirmed" : "Nuclear authorization confirmed";
+    const authorization = protocol === "hellfire" ? "Hellfire strike confirmed" : protocol === "jdam" ? "JDAM release confirmed" : protocol === "dead_hand" ? "Dead Hand activated" : "Nuclear authorization confirmed";
     const caption = protocol === "hellfire"
       ? `Artist's reconstruction of ${launch.names.join(" and ")} asking a drone to improve a basketball bracket. The drone has no known Final Four experience.`
       : protocol === "jdam"
         ? `Artist's reconstruction of ${launch.names.join(" and ")} releasing a precision-guided playoff bracket, then leaving the airspace before anyone could ask about the wild-card picks.`
+        : protocol === "dead_hand"
+          ? `Artist's reconstruction of ${launch.names.join(" and ")} surrendering the entire bowl board to Dead Hand. The machine declined comment but circled Boise twice.`
         : `Artist's reconstruction of ${launch.names.join(" and ")} surrendering all decision-making authority to a computer. ${operators} declined to remove themselves from command before publication.`;
     return (
       <article className="text-center">

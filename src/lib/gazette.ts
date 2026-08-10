@@ -86,7 +86,7 @@ export type GazetteEdition = {
    */
   chaosDetonation: GazetteStory | null;
   /** Emergency front-page art direction for an authorized War Room weapon. */
-  emergencyProtocol?: "tactical_nuke" | "hellfire" | "jdam";
+  emergencyProtocol?: "tactical_nuke" | "dead_hand" | "hellfire" | "jdam";
   /** Career promotions earned when this edition was filed. Back-page orders. */
   promotionOrders?: { name: string; from: string; to: string; deck: string }[];
   samePerson: boolean;

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   buildFoundryGazetteFixture,
   FOUNDRY_GAZETTE_VERSION_COUNT,
@@ -27,4 +28,12 @@ for (const [index, edition] of editions.entries()) {
   assert.match(edition.eventLine || "", /NO CLOUD WRITES/);
 }
 
-console.log("verify-foundry-gazette: ALL 18 EDITIONS PASS");
+const preview = readFileSync("src/app/foundry/preview/page.tsx", "utf8");
+const paper = readFileSync("src/components/GazettePaper.tsx", "utf8");
+assert.match(preview, /warroom-foundry-cfb-act-three-v3/);
+assert.match(preview, /cfbDeadHandAuthorized/);
+assert.match(preview, /emergencyProtocol === "dead_hand"/);
+assert.match(preview, /REMOVED HIMSELF FROM THE CHAIN OF COMMAND/);
+assert.match(paper, /Dead Hand activated/);
+
+console.log("verify-foundry-gazette: ALL 18 EDITIONS + CFB DEAD HAND FRONT PAGE PASS");

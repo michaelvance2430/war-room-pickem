@@ -331,11 +331,17 @@ function Gazette({ state, selectedWeek, onSelectWeek }: { state: FoundryWalkthro
   const raw = buildFoundryGazetteFixture(((active - 1) % 18) + 1, state.generatedAt + active * 1000);
   const isLatestEdition = active === weeks[weeks.length - 1];
   let nflJdamAuthorized = false;
+  let cfbDeadHandAuthorized = false;
+  if (state.sport === "cfb" && isLatestEdition && typeof window !== "undefined") {
+    try { cfbDeadHandAuthorized = !!JSON.parse(localStorage.getItem("warroom-foundry-cfb-act-three-v3") || "null")?.nuclear?.active; } catch { cfbDeadHandAuthorized = false; }
+  }
   if (state.sport === "nfl" && isLatestEdition && typeof window !== "undefined") {
     try { nflJdamAuthorized = !!JSON.parse(localStorage.getItem("warroom-foundry-nfl-maps-v1") || "null")?.original; } catch { nflJdamAuthorized = false; }
   }
   const emergencyProtocol = state.tacticalNukeWeeks?.includes(active)
     ? "tactical_nuke" as const
+    : cfbDeadHandAuthorized
+      ? "dead_hand" as const
     : state.sport === "cbb" && isLatestEdition && state.mapsEvent?.protocol === "hellfire"
       ? "hellfire" as const
       : nflJdamAuthorized
@@ -353,6 +359,8 @@ function Gazette({ state, selectedWeek, onSelectWeek }: { state: FoundryWalkthro
       ? { names: ["Mike V"], pts: 0, kind: "clear" as const, headline: "MIKE V HAS CALLED IN HELLFIRE ON HIS OWN BRACKET", deck: `A drone changed ${state.mapsEvent?.changedCount || "several"} tournament decisions. The bracket no longer reflects his personal beliefs, which legal analysts agree may be the point.` }
       : emergencyProtocol === "jdam"
         ? { names: ["Mike V"], pts: 0, kind: "clear" as const, headline: "MIKE V HAS RELEASED THE JDAM PACKAGE", deck: "The computer acquired the NFL playoff bracket, altered the flight plan, and locked every decision before the pilot could remember who had home-field advantage." }
+        : emergencyProtocol === "dead_hand"
+          ? { names: ["Mike V"], pts: 0, kind: "clear" as const, headline: "MIKE V HAS REMOVED HIMSELF FROM THE CHAIN OF COMMAND", deck: "Dead Hand seized all 25 bowl picks, spent every confidence point, and locked the board before its former commander could object. The machine continues to insist it identified something in Boise." }
         : raw.chaosDetonation;
   const edition = { ...raw, weekIndex: active, weekLabel: PREVIEW_SPORTS[state.sport].weekLabel(active), sportId: state.sport, volumeLabel: `${PREVIEW_SPORTS[state.sport].room.toUpperCase()} · FOUNDRY PREVIEW · NO CLOUD WRITES`, chaosDetonation: tacticalNukeDetonation, emergencyProtocol };
   return <Page title="Gazette Archive" note={`${weeks.length} scored edition${weeks.length === 1 ? "" : "s"} · choose a week, then read its four pages.`}><nav className="mb-4 rounded-xl border border-border bg-card p-3" aria-label="Gazette editions"><div className="flex gap-2 overflow-x-auto pb-1">{weeks.map((week) => <button key={week} type="button" onClick={() => onSelectWeek(week)} className={`min-h-10 shrink-0 rounded-lg px-3 text-xs font-black ${week === active ? "bg-stone-100 text-stone-900" : "border border-border"}`}>{PREVIEW_SPORTS[state.sport].weekLabel(week)}</button>)}</div></nav>{state.sport === "cbb" && ncaaResultsWindow(state.ncaaResults || {}) > 0 && <MadnessGazetteBulletin state={state} />}<GazettePaper edition={edition} foundryPreview /></Page>;
