@@ -4,7 +4,12 @@ import { createFoundryWalkthrough, launchFoundryHellfire } from "../src/lib/foun
 import { generateNcaaPicks, ncaaPickCount } from "../src/lib/ncaa-bracket.ts";
 
 let state = createFoundryWalkthrough("cbb", 19, "player");
-assert.equal(launchFoundryHellfire(state), state, "incomplete bracket must not fire");
+state = launchFoundryHellfire(state);
+assert.equal(state.ncaaBracketLocked, true, "Hellfire must fire before any human picks");
+assert.equal(ncaaPickCount(state.ncaaPicks), 67);
+assert.equal(state.mapsEvent?.changedCount, 67);
+assert.deepEqual(state.mapsEvent?.originalPicks, {});
+state = createFoundryWalkthrough("cbb", 19, "player");
 state = { ...state, ncaaPicks: generateNcaaPicks(777) };
 const original = { ...state.ncaaPicks };
 state = launchFoundryHellfire(state);
@@ -17,7 +22,7 @@ assert.ok((state.mapsEvent?.changedCount || 0) >= 4);
 assert.equal(launchFoundryHellfire(state), state, "M.A.P.'s cannot reroll");
 
 const previewSource = fs.readFileSync("src/app/foundry/preview/page.tsx", "utf8");
-assert.match(previewSource, /HELLFIRE ARMS AFTER THE FULL BRACKET/);
-assert.match(previewSource, /disabled=\{count !== 67\}/);
+assert.match(previewSource, /Computer assumes command/);
+assert.match(previewSource, /onHellfire/);
 
-console.log("Fieldhouse Hellfire verified: visible while picking · complete bracket required · original preserved · four-strike reveal · locked computer bracket · no reroll");
+console.log("Fieldhouse Hellfire verified: available at bracket entry · partial picks preserved · four-strike reveal · locked 67-pick computer bracket · no reroll");

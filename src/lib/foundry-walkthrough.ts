@@ -256,16 +256,15 @@ export function armFoundryTacticalNuke(state: FoundryWalkthrough): FoundryWalkth
   };
 }
 
-/** Fieldhouse M.A.P.'s proof: preserve the human bracket, then replace it with
+/** Fieldhouse M.A.P.'s proof: preserve any human picks, then replace them with
  * a deterministic complete computer bracket and retain the four primary
  * opening-round strikes for the mandatory reveal. Downstream changes are
  * reported as collateral damage, never hidden. */
 export function launchFoundryHellfire(state: FoundryWalkthrough): FoundryWalkthrough {
   if (state.sport !== "cbb" || state.ncaaBracketLocked || state.mapsEvent) return state;
-  if (Object.keys(state.ncaaPicks || {}).length !== 67) return state;
   const originalPicks = { ...state.ncaaPicks };
   const computerPicks = generateNcaaPicks(state.week * 991 + 1776);
-  const changed = Object.keys(originalPicks).filter((id) => originalPicks[id] !== computerPicks[id]);
+  const changed = Object.keys(computerPicks).filter((id) => originalPicks[id] !== computerPicks[id]);
   const openingTargets = changed.filter((id) => id.includes(":r1:")).slice(0, 4);
   const targetIds = [...openingTargets, ...changed.filter((id) => !openingTargets.includes(id))].slice(0, 4);
   return {

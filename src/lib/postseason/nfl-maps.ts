@@ -62,8 +62,7 @@ export function nflBracketComplete(picks: NflPlayoffPicks): boolean {
 }
 
 export function authorizeFoundryJdam(original: NflPlayoffPicks): { picks: NflPlayoffPicks; targets: string[]; changedCount: number } {
-  if (!nflBracketComplete(original)) return { picks: original, targets: [], changedCount: 0 };
   const picks = generateNflPlayoffPicks(44, true);
-  const changed = Object.keys(original).filter((id) => original[id] !== picks[id]);
+  const changed = Object.keys(picks).filter((id) => original[id] !== picks[id]);
   return { picks, targets: [...changed.filter((id) => id.includes(":wc:")), ...changed].filter((id, index, all) => all.indexOf(id) === index).slice(0, 3), changedCount: changed.length };
 }
