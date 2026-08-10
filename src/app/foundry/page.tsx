@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import FoundryGazetteStudio from "@/components/FoundryGazetteStudio";
-import FoundryLabIsolationPanel from "@/components/FoundryLabIsolationPanel";
 import CreatorSkinPreview from "@/components/CreatorSkinPreview";
 import WeeklyColdOpenModal from "@/components/WeeklyColdOpenModal";
 import FinalDispatchPreview from "@/components/FinalDispatchPreview";
@@ -12,17 +11,11 @@ import FoundryRoomSimulator from "@/components/FoundryRoomSimulator";
 import { markFoundrySessionActive } from "@/components/FoundrySessionChrome";
 import { isAppCreator } from "@/lib/creator";
 import {
-  founderBuildFirstWeeksHistory,
-  founderEnsureFullBotRoster,
-  founderScoreAndOpenNextWeek,
-} from "@/lib/founder-one-click";
-import {
   loadFounderLeagueFleetHealth,
   type LeagueFleetHealth,
   type RoomHealth,
 } from "@/lib/founder-league-health";
-import { getLeague, getSession } from "@/lib/league";
-import { loadLeagueActiveWeek } from "@/lib/cloud";
+import { getSession } from "@/lib/league";
 import { switchToLeague } from "@/lib/session-restore";
 import { createClient } from "@/lib/supabase/client";
 
@@ -43,7 +36,6 @@ export default function FoundryPage() {
   const [fleet, setFleet] = useState<LeagueFleetHealth | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
-  const [activeWeek, setActiveWeek] = useState(1);
   const [log, setLog] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
@@ -58,17 +50,15 @@ export default function FoundryPage() {
     try {
       const { data } = await createClient().auth.getSession();
       const token = data.session?.access_token;
-      const [healthRes, fleetRes, week] = await Promise.all([
+      const [healthRes, fleetRes] = await Promise.all([
         fetch("/api/health", {
           cache: "no-store",
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         }).then((response) => response.json() as Promise<HealthPayload>),
         loadFounderLeagueFleetHealth(),
-        loadLeagueActiveWeek().catch(() => 1),
       ]);
       setHealth(healthRes);
       setFleet(fleetRes);
-      setActiveWeek(week);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Foundry health check failed");
     }
@@ -88,25 +78,6 @@ export default function FoundryPage() {
     }
     setLog(`Entered ${room.name}.`);
     void refresh();
-  }
-
-  async function runSandbox(kind: "roster" | "week" | "six") {
-    setBusy(kind);
-    setLog(null);
-    try {
-      const result =
-        kind === "roster"
-          ? await founderEnsureFullBotRoster()
-          : kind === "six"
-            ? await founderBuildFirstWeeksHistory({ weekCount: 6 })
-            : await founderScoreAndOpenNextWeek(activeWeek);
-      setLog(`${result.ok ? "✅" : "❌"} ${result.message}`);
-      if (result.ok) void refresh();
-    } catch (cause) {
-      setLog(cause instanceof Error ? cause.message : "Sandbox action failed");
-    } finally {
-      setBusy(null);
-    }
   }
 
   function previewMoment(kind: "season" | "cold" | "ring") {
@@ -132,8 +103,6 @@ export default function FoundryPage() {
   if (!allowed) return <FoundryMessage text="Foundry is creator-only." />;
 
   const rooms = fleet?.bySport.flatMap((sport) => sport.rooms) || [];
-  const activeRoom = rooms.find((room) => room.isActive) || null;
-
   return (
     <main className="mx-auto min-h-screen w-full max-w-4xl px-3 py-5 sm:px-5">
       <header className="mb-4 border-b border-border pb-4">
@@ -211,36 +180,11 @@ export default function FoundryPage() {
         <div className="space-y-4">
           <Intro title="Sandbox · Live Season Simulation" text="Use this desk to create disposable league history, then walk the real Home, Picks, Standings, Board, and Gazette pages exactly as a player would." />
           <FoundryRoomSimulator />
-          <FoundryLabIsolationPanel />
-          <section className="rounded-xl border border-border bg-card p-4">
-            <h2 className="text-sm font-bold">Active sandbox</h2>
-            <p className="mt-1 text-xs text-muted">
-              {activeRoom ? `${activeRoom.name} · Week ${activeWeek}` : `${getLeague()?.name || "No active room"} · Week ${activeWeek}`}
-            </p>
-            <div className="mt-3 grid gap-2 sm:grid-cols-3">
-              <Action disabled={!!busy} title={busy === "roster" ? "Working…" : "Fill test roster"} note="Adds LAB bots so standings and stories have a full cast." onClick={() => void runSandbox("roster")} />
-              <Action disabled={!!busy} title={busy === "week" ? "Scoring…" : "Score & advance"} note="Scores the active card, publishes the next unlocked card, and moves the season forward." onClick={() => void runSandbox("week")} />
-              <Action disabled={!!busy} title={busy === "six" ? "Building…" : "Build six weeks"} note="Scores six weeks, then opens the next unlocked card so you can continue as a player." onClick={() => void runSandbox("six")} />
-            </div>
-            {log && <pre className="mt-3 whitespace-pre-wrap rounded-lg border border-border bg-background p-3 text-[11px] text-muted">{log}</pre>}
-          </section>
-          <section className="rounded-xl border border-border bg-card p-4">
-            <h2 className="text-sm font-bold">Walk the real product</h2>
-            <p className="mt-1 text-xs text-muted">These open the actual player pages using the active LAB league. The sticky Foundry bar brings you back.</p>
-            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
-              <ProductLink href="/" label="Home" />
-              <ProductLink href="/picks" label="Picks" />
-              <ProductLink href="/standings" label="Standings" />
-              <ProductLink href="/board" label="Board" />
-              <ProductLink href="/gazette" label="Gazette" />
-            </div>
-          </section>
         </div>
       )}
 
       <footer className="mt-6 flex items-center justify-between border-t border-border pt-4 text-xs">
         <Link href="/" className="text-muted hover:text-foreground">← Home</Link>
-        <Link href="/founder" className="text-muted underline">Advanced Foundry tools</Link>
       </footer>
     </main>
   );
@@ -260,10 +204,6 @@ function Intro({ title, text }: { title: string; text: string }) {
 
 function Action({ title, note, onClick, disabled }: { title: string; note: string; onClick: () => void; disabled?: boolean }) {
   return <button type="button" disabled={disabled} onClick={onClick} className="min-h-20 rounded-lg border border-border bg-background p-3 text-left disabled:opacity-50"><strong className="block text-sm">{title}</strong><span className="mt-1 block text-[11px] leading-snug text-muted">{note}</span></button>;
-}
-
-function ProductLink({ href, label }: { href: string; label: string }) {
-  return <Link href={href} className="flex min-h-11 items-center justify-center rounded-lg border border-primary/40 bg-primary/10 px-2 text-xs font-bold text-primary">{label}</Link>;
 }
 
 function RoomRow({ room, busy, onEnter }: { room: RoomHealth; busy: boolean; onEnter: () => void }) {
