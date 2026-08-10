@@ -19,7 +19,8 @@ export default function LeagueBuildGate() {
       pathname.startsWith("/league-build") ||
       pathname.startsWith("/login") ||
       pathname.startsWith("/join") ||
-      pathname.startsWith("/founder")
+      pathname.startsWith("/founder") ||
+      pathname.startsWith("/foundry")
     ) {
       return;
     }
