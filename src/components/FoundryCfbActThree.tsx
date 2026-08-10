@@ -20,7 +20,7 @@ type SavedLab = {
   allocations: CfbBowlAllocation;
   picks: Record<string, string>;
   actEntered?: boolean;
-  nuclear?: { active: boolean; reviewStartedAt: number; acknowledged: boolean };
+  nuclear?: { active: boolean; authorizationWeek: number; reviewStartedAt: number; acknowledged: boolean };
 };
 
 // v2 intentionally clears the old preview that could reopen directly at CFP.
@@ -142,7 +142,7 @@ export default function FoundryCfbActThree({ seasonWeek = 16, postseasonWeek = 1
     setTier("marquee");
     setReviewedTiers(new Set(["marquee"]));
     setNuclearWarning(false);
-    setLab((current) => ({ ...current, stage: "locked", allocations, picks, actEntered: true, nuclear: { active: true, reviewStartedAt: Date.now(), acknowledged: false } }));
+    setLab((current) => ({ ...current, stage: "locked", allocations, picks, actEntered: true, nuclear: { active: true, authorizationWeek: seasonWeek, reviewStartedAt: Date.now(), acknowledged: false } }));
   }
   async function shareNuclearBoard() {
     const canvas = document.createElement("canvas"); canvas.width = 1080; canvas.height = 1080;
