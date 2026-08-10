@@ -96,6 +96,16 @@ create unique index if not exists account_deletion_one_open_operation_idx
 alter table private.account_deletion_operations enable row level security;
 revoke all on schema private from public, anon, authenticated;
 revoke all on private.account_deletion_operations from public, anon, authenticated;
+
+drop policy if exists "No client access" on private.account_deletion_operations;
+create policy "No client access"
+  on private.account_deletion_operations
+  as restrictive
+  for all
+  to anon, authenticated
+  using (false)
+  with check (false);
+
 grant usage on schema private to service_role;
 grant select, insert, update on private.account_deletion_operations to service_role;
 
