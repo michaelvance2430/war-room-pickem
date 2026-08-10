@@ -18,7 +18,6 @@ function LoginPageInner() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
-  const [rememberMe, setRememberMe] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -188,12 +187,6 @@ function LoginPageInner() {
         );
         if (loginError) throw loginError;
 
-        if (rememberMe) {
-          localStorage.setItem("warroom-remember", "1");
-        } else {
-          localStorage.removeItem("warroom-remember");
-        }
-
         navigating = true;
         // Existing accounts: Home card handles missing allegiance
         landAfterAuth({ isNewSignup: false });
@@ -299,16 +292,7 @@ function LoginPageInner() {
           </div>
 
           {mode === "login" && (
-            <div className="flex items-center justify-between gap-3 min-h-[44px]">
-              <label className="flex items-center gap-2.5 text-sm text-muted cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-5 h-5 rounded border-border shrink-0"
-                />
-                Remember me
-              </label>
+            <div className="flex items-center justify-end min-h-[44px]">
               <button
                 type="button"
                 disabled={resetBusy || loading}
