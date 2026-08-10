@@ -39,7 +39,9 @@ export default function FoundryPage() {
   const [log, setLog] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    const uid = getSession()?.playerId || null;
+    const supabase = createClient();
+    const { data: authData } = await supabase.auth.getSession();
+    const uid = authData.session?.user.id || getSession()?.playerId || null;
     if (!isAppCreator(uid)) {
       setAllowed(false);
       return;
@@ -48,8 +50,7 @@ export default function FoundryPage() {
     markFoundrySessionActive();
     setError(null);
     try {
-      const { data } = await createClient().auth.getSession();
-      const token = data.session?.access_token;
+      const token = authData.session?.access_token;
       const [healthRes, fleetRes] = await Promise.all([
         fetch("/api/health", {
           cache: "no-store",
