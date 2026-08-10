@@ -13,10 +13,11 @@ assert.match(preview, /Weapons appear here because the season remembers/);
 assert.match(preview, /Dead Hand Protocol/);
 assert.match(preview, /JDAM Protocol/);
 assert.match(preview, /Hellfire Mode/);
-assert.match(profile, /The rack is always visible/);
+assert.match(profile, /WEAPONS SERVICE RECORD/);
+assert.match(profile, /Foundry is rehearsal\. Production becomes history\./);
 assert.match(profile, /Tactical Nuke/);
 assert.match(profile, /Dead Hand/);
 assert.match(profile, /JDAM/);
 assert.match(profile, /Hellfire/);
 
-console.log("Profile Arsenal verified: five vector insignias · sport-native M.A.P.'s delivery system · season-use status");
+console.log("Profile Arsenal verified: permanent cloud service record · four career weapon totals · Foundry excluded");

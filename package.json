@@ -25,6 +25,7 @@
     "verify:fieldhouse-hellfire": "node --import tsx scripts/verify-fieldhouse-hellfire.mjs",
     "verify:nfl-jdam": "node --import tsx scripts/verify-nfl-jdam.mjs",
     "verify:career-ranks": "node --import tsx scripts/verify-career-ranks.mjs",
+    "verify:weapon-service-record": "node scripts/verify-weapon-service-record.mjs",
     "verify:trophy-shapes": "node scripts/verify-championship-trophy-shapes.mjs",
     "verify:account-legendaries": "node scripts/verify-account-legendaries.mjs",
     "verify:foundry-gazette": "node --import tsx scripts/verify-foundry-gazette.mjs",

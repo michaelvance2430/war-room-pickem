@@ -871,7 +871,7 @@ export default function ProfilePage() {
           </div>
         </section>
 
-        {!mock && <ProfileArsenal isSelf={isSelfProfile} />}
+        {!mock && <ProfileArsenal playerId={player.id} />}
 
         {!detailsOpen && (
           <HeavyDetailsPlaceholder

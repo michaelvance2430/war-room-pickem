@@ -5,13 +5,7 @@ import type { Player } from "@/lib/types";
 import { resolveCareerRank, type CareerRankProgress } from "@/lib/career-ranks";
 import { listLeagueSeasonCounts } from "@/lib/league-seasons";
 import { getSportsPlayed } from "@/lib/sports-played";
-
-function localTacticalNukeCount(): number {
-  try {
-    const preview = JSON.parse(localStorage.getItem("warroom-foundry-walkthrough-v1") || "null") as { tacticalNukeWeeks?: unknown[] } | null;
-    return new Set(Array.isArray(preview?.tacticalNukeWeeks) ? preview.tacticalNukeWeeks : []).size;
-  } catch { return 0; }
-}
+import { loadWeaponServiceSummary } from "@/lib/weapon-service-record";
 
 export default function ProfileRankPlacard({ player }: { player: Player }) {
   const [rank, setRank] = useState<CareerRankProgress>(() => resolveCareerRank({ achievementPoints: 0, seasons: 0, sports: 1 }));
@@ -23,12 +17,12 @@ export default function ProfileRankPlacard({ player }: { player: Player }) {
 
   useEffect(() => {
     let cancelled = false;
-    void import("@/lib/badges").then(({ getAchievementPoints, withPermanentBadges }) => {
+    void Promise.all([import("@/lib/badges"), loadWeaponServiceSummary(player.id)]).then(([{ getAchievementPoints, withPermanentBadges }, service]) => {
       if (cancelled) return;
       const achievementPoints = getAchievementPoints(withPermanentBadges(player));
       const completedSeasons = listLeagueSeasonCounts(player.id).reduce((sum, room) => sum + room.seasons, 0);
       const sportsPlayed = Math.max(1, getSportsPlayed(player.id).length);
-      const nukeCount = localTacticalNukeCount();
+      const nukeCount = service.tacticalNukes;
       setPoints(achievementPoints);
       setSeasons(completedSeasons);
       setSports(sportsPlayed);
