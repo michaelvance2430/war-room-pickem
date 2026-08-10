@@ -1,4 +1,4 @@
-/** CFB Act III — Bowl Mania and the separate College Football Playoff. */
+/** CFB Phase III — Bowl Mania and the separate College Football Playoff. */
 
 export const CFB_BOWL_BOARD = {
   totalGames: 25,

@@ -211,7 +211,7 @@ export function simulateFoundryRegularSeason(state: FoundryWalkthrough): Foundry
   return {
     ...next,
     gazetteWeeks: Array.from({ length: postseasonWeek }, (_, index) => index + 1),
-    ncaaPicks: state.ncaaPicks || {},
+    ncaaPicks: {},
     ncaaResults: {},
     ncaaBracketLocked: false,
     preseasonChampionPicks: state.preseasonChampionPicks || next.preseasonChampionPicks,

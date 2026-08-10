@@ -288,7 +288,7 @@ const PACKS: PaperPack[] = [
     body: (c) =>
       `Critics: “committed,” “loud,” “still picking unders.” ${c.monthLabel} plot: cake, denial, late prop. One Year Older revival. Boos welcome.`,
     spankLine: () =>
-      `Intermission spank · Act II · stay seated.`,
+      `Intermission spank · Phase II · stay seated.`,
     classified: () =>
       `UNDERSTUDY for next One Year Older · accept aging on short notice`,
     pullQuote: () =>

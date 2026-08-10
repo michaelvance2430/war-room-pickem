@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { createFoundryWalkthrough, launchFoundryHellfire } from "../src/lib/foundry-walkthrough.ts";
+import { createFoundryWalkthrough, launchFoundryHellfire, simulateFoundryRegularSeason } from "../src/lib/foundry-walkthrough.ts";
 import { generateNcaaPicks, ncaaPickCount } from "../src/lib/ncaa-bracket.ts";
 
 let state = createFoundryWalkthrough("cbb", 19, "player");
@@ -24,5 +24,11 @@ assert.equal(launchFoundryHellfire(state), state, "M.A.P.'s cannot reroll");
 const previewSource = fs.readFileSync("src/app/foundry/preview/page.tsx", "utf8");
 assert.match(previewSource, /Computer assumes command/);
 assert.match(previewSource, /onHellfire/);
+assert.match(previewSource, /state\.sport === "cbb"[\s\S]*Season status" value="PHASE III"[\s\S]*NcaaBracketPicker/);
+const dirtyPreview = launchFoundryHellfire(createFoundryWalkthrough("cbb", 19, "player"));
+const cleanActThree = simulateFoundryRegularSeason(dirtyPreview);
+assert.equal(ncaaPickCount(cleanActThree.ncaaPicks), 0);
+assert.equal(cleanActThree.ncaaBracketLocked, false);
+assert.equal(cleanActThree.mapsEvent, null);
 
 console.log("Fieldhouse Hellfire verified: available at bracket entry · partial picks preserved · four-strike reveal · locked 67-pick computer bracket · no reroll");

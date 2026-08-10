@@ -1,7 +1,7 @@
 import type { SportId } from "@/lib/sports/types";
 
 /**
- * Native-safe Act III seam.
+ * Native-safe Phase III seam. Internal type names remain stable during migration.
  *
  * The platform owns identity, truth, persistence, history, and lifecycle.
  * Each sport owns its postseason game. Consumers must render the chapter's
@@ -181,12 +181,12 @@ export function canActivateActThree(chapter: ActThreeChapter): boolean {
 
 export function validateActThreeChapter(chapter: ActThreeChapter): string[] {
   const errors: string[] = [];
-  if (!chapter.nativeRequired) errors.push("Act III must ship in the native app.");
+  if (!chapter.nativeRequired) errors.push("Phase III must ship in the native app.");
   if (!chapter.shared.databaseLockAuthority) errors.push("Database lock authority is required.");
   if (!chapter.shared.foundryProofRequired) errors.push("Foundry proof is required.");
-  if (!chapter.phases.length) errors.push("At least one Act III phase is required.");
+  if (!chapter.phases.length) errors.push("At least one Phase III stage is required.");
   if (new Set(chapter.phases.map((phase) => phase.id)).size !== chapter.phases.length) {
-    errors.push("Act III phase ids must be unique.");
+    errors.push("Phase III stage ids must be unique.");
   }
   if (!chapter.phases.some((phase) => phase.kind === "finale")) errors.push("A finale is required.");
   if (!chapter.phases.some((phase) => phase.kind === "ceremony")) errors.push("A ceremony is required.");

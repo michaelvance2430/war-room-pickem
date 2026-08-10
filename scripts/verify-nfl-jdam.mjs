@@ -16,6 +16,7 @@ assert.equal(nflBracketComplete(zeroPickStrike.picks), true);
 assert.equal(zeroPickStrike.changedCount, 13);
 assert.equal(zeroPickStrike.targets.length, 3);
 const ui = readFileSync("src/components/FoundryNflActThree.tsx", "utf8");
+const preview = readFileSync("src/app/foundry/preview/page.tsx", "utf8");
 assert.match(ui, /NFL playoff bracket converging on the Super Bowl/);
 assert.match(ui, /AFC advances right/);
 assert.match(ui, /NFC advances left/);
@@ -23,5 +24,7 @@ assert.match(ui, /Conference champions converge here/);
 assert.match(ui, /1-seeds enter in the Divisional Round/);
 assert.match(ui, /Computer assumes command/);
 assert.doesNotMatch(ui, /JDAM ARMS AFTER THE FULL BRACKET/);
+assert.match(preview, /state\.sport === "nfl"[\s\S]*Season status" value="PHASE III"[\s\S]*FoundryNflActThree/);
+assert.match(preview, /onRegular=\{\(\) => \{[\s\S]*localStorage\.removeItem\("warroom-foundry-nfl-maps-v1"\)/);
 
 console.log("NFL JDAM verified: available at decision zero · partial picks preserved · 14-team field · divisional reseeding · three-impact reveal · complete computer bracket");
