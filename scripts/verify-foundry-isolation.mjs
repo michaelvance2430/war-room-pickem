@@ -6,7 +6,7 @@
  * Failed boundary → hard stop. No soft fallback to production.
  */
 import assert from "node:assert/strict";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -18,7 +18,8 @@ const q = read("src/lib/foundry-quarantine.ts");
 const fp = read("src/lib/foundry-preview.ts");
 const one = read("src/lib/founder-one-click.ts");
 const chrome = read("src/components/FoundrySessionChrome.tsx");
-const panel = read("src/components/FoundryLabIsolationPanel.tsx");
+const foundryPage = read("src/app/foundry/page.tsx");
+const founderPage = read("src/app/founder/page.tsx");
 const commish = read("src/app/commissioner/CommissionerClient.tsx");
 const cloud = read("src/lib/cloud.ts");
 const leagueMode = read("src/lib/league-mode.ts");
@@ -64,13 +65,9 @@ test("founder one-click gated at every entry", () => {
   assert.doesNotMatch(one, /function assertCreator\s*\(/);
 });
 
-test("commish lab tools require isolation (no calendar soft-fallback)", () => {
+test("commissioner has no Foundry simulation access", () => {
   assert.match(commish, /requirePreseasonTools/);
-  assert.match(commish, /assertFoundryNotQuarantined\("requirePreseasonTools"\)/);
-  assert.match(
-    commish,
-    /LAB isolation check unavailable — simulation blocked/
-  );
+  assert.doesNotMatch(commish, /showCommishLabTools|FoundryLabIsolationPanel/);
   assert.match(fp, /isExplicitLabLeague/);
   assert.match(fp, /showCommishLabTools/);
 });
@@ -90,11 +87,10 @@ test("sandbox auto-finish requires LAB", () => {
   assert.match(auto, /assertFoundryNotQuarantined\("autoFinishRemainingWeeks"\)/);
 });
 
-test("LAB UI chrome present", () => {
+test("LAB boundary stays internal instead of becoming a founder choice", () => {
   assert.match(chrome, /LAB · Foundry/);
-  assert.match(panel, /Mark this room LAB/);
-  assert.match(panel, /PRODUCTION · simulations blocked/);
-  assert.ok(existsSync(join(root, "src/components/FoundryLabIsolationPanel.tsx")));
+  assert.doesNotMatch(foundryPage, /FoundryLabIsolationPanel|Mark this room LAB|Unmark \(production\)/);
+  assert.doesNotMatch(founderPage, /FoundryLabIsolationPanel|Mark this room LAB|Unmark \(production\)/);
 });
 
 test("ceremonies require explicit LAB (not sticky alone)", () => {
