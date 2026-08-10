@@ -148,3 +148,14 @@ Supabase advisors reported no error introduced by the lifecycle objects. Remaini
 branch errors belong to the deliberately old core baseline (`announcements` RLS and
 the legacy public `handle_new_user` grant), not the deletion overlay; they reinforce
 the separate requirement to convert production's loose SQL history into migrations.
+
+The server-only checkpoint also passed on the disposable branch. Service-role-only
+RPCs now create the idempotent operation, enforce the commissioner gate, recursively
+redact Gazette and Museum JSON, preserve competitive receipts, and leave a durable
+failure stage for Foundry repair. The dark API route orders session revocation,
+Storage cleanup, transactional database redaction, Auth deletion, and completion;
+an executable dependency-injected test verifies that order and failure receipts.
+
+This is not yet authorization to expose deletion. A real disposable Auth user with
+avatar and locker-media fixtures must complete the full Admin API and Storage path,
+followed by the gated UI and device matrix, before the public flag can change.
