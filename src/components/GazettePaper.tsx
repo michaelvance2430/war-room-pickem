@@ -7,6 +7,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import type { GazetteEdition, GazetteStory } from "@/lib/gazette";
 import GazetteShareSheet from "@/components/GazetteShareSheet";
 import { getSession } from "@/lib/league";
@@ -257,6 +258,53 @@ function Masthead({ edition }: { edition: GazetteEdition }) {
 }
 
 function FrontPage({ edition }: { edition: GazetteEdition }) {
+  if (edition.chaosDetonation) {
+    const launch = edition.chaosDetonation;
+    const operators = launch.names.length > 1 ? "THEY HAVE" : "THIS PERSON HAS";
+    const protocol = edition.emergencyProtocol || "tactical_nuke";
+    const art = protocol === "hellfire" ? "/gazette/hellfire-extra.png" : protocol === "jdam" ? "/gazette/jdam-extra.png" : "/gazette/tactical-nuclear-extra.png";
+    const authorization = protocol === "hellfire" ? "Hellfire strike confirmed" : protocol === "jdam" ? "JDAM release confirmed" : "Nuclear authorization confirmed";
+    const caption = protocol === "hellfire"
+      ? `Artist's reconstruction of ${launch.names.join(" and ")} asking a drone to improve a basketball bracket. The drone has no known Final Four experience.`
+      : protocol === "jdam"
+        ? `Artist's reconstruction of ${launch.names.join(" and ")} releasing a precision-guided playoff bracket, then leaving the airspace before anyone could ask about the wild-card picks.`
+        : `Artist's reconstruction of ${launch.names.join(" and ")} surrendering all decision-making authority to a computer. ${operators} declined to remove themselves from command before publication.`;
+    return (
+      <article className="text-center">
+        <div className="border-y-[6px] border-double border-stone-950 py-2">
+          <p className="text-[11px] font-black uppercase tracking-[0.28em] text-red-800">
+            Emergency extra · {authorization}
+          </p>
+        </div>
+        <h3 className="mx-auto mt-4 max-w-3xl font-serif text-5xl font-black uppercase leading-[0.84] tracking-[-0.045em] text-stone-950 sm:text-7xl">
+          {launch.headline}
+        </h3>
+        <p className="mx-auto mt-4 max-w-2xl border-y border-stone-500 py-3 font-serif text-lg font-bold leading-tight text-stone-800 sm:text-xl">
+          {launch.deck}
+        </p>
+        <figure className="mt-4">
+          <div className="overflow-hidden border-4 border-stone-950 bg-stone-900">
+            <Image
+              src={art}
+              alt={`A fictional newspaper halftone illustration for ${protocol.replace("_", " ")}`}
+              width={1536}
+              height={1024}
+              priority
+              className="aspect-[3/2] w-full object-cover grayscale contrast-125"
+            />
+          </div>
+          <figcaption className="mt-2 border-b-4 border-double border-stone-950 pb-3 text-left text-[10px] font-bold uppercase leading-snug tracking-wide text-stone-700">
+            {caption}
+          </figcaption>
+        </figure>
+        <div className="mt-4 grid grid-cols-2 border-y-2 border-stone-900 text-left text-[10px] font-black uppercase tracking-wide">
+          <p className="border-r border-stone-900 px-2 py-3">Status: Button pushed</p>
+          <p className="px-2 py-3">Damage report: Sports, page 2</p>
+        </div>
+      </article>
+    );
+  }
+
   const [lead, ...briefs] = edition.sideStories;
   return (
     <div className="space-y-4">

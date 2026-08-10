@@ -85,6 +85,8 @@ export type GazetteEdition = {
    * Trigger is lock-in, not final score. All sports.
    */
   chaosDetonation: GazetteStory | null;
+  /** Emergency front-page art direction for an authorized War Room weapon. */
+  emergencyProtocol?: "tactical_nuke" | "hellfire" | "jdam";
   samePerson: boolean;
   masthead: string;
   /** Under the masthead — one-line sizzle */

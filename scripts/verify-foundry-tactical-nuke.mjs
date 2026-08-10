@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import {
   armFoundryTacticalNuke,
   createFoundryWalkthrough,
@@ -24,4 +25,14 @@ state = simulateNextFoundryWeek(state);
 assert.equal(armFoundryTacticalNuke(state).tacticalNukeWeeks.length, 2);
 assert.deepEqual(spent.tacticalNukeWeeks, [2, 3]);
 
-console.log("Foundry Tactical Nuclear Button verified: 2/2 season arsenal · legal computer card · no third use · week persistence");
+const previewSource = fs.readFileSync("src/app/foundry/preview/page.tsx", "utf8");
+const gazetteSource = fs.readFileSync("src/components/GazettePaper.tsx", "utf8");
+assert.match(previewSource, /state\.tacticalNukeWeeks\?\.includes\(active\)/);
+assert.match(previewSource, /MIKE V HAS REMOVED HIMSELF FROM COMMAND/);
+assert.match(gazetteSource, /if \(edition\.chaosDetonation\)/);
+assert.match(gazetteSource, /Emergency extra · \{authorization\}/);
+assert.match(gazetteSource, /tactical-nuclear-extra\.png/);
+assert.match(gazetteSource, /hellfire-extra\.png/);
+assert.match(gazetteSource, /jdam-extra\.png/);
+
+console.log("Foundry Tactical Nuclear Button verified: 2/2 season arsenal · legal computer card · no third use · week persistence · emergency front page");
