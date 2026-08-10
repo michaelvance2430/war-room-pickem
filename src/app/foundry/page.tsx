@@ -15,7 +15,6 @@ import {
   type LeagueFleetHealth,
   type RoomHealth,
 } from "@/lib/founder-league-health";
-import { getSession } from "@/lib/league";
 import { switchToLeague } from "@/lib/session-restore";
 import { createClient } from "@/lib/supabase/client";
 
@@ -41,7 +40,7 @@ export default function FoundryPage() {
   const refresh = useCallback(async () => {
     const supabase = createClient();
     const { data: authData } = await supabase.auth.getSession();
-    const uid = authData.session?.user.id || getSession()?.playerId || null;
+    const uid = authData.session?.user.id || null;
     if (!isAppCreator(uid)) {
       setAllowed(false);
       return;
