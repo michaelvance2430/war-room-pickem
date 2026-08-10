@@ -153,7 +153,7 @@ export default function TrophyCeremonyClient() {
               <p className="text-[11px] text-muted mt-1">
                 over {ready.nationalChampion.loserTeam}
                 {ready.nationalChampion.source === "foundry_sim"
-                  ? " · Foundry sim"
+                  ? " · test simulation"
                   : ""}
               </p>
             </div>
