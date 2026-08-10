@@ -48,6 +48,10 @@ const HomeGazetteSpotlight = dynamic(
 const InviteFriends = dynamic(() => import("@/components/InviteFriends"), {
   ssr: false,
 });
+const SportPoolPollBanner = dynamic(
+  () => import("@/components/SportPoolPollBanner"),
+  { ssr: false }
+);
 
 /** Sync read of local session → paint Home shell without "Loading…" */
 function readLocalHomeShell(): {
@@ -640,6 +644,9 @@ export default function Home() {
 
         {/* Primary job — published card / wait / lock (never Make Picks without publish) */}
         <HomeWeekHero />
+
+        {/* Optional commissioner query: players answer here; weekly job stays first. */}
+        {showSecondary && <SportPoolPollBanner />}
 
         {/* Commissioner: one mission above player destinations — never for pure players */}
         <HomeCommishMissionButton />
