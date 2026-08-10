@@ -77,7 +77,7 @@ assert.ok(
 // actions remain comfortably tappable without changing the stable presenter.
 assert.match(preview, /aria-label="Foundry Ring Ceremony"/);
 assert.match(preview, /seasonFinal \? "Ring Ceremony" : "Sim Week"/);
-assert.match(preview, /seasonFinal \? "Replay Rings" : "Sim Season"/);
+assert.match(preview, /seasonFinal \? "Replay Rings" : "Sim Entire Season"/);
 assert.match(preview, /min-h-12 w-full[^>]*>\{completed \? "Continue Bracket" : "Begin Bracket"\}/);
 assert.match(preview, /min-h-11 w-full/);
 assert.match(preview, /Choose a winner\. The bracket advances automatically\./);
