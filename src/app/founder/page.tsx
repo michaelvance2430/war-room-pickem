@@ -40,7 +40,6 @@ import {
   type RoomLight,
 } from "@/lib/founder-league-health";
 import FoundryPlatformApiUsage from "@/components/FoundryPlatformApiUsage";
-import FoundryLabIsolationPanel from "@/components/FoundryLabIsolationPanel";
 import SandboxHopOptIn from "@/components/SandboxHopOptIn";
 import WeeklyColdOpenModal from "@/components/WeeklyColdOpenModal";
 import CreatorSkinPreview from "@/components/CreatorSkinPreview";
@@ -476,9 +475,6 @@ export default function FounderDashboardPage() {
 
         {/* Platform Odds API ops — creator only (this page is already gated) */}
         <FoundryPlatformApiUsage />
-
-        {/* LAB isolation — hard boundary for simulations */}
-        <FoundryLabIsolationPanel />
 
         {/* Foundry hop — never on customer Host Dashboard */}
         <section
