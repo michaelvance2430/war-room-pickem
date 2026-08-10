@@ -142,7 +142,7 @@ export default function FoundryCfbActThree({ seasonWeek = 16, postseasonWeek = 1
     setTier("marquee");
     setReviewedTiers(new Set(["marquee"]));
     setNuclearWarning(false);
-    setLab({ stage: "locked", allocations, picks, nuclear: { active: true, reviewStartedAt: Date.now(), acknowledged: false } });
+    setLab((current) => ({ ...current, stage: "locked", allocations, picks, actEntered: true, nuclear: { active: true, reviewStartedAt: Date.now(), acknowledged: false } }));
   }
   async function shareNuclearBoard() {
     const canvas = document.createElement("canvas"); canvas.width = 1080; canvas.height = 1080;
@@ -175,7 +175,7 @@ export default function FoundryCfbActThree({ seasonWeek = 16, postseasonWeek = 1
     <header className="rounded-2xl border border-amber-300/40 bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,.18),transparent_45%)] p-4">
       <p className="text-[9px] font-black uppercase tracking-[.2em] text-amber-300">CFB Phase III · Foundry only · no cloud writes</p>
       <h3 className="mt-1 text-2xl font-black">Bowl Mania</h3>
-      <p className="mt-2 text-xs leading-relaxed text-muted">Fifteen bowls you want to pick. Ten bowls you have no business knowing. Put all 100 points on the board.</p>
+      <p className="mt-2 text-xs leading-relaxed text-muted">Fifteen bowls you want to pick. Ten bowls you have no business knowing. Every bowl starts at 4 points—remove points from one before adding them somewhere else. Put all 100 points on the board.</p>
       <div className="mt-4 grid grid-cols-3 gap-2">
         <Metric label="Allocated" value={String(total)} />
         <Metric label="Remaining" value={String(remaining)} alert={remaining !== 0} />
@@ -188,7 +188,7 @@ export default function FoundryCfbActThree({ seasonWeek = 16, postseasonWeek = 1
         <button type="button" onClick={() => moveTier("marquee")} className={`min-h-12 rounded-xl border text-xs font-black ${tier === "marquee" ? "border-amber-300 bg-amber-300 text-black" : "border-border bg-card"}`}>THE MARQUEE 15</button>
         <button type="button" onClick={() => moveTier("sicko")} className={`min-h-12 rounded-xl border text-xs font-black ${tier === "sicko" ? "border-lime-300 bg-lime-300 text-black" : "border-border bg-card"}`}>THE SICKO 10</button>
       </nav>
-      {lab.stage === "board" && <button type="button" onClick={() => setNuclearWarning(true)} className="flex min-h-16 w-full items-center justify-center gap-3 rounded-2xl border-2 border-red-500 bg-[repeating-linear-gradient(135deg,#240303_0,#240303_12px,#050505_12px,#050505_24px)] px-4 text-sm font-black text-red-100 shadow-[0_0_34px_rgba(239,68,68,.42)] transition-transform duration-300" style={{ transform: `translate(${nuclearJolt.x}px,${nuclearJolt.y}px) rotate(${nuclearJolt.r}deg)` }}><WarRoomArsenalIcon kind="dead_hand" size={48}/>INITIATE DEAD HAND</button>}
+      {lab.stage === "board" && <button type="button" onClick={() => setNuclearWarning(true)} className="flex min-h-16 w-full items-center justify-center rounded-2xl border-2 border-red-500 bg-[repeating-linear-gradient(135deg,#240303_0,#240303_12px,#050505_12px,#050505_24px)] px-4 text-sm font-black text-red-100 shadow-[0_0_34px_rgba(239,68,68,.42)]"><span className="flex items-center justify-center gap-3 transition-transform duration-300" style={{ transform: `translate(${nuclearJolt.x}px,${nuclearJolt.y}px) rotate(${nuclearJolt.r}deg)` }}><WarRoomArsenalIcon kind="dead_hand" size={48}/>INITIATE DEAD HAND</span></button>}
       {lab.nuclear?.active && <section className="rounded-2xl border-2 border-red-500/70 bg-red-950/30 p-4 text-center shadow-[0_0_30px_rgba(239,68,68,.18)]"><p className="text-[9px] font-black uppercase tracking-[.22em] text-red-300">Critical system override · irreversible</p><h4 className="mt-1 text-xl font-black">THE MACHINE HAS IDENTIFIED SOMETHING IN BOISE.</h4><p className="mt-2 text-xs text-muted">Review both files. There are no edits, appeals, or commissioner overrides.</p><button type="button" onClick={() => void shareNuclearBoard()} className="mt-3 min-h-12 w-full rounded-xl border border-red-400/60 text-xs font-black text-red-200">SHARE THE EVIDENCE ↗</button></section>}
       <div className="space-y-3">{visible.map((game, index) => {
         const fixture = BY_ID.get(game.id)!;

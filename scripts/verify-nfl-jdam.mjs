@@ -24,8 +24,14 @@ assert.match(ui, /Conference champions converge here/);
 assert.match(ui, /1-seeds enter in the Divisional Round/);
 assert.match(ui, /Computer assumes command/);
 assert.match(ui, /weapon-unstable/);
+assert.match(ui, /NO HUMAN TARGET ON FILE/);
+assert.match(ui, /computer made and locked all 13 decisions/i);
+assert.match(ui, /humanPickCount/);
 assert.doesNotMatch(ui, /JDAM ARMS AFTER THE FULL BRACKET/);
 assert.match(preview, /state\.sport === "nfl"[\s\S]*Season status" value="PHASE III"[\s\S]*FoundryNflActThree/);
 assert.match(preview, /onRegular=\{\(\) => \{[\s\S]*localStorage\.removeItem\("warroom-foundry-nfl-maps-v1"\)/);
+const walkthrough = readFileSync("src/lib/foundry-walkthrough.ts", "utf8");
+assert.match(walkthrough, /sport === "nfl" \? 22/);
+assert.match(preview, /REGULAR SEASON COMPLETE → PHASE II · SEEDS LOCKED/);
 
 console.log("NFL JDAM verified: available at decision zero · partial picks preserved · 14-team field · divisional reseeding · three-impact reveal · complete computer bracket");

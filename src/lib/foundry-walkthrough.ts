@@ -53,6 +53,7 @@ export type FoundryWalkthrough = {
     originalPicks: NcaaPicks;
     targetIds: string[];
     changedCount: number;
+    humanPickCount: number;
     reviewed: boolean;
   } | null;
 };
@@ -69,7 +70,7 @@ export const FOUNDRY_WALKTHROUGH_EVENT = "warroom-foundry-walkthrough";
 
 /** Last playable preview window. The simulator may never advance beyond it. */
 export function foundryFinalWeek(sport: PreviewSport): number {
-  return sport === "cbb" ? 22 : sport === "nfl" ? 18 : 16;
+  return sport === "cbb" ? 22 : sport === "nfl" ? 22 : 16;
 }
 
 /** First official postseason window; regular-season simulation stops here. */
@@ -122,15 +123,16 @@ function createPreseasonChampionPicks(players: PreviewPlayer[], sport: PreviewSp
 export function createFoundryWalkthrough(sport: PreviewSport, week = 1, role: PreviewRole = "player"): FoundryWalkthrough {
   const seed = week + (sport === "nfl" ? 31 : sport === "cbb" ? 67 : 11);
   const players = PEOPLE.map((name, index) => {
-    const weekPoints = 5 + (hash(seed, index) % 21);
-    return { id: `preview-${index}`, name, weekPoints, points: week * 12 + weekPoints + (hash(seed, index, 4) % 42), correct: 2 + (hash(seed, index, 7) % 4), locked: index !== 10 || week % 2 === 0, streak: (hash(seed, index, 9) % 7) - 2, region: FIELDHOUSE_REGIONS[index % FIELDHOUSE_REGIONS.length], madnessPoints: 0, madnessWindowPoints: 0 };
+    const opening = week === 1;
+    const weekPoints = opening ? 0 : 5 + (hash(seed, index) % 21);
+    return { id: `preview-${index}`, name, weekPoints, points: opening ? 0 : week * 12 + weekPoints + (hash(seed, index, 4) % 42), correct: opening ? 0 : 2 + (hash(seed, index, 7) % 4), locked: opening ? false : index !== 10 || week % 2 === 0, streak: opening ? 0 : (hash(seed, index, 9) % 7) - 2, region: FIELDHOUSE_REGIONS[index % FIELDHOUSE_REGIONS.length], madnessPoints: 0, madnessWindowPoints: 0 };
   }).sort((a, b) => b.points - a.points).map((player) => ({ ...player }));
   const games = MATCHUPS[sport].map(([away, home], index) => {
     const homeLine = ((hash(seed, index) % 13) - 7) / 2;
     const awayScore = 17 + (hash(seed, index, 2) % (sport === "cbb" ? 55 : 25));
     const homeScore = 17 + (hash(seed, index, 3) % (sport === "cbb" ? 55 : 25));
-    const final = index < 3;
-    return { id: `${sport}-${week}-${index}`, away, home, spread: `${home} ${homeLine > 0 ? "+" : ""}${homeLine}`, status: final ? "final" as const : "upcoming" as const, result: final ? `${away} ${awayScore} · ${home} ${homeScore}` : undefined, pick: index % 2 ? away : home, confidence: 5 - index };
+    const final = week > 1 && index < 3;
+    return { id: `${sport}-${week}-${index}`, away, home, spread: `${home} ${homeLine > 0 ? "+" : ""}${homeLine}`, status: final ? "final" as const : "upcoming" as const, result: final ? `${away} ${awayScore} · ${home} ${homeScore}` : undefined, pick: week === 1 ? undefined : index % 2 ? away : home, confidence: 5 - index };
   });
   const preseasonChampionPicks = createPreseasonChampionPicks(players, sport);
   return { version: 1, sport, role, week, seasonLabel: "2026 Foundry Season", generatedAt: Date.now(), players, games, unreadGazette: false, gazetteWeeks: [], ncaaPicks: {}, ncaaResults: {}, ncaaBracketLocked: false, preseasonChampionPicks, postseasonFields: null, tacticalNukeWeeks: [], tacticalNukeActive: false, mapsEvent: null };
@@ -271,7 +273,7 @@ export function launchFoundryHellfire(state: FoundryWalkthrough): FoundryWalkthr
     ...state,
     ncaaPicks: computerPicks,
     ncaaBracketLocked: true,
-    mapsEvent: { protocol: "hellfire", originalPicks, targetIds, changedCount: changed.length, reviewed: false },
+    mapsEvent: { protocol: "hellfire", originalPicks, targetIds, changedCount: changed.length, humanPickCount: Object.keys(originalPicks).length, reviewed: false },
   };
 }
 
