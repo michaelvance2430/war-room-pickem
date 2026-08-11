@@ -22,8 +22,8 @@ import {
 import { switchToLeague } from "@/lib/session-restore";
 
 /**
- * Commish: soft invite for a next-sport chapter (community-led).
- * Only yeses get seats. Host of this poll is commissioner of the new desk
+ * Commissioner asks the current league who wants to play another sport.
+ * Only yeses get seats. The host remains commissioner of the new league
  * (spin_up_sport_pool_league seats host + yes-voters only — no handoff picker).
  */
 export default function SportPoolCommishPanel() {
@@ -93,10 +93,10 @@ export default function SportPoolCommishPanel() {
   // Interest signal only — never a “must answer” meter
   const interestNote =
     yeses.length === 0
-      ? "No interest yet — totally fine. Leave the door open or close it."
+      ? "Waiting for someone besides you to display questionable judgment."
       : yeses.length < 3
-        ? "A few people are curious. Open a room when it feels right — or wait."
-        : "Solid interest. Open the chapter when the community feels ready.";
+        ? "A few brave souls have volunteered."
+        : "Now this is becoming a problem worth creating.";
 
   async function sendPoll() {
     setBusy(true);
@@ -122,7 +122,7 @@ export default function SportPoolCommishPanel() {
     }
     setPoll(res.poll);
     setNote(
-      "Invite is live on Home — optional, dismissible. You’re counted as interested as host."
+      "The question is live on every player’s Home screen. You’re already counted in."
     );
     void refresh();
   }
@@ -131,18 +131,17 @@ export default function SportPoolCommishPanel() {
     if (!poll) return;
     if (yeses.length < 1) {
       setErr(
-        "Need at least one interested person (you’re counted as host). Don’t force the room."
+        "Need at least one interested person. You’re already counted in."
       );
       return;
     }
     const pack = getSportPack(poll.targetSportId);
     const ok = confirm(
-      `Open a ${pack.shortLabel} chapter for people who opted in?\n\n` +
-        `• You stay commissioner of the new desk\n` +
-        `• ${yeses.length} interested → get a player seat\n` +
-        `• Pass / no answer → stay only in this room (no move, no shame)\n` +
-        `• This ${getSportPack(currentSport).shortLabel} room keeps going\n\n` +
-        `Community-led — only yeses join the new desk.`
+      `Create the ${pack.shortLabel} league with ${yeses.length} players?\n\n` +
+        `• You are commissioner\n` +
+        `• Everyone who tapped “I’m in” is added automatically\n` +
+        `• Everyone else stays in the ${getSportPack(currentSport).shortLabel} league\n` +
+        `• Nobody is removed or moved`
     );
     if (!ok) return;
 
@@ -171,7 +170,7 @@ export default function SportPoolCommishPanel() {
     });
     setPoll(null);
     setNote(
-      `${res.crewContinues ? "Crew chapter" : "Separate room"} open: ${res.leagueName} · ${res.seated} opted-in · code ${res.code}`
+      `${res.leagueName} created with ${res.seated} players.`
     );
     void refresh();
   }
@@ -187,7 +186,7 @@ export default function SportPoolCommishPanel() {
       window.location.href = "/";
     } else {
       setErr(
-        "Room created — open it from Account → Your leagues if switch failed."
+        "League created — open it from Account → Your leagues if switching failed."
       );
     }
   }
@@ -195,8 +194,8 @@ export default function SportPoolCommishPanel() {
   if (!liveOthers.length) {
     return (
       <div className="rounded-xl border border-border bg-card p-4 text-sm text-muted leading-relaxed">
-        No other live sports to invite yet. When CFB and NFL are both live, you
-        can softly poll this room for a next chapter — never forced.
+        No other sports are live yet. When another sport opens, this is where
+        you&apos;ll ask the league who wants in.
       </div>
     );
   }
@@ -205,16 +204,16 @@ export default function SportPoolCommishPanel() {
     <div className="rounded-xl border border-border/80 bg-card p-4 space-y-4">
       <div>
         <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted">
-          Community-led · optional chapter
+          Another sport
         </p>
         <h3 className="text-base font-bold text-foreground mt-1">
-          Soft invite — same Crew, new desk if they want
+          Ask this league who wants in
         </h3>
         <p className="text-xs text-muted mt-1.5 leading-relaxed">
-          Ask who&apos;s interested in another sport.{" "}
-          <strong className="text-foreground">Nobody is moved</strong> out of
-          this room. Only people who say yes get a seat in the new one. Pass,
-          silence, and hide are all fine — this season keeps going either way.
+          Pick the sport and ask once. Players answer on Home. When you&apos;re
+          ready, one button creates the new league and adds everyone who tapped{" "}
+          <strong className="text-foreground">I&apos;m in</strong>. This league
+          stays exactly where it is.
         </p>
       </div>
 
@@ -243,7 +242,7 @@ export default function SportPoolCommishPanel() {
       {!poll && !spun && (
         <div className="space-y-3">
           <label className="block text-xs text-muted">
-            Sport to invite (not replace this room)
+            New sport
             <select
               value={targetSport}
               onChange={(e) => setTargetSport(e.target.value as SportId)}
@@ -257,7 +256,7 @@ export default function SportPoolCommishPanel() {
             </select>
           </label>
           <label className="block text-xs text-muted">
-            Name if a room opens
+            New league name
             <input
               value={proposedName}
               onChange={(e) => setProposedName(e.target.value)}
@@ -266,12 +265,14 @@ export default function SportPoolCommishPanel() {
             />
           </label>
           <label className="block text-xs text-muted">
-            Invite wording (optional — keep it soft)
+            Message to the league
             <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value.slice(0, 280))}
               rows={3}
-              placeholder={`Optional: anyone interested in ${getSportPack(targetSport).shortLabel}? No pressure.`}
+              placeholder={defaultSportPoolMessage(
+                getSportPack(targetSport).shortLabel
+              )}
               className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-2 text-sm resize-none"
             />
           </label>
@@ -281,11 +282,11 @@ export default function SportPoolCommishPanel() {
             onClick={() => void sendPoll()}
             className="w-full py-3 min-h-[48px] rounded-xl border border-primary/40 bg-primary/15 text-primary font-bold text-sm disabled:opacity-50 hover:bg-primary/25"
           >
-            Share soft invite with the room
+            Ask the league
           </button>
           <p className="text-[11px] text-muted leading-relaxed">
-            Shows a quiet Home card. People can pass, hide forever, or ignore.
-            You&apos;ll only seat interest — never the whole roster by default.
+            This appears on each player&apos;s Home screen. Only “I&apos;m in” gets a
+            seat in the new league.
           </p>
         </div>
       )}
@@ -294,17 +295,17 @@ export default function SportPoolCommishPanel() {
         <div className="space-y-3">
           <div className="rounded-lg border border-border bg-background/60 px-3 py-2.5">
             <p className="text-sm font-semibold text-foreground">
-              Invite open · {getSportPack(poll.targetSportId).emoji}{" "}
+              Question open · {getSportPack(poll.targetSportId).emoji}{" "}
               {getSportPack(poll.targetSportId).shortLabel} · {poll.proposedName}
             </p>
             <p className="text-xs text-muted mt-1.5">
               <span className="text-primary font-semibold">
-                {yeses.length} interested
+                {yeses.length} in
               </span>
               {nos.length > 0 && (
                 <>
                   {" · "}
-                  <span className="text-muted">{nos.length} passed</span>
+                  <span className="text-muted">{nos.length} out</span>
                 </>
               )}
               {answered > 0 && voterTotal > 0 && (
@@ -317,23 +318,24 @@ export default function SportPoolCommishPanel() {
               )}
             </p>
             <p className="text-[11px] text-muted mt-1.5 leading-relaxed">
-              {interestNote} Silence is not a no and not a yes — just silence.
+              {interestNote}
             </p>
             <p className="text-[11px] text-muted mt-1.5 leading-relaxed">
-              Crew line: {crewThreshold} of {sourceMemberCount || "—"}. {crewContinues
-                ? "Threshold met — this opens as the Crew’s next chapter."
-                : `${Math.max(0, crewThreshold - yeses.length)} more needed to carry the Crew name.`}
+              Crew carries forward at {crewThreshold} of {sourceMemberCount || "—"}.{" "}
+              {crewContinues
+                ? "Crew secured."
+                : `${Math.max(0, crewThreshold - yeses.length)} more needed.`}
             </p>
           </div>
 
           {yeses.length > 0 && (
             <div>
               <p className="text-[10px] font-bold uppercase tracking-wide text-muted mb-1.5">
-                Interested · player seats ({yeses.length})
+                Going ({yeses.length})
               </p>
               <p className="text-[11px] text-muted mb-1.5 leading-relaxed">
-                You stay commissioner of the new desk. These people get player
-                seats. Host-only list — we don&apos;t publish who passed.
+                These players will be added automatically. Only you see this
+                list; nobody sees who declined.
               </p>
               <ul className="text-sm space-y-1 max-h-32 overflow-y-auto">
                 {yeses.map((v) => (
@@ -354,8 +356,8 @@ export default function SportPoolCommishPanel() {
             {yeses.length < 1
               ? "Waiting for interest…"
               : crewContinues
-                ? `Continue Crew into ${getSportPack(poll.targetSportId).shortLabel} · ${yeses.length} going`
-                : `Open separate ${getSportPack(poll.targetSportId).shortLabel} room · ${yeses.length} going`}
+                ? `Create ${getSportPack(poll.targetSportId).shortLabel} league · ${yeses.length} players · Crew continues`
+                : `Create ${getSportPack(poll.targetSportId).shortLabel} league · ${yeses.length} players`}
           </button>
           <button
             type="button"
@@ -371,27 +373,26 @@ export default function SportPoolCommishPanel() {
             }}
             className="w-full py-2 text-xs text-muted hover:text-foreground"
           >
-            Close invite without opening a room
+            Close question without creating the league
           </button>
         </div>
       )}
 
       {spun && (
         <div className="rounded-lg border border-primary/35 bg-primary/10 px-3 py-3 text-sm space-y-2">
-          <p className="font-bold text-primary">Chapter opened</p>
+          <p className="font-bold text-primary">New league created</p>
           <p className="text-foreground font-semibold">{spun.leagueName}</p>
           <p className="font-mono tracking-widest text-lg text-foreground">
             {spun.code}
           </p>
           <p className="text-xs text-muted leading-relaxed">
-            {spun.seated} opted-in seated · you&apos;re commissioner ·{" "}
-            {getSportPack(spun.sportId).shortLabel}. Everyone else stays only in
-            this room — nothing was forced.
+            {spun.seated} players added · you&apos;re commissioner ·{" "}
+            {getSportPack(spun.sportId).shortLabel}. The original league is unchanged.
           </p>
           <p className="text-xs text-muted leading-relaxed">
             {spun.crewContinues
-              ? "The 50% Crew line was met. This is another chapter of the same Crew—no expiration date."
-              : "The Crew line was not met, so this opens as a separate room."}
+              ? "Crew continues. Time does not reset it."
+              : "Crew threshold was not met; this league starts its own history."}
           </p>
           <button
             type="button"
@@ -399,7 +400,7 @@ export default function SportPoolCommishPanel() {
             onClick={() => void openNewRoom()}
             className="w-full py-3 min-h-[48px] rounded-xl bg-primary text-black font-bold text-sm disabled:opacity-50"
           >
-            Open new desk →
+            Go to new league →
           </button>
         </div>
       )}

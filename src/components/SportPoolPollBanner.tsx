@@ -121,7 +121,7 @@ export default function SportPoolPollBanner() {
     <div className="mb-5 rounded-xl border border-border/70 bg-card/80 px-4 py-3.5">
       <div className="flex items-start justify-between gap-2 mb-1">
         <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted">
-          Optional · no pressure
+          {sportLabel} roll call
         </p>
         <button
           type="button"
@@ -129,11 +129,11 @@ export default function SportPoolPollBanner() {
           className="shrink-0 text-[11px] text-muted hover:text-foreground touch-manipulation px-1"
           title="Hide this invite for good"
         >
-          Not interested · hide
+          Hide
         </button>
       </div>
       <h2 className="text-base font-semibold text-foreground leading-snug">
-        Open door: {sportLabel}
+        Your commissioner is trying this again: {sportLabel}
         {poll.proposedName ? (
           <>
             {" "}
@@ -149,21 +149,20 @@ export default function SportPoolPollBanner() {
         </p>
       ) : (
         <p className="text-sm text-muted mt-1.5 leading-relaxed">
-          A soft invite from your host — same friends, new desk if you want.
-          Saying no or ignoring this is completely fine. This room keeps going
-          either way.
+          Same people. Different sport. Fresh opportunities to blame the
+          commissioner. You in?
         </p>
       )}
 
       {myVote ? (
         <p className="text-sm text-foreground/90 mt-3 leading-relaxed">
           {myVote === "yes"
-            ? "You’re interested — if a room opens, you’ll have a seat. Change anytime while this is open."
-            : "Noted — you’re sitting this one out. No hard feelings. Change your mind anytime while open."}
+            ? "You’re in. If the league is created, your seat is automatic."
+            : "You’re out. A bold strategy. You can still change your answer."}
         </p>
       ) : (
         <p className="text-xs text-muted mt-2 leading-relaxed">
-          Yes / no / hide — all valid. Nobody gets moved against their will.
+          Tap once. Nobody leaves this league either way.
         </p>
       )}
 
@@ -180,7 +179,7 @@ export default function SportPoolPollBanner() {
               : "bg-primary/15 border border-primary/30 text-primary hover:bg-primary/25"
           }`}
         >
-          {myVote === "yes" ? "Interested ✓" : "I’m interested"}
+          {myVote === "yes" ? "I’m in ✓" : "I’m in"}
         </button>
         <button
           type="button"
@@ -192,7 +191,7 @@ export default function SportPoolPollBanner() {
               : "border-border text-muted hover:text-foreground"
           }`}
         >
-          {myVote === "no" ? "Sitting out ✓" : "I’ll pass"}
+          {myVote === "no" ? "I’m out ✓" : "I’m out"}
         </button>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 const {
   crewContinuityThreshold,
@@ -22,5 +23,21 @@ assert.equal(
   defaultSportPoolMessage("NFL"),
   "NFL. Same crew, new ways to embarrass yourselves. You in?"
 );
+
+const commissionerUi = readFileSync(
+  new URL("../src/components/SportPoolCommishPanel.tsx", import.meta.url),
+  "utf8"
+);
+const playerUi = readFileSync(
+  new URL("../src/components/SportPoolPollBanner.tsx", import.meta.url),
+  "utf8"
+);
+
+assert.match(commissionerUi, /Ask this league who wants in/);
+assert.match(commissionerUi, /Ask the league/);
+assert.match(commissionerUi, /creates the new league/);
+assert.match(playerUi, /I’m in/);
+assert.match(playerUi, /seat is automatic/);
+assert.doesNotMatch(commissionerUi, /Soft invite|new desk/);
 
 console.log("Crew continuity contract: PASS");
