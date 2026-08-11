@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from "react";
 import styles from "./OpeningCinematicPreview.module.css";
+import { startOpeningCinematicAudio } from "@/lib/opening-cinematic-audio";
 
 export default function OpeningCinematicPreview({
   onDone,
@@ -12,11 +13,25 @@ export default function OpeningCinematicPreview({
   showReplay?: boolean;
 }) {
   const [run, setRun] = useState(0);
+  const [audioBlocked, setAudioBlocked] = useState(false);
 
   useEffect(() => {
+    let stop = () => {};
+    void startOpeningCinematicAudio()
+      .then((audio) => {
+        if (!audio) setAudioBlocked(true);
+        else {
+          setAudioBlocked(false);
+          stop = audio.stop;
+        }
+      })
+      .catch(() => setAudioBlocked(true));
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const t = window.setTimeout(() => onDone?.(), reduced ? 1_250 : 7_650);
-    return () => window.clearTimeout(t);
+    return () => {
+      window.clearTimeout(t);
+      stop();
+    };
   }, [onDone, run]);
 
   return (
@@ -32,6 +47,11 @@ export default function OpeningCinematicPreview({
       <img className={styles.title} src="/cinematics/opening/war-room-title.webp" alt="War Room Pick'Em" />
       <div className={styles.flash} />
       <button type="button" className={`${styles.skip} pointer-events-auto`} onClick={onDone}>Skip</button>
+      {audioBlocked && (
+        <button type="button" className={`${styles.sound} pointer-events-auto`} onClick={() => setRun((n) => n + 1)}>
+          Tap for sound
+        </button>
+      )}
       {showReplay && (
         <button type="button" className="absolute z-20 left-4 bottom-4 min-h-[44px] rounded-full border border-white/30 bg-black/50 px-4 text-xs font-bold text-white" onClick={() => setRun((n) => n + 1)}>
           Replay

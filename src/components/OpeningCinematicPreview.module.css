@@ -104,6 +104,24 @@
   backdrop-filter: blur(8px);
 }
 
+.sound {
+  position: absolute;
+  z-index: 20;
+  left: 50%;
+  bottom: max(22px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  min-height: 48px;
+  padding: 0 20px;
+  border: 1px solid rgba(255,106,0,.75);
+  border-radius: 999px;
+  color: #fff;
+  background: rgba(20,8,0,.82);
+  font-size: 13px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+
 @keyframes reveal {
   0%, 5% { opacity: 0; transform: scale(1.12); }
   15%, 42% { opacity: 1; transform: scale(1.02); }
@@ -171,10 +189,26 @@
   94%, 100% { opacity: 0; transform: translate(-630%, 250%) rotate(-260deg) scale(.55); }
 }
 
+@media (max-aspect-ratio: 3 / 4) {
+  .scene,
+  .wink {
+    object-fit: contain;
+    object-position: center 42%;
+  }
+
+  .scene { transform: scale(.98); }
+  .title { top: 55%; width: 96vw; }
+  .equipment {
+    z-index: 10;
+    top: 57%;
+    width: clamp(78px, 22vw, 112px);
+    max-height: 22vh;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .scene { animation: none; opacity: .72; transform: none; }
   .wink, .equipment, .smoke, .flash { display: none; }
   .title { animation: none; opacity: 1; transform: translate(-50%, -50%); }
   .impact { animation: none; }
 }
-
