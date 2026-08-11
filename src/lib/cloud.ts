@@ -1548,6 +1548,36 @@ export async function loadMyPicks(weekNumber = 1) {
   };
 }
 
+/**
+ * Account-wide onboarding truth: how many real cards this player has locked.
+ * Capped by callers at two; existing picks RLS limits the query to the owner.
+ */
+export async function countMyLockedCards(): Promise<number> {
+  const uid = getSession()?.playerId;
+  if (!uid) return 2;
+  try {
+    const supabase = createClient();
+    const result = await withTimeout(
+      (async () => {
+        const { count, error } = await supabase
+          .from("picks")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", uid)
+          .not("locked_at", "is", null);
+        if (error) return null;
+        return count ?? 0;
+      })(),
+      6_000,
+      null
+    );
+    // Fail closed: never trap an established player in onboarding when cloud
+    // counting is unavailable.
+    return result === null ? 2 : Math.min(2, result);
+  } catch {
+    return 2;
+  }
+}
+
 /** One player's full slip for the week board (after scoring / RLS allows). */
 export type WeekBoardSlip = {
   userId: string;

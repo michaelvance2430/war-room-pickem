@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, type ReactNode } from "react";
 import PicksHowToModal from "@/components/PicksHowToModal";
 import PicksPreOpenOddsModal from "@/components/PicksPreOpenOddsModal";
 import FirstFinalModal from "@/components/FirstFinalModal";
@@ -23,6 +23,7 @@ import {
   bustWeekCardCache,
   savePicksToCloud,
   loadMyPicks,
+  countMyLockedCards,
   loadLeagueActiveWeek,
   listPublishedWeekNumbers,
   listScoredWeekNumbers,
@@ -123,6 +124,17 @@ function isCompleteValidCard(
   return true;
 }
 
+function PickCoachCue({ step, children }: { step: string; children: ReactNode }) {
+  return (
+    <div className="mb-2 flex items-start gap-2 rounded-lg border border-emerald-400/70 bg-emerald-500/15 px-3 py-2 text-emerald-100 shadow-[0_0_18px_rgba(52,211,153,0.14)]">
+      <span className="shrink-0 rounded bg-emerald-400 px-1.5 py-0.5 text-[9px] font-black tracking-wider text-black">
+        {step}
+      </span>
+      <span className="text-xs font-bold leading-snug">{children}</span>
+    </div>
+  );
+}
+
 const EMPTY_PROP: Prop = {
   id: "prop",
   question: "",
@@ -220,6 +232,9 @@ export default function PicksClient() {
   /** Brief completion transition after a successful save this session */
   const [justCompleted, setJustCompleted] = useState(false);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  const [coachLockedCards, setCoachLockedCards] = useState(2);
+  const [coachCountLoaded, setCoachCountLoaded] = useState(false);
+  const [coachPassedBestBet, setCoachPassedBestBet] = useState<string[]>([]);
 
   const revisionRef = useRef<string>("");
   const viewWeekRef = useRef(1);
@@ -247,6 +262,18 @@ export default function PicksClient() {
   practiceModeRef.current = practiceMode;
   hasCardRef.current = hasCard;
   savingRef.current = saving;
+
+  useEffect(() => {
+    let cancelled = false;
+    void countMyLockedCards().then((count) => {
+      if (cancelled) return;
+      setCoachLockedCards(count);
+      setCoachCountLoaded(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const loadPicksIntoState = useCallback(
     async (cloud: CloudCard, week: number) => {
@@ -1635,6 +1662,9 @@ export default function PicksClient() {
     editingRef.current = false;
     setPicksLockedAt(savedAt);
     setJustCompleted(true);
+    if (!alreadyLocked) {
+      setCoachLockedCards((count) => Math.min(2, count + 1));
+    }
     savedSnapshotRef.current = {
       picks: { ...lockedPicks },
       bestBetId: nextBest,
@@ -1777,6 +1807,59 @@ export default function PicksClient() {
       propChoice,
       prop.options
     );
+
+  type CoachTarget =
+    | { kind: "side" | "confidence" | "bestBet"; gameId: string }
+    | { kind: "prop" | "finish" }
+    | null;
+  const coachTarget: CoachTarget = (() => {
+    if (
+      !coachCountLoaded ||
+      (!eyesPreview && coachLockedCards >= 2) ||
+      saved ||
+      !editing ||
+      !hasCard ||
+      !canMutatePicks ||
+      viewWeek !== activeWeek
+    ) return null;
+    for (const game of games) {
+      if (isGameLocked(game, now, games)) continue;
+      const pick = picks[game.id];
+      if (!pick?.pick) return { kind: "side", gameId: game.id };
+      if (!pick.confidence) return { kind: "confidence", gameId: game.id };
+      if (!bestBetId && !coachPassedBestBet.includes(game.id)) {
+        return { kind: "bestBet", gameId: game.id };
+      }
+    }
+    if (!bestBetId) {
+      const firstOpen = games.find((game) => !isGameLocked(game, now, games));
+      if (firstOpen) return { kind: "bestBet", gameId: firstOpen.id };
+    }
+    if (!propChoice) return { kind: "prop" };
+    return { kind: "finish" };
+  })();
+
+  const coachTargetKey = coachTarget
+    ? `${coachTarget.kind}:${"gameId" in coachTarget ? coachTarget.gameId : "card"}`
+    : "";
+  useEffect(() => {
+    if (!coachTargetKey) return;
+    const id = coachTargetKey.startsWith("side:")
+      ? `coach-side-${coachTargetKey.slice(5)}`
+      : coachTargetKey.startsWith("confidence:")
+        ? `coach-confidence-${coachTargetKey.slice(11)}`
+        : coachTargetKey.startsWith("bestBet:")
+          ? `coach-bestbet-${coachTargetKey.slice(8)}`
+          : coachTargetKey === "prop:card"
+            ? "weekly-prop-card"
+            : "coach-finish-card";
+    window.requestAnimationFrame(() => {
+      document.getElementById(id)?.scrollIntoView({
+        behavior: prefersReducedMotion ? "auto" : "smooth",
+        block: "center",
+      });
+    });
+  }, [coachTargetKey, prefersReducedMotion]);
 
   /**
    * Compact receipt — only for genuinely complete saved cards.
@@ -2758,7 +2841,18 @@ export default function PicksClient() {
                       </p>
                     )}
 
-                    <div className="grid grid-cols-2 gap-2 sm:gap-3 mb-4">
+                    <div
+                      id={`coach-side-${game.id}`}
+                      className={`mb-4 rounded-xl transition ${
+                        coachTarget?.kind === "side" && coachTarget.gameId === game.id
+                          ? "ring-2 ring-emerald-400 bg-emerald-500/5 p-2"
+                          : ""
+                      }`}
+                    >
+                      {coachTarget?.kind === "side" && coachTarget.gameId === game.id && (
+                        <PickCoachCue step="STEP 1">Pick here first. Choose who covers.</PickCoachCue>
+                      )}
+                    <div className="grid grid-cols-2 gap-2 sm:gap-3">
                       <button
                         type="button"
                         disabled={locked}
@@ -2873,8 +2967,19 @@ export default function PicksClient() {
                         </div>
                       </button>
                     </div>
+                    </div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="flex flex-col gap-1.5">
+                      <div
+                        id={`coach-confidence-${game.id}`}
+                        className={`flex flex-col gap-1.5 rounded-xl transition ${
+                          coachTarget?.kind === "confidence" && coachTarget.gameId === game.id
+                            ? "ring-2 ring-emerald-400 bg-emerald-500/5 p-2"
+                            : ""
+                        }`}
+                      >
+                        {coachTarget?.kind === "confidence" && coachTarget.gameId === game.id && (
+                          <PickCoachCue step="STEP 2">How sure are you? Each number gets used once.</PickCoachCue>
+                        )}
       <span className="text-[10px] uppercase tracking-wider text-muted font-semibold">
                           Confidence
                         </span>
@@ -2932,6 +3037,17 @@ export default function PicksClient() {
                           </p>
                         )}
                       </div>
+      <div
+        id={`coach-bestbet-${game.id}`}
+        className={`rounded-xl transition self-stretch sm:self-auto ${
+          coachTarget?.kind === "bestBet" && coachTarget.gameId === game.id
+            ? "ring-2 ring-emerald-400 bg-emerald-500/5 p-2"
+            : ""
+        }`}
+      >
+                        {coachTarget?.kind === "bestBet" && coachTarget.gameId === game.id && (
+                          <PickCoachCue step="STEP 3">Is this your Best Bet? If not, kick rocks and keep moving.</PickCoachCue>
+                        )}
       <button
                         type="button"
                         disabled={locked}
@@ -2946,6 +3062,16 @@ export default function PicksClient() {
                       >
                         {isBest ? "★ Best Bet" : validationTarget === "bestBet" ? "* Set Best Bet — required" : "Set Best Bet"}
                       </button>
+                        {coachTarget?.kind === "bestBet" && coachTarget.gameId === game.id && !isBest && (
+                          <button
+                            type="button"
+                            onClick={() => setCoachPassedBestBet((ids) => ids.includes(game.id) ? ids : [...ids, game.id])}
+                            className="mt-2 min-h-[44px] w-full rounded-lg border border-emerald-400/40 px-3 text-xs font-bold text-emerald-100"
+                          >
+                            Not this one · keep moving
+                          </button>
+                        )}
+      </div>
       </div>
 
                     {saved && pick && weekEditable && (
@@ -2967,9 +3093,14 @@ export default function PicksClient() {
               className={`rounded-xl border bg-card p-4 mb-8 ${
                 validationTarget === "prop"
                   ? "border-danger ring-2 ring-danger/60 bg-danger/5"
+                  : coachTarget?.kind === "prop"
+                    ? "border-emerald-400 ring-2 ring-emerald-400/80 bg-emerald-500/5"
                   : !canEditProp ? "border-border opacity-95" : "border-border"
               }`}
             >
+              {coachTarget?.kind === "prop" && (
+                <PickCoachCue step="STEP 4">One bonus question. Pick an answer, then finish the card.</PickCoachCue>
+              )}
               <button
                 type="button"
                 className="w-full flex items-center justify-between gap-2 text-left"
@@ -3057,7 +3188,13 @@ export default function PicksClient() {
                 . Use the banner above when you&apos;re ready to leave.
               </p>
             ) : weekEditable || (practiceMode && !saved) ? (
-              <div className="phone-sticky-action space-y-2">
+              <div
+                id="coach-finish-card"
+                className={`phone-sticky-action space-y-2 rounded-xl ${coachTarget?.kind === "finish" ? "ring-2 ring-emerald-400 bg-emerald-500/5 p-2" : ""}`}
+              >
+                {coachTarget?.kind === "finish" && (
+                  <PickCoachCue step="FINAL">Review it. Lock it. Regret remains available after kickoff.</PickCoachCue>
+                )}
                 {practiceMode ? (
                   <button
                     type="button"
