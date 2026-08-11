@@ -52,10 +52,6 @@ const SportPoolPollBanner = dynamic(
   () => import("@/components/SportPoolPollBanner"),
   { ssr: false }
 );
-const OpeningCinematicGate = dynamic(
-  () => import("@/components/OpeningCinematicGate"),
-  { ssr: false }
-);
 
 /** Sync read of local session → paint Home shell without "Loading…" */
 function readLocalHomeShell(): {
@@ -605,7 +601,6 @@ export default function Home() {
       className="min-h-screen flex flex-col relative overflow-x-hidden crt-frame scan-sweep home-war-room"
       data-home-sport={homeChrome.sportId}
     >
-      <OpeningCinematicGate />
       <HomeSportAtmosphere atmosphere={homeChrome.atmosphere} />
 
       {/* Phone-first: less chrome padding, job-first stack (most users are on phones) */}
