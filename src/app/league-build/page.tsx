@@ -29,7 +29,6 @@ import {
 import { saveLeagueToCloud } from "@/lib/league-sync";
 import BrandMark from "@/components/BrandMark";
 import {
-  CHAMPIONSHIP_TROPHIES,
   championshipTrophiesForSport,
   DEFAULT_CHAMPIONSHIP_TROPHY_BY_SPORT,
   DEFAULT_CHAMPIONSHIP_TROPHY_ID,
@@ -63,6 +62,7 @@ function buildStepList(opts: {
 function LeagueBuildInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const query = searchParams.toString();
   const isNew = searchParams.get("new") === "1";
   const isEyes = searchParams.get("eyes") === "1" || isEyesLeagueBuildForced();
 
@@ -86,72 +86,90 @@ function LeagueBuildInner() {
   /** Name/open already chosen on create — don't re-ask */
   const [skipName, setSkipName] = useState(false);
   const [skipOpen, setSkipOpen] = useState(false);
+  const [initAttempt, setInitAttempt] = useState(0);
 
   useEffect(() => {
-    const session = getSession();
-    const league = getLeague();
-    if (!session?.leagueId || !league) {
-      router.replace("/join?mode=create");
-      return;
-    }
-    if (!isActuallyCommissioner() && !isEyes) {
-      router.replace("/");
-      return;
-    }
-    const lock = isLeagueBuildLocked(league.sportId);
-    setLocked(lock);
-    setSportId(league.sportId || "cfb");
+    try {
+      setError(null);
+      const session = getSession();
+      const league = getLeague();
+      if (!session?.leagueId || !league) {
+        router.replace("/join?mode=create");
+        return;
+      }
+      if (!isActuallyCommissioner() && !isEyes) {
+        router.replace("/");
+        return;
+      }
+      const lock = isLeagueBuildLocked(league.sportId);
+      setLocked(lock);
+      setSportId(league.sportId || "cfb");
 
-    const leagueName = (league.name || "").trim() || "War Room";
-    setName(leagueName);
-    setCrystalBall(league.settings?.crystalBallEnabled !== false);
-    setCutPercent(league.settings?.cutPercent ?? 50);
-    setTrophyId(getChampionshipTrophyDesign(league.settings?.championshipTrophyId || DEFAULT_CHAMPIONSHIP_TROPHY_BY_SPORT[league.sportId === "nfl" ? "nfl" : league.sportId === "cbb" ? "cbb" : "cfb"], league.sportId).id);
+      const leagueName = (league.name || "").trim() || "War Room";
+      setName(leagueName);
+      setCrystalBall(league.settings?.crystalBallEnabled !== false);
+      setCutPercent(league.settings?.cutPercent ?? 50);
+      const trophySport =
+        league.sportId === "nfl"
+          ? "nfl"
+          : league.sportId === "cbb"
+            ? "cbb"
+            : "cfb";
+      setTrophyId(
+        getChampionshipTrophyDesign(
+          league.settings?.championshipTrophyId ||
+            DEFAULT_CHAMPIONSHIP_TROPHY_BY_SPORT[trophySport],
+          trophySport
+        ).id
+      );
 
     // Open room from create (?open=1) or local league flag
-    let openPrefill = false;
-    try {
-      if (searchParams.get("open") === "1") openPrefill = true;
-      else {
-        const raw = localStorage.getItem("warroom-league");
-        if (raw) {
-          const j = JSON.parse(raw) as { isOpen?: boolean };
-          if (j.isOpen) openPrefill = true;
+      let openPrefill = false;
+      try {
+        if (searchParams.get("open") === "1") openPrefill = true;
+        else {
+          const raw = localStorage.getItem("warroom-league");
+          if (raw) {
+            const j = JSON.parse(raw) as { isOpen?: boolean };
+            if (j.isOpen) openPrefill = true;
+          }
         }
+      } catch {
+        /* A damaged optional preference must not take down setup. */
       }
-    } catch {
-      /* ignore */
-    }
-    setOpenRoom(openPrefill);
+      setOpenRoom(openPrefill);
 
     // Skip re-asking when create already set these.
     // Name: always set on create → skip on new / first build
     // Open: decided on create form → skip on new / first build
-    const firstBuild = isNew || needsLeagueBuild(league.id) || isEyes;
-    const doSkipName = firstBuild && !!leagueName && leagueName.length > 0;
-    const doSkipOpen = firstBuild;
-    setSkipName(doSkipName);
-    setSkipOpen(doSkipOpen);
+      const firstBuild = isNew || needsLeagueBuild(league.id) || isEyes;
+      const doSkipName = firstBuild && !!leagueName && leagueName.length > 0;
+      const doSkipOpen = firstBuild;
+      setSkipName(doSkipName);
+      setSkipOpen(doSkipOpen);
 
-    const showWelcome = !lock;
-    const list = buildStepList({
-      skipName: doSkipName,
-      skipOpen: doSkipOpen,
-      showWelcome,
-    });
-    setSteps(list);
-    setStep(list[0] || "crystal");
+      const showWelcome = !lock;
+      const list = buildStepList({
+        skipName: doSkipName,
+        skipOpen: doSkipOpen,
+        showWelcome,
+      });
+      setSteps(list);
+      setStep(list[0] || "crystal");
 
-    if (
-      !isEyes &&
-      !needsLeagueBuild(league.id) &&
-      !isNew
-    ) {
-      router.replace("/commissioner");
-      return;
+      if (!isEyes && !needsLeagueBuild(league.id) && !isNew) {
+        router.replace("/commissioner");
+        return;
+      }
+      setReady(true);
+    } catch (cause) {
+      console.error("[league-build] initialization failed", cause);
+      setError(
+        "Season setup could not read this room. Try again; if it continues, return Home and reopen setup."
+      );
+      setReady(true);
     }
-    setReady(true);
-  }, [router, isNew, isEyes, searchParams]);
+  }, [router, isNew, isEyes, query, initAttempt]);
 
   const pride = useMemo(() => pridePickWizardCopy(sportId), [sportId]);
   const stepIndex = Math.max(0, steps.indexOf(step));
@@ -190,13 +208,6 @@ function LeagueBuildInner() {
     setBusy(true);
     setError(null);
     try {
-      updateLeagueName(name.trim() || league.name);
-      updateLeagueSettings({
-        crystalBallEnabled: crystalBall,
-        cutPercent,
-        championshipTrophyId: trophyId,
-      });
-
       if (!isEyes) {
         const save = await saveLeagueToCloud({
           name: name.trim() || league.name,
@@ -209,6 +220,9 @@ function LeagueBuildInner() {
         });
         if (!save.ok) {
           console.warn("[league-build] cloud save", save.error);
+          throw new Error(
+            save.error || "Season setup could not be saved. Nothing was finalized."
+          );
         }
 
         try {
@@ -219,6 +233,14 @@ function LeagueBuildInner() {
         }
 
       }
+
+      // Commit browser state only after the authoritative save succeeds.
+      updateLeagueName(name.trim() || league.name);
+      updateLeagueSettings({
+        crystalBallEnabled: crystalBall,
+        cutPercent,
+        championshipTrophyId: trophyId,
+      });
 
       markLeagueBuildComplete(league.id);
       // Room is set → Home owns the next commissioner job (build card, etc.)
@@ -325,7 +347,21 @@ function LeagueBuildInner() {
         )}
 
         {error && (
-          <p className="text-sm text-danger text-center">{error}</p>
+          <div className="space-y-2 rounded-xl border border-danger/40 bg-danger/10 px-3 py-3 text-center">
+            <p className="text-sm text-danger">{error}</p>
+            {!busy && (
+              <button
+                type="button"
+                onClick={() => {
+                  setReady(false);
+                  setInitAttempt((attempt) => attempt + 1);
+                }}
+                className="min-h-[44px] rounded-lg border border-danger/40 px-4 text-sm font-bold text-foreground"
+              >
+                Try setup again
+              </button>
+            )}
+          </div>
         )}
 
         {/* ── Welcome: hero Use recommended ───────────────────────── */}

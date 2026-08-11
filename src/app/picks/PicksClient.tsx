@@ -1453,7 +1453,7 @@ export default function PicksClient() {
             isBestBet: false,
           };
         }
-        let nextBest = bestBetRef.current;
+        let nextBest: string | null = bestBetRef.current;
         if (nextBest && !lockedPicks[nextBest]) nextBest = null;
         for (const id of Object.keys(lockedPicks)) {
           lockedPicks[id] = {
@@ -1591,7 +1591,7 @@ export default function PicksClient() {
       };
     }
 
-    let nextBest = bestBetRef.current;
+    let nextBest: string | null = bestBetRef.current;
     if (nextBest && !lockedPicks[nextBest]) nextBest = null;
     for (const id of Object.keys(lockedPicks)) {
       lockedPicks[id] = {
