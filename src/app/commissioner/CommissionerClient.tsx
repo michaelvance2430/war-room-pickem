@@ -106,6 +106,7 @@ import {
   listSeasonWeekNumbers,
   firstSeasonWeek,
   seasonMaxWeek,
+  cutLockWeek,
 } from "@/lib/season-calendar";
 import { autoFinishRemainingWeeks } from "@/lib/sandbox-auto-finish";
 import {
@@ -2758,7 +2759,8 @@ function CommissionerPageInner() {
                 </p>
       <p className="text-xs text-muted leading-relaxed">
                   Name, Crystal Ball / Super Bowl pride pick, cut line, open
-                  room, bots. Editable until opening week locks the rules.
+                  room access, and championship hardware. Editable until
+                  opening week locks the rules.
                 </p>
       <a
                   href="/league-build?review=1"
@@ -3644,7 +3646,7 @@ function CommissionerPageInner() {
                         className={weekChipClass({
                           active: activeWeek === w,
                           scored,
-                          cutHint: w === 14,
+                          cutHint: w === cutLockWeek(league?.sportId),
                         })}
                       >
                         {weekTitle(w)}
@@ -4676,7 +4678,7 @@ function CommissionerPageInner() {
                         className={weekChipClass({
                           active: activeWeek === w,
                           scored,
-                          cutHint: w === 14,
+                          cutHint: w === cutLockWeek(league?.sportId),
                         })}
                       >
                         {weekTitle(w)}

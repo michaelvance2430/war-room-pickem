@@ -24,6 +24,7 @@
     "verify:profile-arsenal": "node scripts/verify-profile-arsenal.mjs",
     "verify:fieldhouse-hellfire": "node --import tsx scripts/verify-fieldhouse-hellfire.mjs",
     "verify:nfl-jdam": "node --import tsx scripts/verify-nfl-jdam.mjs",
+    "verify:nfl-season": "node --import tsx scripts/verify-nfl-season-language.mjs",
     "verify:career-ranks": "node --import tsx scripts/verify-career-ranks.mjs",
     "verify:weapon-service-record": "node scripts/verify-weapon-service-record.mjs",
     "verify:trophy-shapes": "node scripts/verify-championship-trophy-shapes.mjs",
