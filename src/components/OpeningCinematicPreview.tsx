@@ -27,7 +27,7 @@ export default function OpeningCinematicPreview({
       })
       .catch(() => setAudioBlocked(true));
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const t = window.setTimeout(() => onDone?.(), reduced ? 1_250 : 7_650);
+    const t = window.setTimeout(() => onDone?.(), reduced ? 1_250 : 9_650);
     return () => {
       window.clearTimeout(t);
       stop();
