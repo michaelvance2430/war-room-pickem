@@ -9,9 +9,13 @@ const EXIT_MS = 700;
 export default function SeasonOpening() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const exitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [visible, setVisible] = useState(false);
+  // Render the black opening layer on the very first paint. Waiting for an
+  // effect here lets Home paint for one frame before the cinematic mounts.
+  const [visible, setVisible] = useState(true);
   const [exiting, setExiting] = useState(false);
-  const [muted, setMuted] = useState(false);
+  // Browsers reject autoplay with sound. Begin reliably, then let the first
+  // tap satisfy the browser's audio permission and unmute in place.
+  const [muted, setMuted] = useState(true);
 
   useEffect(() => {
     let shouldShow = false;
@@ -31,8 +35,7 @@ export default function SeasonOpening() {
       shouldShow = false;
     }
 
-    if (!shouldShow) return;
-    setVisible(true);
+    if (!shouldShow) setVisible(false);
   }, []);
 
   useEffect(() => {
@@ -42,14 +45,11 @@ export default function SeasonOpening() {
 
     const start = async () => {
       try {
-        video.muted = false;
+        video.muted = true;
         await video.play();
       } catch {
-        // Mobile browsers commonly require muted autoplay. Keep the opening
-        // moving and offer a one-tap sound control instead of blocking Home.
         try {
           video.muted = true;
-          setMuted(true);
           await video.play();
         } catch {
           setVisible(false);
@@ -121,6 +121,8 @@ export default function SeasonOpening() {
         ref={videoRef}
         className="h-full w-full object-cover"
         src="/media/war-room-opening-vertical.mp4"
+        autoPlay
+        muted={muted}
         playsInline
         preload="auto"
         onTimeUpdate={softenEnding}
@@ -133,9 +135,9 @@ export default function SeasonOpening() {
           <button
             type="button"
             onClick={enableSound}
-            className="min-h-[44px] rounded-full border border-white/35 bg-black/55 px-4 text-xs font-bold uppercase tracking-[0.12em] text-white backdrop-blur-md"
+            className="absolute bottom-16 left-1/2 min-h-[52px] -translate-x-1/2 animate-pulse whitespace-nowrap rounded-full border border-primary/80 bg-black/80 px-6 text-sm font-black uppercase tracking-[0.14em] text-white shadow-[0_0_30px_rgba(212,175,55,.45)] backdrop-blur-md"
           >
-            Sound on
+            Tap for sound
           </button>
         )}
         <button
