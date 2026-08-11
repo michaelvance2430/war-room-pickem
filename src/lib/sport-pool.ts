@@ -24,6 +24,7 @@ export type SportPoolPoll = {
   message: string;
   status: "open" | "closed" | "spun_up";
   createdLeagueId: string | null;
+  sourceMemberCount: number;
   createdAt: string;
 };
 
@@ -32,6 +33,24 @@ export type SportPoolVote = {
   response: "yes" | "no";
   displayName?: string;
 };
+
+/** Permanent Crew law: time and sport order never enter this calculation. */
+export function crewContinuityThreshold(sourceMemberCount: number): number {
+  const humans = Math.max(0, Math.floor(sourceMemberCount || 0));
+  return Math.max(3, Math.ceil(humans / 2));
+}
+
+export function doesCrewContinue(
+  sourceMemberCount: number,
+  optedInCount: number
+): boolean {
+  return Math.max(0, Math.floor(optedInCount || 0)) >=
+    crewContinuityThreshold(sourceMemberCount);
+}
+
+export function defaultSportPoolMessage(sportLabel: string): string {
+  return `${sportLabel}. Same crew, new ways to embarrass yourselves. You in?`;
+}
 
 function sqlMissing(msg: string): boolean {
   return /sport_pool|relation|schema cache|column|does not exist/i.test(msg);
@@ -44,98 +63,22 @@ export function sportPoolSqlHint(): string {
   );
 }
 
-/** Who should answer the pool poll (humans + trial bots). */
-export async function countSourceLeagueVoters(
-  leagueId: string
-): Promise<{ total: number; humans: number; bots: number }> {
+/** Human members eligible to answer the pool poll. */
+export async function countSourceLeagueHumans(leagueId: string): Promise<number> {
   if (!hasSupabaseConfig() || !leagueId) {
-    return { total: 0, humans: 0, bots: 0 };
+    return 0;
   }
   const supabase = createClient();
   try {
-    const { data, error } = await supabase
+    const { count, error } = await supabase
       .from("memberships")
-      .select("user_id, is_bot")
-      .eq("league_id", leagueId);
-    if (error || !data) return { total: 0, humans: 0, bots: 0 };
-    let humans = 0;
-    let bots = 0;
-    for (const r of data) {
-      if ((r as { is_bot?: boolean }).is_bot) bots += 1;
-      else humans += 1;
-    }
-    return { total: humans + bots, humans, bots };
+      .select("user_id", { count: "exact", head: true })
+      .eq("league_id", leagueId)
+      .eq("is_bot", false);
+    if (error) return 0;
+    return count || 0;
   } catch {
-    return { total: 0, humans: 0, bots: 0 };
-  }
-}
-
-/** @deprecated use countSourceLeagueVoters — kept for any external callers */
-export async function countSourceLeagueHumans(
-  leagueId: string
-): Promise<number> {
-  const c = await countSourceLeagueVoters(leagueId);
-  return c.humans;
-}
-
-/**
- * Trial bots cast yes/no on an open poll (security-definer RPC).
- * ~80% yes / 20% no so you can practice one-click create with a padded room.
- */
-export async function seedBotSportPoolVotes(
-  pollId: string
-): Promise<
-  | { ok: true; yes: number; no: number; bots: number }
-  | { ok: false; error: string }
-> {
-  if (!hasSupabaseConfig() || !pollId) {
-    return { ok: false, error: "Supabase is not configured." };
-  }
-  const session = getSession();
-  if (!session?.playerId || !session.isCommissioner) {
-    return { ok: false, error: "Only the commissioner can seed bot votes." };
-  }
-  const supabase = createClient();
-  try {
-    const { data, error } = await supabase.rpc("seed_bot_sport_pool_votes", {
-      p_poll_id: pollId,
-    });
-    if (error) {
-      const msg = error.message || "";
-      if (
-        sqlMissing(msg) ||
-        /seed_bot_sport_pool|does not exist|schema cache/i.test(msg)
-      ) {
-        return {
-          ok: false,
-          error:
-            "Bot poll votes need a quick SQL update: re-run " +
-            "supabase/sport-pool-polls.sql in Supabase SQL Editor (adds seed_bot_sport_pool_votes).",
-        };
-      }
-      return { ok: false, error: msg };
-    }
-    const row = data as {
-      ok?: boolean;
-      error?: string;
-      yes?: number;
-      no?: number;
-      bots?: number;
-    } | null;
-    if (!row || row.ok === false) {
-      return { ok: false, error: row?.error || "Bot vote seed failed" };
-    }
-    return {
-      ok: true,
-      yes: Number(row.yes) || 0,
-      no: Number(row.no) || 0,
-      bots: Number(row.bots) || 0,
-    };
-  } catch (e) {
-    return {
-      ok: false,
-      error: e instanceof Error ? e.message : "Bot vote seed failed",
-    };
+    return 0;
   }
 }
 
@@ -202,13 +145,6 @@ export async function createSportPoolPoll(opts: {
     /* vote table may still be missing if partial SQL */
   }
 
-  // Trial bots auto-answer so padded rooms can practice one-click create
-  try {
-    await seedBotSportPoolVotes(poll.id);
-  } catch {
-    /* RPC may not be installed yet — UI can re-try */
-  }
-
   return { ok: true, poll };
 }
 
@@ -222,6 +158,7 @@ function mapPoll(raw: Record<string, unknown>): SportPoolPoll {
     message: (raw.message as string) || "",
     status: (raw.status as SportPoolPoll["status"]) || "open",
     createdLeagueId: (raw.created_league_id as string) || null,
+    sourceMemberCount: Number(raw.source_member_count) || 0,
     createdAt: (raw.created_at as string) || "",
   };
 }
@@ -379,6 +316,8 @@ export async function spinUpLeagueFromPoll(opts: {
       leagueName: string;
       seated: number;
       sportId: string;
+      crewContinues: boolean;
+      crewThreshold: number;
     }
   | { ok: false; error: string }
 > {
@@ -507,6 +446,15 @@ export async function spinUpLeagueFromPoll(opts: {
     row.sport_id || row.sportId || poll.targetSportId || "cfb"
   ) as SportId;
   const seated = Number(row.seated ?? row.member_count ?? row.humans ?? 0);
+  const sourceMemberCount =
+    Number(row.source_member_count) ||
+    poll.sourceMemberCount ||
+    (await countSourceLeagueHumans(poll.sourceLeagueId));
+  const crewThreshold = crewContinuityThreshold(sourceMemberCount);
+  const crewContinues =
+    typeof row.crew_continues === "boolean"
+      ? row.crew_continues
+      : doesCrewContinue(sourceMemberCount, yesCount);
 
   // Same Crew, new chapter (sport 2) — local-first optional
   try {
@@ -520,9 +468,10 @@ export async function spinUpLeagueFromPoll(opts: {
         createdBy: session.playerId,
       });
     }
-    const prefer =
-      getCrewIdForLeague(sourceLeagueId) ||
-      getCrewIdForLeague(session.leagueId);
+    const prefer = crewContinues
+      ? getCrewIdForLeague(sourceLeagueId) ||
+        getCrewIdForLeague(session.leagueId)
+      : null;
     ensureCrewForLeague({
       leagueId,
       leagueName,
@@ -541,6 +490,8 @@ export async function spinUpLeagueFromPoll(opts: {
     leagueName,
     seated: Number.isFinite(seated) ? seated : 0,
     sportId,
+    crewContinues,
+    crewThreshold,
   };
 }
 

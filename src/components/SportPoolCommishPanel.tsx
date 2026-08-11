@@ -7,11 +7,13 @@ import { listSportPickerOptions, getSportPack } from "@/lib/sports/registry";
 import type { SportId } from "@/lib/sports/types";
 import {
   closeSportPoolPoll,
-  countSourceLeagueVoters,
+  countSourceLeagueHumans,
+  crewContinuityThreshold,
   createSportPoolPoll,
+  defaultSportPoolMessage,
+  doesCrewContinue,
   loadOpenPollForLeague,
   loadPollVotes,
-  seedBotSportPoolVotes,
   spinUpLeagueFromPoll,
   sportPoolSqlHint,
   type SportPoolPoll,
@@ -40,7 +42,6 @@ export default function SportPoolCommishPanel() {
   const [poll, setPoll] = useState<SportPoolPoll | null>(null);
   const [votes, setVotes] = useState<SportPoolVote[]>([]);
   const [voterTotal, setVoterTotal] = useState(0);
-  const [botCount, setBotCount] = useState(0);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -50,14 +51,13 @@ export default function SportPoolCommishPanel() {
     leagueName: string;
     seated: number;
     sportId: string;
+    crewContinues: boolean;
   } | null>(null);
   const [sqlNeeded, setSqlNeeded] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!league?.id) return;
-    const counts = await countSourceLeagueVoters(league.id);
-    setVoterTotal(counts.total);
-    setBotCount(counts.bots);
+    setVoterTotal(await countSourceLeagueHumans(league.id));
 
     const { poll: p, error } = await loadOpenPollForLeague(league.id);
     if (error && /sport-pool-polls\.sql|SQL Editor/i.test(error)) {
@@ -87,7 +87,9 @@ export default function SportPoolCommishPanel() {
   const yeses = votes.filter((v) => v.response === "yes");
   const nos = votes.filter((v) => v.response === "no");
   const answered = votes.length;
-  const humansApprox = Math.max(0, voterTotal - botCount);
+  const sourceMemberCount = poll?.sourceMemberCount || voterTotal;
+  const crewThreshold = crewContinuityThreshold(sourceMemberCount);
+  const crewContinues = doesCrewContinue(sourceMemberCount, yeses.length);
   // Interest signal only — never a “must answer” meter
   const interestNote =
     yeses.length === 0
@@ -102,9 +104,7 @@ export default function SportPoolCommishPanel() {
     setNote(null);
     setSqlNeeded(false);
     const pack = getSportPack(targetSport);
-    const defaultMsg =
-      `Optional: anyone interested in ${pack.shortLabel} with this crew? ` +
-      `No pressure — pass or ignore is fine. This room keeps going either way.`;
+    const defaultMsg = defaultSportPoolMessage(pack.shortLabel);
     const res = await createSportPoolPoll({
       targetSportId: targetSport,
       proposedName:
@@ -122,34 +122,8 @@ export default function SportPoolCommishPanel() {
     }
     setPoll(res.poll);
     setNote(
-      botCount > 0
-        ? "Invite is live (soft). You’re marked interested so you can practice. Bots can answer for preseason tests only."
-        : "Invite is live on Home — optional, dismissible. You’re counted as interested as host."
+      "Invite is live on Home — optional, dismissible. You’re counted as interested as host."
     );
-    void refresh();
-  }
-
-  async function botsAnswer() {
-    if (!poll) return;
-    setBusy(true);
-    setErr(null);
-    setNote(null);
-    const res = await seedBotSportPoolVotes(poll.id);
-    setBusy(false);
-    if (!res.ok) {
-      if (/sport-pool-polls\.sql|SQL Editor/i.test(res.error)) {
-        setSqlNeeded(true);
-      }
-      setErr(res.error);
-      return;
-    }
-    if (res.bots < 1) {
-      setNote("No trial bots in this room — optional for practice only.");
-    } else {
-      setNote(
-        `Practice: bots simulated ${res.yes} interested · ${res.no} pass. Humans still choose freely.`
-      );
-    }
     void refresh();
   }
 
@@ -193,10 +167,11 @@ export default function SportPoolCommishPanel() {
       leagueName: res.leagueName,
       seated: res.seated,
       sportId: res.sportId,
+      crewContinues: res.crewContinues,
     });
     setPoll(null);
     setNote(
-      `Chapter open: ${res.leagueName} · ${res.seated} opted-in · code ${res.code}`
+      `${res.crewContinues ? "Crew chapter" : "Separate room"} open: ${res.leagueName} · ${res.seated} opted-in · code ${res.code}`
     );
     void refresh();
   }
@@ -332,18 +307,22 @@ export default function SportPoolCommishPanel() {
                   <span className="text-muted">{nos.length} passed</span>
                 </>
               )}
-              {answered > 0 && humansApprox > 0 && (
+              {answered > 0 && voterTotal > 0 && (
                 <>
                   {" · "}
                   <span className="text-muted">
-                    {answered} responded (of ~{voterTotal || "?"} in room
-                    {botCount > 0 ? `, incl. ${botCount} bots` : ""})
+                    {answered} responded (of {voterTotal} in room)
                   </span>
                 </>
               )}
             </p>
             <p className="text-[11px] text-muted mt-1.5 leading-relaxed">
               {interestNote} Silence is not a no and not a yes — just silence.
+            </p>
+            <p className="text-[11px] text-muted mt-1.5 leading-relaxed">
+              Crew line: {crewThreshold} of {sourceMemberCount || "—"}. {crewContinues
+                ? "Threshold met — this opens as the Crew’s next chapter."
+                : `${Math.max(0, crewThreshold - yeses.length)} more needed to carry the Crew name.`}
             </p>
           </div>
 
@@ -374,18 +353,10 @@ export default function SportPoolCommishPanel() {
           >
             {yeses.length < 1
               ? "Waiting for interest…"
-              : `Open ${getSportPack(poll.targetSportId).shortLabel} chapter for ${yeses.length} interested`}
+              : crewContinues
+                ? `Continue Crew into ${getSportPack(poll.targetSportId).shortLabel} · ${yeses.length} going`
+                : `Open separate ${getSportPack(poll.targetSportId).shortLabel} room · ${yeses.length} going`}
           </button>
-          {botCount > 0 && (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void botsAnswer()}
-              className="w-full py-2.5 min-h-[44px] rounded-xl border border-border bg-background text-sm font-medium text-muted disabled:opacity-50"
-            >
-              Practice: bots simulate answers
-            </button>
-          )}
           <button
             type="button"
             disabled={busy}
@@ -416,6 +387,11 @@ export default function SportPoolCommishPanel() {
             {spun.seated} opted-in seated · you&apos;re commissioner ·{" "}
             {getSportPack(spun.sportId).shortLabel}. Everyone else stays only in
             this room — nothing was forced.
+          </p>
+          <p className="text-xs text-muted leading-relaxed">
+            {spun.crewContinues
+              ? "The 50% Crew line was met. This is another chapter of the same Crew—no expiration date."
+              : "The Crew line was not met, so this opens as a separate room."}
           </p>
           <button
             type="button"
