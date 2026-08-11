@@ -14,12 +14,8 @@ import { isAppCreator } from "@/lib/creator";
 import { getSession } from "@/lib/league";
 import { createClient } from "@/lib/supabase/client";
 import {
-  creatorEyesLabel,
   EVENT_CREATOR_EYES,
   getCreatorEyesMode,
-  isCreatorEyesActive,
-  setCreatorEyesMode,
-  type CreatorEyesMode,
 } from "@/lib/creator-eyes";
 
 const STICKY_KEY = "warroom-foundry-session-v1";
@@ -69,7 +65,6 @@ function isFoundrySessionSticky(): boolean {
 export default function FoundrySessionChrome() {
   const pathname = usePathname();
   const [show, setShow] = useState(false);
-  const [eyes, setEyes] = useState<CreatorEyesMode>("off");
 
   useEffect(() => {
     let cancelled = false;
@@ -84,13 +79,15 @@ export default function FoundrySessionChrome() {
         return;
       }
       const e = getCreatorEyesMode();
-      setEyes(e);
       const onFoundry =
         pathname === "/foundry" ||
         pathname?.startsWith("/foundry/") ||
         pathname === "/founder" ||
         pathname?.startsWith("/founder/");
-      setShow(!onFoundry && (isCreatorEyesActive() || isFoundrySessionSticky()));
+      // Eyes mode must be visually identical to the player product. Its exit
+      // lives inside the ordinary You menu; never overlay LAB chrome on top of
+      // the experience being evaluated.
+      setShow(!onFoundry && e === "off" && isFoundrySessionSticky());
     }
 
     const handleRefresh = () => void refresh();
@@ -110,8 +107,6 @@ export default function FoundrySessionChrome() {
 
   if (!show) return null;
 
-  const eyesOn = eyes !== "off";
-
   return (
     <div className="fixed bottom-0 inset-x-0 z-[95] pointer-events-none" style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
       <div className="pointer-events-auto max-w-lg mx-auto px-3 pb-3">
@@ -119,15 +114,11 @@ export default function FoundrySessionChrome() {
           <div className="flex-1 min-w-0">
             <p className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-300">LAB · Foundry</p>
             <p className="text-xs text-sky-100/90 truncate font-semibold">
-              {eyesOn ? `${creatorEyesLabel(eyes)} · first-hour / eyes preview` : "LAB testing · one tap back to Foundry"}
+              LAB testing · one tap back to Foundry
             </p>
           </div>
           <Link href="/foundry" className="shrink-0 min-h-[44px] px-3.5 rounded-xl bg-sky-400 text-black text-xs font-extrabold inline-flex items-center touch-manipulation">← Foundry</Link>
-          {eyesOn ? (
-            <button type="button" onClick={() => { setCreatorEyesMode("off"); setEyes("off"); window.location.href = "/foundry"; }} className="shrink-0 min-h-[44px] px-2.5 rounded-xl border border-sky-400/50 text-sky-100 text-[11px] font-bold touch-manipulation">Exit eyes</button>
-          ) : (
-            <button type="button" onClick={() => { clearFoundrySession(); setShow(false); }} className="shrink-0 min-h-[44px] px-2.5 rounded-xl border border-sky-400/40 text-sky-200/80 text-[11px] font-bold touch-manipulation">End</button>
-          )}
+          <button type="button" onClick={() => { clearFoundrySession(); setShow(false); }} className="shrink-0 min-h-[44px] px-2.5 rounded-xl border border-sky-400/40 text-sky-200/80 text-[11px] font-bold touch-manipulation">End</button>
         </div>
       </div>
     </div>

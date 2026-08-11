@@ -30,6 +30,7 @@
     "verify:account-legendaries": "node scripts/verify-account-legendaries.mjs",
     "verify:foundry-gazette": "node --import tsx scripts/verify-foundry-gazette.mjs",
     "verify:foundry-owner": "node scripts/verify-foundry-owner-perimeter.mjs",
+    "verify:foundry-eyes": "node scripts/verify-foundry-eyes-clean.mjs",
     "verify:native-readiness": "node scripts/verify-native-readiness.mjs",
     "verify:account-lifecycle": "node scripts/verify-account-lifecycle.mjs && node scripts/verify-account-deletion-ui.mjs",
     "verify:crew-continuity": "node --import tsx scripts/verify-crew-continuity.mjs",

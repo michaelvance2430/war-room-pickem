@@ -135,6 +135,16 @@ export default function Nav() {
   }
 
   function exitPlayerView() {
+    if (eyesLabel) {
+      void import("@/lib/creator-eyes").then((eyes) => {
+        eyes.setCreatorEyesMode("off");
+        setEyesLabel("");
+        setMenuOpen(false);
+        setMoreOpen(false);
+        window.location.href = "/foundry";
+      });
+      return;
+    }
     setViewAsPlayer(false);
     refreshRoles();
     setMenuOpen(false);
@@ -631,33 +641,6 @@ export default function Nav() {
 
   return (
     <>
-      {eyesLabel ? (
-        <div className="bg-sky-400 text-black text-[11px] font-bold text-center py-1.5 px-3 sticky top-0 z-[60]">
-          {eyesLabel} · PREVIEW (local card · not real standings) ·{" "}
-          <Link href="/picks" className="underline">
-            picks
-          </Link>
-          {" · "}
-          <Link href="/foundry" className="underline">
-            founder
-          </Link>
-          {" · "}
-          <button
-            type="button"
-            className="underline font-extrabold"
-            onClick={() => {
-              void import("@/lib/creator-eyes").then((m) => {
-                m.setCreatorEyesMode("off");
-                setEyesLabel("");
-                // Land on Foundry eyes desk so you can switch previews quickly
-                window.location.href = "/foundry";
-              });
-            }}
-          >
-            exit → Foundry
-          </button>
-        </div>
-      ) : null}
       <header
         className={`${
           !sportIsWwc &&
@@ -716,7 +699,7 @@ export default function Nav() {
 
           {/* Desktop: primary + More */}
           <nav className="hidden md:flex flex-1 items-center justify-end gap-x-3 text-[13px] text-muted min-w-0">
-            {playerPreview && (
+            {playerPreview && !eyesLabel && (
               <button
                 type="button"
                 onClick={exitPlayerView}
@@ -756,6 +739,15 @@ export default function Nav() {
                     onClick={() => setMoreOpen(false)}
                   />
                   <div className="absolute right-0 top-full mt-2 z-50 w-56 rounded-xl border border-border bg-card shadow-xl py-1">
+                    {eyesLabel && (
+                      <button
+                        type="button"
+                        onClick={exitPlayerView}
+                        className="w-full border-b border-border px-3 py-2 text-left text-sm font-extrabold text-amber-300 hover:bg-card-hover"
+                      >
+                        Exit player preview
+                      </button>
+                    )}
                     {accountLinks.map((link) => {
                       const path = link.href.split("#")[0] || link.href;
                       const isAccountSettings =
@@ -800,7 +792,7 @@ export default function Nav() {
           </nav>
 
           <div className="flex items-center gap-1 sm:gap-2 shrink-0 ml-auto md:ml-2">
-            {playerPreview && (
+            {playerPreview && !eyesLabel && (
               <button
                 type="button"
                 onClick={exitPlayerView}
@@ -825,7 +817,7 @@ export default function Nav() {
               />
               <span className="hidden sm:inline">
                 {name || "Account"}
-                {playerPreview && (
+                {playerPreview && !eyesLabel && (
                   <span className="ml-1 text-xs text-warning">(Player view)</span>
                 )}
                 {isCommish && !playerPreview && (
@@ -920,7 +912,7 @@ export default function Nav() {
                     onClick={exitPlayerView}
                     className="w-full py-3.5 rounded-xl bg-warning text-black text-sm font-extrabold uppercase tracking-wide min-h-[48px]"
                   >
-                    Exit → Home (Commish)
+                    {eyesLabel ? "Exit player preview" : "Exit → Home (Commish)"}
                   </button>
                 </div>
               )}
@@ -1053,7 +1045,7 @@ export default function Nav() {
         </ul>
       </nav>
 
-      {playerPreview && (
+      {playerPreview && !eyesLabel && (
         <div className="sticky top-14 z-[45] border-b-2 border-warning bg-warning text-black">
           <div className="max-w-6xl mx-auto px-3 sm:px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs sm:text-sm font-bold">
@@ -1070,7 +1062,7 @@ export default function Nav() {
         </div>
       )}
       {/* Floating exit — above phone tab bar */}
-      {playerPreview && (
+      {playerPreview && !eyesLabel && (
         <button
           type="button"
           onClick={exitPlayerView}
