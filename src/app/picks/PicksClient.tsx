@@ -81,6 +81,8 @@ import {
 } from "@/lib/teams/cfb-catalog";
 import PicksCompletedSummary from "@/components/PicksCompletedSummary";
 import PicksCrystalBallSummary from "@/components/PicksCrystalBallSummary";
+import WeaponStrikeVideo from "@/components/WeaponStrikeVideo";
+import { strikeVideoForSport } from "@/lib/weapon-strike-video";
 
 function formatSpread(
   spread: number,
@@ -172,6 +174,7 @@ export default function PicksClient() {
   const [chaosConfirm, setChaosConfirm] = useState(false);
   const [chaosRemaining, setChaosRemaining] = useState(CHAOS_USES_PER_SEASON);
   const [chaosLockedWeek, setChaosLockedWeek] = useState(false);
+  const [weaponStrikeVideo, setWeaponStrikeVideo] = useState<string | null>(null);
   const [prop, setProp] = useState<Prop>(EMPTY_PROP);
   const [hasCard, setHasCard] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -2277,6 +2280,9 @@ export default function PicksClient() {
                   setEditing(true);
                   editingRef.current = true;
                   setChaosConfirm(false);
+                  setWeaponStrikeVideo(
+                    strikeVideoForSport(getLeague()?.sportId || "cfb")
+                  );
                 }}
                 className="w-full py-3.5 min-h-[52px] rounded-xl bg-orange-600 text-white font-extrabold"
               >
@@ -2291,6 +2297,20 @@ export default function PicksClient() {
               </button>
       </div>
           </div>
+        )}
+
+        {weaponStrikeVideo && (
+          <WeaponStrikeVideo
+            src={weaponStrikeVideo}
+            onComplete={() => {
+              setWeaponStrikeVideo(null);
+              window.requestAnimationFrame(() => {
+                document
+                  .getElementById("picks-card-start")
+                  ?.scrollIntoView({ behavior: "smooth", block: "start" });
+              });
+            }}
+          />
         )}
 
         {/* Week banner — practice uses normal card chrome; identity lives in PracticeModeChrome only */}

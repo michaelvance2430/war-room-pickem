@@ -41,6 +41,7 @@ import FairEntryNotice from "@/components/FairEntryNotice";
 import HomeAllegianceCard from "@/components/HomeAllegianceCard";
 import CfbSituationDestinations from "@/components/CfbSituationDestinations";
 import HomeSeasonCommand from "@/components/HomeSeasonCommand";
+import SeasonOpening from "@/components/SeasonOpening";
 
 const HomeGazetteSpotlight = dynamic(
   () => import("@/components/HomeGazetteSpotlight"),
@@ -602,6 +603,7 @@ export default function Home() {
       className="min-h-screen flex flex-col relative overflow-x-hidden crt-frame scan-sweep home-war-room"
       data-home-sport={homeChrome.sportId}
     >
+      <SeasonOpening />
       <HomeSportAtmosphere atmosphere={homeChrome.atmosphere} />
 
       {/* Phone-first: less chrome padding, job-first stack (most users are on phones) */}

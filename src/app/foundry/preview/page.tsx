@@ -6,6 +6,7 @@ import GazettePaper from "@/components/GazettePaper";
 import FoundryCfbActThree from "@/components/FoundryCfbActThree";
 import FoundryNflActThree from "@/components/FoundryNflActThree";
 import WarRoomArsenalIcon from "@/components/WarRoomArsenalIcon";
+import WeaponStrikeVideo from "@/components/WeaponStrikeVideo";
 import { buildFoundryGazetteFixture } from "@/lib/foundry-gazette-fixtures";
 import {
   createFoundryWalkthrough,
@@ -48,6 +49,7 @@ import {
   type NcaaRegion,
 } from "@/lib/ncaa-bracket";
 import { resolveHomeSeasonCommand } from "@/lib/home-season-command";
+import { strikeVideoForSport } from "@/lib/weapon-strike-video";
 
 type View = "home" | "picks" | "standings" | "postseason" | "gazette" | "locker" | "board" | "profile" | "commissioner";
 const NAV: { id: View; label: string }[] = [
@@ -175,8 +177,14 @@ function FoundrySeasonCommand({ state }: { state: FoundryWalkthrough }) {
 
 function Picks({ state, onUpdate }: { state: FoundryWalkthrough; onUpdate: (next: FoundryWalkthrough) => void }) {
   const [confirmNuke, setConfirmNuke] = useState(false);
+  const [tacticalStrikeVideo, setTacticalStrikeVideo] = useState<string | null>(null);
   const remaining = foundryTacticalNukesRemaining(state);
   const regularSeason = state.week < foundryPostseasonStartWeek(state.sport);
+  function authorizeTacticalNuke() {
+    onUpdate(armFoundryTacticalNuke(state));
+    setConfirmNuke(false);
+    setTacticalStrikeVideo(strikeVideoForSport(state.sport));
+  }
   return <Page title="My Picks" note={`${PREVIEW_SPORTS[state.sport].weekLabel(state.week)} · saved locally for preview`}>
     {regularSeason && <section className={`mb-4 overflow-hidden rounded-2xl border-2 p-4 ${state.tacticalNukeActive ? "border-lime-300 bg-lime-950/25 shadow-[0_0_30px_rgba(190,242,100,.2)]" : "border-red-500/80 bg-[repeating-linear-gradient(135deg,#250303_0,#250303_12px,#050505_12px,#050505_24px)] shadow-[0_0_34px_rgba(239,68,68,.3)]"}`}>
       <div className="flex items-center gap-3"><WarRoomArsenalIcon kind="nuke" size={52}/><div className="min-w-0 flex-1"><p className="text-[9px] font-black uppercase tracking-[.2em] text-red-300">Regular season weapon</p><h3 className="text-xl font-black">TACTICAL NUCLEAR BUTTON</h3></div><strong className="rounded-full border-2 border-red-300 bg-black/70 px-3 py-2 text-lg tabular-nums text-red-100">{remaining}/{FOUNDRY_TACTICAL_NUKE_LIMIT}</strong></div>
@@ -184,7 +192,8 @@ function Picks({ state, onUpdate }: { state: FoundryWalkthrough; onUpdate: (next
     </section>}
     <div className="space-y-3">{state.games.map((g) => <article key={g.id} className={`rounded-xl border bg-card p-4 ${state.tacticalNukeActive ? "border-lime-300/35" : "border-border"}`}><div className="flex justify-between gap-3"><div><p className="text-[10px] font-black uppercase text-muted">{g.status === "final" ? "Final" : "Upcoming"}</p><h3 className="mt-1 font-black">{g.away} at {g.home}</h3><p className="text-xs text-muted">{g.spread}{g.result ? ` · ${g.result}` : ""}</p></div><span className={`flex h-9 w-9 items-center justify-center rounded-full font-black text-black ${state.tacticalNukeActive ? "bg-lime-300" : "bg-primary"}`}>{g.confidence}</span></div><div className={`mt-3 rounded-lg border p-3 text-sm ${state.tacticalNukeActive ? "border-lime-300/30 bg-lime-300/10" : "border-primary/30 bg-primary/10"}`}>Pick: <strong>{g.pick}</strong></div></article>)}</div>
     <p className="mt-4 rounded-xl border border-emerald-400/30 bg-emerald-400/10 p-3 text-xs font-bold text-emerald-200">Card locked · preview picks cannot reach a live league.</p>
-    {confirmNuke && <div className="fixed inset-0 z-[75] flex items-end justify-center bg-red-950/90 p-4 backdrop-blur-sm sm:items-center" role="dialog" aria-modal="true" aria-label="Confirm Tactical Nuclear Button"><section className="w-full max-w-md rounded-3xl border-2 border-red-500 bg-black p-5 text-center shadow-[0_0_80px_rgba(239,68,68,.55)]"><WarRoomArsenalIcon kind="nuke" size={78}/><p className="mt-3 text-[10px] font-black uppercase tracking-[.24em] text-red-300">Tactical authorization required</p><h3 className="mt-2 text-3xl font-black">GO NUCLEAR?</h3><p className="mt-3 text-sm leading-relaxed text-white/70">The computer takes the entire weekly card. If it cooks, every point doubles. This spends one of your two season uses immediately.</p><p className="mt-3 text-xs font-black text-red-300">NO EDITS · NO REROLLS · NO REFUNDS</p><div className="mt-5 grid grid-cols-2 gap-2"><button type="button" onClick={() => setConfirmNuke(false)} className="min-h-12 rounded-xl border border-white/25 text-xs font-bold">Keep control</button><button type="button" onClick={() => { onUpdate(armFoundryTacticalNuke(state)); setConfirmNuke(false); }} className="min-h-12 rounded-xl bg-red-600 text-xs font-black text-white">AUTHORIZE ☢</button></div></section></div>}
+    {confirmNuke && <div className="fixed inset-0 z-[75] flex items-end justify-center bg-red-950/90 p-4 backdrop-blur-sm sm:items-center" role="dialog" aria-modal="true" aria-label="Confirm Tactical Nuclear Button"><section className="w-full max-w-md rounded-3xl border-2 border-red-500 bg-black p-5 text-center shadow-[0_0_80px_rgba(239,68,68,.55)]"><WarRoomArsenalIcon kind="nuke" size={78}/><p className="mt-3 text-[10px] font-black uppercase tracking-[.24em] text-red-300">Tactical authorization required</p><h3 className="mt-2 text-3xl font-black">GO NUCLEAR?</h3><p className="mt-3 text-sm leading-relaxed text-white/70">The computer takes the entire weekly card. If it cooks, every point doubles. This spends one of your two season uses immediately.</p><p className="mt-3 text-xs font-black text-red-300">NO EDITS · NO REROLLS · NO REFUNDS</p><div className="mt-5 grid grid-cols-2 gap-2"><button type="button" onClick={() => setConfirmNuke(false)} className="min-h-12 rounded-xl border border-white/25 text-xs font-bold">Keep control</button><button type="button" onClick={authorizeTacticalNuke} className="min-h-12 rounded-xl bg-red-600 text-xs font-black text-white">AUTHORIZE ☢</button></div></section></div>}
+    {tacticalStrikeVideo && <WeaponStrikeVideo src={tacticalStrikeVideo} onComplete={() => setTacticalStrikeVideo(null)} />}
   </Page>;
 }
 
@@ -234,6 +243,7 @@ function Postseason({ state, onUpdate }: { state: FoundryWalkthrough; onUpdate: 
 function NcaaBracketPicker({ state, onUpdate }: { state: FoundryWalkthrough; onUpdate: (next: FoundryWalkthrough) => void }) {
   const [guidedPick, setGuidedPick] = useState<number | null>(null);
   const [hellfireStep, setHellfireStep] = useState(0);
+  const [hellfireStrikeVideo, setHellfireStrikeVideo] = useState<string | null>(null);
   const picks = state.ncaaPicks || {};
   const results = state.ncaaResults || {};
   const count = ncaaPickCount(picks);
@@ -245,14 +255,19 @@ function NcaaBracketPicker({ state, onUpdate }: { state: FoundryWalkthrough; onU
     const nextPicks = sanitizeNcaaPicks({ ...picks, [game.id]: team });
     onUpdate({ ...state, ncaaPicks: nextPicks });
   }
+  function authorizeHellfire() {
+    onUpdate(launchFoundryHellfire(state));
+    setHellfireStrikeVideo(strikeVideoForSport("cbb"));
+  }
   return <section className="rounded-2xl border border-orange-300/40 bg-orange-950/20 p-3 sm:p-4"><div className="flex items-start justify-between gap-3"><div><p className="text-[9px] font-black uppercase tracking-[.18em] text-orange-300">Selection Sunday · 68 teams · 67 decisions</p><h3 className="text-xl font-black">The Bracket Drop</h3><p className="mt-1 text-[10px] text-muted">Fill the entire bracket once. Lock it before the First Four. Then watch the evidence accumulate.</p></div><div className="grid grid-cols-2 gap-1"><div className="rounded-xl border border-orange-300/30 bg-black/30 px-2 py-2 text-center"><strong className="block text-lg text-orange-200">{count}/67</strong><span className="text-[8px] uppercase text-muted">picked</span></div><div className="rounded-xl border border-emerald-300/30 bg-black/30 px-2 py-2 text-center"><strong className="block text-lg text-emerald-200">{score}</strong><span className="text-[8px] uppercase text-muted">points</span></div></div></div>
-    {!state.ncaaBracketLocked && resultWindow === 0 && <><div className="mt-3 grid grid-cols-2 gap-2"><button type="button" onClick={() => onUpdate({ ...state, ncaaPicks: generateNcaaPicks(777) })} className="min-h-11 rounded-xl border border-orange-300/40 text-[10px] font-black text-orange-200">Test-fill 67 · no Hellfire</button><button type="button" disabled={count !== 67} onClick={() => onUpdate({ ...state, ncaaBracketLocked: true })} className="min-h-11 rounded-xl bg-orange-300 text-[10px] font-black text-black disabled:opacity-35">Lock entire bracket</button></div><HellfireAuthorizeButton count={count} onAuthorize={() => onUpdate(launchFoundryHellfire(state))}/><p className="mt-2 text-center text-[9px] font-bold text-orange-200/65">Hellfire fills every unpicked decision, replaces any human picks already on file, and locks the bracket.</p></>}
+    {!state.ncaaBracketLocked && resultWindow === 0 && <><div className="mt-3 grid grid-cols-2 gap-2"><button type="button" onClick={() => onUpdate({ ...state, ncaaPicks: generateNcaaPicks(777) })} className="min-h-11 rounded-xl border border-orange-300/40 text-[10px] font-black text-orange-200">Test-fill 67 · no Hellfire</button><button type="button" disabled={count !== 67} onClick={() => onUpdate({ ...state, ncaaBracketLocked: true })} className="min-h-11 rounded-xl bg-orange-300 text-[10px] font-black text-black disabled:opacity-35">Lock entire bracket</button></div><HellfireAuthorizeButton count={count} onAuthorize={authorizeHellfire}/><p className="mt-2 text-center text-[9px] font-bold text-orange-200/65">Hellfire fills every unpicked decision, replaces any human picks already on file, and locks the bracket.</p></>}
     {state.ncaaBracketLocked && <div className="mt-3 rounded-xl border border-emerald-300/40 bg-emerald-300/10 px-3 py-2 text-center text-[10px] font-black text-emerald-200">BRACKET LOCKED · No changes after first tip</div>}
     <div className="mt-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-[9px] text-muted"><strong className="text-foreground">Scoring:</strong> R64 1 · R32 2 · Sweet 16 4 · Elite Eight 8 · Final Four 16 · Title 32. {resultWindow ? `Results posted through postseason stage ${resultWindow}.` : "No tournament results posted yet."}</div>
-    {guidedPick === null ? <FullBracketMap picks={picks} onBegin={() => setGuidedPick(Math.min(guidedGames.findIndex((game) => !picks[game.id]) < 0 ? 66 : guidedGames.findIndex((game) => !picks[game.id]), 66))} /> : <GuidedBracketPick game={guidedGames[guidedPick]} index={guidedPick} total={guidedGames.length} selected={picks[guidedGames[guidedPick].id] || null} result={results[guidedGames[guidedPick].id] || null} bracketLocked={state.ncaaBracketLocked} onChoose={(team) => { choose(guidedGames[guidedPick], team); window.setTimeout(() => setGuidedPick((current) => current === null || current >= guidedGames.length - 1 ? null : current + 1), 180); }} onBack={() => setGuidedPick((current) => current === null || current === 0 ? null : current - 1)} onMap={() => setGuidedPick(null)} onHellfire={() => onUpdate(launchFoundryHellfire(state))} />}
+    {guidedPick === null ? <FullBracketMap picks={picks} onBegin={() => setGuidedPick(Math.min(guidedGames.findIndex((game) => !picks[game.id]) < 0 ? 66 : guidedGames.findIndex((game) => !picks[game.id]), 66))} /> : <GuidedBracketPick game={guidedGames[guidedPick]} index={guidedPick} total={guidedGames.length} selected={picks[guidedGames[guidedPick].id] || null} result={results[guidedGames[guidedPick].id] || null} bracketLocked={state.ncaaBracketLocked} onChoose={(team) => { choose(guidedGames[guidedPick], team); window.setTimeout(() => setGuidedPick((current) => current === null || current >= guidedGames.length - 1 ? null : current + 1), 180); }} onBack={() => setGuidedPick((current) => current === null || current === 0 ? null : current - 1)} onMap={() => setGuidedPick(null)} onHellfire={authorizeHellfire} />}
     {count === 67 && <div className="mt-4 rounded-xl border border-emerald-300/40 bg-emerald-300/10 p-3 text-center"><p className="text-[9px] font-black uppercase tracking-[.18em] text-emerald-200">Bracket locked and loaded</p><p className="mt-1 text-sm font-black">Champion: {picks["national:championship"]}</p></div>}
     {state.mapsEvent?.protocol === "hellfire" && state.mapsEvent.reviewed && <HellfireDamageAssessment state={state} />}
     {state.mapsEvent?.protocol === "hellfire" && !state.mapsEvent.reviewed && <HellfireStrikeReview state={state} step={hellfireStep} onNext={() => setHellfireStep((value) => Math.min(value + 1, state.mapsEvent!.targetIds.length))} onComplete={() => onUpdate({ ...state, mapsEvent: state.mapsEvent ? { ...state.mapsEvent, reviewed: true } : null })} />}
+    {hellfireStrikeVideo && <WeaponStrikeVideo src={hellfireStrikeVideo} onComplete={() => setHellfireStrikeVideo(null)} />}
   </section>;
 }
 
