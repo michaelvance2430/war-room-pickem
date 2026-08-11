@@ -14,6 +14,7 @@ import {
   FIELDHOUSE_REGIONS,
   FOUNDRY_WALKTHROUGH_EVENT,
   foundryWeekStartDate,
+  foundryFinalWeek,
   foundryPostseasonStartWeek,
   foundryPostseasonRounds,
   foundryTacticalNukesRemaining,
@@ -46,6 +47,7 @@ import {
   type NcaaGame,
   type NcaaRegion,
 } from "@/lib/ncaa-bracket";
+import { resolveHomeSeasonCommand } from "@/lib/home-season-command";
 
 type View = "home" | "picks" | "standings" | "postseason" | "gazette" | "locker" | "board" | "profile" | "commissioner";
 const NAV: { id: View; label: string }[] = [
@@ -143,13 +145,32 @@ export default function FoundryPreviewPage() {
 
 function Home({ state, go, onUpdate }: { state: FoundryWalkthrough; go: (v: View) => void; onUpdate: (next: FoundryWalkthrough) => void }) {
   const meta = PREVIEW_SPORTS[state.sport]; const me = state.players.find((p) => p.name === "Mike V") || state.players[0]; const rank = state.players.findIndex((p) => p.id === me.id) + 1;
-  if (state.sport === "cfb" && state.week >= foundryPostseasonStartWeek("cfb")) { const phaseThreeWeek = foundryPostseasonStartWeek("cfb") + 1; return <div className="space-y-4"><section className="grid grid-cols-2 gap-3"><Stat label="Final regular rank" value={`#${rank}`} note={`${me.points} season points`}/><Stat label="Season status" value={state.week < phaseThreeWeek ? "PHASE II" : "PHASE III"} note={state.week < phaseThreeWeek ? "conference championships" : "bowls + CFP"}/></section><FoundryCfbActThree key={`cfb-phase-${state.generatedAt}`} seasonWeek={state.week} postseasonWeek={phaseThreeWeek} /></div>; }
-  if (state.sport === "nfl" && state.week >= foundryPostseasonStartWeek("nfl")) return <div className="space-y-4"><section className="grid grid-cols-2 gap-3"><Stat label="Final regular rank" value={`#${rank}`} note={`${me.points} season points`}/><Stat label="Season status" value="PHASE III" note="Road to the Bowl"/></section><p className="rounded-xl border border-sky-300/25 bg-sky-950/20 px-3 py-2 text-center text-[9px] font-bold text-sky-200">PHASE I · REGULAR SEASON COMPLETE → PHASE II · SEEDS LOCKED → PHASE III · WAR ROOM PLAYOFFS</p><FoundryNflActThree seasonWeek={state.week} /></div>;
-  if (state.sport === "cbb" && state.week >= foundryPostseasonStartWeek("cbb")) return <div className="space-y-4"><section className="grid grid-cols-2 gap-3"><Stat label="Final regular rank" value={`#${rank}`} note={`${me.points} season points`}/><Stat label="Season status" value="PHASE III" note="Fieldhouse postseason"/></section><p className="rounded-xl border border-orange-300/25 bg-orange-950/20 px-3 py-2 text-center text-[9px] font-bold text-orange-200">PHASE I · CONFERENCE SEASON → PHASE II · CONFERENCE TOURNAMENTS COMPLETE → PHASE III · MARCH MADNESS</p><Page title="March Madness Command Center" note="Your national bracket opens clean. Hellfire remains available before the first human pick."><NcaaBracketPicker state={state} onUpdate={onUpdate} /></Page></div>;
-  return <div className="space-y-3"><section className="rounded-2xl border border-primary/35 bg-card p-5"><p className="text-[10px] font-black uppercase tracking-[.2em] text-primary">{meta.cadence} · card open</p><h2 className="mt-2 text-3xl font-black">{meta.weekLabel(state.week)}</h2><p className="mt-2 text-sm text-muted">Five games. Confidence 5 through 1. Lock before the first game begins.</p><button onClick={() => go("picks")} className="mt-4 min-h-12 w-full rounded-xl bg-primary text-sm font-black text-black">Open My Picks</button></section>
+  if (state.sport === "cfb" && state.week >= foundryPostseasonStartWeek("cfb")) { const phaseThreeWeek = foundryPostseasonStartWeek("cfb") + 1; return <div className="space-y-4"><FoundrySeasonCommand state={state}/><section className="grid grid-cols-2 gap-3"><Stat label="Final regular rank" value={`#${rank}`} note={`${me.points} season points`}/><Stat label="Season status" value={state.week < phaseThreeWeek ? "PHASE II" : "PHASE III"} note={state.week < phaseThreeWeek ? "conference championships" : "bowls + CFP"}/></section><FoundryCfbActThree key={`cfb-phase-${state.generatedAt}`} seasonWeek={state.week} postseasonWeek={phaseThreeWeek} /></div>; }
+  if (state.sport === "nfl" && state.week >= foundryPostseasonStartWeek("nfl")) return <div className="space-y-4"><FoundrySeasonCommand state={state}/><section className="grid grid-cols-2 gap-3"><Stat label="Final regular rank" value={`#${rank}`} note={`${me.points} season points`}/><Stat label="Season status" value="PHASE III" note="Road to the Bowl"/></section><p className="rounded-xl border border-sky-300/25 bg-sky-950/20 px-3 py-2 text-center text-[9px] font-bold text-sky-200">PHASE I · REGULAR SEASON COMPLETE → PHASE II · SEEDS LOCKED → PHASE III · WAR ROOM PLAYOFFS</p><FoundryNflActThree seasonWeek={state.week} /></div>;
+  if (state.sport === "cbb" && state.week >= foundryPostseasonStartWeek("cbb")) return <div className="space-y-4"><FoundrySeasonCommand state={state}/><section className="grid grid-cols-2 gap-3"><Stat label="Final regular rank" value={`#${rank}`} note={`${me.points} season points`}/><Stat label="Season status" value="PHASE III" note="Fieldhouse postseason"/></section><p className="rounded-xl border border-orange-300/25 bg-orange-950/20 px-3 py-2 text-center text-[9px] font-bold text-orange-200">PHASE I · CONFERENCE SEASON → PHASE II · CONFERENCE TOURNAMENTS COMPLETE → PHASE III · MARCH MADNESS</p><Page title="March Madness Command Center" note="Your national bracket opens clean. Hellfire remains available before the first human pick."><NcaaBracketPicker state={state} onUpdate={onUpdate} /></Page></div>;
+  return <div className="space-y-3"><FoundrySeasonCommand state={state}/><section className="rounded-2xl border border-primary/35 bg-card p-5"><p className="text-[10px] font-black uppercase tracking-[.2em] text-primary">{meta.cadence} · card open</p><h2 className="mt-2 text-3xl font-black">{meta.weekLabel(state.week)}</h2><p className="mt-2 text-sm text-muted">Five games. Confidence 5 through 1. Lock before the first game begins.</p><button onClick={() => go("picks")} className="mt-4 min-h-12 w-full rounded-xl bg-primary text-sm font-black text-black">Open My Picks</button></section>
     <div className="grid grid-cols-2 gap-3"><Stat label="Your rank" value={`#${rank}`} note={`${me.points} season points`} /><Stat label="This week" value={`${me.weekPoints} pts`} note={`${me.correct} correct`} /></div>
     <button onClick={() => go("gazette")} className="w-full rounded-2xl border border-stone-500 bg-[#eee8da] p-4 text-left text-stone-900"><p className="text-[9px] font-black uppercase tracking-[.2em] text-red-800">{state.gazetteWeeks.length ? `${state.gazetteWeeks.length} archived edition${state.gazetteWeeks.length === 1 ? "" : "s"}` : "After the first score"}</p><strong className="mt-1 block font-serif text-xl">The War Room Gazette</strong><span className="text-xs">{state.gazetteWeeks.length ? "Tap a week in the archive to read that edition." : "The first weekly paper prints when you simulate Week 1."}</span></button>
     <section className="rounded-2xl border border-border bg-card p-4"><h3 className="font-black">Room pulse</h3><div className="mt-3 space-y-2">{state.players.slice(0, 3).map((p, i) => <div key={p.id} className="flex items-center justify-between text-sm"><span>{i + 1}. {p.name}</span><strong>{p.points}</strong></div>)}</div><button onClick={() => go("standings")} className="mt-3 text-xs font-bold text-primary">Full standings →</button></section></div>;
+}
+
+function FoundrySeasonCommand({ state }: { state: FoundryWalkthrough }) {
+  const me = state.players.find((player) => player.name === "Mike V") || state.players[0];
+  const command = resolveHomeSeasonCommand({
+    week: state.week,
+    cutWeek: foundryPostseasonStartWeek(state.sport),
+    finalWeek: foundryFinalWeek(state.sport),
+    players: state.players.map((player) => ({
+      id: player.id,
+      name: player.name,
+      totalPoints: player.points,
+      weeklyPoints: state.week > 1 ? [player.weekPoints] : [],
+    })),
+    playerId: me?.id,
+    cutPercent: 50,
+  });
+  const tone = command.tone === "red" ? "border-red-500/60 bg-red-950/35 text-red-200" : command.tone === "gold" ? "border-yellow-300/50 bg-yellow-500/10 text-yellow-100" : command.tone === "amber" ? "border-amber-400/50 bg-amber-500/10 text-amber-200" : "border-emerald-400/45 bg-emerald-500/10 text-emerald-200";
+  return <section className={`rounded-2xl border p-4 ${tone}`} data-season-command={command.phase}><p className="text-[9px] font-black uppercase tracking-[.2em] opacity-75">{command.kicker}</p><h2 className="mt-1 text-xl font-black leading-tight text-white">{command.headline}</h2><p className="mt-1 text-xs text-white/65">{command.order}</p>{(command.story || command.personal) && <div className="mt-3 flex flex-wrap gap-2 border-t border-current/20 pt-3 text-[10px] font-bold">{command.story && <span>{command.story}</span>}{command.personal && <span className="rounded-full border border-current/35 px-2 py-1 uppercase">{command.personal}</span>}</div>}</section>;
 }
 
 function Picks({ state, onUpdate }: { state: FoundryWalkthrough; onUpdate: (next: FoundryWalkthrough) => void }) {

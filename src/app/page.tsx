@@ -40,6 +40,7 @@ import { isFirstWeekChrome } from "@/lib/first-week";
 import FairEntryNotice from "@/components/FairEntryNotice";
 import HomeAllegianceCard from "@/components/HomeAllegianceCard";
 import CfbSituationDestinations from "@/components/CfbSituationDestinations";
+import HomeSeasonCommand from "@/components/HomeSeasonCommand";
 
 const HomeGazetteSpotlight = dynamic(
   () => import("@/components/HomeGazetteSpotlight"),
@@ -644,6 +645,8 @@ export default function Home() {
 
         {/* Primary job — published card / wait / lock (never Make Picks without publish) */}
         <HomeWeekHero />
+
+        {!firstWeekChrome && <HomeSeasonCommand />}
 
         {/* Commissioner query is operational, not flavor: mount it reliably. */}
         <SportPoolPollBanner />
