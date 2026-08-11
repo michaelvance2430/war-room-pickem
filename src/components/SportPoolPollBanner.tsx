@@ -65,24 +65,9 @@ export default function SportPoolPollBanner() {
       setPoll(null);
       return;
     }
-    // Already play that sport elsewhere — no need to invite again
-    if (p.targetSportId) {
-      try {
-        const { fetchMyMemberships } = await import("@/lib/session-restore");
-        const ms = await fetchMyMemberships();
-        const already = ms.some(
-          (m) =>
-            (m.sportId || "cfb").toLowerCase() ===
-            (p.targetSportId || "").toLowerCase()
-        );
-        if (already) {
-          setPoll(null);
-          return;
-        }
-      } catch {
-        /* show invite if memberships fail */
-      }
-    }
+    // This question is about joining this Crew's next league, not whether the
+    // player has ever joined another room for that sport. Existing NFL/CFB
+    // memberships must never hide the commissioner's question.
     setPoll(p);
     const v = await myVoteForPoll(p.id);
     setMyVote(v);

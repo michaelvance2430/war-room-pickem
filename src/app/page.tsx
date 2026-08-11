@@ -645,8 +645,8 @@ export default function Home() {
         {/* Primary job — published card / wait / lock (never Make Picks without publish) */}
         <HomeWeekHero />
 
-        {/* Optional commissioner query: players answer here; weekly job stays first. */}
-        {showSecondary && <SportPoolPollBanner />}
+        {/* Commissioner query is operational, not flavor: mount it reliably. */}
+        <SportPoolPollBanner />
 
         {/* Commissioner: one mission above player destinations — never for pure players */}
         <HomeCommishMissionButton />
