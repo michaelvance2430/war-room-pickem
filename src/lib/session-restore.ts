@@ -757,17 +757,42 @@ export async function leaveLeague(leagueId: string): Promise<{
   };
 }
 
-/**
- * PRODUCT FREEZE: production league deletion is not offered in the app.
- * Helper retained only so accidental callers fail closed — no Supabase DELETE.
- * Future Archive League will be a separate design.
- */
 export async function deleteLeague(
-  _leagueId: string
-): Promise<{ ok: boolean; error?: string }> {
-  return {
-    ok: false,
-    error:
-      "League history is preserved. Production leagues cannot be deleted from the app.",
-  };
+  leagueId: string,
+  confirmName: string
+): Promise<{ ok: boolean; nextLeagueId?: string; error?: string }> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("delete_unused_league", {
+    p_league_id: leagueId,
+    p_confirm_name: confirmName,
+  });
+  if (error) {
+    const raw = error.message || "";
+    const message = /name_mismatch/i.test(raw)
+      ? "League name did not match. Nothing was deleted."
+      : /league_started|history_exists/i.test(raw)
+        ? "This league has started, so its history cannot be deleted."
+        : /kickoff_unverifiable/i.test(raw)
+          ? "A kickoff could not be verified, so deletion was blocked."
+          : /commissioner_only/i.test(raw)
+            ? "Only the commissioner can delete this league."
+            : raw || "Could not delete the league.";
+    return { ok: false, error: message };
+  }
+  const row = data as { ok?: boolean; deleted?: boolean } | null;
+  if (!row?.ok || !row.deleted) return { ok: false, error: "League was not deleted." };
+
+  invalidateMembershipsCache();
+  if (canUseStorage()) {
+    localStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(LEAGUE_KEY);
+    localStorage.removeItem(ACTIVE_LEAGUE_KEY);
+  }
+
+  const { data: authData } = await supabase.auth.getSession();
+  const userId = authData.session?.user?.id;
+  const memberships = await fetchMyMemberships().catch(() => []);
+  const next = memberships[0];
+  if (userId && next) writeSessionAndLeague(next, userId);
+  return { ok: true, nextLeagueId: next?.leagueId };
 }

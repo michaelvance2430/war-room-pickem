@@ -824,6 +824,68 @@ export async function publishWeekCard(opts: {
   return { ok: true, weekCardId, games: gamesWithIds };
 }
 
+/** Commissioner-only: withdraw an unscored, pre-kickoff card and its picks. */
+export async function unpublishWeekCard(
+  weekNumber: number
+): Promise<{
+  ok: boolean;
+  picksRemoved?: number;
+  alreadyClear?: boolean;
+  error?: string;
+}> {
+  const session = getSession();
+  if (!session?.leagueId || !session.isCommissioner) {
+    return { ok: false, error: "Commissioner required" };
+  }
+
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("unpublish_week_card", {
+    p_league_id: session.leagueId,
+    p_week_number: weekNumber,
+  });
+  if (error) {
+    const raw = error.message || "";
+    const message = /week_already_scored/i.test(raw)
+      ? "This week is already scored and cannot be unpublished."
+      : /kickoff_started/i.test(raw)
+        ? "Kickoff has started. The card is now part of league history."
+        : /kickoff_unverifiable/i.test(raw)
+          ? "Kickoff could not be verified, so nothing was changed."
+          : /commissioner_only/i.test(raw)
+            ? "Only the commissioner can unpublish a card."
+            : raw || "Could not unpublish the card.";
+    return { ok: false, error: message };
+  }
+
+  const row = data as {
+    ok?: boolean;
+    already_clear?: boolean;
+    picks_removed?: number;
+  } | null;
+  if (!row?.ok) {
+    return { ok: false, error: "The card was not cleared." };
+  }
+
+  invalidateCloudWeekCaches(session.leagueId);
+  try {
+    localStorage.removeItem(`warroom-card-week-${weekNumber}`);
+    localStorage.removeItem(`warroom-picks-week-${weekNumber}`);
+    window.dispatchEvent(
+      new CustomEvent("warroom-card-unpublished", {
+        detail: { leagueId: session.leagueId, weekNumber },
+      })
+    );
+  } catch {
+    /* cloud result is authoritative */
+  }
+
+  return {
+    ok: true,
+    alreadyClear: !!row.already_clear,
+    picksRemoved: Number(row.picks_removed) || 0,
+  };
+}
+
 /** Sync peek of memory + sessionStorage — paints My Picks from Standings. */
 export function peekCachedWeekCard(
   weekNumber = 1

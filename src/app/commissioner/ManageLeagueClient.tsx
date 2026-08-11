@@ -20,10 +20,14 @@ import {
 import { saveLeagueToCloud, syncLeagueFromCloud } from "@/lib/league-sync";
 import {
   loadLeagueRoster,
+  loadLeagueActiveWeek,
+  loadWeekCard,
   listScoredWeekNumbers,
   refreshStaffSessionFlags,
   setMemberModeration,
   startNextSeasonInCloud,
+  unpublishWeekCard,
+  type CloudCard,
   type LeagueRosterMember,
 } from "@/lib/cloud";
 import {
@@ -37,6 +41,8 @@ import { paintAutomaticSeasonTheme } from "@/lib/season-theme";
 import { DIVISIONS, divisionDisplayLabel } from "@/lib/divisions";
 import { isLeagueBuildLocked, openingWeekLockLabel } from "@/lib/league-build";
 import SportPoolCommishPanel from "@/components/SportPoolCommishPanel";
+import { weekTitle } from "@/lib/dates";
+import { deleteLeague } from "@/lib/session-restore";
 
 type SectionId =
   | "identity"
@@ -101,6 +107,12 @@ function ManageLeagueInner() {
   const [scoredWeeks, setScoredWeeks] = useState<number[]>([]);
   const [resettingSeason, setResettingSeason] = useState(false);
   const [seasonReport, setSeasonReport] = useState<string | null>(null);
+  const [activeWeek, setActiveWeek] = useState(0);
+  const [activeCard, setActiveCard] = useState<CloudCard | null>(null);
+  const [unpublishBusy, setUnpublishBusy] = useState(false);
+  const [unpublishReport, setUnpublishReport] = useState<string | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteReport, setDeleteReport] = useState<string | null>(null);
 
   const [peopleExtrasOpen, setPeopleExtrasOpen] = useState(false);
 
@@ -165,6 +177,13 @@ function ManageLeagueInner() {
         }
       } catch {
         /* optional column */
+      }
+      try {
+        const liveWeek = await loadLeagueActiveWeek();
+        setActiveWeek(liveWeek);
+        setActiveCard(await loadWeekCard(liveWeek));
+      } catch {
+        setActiveCard(null);
       }
     }
 
@@ -375,6 +394,54 @@ function ManageLeagueInner() {
     }
     setSeasonReport(res.message || "Next season board is open.");
     void hydrate();
+  }
+
+  async function handleUnpublishWeek() {
+    const label = weekTitle(activeWeek, league?.sportId || "cfb");
+    const typed = window.prompt(
+      `Unpublish ${label}?\n\nThis removes the live card and every player’s picks for this week. It does not remove anyone from the league. An announcement will tell everyone they must pick again after you publish the replacement.\n\nThis is blocked after kickoff or scoring.\n\nType CLEAR to confirm.`
+    );
+    if (typed !== "CLEAR") {
+      setUnpublishReport("Cancelled. Nothing changed.");
+      return;
+    }
+
+    setUnpublishBusy(true);
+    setUnpublishReport(null);
+    const result = await unpublishWeekCard(activeWeek);
+    setUnpublishBusy(false);
+    if (!result.ok) {
+      setUnpublishReport(result.error || "Could not unpublish the card.");
+      return;
+    }
+
+    setActiveCard(null);
+    setUnpublishReport(
+      result.alreadyClear
+        ? `${label} was already clear.`
+        : `${label} unpublished. ${result.picksRemoved || 0} player pick${result.picksRemoved === 1 ? "" : "s"} removed. Announcement posted.`
+    );
+  }
+
+  async function handleDeleteLeague() {
+    if (!league?.id || !league.name) return;
+    const typed = window.prompt(
+      `Permanently delete “${league.name}”?\n\nThis removes the room, its members, cards, and picks. Player accounts stay intact. Deletion is blocked once any game kicks off or league history exists.\n\nType the exact league name to confirm.`
+    );
+    if (typed === null) {
+      setDeleteReport("Cancelled. Nothing changed.");
+      return;
+    }
+    setDeleteBusy(true);
+    setDeleteReport(null);
+    const result = await deleteLeague(league.id, typed);
+    setDeleteBusy(false);
+    if (!result.ok) {
+      setDeleteReport(result.error || "Could not delete the league.");
+      return;
+    }
+    router.replace(result.nextLeagueId ? "/" : "/account");
+    router.refresh();
   }
 
   function toggleSection(id: SectionId) {
@@ -878,6 +945,68 @@ function ManageLeagueInner() {
               <SportPoolCommishPanel />
             </div>
           )}
+
+          {/* Bottom of League Tools: reversible only before kickoff/scoring. */}
+          <section className="lg:col-span-2 rounded-xl border border-danger/35 bg-card p-4 sm:p-5">
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-danger">
+              League Tools · Card control
+            </p>
+            <h2 className="font-bold text-foreground mt-1">
+              Unpublish this week&apos;s card
+            </h2>
+            {activeCard?.games?.length ? (
+              <>
+                <p className="text-sm text-muted mt-1.5 leading-relaxed">
+                  {weekTitle(activeWeek, league?.sportId || "cfb")} is live. Clearing
+                  it removes the card and everyone&apos;s picks for that week so you
+                  can pull fresh odds and publish again. The league gets an
+                  announcement automatically.
+                </p>
+                <button
+                  type="button"
+                  disabled={unpublishBusy}
+                  onClick={() => void handleUnpublishWeek()}
+                  className="mt-4 w-full min-h-[48px] rounded-xl border border-danger/60 bg-danger/10 px-4 py-3 text-sm font-bold text-danger disabled:opacity-50"
+                >
+                  {unpublishBusy
+                    ? "Unpublishing…"
+                    : `Unpublish ${weekTitle(activeWeek, league?.sportId || "cfb")} card`}
+                </button>
+              </>
+            ) : (
+              <p className="text-sm text-muted mt-1.5">
+                No published card for {weekTitle(activeWeek, league?.sportId || "cfb")}.
+              </p>
+            )}
+            {unpublishReport && (
+              <p className="text-sm text-muted mt-3 leading-relaxed">
+                {unpublishReport}
+              </p>
+            )}
+          </section>
+
+          <section className="lg:col-span-2 rounded-xl border border-danger/50 bg-danger/5 p-4 sm:p-5">
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-danger">
+              League Tools · Permanent cleanup
+            </p>
+            <h2 className="font-bold text-foreground mt-1">Delete unused league</h2>
+            <p className="text-sm text-muted mt-1.5 leading-relaxed">
+              Made an extra room while testing? Delete it before the first kickoff.
+              Once play begins—or any official history exists—the room is permanent.
+              Player accounts are never deleted.
+            </p>
+            <button
+              type="button"
+              disabled={deleteBusy}
+              onClick={() => void handleDeleteLeague()}
+              className="mt-4 w-full min-h-[48px] rounded-xl border border-danger/70 bg-danger/10 px-4 py-3 text-sm font-bold text-danger disabled:opacity-50"
+            >
+              {deleteBusy ? "Deleting…" : "Delete this unused league"}
+            </button>
+            {deleteReport && (
+              <p className="text-sm text-muted mt-3 leading-relaxed">{deleteReport}</p>
+            )}
+          </section>
         </div>
 
         <p className="text-center text-xs text-muted mt-8">
