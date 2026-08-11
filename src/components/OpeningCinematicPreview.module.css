@@ -1,0 +1,180 @@
+.stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  isolation: isolate;
+  background: #000;
+}
+
+.scene,
+.wink {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.scene {
+  opacity: 0;
+  transform: scale(1.08);
+  animation: reveal 7.6s linear forwards;
+}
+
+.wink {
+  opacity: 0;
+  z-index: 2;
+  animation: wink 7.6s linear forwards;
+}
+
+.smoke {
+  position: absolute;
+  inset: -15%;
+  z-index: 3;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 50% 55%, transparent 16%, rgba(0,0,0,.28) 48%, rgba(0,0,0,.94) 86%),
+    repeating-radial-gradient(ellipse at 48% 68%, rgba(40,30,24,.08) 0 7%, rgba(0,0,0,.12) 10% 18%);
+  filter: blur(14px);
+  animation: smoke 7.6s ease-in-out forwards;
+}
+
+.flash {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  pointer-events: none;
+  background: #ff6a00;
+  opacity: 0;
+  mix-blend-mode: screen;
+  animation: flash 7.6s linear forwards;
+}
+
+.title {
+  position: absolute;
+  z-index: 8;
+  left: 50%;
+  top: 54%;
+  width: min(86vw, 900px);
+  height: auto;
+  opacity: 0;
+  transform: translate(-50%, -180vh) scale(1.75);
+  filter: drop-shadow(0 22px 28px rgba(0,0,0,.9));
+  animation: titleSlam 7.6s cubic-bezier(.12,.78,.18,1) forwards;
+}
+
+.equipment {
+  position: absolute;
+  z-index: 6;
+  left: 50%;
+  top: 60%;
+  width: clamp(62px, 10vw, 138px);
+  max-height: 19vh;
+  object-fit: contain;
+  opacity: 0;
+  filter: drop-shadow(0 10px 12px rgba(0,0,0,.75));
+  transform: translate(-50%, -50%);
+}
+
+.football { animation: football 7.6s ease-out forwards; }
+.baseball { animation: baseball 7.6s ease-out forwards; }
+.puck { animation: puck 7.6s ease-out forwards; }
+.soccer { animation: soccer 7.6s ease-out forwards; }
+.basketball { animation: lateBall 7.6s ease-in-out forwards; }
+
+.impact {
+  animation: impactShake 7.6s linear forwards;
+}
+
+.skip {
+  position: absolute;
+  z-index: 20;
+  right: max(14px, env(safe-area-inset-right));
+  top: max(14px, env(safe-area-inset-top));
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid rgba(255,255,255,.32);
+  border-radius: 999px;
+  color: rgba(255,255,255,.85);
+  background: rgba(0,0,0,.46);
+  font-size: 13px;
+  font-weight: 700;
+  backdrop-filter: blur(8px);
+}
+
+@keyframes reveal {
+  0%, 5% { opacity: 0; transform: scale(1.12); }
+  15%, 42% { opacity: 1; transform: scale(1.02); }
+  53% { opacity: 1; transform: scale(.94); }
+  60%, 100% { opacity: .68; transform: scale(.9); }
+}
+@keyframes wink {
+  0%, 31% { opacity: 0; }
+  33%, 37% { opacity: 1; }
+  39%, 100% { opacity: 0; }
+}
+@keyframes smoke {
+  0% { opacity: 1; transform: translateX(-4%) scale(1.12); }
+  17%, 39% { opacity: .16; transform: translateX(3%) scale(1); }
+  51% { opacity: .78; transform: translateX(-2%) scale(1.06); }
+  61%, 100% { opacity: .2; transform: translateX(2%) scale(1); }
+}
+@keyframes flash {
+  0%, 56% { opacity: 0; }
+  57% { opacity: .82; }
+  58.5%, 100% { opacity: 0; }
+}
+@keyframes titleSlam {
+  0%, 49% { opacity: 0; transform: translate(-50%, -180vh) scale(1.75); }
+  50% { opacity: 1; }
+  57% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); }
+  59% { transform: translate(-50%, -50%) scale(.97); }
+  62%, 91% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes impactShake {
+  0%, 56% { transform: translate(0); }
+  57% { transform: translate(-10px, 7px); }
+  58% { transform: translate(8px, -5px); }
+  59% { transform: translate(-5px, 3px); }
+  61%, 100% { transform: translate(0); }
+}
+@keyframes football {
+  0%, 54% { opacity: 0; transform: translate(-80%, -30%) rotate(-14deg) scale(.7); }
+  56% { opacity: 1; }
+  76%, 100% { opacity: 0; transform: translate(-620%, -360%) rotate(-620deg) scale(1.15); }
+}
+@keyframes baseball {
+  0%, 54% { opacity: 0; transform: translate(-15%, -45%) scale(.66); }
+  56% { opacity: 1; }
+  76%, 100% { opacity: 0; transform: translate(720%, -520%) rotate(780deg) scale(.95); }
+}
+@keyframes puck {
+  0%, 54% { opacity: 0; transform: translate(-120%, 20%) rotate(0) scale(.6); }
+  56% { opacity: 1; }
+  76%, 100% { opacity: 0; transform: translate(-760%, 410%) rotate(-420deg) scale(1.1); }
+}
+@keyframes soccer {
+  0%, 54% { opacity: 0; transform: translate(30%, -10%) scale(.76); }
+  56% { opacity: 1; }
+  76%, 100% { opacity: 0; transform: translate(620%, 330%) rotate(690deg) scale(1.12); }
+}
+@keyframes lateBall {
+  0%, 54% { opacity: 0; transform: translate(-50%, -40%) scale(.76); }
+  56% { opacity: 1; }
+  67% { opacity: 0; transform: translate(620%, -180%) rotate(560deg) scale(1); }
+  73% { opacity: 0; transform: translate(540%, 250%) rotate(560deg) scale(.55); }
+  76% { opacity: 1; }
+  90% { opacity: 1; transform: translate(-520%, 250%) rotate(-180deg) scale(.55); }
+  94%, 100% { opacity: 0; transform: translate(-630%, 250%) rotate(-260deg) scale(.55); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scene { animation: none; opacity: .72; transform: none; }
+  .wink, .equipment, .smoke, .flash { display: none; }
+  .title { animation: none; opacity: 1; transform: translate(-50%, -50%); }
+  .impact { animation: none; }
+}
+

@@ -82,6 +82,10 @@ import { listLeagueSeasonCounts } from "@/lib/league-seasons";
 import { getSportsPlayed } from "@/lib/sports-played";
 import AccountDeletionPanel from "@/components/AccountDeletionPanel";
 import { ACCOUNT_LIFECYCLE_PUBLIC } from "@/lib/account-lifecycle-contract";
+import {
+  isOpeningCinematicEnabled,
+  setOpeningCinematicEnabled,
+} from "@/lib/opening-cinematic";
 
 export default function AccountPage() {
   const router = useRouter();
@@ -139,6 +143,7 @@ export default function AccountPage() {
   const [leagueAliasDraft, setLeagueAliasDraft] = useState("");
   const [leagueResolvedName, setLeagueResolvedName] = useState("");
   const [leagueAliasBusy, setLeagueAliasBusy] = useState(false);
+  const [openingCinematic, setOpeningCinematic] = useState(true);
 
   async function reload() {
     const session = getSession();
@@ -269,6 +274,7 @@ export default function AccountPage() {
   }
 
   useEffect(() => {
+    setOpeningCinematic(isOpeningCinematicEnabled());
     let cancelled = false;
     const disarm = (() => {
       try {
@@ -1555,6 +1561,37 @@ export default function AccountPage() {
       </span>
           </label>
       </section>
+
+        <section className="rounded-xl border border-border bg-card p-5 space-y-3">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="font-semibold">Opening cinematic</h2>
+              <p className="text-xs text-muted mt-1 leading-relaxed">
+                Play the War Room opening when the app starts. Skip never changes
+                this preference—you can turn it off or back on here anytime.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={openingCinematic}
+              onClick={() => {
+                const next = !openingCinematic;
+                setOpeningCinematic(next);
+                setOpeningCinematicEnabled(next);
+              }}
+              className={`relative shrink-0 w-12 h-7 rounded-full ${openingCinematic ? "bg-primary" : "bg-border"}`}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-black transition ${openingCinematic ? "translate-x-5" : ""}`} />
+            </button>
+          </div>
+          <Link
+            href="/opening-preview"
+            className="flex min-h-[48px] items-center justify-center rounded-xl border border-primary/50 bg-primary/10 px-4 text-sm font-bold text-primary"
+          >
+            Preview cinematic
+          </Link>
+        </section>
 
         <FeedbackForm />
       <section className="rounded-xl border border-border bg-card p-5">
