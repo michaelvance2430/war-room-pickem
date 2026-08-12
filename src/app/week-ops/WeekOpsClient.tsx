@@ -970,24 +970,6 @@ export default function WeekOpsClient() {
           </div>
         )}
 
-        {/* Advanced — never on Pull Odds (step 1). Mission stays simple. */}
-        {step !== "done" && step !== 1 && (
-          <details className="mt-10 group">
-            <summary className="text-xs text-muted font-semibold cursor-pointer list-none flex items-center gap-1">
-              <span className="group-open:hidden">▼</span>
-              <span className="hidden group-open:inline">▲</span>
-              Advanced
-            </summary>
-            <div className="mt-2 pl-1 space-y-2 text-xs">
-              <Link
-                href="/commissioner"
-                className="block text-muted hover:text-foreground underline-offset-2 hover:underline py-1"
-              >
-                Manage League
-              </Link>
-            </div>
-          </details>
-        )}
       </main>
     </div>
   );
