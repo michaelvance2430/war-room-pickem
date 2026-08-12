@@ -129,7 +129,7 @@ function ManageLeagueInner() {
       return;
     }
     if (tab === "results" || tab === "score" || tab === "scoring") {
-      router.replace("/week-ops?score=1");
+      router.replace("/week-ops?step=score");
       return;
     }
     if (tab === "picks") {

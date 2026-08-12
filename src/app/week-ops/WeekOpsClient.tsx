@@ -87,8 +87,11 @@ export default function WeekOpsClient() {
   const searchParams = useSearchParams();
   const weekParam = searchParams.get("week");
   const stepParam = searchParams.get("step");
+  const sportId = getLeague()?.sportId || "cfb";
+  const initialWeek = sportId === "nfl" ? 1 : 0;
+  const initialPropPreset = defaultPropPreset(sportId);
 
-  const [week, setWeek] = useState(0);
+  const [week, setWeek] = useState(initialWeek);
   const [step, setStep] = useState<Step>(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -104,13 +107,13 @@ export default function WeekOpsClient() {
     "default" | "league-interest"
   >("default");
   const [propCategory, setPropCategory] = useState<PropCategory>(() =>
-    defaultPropPreset("cfb").category
+    initialPropPreset.category
   );
   const [propPresetId, setPropPresetId] = useState<string>(
-    () => defaultPropPreset("cfb").id
+    () => initialPropPreset.id
   );
   const [prop, setProp] = useState<Prop>(() =>
-    propFromPreset(defaultPropPreset("cfb"), 0)
+    propFromPreset(initialPropPreset, initialWeek)
   );
   const [customQ, setCustomQ] = useState("");
   const [optA, setOptA] = useState("Over");
@@ -125,7 +128,6 @@ export default function WeekOpsClient() {
   const isFirstHour =
     searchParams.get("first") === "1" || roomJustReady != null;
 
-  const sportId = getLeague()?.sportId || "cfb";
   const weekLabel = weekTitle(week, sportId);
 
   const selectedGames = useMemo(
