@@ -144,7 +144,8 @@ export async function seedBotLockerTalk(opts?: {
   }
 
   const roster = await loadLeagueRoster();
-  const bots = roster.filter((m) => m.isBot).map((m) => m.userId);
+  const botMembers = roster.filter((m) => m.isBot);
+  const bots = botMembers.map((m) => m.userId);
   if (!bots.length) {
     return {
       ok: false,
@@ -171,6 +172,15 @@ export async function seedBotLockerTalk(opts?: {
     weekLabel: opts?.weekLabel,
     sportId,
     count: opts?.count,
+  });
+
+  // Maria is the room's recurring psychopath. Foundry week seeding always
+  // gives the real Dispatch pipeline her same meltdown to redact.
+  const maria = botMembers.find((member) => /\bmaria\b/i.test(member.name));
+  posts.push({
+    user_id: maria?.userId || bots[0],
+    body: "The fuckin confidence fuckin five fuckin was fuckin a fuckin crime fuckin scene.",
+    minutes_ago: 0,
   });
 
   if (!posts.length) {
