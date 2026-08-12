@@ -60,6 +60,12 @@ export function validateDispatchAiDraft(
 ): DispatchDraftValidation {
   const allowed = new Set(packet.facts.map((fact) => fact.id));
   const stories = [draft.lead, ...draft.briefs, ...draft.lockerRoasts];
+  if (draft.schemaVersion !== 1) {
+    return { ok: false, error: "Dispatch AI returned an unsupported schema." };
+  }
+  if (draft.briefs.length > 5 || draft.lockerRoasts.length > 3) {
+    return { ok: false, error: "Dispatch AI returned too many stories." };
+  }
   for (const story of stories) {
     if (!story.headline.trim() || !story.body.trim()) {
       return { ok: false, error: "Dispatch AI returned an empty story." };
@@ -71,7 +77,9 @@ export function validateDispatchAiDraft(
     if (unknown) {
       return { ok: false, error: `Dispatch AI cited unknown fact ${unknown}.` };
     }
+    if (story.headline.length > 120 || story.body.length > 420) {
+      return { ok: false, error: "Dispatch AI story exceeded the newsroom length limit." };
+    }
   }
   return { ok: true };
 }
-

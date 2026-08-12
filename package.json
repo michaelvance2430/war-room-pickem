@@ -33,6 +33,7 @@
     "verify:foundry-owner": "node scripts/verify-foundry-owner-perimeter.mjs",
     "verify:foundry-eyes": "node scripts/verify-foundry-eyes-clean.mjs",
     "verify:dispatch": "node --import tsx scripts/verify-dispatch-contract.mjs",
+    "verify:dispatch-newsroom": "node --import tsx scripts/verify-dispatch-newsroom.mjs",
     "verify:season-opening": "node scripts/verify-season-opening-controls.mjs",
     "verify:lock-clock": "node scripts/verify-lock-clock-surfaces.mjs",
     "verify:commissioner-journey": "node --import tsx scripts/verify-commissioner-journey.mjs",
