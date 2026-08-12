@@ -286,7 +286,6 @@ async function generateDraft(
           role: "system" as const,
           content: `These lines already appeared in another Dispatch and are forbidden. Write genuinely different copy, not a suffix or punctuation variation:\n${rejectedLines.slice(0, 40).join("\n")}`,
         }] : []),
-        },
         { role: "user", content: JSON.stringify(packet) },
       ],
       text: {
