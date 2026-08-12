@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 20744)
-Total output lines: 2197
-
 import type { Player } from "./types";
 import {
   rankPlayersWithSwings,
@@ -1030,7 +1027,83 @@ export async function buildGazetteEdition(
       ),
       deck: byWeek(STANDINGS_TIE_DECKS, weekIndex, 0, "standings_tie_decks")(
         overallTie.pts,
-  …744 tokens truncated…reerPromotion({ playerId: player.id, playerName: player.name, rank: resolved.current, weekIndex });
+        overallTie.names.length
+      ),
+    };
+  }
+
+  // Forgot to lock → milk carton story
+  let noLock: GazetteStory | null = null;
+  let ghostNames: string[] = [];
+  try {
+    const { loadWeekNoLockNames } = await import("./cloud");
+    ghostNames = await loadWeekNoLockNames(weekIndex);
+  } catch {
+    ghostNames = [];
+  }
+  if (!ghostNames.length) {
+    ghostNames = inferNoLockNamesFromScores(players, weekIndex);
+  }
+  if (ghostNames.length) {
+    const label = formatNameList(ghostNames);
+    noLock = {
+      names: ghostNames,
+      pts: 0,
+      kind: ghostNames.length > 1 ? "tie" : "clear",
+      headline: byWeek(NO_LOCK_HEADLINES, weekIndex, 3, "no_lock_headlines")(label),
+      deck: byWeek(NO_LOCK_DECKS, weekIndex, 3, "no_lock_decks")(ghostNames.length),
+    };
+    // If the "shame" player is only on the carton for ghosting, prefer milk carton copy
+    // and still keep shame for legit low scores who did lock.
+    if (
+      shame &&
+      ghostNames.some(
+        (g) => g.toLowerCase() === (shame!.names[0] || "").toLowerCase()
+      ) &&
+      shame.pts === 0
+    ) {
+      shame = null;
+    }
+  }
+
+  // Week 0 scored / frozen → roast who never locked Crystal Ball
+  let crystalBallMiss: GazetteStory | null = null;
+  if (weekIndex === 0) {
+    try {
+      const { loadCrystalBallNoPickNames } = await import("./crystal-ball");
+      const missNames = await loadCrystalBallNoPickNames();
+      if (missNames.length) {
+        const label = formatNameList(missNames);
+        crystalBallMiss = {
+          names: missNames,
+          pts: 0,
+          kind: missNames.length > 1 ? "tie" : "clear",
+          headline: byWeek(CRYSTAL_MISS_HEADLINES, weekIndex, 1, "crystal_miss_headlines")(label),
+          deck: byWeek(CRYSTAL_MISS_DECKS, weekIndex, 1, "crystal_miss_decks")(missNames.length),
+        };
+      }
+    } catch {
+      crystalBallMiss = null;
+    }
+  }
+
+  // Chaos went postal / nuclear — one headline, multi-name if several nuked
+  let chaosDetonation: GazetteStory | null = null;
+  try {
+    chaosDetonation = await buildChaosDetonationStory(weekIndex, players);
+  } catch {
+    chaosDetonation = null;
+  }
+
+  let promotionOrders: NonNullable<GazetteEdition["promotionOrders"]> = [];
+  try {
+    const [{ getAchievementPoints, withPermanentBadges }, { resolveCareerRank }, { observeCareerPromotion, promotionGazetteDeck }, { listLeagueSeasonCounts }, { getSportsPlayed }] = await Promise.all([
+      import("./badges"), import("./career-ranks"), import("./career-rank-promotions"), import("./league-seasons"), import("./sports-played"),
+    ]);
+    promotionOrders = players.flatMap((player) => {
+      if (player.isMock) return [];
+      const resolved = resolveCareerRank({ achievementPoints: getAchievementPoints(withPermanentBadges(player)), seasons: listLeagueSeasonCounts(player.id).reduce((sum, room) => sum + room.seasons, 0), sports: Math.max(1, getSportsPlayed(player.id).length) });
+      const promotion = observeCareerPromotion({ playerId: player.id, playerName: player.name, rank: resolved.current, weekIndex });
       return promotion ? [{ name: promotion.name, from: promotion.from.abbreviation, to: promotion.to.abbreviation, deck: promotionGazetteDeck(promotion.name, promotion.from, promotion.to) }] : [];
     });
   } catch {
