@@ -16,10 +16,10 @@ const cfbOpening = createFoundryWalkthrough("cfb");
 assert.equal(cfbOpening.week, 0, "CFB Sandbox starts in Week 0");
 const cfbWeekOne = simulateNextFoundryWeek(cfbOpening);
 assert.equal(cfbWeekOne.week, 1, "Week 0 advances to Week 1");
-assert.deepEqual(cfbWeekOne.gazetteWeeks, [], "Week 0 never creates a Dispatch");
+assert.deepEqual(cfbWeekOne.gazetteWeeks, [0], "scored Week 0 immediately creates a Dispatch");
 const cfbWeekTwo = simulateNextFoundryWeek(cfbWeekOne);
 assert.equal(cfbWeekTwo.week, 2, "Week 1 advances to Week 2");
-assert.deepEqual(cfbWeekTwo.gazetteWeeks, [1], "first Dispatch covers Week 1");
+assert.deepEqual(cfbWeekTwo.gazetteWeeks, [0, 1], "each scored week immediately creates a Dispatch");
 
 const packet = {
   schemaVersion: 1,
@@ -37,9 +37,9 @@ assert.equal(validateDispatchAiDraft(packet, { schemaVersion: 1, lead: { ...stor
 const gazette = readFileSync("src/lib/gazette.ts", "utf8");
 const paper = readFileSync("src/components/GazettePaper.tsx", "utf8");
 const nav = readFileSync("src/components/Nav.tsx", "utf8");
-assert.match(gazette, /weekIndex < 1/);
+assert.doesNotMatch(gazette, /edition\.weekIndex < 1|weekIndex < 1/);
 assert.match(gazette, /THE WAR ROOM DISPATCH/);
 assert.match(paper, /edition\.coverageLine/);
 assert.match(nav, /label: "The Dispatch"/);
 
-console.log("Dispatch contract verified: Week 2 debut · real coverage ranges · cited AI stories only");
+console.log("Dispatch contract verified: immediate first-score release · real coverage ranges · cited AI stories only");

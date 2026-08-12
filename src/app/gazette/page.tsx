@@ -106,7 +106,7 @@ export default function GazetteArchivePage() {
             </p>
       <p className="font-bold text-lg mb-1">No paper yet</p>
       <p className="text-sm text-muted max-w-sm mx-auto leading-relaxed">
-              Week 1 writes the first issue. The Dispatch drops as Week 2 opens,
+              The first scored card writes and publishes the first issue immediately,
               then returns after every scored card. Lock picks. Wait for blood.
               Come back.
             </p>

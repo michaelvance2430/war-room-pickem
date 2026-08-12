@@ -342,20 +342,49 @@ function FrontPage({ edition }: { edition: GazetteEdition }) {
         <p className="mx-auto mt-3 max-w-2xl border-y border-stone-500 py-2 font-serif text-[15px] font-bold leading-tight text-stone-800">
           {edition.crown.deck}
         </p>
-        <div className="mt-3 grid grid-cols-2 border-2 border-stone-950 bg-stone-950 text-[#f4f0e6]">
-          <div className="border-r border-stone-500 px-2 py-3"><p className="text-[8px] font-black uppercase tracking-widest text-red-300">Top brass</p><p className="mt-1 font-serif text-xl font-black uppercase leading-none">{edition.crown.names.join(" · ")}</p></div>
-          <div className="px-2 py-3"><p className="text-[8px] font-black uppercase tracking-widest text-red-300">Damage inflicted</p><p className="mt-1 font-serif text-3xl font-black leading-none">{edition.crown.pts} PTS</p></div>
+        <div className="mt-3 grid grid-cols-[1.75fr_.8fr] gap-2 text-left">
+          <figure className="relative min-h-[210px] overflow-hidden border-[3px] border-stone-950 bg-stone-900 sm:min-h-[290px]">
+            <Image
+              src={edition.sportId === "nfl" ? "/skins/nfl-sunday/gazette-mobile.webp" : "/skins/cfb-situation/hero.webp"}
+              alt="War Room game-day command center"
+              fill
+              priority
+              className="object-cover object-top saturate-125 contrast-110"
+            />
+            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/80 to-transparent px-2 pb-2 pt-10 text-white">
+              <p className="text-[8px] font-black uppercase tracking-[.15em] text-amber-300">Exclusive · Dispatch photo desk</p>
+              <p className="mt-1 text-[9px] font-bold leading-tight">The room reviews the wreckage after another card reached final status. Nobody has accepted responsibility.</p>
+            </div>
+          </figure>
+          <aside className="grid content-start gap-2">
+            <div className="border-[3px] border-stone-950 bg-amber-300 p-2 text-stone-950">
+              <p className="text-[7px] font-black uppercase tracking-widest">Player of the week</p>
+              <p className="mt-1 font-serif text-[17px] font-black uppercase leading-[.9]">{edition.crown.names.join(" · ")}</p>
+              <p className="mt-2 text-[8px] font-bold leading-tight">Sources say the statue request is already with zoning.</p>
+            </div>
+            <div className="border-[3px] border-stone-950 bg-red-700 p-2 text-white">
+              <p className="text-[7px] font-black uppercase tracking-widest text-red-100">Points confirmed</p>
+              <p className="mt-1 font-serif text-[30px] font-black leading-none">{edition.crown.pts}</p>
+              <p className="text-[8px] font-black uppercase">Damage report</p>
+            </div>
+            <div className="border-[3px] border-stone-950 bg-emerald-800 p-2 text-white">
+              <p className="text-[7px] font-black uppercase tracking-widest text-emerald-100">Power index</p>
+              {[edition.crown, edition.swing, edition.rivalryWatch].filter(Boolean).slice(0, 3).map((story, index) => (
+                <p key={index} className="mt-1 border-t border-white/35 pt-1 text-[8px] font-black uppercase leading-tight"><span className="mr-1 text-amber-300">{index + 1}</span>{story?.names.join(" / ")}</p>
+              ))}
+            </div>
+          </aside>
         </div>
       </article>
 
-      <div className="grid grid-cols-1 border-b-[5px] border-double border-stone-950 sm:grid-cols-[1.45fr_.75fr]">
-        <article className="border-b border-stone-800 py-3 sm:border-b-0 sm:border-r sm:pr-3">
+      <div className="grid grid-cols-[1.45fr_.75fr] border-b-[5px] border-double border-stone-950">
+        <article className="border-r border-stone-800 py-3 pr-2">
           <p className="text-[9px] font-black uppercase tracking-[.18em] text-red-800">{lead?.kicker || "Room desk"} · Above the fold</p>
           <h3 className="mt-1 font-serif text-[26px] font-black uppercase leading-[.94] tracking-[-.025em]">{lead?.headline || "THE ROOM SURVIVED ANOTHER WEEK"}</h3>
           <p className="mt-2 text-[13px] leading-[1.35] text-stone-800 first-letter:float-left first-letter:mr-1 first-letter:font-serif first-letter:text-4xl first-letter:font-black first-letter:leading-[.8]">{lead?.body || "The official record is still being assembled. The Locker Room has already reached several conclusions."}</p>
         </article>
-        <aside className="py-3 sm:pl-3">
-          <p className="text-[8px] font-black uppercase tracking-[.18em] text-stone-600">Wall of shame</p>
+        <aside className="bg-fuchsia-100/70 py-3 pl-2">
+          <p className="bg-fuchsia-800 px-1 py-0.5 text-[7px] font-black uppercase tracking-[.14em] text-white">Wall of shame</p>
           <h3 className="mt-1 font-serif text-xl font-black uppercase leading-[.95]">{edition.shame?.headline || "DIGNITY ESCAPES UNHARMED"}</h3>
           <p className="mt-2 text-[11px] leading-snug text-stone-700">{edition.shame?.deck || edition.weather.body}</p>
         </aside>

@@ -2,8 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 
-const DISABLED_KEY = "warroom-season-opening-disabled";
-const SEEN_THIS_SESSION_KEY = "warroom-season-opening-seen";
 const EXIT_MS = 700;
 
 export default function SeasonOpening() {
@@ -18,24 +16,8 @@ export default function SeasonOpening() {
   const [muted, setMuted] = useState(true);
 
   useEffect(() => {
-    let shouldShow = false;
-    try {
-      const reducedMotion = window.matchMedia(
-        "(prefers-reduced-motion: reduce)"
-      ).matches;
-      shouldShow =
-        !reducedMotion &&
-        localStorage.getItem(DISABLED_KEY) !== "1" &&
-        sessionStorage.getItem(SEEN_THIS_SESSION_KEY) !== "1";
-      if (shouldShow) {
-        sessionStorage.setItem(SEEN_THIS_SESSION_KEY, "1");
-      }
-    } catch {
-      // Storage or media-query failures must never block Home.
-      shouldShow = false;
-    }
-
-    if (!shouldShow) setVisible(false);
+    // Product rule: the opening runs on every fresh app/Home mount. Nothing is
+    // remembered between visits; Skip Intro dismisses only this playback.
   }, []);
 
   useEffect(() => {
@@ -76,15 +58,6 @@ export default function SeasonOpening() {
     if (exiting) return;
     setExiting(true);
     exitTimerRef.current = setTimeout(() => setVisible(false), EXIT_MS);
-  }
-
-  function disableOpening() {
-    try {
-      localStorage.setItem(DISABLED_KEY, "1");
-    } catch {
-      /* Dismiss even when browser storage is unavailable. */
-    }
-    dismiss();
   }
 
   function enableSound() {
@@ -130,7 +103,16 @@ export default function SeasonOpening() {
         onError={() => setVisible(false)}
       />
 
-      <div className="absolute inset-x-0 bottom-[max(1.25rem,env(safe-area-inset-bottom))] flex items-center justify-center gap-2 px-4">
+      <button
+        type="button"
+        onClick={dismiss}
+        aria-label="Skip the opening video this time"
+        className="absolute right-4 top-[max(1rem,env(safe-area-inset-top))] z-10 min-h-[46px] rounded-full border-2 border-white/70 bg-black/75 px-5 text-xs font-black uppercase tracking-[0.14em] text-white shadow-lg backdrop-blur-md active:scale-[0.98]"
+      >
+        Skip intro →
+      </button>
+
+      <div className="absolute inset-x-0 bottom-[max(1.25rem,env(safe-area-inset-bottom))] flex items-center justify-center px-4">
         {muted && (
           <button
             type="button"
@@ -140,20 +122,6 @@ export default function SeasonOpening() {
             Tap for sound
           </button>
         )}
-        <button
-          type="button"
-          onClick={dismiss}
-          className="min-h-[44px] rounded-full border border-white/35 bg-black/55 px-4 text-xs font-bold uppercase tracking-[0.12em] text-white backdrop-blur-md"
-        >
-          Skip
-        </button>
-        <button
-          type="button"
-          onClick={disableOpening}
-          className="min-h-[44px] rounded-full border border-white/35 bg-black/55 px-4 text-xs font-bold uppercase tracking-[0.12em] text-white backdrop-blur-md"
-        >
-          Don&apos;t show again
-        </button>
       </div>
     </section>
   );

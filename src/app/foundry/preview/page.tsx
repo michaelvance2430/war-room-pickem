@@ -88,12 +88,12 @@ export default function FoundryPreviewPage() {
           : simulateFoundrySeason(state);
       update(next);
       setSimulation(null);
-      setGazetteWeek(simulation.kind === "week" && state.week >= 1 ? state.week : next.gazetteWeeks[next.gazetteWeeks.length - 1] || null);
+      setGazetteWeek(simulation.kind === "week" ? state.week : next.gazetteWeeks.at(-1) ?? null);
       // The finale belongs to the championship result, regardless of whether
       // Mike arrived one week at a time or used Sim Season.
       if (isFoundrySeasonFinal(next)) setRingCeremony(next);
       const cfbPhaseThreeOpened = simulation.kind === "week" && next.sport === "cfb" && next.week === foundryPostseasonStartWeek("cfb") + 1;
-      setView(cfbPhaseThreeOpened ? "postseason" : simulation.kind === "week" && state.week >= 1 ? "gazette" : "home");
+      setView(cfbPhaseThreeOpened ? "postseason" : simulation.kind === "week" ? "gazette" : "home");
     }, simulation.step === 0 ? 500 : 850);
     return () => window.clearTimeout(timer);
   }, [simulation, state]);
@@ -152,7 +152,7 @@ function Home({ state, go, onUpdate }: { state: FoundryWalkthrough; go: (v: View
   if (state.sport === "cbb" && state.week >= foundryPostseasonStartWeek("cbb")) return <div className="space-y-4"><FoundrySeasonCommand state={state}/><section className="grid grid-cols-2 gap-3"><Stat label="Final regular rank" value={`#${rank}`} note={`${me.points} season points`}/><Stat label="Season status" value="PHASE III" note="Fieldhouse postseason"/></section><p className="rounded-xl border border-orange-300/25 bg-orange-950/20 px-3 py-2 text-center text-[9px] font-bold text-orange-200">PHASE I · CONFERENCE SEASON → PHASE II · CONFERENCE TOURNAMENTS COMPLETE → PHASE III · MARCH MADNESS</p><Page title="March Madness Command Center" note="Your national bracket opens clean. Hellfire remains available before the first human pick."><NcaaBracketPicker state={state} onUpdate={onUpdate} /></Page></div>;
   return <div className="space-y-3"><FoundrySeasonCommand state={state}/><section className="rounded-2xl border border-primary/35 bg-card p-5"><p className="text-[10px] font-black uppercase tracking-[.2em] text-primary">{meta.cadence} · card open</p><h2 className="mt-2 text-3xl font-black">{meta.weekLabel(state.week)}</h2><p className="mt-2 text-sm text-muted">Five games. Confidence 5 through 1. Lock before the first game begins.</p><button onClick={() => go("picks")} className="mt-4 min-h-12 w-full rounded-xl bg-primary text-sm font-black text-black">Open My Picks</button></section>
     <div className="grid grid-cols-2 gap-3"><Stat label="Your rank" value={`#${rank}`} note={`${me.points} season points`} /><Stat label="This week" value={`${me.weekPoints} pts`} note={`${me.correct} correct`} /></div>
-    <button onClick={() => go("gazette")} className="w-full rounded-2xl border border-stone-500 bg-[#eee8da] p-4 text-left text-stone-900"><p className="text-[9px] font-black uppercase tracking-[.2em] text-red-800">{state.gazetteWeeks.length ? `${state.gazetteWeeks.length} archived edition${state.gazetteWeeks.length === 1 ? "" : "s"}` : "After Week 1 is scored"}</p><strong className="mt-1 block font-serif text-xl">The War Room Dispatch</strong><span className="text-xs">{state.gazetteWeeks.length ? "Tap a week in the archive to read that edition." : "The first Dispatch drops as Week 2 opens."}</span></button>
+    <button onClick={() => go("gazette")} className="w-full rounded-2xl border border-stone-500 bg-[#eee8da] p-4 text-left text-stone-900"><p className="text-[9px] font-black uppercase tracking-[.2em] text-red-800">{state.gazetteWeeks.length ? `${state.gazetteWeeks.length} archived edition${state.gazetteWeeks.length === 1 ? "" : "s"}` : "Publishes after the opening score"}</p><strong className="mt-1 block font-serif text-xl">The War Room Dispatch</strong><span className="text-xs">{state.gazetteWeeks.length ? "Tap a week in the archive to read that edition." : "The first scored card immediately becomes the first Dispatch."}</span></button>
     <section className="rounded-2xl border border-border bg-card p-4"><h3 className="font-black">Room pulse</h3><div className="mt-3 space-y-2">{state.players.slice(0, 3).map((p, i) => <div key={p.id} className="flex items-center justify-between text-sm"><span>{i + 1}. {p.name}</span><strong>{p.points}</strong></div>)}</div><button onClick={() => go("standings")} className="mt-3 text-xs font-bold text-primary">Full standings →</button></section></div>;
 }
 
@@ -362,9 +362,9 @@ function BracketRound({ label, pairs, completed, muted }: { label: string; pairs
 
 function Gazette({ state, selectedWeek, onSelectWeek }: { state: FoundryWalkthrough; selectedWeek: number | null; onSelectWeek: (week: number) => void }) {
   const weeks = state.gazetteWeeks || [];
-  const active = selectedWeek && weeks.includes(selectedWeek) ? selectedWeek : weeks[weeks.length - 1] || null;
-  if (!active) return <Page title="Dispatch Archive" note="The first issue covers Week 1 and drops as Week 2 opens."><div className="rounded-2xl border border-dashed border-border bg-card p-6 text-center"><h3 className="font-black">The presses are quiet</h3><p className="mt-2 text-xs text-muted">Score Week 1 to publish the first Dispatch.</p></div></Page>;
-  const raw = buildFoundryGazetteFixture(((active - 1) % 18) + 1, state.generatedAt + active * 1000);
+  const active = selectedWeek !== null && weeks.includes(selectedWeek) ? selectedWeek : weeks.at(-1) ?? null;
+  if (active === null) return <Page title="Dispatch Archive" note="The first scored card publishes immediately."><div className="rounded-2xl border border-dashed border-border bg-card p-6 text-center"><h3 className="font-black">The presses are quiet</h3><p className="mt-2 text-xs text-muted">Score the opening card to publish the first Dispatch.</p></div></Page>;
+  const raw = buildFoundryGazetteFixture((active % 18) + 1, state.generatedAt + active * 1000);
   let nflJdamAuthorized = false;
   let cfbDeadHandAuthorized = false;
   if (state.sport === "cfb" && typeof window !== "undefined") {

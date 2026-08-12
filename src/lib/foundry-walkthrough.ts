@@ -194,10 +194,8 @@ export function simulateNextFoundryWeek(state: FoundryWalkthrough): FoundryWalkt
     const priorMadnessPoints = ncaaScore(bracket, state.ncaaResults || {});
     return { ...player, madnessPoints, madnessWindowPoints: madnessPoints - priorMadnessPoints, points: player.points + madnessPoints };
   }).sort((a, b) => b.points - a.points);
-  const publishableWeeks = state.week >= 1
-    ? [...(state.gazetteWeeks || []), state.week]
-    : state.gazetteWeeks || [];
-  return { ...next, players, gazetteWeeks: Array.from(new Set(publishableWeeks)).sort((a, b) => a - b), ncaaPicks: state.ncaaPicks || {}, ncaaResults, ncaaBracketLocked: state.ncaaBracketLocked, preseasonChampionPicks: state.preseasonChampionPicks || {}, postseasonFields: state.postseasonFields, tacticalNukeWeeks: state.tacticalNukeWeeks || [], tacticalNukeActive: false, mapsEvent: state.mapsEvent || null, unreadGazette: state.week >= 1 };
+  const publishableWeeks = [...(state.gazetteWeeks || []), state.week];
+  return { ...next, players, gazetteWeeks: Array.from(new Set(publishableWeeks)).sort((a, b) => a - b), ncaaPicks: state.ncaaPicks || {}, ncaaResults, ncaaBracketLocked: state.ncaaBracketLocked, preseasonChampionPicks: state.preseasonChampionPicks || {}, postseasonFields: state.postseasonFields, tacticalNukeWeeks: state.tacticalNukeWeeks || [], tacticalNukeActive: false, mapsEvent: state.mapsEvent || null, unreadGazette: true };
 }
 
 export function simulateFoundrySeason(state: FoundryWalkthrough): FoundryWalkthrough {

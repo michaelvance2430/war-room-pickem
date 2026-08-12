@@ -557,7 +557,7 @@ function buildCfbInauguralLockedCopy(ctx: CopyCtx): WeeklyColdOpenCopy {
     cartonBanner: bits.cartonBanner,
     sportTag: bits.sportTag,
     foot:
-      "One-time CFB preseason drop — the week before Week 0. Heat first. Saturdays next. After Week 1 is scored, The Dispatch drops as Week 2 opens with crowns, shame, and receipts.",
+      "One-time CFB preseason drop — the week before Week 0. Heat first. Saturdays next. The first scored card immediately publishes The Dispatch with crowns, shame, and receipts.",
     packId: CFB_INAUGURAL_COLD_OPEN_PACK_ID,
     editionLine: `Once per season · week before Week 0 · ${ctx.year} CFB champ · ${ctx.room} · inaugural (locked) · competition brewing`,
   };

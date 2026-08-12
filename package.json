@@ -33,6 +33,7 @@
     "verify:foundry-owner": "node scripts/verify-foundry-owner-perimeter.mjs",
     "verify:foundry-eyes": "node scripts/verify-foundry-eyes-clean.mjs",
     "verify:dispatch": "node --import tsx scripts/verify-dispatch-contract.mjs",
+    "verify:season-opening": "node scripts/verify-season-opening-controls.mjs",
     "verify:native-readiness": "node scripts/verify-native-readiness.mjs",
     "verify:account-lifecycle": "node scripts/verify-account-lifecycle.mjs && node scripts/verify-account-deletion-ui.mjs",
     "verify:crew-continuity": "node --import tsx scripts/verify-crew-continuity.mjs",

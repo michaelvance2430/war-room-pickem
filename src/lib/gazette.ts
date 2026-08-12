@@ -972,9 +972,8 @@ export async function buildGazetteEdition(
 
   const weekIndex = data.weekIndex;
   const currentSportId = getLeague()?.sportId || "cfb";
-  // Opening rhythm: Week 0 is preseason/setup material. The first real
-  // Dispatch covers Week 1 and drops as Week 2 opens.
-  if (currentSportId !== "soccer_wwc" && weekIndex < 1) return null;
+  // Every scored card earns a Dispatch immediately. This includes CFB Week 0:
+  // a one-week player still gets the complete picks → results → story loop.
   const weekLabel = weekTitle(weekIndex, currentSportId);
   const range =
     currentSportId === "cfb" || currentSportId === "nfl"
@@ -2035,10 +2034,6 @@ export async function shouldOfferGazette(
 
   const edition = await buildGazetteEdition(players);
   if (!edition) return { show: false };
-  if (edition.sportId !== "soccer_wwc" && edition.weekIndex < 1) {
-    return { show: false };
-  }
-
   if (hasSeenGazette(session.leagueId, edition.weekIndex)) {
     return { show: false };
   }
@@ -2062,11 +2057,7 @@ export type ArchivedGazette = {
 export async function archiveGazetteEdition(
   edition: GazetteEdition
 ): Promise<{ ok: boolean; error?: string }> {
-  // No preseason paper. The first archived Dispatch is Week 1 and becomes
-  // visible as Week 2 opens.
-  if (edition.sportId !== "soccer_wwc" && edition.weekIndex < 1) {
-    return { ok: true };
-  }
+  // Every official scored card is publishable, including CFB Week 0.
   const session = getSession();
   // Deputies scoring a week should also archive the paper
   if (
