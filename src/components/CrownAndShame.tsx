@@ -185,7 +185,7 @@ export default function CrownAndShame({
       <div className="px-4 py-2 border-t border-border bg-card/50 text-[11px] text-muted flex flex-wrap justify-between gap-2">
         <span>Latest scored week · older covers in the archive</span>
         <span className="flex gap-3">
-          <Link href="/gazette" className="text-primary hover:underline">
+          <Link href="/dispatch" className="text-primary hover:underline">
             Gazette →
           </Link>
           <Link href="/board" className="text-primary hover:underline">

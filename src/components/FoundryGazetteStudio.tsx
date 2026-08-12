@@ -112,14 +112,14 @@ export default function FoundryGazetteStudio() {
       const result = await loadGazetteArchive();
       if (!result.ok) {
         setEditions([]);
-        setError(result.error || "Could not load Gazette archive");
+        setError(result.error || "Could not load Dispatch archive");
       } else {
         setEditions(result.editions || []);
         setSelected(0);
       }
     } catch (cause) {
       setEditions([]);
-      setError(cause instanceof Error ? cause.message : "Could not load Gazette archive");
+      setError(cause instanceof Error ? cause.message : "Could not load Dispatch archive");
     } finally {
       setLoading(false);
     }
@@ -162,7 +162,7 @@ export default function FoundryGazetteStudio() {
           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-red-300">
             Foundry Studio · Flagship experience
           </p>
-          <h3 className="mt-1 text-lg font-black">Gazette proof bench</h3>
+          <h3 className="mt-1 text-lg font-black">Dispatch proof bench</h3>
           <p className="mt-1 text-[11px] leading-relaxed text-muted">
             Two lanes, one production reader: 18 fictional editorial stress tests plus archived
             real-edition proof. Neither preview writes scores, profiles, trophies, or Gazette rows.

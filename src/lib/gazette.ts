@@ -4,6 +4,7 @@ import {
   weekCrownAndShame,
 } from "./fun-board";
 import { weekTitle } from "./dates";
+import { weekDateRangeLabel } from "./season-calendar";
 import { getSession, getLeague } from "./league";
 import { hasSeenRules } from "./rules";
 import { createClient } from "@/lib/supabase/client";
@@ -57,6 +58,8 @@ export type GazetteEdition = {
   weekIndex: number;
   weekLabel: string;
   volumeLabel: string;
+  /** Real calendar window covered by this issue. */
+  coverageLine?: string;
   /** Best week card (single name — weekly multi-ties pick one, no “deadlock” copy). */
   crown: GazetteStory;
   /** Worst week card (single name). */
@@ -318,13 +321,13 @@ export function gazetteAnticipationCopy(): {
   }
   if (day === 0 || day === 1) {
     return {
-      title: "The paper is almost here",
-      body: "When the commish scores this week, the Sunday / Monday Gazette drops — crowns, shame, fake news, the works.",
+        title: "The Dispatch is almost here",
+        body: "When the commish scores this week, The Dispatch drops — crowns, shame, fake news, the works.",
       ritualHint: ritualEditionName(),
     };
   }
   return {
-    title: "Save room for the Gazette",
+    title: "Save room for The Dispatch",
     body: "After scores post, the room gets a full paper. It’s the weekly appointment — don’t miss the splash.",
     ritualHint: "Weekly paper",
   };
@@ -968,7 +971,16 @@ export async function buildGazetteEdition(
   if (withPts.length < 2) return null;
 
   const weekIndex = data.weekIndex;
-  const weekLabel = weekTitle(weekIndex);
+  const currentSportId = getLeague()?.sportId || "cfb";
+  // Opening rhythm: Week 0 is preseason/setup material. The first real
+  // Dispatch covers Week 1 and drops as Week 2 opens.
+  if (currentSportId !== "soccer_wwc" && weekIndex < 1) return null;
+  const weekLabel = weekTitle(weekIndex, currentSportId);
+  const range =
+    currentSportId === "cfb" || currentSportId === "nfl"
+      ? weekDateRangeLabel(weekIndex, currentSportId)
+      : "";
+  const coverageLine = range ? `Coverage: ${range}` : `Coverage: ${weekLabel}`;
   const eggs = eggFields(weekIndex);
 
   const cn = data.crown.player.name;
@@ -1336,7 +1348,8 @@ export async function buildGazetteEdition(
       weekIndex,
       weekLabel,
       volumeLabel: `Sunday Edition · Vol. ${weekIndex + 1} · ${weekLabel} · ${year}`,
-      masthead: "THE WAR ROOM · SUNDAY",
+      coverageLine,
+      masthead: "THE WAR ROOM DISPATCH",
       ritualName,
       tagline,
       printedLine,
@@ -1421,7 +1434,8 @@ export async function buildGazetteEdition(
       weekIndex,
       weekLabel,
       volumeLabel: `WORLD CUP EDITION · Matchday ${weekIndex + 1} · ${weekLabel} · Brazil 2027`,
-      masthead: "WORLD CUP EDITION",
+      coverageLine,
+      masthead: "THE WAR ROOM DISPATCH · WORLD CUP",
       ritualName,
       tagline,
       printedLine,
@@ -1492,7 +1506,8 @@ export async function buildGazetteEdition(
     volumeLabel: conferenceChampions?.length
       ? `CONFERENCE CHAMPS EXTRA · Vol. ${weekIndex + 1} · ${weekLabel} · ${year}`
       : `${ritualName} · Vol. ${weekIndex + 1} · ${weekLabel} · ${year}`,
-    masthead: "THE WAR ROOM GAZETTE",
+    masthead: "THE WAR ROOM DISPATCH",
+    coverageLine,
     ritualName,
     tagline: conferenceChampions?.length
       ? "CONFERENCE TITLE NIGHT · the paper that yells in all caps (affectionately)"
@@ -2020,6 +2035,9 @@ export async function shouldOfferGazette(
 
   const edition = await buildGazetteEdition(players);
   if (!edition) return { show: false };
+  if (edition.sportId !== "soccer_wwc" && edition.weekIndex < 1) {
+    return { show: false };
+  }
 
   if (hasSeenGazette(session.leagueId, edition.weekIndex)) {
     return { show: false };
@@ -2044,6 +2062,11 @@ export type ArchivedGazette = {
 export async function archiveGazetteEdition(
   edition: GazetteEdition
 ): Promise<{ ok: boolean; error?: string }> {
+  // No preseason paper. The first archived Dispatch is Week 1 and becomes
+  // visible as Week 2 opens.
+  if (edition.sportId !== "soccer_wwc" && edition.weekIndex < 1) {
+    return { ok: true };
+  }
   const session = getSession();
   // Deputies scoring a week should also archive the paper
   if (
@@ -2126,7 +2149,16 @@ export async function loadGazetteArchive(): Promise<{
           payload.volumeLabel ||
           (r.volume_label as string) ||
           `Vol. ${weekNumber}`,
-        masthead: payload.masthead || "THE WAR ROOM GAZETTE",
+        masthead: (payload.masthead || "THE WAR ROOM DISPATCH").replace(/GAZETTE/gi, "DISPATCH"),
+        coverageLine:
+          payload.coverageLine ||
+          (() => {
+            const range =
+              payload.sportId === "cfb" || payload.sportId === "nfl"
+                ? weekDateRangeLabel(weekNumber, payload.sportId)
+                : "";
+            return range ? `Coverage: ${range}` : `Coverage: ${weekTitle(weekNumber, payload.sportId)}`;
+          })(),
       },
       createdAt: (r.created_at as string) || new Date().toISOString(),
     };
@@ -2149,8 +2181,13 @@ export async function snapshotGazetteAfterScore(
     // Prefer explicit week when re-scoring a specific card
     if (weekNumber != null && Number.isFinite(weekNumber)) {
       edition.weekIndex = weekNumber;
-      edition.weekLabel = weekTitle(weekNumber);
+      edition.weekLabel = weekTitle(weekNumber, edition.sportId);
       edition.volumeLabel = `Vol. ${weekNumber} · ${edition.weekLabel}`;
+      const range =
+        edition.sportId === "cfb" || edition.sportId === "nfl"
+          ? weekDateRangeLabel(weekNumber, edition.sportId)
+          : "";
+      edition.coverageLine = range ? `Coverage: ${range}` : `Coverage: ${edition.weekLabel}`;
     }
     await archiveGazetteEdition(edition);
   } catch {

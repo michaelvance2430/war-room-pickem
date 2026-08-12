@@ -137,7 +137,7 @@ export default function HomeGazetteSpotlight() {
               sass — Brazil 2027 on the masthead.
             </p>
             <Link
-              href="/gazette"
+              href="/dispatch"
               className="mt-4 flex items-center justify-center w-full py-3.5 min-h-[52px] rounded-xl text-base font-extrabold touch-manipulation active:scale-[0.99] shadow-lg text-white"
               style={{ backgroundColor: "#009C3B" }}
             >
@@ -175,7 +175,7 @@ export default function HomeGazetteSpotlight() {
             filed. This is what the room opens for on Sunday and Monday.
           </p>
           <Link
-            href="/gazette"
+            href="/dispatch"
             className="mt-4 flex items-center justify-center w-full py-3.5 min-h-[52px] rounded-xl bg-red-600 hover:bg-red-500 text-white text-base font-extrabold touch-manipulation active:scale-[0.99] shadow-lg"
           >
             Read the paper →
@@ -204,7 +204,7 @@ export default function HomeGazetteSpotlight() {
           </h2>
           <p className="text-sm text-muted mt-1 leading-relaxed">{mode.body}</p>
           <Link
-            href="/gazette"
+            href="/dispatch"
             className="inline-flex mt-2 text-xs font-semibold text-primary min-h-[40px] items-center"
           >
             Past editions →

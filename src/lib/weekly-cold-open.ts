@@ -39,11 +39,11 @@ const PACK_MEMORY_KEY = "warroom-cold-open-pack-memory-v1";
 /** Shared brand with GazettePaper / buildGazetteEdition */
 export const GAZETTE_STATION = {
   callSign: "WRG",
-  masthead: "THE WAR ROOM GAZETTE",
+  masthead: "THE WAR ROOM DISPATCH",
   tagline: "All the news that's fit to roast",
-  network: "Gazette Network",
+  network: "Dispatch Network",
   desk: "Investigative Desk",
-  bugLabel: "GAZETTE · LIVE",
+  bugLabel: "DISPATCH · LIVE",
 } as const;
 
 /** Foundry / creator: open broadcast without leaving the page. */
@@ -337,7 +337,7 @@ const HEADLINE_BANK: ((c: CopyCtx) => string)[] = [
 
 const BODY_BANK: ((c: CopyCtx) => string)[] = [
   (c) =>
-    `Gazette Network has it on the record: ${c.nameCall} is a known time traveler. ` +
+    `Dispatch Network has it on the record: ${c.nameCall} is a known time traveler. ` +
     `Room veterans have long whispered that the reigning champ (${c.year} ${c.hardware}) ` +
     `somehow always knows next week’s scores before the rest of us lock. ` +
     `Some even say a cheat. Investigative Desk has not recovered a DeLorean — ` +
@@ -372,7 +372,7 @@ const BODY_BANK: ((c: CopyCtx) => string)[] = [
     `Reward for unseating them: eternal bragging rights and a new face on next year’s carton. ` +
     `Excitement is not optional. Competition is the product.`,
   (c) =>
-    `Gazette Network special: the week before ${c.dayLabel}, we put the champ on blast. ` +
+    `Dispatch Network special: the week before ${c.dayLabel}, we put the champ on blast. ` +
     `${c.nameCall} is the defending ${c.hardwareShort} holder. ` +
     `That is not a compliment — it’s a bounty notice. ` +
     `The field is deep. The juice is live. The target is public. ` +
@@ -410,7 +410,7 @@ const KALSHI_BANK: ((c: CopyCtx) => string)[] = [
   (c) =>
     `Prediction markets buried ${c.name}. History says champs get hunted. Math says the field is deep. Drama says load your card.`,
   (c) =>
-    `Kalshi: ${c.name} ❌ this year. Gazette: face on the carton anyway — because nothing fuels a room like a public fade.`,
+    `Kalshi: ${c.name} ❌ this year. Dispatch: face on the carton anyway — because nothing fuels a room like a public fade.`,
   (c) =>
     `Oddsmakers say ${c.name} is not the pick. The carton stays up. Hope is not a strategy. Locking is.`,
   (c) =>
@@ -432,7 +432,7 @@ const EDITION_BANK: ((c: CopyCtx) => string)[] = [
   (c) =>
     `Preseason exclusive · ${c.room} · the hunt is the product`,
   (c) =>
-    `Gazette carton drop · one view · then the season eats the evidence`,
+    `Dispatch carton drop · one view · then the season eats the evidence`,
   (c) =>
     `${c.dayLabel} approaches · ${c.name} on notice · you on notice too`,
   (c) =>
@@ -451,7 +451,7 @@ const FOOT_BANK: ((c: CopyCtx) => string)[] = [
       ? "Preseason only. No weekly reruns. Different room, different year, same hunger — take the Super Bowl energy back."
       : "Preseason only. No weekly reruns. Different room, different year, same hunger — take the crystal back.",
   () =>
-    "You get one look. Then it’s confidence points and bad intentions. The Gazette will be back with the scoreboard.",
+    "You get one look. Then it’s confidence points and bad intentions. The Dispatch will be back with the scoreboard.",
 ];
 
 /**
@@ -539,7 +539,7 @@ function buildCfbInauguralLockedCopy(ctx: CopyCtx): WeeklyColdOpenCopy {
     headline: `${ctx.name}: known time traveler — some even say a cheat`,
     phonetic: champPhonetic(ctx.name, "cfb"),
     body:
-      `Gazette Network has it on the record: ${nameCall} is a known time traveler. ` +
+      `Dispatch Network has it on the record: ${nameCall} is a known time traveler. ` +
       `Room veterans have long whispered that the reigning CFB champ (${ctx.year} ${bits.hardware}) ` +
       `somehow always knows next Saturday’s scores before the rest of us lock. ` +
       `Some even say a cheat. Investigative Desk has not recovered a DeLorean — ` +
@@ -552,12 +552,12 @@ function buildCfbInauguralLockedCopy(ctx: CopyCtx): WeeklyColdOpenCopy {
     kalshi:
       `Kalshi odds have ${ctx.name} definitely not winning this CFB season. Markets price the time-travel edge as spent. The board is open — the field is hungry — the tape says the hunt is on.`,
     cta: "I'm hunting — open the room",
-    ctaGazette: "Open the Gazette",
+    ctaGazette: "Open The Dispatch",
     hardwareLabel: bits.hardwareLabel,
     cartonBanner: bits.cartonBanner,
     sportTag: bits.sportTag,
     foot:
-      "One-time CFB preseason drop — the week before Week 0. Heat first. Saturdays next. When the commish scores, the full Gazette drops with crowns, shame, and receipts.",
+      "One-time CFB preseason drop — the week before Week 0. Heat first. Saturdays next. After Week 1 is scored, The Dispatch drops as Week 2 opens with crowns, shame, and receipts.",
     packId: CFB_INAUGURAL_COLD_OPEN_PACK_ID,
     editionLine: `Once per season · week before Week 0 · ${ctx.year} CFB champ · ${ctx.room} · inaugural (locked) · competition brewing`,
   };
@@ -666,7 +666,7 @@ export function getWeeklyColdOpenCopy(
     body,
     kalshi: KALSHI_BANK[ki]!(ctx),
     cta: CTA_BANK[ci]!,
-    ctaGazette: "Open the Gazette",
+    ctaGazette: "Open The Dispatch",
     hardwareLabel: bits.hardwareLabel,
     cartonBanner: bits.cartonBanner,
     sportTag: bits.sportTag,

@@ -267,13 +267,13 @@ function buildGazetteTease(
   if (totalPoints >= 12) {
     return {
       gazetteHeadline: `SOLID CARD: ${name} IN THE MIX (BARELY FAMOUS)`,
-      gazetteDeck: `${totalPoints} pts · ${correctCount}/${games}. Real Gazette drops after the commish scores — same vibe, meaner nicknames.`,
+      gazetteDeck: `${totalPoints} pts · ${correctCount}/${games}. The real Dispatch drops after the commish scores — same vibe, meaner nicknames.`,
       boardTease: `Roughly #${botRank} of ${botField} on a fake field. Live Board updates when results post.`,
     };
   }
   return {
     gazetteHeadline: `WEEKLY PAPER: PRACTICE EDITION (NOBODY CARED)`,
-    gazetteDeck: `${totalPoints} pts locked in. After a real week, Home lights up with Gazette, Board swings, and Locker trash.`,
+    gazetteDeck: `${totalPoints} pts locked in. After a real week, Home lights up with The Dispatch, Board swings, and Locker trash.`,
     boardTease: `Practice rank #${botRank} of ${botField}. Next real Monday you’ll open the paper — this one doesn’t count.`,
   };
 }

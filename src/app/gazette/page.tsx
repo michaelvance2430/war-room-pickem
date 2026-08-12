@@ -75,7 +75,7 @@ export default function GazetteArchivePage() {
             The weekly appointment
           </p>
       <h1 className="text-2xl sm:text-3xl font-black mt-0.5">
-            War Room Gazette
+            The War Room Dispatch
           </h1>
       <p className="text-sm text-muted mt-1.5 leading-relaxed">
             {leagueName ? `${leagueName} · ` : ""}
@@ -106,8 +106,8 @@ export default function GazetteArchivePage() {
             </p>
       <p className="font-bold text-lg mb-1">No paper yet</p>
       <p className="text-sm text-muted max-w-sm mx-auto leading-relaxed">
-              When the commish scores a week, the Gazette drops here — the Sunday /
-              Monday appointment the room waits for. Lock picks. Wait for blood.
+              Week 1 writes the first issue. The Dispatch drops as Week 2 opens,
+              then returns after every scored card. Lock picks. Wait for blood.
               Come back.
             </p>
       </div>

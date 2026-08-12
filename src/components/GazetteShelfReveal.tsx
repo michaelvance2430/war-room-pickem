@@ -73,13 +73,13 @@ export default function GazetteShelfReveal() {
             id="gazette-shelf-title"
             className="text-lg font-extrabold text-white mt-0.5"
           >
-            Every week has a paper now
+            The Dispatch is now on the stand
           </h2>
         </div>
         <div className="px-5 py-4 space-y-3 text-sm text-muted leading-relaxed">
           <p>
             Every week when games die, the{" "}
-            <strong className="text-foreground">Gazette</strong> still drops —
+            <strong className="text-foreground">The Dispatch</strong> drops —
             crown, shame, movers, the whole roast.
           </p>
           <p>
@@ -87,7 +87,7 @@ export default function GazetteShelfReveal() {
             <strong className="text-foreground">
               every week&apos;s paper for the season
             </strong>{" "}
-            under <strong className="text-foreground">Gazette</strong> in the
+            under <strong className="text-foreground">The Dispatch</strong> in the
             nav (and on Home). Old headlines stay put.
           </p>
           <p className="text-xs text-muted">
@@ -97,7 +97,7 @@ export default function GazetteShelfReveal() {
         </div>
         <div className="px-5 pb-5 flex flex-col sm:flex-row gap-2">
           <Link
-            href="/gazette"
+            href="/dispatch"
             onClick={dismiss}
             className="flex-1 text-center py-3 min-h-[48px] rounded-xl bg-red-700 text-white font-bold text-sm hover:bg-red-600"
           >

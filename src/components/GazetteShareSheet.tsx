@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Share this Gazette edition — newspaper image + FB/IG/chat flex.
+ * Share this Dispatch edition — newspaper image + FB/IG/chat flex.
  */
 
 import { useEffect, useMemo, useState } from "react";
@@ -125,7 +125,7 @@ export default function GazetteShareSheet({ edition, open, onClose }: Props) {
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={previewUrl}
-                alt="Gazette share graphic"
+                alt="Dispatch share graphic"
                 className="w-full h-full object-cover"
               />
             ) : (

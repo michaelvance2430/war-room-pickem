@@ -59,7 +59,7 @@ export const DISCOVERY_CATALOG: DiscoveryDef[] = [
     id: "egg_anniversary",
     name: "One Year of Bad Picks",
     description: "You came back for another season of feelings.",
-    flavor: "Confetti. A Gazette that knew your name. No points. Just history.",
+    flavor: "Confetti. A Dispatch that knew your name. No points. Just history.",
     kind: "anniversary",
     icon: "🎉",
     stampLabel: "Year one",
@@ -86,7 +86,7 @@ export const DISCOVERY_CATALOG: DiscoveryDef[] = [
   {
     id: "egg_hidden_headline",
     name: "Ink Stain",
-    description: "You caught a Gazette that shouldn't exist.",
+    description: "You caught a Dispatch that shouldn't exist.",
     flavor: "Local Commissioner Still Blaming Referees — and worse.",
     kind: "hidden_headline",
     icon: "📰",
@@ -132,7 +132,7 @@ export const DISCOVERY_CATALOG: DiscoveryDef[] = [
     id: "egg_obsession",
     name: "Authorities Concerned",
     description: "365 consecutive days in the War Room.",
-    flavor: "Not a popup farm. A Gazette roast. Touch grass (optional).",
+    flavor: "Not a popup farm. A Dispatch roast. Touch grass (optional).",
     kind: "streak",
     icon: "🕵️",
     stampLabel: "Daily",
@@ -213,7 +213,7 @@ export const DISCOVERY_CATALOG: DiscoveryDef[] = [
     id: "egg_mascot_scout",
     name: "Mascot Spotter",
     description: "You found the helmet in the wild.",
-    flavor: "One week behind the Gazette. Another on the scoreboard.",
+    flavor: "One week behind The Dispatch. Another on the scoreboard.",
     kind: "mascot",
     icon: "🪖",
     stampLabel: "Sighting",
@@ -714,7 +714,7 @@ export function noteAppOpen(opts: {
     tryGrant("egg_christmas", {
       id: "egg_christmas",
       title: "Candy Cane Edition",
-      body: "Merry confidence. The Gazette got festive borders in spirit.",
+      body: "Merry confidence. The Dispatch got festive borders in spirit.",
       icon: "🎄",
       confetti: true,
     });
@@ -769,7 +769,7 @@ export function noteAppOpen(opts: {
           body:
             yrs >= 2
               ? `${Math.floor(yrs)} years in the War Room. Confetti. No points. Pure loyalty.`
-              : "One year. Confetti. The Gazette already wrote the headline.",
+              : "One year. Confetti. The Dispatch already wrote the headline.",
           icon: "🎉",
           confetti: true,
           homeHeadline: "ONE YEAR OF BAD PICKS.",
@@ -836,7 +836,7 @@ export function noteAppOpen(opts: {
     tryGrant("egg_obsession", {
       id: "egg_obsession",
       title: "Authorities Concerned About Obsession",
-      body: "365 consecutive days. The Gazette printed it. Touch grass optional.",
+      body: "365 consecutive days. The Dispatch printed it. Touch grass optional.",
       icon: "🕵️",
       gazetteHeadline: "Authorities Concerned About Obsession",
       gazetteDeck: "Subject has opened War Room every day for a year.",

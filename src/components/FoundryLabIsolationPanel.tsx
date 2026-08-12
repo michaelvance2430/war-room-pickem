@@ -84,7 +84,7 @@ export default function FoundryLabIsolationPanel() {
           onClick={async () => {
             if (!id) return;
             const proof = window.prompt(
-              `Mark “${name || "this room"}” as disposable LAB data?\n\nType LAB to allow simulations that write cards, picks, results, standings, bots, and Gazette history.`
+              `Mark “${name || "this room"}” as disposable LAB data?\n\nType LAB to allow simulations that write cards, picks, results, standings, bots, and Dispatch history.`
             );
             if (proof !== "LAB") {
               setNote("LAB mark cancelled. Type LAB exactly to arm simulations.");

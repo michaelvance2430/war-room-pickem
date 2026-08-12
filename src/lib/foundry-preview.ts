@@ -172,7 +172,7 @@ export async function prepareFoundryDramaAfterScore(
 
     return {
       ok: true,
-      message: "Drama unlocked — Gazette + cheevos can fire",
+      message: "Drama unlocked — The Dispatch + cheevos can fire",
     };
   } catch (e) {
     return {

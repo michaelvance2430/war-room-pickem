@@ -720,7 +720,7 @@ export default function AccountPage() {
 
           <div className="mt-5 pt-4 border-t border-border/60">
             <p className="text-xs text-muted mb-2 leading-relaxed">
-              Birthday (optional) — private. One quiet Gazette line if you open
+              Birthday (optional) — private. One quiet Dispatch line if you open
               the app that day.{" "}
               <strong className="text-foreground/90">
                 Hard lock after save
@@ -1550,7 +1550,7 @@ export default function AccountPage() {
             <span className="text-sm text-foreground">
       <span className="font-semibold">Show full room</span>
       <span className="block text-xs text-muted mt-0.5">
-                Gazette, News, trophies, stats — no progressive hide
+                The Dispatch, News, trophies, stats — no progressive hide
               </span>
       </span>
           </label>

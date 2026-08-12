@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Production Gazette reader.
+ * Production Dispatch reader.
  *
  * Body lock: named owner "gazette-reader" via acquireBodyLock so the global
  * orphan watchdog never force-unlocks mid-read (position:fixed is intentional).
@@ -316,7 +316,7 @@ export default function GazetteModal() {
     edition.weekLabel ||
     edition.printedLine ||
     edition.masthead ||
-    "War Room Gazette";
+    "The War Room Dispatch";
 
   return (
     <div
@@ -334,7 +334,7 @@ export default function GazetteModal() {
       <button
         type="button"
         className="absolute inset-0 bg-black/85 backdrop-blur-sm"
-        aria-label="Close Gazette"
+        aria-label="Close The Dispatch"
         tabIndex={-1}
         onClick={() => hardClose({ markSeen: true })}
       />
@@ -363,7 +363,7 @@ export default function GazetteModal() {
               id={titleId}
               className="text-[11px] sm:text-xs font-black uppercase tracking-[0.14em] truncate"
             >
-              {edition.masthead || "The War Room Gazette"}
+              {(edition.masthead || "The War Room Dispatch").replace(/Gazette/gi, "Dispatch")}
             </p>
             <p className="text-[10px] text-stone-400 truncate font-medium">
               {issueLabel}
@@ -374,7 +374,7 @@ export default function GazetteModal() {
             type="button"
             onClick={() => hardClose({ markSeen: true })}
             className="shrink-0 min-w-[44px] min-h-[44px] rounded-lg border border-stone-500 text-[#f4f0e6] text-xl font-bold leading-none flex items-center justify-center hover:bg-stone-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 touch-manipulation"
-            aria-label="Close Gazette"
+            aria-label="Close The Dispatch"
           >
             ✕
           </button>

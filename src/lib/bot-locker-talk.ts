@@ -32,7 +32,7 @@ const CFB_LINES: ((week: number, label: string) => string)[] = [
   () => `Lock before kickoff or the student section will remember.`,
   (w) => `Best Bet season is a personality. Week ${w} will expose you.`,
   () => `Who faded the dog that "spoke to them"? Raise your hand. Don't.`,
-  (w) => `Gazette is loading. Week ${w} crown is about to get loud.`,
+  (w) => `The Dispatch is loading. Week ${w} crown is about to get loud.`,
   () => `Toilet Bowl scouting report: accepting applications all season.`,
   () => `Confidence 5 on a 3-score dog is campus chaos not a plan 💀`,
   (w) => `If you didn't lock Week ${w} yet… what are we even doing here.`,

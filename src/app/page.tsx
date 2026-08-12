@@ -920,7 +920,7 @@ export default function Home() {
 
               {showGazetteShelf && (
                 <Link
-                  href="/gazette"
+                  href="/dispatch"
                   className="group rounded-xl border border-red-700/40 bg-black/40 backdrop-blur-sm p-6 hover:border-red-500/60 hover:bg-red-950/30 transition shadow-[0_0_40px_rgba(185,28,28,0.12)]"
                 >
       <div className="text-xs uppercase tracking-wider text-red-300/80 mb-2">

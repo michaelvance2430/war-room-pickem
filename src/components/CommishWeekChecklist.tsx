@@ -138,7 +138,7 @@ export default function CommishWeekChecklist({
             id: "vibe",
             label: "6. Let the room cook",
             detail:
-              "Gazette, Locker, standings drama — the app does the theater after you score",
+              "The Dispatch, Locker, standings drama — the app does the theater after you score",
             why: "This is why they stay.",
             done: thisWeekScored || completeLocks > 0,
           },

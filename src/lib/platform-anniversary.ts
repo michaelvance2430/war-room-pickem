@@ -101,7 +101,7 @@ const PACKS: PaperPack[] = [
     deck: (c) =>
       `${c.yearWord} later, the corpse still ships features. ${c.leagueName} applauds incorrectly.`,
     body: (c) =>
-      `Survived by unfinished props, trial bots, and a Gazette with trust issues. Cause of death: “one more polish pass.” War Room Pick’Em refuses to stay buried. Happy ${c.yearsAlive}${ordinal(c.yearsAlive)} to the machine.`,
+      `Survived by unfinished props, trial bots, and a Dispatch with trust issues. Cause of death: “one more polish pass.” War Room Pick’Em refuses to stay buried. Happy ${c.yearsAlive}${ordinal(c.yearsAlive)} to the machine.`,
     classified: () =>
       `IN MEMORIAM: free evenings, 2026–present. Donations accepted in locked cards.`,
     pullQuote: () =>
@@ -170,7 +170,7 @@ const PACKS: PaperPack[] = [
     deck: (c) =>
       `And yet ${c.yearsAlive} year${c.yearsAlive === 1 ? "" : "s"} later, here we are.`,
     body: (c) =>
-      `A group-chat pick’em with hardware, a Gazette, and career flex is objectively unhinged. ${c.leagueName} proves unhinged scales. On this day we celebrate the refusal to touch grass.`,
+      `A group-chat pick’em with hardware, The Dispatch, and career flex is objectively unhinged. ${c.leagueName} proves unhinged scales. On this day we celebrate the refusal to touch grass.`,
     classified: () =>
       `LETTERS: “Please add more sports.” We know. We’re already too far in.`,
     pullQuote: () =>
@@ -219,7 +219,7 @@ const PACKS: PaperPack[] = [
     stamp: "ANNIVERSARY WEATHER",
     headline: () => `FORECAST: HIGH DRAMA, LOW SLEEP, SCATTERED HARDWARE`,
     deck: (c) =>
-      `Climate of ${c.leagueName} unchanged since launch: salty with a chance of Gazette.`,
+      `Climate of ${c.leagueName} unchanged since launch: salty with a chance of Dispatch.`,
     body: (c) =>
       `${c.yearWord} of atmospheric pressure every Sunday night. Ring ceremonies, cold opens, One Year Older papers — the full storm system. Anniversary weather: 100% chance of reminiscing about a bug that was “definitely fixed.”`,
     classified: () =>
@@ -272,7 +272,7 @@ const PACKS: PaperPack[] = [
     deck: (c) =>
       `Lucky number: ${c.yearsAlive}. Lucky move: not deleting the account.`,
     body: (c) =>
-      `On this day the cosmos reminds ${c.leagueName} that loyalty looks like another season of feelings. Founded ${c.foundedLabel}. Prophecy: more sports, same friends, louder Gazette.`,
+      `On this day the cosmos reminds ${c.leagueName} that loyalty looks like another season of feelings. Founded ${c.foundedLabel}. Prophecy: more sports, same friends, louder Dispatch.`,
     classified: () =>
       `PSYCHIC: you will age. The app will ship. Both will mock you.`,
     pullQuote: () =>

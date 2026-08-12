@@ -82,7 +82,7 @@ export default function Nav() {
   const [sportIsWwc, setSportIsWwc] = useState(false);
   const [sportIsNfl, setSportIsNfl] = useState(false);
   const [playerPreview, setPlayerPreview] = useState(false);
-  /** Progressive disclosure — Gazette shelf after ~week 3 */
+  /** Progressive disclosure — Dispatch shelf after Week 1 is scored */
   const [showGazetteNav, setShowGazetteNav] = useState(true);
   const [showNewsNav, setShowNewsNav] = useState(true);
   const [earlyNav, setEarlyNav] = useState(false);
@@ -401,7 +401,12 @@ export default function Nav() {
       setLockerUnseen(0);
       return;
     }
-    if (pathname === "/gazette" || pathname.startsWith("/gazette/")) {
+    if (
+      pathname === "/dispatch" ||
+      pathname.startsWith("/dispatch/") ||
+      pathname === "/gazette" ||
+      pathname.startsWith("/gazette/")
+    ) {
       setGazetteUnseen(0);
       return;
     }
@@ -461,7 +466,7 @@ export default function Nav() {
     return () => window.removeEventListener("keydown", onKey);
   }, [menuOpen, moreOpen]);
 
-  // Desktop primary only: play the game. Board/Gazette open after first lock.
+  // Desktop primary only: play the game. Board/Dispatch open after first lock.
   // Phone bottom tabs are separate (Home · Picks · Standings · Locker · You).
   // Never mirror primary destinations in the hamburger.
   const primaryLinks: NavLink[] = earlyNav
@@ -481,7 +486,7 @@ export default function Nav() {
           ? [
               {
                 href: "/gazette",
-                label: "Gazette",
+                label: "The Dispatch",
                 badge: gazetteUnseen,
               } as NavLink,
             ]

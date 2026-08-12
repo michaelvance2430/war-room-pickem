@@ -102,7 +102,7 @@ const PACKS: PaperPack[] = [
     pullQuote: () =>
       `"I'm not one year older. My confidence numbers just got shorter." — Liar`,
     foot: () =>
-      `One Year Older · No gifts. No points. Happy (alleged) birthday — Gazette Network.`,
+      `One Year Older · No gifts. No points. Happy (alleged) birthday — Dispatch Network.`,
   },
   {
     id: "obituary",
@@ -243,7 +243,7 @@ const PACKS: PaperPack[] = [
     pullQuote: () =>
       `"Age is wisdom." — About to lock the worst number`,
     foot: () =>
-      `One Year Older · Unsigned. Love, the Gazette.`,
+      `One Year Older · Unsigned. Love, The Dispatch.`,
   },
   {
     id: "police",

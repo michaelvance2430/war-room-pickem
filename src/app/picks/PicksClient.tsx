@@ -2364,7 +2364,7 @@ export default function PicksClient() {
               : `${leagueName ? `${leagueName} · ` : ""}${
                   weekEditable
                     ? missedLockWindow
-                      ? "First kickoff hit and you never locked. Card closed. 0 pts. The Gazette remembers."
+                      ? "First kickoff hit and you never locked. Card closed. 0 pts. The Dispatch remembers."
                       : cardFrozen
                         ? "First kickoff hit — entire card is frozen. No more hero edits."
                         : picksLockBeforeCopy(games)
@@ -2696,7 +2696,7 @@ export default function PicksClient() {
                     </>
                   )}{" "}
                   After first kickoff you <strong>cannot</strong> lock. You
-                  score <strong>0</strong> this week. No makeups. Gazette may
+                  score <strong>0</strong> this week. No makeups. The Dispatch may
                   put you on the milk carton.
                 </p>
       </div>

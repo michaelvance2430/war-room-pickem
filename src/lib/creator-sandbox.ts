@@ -158,7 +158,7 @@ export function phaseLabel(phase: Exclude<SandboxPhase, "auto">): string {
     case "core":
       return "Core — locked once; competition loud, depth quiet";
     case "deepening":
-      return "Deepening — Gazette shelf / News unlocked (~week 3)";
+      return "Deepening — Dispatch shelf / News unlocked (Week 2)";
     case "full":
       return "Full room — everything visible";
   }
@@ -261,7 +261,7 @@ export function jumpOpenLocker(): void {
 
 export function jumpOpenGazette(): void {
   if (typeof window === "undefined") return;
-  window.location.href = "/gazette";
+  window.location.href = "/dispatch";
 }
 
 /**

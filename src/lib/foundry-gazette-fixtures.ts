@@ -142,7 +142,7 @@ export function buildFoundryGazetteFixture(
           }
         : null,
     samePerson: false,
-    masthead: "THE WAR ROOM GAZETTE",
+    masthead: "THE WAR ROOM DISPATCH",
     tagline: "Foundry editorial simulator · fictional people · real newspaper pressure",
     printedLine: "FOUNDRY ONLY · FICTIONAL EDITION · NEVER FILED TO A REAL LEAGUE",
     weather: {

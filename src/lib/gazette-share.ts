@@ -1,5 +1,5 @@
 /**
- * Gazette share — newspaper graphic + caption for IG / FB / chats.
+ * Dispatch share — newspaper graphic + caption for IG / FB / chats.
  * Flex the room, advertise War Room, keep the paper energy.
  */
 
@@ -51,7 +51,7 @@ export function buildGazetteSharePack(
 ): GazetteSharePack {
   const origin = appOrigin();
   const week = edition.weekLabel || `Week ${edition.weekIndex}`;
-  const ritual = edition.ritualName || "War Room Gazette";
+  const ritual = edition.ritualName || "The Dispatch";
   const body = formatGazetteShareText(edition);
   const tag = sportHashtag(edition.sportId);
 
@@ -64,14 +64,14 @@ export function buildGazetteSharePack(
     "",
     `Join the chaos → ${origin}`,
     "",
-    `#WarRoomPickEm #Gazette ${tag} #PickEm`,
+    `#WarRoomPickEm #TheDispatch ${tag} #PickEm`,
   ].join("\n");
 
   return {
     shareTitle: `${ritual} · ${week}`,
     caption,
     shortLabel: week,
-    filename: `war-room-gazette-w${edition.weekIndex}.png`,
+    filename: `war-room-dispatch-w${edition.weekIndex}.png`,
   };
 }
 
@@ -195,7 +195,7 @@ export function renderGazetteShareCanvas(
   ctx.font = `900 ${Math.min(54, 48) * s}px Georgia, "Times New Roman", serif`;
   ctx.textBaseline = "alphabetic";
   const mast =
-    (edition.masthead || "WAR ROOM GAZETTE").toUpperCase().slice(0, 28);
+    (edition.masthead || "THE WAR ROOM DISPATCH").replace(/GAZETTE/gi, "DISPATCH").toUpperCase().slice(0, 28);
   // shrink if needed
   let mastSize = 48 * s;
   ctx.font = `900 ${mastSize}px Georgia, "Times New Roman", serif`;
@@ -363,6 +363,16 @@ export function renderGazetteShareCanvas(
     "Friend leagues · confidence · Best Bet · Toilet Bowl",
     size / 2,
     adY + 52 * s
+  );
+
+  // Real covered calendar window, printed at the foot of the social artifact.
+  ctx.textAlign = "center";
+  ctx.font = `800 ${14 * s}px system-ui, sans-serif`;
+  ctx.fillStyle = muted;
+  ctx.fillText(
+    (edition.coverageLine || edition.weekLabel || "").toUpperCase().slice(0, 70),
+    size / 2,
+    size - 30 * s
   );
 
   return canvas;

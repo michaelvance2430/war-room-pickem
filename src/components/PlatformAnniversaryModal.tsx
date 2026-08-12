@@ -99,7 +99,7 @@ export default function PlatformAnniversaryModal() {
             <BrandMark size={48} variant="force" className="rounded-md" />
           </div>
           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-800 mb-1">
-            The War Room Gazette · {PLATFORM_ANNIV_RITUAL}
+            The War Room Dispatch · {PLATFORM_ANNIV_RITUAL}
           </p>
           <p className="text-[11px] uppercase tracking-widest text-stone-600 mb-2">
             Founded {WAR_ROOM_FOUNDED_LABEL} · {edition.leagueName}

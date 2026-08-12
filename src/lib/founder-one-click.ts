@@ -353,7 +353,7 @@ export async function founderScoreWeek(weekNumber: number): Promise<OneClickLog>
 
     return {
       ok: true,
-      message: `${label} scored · ${scored.scoredCount ?? 0} on the board · open Home for Gazette`,
+      message: `${label} scored · ${scored.scoredCount ?? 0} on the board · open Home for The Dispatch`,
       steps,
     };
   } catch (e) {

@@ -184,7 +184,7 @@ export default function FoundryPage() {
 
       {desk === "sandbox" && (
         <div className="space-y-4">
-          <Intro title="Sandbox · Live Season Simulation" text="Use this desk to create disposable league history, then walk the real Home, Picks, Standings, Board, and Gazette pages exactly as a player would." />
+          <Intro title="Sandbox · Live Season Simulation" text="Use this desk to create disposable league history, then walk the real Home, Picks, Standings, Board, and Dispatch pages exactly as a player would." />
           <FoundryRoomSimulator />
         </div>
       )}

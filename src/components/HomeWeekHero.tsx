@@ -628,8 +628,8 @@ export default function HomeWeekHero() {
       ? `${weekLabel} is live — sit tight`
       : `You're locked for ${weekLabel}`;
     body = state.frozen
-      ? "Football's running. Standings move when the card is scored — then the Gazette drops. Nothing fake to do until something real happens."
-      : `You're done for now${state.lockLabel ? ` · lock was ${state.lockLabel}` : ""}. Enjoy the wait. Come back when kickoff hits, the Gazette drops, or the room has something worth talking about.`;
+      ? "Football's running. Standings move when the card is scored — then The Dispatch drops. Nothing fake to do until something real happens."
+      : `You're done for now${state.lockLabel ? ` · lock was ${state.lockLabel}` : ""}. Enjoy the wait. Come back when kickoff hits, The Dispatch drops, or the room has something worth talking about.`;
     primaryHref = null;
     secondaryHref = null;
   } else if (state.frozen) {

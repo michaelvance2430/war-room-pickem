@@ -39,7 +39,7 @@ export default function CfbSituationDestinations({
       ? [
           {
             href: "/gazette",
-            eyebrow: "Gazette",
+            eyebrow: "The Dispatch",
             title: "The headlines",
             blurb: "Stories · rivalries · trash talk · history",
             art: "/skins/cfb-situation/gazette.webp",

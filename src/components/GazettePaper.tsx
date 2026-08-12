@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * The War Room Gazette — a four-page, phone-first weekly newspaper.
+ * The War Room Dispatch — a four-page, phone-first weekly newspaper.
  * One component powers the production modal, archive, and Foundry preview.
  */
 
@@ -17,6 +17,7 @@ import {
   noteRareHeadlineSeen,
   EVENT_EASTER_EGG,
 } from "@/lib/easter-eggs";
+import { weekDateRangeLabel } from "@/lib/season-calendar";
 
 type Props = {
   edition: GazetteEdition;
@@ -48,6 +49,16 @@ export function normalizeEdition(raw: GazetteEdition): GazetteEdition {
     printedLine:
       raw.printedLine ||
       `${raw.ritualName || "Edition"} · ${raw.weekLabel || "Week"} · War Room`,
+    coverageLine:
+      raw.coverageLine ||
+      (() => {
+        const range =
+          raw.sportId === "cfb" || raw.sportId === "nfl"
+            ? weekDateRangeLabel(raw.weekIndex, raw.sportId)
+            : "";
+        return range ? `Coverage: ${range}` : `Coverage: ${raw.weekLabel || `Week ${raw.weekIndex}`}`;
+      })(),
+    masthead: (raw.masthead || "THE WAR ROOM DISPATCH").replace(/GAZETTE/gi, "DISPATCH"),
     weather: raw.weather || {
       kicker: wwc ? "Brasil forecast" : "War Room weather",
       body: wwc
@@ -132,7 +143,7 @@ export default function GazettePaper({
       <Masthead edition={edition} />
 
       <nav
-        aria-label="Gazette pages"
+        aria-label="Dispatch pages"
         className="border-b border-stone-400 bg-[#e8e1d2] px-2 py-2"
       >
         <div className="grid grid-cols-4 gap-1">
@@ -174,6 +185,10 @@ export default function GazettePaper({
       </main>
 
       <PageTurner page={page} onTurn={turnPage} />
+
+      <footer className="border-t-4 border-double border-stone-900 bg-[#e8e1d2] px-4 py-2 text-center text-[10px] font-black uppercase tracking-[0.16em] text-stone-700">
+        {edition.coverageLine}
+      </footer>
 
       {page === PAGE_META.length - 1 && (
         <div className="border-t-4 border-double border-stone-900 px-4 pb-4 pt-4">
@@ -241,7 +256,7 @@ function Masthead({ edition }: { edition: GazetteEdition }) {
         {edition.eventLine || edition.printedLine}
       </p>
       <h1 className="font-serif text-2xl font-black leading-none tracking-tight sm:text-3xl">
-        {edition.masthead || "THE WAR ROOM GAZETTE"}
+        {edition.masthead || "THE WAR ROOM DISPATCH"}
       </h1>
       <p className="mt-2 text-[11px] italic text-stone-600">
         {edition.tagline}

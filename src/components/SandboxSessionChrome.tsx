@@ -54,7 +54,7 @@ const HOPS: { href: string; label: string }[] = [
   { href: "/", label: "Home" },
   { href: "/picks", label: "Picks" },
   { href: "/board", label: "Board" },
-  { href: "/gazette", label: "Gazette" },
+  { href: "/dispatch", label: "The Dispatch" },
   { href: "/locker-room", label: "Locker" },
   { href: "/commissioner", label: "Commish" },
 ];

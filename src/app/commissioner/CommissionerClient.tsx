@@ -2160,7 +2160,7 @@ function CommissionerPageInner() {
         "• All picks (humans + bots)\n" +
         "• Results & season standings stats\n" +
         "• Crystal Ball / pride picks for this run\n" +
-        "• This season’s Gazette, announcements, locker board\n" +
+        "• This season’s Dispatch, announcements, locker board\n" +
         (sandbox
           ? "• Preseason Trophy engravings on this device\n"
           : "") +
@@ -2475,7 +2475,7 @@ function CommissionerPageInner() {
                   void refreshPickStatus();
                 },
                 onOpenStandings: () => router.push("/standings"),
-                onOpenGazette: () => router.push("/gazette"),
+                onOpenGazette: () => router.push("/dispatch"),
                 onEditCard: () => {
                   setTab("card");
                   scrollTools();
@@ -3464,7 +3464,7 @@ function CommissionerPageInner() {
       </li>
                 <li>
       <span className="text-foreground font-medium">Clears:</span>{" "}
-                  cards, picks, standings, this season&apos;s Gazette / Crystal
+                  cards, picks, standings, this season&apos;s Dispatch / Crystal
                   Ball / locker noise
                 </li>
       </ul>

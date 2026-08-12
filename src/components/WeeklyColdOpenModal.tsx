@@ -532,7 +532,7 @@ export default function WeeklyColdOpenModal({ forceOnly = false }: Props) {
           {/* Live strip */}
           <div className="px-3 py-1.5 flex items-center justify-between gap-2 bg-amber-950/80 border-b border-amber-400/25 text-amber-100/90">
             <span className="text-[10px] font-bold uppercase tracking-wider">
-              Gazette {preview ? "· preview" : ""}
+              The Dispatch {preview ? "· preview" : ""}
             </span>
             <span className="text-[10px] font-mono tabular-nums font-semibold">
               {clock}
@@ -632,7 +632,7 @@ export default function WeeklyColdOpenModal({ forceOnly = false }: Props) {
               <span className="h-px flex-1 bg-amber-400/35" />
             </div>
             <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber-300">
-              From the Gazette newsroom
+              From The Dispatch newsroom
               {copy.phonetic ? ` · ${copy.phonetic}` : ""}
             </p>
             <h3

@@ -19,7 +19,7 @@ function sceneForPath(pathname: string): NflScene {
   if (pathname.startsWith("/picks") || pathname.startsWith("/crystal-ball")) return "picks";
   if (pathname.startsWith("/standings") || pathname.startsWith("/stats") || pathname.startsWith("/power-rankings")) return "standings";
   if (pathname.startsWith("/locker-room") || pathname.startsWith("/announcements")) return "locker";
-  if (pathname.startsWith("/gazette")) return "gazette";
+  if (pathname.startsWith("/dispatch") || pathname.startsWith("/gazette")) return "gazette";
   if (pathname.startsWith("/board")) return "board";
   if (pathname.startsWith("/championship")) return "championship";
   if (pathname.startsWith("/toilet-bowl")) return "toilet";
