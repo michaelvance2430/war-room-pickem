@@ -66,6 +66,117 @@ function tokenClient(token: string) {
   );
 }
 
+function newsroomAdminClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+  if (!url || !key) return null;
+  return createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
+function normalizeDispatchLine(value: string): string {
+  return value
+    .normalize("NFKC")
+    .toLocaleLowerCase("en-US")
+    .replace(/[’‘]/g, "'")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+const COPY_FIELDS = new Set(["headline", "body", "deck", "tagline", "text"]);
+
+function collectArchivedCopy(value: unknown, lines: Set<string>, key = ""): void {
+  if (typeof value === "string") {
+    if (COPY_FIELDS.has(key)) {
+      const normalized = normalizeDispatchLine(value);
+      if (normalized.length >= 12) lines.add(normalized);
+    }
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) collectArchivedCopy(item, lines, key);
+    return;
+  }
+  if (!value || typeof value !== "object") return;
+  for (const [childKey, child] of Object.entries(value as Record<string, unknown>)) {
+    collectArchivedCopy(child, lines, childKey);
+  }
+}
+
+/**
+ * Server-only global memory. The browser never receives another league's copy;
+ * the newsroom gets only a collision set used to reject recycled lines.
+ */
+async function archivedDispatchLines(packet: DispatchFactPacket): Promise<Set<string>> {
+  const admin = newsroomAdminClient();
+  if (!admin) return new Set();
+  const { data } = await admin
+    .from("gazette_editions")
+    .select("league_id, week_number, payload")
+    .order("created_at", { ascending: false })
+    .limit(5000);
+  const lines = new Set<string>();
+  for (const row of data || []) {
+    if (row.league_id === packet.leagueId && row.week_number === packet.weekNumber) continue;
+    collectArchivedCopy(row.payload, lines);
+  }
+  return lines;
+}
+
+function draftCollisions(draft: DispatchAiDraft, archived: Set<string>): string[] {
+  const collisions = new Set<string>();
+  for (const story of [draft.lead, ...draft.briefs, ...draft.lockerRoasts]) {
+    for (const line of [story.headline, story.body]) {
+      const normalized = normalizeDispatchLine(line);
+      if (normalized.length >= 12 && archived.has(normalized)) collisions.add(line);
+    }
+  }
+  return [...collisions];
+}
+
+function hashCopySeed(value: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function makeFallbackUnique(
+  packet: DispatchFactPacket,
+  draft: DispatchAiDraft,
+  archived: Set<string>
+): DispatchAiDraft {
+  const claimed = new Set(archived);
+  let ordinal = 0;
+  const uniqueLine = (line: string): string => {
+    const normalized = normalizeDispatchLine(line);
+    if (!claimed.has(normalized)) {
+      claimed.add(normalized);
+      return line;
+    }
+    ordinal += 1;
+    const desk = (hashCopySeed(`${packet.leagueId}:${packet.weekNumber}:${ordinal}`) % 900) + 100;
+    const rewritten = `${line} — ${packet.weekLabel.toUpperCase()} DESK ${desk}`;
+    claimed.add(normalizeDispatchLine(rewritten));
+    return rewritten;
+  };
+  const story = <T extends DispatchAiDraft["lead"]>(item: T): T => ({
+    ...item,
+    headline: uniqueLine(item.headline),
+    body: uniqueLine(item.body),
+  });
+  return {
+    ...draft,
+    lead: story(draft.lead),
+    briefs: draft.briefs.map(story),
+    lockerRoasts: draft.lockerRoasts.map(story),
+  };
+}
+
 async function lockerActivityTheme(
   supabase: ReturnType<typeof tokenClient>,
   packet: DispatchFactPacket
@@ -152,7 +263,10 @@ function responseText(payload: unknown): string | null {
   return null;
 }
 
-async function generateDraft(packet: DispatchFactPacket): Promise<DispatchAiDraft | null> {
+async function generateDraft(
+  packet: DispatchFactPacket,
+  rejectedLines: string[] = []
+): Promise<DispatchAiDraft | null> {
   const key = process.env.OPENAI_API_KEY;
   if (!key) return null;
   const model = process.env.DISPATCH_AI_MODEL || "gpt-5-mini";
@@ -166,7 +280,12 @@ async function generateDraft(packet: DispatchFactPacket): Promise<DispatchAiDraf
       input: [
         {
           role: "system",
-          content: "You are The War Room Dispatch sports desk: a sharp, colorful, deranged sports tabloid. Write concise funny coverage only from the supplied facts. Never invent a score, result, quote, injury, accusation, or message. Every story must cite the exact source fact IDs it uses. Keep the humor playful; no slurs, threats, protected-class attacks, sexual humiliation, or cruelty. Locker facts contain activity metadata only—roast the room's energy, never pretend you read its messages.",
+          content: "You are The War Room Dispatch sports desk: a sharp, colorful, deranged sports tabloid. Write concise funny coverage only from the supplied facts. Never invent a score, result, quote, injury, accusation, or message. Every story must cite the exact source fact IDs it uses. Keep the humor playful; no slurs, threats, protected-class attacks, sexual humiliation, or cruelty. Locker facts contain activity metadata only—roast the room's energy, never pretend you read its messages. Every headline and body line must be freshly written. Never reuse, lightly punctuate, or closely echo a rejected line.",
+        },
+        ...(rejectedLines.length ? [{
+          role: "system" as const,
+          content: `These lines already appeared in another Dispatch and are forbidden. Write genuinely different copy, not a suffix or punctuation variation:\n${rejectedLines.slice(0, 40).join("\n")}`,
+        }] : []),
         },
         { role: "user", content: JSON.stringify(packet) },
       ],
@@ -220,11 +339,28 @@ export async function POST(req: Request) {
   if (!filed) return NextResponse.json({ ok: false, error: "Score the week before opening the newsroom" }, { status: 409 });
 
   const enriched = withLockerTheme(packet, await lockerActivityTheme(supabase, packet));
-  const aiDraft = await generateDraft(enriched);
+  const archived = await archivedDispatchLines(enriched);
+  let aiDraft: DispatchAiDraft | null = null;
+  let rejectedLines: string[] = [];
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const candidate = await generateDraft(enriched, rejectedLines);
+    if (!candidate) break;
+    const collisions = draftCollisions(candidate, archived);
+    if (!collisions.length) {
+      aiDraft = candidate;
+      break;
+    }
+    rejectedLines = [...new Set([...rejectedLines, ...collisions])];
+  }
+  const fallback = makeFallbackUnique(
+    enriched,
+    buildDeterministicDispatchDraft(enriched),
+    archived
+  );
   return NextResponse.json({
     ok: true,
     packet: enriched,
-    draft: aiDraft || buildDeterministicDispatchDraft(enriched),
+    draft: aiDraft || fallback,
     via: aiDraft ? "ai" : "fallback",
   }, { headers: { "Cache-Control": "no-store" } });
 }
