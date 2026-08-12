@@ -2185,8 +2185,17 @@ export async function snapshotGazetteAfterScore(
       const { buildDispatchFactPacket, buildDeterministicDispatchDraft, dispatchDraftSideStories } =
         await import("@/lib/dispatch-newsroom");
       const packet = buildDispatchFactPacket({ leagueId: session.leagueId, edition, players });
+      const originalSideStories = edition.sideStories;
       const newsroom = dispatchDraftSideStories(packet, buildDeterministicDispatchDraft(packet));
-      if (newsroom.length) edition.sideStories = [...newsroom, ...edition.sideStories].slice(0, 8);
+      if (newsroom.length) edition.sideStories = [...newsroom, ...originalSideStories].slice(0, 8);
+      // File truth first. AI is an optional rewrite and can never hold scoring hostage.
+      await archiveGazetteEdition(edition);
+      const { requestDispatchNewsroom } = await import("@/lib/dispatch-ai-client");
+      const result = await requestDispatchNewsroom(packet);
+      if (result) {
+        const rewritten = dispatchDraftSideStories(result.packet, result.draft);
+        if (rewritten.length) edition.sideStories = [...rewritten, ...originalSideStories].slice(0, 8);
+      }
     }
     await archiveGazetteEdition(edition);
   } catch {

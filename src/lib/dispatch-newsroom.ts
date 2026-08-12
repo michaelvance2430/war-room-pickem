@@ -82,7 +82,11 @@ export function buildDispatchFactPacket(opts: {
 export function buildDeterministicDispatchDraft(packet: DispatchFactPacket): DispatchAiDraft {
   const leadFact = packet.facts.find((fact) => fact.kind === "weekly_score") || packet.facts[0];
   const leadName = leadFact?.people[0] || "SOMEBODY";
-  const briefs = packet.facts.slice(1, 5).map((fact) => ({
+  const supportingFacts = packet.facts
+    .filter((fact) => fact.id !== leadFact?.id)
+    .sort((a, b) => Number(b.kind === "locker_theme") - Number(a.kind === "locker_theme"))
+    .slice(0, 4);
+  const briefs = supportingFacts.map((fact) => ({
     kicker: fact.kind === "no_lock" ? "Missing persons" : fact.kind === "weapon_use" ? "Arsenal desk" : fact.kind === "locker_theme" ? "Locker wire" : "Around the room",
     headline: fact.kind === "no_lock" ? "CARD NEVER ARRIVES; SEARCH PARTY CLOCKS OUT" : fact.kind === "weapon_use" ? "AUTHORITIES CONFIRM THE BUTTON WAS, IN FACT, PRESSED" : fact.kind === "locker_theme" ? "LOCKER ROOM PRODUCES ANOTHER COMPLETELY NORMAL DISCUSSION" : "STANDINGS MOVE; GROUP CHAT DEMANDS INVESTIGATION",
     body: fact.summary,
@@ -103,5 +107,7 @@ export function buildDeterministicDispatchDraft(packet: DispatchFactPacket): Dis
 
 export function dispatchDraftSideStories(packet: DispatchFactPacket, draft: DispatchAiDraft): GazetteSideStory[] {
   if (!validateDispatchAiDraft(packet, draft).ok) return [];
-  return draft.briefs.map(({ kicker, headline, body }) => ({ kicker, headline, body }));
+  return [...draft.briefs, ...draft.lockerRoasts]
+    .slice(0, 6)
+    .map(({ kicker, headline, body }) => ({ kicker, headline, body }));
 }
