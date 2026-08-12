@@ -3,7 +3,7 @@
 /**
  * Manage League — Stage 1
  * Persistent settings only. Weekly ops live on Home → /week-ops.
- * Foundry/testing tools are not rendered here.
+ * Simulation and testing tools are never rendered here.
  */
 
 import { useCallback, useEffect, useMemo, useState, Suspense } from "react";

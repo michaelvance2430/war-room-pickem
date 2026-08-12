@@ -19,9 +19,8 @@ assert.match(owner, /import "server-only"/, "owner authorization must never beco
 assert.doesNotMatch(owner, /NEXT_PUBLIC_/, "owner authorization must not trust public environment variables");
 assert.doesNotMatch(owner, /userId === "1"/, "local demo identities must not authorize the workshop");
 
-const commissioner = read("src/app/commissioner/CommissionerClient.tsx");
-assert.match(commissioner, /const labTools = false/, "commissioner simulators must remain disabled");
-assert.doesNotMatch(commissioner, /showCommishLabTools/, "commissioner must not dynamically enable simulators");
+const commissioner = read("src/app/commissioner/ManageLeagueClient.tsx") + read("src/app/week-ops/WeekOpsClient.tsx");
+assert.doesNotMatch(commissioner, /Foundry|showCommishLabTools|generateDemoSlate|autoFinishRemainingWeeks/, "production commissioner routes must contain no workshop or simulation controls");
 
 const arsenal = read("src/components/ProfileArsenal.tsx");
 assert.doesNotMatch(arsenal, />Foundry is rehearsal/, "public profile copy must not expose the workshop name");

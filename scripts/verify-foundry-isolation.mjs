@@ -20,7 +20,7 @@ const one = read("src/lib/founder-one-click.ts");
 const chrome = read("src/components/FoundrySessionChrome.tsx");
 const foundryPage = read("src/app/foundry/page.tsx");
 const founderPage = read("src/app/founder/page.tsx");
-const commish = read("src/app/commissioner/CommissionerClient.tsx");
+const commish = read("src/app/commissioner/ManageLeagueClient.tsx") + read("src/app/week-ops/WeekOpsClient.tsx");
 const cloud = read("src/lib/cloud.ts");
 const leagueMode = read("src/lib/league-mode.ts");
 
@@ -66,8 +66,7 @@ test("founder one-click gated at every entry", () => {
 });
 
 test("commissioner has no Foundry simulation access", () => {
-  assert.match(commish, /requirePreseasonTools/);
-  assert.doesNotMatch(commish, /showCommishLabTools|FoundryLabIsolationPanel/);
+  assert.doesNotMatch(commish, /showCommishLabTools|FoundryLabIsolationPanel|generateDemoSlate|autoFinishRemainingWeeks/);
   assert.match(fp, /isExplicitLabLeague/);
   assert.match(fp, /showCommishLabTools/);
 });

@@ -3,7 +3,8 @@
 /**
  * Manage League — Stage 1
  * Weekly ops: Home → /week-ops (legacy ?tab=card|results redirect there).
- * Full CommissionerClient workbench is no longer the landing page.
+ * Manage League contains only production identity, access, people, season,
+ * card-control, and danger-zone tools. Simulation belongs outside this route.
  */
 
 import dynamic from "next/dynamic";

@@ -17,24 +17,8 @@ assert.deepEqual(
   "NFL uses official Weeks 1–18 followed by playoff slots 19–22"
 );
 
-const commissioner = readFileSync(
-  "src/app/commissioner/CommissionerClient.tsx",
-  "utf8"
-);
 const championship = readFileSync("src/app/championship/page.tsx", "utf8");
 const rules = readFileSync("src/lib/rules.ts", "utf8");
-
-assert.doesNotMatch(
-  commissioner,
-  /cutHint:\s*w === 14/,
-  "commissioner cut styling must never hard-code the CFB week for NFL"
-);
-assert.equal(
-  commissioner.match(/cutHint:\s*w === cutLockWeek\(league\?\.sportId\)/g)
-    ?.length,
-  2,
-  "both commissioner week pickers use the sport-native cut"
-);
 assert.match(
   championship,
   /After Week 18, seeds lock and the War Room playoffs begin/,

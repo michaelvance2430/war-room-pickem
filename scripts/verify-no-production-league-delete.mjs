@@ -1,6 +1,4 @@
-/**
- * Assert production UI / app-layer cannot delete leagues.
- */
+/** Assert only unused, unplayed leagues expose the guarded delete RPC. */
 import { readFileSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
@@ -18,7 +16,6 @@ function assert(c, m) {
 
 const account = read("src/app/account/page.tsx");
 const manage = read("src/app/commissioner/ManageLeagueClient.tsx");
-const commish = read("src/app/commissioner/CommissionerClient.tsx");
 const del = read("src/lib/session-restore.ts");
 const admin = read("src/lib/admin-test-cleanup.ts");
 const founder = read("src/app/founder/page.tsx");
@@ -28,24 +25,23 @@ assert(!account.includes("deleteModal"), "2 Account: no delete modal");
 assert(!account.includes("confirmHardDelete"), "3 Account: no hard delete");
 assert(account.includes("leaveLeague"), "4 Account: Leave preserved");
 
-assert(!manage.includes("Delete league"), "5 Manage League: no Delete league");
-assert(!manage.includes("handleDeleteLeague"), "6 Manage League: no handleDelete");
+assert(manage.includes("Delete unused league"), "5 Manage: unused-room cleanup is explicit");
+assert(manage.includes("handleDeleteLeague"), "6 Manage: guarded cleanup handler exists");
 assert(!manage.includes("resetLeague"), "7 Manage League: no resetLeague import");
-assert(manage.includes("League history is preserved"), "8 Manage: preserve copy");
+assert(manage.includes("Once play begins—or any official history exists—the room is permanent"), "8 Manage: history protection is explicit");
 
-assert(
-  !commish.includes("Delete league and reset app"),
-  "9 CommissionerClient: no delete reset button"
-);
-assert(!/\bonClick=\{handleReset\}/.test(commish), "10 no handleReset click");
+assert(!manage.includes("Delete league and reset app"), "9 Manage: no unguarded delete/reset action");
+assert(!/\bonClick=\{handleReset\}/.test(manage), "10 no legacy handleReset click");
 
 const delFn = del.slice(
   del.indexOf("export async function deleteLeague"),
-  del.indexOf("export async function deleteLeague") + 500
+  del.indexOf("export async function deleteLeague") + 1400
 );
 assert(
-  delFn.includes("ok: false") && !delFn.includes('.from("leagues").delete'),
-  "11 deleteLeague fails closed without Supabase DELETE"
+  delFn.includes('rpc("delete_unused_league"') &&
+    delFn.includes("league_started|history_exists") &&
+    !delFn.includes('.from("leagues").delete'),
+  "11 deleteLeague delegates to the server-side unused-room guard"
 );
 
 assert(
