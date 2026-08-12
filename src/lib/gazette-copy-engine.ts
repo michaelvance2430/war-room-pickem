@@ -49,12 +49,15 @@ function writeStore(store: RootStore) {
   }
 }
 
-function seasonKey(leagueId: string, year: number): string {
-  return `${leagueId}:${year}`;
+function seasonKey(_leagueId: string, year: number): string {
+  // One newsroom memory for every sport and league. A template spent in CFB
+  // cannot quietly reappear in NFL, Fieldhouse, or another crew.
+  return `global:${year}`;
 }
 
-function weekKey(weekIndex: number, offset: number): string {
-  return `${weekIndex}:${offset}`;
+function weekKey(leagueId: string, weekIndex: number, offset: number): string {
+  // Assignments remain stable per issue even though the used pool is global.
+  return `${leagueId}:${weekIndex}:${offset}`;
 }
 
 function emptyBank(): BankState {
@@ -103,7 +106,7 @@ export function pickBankSlot(opts: {
   const leagueId =
     opts.leagueId || getLeague()?.id || "local";
   const year = opts.seasonYear ?? defaultSeasonYear();
-  const wk = weekKey(weekIndex, offset);
+  const wk = weekKey(leagueId, weekIndex, offset);
 
   if (bankLen <= 0) {
     return { index: 0, mode: "combo", comboSalt: weekIndex * 17 + offset };
@@ -161,15 +164,12 @@ function hashStr(s: string): number {
   return h >>> 0;
 }
 
-/** Wipe copy memory for a league (season reset). */
-export function clearGazetteCopyForLeague(leagueId: string): void {
-  if (!leagueId || !canStore()) return;
-  const store = readStore();
-  const prefix = `${leagueId}:`;
-  for (const k of Object.keys(store)) {
-    if (k.startsWith(prefix) || k === leagueId) delete store[k];
-  }
-  writeStore(store);
+/**
+ * Season resets must not erase newsroom memory. Foundry may reset a league,
+ * but previously printed copy stays spent across every sport and crew.
+ */
+export function clearGazetteCopyForLeague(_leagueId: string): void {
+  // Intentionally retained. The archive is the product's anti-repeat memory.
 }
 
 // ── Combinatorial “forever” banks (hand-authored slots, infinite mix) ──
