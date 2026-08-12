@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import LeagueLockTimer from "@/components/LeagueLockTimer";
+import type { Game } from "@/lib/types";
 import {
   loadWeekCard,
   loadBestAvailableWeekCard,
@@ -33,6 +35,8 @@ type HeroState = {
    */
   hasCard: boolean;
   gameCount: number;
+  /** Exact commissioner-published games that own the weekly lock deadline. */
+  games: Game[];
   lockLabel: string | null;
   frozen: boolean;
   iLocked: boolean;
@@ -114,6 +118,7 @@ export default function HomeWeekHero() {
         truthTrusted: false,
         hasCard: false,
         gameCount: 0,
+        games: [],
         lockLabel: null,
         frozen: false,
         iLocked: false,
@@ -149,6 +154,7 @@ export default function HomeWeekHero() {
             truthTrusted: false,
             hasCard: false,
             gameCount: 0,
+            games: [],
             lockLabel: null,
             frozen: false,
             iLocked: false,
@@ -169,6 +175,7 @@ export default function HomeWeekHero() {
             truthTrusted: false,
             hasCard: false,
             gameCount: 0,
+            games: [],
             lockLabel: null,
             frozen: false,
             iLocked: false,
@@ -296,6 +303,7 @@ export default function HomeWeekHero() {
           truthTrusted: true,
           hasCard,
           gameCount: games.length,
+          games,
           lockLabel: hasCard ? formatCardLockDeadline(games) : null,
           frozen,
           iLocked,
@@ -635,6 +643,9 @@ export default function HomeWeekHero() {
 
   return (
     <>
+    {state.hasCard && state.games.length > 0 ? (
+      <LeagueLockTimer games={state.games} />
+    ) : null}
     <section className={`mb-5 sm:mb-8 ${!isNfl && sportId !== "soccer_wwc" ? "cfb-week-hero" : ""}`}>
       <div
         className={`home-week-hero-card home-week-state-${visualState} rounded-2xl border-2 border-primary/40 bg-gradient-to-br from-primary/15 via-black/50 to-black/70 p-4 sm:p-6 ${state.iLocked ? "is-locked" : ""} ${state.hasCard && !state.iLocked ? "is-open" : ""}`}

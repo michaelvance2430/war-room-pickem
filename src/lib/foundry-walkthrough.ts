@@ -26,6 +26,8 @@ export type PreviewGame = {
   result?: string;
   pick?: string;
   confidence: number;
+  /** Commissioner-selected kickoff; the earliest game locks the whole card. */
+  kickoffAt: string;
 };
 export type FoundryWalkthrough = {
   version: 1;
@@ -139,7 +141,10 @@ export function createFoundryWalkthrough(sport: PreviewSport, week = foundryOpen
     const awayScore = 17 + (hash(seed, index, 2) % (sport === "cbb" ? 55 : 25));
     const homeScore = 17 + (hash(seed, index, 3) % (sport === "cbb" ? 55 : 25));
     const final = week > foundryOpeningWeek(sport) && index < 3;
-    return { id: `${sport}-${week}-${index}`, away, home, spread: `${home} ${homeLine > 0 ? "+" : ""}${homeLine}`, status: final ? "final" as const : "upcoming" as const, result: final ? `${away} ${awayScore} · ${home} ${homeScore}` : undefined, pick: opening ? undefined : index % 2 ? away : home, confidence: 5 - index };
+    const weekStart = foundryWeekStartDate(sport, week).getTime();
+    const firstKickoffDay = sport === "nfl" || (sport === "cfb" && week % 3 === 1) ? 3 : 5;
+    const kickoffAt = new Date(weekStart + (firstKickoffDay * 24 + 18 + index * 3) * 60 * 60 * 1000).toISOString();
+    return { id: `${sport}-${week}-${index}`, away, home, spread: `${home} ${homeLine > 0 ? "+" : ""}${homeLine}`, status: final ? "final" as const : "upcoming" as const, result: final ? `${away} ${awayScore} · ${home} ${homeScore}` : undefined, pick: opening ? undefined : index % 2 ? away : home, confidence: 5 - index, kickoffAt };
   });
   const preseasonChampionPicks = createPreseasonChampionPicks(players, sport);
   return { version: 1, sport, role, week, seasonLabel: "2026 Foundry Season", generatedAt: Date.now(), players, games, unreadGazette: false, gazetteWeeks: [], ncaaPicks: {}, ncaaResults: {}, ncaaBracketLocked: false, preseasonChampionPicks, postseasonFields: null, tacticalNukeWeeks: [], tacticalNukeActive: false, mapsEvent: null };
@@ -324,7 +329,8 @@ export function foundryPostseasonRounds(state: FoundryWalkthrough, competition: 
 /** Monday start for each sport's 2026 season window. */
 export function foundryWeekStartDate(sport: PreviewSport, week: number): Date {
   const start = sport === "cfb" ? Date.UTC(2026, 7, 24, 16) : sport === "nfl" ? Date.UTC(2026, 8, 7, 16) : Date.UTC(2026, 10, 2, 16);
-  return new Date(start + Math.max(0, week - 1) * 7 * 24 * 60 * 60 * 1000);
+  const offset = sport === "cfb" ? Math.max(0, week) : Math.max(0, week - 1);
+  return new Date(start + offset * 7 * 24 * 60 * 60 * 1000);
 }
 
 export function setFoundryWalkthroughRole(state: FoundryWalkthrough, role: PreviewRole): FoundryWalkthrough {

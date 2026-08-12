@@ -42,7 +42,6 @@ import HomeAllegianceCard from "@/components/HomeAllegianceCard";
 import CfbSituationDestinations from "@/components/CfbSituationDestinations";
 import HomeSeasonCommand from "@/components/HomeSeasonCommand";
 import SeasonOpening from "@/components/SeasonOpening";
-import HomeLockMissionClock from "@/components/HomeLockMissionClock";
 
 const HomeGazetteSpotlight = dynamic(
   () => import("@/components/HomeGazetteSpotlight"),
@@ -640,9 +639,6 @@ export default function Home() {
             />
           );
         })()}
-
-        {/* League deadline is always visible when a published card has a real kickoff. */}
-        <HomeLockMissionClock />
 
         <SandboxSimBanner />
 

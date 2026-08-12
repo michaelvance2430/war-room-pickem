@@ -1,23 +1,32 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 const EXIT_MS = 700;
+const INTRO_SESSION_KEY = "warroom-opening-played-this-session";
 
 export default function SeasonOpening() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const exitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Render the black opening layer on the very first paint. Waiting for an
-  // effect here lets Home paint for one frame before the cinematic mounts.
-  const [visible, setVisible] = useState(true);
+  // Decide before paint so a fresh visit opens on black, while internal
+  // navigation never flashes/restarts the cinematic.
+  const [visible, setVisible] = useState(false);
   const [exiting, setExiting] = useState(false);
   // Browsers reject autoplay with sound. Begin reliably, then let the first
   // tap satisfy the browser's audio permission and unmute in place.
   const [muted, setMuted] = useState(true);
 
-  useEffect(() => {
-    // Product rule: the opening runs on every fresh app/Home mount. Nothing is
-    // remembered between visits; Skip Intro dismisses only this playback.
+  useLayoutEffect(() => {
+    // Product rule: once per open app/browser session. Page changes, returning
+    // Home, and publishing a commissioner card must not replay it. Closing the
+    // tab/app clears sessionStorage, so the next genuine opening runs again.
+    try {
+      if (sessionStorage.getItem(INTRO_SESSION_KEY) === "1") return;
+      sessionStorage.setItem(INTRO_SESSION_KEY, "1");
+    } catch {
+      // If storage is unavailable, still allow this mount's opening.
+    }
+    setVisible(true);
   }, []);
 
   useEffect(() => {

@@ -12,6 +12,7 @@ assert.match(
 assert.match(source, /onClick=\{dismiss\}/, "skip must dismiss only this playback");
 assert.doesNotMatch(source, /Don(?:'|&apos;)t show again/i, "permanent disable must not be offered");
 assert.doesNotMatch(source, /DISABLED_KEY|disableOpening|localStorage\.setItem/, "permanent-disable state must not exist");
-assert.doesNotMatch(source, /SEEN_THIS_SESSION_KEY|sessionStorage/, "opening must not be suppressed for the session");
+assert.match(source, /sessionStorage\.getItem\(INTRO_SESSION_KEY\)/, "internal navigation must not replay the opening");
+assert.match(source, /sessionStorage\.setItem\(INTRO_SESSION_KEY, "1"\)/, "the opening must be marked for this app session");
 
-console.log("Season opening controls verified: always opens · temporary skip only");
+console.log("Season opening controls verified: once per app session · temporary skip only");
