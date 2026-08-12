@@ -70,6 +70,11 @@ export type FoundryPostseasonRounds = {
 export const FOUNDRY_WALKTHROUGH_KEY = "warroom-foundry-walkthrough-v1";
 export const FOUNDRY_WALKTHROUGH_EVENT = "warroom-foundry-walkthrough";
 
+/** CFB has an official Week 0; NFL and Fieldhouse begin at Week/Window 1. */
+export function foundryOpeningWeek(sport: PreviewSport): number {
+  return sport === "cfb" ? 0 : 1;
+}
+
 /** Last playable preview window. The simulator may never advance beyond it. */
 export function foundryFinalWeek(sport: PreviewSport): number {
   return sport === "cbb" ? 22 : sport === "nfl" ? 22 : 16;
@@ -122,10 +127,10 @@ function createPreseasonChampionPicks(players: PreviewPlayer[], sport: PreviewSp
   return Object.fromEntries(players.map((player, index) => [player.id, index === 2 || index === 9 ? simulatedChampion : generateNcaaPicks(index + 301)["national:championship"] || "Duke"]));
 }
 
-export function createFoundryWalkthrough(sport: PreviewSport, week = 1, role: PreviewRole = "player"): FoundryWalkthrough {
+export function createFoundryWalkthrough(sport: PreviewSport, week = foundryOpeningWeek(sport), role: PreviewRole = "player"): FoundryWalkthrough {
   const seed = week + (sport === "nfl" ? 31 : sport === "cbb" ? 67 : 11);
+  const opening = week === foundryOpeningWeek(sport);
   const players = PEOPLE.map((name, index) => {
-    const opening = week === 1;
     const weekPoints = opening ? 0 : 5 + (hash(seed, index) % 21);
     return { id: `preview-${index}`, name, weekPoints, points: opening ? 0 : week * 12 + weekPoints + (hash(seed, index, 4) % 42), correct: opening ? 0 : 2 + (hash(seed, index, 7) % 4), locked: opening ? false : index !== 10 || week % 2 === 0, streak: opening ? 0 : (hash(seed, index, 9) % 7) - 2, region: FIELDHOUSE_REGIONS[index % FIELDHOUSE_REGIONS.length], madnessPoints: 0, madnessWindowPoints: 0 };
   }).sort((a, b) => b.points - a.points).map((player) => ({ ...player }));
@@ -133,8 +138,8 @@ export function createFoundryWalkthrough(sport: PreviewSport, week = 1, role: Pr
     const homeLine = ((hash(seed, index) % 13) - 7) / 2;
     const awayScore = 17 + (hash(seed, index, 2) % (sport === "cbb" ? 55 : 25));
     const homeScore = 17 + (hash(seed, index, 3) % (sport === "cbb" ? 55 : 25));
-    const final = week > 1 && index < 3;
-    return { id: `${sport}-${week}-${index}`, away, home, spread: `${home} ${homeLine > 0 ? "+" : ""}${homeLine}`, status: final ? "final" as const : "upcoming" as const, result: final ? `${away} ${awayScore} · ${home} ${homeScore}` : undefined, pick: week === 1 ? undefined : index % 2 ? away : home, confidence: 5 - index };
+    const final = week > foundryOpeningWeek(sport) && index < 3;
+    return { id: `${sport}-${week}-${index}`, away, home, spread: `${home} ${homeLine > 0 ? "+" : ""}${homeLine}`, status: final ? "final" as const : "upcoming" as const, result: final ? `${away} ${awayScore} · ${home} ${homeScore}` : undefined, pick: opening ? undefined : index % 2 ? away : home, confidence: 5 - index };
   });
   const preseasonChampionPicks = createPreseasonChampionPicks(players, sport);
   return { version: 1, sport, role, week, seasonLabel: "2026 Foundry Season", generatedAt: Date.now(), players, games, unreadGazette: false, gazetteWeeks: [], ncaaPicks: {}, ncaaResults: {}, ncaaBracketLocked: false, preseasonChampionPicks, postseasonFields: null, tacticalNukeWeeks: [], tacticalNukeActive: false, mapsEvent: null };
@@ -189,7 +194,10 @@ export function simulateNextFoundryWeek(state: FoundryWalkthrough): FoundryWalkt
     const priorMadnessPoints = ncaaScore(bracket, state.ncaaResults || {});
     return { ...player, madnessPoints, madnessWindowPoints: madnessPoints - priorMadnessPoints, points: player.points + madnessPoints };
   }).sort((a, b) => b.points - a.points);
-  return { ...next, players, gazetteWeeks: Array.from(new Set([...(state.gazetteWeeks || []), state.week])).sort((a, b) => a - b), ncaaPicks: state.ncaaPicks || {}, ncaaResults, ncaaBracketLocked: state.ncaaBracketLocked, preseasonChampionPicks: state.preseasonChampionPicks || {}, postseasonFields: state.postseasonFields, tacticalNukeWeeks: state.tacticalNukeWeeks || [], tacticalNukeActive: false, mapsEvent: state.mapsEvent || null, unreadGazette: true };
+  const publishableWeeks = state.week >= 1
+    ? [...(state.gazetteWeeks || []), state.week]
+    : state.gazetteWeeks || [];
+  return { ...next, players, gazetteWeeks: Array.from(new Set(publishableWeeks)).sort((a, b) => a - b), ncaaPicks: state.ncaaPicks || {}, ncaaResults, ncaaBracketLocked: state.ncaaBracketLocked, preseasonChampionPicks: state.preseasonChampionPicks || {}, postseasonFields: state.postseasonFields, tacticalNukeWeeks: state.tacticalNukeWeeks || [], tacticalNukeActive: false, mapsEvent: state.mapsEvent || null, unreadGazette: state.week >= 1 };
 }
 
 export function simulateFoundrySeason(state: FoundryWalkthrough): FoundryWalkthrough {

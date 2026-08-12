@@ -133,7 +133,7 @@ export default function GazettePaper({
   return (
     <div
       ref={rootRef}
-      className={`bg-[#f4f0e6] text-stone-900 ${
+      className={`text-stone-950 [background-color:#eee7d6] [background-image:radial-gradient(rgba(28,25,23,.08)_0.7px,transparent_0.7px),linear-gradient(90deg,rgba(120,90,50,.035),transparent_35%,rgba(120,90,50,.04))] [background-size:4px_4px,100%_100%] ${
         variant === "modal"
           ? "overflow-visible rounded-none border-0 shadow-none"
           : "overflow-hidden rounded-sm border-2 border-stone-600 shadow-lg"
@@ -166,14 +166,14 @@ export default function GazettePaper({
         </div>
       </nav>
 
-      <main className="px-4 pb-3 pt-4 min-h-[420px]">
+      <main className="min-h-[520px] px-3 pb-3 pt-3 sm:px-5">
         <p className="mb-1 text-[9px] font-black uppercase tracking-[0.22em] text-red-800">
           Page {page + 1} of {PAGE_META.length}
         </p>
         <h2
           ref={pageTitleRef}
           tabIndex={-1}
-          className="mb-4 border-b-4 border-double border-stone-900 pb-2 font-serif text-2xl font-black leading-none outline-none"
+          className="mb-3 border-b-[5px] border-double border-stone-950 pb-2 font-serif text-[28px] font-black uppercase leading-none tracking-[-0.035em] outline-none"
         >
           {PAGE_META[page].name}
         </h2>
@@ -251,14 +251,19 @@ function EditionStrip({ edition }: { edition: GazetteEdition }) {
 
 function Masthead({ edition }: { edition: GazetteEdition }) {
   return (
-    <header className="border-b-4 border-double border-stone-900 px-4 pb-3 pt-4 text-center">
+    <header className="border-b-[6px] border-double border-stone-950 px-3 pb-2 pt-3 text-center">
+      <div className="mb-2 grid grid-cols-[1fr_auto_1fr] items-center border-y border-stone-600 py-1 text-[8px] font-black uppercase tracking-[.13em] text-stone-700">
+        <span className="text-left">Independent · Unsupervised</span>
+        <span className="px-2 text-red-800">After Action Edition</span>
+        <span className="text-right">Price: Your Dignity</span>
+      </div>
       <p className="mb-1 text-[9px] font-black uppercase tracking-[0.24em] text-red-800">
         {edition.eventLine || edition.printedLine}
       </p>
-      <h1 className="font-serif text-2xl font-black leading-none tracking-tight sm:text-3xl">
+      <h1 className="font-serif text-[34px] font-black uppercase leading-[.86] tracking-[-.055em] sm:text-5xl">
         {edition.masthead || "THE WAR ROOM DISPATCH"}
       </h1>
-      <p className="mt-2 text-[11px] italic text-stone-600">
+      <p className="mt-2 font-serif text-[11px] font-bold italic text-stone-700">
         {edition.tagline}
         {edition.secretLetter ? (
           <span className="ml-1 font-serif font-black text-stone-800 underline decoration-dotted decoration-stone-400">
@@ -266,8 +271,8 @@ function Masthead({ edition }: { edition: GazetteEdition }) {
           </span>
         ) : null}
       </p>
-      <p className="mt-2 border-y border-stone-400 py-1 text-[10px] font-semibold uppercase tracking-widest text-stone-700">
-        {edition.volumeLabel}
+      <p className="mt-2 border-t-2 border-stone-950 pt-1 text-[9px] font-black uppercase tracking-[.16em] text-stone-800">
+        {edition.volumeLabel} · {edition.coverageLine}
       </p>
     </header>
   );
@@ -325,44 +330,52 @@ function FrontPage({ edition }: { edition: GazetteEdition }) {
 
   const [lead, ...briefs] = edition.sideStories;
   return (
-    <div className="space-y-4">
-      {lead ? (
-        <article>
-          <p className="mb-1 text-[10px] font-black uppercase tracking-[0.18em] text-red-800">
-            {lead.kicker} · Above the fold
-          </p>
-          <h3 className="font-serif text-3xl font-black leading-[1.02] text-stone-950">
-            {lead.headline}
-          </h3>
-          <p className="mt-3 text-[15px] font-medium leading-relaxed text-stone-800">
-            {lead.body}
-          </p>
-        </article>
-      ) : (
-        <article>
-          <p className="mb-1 text-[10px] font-black uppercase tracking-[0.18em] text-red-800">Room desk · Above the fold</p>
-          <h3 className="font-serif text-3xl font-black leading-[1.02]">THE ROOM SURVIVED ANOTHER WEEK</h3>
-          <p className="mt-3 text-[15px] leading-relaxed text-stone-800">The official record is still being assembled. The Locker Room has already reached several conclusions.</p>
-        </article>
-      )}
+    <div>
+      <div className="bg-red-800 px-2 py-1 text-center text-[9px] font-black uppercase tracking-[.28em] text-[#f4f0e6]">
+        Breaking · The room has issued a statement against accountability
+      </div>
+      <article className="border-b-[5px] border-double border-stone-950 py-3 text-center">
+        <p className="text-[9px] font-black uppercase tracking-[.22em] text-red-800">A1 · Commander of the week</p>
+        <h3 className="mx-auto mt-2 max-w-3xl font-serif text-[42px] font-black uppercase leading-[.83] tracking-[-.055em] text-stone-950 sm:text-6xl">
+          {edition.crown.headline}
+        </h3>
+        <p className="mx-auto mt-3 max-w-2xl border-y border-stone-500 py-2 font-serif text-[15px] font-bold leading-tight text-stone-800">
+          {edition.crown.deck}
+        </p>
+        <div className="mt-3 grid grid-cols-2 border-2 border-stone-950 bg-stone-950 text-[#f4f0e6]">
+          <div className="border-r border-stone-500 px-2 py-3"><p className="text-[8px] font-black uppercase tracking-widest text-red-300">Top brass</p><p className="mt-1 font-serif text-xl font-black uppercase leading-none">{edition.crown.names.join(" · ")}</p></div>
+          <div className="px-2 py-3"><p className="text-[8px] font-black uppercase tracking-widest text-red-300">Damage inflicted</p><p className="mt-1 font-serif text-3xl font-black leading-none">{edition.crown.pts} PTS</p></div>
+        </div>
+      </article>
 
-      <blockquote className="border-y-4 border-double border-stone-900 py-3 text-center">
-        <p className="font-serif text-xl font-black italic leading-snug">{edition.pullQuote.text}</p>
-        <footer className="mt-1 text-[11px] font-semibold text-stone-600">— {edition.pullQuote.by}</footer>
-      </blockquote>
-
-      <div className="rounded border-2 border-stone-800 bg-sky-50/90 px-3 py-3">
-        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-sky-900">War Room forecast · {edition.weather.kicker}</p>
-        <p className="mt-1 text-sm leading-snug text-stone-800">{edition.weather.body}</p>
+      <div className="grid grid-cols-1 border-b-[5px] border-double border-stone-950 sm:grid-cols-[1.45fr_.75fr]">
+        <article className="border-b border-stone-800 py-3 sm:border-b-0 sm:border-r sm:pr-3">
+          <p className="text-[9px] font-black uppercase tracking-[.18em] text-red-800">{lead?.kicker || "Room desk"} · Above the fold</p>
+          <h3 className="mt-1 font-serif text-[26px] font-black uppercase leading-[.94] tracking-[-.025em]">{lead?.headline || "THE ROOM SURVIVED ANOTHER WEEK"}</h3>
+          <p className="mt-2 text-[13px] leading-[1.35] text-stone-800 first-letter:float-left first-letter:mr-1 first-letter:font-serif first-letter:text-4xl first-letter:font-black first-letter:leading-[.8]">{lead?.body || "The official record is still being assembled. The Locker Room has already reached several conclusions."}</p>
+        </article>
+        <aside className="py-3 sm:pl-3">
+          <p className="text-[8px] font-black uppercase tracking-[.18em] text-stone-600">Wall of shame</p>
+          <h3 className="mt-1 font-serif text-xl font-black uppercase leading-[.95]">{edition.shame?.headline || "DIGNITY ESCAPES UNHARMED"}</h3>
+          <p className="mt-2 text-[11px] leading-snug text-stone-700">{edition.shame?.deck || edition.weather.body}</p>
+        </aside>
       </div>
 
-      {briefs.map((story, index) => (
-        <article key={`${story.headline}-${index}`} className="border-t border-stone-400 pt-3">
-          <p className="text-[9px] font-black uppercase tracking-[0.16em] text-stone-500">{story.kicker}</p>
-          <h3 className="mt-1 font-serif text-lg font-black leading-snug">{story.headline}</h3>
-          <p className="mt-1 text-[13px] leading-snug text-stone-700">{story.body}</p>
-        </article>
-      ))}
+      <blockquote className="border-b-2 border-stone-950 py-3 text-center">
+        <p className="font-serif text-lg font-black italic leading-tight">“{edition.pullQuote.text.replace(/^“|”$|^\"|\"$/g, "")}”</p>
+        <footer className="mt-1 text-[9px] font-black uppercase tracking-wider text-stone-600">— {edition.pullQuote.by}</footer>
+      </blockquote>
+
+      <div className="grid grid-cols-2 divide-x divide-stone-600 border-b-2 border-stone-950">
+        {briefs.slice(0, 2).map((story, index) => (
+          <article key={`${story.headline}-${index}`} className="px-2 py-3 first:pl-0 last:pr-0">
+            <p className="text-[8px] font-black uppercase tracking-[.14em] text-red-800">{story.kicker}</p>
+            <h3 className="mt-1 font-serif text-base font-black uppercase leading-[1]">{story.headline}</h3>
+            <p className="mt-1 text-[10px] leading-snug text-stone-700">{story.body}</p>
+          </article>
+        ))}
+      </div>
+      <p className="py-2 text-center text-[8px] font-black uppercase tracking-[.2em] text-stone-600">Forecast · {edition.weather.kicker} · {edition.weather.body}</p>
     </div>
   );
 }

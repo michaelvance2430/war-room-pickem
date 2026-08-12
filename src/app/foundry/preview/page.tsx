@@ -88,12 +88,12 @@ export default function FoundryPreviewPage() {
           : simulateFoundrySeason(state);
       update(next);
       setSimulation(null);
-      setGazetteWeek(simulation.kind === "week" ? state.week : next.gazetteWeeks[next.gazetteWeeks.length - 1] || null);
+      setGazetteWeek(simulation.kind === "week" && state.week >= 1 ? state.week : next.gazetteWeeks[next.gazetteWeeks.length - 1] || null);
       // The finale belongs to the championship result, regardless of whether
       // Mike arrived one week at a time or used Sim Season.
       if (isFoundrySeasonFinal(next)) setRingCeremony(next);
       const cfbPhaseThreeOpened = simulation.kind === "week" && next.sport === "cfb" && next.week === foundryPostseasonStartWeek("cfb") + 1;
-      setView(cfbPhaseThreeOpened ? "postseason" : simulation.kind === "week" ? "gazette" : "home");
+      setView(cfbPhaseThreeOpened ? "postseason" : simulation.kind === "week" && state.week >= 1 ? "gazette" : "home");
     }, simulation.step === 0 ? 500 : 850);
     return () => window.clearTimeout(timer);
   }, [simulation, state]);
@@ -141,7 +141,7 @@ export default function FoundryPreviewPage() {
     {simulation && <SimulationPulse kind={simulation.kind} step={simulation.step} />}
     {resetReceipt && <div className="fixed inset-x-3 top-[max(12px,env(safe-area-inset-top))] z-[70] mx-auto max-w-sm rounded-2xl border-2 border-emerald-300 bg-emerald-950/95 p-4 text-center shadow-2xl" role="status"><p className="text-[9px] font-black uppercase tracking-[.2em] text-emerald-300">Foundry reset complete</p><p className="mt-2 text-sm font-black">Season, picks, brackets, simulations, and weapon states cleared.</p><p className="mt-1 text-[10px] text-emerald-100/65">No production data was touched.</p></div>}
     {ringCeremony && <PreviewRingCeremony state={ringCeremony} onClose={() => setRingCeremony(null)} />}
-    <PreviewChrome state={state} busy={!!simulation} onWeek={() => isFoundrySeasonFinal(state) ? setRingCeremony(state) : state.sport === "cbb" && state.week >= foundryPostseasonStartWeek("cbb") && !state.ncaaBracketLocked ? setView("postseason") : setSimulation({ kind: "week", step: 0 })} onRegular={() => { if (state.sport === "cfb") localStorage.removeItem("warroom-foundry-cfb-act-three-v3"); if (state.sport === "nfl") localStorage.removeItem("warroom-foundry-nfl-maps-v1"); setSimulation({ kind: "regular", step: 0 }); }} onSeason={() => isFoundrySeasonFinal(state) ? setRingCeremony(state) : state.sport === "cbb" && state.week >= foundryPostseasonStartWeek("cbb") && !state.ncaaBracketLocked ? setView("postseason") : setSimulation({ kind: "season", step: 0 })} onRole={(role) => update(setFoundryWalkthroughRole(state, role))} onGazette={() => { setGazetteWeek(state.gazetteWeeks[state.gazetteWeeks.length - 1] || null); setView("gazette"); }} onBrackets={() => setView("postseason")} onHome={() => setView("home")} onReset={() => { localStorage.removeItem("warroom-foundry-cfb-act-three-v3"); localStorage.removeItem("warroom-foundry-cfb-act-three-v2"); localStorage.removeItem("warroom-foundry-nfl-maps-v1"); update(createFoundryWalkthrough(state.sport, 1, state.role)); setGazetteWeek(null); setView("home"); setResetReceipt(true); window.setTimeout(() => setResetReceipt(false), 3200); }} />
+    <PreviewChrome state={state} busy={!!simulation} onWeek={() => isFoundrySeasonFinal(state) ? setRingCeremony(state) : state.sport === "cbb" && state.week >= foundryPostseasonStartWeek("cbb") && !state.ncaaBracketLocked ? setView("postseason") : setSimulation({ kind: "week", step: 0 })} onRegular={() => { if (state.sport === "cfb") localStorage.removeItem("warroom-foundry-cfb-act-three-v3"); if (state.sport === "nfl") localStorage.removeItem("warroom-foundry-nfl-maps-v1"); setSimulation({ kind: "regular", step: 0 }); }} onSeason={() => isFoundrySeasonFinal(state) ? setRingCeremony(state) : state.sport === "cbb" && state.week >= foundryPostseasonStartWeek("cbb") && !state.ncaaBracketLocked ? setView("postseason") : setSimulation({ kind: "season", step: 0 })} onRole={(role) => update(setFoundryWalkthroughRole(state, role))} onGazette={() => { setGazetteWeek(state.gazetteWeeks[state.gazetteWeeks.length - 1] || null); setView("gazette"); }} onBrackets={() => setView("postseason")} onHome={() => setView("home")} onReset={() => { localStorage.removeItem("warroom-foundry-cfb-act-three-v3"); localStorage.removeItem("warroom-foundry-cfb-act-three-v2"); localStorage.removeItem("warroom-foundry-nfl-maps-v1"); update(createFoundryWalkthrough(state.sport, undefined, state.role)); setGazetteWeek(null); setView("home"); setResetReceipt(true); window.setTimeout(() => setResetReceipt(false), 3200); }} />
   </main>;
 }
 

@@ -4,9 +4,22 @@ import {
   validateDispatchAiDraft,
 } from "../src/lib/dispatch-ai-contract.ts";
 import { weekDateRangeLabel } from "../src/lib/season-calendar.ts";
+import {
+  createFoundryWalkthrough,
+  simulateNextFoundryWeek,
+} from "../src/lib/foundry-walkthrough.ts";
 
 assert.equal(weekDateRangeLabel(1, "cfb"), "Sep 3–7, 2026");
 assert.equal(weekDateRangeLabel(1, "nfl"), "Sep 10–14, 2026");
+
+const cfbOpening = createFoundryWalkthrough("cfb");
+assert.equal(cfbOpening.week, 0, "CFB Sandbox starts in Week 0");
+const cfbWeekOne = simulateNextFoundryWeek(cfbOpening);
+assert.equal(cfbWeekOne.week, 1, "Week 0 advances to Week 1");
+assert.deepEqual(cfbWeekOne.gazetteWeeks, [], "Week 0 never creates a Dispatch");
+const cfbWeekTwo = simulateNextFoundryWeek(cfbWeekOne);
+assert.equal(cfbWeekTwo.week, 2, "Week 1 advances to Week 2");
+assert.deepEqual(cfbWeekTwo.gazetteWeeks, [1], "first Dispatch covers Week 1");
 
 const packet = {
   schemaVersion: 1,
@@ -30,4 +43,3 @@ assert.match(paper, /edition\.coverageLine/);
 assert.match(nav, /label: "The Dispatch"/);
 
 console.log("Dispatch contract verified: Week 2 debut · real coverage ranges · cited AI stories only");
-

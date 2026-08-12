@@ -15,7 +15,7 @@ export default function FoundryRoomSimulator() {
   }, []);
 
   function enterSport(sport: PreviewSport) {
-    const state = createFoundryWalkthrough(sport, 1, "player");
+    const state = createFoundryWalkthrough(sport, undefined, "player");
     saveFoundryWalkthrough(state);
     router.push("/foundry/preview");
   }
