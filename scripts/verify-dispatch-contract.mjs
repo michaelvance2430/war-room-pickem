@@ -40,6 +40,9 @@ const nav = readFileSync("src/components/Nav.tsx", "utf8");
 assert.doesNotMatch(gazette, /edition\.weekIndex < 1|weekIndex < 1/);
 assert.match(gazette, /THE WAR ROOM DISPATCH/);
 assert.match(paper, /edition\.coverageLine/);
+assert.match(paper, /CFB_DISPATCH_ART/);
+assert.match(paper, /NFL_DISPATCH_ART/);
+assert.match(paper, /edition\.weekIndex.*desk\.length/);
 assert.match(nav, /label: "The Dispatch"/);
 
 console.log("Dispatch contract verified: immediate first-score release · real coverage ranges · cited AI stories only");

@@ -95,7 +95,7 @@ export default function HomeLockMissionClock() {
             Mission clock · {sport} week {clock.week}
           </p>
           <p className={`mt-0.5 text-[11px] font-black uppercase tracking-[0.12em] ${countdown.locked ? "text-white/80" : urgent ? "text-red-200" : finalDay ? "text-amber-200" : "text-emerald-300"}`}>
-            {countdown.locked ? "Card locked · games underway" : "Next lock"}
+            {countdown.locked ? "Card closed · games underway" : "Next lock"}
           </p>
         </div>
 

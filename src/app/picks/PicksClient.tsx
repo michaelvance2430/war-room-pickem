@@ -2039,7 +2039,7 @@ export default function PicksClient() {
         {hasCard && games.length > 0 && (
           <LeagueLockTimer
             games={games}
-            hidden={practiceMode || isPastOrOtherWeek || !weekEditable}
+            hidden={practiceMode || isPastOrOtherWeek}
           />
         )}
 

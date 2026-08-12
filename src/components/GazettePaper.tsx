@@ -278,6 +278,29 @@ function Masthead({ edition }: { edition: GazetteEdition }) {
   );
 }
 
+const CFB_DISPATCH_ART = [
+  "/skins/cfb-situation/matchups.webp",
+  "/skins/cfb-standings/jumbotron.webp",
+  "/skins/cfb-locker/room.webp",
+  "/skins/cfb-picks/film-room.webp",
+  "/skins/cfb-situation/standings.webp",
+  "/skins/cfb-situation/locker.webp",
+] as const;
+
+const NFL_DISPATCH_ART = [
+  "/skins/nfl-sunday/gazette-mobile.webp",
+  "/skins/nfl-sunday/standings-mobile.webp",
+  "/skins/nfl-sunday/locker-mobile.webp",
+  "/skins/nfl-sunday/board-mobile.webp",
+  "/skins/nfl-sunday/picks-mobile.webp",
+  "/skins/nfl-sunday/championship-mobile.webp",
+] as const;
+
+function dispatchHeroArt(edition: GazetteEdition): string {
+  const desk = edition.sportId === "nfl" ? NFL_DISPATCH_ART : CFB_DISPATCH_ART;
+  return desk[Math.abs(edition.weekIndex) % desk.length];
+}
+
 function FrontPage({ edition }: { edition: GazetteEdition }) {
   if (edition.chaosDetonation) {
     const launch = edition.chaosDetonation;
@@ -345,7 +368,7 @@ function FrontPage({ edition }: { edition: GazetteEdition }) {
         <div className="mt-3 grid grid-cols-[1.75fr_.8fr] gap-2 text-left">
           <figure className="relative min-h-[210px] overflow-hidden border-[3px] border-stone-950 bg-stone-900 sm:min-h-[290px]">
             <Image
-              src={edition.sportId === "nfl" ? "/skins/nfl-sunday/gazette-mobile.webp" : "/skins/cfb-situation/hero.webp"}
+              src={dispatchHeroArt(edition)}
               alt="War Room game-day command center"
               fill
               priority
