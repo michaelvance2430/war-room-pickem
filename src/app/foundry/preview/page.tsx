@@ -415,7 +415,12 @@ function Gazette({ state, selectedWeek, onSelectWeek }: { state: FoundryWalkthro
         : emergencyProtocol === "dead_hand"
           ? { names: ["Mike V"], pts: 0, kind: "clear" as const, headline: "MIKE V HAS REMOVED HIMSELF FROM THE CHAIN OF COMMAND", deck: "Dead Hand seized all 25 bowl picks, spent every confidence point, and locked the board before its former commander could object. The machine continues to insist it identified something in Boise." }
         : raw.chaosDetonation;
-  const edition = { ...raw, weekIndex: active, weekLabel: PREVIEW_SPORTS[state.sport].weekLabel(active), sportId: state.sport, volumeLabel: `${PREVIEW_SPORTS[state.sport].room.toUpperCase()} · FOUNDRY PREVIEW · NO CLOUD WRITES`, chaosDetonation: tacticalNukeDetonation, emergencyProtocol };
+  const mariaMeltdown = {
+    kicker: "Locker wire",
+    headline: "MARIA FILES FORMAL COMPLAINT IN MOST INFORMAL WAY POSSIBLE",
+    body: 'Maria delivered a fully redacted outburst: "#$@#$(@*#$@#*($()@$)@*#$". Somebody get that woman a Snickers.',
+  };
+  const edition = { ...raw, weekIndex: active, weekLabel: PREVIEW_SPORTS[state.sport].weekLabel(active), sportId: state.sport, volumeLabel: `${PREVIEW_SPORTS[state.sport].room.toUpperCase()} · FOUNDRY PREVIEW · NO CLOUD WRITES`, sideStories: [mariaMeltdown, ...(raw.sideStories || [])].slice(0, 8), chaosDetonation: tacticalNukeDetonation, emergencyProtocol };
   return <Page title="Dispatch Archive" note={`${weeks.length} scored edition${weeks.length === 1 ? "" : "s"} · choose a week, then read its four pages.`}><nav className="mb-4 rounded-xl border border-border bg-card p-3" aria-label="Dispatch editions"><label className="block text-[9px] font-black uppercase tracking-[.16em] text-muted sm:hidden" htmlFor="gazette-edition-picker">Edition</label><select id="gazette-edition-picker" value={active} onChange={(event) => onSelectWeek(Number(event.target.value))} className="mt-2 min-h-11 w-full rounded-lg border border-border bg-background px-3 text-sm font-black sm:hidden">{[...weeks].reverse().map((week) => <option key={week} value={week}>{PREVIEW_SPORTS[state.sport].weekLabel(week)}{week === weeks[weeks.length - 1] ? " · latest" : ""}</option>)}</select><div className="hidden gap-2 overflow-x-auto pb-1 sm:flex">{weeks.map((week) => <button key={week} type="button" onClick={() => onSelectWeek(week)} className={`min-h-10 shrink-0 rounded-lg px-3 text-xs font-black ${week === active ? "bg-stone-100 text-stone-900" : "border border-border"}`}>{PREVIEW_SPORTS[state.sport].weekLabel(week)}</button>)}</div></nav>{state.sport === "cbb" && ncaaResultsWindow(state.ncaaResults || {}) > 0 && <MadnessGazetteBulletin state={state} />}<GazettePaper edition={edition} foundryPreview /></Page>;
 }
 
