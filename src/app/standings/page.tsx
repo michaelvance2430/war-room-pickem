@@ -649,7 +649,7 @@ export default function StandingsPage() {
                                 )}
                               >
                                 <PlayerLink id={player.id} name={player.name} />
-                                {standingsHardwareFlair(player.name).map((f) => (
+                                {standingsHardwareFlair(player.name, player.id).map((f) => (
                                   <span
                                     key={f.title}
                                     className="ml-1 inline-block text-sm align-middle"
@@ -810,7 +810,7 @@ export default function StandingsPage() {
                                   id={player.id}
                                   name={player.name}
                                 />
-                                {standingsHardwareFlair(player.name).map(
+                                {standingsHardwareFlair(player.name, player.id).map(
                                   (f) => (
                                     <span
                                       key={f.title}

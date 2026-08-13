@@ -498,7 +498,7 @@ export const BIG_GAME_KINDS: ProfileTrophyKind[] = [
 ];
 
 /** Tiny standings flair — sport-local to the active league board only. */
-export function standingsHardwareFlair(playerName: string): {
+export function standingsHardwareFlair(playerName: string, playerId = ""): {
   emoji: string;
   title: string;
 }[] {
@@ -511,7 +511,7 @@ export function standingsHardwareFlair(playerName: string): {
     sportId = null;
   }
   const items = getProfileHardware({
-    playerId: "",
+    playerId,
     playerName,
     leagueTrophies: [],
     sportId,
