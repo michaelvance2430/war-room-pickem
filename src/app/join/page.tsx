@@ -834,7 +834,33 @@ function JoinPageInner() {
 
 {mode === "join" && (
           <div className="rounded-xl border border-border bg-card p-5 space-y-4">
-      <h2 className="font-semibold">Join league</h2>
+            {deepLinkCode && (
+              <div className="overflow-hidden rounded-xl border border-primary/40 bg-gradient-to-br from-primary/15 via-background to-black p-5 text-center">
+                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">
+                  Private War Room invitation
+                </p>
+                <h2 className="mt-2 text-2xl font-black text-foreground">
+                  Your seat is waiting.
+                </h2>
+                <p className="mx-auto mt-2 max-w-sm text-xs leading-relaxed text-muted">
+                  Weekly picks become standings, rivalries, hardware, and a Dispatch
+                  that remembers exactly who talked big before collapsing.
+                </p>
+                <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+                  {[
+                    ["10–15 min", "a week"],
+                    ["No ads", "just the room"],
+                    ["Free", "to play"],
+                  ].map(([value, label]) => (
+                    <div key={value} className="rounded-lg border border-white/10 bg-black/35 px-2 py-2.5">
+                      <p className="text-xs font-black text-foreground">{value}</p>
+                      <p className="mt-0.5 text-[9px] uppercase tracking-wide text-muted">{label}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+      <h2 className="font-semibold">{deepLinkCode ? "Claim your seat" : "Join league"}</h2>
             {deepLinkCode ? (
               <p className="text-xs text-primary font-medium leading-relaxed">
                 Invite link detected — code filled in. Confirm your name and

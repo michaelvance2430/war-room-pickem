@@ -8,6 +8,7 @@
 import type { LeagueMembership } from "@/lib/session-restore";
 import { membershipRoleLabel } from "@/lib/session-restore";
 import { getSportPack } from "@/lib/sports/registry";
+import { MAX_LEAGUE_PLAYERS } from "@/lib/league-limits";
 
 type Props = {
   membership: LeagueMembership;
@@ -84,6 +85,20 @@ export default function LeagueMembershipCard({
           </Chip>
         )}
         {active && <Chip tone="active">Active</Chip>}
+      </div>
+
+      <div className="mb-3 rounded-lg border border-border/70 bg-background/35 px-3 py-2.5">
+        <p className="text-[10px] leading-relaxed text-muted">
+          {pack.rulesOneLiner}
+        </p>
+        {typeof humans === "number" && (
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-black/50" aria-label={`${humans} of ${MAX_LEAGUE_PLAYERS} seats filled`}>
+            <div
+              className="h-full rounded-full bg-primary/80"
+              style={{ width: `${Math.max(4, Math.min(100, (humans / MAX_LEAGUE_PLAYERS) * 100))}%` }}
+            />
+          </div>
+        )}
       </div>
 
       {children}

@@ -14,6 +14,7 @@ import {
 import { MAX_LEAGUE_PLAYERS } from "@/lib/league-limits";
 import OwnershipNotice from "@/components/OwnershipNotice";
 import BrandMark from "@/components/BrandMark";
+import RoomDiscoveryCard from "@/components/RoomDiscoveryCard";
 
 type Phase =
   | "boot"
@@ -253,29 +254,18 @@ export default function OpenRoomPage() {
               <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted mb-2">
                 Open rooms filling now
               </p>
-              <ul className="space-y-2">
+              <div className="space-y-3">
                 {preview.map((r, i) => (
-                  <li
+                  <RoomDiscoveryCard
                     key={r.id}
-                    className={`rounded-lg border px-3 py-2 text-sm flex justify-between gap-2 ${
-                      i === 0
-                        ? "border-primary/50 bg-primary/10"
-                        : "border-border bg-background/40"
-                    }`}
-                  >
-                    <span className="font-medium text-foreground truncate">
-                      {i === 0 ? "→ " : ""}
-                      {r.name}
-                    </span>
-                    <span className="text-xs text-muted shrink-0 tabular-nums">
-                      {r.memberCount}/{r.maxHumanMembers || MAX_LEAGUE_PLAYERS}
-                      <span className="text-primary ml-1">
-                        · {r.seatsLeft} left
-                      </span>
-                    </span>
-                  </li>
+                    name={r.name}
+                    sportId={r.sportId}
+                    memberCount={r.memberCount}
+                    maxMembers={r.maxHumanMembers || MAX_LEAGUE_PLAYERS}
+                    featured={i === 0}
+                  />
                 ))}
-              </ul>
+              </div>
               <p className="text-[11px] text-muted mt-2 leading-relaxed">
                 First in line is the fullest open room — we pack that one before
                 starting the next. Codes stay private.
