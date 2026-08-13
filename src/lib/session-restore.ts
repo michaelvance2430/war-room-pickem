@@ -20,6 +20,8 @@ export interface LeagueMembership {
   leagueName: string;
   code: string;
   commissionerId: string;
+  /** Verified account display name for the room commissioner. */
+  commissionerName?: string | null;
   createdAt: string;
   cutPercent: number;
   regularSeasonWeeks: number;
@@ -374,6 +376,34 @@ async function fetchMyMembershipsFresh(
       }
     } catch {
       /* counts optional */
+    }
+  }
+
+  // Host identity — one batched profile lookup for every room card.
+  // Display-only; commissionerId remains the authorization source of truth.
+  if (list.length) {
+    try {
+      const commissionerIds = [
+        ...new Set(list.map((m) => m.commissionerId).filter(Boolean)),
+      ];
+      const { data: hosts, error: hostErr } = await supabase
+        .from("profiles")
+        .select("id, display_name")
+        .in("id", commissionerIds);
+      if (!hostErr && hosts?.length) {
+        const names = new Map(
+          hosts.map((host) => [
+            host.id as string,
+            ((host.display_name as string | null) || "").trim(),
+          ])
+        );
+        for (const membership of list) {
+          membership.commissionerName =
+            names.get(membership.commissionerId) || null;
+        }
+      }
+    } catch {
+      /* host label is optional; room access must never depend on it */
     }
   }
 

@@ -68,6 +68,13 @@ export default function LeagueMembershipCard({
             {m.code}
             {active ? " · Active" : ""}
           </div>
+          <p className="mt-1 text-[11px] font-medium text-foreground/80">
+            {isCommish
+              ? "Commanded by you"
+              : m.commissionerName
+                ? `Hosted by ${m.commissionerName}`
+                : "Commissioner-hosted room"}
+          </p>
         </div>
       </div>
 
@@ -88,7 +95,10 @@ export default function LeagueMembershipCard({
       </div>
 
       <div className="mb-3 rounded-lg border border-border/70 bg-background/35 px-3 py-2.5">
-        <p className="text-[10px] leading-relaxed text-muted">
+        <p className="text-[9px] font-black uppercase tracking-[0.16em] text-primary/80">
+          Room format
+        </p>
+        <p className="mt-1 text-[10px] leading-relaxed text-muted">
           {pack.rulesOneLiner}
         </p>
         {typeof humans === "number" && (

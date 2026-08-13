@@ -25,6 +25,7 @@
     "verify:profile-earned-badges": "node scripts/verify-profile-earned-badges.mjs",
     "verify:profile-trophy-room": "node scripts/verify-profile-trophy-room.mjs",
     "verify:room-discovery": "node scripts/verify-room-discovery.mjs",
+    "verify:commissioner-host-identity": "node scripts/verify-commissioner-host-identity.mjs",
     "verify:fieldhouse-hellfire": "node --import tsx scripts/verify-fieldhouse-hellfire.mjs",
     "verify:nfl-jdam": "node --import tsx scripts/verify-nfl-jdam.mjs",
     "verify:nfl-season": "node --import tsx scripts/verify-nfl-season-language.mjs",
