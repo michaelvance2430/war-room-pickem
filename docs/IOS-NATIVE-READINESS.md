@@ -23,7 +23,7 @@ iOS accounts. Supabase remains the source of truth.
 | Native iOS project | Development build ready | Capacitor/Xcode project builds and runs in the iPhone simulator |
 | Native opening | Ready | Bundled vertical opening plays natively with Skip Intro, then reveals the live app |
 | Runtime boundary | Active | `src/lib/native-contract.ts` plus native URL routing; web opening is suppressed in the container |
-| Universal/deep links | Partial | `warroom://` and in-app URL routing are wired; Associated Domains, AASA, and Supabase redirects remain |
+| Universal/deep links | Integration ready | `warroom://`, Associated Domains, AASA endpoint, and in-app routing are wired; Apple Team ID, deployment, and physical-device proof remain |
 | Password recovery | Web only | Current reset uses `window.location.origin`; route through universal-link contract |
 | Account deletion | **App Review blocker** | Product contract and cascade safety gate added; schema/server implementation remains gated |
 | User reporting/blocking | **App Review blocker** | Staff moderation exists; player report/block controls were not found |
@@ -63,8 +63,8 @@ The binding MIA/deletion behavior and current cascade blocker are defined in
 4. Confirm Apple Developer membership and the exact legal seller identity.
 5. Create the App ID using `com.warroompicks.app` only after confirming it in
    Apple Developer; do not casually change the bundle ID afterward.
-6. Configure signing, Associated Domains, push capability, and app groups only
-   when required.
+6. Complete signing and set `APPLE_TEAM_ID` on the website deployment so the
+   prepared Associated Domains/AASA handshake becomes live.
 7. Run the current build on Mike's physical iPhone.
 8. Add native value before App Store submission: push, universal invite links,
    native share, haptics, badge count, and polished resume behavior.

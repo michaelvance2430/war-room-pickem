@@ -89,6 +89,7 @@ The app loads War Room's canonical HTTPS product inside a Capacitor iOS containe
 
 ## Owner actions before upload
 
+- Copy the 10-character Apple Team ID from Membership Details and add it to the website deployment as `APPLE_TEAM_ID`.
 - Create a fictional, populated App Review league and two non-personal review accounts.
 - Put the credentials in App Store Connect Review Information, never in source control.
 - Confirm the support inbox is monitored.
