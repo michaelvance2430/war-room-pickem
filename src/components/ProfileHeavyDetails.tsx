@@ -357,6 +357,10 @@ export default function ProfileHeavyDetails({
   const isWwcLeague = sportId === "soccer_wwc";
   const mock = isMockPlayer(player);
   const earnedCount = badges.filter((b) => b.earned).length;
+  const visibleBadges = isSelf ? badges : badges.filter((badge) => badge.earned);
+  const visibleWwcBadges = isSelf
+    ? wwcBadges
+    : wwcBadges.filter((badge) => badge.earned);
   const leagueName = lg?.name || "War Room";
 
   if (phase === "loading") {
@@ -414,11 +418,11 @@ export default function ProfileHeavyDetails({
         />
       )}
 
-      {isWwcLeague && wwcBadges.length > 0 && (
-        <WwcPassportShelf badges={wwcBadges} />
+      {isWwcLeague && visibleWwcBadges.length > 0 && (
+        <WwcPassportShelf badges={visibleWwcBadges} />
       )}
 
-      {!isWwcLeague && badges.length > 0 && (
+      {!isWwcLeague && visibleBadges.length > 0 && (
         <div className="rounded-2xl border border-amber-400/30 bg-amber-400/5 p-5 sm:p-6 mb-6">
           <div className="flex items-center justify-between gap-2 mb-2">
             <p className="text-[10px] uppercase tracking-wider text-amber-300 font-bold">
@@ -428,26 +432,30 @@ export default function ProfileHeavyDetails({
               Live foxhole →
             </Link>
           </div>
-          <BadgeShelf badges={filterCrewCheevos(badges)} />
+          <BadgeShelf badges={filterCrewCheevos(visibleBadges)} />
         </div>
       )}
 
       {!isWwcLeague && (
         <div className="rounded-2xl border border-border bg-card p-5 sm:p-6 mb-6">
-          {badges.length > 0 ? (
+          {visibleBadges.length > 0 ? (
             <>
               <p className="text-[10px] uppercase tracking-wider text-muted font-bold mb-1">
                 Achievements
               </p>
               <p className="text-xs text-muted mb-4">
                 {earnedCount > 0
-                  ? `${earnedCount} earned in this catalog — open a badge for the story.`
+                  ? isSelf
+                    ? `${earnedCount} earned in this catalog — open a badge for the story.`
+                    : `${earnedCount} earned — open a badge for the story.`
                   : "Nothing earned yet. The first card is still destiny."}
               </p>
-              <BadgeShelf badges={badges} />
+              <BadgeShelf badges={visibleBadges} />
             </>
           ) : (
-            <p className="text-sm text-muted">No badges loaded.</p>
+            <p className="text-sm text-muted">
+              {isSelf ? "No badges loaded." : "No achievements earned yet."}
+            </p>
           )}
         </div>
       )}
