@@ -18,6 +18,8 @@ const nativeRuntime = read("src/components/NativeRuntime.tsx");
 const seasonOpening = read("src/components/SeasonOpening.tsx");
 const capacitorConfig = read("capacitor.config.ts");
 const sceneDelegate = read("ios/App/App/SceneDelegate.swift");
+const infoPlist = read("ios/App/App/Info.plist");
+const submissionPacket = read("docs/APP-STORE-SUBMISSION.md");
 const nativeFeedback = read("src/lib/native-feedback.ts");
 const commishOnboarding = read("src/lib/commish-onboarding.ts");
 
@@ -49,5 +51,10 @@ assert(capacitorConfig.includes('appId: "com.warroompicks.app"'), "Capacitor bun
 assert(capacitorConfig.includes('overlaysWebView: false'), "iPhone status bar can cover War Room chrome");
 assert(sceneDelegate.includes("SeasonOpeningViewController"), "native opening controller missing");
 assert(sceneDelegate.includes('subdirectory: "public/media"'), "native opening asset path missing");
+assert(infoPlist.includes("ITSAppUsesNonExemptEncryption"), "export compliance declaration missing");
+assert(!infoPlist.includes("UIInterfaceOrientationLandscapeLeft") || infoPlist.indexOf("UIInterfaceOrientationLandscapeLeft") > infoPlist.indexOf("UISupportedInterfaceOrientations~ipad"), "iPhone must remain portrait-first");
+assert(submissionPacket.includes("Tracking: **No**"), "App Privacy tracking answer missing");
+assert(submissionPacket.includes("Gambling with real money or redeemable currency: **No**"), "real-money boundary missing");
+assert(submissionPacket.includes("Create a fictional, populated App Review league"), "review account owner action missing");
 
 console.log("[native-readiness] PASS — identity, links, safe areas, and free-1.0 Plus guard verified");
