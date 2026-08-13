@@ -38,6 +38,7 @@
     "verify:lock-clock": "node scripts/verify-lock-clock-surfaces.mjs",
     "verify:commissioner-journey": "node --import tsx scripts/verify-commissioner-journey.mjs",
     "verify:native-readiness": "node scripts/verify-native-readiness.mjs",
+    "verify:invite-auth": "node scripts/verify-invite-auth-flow.mjs",
     "verify:account-lifecycle": "node scripts/verify-account-lifecycle.mjs && node scripts/verify-account-deletion-ui.mjs",
     "verify:crew-continuity": "node --import tsx scripts/verify-crew-continuity.mjs",
     "verify:egg-catalog": "node scripts/verify-easter-egg-catalog-parity.mjs",

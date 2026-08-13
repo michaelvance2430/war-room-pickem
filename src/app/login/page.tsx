@@ -54,7 +54,6 @@ function LoginPageInner() {
       peekPendingJoinCode();
     if (code) {
       stashPendingJoinCode(code);
-      setMode("signup");
     }
   }, [searchParams]);
 
