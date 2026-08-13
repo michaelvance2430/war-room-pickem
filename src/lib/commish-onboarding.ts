@@ -732,6 +732,10 @@ export async function shareLeagueInvite(opts: {
   flavor?: InviteFlavor | "random";
   sportId?: string | null;
 }): Promise<"shared" | "copied" | "failed"> {
+  const { nativeSelectionFeedback, nativeSuccessFeedback } = await import(
+    "@/lib/native-feedback"
+  );
+  await nativeSelectionFeedback();
   const sportId = resolveInviteSportId(opts.sportId);
   const text = buildInviteShareText({
     ...opts,
@@ -749,6 +753,7 @@ export async function shareLeagueInvite(opts: {
         text,
         url: url || undefined,
       });
+      await nativeSuccessFeedback();
       return "shared";
     }
   } catch (e: unknown) {
@@ -759,6 +764,7 @@ export async function shareLeagueInvite(opts: {
   }
   try {
     await navigator.clipboard.writeText(text);
+    await nativeSuccessFeedback();
     return "copied";
   } catch {
     return "failed";

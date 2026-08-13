@@ -18,6 +18,8 @@ const nativeRuntime = read("src/components/NativeRuntime.tsx");
 const seasonOpening = read("src/components/SeasonOpening.tsx");
 const capacitorConfig = read("capacitor.config.ts");
 const sceneDelegate = read("ios/App/App/SceneDelegate.swift");
+const nativeFeedback = read("src/lib/native-feedback.ts");
+const commishOnboarding = read("src/lib/commish-onboarding.ts");
 
 assert(manifest.name === "War Room Pick'Em", "manifest app name drifted");
 assert(manifest.id === "/" && manifest.scope === "/", "manifest identity/scope missing");
@@ -36,7 +38,12 @@ assert(plusContract.includes("export const WAR_ROOM_PLUS_PUBLIC = false"), "Plus
 assert(plusContract.includes('"competitive_fairness"'), "free competitive fairness boundary missing");
 assert(plusContract.includes('"extra_points"'), "never-paid competitive guard missing");
 assert(nativeRuntime.includes('App.addListener("appUrlOpen"'), "native deep-link listener missing");
+assert(nativeRuntime.includes('App.addListener("appStateChange"'), "native resume listener missing");
+assert(nativeRuntime.includes("App.getLaunchUrl()"), "cold-start deep-link handling missing");
+assert(nativeRuntime.includes('router.refresh()'), "native foreground does not refresh server state");
 assert(nativeRuntime.includes("safeWarRoomPath"), "native deep links bypass safe path guard");
+assert(nativeFeedback.includes('import("@capacitor/haptics")'), "native haptic adapter missing");
+assert(commishOnboarding.includes("nativeSuccessFeedback"), "invite sharing lacks native success feedback");
 assert(seasonOpening.includes("isWarRoomNative()"), "web opening can stack over native opening");
 assert(capacitorConfig.includes('appId: "com.warroompicks.app"'), "Capacitor bundle ID drifted");
 assert(capacitorConfig.includes('overlaysWebView: false'), "iPhone status bar can cover War Room chrome");

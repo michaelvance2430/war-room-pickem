@@ -29,20 +29,30 @@ export default function NativeRuntime() {
   useEffect(() => {
     if (!isWarRoomNative()) return;
     let cancelled = false;
-    let removeUrlListener: (() => Promise<void>) | undefined;
+    const removers: Array<() => Promise<void>> = [];
 
     void import("@capacitor/app").then(async ({ App }) => {
-      const listener = await App.addListener("appUrlOpen", ({ url }) => {
+      const openUrl = ({ url }: { url: string }) => {
         const path = pathFromNativeUrl(url);
         if (path) router.push(path);
+      };
+      const urlListener = await App.addListener("appUrlOpen", openUrl);
+      const stateListener = await App.addListener("appStateChange", ({ isActive }) => {
+        if (!isActive) return;
+        window.dispatchEvent(new CustomEvent("warroom:native-resume"));
+        router.refresh();
       });
-      if (cancelled) await listener.remove();
-      else removeUrlListener = () => listener.remove();
+      const launchUrl = await App.getLaunchUrl();
+      if (launchUrl?.url) openUrl(launchUrl);
+
+      const newRemovers = [() => urlListener.remove(), () => stateListener.remove()];
+      if (cancelled) await Promise.all(newRemovers.map((remove) => remove()));
+      else removers.push(...newRemovers);
     });
 
     return () => {
       cancelled = true;
-      void removeUrlListener?.();
+      void Promise.all(removers.map((remove) => remove()));
     };
   }, [router]);
 
