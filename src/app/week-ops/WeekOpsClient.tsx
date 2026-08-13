@@ -969,6 +969,14 @@ export default function WeekOpsClient() {
             >
               Done → Home
             </button>
+            {!/LIVE/i.test(doneLabel) && (
+              <Link
+                href="/commissioner-plus/results"
+                className="flex min-h-[52px] w-full items-center justify-center rounded-2xl border border-amber-300/50 bg-amber-300/10 px-4 text-sm font-extrabold text-amber-200"
+              >
+                Preview shareable results ↗
+              </Link>
+            )}
           </div>
         )}
 
