@@ -11,4 +11,5 @@ expect(page.includes("if (!isOps())"), "Weekly results preview must be commissio
 expect(page.includes("never reveals anyone&apos;s picks"), "Preview must state its pick-privacy boundary.");
 expect(!lib.includes("pick_games") && !lib.includes("prop_choice"), "Share card must not fetch or expose picks.");
 expect(ops.includes('href="/commissioner-plus/results"'), "Scoring completion must offer the results preview.");
+expect(page.indexOf("Share this card") < page.indexOf("alt={`${model.leagueName}"), "Share control must appear above the tall mobile preview.");
 console.log("Commissioner weekly results verified: real scores · ops only · no pick leakage · share path wired");

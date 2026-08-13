@@ -72,14 +72,14 @@ export default function CommissionerWeeklyResultsPage() {
         )}
         {model && preview && (
           <div className="mt-6 space-y-4">
+            <button type="button" onClick={() => void share()} className="min-h-14 w-full rounded-2xl bg-amber-300 px-4 text-base font-black text-black shadow-[0_0_30px_rgba(252,211,77,.18)]">
+              Share this card ↗
+            </button>
+            {status && <p className="text-center text-xs text-muted">{status}</p>}
             <div className="overflow-hidden rounded-2xl border-2 border-amber-300/30 bg-black shadow-2xl">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={preview} alt={`${model.leagueName} ${model.weekLabel} weekly results card`} className="block h-auto w-full" />
             </div>
-            <button type="button" onClick={() => void share()} className="min-h-14 w-full rounded-2xl bg-amber-300 px-4 text-base font-black text-black">
-              Share weekly results ↗
-            </button>
-            {status && <p className="text-center text-xs text-muted">{status}</p>}
             <p className="text-center text-[11px] leading-relaxed text-muted">
               This never reveals anyone&apos;s picks. It only uses results already visible after scoring.
             </p>
