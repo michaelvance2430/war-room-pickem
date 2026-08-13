@@ -47,6 +47,8 @@ export type FoundryWalkthrough = {
   /** Frozen before Window 1; separate from the Selection Sunday bracket. */
   preseasonChampionPicks: Record<string, string>;
   postseasonFields: { championship: string[]; toilet: string[] } | null;
+  /** Explicit dual-bracket progress. CFB finale requires all four rounds. */
+  postseasonRoundsPlayed: number;
   /** Regular-season Tactical Nuclear Button: two irreversible uses per season. */
   tacticalNukeWeeks: number[];
   tacticalNukeActive: boolean;
@@ -84,10 +86,12 @@ export function foundryFinalWeek(sport: PreviewSport): number {
 
 /** First official postseason window; regular-season simulation stops here. */
 export function foundryPostseasonStartWeek(sport: PreviewSport): number {
+  if (sport === "cfb") return 14;
   return foundryFinalWeek(sport) - 3;
 }
 
-export function isFoundrySeasonFinal(state: Pick<FoundryWalkthrough, "sport" | "week">): boolean {
+export function isFoundrySeasonFinal(state: Pick<FoundryWalkthrough, "sport" | "week" | "postseasonRoundsPlayed">): boolean {
+  if (state.sport === "cfb") return state.postseasonRoundsPlayed >= 4;
   return state.week >= foundryFinalWeek(state.sport);
 }
 
@@ -112,7 +116,7 @@ export const PREVIEW_SPORTS: Record<PreviewSport, {
   cbb: { room: "The Fieldhouse", sport: "College Basketball", cadence: "Saturday card", accent: "orange", weekLabel: (w) => `Window ${w}` },
 };
 
-const PEOPLE = ["Mike V", "Maria", "Kahmann", "Big Balls Ben", "Jstray", "Prestige Worldwide", "Rob Harbison", "The Commissioner", "Fourth Down Fran", "Captain Spreadsheet", "Aunt Linda", "Two-Screen Tony", "Parlay Pete", "Overtime Olivia", "Wrong-Way Randy", "Tailgate Terry"];
+const PEOPLE = ["Mike V", "Maria", "Kahmann", "Big Balls Ben", "Jstray", "Prestige Worldwide", "Rob Harbison", "The Commissioner", "Fourth Down Fran", "Captain Spreadsheet", "Aunt Linda", "Two-Screen Tony", "Parlay Pete", "Overtime Olivia", "Wrong-Way Randy", "Tailgate Terry", "Fourth Quarter Frank", "Bye Week Barry", "Coach Google", "The Spreadsheet Son", "Punt Intended", "Saturday Susan", "Zero Confidence", "The Film Room", "Unranked Randy", "Clock Management", "Transfer Portal Tom", "The Committee", "Road Dog Rick", "Halftime Holly", "Two Loss Tony", "The Alleged Expert"];
 const MATCHUPS: Record<PreviewSport, [string, string][]> = {
   cfb: [["Georgia", "Alabama"], ["Ohio State", "Michigan"], ["Texas", "Oklahoma"], ["Notre Dame", "USC"], ["Penn State", "Oregon"]],
   nfl: [["Chiefs", "Bills"], ["Eagles", "Cowboys"], ["Lions", "Packers"], ["Ravens", "Bengals"], ["49ers", "Rams"]],
@@ -132,7 +136,8 @@ function createPreseasonChampionPicks(players: PreviewPlayer[], sport: PreviewSp
 export function createFoundryWalkthrough(sport: PreviewSport, week = foundryOpeningWeek(sport), role: PreviewRole = "player"): FoundryWalkthrough {
   const seed = week + (sport === "nfl" ? 31 : sport === "cbb" ? 67 : 11);
   const opening = week === foundryOpeningWeek(sport);
-  const players = PEOPLE.map((name, index) => {
+  const playerNames = sport === "cfb" ? PEOPLE : PEOPLE.slice(0, 16);
+  const players = playerNames.map((name, index) => {
     const weekPoints = opening ? 0 : 5 + (hash(seed, index) % 21);
     return { id: `preview-${index}`, name, weekPoints, points: opening ? 0 : week * 12 + weekPoints + (hash(seed, index, 4) % 42), correct: opening ? 0 : 2 + (hash(seed, index, 7) % 4), locked: opening ? false : index !== 10 || week % 2 === 0, streak: opening ? 0 : (hash(seed, index, 9) % 7) - 2, region: FIELDHOUSE_REGIONS[index % FIELDHOUSE_REGIONS.length], madnessPoints: 0, madnessWindowPoints: 0 };
   }).sort((a, b) => b.points - a.points).map((player) => ({ ...player }));
@@ -147,7 +152,7 @@ export function createFoundryWalkthrough(sport: PreviewSport, week = foundryOpen
     return { id: `${sport}-${week}-${index}`, away, home, spread: `${home} ${homeLine > 0 ? "+" : ""}${homeLine}`, status: final ? "final" as const : "upcoming" as const, result: final ? `${away} ${awayScore} · ${home} ${homeScore}` : undefined, pick: opening ? undefined : index % 2 ? away : home, confidence: 5 - index, kickoffAt };
   });
   const preseasonChampionPicks = createPreseasonChampionPicks(players, sport);
-  return { version: 1, sport, role, week, seasonLabel: "2026 Foundry Season", generatedAt: Date.now(), players, games, unreadGazette: false, gazetteWeeks: [], ncaaPicks: {}, ncaaResults: {}, ncaaBracketLocked: false, preseasonChampionPicks, postseasonFields: null, tacticalNukeWeeks: [], tacticalNukeActive: false, mapsEvent: null };
+  return { version: 1, sport, role, week, seasonLabel: "2026 Foundry Season", generatedAt: Date.now(), players, games, unreadGazette: false, gazetteWeeks: [], ncaaPicks: {}, ncaaResults: {}, ncaaBracketLocked: false, preseasonChampionPicks, postseasonFields: null, postseasonRoundsPlayed: 0, tacticalNukeWeeks: [], tacticalNukeActive: false, mapsEvent: null };
 }
 
 export function saveFoundryWalkthrough(state: FoundryWalkthrough) {
@@ -176,6 +181,11 @@ export function loadFoundryWalkthrough(): FoundryWalkthrough | null {
       ncaaBracketLocked: !!parsed.ncaaBracketLocked,
       preseasonChampionPicks: parsed.preseasonChampionPicks && typeof parsed.preseasonChampionPicks === "object" && Object.keys(parsed.preseasonChampionPicks).length ? parsed.preseasonChampionPicks : createPreseasonChampionPicks(parsed.players, parsed.sport),
       postseasonFields: parsed.postseasonFields && Array.isArray(parsed.postseasonFields.championship) && Array.isArray(parsed.postseasonFields.toilet) ? parsed.postseasonFields : null,
+      postseasonRoundsPlayed: Number.isInteger(parsed.postseasonRoundsPlayed)
+        ? Math.max(0, Math.min(4, parsed.postseasonRoundsPlayed))
+        : parsed.sport === "cfb"
+          ? Math.max(0, Math.min(3, parsed.week - foundryPostseasonStartWeek("cfb")))
+          : 0,
       tacticalNukeWeeks: Array.isArray(parsed.tacticalNukeWeeks)
         ? parsed.tacticalNukeWeeks.filter((week) => Number.isInteger(week) && week > 0).slice(0, 2)
         : [],
@@ -200,7 +210,10 @@ export function simulateNextFoundryWeek(state: FoundryWalkthrough): FoundryWalkt
     return { ...player, madnessPoints, madnessWindowPoints: madnessPoints - priorMadnessPoints, points: player.points + madnessPoints };
   }).sort((a, b) => b.points - a.points);
   const publishableWeeks = [...(state.gazetteWeeks || []), state.week];
-  return { ...next, players, gazetteWeeks: Array.from(new Set(publishableWeeks)).sort((a, b) => a - b), ncaaPicks: state.ncaaPicks || {}, ncaaResults, ncaaBracketLocked: state.ncaaBracketLocked, preseasonChampionPicks: state.preseasonChampionPicks || {}, postseasonFields: state.postseasonFields, tacticalNukeWeeks: state.tacticalNukeWeeks || [], tacticalNukeActive: false, mapsEvent: state.mapsEvent || null, unreadGazette: true };
+  const postseasonRoundsPlayed = state.sport === "cfb" && state.week >= foundryPostseasonStartWeek("cfb")
+    ? Math.min(4, (state.postseasonRoundsPlayed || 0) + 1)
+    : state.postseasonRoundsPlayed || 0;
+  return { ...next, players, gazetteWeeks: Array.from(new Set(publishableWeeks)).sort((a, b) => a - b), ncaaPicks: state.ncaaPicks || {}, ncaaResults, ncaaBracketLocked: state.ncaaBracketLocked, preseasonChampionPicks: state.preseasonChampionPicks || {}, postseasonFields: state.postseasonFields, postseasonRoundsPlayed, tacticalNukeWeeks: state.tacticalNukeWeeks || [], tacticalNukeActive: false, mapsEvent: state.mapsEvent || null, unreadGazette: true };
 }
 
 export function simulateFoundrySeason(state: FoundryWalkthrough): FoundryWalkthrough {
@@ -212,7 +225,7 @@ export function simulateFoundrySeason(state: FoundryWalkthrough): FoundryWalkthr
     const madnessPoints = ncaaScore(bracket, ncaaResults);
     return { ...player, madnessPoints, madnessWindowPoints: madnessPoints, points: player.points + madnessPoints };
   }).sort((a, b) => b.points - a.points);
-  return { ...next, players, gazetteWeeks: Array.from({ length: finalWeek }, (_, index) => index + 1), ncaaPicks: state.ncaaPicks || {}, ncaaResults, ncaaBracketLocked: state.ncaaBracketLocked, preseasonChampionPicks: state.preseasonChampionPicks || {}, postseasonFields: state.postseasonFields, tacticalNukeWeeks: state.tacticalNukeWeeks || [], tacticalNukeActive: false, mapsEvent: state.mapsEvent || null, unreadGazette: true };
+  return { ...next, players, gazetteWeeks: Array.from({ length: finalWeek }, (_, index) => index + 1), ncaaPicks: state.ncaaPicks || {}, ncaaResults, ncaaBracketLocked: state.ncaaBracketLocked, preseasonChampionPicks: state.preseasonChampionPicks || {}, postseasonFields: state.postseasonFields, postseasonRoundsPlayed: state.sport === "cfb" ? 4 : state.postseasonRoundsPlayed || 0, tacticalNukeWeeks: state.tacticalNukeWeeks || [], tacticalNukeActive: false, mapsEvent: state.mapsEvent || null, unreadGazette: true };
 }
 
 export function simulateFoundryRegularSeason(state: FoundryWalkthrough): FoundryWalkthrough {
@@ -234,6 +247,7 @@ export function simulateFoundryRegularSeason(state: FoundryWalkthrough): Foundry
       championship: fields.flatMap((field) => field.championship),
       toilet: fields.flatMap((field) => field.toilet),
     },
+    postseasonRoundsPlayed: 0,
     tacticalNukeWeeks: state.tacticalNukeWeeks || [],
     tacticalNukeActive: false,
     mapsEvent: null,

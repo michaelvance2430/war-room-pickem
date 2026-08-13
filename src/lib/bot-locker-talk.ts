@@ -67,6 +67,20 @@ function bankForSport(sportId?: string | null) {
   return sportId === "nfl" ? NFL_LINES : CFB_LINES;
 }
 
+const MARIA_MELTDOWNS = [
+  "The fuckin confidence five was a crime scene and I would like several people detained.",
+  "I reviewed the fuckin tape. The tape is stupid and the standings are complicit.",
+  "This tie is bullshit. I will only take questions that support my position.",
+  "The math says tie. My spirit says somebody needs to be investigated.",
+  "I demand a recount conducted by anyone except the people currently ahead of me.",
+  "Everybody tied and somehow I still feel personally attacked by the confidence five.",
+] as const;
+
+export function mariaMeltdownForWeek(weekNumber: number): string {
+  const week = Math.max(0, Math.floor(weekNumber));
+  return MARIA_MELTDOWNS[week % MARIA_MELTDOWNS.length];
+}
+
 /**
  * Build staggered posts from bot roster + week flavor.
  */
@@ -174,12 +188,11 @@ export async function seedBotLockerTalk(opts?: {
     count: opts?.count,
   });
 
-  // Maria is the room's recurring psychopath. Foundry week seeding always
-  // gives the real Dispatch pipeline her same meltdown to redact.
+  // Maria stays recognizable without becoming a repeating catchphrase.
   const maria = botMembers.find((member) => /\bmaria\b/i.test(member.name));
   posts.push({
     user_id: maria?.userId || bots[0],
-    body: "The fuckin confidence fuckin five fuckin was fuckin a fuckin crime fuckin scene.",
+    body: mariaMeltdownForWeek(weekNumber),
     minutes_ago: 0,
   });
 
