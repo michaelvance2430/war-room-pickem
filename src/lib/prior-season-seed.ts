@@ -4,7 +4,7 @@
  * CFB (Excel 2025–26, season_year 2025):
  *  - Championship → Kahmann
  *  - Toilet Bowl → Justin Strayer
- *  - Village Nerd (Crystal Ball) → Big Ball Ben
+ *  - Village Nerd (Crystal Ball) → Big Balls Ben
  *
  * NFL (2025 season Super Bowl → season_year 2025):
  *  - Championship → Maria (defending Super Bowl champ; ring at Week 1 open)
@@ -62,11 +62,11 @@ export const PRIOR_SEASON_2025_SEEDS: SeedRow[] = [
   },
   {
     trophyType: "crystal_ball",
-    winnerName: "Big Ball Ben",
+    winnerName: "Big Balls Ben",
     namePatterns: [
-      /\bbig\s*ball\s*ben\b/i,
-      /\bbill\s*ball\s*ben\b/i,
-      /\bbillballben\b/i,
+      /\bbig\s*balls?\s*ben\b/i,
+      /\bbill\s*balls?\s*ben\b/i,
+      /\bbillballs?ben\b/i,
     ],
     subtitle: `Village Nerd · Crystal Ball · ${PRIOR_SEASON_LABEL}`,
     notes: `Called the national champ · ${PRIOR_SEASON_LABEL}. Zero standings points. Infinite smug.`,

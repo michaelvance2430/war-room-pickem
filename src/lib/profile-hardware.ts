@@ -85,7 +85,7 @@ type LegacySeed = Omit<ProfileTrophy, "source"> & {
 
 /**
  * Confirmed prior-season hardware only.
- * CFB 2025–26 Excel: Kahmann / Strayer / Big Ball Ben.
+ * CFB 2025–26 Excel: Kahmann / Strayer / Big Balls Ben.
  * NFL 2025: Maria Super Bowl (or Vonnagio gold family form).
  * NFL 2026 conference hardware: Mike NFC Championship · Maria AFC Championship.
  * Profile Trophy Room is global — seeds keep sport identity but are not
@@ -121,7 +121,9 @@ export const LEGACY_PROFILE_HARDWARE: LegacySeed[] = [
     title: "Village Nerd Award",
     subtitle: "Crystal Ball prophet · 2025–26",
     notes: "2025–26 Crystal Ball. Zero standings points. Infinite smug.",
-    winnerName: "Big Ball Ben",
+    /** Permanent identity pin — survives nickname and league changes. */
+    winnerName: "Big Balls Ben",
+    winnerUserId: "fdddf273-2430-42db-9127-b8fa7efc1572",
     sport: "cfb",
     sportId: "cfb",
   },
@@ -194,7 +196,7 @@ const LEGACY_NAME_ALIASES: { pattern: RegExp; legacyId: string }[] = [
     legacyId: "legacy-justin-strayer-toilet-2025",
   },
   {
-    pattern: /\bbig\s*ball\s*ben\b|\bbill\s*ball\s*ben\b|\bbillballben\b/i,
+    pattern: /\bbig\s*balls?\s*ben\b|\bbill\s*balls?\s*ben\b|\bbillballs?ben\b/i,
     legacyId: "legacy-bill-ball-ben-nerd-2025",
   },
   {

@@ -27,6 +27,7 @@
     "verify:room-discovery": "node scripts/verify-room-discovery.mjs",
     "verify:commissioner-host-identity": "node scripts/verify-commissioner-host-identity.mjs",
     "verify:opening-covers-app-chrome": "node scripts/verify-opening-covers-app-chrome.mjs",
+    "verify:big-balls-ben-legacy": "node scripts/verify-big-balls-ben-legacy.mjs",
     "verify:fieldhouse-hellfire": "node --import tsx scripts/verify-fieldhouse-hellfire.mjs",
     "verify:nfl-jdam": "node --import tsx scripts/verify-nfl-jdam.mjs",
     "verify:nfl-season": "node --import tsx scripts/verify-nfl-season-language.mjs",

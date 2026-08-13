@@ -54,6 +54,9 @@ export const ROB_HARBISON_USER_IDS: readonly string[] = [
 export const KAHMANN_USER_IDS: readonly string[] = [
   "9e579623-23b7-4f0b-9ae6-683e50bae1dc",
 ];
+export const BIG_BALLS_BEN_USER_IDS: readonly string[] = [
+  "fdddf273-2430-42db-9127-b8fa7efc1572",
+];
 
 /**
  * Optional hard UUID pins for House Dragon (preferred over name alone).
@@ -96,9 +99,11 @@ export const LEGACY_BADGE_GRANTS: LegacyBadgeGrant[] = [
     reason: "2025–26 Championship — War Room Legend",
   },
   {
-    pattern: /\bbig\s*ball\s*ben\b|\bbill\s*ball\s*ben\b|\bbillballben\b/i,
+    pattern: /\bbig\s*balls?\s*ben\b|\bbill\s*balls?\s*ben\b|\bbillballs?ben\b/i,
     badgeId: WAR_ROOM_LEGEND_ID,
     reason: "2025–26 Village Nerd — War Room Legend",
+    userIds: BIG_BALLS_BEN_USER_IDS,
+    exactNormalizedNames: ["bigballsben", "bigballben", "billballsben", "billballben"],
   },
   {
     // Tbone / T-Bone Soulstache / Rockstar / Football Guru

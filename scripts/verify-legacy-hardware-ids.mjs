@@ -11,6 +11,7 @@ import {
 
 const MIKE_ID = "09544d2b-6eca-4131-a321-c000586c9029";
 const MARIA_ID = "131b404e-db8e-4adf-86f4-f78aacf2a5bc";
+const BIG_BALLS_BEN_ID = "fdddf273-2430-42db-9127-b8fa7efc1572";
 
 let passed = 0;
 let failed = 0;
@@ -40,6 +41,27 @@ function titles(playerId, playerName, sportId) {
 }
 
 console.log("\n=== Legacy hardware ID binding (global career) ===\n");
+
+test("Big Balls Ben Village Nerd is permanent id-only hardware", () => {
+  const seed = LEGACY_PROFILE_HARDWARE.find(
+    (s) => s.id === "legacy-bill-ball-ben-nerd-2025"
+  );
+  assert.ok(seed);
+  assert.equal(seed.winnerUserId, BIG_BALLS_BEN_ID);
+  assert.equal(seed.kind, "crystal_ball");
+  assert.equal(seed.title, "Village Nerd Award");
+  assert.ok(
+    titles(BIG_BALLS_BEN_ID, "Completely Renamed", "nfl").includes(
+      "Village Nerd Award"
+    )
+  );
+  assert.equal(
+    titles("wrong-ben-id", "Big Balls Ben", "cfb").includes(
+      "Village Nerd Award"
+    ),
+    false
+  );
+});
 
 test("Mike NFC seed is id-only · 2026 · NFL", () => {
   const seed = LEGACY_PROFILE_HARDWARE.find(
