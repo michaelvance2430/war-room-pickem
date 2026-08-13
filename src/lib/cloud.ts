@@ -1858,7 +1858,7 @@ export type PickSubmissionStatus = {
   role: "commissioner" | "player";
   /** Has a picks row for this week */
   submitted: boolean;
-  /** Full card: 5 sides + confidence + best bet + prop */
+  /** Locked full card: all sides + confidence + best bet + prop */
   complete: boolean;
   gamePickCount: number;
   hasProp: boolean;
@@ -1967,6 +1967,7 @@ export async function loadPickSubmissionStatus(
     const hasBestBet = !!(pick?.best_bet_game_id);
     const complete =
       !!pick &&
+      !!pick.locked_at &&
       gamePickCount >= expectedGames &&
       hasProp &&
       hasBestBet;

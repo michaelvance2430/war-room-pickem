@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import LeagueLockTimer from "@/components/LeagueLockTimer";
+import WeeklyParticipationPulse from "@/components/WeeklyParticipationPulse";
 import type { Game } from "@/lib/types";
 import {
   loadWeekCard,
@@ -644,7 +645,10 @@ export default function HomeWeekHero() {
   return (
     <>
     {state.hasCard && state.games.length > 0 ? (
-      <LeagueLockTimer games={state.games} />
+      <>
+        <LeagueLockTimer games={state.games} />
+        <WeeklyParticipationPulse weekNumber={state.week} games={state.games} />
+      </>
     ) : null}
     <section className={`mb-5 sm:mb-8 ${!isNfl && sportId !== "soccer_wwc" ? "cfb-week-hero" : ""}`}>
       <div
