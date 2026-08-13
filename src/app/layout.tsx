@@ -15,6 +15,7 @@ import AppShell from "@/components/AppShell";
 import ThemeDecorGate from "@/components/ThemeDecorGate";
 import NflRouteSkin from "@/components/NflRouteSkin";
 import NativeRuntime from "@/components/NativeRuntime";
+import PublicPolicyLinks from "@/components/PublicPolicyLinks";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -106,6 +107,7 @@ export default function RootLayout({
         <MomentHost />
         <BadgeUnlockModal />
         <AppShell>{children}</AppShell>
+        <PublicPolicyLinks className="px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-5" />
         {/* Skin tester lives in Foundry only — not the player shell */}
       </body>
     </html>

@@ -27,7 +27,7 @@ iOS accounts. Supabase remains the source of truth.
 | Password recovery | Web only | Current reset uses `window.location.origin`; route through universal-link contract |
 | Account deletion | **App Review blocker** | Product contract and cascade safety gate added; schema/server implementation remains gated |
 | User reporting/blocking | **App Review blocker** | Staff moderation exists; player report/block controls were not found |
-| Privacy / Terms / Support | **Submission blocker** | Publish final, non-placeholder public pages and support contact |
+| Privacy / Terms / Support | Published base | In-app public pages and support contact are reachable globally; final legal review remains |
 | Plus entitlements | Inactive contract | `src/lib/plus-contract.ts`; no UI, checkout, or client grants |
 | Payments | Intentionally absent | Free 1.0 remains viable; do not add until business and Apple gates pass |
 
