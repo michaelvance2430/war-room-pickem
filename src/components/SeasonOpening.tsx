@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { isWarRoomNative } from "@/lib/native-contract";
 
 const EXIT_MS = 700;
 const INTRO_SESSION_KEY = "warroom-opening-played-this-session";
@@ -18,6 +19,9 @@ export default function SeasonOpening() {
   const [muted, setMuted] = useState(true);
 
   useLayoutEffect(() => {
+    // The iOS container presents the same film natively before the web view.
+    // Never stack a second copy of the opening inside Capacitor.
+    if (isWarRoomNative()) return;
     // Product rule: once per open app/browser session. Page changes, returning
     // Home, and publishing a commissioner card must not replay it. Closing the
     // tab/app clears sessionStorage, so the next genuine opening runs again.

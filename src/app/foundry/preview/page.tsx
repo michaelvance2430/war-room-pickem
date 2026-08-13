@@ -8,6 +8,7 @@ import FoundryNflActThree from "@/components/FoundryNflActThree";
 import WarRoomArsenalIcon from "@/components/WarRoomArsenalIcon";
 import WeaponStrikeVideo from "@/components/WeaponStrikeVideo";
 import { buildFoundryGazetteFixture } from "@/lib/foundry-gazette-fixtures";
+import { mariaMeltdownForWeek } from "@/lib/bot-locker-talk";
 import {
   createFoundryWalkthrough,
   armFoundryTacticalNuke,
@@ -230,7 +231,9 @@ function Standings({ state }: { state: FoundryWalkthrough }) {
 function Postseason({ state, onUpdate }: { state: FoundryWalkthrough; onUpdate: (next: FoundryWalkthrough) => void }) {
   const [competition, setCompetition] = useState<"ncaa" | "championship" | "toilet">("ncaa");
   const cutWeek = foundryPostseasonStartWeek(state.sport);
-  const stage = state.week < cutWeek ? -1 : Math.min(3, state.week - cutWeek);
+  const stage = state.sport === "cfb"
+    ? state.postseasonRoundsPlayed
+    : state.week < cutWeek ? -1 : Math.min(3, state.week - cutWeek);
   const championshipIds = new Set(state.postseasonFields?.championship || []);
   const toiletIds = new Set(state.postseasonFields?.toilet || []);
   const regionalFields = FIELDHOUSE_REGIONS.map((region) => {
@@ -244,10 +247,14 @@ function Postseason({ state, onUpdate }: { state: FoundryWalkthrough; onUpdate: 
       toilet: state.postseasonFields ? ranked.filter((player) => toiletIds.has(player.id)).sort((a, b) => frozenToilet.indexOf(a.id) - frozenToilet.indexOf(b.id)) : ranked.slice(cut),
     };
   });
-  const top = state.sport === "cbb" ? regionalFields.flatMap((field) => field.championship) : state.players.slice(0, 8);
-  const bottom = state.sport === "cbb" ? regionalFields.flatMap((field) => field.toilet) : state.players.slice(8, 16);
+  const top = state.postseasonFields
+    ? state.players.filter((player) => championshipIds.has(player.id)).sort((a, b) => (state.postseasonFields?.championship.indexOf(a.id) || 0) - (state.postseasonFields?.championship.indexOf(b.id) || 0))
+    : state.sport === "cbb" ? regionalFields.flatMap((field) => field.championship) : state.players.slice(0, Math.ceil(state.players.length / 2));
+  const bottom = state.postseasonFields
+    ? state.players.filter((player) => toiletIds.has(player.id)).sort((a, b) => (state.postseasonFields?.toilet.indexOf(a.id) || 0) - (state.postseasonFields?.toilet.indexOf(b.id) || 0))
+    : state.sport === "cbb" ? regionalFields.flatMap((field) => field.toilet) : state.players.slice(Math.ceil(state.players.length / 2));
   const phase = stage < 0 ? `Projected fields · cut locks after ${PREVIEW_SPORTS[state.sport].weekLabel(cutWeek - 1)}` : stage === 0 ? "Fields locked · quarterfinals ready" : stage === 1 ? "Quarterfinals complete · semifinals ready" : stage === 2 ? "Semifinals complete · championship matchups ready" : "Postseason complete · winners crowned";
-  if (state.sport === "cfb") { const phaseThreeWeek = cutWeek + 1; return <Page title={state.week < cutWeek ? "Regular Season Command" : state.week < phaseThreeWeek ? "CFB Phase II Lab" : "CFB Phase III Lab"} note={state.week < cutWeek ? `Phase II remains sealed until ${PREVIEW_SPORTS.cfb.weekLabel(cutWeek)}.` : state.week < phaseThreeWeek ? "Conference championships determine the final bowl and CFP field." : "Bowl Mania and the CFP are isolated Foundry previews. Nothing here writes to a live league."}><FoundryCfbActThree key={`cfb-phase-${state.generatedAt}`} seasonWeek={state.week} postseasonWeek={phaseThreeWeek} /></Page>; }
+  if (state.sport === "cfb") { const phaseThreeWeek = cutWeek + 1; return <Page title={state.week < cutWeek ? "Regular Season Command" : state.week < phaseThreeWeek ? "CFB Phase II Lab" : "CFB Phase III Lab"} note={state.week < cutWeek ? `Phase II remains sealed until ${PREVIEW_SPORTS.cfb.weekLabel(cutWeek)}.` : state.week < phaseThreeWeek ? "Conference championships determine the final bowl and CFP field." : "Bowl Mania and both War Room brackets advance independently. The season cannot close before all four rounds."}><FoundryCfbActThree key={`cfb-phase-${state.generatedAt}`} seasonWeek={state.week} postseasonWeek={phaseThreeWeek} /><div className="mt-5 grid gap-5"><TournamentBracket title="Championship" tone="gold" players={top} stage={stage} /><TournamentBracket title="Toilet Bowl" tone="purple" players={bottom} stage={stage} /></div></Page>; }
   if (state.sport === "nfl") return <Page title={state.week < cutWeek ? "Regular Season Command" : "NFL Phase III Lab"} note={state.week < cutWeek ? `The Road to the Bowl remains sealed until ${PREVIEW_SPORTS.nfl.weekLabel(cutWeek)}.` : "The playoff bracket and JDAM Protocol are isolated Foundry previews. Nothing here writes to a live league."}>{state.week < cutWeek ? <section className="rounded-2xl border border-sky-300/25 bg-card p-6 text-center"><h3 className="text-xl font-black">PLAYOFF OPERATIONS SEALED</h3><p className="mt-2 text-xs text-muted">Finish the regular season before the field exists.</p></section> : <FoundryNflActThree seasonWeek={state.week} />}</Page>;
   if (state.sport !== "cbb") return <Page title="The Postseason" note={phase}><div className="mb-4 grid grid-cols-2 gap-2"><Stat label="Championship field" value={String(top.length)} note={stage < 0 ? "projected" : "locked"} /><Stat label="Toilet Bowl field" value={String(bottom.length)} note={stage < 0 ? "projected" : "locked"} /></div><div className="grid gap-5"><TournamentBracket title="Championship" tone="gold" players={top} stage={stage} /><TournamentBracket title="Toilet Bowl" tone="purple" players={bottom} stage={stage} /></div></Page>;
   return <Page title="March Madness Command Center" note="Three separate competitions. NCAA picks never alter the player Championship or Toilet Bowl fields."><nav className="mb-4 grid grid-cols-3 gap-2">{([[
@@ -366,11 +373,12 @@ function RegionSide({ fields, stage, side, regionalWinners, seedOrder }: { field
 function TournamentBracket({ title, tone, players, stage }: { title: string; tone: "gold" | "purple"; players: FoundryWalkthrough["players"]; stage: number }) {
   const color = tone === "gold" ? "border-amber-300/45 bg-amber-300/5 text-amber-200" : "border-purple-400/45 bg-purple-400/5 text-purple-200";
   const seeded = players.map((player, index) => ({ ...player, seed: index + 1 }));
+  const r1 = Array.from({ length: 8 }, (_, index) => [seeded[index], seeded[15 - index]]);
   const qf = [[seeded[0], seeded[7]], [seeded[3], seeded[4]], [seeded[1], seeded[6]], [seeded[2], seeded[5]]];
   const sf = [[seeded[0], seeded[3]], [seeded[1], seeded[2]]];
   const final = [[seeded[0], seeded[1]]];
-  return <section className={`rounded-2xl border p-4 ${color}`}><div className="flex items-center justify-between gap-2"><div><p className="text-[9px] font-black uppercase tracking-[.18em]">War Room bracket</p><h3 className="text-xl font-black">{title}</h3></div><span className="rounded-full border border-current/30 px-2 py-1 text-[9px] font-black">{stage < 0 ? "LIVE PROJECTION" : stage >= 3 ? "FINAL" : "IN PROGRESS"}</span></div>
-    {stage < 0 ? <div className="mt-4 space-y-2">{seeded.map((p) => <div key={p.id} className="flex items-center justify-between rounded-lg bg-black/25 px-3 py-2 text-xs"><span><strong className="mr-2">{p.seed}</strong>{p.name}</span><span>{p.points}</span></div>)}</div> : <div className="mt-4 space-y-4"><BracketRound label="Quarterfinals" pairs={qf} completed={stage >= 1} /><BracketRound label="Semifinals" pairs={sf} completed={stage >= 2} muted={stage < 1} /><BracketRound label="Final" pairs={final} completed={stage >= 3} muted={stage < 2} />{stage >= 3 && <div className="rounded-xl border border-current/40 bg-black/35 p-4 text-center"><p className="text-[9px] font-black uppercase tracking-[.2em]">{title} winner</p><p className="mt-1 text-2xl font-black">{seeded[0]?.name}</p><p className="mt-1 text-[10px] opacity-70">Seed {seeded[0]?.seed} · survives the bracket</p></div>}</div>}
+  return <section className={`rounded-2xl border p-4 ${color}`}><div className="flex items-center justify-between gap-2"><div><p className="text-[9px] font-black uppercase tracking-[.18em]">War Room bracket · four rounds</p><h3 className="text-xl font-black">{title}</h3></div><span className="rounded-full border border-current/30 px-2 py-1 text-[9px] font-black">{stage >= 4 ? "FINAL" : `ROUND ${Math.max(1, stage + 1)} OF 4`}</span></div>
+    <div className="mt-4 space-y-4"><BracketRound label="Round 1" pairs={r1} completed={stage >= 1} /><BracketRound label="Quarterfinals" pairs={qf} completed={stage >= 2} muted={stage < 1} /><BracketRound label="Semifinals" pairs={sf} completed={stage >= 3} muted={stage < 2} /><BracketRound label="Final" pairs={final} completed={stage >= 4} muted={stage < 3} />{stage >= 4 && <div className="rounded-xl border border-current/40 bg-black/35 p-4 text-center"><p className="text-[9px] font-black uppercase tracking-[.2em]">{title} winner</p><p className="mt-1 text-2xl font-black">{seeded[0]?.name}</p><p className="mt-1 text-[10px] opacity-70">Seed {seeded[0]?.seed} · survived all four rounds</p></div>}</div>
   </section>;
 }
 
@@ -417,8 +425,15 @@ function Gazette({ state, selectedWeek, onSelectWeek }: { state: FoundryWalkthro
         : raw.chaosDetonation;
   const mariaMeltdown = {
     kicker: "Locker wire",
-    headline: "MARIA FILES FORMAL COMPLAINT IN MOST INFORMAL WAY POSSIBLE",
-    body: 'Maria delivered a fully redacted outburst: "#$@#$(@*#$@#*($()@$)@*#$". Somebody get that woman a Snickers.',
+    headline: [
+      "MARIA REQUESTS RECOUNT; OFFICIALS REQUEST EAR PROTECTION",
+      "TIE ANNOUNCED; MARIA OPENS INTERNAL INVESTIGATION",
+      "MARIA REJECTS MATH, SUBMITS ALTERNATE STANDINGS",
+      "COMMITTEE CONFIRMS TIE; MARIA CONFIRMS NOTHING",
+      "MARIA APPEALS RESULT TO COURT OF LOUD OPINION",
+      "LEAGUE TIES; MARIA DECLARES THE SYSTEM COMPROMISED",
+    ][active % 6],
+    body: `Maria delivered a fully redacted outburst: "${mariaMeltdownForWeek(active).replace(/[A-Za-z]/g, "#")}". The desk has retained counsel.`,
   };
   const edition = { ...raw, weekIndex: active, weekLabel: PREVIEW_SPORTS[state.sport].weekLabel(active), sportId: state.sport, volumeLabel: `${PREVIEW_SPORTS[state.sport].room.toUpperCase()} · FOUNDRY PREVIEW · NO CLOUD WRITES`, sideStories: [mariaMeltdown, ...(raw.sideStories || [])].slice(0, 8), chaosDetonation: tacticalNukeDetonation, emergencyProtocol };
   return <Page title="Dispatch Archive" note={`${weeks.length} scored edition${weeks.length === 1 ? "" : "s"} · choose a week, then read its four pages.`}><nav className="mb-4 rounded-xl border border-border bg-card p-3" aria-label="Dispatch editions"><label className="block text-[9px] font-black uppercase tracking-[.16em] text-muted sm:hidden" htmlFor="gazette-edition-picker">Edition</label><select id="gazette-edition-picker" value={active} onChange={(event) => onSelectWeek(Number(event.target.value))} className="mt-2 min-h-11 w-full rounded-lg border border-border bg-background px-3 text-sm font-black sm:hidden">{[...weeks].reverse().map((week) => <option key={week} value={week}>{PREVIEW_SPORTS[state.sport].weekLabel(week)}{week === weeks[weeks.length - 1] ? " · latest" : ""}</option>)}</select><div className="hidden gap-2 overflow-x-auto pb-1 sm:flex">{weeks.map((week) => <button key={week} type="button" onClick={() => onSelectWeek(week)} className={`min-h-10 shrink-0 rounded-lg px-3 text-xs font-black ${week === active ? "bg-stone-100 text-stone-900" : "border border-border"}`}>{PREVIEW_SPORTS[state.sport].weekLabel(week)}</button>)}</div></nav>{state.sport === "cbb" && ncaaResultsWindow(state.ncaaResults || {}) > 0 && <MadnessGazetteBulletin state={state} />}<GazettePaper edition={edition} foundryPreview /></Page>;
@@ -436,7 +451,7 @@ function MadnessGazetteBulletin({ state }: { state: FoundryWalkthrough }) {
   return <aside className="mb-4 rounded-2xl border-2 border-orange-300/50 bg-[#efe7d2] p-4 text-stone-950 shadow-lg"><p className="text-[9px] font-black uppercase tracking-[.18em] text-red-800">{copy.kicker}</p><h3 className="mt-2 font-serif text-xl font-black leading-tight">{copy.headline}</h3><p className="mt-2 text-xs leading-relaxed text-stone-700">{copy.body}</p><div className="mt-3 border-t border-stone-400/50 pt-2 text-[10px] font-bold">Mike’s bracket: {me?.madnessPoints || 0} points · League leader: {state.players[0]?.name} ({state.players[0]?.madnessPoints || 0} Madness points)</div></aside>;
 }
 
-function Locker({ state }: { state: FoundryWalkthrough }) { const crown = state.players[0]; return <Page title="Locker Room" note="Fictional room talk generated from this simulated week."><div className="space-y-3">{[["Kahmann", `Congrats ${crown.name}. Please stop refreshing the standings.`], ["Maria", "The fuckin confidence fuckin five fuckin was fuckin a fuckin crime fuckin scene."], ["Big Balls Ben", "I have reviewed the tape and decided the tape is biased."], ["Jstray", "Toilet Bowl scouts were in attendance. No comment."]].map(([name, message], i) => <div key={name} className={`max-w-[88%] rounded-2xl p-3 ${i % 2 ? "ml-auto bg-primary/15" : "border border-border bg-card"}`}><strong className="text-xs">{name}</strong><p className="mt-1 text-sm">{message}</p></div>)}</div><div className="mt-5 flex min-h-12 items-center rounded-full border border-border bg-card px-4 text-xs text-muted">Message entry disabled in isolated preview</div></Page>; }
+function Locker({ state }: { state: FoundryWalkthrough }) { const crown = state.players[0]; return <Page title="Locker Room" note="Fictional room talk generated from this simulated week."><div className="space-y-3">{[["Kahmann", `Congrats ${crown.name}. Please stop refreshing the standings.`], ["Maria", mariaMeltdownForWeek(state.week)], ["Big Balls Ben", "I have reviewed the tape and decided the tape is biased."], ["Jstray", "Toilet Bowl scouts were in attendance. No comment."]].map(([name, message], i) => <div key={name} className={`max-w-[88%] rounded-2xl p-3 ${i % 2 ? "ml-auto bg-primary/15" : "border border-border bg-card"}`}><strong className="text-xs">{name}</strong><p className="mt-1 text-sm">{message}</p></div>)}</div><div className="mt-5 flex min-h-12 items-center rounded-full border border-border bg-card px-4 text-xs text-muted">Message entry disabled in isolated preview</div></Page>; }
 
 function FoundryCrownAndShame({ state }: { state: FoundryWalkthrough }) {
   const scored = (state.gazetteWeeks || []).length > 0;
@@ -509,8 +524,10 @@ function PreviewRingCeremony({ state, onClose }: { state: FoundryWalkthrough; on
   const [slide, setSlide] = useState(0);
   const championship = foundryPostseasonRounds(state, "championship");
   const toilet = foundryPostseasonRounds(state, "toilet");
-  const champion = state.players.find((player) => player.id === championship.champion) || state.players[0];
-  const toiletChampion = state.players.find((player) => player.id === toilet.champion) || state.players[state.players.length - 1];
+  const championId = championship.champion || state.postseasonFields?.championship[0];
+  const toiletChampionId = toilet.champion || state.postseasonFields?.toilet[0];
+  const champion = state.players.find((player) => player.id === championId) || state.players[0];
+  const toiletChampion = state.players.find((player) => player.id === toiletChampionId) || state.players[state.players.length - 1];
   const bracketWinner = [...state.players].sort((a, b) => b.madnessPoints - a.madnessPoints || b.points - a.points)[0];
   const ncaaChampion = state.ncaaResults?.["national:championship"];
   const nerds = state.players.filter((player) => ncaaChampion && state.preseasonChampionPicks?.[player.id] === ncaaChampion);
@@ -530,6 +547,7 @@ function PreviewRingCeremony({ state, onClose }: { state: FoundryWalkthrough; on
   ] : [
     { kicker: "The season is final", title: "ONE NAME REMAINS", body: `${meta.room} has receipts, casualties, and a champion.` },
     { kicker: "2026 champion", title: champion.name.toUpperCase(), body: `${champion.points} points. ${state.gazetteWeeks.length} windows survived. Every excuse has been entered into evidence.` },
+    { kicker: "2026 Toilet Bowl champion", title: toiletChampion.name.toUpperCase(), body: "Four rounds through the wrong side of the cut. Porcelain hardware earned. Group-chat immunity denied." },
     { kicker: "The ring", title: "HISTORY DOESN’T ASK HOW", body: "It only remembers whose name was engraved when everybody else ran out of weeks." },
   ];
   const current = slides[slide];

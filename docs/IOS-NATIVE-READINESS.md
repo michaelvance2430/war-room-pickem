@@ -1,7 +1,7 @@
 # War Room iOS Native Readiness
 
-**Status:** Active preparation; no public App Store launch authorized  
-**Owner:** Mike Vance  
+**Status:** Simulator development build active; no public App Store launch authorized
+**Owner:** Mike Vance
 **Architecture:** Existing Next.js/Supabase product inside a Capacitor iOS container
 
 ## Governing launch doctrine
@@ -20,9 +20,10 @@ iOS accounts. Supabase remains the source of truth.
 |---|---|---|
 | Responsive phone UI | Strong base | Viewport cover, safe-area CSS, phone shell, 44px+ controls are present |
 | Web install identity | Ready base | Manifest, icons, Apple web-app metadata are present |
-| Native iOS project | Not started | Add Capacitor and Xcode project on the Mac |
-| Runtime boundary | Prepared | `src/lib/native-contract.ts`; no Capacitor dependency in web runtime |
-| Universal/deep links | Contract only | Configure Associated Domains, AASA file, Capacitor App listener, Supabase redirects |
+| Native iOS project | Development build ready | Capacitor/Xcode project builds and runs in the iPhone simulator |
+| Native opening | Ready | Bundled vertical opening plays natively with Skip Intro, then reveals the live app |
+| Runtime boundary | Active | `src/lib/native-contract.ts` plus native URL routing; web opening is suppressed in the container |
+| Universal/deep links | Partial | `warroom://` and in-app URL routing are wired; Associated Domains, AASA, and Supabase redirects remain |
 | Password recovery | Web only | Current reset uses `window.location.origin`; route through universal-link contract |
 | Account deletion | **App Review blocker** | Product contract and cascade safety gate added; schema/server implementation remains gated |
 | User reporting/blocking | **App Review blocker** | Staff moderation exists; player report/block controls were not found |
@@ -54,20 +55,26 @@ iOS accounts. Supabase remains the source of truth.
 The binding MIA/deletion behavior and current cascade blocker are defined in
 [`ACCOUNT-LIFECYCLE.md`](./ACCOUNT-LIFECYCLE.md).
 
-## Mac / Xcode handoff
+## Mac / Xcode progress
 
-1. Install current Xcode and command-line tools.
-2. Confirm Apple Developer membership and the exact legal seller identity.
-3. Add Capacitor packages and the iOS platform in one isolated commit.
-4. Create the App ID using `com.warroompicks.app` only after confirming it in
+1. Xcode, Capacitor packages, and the iOS platform are installed and operational.
+2. The first iPhone simulator build loads the production War Room account and home experience.
+3. The native opening movie, native skip control, branded icon/splash, safe status bar, and URL listener are installed.
+4. Confirm Apple Developer membership and the exact legal seller identity.
+5. Create the App ID using `com.warroompicks.app` only after confirming it in
    Apple Developer; do not casually change the bundle ID afterward.
-5. Configure signing, Associated Domains, push capability, and app groups only
+6. Configure signing, Associated Domains, push capability, and app groups only
    when required.
-6. Run first in the simulator, then on Mike's physical iPhone.
-7. Add native value before App Store submission: push, universal invite links,
+7. Run the current build on Mike's physical iPhone.
+8. Add native value before App Store submission: push, universal invite links,
    native share, haptics, badge count, and polished resume behavior.
-8. Archive and upload an internal TestFlight build. TestFlight is the proving
+9. Archive and upload an internal TestFlight build. TestFlight is the proving
    ground; it is not authorization for public launch.
+
+The current development container intentionally loads the canonical HTTPS app so
+the simulator stays aligned with production while native work proceeds. Replace
+that development server boundary with the reviewed release strategy before an
+App Store archive.
 
 ## Plus sequencing
 

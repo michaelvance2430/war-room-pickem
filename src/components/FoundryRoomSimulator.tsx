@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createFoundryWalkthrough, loadFoundryWalkthrough, PREVIEW_SPORTS, saveFoundryWalkthrough, type PreviewSport } from "@/lib/foundry-walkthrough";
+import { setFoundryLivePagesActive } from "@/lib/foundry-live-adapter";
+import { markFoundrySessionActive } from "@/components/FoundrySessionChrome";
 
 export default function FoundryRoomSimulator() {
   const router = useRouter();
@@ -17,7 +19,9 @@ export default function FoundryRoomSimulator() {
   function enterSport(sport: PreviewSport) {
     const state = createFoundryWalkthrough(sport, undefined, "player");
     saveFoundryWalkthrough(state);
-    router.push("/foundry/preview");
+    setFoundryLivePagesActive(true);
+    markFoundrySessionActive();
+    router.push("/");
   }
 
   function testPickCoach(sportId: "cfb" | "nfl") {
@@ -44,6 +48,6 @@ export default function FoundryRoomSimulator() {
         <button type="button" onClick={() => testPickCoach("nfl")} className="min-h-11 rounded-xl border border-emerald-400/50 px-3 text-xs font-black text-emerald-200">NFL BLANK CARD</button>
       </div>
     </div>
-    {ready && <button type="button" onClick={() => router.push("/foundry/preview")} className="mt-3 min-h-11 w-full rounded-xl border border-border text-xs font-bold">Resume saved {PREVIEW_SPORTS[savedSport].room} sandbox</button>}
+    {ready && <button type="button" onClick={() => { setFoundryLivePagesActive(true); markFoundrySessionActive(); router.push("/"); }} className="mt-3 min-h-11 w-full rounded-xl border border-border text-xs font-bold">Resume saved {PREVIEW_SPORTS[savedSport].room} sandbox</button>}
   </section>;
 }

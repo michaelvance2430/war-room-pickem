@@ -10,6 +10,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "native:sync": "npx cap sync ios",
+    "native:open": "npx cap open ios",
     "verify:museum-1a": "node scripts/verify-museum-phase1a.mjs",
     "verify:postseason-ps1": "node --import tsx scripts/verify-postseason-ps1.mjs",
     "verify:home-mission": "node --import tsx scripts/verify-nfl-cfb-home-mission.mjs",
@@ -55,6 +57,12 @@
     "verify:predeploy": "npm run verify:egg-catalog && npm run verify:egg-cloud && npm run verify:home-mission && npm run verify:native-readiness && npm run verify:account-lifecycle"
   },
   "dependencies": {
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/core": "^8.5.0",
+    "@capacitor/haptics": "^8.0.2",
+    "@capacitor/ios": "^8.5.0",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capacitor/status-bar": "^8.0.3",
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.49.1",
     "next": "15.1.9",
@@ -62,6 +70,7 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.0",
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",

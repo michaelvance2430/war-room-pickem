@@ -14,6 +14,10 @@ const plusContract = read("src/lib/plus-contract.ts");
 const login = read("src/app/login/page.tsx");
 const layout = read("src/app/layout.tsx");
 const browserSupabase = read("src/lib/supabase/client.ts");
+const nativeRuntime = read("src/components/NativeRuntime.tsx");
+const seasonOpening = read("src/components/SeasonOpening.tsx");
+const capacitorConfig = read("capacitor.config.ts");
+const sceneDelegate = read("ios/App/App/SceneDelegate.swift");
 
 assert(manifest.name === "War Room Pick'Em", "manifest app name drifted");
 assert(manifest.id === "/" && manifest.scope === "/", "manifest identity/scope missing");
@@ -31,5 +35,12 @@ assert(layout.includes('viewportFit: "cover"'), "iOS safe-area viewport coverage
 assert(plusContract.includes("export const WAR_ROOM_PLUS_PUBLIC = false"), "Plus must remain inactive for free 1.0");
 assert(plusContract.includes('"competitive_fairness"'), "free competitive fairness boundary missing");
 assert(plusContract.includes('"extra_points"'), "never-paid competitive guard missing");
+assert(nativeRuntime.includes('App.addListener("appUrlOpen"'), "native deep-link listener missing");
+assert(nativeRuntime.includes("safeWarRoomPath"), "native deep links bypass safe path guard");
+assert(seasonOpening.includes("isWarRoomNative()"), "web opening can stack over native opening");
+assert(capacitorConfig.includes('appId: "com.warroompicks.app"'), "Capacitor bundle ID drifted");
+assert(capacitorConfig.includes('overlaysWebView: false'), "iPhone status bar can cover War Room chrome");
+assert(sceneDelegate.includes("SeasonOpeningViewController"), "native opening controller missing");
+assert(sceneDelegate.includes('subdirectory: "public/media"'), "native opening asset path missing");
 
 console.log("[native-readiness] PASS — identity, links, safe areas, and free-1.0 Plus guard verified");

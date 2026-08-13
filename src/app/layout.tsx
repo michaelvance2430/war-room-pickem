@@ -14,6 +14,7 @@ import SmoothRuntime from "@/components/SmoothRuntime";
 import AppShell from "@/components/AppShell";
 import ThemeDecorGate from "@/components/ThemeDecorGate";
 import NflRouteSkin from "@/components/NflRouteSkin";
+import NativeRuntime from "@/components/NativeRuntime";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -85,6 +86,7 @@ export default function RootLayout({
           route prefetch. No global PullToRefresh (that froze touch).
         */}
         <SmoothRuntime />
+        <NativeRuntime />
         {/* Creator operator chrome must not disappear with optional theme/decor isolation. */}
         <FoundrySessionChrome />
         <ThemeDecorGate>

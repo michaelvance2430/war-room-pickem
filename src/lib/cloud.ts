@@ -463,6 +463,11 @@ function wrCurrentWeekLog(
  */
 export async function loadLeagueActiveWeek(): Promise<number> {
   try {
+    const { foundryLiveWeek } = await import("./foundry-live-adapter");
+    const week = foundryLiveWeek();
+    if (week != null) return week;
+  } catch { /* fall through */ }
+  try {
     const { profileNavLeagueWork } = await import("./profile-nav-trace");
     profileNavLeagueWork("loadLeagueActiveWeek", "call");
   } catch {
@@ -957,6 +962,10 @@ function buildCloudCardFromRow(
 }
 
 export async function loadWeekCard(weekNumber = 1): Promise<CloudCard | null> {
+  try {
+    const { foundryLiveCard, isFoundryLivePagesActive } = await import("./foundry-live-adapter");
+    if (isFoundryLivePagesActive()) return foundryLiveCard(weekNumber);
+  } catch { /* fall through */ }
   const session = getSession();
   if (!session?.leagueId) return null;
 
@@ -1271,6 +1280,18 @@ export async function savePicksToCloud(opts: {
     return { ok: false, error: "Not signed into a league" };
   }
 
+  // Foundry uses the production Picks page, but it is an isolated local room.
+  // Stop here before creating a Supabase client or touching the live league.
+  try {
+    const { isFoundryLivePagesActive, saveFoundryLivePicks } = await import("./foundry-live-adapter");
+    if (isFoundryLivePagesActive()) {
+      if (!Object.keys(opts.picks).length) return { ok: false, error: "No picks to save" };
+      return saveFoundryLivePicks(opts.weekNumber, opts.picks)
+        ? { ok: true, firstFinal: "ignored", firstFinalPointsDelta: 0 }
+        : { ok: false, error: "Foundry week changed. Reload the card." };
+    }
+  } catch { /* fall through */ }
+
   // Creator eyes: local picks only (never write real league board)
   try {
     const eyes = await import("./creator-eyes");
@@ -1450,6 +1471,10 @@ export async function savePicksToCloud(opts: {
 }
 
 export async function loadMyPicks(weekNumber = 1) {
+  try {
+    const { foundryLiveMyPicks, isFoundryLivePagesActive } = await import("./foundry-live-adapter");
+    if (isFoundryLivePagesActive()) return foundryLiveMyPicks(weekNumber);
+  } catch { /* fall through */ }
   const session = getSession();
   if (!session?.leagueId) return null;
 
@@ -1858,7 +1883,7 @@ export type PickSubmissionStatus = {
   role: "commissioner" | "player";
   /** Has a picks row for this week */
   submitted: boolean;
-  /** Locked full card: all sides + confidence + best bet + prop */
+  /** Full card: 5 sides + confidence + best bet + prop */
   complete: boolean;
   gamePickCount: number;
   hasProp: boolean;
@@ -1967,7 +1992,6 @@ export async function loadPickSubmissionStatus(
     const hasBestBet = !!(pick?.best_bet_game_id);
     const complete =
       !!pick &&
-      !!pick.locked_at &&
       gamePickCount >= expectedGames &&
       hasProp &&
       hasBestBet;
@@ -2184,6 +2208,11 @@ export async function clearWeekScoreInCloud(
  * empty shells (score clicked with 0 locked picks) must not strike the pill.
  */
 export async function listScoredWeekNumbers(): Promise<number[]> {
+  try {
+    const { foundryLiveScoredWeeks } = await import("./foundry-live-adapter");
+    const weeks = foundryLiveScoredWeeks();
+    if (weeks) return weeks;
+  } catch { /* fall through */ }
   const fn0 =
     typeof performance !== "undefined" ? performance.now() : Date.now();
   const session = getSession();
@@ -3221,6 +3250,11 @@ export async function loadLeagueStandings(): Promise<StandingsCloudRow[]> {
 export async function loadLeaguePlayers(
   caller?: string
 ): Promise<import("./types").Player[]> {
+  try {
+    const { foundryLivePlayers } = await import("./foundry-live-adapter");
+    const players = foundryLivePlayers();
+    if (players) return players;
+  } catch { /* fall through */ }
   const who = caller || "unknown";
 
   const session = getSession();
@@ -3670,6 +3704,11 @@ export async function recordLeagueFirstJoin(
 
 /** Live league roster from Supabase memberships (not local mock players). */
 export async function loadLeagueRoster(): Promise<LeagueRosterMember[]> {
+  try {
+    const { foundryLiveRoster } = await import("./foundry-live-adapter");
+    const roster = foundryLiveRoster();
+    if (roster) return roster;
+  } catch { /* fall through */ }
   try {
     const { profileNavLeagueWork } = await import("./profile-nav-trace");
     profileNavLeagueWork("loadLeagueRoster", "call");
