@@ -7,7 +7,7 @@
  * session or Creator Eyes preview.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useRouter } from "next/navigation";
@@ -77,6 +77,35 @@ export default function FoundrySessionChrome() {
   const router = useRouter();
   const [show, setShow] = useState(false);
   const [walkthrough, setWalkthrough] = useState(() => loadFoundryWalkthrough());
+  const panelRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{ dx: number; dy: number } | null>(null);
+  const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
+
+  function clampPosition(left: number, top: number) {
+    const panel = panelRef.current;
+    const width = panel?.offsetWidth || Math.min(360, window.innerWidth - 24);
+    const height = panel?.offsetHeight || 220;
+    return {
+      left: Math.max(8, Math.min(left, window.innerWidth - width - 8)),
+      top: Math.max(8, Math.min(top, window.innerHeight - height - 8)),
+    };
+  }
+
+  function startDrag(event: React.PointerEvent<HTMLButtonElement>) {
+    if (!panelRef.current) return;
+    const rect = panelRef.current.getBoundingClientRect();
+    dragRef.current = { dx: event.clientX - rect.left, dy: event.clientY - rect.top };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function moveDrag(event: React.PointerEvent<HTMLButtonElement>) {
+    if (!dragRef.current) return;
+    setPosition(clampPosition(event.clientX - dragRef.current.dx, event.clientY - dragRef.current.dy));
+  }
+
+  function endDrag() {
+    dragRef.current = null;
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -134,9 +163,12 @@ export default function FoundrySessionChrome() {
   }
 
   return (
-    <div className="fixed bottom-0 inset-x-0 z-[95] pointer-events-none" style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
-      <div className="pointer-events-auto max-w-lg mx-auto px-3 pb-3">
+    <div className="fixed inset-0 z-[95] pointer-events-none">
+      <div ref={panelRef} className="pointer-events-auto fixed w-[calc(100vw-24px)] max-w-[420px]" style={position ? { left: position.left, top: position.top } : { left: 12, bottom: "max(12px, env(safe-area-inset-bottom))" }}>
         <div className="rounded-2xl border-2 border-sky-400/50 bg-sky-950/95 backdrop-blur-md shadow-[0_0_40px_rgba(56,189,248,0.25)] px-3 py-2.5 space-y-2">
+          <button type="button" aria-label="Drag founder controls" onPointerDown={startDrag} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag} className="flex h-7 w-full touch-none cursor-grab items-center justify-center rounded-lg border border-sky-300/20 bg-black/25 active:cursor-grabbing">
+            <span className="h-1 w-14 rounded-full bg-sky-200/60" />
+          </button>
           <div className="flex items-center gap-2">
           <div className="flex-1 min-w-0">
             <p className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-300">LAB · Foundry</p>
