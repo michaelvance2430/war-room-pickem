@@ -2,12 +2,10 @@
 
 import { useState } from "react";
 import {
-  BIG_GAME_KINDS,
   DIVISION_CONFERENCE_SECTION,
   HARDWARE_KIND_META,
   splitHardwareCases,
   type ProfileTrophy,
-  type ProfileTrophyKind,
 } from "@/lib/profile-hardware";
 import TrophyShareButton from "@/components/TrophyShareButton";
 import { divisionFullLabel } from "@/lib/divisions";
@@ -175,100 +173,6 @@ function Plaque({
   );
 }
 
-function EmptySlot({
-  kind,
-  spinny,
-  onTrophyTap,
-  sportId,
-  leagueName,
-  leagueId,
-  leagueCode,
-}: {
-  kind: ProfileTrophyKind;
-  spinny?: boolean;
-  onTrophyTap?: () => void;
-  sportId?: string | null;
-  leagueName?: string | null;
-  leagueId?: string | null;
-  leagueCode?: string | null;
-}) {
-  const meta = HARDWARE_KIND_META[kind];
-  return (
-    <div className="rounded-xl border border-dashed border-border/70 bg-card/30 p-4 min-h-[120px] flex flex-col justify-center opacity-50">
-      <button
-        type="button"
-        className={`mb-1 grayscale text-left ${
-          spinny ? "animate-spin" : ""
-        } ${kind === "championship" ? "cursor-pointer" : "cursor-default"}`}
-        aria-hidden
-        tabIndex={kind === "championship" ? 0 : -1}
-        onClick={() => {
-          if (kind === "championship") onTrophyTap?.();
-        }}
-      >
-        <HardwareTrophyIcon
-          kind={kind}
-          sportId={sportId}
-          size={40}
-          empty
-          animate={false}
-          leagueName={leagueName}
-          leagueId={leagueId}
-          leagueCode={leagueCode}
-        />
-      </button>
-      <div className="text-[10px] uppercase tracking-wide text-muted">
-        {kind === "championship"
-          ? "Championship"
-          : kind === "toilet_bowl"
-            ? "Toilet Bowl"
-            : kind === "crystal_ball"
-              ? "Village Nerd"
-              : DIVISION_CONFERENCE_SECTION.combined}
-      </div>
-      <p className="text-xs text-muted mt-1">{meta.emptyLabel}</p>
-    </div>
-  );
-}
-
-/** Empty shelf tile with its own Division or Conference label (side-by-side pair). */
-function EmptyDivConfSlot({
-  flavor,
-}: {
-  flavor: "division" | "conference";
-}) {
-  const label =
-    flavor === "division"
-      ? DIVISION_CONFERENCE_SECTION.labelA
-      : DIVISION_CONFERENCE_SECTION.labelB;
-  const empty =
-    flavor === "division"
-      ? DIVISION_CONFERENCE_SECTION.emptyA
-      : DIVISION_CONFERENCE_SECTION.emptyB;
-  return (
-    <div className="rounded-xl border border-dashed border-border/70 bg-card/30 p-4 min-h-[120px] flex flex-col justify-center opacity-50">
-      <div className="mb-1 grayscale">
-        <HardwareTrophyIcon
-          kind="division"
-          sportId={getLeague()?.sportId}
-          size={40}
-          empty
-          animate={false}
-        />
-      </div>
-      <div className="text-[10px] uppercase tracking-wide text-muted font-semibold">
-        {label}
-      </div>
-      <p className="text-xs text-muted mt-1">{empty}</p>
-      <p className="text-[10px] text-muted/70 mt-2 leading-snug">
-        {flavor === "division"
-          ? "NFL-style division crown (AFC East, etc.)."
-          : "CFB-style conference crown (SEC, Big Ten, …)."}
-      </p>
-    </div>
-  );
-}
-
 export default function ProfileTrophyCase({
   items,
   playerName,
@@ -286,9 +190,6 @@ export default function ProfileTrophyCase({
 }) {
   const { bigGame, division } = splitHardwareCases(items);
   const [spinId, setSpinId] = useState<string | null>(null);
-
-  const byKind = (kind: ProfileTrophyKind) =>
-    bigGame.filter((i) => i.kind === kind);
 
   const hasAny = items.length > 0;
   // Anyone can flex hardware (yours or a buddy's roast share)
@@ -340,79 +241,47 @@ export default function ProfileTrophyCase({
   return (
     <section className="rounded-2xl border border-border bg-card p-5 sm:p-6 mb-6">
       <div className="mb-4">
-        <h2 className="font-semibold text-lg">Trophy case</h2>
-        <p className="text-xs text-muted mt-0.5">
-          Championship &amp; Toilet hardware, Village Nerd, and{" "}
-          <strong className="text-foreground">Division / Conference</strong>{" "}
-          titles — career flex for{" "}
-          {playerName.split(/\s+/)[0] || "this player"}.{" "}
-          <strong className="text-foreground">
-            Every league is its own plaque
-          </strong>{" "}
-          (win 3 CFB rooms in 2025 → three 2025 trophies with the room name
-          under each). Stack years and rooms.
-          {hasAny ? (
-            <>
-              {" "}
-              Hit <strong className="text-foreground">Share</strong> on a
-              plaque for a custom IG/FB graphic.
-            </>
-          ) : (
-            <> Empty shelves fill when they win hardware.</>
-          )}
-        </p>
+        <h2 className="font-semibold text-lg">Trophy Room</h2>
+        {hasAny && (
+          <p className="text-xs text-muted mt-0.5">
+            Career hardware for {playerName.split(/\s+/)[0] || "this player"}.
+            Every league gets its own plaque, and every plaque can be shared.
+          </p>
+        )}
       </div>
 
       {/* Big game hardware */}
-      <div className="mb-6">
-        <div className="flex items-center gap-2 mb-3">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-amber-300/90">
-            Championship hardware
-          </h3>
-          <div className="flex-1 h-px bg-border" />
+      {bigGame.length > 0 && (
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-3">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-amber-300/90">
+              Championship hardware
+            </h3>
+            <div className="flex-1 h-px bg-border" />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {bigGame.map((item) => (
+              <Plaque
+                key={`${item.id}:${item.leagueId || item.leagueName || ""}`}
+                item={item}
+                leagueName={item.leagueName || leagueName}
+                leagueId={item.leagueId || leagueId}
+                leagueCode={item.leagueCode || leagueCode}
+                canShare={canShare}
+                sportId={item.sportId || sportId}
+                winnerAvatarUrl={winnerAvatarUrl}
+                liveWinnerName={playerName}
+                spinny={spinId === item.id}
+                onTrophyTap={() => handleTrophyTap(item.id)}
+              />
+            ))}
+          </div>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {BIG_GAME_KINDS.map((kind) => {
-            const won = byKind(kind);
-            if (won.length === 0) {
-              return (
-                <EmptySlot
-                  key={kind}
-                  kind={kind}
-                  sportId={sportId}
-                  leagueName={leagueName}
-                  leagueId={leagueId}
-                  leagueCode={leagueCode}
-                  spinny={spinId === `empty-${kind}`}
-                  onTrophyTap={() => handleTrophyTap(`empty-${kind}`)}
-                />
-              );
-            }
-            return (
-              <div key={kind} className="space-y-2">
-                {won.map((item) => (
-                  <Plaque
-                    key={`${item.id}:${item.leagueId || item.leagueName || ""}`}
-                    item={item}
-                    leagueName={item.leagueName || leagueName}
-                    leagueId={item.leagueId || leagueId}
-                    leagueCode={item.leagueCode || leagueCode}
-                    canShare={canShare}
-                    sportId={item.sportId || sportId}
-                    winnerAvatarUrl={winnerAvatarUrl}
-                    liveWinnerName={playerName}
-                    spinny={spinId === item.id}
-                    onTrophyTap={() => handleTrophyTap(item.id)}
-                  />
-                ))}
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      )}
 
       {/* Division / Conference case — side-by-side labels; plaques stack */}
-      <div>
+      {division.length > 0 && (
+        <div>
         <div className="flex items-center gap-2 mb-1.5">
           <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
             <h3 className="text-xs font-bold uppercase tracking-wider text-primary shrink-0">
@@ -433,43 +302,31 @@ export default function ProfileTrophyCase({
         <p className="text-[10px] text-muted mb-3 leading-relaxed">
           {DIVISION_CONFERENCE_SECTION.blurb}
         </p>
-        {division.length === 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <EmptyDivConfSlot flavor="division" />
-            <EmptyDivConfSlot flavor="conference" />
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {division.map((item) => (
-              <Plaque
-                key={item.id}
-                item={item}
-                leagueName={leagueName}
-                canShare={canShare}
-                sportId={sportId}
-                winnerAvatarUrl={winnerAvatarUrl}
-                liveWinnerName={playerName}
-              />
-            ))}
-            {/* Keep a free shelf so next year’s stack is obvious */}
-            <div className="rounded-xl border border-dashed border-primary/25 bg-card/20 p-4 min-h-[100px] flex flex-col justify-center opacity-45">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-primary/80">
-                Open shelf
-              </p>
-              <p className="text-xs text-muted mt-1 leading-snug">
-                Win another division or conference crown — plaques stack here
-                year after year.
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {division.map((item) => (
+            <Plaque
+              key={item.id}
+              item={item}
+              leagueName={leagueName}
+              canShare={canShare}
+              sportId={sportId}
+              winnerAvatarUrl={winnerAvatarUrl}
+              liveWinnerName={playerName}
+            />
+          ))}
+        </div>
+        </div>
+      )}
 
       {!hasAny && (
-        <p className="text-[11px] text-muted mt-4 text-center">
-          Empty shelves — win a championship, toilet, nerd award, or
-          division/conference title. Then share it to IG/FB with one tap.
-        </p>
+        <div className="rounded-xl border border-amber-300/25 bg-amber-300/5 px-5 py-6 text-center">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-300">
+            Trophy Room Security Report
+          </p>
+          <p className="mt-2 text-sm font-bold text-foreground">
+            No brass has breached the perimeter. Get back out there and fix that.
+          </p>
+        </div>
       )}
     </section>
   );
