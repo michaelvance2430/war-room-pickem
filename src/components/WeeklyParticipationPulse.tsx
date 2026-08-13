@@ -78,15 +78,15 @@ export default function WeeklyParticipationPulse({ weekNumber, games }: Props) {
             {pulse.locked} of {pulse.expected} locked
           </p>
         </div>
-        <span className={`text-[10px] font-extrabold uppercase tracking-wide rounded-full border px-2 py-1 ${
-          pulse.locked >= pulse.expected
-            ? "border-primary/40 bg-primary/10 text-primary"
-            : lockPassed
-              ? "border-warning/40 bg-warning/10 text-warning"
-              : "border-border text-muted"
-        }`}>
-          {pulse.locked >= pulse.expected ? "All in" : lockPassed ? "Closed" : "Open"}
-        </span>
+        {(pulse.locked >= pulse.expected || lockPassed) && (
+          <span className={`text-[10px] font-extrabold uppercase tracking-wide rounded-full border px-2 py-1 ${
+            pulse.locked >= pulse.expected
+              ? "border-primary/40 bg-primary/10 text-primary"
+              : "border-warning/40 bg-warning/10 text-warning"
+          }`}>
+            {pulse.locked >= pulse.expected ? "All in" : "Closed"}
+          </span>
+        )}
       </div>
 
       {ops && rows && incomplete.length > 0 && (

@@ -28,5 +28,9 @@ expect(
   !pulse.includes("pick_games") && !pulse.includes("prop_choice"),
   "Participation UI must never fetch or expose actual pick choices."
 );
+expect(
+  !pulse.includes('? "Closed" : "Open"'),
+  "Open-card status must not render a misleading button-like badge."
+);
 
 console.log("Participation pulse regression checks passed.");
