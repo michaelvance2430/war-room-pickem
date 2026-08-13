@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 const EXIT_MS = 700;
 const INTRO_SESSION_KEY = "warroom-opening-played-this-session";
@@ -91,10 +92,10 @@ export default function SeasonOpening() {
 
   if (!visible) return null;
 
-  return (
+  return createPortal(
     <section
       aria-label="War Room season opening"
-      className={`fixed inset-0 z-[100] bg-black transition-opacity ease-out ${
+      className={`fixed inset-0 z-[300] bg-black transition-opacity ease-out ${
         exiting ? "opacity-0 pointer-events-none" : "opacity-100"
       }`}
       style={{ transitionDuration: `${EXIT_MS}ms` }}
@@ -132,6 +133,7 @@ export default function SeasonOpening() {
           </button>
         )}
       </div>
-    </section>
+    </section>,
+    document.body
   );
 }
