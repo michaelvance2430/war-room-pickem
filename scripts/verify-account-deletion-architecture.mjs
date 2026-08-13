@@ -56,6 +56,10 @@ assert(serverRpcs.includes("private.redact_jsonb_text"), "Gazette JSON redaction
 assert(serverRpcs.includes("to service_role"), "deletion RPCs are not service-role-only");
 assert(serverRpcs.includes("blocked_commissioner"), "server commissioner gate is missing");
 assert(serverRpcs.includes("deleting_auth_user"), "Auth deletion handoff stage is missing");
+assert(serverRpcs.includes("delete from public.player_blocks"), "player blocks are missing from private-data deletion");
+assert(serverRpcs.includes("delete from public.player_reports where reporter_id"), "reports authored by the user are not deleted");
+assert(serverRpcs.includes("set resolved_by = null"), "staff resolution identity is not detached");
+assert(preflight.includes("'reporter_id', 'reported_id', 'blocked_id', 'resolved_by'"), "player safety identity columns are missing from preflight");
 assert(serverRpcHarness.includes("authenticated role executed service-only deletion RPC"), "RPC privilege boundary is untested");
 assert(serverRpcHarness.includes("completed operation is not idempotent"), "RPC retry safety is untested");
 

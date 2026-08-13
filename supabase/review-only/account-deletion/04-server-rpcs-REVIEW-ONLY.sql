@@ -159,6 +159,15 @@ begin
   if to_regclass('public.profile_favorite_teams') is not null then
     execute 'delete from public.profile_favorite_teams where user_id = $1' using p_user_id;
   end if;
+  if to_regclass('public.player_blocks') is not null then
+    execute 'delete from public.player_blocks where blocker_id = $1 or blocked_id = $1' using p_user_id;
+  end if;
+  if to_regclass('public.player_reports') is not null then
+    -- Reports authored by the departing player are private identity data.
+    -- Reports about them remain as staff safety records against [REDACTED].
+    execute 'delete from public.player_reports where reporter_id = $1' using p_user_id;
+    execute 'update public.player_reports set resolved_by = null where resolved_by = $1' using p_user_id;
+  end if;
 
   update private.account_deletion_operations
   set status = 'redacting_history', updated_at = now()

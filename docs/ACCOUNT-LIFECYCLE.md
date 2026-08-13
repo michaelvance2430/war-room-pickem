@@ -84,3 +84,15 @@ history.
 - Account deletion succeeds on a physical iPhone and meets App Review behavior.
 - `ACCOUNT_LIFECYCLE_PUBLIC` remains `false` until every gate passes.
 
+## August 13, 2026 production audit
+
+The read-only live inventory reconfirmed that `profiles.id` still cascades from
+`auth.users.id`. Competitive tables including memberships, picks, achievements,
+Crystal Ball picks, and weapon history still cascade from profiles. Leagues also
+cascade from the commissioner profile. The public deletion switch therefore
+remains closed.
+
+The review-only redaction plan now includes player safety data: blocks involving
+the departing account are removed; reports authored by that account are removed;
+reports about the account may remain as staff safety records against the durable
+`[REDACTED]` participant; and staff resolution identity is detached.

@@ -36,6 +36,7 @@ where table_schema in ('public', 'storage')
       'id', 'user_id', 'profile_id', 'player_id', 'author_id', 'created_by',
       'updated_by', 'commissioner_id', 'owner_id', 'owner', 'owner_id',
       'reported_by', 'blocked_user_id', 'blocker_id', 'finder_user_id',
+      'reporter_id', 'reported_id', 'blocked_id', 'resolved_by',
       'winner_user_id', 'actor_user_id', 'crowned_by', 'repaired_by',
       'corrected_by'
     )
@@ -96,4 +97,3 @@ join pg_namespace n on n.oid = p.pronamespace
 where n.nspname in ('public', 'private')
   and pg_get_functiondef(p.oid) like '%auth.uid%'
 order by function_schema, function_name, arguments;
-
