@@ -17,4 +17,10 @@ for (const loader of ["loadLeagueActiveWeek", "loadWeekCard", "loadMyPicks", "li
 assert.match(cloud, /isFoundryLivePagesActive\(\)[\s\S]{0,220}saveFoundryLivePicks/, "Foundry save must stop before cloud write");
 assert.match(adapter, /localStorage\.getItem\(ACTIVE_KEY\)/);
 assert.match(adapter, /saveFoundryWalkthrough/);
+assert.match(chrome, /onPointerDown=\{startDrag\}/, "founder controls must be draggable");
+assert.match(chrome, /touch-none cursor-grab/, "drag handle must work on touch screens");
+const walkthrough = readFileSync("src/lib/foundry-walkthrough.ts", "utf8");
+assert.match(walkthrough, /for \(const player of players\) player\.locked = true/, "simulated members need locked cards");
+assert.doesNotMatch(walkthrough, /pick: opening \? undefined/, "opening Foundry card cannot be empty");
+assert.match(walkthrough, /pick: game\.pick \|\|/, "saved empty Foundry rooms must self-repair");
 console.log("Foundry live pages verified: real routes, local adapter, founder bar, cloud-write boundary");
