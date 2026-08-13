@@ -47,6 +47,7 @@ import {
   profileNavUsable,
 } from "@/lib/profile-nav-trace";
 import type { CanonicalTeam } from "@/lib/teams/cfb-catalog";
+import PlayerSafetyControls from "@/components/PlayerSafetyControls";
 
 // Module evaluation boundary — if this never logs, freeze is BEFORE profile chunk runs
 const __profileModuleT0 =
@@ -886,6 +887,10 @@ export default function ProfilePage() {
             joinTitle={joinTitle}
             isSelf={isSelfProfile}
           />
+        )}
+
+        {!isSelfProfile && !mock && (
+          <PlayerSafetyControls playerId={player.id} playerName={player.name} />
         )}
 
         <p className="text-[10px] text-muted text-center mt-4">

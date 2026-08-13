@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 import { getSession } from "@/lib/league";
+import { loadBlockedPlayerIds } from "@/lib/player-safety";
 
 /** Hard cap — punchy trash talk, not essays. */
 export const LOCKER_MAX_CHARS = 280;
@@ -343,7 +344,9 @@ export async function loadLockerMessages(limit = 100): Promise<{
     }
   }
 
+  const blockedIds = await loadBlockedPlayerIds();
   const messages = chatRows
+    .filter((r) => !blockedIds.has(String(r.user_id || "")))
     .slice(0, limit)
     .map((r) => mapRow(r, nameById))
     .reverse();
