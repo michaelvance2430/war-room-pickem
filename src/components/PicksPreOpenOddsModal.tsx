@@ -66,6 +66,9 @@ export default function PicksPreOpenOddsModal() {
   return (
     <div
       className="fixed inset-0 z-[130] flex items-end sm:items-center justify-center p-0 sm:p-4"
+      style={{
+        paddingBottom: "calc(3.75rem + env(safe-area-inset-bottom, 0px))",
+      }}
       role="dialog"
       aria-modal="true"
       aria-labelledby="picks-preopen-title"
@@ -76,7 +79,7 @@ export default function PicksPreOpenOddsModal() {
         aria-label="Close"
         onClick={dismiss}
       />
-      <div className="relative w-full sm:max-w-md max-h-[90vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl border border-primary/40 bg-card shadow-2xl">
+      <div className="relative w-full sm:max-w-md max-h-[calc(90dvh-3.75rem-env(safe-area-inset-bottom,0px))] sm:max-h-[90vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl border border-primary/40 bg-card shadow-2xl">
         <div className="px-5 pt-5 pb-3 border-b border-border bg-primary/10 flex items-center gap-3">
           <BrandMark size={48} variant="force" className="rounded-lg" />
           <div>
