@@ -149,8 +149,12 @@ export function createFoundryWalkthrough(sport: PreviewSport, week = foundryOpen
     const weekStart = foundryWeekStartDate(sport, week).getTime();
     const firstKickoffDay = sport === "nfl" || (sport === "cfb" && week % 3 === 1) ? 3 : 5;
     const kickoffAt = new Date(weekStart + (firstKickoffDay * 24 + 18 + index * 3) * 60 * 60 * 1000).toISOString();
-    return { id: `${sport}-${week}-${index}`, away, home, spread: `${home} ${homeLine > 0 ? "+" : ""}${homeLine}`, status: final ? "final" as const : "upcoming" as const, result: final ? `${away} ${awayScore} · ${home} ${homeScore}` : undefined, pick: opening ? undefined : index % 2 ? away : home, confidence: 5 - index, kickoffAt };
+    return { id: `${sport}-${week}-${index}`, away, home, spread: `${home} ${homeLine > 0 ? "+" : ""}${homeLine}`, status: final ? "final" as const : "upcoming" as const, result: final ? `${away} ${awayScore} · ${home} ${homeScore}` : undefined, pick: index % 2 ? away : home, confidence: 5 - index, kickoffAt };
   });
+  // A Foundry room is a populated stress test, not a blank new-player league.
+  // Every simulated member arrives with a legal locked card so the opening
+  // week can score immediately through the real league pages.
+  for (const player of players) player.locked = true;
   const preseasonChampionPicks = createPreseasonChampionPicks(players, sport);
   return { version: 1, sport, role, week, seasonLabel: "2026 Foundry Season", generatedAt: Date.now(), players, games, unreadGazette: false, gazetteWeeks: [], ncaaPicks: {}, ncaaResults: {}, ncaaBracketLocked: false, preseasonChampionPicks, postseasonFields: null, postseasonRoundsPlayed: 0, tacticalNukeWeeks: [], tacticalNukeActive: false, mapsEvent: null };
 }
@@ -169,11 +173,19 @@ export function loadFoundryWalkthrough(): FoundryWalkthrough | null {
       ...parsed,
       players: parsed.players.map((player, index) => ({
         ...player,
+        locked: true,
         region: FIELDHOUSE_REGIONS.includes(player.region as FieldhouseRegion)
           ? player.region
           : FIELDHOUSE_REGIONS[index % FIELDHOUSE_REGIONS.length],
         madnessPoints: Number(player.madnessPoints) || 0,
         madnessWindowPoints: Number(player.madnessWindowPoints) || 0,
+      })),
+      games: parsed.games.map((game, index) => ({
+        ...game,
+        pick: game.pick || (index % 2 ? game.away : game.home),
+        confidence: Number.isInteger(game.confidence) && game.confidence > 0
+          ? game.confidence
+          : Math.max(1, parsed.games.length - index),
       })),
       gazetteWeeks: Array.isArray(parsed.gazetteWeeks) ? parsed.gazetteWeeks : [],
       ncaaPicks: parsed.ncaaPicks && typeof parsed.ncaaPicks === "object" ? parsed.ncaaPicks : {},
