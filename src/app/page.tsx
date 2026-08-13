@@ -42,6 +42,7 @@ import HomeAllegianceCard from "@/components/HomeAllegianceCard";
 import CfbSituationDestinations from "@/components/CfbSituationDestinations";
 import HomeSeasonCommand from "@/components/HomeSeasonCommand";
 import SeasonOpening from "@/components/SeasonOpening";
+import CommissionerPlusPreview from "@/components/CommissionerPlusPreview";
 
 const HomeGazetteSpotlight = dynamic(
   () => import("@/components/HomeGazetteSpotlight"),
@@ -1008,6 +1009,9 @@ export default function Home() {
       <InviteFriends />
           </div>
         )}
+
+        {/* Founder preview only — the actual commissioner sees the seasonal upgrade. */}
+        {actuallyCommish && <CommissionerPlusPreview />}
       </main>
       </div>
   );

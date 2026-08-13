@@ -8,6 +8,7 @@
  */
 
 export const WAR_ROOM_PLUS_PUBLIC = false;
+export const COMMISSIONER_PLUS_PUBLIC = false;
 
 export type WarRoomPlan = "free" | "plus" | "commissioner_plus";
 export type EntitlementSource = "apple" | "web" | "founder_grant";
@@ -42,6 +43,14 @@ export const PLUS_CANDIDATES = Object.freeze([
   "expanded_profile_hardware",
   "enhanced_season_memories",
   "personalized_scouting_and_intelligence",
+] as const);
+
+/** First paid product candidate: one commissioner purchase, one league season. */
+export const COMMISSIONER_PLUS_CANDIDATES = Object.freeze([
+  "commissioner_automation",
+  "premium_league_identity",
+  "enhanced_league_moments",
+  "advanced_league_legacy",
 ] as const);
 
 export const NEVER_PAID = Object.freeze([
