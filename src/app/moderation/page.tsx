@@ -16,6 +16,7 @@ import {
   deleteLockerMessage,
   type LockerMessage,
 } from "@/lib/locker-room";
+import { loadLeagueReports, updatePlayerReportStatus, type PlayerReport, type PlayerReportStatus } from "@/lib/player-safety";
 
 /**
  * Troll control for commissioner + appointed moderators.
@@ -28,17 +29,20 @@ export default function ModerationPage() {
   const [selfId, setSelfId] = useState<string | null>(null);
   const [roster, setRoster] = useState<LeagueRosterMember[]>([]);
   const [messages, setMessages] = useState<LockerMessage[]>([]);
+  const [reports, setReports] = useState<PlayerReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
 
   async function reload() {
-    const [r, locker] = await Promise.all([
+    const [r, locker, reportRows] = await Promise.all([
       loadLeagueRoster(),
       loadLockerMessages(40),
+      loadLeagueReports(),
     ]);
     setRoster(r.filter((m) => !m.isBot));
     if (locker.ok) setMessages(locker.messages || []);
+    setReports(reportRows);
   }
 
   useEffect(() => {
@@ -142,6 +146,17 @@ export default function ModerationPage() {
     await reload();
   }
 
+  async function setReportStatus(report: PlayerReport, status: PlayerReportStatus) {
+    setBusyId(report.id); setMsg(null);
+    const result = await updatePlayerReportStatus(report.id, status);
+    setBusyId(null);
+    if (!result.ok) return setMsg(result.error || "Could not update report.");
+    setMsg(status === "resolved" ? "Report resolved." : status === "dismissed" ? "Report dismissed." : "Report reopened.");
+    await reload();
+  }
+
+  function playerName(id: string) { return roster.find((member) => member.userId === id)?.name || "Former player"; }
+
   if (allowed === null || loading) {
     return (
       <div className="min-h-screen flex flex-col">
@@ -189,6 +204,23 @@ export default function ModerationPage() {
             {msg}
           </div>
         )}
+
+        <section className="mb-6 rounded-xl border border-danger/30 bg-card p-5">
+          <h2 className="font-semibold">Player reports</h2>
+          <p className="mb-4 text-xs text-muted">Private safety queue for this league. Reporter identity stays staff-only.</p>
+          {reports.length === 0 ? <p className="py-3 text-center text-sm text-muted">No reports.</p> : <ul className="space-y-3">
+            {reports.map((report) => <li key={report.id} className="rounded-lg border border-border bg-background p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2"><strong className="text-sm">{playerName(report.reportedId)}</strong><span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-black uppercase">{report.status}</span></div>
+              <p className="mt-1 text-[11px] text-muted">Reported by {playerName(report.reporterId)} · {report.category} · {new Date(report.createdAt).toLocaleString()}</p>
+              {report.details && <p className="mt-2 whitespace-pre-wrap break-words text-sm">{report.details}</p>}
+              <div className="mt-3 flex gap-2">
+                {report.status !== "resolved" && <button disabled={busyId === report.id} onClick={() => void setReportStatus(report, "resolved")} className="min-h-10 flex-1 rounded-lg bg-primary px-3 text-xs font-bold text-black disabled:opacity-50">Resolve</button>}
+                {report.status !== "dismissed" && <button disabled={busyId === report.id} onClick={() => void setReportStatus(report, "dismissed")} className="min-h-10 flex-1 rounded-lg border border-border px-3 text-xs font-bold disabled:opacity-50">Dismiss</button>}
+                {report.status !== "open" && <button disabled={busyId === report.id} onClick={() => void setReportStatus(report, "open")} className="min-h-10 rounded-lg border border-border px-3 text-xs font-bold disabled:opacity-50">Reopen</button>}
+              </div>
+            </li>)}
+          </ul>}
+        </section>
 
         <section className="rounded-xl border border-border bg-card p-5 mb-6">
       <h2 className="font-semibold mb-1">Players</h2>

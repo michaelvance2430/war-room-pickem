@@ -2,6 +2,16 @@ import { createClient } from "@/lib/supabase/client";
 import { getSession } from "@/lib/league";
 
 export type ReportCategory = "harassment" | "hate" | "threats" | "spam" | "other";
+export type PlayerReportStatus = "open" | "reviewing" | "resolved" | "dismissed";
+export type PlayerReport = {
+  id: string;
+  reporterId: string;
+  reportedId: string;
+  category: ReportCategory;
+  details: string;
+  status: PlayerReportStatus;
+  createdAt: string;
+};
 
 export async function loadBlockedPlayerIds(): Promise<Set<string>> {
   const session = getSession();
@@ -37,4 +47,33 @@ export async function reportPlayer(opts: { reportedId: string; category: ReportC
     details: opts.details.trim().slice(0, 500),
   });
   return error ? { ok: false, error: "Reports are not available yet." } : { ok: true };
+}
+
+export async function loadLeagueReports(): Promise<PlayerReport[]> {
+  const session = getSession();
+  if (!session?.leagueId || (!session.isCommissioner && !session.isModerator)) return [];
+  const { data, error } = await createClient()
+    .from("player_reports")
+    .select("id, reporter_id, reported_id, category, details, status, created_at")
+    .eq("league_id", session.leagueId)
+    .order("created_at", { ascending: false })
+    .limit(100);
+  if (error) return [];
+  return (data || []).map((row) => ({
+    id: String(row.id), reporterId: String(row.reporter_id), reportedId: String(row.reported_id),
+    category: row.category as ReportCategory, details: String(row.details || ""),
+    status: row.status as PlayerReportStatus, createdAt: String(row.created_at),
+  }));
+}
+
+export async function updatePlayerReportStatus(id: string, status: PlayerReportStatus) {
+  const session = getSession();
+  if (!session?.playerId || (!session.isCommissioner && !session.isModerator)) return { ok: false, error: "Staff only" };
+  const closed = status === "resolved" || status === "dismissed";
+  const { error } = await createClient().from("player_reports").update({
+    status,
+    resolved_at: closed ? new Date().toISOString() : null,
+    resolved_by: closed ? session.playerId : null,
+  }).eq("id", id);
+  return error ? { ok: false, error: "Could not update report." } : { ok: true };
 }
