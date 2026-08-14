@@ -18,6 +18,36 @@
   --badge-legendary: #eab308;
 }
 
+/*
+ * Capacitor interaction polish. The website keeps normal browser semantics;
+ * only the installed app loses browser callouts, tap flashes, and rubber-band
+ * page chrome. Inputs and readable/user-authored copy remain selectable.
+ */
+html[data-war-room-runtime="native"] {
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html[data-war-room-runtime="native"] body {
+  overscroll-behavior-y: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+html[data-war-room-runtime="native"] a,
+html[data-war-room-runtime="native"] button,
+html[data-war-room-runtime="native"] img {
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+}
+
+html[data-war-room-runtime="native"] input,
+html[data-war-room-runtime="native"] textarea,
+html[data-war-room-runtime="native"] [data-native-selectable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-card: var(--card);

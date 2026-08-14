@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   getSession,
@@ -62,6 +62,7 @@ type NavLink = {
  */
 export default function Nav() {
   const pathname = usePathname();
+  const router = useRouter();
   if (pathname?.startsWith("/profile")) {
     wrProfileRoute("Nav.render", pathname);
   }
@@ -150,7 +151,7 @@ export default function Nav() {
     setMenuOpen(false);
     setMoreOpen(false);
     // Leave current page → Home as commissioner (invite code, hero, tiles)
-    window.location.href = "/";
+    router.push("/");
   }
 
   // Deferred chrome once — Nav is layout-persistent so this no longer re-runs
@@ -555,7 +556,7 @@ export default function Nav() {
     } catch {
       /* still leave */
     }
-    window.location.href = "/login";
+    router.replace("/login");
   }
 
   function linkActive(href: string) {

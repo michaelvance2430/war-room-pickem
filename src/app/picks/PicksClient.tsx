@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import PicksHowToModal from "@/components/PicksHowToModal";
 import PicksPreOpenOddsModal from "@/components/PicksPreOpenOddsModal";
 import FirstFinalModal from "@/components/FirstFinalModal";
@@ -150,6 +151,7 @@ const POLL_MS = 45_000;
 const SOFT_REFRESH_GAP_MS = 12_000;
 
 export default function PicksClient() {
+  const router = useRouter();
   /** League's official pick week (commissioner-controlled). */
   const [activeWeek, setActiveWeek] = useState(1);
   /** Week the user is viewing (may be past = read-only). */
@@ -477,16 +479,16 @@ export default function PicksClient() {
             session = getSession();
             league = getLeague();
           } else if (restored.status === "no_auth") {
-            window.location.replace("/login");
+            router.replace("/login");
             return null;
           } else if (restored.status === "no_leagues") {
-            window.location.replace("/join");
+            router.replace("/join");
             return null;
           } else if (restored.status === "pick_league") {
-            window.location.replace("/");
+            router.replace("/");
             return null;
           } else if (restored.status === "network_error") {
-            window.location.replace("/");
+            router.replace("/");
             return null;
           }
         } catch {
@@ -666,7 +668,7 @@ export default function PicksClient() {
         setCardBusy(false);
       }
     },
-    [applyCard]
+    [applyCard, router]
   );
 
   /** Poll / realtime: refresh current view week + active week number only. */

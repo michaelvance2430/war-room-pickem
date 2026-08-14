@@ -11,6 +11,7 @@
  */
 
 import { useState, useEffect, Fragment, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import SwingBadge from "@/components/SwingBadge";
 import CrownAndShame from "@/components/CrownAndShame";
 import {
@@ -88,6 +89,7 @@ function compareForPulse(a: Player, b: Player): number {
 }
 
 export default function StandingsPage() {
+  const router = useRouter();
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
   /** Competitive crown/PTS table — production + official scores only */
@@ -141,15 +143,15 @@ export default function StandingsPage() {
           const restored = await restoreSessionFromCloud();
           if (cancelled) return;
           if (restored.status === "no_auth") {
-            window.location.replace("/login");
+            router.replace("/login");
             return;
           }
           if (restored.status === "no_leagues") {
-            window.location.replace("/join");
+            router.replace("/join");
             return;
           }
           if (restored.status === "pick_league") {
-            window.location.replace("/");
+            router.replace("/");
             return;
           }
           if (restored.status === "network_error") {
@@ -157,7 +159,7 @@ export default function StandingsPage() {
           }
         } catch {
           // Home owns the retry UI and can distinguish auth from network state.
-          window.location.replace("/");
+          router.replace("/");
           return;
         }
       }
@@ -315,7 +317,7 @@ export default function StandingsPage() {
       window.clearInterval(heartbeat);
       document.removeEventListener("visibilitychange", onVis);
     };
-  }, []);
+  }, [router]);
 
   const sportId = getLeague()?.sportId;
   const phaseCopy = standingsPulsePhaseCopy(pulsePhase);

@@ -8,10 +8,12 @@
 
 import { FormEvent, Suspense, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import BrandMark from "@/components/BrandMark";
 
 function ResetPasswordInner() {
+  const router = useRouter();
   const [ready, setReady] = useState(false);
   const [checking, setChecking] = useState(true);
   const [password, setPassword] = useState("");
@@ -181,11 +183,7 @@ function ResetPasswordInner() {
 
       setDone(true);
       window.setTimeout(() => {
-        try {
-          window.location.assign("/login?mode=login&reset=ok");
-        } catch {
-          window.location.href = "/login?mode=login&reset=ok";
-        }
+        router.replace("/login?mode=login&reset=ok");
       }, 900);
     } catch (err: unknown) {
       setError(

@@ -31,6 +31,10 @@ export default function NativeRuntime() {
     let cancelled = false;
     const removers: Array<() => Promise<void>> = [];
 
+    // Give the shared UI an explicit native boundary. This keeps iOS-only
+    // interaction polish out of the website without maintaining two UIs.
+    document.documentElement.dataset.warRoomRuntime = "native";
+
     void import("@capacitor/app").then(async ({ App }) => {
       const openUrl = ({ url }: { url: string }) => {
         const path = pathFromNativeUrl(url);
@@ -52,6 +56,7 @@ export default function NativeRuntime() {
 
     return () => {
       cancelled = true;
+      delete document.documentElement.dataset.warRoomRuntime;
       void Promise.all(removers.map((remove) => remove()));
     };
   }, [router]);
