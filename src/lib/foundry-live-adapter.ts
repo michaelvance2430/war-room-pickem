@@ -34,9 +34,8 @@ function state(): FoundryWalkthrough | null {
 function stateForWeek(weekNumber: number): FoundryWalkthrough | null {
   const current = state();
   if (!current) return null;
-  if (current.week === weekNumber) return current;
   const snapshot = current.weekHistory?.find((entry) => entry.week === weekNumber);
-  if (!snapshot) return null;
+  if (!snapshot) return current.week === weekNumber ? current : null;
   const historical = createFoundryWalkthrough(current.sport, weekNumber, current.role);
   return {
     ...historical,
@@ -68,12 +67,17 @@ function favoriteFor(game: FoundryWalkthrough["games"][number]) {
 }
 
 export function foundryLiveWeek(): number | null {
-  return state()?.week ?? null;
+  const s = state();
+  if (!s) return null;
+  // After a simulation, keep the real app parked on the completed card so
+  // Home/Board/Dispatch show its score instead of demanding manual scoring of
+  // the next queued card. The Foundry control still advances s.week on tap.
+  return s.gazetteWeeks.at(-1) ?? s.week;
 }
 
 export function foundryLiveCard(weekNumber: number): CloudCard | null {
-  const s = state();
-  if (!s || weekNumber !== s.week) return null;
+  const s = stateForWeek(weekNumber);
+  if (!s) return null;
   return {
     weekCardId: `foundry-${s.sport}-${s.week}`,
     weekNumber: s.week,
@@ -106,8 +110,8 @@ export function foundryLiveMyPicks(weekNumber: number): {
   lockedAt: string | null;
   isChaos: boolean;
 } | null {
-  const s = state();
-  if (!s || s.week !== weekNumber) return null;
+  const s = stateForWeek(weekNumber);
+  if (!s) return null;
   const picks: Record<string, UserPick> = {};
   for (const game of s.games) {
     if (!game.pick) continue;

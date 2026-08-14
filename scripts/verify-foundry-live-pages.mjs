@@ -25,6 +25,7 @@ assert.match(adapter, /foundryLivePickSubmissionStatus/, "real commissioner view
 assert.match(adapter, /foundryLiveNoLockNames/, "real Dispatch must receive simulated no-lock truth");
 assert.match(adapter, /gazetteWeeks/, "scored-week history must survive after the simulator opens the next card");
 assert.match(adapter, /foundryLivePublishedWeeks/, "real league truth must use Foundry's published-week inventory");
+assert.match(adapter, /gazetteWeeks\.at\(-1\) \?\? s\.week/, "real Home must remain on the completed Foundry week instead of demanding the next manual score");
 assert.match(cloud, /foundryLivePublishedWeeks/, "cloud published-week loader must honor Foundry before production data");
 assert.match(cloud, /isFoundryLivePagesActive\(\)\) return foundryLiveWeekResults\(weekNumber\)/, "Board results loader must stop before cloud reads in Foundry");
 assert.match(chrome, /onPointerDown=\{startDrag\}/, "founder controls must be draggable");
