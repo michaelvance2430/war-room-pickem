@@ -3,8 +3,8 @@
 import { useMemo, useState } from "react";
 import { getSession, getLeague } from "@/lib/league";
 
-/** Personal inbox until a business address exists. */
-export const FEEDBACK_TO_EMAIL = "michaelvance2430@gmail.com";
+/** Primary War Room support and feedback inbox. */
+export const FEEDBACK_TO_EMAIL = "mike@war-room-picks.com";
 
 const KINDS = [
   { id: "issue", label: "Issue / bug", hint: "Something broken or confusing" },

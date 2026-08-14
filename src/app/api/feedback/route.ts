@@ -18,9 +18,9 @@ const KINDS = new Set(["issue", "recommendation", "discussion", "other"]);
  * Player feedback → your inbox.
  *
  * Configure on Vercel (any one path works):
- *  1) FEEDBACK_TO_EMAIL + RESEND_API_KEY  (Resend.com free tier)
+ *  1) RESEND_API_KEY                       (Resend.com free tier)
  *  2) WEB3FORMS_ACCESS_KEY                 (web3forms.com free — email only)
- *  3) FEEDBACK_TO_EMAIL only               → returns mailto: for the client
+ *  3) No provider key                      → returns mailto: for the client
  */
 export async function POST(req: Request) {
   const identity = await authenticateApiRequest(req);
@@ -82,11 +82,7 @@ export async function POST(req: Request) {
     .filter(Boolean)
     .join("\n");
 
-  // Default personal inbox; override with FEEDBACK_TO_EMAIL when business email exists
-  const to =
-    process.env.FEEDBACK_TO_EMAIL ||
-    process.env.NEXT_PUBLIC_FEEDBACK_EMAIL ||
-    "michaelvance2430@gmail.com";
+  const to = "mike@war-room-picks.com";
 
   // 1) Resend (optional — only if keys configured)
   const resendKey = process.env.RESEND_API_KEY;
