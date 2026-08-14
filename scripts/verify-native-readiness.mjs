@@ -51,6 +51,8 @@ assert(capacitorConfig.includes('appId: "com.warroompicks.app"'), "Capacitor bun
 assert(capacitorConfig.includes('overlaysWebView: false'), "iPhone status bar can cover War Room chrome");
 assert(sceneDelegate.includes("SeasonOpeningViewController"), "native opening controller missing");
 assert(sceneDelegate.includes('subdirectory: "public/media"'), "native opening asset path missing");
+assert(sceneDelegate.includes("configureSoundButton()"), "native opening sound control missing");
+assert(sceneDelegate.includes("player?.isMuted = !soundEnabled"), "native opening sound control is not wired to playback");
 assert(infoPlist.includes("ITSAppUsesNonExemptEncryption"), "export compliance declaration missing");
 assert(!infoPlist.includes("UIInterfaceOrientationLandscapeLeft") || infoPlist.indexOf("UIInterfaceOrientationLandscapeLeft") > infoPlist.indexOf("UISupportedInterfaceOrientations~ipad"), "iPhone must remain portrait-first");
 assert(submissionPacket.includes("Tracking: **No**"), "App Privacy tracking answer missing");

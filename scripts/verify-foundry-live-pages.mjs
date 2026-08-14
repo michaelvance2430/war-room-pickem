@@ -17,6 +17,10 @@ for (const loader of ["loadLeagueActiveWeek", "loadWeekCard", "loadMyPicks", "li
 assert.match(cloud, /isFoundryLivePagesActive\(\)[\s\S]{0,220}saveFoundryLivePicks/, "Foundry save must stop before cloud write");
 assert.match(adapter, /localStorage\.getItem\(ACTIVE_KEY\)/);
 assert.match(adapter, /saveFoundryWalkthrough/);
+assert.match(adapter, /foundryLiveWeekResults/, "Foundry must expose simulated ATS results to real pages");
+assert.match(adapter, /game\.status === "final"/, "only final Foundry games may score");
+assert.match(adapter, /\? \[s\.week\]/, "Board must request the card retained by the Foundry sandbox");
+assert.match(cloud, /isFoundryLivePagesActive\(\)\) return foundryLiveWeekResults\(weekNumber\)/, "Board results loader must stop before cloud reads in Foundry");
 assert.match(chrome, /onPointerDown=\{startDrag\}/, "founder controls must be draggable");
 assert.match(chrome, /touch-none cursor-grab/, "drag handle must work on touch screens");
 const walkthrough = readFileSync("src/lib/foundry-walkthrough.ts", "utf8");

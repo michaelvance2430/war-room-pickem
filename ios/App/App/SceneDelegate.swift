@@ -35,6 +35,8 @@ private final class SeasonOpeningViewController: UIViewController {
     private var playerLayer: AVPlayerLayer?
     private var playbackObserver: NSObjectProtocol?
     private var finishing = false
+    private var soundEnabled = true
+    private let soundButton = UIButton(type: .system)
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -56,6 +58,8 @@ private final class SeasonOpeningViewController: UIViewController {
         view.layer.addSublayer(layer)
         self.player = player
         self.playerLayer = layer
+
+        configureSoundButton()
 
         let skip = UIButton(type: .system)
         var configuration = UIButton.Configuration.filled()
@@ -85,6 +89,29 @@ private final class SeasonOpeningViewController: UIViewController {
         player.play()
     }
 
+    private func configureSoundButton() {
+        var configuration = UIButton.Configuration.filled()
+        configuration.title = "SOUND ON"
+        configuration.image = UIImage(systemName: "speaker.wave.2.fill")
+        configuration.imagePadding = 7
+        configuration.baseForegroundColor = .white
+        configuration.baseBackgroundColor = UIColor.black.withAlphaComponent(0.72)
+        configuration.cornerStyle = .capsule
+        configuration.contentInsets = NSDirectionalEdgeInsets(top: 12, leading: 18, bottom: 12, trailing: 18)
+        soundButton.configuration = configuration
+        soundButton.titleLabel?.font = .systemFont(ofSize: 12, weight: .black)
+        soundButton.accessibilityLabel = "Opening sound on"
+        soundButton.translatesAutoresizingMaskIntoConstraints = false
+        soundButton.addTarget(self, action: #selector(toggleSound), for: .touchUpInside)
+        view.addSubview(soundButton)
+
+        NSLayoutConstraint.activate([
+            soundButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            soundButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -14),
+            soundButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 46),
+        ])
+    }
+
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         playerLayer?.frame = view.bounds
@@ -100,6 +127,16 @@ private final class SeasonOpeningViewController: UIViewController {
 
     @objc private func skipOpening() {
         finishOpening()
+    }
+
+    @objc private func toggleSound() {
+        soundEnabled.toggle()
+        player?.isMuted = !soundEnabled
+        soundButton.configuration?.title = soundEnabled ? "SOUND ON" : "SOUND OFF"
+        soundButton.configuration?.image = UIImage(
+            systemName: soundEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill"
+        )
+        soundButton.accessibilityLabel = soundEnabled ? "Opening sound on" : "Opening sound off"
     }
 
     private func finishOpening() {

@@ -1,4 +1,5 @@
 import type { CloudCard, LeagueRosterMember } from "@/lib/cloud";
+import type { GameResult } from "@/lib/scoring";
 import type { Player, UserPick } from "@/lib/types";
 import {
   FOUNDRY_WALKTHROUGH_EVENT,
@@ -29,6 +30,14 @@ function state(): FoundryWalkthrough | null {
   return isFoundryLivePagesActive() ? loadFoundryWalkthrough() : null;
 }
 
+function lineFor(game: FoundryWalkthrough["games"][number]) {
+  return Number(game.spread.match(/(-?\d+(?:\.\d+)?)$/)?.[1] || 0);
+}
+
+function favoriteFor(game: FoundryWalkthrough["games"][number]) {
+  return lineFor(game) <= 0 ? "home" as const : "away" as const;
+}
+
 export function foundryLiveWeek(): number | null {
   return state()?.week ?? null;
 }
@@ -41,13 +50,12 @@ export function foundryLiveCard(weekNumber: number): CloudCard | null {
     weekNumber: s.week,
     publishedAt: new Date(s.generatedAt).toISOString(),
     games: s.games.map((game) => {
-      const favorite = game.spread.startsWith(game.home) ? "home" as const : "away" as const;
-      const spreadMatch = game.spread.match(/(-?\d+(?:\.\d+)?)$/);
+      const favorite = favoriteFor(game);
       return {
         id: game.id,
         awayTeam: game.away,
         homeTeam: game.home,
-        spread: Math.abs(Number(spreadMatch?.[1] || 0)),
+        spread: Math.abs(lineFor(game)),
         favorite,
         startTime: new Date(game.kickoffAt).toLocaleString(),
         commenceTime: game.kickoffAt,
@@ -74,7 +82,7 @@ export function foundryLiveMyPicks(weekNumber: number): {
   const picks: Record<string, UserPick> = {};
   for (const game of s.games) {
     if (!game.pick) continue;
-    const favorite = game.spread.startsWith(game.home) ? "home" as const : "away" as const;
+    const favorite = favoriteFor(game);
     picks[game.id] = {
       gameId: game.id,
       pick: game.pick === game.home ? "home" : "away",
@@ -86,6 +94,37 @@ export function foundryLiveMyPicks(weekNumber: number): {
   }
   if (!Object.keys(picks).length) return null;
   return { picks, bestBetId: Object.values(picks).find((p) => p.isBestBet)?.gameId || null, propChoice: "Absolutely", lockedAt: s.players[0]?.locked ? new Date(s.generatedAt).toISOString() : null, isChaos: false };
+}
+
+export function foundryLiveWeekResults(weekNumber: number): {
+  results: Record<string, GameResult>;
+  propResult: string | null;
+  scoredAt: string | null;
+} | null {
+  const s = state();
+  if (!s || s.week !== weekNumber) return null;
+
+  const results: Record<string, GameResult> = {};
+  for (const game of s.games) {
+    if (game.status !== "final" || !game.result) continue;
+    const scores = [...game.result.matchAll(/(\d+)/g)].map((match) => Number(match[1]));
+    if (scores.length < 2) continue;
+    const [awayScore, homeScore] = scores;
+    const favorite = favoriteFor(game);
+    const spread = Math.abs(lineFor(game));
+    const awayAdjusted = awayScore + (favorite === "away" ? -spread : spread);
+    const winner = awayAdjusted === homeScore
+      ? "push"
+      : awayAdjusted > homeScore ? "away" : "home";
+    results[game.id] = { gameId: game.id, winner };
+  }
+
+  if (!Object.keys(results).length) return null;
+  return {
+    results,
+    propResult: "Absolutely",
+    scoredAt: new Date(s.generatedAt).toISOString(),
+  };
 }
 
 export function saveFoundryLivePicks(weekNumber: number, picks: Record<string, UserPick>): boolean {
@@ -134,5 +173,7 @@ export function foundryLiveRoster(): LeagueRosterMember[] | null {
 export function foundryLiveScoredWeeks(): number[] | null {
   const s = state();
   if (!s) return null;
-  return Array.from({ length: Math.max(0, s.week) }, (_, index) => index);
+  return s.games.some((game) => game.status === "final" && !!game.result)
+    ? [s.week]
+    : [];
 }
