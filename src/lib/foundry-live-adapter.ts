@@ -3,6 +3,7 @@ import type { GameResult } from "@/lib/scoring";
 import type { Player, UserPick } from "@/lib/types";
 import {
   FOUNDRY_WALKTHROUGH_EVENT,
+  createFoundryWalkthrough,
   loadFoundryWalkthrough,
   saveFoundryWalkthrough,
   type FoundryWalkthrough,
@@ -28,6 +29,34 @@ export function setFoundryLivePagesActive(active: boolean): void {
 
 function state(): FoundryWalkthrough | null {
   return isFoundryLivePagesActive() ? loadFoundryWalkthrough() : null;
+}
+
+function stateForWeek(weekNumber: number): FoundryWalkthrough | null {
+  const current = state();
+  if (!current) return null;
+  if (current.week === weekNumber) return current;
+  if (!current.gazetteWeeks.includes(weekNumber)) return null;
+  const historical = createFoundryWalkthrough(current.sport, weekNumber, current.role);
+  return {
+    ...historical,
+    gazetteWeeks: current.gazetteWeeks,
+    games: historical.games.map((game, index) => ({
+      ...game,
+      status: "final" as const,
+      result: game.result || `${game.away} ${24 + index} · ${game.home} ${17 + index}`,
+    })),
+  };
+}
+
+function picksForGames(games: FoundryWalkthrough["games"]): Record<string, UserPick> {
+  return Object.fromEntries(games.map((game) => [game.id, {
+    gameId: game.id,
+    pick: game.pick === game.away ? "away" as const : "home" as const,
+    confidence: game.confidence,
+    isBestBet: game.confidence === 5,
+    lockedSpread: Math.abs(lineFor(game)),
+    lockedFavorite: favoriteFor(game),
+  }]));
 }
 
 function lineFor(game: FoundryWalkthrough["games"][number]) {
@@ -101,12 +130,14 @@ export function foundryLiveWeekResults(weekNumber: number): {
   propResult: string | null;
   scoredAt: string | null;
 } | null {
-  const s = state();
-  if (!s || s.week !== weekNumber) return null;
+  const current = state();
+  if (!current?.gazetteWeeks.includes(weekNumber)) return null;
+  const s = stateForWeek(weekNumber);
+  if (!s) return null;
 
   const results: Record<string, GameResult> = {};
   for (const game of s.games) {
-    if (game.status !== "final" || !game.result) continue;
+    if (!(game.status === "final" && game.result)) continue;
     const scores = [...game.result.matchAll(/(\d+)/g)].map((match) => Number(match[1]));
     if (scores.length < 2) continue;
     const [awayScore, homeScore] = scores;
@@ -125,6 +156,54 @@ export function foundryLiveWeekResults(weekNumber: number): {
     propResult: "Absolutely",
     scoredAt: new Date(s.generatedAt).toISOString(),
   };
+}
+
+export function foundryLiveWeekBoard(weekNumber: number) {
+  const s = stateForWeek(weekNumber);
+  if (!s) return null;
+  const scored = s.gazetteWeeks.includes(weekNumber);
+  const picks = picksForGames(s.games);
+  return {
+    ok: true,
+    scored,
+    lockedOpen: true,
+    slips: s.players.map((player, index) => ({
+      userId: player.id,
+      name: player.name,
+      isBot: index > 0,
+      picks,
+      bestBetId: s.games.find((game) => game.confidence === 5)?.id || null,
+      propChoice: "Absolutely",
+      lockedAt: player.locked ? new Date(s.generatedAt).toISOString() : null,
+      totalPoints: scored ? player.weekPoints : null,
+      isChaos: false,
+    })).sort((a, b) => (b.totalPoints ?? -1) - (a.totalPoints ?? -1) || a.name.localeCompare(b.name)),
+  };
+}
+
+export function foundryLivePickSubmissionStatus(weekNumber: number) {
+  const s = stateForWeek(weekNumber);
+  if (!s) return null;
+  return {
+    ok: true,
+    rows: s.players.map((player, index) => ({
+      userId: player.id,
+      name: player.name,
+      division: (["North", "South", "East", "West"] as const)[index % 4],
+      role: index === 0 ? "commissioner" as const : "player" as const,
+      submitted: player.locked,
+      complete: player.locked,
+      gamePickCount: player.locked ? s.games.length : 0,
+      hasProp: player.locked,
+      hasBestBet: player.locked,
+      lockedAt: player.locked ? new Date(s.generatedAt).toISOString() : null,
+    })),
+  };
+}
+
+export function foundryLiveNoLockNames(weekNumber: number): string[] | null {
+  const s = stateForWeek(weekNumber);
+  return s ? s.players.filter((player) => !player.locked).map((player) => player.name).sort() : null;
 }
 
 export function saveFoundryLivePicks(weekNumber: number, picks: Record<string, UserPick>): boolean {
@@ -173,7 +252,5 @@ export function foundryLiveRoster(): LeagueRosterMember[] | null {
 export function foundryLiveScoredWeeks(): number[] | null {
   const s = state();
   if (!s) return null;
-  return s.games.some((game) => game.status === "final" && !!game.result)
-    ? [s.week]
-    : [];
+  return [...s.gazetteWeeks].sort((a, b) => a - b);
 }

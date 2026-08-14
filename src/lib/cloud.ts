@@ -1634,6 +1634,11 @@ export async function loadLeagueWeekBoard(weekNumber: number): Promise<{
   lockedOpen: boolean;
   error?: string;
 }> {
+  try {
+    const { foundryLiveWeekBoard } = await import("./foundry-live-adapter");
+    const board = foundryLiveWeekBoard(weekNumber);
+    if (board) return board;
+  } catch { /* fall through */ }
   const session = getSession();
   if (!session?.leagueId) {
     return {
@@ -1941,6 +1946,11 @@ export async function loadPickSubmissionStatus(
   weekNumber: number,
   expectedGames = 5
 ): Promise<{ ok: boolean; rows: PickSubmissionStatus[]; error?: string }> {
+  try {
+    const { foundryLivePickSubmissionStatus } = await import("./foundry-live-adapter");
+    const status = foundryLivePickSubmissionStatus(weekNumber);
+    if (status) return status;
+  } catch { /* fall through */ }
   const session = getSession();
   if (!session?.leagueId || !isOps()) {
     return { ok: false, rows: [], error: "Commissioner or deputy only" };
@@ -2033,6 +2043,11 @@ export async function loadWeekNoLockNames(
   weekNumber: number,
   expectedGames = 5
 ): Promise<string[]> {
+  try {
+    const { foundryLiveNoLockNames } = await import("./foundry-live-adapter");
+    const names = foundryLiveNoLockNames(weekNumber);
+    if (names) return names;
+  } catch { /* fall through */ }
   const session = getSession();
   if (!session?.leagueId) return [];
 
