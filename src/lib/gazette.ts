@@ -2099,6 +2099,24 @@ export async function loadGazetteArchive(): Promise<{
   editions?: ArchivedGazette[];
   error?: string;
 }> {
+  try {
+    const { foundryLivePlayersForWeek, foundryLiveScoredWeeks, isFoundryLivePagesActive } = await import("./foundry-live-adapter");
+    if (isFoundryLivePagesActive()) {
+      const weeks = [...(foundryLiveScoredWeeks() || [])].sort((a, b) => b - a);
+      const editions: ArchivedGazette[] = [];
+      for (const weekNumber of weeks) {
+        const players = foundryLivePlayersForWeek(weekNumber);
+        const edition = players ? await buildGazetteEdition(players) : null;
+        if (!edition) continue;
+        edition.weekIndex = weekNumber;
+        edition.weekLabel = weekTitle(weekNumber, edition.sportId);
+        editions.push({ id: `foundry-dispatch-${weekNumber}`, weekNumber, weekLabel: edition.weekLabel, volumeLabel: `Vol. ${weekNumber}`, edition, createdAt: new Date().toISOString() });
+      }
+      return { ok: true, editions };
+    }
+  } catch {
+    /* continue to the production archive */
+  }
   const session = getSession();
   if (!session?.leagueId) {
     return { ok: false, error: "No league selected" };

@@ -35,16 +35,16 @@ function stateForWeek(weekNumber: number): FoundryWalkthrough | null {
   const current = state();
   if (!current) return null;
   if (current.week === weekNumber) return current;
-  if (!current.gazetteWeeks.includes(weekNumber)) return null;
+  const snapshot = current.weekHistory?.find((entry) => entry.week === weekNumber);
+  if (!snapshot) return null;
   const historical = createFoundryWalkthrough(current.sport, weekNumber, current.role);
   return {
     ...historical,
     gazetteWeeks: current.gazetteWeeks,
-    games: historical.games.map((game, index) => ({
-      ...game,
-      status: "final" as const,
-      result: game.result || `${game.away} ${24 + index} · ${game.home} ${17 + index}`,
-    })),
+    weekHistory: current.weekHistory,
+    generatedAt: snapshot.generatedAt,
+    players: snapshot.players,
+    games: snapshot.games,
   };
 }
 
@@ -138,9 +138,10 @@ export function foundryLiveWeekResults(weekNumber: number): {
   const results: Record<string, GameResult> = {};
   for (const game of s.games) {
     if (!(game.status === "final" && game.result)) continue;
-    const scores = [...game.result.matchAll(/(\d+)/g)].map((match) => Number(match[1]));
-    if (scores.length < 2) continue;
-    const [awayScore, homeScore] = scores;
+    const sides = game.result.split("·");
+    const awayScore = Number(sides[0]?.match(/(\d+)\s*$/)?.[1]);
+    const homeScore = Number(sides[1]?.match(/(\d+)\s*$/)?.[1]);
+    if (!Number.isFinite(awayScore) || !Number.isFinite(homeScore)) continue;
     const favorite = favoriteFor(game);
     const spread = Math.abs(lineFor(game));
     const awayAdjusted = awayScore + (favorite === "away" ? -spread : spread);
@@ -219,15 +220,14 @@ export function saveFoundryLivePicks(weekNumber: number, picks: Record<string, U
   return true;
 }
 
-export function foundryLivePlayers(): Player[] | null {
-  const s = state();
-  if (!s) return null;
+function playersForState(s: FoundryWalkthrough): Player[] {
+  const history = [...(s.weekHistory || [])].sort((a, b) => a.week - b.week);
   return s.players.map((p, index) => ({
     id: p.id,
     name: p.name,
     division: (["North", "South", "East", "West"] as const)[index % 4],
-    totalPoints: p.points,
-    weeklyPoints: Array.from({ length: Math.max(1, s.week + 1) }, (_, week) => week === s.week ? p.weekPoints : Math.max(0, Math.round((p.points - p.weekPoints) / Math.max(1, s.week)))),
+    totalPoints: history.reduce((sum, snapshot) => sum + (snapshot.players.find((row) => row.id === p.id)?.weekPoints || 0), 0),
+    weeklyPoints: history.map((snapshot) => snapshot.players.find((row) => row.id === p.id)?.weekPoints || 0),
     atsCorrect: p.correct + Math.max(0, s.week * 2),
     atsTotal: Math.max(p.correct, s.week * 5),
     currentStreak: p.streak,
@@ -238,9 +238,23 @@ export function foundryLivePlayers(): Player[] | null {
     bestBetTotal: Math.max(0, s.week),
     propHits: Math.max(0, Math.floor(s.week / 3)),
     propTotal: Math.max(0, s.week),
-    weeksPlayed: Math.max(0, s.week),
+    weeksPlayed: history.length,
     isMock: true,
   }));
+}
+
+export function foundryLivePlayers(): Player[] | null {
+  const s = state();
+  return s ? playersForState(s) : null;
+}
+
+export function foundryLivePlayersForWeek(weekNumber: number): Player[] | null {
+  const current = state();
+  if (!current) return null;
+  const snapshots = (current.weekHistory || []).filter((snapshot) => snapshot.week <= weekNumber);
+  const target = snapshots.find((snapshot) => snapshot.week === weekNumber);
+  if (!target) return null;
+  return playersForState({ ...current, players: target.players, weekHistory: snapshots });
 }
 
 export function foundryLiveRoster(): LeagueRosterMember[] | null {

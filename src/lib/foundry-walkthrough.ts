@@ -29,6 +29,12 @@ export type PreviewGame = {
   /** Commissioner-selected kickoff; the earliest game locks the whole card. */
   kickoffAt: string;
 };
+export type FoundryWeekSnapshot = {
+  week: number;
+  generatedAt: number;
+  players: PreviewPlayer[];
+  games: PreviewGame[];
+};
 export type FoundryWalkthrough = {
   version: 1;
   sport: PreviewSport;
@@ -41,6 +47,8 @@ export type FoundryWalkthrough = {
   unreadGazette: boolean;
   /** Scored weekly editions retained for the walkable Gazette archive. */
   gazetteWeeks: number[];
+  /** Atomic truth for Board, scores, standings, Crown/Shame, and Dispatch. */
+  weekHistory: FoundryWeekSnapshot[];
   ncaaPicks: NcaaPicks;
   ncaaResults: NcaaPicks;
   ncaaBracketLocked: boolean;
@@ -156,7 +164,7 @@ export function createFoundryWalkthrough(sport: PreviewSport, week = foundryOpen
   // week can score immediately through the real league pages.
   for (const player of players) player.locked = true;
   const preseasonChampionPicks = createPreseasonChampionPicks(players, sport);
-  return { version: 1, sport, role, week, seasonLabel: "2026 Foundry Season", generatedAt: Date.now(), players, games, unreadGazette: false, gazetteWeeks: [], ncaaPicks: {}, ncaaResults: {}, ncaaBracketLocked: false, preseasonChampionPicks, postseasonFields: null, postseasonRoundsPlayed: 0, tacticalNukeWeeks: [], tacticalNukeActive: false, mapsEvent: null };
+  return { version: 1, sport, role, week, seasonLabel: "2026 Foundry Season", generatedAt: Date.now(), players, games, unreadGazette: false, gazetteWeeks: [], weekHistory: [], ncaaPicks: {}, ncaaResults: {}, ncaaBracketLocked: false, preseasonChampionPicks, postseasonFields: null, postseasonRoundsPlayed: 0, tacticalNukeWeeks: [], tacticalNukeActive: false, mapsEvent: null };
 }
 
 export function saveFoundryWalkthrough(state: FoundryWalkthrough) {
@@ -188,6 +196,7 @@ export function loadFoundryWalkthrough(): FoundryWalkthrough | null {
           : Math.max(1, parsed.games.length - index),
       })),
       gazetteWeeks: Array.isArray(parsed.gazetteWeeks) ? parsed.gazetteWeeks : [],
+      weekHistory: Array.isArray(parsed.weekHistory) ? parsed.weekHistory : [],
       ncaaPicks: parsed.ncaaPicks && typeof parsed.ncaaPicks === "object" ? parsed.ncaaPicks : {},
       ncaaResults: parsed.ncaaResults && typeof parsed.ncaaResults === "object" ? parsed.ncaaResults : {},
       ncaaBracketLocked: !!parsed.ncaaBracketLocked,
@@ -207,12 +216,30 @@ export function loadFoundryWalkthrough(): FoundryWalkthrough | null {
   } catch { return null; }
 }
 
+function completedWeekSnapshot(state: FoundryWalkthrough): FoundryWeekSnapshot {
+  const games = state.games.map((game, index) => {
+    if (game.status === "final" && game.result) return game;
+    const awayScore = 17 + (hash(state.week + 401, index, 2) % (state.sport === "cbb" ? 55 : 25));
+    const homeScore = 17 + (hash(state.week + 401, index, 3) % (state.sport === "cbb" ? 55 : 25));
+    return { ...game, status: "final" as const, result: `${game.away} ${awayScore} · ${game.home} ${homeScore}` };
+  });
+  return {
+    week: state.week,
+    generatedAt: Date.now(),
+    games,
+    players: state.players.map((player) => ({ ...player, locked: true })),
+  };
+}
+
 export function simulateNextFoundryWeek(state: FoundryWalkthrough): FoundryWalkthrough {
   const nextWeek = Math.min(state.week + 1, foundryFinalWeek(state.sport));
   // A completed season is immutable. Preserve its archive instead of creating
   // a fictional Window 23 / Week 19 when Sim Week is pressed again.
   if (nextWeek === state.week) return state;
   const next = createFoundryWalkthrough(state.sport, nextWeek, state.role);
+  const completed = completedWeekSnapshot(state);
+  const weekHistory = [...(state.weekHistory || []).filter((snapshot) => snapshot.week !== state.week), completed]
+    .sort((a, b) => a.week - b.week);
   const postseasonWindow = state.sport === "cbb" ? foundryNcaaWindowForWeek(nextWeek) : 0;
   const ncaaResults = state.sport === "cbb" ? simulateNcaaResultsThroughWindow(postseasonWindow) : {};
   const players = next.players.map((player, index) => {
@@ -225,7 +252,7 @@ export function simulateNextFoundryWeek(state: FoundryWalkthrough): FoundryWalkt
   const postseasonRoundsPlayed = state.sport === "cfb" && state.week >= foundryPostseasonStartWeek("cfb")
     ? Math.min(4, (state.postseasonRoundsPlayed || 0) + 1)
     : state.postseasonRoundsPlayed || 0;
-  return { ...next, players, gazetteWeeks: Array.from(new Set(publishableWeeks)).sort((a, b) => a - b), ncaaPicks: state.ncaaPicks || {}, ncaaResults, ncaaBracketLocked: state.ncaaBracketLocked, preseasonChampionPicks: state.preseasonChampionPicks || {}, postseasonFields: state.postseasonFields, postseasonRoundsPlayed, tacticalNukeWeeks: state.tacticalNukeWeeks || [], tacticalNukeActive: false, mapsEvent: state.mapsEvent || null, unreadGazette: true };
+  return { ...next, players, gazetteWeeks: Array.from(new Set(publishableWeeks)).sort((a, b) => a - b), weekHistory, ncaaPicks: state.ncaaPicks || {}, ncaaResults, ncaaBracketLocked: state.ncaaBracketLocked, preseasonChampionPicks: state.preseasonChampionPicks || {}, postseasonFields: state.postseasonFields, postseasonRoundsPlayed, tacticalNukeWeeks: state.tacticalNukeWeeks || [], tacticalNukeActive: false, mapsEvent: state.mapsEvent || null, unreadGazette: true };
 }
 
 export function simulateFoundrySeason(state: FoundryWalkthrough): FoundryWalkthrough {

@@ -17,9 +17,13 @@ assert.equal(cfbOpening.week, 0, "CFB Sandbox starts in Week 0");
 const cfbWeekOne = simulateNextFoundryWeek(cfbOpening);
 assert.equal(cfbWeekOne.week, 1, "Week 0 advances to Week 1");
 assert.deepEqual(cfbWeekOne.gazetteWeeks, [0], "scored Week 0 immediately creates a Dispatch");
+assert.equal(cfbWeekOne.weekHistory.length, 1, "one tap atomically archives one completed week");
+assert.ok(cfbWeekOne.weekHistory[0].players.every((player) => player.locked), "every bot card is locked in the weekly record");
+assert.ok(cfbWeekOne.weekHistory[0].games.every((game) => game.status === "final" && game.result), "every score is final in the weekly record");
 const cfbWeekTwo = simulateNextFoundryWeek(cfbWeekOne);
 assert.equal(cfbWeekTwo.week, 2, "Week 1 advances to Week 2");
 assert.deepEqual(cfbWeekTwo.gazetteWeeks, [0, 1], "each scored week immediately creates a Dispatch");
+assert.equal(cfbWeekTwo.weekHistory.length, 2, "weekly snapshots survive when the next card opens");
 
 const packet = {
   schemaVersion: 1,

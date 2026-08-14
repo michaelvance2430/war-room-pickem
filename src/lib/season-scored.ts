@@ -107,6 +107,12 @@ export async function hasCompetitiveAchievementData(opts?: {
   allowFoundryDisplay?: boolean;
 }): Promise<boolean> {
   try {
+    const { foundryLiveScoredWeeks, isFoundryLivePagesActive } = await import("./foundry-live-adapter");
+    if (isFoundryLivePagesActive()) return (foundryLiveScoredWeeks()?.length || 0) > 0;
+  } catch {
+    /* continue through the production trust gate */
+  }
+  try {
     const { resolveLeagueMode } = await import("./league-mode");
     const mode = resolveLeagueMode();
     const displayOnlyFoundry =
