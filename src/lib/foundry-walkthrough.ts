@@ -248,11 +248,23 @@ export function simulateNextFoundryWeek(state: FoundryWalkthrough): FoundryWalkt
     const priorMadnessPoints = ncaaScore(bracket, state.ncaaResults || {});
     return { ...player, madnessPoints, madnessWindowPoints: madnessPoints - priorMadnessPoints, points: player.points + madnessPoints };
   }).sort((a, b) => b.points - a.points);
+  let postseasonFields = state.postseasonFields;
+  if (!postseasonFields && nextWeek === foundryPostseasonStartWeek(state.sport)) {
+    const fields = FIELDHOUSE_REGIONS.map((region) => {
+      const ranked = players.filter((player) => player.region === region).sort((a, b) => b.points - a.points);
+      const cut = Math.ceil(ranked.length / 2);
+      return { championship: ranked.slice(0, cut).map((player) => player.id), toilet: ranked.slice(cut).map((player) => player.id) };
+    });
+    postseasonFields = {
+      championship: fields.flatMap((field) => field.championship),
+      toilet: fields.flatMap((field) => field.toilet),
+    };
+  }
   const publishableWeeks = [...(state.gazetteWeeks || []), state.week];
   const postseasonRoundsPlayed = state.sport === "cfb" && state.week >= foundryPostseasonStartWeek("cfb")
     ? Math.min(4, (state.postseasonRoundsPlayed || 0) + 1)
     : state.postseasonRoundsPlayed || 0;
-  return { ...next, players, gazetteWeeks: Array.from(new Set(publishableWeeks)).sort((a, b) => a - b), weekHistory, ncaaPicks: state.ncaaPicks || {}, ncaaResults, ncaaBracketLocked: state.ncaaBracketLocked, preseasonChampionPicks: state.preseasonChampionPicks || {}, postseasonFields: state.postseasonFields, postseasonRoundsPlayed, tacticalNukeWeeks: state.tacticalNukeWeeks || [], tacticalNukeActive: false, mapsEvent: state.mapsEvent || null, unreadGazette: true };
+  return { ...next, players, gazetteWeeks: Array.from(new Set(publishableWeeks)).sort((a, b) => a - b), weekHistory, ncaaPicks: state.ncaaPicks || {}, ncaaResults, ncaaBracketLocked: state.ncaaBracketLocked, preseasonChampionPicks: state.preseasonChampionPicks || {}, postseasonFields, postseasonRoundsPlayed, tacticalNukeWeeks: state.tacticalNukeWeeks || [], tacticalNukeActive: false, mapsEvent: state.mapsEvent || null, unreadGazette: true };
 }
 
 export function simulateFoundrySeason(state: FoundryWalkthrough): FoundryWalkthrough {
