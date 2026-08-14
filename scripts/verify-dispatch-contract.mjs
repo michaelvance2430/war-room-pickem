@@ -6,6 +6,7 @@ import {
 import { weekDateRangeLabel } from "../src/lib/season-calendar.ts";
 import {
   createFoundryWalkthrough,
+  foundryPostseasonStartWeek,
   simulateNextFoundryWeek,
   simulateFoundrySeason,
 } from "../src/lib/foundry-walkthrough.ts";
@@ -25,11 +26,21 @@ const cfbWeekTwo = simulateNextFoundryWeek(cfbWeekOne);
 assert.equal(cfbWeekTwo.week, 2, "Week 1 advances to Week 2");
 assert.deepEqual(cfbWeekTwo.gazetteWeeks, [0, 1], "each scored week immediately creates a Dispatch");
 assert.equal(cfbWeekTwo.weekHistory.length, 2, "weekly snapshots survive when the next card opens");
+let cfbPostseason = cfbWeekTwo;
+while (cfbPostseason.week < foundryPostseasonStartWeek("cfb")) cfbPostseason = simulateNextFoundryWeek(cfbPostseason);
+assert.ok(cfbPostseason.postseasonFields, "consecutive week scoring freezes postseason fields at the cut line");
+assert.equal(cfbPostseason.postseasonFields.championship.length + cfbPostseason.postseasonFields.toilet.length, cfbPostseason.players.length, "every Foundry player enters exactly one postseason field");
+const frozenCfbFields = cfbPostseason.postseasonFields;
+const cfbPlayoffRound = simulateNextFoundryWeek(cfbPostseason);
+assert.deepEqual(cfbPlayoffRound.postseasonFields, frozenCfbFields, "postseason fields remain frozen while playoff rounds advance");
+assert.equal(cfbPlayoffRound.postseasonRoundsPlayed, 1, "the first CFB playoff round advances exactly once");
 const cfbFullSeason = simulateFoundrySeason(cfbOpening);
 assert.equal(cfbFullSeason.week, 16, "one tap reaches the CFB season boundary");
 assert.deepEqual(cfbFullSeason.gazetteWeeks, Array.from({ length: 17 }, (_, index) => index), "one tap scores every CFB week including Week 0");
 assert.equal(cfbFullSeason.weekHistory.length, 17, "every week has one atomic saved record");
 assert.ok(cfbFullSeason.weekHistory.every((snapshot) => snapshot.games.every((game) => game.status === "final" && game.result)), "full-season simulation leaves no game requiring manual scoring");
+assert.ok(cfbFullSeason.postseasonFields, "full-season scoring preserves the regular-season postseason field");
+assert.equal(cfbFullSeason.postseasonRoundsPlayed, 4, "full-season scoring completes CFB postseason progression");
 
 const packet = {
   schemaVersion: 1,
