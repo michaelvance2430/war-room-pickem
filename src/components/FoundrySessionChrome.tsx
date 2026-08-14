@@ -20,11 +20,12 @@ import {
 } from "@/lib/creator-eyes";
 import {
   foundryPostseasonStartWeek,
+  isFoundrySeasonFinal,
   loadFoundryWalkthrough,
   PREVIEW_SPORTS,
   saveFoundryWalkthrough,
-  simulateFoundryRegularSeason,
   simulateNextFoundryWeek,
+  simulateFoundrySeason,
 } from "@/lib/foundry-walkthrough";
 import { isFoundryLivePagesActive, setFoundryLivePagesActive } from "@/lib/foundry-live-adapter";
 
@@ -150,11 +151,11 @@ export default function FoundrySessionChrome() {
   if (!show) return null;
 
   const livePages = isFoundryLivePagesActive() && !!walkthrough;
-  function advance(fullRegularSeason = false) {
+  function advance(entireSeason = false) {
     const current = loadFoundryWalkthrough();
     if (!current) return;
-    const next = fullRegularSeason
-      ? simulateFoundryRegularSeason(current)
+    const next = entireSeason
+      ? simulateFoundrySeason(current)
       : simulateNextFoundryWeek(current);
     saveFoundryWalkthrough(next);
     setWalkthrough(next);
@@ -185,7 +186,7 @@ export default function FoundrySessionChrome() {
             </div>
             <div className="grid grid-cols-2 gap-2">
               <button type="button" onClick={() => advance(false)} className="min-h-[42px] rounded-xl bg-amber-300 px-3 text-xs font-black text-black">{walkthrough.week >= foundryPostseasonStartWeek(walkthrough.sport) ? "SIM PLAYOFF ROUND" : "SIM THIS WEEK"}</button>
-              <button type="button" onClick={() => advance(true)} disabled={walkthrough.week >= foundryPostseasonStartWeek(walkthrough.sport)} className="min-h-[42px] rounded-xl border border-sky-300/40 px-3 text-xs font-black text-sky-100 disabled:opacity-35">ENTER POSTSEASON</button>
+              <button type="button" onClick={() => advance(true)} disabled={isFoundrySeasonFinal(walkthrough)} className="min-h-[42px] rounded-xl border border-sky-300/40 px-3 text-xs font-black text-sky-100 disabled:opacity-35">SIM ENTIRE SEASON</button>
             </div>
           </>}
         </div>

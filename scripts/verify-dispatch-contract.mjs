@@ -7,6 +7,7 @@ import { weekDateRangeLabel } from "../src/lib/season-calendar.ts";
 import {
   createFoundryWalkthrough,
   simulateNextFoundryWeek,
+  simulateFoundrySeason,
 } from "../src/lib/foundry-walkthrough.ts";
 
 assert.equal(weekDateRangeLabel(1, "cfb"), "Sep 3–7, 2026");
@@ -24,6 +25,11 @@ const cfbWeekTwo = simulateNextFoundryWeek(cfbWeekOne);
 assert.equal(cfbWeekTwo.week, 2, "Week 1 advances to Week 2");
 assert.deepEqual(cfbWeekTwo.gazetteWeeks, [0, 1], "each scored week immediately creates a Dispatch");
 assert.equal(cfbWeekTwo.weekHistory.length, 2, "weekly snapshots survive when the next card opens");
+const cfbFullSeason = simulateFoundrySeason(cfbOpening);
+assert.equal(cfbFullSeason.week, 16, "one tap reaches the CFB season boundary");
+assert.deepEqual(cfbFullSeason.gazetteWeeks, Array.from({ length: 17 }, (_, index) => index), "one tap scores every CFB week including Week 0");
+assert.equal(cfbFullSeason.weekHistory.length, 17, "every week has one atomic saved record");
+assert.ok(cfbFullSeason.weekHistory.every((snapshot) => snapshot.games.every((game) => game.status === "final" && game.result)), "full-season simulation leaves no game requiring manual scoring");
 
 const packet = {
   schemaVersion: 1,

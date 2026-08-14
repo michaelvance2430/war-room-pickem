@@ -256,15 +256,25 @@ export function simulateNextFoundryWeek(state: FoundryWalkthrough): FoundryWalkt
 }
 
 export function simulateFoundrySeason(state: FoundryWalkthrough): FoundryWalkthrough {
+  let next = state;
   const finalWeek = foundryFinalWeek(state.sport);
-  const next = createFoundryWalkthrough(state.sport, finalWeek, state.role);
-  const ncaaResults = state.sport === "cbb" ? simulateNcaaResultsThroughWindow(4) : {};
-  const players = next.players.map((player, index) => {
-    const bracket = player.name === "Mike V" ? state.ncaaPicks || {} : generateNcaaPicks(index + 91);
-    const madnessPoints = ncaaScore(bracket, ncaaResults);
-    return { ...player, madnessPoints, madnessWindowPoints: madnessPoints, points: player.points + madnessPoints };
-  }).sort((a, b) => b.points - a.points);
-  return { ...next, players, gazetteWeeks: Array.from({ length: finalWeek }, (_, index) => index + 1), ncaaPicks: state.ncaaPicks || {}, ncaaResults, ncaaBracketLocked: state.ncaaBracketLocked, preseasonChampionPicks: state.preseasonChampionPicks || {}, postseasonFields: state.postseasonFields, postseasonRoundsPlayed: state.sport === "cfb" ? 4 : state.postseasonRoundsPlayed || 0, tacticalNukeWeeks: state.tacticalNukeWeeks || [], tacticalNukeActive: false, mapsEvent: state.mapsEvent || null, unreadGazette: true };
+  while (next.week < finalWeek) next = simulateNextFoundryWeek(next);
+
+  // The ordinary weekly button cannot advance beyond the season boundary, so
+  // the full-season command explicitly scores and archives the final card.
+  const finalSnapshot = completedWeekSnapshot(next);
+  const weekHistory = [...(next.weekHistory || []).filter((snapshot) => snapshot.week !== finalWeek), finalSnapshot]
+    .sort((a, b) => a.week - b.week);
+  const gazetteWeeks = Array.from(new Set([...next.gazetteWeeks, finalWeek])).sort((a, b) => a - b);
+  return {
+    ...next,
+    weekHistory,
+    gazetteWeeks,
+    ncaaResults: state.sport === "cbb" ? simulateNcaaResultsThroughWindow(4) : next.ncaaResults,
+    postseasonRoundsPlayed: state.sport === "cfb" ? 4 : next.postseasonRoundsPlayed,
+    unreadGazette: true,
+    generatedAt: Date.now(),
+  };
 }
 
 export function simulateFoundryRegularSeason(state: FoundryWalkthrough): FoundryWalkthrough {
