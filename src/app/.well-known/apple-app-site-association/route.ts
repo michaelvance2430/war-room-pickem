@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 
 const bundleId = "com.warroompicks.app";
+const teamId = "XWW458P3J7";
 const supportedPaths = [
   "/join",
   "/join/*",
@@ -21,15 +22,6 @@ const supportedPaths = [
 ];
 
 export function GET() {
-  const teamId = process.env.APPLE_TEAM_ID?.trim().toUpperCase();
-
-  if (!teamId || !/^[A-Z0-9]{10}$/.test(teamId)) {
-    return NextResponse.json(
-      { error: "Apple association is awaiting a valid APPLE_TEAM_ID." },
-      { status: 503, headers: { "Cache-Control": "no-store" } },
-    );
-  }
-
   return NextResponse.json(
     {
       applinks: {
