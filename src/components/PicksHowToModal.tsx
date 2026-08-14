@@ -53,7 +53,7 @@ export default function PicksHowToModal() {
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden sm:p-4"
+      className="fixed inset-0 z-[100] flex items-start justify-center overflow-hidden px-3 pt-2 sm:items-center sm:p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="picks-howto-title"
@@ -65,8 +65,11 @@ export default function PicksHowToModal() {
         onClick={close}
       />
 
-      <div className="relative grid h-[100dvh] max-h-[100dvh] w-full grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden border border-border bg-card shadow-2xl sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:max-w-md sm:rounded-2xl">
-        <div className="border-b border-border px-4 pb-2.5 pt-[max(.75rem,env(safe-area-inset-top))] sm:px-5 sm:pb-3 sm:pt-5">
+      <div
+        className="relative grid w-full max-w-md grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-2xl border border-border bg-card shadow-2xl sm:max-h-[calc(100dvh-2rem)]"
+        style={{ height: "min(46rem, calc(100dvh - 1rem - env(safe-area-inset-bottom)))" }}
+      >
+        <div className="border-b border-border px-4 pb-2.5 pt-3 sm:px-5 sm:pb-3 sm:pt-5">
           <div className="inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] text-primary mb-2">
             <span className="w-1.5 h-1.5 rounded-full bg-primary" />
             My Picks
