@@ -57,6 +57,8 @@ export default function SeasonOpening() {
     return () => {
       if (exitTimerRef.current) clearTimeout(exitTimerRef.current);
       video.pause();
+      video.removeAttribute("src");
+      video.load();
     };
   }, [visible]);
 

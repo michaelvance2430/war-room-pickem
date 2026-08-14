@@ -25,7 +25,11 @@ export default function WeaponStrikeVideo({
 
     return () => {
       window.removeEventListener("keydown", onKeyDown);
-      video?.pause();
+      if (video) {
+        video.pause();
+        video.removeAttribute("src");
+        video.load();
+      }
     };
   }, [onComplete, src]);
 

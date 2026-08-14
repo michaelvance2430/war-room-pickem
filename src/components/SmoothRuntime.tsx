@@ -39,6 +39,7 @@ import {
 } from "@/lib/runtime-iso";
 import { installEventLoopProbe } from "@/lib/event-loop-probe";
 import { profileNavRouteCommit } from "@/lib/profile-nav-trace";
+import { isWarRoomNative } from "@/lib/native-contract";
 
 function scrollTopHard() {
   if (typeof window === "undefined") return;
@@ -247,6 +248,12 @@ export default function SmoothRuntime() {
     const warm = () => {
       if (prefetchedOnce.current) return;
       prefetchedOnce.current = true;
+      // Next's visible links already prefetch the immediate phone tabs. Do not
+      // also retain every primary route bundle inside WKWebView.
+      if (isWarRoomNative()) {
+        wrLog("[WR-NAV]", "bulk prefetch skipped in native runtime");
+        return;
+      }
       wrLog("[WR-NAV]", "prefetchPrimaryRoutes once");
       prefetchPrimaryRoutes((href) => {
         try {

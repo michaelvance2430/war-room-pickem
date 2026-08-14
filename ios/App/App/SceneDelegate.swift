@@ -119,10 +119,24 @@ private final class SeasonOpeningViewController: UIViewController {
 
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
-        player?.pause()
+        releasePlayback()
+    }
+
+    deinit {
+        releasePlayback()
+    }
+
+    private func releasePlayback() {
         if let playbackObserver {
             NotificationCenter.default.removeObserver(playbackObserver)
+            self.playbackObserver = nil
         }
+        player?.pause()
+        player?.replaceCurrentItem(with: nil)
+        playerLayer?.player = nil
+        playerLayer?.removeFromSuperlayer()
+        playerLayer = nil
+        player = nil
     }
 
     @objc private func skipOpening() {
@@ -146,6 +160,7 @@ private final class SeasonOpeningViewController: UIViewController {
         UIView.animate(withDuration: 0.55, delay: 0, options: [.curveEaseOut]) {
             self.view.alpha = 0
         } completion: { _ in
+            self.releasePlayback()
             self.dismiss(animated: false)
         }
     }

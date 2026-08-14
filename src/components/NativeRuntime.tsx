@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { isWarRoomNative, safeWarRoomPath, WAR_ROOM_NATIVE } from "@/lib/native-contract";
 
@@ -25,6 +25,8 @@ function pathFromNativeUrl(rawUrl: string): string | null {
 
 export default function NativeRuntime() {
   const router = useRouter();
+  const backgroundedAt = useRef<number | null>(null);
+  const lastResumeRefreshAt = useRef(0);
 
   useEffect(() => {
     if (!isWarRoomNative()) return;
@@ -42,9 +44,22 @@ export default function NativeRuntime() {
       };
       const urlListener = await App.addListener("appUrlOpen", openUrl);
       const stateListener = await App.addListener("appStateChange", ({ isActive }) => {
-        if (!isActive) return;
+        if (!isActive) {
+          backgroundedAt.current = Date.now();
+          return;
+        }
         window.dispatchEvent(new CustomEvent("warroom:native-resume"));
-        router.refresh();
+
+        // A quick Messages/Xcode/app-switch round trip should not rebuild the
+        // entire React route. Refresh after a meaningful absence, and never
+        // more than once per minute, to keep WKWebView memory flat.
+        const now = Date.now();
+        const awayFor = backgroundedAt.current == null ? 0 : now - backgroundedAt.current;
+        backgroundedAt.current = null;
+        if (awayFor >= 30_000 && now - lastResumeRefreshAt.current >= 60_000) {
+          lastResumeRefreshAt.current = now;
+          router.refresh();
+        }
       });
       const launchUrl = await App.getLaunchUrl();
       if (launchUrl?.url) openUrl(launchUrl);
