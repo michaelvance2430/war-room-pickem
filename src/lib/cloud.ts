@@ -1101,6 +1101,11 @@ export async function loadWeekCard(weekNumber = 1): Promise<CloudCard | null> {
  * orphan week_card rows do not count — never ghost "Week 1" before it exists.
  */
 export async function listPublishedWeekNumbers(): Promise<number[]> {
+  try {
+    const { foundryLivePublishedWeeks } = await import("./foundry-live-adapter");
+    const weeks = foundryLivePublishedWeeks();
+    if (weeks) return weeks;
+  } catch { /* fall through */ }
   const session = getSession();
   if (!session?.leagueId) return [];
   const hit = cacheGet(publishedCache, session.leagueId, LIST_TTL_MS);

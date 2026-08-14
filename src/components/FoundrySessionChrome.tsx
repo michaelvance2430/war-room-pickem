@@ -19,6 +19,7 @@ import {
   getCreatorEyesMode,
 } from "@/lib/creator-eyes";
 import {
+  createFoundryWalkthrough,
   foundryPostseasonStartWeek,
   isFoundrySeasonFinal,
   loadFoundryWalkthrough,
@@ -152,8 +153,11 @@ export default function FoundrySessionChrome() {
 
   const livePages = isFoundryLivePagesActive() && !!walkthrough;
   function advance(entireSeason = false) {
-    const current = loadFoundryWalkthrough();
-    if (!current) return;
+    const loaded = loadFoundryWalkthrough();
+    if (!loaded) return;
+    const current = entireSeason && isFoundrySeasonFinal(loaded)
+      ? createFoundryWalkthrough(loaded.sport, undefined, loaded.role)
+      : loaded;
     const next = entireSeason
       ? simulateFoundrySeason(current)
       : simulateNextFoundryWeek(current);
@@ -185,8 +189,8 @@ export default function FoundrySessionChrome() {
               {[{ href: "/", label: "Home" }, { href: "/picks", label: "Picks" }, { href: "/standings", label: "Standings" }, { href: "/board", label: "Board" }, { href: "/locker-room", label: "Locker" }, { href: "/dispatch", label: "Dispatch" }].map((item) => <Link key={item.href} href={item.href} className={`shrink-0 min-h-[38px] rounded-lg border px-3 text-[11px] font-bold inline-flex items-center ${pathname === item.href ? "border-amber-300 bg-amber-300 text-black" : "border-sky-300/30 bg-black/30 text-sky-100"}`}>{item.label}</Link>)}
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <button type="button" onClick={() => advance(false)} className="min-h-[42px] rounded-xl bg-amber-300 px-3 text-xs font-black text-black">{walkthrough.week >= foundryPostseasonStartWeek(walkthrough.sport) ? "SIM PLAYOFF ROUND" : "SIM THIS WEEK"}</button>
-              <button type="button" onClick={() => advance(true)} disabled={isFoundrySeasonFinal(walkthrough)} className="min-h-[42px] rounded-xl border border-sky-300/40 px-3 text-xs font-black text-sky-100 disabled:opacity-35">SIM ENTIRE SEASON</button>
+              <button type="button" onClick={() => advance(false)} className="min-h-[42px] rounded-xl bg-amber-300 px-3 text-xs font-black text-black">{walkthrough.week >= foundryPostseasonStartWeek(walkthrough.sport) ? "SCORE PLAYOFF ROUND" : "SCORE WEEK + PROP"}</button>
+              <button type="button" onClick={() => advance(true)} className="min-h-[42px] rounded-xl border border-sky-300/40 px-3 text-xs font-black text-sky-100">{isFoundrySeasonFinal(walkthrough) ? "RE-SIM ALL WEEKS" : "SCORE ALL WEEKS + PROPS"}</button>
             </div>
           </>}
         </div>

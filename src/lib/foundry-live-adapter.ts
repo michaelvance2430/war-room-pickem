@@ -268,3 +268,9 @@ export function foundryLiveScoredWeeks(): number[] | null {
   if (!s) return null;
   return [...s.gazetteWeeks].sort((a, b) => a - b);
 }
+
+export function foundryLivePublishedWeeks(): number[] | null {
+  const s = state();
+  if (!s) return null;
+  return Array.from(new Set([...(s.gazetteWeeks || []), s.week])).sort((a, b) => a - b);
+}
