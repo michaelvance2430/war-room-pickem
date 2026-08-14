@@ -280,9 +280,9 @@ function Masthead({ edition }: { edition: GazetteEdition }) {
 
 const CFB_DISPATCH_ART = [
   "/skins/cfb-situation/matchups.jpg",
-  "/skins/cfb-standings/jumbotron.webp",
-  "/skins/cfb-locker/room.webp",
-  "/skins/cfb-picks/film-room.webp",
+  "/skins/cfb-standings/jumbotron.jpg",
+  "/skins/cfb-locker/room.jpg",
+  "/skins/cfb-picks/film-room.jpg",
   "/skins/cfb-situation/standings.jpg",
   "/skins/cfb-situation/locker.jpg",
 ] as const;
