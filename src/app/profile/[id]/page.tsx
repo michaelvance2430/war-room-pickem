@@ -20,7 +20,7 @@ import AvatarLightbox from "@/components/AvatarLightbox";
 import ProfileRankPlacard from "@/components/ProfileRankPlacard";
 import ProfileArsenal from "@/components/ProfileArsenal";
 import { divisionFullLabel } from "@/lib/divisions";
-import { withCreatorFlag } from "@/lib/creator";
+import { isAppCreator, withCreatorFlag } from "@/lib/creator";
 import {
   computeJoinTitles,
   isJustJoined,
@@ -645,7 +645,7 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen flex flex-col">
       <main className="flex-1 max-w-3xl mx-auto w-full px-4 py-8">
-        {player.isCreator && isSelfProfile && (
+        {isSelfProfile && isAppCreator(sessionPlayerId) && (
           <Link
             href="/foundry"
             className="mb-4 flex min-h-[48px] w-full items-center justify-between rounded-xl border-2 border-amber-400/60 bg-amber-500/10 px-4 text-sm font-extrabold text-amber-200"
