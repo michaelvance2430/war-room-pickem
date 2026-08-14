@@ -24,7 +24,7 @@ export default function CfbSituationDestinations({
       eyebrow: "Who’s winning",
       title: "Standings",
       blurb: "Season points · divisions · cut line · last in",
-      art: "/skins/cfb-situation/standings.webp",
+      art: "/skins/cfb-situation/standings.jpg",
       tone: "gold",
     },
     {
@@ -32,7 +32,7 @@ export default function CfbSituationDestinations({
       eyebrow: "Card reveal",
       title: "See the matchups",
       blurb: "Peek the card · game notes · spreads",
-      art: "/skins/cfb-situation/matchups.webp",
+      art: "/skins/cfb-situation/matchups.jpg",
       tone: "green",
     },
     ...(showGazette
@@ -42,7 +42,7 @@ export default function CfbSituationDestinations({
             eyebrow: "The Dispatch",
             title: "The headlines",
             blurb: "Stories · rivalries · trash talk · history",
-            art: "/skins/cfb-situation/gazette.webp",
+            art: "/skins/cfb-situation/gazette.jpg",
             tone: "gold" as const,
           },
         ]
@@ -52,7 +52,7 @@ export default function CfbSituationDestinations({
       eyebrow: "Locker room",
       title: "Sitrep & crew talk",
       blurb: "Trash talk · memes · calls · compliments",
-      art: "/skins/cfb-situation/locker.webp",
+      art: "/skins/cfb-situation/locker.jpg",
       tone: "green",
       unseen: "locker",
     },

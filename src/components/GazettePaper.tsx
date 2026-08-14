@@ -279,12 +279,12 @@ function Masthead({ edition }: { edition: GazetteEdition }) {
 }
 
 const CFB_DISPATCH_ART = [
-  "/skins/cfb-situation/matchups.webp",
+  "/skins/cfb-situation/matchups.jpg",
   "/skins/cfb-standings/jumbotron.webp",
   "/skins/cfb-locker/room.webp",
   "/skins/cfb-picks/film-room.webp",
-  "/skins/cfb-situation/standings.webp",
-  "/skins/cfb-situation/locker.webp",
+  "/skins/cfb-situation/standings.jpg",
+  "/skins/cfb-situation/locker.jpg",
 ] as const;
 
 const NFL_DISPATCH_ART = [
