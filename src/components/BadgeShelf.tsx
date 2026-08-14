@@ -154,13 +154,13 @@ function BadgeDetailModal({
 
   return (
     <div
-      className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center bg-black/70 p-4"
+      className="fixed inset-0 z-[90] flex items-center justify-center overflow-y-auto bg-black/70 px-4 py-[max(1rem,env(safe-area-inset-top))]"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
     >
       <div
-        className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-xl"
+        className="my-auto max-h-[calc(100dvh-2rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] w-full max-w-md overflow-y-auto rounded-2xl border border-border bg-card p-5 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start gap-4">

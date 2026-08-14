@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { loadLeagueActiveWeek, loadLeaguePlayers } from "@/lib/cloud";
+import { loadLeagueActiveWeek, loadLeaguePlayers, loadMyPicks } from "@/lib/cloud";
 import { getLeague, getSession } from "@/lib/league";
 import { cutLockWeek, seasonMaxWeek } from "@/lib/season-calendar";
 import { resolveHomeSeasonCommand, type HomeSeasonCommand as Command } from "@/lib/home-season-command";
@@ -18,18 +18,27 @@ export default function HomeSeasonCommand() {
 
   useEffect(() => {
     let cancelled = false;
-    void Promise.all([loadLeagueActiveWeek(), loadLeaguePlayers("HomeSeasonCommand")]).then(([week, players]) => {
+    void Promise.all([loadLeagueActiveWeek(), loadLeaguePlayers("HomeSeasonCommand")]).then(async ([week, players]) => {
       if (cancelled) return;
       const league = getLeague();
       const sportId = league?.sportId || "cfb";
-      setCommand(resolveHomeSeasonCommand({
+      const next = resolveHomeSeasonCommand({
         week,
         cutWeek: cutLockWeek(sportId),
         finalWeek: seasonMaxWeek(sportId),
         players,
         playerId: getSession()?.playerId,
         cutPercent: league?.settings.cutPercent ?? 50,
-      }));
+      });
+      if (next.phase === "opening") {
+        const picks = await loadMyPicks(week).catch(() => null);
+        if (cancelled) return;
+        if (picks?.lockedAt && Object.keys(picks.picks || {}).length > 0) {
+          setCommand(null);
+          return;
+        }
+      }
+      setCommand(next);
     });
     return () => { cancelled = true; };
   }, []);

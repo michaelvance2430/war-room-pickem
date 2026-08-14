@@ -666,10 +666,16 @@ export default function Nav() {
           <Link
             href="/"
             prefetch
-            onClick={() => closeChrome()}
+            onClick={(event) => {
+              closeChrome();
+              if (pathname !== "/" && typeof window !== "undefined" && window.history.length > 1) {
+                event.preventDefault();
+                router.back();
+              }
+            }}
             className="flex items-center gap-2 shrink-0 min-w-0 max-w-[11rem] sm:max-w-[14rem] rounded-md hover:opacity-90 transition"
-            title="Back to Home"
-            aria-label="Home"
+            title={pathname === "/" ? "War Room Home" : "Back"}
+            aria-label={pathname === "/" ? "Home" : "Back"}
           >
             <BrandMark size={36} className="shrink-0" variant="force" />
             {/* Shared brand hierarchy every sport: product name · sport chip · room */}
@@ -681,7 +687,7 @@ export default function Nav() {
                     : "font-extrabold text-[15px] sm:text-base text-primary"
                 }`}
               >
-                {pathname === "/" ? "War Room" : "← Home"}
+                {pathname === "/" ? "War Room" : "← Back"}
               </span>
               <span
                 className={`text-[10px] font-semibold leading-tight truncate ${
