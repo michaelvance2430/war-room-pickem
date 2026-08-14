@@ -8,6 +8,22 @@ function read(): Store {
   try { return JSON.parse(localStorage.getItem(KEY) || "{}") as Store; } catch { return {}; }
 }
 
+export function getRecordedCareerRankId(playerId: string): string | null {
+  return playerId ? read()[playerId]?.rankId || null : null;
+}
+
+/** Career rank is a ratchet: once displayed as earned, it can only move forward. */
+export function recordCareerRankFloor(playerId: string, rankId: string, weekIndex = 0): void {
+  if (!playerId || !rankId || typeof localStorage === "undefined") return;
+  const store = read();
+  const previous = store[playerId];
+  const previousIndex = CAREER_RANKS.findIndex((rank) => rank.id === previous?.rankId);
+  const nextIndex = CAREER_RANKS.findIndex((rank) => rank.id === rankId);
+  if (nextIndex < 0 || previousIndex >= nextIndex) return;
+  store[playerId] = { rankId, weekIndex };
+  localStorage.setItem(KEY, JSON.stringify(store));
+}
+
 /** Records only forward movement. First observation establishes the baseline. */
 export function observeCareerPromotion(input: { playerId: string; playerName: string; rank: CareerRank; weekIndex: number }): { name: string; from: CareerRank; to: CareerRank } | null {
   if (!input.playerId || typeof localStorage === "undefined") return null;

@@ -645,6 +645,16 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen flex flex-col">
       <main className="flex-1 max-w-3xl mx-auto w-full px-4 py-8">
+        {player.isCreator && isSelfProfile && (
+          <Link
+            href="/foundry"
+            className="mb-4 flex min-h-[48px] w-full items-center justify-between rounded-xl border-2 border-amber-400/60 bg-amber-500/10 px-4 text-sm font-extrabold text-amber-200"
+          >
+            <span>Enter Foundry</span>
+            <span aria-hidden>→</span>
+          </Link>
+        )}
+
         {mock && roast && (
           <div className="mb-4 rounded-xl border border-warning/40 bg-warning/10 px-4 py-3">
             <div className="flex justify-between gap-2 mb-1">

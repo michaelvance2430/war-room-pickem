@@ -11,6 +11,7 @@ assert.equal(resolveCareerRank({ achievementPoints: 20000, seasons: 0, sports: 5
 assert.equal(resolveCareerRank({ achievementPoints: 20000, seasons: 20, sports: 5, tacticalNukes: 1 }).current.name, "Five-Star Field General");
 assert.equal(resolveCareerRank({ achievementPoints: 6000, seasons: 8, sports: 3 }).current.abbreviation, "LTC", "COL requires a Tactical Nuke call");
 assert.equal(resolveCareerRank({ achievementPoints: 6000, seasons: 8, sports: 3, tacticalNukes: 1 }).current.abbreviation, "COL", "one Tactical Nuke qualifies COL");
+assert.equal(resolveCareerRank({ achievementPoints: 180, seasons: 0, sports: 1, minimumRankId: "rank_sgt" }).current.abbreviation, "SGT", "earned ranks never reverse when current points load lower");
 assert.equal(careerRankByTitleId("rank_sgt")?.abbreviation, "SGT");
 assert.match(promotionGazetteDeck("Mike", careerRankByTitleId("rank_csm"), careerRankByTitleId("rank_2lt")), /adult supervision and a map/);
 assert.match(promotionGazetteDeck("Mike", careerRankByTitleId("rank_sgm"), careerRankByTitleId("rank_csm")), /grass has been placed on notice/);

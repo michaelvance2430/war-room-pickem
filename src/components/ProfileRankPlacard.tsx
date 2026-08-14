@@ -1,8 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import type { Player } from "@/lib/types";
-import { resolveCareerRank, type CareerRankProgress } from "@/lib/career-ranks";
+import { CAREER_RANKS, resolveCareerRank, type CareerRankProgress } from "@/lib/career-ranks";
+import { getRecordedCareerRankId, recordCareerRankFloor } from "@/lib/career-rank-promotions";
+import { getLocalEquippedBadgeId } from "@/lib/equipped-title-store";
 import { listLeagueSeasonCounts } from "@/lib/league-seasons";
 import { getSportsPlayed } from "@/lib/sports-played";
 import { loadWeaponServiceSummary } from "@/lib/weapon-service-record";
@@ -27,7 +30,14 @@ export default function ProfileRankPlacard({ player }: { player: Player }) {
       setSeasons(completedSeasons);
       setSports(sportsPlayed);
       setTacticalNukes(nukeCount);
-      setRank(resolveCareerRank({ achievementPoints, seasons: completedSeasons, sports: sportsPlayed, tacticalNukes: nukeCount }));
+      const recordedRankId = getRecordedCareerRankId(player.id);
+      const equippedRankId = getLocalEquippedBadgeId(player.id)?.startsWith("rank_") ? getLocalEquippedBadgeId(player.id) : null;
+      const minimumRankId = [recordedRankId, equippedRankId]
+        .filter((id): id is string => !!id)
+        .sort((a, b) => CAREER_RANKS.findIndex((rank) => rank.id === b) - CAREER_RANKS.findIndex((rank) => rank.id === a))[0] || null;
+      const resolved = resolveCareerRank({ achievementPoints, seasons: completedSeasons, sports: sportsPlayed, tacticalNukes: nukeCount, minimumRankId });
+      recordCareerRankFloor(player.id, resolved.current.id);
+      setRank(resolved);
     }).catch(() => undefined);
     return () => { cancelled = true; };
   }, [player]);
@@ -58,6 +68,7 @@ export default function ProfileRankPlacard({ player }: { player: Player }) {
       <div className="mt-2 flex min-w-0 items-end justify-between gap-2"><div className="min-w-0"><h3 className="break-words text-xl font-black">{next?.abbreviation || rank.current.abbreviation}</h3><p className="break-words text-[10px] font-bold text-white/55">{next?.name || rank.current.name}</p></div><span className={`max-w-[132px] shrink-0 break-words rounded border px-2 py-1 text-center text-[8px] font-black ${status === "PROMOTABLE" || status === "MAXIMUM RANK" ? "border-emerald-300/50 text-emerald-300" : "border-red-400/50 text-red-300"}`}>{status}</span></div>
       <div className="mt-4 space-y-2"><Qualification label="Promotion points" value={`${points} / ${next?.achievementPoints ?? points} AP`} qualified={pointQualified}/><Qualification label="Time in service" value={`${seasons} / ${next?.seasons ?? seasons} seasons`} qualified={seasonQualified}/><Qualification label="Campaign breadth" value={`${sports} / ${next?.sports ?? sports} sports`} qualified={sportQualified}/>{next?.tacticalNukes ? <Qualification label="Nuclear qualification" value={`${tacticalNukes} / ${next.tacticalNukes} Tactical Nuke called`} qualified={nukeQualified}/> : null}</div>
       <p className="mt-3 border-t border-white/10 pt-3 text-[9px] leading-relaxed text-white/45">Points prove performance. Seasons prove staying power. Senior grades require service across multiple War Room sports. Colonel requires documented nuclear judgment.</p>
+      <Link href="/career-progression" onClick={() => setOpen(false)} className="mt-4 flex min-h-11 w-full items-center justify-between rounded-xl bg-amber-300 px-4 text-sm font-black text-black"><span>Career Progression</span><span aria-hidden>→</span></Link>
     </section>}
   </div>;
 }

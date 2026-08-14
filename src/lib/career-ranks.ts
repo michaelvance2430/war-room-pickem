@@ -47,14 +47,17 @@ export type CareerRankProgress = {
   progress: number;
 };
 
-export function resolveCareerRank(input: { achievementPoints: number; seasons: number; sports: number; tacticalNukes?: number }): CareerRankProgress {
+export function resolveCareerRank(input: { achievementPoints: number; seasons: number; sports: number; tacticalNukes?: number; minimumRankId?: string | null }): CareerRankProgress {
   const achievementPoints = Math.max(0, Math.floor(input.achievementPoints || 0));
   const seasons = Math.max(0, Math.floor(input.seasons || 0));
   const sports = Math.max(1, Math.floor(input.sports || 1));
   const tacticalNukes = Math.max(0, Math.floor(input.tacticalNukes || 0));
-  const unlocked = CAREER_RANKS.filter((rank) => achievementPoints >= rank.achievementPoints && seasons >= rank.seasons && sports >= rank.sports && tacticalNukes >= rank.tacticalNukes);
-  const current = unlocked[unlocked.length - 1] || CAREER_RANKS[0];
-  const currentIndex = CAREER_RANKS.findIndex((rank) => rank.id === current.id);
+  const qualified = CAREER_RANKS.filter((rank) => achievementPoints >= rank.achievementPoints && seasons >= rank.seasons && sports >= rank.sports && tacticalNukes >= rank.tacticalNukes);
+  const qualifiedIndex = Math.max(0, CAREER_RANKS.findIndex((rank) => rank.id === (qualified[qualified.length - 1] || CAREER_RANKS[0]).id));
+  const minimumIndex = Math.max(0, CAREER_RANKS.findIndex((rank) => rank.id === input.minimumRankId));
+  const currentIndex = Math.max(qualifiedIndex, minimumIndex);
+  const current = CAREER_RANKS[currentIndex];
+  const unlocked = CAREER_RANKS.slice(0, currentIndex + 1);
   const next = CAREER_RANKS[currentIndex + 1] || null;
   const span = next ? Math.max(1, next.achievementPoints - current.achievementPoints) : 1;
   return { current, next, unlocked, pointsToNext: next ? Math.max(0, next.achievementPoints - achievementPoints) : 0, progress: next ? Math.max(0, Math.min(1, (achievementPoints - current.achievementPoints) / span)) : 1 };
