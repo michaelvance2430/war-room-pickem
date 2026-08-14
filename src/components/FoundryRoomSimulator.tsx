@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createFoundryWalkthrough, loadFoundryWalkthrough, PREVIEW_SPORTS, saveFoundryWalkthrough, type PreviewSport } from "@/lib/foundry-walkthrough";
 import { setFoundryLivePagesActive } from "@/lib/foundry-live-adapter";
-import { markFoundrySessionActive } from "@/components/FoundrySessionChrome";
 
 export default function FoundryRoomSimulator() {
   const router = useRouter();
@@ -19,9 +18,8 @@ export default function FoundryRoomSimulator() {
   function enterSport(sport: PreviewSport) {
     const state = createFoundryWalkthrough(sport, undefined, "player");
     saveFoundryWalkthrough(state);
-    setFoundryLivePagesActive(true);
-    markFoundrySessionActive();
-    router.push("/");
+    setFoundryLivePagesActive(false);
+    router.push("/foundry/preview");
   }
 
   function testPickCoach(sportId: "cfb" | "nfl") {
@@ -33,7 +31,7 @@ export default function FoundryRoomSimulator() {
 
   return <section className="rounded-xl border border-emerald-400/35 bg-emerald-400/[0.04] p-4">
     <div className="flex items-start justify-between gap-3">
-      <div><p className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-300">Walkable product · local memory only</p><h2 className="mt-1 text-lg font-black">Choose a sport</h2><p className="mt-1 text-xs leading-relaxed text-muted">The sport opens directly on its sandbox Home page. Use the movable Foundry bar inside to simulate a week or the full season. Zero cloud writes.</p></div>
+      <div><p className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-300">Walkable product · local memory only</p><h2 className="mt-1 text-lg font-black">Choose a sport</h2><p className="mt-1 text-xs leading-relaxed text-muted">Open the complete isolated season preview. Sim weeks, then inspect Dispatch, Picks, Standings, Board, Locker, Profile, and postseason features from one screen. Zero cloud writes.</p></div>
       <span className="rounded-full border border-emerald-400/30 px-2 py-1 text-[9px] font-black text-emerald-300">ISOLATED</span>
     </div>
     <div className="mt-4 grid grid-cols-3 gap-2">
@@ -48,6 +46,6 @@ export default function FoundryRoomSimulator() {
         <button type="button" onClick={() => testPickCoach("nfl")} className="min-h-11 rounded-xl border border-emerald-400/50 px-3 text-xs font-black text-emerald-200">NFL BLANK CARD</button>
       </div>
     </div>
-    {ready && <button type="button" onClick={() => { setFoundryLivePagesActive(true); markFoundrySessionActive(); router.push("/"); }} className="mt-3 min-h-11 w-full rounded-xl border border-border text-xs font-bold">Resume saved {PREVIEW_SPORTS[savedSport].room} sandbox</button>}
+    {ready && <button type="button" onClick={() => { setFoundryLivePagesActive(false); router.push("/foundry/preview"); }} className="mt-3 min-h-11 w-full rounded-xl border border-border text-xs font-bold">Resume saved {PREVIEW_SPORTS[savedSport].room} preview</button>}
   </section>;
 }
