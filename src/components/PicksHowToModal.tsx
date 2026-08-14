@@ -53,7 +53,7 @@ export default function PicksHowToModal() {
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4"
+      className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden px-3 py-[max(.75rem,env(safe-area-inset-top))]"
       role="dialog"
       aria-modal="true"
       aria-labelledby="picks-howto-title"
@@ -65,8 +65,8 @@ export default function PicksHowToModal() {
         onClick={close}
       />
 
-      <div className="relative w-full sm:max-w-md max-h-[90vh] flex flex-col rounded-t-2xl sm:rounded-2xl border border-border bg-card shadow-2xl">
-        <div className="px-5 pt-5 pb-3 border-b border-border shrink-0">
+      <div className="relative my-auto flex max-h-[calc(100dvh-1.5rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+        <div className="shrink-0 border-b border-border px-4 pb-2.5 pt-4 sm:px-5 sm:pb-3 sm:pt-5">
           <div className="inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.18em] text-primary mb-2">
             <span className="w-1.5 h-1.5 rounded-full bg-primary" />
             My Picks
@@ -82,7 +82,7 @@ export default function PicksHowToModal() {
           </p>
         </div>
 
-        <div className="px-5 py-4 overflow-y-auto flex-1 min-h-0 space-y-3">
+        <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto overscroll-contain px-4 py-3 sm:space-y-3 sm:px-5 sm:py-4">
           {PICKS_HOW_TO_STEPS.map((step) => (
             <div
               key={step.title}
@@ -106,7 +106,7 @@ export default function PicksHowToModal() {
           </div>
         </div>
 
-        <div className="px-5 py-4 border-t border-border shrink-0 space-y-3">
+        <div className="shrink-0 space-y-2.5 border-t border-border px-4 pb-[max(.75rem,env(safe-area-inset-bottom))] pt-3 sm:space-y-3 sm:px-5 sm:pt-4">
           <label className="flex items-start gap-2.5 cursor-pointer select-none">
             <input
               type="checkbox"
