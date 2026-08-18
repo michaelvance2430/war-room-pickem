@@ -30,6 +30,7 @@ import {
   fetchLeagueRowForMember,
   joinLeagueByCode,
 } from "@/lib/d1b-b-membership";
+import type { DeploymentCreditPolicy } from "@/lib/deployment-credit";
 
 function JoinPageInner() {
   const router = useRouter();
@@ -52,6 +53,8 @@ function JoinPageInner() {
   const [sportId, setSportId] = useState<SportId>(DEFAULT_SPORT_ID);
   /** List new league in open-room lobby for strangers to fill seats */
   const [listAsOpen, setListAsOpen] = useState(false);
+  const [lateJoinPolicy, setLateJoinPolicy] =
+    useState<DeploymentCreditPolicy>("reinforcement_credit");
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -182,6 +185,7 @@ function JoinPageInner() {
         listAsOpen,
         crystalBallEnabled: true,
         currentWeek: openingWeek,
+        lateJoinPolicy: listAsOpen ? "reinforcement_credit" : lateJoinPolicy,
       });
       if (!created.ok) {
         throw new Error(created.message);
@@ -791,7 +795,12 @@ function JoinPageInner() {
                   <input
                     type="checkbox"
                     checked={listAsOpen}
-                    onChange={(e) => setListAsOpen(e.target.checked)}
+                    onChange={(e) => {
+                      setListAsOpen(e.target.checked);
+                      if (e.target.checked) {
+                        setLateJoinPolicy("reinforcement_credit");
+                      }
+                    }}
                     className="mt-1 w-5 h-5 rounded border-border shrink-0"
                   />
                   <span>
@@ -804,6 +813,58 @@ function JoinPageInner() {
                     </span>
                   </span>
                 </label>
+                <fieldset className="space-y-2 rounded-xl border border-border bg-background/50 px-3 py-3">
+                  <legend className="px-1 text-[11px] font-semibold uppercase tracking-wide text-muted">
+                    Late-join rule · locked at creation
+                  </legend>
+                  {([
+                    [
+                      "reinforcement_credit",
+                      "Reinforcement Credit",
+                      "Bottom-15% weekly credit. Required for public rooms.",
+                    ],
+                    [
+                      "zero_backfill",
+                      "Zero Backfill",
+                      "Late arrivals begin at zero and climb from there.",
+                    ],
+                    [
+                      "closed_roster",
+                      "Closed Roster",
+                      "Joining closes as soon as the first card is published.",
+                    ],
+                  ] as const).map(([value, label, detail]) => {
+                    const disabled = listAsOpen && value !== "reinforcement_credit";
+                    return (
+                      <label
+                        key={value}
+                        className={`flex items-start gap-3 rounded-lg border px-3 py-2.5 ${
+                          lateJoinPolicy === value
+                            ? "border-primary/60 bg-primary/5"
+                            : "border-border"
+                        } ${disabled ? "opacity-45" : "cursor-pointer"}`}
+                      >
+                        <input
+                          type="radio"
+                          name="late-join-policy"
+                          value={value}
+                          checked={lateJoinPolicy === value}
+                          disabled={disabled}
+                          onChange={() => setLateJoinPolicy(value)}
+                          className="mt-1 h-4 w-4"
+                        />
+                        <span>
+                          <span className="block text-sm font-semibold text-foreground">
+                            {label}
+                          </span>
+                          <span className="block text-[11px] leading-relaxed text-muted">
+                            {detail}
+                          </span>
+                        </span>
+                      </label>
+                    );
+                  })}
+                </fieldset>
                 {error && <p className="text-sm text-danger">{error}</p>}
                 <button
                   type="button"
