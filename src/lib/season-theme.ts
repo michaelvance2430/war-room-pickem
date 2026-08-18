@@ -335,7 +335,7 @@ export type CreatorSkinSimState = {
   etDate: string;
   /** HH:mm Eastern wall time */
   etTime: string;
-  /** Simulated trusted CFB week (0–18) */
+  /** Simulated trusted CFB week (0–20) */
   week: number;
 };
 
@@ -441,7 +441,7 @@ export function getCreatorSkinSim(
       active: true,
       etDate: parsed.etDate,
       etTime: parsed.etTime,
-      week: Math.max(0, Math.min(18, Math.floor(week))),
+      week: Math.max(0, Math.min(20, Math.floor(week))),
     };
   } catch {
     return null;
@@ -474,7 +474,7 @@ export function setCreatorSkinSim(
         active: true,
         etDate: state.etDate,
         etTime: state.etTime,
-        week: Math.max(0, Math.min(18, Math.floor(Number(state.week) || 0))),
+        week: Math.max(0, Math.min(20, Math.floor(Number(state.week) || 0))),
       };
       localStorage.setItem(CREATOR_SKIN_SIM_KEY, JSON.stringify(next));
     }
