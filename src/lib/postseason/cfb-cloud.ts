@@ -31,6 +31,12 @@ export type CfbPostseasonEntry = {
   cfpScore: number | null;
 };
 
+export type CfbPostseasonResults = {
+  bowlResults: Record<string, string>;
+  cfpResults: Record<string, string>;
+  updatedAt: string | null;
+};
+
 export const CFB_CFP_GAME_ORDER = [
   "r1a", "r1b", "r1c", "r1d",
   "q1", "q2", "q3", "q4",
@@ -90,6 +96,61 @@ export async function loadCfbPostseasonSlate(
     cfpSeeds: (data.cfp_seeds || []) as string[],
     publishedAt: String(data.published_at),
   };
+}
+
+export async function publishCfbPostseasonSlate(input: {
+  bowlGames: CfbPostseasonBowlGame[];
+  cfpSeeds: string[];
+  seasonKey?: number;
+}): Promise<{ ok: boolean; error?: string }> {
+  const session = getSession();
+  if (!session?.leagueId || !session.isCommissioner) {
+    return { ok: false, error: "Commissioner authority required." };
+  }
+  const { error } = await createClient().rpc("publish_cfb_postseason_slate", {
+    p_league_id: session.leagueId,
+    p_season_key: input.seasonKey ?? canonicalSeasonYear(),
+    p_bowl_games: input.bowlGames,
+    p_cfp_seeds: input.cfpSeeds,
+  });
+  return error ? { ok: false, error: error.message } : { ok: true };
+}
+
+export async function loadCfbPostseasonResults(
+  seasonKey = canonicalSeasonYear()
+): Promise<CfbPostseasonResults> {
+  const leagueId = getSession()?.leagueId;
+  if (!leagueId) return { bowlResults: {}, cfpResults: {}, updatedAt: null };
+  const { data, error } = await createClient()
+    .from("cfb_postseason_results")
+    .select("bowl_results,cfp_results,updated_at")
+    .eq("league_id", leagueId)
+    .eq("season_key", seasonKey)
+    .maybeSingle();
+  if (error) throw error;
+  return {
+    bowlResults: (data?.bowl_results || {}) as Record<string, string>,
+    cfpResults: (data?.cfp_results || {}) as Record<string, string>,
+    updatedAt: data?.updated_at ? String(data.updated_at) : null,
+  };
+}
+
+export async function saveCfbPostseasonResults(input: {
+  bowlResults: Record<string, string>;
+  cfpResults: Record<string, string>;
+  seasonKey?: number;
+}): Promise<{ ok: boolean; error?: string }> {
+  const session = getSession();
+  if (!session?.leagueId || !session.isCommissioner) {
+    return { ok: false, error: "Commissioner authority required." };
+  }
+  const { error } = await createClient().from("cfb_postseason_results").upsert({
+    league_id: session.leagueId,
+    season_key: input.seasonKey ?? canonicalSeasonYear(),
+    bowl_results: input.bowlResults,
+    cfp_results: input.cfpResults,
+  }, { onConflict: "league_id,season_key" });
+  return error ? { ok: false, error: error.message } : { ok: true };
 }
 
 export async function loadMyCfbPostseasonEntry(
