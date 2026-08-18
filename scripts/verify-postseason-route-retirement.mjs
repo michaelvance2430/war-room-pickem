@@ -4,11 +4,13 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const home = readFileSync(join(root, "src/app/page.tsx"), "utf8");
+const screen = readFileSync(join(root, "src/components/PostseasonBracketScreen.tsx"), "utf8");
 
-assert.equal(existsSync(join(root, "src/app/championship/page.tsx")), false);
-assert.equal(existsSync(join(root, "src/app/toilet-bowl/page.tsx")), false);
-assert.doesNotMatch(home, /href="\/championship"/);
-assert.doesNotMatch(home, /href="\/toilet-bowl"/);
+assert.equal(existsSync(join(root, "src/app/championship/page.tsx")), true);
+assert.equal(existsSync(join(root, "src/app/toilet-bowl/page.tsx")), true);
+assert.match(screen, /loadFrozenPostseasonSnapshot/);
+assert.match(screen, /advanceBracketFromCfpWeeks/);
+assert.doesNotMatch(screen, /localStorage|sessionStorage/);
+assert.doesNotMatch(screen, /seedChampionship|seedToiletBowl/);
 
-console.log("Obsolete browser-built postseason routes are absent and unlinked.");
+console.log("Authoritative cloud-backed postseason routes PASS");
