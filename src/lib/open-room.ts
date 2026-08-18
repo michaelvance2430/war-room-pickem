@@ -160,23 +160,15 @@ export async function seatPlayerInLeague(opts: {
     return { ok: false, error: joinRes.message };
   }
 
-  // Fair Entry notice only — points already applied server-side
+  // Deployment Credit notice only — points already applied server-side
   const startPts = joinRes.totalPoints ?? 0;
   if (startPts > 0 && !joinRes.alreadyMember) {
     try {
-      const { markFairEntryPendingNotice, bandForLatestScoredWeek } =
-        await import("@/lib/fair-entry");
-      const { listScoredWeekNumbers } = await import("@/lib/cloud");
-      const scored = await listScoredWeekNumbers();
-      const latest =
-        scored.length > 0 ? Math.max(...scored.filter((w) => w >= 0)) : null;
-      const band = bandForLatestScoredWeek(latest);
-      if (band) {
-        markFairEntryPendingNotice(leagueId, userId, {
-          points: startPts,
-          bandId: band.id,
-        });
-      }
+      const { markFairEntryPendingNotice } = await import("@/lib/fair-entry");
+      markFairEntryPendingNotice(leagueId, userId, {
+        points: startPts,
+        bandId: "deployment",
+      });
     } catch {
       /* notice is optional chrome */
     }
