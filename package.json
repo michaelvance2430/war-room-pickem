@@ -61,6 +61,7 @@
     "verify:atomic-week-rescore": "node scripts/verify-atomic-week-rescore.mjs",
     "verify:deployment-credit": "node --import tsx scripts/verify-deployment-credit.mjs && node scripts/verify-deployment-credit-sql.mjs",
     "verify:native-readiness": "node scripts/verify-native-readiness.mjs && node scripts/verify-universal-links.mjs",
+    "verify:app-host-live": "node scripts/verify-dedicated-app-host-live.mjs",
     "verify:universal-links": "node scripts/verify-universal-links.mjs",
     "verify:invite-auth": "node scripts/verify-invite-auth-flow.mjs",
     "verify:commissioner-plus": "node scripts/verify-commissioner-plus.mjs",
@@ -69,7 +70,7 @@
     "verify:egg-catalog": "node scripts/verify-easter-egg-catalog-parity.mjs",
     "verify:egg-cloud": "node scripts/verify-easter-egg-cloud.mjs",
     "verify:eggs": "npm run verify:egg-catalog && npm run verify:egg-cloud",
-    "verify:predeploy": "npm run verify:egg-catalog && npm run verify:egg-cloud && npm run verify:home-mission && npm run verify:native-readiness && npm run verify:account-lifecycle"
+    "verify:predeploy": "npm run verify:egg-catalog && npm run verify:egg-cloud && npm run verify:home-mission && npm run verify:native-readiness && npm run verify:account-lifecycle && npm run verify:app-host-live"
   },
   "dependencies": {
     "@capacitor/app": "^8.1.1",
