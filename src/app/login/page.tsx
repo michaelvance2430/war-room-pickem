@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, FormEvent, Suspense, useEffect } from "react";
+import { useState, FormEvent, Suspense, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import {
@@ -23,8 +23,11 @@ function LoginPageInner() {
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [resetBusy, setResetBusy] = useState(false);
+  const [invitePending, setInvitePending] = useState(false);
+  const displayNameRef = useRef<HTMLInputElement>(null);
+  const emailRef = useRef<HTMLInputElement>(null);
 
-  // Invite codes stay in the background for post-auth routing only — never UI.
+  // Invite codes stay private; UI only reassures the player that routing is saved.
   // Purge leftover guest tour residue.
   useEffect(() => {
     try {
@@ -54,8 +57,23 @@ function LoginPageInner() {
       peekPendingJoinCode();
     if (code) {
       stashPendingJoinCode(code);
+      setInvitePending(true);
     }
   }, [searchParams]);
+
+  function switchMode(nextMode: "login" | "signup") {
+    setMode(nextMode);
+    setError(null);
+    setMessage(null);
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, behavior: "instant" });
+      window.requestAnimationFrame(() => {
+        (nextMode === "signup" ? displayNameRef.current : emailRef.current)?.focus({
+          preventScroll: true,
+        });
+      });
+    });
+  }
 
   /**
    * Post-auth land. Sport-aware allegiance is required only after the product
@@ -223,12 +241,21 @@ function LoginPageInner() {
           onSubmit={handleSubmit}
           className="rounded-xl border border-border bg-card p-5 space-y-4"
         >
+          {invitePending && (
+            <div className="rounded-lg border border-primary/40 bg-primary/10 px-3 py-2.5 text-sm text-foreground">
+              <strong className="block text-primary">Invitation saved</strong>
+              <span className="text-xs text-muted">
+                Sign in or create an account and we&apos;ll take you straight to your room.
+              </span>
+            </div>
+          )}
           {mode === "signup" && (
             <div>
               <label className="text-xs text-muted block mb-1.5 font-medium">
                 Display name
               </label>
               <input
+                ref={displayNameRef}
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 className={inputClass}
@@ -243,6 +270,7 @@ function LoginPageInner() {
               Email
             </label>
             <input
+              ref={emailRef}
               type="email"
               required
               value={email}
@@ -323,11 +351,7 @@ function LoginPageInner() {
           {mode === "login" ? (
             <button
               type="button"
-              onClick={() => {
-                setMode("signup");
-                setError(null);
-                setMessage(null);
-              }}
+              onClick={() => switchMode("signup")}
               className="w-full py-3.5 min-h-[52px] rounded-xl border-2 border-primary/40 bg-primary/10 text-sm font-extrabold text-foreground touch-manipulation"
             >
               CREATE ACCOUNT
@@ -335,11 +359,7 @@ function LoginPageInner() {
           ) : (
             <button
               type="button"
-              onClick={() => {
-                setMode("login");
-                setError(null);
-                setMessage(null);
-              }}
+              onClick={() => switchMode("login")}
               className="w-full text-sm font-semibold text-muted hover:text-foreground min-h-[44px] touch-manipulation"
             >
               Already have an account? Log in
