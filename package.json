@@ -55,6 +55,7 @@
     "verify:lock-clock": "node scripts/verify-lock-clock-surfaces.mjs",
     "verify:commissioner-journey": "node --import tsx scripts/verify-commissioner-journey.mjs",
     "verify:one-click-scoring": "node --import tsx scripts/verify-one-click-scoring.mjs",
+    "verify:atomic-week-rescore": "node scripts/verify-atomic-week-rescore.mjs",
     "verify:deployment-credit": "node --import tsx scripts/verify-deployment-credit.mjs && node scripts/verify-deployment-credit-sql.mjs",
     "verify:native-readiness": "node scripts/verify-native-readiness.mjs && node scripts/verify-universal-links.mjs",
     "verify:universal-links": "node scripts/verify-universal-links.mjs",
