@@ -12,6 +12,8 @@ for (const table of [
   "cfb_postseason_results",
   "cfb_postseason_entries",
   "cfb_postseason_slates",
+  "league_season_closeouts",
+  "league_postseason_snapshots",
   "week_results",
   "picks",
   "locker_messages",
@@ -23,5 +25,7 @@ assert.match(sql, /run_number = public\.foundry_season_lifecycle\.run_number \+ 
 assert.match(sql, /stage = 'season_opening'/);
 assert.match(sql, /week_number = 0/);
 assert.match(sql, /seed_bot_picks_for_week\(p_league_id, 0\)/);
+assert.match(sql, /deployment_credit = 0/);
+assert.match(sql, /eligible_from_week = 0/);
 
 console.log("Foundry reset contract verified: isolation, full cleanup, opening lifecycle, Week 0 reseed.");
