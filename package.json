@@ -19,6 +19,7 @@
     "verify:cfb-postseason-calendar": "node --import tsx scripts/verify-cfb-postseason-calendar.mjs",
     "verify:cfb-weeks-15-20": "node --import tsx scripts/verify-cfb-weeks-15-20.mjs",
     "verify:cfb-season-closeout": "node scripts/verify-cfb-season-closeout.mjs",
+    "verify:cfb-launch-regressions": "node scripts/verify-cfb-launch-regressions.mjs",
     "verify:cfb-postseason-player": "node --import tsx scripts/verify-cfb-postseason-player.mjs",
     "verify:cfb-postseason-ops": "node scripts/verify-cfb-postseason-ops.mjs",
     "verify:home-mission": "node --import tsx scripts/verify-nfl-cfb-home-mission.mjs",
