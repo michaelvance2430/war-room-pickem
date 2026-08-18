@@ -127,8 +127,8 @@ async function resolveBracketWinners(players: Player[]): Promise<{
 
   let scored: number[] = [];
   try {
-    const { listScoredWeekNumbers } = await import("./cloud");
-    scored = await listScoredWeekNumbers();
+    const { listBracketScoredWeekNumbers } = await import("./postseason/cloud");
+    scored = await listBracketScoredWeekNumbers();
   } catch {
     scored = [];
   }
