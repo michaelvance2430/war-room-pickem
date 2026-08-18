@@ -5,6 +5,9 @@ const sql = fs.readFileSync(new URL("../supabase/deployment-credit-v1.sql", impo
 const cloud = fs.readFileSync(new URL("../src/lib/cloud.ts", import.meta.url), "utf8");
 const standings = fs.readFileSync(new URL("../src/app/standings/page.tsx", import.meta.url), "utf8");
 const profile = fs.readFileSync(new URL("../src/app/profile/[id]/page.tsx", import.meta.url), "utf8");
+const policySql = fs.readFileSync(new URL("../supabase/deployment-credit-policy-v2.sql", import.meta.url), "utf8");
+const joinPage = fs.readFileSync(new URL("../src/app/join/page.tsx", import.meta.url), "utf8");
+const membershipClient = fs.readFileSync(new URL("../src/lib/d1b-b-membership.ts", import.meta.url), "utf8");
 
 for (const fragment of [
   "late_join_policy",
@@ -39,5 +42,10 @@ assert.ok(cloud.includes("deployment_credit_breakdown"), "cloud standings must h
 assert.ok(standings.includes("earned +") && standings.includes("DC"), "standings must separate earned points and credit");
 assert.ok(profile.includes('label="Deployment Credit"'), "profile must label Deployment Credit");
 assert.ok(profile.includes('label="Eligible from"'), "profile must show first eligible week");
+assert.ok(policySql.includes("p_late_join_policy text default 'reinforcement_credit'"), "create RPC must accept a policy atomically");
+assert.ok(policySql.includes("if coalesce(p_list_as_open, false)"), "public rooms must force reinforcement credit");
+assert.ok(joinPage.includes("Late-join rule · locked at creation"), "league creation must explain immutable policy");
+assert.ok(joinPage.includes("Zero Backfill") && joinPage.includes("Closed Roster"), "private policy choices must be visible");
+assert.ok(membershipClient.includes("p_late_join_policy"), "client must send the policy into atomic create");
 
 console.log("Deployment Credit SQL contract PASS");
