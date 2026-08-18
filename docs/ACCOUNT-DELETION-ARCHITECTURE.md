@@ -159,3 +159,17 @@ an executable dependency-injected test verifies that order and failure receipts.
 This is not yet authorization to expose deletion. A real disposable Auth user with
 avatar and locker-media fixtures must complete the full Admin API and Storage path,
 followed by the gated UI and device matrix, before the public flag can change.
+
+## Refreshed branch proof — 2026-08-18
+
+The existing disposable branch was reset and rebuilt for the current launch
+candidate. The lifecycle and service-RPC rollback harnesses passed again. The
+refresh also caught two CFB tables added after the original design:
+`cfb_postseason_entries` and `postseason_scorecards` still referenced
+`auth.users ON DELETE CASCADE`. Their review migration now attaches both to the
+durable profile tombstone with `ON DELETE RESTRICT`.
+
+A new rollback harness deleted a real disposable `auth.users` row and proved
+that its profile, Bowl/CFP entry, and postseason scorecard all survived. This
+closes the current CFB-history cascade gap; production activation and the full
+Admin API/Storage/device proof remain separate gates.
