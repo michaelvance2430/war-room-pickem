@@ -28,7 +28,9 @@ assert(manifest.id === "/" && manifest.scope === "/", "manifest identity/scope m
 assert(manifest.display === "standalone", "manifest must remain standalone");
 assert(manifest.icons?.some((icon) => icon.sizes === "512x512"), "512px app icon missing");
 assert(nativeContract.includes('bundleId: "com.warroompicks.app"'), "bundle ID contract missing");
-assert(nativeContract.includes('canonicalOrigin: "https://www.war-room-picks.com"'), "canonical origin drifted");
+assert(nativeContract.includes('canonicalOrigin: "https://app.war-room-picks.com"'), "dedicated app origin drifted");
+assert(capacitorConfig.includes('url: "https://app.war-room-picks.com"'), "native shell is not pinned to the dedicated app host");
+assert(!capacitorConfig.includes('allowNavigation: ["www.war-room-picks.com"'), "native shell can navigate into the storefront");
 assert(login.includes('warRoomAuthReturnUrl("/reset-password")'), "password reset bypasses native-safe return contract");
 assert(!login.includes("warroom-remember"), "login contains a cosmetic remember-me flag");
 assert(!login.includes("Remember me"), "login promises a session option it cannot honor");
