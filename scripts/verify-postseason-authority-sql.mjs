@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 const sql = readFileSync(new URL("../supabase/postseason-authority-v1.sql", import.meta.url), "utf8");
 const closeout = readFileSync(new URL("../src/lib/season-closeout.ts", import.meta.url), "utf8");
 const cloud = readFileSync(new URL("../src/lib/postseason/cloud.ts", import.meta.url), "utf8");
+const autoTrophies = readFileSync(new URL("../src/lib/auto-trophies.ts", import.meta.url), "utf8");
 for (const fragment of [
   "league_postseason_snapshots",
   "league_postseason_participants",
@@ -27,5 +28,7 @@ assert.doesNotMatch(closeout, /seedChampionship|seedToiletBowl/);
 assert.match(closeout, /Durable cut-week snapshot is missing/);
 assert.match(cloud, /league_postseason_snapshots/);
 assert.match(cloud, /league_postseason_participants/);
+assert.match(autoTrophies, /loadFrozenPostseasonSnapshot/);
+assert.doesNotMatch(autoTrophies, /seedChampionship|seedToiletBowl/);
 
 console.log("Postseason authority SQL contract PASS");
