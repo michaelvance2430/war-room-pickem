@@ -7,6 +7,17 @@ export interface Player {
   name: string;
   division: Division;
   totalPoints: number;
+  /** Synthetic late-join standings credit; never counts as earned play. */
+  deploymentCredit?: number;
+  /** First league week this member may submit a card. */
+  eligibleFromWeek?: number;
+  /** Auditable week-by-week Deployment Credit calculation. */
+  deploymentCreditBreakdown?: Array<{
+    weekNumber: number;
+    qualifyingPlayers: number;
+    bottomCount: number;
+    credit: number;
+  }>;
   weeklyPoints: number[];
   atsCorrect: number;
   atsTotal: number;
