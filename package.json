@@ -41,6 +41,7 @@
     "verify:account-legendaries": "node scripts/verify-account-legendaries.mjs",
     "verify:foundry-gazette": "node --import tsx scripts/verify-foundry-gazette.mjs",
     "verify:foundry-owner": "node scripts/verify-foundry-owner-perimeter.mjs",
+    "verify:foundry-reset": "node scripts/verify-foundry-reset-sql.mjs",
     "verify:foundry-eyes": "node scripts/verify-foundry-eyes-clean.mjs",
     "verify:dispatch": "node --import tsx scripts/verify-dispatch-contract.mjs",
     "verify:dispatch-newsroom": "node --import tsx scripts/verify-dispatch-newsroom.mjs",
