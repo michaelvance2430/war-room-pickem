@@ -19,6 +19,7 @@ const seasonOpening = read("src/components/SeasonOpening.tsx");
 const capacitorConfig = read("capacitor.config.ts");
 const sceneDelegate = read("ios/App/App/SceneDelegate.swift");
 const infoPlist = read("ios/App/App/Info.plist");
+const appStoreExport = read("ios/ExportOptions-AppStore.plist");
 const submissionPacket = read("docs/APP-STORE-SUBMISSION.md");
 const nativeFeedback = read("src/lib/native-feedback.ts");
 const commishOnboarding = read("src/lib/commish-onboarding.ts");
@@ -56,6 +57,9 @@ assert(sceneDelegate.includes('subdirectory: "public/media"'), "native opening a
 assert(sceneDelegate.includes("configureSoundButton()"), "native opening sound control missing");
 assert(sceneDelegate.includes("player?.isMuted = !soundEnabled"), "native opening sound control is not wired to playback");
 assert(infoPlist.includes("ITSAppUsesNonExemptEncryption"), "export compliance declaration missing");
+assert(appStoreExport.includes("app-store-connect"), "App Store Connect export method missing");
+assert(appStoreExport.includes("XWW458P3J7"), "App Store export team drifted");
+assert(appStoreExport.includes("<key>signingStyle</key>\n\t<string>automatic</string>"), "App Store export must use managed signing");
 assert(!infoPlist.includes("UIInterfaceOrientationLandscapeLeft") || infoPlist.indexOf("UIInterfaceOrientationLandscapeLeft") > infoPlist.indexOf("UISupportedInterfaceOrientations~ipad"), "iPhone must remain portrait-first");
 assert(submissionPacket.includes("Tracking: **No**"), "App Privacy tracking answer missing");
 assert(submissionPacket.includes("Gambling with real money or redeemable currency: **No**"), "real-money boundary missing");
