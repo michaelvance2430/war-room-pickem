@@ -108,12 +108,22 @@ async function resolveBracketWinners(players: Player[]): Promise<{
   toiletReason: string;
 }> {
   const {
-    seedChampionship,
-    seedToiletBowl,
     buildBracket,
     advanceBracketFromCfpWeeks,
   } = await import("./brackets");
+  const { loadFrozenPostseasonSnapshot } = await import("./postseason/cloud");
   const sportId = getLeague()?.sportId;
+  const snapshot = await loadFrozenPostseasonSnapshot();
+
+  if (!snapshot) {
+    return {
+      champ: null,
+      toilet: null,
+      champReason: "Durable cut-week snapshot is missing",
+      toiletReason: "Durable cut-week snapshot is missing",
+    };
+  }
+  const frozenSnapshot = snapshot;
 
   let scored: number[] = [];
   try {
@@ -127,10 +137,12 @@ async function resolveBracketWinners(players: Player[]): Promise<{
     type: "championship" | "toilet"
   ): { player: Player; reason: string } | null {
     if (players.length < 2) return null;
-    const seeded =
-      type === "championship"
-        ? seedChampionship(players)
-        : seedToiletBowl(players);
+    const playerById = new Map(players.map((player) => [player.id, player]));
+    const seeded = frozenSnapshot.participants
+      .filter((participant) => participant.field === type)
+      .sort((a, b) => (a.seed ?? 999) - (b.seed ?? 999))
+      .map((participant) => playerById.get(participant.userId))
+      .filter((player): player is Player => !!player);
     if (seeded.length < 2) return null;
     const built = buildBracket(type, seeded);
     const advanced = advanceBracketFromCfpWeeks(built, scored, sportId);
