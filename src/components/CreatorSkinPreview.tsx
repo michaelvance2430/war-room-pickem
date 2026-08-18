@@ -31,7 +31,7 @@ const PRESETS: { label: string; etDate: string; etTime: string; week: number }[]
     { label: "Grind · W7", etDate: "2026-10-10", etTime: "12:00", week: 7 },
     { label: "Grind · W13", etDate: "2026-11-21", etTime: "12:00", week: 13 },
     { label: "Champ · W14", etDate: "2026-12-05", etTime: "12:00", week: 14 },
-    { label: "Champ · W18", etDate: "2027-01-19", etTime: "12:00", week: 18 },
+    { label: "Champ · W20", etDate: "2027-01-25", etTime: "12:00", week: 20 },
     {
       label: "Halloween eve",
       etDate: "2026-10-30",
@@ -313,11 +313,11 @@ export default function CreatorSkinPreview() {
             />
           </label>
           <label className="block text-[10px] font-bold uppercase text-muted">
-            Simulated CFB week (0–18)
+            Simulated CFB week (0–20)
             <input
               type="number"
               min={0}
-              max={18}
+              max={20}
               value={week}
               onChange={(e) => setWeek(Number(e.target.value))}
               className="mt-1 w-full rounded-lg border border-border bg-background px-2 py-2 text-sm text-foreground"
