@@ -1,5 +1,5 @@
 -- War Room account deletion lifecycle boundary.
--- REVIEW ONLY. DO NOT run in production until disposable-branch tests pass.
+-- Applied to production after refreshed branch proof on 2026-08-18.
 
 begin;
 
