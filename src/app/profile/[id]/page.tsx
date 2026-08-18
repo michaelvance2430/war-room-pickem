@@ -220,6 +220,8 @@ export default function ProfilePage() {
       name: string;
       division?: string;
       totalPoints?: number;
+      deploymentCredit?: number;
+      eligibleFromWeek?: number;
       avatarUrl?: string | null;
       joinedAt?: string | null;
     }): Player {
@@ -228,6 +230,8 @@ export default function ProfilePage() {
         name: row.name || "Player",
         division: (row.division as Player["division"]) || "North",
         totalPoints: row.totalPoints || 0,
+        deploymentCredit: row.deploymentCredit || 0,
+        eligibleFromWeek: row.eligibleFromWeek || 0,
         weeklyPoints: [],
         atsCorrect: 0,
         atsTotal: 0,
@@ -823,6 +827,25 @@ export default function ProfilePage() {
                     mock ? "Never" : formatMemberSince(player.memberSince)
                   }
                 />
+                {!mock && !!player.deploymentCredit && (
+                  <Chip
+                    label="Deployment Credit"
+                    value={`${player.deploymentCredit} pts`}
+                    accent
+                  />
+                )}
+                {!mock && !!player.deploymentCredit && (
+                  <Chip
+                    label="Earned points"
+                    value={String(player.totalPoints - player.deploymentCredit)}
+                  />
+                )}
+                {!mock && !!player.eligibleFromWeek && (
+                  <Chip
+                    label="Eligible from"
+                    value={`Week ${player.eligibleFromWeek}`}
+                  />
+                )}
                 <Chip
                   label="Last in"
                   value={mock ? "NPC" : formatLastSeen(lastSeenAt)}
