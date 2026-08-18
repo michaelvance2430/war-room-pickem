@@ -15,6 +15,7 @@
     "verify:museum-1a": "node scripts/verify-museum-phase1a.mjs",
     "verify:postseason-ps1": "node --import tsx scripts/verify-postseason-ps1.mjs",
     "verify:postseason-routes": "node scripts/verify-postseason-route-retirement.mjs",
+    "verify:postseason-authority": "node scripts/verify-postseason-authority-sql.mjs",
     "verify:home-mission": "node --import tsx scripts/verify-nfl-cfb-home-mission.mjs",
     "verify:home-tagline": "node --import tsx scripts/verify-home-tagline-rotation.mjs",
     "verify:season-rival": "node --import tsx scripts/verify-season-rival.mjs",
