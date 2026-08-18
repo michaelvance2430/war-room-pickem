@@ -116,9 +116,9 @@ function parseScore(
   return Number.isFinite(n) ? n : null;
 }
 
-function inCfpFinalWindow(commenceIso: string | undefined): boolean {
+export function inCfpFinalWindow(commenceIso: string | undefined): boolean {
   if (!commenceIso) return false;
-  const win = weekDateWindow(18, "cfb");
+  const win = weekDateWindow(20, "cfb");
   if (!win) return false;
   const t = Date.parse(commenceIso);
   if (Number.isNaN(t)) return false;
