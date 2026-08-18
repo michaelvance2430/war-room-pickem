@@ -1,6 +1,6 @@
 # War Room Pick'Em — App Store Submission Packet
 
-**Prepared:** August 13, 2026  
+**Prepared:** August 18, 2026
 **Bundle ID:** `com.warroompicks.app`  
 **Version:** 1.0  
 **Release model:** Free 1.0; no purchases, ads, cash prizes, or wagering
@@ -88,6 +88,7 @@ Review path:
 4. Visit Picks, Standings, Locker, another player's profile, and You/Account.
 5. On another player's profile, expand Safety to test report/block controls.
 6. The commissioner review account can open Moderation to review reports, mute members, and remove posts.
+7. Open Account → Delete account to inspect the permanent deletion flow. The populated commissioner account is intentionally blocked until it uses Pass the Keys; provide a second non-commissioner account if App Review needs to complete deletion.
 
 The app loads War Room's canonical HTTPS product inside a Capacitor iOS container while native opening, lifecycle, link routing, haptics, and status-bar behavior are supplied by the iOS project.
 
@@ -97,7 +98,7 @@ The app loads War Room's canonical HTTPS product inside a Capacitor iOS containe
 - Create a fictional, populated App Review league and two non-personal review accounts.
 - Put the credentials in App Store Connect Review Information, never in source control.
 - Confirm the support inbox is monitored.
-- Confirm account deletion is publicly enabled only after the cascade-safe migration and device proof pass.
+- Confirm Account → Delete account is visible and complete a disposable non-commissioner deletion before submission.
 - Capture current iPhone screenshots after the signed device build is final.
 - Recheck every privacy answer if analytics, crash reporting, notifications, payments, or advertising are added.
 
@@ -121,4 +122,5 @@ The app loads War Room's canonical HTTPS product inside a Capacitor iOS containe
 - Report enters the private staff queue; staff resolve/dismiss/reopen.
 - Network interruption produces a recoverable state and no duplicated write.
 - Privacy, Terms, Community Standards, and Support open inside the app.
-- Account deletion passes only after its release gate opens.
+- Account deletion: commissioner block → Pass the Keys; disposable player → reauthenticate → delete → login rejected.
+- Locker safety: explicit blocked-language test is rejected; report, block, mute, and remove-post controls work.
