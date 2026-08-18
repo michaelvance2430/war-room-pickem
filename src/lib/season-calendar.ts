@@ -9,10 +9,12 @@
  * | 1–12  | Week 1 … Week 12             | Regular season pick'em            | Yes         |
  * | 13    | Week 13 · Late RS             | Final regular-season Saturday(s)  | Yes         |
  * | 14    | Conf. Championships           | Conf title games — CUT LOCKS HERE | Yes → cut   |
- * | 15    | CFP Round 1                   | First round (12-team)             | Bracket     |
- * | 16    | CFP Quarterfinals             | NY6 / QF                          | Bracket     |
- * | 17    | CFP Semifinals                | Semis                             | Bracket     |
- * | 18    | CFP National Championship     | Title game                        | Bracket     |
+ * | 15    | Bowl Selection                | Postseason field + picks open     | Frozen      |
+ * | 16    | Bowl Opening                  | Opening bowl slate                | Frozen      |
+ * | 17    | Bowls + CFP Round 1           | Final bowls + first bracket round | Bracket     |
+ * | 18    | CFP Quarterfinals             | NY6 / QF                          | Bracket     |
+ * | 19    | CFP Semifinals                | Semis                             | Bracket     |
+ * | 20    | CFP National Championship     | Title game                        | Bracket     |
  *
  * *Week 0: run as its own card. Score it if you want fun points, but the
  * championship/toilet cut is based on standings after Conference Championships
@@ -22,10 +24,11 @@
  * - Week 0 only:            1 (independent)
  * - Regular season 1–13:   13
  * - Conference champ:       1  (finalizer for brackets)
- * - CFP playoff rounds:     4  (R1 → QF → SF → Final)
- * - TOTAL max cards:       1 + 13 + 1 + 4 = 19 slots (app weeks 0–18)
+ * - Bowl selection/scoring: 2  (selection → opening bowls)
+ * - CFP + bowl finale:      4  (R1 → QF → SF → Final)
+ * - TOTAL timeline:         app weeks 0–20
  *
- * Bracket weeks (15–18): standings already locked into Championship vs Toilet;
+ * Bracket weeks (17–20): standings already locked into Championship vs Toilet;
  * those weeks advance bracket matchups (higher weekly score advances). You can
  * still publish a 5-game pick'em card on real CFP games if you want.
  */
@@ -34,21 +37,23 @@ export type SeasonPhase =
   | "week0"
   | "regular"
   | "conf_championship"
+  | "bowl_selection"
+  | "bowl_opening"
   | "cfp_r1"
   | "cfp_qf"
   | "cfp_sf"
   | "cfp_final"
   | "other";
 
-/** Highest week index in the full calendar (0…N inclusive). Always 18 — not configurable. */
-export const FULL_SEASON_MAX_WEEK = 18;
+/** Highest week index in the full CFB calendar (0…20 inclusive). */
+export const FULL_SEASON_MAX_WEEK = 20;
 
 /** After this week is scored, Championship / Toilet fields lock from standings. */
 export const DEFAULT_CUT_LOCK_WEEK = 14;
 
 /**
  * Fixed season length for every league.
- * Weeks 0–18: openers → RS → Conf Champ cut → CFP Final.
+ * Weeks 0–20: openers → RS → Conf Champ cut → bowls → CFP Final.
  * Do not expose a shorter option — CFB needs the full map.
  */
 export const SEASON_MAX_WEEK = FULL_SEASON_MAX_WEEK;
@@ -95,12 +100,14 @@ function buildRegularWindows2026(): WeekDateWindow[] {
     startDate: "2026-12-04",
     endDate: "2026-12-06",
   });
-  // CFP (approx 2026–27 windows — filter when books post)
+  // Selection, bowls, and official 2026–27 CFP windows.
   out.push(
-    { weekNumber: 15, startDate: "2026-12-18", endDate: "2026-12-21" },
-    { weekNumber: 16, startDate: "2026-12-31", endDate: "2027-01-02" },
-    { weekNumber: 17, startDate: "2027-01-08", endDate: "2027-01-11" },
-    { weekNumber: 18, startDate: "2027-01-18", endDate: "2027-01-20" }
+    { weekNumber: 15, startDate: "2026-12-06", endDate: "2026-12-11" },
+    { weekNumber: 16, startDate: "2026-12-12", endDate: "2026-12-17" },
+    { weekNumber: 17, startDate: "2026-12-18", endDate: "2026-12-29" },
+    { weekNumber: 18, startDate: "2026-12-30", endDate: "2027-01-01" },
+    { weekNumber: 19, startDate: "2027-01-14", endDate: "2027-01-15" },
+    { weekNumber: 20, startDate: "2027-01-25", endDate: "2027-01-25" }
   );
   return out;
 }
@@ -156,7 +163,7 @@ function buildNflWindows2026(): WeekDateWindow[] {
 
 /**
  * Week numbers that exist for this sport.
- * NFL: 1–22 (RS 1–18 + playoffs). CFB: 0–18.
+ * NFL: 1–22 (RS 1–18 + playoffs). CFB: 0–20.
  */
 export function listSeasonWeekNumbers(
   sportId?: string | null
@@ -188,13 +195,13 @@ export function cutLockWeek(sportId?: string | null): number {
     : DEFAULT_CUT_LOCK_WEEK;
 }
 
-/** Bracket advancement weeks (CFP 15–18 or NFL playoffs 19–22). */
+/** Bracket advancement weeks (CFP 17–20 or NFL playoffs 19–22). */
 export function bracketWeeksForSport(
   sportId?: string | null
 ): readonly number[] {
   return resolveCalendarSport(sportId) === "nfl"
     ? NFL_PLAYOFF_WEEKS
-    : ([15, 16, 17, 18] as const);
+    : ([17, 18, 19, 20] as const);
 }
 
 const NFL_WINDOWS_2026 = buildNflWindows2026();
@@ -323,15 +330,17 @@ export function filterGamesForWeek<
   });
 }
 
-/** CFB phase map (week 14 = conf champ cut, 15–18 = CFP). */
+/** CFB phase map (week 14 cut, 15–16 bowls, 17–20 CFP). */
 export function seasonPhase(weekNumber: number): SeasonPhase {
   if (weekNumber === 0) return "week0";
   if (weekNumber >= 1 && weekNumber <= 13) return "regular";
   if (weekNumber === 14) return "conf_championship";
-  if (weekNumber === 15) return "cfp_r1";
-  if (weekNumber === 16) return "cfp_qf";
-  if (weekNumber === 17) return "cfp_sf";
-  if (weekNumber === 18) return "cfp_final";
+  if (weekNumber === 15) return "bowl_selection";
+  if (weekNumber === 16) return "bowl_opening";
+  if (weekNumber === 17) return "cfp_r1";
+  if (weekNumber === 18) return "cfp_qf";
+  if (weekNumber === 19) return "cfp_sf";
+  if (weekNumber === 20) return "cfp_final";
   return "other";
 }
 
@@ -376,6 +385,10 @@ export function weekTitle(
       return "Week 0";
     case "conf_championship":
       return "Conf. Champ";
+    case "bowl_selection":
+      return "Bowl Selection";
+    case "bowl_opening":
+      return "Bowl Opening";
     case "cfp_r1":
       return "CFP R1";
     case "cfp_qf":
@@ -433,6 +446,10 @@ export function weekSubtitle(
       return `Regular-season Thu–Mon window.${rangeBit} Counts toward standings & the cut.`;
     case "conf_championship":
       return `Conference championship weekend.${rangeBit} After scoring, cut locks Championship vs Toilet.`;
+    case "bowl_selection":
+      return `Bowl field and CFP bracket selection.${rangeBit} Make postseason picks before the first bowl kicks off.`;
+    case "bowl_opening":
+      return `Opening bowl slate.${rangeBit} Bowl confidence points begin.`;
     case "cfp_r1":
       return `CFP first round.${rangeBit} Bracket advancement week.`;
     case "cfp_qf":
@@ -464,6 +481,10 @@ export function weekPillHint(
       return "openers";
     case "conf_championship":
       return "CUT";
+    case "bowl_selection":
+      return "select";
+    case "bowl_opening":
+      return "bowls";
     case "cfp_r1":
     case "cfp_qf":
     case "cfp_sf":
@@ -480,8 +501,9 @@ export const SEASON_SCRUB_SUMMARY = {
   week0: "1 independent opener week (run alone if you want)",
   regularSeason: "13 pick'em weeks (Week 1–13)",
   confChampionship: "1 week (app week 14) — locks Championship vs Toilet cut",
-  cfpPlayoffs: "4 weeks (15–18): R1, QF, SF, National Championship",
-  totalCardsMax: 19, // weeks 0 through 18 inclusive
+  bowlPostseason: "Weeks 15–16: selection + opening bowl slate",
+  cfpPlayoffs: "4 weeks (17–20): R1, QF, SF, National Championship",
+  totalCardsMax: 21, // weeks 0 through 20 inclusive
   cutLocksAfterWeek: DEFAULT_CUT_LOCK_WEEK,
 };
 
