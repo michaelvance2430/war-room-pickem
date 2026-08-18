@@ -922,7 +922,7 @@ export default function StandingsPage() {
                                 className="block text-[9px] font-bold uppercase tracking-[0.08em] text-amber-300"
                                 title={`${player.totalPoints - player.deploymentCredit} earned points + ${player.deploymentCredit} Deployment Credit`}
                               >
-                                {player.totalPoints - player.deploymentCredit} earned + {player.deploymentCredit} DC
+                                {player.totalPoints - player.deploymentCredit} earned + {player.deploymentCredit} Deployment Credit
                               </span>
                             )}
                           </td>
