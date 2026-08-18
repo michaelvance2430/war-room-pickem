@@ -22,6 +22,21 @@ export default function HomeSeasonCommand() {
       if (cancelled) return;
       const league = getLeague();
       const sportId = league?.sportId || "cfb";
+      let frozenField: "championship" | "toilet" | "eliminated" | null = null;
+      if (week > cutLockWeek(sportId)) {
+        try {
+          const { loadFrozenPostseasonSnapshot } = await import(
+            "@/lib/postseason/cloud"
+          );
+          const snapshot = await loadFrozenPostseasonSnapshot();
+          frozenField =
+            snapshot?.participants.find(
+              (participant) => participant.userId === getSession()?.playerId
+            )?.field || null;
+        } catch {
+          frozenField = null;
+        }
+      }
       const next = resolveHomeSeasonCommand({
         week,
         cutWeek: cutLockWeek(sportId),
@@ -29,6 +44,7 @@ export default function HomeSeasonCommand() {
         players,
         playerId: getSession()?.playerId,
         cutPercent: league?.settings.cutPercent ?? 50,
+        frozenField,
       });
       if (next.phase === "opening") {
         const picks = await loadMyPicks(week).catch(() => null);
