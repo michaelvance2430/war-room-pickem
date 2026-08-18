@@ -33,6 +33,8 @@ begin
   delete from public.cfb_postseason_results where league_id = p_league_id;
   delete from public.cfb_postseason_entries where league_id = p_league_id;
   delete from public.cfb_postseason_slates where league_id = p_league_id;
+  delete from public.league_season_closeouts where league_id = p_league_id;
+  delete from public.league_postseason_snapshots where league_id = p_league_id;
   delete from public.week_results where league_id = p_league_id;
   delete from public.picks where league_id = p_league_id;
   delete from public.week_cards where league_id = p_league_id and week_number > 0;
@@ -60,7 +62,10 @@ begin
     best_bet_hits = 0,
     best_bet_total = 0,
     prop_hits = 0,
-    prop_total = 0
+    prop_total = 0,
+    deployment_credit = 0,
+    deployment_credit_breakdown = '[]'::jsonb,
+    eligible_from_week = 0
   where league_id = p_league_id;
 
   update public.leagues set current_week = 0 where id = p_league_id;
