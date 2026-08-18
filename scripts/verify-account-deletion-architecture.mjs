@@ -12,10 +12,12 @@ const design = read("docs/ACCOUNT-DELETION-ARCHITECTURE.md");
 const preflight = read("supabase/review-only/account-deletion/00-preflight-SELECT-ONLY.sql");
 const driftBaseline = read("supabase/review-only/account-deletion/00b-disposable-production-drift-baseline.sql");
 const lifecycleSchema = read("supabase/review-only/account-deletion/01-lifecycle-schema-REVIEW-ONLY.sql");
+const postseasonFks = read("supabase/review-only/account-deletion/01b-postseason-tombstone-fks-REVIEW-ONLY.sql");
 const disposableHarness = read("supabase/review-only/account-deletion/02-disposable-test-harness.sql");
 const policyOverlay = read("supabase/review-only/account-deletion/03-active-account-policy-overlay-REVIEW-ONLY.sql");
 const serverRpcs = read("supabase/review-only/account-deletion/04-server-rpcs-REVIEW-ONLY.sql");
 const serverRpcHarness = read("supabase/review-only/account-deletion/05-server-rpc-test-harness.sql");
+const postseasonDeleteHarness = read("supabase/review-only/account-deletion/06-postseason-auth-delete-test-harness.sql");
 const lifecycle = read("src/lib/account-lifecycle-contract.ts");
 
 assert(design.includes("No production mutation is authorized"), "review-only boundary missing");
@@ -43,6 +45,8 @@ assert(lifecycleSchema.includes("security definer"), "active-account RLS helper 
 assert(lifecycleSchema.includes("set search_path = ''"), "privileged helper search path is unsafe");
 assert(lifecycleSchema.includes("where p.id = (select auth.uid())"), "active-account helper does not bind the caller identity");
 assert(lifecycleSchema.includes("revoke all on function private.is_active_account()"), "active-account helper remains public");
+assert(/cfb_postseason_entries_user_id_fkey[\s\S]*references public\.profiles\(id\) on delete restrict/i.test(postseasonFks), "CFB postseason entry history still follows Auth deletion");
+assert(/postseason_scorecards_user_id_fkey[\s\S]*references public\.profiles\(id\) on delete restrict/i.test(postseasonFks), "postseason scorecard history still follows Auth deletion");
 assert(disposableHarness.includes("set local role authenticated"), "browser lifecycle attack is not tested");
 assert(disposableHarness.includes("private.is_active_account()"), "revoked-token active gate is not tested");
 assert(disposableHarness.includes("competitive pick receipt was lost"), "pick preservation is not tested");
@@ -62,5 +66,9 @@ assert(serverRpcs.includes("set resolved_by = null"), "staff resolution identity
 assert(preflight.includes("'reporter_id', 'reported_id', 'blocked_id', 'resolved_by'"), "player safety identity columns are missing from preflight");
 assert(serverRpcHarness.includes("authenticated role executed service-only deletion RPC"), "RPC privilege boundary is untested");
 assert(serverRpcHarness.includes("completed operation is not idempotent"), "RPC retry safety is untested");
+assert(postseasonDeleteHarness.includes("delete from auth.users"), "real Auth deletion cascade is not exercised");
+assert(postseasonDeleteHarness.includes("postseason entry cascaded"), "CFB postseason entry preservation is not tested");
+assert(postseasonDeleteHarness.includes("postseason scorecard cascaded"), "postseason scorecard preservation is not tested");
+assert(postseasonDeleteHarness.includes("rollback;"), "postseason deletion fixtures are not rolled back");
 
 console.log("[account-deletion-architecture] PASS — tombstone identity, inventory, revocation, and Foundry gates verified");
