@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { getSession } from "@/lib/league";
 import { loadBlockedPlayerIds } from "@/lib/player-safety";
+import { objectionableLockerReason } from "@/lib/content-safety";
 
 /** Hard cap — punchy trash talk, not essays. */
 export const LOCKER_MAX_CHARS = 280;
@@ -840,6 +841,8 @@ export async function postLockerMessage(body: string): Promise<{
       error: `Max ${LOCKER_MAX_CHARS} characters.`,
     };
   }
+  const safetyError = objectionableLockerReason(text);
+  if (safetyError) return { ok: false, error: safetyError };
 
   // Guest Mode: observe only — never hit Supabase as a fake member
   
@@ -881,6 +884,12 @@ export async function postLockerMessage(body: string): Promise<{
         ok: false,
         error:
           "Locker Room isn’t set up yet. Run supabase/locker-room.sql in Supabase SQL Editor once.",
+      };
+    }
+    if (/locker_content_rejected/i.test(error.message || "")) {
+      return {
+        ok: false,
+        error: "That message contains language that is not allowed in the Locker.",
       };
     }
     if (/policy|row-level|violates|muted|check/i.test(error.message || "")) {
