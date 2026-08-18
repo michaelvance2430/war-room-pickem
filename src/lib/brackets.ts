@@ -209,8 +209,8 @@ export function scoreMatchup(
 }
 
 /** App weeks that power bracket rounds (CFP R1 → Final). */
-/** CFB / default: CFP rounds map to app weeks 15–18 */
-export const CFP_BRACKET_WEEKS = [15, 16, 17, 18] as const;
+/** CFB / default: league bracket rounds map to CFP app weeks 17–20. */
+export const CFP_BRACKET_WEEKS = [17, 18, 19, 20] as const;
 
 /** NFL: playoff cards after full RS (official weeks 1–18) */
 export const NFL_BRACKET_WEEKS = [19, 20, 21, 22] as const;
@@ -233,7 +233,7 @@ export function bracketWeeksForLeague(
 
 /**
  * Which season week scores a given bracket round index.
- * CFB: Final → week 18. NFL: Final → Super Bowl week 22.
+ * CFB: Final → week 20. NFL: Final → Super Bowl week 22.
  */
 export function cfpWeekForRound(
   roundIndex: number,
@@ -350,7 +350,7 @@ function placeWinnerIntoNext(
 
 /**
  * Advance bracket slots using CFP weekly pick'em scores.
- * - Round 1 → week 15, QF → 16, SF → 17, Final → 18 (aligned for smaller fields)
+ * - Round 1 → week 17, QF → 18, SF → 19, Final → 20 (aligned for smaller fields)
  * - Higher weekly score advances; ties use season tiebreakers
  * - Resolves a round if week is scored OR weekly_points exist for that week
  * - 0–0 still advances via tiebreakers so the board never stays blank after a scored week
