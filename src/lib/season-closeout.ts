@@ -10,7 +10,6 @@
 import { getLeague, getSession, isOps } from "@/lib/league";
 import {
   defaultSeasonYear,
-  loadLeagueTrophies,
   awardTrophy,
   type TrophyType,
 } from "@/lib/trophies";
@@ -78,6 +77,25 @@ function writeClosed(leagueId: string, year: number, closedAt: string) {
     );
   } catch {
     /* ignore */
+  }
+}
+
+async function loadDurableCloseout(
+  leagueId: string,
+  year: number
+): Promise<{ closedAt: string } | null> {
+  try {
+    const { createClient } = await import("./supabase/client");
+    const { data, error } = await createClient()
+      .from("league_season_closeouts")
+      .select("closed_at")
+      .eq("league_id", leagueId)
+      .eq("season_key", year)
+      .maybeSingle();
+    if (error || !data?.closed_at) return null;
+    return { closedAt: String(data.closed_at) };
+  } catch {
+    return null;
   }
 }
 
@@ -245,42 +263,20 @@ export async function resolveSeasonCloseoutReadiness(): Promise<SeasonCloseoutRe
   }
 
   const year = defaultSeasonYear();
-  const closed = readClosed(session.leagueId, year);
-  if (closed) {
+  const durableClosed = await loadDurableCloseout(session.leagueId, year);
+  if (durableClosed) {
+    writeClosed(session.leagueId, year, durableClosed.closedAt);
     return {
       status: "already-closed",
-      closedAt: closed.closedAt,
+      closedAt: durableClosed.closedAt,
       seasonYear: year,
     };
   }
-
-  // Cloud signal: championship + toilet trophies already for this year
-  // AND crystal_ball_result set → treat as closed if local flag missing
-  try {
-    const trophies = await loadLeagueTrophies();
-    const yearItems = trophies.filter((t) => t.seasonYear === year);
-    const hasChamp = yearItems.some((t) => t.trophyType === "championship");
-    const hasToilet = yearItems.some((t) => t.trophyType === "toilet_bowl");
-    const { loadCrystalBall } = await import("./crystal-ball");
-    const cb = await loadCrystalBall();
-    if (hasChamp && hasToilet && cb.champion) {
-      // Recover closed flag for multi-device consistency without re-granting
-      writeClosed(session.leagueId, year, yearItems[0]?.awardedAt || new Date().toISOString());
-      return {
-        status: "already-closed",
-        closedAt: yearItems[0]?.awardedAt || new Date().toISOString(),
-        seasonYear: year,
-      };
-    }
-  } catch {
-    /* continue */
-  }
-
   const maxW = seasonMaxWeek(league?.sportId || "cfb");
   let scored: number[] = [];
   try {
-    const { listScoredWeekNumbers } = await import("./cloud");
-    scored = await listScoredWeekNumbers();
+    const { listBracketScoredWeekNumbers } = await import("./postseason/cloud");
+    scored = await listBracketScoredWeekNumbers();
   } catch {
     scored = [];
   }
@@ -406,18 +402,6 @@ export async function closeCfbSeason(opts?: {
   }
 
   const year = defaultSeasonYear();
-  const existing = readClosed(session.leagueId, year);
-  if (existing) {
-    return {
-      ok: true,
-      alreadyClosed: true,
-      closedAt: existing.closedAt,
-      seasonYear: year,
-      winners: 0,
-      message: "Season already closed.",
-    };
-  }
-
   // In-flight lock (same tab double-click)
   const lockKey = `${CLOSE_LOCK_KEY}:${session.leagueId}:${year}`;
   try {
@@ -495,24 +479,30 @@ export async function closeCfbSeason(opts?: {
     }
 
     // Explicit awards (idempotent) — multi Crystal Ball names in notes
-    await awardIfNeeded({
+    const championshipAward = await awardIfNeeded({
       trophyType: "championship",
       winnerName: readiness.leagueChampionNames[0] || "Champion",
       winnerUserId: readiness.leagueChampionIds[0] || null,
       subtitle: "War Room Champion",
       notes: "Season closeout · Championship bracket final",
     });
-    await awardIfNeeded({
+    if (!championshipAward.ok) {
+      return { ok: false, error: championshipAward.error || "Championship engraving failed" };
+    }
+    const toiletAward = await awardIfNeeded({
       trophyType: "toilet_bowl",
       winnerName: readiness.toiletBowlNames[0] || "Toilet Bowl",
       winnerUserId: readiness.toiletBowlIds[0] || null,
       subtitle: "Toilet Bowl Champion",
       notes: "Season closeout · Toilet Bowl bracket final",
     });
+    if (!toiletAward.ok) {
+      return { ok: false, error: toiletAward.error || "Toilet Bowl engraving failed" };
+    }
 
     if (readiness.crystalBallWinnerIds.length > 0) {
       const names = readiness.crystalBallWinnerNames;
-      await awardIfNeeded({
+      const crystalAward = await awardIfNeeded({
         trophyType: "crystal_ball",
         winnerName: names[0] || "Prophet",
         winnerUserId: readiness.crystalBallWinnerIds[0] || null,
@@ -522,18 +512,24 @@ export async function closeCfbSeason(opts?: {
             ? `Village Nerd · all correct: ${names.join(" · ")}`
             : `Village Nerd · only correct Crystal Ball on ${champTeam}`,
       });
+      if (!crystalAward.ok) {
+        return { ok: false, error: crystalAward.error || "Crystal Ball engraving failed" };
+      }
       // Badges already granted in crown path for all winners
     }
 
     for (const o of readiness.otherAwards) {
       if (!o.recipientNames[0]) continue;
-      await awardIfNeeded({
+      const otherAward = await awardIfNeeded({
         trophyType: o.type as TrophyType,
         winnerName: o.recipientNames[0],
         winnerUserId: o.recipientIds[0] || null,
         subtitle: o.label,
         notes: "Season closeout · division title",
       });
+      if (!otherAward.ok) {
+        return { ok: false, error: otherAward.error || `${o.label} engraving failed` };
+      }
     }
 
     // 8–9) Ceremony presentation: clear finale seen so SeasonFinale can fire
@@ -571,8 +567,30 @@ export async function closeCfbSeason(opts?: {
       /* ignore */
     }
 
-    // 11) Mark season closed (local + durable enough for refresh)
-    const closedAt = new Date().toISOString();
+    // 11) Commit the immutable server receipt only after required hardware exists.
+    const { createClient } = await import("./supabase/client");
+    const { data: closeout, error: closeoutError } = await createClient().rpc(
+      "record_cfb_season_closeout",
+      {
+        p_league_id: session.leagueId,
+        p_season_key: year,
+        p_readiness_version: readiness.version,
+        p_national_champion: champTeam,
+        p_league_champion_id: readiness.leagueChampionIds[0],
+        p_toilet_bowl_champion_id: readiness.toiletBowlIds[0],
+        p_award_manifest: {
+          championship: readiness.leagueChampionIds,
+          toilet_bowl: readiness.toiletBowlIds,
+          crystal_ball: readiness.crystalBallWinnerIds,
+          other: readiness.otherAwards,
+        },
+      }
+    );
+    if (closeoutError) {
+      return { ok: false, error: closeoutError.message };
+    }
+    const closeoutRow = Array.isArray(closeout) ? closeout[0] : closeout;
+    const closedAt = String(closeoutRow?.closed_at || new Date().toISOString());
     writeClosed(session.leagueId, year, closedAt);
 
     // 12) Museum reads league_trophies — already written via awardTrophy
@@ -601,9 +619,9 @@ async function awardIfNeeded(opts: {
   winnerUserId: string | null;
   subtitle?: string;
   notes?: string;
-}) {
+}): Promise<{ ok: boolean; error?: string }> {
   try {
-    await awardTrophy({
+    return await awardTrophy({
       seasonYear: defaultSeasonYear(),
       trophyType: opts.trophyType,
       winnerName: opts.winnerName,
@@ -612,8 +630,11 @@ async function awardIfNeeded(opts: {
       notes: opts.notes || null,
       allowOps: true,
     });
-  } catch {
-    /* ignore single award failure */
+  } catch (cause) {
+    return {
+      ok: false,
+      error: cause instanceof Error ? cause.message : "Trophy write failed",
+    };
   }
 }
 
