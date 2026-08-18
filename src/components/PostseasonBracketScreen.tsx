@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import BracketView from "@/components/BracketView";
+import SportChampionshipTrophy from "@/components/SportChampionshipTrophy";
+import { getChampionshipTrophyDesign } from "@/lib/championship-trophy-catalog";
 import { advanceBracketFromCfpWeeks, buildBracket, type Bracket } from "@/lib/brackets";
 import { loadLeaguePlayers } from "@/lib/cloud";
 import { getLeague, getSession } from "@/lib/league";
@@ -25,7 +27,10 @@ export default function PostseasonBracketScreen({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const selfId = getSession()?.playerId || null;
+  const league = getLeague();
   const isChampionship = competition === "championship";
+  const championshipTrophyId = league?.settings?.championshipTrophyId || "command_cup";
+  const championshipTrophy = getChampionshipTrophyDesign(championshipTrophyId, league?.sportId);
 
   useEffect(() => {
     let cancelled = false;
@@ -90,6 +95,25 @@ export default function PostseasonBracketScreen({
           Standings
         </Link>
       </div>
+
+      {isChampionship && (
+        <section className="mt-6 grid items-center gap-4 rounded-2xl border border-amber-300/30 bg-[radial-gradient(circle_at_top,rgba(251,191,36,.13),transparent_62%)] p-4 sm:grid-cols-[170px_1fr]">
+          <div className="flex justify-center">
+            <SportChampionshipTrophy
+              sport={league?.sportId || "cfb"}
+              size={140}
+              trophyDesignId={championshipTrophyId}
+              animate
+            />
+          </div>
+          <div className="text-center sm:text-left">
+            <p className="text-[9px] font-black uppercase tracking-[.2em] text-amber-300">The object at the middle</p>
+            <h2 className="mt-1 text-2xl font-black">{championshipTrophy.name}</h2>
+            <p className="mt-1 text-xs font-bold text-amber-100">{championshipTrophy.short}</p>
+            <p className="mt-3 text-sm italic text-muted">“{championshipTrophy.inscription}”</p>
+          </div>
+        </section>
+      )}
 
       {loading && <p className="mt-8 text-sm text-muted">Loading the frozen field…</p>}
       {error && (
