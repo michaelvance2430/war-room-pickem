@@ -91,9 +91,7 @@ async function rpcPayload(
 }
 
 export async function POST(req: Request) {
-  // The complete workflow stays dark until the production migration and all
-  // Foundry/device gates are approved.
-  if (!ACCOUNT_LIFECYCLE_PUBLIC || process.env.ACCOUNT_DELETION_ENABLED !== "true") {
+  if (!ACCOUNT_LIFECYCLE_PUBLIC) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
