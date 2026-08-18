@@ -111,6 +111,10 @@ export default function StandingsPage() {
   >({});
   const [selfId, setSelfId] = useState<string | null>(null);
   const [active, setActive] = useState<Division | "Overall">("Overall");
+  const [postseasonFieldById, setPostseasonFieldById] = useState<Record<
+    string,
+    "championship" | "toilet" | "eliminated"
+  > | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -220,6 +224,25 @@ export default function StandingsPage() {
         );
         if (cancelled) return;
         setPlayers(Array.isArray(list) ? list : []);
+
+        try {
+          const { loadFrozenPostseasonSnapshot } = await import(
+            "@/lib/postseason/cloud"
+          );
+          const snapshot = await loadFrozenPostseasonSnapshot();
+          if (!cancelled && snapshot) {
+            setPostseasonFieldById(
+              Object.fromEntries(
+                snapshot.participants.map((participant) => [
+                  participant.userId,
+                  participant.field,
+                ])
+              )
+            );
+          }
+        } catch {
+          if (!cancelled) setPostseasonFieldById(null);
+        }
 
         // Regular-season pulse: pick lock counts (privacy-safe)
         if (phase === "regular" && liveWeek != null) {
@@ -351,9 +374,15 @@ export default function StandingsPage() {
 
   const preseasonCutIndex =
     active === "Overall" ? -1 : Math.ceil(pulseRows.length / 2);
-  const championshipIds = new Set(seedChampionship(players).map((p) => p.id));
+  const championshipIds = new Set(
+    postseasonFieldById
+      ? Object.entries(postseasonFieldById)
+          .filter(([, field]) => field === "championship")
+          .map(([id]) => id)
+      : seedChampionship(players).map((p) => p.id)
+  );
   const cutIndex =
-    seasonStarted && active !== "Overall"
+    seasonStarted && active !== "Overall" && postseasonFieldById === null
       ? competitiveRows.filter((p) => championshipIds.has(p.id)).length
       : -1;
   const activeConferenceLabel =
@@ -570,6 +599,16 @@ export default function StandingsPage() {
 
         {!loading && players.length > 0 && (
           <>
+            {postseasonFieldById && (
+              <nav className="mb-4 grid grid-cols-2 gap-2" aria-label="Postseason brackets">
+                <a href="/championship" className="min-h-12 rounded-xl border border-primary/45 bg-primary/10 px-3 py-3 text-center text-sm font-black text-primary">
+                  Championship
+                </a>
+                <a href="/toilet-bowl" className="min-h-12 rounded-xl border border-toilet/45 bg-toilet/10 px-3 py-3 text-center text-sm font-black text-toilet">
+                  Toilet Bowl
+                </a>
+              </nav>
+            )}
             <div className="cfb-division-tabs phone-h-scroll sm:flex-wrap sm:overflow-visible mb-4">
               {divisions.map((d) => (
                 <button
@@ -812,6 +851,16 @@ export default function StandingsPage() {
                                   id={player.id}
                                   name={player.name}
                                 />
+                                {postseasonFieldById?.[player.id] === "championship" && (
+                                  <span className="ml-2 rounded-full border border-primary/45 bg-primary/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-primary">
+                                    Championship
+                                  </span>
+                                )}
+                                {postseasonFieldById?.[player.id] === "toilet" && (
+                                  <span className="ml-2 rounded-full border border-toilet/45 bg-toilet/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-toilet">
+                                    Toilet Bowl
+                                  </span>
+                                )}
                                 {standingsHardwareFlair(player.name, player.id).map(
                                   (f) => (
                                     <span
