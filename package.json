@@ -68,6 +68,7 @@
     "verify:invite-auth": "node scripts/verify-invite-auth-flow.mjs",
     "verify:commissioner-plus": "node scripts/verify-commissioner-plus.mjs",
     "verify:account-lifecycle": "node scripts/verify-account-lifecycle.mjs && node scripts/verify-account-deletion-ui.mjs",
+    "verify:apple-submission": "node --import tsx scripts/verify-apple-submission.mjs",
     "verify:crew-continuity": "node --import tsx scripts/verify-crew-continuity.mjs",
     "verify:egg-catalog": "node scripts/verify-easter-egg-catalog-parity.mjs",
     "verify:egg-cloud": "node scripts/verify-easter-egg-cloud.mjs",
