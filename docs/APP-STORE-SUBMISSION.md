@@ -89,13 +89,20 @@ The app loads War Room's canonical HTTPS product inside a Capacitor iOS containe
 
 ## Owner actions before upload
 
-- Confirm Xcode recognizes enrolled Apple Team `XWW458P3J7` before the signed device build.
+- Increment `CURRENT_PROJECT_VERSION` for every App Store Connect upload after build 1.
 - Create a fictional, populated App Review league and two non-personal review accounts.
 - Put the credentials in App Store Connect Review Information, never in source control.
 - Confirm the support inbox is monitored.
 - Confirm account deletion is publicly enabled only after the cascade-safe migration and device proof pass.
 - Capture current iPhone screenshots after the signed device build is final.
 - Recheck every privacy answer if analytics, crash reporting, notifications, payments, or advertising are added.
+
+## Engineering certification
+
+- On August 18, 2026, Xcode produced a signed Release device archive for `com.warroompicks.app` with Apple Team `XWW458P3J7`.
+- The archive exported successfully with App Store Connect distribution signing, `get-task-allow = false`, and the dedicated `app.war-room-picks.com` associated domain.
+- Exported identity: version `1.0`, build `1`, minimum iOS `15.0`, non-exempt encryption `false`.
+- Repeat the archive and export after the final production checkpoint; a successful historical export does not replace the final upload validation.
 
 ## TestFlight acceptance run
 
