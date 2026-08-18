@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const sql = fs.readFileSync(new URL("../supabase/deployment-credit-v1.sql", import.meta.url), "utf8");
+const cloud = fs.readFileSync(new URL("../src/lib/cloud.ts", import.meta.url), "utf8");
+const standings = fs.readFileSync(new URL("../src/app/standings/page.tsx", import.meta.url), "utf8");
+const profile = fs.readFileSync(new URL("../src/app/profile/[id]/page.tsx", import.meta.url), "utf8");
 
 for (const fragment of [
   "late_join_policy",
@@ -32,5 +35,9 @@ assert.ok(
   /before update of total_points, deployment_credit on public\.memberships/i.test(sql),
   "authoritative rescoring must preserve separate credit",
 );
+assert.ok(cloud.includes("deployment_credit_breakdown"), "cloud standings must hydrate credit provenance");
+assert.ok(standings.includes("earned +") && standings.includes("DC"), "standings must separate earned points and credit");
+assert.ok(profile.includes('label="Deployment Credit"'), "profile must label Deployment Credit");
+assert.ok(profile.includes('label="Eligible from"'), "profile must show first eligible week");
 
 console.log("Deployment Credit SQL contract PASS");
