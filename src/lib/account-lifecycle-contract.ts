@@ -6,7 +6,7 @@
  * neither exit may ship until its protected server path passes Foundry.
  */
 
-export const ACCOUNT_LIFECYCLE_PUBLIC = false as const;
+export const ACCOUNT_LIFECYCLE_PUBLIC = true as const;
 
 export const MIA_DISPLAY_LABEL = "MIA" as const;
 export const REDACTED_DISPLAY_NAME = "[REDACTED]" as const;
@@ -58,4 +58,3 @@ export const ACCOUNT_DELETION_RELEASE_GATES = [
   "foundry_cascade_and_rollback_proof",
   "app_review_device_test",
 ] as const;
-
