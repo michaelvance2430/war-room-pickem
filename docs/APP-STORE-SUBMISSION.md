@@ -7,11 +7,11 @@
 
 ## Store URLs
 
-- Support: `https://www.war-room-picks.com/support`
-- Privacy Policy: `https://www.war-room-picks.com/privacy`
-- Privacy Choices: `https://www.war-room-picks.com/account`
-- Terms: `https://www.war-room-picks.com/terms`
-- Community Standards: `https://www.war-room-picks.com/community`
+- Support: `https://app.war-room-picks.com/support`
+- Privacy Policy: `https://app.war-room-picks.com/privacy`
+- Privacy Choices: `https://app.war-room-picks.com/account`
+- Terms: `https://app.war-room-picks.com/terms`
+- Community Standards: `https://app.war-room-picks.com/community`
 
 ## Suggested listing
 
