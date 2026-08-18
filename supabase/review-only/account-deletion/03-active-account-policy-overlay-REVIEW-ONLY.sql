@@ -1,5 +1,5 @@
 -- Fail closed for valid-but-revoked JWTs after account deletion begins.
--- REVIEW ONLY. Apply to disposable branches before production consideration.
+-- Applied to production after refreshed branch proof on 2026-08-18.
 
 do $$
 declare
@@ -39,4 +39,3 @@ create policy "Active accounts only"
   to authenticated
   using ((select private.is_active_account()))
   with check ((select private.is_active_account()));
-
