@@ -5,6 +5,9 @@ const sql = readFileSync(new URL("../supabase/postseason-authority-v1.sql", impo
 const closeout = readFileSync(new URL("../src/lib/season-closeout.ts", import.meta.url), "utf8");
 const cloud = readFileSync(new URL("../src/lib/postseason/cloud.ts", import.meta.url), "utf8");
 const autoTrophies = readFileSync(new URL("../src/lib/auto-trophies.ts", import.meta.url), "utf8");
+const standings = readFileSync(new URL("../src/app/standings/page.tsx", import.meta.url), "utf8");
+const homeCommand = readFileSync(new URL("../src/components/HomeSeasonCommand.tsx", import.meta.url), "utf8");
+const homeCommandLogic = readFileSync(new URL("../src/lib/home-season-command.ts", import.meta.url), "utf8");
 for (const fragment of [
   "league_postseason_snapshots",
   "league_postseason_participants",
@@ -28,7 +31,15 @@ assert.doesNotMatch(closeout, /seedChampionship|seedToiletBowl/);
 assert.match(closeout, /Durable cut-week snapshot is missing/);
 assert.match(cloud, /league_postseason_snapshots/);
 assert.match(cloud, /league_postseason_participants/);
+assert.match(cloud, /postseason_scorecards/);
+assert.match(cloud, /listBracketScoredWeekNumbers/);
 assert.match(autoTrophies, /loadFrozenPostseasonSnapshot/);
+assert.match(autoTrophies, /listBracketScoredWeekNumbers/);
 assert.doesNotMatch(autoTrophies, /seedChampionship|seedToiletBowl/);
+assert.match(standings, /loadFrozenPostseasonSnapshot/);
+assert.match(standings, /postseasonFieldById/);
+assert.match(homeCommand, /loadFrozenPostseasonSnapshot/);
+assert.match(homeCommandLogic, /FIELD PENDING AUTHORITY/);
+assert.match(closeout, /listBracketScoredWeekNumbers/);
 
 console.log("Postseason authority SQL contract PASS");
