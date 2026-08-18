@@ -65,6 +65,8 @@ create policy "Members read postseason participants"
 
 grant select on public.league_postseason_snapshots to authenticated;
 grant select on public.league_postseason_participants to authenticated;
+revoke all on public.league_postseason_snapshots from anon;
+revoke all on public.league_postseason_participants from anon;
 
 create or replace function public.freeze_postseason_snapshot_if_absent(
   p_league_id uuid,
@@ -174,8 +176,7 @@ begin
 end;
 $$;
 
-revoke all on function public.freeze_postseason_snapshot_if_absent(uuid,text) from public,anon;
-grant execute on function public.freeze_postseason_snapshot_if_absent(uuid,text) to authenticated;
+revoke all on function public.freeze_postseason_snapshot_if_absent(uuid,text) from public,anon,authenticated;
 
 create or replace function public.freeze_postseason_after_cut_score()
 returns trigger language plpgsql security definer set search_path=public,pg_temp as $$
@@ -191,6 +192,8 @@ create constraint trigger freeze_postseason_after_cut_score
 after insert or update on public.week_results deferrable initially deferred
 for each row execute function public.freeze_postseason_after_cut_score();
 
+revoke all on function public.freeze_postseason_after_cut_score() from public,anon,authenticated;
+
 create or replace function public.clear_postseason_snapshot_on_season_reset()
 returns trigger language plpgsql security definer set search_path=public,pg_temp as $$
 begin
@@ -204,5 +207,7 @@ drop trigger if exists clear_postseason_snapshot_on_season_reset on public.leagu
 create trigger clear_postseason_snapshot_on_season_reset
 after update of current_week on public.leagues for each row
 execute function public.clear_postseason_snapshot_on_season_reset();
+
+revoke all on function public.clear_postseason_snapshot_on_season_reset() from public,anon,authenticated;
 
 notify pgrst, 'reload schema';
