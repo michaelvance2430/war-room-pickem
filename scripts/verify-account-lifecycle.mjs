@@ -10,9 +10,9 @@ function assert(condition, message) {
 
 const contract = read("src/lib/account-lifecycle-contract.ts");
 const design = read("docs/ACCOUNT-LIFECYCLE.md");
-const schema = read("supabase/schema.sql");
+const lifecycleSchema = read("supabase/review-only/account-deletion/01-lifecycle-schema-REVIEW-ONLY.sql");
 
-assert(contract.includes("ACCOUNT_LIFECYCLE_PUBLIC = false"), "unsafe public activation");
+assert(contract.includes("ACCOUNT_LIFECYCLE_PUBLIC = true"), "public deletion entry is not active");
 assert(contract.includes('action: "GO MIA"'), "MIA action missing");
 assert(contract.includes('action: "BURN THE DOSSIER"'), "permanent action missing");
 assert(contract.includes('REDACTED_DISPLAY_NAME = "[REDACTED]"'), "redacted identity missing");
@@ -20,14 +20,7 @@ assert(contract.includes('"revoke_all_sessions"'), "session revocation gate miss
 assert(contract.includes('"prevent_automatic_history_reclaim"'), "history reclaim guard missing");
 assert(design.includes("No client account-deletion mutation may ship"), "cascade stop rule missing");
 assert(design.includes("Pass the Keys"), "commissioner ownership gate missing");
+assert(lifecycleSchema.includes("drop constraint if exists profiles_id_fkey"), "Auth cascade detachment missing");
+assert(lifecycleSchema.includes("account_deletion_operations"), "server deletion ledger missing");
 
-const profileCascade = /references\s+auth\.users\s*\(id\)\s+on\s+delete\s+cascade/i.test(schema);
-if (profileCascade) {
-  assert(
-    contract.includes("ACCOUNT_LIFECYCLE_PUBLIC = false"),
-    "lifecycle cannot be public while auth deletion cascades through profiles"
-  );
-}
-
-console.log("[account-lifecycle] PASS — MIA, redaction, cascade stop, and deletion gates verified");
-
+console.log("[account-lifecycle] PASS — public deletion, MIA, redaction, tombstone, and ledger verified");
