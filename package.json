@@ -17,6 +17,7 @@
     "verify:postseason-routes": "node scripts/verify-postseason-route-retirement.mjs",
     "verify:postseason-authority": "node scripts/verify-postseason-authority-sql.mjs",
     "verify:cfb-postseason-calendar": "node --import tsx scripts/verify-cfb-postseason-calendar.mjs",
+    "verify:cfb-weeks-15-20": "node --import tsx scripts/verify-cfb-weeks-15-20.mjs",
     "verify:cfb-season-closeout": "node scripts/verify-cfb-season-closeout.mjs",
     "verify:cfb-postseason-player": "node --import tsx scripts/verify-cfb-postseason-player.mjs",
     "verify:cfb-postseason-ops": "node scripts/verify-cfb-postseason-ops.mjs",
