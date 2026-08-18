@@ -60,5 +60,8 @@ assert(!infoPlist.includes("UIInterfaceOrientationLandscapeLeft") || infoPlist.i
 assert(submissionPacket.includes("Tracking: **No**"), "App Privacy tracking answer missing");
 assert(submissionPacket.includes("Gambling with real money or redeemable currency: **No**"), "real-money boundary missing");
 assert(submissionPacket.includes("Create a fictional, populated App Review league"), "review account owner action missing");
+assert(submissionPacket.includes("https://app.war-room-picks.com/support"), "App Store support URL is not on the dedicated app host");
+assert(submissionPacket.includes("https://app.war-room-picks.com/privacy"), "App Store privacy URL is not on the dedicated app host");
+assert(!submissionPacket.includes("https://www.war-room-picks.com"), "App Store packet points back to the storefront");
 
 console.log("[native-readiness] PASS — identity, links, safe areas, and free-1.0 Plus guard verified");
