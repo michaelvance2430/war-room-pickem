@@ -29,6 +29,7 @@ import {
   listPublishedWeekNumbers,
   listScoredWeekNumbers,
   loadWeekResultsFromCloud,
+  loadLeaguePlayers,
   cardRevision,
   type CloudCard,
 } from "@/lib/cloud";
@@ -186,6 +187,10 @@ export default function PicksClient() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [validationTarget, setValidationTarget] = useState<string | null>(null);
   const [leagueName, setLeagueName] = useState("");
+  const [seasonPointLedger, setSeasonPointLedger] = useState<{
+    earned: number;
+    deploymentCredit: number;
+  } | null>(null);
   const [cardNotice, setCardNotice] = useState<string | null>(null);
   /** Tooltip / flash when confidence tapped before a winner side */
   const [confTipGameId, setConfTipGameId] = useState<string | null>(null);
@@ -762,6 +767,27 @@ export default function PicksClient() {
       })
     );
   }, [hostCanBuild]);
+
+  // Weekly scorecards contain earned play only. Synthetic late-join credit is
+  // disclosed as a separate season ledger and never folded into this card.
+  useEffect(() => {
+    let cancelled = false;
+    const playerId = getSession()?.playerId;
+    if (!playerId) return;
+    void loadLeaguePlayers("Picks.scorecard-ledger").then((players) => {
+      if (cancelled) return;
+      const me = players.find((player) => player.id === playerId);
+      if (!me) return;
+      const deploymentCredit = Math.max(0, me.deploymentCredit || 0);
+      setSeasonPointLedger({
+        earned: Math.max(0, me.totalPoints - deploymentCredit),
+        deploymentCredit,
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // CFB favorite for restrained side accent (no pick/scoring side effects)
   useEffect(() => {
@@ -2099,6 +2125,16 @@ export default function PicksClient() {
                         : "Almost";
                     })()}
                   </p>
+                  {seasonPointLedger?.deploymentCredit ? (
+                    <p className="text-xs text-muted">
+                      Season ledger: {seasonPointLedger.earned} earned +{" "}
+                      <span className="font-semibold text-amber-300">
+                        {seasonPointLedger.deploymentCredit} Deployment Credit
+                      </span>
+                      . Credit is separate from this scorecard and cannot unlock awards.
+                    </p>
+                  ) : null}
+                  </div>
                 )}
               </div>
       <div className="flex flex-wrap gap-1.5 sm:gap-2 text-[11px] sm:text-xs">
@@ -2586,6 +2622,7 @@ export default function PicksClient() {
       </p>
                 )}
                 {myWeekScore && (
+                  <div className="space-y-1">
                   <p className="text-foreground font-medium">
                     Your score:{" "}
                     <span className="text-primary text-lg tabular-nums">
