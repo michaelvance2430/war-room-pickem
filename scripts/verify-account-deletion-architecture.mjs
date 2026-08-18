@@ -18,9 +18,10 @@ const policyOverlay = read("supabase/review-only/account-deletion/03-active-acco
 const serverRpcs = read("supabase/review-only/account-deletion/04-server-rpcs-REVIEW-ONLY.sql");
 const serverRpcHarness = read("supabase/review-only/account-deletion/05-server-rpc-test-harness.sql");
 const postseasonDeleteHarness = read("supabase/review-only/account-deletion/06-postseason-auth-delete-test-harness.sql");
+const productionPostverify = read("supabase/review-only/account-deletion/07-production-postverify-SELECT-ONLY.sql");
 const lifecycle = read("src/lib/account-lifecycle-contract.ts");
 
-assert(design.includes("No production mutation is authorized"), "review-only boundary missing");
+assert(design.includes("Production foundation applied"), "production lifecycle status is stale");
 assert(design.includes("Pass the Keys"), "commissioner transfer gate missing");
 assert(design.includes("is_active_account()"), "revoked-token authorization gate missing");
 assert(design.includes("replays the pre-deletion token"), "old access-token proof missing");
@@ -63,6 +64,7 @@ assert(serverRpcs.includes("deleting_auth_user"), "Auth deletion handoff stage i
 assert(serverRpcs.includes("delete from public.player_blocks"), "player blocks are missing from private-data deletion");
 assert(serverRpcs.includes("delete from public.player_reports where reporter_id"), "reports authored by the user are not deleted");
 assert(serverRpcs.includes("set resolved_by = null"), "staff resolution identity is not detached");
+assert(serverRpcs.includes("app.bypass_birthday_lock"), "permanent redaction cannot clear a hard-locked birthday");
 assert(preflight.includes("'reporter_id', 'reported_id', 'blocked_id', 'resolved_by'"), "player safety identity columns are missing from preflight");
 assert(serverRpcHarness.includes("authenticated role executed service-only deletion RPC"), "RPC privilege boundary is untested");
 assert(serverRpcHarness.includes("completed operation is not idempotent"), "RPC retry safety is untested");
@@ -70,5 +72,8 @@ assert(postseasonDeleteHarness.includes("delete from auth.users"), "real Auth de
 assert(postseasonDeleteHarness.includes("postseason entry cascaded"), "CFB postseason entry preservation is not tested");
 assert(postseasonDeleteHarness.includes("postseason scorecard cascaded"), "postseason scorecard preservation is not tested");
 assert(postseasonDeleteHarness.includes("rollback;"), "postseason deletion fixtures are not rolled back");
+assert(productionPostverify.includes("missingActivePolicies"), "production active-account policy proof missing");
+assert(productionPostverify.includes("profilesAuthFkExists"), "production Auth-cascade proof missing");
+assert(productionPostverify.includes("has_function_privilege"), "production deletion RPC ACL proof missing");
 
 console.log("[account-deletion-architecture] PASS — tombstone identity, inventory, revocation, and Foundry gates verified");
