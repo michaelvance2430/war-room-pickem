@@ -13,6 +13,10 @@
 - Terms: `https://app.war-room-picks.com/terms`
 - Community Standards: `https://app.war-room-picks.com/community`
 
+The dedicated host is a hard submission gate. Run
+`npm run verify:app-host-live`; DNS, HTTPS, policy pages, universal links, and
+storefront isolation must all pass before archiving the submission candidate.
+
 ## Suggested listing
 
 **Name:** War Room Pick'Em  
