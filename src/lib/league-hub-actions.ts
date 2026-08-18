@@ -9,11 +9,11 @@
  * signature scan layer; the button still says the verb.
  */
 
-import { createClient } from "@/lib/supabase/client";
-import type { LeagueMembership } from "@/lib/session-restore";
-import { normalizeSportId } from "@/lib/sports/registry";
-import type { SportId } from "@/lib/sports/types";
-import { weekTitle, seasonMaxWeek } from "@/lib/season-calendar";
+import { createClient } from "./supabase/client";
+import type { LeagueMembership } from "./session-restore";
+import { normalizeSportId } from "./sports/registry";
+import type { SportId } from "./sports/types";
+import { weekTitle, seasonMaxWeek } from "./season-calendar";
 import {
   membershipIsOps,
   resolveHostOpsMission,
