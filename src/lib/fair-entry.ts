@@ -15,7 +15,13 @@
 import { createClient } from "@/lib/supabase/client";
 import { getSession } from "@/lib/league";
 
-export type FairEntryBandId = "1-2" | "3-4" | "5-6" | "7-8" | "9+";
+export type FairEntryBandId =
+  | "1-2"
+  | "3-4"
+  | "5-6"
+  | "7-8"
+  | "9+"
+  | "deployment";
 
 export type FairEntryBandDef = {
   id: FairEntryBandId;
@@ -44,9 +50,9 @@ export const FAIR_ENTRY_BANDS: readonly FairEntryBandDef[] = [
 ] as const;
 
 export const FAIR_ENTRY_COPY = {
-  title: "Mid-Season Entry",
+  title: "Deployment Credit",
   body:
-    "War Room automatically places late arrivals in a fair starting position based on when they join the season. Early players keep the advantage they earned, while new players still have a meaningful chance to climb the standings.",
+    "Your standings include conservative credit based on each completed week's bottom 15%. It is shown separately from points you earn and cannot create retroactive wins, streaks, records, or cheevos.",
 } as const;
 
 type FairEntryStore = {
