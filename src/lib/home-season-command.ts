@@ -39,17 +39,21 @@ function personalCutStatus(opts: {
   playerId?: string | null;
   cutPercent: number;
   locked: boolean;
+  frozenField?: "championship" | "toilet" | "eliminated" | null;
 }): string | null {
   if (!opts.playerId || opts.players.length < 2) return null;
   const ranked = [...opts.players].sort((a, b) => b.totalPoints - a.totalPoints || a.name.localeCompare(b.name));
   const rank = ranked.findIndex((player) => player.id === opts.playerId) + 1;
   if (!rank) return null;
-  const championshipSeats = Math.max(1, Math.ceil(ranked.length * (1 - opts.cutPercent / 100)));
-  if (opts.locked) {
-    return rank <= championshipSeats
-      ? `#${rank} · CHAMPIONSHIP FIELD`
-      : `#${rank} · TOILET FIELD`;
+  if (opts.locked && opts.frozenField) {
+    if (opts.frozenField === "championship") {
+      return `#${rank} · CHAMPIONSHIP FIELD`;
+    }
+    if (opts.frozenField === "toilet") return `#${rank} · TOILET FIELD`;
+    return `#${rank} · POSTSEASON ELIMINATED`;
   }
+  const championshipSeats = Math.max(1, Math.ceil(ranked.length * (1 - opts.cutPercent / 100)));
+  if (opts.locked) return `#${rank} · FIELD PENDING AUTHORITY`;
   if (rank < championshipSeats) return `#${rank} · projected IN`;
   if (rank <= championshipSeats + 1) return `#${rank} · ON THE BUBBLE`;
   return `#${rank} · projected Toilet`; 
@@ -62,6 +66,7 @@ export function resolveHomeSeasonCommand(opts: {
   players?: SeasonCommandPlayer[];
   playerId?: string | null;
   cutPercent?: number;
+  frozenField?: "championship" | "toilet" | "eliminated" | null;
 }): HomeSeasonCommand {
   const players = opts.players || [];
   const story = weeklyStory(players);
@@ -70,6 +75,7 @@ export function resolveHomeSeasonCommand(opts: {
     playerId: opts.playerId,
     cutPercent: opts.cutPercent ?? 50,
     locked: opts.week > opts.cutWeek,
+    frozenField: opts.frozenField,
   });
 
   if (opts.week >= opts.finalWeek) {
