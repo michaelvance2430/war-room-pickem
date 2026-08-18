@@ -61,6 +61,7 @@
     "verify:one-click-scoring": "node --import tsx scripts/verify-one-click-scoring.mjs",
     "verify:atomic-week-rescore": "node scripts/verify-atomic-week-rescore.mjs",
     "verify:deployment-credit": "node --import tsx scripts/verify-deployment-credit.mjs && node scripts/verify-deployment-credit-sql.mjs",
+    "verify:late-join-lifecycle": "node --import tsx scripts/verify-late-join-lifecycle.mjs",
     "verify:native-readiness": "node scripts/verify-native-readiness.mjs && node scripts/verify-universal-links.mjs",
     "verify:app-host-live": "node scripts/verify-dedicated-app-host-live.mjs",
     "verify:universal-links": "node scripts/verify-universal-links.mjs",
