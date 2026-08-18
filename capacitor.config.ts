@@ -5,9 +5,9 @@ const config: CapacitorConfig = {
   appName: "War Room Pick'Em",
   webDir: "public",
   server: {
-    url: "https://www.war-room-picks.com",
+    url: "https://app.war-room-picks.com",
     cleartext: false,
-    allowNavigation: ["www.war-room-picks.com", "war-room-picks.com"],
+    allowNavigation: ["app.war-room-picks.com"],
   },
   ios: {
     contentInset: "automatic",
