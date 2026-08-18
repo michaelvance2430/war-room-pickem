@@ -2,7 +2,7 @@
  * Public product default: hard league capacity.
  *
  * Why 32: 50% cut → 16-team Championship + 16-team Toilet Bowl.
- * 16-team single-elim = 4 rounds = CFP weeks 15–18. Larger fields need a
+ * 16-team single-elim = 4 rounds = CFP weeks 17–20. Larger fields need a
  * 5th+ round the season calendar doesn't have (and seed placement degrades).
  */
 export const MAX_LEAGUE_PLAYERS = 32;
