@@ -34,10 +34,11 @@ begin
     v_league, v_departing, 2026, '{"bowl-1":"home"}'::jsonb
   );
   insert into public.postseason_scorecards (
-    league_id, user_id, season_key, week_number, components
+    league_id, user_id, season_key, week_number, phase, components,
+    weekly_total, season_total_before, season_total_after
   ) values (
-    v_league, v_departing, 2026, 16,
-    '[{"label":"Bowl","points":8}]'::jsonb
+    v_league, v_departing, 2026, 16, 'bowl_opening',
+    '[{"label":"Bowl","points":8}]'::jsonb, 8, 20, 28
   );
 
   delete from auth.users where id = v_departing;
