@@ -9,6 +9,7 @@ const picks = fs.readFileSync(new URL("../src/app/picks/PicksClient.tsx", import
 const policySql = fs.readFileSync(new URL("../supabase/deployment-credit-policy-v2.sql", import.meta.url), "utf8");
 const joinPage = fs.readFileSync(new URL("../src/app/join/page.tsx", import.meta.url), "utf8");
 const membershipClient = fs.readFileSync(new URL("../src/lib/d1b-b-membership.ts", import.meta.url), "utf8");
+const noticeState = fs.readFileSync(new URL("../src/lib/fair-entry.ts", import.meta.url), "utf8");
 
 for (const fragment of [
   "late_join_policy",
@@ -52,5 +53,7 @@ assert.ok(joinPage.includes("Zero Backfill") && joinPage.includes("Closed Roster
 assert.ok(membershipClient.includes("p_late_join_policy"), "client must send the policy into atomic create");
 assert.ok(!cloud.includes("freezeFairEntryAfterScore"), "scoring must not write obsolete browser percentile freezes");
 assert.ok(joinPage.includes('bandId: "deployment"'), "Week 0 and later joiners must receive the Deployment Credit notice");
+assert.ok(!noticeState.includes("percentileValue"), "browser must not retain the obsolete percentile calculator");
+assert.ok(!noticeState.includes("createClient"), "browser notice state must never write standings credit");
 
 console.log("Deployment Credit SQL contract PASS");
