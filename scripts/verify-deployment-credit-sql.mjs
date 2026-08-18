@@ -47,5 +47,7 @@ assert.ok(policySql.includes("if coalesce(p_list_as_open, false)"), "public room
 assert.ok(joinPage.includes("Late-join rule · locked at creation"), "league creation must explain immutable policy");
 assert.ok(joinPage.includes("Zero Backfill") && joinPage.includes("Closed Roster"), "private policy choices must be visible");
 assert.ok(membershipClient.includes("p_late_join_policy"), "client must send the policy into atomic create");
+assert.ok(!cloud.includes("freezeFairEntryAfterScore"), "scoring must not write obsolete browser percentile freezes");
+assert.ok(joinPage.includes('bandId: "deployment"'), "Week 0 and later joiners must receive the Deployment Credit notice");
 
 console.log("Deployment Credit SQL contract PASS");
