@@ -1,6 +1,6 @@
 # War Room Account Deletion Architecture
 
-**Status:** Review-only design. No production mutation is authorized.
+**Status:** Production foundation applied; public feature remains gated pending full Admin API, Storage, and physical-device proof.
 
 ## Decision
 
@@ -173,3 +173,20 @@ A new rollback harness deleted a real disposable `auth.users` row and proved
 that its profile, Bowl/CFP entry, and postseason scorecard all survived. This
 closes the current CFB-history cascade gap; production activation and the full
 Admin API/Storage/device proof remain separate gates.
+
+## Production foundation — 2026-08-18
+
+After explicit approval, the lifecycle schema, active-account policy overlay,
+postseason tombstone foreign keys, and service-only RPCs were applied to the
+live project. Live rollback harnesses exposed and then closed one additional
+drift: the birthday hard-lock now accepts a transaction-local bypass only from
+the service deletion workflow, allowing private birthday data to be erased.
+
+All three live rollback harnesses now pass. Production verification confirms
+44 of 44 RLS tables carry the restrictive active-account policy; deletion RPCs
+are executable by `service_role` and not by `anon` or `authenticated`; the
+profile-to-Auth cascade is gone; postseason entries and scorecards reference
+durable profiles with `ON DELETE RESTRICT`; and all 468 existing profiles remain
+active with league, membership, score, postseason-entry, and scorecard counts
+unchanged. The public flag intentionally remains off until a disposable real
+account completes the Admin API, object-storage, old-token, and device flow.
