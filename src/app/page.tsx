@@ -858,7 +858,6 @@ export default function Home() {
                 </p>
       </Link>
 
-
               <Link
                 href="/trophy-room"
                 className="group rounded-xl border border-amber-400/30 bg-black/40 backdrop-blur-sm p-6 hover:border-amber-300/60 hover:bg-amber-400/10 transition shadow-[0_0_40px_rgba(251,191,36,0.08)]"
