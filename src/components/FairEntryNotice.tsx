@@ -64,7 +64,7 @@ export default function FairEntryNotice() {
         <div className="h-1.5 w-full bg-gradient-to-r from-primary via-sky-400 to-amber-400" />
         <div className="px-5 pt-5 pb-3 text-center border-b border-border">
           <p className="text-[10px] uppercase tracking-[0.2em] text-primary font-bold mb-2">
-            Deployment Credit
+            Late-join standings
           </p>
           <h2
             id="fair-entry-title"
