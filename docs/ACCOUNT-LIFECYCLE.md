@@ -1,6 +1,6 @@
 # War Room Account Lifecycle
 
-**Status:** Binding product contract; implementation intentionally gated  
+**Status:** Binding product contract; production foundation verified and public entry enabled
 **Decision:** MIA is reversible. Dossier destruction is permanent. Competitive receipts survive anonymously.
 
 ## Player-facing exits
@@ -47,15 +47,15 @@ Public historical examples:
 - `[REDACTED] finished 3rd with 184 points.`
 - `Former player · dossier destroyed`
 
-## Current schema blocker
+## Historical schema blocker — resolved August 18, 2026
 
-The current model ties `public.profiles.id` directly to `auth.users.id` with
+The original model tied `public.profiles.id` directly to `auth.users.id` with
 `ON DELETE CASCADE`. Leagues, memberships, picks, Locker messages, Crystal Ball
 picks, and other records also reference profiles with cascading deletes. Deleting
 the Auth user today can therefore erase the receipts and may erase an entire
 commissioner-owned league.
 
-No client account-deletion mutation may ship against that model.
+No client account-deletion mutation may ship against that model. Production now detaches the Auth foreign key, preserves a durable redacted profile tombstone, blocks non-active JWTs through restrictive RLS policies, and restricts deletion RPCs to the service role.
 
 ## Required target model
 
@@ -82,7 +82,7 @@ history.
 - Historical UI consistently renders `[REDACTED]` without leaking old aliases,
   avatars, Gazette text, share cards, logs, or cached client state.
 - Account deletion succeeds on a physical iPhone and meets App Review behavior.
-- `ACCOUNT_LIFECYCLE_PUBLIC` remains `false` until every gate passes.
+- `ACCOUNT_LIFECYCLE_PUBLIC` may remain `true` only while the production post-verification and App Review regression gates pass.
 
 ## August 13, 2026 production audit
 
