@@ -864,7 +864,15 @@ export default function StandingsPage() {
                             )}
                           </td>
                           <td className="px-3 sm:px-4 py-3.5 text-right font-semibold align-middle text-base">
-                            {player.totalPoints}
+                            <span className="block">{player.totalPoints}</span>
+                            {!!player.deploymentCredit && (
+                              <span
+                                className="block text-[9px] font-bold uppercase tracking-[0.08em] text-amber-300"
+                                title={`${player.totalPoints - player.deploymentCredit} earned points + ${player.deploymentCredit} Deployment Credit`}
+                              >
+                                {player.totalPoints - player.deploymentCredit} earned + {player.deploymentCredit} DC
+                              </span>
+                            )}
                           </td>
                           <td className="px-4 py-3.5 text-right text-muted hidden sm:table-cell align-middle">
                             {atsPct(player)}
