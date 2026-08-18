@@ -1,5 +1,6 @@
 -- Server-only account deletion transaction boundaries.
--- REVIEW ONLY. These RPCs are callable by service_role only.
+-- Applied to production after refreshed branch and live rollback proof on 2026-08-18.
+-- These RPCs are callable by service_role only.
 
 create or replace function private.redact_jsonb_text(
   p_value jsonb,
@@ -207,6 +208,10 @@ begin
       open_room_nudge_pending = false,
       open_room_nudge_at = null
   where open_room_nudge_left_name = v_name;
+
+  -- Birthday is deliberately immutable through normal account/profile paths.
+  -- Permanent service-side redaction is the one authorized exception.
+  perform set_config('app.bypass_birthday_lock', '1', true);
 
   update public.profiles
   set display_name = '[REDACTED]',
