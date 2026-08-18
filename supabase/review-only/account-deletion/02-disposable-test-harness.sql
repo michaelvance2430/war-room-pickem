@@ -116,6 +116,7 @@ begin
 
   -- Redact identity, but never delete the durable participant row.
   set local role service_role;
+  perform set_config('app.bypass_birthday_lock', '1', true);
   update public.profiles
   set
     display_name = '[REDACTED]',
