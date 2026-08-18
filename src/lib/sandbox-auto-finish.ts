@@ -139,7 +139,7 @@ export async function autoFinishRemainingWeeks(opts?: {
       message:
         sportId === "nfl"
           ? "Every NFL week (1–22) is already scored. Season complete — check Champ / Toilet / Trophies."
-          : "Every week 0–18 is already scored. Season complete — check Champ / Toilet / Trophies.",
+          : "Every week 0–20 is already scored. Season complete — check Champ / Toilet / Trophies.",
     };
   }
 
