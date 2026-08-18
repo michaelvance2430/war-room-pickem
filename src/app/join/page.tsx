@@ -389,25 +389,16 @@ function JoinPageInner() {
         "cfb";
       const joinPack = getSportPack(joinedSportId);
 
-      // Fair Entry notice only — server already wrote total_points inside join RPC
+      // Deployment Credit notice only — server already wrote the separate credit
       const startPts = joined.totalPoints ?? 0;
       if (startPts > 0 && !joined.alreadyMember) {
         try {
-          const { markFairEntryPendingNotice, bandForLatestScoredWeek } =
+          const { markFairEntryPendingNotice } =
             await import("@/lib/fair-entry");
-          const { listScoredWeekNumbers } = await import("@/lib/cloud");
-          const scored = await listScoredWeekNumbers();
-          const latest =
-            scored.length > 0
-              ? Math.max(...scored.filter((w) => w >= 0))
-              : null;
-          const band = bandForLatestScoredWeek(latest);
-          if (band) {
-            markFairEntryPendingNotice(leagueId, userId, {
-              points: startPts,
-              bandId: band.id,
-            });
-          }
+          markFairEntryPendingNotice(leagueId, userId, {
+            points: startPts,
+            bandId: "deployment",
+          });
         } catch {
           /* ignore */
         }
