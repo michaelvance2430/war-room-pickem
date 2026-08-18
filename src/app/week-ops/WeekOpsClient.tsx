@@ -43,6 +43,12 @@ import {
 } from "@/lib/prop-presets";
 import type { GameResult } from "@/lib/scoring";
 import {
+  buildResultsFromScores,
+  fetchFootballScores,
+  type FinalBoxScore,
+} from "@/lib/scores";
+import { settlePropFromScores } from "@/lib/prop-settle";
+import {
   loadLeagueFavoriteTeamCounts,
   resolveGameLeagueInterest,
   sortGamesByLeagueInterest,
@@ -122,6 +128,9 @@ export default function WeekOpsClient() {
   const [scoreCard, setScoreCard] = useState<CloudCard | null>(null);
   const [results, setResults] = useState<Record<string, GameResult>>({});
   const [propResult, setPropResult] = useState<string | null>(null);
+  const [finalBoxes, setFinalBoxes] = useState<FinalBoxScore[]>([]);
+  const [scoreSyncReport, setScoreSyncReport] = useState<string | null>(null);
+  const [manualCorrections, setManualCorrections] = useState<string[]>([]);
   const [doneLabel, setDoneLabel] = useState("");
   /** First-hour host: room just set, or first card path */
   const [roomJustReady, setRoomJustReady] = useState<string | null>(null);
@@ -364,6 +373,7 @@ export default function WeekOpsClient() {
         prop: scoreCard.prop,
         results,
         propResult,
+        finalBoxes,
       });
       if (!res.ok) {
         setError(res.error || "Score failed");
@@ -373,6 +383,44 @@ export default function WeekOpsClient() {
       setStep("done");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Score failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function fetchFinalScores() {
+    if (!scoreCard?.games?.length) return;
+    setBusy(true);
+    setError(null);
+    setScoreSyncReport(null);
+    try {
+      const response = await fetchFootballScores(
+        sportId === "nfl" ? "nfl" : "cfb",
+        3
+      );
+      const built = buildResultsFromScores(scoreCard.games, response.events);
+      setResults((current) => ({ ...current, ...built.results }));
+      setFinalBoxes(built.boxes);
+      setManualCorrections([]);
+
+      const settled = settlePropFromScores({
+        prop: scoreCard.prop,
+        games: scoreCard.games,
+        boxes: built.boxes,
+      });
+      if (settled.status === "settled" && settled.propResult) {
+        setPropResult(settled.propResult);
+      }
+
+      setScoreSyncReport(
+        built.pending
+          ? `${built.filled} final · ${built.pending} pending or unmatched. Fill the rest manually.`
+          : `${built.filled} finals loaded. Review every cover before scoring.`
+      );
+    } catch (e) {
+      setError(
+        `${e instanceof Error ? e.message : "Final-score retrieval failed"} Manual scoring remains available below.`
+      );
     } finally {
       setBusy(false);
     }
@@ -488,6 +536,27 @@ export default function WeekOpsClient() {
         {/* ── SCORE ───────────────────────────────────────────── */}
         {step === "score" && scoreCard && (
           <div className="space-y-3">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void fetchFinalScores()}
+              className="w-full min-h-[52px] rounded-xl border-2 border-primary bg-primary/10 text-primary font-extrabold disabled:opacity-50"
+            >
+              {busy ? "Fetching finals…" : "Fetch Final Scores"}
+            </button>
+            <p className="text-xs text-muted">
+              One tap fills completed games. Every result remains editable before you score.
+            </p>
+            {scoreSyncReport && (
+              <p className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-primary">
+                {scoreSyncReport}
+              </p>
+            )}
+            {manualCorrections.length > 0 && (
+              <p className="rounded-lg border border-amber-300/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-200">
+                Manual correction applied to {manualCorrections.length} game{manualCorrections.length === 1 ? "" : "s"}. Imported box scores for those games will not be archived.
+              </p>
+            )}
             <p className="text-sm font-bold">Score covers</p>
             {scoreCard.games.map((g) => {
               const r = results[g.id];
@@ -511,15 +580,19 @@ export default function WeekOpsClient() {
                       <button
                         key={w}
                         type="button"
-                        onClick={() =>
+                        onClick={() => {
+                          setFinalBoxes((boxes) => boxes.filter((box) => box.gameId !== g.id));
+                          setManualCorrections((ids) =>
+                            ids.includes(g.id) ? ids : [...ids, g.id]
+                          );
                           setResults((prev) => ({
                             ...prev,
                             [g.id]: {
                               gameId: g.id,
                               winner: w as "home" | "away" | "push",
                             },
-                          }))
-                        }
+                          }));
+                        }}
                         className={`px-3 py-2 rounded-lg text-xs font-bold min-h-[40px] ${
                           r?.winner === w
                             ? "bg-primary text-black"
