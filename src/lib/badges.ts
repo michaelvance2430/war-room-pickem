@@ -1631,7 +1631,7 @@ function evaluateBadge(
     }
 
     case "the_closer":
-      // CFP weeks 15–18: any solid score on late weeks
+      // CFB postseason: any solid score from Bowl Selection onward (Weeks 15–20).
       return {
         earned: weeklyArr(player).some(
           (pts, i) => i >= 15 && (pts || 0) >= 10
