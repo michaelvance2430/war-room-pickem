@@ -22,6 +22,28 @@ export type FrozenPostseasonSnapshot = {
   participants: FrozenPostseasonParticipant[];
 };
 
+/**
+ * Certified weeks that may advance a league bracket. Regular cards live in
+ * week_results; the bowl/CFP engine writes durable postseason_scorecards.
+ */
+export async function listBracketScoredWeekNumbers(): Promise<number[]> {
+  const leagueId = getSession()?.leagueId;
+  if (!leagueId) return [];
+  const { listScoredWeekNumbers } = await import("@/lib/cloud");
+  const regular = await listScoredWeekNumbers().catch(() => [] as number[]);
+  const { data, error } = await createClient()
+    .from("postseason_scorecards")
+    .select("week_number")
+    .eq("league_id", leagueId);
+  if (error) return regular;
+  return [...new Set([
+    ...regular,
+    ...(data || []).map((row) => Number(row.week_number)),
+  ])]
+    .filter(Number.isFinite)
+    .sort((a, b) => a - b);
+}
+
 /** Read-only authoritative cut snapshot. Missing schema/snapshot fails closed. */
 export async function loadFrozenPostseasonSnapshot(
   seasonKey = canonicalSeasonKey()
