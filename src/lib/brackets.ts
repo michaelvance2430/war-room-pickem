@@ -279,7 +279,12 @@ function weekPoints(player: Player | null | undefined, week: number): number {
   return w[week] || 0;
 }
 
-/** True if league marked week scored OR anyone has a weekly slot at that index. */
+/**
+ * True if the league certified the week, or legacy/local data contains an
+ * actual non-zero score. Merely pre-sizing weeklyPoints with future zeroes must
+ * never advance a bracket early. A legitimately all-zero week still advances
+ * through the authoritative scored-week record.
+ */
 function weekIsPlayable(
   week: number,
   scored: Set<number>,
@@ -288,7 +293,7 @@ function weekIsPlayable(
   if (scored.has(week)) return true;
   return players.some((p) => {
     const w = normalizeWeeklyPoints(p.weeklyPoints);
-    return w.length > week;
+    return w.length > week && Number(w[week]) !== 0;
   });
 }
 
