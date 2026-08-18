@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { getSession } from "@/lib/league";
 import {
   CFB_CFP_GAME_ORDER,
   cfpMatchups,
@@ -23,12 +24,14 @@ export default function CfbPostseasonPage() {
   const [allocations, setAllocations] = useState<Record<string, number>>({});
   const [cfpPicks, setCfpPicks] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+  const [canOperate, setCanOperate] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    setCanOperate(!!getSession()?.isCommissioner);
     void Promise.all([loadCfbPostseasonSlate(), loadMyCfbPostseasonEntry()])
       .then(([nextSlate, nextEntry]) => {
         if (cancelled) return;
@@ -106,6 +109,7 @@ export default function CfbPostseasonPage() {
         <p className="text-[10px] font-black uppercase tracking-[.2em] text-amber-300">CFB postseason</p>
         <h1 className="mt-1 text-3xl font-black">Selection is not final</h1>
         <p className="mt-3 text-sm leading-relaxed text-muted">The commissioner has not published the 25-bowl board and 12-team CFP field yet. This page will open for every league member from the same cloud slate.</p>
+        {canOperate && <Link href="/postseason-ops" className="mt-6 flex min-h-12 items-center justify-center rounded-xl bg-amber-300 font-black text-black">Build Postseason Field</Link>}
         <Link href="/" className="mt-6 flex min-h-12 items-center justify-center rounded-xl border border-border font-bold">Return Home</Link>
       </main>
     );
@@ -121,6 +125,7 @@ export default function CfbPostseasonPage() {
           <Link href="/championship" className="rounded-xl border border-primary/35 p-2 text-primary">Championship</Link>
           <Link href="/toilet-bowl" className="rounded-xl border border-toilet/35 p-2 text-toilet">Toilet Bowl</Link>
         </div>
+        {canOperate && <Link href="/postseason-ops" className="mt-2 flex min-h-11 items-center justify-center rounded-xl bg-amber-300 font-black text-black">Commissioner Postseason Ops</Link>}
       </header>
 
       <nav className="mt-4 grid grid-cols-2 gap-2" aria-label="Postseason pick sections">
