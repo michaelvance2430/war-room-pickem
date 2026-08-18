@@ -2577,13 +2577,6 @@ export async function saveResultsAndScoreWeek(opts: {
   } catch {
     /* best-effort */
   }
-  try {
-    const { freezeFairEntryAfterScore } = await import("./fair-entry");
-    await freezeFairEntryAfterScore(opts.weekNumber, session.leagueId);
-  } catch {
-    /* best-effort */
-  }
-
   return {
     ok: true,
     scoredCount: payload.scoredCount || 0,
@@ -3008,14 +3001,6 @@ export async function saveResultsAndScoreWeekLegacyUnsafe(opts: {
     const { autoEngraveAllTrophies } = await import("./auto-trophies");
     const players = await loadLeaguePlayers("scoreWeek.autoTrophies");
     await autoEngraveAllTrophies({ weekNumber, players });
-  } catch {
-    /* best-effort */
-  }
-
-  // Fair Entry — freeze join bands after official score (idempotent)
-  try {
-    const { freezeFairEntryAfterScore } = await import("./fair-entry");
-    await freezeFairEntryAfterScore(weekNumber, leagueId);
   } catch {
     /* best-effort */
   }
