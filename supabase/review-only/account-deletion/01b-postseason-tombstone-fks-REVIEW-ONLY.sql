@@ -1,5 +1,5 @@
 -- Account deletion postseason history boundary.
--- REVIEW ONLY until the refreshed disposable branch passes every deletion gate.
+-- Applied to production after refreshed branch proof on 2026-08-18.
 
 begin;
 
