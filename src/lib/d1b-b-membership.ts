@@ -16,6 +16,7 @@
 
 import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
 import { leagueFullMessage } from "@/lib/league-limits";
+import type { DeploymentCreditPolicy } from "@/lib/deployment-credit";
 
 /** Stable server error tokens from d1b_b_raise */
 export type D1bBErrorCode =
@@ -50,6 +51,7 @@ export type CreateLeagueResult =
       maxHumanMembers: number;
       isOpen: boolean;
       currentWeek: number;
+      lateJoinPolicy: DeploymentCreditPolicy;
     }
   | D1bBAppError;
 
@@ -305,6 +307,7 @@ export async function createLeagueWithCommissionerSeat(input: {
   currentWeek?: number;
   cutPercent?: number;
   maxHumanMembers?: number;
+  lateJoinPolicy?: DeploymentCreditPolicy;
 }): Promise<CreateLeagueResult> {
   if (!hasSupabaseConfig()) return configError();
   const supabase = createClient();
@@ -318,6 +321,10 @@ export async function createLeagueWithCommissionerSeat(input: {
       p_current_week: input.currentWeek ?? 0,
       p_cut_percent: input.cutPercent ?? 50,
       p_max_human_members: input.maxHumanMembers ?? 32,
+      p_late_join_policy:
+        input.listAsOpen === true
+          ? "reinforcement_credit"
+          : input.lateJoinPolicy ?? "reinforcement_credit",
     }
   );
 
@@ -351,6 +358,9 @@ export async function createLeagueWithCommissionerSeat(input: {
     maxHumanMembers: Number(row.max_human_members ?? 32),
     isOpen: row.is_open === true,
     currentWeek: Number(row.current_week ?? input.currentWeek ?? 0),
+    lateJoinPolicy: String(
+      row.late_join_policy || input.lateJoinPolicy || "reinforcement_credit"
+    ) as DeploymentCreditPolicy,
   };
 }
 
