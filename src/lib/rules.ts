@@ -96,7 +96,8 @@ const SEASON_CFB: RuleSection = {
     "Week 0 may contain a real scored card. It does not independently trigger the championship cut.",
     "Chase points through the regular season into Conference Championships (Week 14).",
     "After that week is scored, the field splits at your league’s cut line — Championship bracket vs Toilet Bowl.",
-    "CFP weeks (15–18): still pick; higher weekly score advances your bracket matchup.",
+    "Week 15 opens bowl selection. Bowl scoring begins Week 16.",
+    "CFP weeks (17–20): higher weekly score advances your Championship or Toilet Bowl matchup.",
     "Hardware lives in the Trophy Room after the season.",
   ],
 };
