@@ -600,7 +600,10 @@ export default function StandingsPage() {
         {!loading && players.length > 0 && (
           <>
             {postseasonFieldById && (
-              <nav className="mb-4 grid grid-cols-2 gap-2" aria-label="Postseason brackets">
+              <nav className="mb-4 grid grid-cols-3 gap-2" aria-label="Postseason command">
+                <a href="/postseason" className="min-h-12 rounded-xl border border-amber-300/45 bg-amber-300/10 px-2 py-3 text-center text-xs font-black text-amber-200">
+                  Bowl + CFP Picks
+                </a>
                 <a href="/championship" className="min-h-12 rounded-xl border border-primary/45 bg-primary/10 px-3 py-3 text-center text-sm font-black text-primary">
                   Championship
                 </a>
