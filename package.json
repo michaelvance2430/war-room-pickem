@@ -56,6 +56,7 @@
     "verify:dispatch-newsroom": "node --import tsx scripts/verify-dispatch-newsroom.mjs",
     "verify:season-opening": "node scripts/verify-season-opening-controls.mjs",
     "verify:lock-clock": "node scripts/verify-lock-clock-surfaces.mjs",
+    "verify:failure-surfaces": "node scripts/verify-app-failure-surfaces.mjs",
     "verify:commissioner-journey": "node --import tsx scripts/verify-commissioner-journey.mjs",
     "verify:one-click-scoring": "node --import tsx scripts/verify-one-click-scoring.mjs",
     "verify:atomic-week-rescore": "node scripts/verify-atomic-week-rescore.mjs",
