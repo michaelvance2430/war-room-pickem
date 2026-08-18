@@ -6,6 +6,7 @@ const checks = [
   ["Foundry reset", "scripts/verify-foundry-reset-sql.mjs"],
   ["Foundry CFB certification transition", "scripts/verify-foundry-cfb-certification-v2.mjs"],
   ["kickoff locks and reveal", "scripts/verify-lock-clock-surfaces.mjs"],
+  ["app failure and recovery surfaces", "scripts/verify-app-failure-surfaces.mjs"],
   ["CFB calendar", "scripts/verify-cfb-postseason-calendar.mjs", true],
   ["Weeks 15–20 progression", "scripts/verify-cfb-weeks-15-20.mjs", true],
   ["postseason partition", "scripts/verify-postseason-ps1.mjs", true],
