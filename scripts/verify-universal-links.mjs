@@ -14,8 +14,9 @@ const associationRoute = read("src/app/.well-known/apple-app-site-association/ro
 const nativeRuntime = read("src/components/NativeRuntime.tsx");
 
 assert(entitlements.includes("com.apple.developer.associated-domains"), "Associated Domains entitlement missing");
-assert(entitlements.includes("applinks:www.war-room-picks.com"), "canonical universal-link host missing");
-assert(entitlements.includes("applinks:war-room-picks.com"), "apex universal-link host missing");
+assert(entitlements.includes("applinks:app.war-room-picks.com"), "dedicated app universal-link host missing");
+assert(!entitlements.includes("applinks:www.war-room-picks.com"), "storefront must not open the app");
+assert(!entitlements.includes("applinks:war-room-picks.com"), "apex storefront must not open the app");
 assert(xcodeProject.match(/CODE_SIGN_ENTITLEMENTS = App\/App\.entitlements;/g)?.length === 2, "entitlements are not attached to both app build configurations");
 assert(associationRoute.includes('const teamId = "XWW458P3J7"'), "AASA route is not bound to the enrolled Apple Team ID");
 assert(associationRoute.includes('const bundleId = "com.warroompicks.app"'), "AASA bundle ID drifted");
