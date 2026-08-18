@@ -3029,6 +3029,9 @@ type StandingsCloudRow = {
   avatarUrl: string | null;
   division: string;
   totalPoints: number;
+  deploymentCredit: number;
+  deploymentCreditBreakdown: import("./types").Player["deploymentCreditBreakdown"];
+  eligibleFromWeek: number;
   weeklyPoints: number[];
   atsCorrect: number;
   atsTotal: number;
@@ -3104,6 +3107,11 @@ function mapStandingsRows(rows: Record<string, unknown>[]): StandingsCloudRow[] 
           avatarUrl: (profile?.avatar_url as string | null) || null,
           division: (m.division as string) || "North",
           totalPoints: (m.total_points as number) || 0,
+          deploymentCredit: (m.deployment_credit as number) || 0,
+          deploymentCreditBreakdown: Array.isArray(m.deployment_credit_breakdown)
+            ? (m.deployment_credit_breakdown as StandingsCloudRow["deploymentCreditBreakdown"])
+            : [],
+          eligibleFromWeek: (m.eligible_from_week as number) || 0,
           weeklyPoints: normalizeWeeklyPointsField(m.weekly_points),
           atsCorrect: (m.ats_correct as number) || 0,
           atsTotal: (m.ats_total as number) || 0,
@@ -3399,6 +3407,9 @@ async function fetchLeaguePlayersNetwork(
         division:
           (c.division as import("./types").Player["division"]) || "North",
         totalPoints: c.totalPoints,
+        deploymentCredit: c.deploymentCredit,
+        deploymentCreditBreakdown: c.deploymentCreditBreakdown,
+        eligibleFromWeek: c.eligibleFromWeek,
         weeklyPoints: c.weeklyPoints || [],
         atsCorrect: c.atsCorrect,
         atsTotal: c.atsTotal,
@@ -3469,6 +3480,8 @@ export type LeagueRosterMember = {
   division: "North" | "South" | "East" | "West";
   role: "commissioner" | "player";
   totalPoints: number;
+  deploymentCredit?: number;
+  eligibleFromWeek?: number;
   avatarUrl?: string | null;
   isBot?: boolean;
   isModerator?: boolean;
@@ -3874,14 +3887,14 @@ async function loadLeagueRosterFresh(
     const res = await supabase
       .from("memberships")
       .select(
-        "id, user_id, role, division, total_points, joined_at, is_bot, is_moderator, locker_muted, is_deputy, display_name_override, profiles(display_name, avatar_url)"
+        "id, user_id, role, division, total_points, deployment_credit, eligible_from_week, joined_at, is_bot, is_moderator, locker_muted, is_deputy, display_name_override, profiles(display_name, avatar_url)"
       )
       .eq("league_id", leagueId);
     if (res.error && /is_bot|display_name_override|schema cache|column/i.test(res.error.message || "")) {
       const res2 = await supabase
         .from("memberships")
         .select(
-          "id, user_id, role, division, total_points, joined_at, is_bot, is_moderator, locker_muted, is_deputy, profiles(display_name, avatar_url)"
+          "id, user_id, role, division, total_points, deployment_credit, eligible_from_week, joined_at, is_bot, is_moderator, locker_muted, is_deputy, profiles(display_name, avatar_url)"
         )
         .eq("league_id", leagueId);
       if (res2.error) {
@@ -3944,6 +3957,8 @@ async function loadLeagueRosterFresh(
         division,
         role,
         totalPoints: (m.total_points as number) || 0,
+        deploymentCredit: (m.deployment_credit as number) || 0,
+        eligibleFromWeek: (m.eligible_from_week as number) || 0,
         avatarUrl: profile?.avatar_url || null,
         isBot: !!m.is_bot,
         isModerator: !!m.is_moderator,
