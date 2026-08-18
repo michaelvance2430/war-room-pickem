@@ -663,35 +663,12 @@ export default function Home() {
         {/* Mid-season join — Fair Entry explanation (no point math) */}
         <FairEntryNotice />
 
-        {firstWeekChrome && (
+        {firstWeekChrome && isCommish && (
           <p className="text-xs text-muted mb-4 leading-relaxed max-w-xl -mt-1">
-            {isCommish ? (
-              <>
-                You&apos;re the host — follow{" "}
-                <strong className="text-foreground">Start here</strong> one
-                step at a time. No trophies or papers until someone locks.
-                Yes, including you.
-              </>
-            ) : liveCard === false ? (
-              <>
-                First ten minutes:{" "}
-                <strong className="text-foreground">
-                  you&apos;re seated — waiting on the card
-                </strong>
-                . Your commish hasn&apos;t published yet. Hang in the Locker;
-                when a card drops, open My Picks and lock before kickoff. That
-                becomes the whole movie.
-              </>
-            ) : (
-              <>
-                First ten minutes:{" "}
-                <strong className="text-foreground">
-                  open My Picks and lock before kickoff
-                </strong>
-                . That&apos;s the whole movie. Everything flashy waits until you
-                prove you can press one button.
-              </>
-            )}
+            You&apos;re the host — follow{" "}
+            <strong className="text-foreground">Start here</strong> one step at
+            a time. No trophies or papers until someone locks. Yes, including
+            you.
           </p>
         )}
         {/* Real moments only — paper when it is real. No manufactured busywork. */}
@@ -719,22 +696,8 @@ export default function Home() {
                   </p>
                 </Link>
                 <Link
-                  href="/picks"
-                  className="group rounded-xl border border-border/80 bg-black/40 p-5 hover:border-primary/40 transition"
-                >
-                  <div className="text-xs uppercase tracking-wider text-muted mb-1">
-                    Later
-                  </div>
-                  <div className="text-base font-semibold text-white">
-                    My Picks
-                  </div>
-                  <p className="text-xs text-muted mt-1">
-                    Check if a card went live
-                  </p>
-                </Link>
-                <Link
                   href="/rules"
-                  className="group rounded-xl border border-border/80 bg-black/40 p-5 hover:border-primary/40 transition"
+                  className="group rounded-xl border border-border/80 bg-black/40 p-5 hover:border-primary/40 transition sm:col-span-2"
                 >
                   <div className="text-xs uppercase tracking-wider text-muted mb-1">
                     Optional
@@ -746,22 +709,24 @@ export default function Home() {
               </>
             ) : (
               <>
-                <Link
-                  href="/picks"
-                  className="group rounded-xl border-2 border-primary/50 bg-primary/10 p-5 hover:border-primary transition sm:col-span-2"
-                >
-                  <div className="text-xs uppercase tracking-wider text-primary mb-1">
-                    Do this
-                  </div>
-                  <div className="text-lg font-semibold text-white">
-                    My Picks
-                  </div>
-                  <p className="text-xs text-muted mt-1">
-                    {liveCard === false && isCommish
-                      ? "No card live yet — publish first (tile below), then lock your own picks."
-                      : "Lock the card before kickoff. That is the weekly job."}
-                  </p>
-                </Link>
+                {isCommish && (
+                  <Link
+                    href="/picks"
+                    className="group rounded-xl border-2 border-primary/50 bg-primary/10 p-5 hover:border-primary transition sm:col-span-2"
+                  >
+                    <div className="text-xs uppercase tracking-wider text-primary mb-1">
+                      Do this
+                    </div>
+                    <div className="text-lg font-semibold text-white">
+                      My Picks
+                    </div>
+                    <p className="text-xs text-muted mt-1">
+                      {liveCard === false
+                        ? "No card live yet — publish first (tile below), then lock your own picks."
+                        : "Lock the card before kickoff. That is the weekly job."}
+                    </p>
+                  </Link>
+                )}
                 <Link
                   href="/locker-room"
                   className="group rounded-xl border border-orange-400/30 bg-black/40 p-5 hover:border-orange-300/60 transition"
