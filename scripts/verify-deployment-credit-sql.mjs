@@ -41,7 +41,7 @@ assert.ok(
   "authoritative rescoring must preserve separate credit",
 );
 assert.ok(cloud.includes("deployment_credit_breakdown"), "cloud standings must hydrate credit provenance");
-assert.ok(standings.includes("earned +") && standings.includes("DC"), "standings must separate earned points and credit");
+assert.ok(standings.includes("earned +") && standings.includes("Deployment Credit"), "standings must separate earned points and spell out credit on phones");
 assert.ok(profile.includes('label="Deployment Credit"'), "profile must label Deployment Credit");
 assert.ok(profile.includes('label="Eligible from"'), "profile must show first eligible week");
 assert.ok(picks.includes("Season ledger:"), "scorecard must disclose the separate season ledger");
