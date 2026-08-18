@@ -11,10 +11,10 @@
  * Season voice progression:
  *   Early  (0–3)  → Teach
  *   Mid    (4–9)  → Assume competence
- *   Late   (10–18)→ Roast everyone equally
+ *   Late   (10–20)→ Roast everyone equally
  *   NFL PO (19–22)→ Playoff veterans (still universal, still true)
  *
- * Index = week number (CFB 0–18, NFL 1–22 Super Bowl).
+ * Index = week number (CFB 0–20, NFL 1–22 Super Bowl).
  */
 
 export type BoardCopy = {
