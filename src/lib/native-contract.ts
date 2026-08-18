@@ -8,8 +8,8 @@ export const WAR_ROOM_NATIVE = Object.freeze({
   appName: "War Room Pick'Em",
   bundleId: "com.warroompicks.app",
   customScheme: "warroom",
-  canonicalOrigin: "https://www.war-room-picks.com",
-  universalLinkHost: "www.war-room-picks.com",
+  canonicalOrigin: "https://app.war-room-picks.com",
+  universalLinkHost: "app.war-room-picks.com",
 });
 
 export type WarRoomRuntime = "web" | "ios" | "android";
