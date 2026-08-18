@@ -63,8 +63,8 @@ export interface Session {
 
 const DEFAULT_SETTINGS: LeagueSettings = {
   cutPercent: 50,
-  /** Fixed: Week 0 … 18 (CFP Final). See season-calendar.ts. */
-  regularSeasonWeeks: 18,
+  /** Fixed full timeline: Week 0 … 20 (CFP Final). See season-calendar.ts. */
+  regularSeasonWeeks: 20,
   gamesPerWeek: 5,
   crystalBallEnabled: true,
   homeTaglineId: "good-teams",
