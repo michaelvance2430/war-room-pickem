@@ -858,51 +858,6 @@ export default function Home() {
                 </p>
       </Link>
 
-              <Link
-                href="/championship"
-                className={
-                  homeChrome.sportId === "soccer_wwc"
-                    ? "group rounded-xl border bg-black/40 backdrop-blur-sm p-6 transition border-[#009C3B]/50 hover:border-[#FFDF00]/70 hover:bg-[#009C3B]/10 shadow-[0_0_40px_rgba(0,156,59,0.15)]"
-                    : "group rounded-xl border bg-black/40 backdrop-blur-sm p-6 transition border-primary/30 hover:border-primary hover:bg-primary/10 shadow-[0_0_40px_rgba(34,197,94,0.08)]"
-                }
-              >
-      <div
-                  className={
-                    homeChrome.sportId === "soccer_wwc"
-                      ? "text-xs uppercase tracking-wider mb-2 text-[#FFDF00]/90"
-                      : "text-xs uppercase tracking-wider mb-2 text-primary/70"
-                  }
-                >
-                  Postseason
-                </div>
-      <div
-                  className={
-                    homeChrome.sportId === "soccer_wwc"
-                      ? "text-lg font-semibold text-white"
-                      : "text-lg font-semibold text-primary"
-                  }
-                >
-                  {homeChrome.primaryPathLabel}
-                </div>
-      <p className="text-sm text-muted mt-2">
-                  {homeChrome.primaryPathBlurb}
-                </p>
-      </Link>
-
-              <Link
-                href="/toilet-bowl"
-                className="group rounded-xl border border-purple-500/30 bg-black/40 backdrop-blur-sm p-6 hover:border-purple-400/60 hover:bg-purple-500/10 transition shadow-[0_0_40px_rgba(0,0,0,0.35)]"
-              >
-      <div className="text-xs uppercase tracking-wider text-purple-300/70 mb-2">
-                  Bottom half
-                </div>
-      <div className="text-lg font-semibold text-purple-300">
-                  {homeChrome.shamePathLabel}
-                </div>
-      <p className="text-sm text-muted mt-2">
-                  {homeChrome.shamePathBlurb}
-                </p>
-      </Link>
 
               <Link
                 href="/trophy-room"
