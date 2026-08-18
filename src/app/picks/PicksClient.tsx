@@ -2125,16 +2125,6 @@ export default function PicksClient() {
                         : "Almost";
                     })()}
                   </p>
-                  {seasonPointLedger?.deploymentCredit ? (
-                    <p className="text-xs text-muted">
-                      Season ledger: {seasonPointLedger.earned} earned +{" "}
-                      <span className="font-semibold text-amber-300">
-                        {seasonPointLedger.deploymentCredit} Deployment Credit
-                      </span>
-                      . Credit is separate from this scorecard and cannot unlock awards.
-                    </p>
-                  ) : null}
-                  </div>
                 )}
               </div>
       <div className="flex flex-wrap gap-1.5 sm:gap-2 text-[11px] sm:text-xs">
@@ -2637,6 +2627,16 @@ export default function PicksClient() {
                       </>
                     ) : null}
                   </p>
+                  {seasonPointLedger?.deploymentCredit ? (
+                    <p className="text-xs text-muted">
+                      Season ledger: {seasonPointLedger.earned} earned +{" "}
+                      <span className="font-semibold text-amber-300">
+                        {seasonPointLedger.deploymentCredit} Deployment Credit
+                      </span>
+                      . Credit is separate from this scorecard and cannot unlock awards.
+                    </p>
+                  ) : null}
+                  </div>
                 )}
               </div>
             )}
