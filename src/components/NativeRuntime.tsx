@@ -13,7 +13,7 @@ function pathFromNativeUrl(rawUrl: string): string | null {
     }
     if (
       url.protocol === "https:" &&
-      (url.host === WAR_ROOM_NATIVE.universalLinkHost || url.host === "war-room-picks.com")
+      url.host === WAR_ROOM_NATIVE.universalLinkHost
     ) {
       return `${safeWarRoomPath(url.pathname)}${url.search}${url.hash}`;
     }
