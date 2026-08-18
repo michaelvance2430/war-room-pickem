@@ -357,7 +357,7 @@ function placeWinnerIntoNext(
  * Advance bracket slots using CFP weekly pick'em scores.
  * - Round 1 → week 17, QF → 18, SF → 19, Final → 20 (aligned for smaller fields)
  * - Higher weekly score advances; ties use season tiebreakers
- * - Resolves a round if week is scored OR weekly_points exist for that week
+ * - Resolves a round if week is certified scored OR legacy data has a non-zero score
  * - 0–0 still advances via tiebreakers so the board never stays blank after a scored week
  * - Byes auto-advance
  */
