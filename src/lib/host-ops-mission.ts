@@ -16,10 +16,10 @@
  * leaves it false to avoid cross-league closeout fan-out).
  */
 
-import { isCardLockDeadlinePassed } from "@/lib/dates";
-import { weekTitle } from "@/lib/dates";
-import { seasonMaxWeek } from "@/lib/season-calendar";
-import type { Game } from "@/lib/types";
+import { isCardLockDeadlinePassed } from "./dates";
+import { weekTitle } from "./dates";
+import { seasonMaxWeek } from "./season-calendar";
+import type { Game } from "./types";
 
 /** Semantic kinds — match prior CommishHomeMission kinds. */
 export type HostOpsMissionKind =
