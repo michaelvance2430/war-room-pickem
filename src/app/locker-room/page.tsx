@@ -29,6 +29,7 @@ import {
   type LockerMessage,
 } from "@/lib/locker-room";
 import { markLockerCaughtUp, markLockerSeen } from "@/lib/room-unseen";
+import { LOCKER_SAFETY_COPY } from "@/lib/content-safety";
 import { loadLeagueRoster } from "@/lib/cloud";
 import { refreshStaffSessionFlags } from "@/lib/cloud";
 import {
@@ -696,6 +697,7 @@ export default function LockerRoomPage() {
                   <span>GIF ready</span>
                 </div>
               ) : (
+              <>
               <textarea
                 ref={textareaRef}
                 value={body}
@@ -720,6 +722,10 @@ export default function LockerRoomPage() {
                 placeholder="Talk your shit… @someone to call them out"
                 className="w-full bg-background border border-border rounded-lg px-3 pt-2 pb-7 text-sm text-foreground resize-none focus:outline-none focus:ring-1 focus:ring-primary/50"
               />
+              <p className="mt-2 text-[10px] leading-relaxed text-muted">
+                {LOCKER_SAFETY_COPY}
+              </p>
+              </>
               )}
               {/* Char count: bottom-right of chat box, above emoji row */}
               {!attachedGif && !photoPreview && (
