@@ -50,8 +50,8 @@ async function finalWinner(
 
   let scored: number[] = [];
   try {
-    const { listScoredWeekNumbers } = await import("./cloud");
-    scored = await listScoredWeekNumbers();
+    const { listBracketScoredWeekNumbers } = await import("./postseason/cloud");
+    scored = await listBracketScoredWeekNumbers();
   } catch {
     // Fallback: indices present on weeklyPoints
     const set = new Set<number>();
