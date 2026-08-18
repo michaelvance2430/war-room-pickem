@@ -16,8 +16,6 @@ import {
   type TrophyType,
 } from "./trophies";
 import {
-  seedChampionship,
-  seedToiletBowl,
   buildBracket,
   advanceBracketFromCfpWeeks,
 } from "./brackets";
@@ -39,10 +37,15 @@ async function finalWinner(
 ): Promise<{ player: Player; reason: string } | null> {
   if (players.length < 2) return null;
   const sportId = getLeague()?.sportId;
-  const seeded =
-    type === "championship"
-      ? seedChampionship(players)
-      : seedToiletBowl(players);
+  const { loadFrozenPostseasonSnapshot } = await import("./postseason/cloud");
+  const snapshot = await loadFrozenPostseasonSnapshot();
+  if (!snapshot) return null;
+  const playerById = new Map(players.map((player) => [player.id, player]));
+  const seeded = snapshot.participants
+    .filter((participant) => participant.field === type)
+    .sort((a, b) => (a.seed ?? 999) - (b.seed ?? 999))
+    .map((participant) => playerById.get(participant.userId))
+    .filter((player): player is Player => !!player);
   if (seeded.length < 2) return null;
 
   let scored: number[] = [];
