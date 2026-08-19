@@ -17,12 +17,17 @@ assert.deepEqual(
   "NFL uses official Weeks 1–18 followed by playoff slots 19–22"
 );
 
-const championship = readFileSync("src/app/championship/page.tsx", "utf8");
+const championship = readFileSync("src/components/PostseasonBracketScreen.tsx", "utf8");
 const rules = readFileSync("src/lib/rules.ts", "utf8");
 assert.match(
   championship,
-  /After Week 18, seeds lock and the War Room playoffs begin/,
+  /Seeds lock after Week 18\. Weekly playoff scores advance each matchup\./,
   "NFL bracket explains the real seed lock"
+);
+assert.match(
+  championship,
+  /Seeds lock after Conference Championships\. Weekly postseason scores advance each matchup\./,
+  "CFB bracket keeps its own conference-championship language"
 );
 assert.match(
   rules,

@@ -28,6 +28,7 @@ export default function PostseasonBracketScreen({
   const [error, setError] = useState<string | null>(null);
   const selfId = getSession()?.playerId || null;
   const league = getLeague();
+  const isNfl = league?.sportId === "nfl";
   const isChampionship = competition === "championship";
   const championshipTrophyId = league?.settings?.championshipTrophyId || "command_cup";
   const championshipTrophy = getChampionshipTrophyDesign(championshipTrophyId, league?.sportId);
@@ -88,7 +89,9 @@ export default function PostseasonBracketScreen({
           </p>
           <h1 className="mt-1 text-3xl font-black">{title}</h1>
           <p className="mt-2 max-w-2xl text-sm text-muted">
-            Seeds locked after Conference Championships. Weekly postseason scores advance each matchup.
+            {isNfl
+              ? "Seeds lock after Week 18. Weekly playoff scores advance each matchup."
+              : "Seeds lock after Conference Championships. Weekly postseason scores advance each matchup."}
           </p>
         </div>
         <Link href="/standings" className="min-h-11 rounded-xl border border-border px-4 py-3 text-sm font-bold">

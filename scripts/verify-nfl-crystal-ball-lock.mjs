@@ -10,6 +10,10 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const src = readFileSync(resolve(root, "src/lib/crystal-ball.ts"), "utf8");
 const dates = readFileSync(resolve(root, "src/lib/dates.ts"), "utf8");
 const page = readFileSync(resolve(root, "src/app/crystal-ball/page.tsx"), "utf8");
+const favoriteCard = readFileSync(
+  resolve(root, "src/components/CrystalBallFavoriteTeamCard.tsx"),
+  "utf8"
+);
 
 let fails = 0;
 function assert(cond, msg) {
@@ -35,8 +39,7 @@ assert(
   "NFL lock uses firstKickoffOnCardMs from Week 1 games"
 );
 assert(
-  src.includes('openWeek = sport === "nfl" ? 1 : 0') ||
-    src.includes("const openWeek = sport === \"nfl\" ? 1 : 0"),
+  src.includes('const openWeek = sport === "cfb" ? 0 : 1'),
   "NFL opening week is Week 1"
 );
 assert(
@@ -48,7 +51,7 @@ assert(
   "Locked copy present in lib"
 );
 assert(
-  page.includes("Your Super Bowl pick is in."),
+  page.includes("Your pick is in."),
   "Confirmation copy in page"
 );
 assert(
@@ -68,9 +71,14 @@ assert(
   "formatCountdownToDeadline exported from dates.ts"
 );
 assert(
-  !page.includes("profile_favorite_teams") &&
-    !page.includes("setMyFavoriteTeam"),
-  "Crystal Ball page never writes favorite-team allegiance"
+  page.includes("CrystalBallFavoriteTeamCard") &&
+    favoriteCard.includes("setMyFavoriteTeam") &&
+    favoriteCard.includes('sportId={sportId}'),
+  "Crystal Ball offers a separate, sport-scoped favorite-team choice"
+);
+assert(
+  favoriteCard.includes('nfl ? "Super Bowl" : "national champion"'),
+  "Favorite-team copy stays distinct for NFL and CFB"
 );
 assert(
   src.includes("2026-08-29T12:00:00-04:00"),

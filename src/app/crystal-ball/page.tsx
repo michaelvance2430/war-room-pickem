@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import PlayerLink from "@/components/PlayerLink";
+import CrystalBallFavoriteTeamCard from "@/components/CrystalBallFavoriteTeamCard";
 import {
   crystalBallLockLabel,
   crystalBallTeams,
@@ -477,6 +478,8 @@ export default function CrystalBallPage() {
             {msg}
           </div>
         )}
+
+        <CrystalBallFavoriteTeamCard sportId={nfl ? "nfl" : "cfb"} />
 
         {myAchievements.length > 0 && (
           <div className="mb-6 rounded-xl border border-primary/40 bg-primary/5 p-4">

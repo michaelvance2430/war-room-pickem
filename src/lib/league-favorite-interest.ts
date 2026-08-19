@@ -11,6 +11,7 @@ import {
   matchCfbTeamConfident,
   type CanonicalTeam,
 } from "@/lib/teams/cfb-catalog";
+import { getNflTeamByName } from "@/lib/teams/nfl-catalog";
 import { NO_TEAM_ID } from "@/lib/favorite-teams";
 
 /** team_id → count of distinct active human members who favor that team */
@@ -84,7 +85,7 @@ export function matchScheduleTeamForSport(
   sportId: SportId | string
 ): CanonicalTeam | null {
   if (sportId === "cfb") return matchCfbTeamConfident(rawName);
-  // NFL catalog not in Phase 1
+  if (sportId === "nfl") return getNflTeamByName(rawName);
   return null;
 }
 
@@ -100,7 +101,7 @@ export function resolveGameLeagueInterest(
     bothSides: false,
   };
   if (!counts || !Object.keys(counts).length) return empty;
-  if (sportId !== "cfb") return empty;
+  if (sportId !== "cfb" && sportId !== "nfl") return empty;
 
   const awayMatch = matchScheduleTeamForSport(game.awayTeam, sportId);
   const homeMatch = matchScheduleTeamForSport(game.homeTeam, sportId);
