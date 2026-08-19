@@ -27,7 +27,7 @@ function PlayerBoard({ rows }: { rows: LobbyPlayerLeader[] }) {
       <div className="pointer-events-none absolute inset-0 opacity-60 [background-image:linear-gradient(rgba(132,204,22,.08)_1px,transparent_1px),linear-gradient(90deg,rgba(132,204,22,.08)_1px,transparent_1px)] [background-size:28px_28px]" />
       <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-lime-300/15 blur-[70px]" />
       <header className="relative flex items-end justify-between gap-3 border-b border-lime-300/15 px-5 py-5 sm:px-7">
-        <div><p className="text-[9px] font-black uppercase tracking-[.32em] text-lime-300">Live Cheevo voltage</p><h2 className="mt-1 text-2xl font-black tracking-[-.03em] text-white">TOP 10 PLAYERS</h2></div>
+        <div><p className="text-[9px] font-black uppercase tracking-[.32em] text-lime-300">Live Cheevo voltage</p><h2 className="mt-1 text-xl font-black tracking-[-.03em] text-white sm:text-2xl">TOP 10 PLAYERS</h2></div>
         <div className="rounded-full border border-cyan-300/20 bg-cyan-300/[.06] px-3 py-1.5 text-right"><p className="text-[8px] font-black uppercase tracking-[.18em] text-cyan-200">One player · one rank</p></div>
       </header>
       {top.length === 0 ? (
@@ -38,7 +38,7 @@ function PlayerBoard({ rows }: { rows: LobbyPlayerLeader[] }) {
             {podium.map((player, index) => (
               <article key={player.gameHandle} className={`relative overflow-hidden rounded-2xl border px-2 py-4 text-center ${index === 0 ? "order-2 min-h-[150px] border-lime-300/50 bg-lime-300/[.12] shadow-[0_0_30px_rgba(163,230,53,.12)]" : index === 1 ? "order-1 min-h-[126px] border-cyan-200/25 bg-cyan-200/[.06]" : "order-3 min-h-[112px] border-amber-300/25 bg-amber-300/[.06]"}`}>
                 <span className={`inline-flex h-8 w-8 items-center justify-center rounded-full border text-sm font-black ${index === 0 ? "border-lime-300/50 bg-lime-300 text-black" : "border-white/15 bg-white/[.06] text-white"}`}>{index + 1}</span>
-                <p className="mt-3 truncate text-sm font-black text-white">{player.gameHandle}</p>
+                <p className="mt-3 flex min-h-[2.35rem] items-center justify-center break-words text-[11px] font-black leading-[1.05] text-white sm:text-sm">{player.gameHandle}</p>
                 <p className="mt-3 text-xl font-black tabular-nums text-lime-300">{player.cheevoPoints}</p>
                 <p className="text-[7px] font-black uppercase tracking-[.17em] text-white/35">Cheevo pts</p>
               </article>
