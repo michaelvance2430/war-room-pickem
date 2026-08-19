@@ -1757,7 +1757,8 @@ struct HomeView: View {
                                         detail: "Manage players, conference assignments, and season controls from one place.",
                                         icon: "person.3.sequence.fill",
                                         featured: true,
-                                        accent: .cyan
+                                        accent: .cyan,
+                                        actionLabel: "OPEN COMMAND"
                                     )
                                 }
                             }.buttonStyle(WarRoomCardButtonStyle())
@@ -1781,7 +1782,7 @@ struct HomeView: View {
                                         : isNFL
                                             ? "\(scorecard.weeklyTotal) points. Every Wild Card, Divisional, Conference, Super Bowl, and JDAM decision is itemized."
                                             : "\(scorecard.weeklyTotal) points. Every bowl allocation, Dead Hand adjustment, and bracket point is itemized.",
-                                    icon: "list.clipboard.fill", featured: true, accent: isNFL ? .cyan : .yellow
+                                    icon: "list.clipboard.fill", featured: true, accent: isNFL ? .cyan : .yellow, actionLabel: "VIEW SCORECARD"
                                 )
                             }.buttonStyle(WarRoomCardButtonStyle())
                         }
@@ -1831,29 +1832,29 @@ struct HomeView: View {
                             NflPrimaryActionCard(kicker: "CARD FILED · WEEK \(membership.leagues.currentWeek)", title: "You’re set for kickoff", detail: "Your card is saved. The board opens game by game.", icon: "checkmark.seal.fill")
                         } else if needsCrystalBall {
                             NavigationLink { CrystalBallView(membership: membership) } label: {
-                                StatusCard(kicker: "DO THIS FIRST", title: "Pick Crystal Ball", detail: "Choose the champion now. Revisionist history is not a feature.", icon: "sparkles", featured: true, accent: .yellow)
+                                StatusCard(kicker: "🚨 REQUIRED · LOOK HERE FIRST", title: "PICK CRYSTAL BALL NOW", detail: "Choose the champion before you do anything else. Revisionist history is not a feature.", icon: "exclamationmark.triangle.fill", featured: true, accent: .red, emergency: true)
                             }.buttonStyle(WarRoomCardButtonStyle())
                         } else if card == nil && isCommissioner {
                             NavigationLink { CommissionerCardBuilderView(membership: membership) } label: {
-                                StatusCard(kicker: isRivalryWeek ? "RIVALRY DESK · CHOOSE THE HATE" : "COMMISSIONER · YOUR MOVE", title: isRivalryWeek ? "Build the Rivalry Card" : "Build Card", detail: isRivalryWeek ? "Pick five grudge games. Family, geography, trophies, and good judgment are all suspended." : "Pick five games, add one prop, then give the room something to argue about.", icon: isRivalryWeek ? "bolt.horizontal.fill" : "hammer.fill", featured: true, accent: isRivalryWeek ? .red : .yellow)
+                                StatusCard(kicker: isRivalryWeek ? "RIVALRY DESK · CHOOSE THE HATE" : "COMMISSIONER · YOUR MOVE", title: isRivalryWeek ? "Build the Rivalry Card" : "Build Card", detail: isRivalryWeek ? "Pick five grudge games. Family, geography, trophies, and good judgment are all suspended." : "Pick five games, add one prop, then give the room something to argue about.", icon: isRivalryWeek ? "bolt.horizontal.fill" : "hammer.fill", featured: true, accent: isRivalryWeek ? .red : .yellow, actionLabel: "OPEN COMMAND")
                             }.buttonStyle(WarRoomCardButtonStyle())
                         } else if card == nil {
                             Button(action: onOpenLocker) {
-                                StatusCard(kicker: "WAITING ON THE COMMISH", title: "No card. No picks. Outstanding leadership.", detail: "The Locker Room is accepting public complaints.", icon: "bubble.left.fill", featured: true, accent: .yellow)
+                                StatusCard(kicker: "WAITING ON THE COMMISH", title: "No card. No picks. Outstanding leadership.", detail: "The Locker Room is accepting public complaints.", icon: "bubble.left.fill", featured: true, accent: .yellow, actionLabel: "OPEN LOCKER ROOM")
                             }.buttonStyle(WarRoomCardButtonStyle())
                         } else if kickoffStarted {
                             Button(action: onOpenPicks) {
-                                StatusCard(kicker: "KICKOFF HIT · THE BOARD IS LIVE", title: "Scout the competition", detail: "Each matchup declassifies at its own kickoff. See who backed whom—and how much confidence they put on it.", icon: "binoculars.fill", featured: true, accent: .orange)
+                                StatusCard(kicker: "KICKOFF HIT · THE BOARD IS LIVE", title: "Scout the competition", detail: "Each matchup declassifies at its own kickoff. See who backed whom—and how much confidence they put on it.", icon: "binoculars.fill", featured: true, accent: .orange, actionLabel: "OPEN BOARD")
                             }.buttonStyle(WarRoomCardButtonStyle())
                         } else if pick == nil {
                             Button(action: onOpenPicks) {
-                                StatusCard(kicker: isRivalryWeek ? "HATE WEEK · PICK A SIDE" : "DO THIS NOW · WEEK \(membership.leagues.currentWeek)", title: isRivalryWeek ? "Choose your enemies" : "Make your picks", detail: isRivalryWeek ? "Five rivalry games. One Best Bet. Every bad decision becomes family evidence." : "Spreads, confidence, Best Bet, and the weekly prop are ready.", icon: isRivalryWeek ? "flame.fill" : "arrow.right.circle.fill", featured: true, accent: isRivalryWeek ? .red : .green)
+                                StatusCard(kicker: isRivalryWeek ? "HATE WEEK · PICK A SIDE" : "DO THIS NOW · WEEK \(membership.leagues.currentWeek)", title: isRivalryWeek ? "Choose your enemies" : "Make your picks", detail: isRivalryWeek ? "Five rivalry games. One Best Bet. Every bad decision becomes family evidence." : "Spreads, confidence, Best Bet, and the weekly prop are ready.", icon: isRivalryWeek ? "flame.fill" : "arrow.right.circle.fill", featured: true, accent: isRivalryWeek ? .red : .green, actionLabel: "MAKE PICKS")
                             }.buttonStyle(WarRoomCardButtonStyle())
                         } else if isCommissioner {
                             NavigationLink {
                                 CommissionerCommandCenterView(membership: membership, standings: standings, submittedUserIds: visibleSubmittedUserIds)
                             } label: {
-                                StatusCard(kicker: "CARD IS LIVE · COMMISSIONER VIEW", title: "Week \(membership.leagues.currentWeek) is ready", detail: "\(visibleSubmissionCount) of \(standings.count) have submitted. Tap for the attendance sheet.", icon: "person.2.badge.gearshape.fill", featured: true)
+                                StatusCard(kicker: "CARD IS LIVE · COMMISSIONER VIEW", title: "Week \(membership.leagues.currentWeek) is ready", detail: "\(visibleSubmissionCount) of \(standings.count) have submitted. Tap for the attendance sheet.", icon: "person.2.badge.gearshape.fill", featured: true, actionLabel: "OPEN COMMAND")
                             }.buttonStyle(WarRoomCardButtonStyle())
                         } else {
                             StatusCard(kicker: "YOU’RE CAUGHT UP", title: "Week \(membership.leagues.currentWeek) is locked", detail: "Your work here is done. Suspicious, but true.", icon: "checkmark.seal.fill", featured: true)
@@ -2418,7 +2419,6 @@ struct CommissionerScoreWeekView: View {
             HStack(spacing: 8) {
                 coverButton(game.awayTeam, value: "away", game: game)
                 coverButton(game.homeTeam, value: "home", game: game)
-                coverButton("PUSH", value: "push", game: game)
             }
         }.commandPanel(accent: accent, cornerRadius: identity.isNFL ? 6 : 15)
     }
@@ -2440,7 +2440,7 @@ struct CommissionerScoreWeekView: View {
         var simulated: [UUID: String] = [:]
         for (index, game) in card.cardGames.enumerated() {
             let seed = game.id.uuidString.unicodeScalars.reduce(index + week) { $0 + Int($1.value) }
-            simulated[game.id] = seed.isMultiple(of: 11) ? "push" : seed.isMultiple(of: 2) ? "home" : "away"
+            simulated[game.id] = seed.isMultiple(of: 2) ? "home" : "away"
         }
         results = simulated
         propResult = week.isMultiple(of: 2) ? card.propOptionA : card.propOptionB
@@ -3230,8 +3230,8 @@ private struct AutomaticPropPreset: Identifiable {
 private let automaticFootballProps: [AutomaticPropPreset] = [
     .init(id: "close7", label: "3+ games decided by 7 or fewer", question: "Will at least 3 of the 5 games be decided by 7 or fewer points?", yes: "Yes — at least 3", no: "No — 2 or fewer"),
     .init(id: "close3", label: "3+ games decided by 3 or fewer", question: "Will at least 3 of the 5 games be decided by 3 or fewer points?", yes: "Yes — at least 3", no: "No — 2 or fewer"),
-    .init(id: "dogcover", label: "Any underdog covers", question: "Using the locked spreads, will any underdog cover? Push does not count.", yes: "Yes — a dog covers", no: "No — no dog covers"),
-    .init(id: "fav3", label: "Favorites cover 3+ games", question: "Will favorites cover at least 3 of the 5 games? Push does not count.", yes: "Yes — favorites cover 3+", no: "No — favorites cover 2 or fewer"),
+    .init(id: "dogcover", label: "Any underdog covers", question: "Using the locked half-point spreads, will any underdog cover?", yes: "Yes — a dog covers", no: "No — no dog covers"),
+    .init(id: "fav3", label: "Favorites cover 3+ games", question: "Will favorites cover at least 3 of the 5 games?", yes: "Yes — favorites cover 3+", no: "No — favorites cover 2 or fewer"),
     .init(id: "over55", label: "Any game totals 56+", question: "Will any game finish with a combined score of 56 or more?", yes: "Yes — at least one totals 56+", no: "No — every total is 55 or less"),
     .init(id: "under40", label: "Any game totals 40 or fewer", question: "Will any game finish with a combined score of 40 or fewer?", yes: "Yes — at least one totals 40 or fewer", no: "No — every total is 41+"),
     .init(id: "high61", label: "Highest game total is 61+", question: "Will the highest combined final score among the five games be 61 or more?", yes: "Yes — highest is 61+", no: "No — highest is 60 or less"),
@@ -3240,8 +3240,8 @@ private let automaticFootballProps: [AutomaticPropPreset] = [
     .init(id: "team9", label: "Any team scores 9 or fewer", question: "Will any team finish with 9 or fewer points?", yes: "Yes — a team scores 9 or fewer", no: "No — every team scores 10+"),
     .init(id: "team46", label: "Any team scores 46+", question: "Will any team finish with 46 or more points?", yes: "Yes — a team scores 46+", no: "No — every team scores 45 or less"),
     .init(id: "both25", label: "Both teams score 25+", question: "Will any game end with both teams scoring at least 25 points?", yes: "Yes — both teams reach 25", no: "No — never both"),
-    .init(id: "chalk", label: "All five favorites cover", question: "Will the favorite cover all five games? Any push counts as No.", yes: "Yes — chalk sweep", no: "No — chalk fails"),
-    .init(id: "dogs", label: "All five underdogs cover", question: "Will every underdog cover all five games? Any push counts as No.", yes: "Yes — dog sweep", no: "No — not a full sweep"),
+    .init(id: "chalk", label: "All five favorites cover", question: "Will the favorite cover all five games?", yes: "Yes — chalk sweep", no: "No — chalk fails"),
+    .init(id: "dogs", label: "All five underdogs cover", question: "Will every underdog cover all five games?", yes: "Yes — dog sweep", no: "No — not a full sweep"),
     .init(id: "shutout", label: "Any team is shut out", question: "Will any team finish with exactly 0 points?", yes: "Yes — somebody scores 0", no: "No — everybody scores"),
     .init(id: "fifty", label: "Any team scores 50+", question: "Will any team score 50 or more points?", yes: "Yes — a team scores 50+", no: "No — every team scores 49 or less"),
     .init(id: "tie", label: "Any game ends tied", question: "Will any game finish with equal home and away scores?", yes: "Yes — at least one tie", no: "No — every game has a winner"),
@@ -3253,7 +3253,7 @@ private let automaticFootballProps: [AutomaticPropPreset] = [
     .init(id: "cfb35", label: "Any winning margin is 35+", question: "Will any game be decided by 35 or more points?", yes: "Yes — a margin is 35+", no: "No — every margin is 34 or less", sport: "cfb"),
     .init(id: "cfbboth30", label: "Both teams score 30+", question: "Will any game end with both teams scoring at least 30 points?", yes: "Yes — both teams reach 30", no: "No — never both", sport: "cfb"),
     .init(id: "cfb60", label: "Any team drops a 60-burger", question: "Will any team score 60 or more points?", yes: "Yes — a team scores 60+", no: "No — every team scores 59 or less", sport: "cfb"),
-    .init(id: "cfbbigdog", label: "Any 14+ underdog covers", question: "Will any underdog listed at +14 or more cover? Push does not count.", yes: "Yes — a big dog covers", no: "No — no big dog covers", sport: "cfb"),
+    .init(id: "cfbbigdog", label: "Any 14+ underdog covers", question: "Will any underdog listed at +14 or more cover?", yes: "Yes — a big dog covers", no: "No — no big dog covers", sport: "cfb"),
     .init(id: "cfbhomedogs", label: "2+ home underdogs win", question: "Will at least 2 home underdogs win straight up?", yes: "Yes — 2+ home dogs win", no: "No — 1 or fewer", sport: "cfb"),
     .init(id: "hateweekdogs", label: "Rivalry dogs bite twice", question: "Will at least 2 rivalry underdogs win outright during Hate Week?", yes: "Yes — 2+ grudges erupt", no: "No — chalk survives", sport: "cfb", week: 13),
     .init(id: "hateweekknife", label: "One grudge decided by 3", question: "Will a designated rivalry game be decided by 3 points or fewer?", yes: "Yes — family therapy required", no: "No — somebody runs away", sport: "cfb", week: 13),
@@ -3384,7 +3384,11 @@ struct CommissionerCardBuilderView: View {
                 Section("Game \((games.firstIndex(where: { $0.id == game.id }) ?? 0) + 1)") {
                     TextField("Away team", text: $game.away).textInputAutocapitalization(.words)
                     TextField("Home team", text: $game.home).textInputAutocapitalization(.words)
-                    TextField("Spread (example: 7.5)", text: $game.spread).keyboardType(.decimalPad)
+                    TextField("Spread (half-points only, example: 7.5)", text: $game.spread).keyboardType(.decimalPad)
+                    if let spread = Double(game.spread), !isNoPushSpread(spread) {
+                        Label("Use a half-point line so every game has a winner.", systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption.weight(.bold)).foregroundStyle(.red)
+                    }
                     Picker("Favorite", selection: $game.favorite) {
                         Text("Away").tag("away")
                         Text("Home").tag("home")
@@ -3468,7 +3472,11 @@ struct CommissionerCardBuilderView: View {
     }
 
     private var isComplete: Bool {
-        games.allSatisfy { !$0.away.trimmingCharacters(in: .whitespaces).isEmpty && !$0.home.trimmingCharacters(in: .whitespaces).isEmpty && Double($0.spread) != nil }
+        games.allSatisfy {
+            !$0.away.trimmingCharacters(in: .whitespaces).isEmpty
+            && !$0.home.trimmingCharacters(in: .whitespaces).isEmpty
+            && Double($0.spread).map(isNoPushSpread) == true
+        }
         && !propQuestion.trimmingCharacters(in: .whitespaces).isEmpty
         && !propA.trimmingCharacters(in: .whitespaces).isEmpty
         && !propB.trimmingCharacters(in: .whitespaces).isEmpty
@@ -3533,7 +3541,7 @@ struct CommissionerCardBuilderView: View {
             let source = chosen[index]
             games[index].away = source.awayTeam
             games[index].home = source.homeTeam
-            games[index].spread = String(source.spread)
+            games[index].spread = String(format: "%.1f", noPushSpread(source.spread))
             games[index].favorite = source.favorite
             games[index].isRivalry = isRivalryWeek && RivalryMatchupCatalog.match(away: source.awayTeam, home: source.homeTeam) != nil
             if let iso = source.commenceTime, let date = ISO8601DateFormatter().date(from: iso) { games[index].kickoff = date }
@@ -3544,7 +3552,7 @@ struct CommissionerCardBuilderView: View {
     private func oddsLine(_ game: OddsGame) -> String {
         let favorite = game.favorite == "away" ? game.awayTeam : game.homeTeam
         let book = game.bookmaker.map { " · \($0)" } ?? ""
-        return "\(favorite) -\(String(format: "%.1f", abs(game.spread)))\(book)"
+        return "\(favorite) -\(String(format: "%.1f", noPushSpread(game.spread)))\(book)"
     }
 
     private func favoriteCount(for game: OddsGame) -> Int {
@@ -3567,7 +3575,7 @@ struct CommissionerCardBuilderView: View {
         do {
             let formatter = ISO8601DateFormatter()
             let payload: [[String: Any]] = games.enumerated().map { index, game in
-                ["sort_order": index, "away_team": game.away, "home_team": game.home, "spread": Double(game.spread) ?? 0,
+                ["sort_order": index, "away_team": game.away, "home_team": game.home, "spread": noPushSpread(Double(game.spread) ?? 0.5),
                  "favorite": game.favorite, "start_time": formatter.string(from: game.kickoff), "bookmaker": "Manual", "away_rank": NSNull(), "home_rank": NSNull(),
                  "is_rivalry": isRivalryWeek && (game.isRivalry || RivalryMatchupCatalog.match(away: game.away, home: game.home) != nil)]
             }
@@ -3578,6 +3586,19 @@ struct CommissionerCardBuilderView: View {
     }
 }
 
+func noPushSpread(_ value: Double) -> Double {
+    let halfPoint = (abs(value) * 2).rounded() / 2
+    return halfPoint.truncatingRemainder(dividingBy: 1) == 0 ? halfPoint + 0.5 : halfPoint
+}
+
+func isNoPushSpread(_ value: Double) -> Bool {
+    let magnitude = abs(value)
+    guard magnitude.isFinite else { return false }
+    let doubled = magnitude * 2
+    return abs(doubled.rounded() - doubled) < 0.000_001
+        && magnitude.truncatingRemainder(dividingBy: 1) == 0.5
+}
+
 private struct StatusCard: View {
     let kicker: String
     let title: String
@@ -3585,36 +3606,42 @@ private struct StatusCard: View {
     var icon: String? = nil
     var featured = false
     var accent: Color = .green
+    var emergency = false
+    var actionLabel: String? = nil
+    @State private var pulse = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(kicker).font(.caption2.weight(.black)).tracking(2).foregroundStyle(accent)
+            Text(kicker).font(emergency ? .headline.weight(.black) : .caption2.weight(.black)).tracking(emergency ? 1.2 : 2).foregroundStyle(emergency ? .white : accent)
             HStack {
-                Text(title).font(featured ? .system(size: 25, weight: .black) : .title3.weight(.black)).fontWidth(featured ? .condensed : .standard)
+                Text(title).font(emergency ? .system(size: 34, weight: .black) : (featured ? .system(size: 25, weight: .black) : .title3.weight(.black))).fontWidth(featured ? .condensed : .standard)
                 Spacer(minLength: 6)
                 if let icon {
-                    Image(systemName: icon).font(featured ? .title2 : .headline).foregroundStyle(accent)
-                        .padding(featured ? 10 : 0)
-                        .background(featured ? accent.opacity(0.1) : .clear, in: Circle())
+                    Image(systemName: icon).font(emergency ? .system(size: 30, weight: .black) : (featured ? .title2 : .headline)).foregroundStyle(emergency ? .white : accent)
+                        .padding(emergency ? 13 : (featured ? 10 : 0))
+                        .background(emergency ? .white.opacity(0.16) : (featured ? accent.opacity(0.1) : .clear), in: Circle())
                 }
             }
-            Text(detail).font(.subheadline).foregroundStyle(.secondary)
-            if featured {
+            Text(detail).font(emergency ? .body.weight(.bold) : .subheadline).foregroundStyle(emergency ? .white.opacity(0.88) : .secondary)
+            if featured, emergency || actionLabel != nil {
                 HStack(spacing: 6) {
-                    Text("OPEN COMMAND").font(.system(size: 9, weight: .black)).tracking(1.5)
+                    Text(emergency ? "DO THIS NOW" : actionLabel ?? "").font(.system(size: emergency ? 12 : 9, weight: .black)).tracking(1.5)
                     Image(systemName: "arrow.right").font(.caption2.weight(.black))
-                }.foregroundStyle(accent)
+                }.foregroundStyle(emergency ? .white : accent)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(featured ? 22 : 18)
+        .padding(emergency ? 26 : (featured ? 22 : 18))
         .background(
-            LinearGradient(colors: [.black.opacity(featured ? 0.72 : 0.76), accent.opacity(featured ? 0.20 : 0.10)], startPoint: .leading, endPoint: .trailing),
+            LinearGradient(colors: emergency ? [Color.red.opacity(0.96), Color(red: 0.35, green: 0, blue: 0), .black.opacity(0.9)] : [.black.opacity(featured ? 0.72 : 0.76), accent.opacity(featured ? 0.20 : 0.10)], startPoint: .leading, endPoint: .trailing),
             in: UnevenRoundedRectangle(topLeadingRadius: 4, bottomLeadingRadius: 22, bottomTrailingRadius: 4, topTrailingRadius: 22)
         )
-        .overlay(alignment: .leading) { Rectangle().fill(accent).frame(width: featured ? 4 : 2).padding(.vertical, 12) }
-        .overlay(UnevenRoundedRectangle(topLeadingRadius: 4, bottomLeadingRadius: 22, bottomTrailingRadius: 4, topTrailingRadius: 22).stroke(accent.opacity(featured ? 0.72 : 0.3), lineWidth: featured ? 1.5 : 1))
-        .shadow(color: featured ? accent.opacity(0.24) : .clear, radius: 26, y: 10)
+        .overlay(alignment: .leading) { Rectangle().fill(emergency ? .white : accent).frame(width: emergency ? 7 : (featured ? 4 : 2)).padding(.vertical, emergency ? 8 : 12) }
+        .overlay(UnevenRoundedRectangle(topLeadingRadius: 4, bottomLeadingRadius: 22, bottomTrailingRadius: 4, topTrailingRadius: 22).stroke(emergency ? .white.opacity(0.78) : accent.opacity(featured ? 0.72 : 0.3), lineWidth: emergency ? 2.5 : (featured ? 1.5 : 1)))
+        .shadow(color: emergency ? .red.opacity(pulse ? 0.72 : 0.38) : (featured ? accent.opacity(0.24) : .clear), radius: emergency ? (pulse ? 30 : 18) : 26, y: 10)
+        .scaleEffect(emergency && pulse ? 1.012 : 1)
+        .animation(emergency ? .easeInOut(duration: 0.9).repeatForever(autoreverses: true) : .default, value: pulse)
+        .onAppear { if emergency { pulse = true } }
     }
 }
 
@@ -4831,7 +4858,7 @@ halfway_hangin|Halfway Hangin’
 double_digit_club|Double Digit Club
 fifty_club|Fifty Club
 century_club|Century Club
-push_happens|Push Happens
+push_happens|Half-Point Hero
 favorite_survivor|Favorite Survivor
 dog_day_afternoon|Dog Day Afternoon
 spread_survivor|Spread Survivor
@@ -5168,14 +5195,8 @@ private struct CheevoRarityView: View {
                                                     .padding(3)
                                             }
                                         }
-                                    } else if rarity == .common && achievement == nil {
-                                        Image("CommonLockedCheevoArtifact").resizable().scaledToFill()
                                     } else {
-                                        ZStack {
-                                            RoundedRectangle(cornerRadius: 12).fill(rarity.color.opacity(achievement == nil ? 0.05 : 0.16))
-                                            Image(systemName: achievement == nil ? "lock.fill" : achievementVisual(for: cheevo.id).icon)
-                                                .font(.headline.weight(.black)).foregroundStyle(achievement == nil ? .white.opacity(0.22) : accent)
-                                        }
+                                        GeneratedCheevoArtifactView(code: cheevo.id, locked: achievement == nil)
                                     }
                                 }
                                 .frame(width: 48, height: 48).clipShape(RoundedRectangle(cornerRadius: 10))
@@ -5271,12 +5292,10 @@ private struct CheevoBriefingView: View {
                                 .clipShape(RoundedRectangle(cornerRadius: 22))
                                 .overlay(RoundedRectangle(cornerRadius: 22).stroke(visual.color.opacity(0.45), lineWidth: 2))
                         } else {
-                            ZStack {
-                                Circle().fill(visual.color.opacity(0.12)).frame(width: 190, height: 190)
-                                Circle().stroke(visual.color.opacity(0.28), lineWidth: 18).frame(width: 168, height: 168)
-                                Circle().stroke(visual.color, lineWidth: 3).frame(width: 150, height: 150)
-                                AchievementGlyph(visual: visual, size: 68).opacity(isEarned ? 1 : 0.62)
-                            }
+                            GeneratedCheevoArtifactView(code: definition.id, locked: !isEarned)
+                                .frame(maxWidth: 310, maxHeight: 310)
+                                .clipShape(RoundedRectangle(cornerRadius: 22))
+                                .overlay(RoundedRectangle(cornerRadius: 22).stroke(visual.color.opacity(0.45), lineWidth: 2))
                         }
                     }.shadow(color: visual.color.opacity(0.45), radius: 24)
 
@@ -5387,6 +5406,24 @@ private func trophyFeaturePriority(_ type: String) -> Int {
 private func achievementVisual(for code: String) -> AchievementVisual {
     switch code.lowercased() {
     case "the_creator", "the_commissioner": return AchievementVisual(icon: "crown.fill", glyph: "👑", color: .yellow)
+    case "two_wolves_of_prestige": return AchievementVisual(icon: "pawprint.fill", glyph: "🐺", color: .yellow)
+    case "egg_obsession": return AchievementVisual(icon: "eye.fill", glyph: "🫣", color: .purple)
+    case "egg_three_peat": return AchievementVisual(icon: "3.circle.fill", glyph: "3️⃣", color: .purple)
+    case "egg_never_give_up": return AchievementVisual(icon: "figure.strengthtraining.traditional", glyph: "🫡", color: .purple)
+    case "egg_veterans": return AchievementVisual(icon: "medal.fill", glyph: "🎖️", color: .purple)
+    case "egg_anniversary": return AchievementVisual(icon: "calendar.badge.clock", glyph: "🎂", color: .cyan)
+    case "egg_curiosity_trophy": return AchievementVisual(icon: "cat.fill", glyph: "🐈", color: .cyan)
+    case "egg_vonnaggio_gold": return AchievementVisual(icon: "sun.max.fill", glyph: "🏖️", color: .cyan)
+    case "egg_hidden_headline": return AchievementVisual(icon: "newspaper.fill", glyph: "🗞️", color: .cyan)
+    case "egg_leap_day": return AchievementVisual(icon: "hare.fill", glyph: "🐇", color: .cyan)
+    case "egg_birthday": return AchievementVisual(icon: "gift.fill", glyph: "🎁", color: .cyan)
+    case "egg_lucky_seven": return AchievementVisual(icon: "7.circle.fill", glyph: "🎰", color: .cyan)
+    case "egg_halloween": return AchievementVisual(icon: "moon.haze.fill", glyph: "🎃", color: .cyan)
+    case "egg_christmas": return AchievementVisual(icon: "snowflake", glyph: "🎄", color: .cyan)
+    case "egg_thanksgiving": return AchievementVisual(icon: "fork.knife", glyph: "🦃", color: .cyan)
+    case "egg_newyear": return AchievementVisual(icon: "sparkles", glyph: "🎆", color: .cyan)
+    case "egg_developer_thanks": return AchievementVisual(icon: "heart.fill", glyph: "💚", color: .cyan)
+    case "egg_mascot_scout": return AchievementVisual(icon: "binoculars.fill", glyph: "🦅", color: .cyan)
     case "neighborhood_creeper": return AchievementVisual(icon: "binoculars.fill", glyph: "🪟", color: .green)
     case "let_them_cook": return AchievementVisual(icon: "cpu.fill", glyph: "🤖", color: .purple)
     case "cheevo_king": return AchievementVisual(icon: "crown.fill", glyph: "👑", color: .yellow)
@@ -5401,6 +5438,38 @@ private func achievementVisual(for code: String) -> AchievementVisual {
     case "war_room_recruit": return AchievementVisual(icon: "helmet.fill", glyph: "🪖", color: .green)
     case "creator_checked_in": return AchievementVisual(icon: "gift.fill", glyph: "🎁", color: .red)
     case "face_of_the_franchise": return AchievementVisual(icon: "person.crop.circle.badge.camera.fill", glyph: "📸", color: .cyan)
+    case "first_blood": return AchievementVisual(icon: "drop.fill", glyph: "🩸", color: .red)
+    case "lock_it_in": return AchievementVisual(icon: "lock.fill", glyph: "🔐", color: .green)
+    case "on_the_board": return AchievementVisual(icon: "chart.bar.fill", glyph: "📍", color: .green)
+    case "chalk_eater": return AchievementVisual(icon: "figure.american.football", glyph: "🧱", color: .green)
+    case "saturday_starter": return AchievementVisual(icon: "calendar", glyph: "🗓️", color: .green)
+    case "green_light": return AchievementVisual(icon: "light.beacon.max.fill", glyph: "🚦", color: .green)
+    case "gameday_ready": return AchievementVisual(icon: "backpack.fill", glyph: "🎒", color: .green)
+    case "streak_starter": return AchievementVisual(icon: "flame.fill", glyph: "🔥", color: .green)
+    case "card_complete": return AchievementVisual(icon: "checkmark.rectangle.stack.fill", glyph: "✅", color: .green)
+    case "prop_merchant": return AchievementVisual(icon: "text.badge.checkmark", glyph: "🧾", color: .green)
+    case "best_bet_marked": return AchievementVisual(icon: "star.square.fill", glyph: "⭐️", color: .green)
+    case "confidence_ladder": return AchievementVisual(icon: "chart.bar.xaxis.ascending", glyph: "🪜", color: .green)
+    case "division_dweller": return AchievementVisual(icon: "house.fill", glyph: "🏠", color: .green)
+    case "week_one_warrior": return AchievementVisual(icon: "1.circle.fill", glyph: "1️⃣", color: .green)
+    case "two_week_tour": return AchievementVisual(icon: "2.circle.fill", glyph: "2️⃣", color: .green)
+    case "halfway_hangin": return AchievementVisual(icon: "circle.lefthalf.filled", glyph: "🪢", color: .green)
+    case "double_digit_club": return AchievementVisual(icon: "10.circle.fill", glyph: "🔟", color: .green)
+    case "push_happens": return AchievementVisual(icon: "arrow.left.arrow.right", glyph: "↔️", color: .green)
+    case "favorite_survivor": return AchievementVisual(icon: "shield.checkered", glyph: "🛡️", color: .green)
+    case "dog_day_afternoon": return AchievementVisual(icon: "pawprint.fill", glyph: "🐶", color: .green)
+    case "spread_survivor": return AchievementVisual(icon: "ruler.fill", glyph: "📏", color: .green)
+    case "multi_game_monday": return AchievementVisual(icon: "moon.stars.fill", glyph: "🌙", color: .green)
+    case "three_pack": return AchievementVisual(icon: "3.circle.fill", glyph: "3️⃣", color: .green)
+    case "locker_lurker": return AchievementVisual(icon: "eye.fill", glyph: "👀", color: .green)
+    case "news_reader": return AchievementVisual(icon: "newspaper.fill", glyph: "📰", color: .green)
+    case "board_watcher": return AchievementVisual(icon: "binoculars.fill", glyph: "🔭", color: .green)
+    case "rules_skimmer": return AchievementVisual(icon: "book.pages.fill", glyph: "📖", color: .green)
+    case "crystal_gazed": return AchievementVisual(icon: "sparkles", glyph: "🔮", color: .green)
+    case "profile_peeker": return AchievementVisual(icon: "person.text.rectangle.fill", glyph: "🕵️", color: .green)
+    case "late_night_lock": return AchievementVisual(icon: "moon.fill", glyph: "🌃", color: .green)
+    case "rematch_ready": return AchievementVisual(icon: "arrow.trianglehead.2.clockwise.rotate.90", glyph: "🔁", color: .green)
+    case "bare_minimum_dual": return AchievementVisual(icon: "2.circle.fill", glyph: "✌️", color: .green)
     case "keys_to_the_war_room": return AchievementVisual(icon: "key.fill", glyph: "🗝️", color: .yellow)
     case "open_for_business": return AchievementVisual(icon: "door.left.hand.open", glyph: "🚪", color: .green)
     case "the_velvet_rope": return AchievementVisual(icon: "person.badge.key.fill", glyph: "🪢", color: .purple)
@@ -5559,12 +5628,9 @@ private struct AchievementArtifactTile: View {
                         .frame(width: 92, height: 92).clipShape(RoundedRectangle(cornerRadius: 14))
                         .overlay(RoundedRectangle(cornerRadius: 14).stroke(visual.color.opacity(0.45)))
                 } else {
-                    ZStack {
-                        Circle().fill(visual.color.opacity(0.12)).frame(width: 78, height: 78)
-                        Circle().stroke(visual.color.opacity(0.35), lineWidth: 8).frame(width: 68, height: 68)
-                        Circle().stroke(visual.color, lineWidth: 2).frame(width: 64, height: 64)
-                        AchievementGlyph(visual: visual, size: 28)
-                    }
+                    GeneratedCheevoArtifactView(code: achievement.code, locked: false)
+                        .frame(width: 92, height: 92).clipShape(RoundedRectangle(cornerRadius: 14))
+                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(visual.color.opacity(0.45)))
                 }
             }
             .shadow(color: visual.color.opacity(0.32), radius: 10)
@@ -5586,6 +5652,60 @@ private struct AchievementGlyph: View {
         Group {
             if let glyph = visual.glyph { Text(glyph).font(.system(size: size)) }
             else { Image(systemName: visual.icon).font(.system(size: size, weight: .black)).foregroundStyle(visual.color) }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+private struct GeneratedCheevoArtifactView: View {
+    let code: String
+    let locked: Bool
+    private var visual: AchievementVisual { achievementVisual(for: code) }
+    private var definition: CheevoDefinition? {
+        let normalized = code == "the_creator" ? "the_commissioner" : code.lowercased()
+        return CheevoCatalog.all.first { $0.id == normalized }
+    }
+    private var rarity: CheevoRarity { definition?.rarity ?? .common }
+    private var assetName: String {
+        if locked && rarity == .common { return "CommonLockedCheevoArtifact" }
+        switch rarity {
+        case .legendary: return "LegendaryFallbackCheevoArtifact"
+        case .epic: return "EpicFallbackCheevoArtifact"
+        case .rare: return "RareFallbackCheevoArtifact"
+        case .common:
+            switch definition?.recruitmentTag?.label {
+            case "NFL": return "CommonNflCheevoArtifact"
+            case "CFB": return "CommonCfbCheevoArtifact"
+            case "FIELDHOUSE": return "CommonFieldhouseCheevoArtifact"
+            default: return "CommonUnlockedCheevoArtifact"
+            }
+        }
+    }
+
+    var body: some View {
+        GeometryReader { proxy in
+            let edge = min(proxy.size.width, proxy.size.height)
+            ZStack {
+                Image(assetName)
+                    .resizable()
+                    .scaledToFill()
+                    .saturation(locked ? 0.35 : 1)
+                    .opacity(locked ? 0.68 : 1)
+                if locked && rarity != .common {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: edge * 0.18, weight: .black))
+                        .foregroundStyle(.white.opacity(0.72))
+                        .padding(edge * 0.09)
+                        .background(.black.opacity(0.76), in: Circle())
+                } else if !locked {
+                    Circle()
+                        .fill(.black.opacity(0.58))
+                        .frame(width: edge * 0.40, height: edge * 0.40)
+                        .overlay(Circle().stroke(visual.color.opacity(0.92), lineWidth: max(1, edge * 0.016)))
+                    AchievementGlyph(visual: visual, size: edge * 0.22)
+                        .shadow(color: visual.color.opacity(0.9), radius: edge * 0.05)
+                }
+            }
         }
         .accessibilityHidden(true)
     }
@@ -5618,12 +5738,10 @@ private struct AchievementEvidenceView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 22))
                             .overlay(RoundedRectangle(cornerRadius: 22).stroke(visual.color.opacity(0.4)))
                     } else {
-                        ZStack {
-                            Circle().fill(visual.color.opacity(0.12)).frame(width: 170, height: 170)
-                            Circle().stroke(visual.color.opacity(0.25), lineWidth: 18).frame(width: 150, height: 150)
-                            Circle().stroke(visual.color, lineWidth: 3).frame(width: 136, height: 136)
-                            AchievementGlyph(visual: visual, size: 62)
-                        }
+                        GeneratedCheevoArtifactView(code: achievement.code, locked: false)
+                            .frame(maxWidth: 310, maxHeight: 310)
+                            .clipShape(RoundedRectangle(cornerRadius: 22))
+                            .overlay(RoundedRectangle(cornerRadius: 22).stroke(visual.color.opacity(0.4)))
                     }
                 }
                 .shadow(color: visual.color.opacity(0.52), radius: 26)

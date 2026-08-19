@@ -104,7 +104,7 @@ begin
     if v_next_card is null then
       insert into public.week_cards(league_id,week_number,lock_time,prop_question,prop_option_a,prop_option_b,prop_points,published_at)
       select p_league_id,v_next,(now()+interval '7 days')::text,
-        case when v_phase='postseason' then 'Will postseason pressure create at least one push?' else 'Will the room blame the commissioner before Monday?' end,
+        case when v_phase='postseason' then 'Will postseason pressure create a one-score finish?' else 'Will the room blame the commissioner before Monday?' end,
         'Yes — dignity is already gone','No — a shocking display of restraint',3,now()
       from public.week_cards where league_id=p_league_id and week_number=p_week_number
       returning id into v_next_card;
@@ -221,8 +221,7 @@ begin
     select jsonb_agg(
       jsonb_build_object(
         'game_id', cg.id,
-        'winner', case when (cg.sort_order + v_week) % 7 = 0 then 'push'
-                       when (cg.sort_order + v_week) % 2 = 0 then 'home'
+        'winner', case when (cg.sort_order + v_week) % 2 = 0 then 'home'
                        else 'away' end
       ) order by cg.sort_order
     ) into v_results

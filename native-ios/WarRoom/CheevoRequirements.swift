@@ -125,7 +125,7 @@ halfway_hangin|Play 6 weeks in a season.
 double_digit_club|Reach 10 season pick'em points.
 fifty_club|Reach 50 season points.
 century_club|Reach 100 season points.
-push_happens|Record a push (tracked when scoring lands a push).
+push_happens|Win a pick by exactly half a point against the spread.
 favorite_survivor|Get 3 correct ATS picks.
 dog_day_afternoon|Get 1 correct ATS pick (dog proxy until side tracking).
 spread_survivor|Win any single ATS pick.

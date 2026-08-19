@@ -129,7 +129,7 @@ begin
 
   v_locked:=public.lock_foundry_week(p_league_id,p_week_number);
   select jsonb_agg(jsonb_build_object('game_id',cg.id,'winner',
-    case when (cg.sort_order+p_week_number)%7=0 then 'push' when (cg.sort_order+p_week_number)%2=0 then 'home' else 'away' end
+    case when (cg.sort_order+p_week_number)%2=0 then 'home' else 'away' end
   ) order by cg.sort_order),
   case when p_week_number%2=0 then wc.prop_option_a else wc.prop_option_b end
   into v_results,v_prop

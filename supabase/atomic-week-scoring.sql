@@ -63,7 +63,7 @@ begin
   from supplied s
   left join public.card_games cg
     on cg.id = s.game_id and cg.week_card_id = v_card.id
-  where cg.id is null or s.winner not in ('home', 'away', 'push');
+  where cg.id is null or s.winner not in ('home', 'away');
 
   if v_bad_count > 0
      or jsonb_array_length(p_results) <> v_game_count

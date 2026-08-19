@@ -11,6 +11,51 @@ import Foundation
 
 struct WarRoomTests {
 
+    @Test func bettingLinesAlwaysResolveWithoutATie() {
+        #expect(noPushSpread(3) == 3.5)
+        #expect(noPushSpread(-4) == 4.5)
+        #expect(noPushSpread(7.5) == 7.5)
+        #expect(noPushSpread(2.24) == 2.5)
+        #expect(isNoPushSpread(3.5))
+        #expect(isNoPushSpread(-10.5))
+        #expect(!isNoPushSpread(3))
+        #expect(!isNoPushSpread(7.25))
+    }
+
+    @Test func leagueAutoBalanceIsEvenAndMinimizesMoves() {
+        let players = (0..<11).map { index in
+            LeagueDivisionBalanceCandidate(
+                membershipId: UUID(uuidString: String(format: "00000000-0000-0000-0000-%012d", index + 1))!,
+                name: "Player \(index + 1)",
+                currentDivision: index < 4 ? "North" : (index < 7 ? "South" : (index < 9 ? "East" : "West"))
+            )
+        }
+        let assignments = LeagueDivisionBalancer.assignments(for: players)
+        let counts = Dictionary(grouping: assignments.values, by: { $0 }).mapValues(\.count)
+        #expect(counts["North"] == 3)
+        #expect(counts["South"] == 3)
+        #expect(counts["East"] == 3)
+        #expect(counts["West"] == 2)
+        #expect(assignments[players[0].membershipId] == "North")
+        #expect(assignments[players[4].membershipId] == "South")
+    }
+
+    @Test func leagueAutoBalanceAssignsEveryPlayerDeterministically() {
+        let players = (0..<6).map { index in
+            LeagueDivisionBalanceCandidate(
+                membershipId: UUID(uuidString: String(format: "10000000-0000-0000-0000-%012d", index + 1))!,
+                name: "Player \(index + 1)",
+                currentDivision: nil
+            )
+        }
+        let first = LeagueDivisionBalancer.assignments(for: players)
+        let second = LeagueDivisionBalancer.assignments(for: players.reversed())
+        #expect(first == second)
+        #expect(first.count == players.count)
+        let counts = Dictionary(grouping: first.values, by: { $0 }).mapValues(\.count)
+        #expect((counts.values.max() ?? 0) - (counts.values.min() ?? 0) <= 1)
+    }
+
     @Test func cfbWeeksTwoThroughFourteenMatchEspnTuesdayBuckets() throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!

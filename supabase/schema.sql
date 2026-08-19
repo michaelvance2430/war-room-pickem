@@ -125,7 +125,7 @@ create table if not exists public.game_results (
   id uuid primary key default gen_random_uuid(),
   week_result_id uuid not null references public.week_results (id) on delete cascade,
   card_game_id uuid not null references public.card_games (id) on delete cascade,
-  winner text not null check (winner in ('home', 'away', 'push')),
+  winner text not null check (winner in ('home', 'away')),
   unique (week_result_id, card_game_id)
 );
 

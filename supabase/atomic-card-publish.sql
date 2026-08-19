@@ -43,9 +43,10 @@ begin
     where g.sort_order is null or g.sort_order<0 or g.sort_order>4
        or coalesce(btrim(g.away_team),'')='' or coalesce(btrim(g.home_team),'')=''
        or g.away_team=g.home_team or g.spread is null
+       or mod(abs(g.spread), 1) <> 0.5
        or g.favorite is null or g.favorite not in ('home','away')
        or coalesce(btrim(g.start_time),'')=''
-  ) then raise exception 'Every game needs valid teams, spread, favorite, and kickoff'; end if;
+  ) then raise exception 'Every game needs valid teams, a half-point spread, favorite, and kickoff'; end if;
   if (select count(distinct g.sort_order) from jsonb_to_recordset(p_games) as g(sort_order integer))<>5 then
     raise exception 'Game order must be unique';
   end if;

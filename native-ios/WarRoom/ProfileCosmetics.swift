@@ -31,7 +31,7 @@ enum ProfileCosmetics {
         "prop_prophet": "Prop Prophet", "parlay_pilot": "Parlay Pilot", "comeback_kid": "Comeback Kid",
         "cut_line_killer": "Cut Line Killer", "road_dog": "Road Dog", "toilet_crown": "Eater of Trash",
         "bottom_of_the_barrel": "Bottom of the Barrel", "chalk_eater": "Chalk Eater", "chalk_streak": "Public Favorite",
-        "division_dweller": "Division Dweller", "locker_lurker": "Locker Lurker", "push_happens": "Push Merchant",
+        "division_dweller": "Division Dweller", "locker_lurker": "Locker Lurker", "push_happens": "Half-Point Hero",
         "cut_line_escape": "Cut Line Escapee", "leaderboard_lookin": "Leaderboard Lookin’", "volume_shooter": "Volume Shooter",
         "iron_lungs": "Never Ghosts", "ten_week_tenant": "Ten-Week Tenant", "home_cookin": "Home Cookin’",
         "hot_hand": "Hot Hand", "clean_sheet": "Clean Sheet", "best_bet_banker": "Best Bet Banker",

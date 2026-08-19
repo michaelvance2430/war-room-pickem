@@ -15,6 +15,9 @@ struct LeagueManagementView: View {
     @State private var standings: [Standing] = []
     @State private var loading = true
     @State private var savingMembershipId: UUID?
+    @State private var balancing = false
+    @State private var showingAutoBalanceConfirmation = false
+    @State private var balanceSummary: String?
     @State private var error: String?
 
     private var identity: SportIdentity { SportIdentity(membership.leagues.sportId) }
@@ -52,6 +55,7 @@ struct LeagueManagementView: View {
                                 playerRow(standing)
                             }
                         }
+                        autoBalanceControl
                     }
                     if let error {
                         managementPanel {
@@ -69,6 +73,12 @@ struct LeagueManagementView: View {
         .navigationBarTitleDisplayMode(.inline)
         .preferredColorScheme(.dark)
         .task { await loadRoster() }
+        .alert("Auto-balance the roster?", isPresented: $showingAutoBalanceConfirmation) {
+            Button("CANCEL", role: .cancel) {}
+            Button("BALANCE (groupNoun)") { Task { await autoBalance() } }
+        } message: {
+            Text("This evenly redistributes all players across four groups. Existing assignments are preserved whenever the final group sizes allow it. You can still move anyone manually afterward.")
+        }
     }
 
     @ViewBuilder private var managementBackdrop: some View {
@@ -163,6 +173,33 @@ struct LeagueManagementView: View {
         .overlay(RoundedRectangle(cornerRadius: identity.isNFL ? 6 : 14).stroke(.white.opacity(0.1)))
     }
 
+    private var autoBalanceControl: some View {
+        managementPanel {
+            VStack(alignment: .leading, spacing: 11) {
+                HStack(spacing: 11) {
+                    Image(systemName: "scale.3d").font(.title2.weight(.black)).foregroundStyle(accent)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("AUTO-BALANCE ROSTER").font(.headline.weight(.black)).foregroundStyle(.white)
+                        Text("Even groups. Minimum necessary moves. Manual control remains.")
+                            .font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.55))
+                    }
+                }
+                Button { showingAutoBalanceConfirmation = true } label: {
+                    Label(balancing ? "BALANCING…" : "BALANCE (standings.count) PLAYERS", systemImage: "person.3.sequence.fill")
+                        .font(.subheadline.weight(.black)).frame(maxWidth: .infinity).padding(13)
+                        .foregroundStyle(identity.isNFL ? .black : .black)
+                        .background(balancing ? Color.gray : accent, in: RoundedRectangle(cornerRadius: identity.isNFL ? 5 : 12))
+                }
+                .buttonStyle(.plain)
+                .disabled(balancing || savingMembershipId != nil || standings.isEmpty)
+                if let balanceSummary {
+                    Label(balanceSummary, systemImage: "checkmark.seal.fill")
+                        .font(.caption.weight(.black)).foregroundStyle(accent)
+                }
+            }
+        }
+    }
+
     private var seasonControls: some View {
         VStack(alignment: .leading, spacing: 11) {
             Text("SEASON CONTROL").font(.caption.weight(.black)).tracking(1.7).foregroundStyle(.red)
@@ -214,6 +251,37 @@ struct LeagueManagementView: View {
             try await SupabaseAPI.updateMemberDivision(token: token, leagueId: membership.leagueId, membershipId: standing.id, division: division.rawValue)
             standings = try await SupabaseAPI.standings(token: token, leagueId: membership.leagueId)
         } catch { self.error = error.localizedDescription }
+    }
+
+    @MainActor private func autoBalance() async {
+        guard let token = auth.token, !standings.isEmpty else { return }
+        balancing = true
+        error = nil
+        balanceSummary = nil
+        defer { balancing = false }
+        let candidates = standings.map {
+            LeagueDivisionBalanceCandidate(membershipId: $0.id, name: $0.name, currentDivision: $0.division)
+        }
+        let assignments = LeagueDivisionBalancer.assignments(for: candidates)
+        let moves = standings.compactMap { standing -> (Standing, String)? in
+            guard let division = assignments[standing.id], normalizedDivision(standing.division) != division else { return nil }
+            return (standing, division)
+        }
+        do {
+            for (standing, division) in moves {
+                try await SupabaseAPI.updateMemberDivision(
+                    token: token,
+                    leagueId: membership.leagueId,
+                    membershipId: standing.id,
+                    division: division
+                )
+            }
+            standings = try await SupabaseAPI.standings(token: token, leagueId: membership.leagueId)
+            balanceSummary = moves.isEmpty ? "ROSTER ALREADY BALANCED" : "(moves.count) MOVES COMPLETE · GROUPS BALANCED"
+        } catch {
+            standings = (try? await SupabaseAPI.standings(token: token, leagueId: membership.leagueId)) ?? standings
+            self.error = "Auto-balance stopped: \(error.localizedDescription)"
+        }
     }
 }
 

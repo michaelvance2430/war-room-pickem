@@ -123,7 +123,7 @@ enum CheevoLore {
         "two_week_tour": "You returned for a second week despite having access to the first week’s evidence.",
         "halfway_hangin": "Six weeks played and still attached to the season by both hands and one questionable Best Bet.",
         "double_digit_club": "Ten season points opened the velvet rope. The club is crowded and the dress code is confidence.",
-        "push_happens": "The game landed exactly on the number. Nobody won, nobody lost, and everybody found a reason to complain.",
+        "push_happens": "The hook showed up at the last second and your side survived by half a point. Clean result. Maximum complaining.",
         "favorite_survivor": "Three favorites covered without stepping on a rake. Conservative does not mean painless.",
         "dog_day_afternoon": "Your first real underdog covered. Somewhere, a tiny helmeted mutt just learned your name.",
         "spread_survivor": "One pick escaped the number alive. Do not confuse survival with control of the situation.",
