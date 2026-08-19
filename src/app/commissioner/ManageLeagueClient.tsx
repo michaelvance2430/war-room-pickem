@@ -43,6 +43,13 @@ import { isLeagueBuildLocked, openingWeekLockLabel } from "@/lib/league-build";
 import SportPoolCommishPanel from "@/components/SportPoolCommishPanel";
 import { weekTitle } from "@/lib/dates";
 import { deleteLeague } from "@/lib/session-restore";
+import {
+  listPrivateRoomJoinRequests,
+  reviewPrivateRoomJoin,
+  setLeagueLobbyVisibility,
+  type LobbyJoinRequest,
+  type LobbyVisibility,
+} from "@/lib/lobby";
 
 type SectionId =
   | "identity"
@@ -86,7 +93,8 @@ function ManageLeagueInner() {
   const [leagueNameEdit, setLeagueNameEdit] = useState("");
   const [cutPercent, setCutPercent] = useState(50);
   const [crystalBallEnabled, setCrystalBallEnabled] = useState(true);
-  const [isOpenRoom, setIsOpenRoom] = useState(false);
+  const [lobbyVisibility, setLobbyVisibility] = useState<LobbyVisibility>("hidden");
+  const [joinRequests, setJoinRequests] = useState<LobbyJoinRequest[]>([]);
   const [openRoomBusy, setOpenRoomBusy] = useState(false);
   const [openRoomNote, setOpenRoomNote] = useState<string | null>(null);
   const [homeTaglineId, setHomeTaglineId] = useState(DEFAULT_HOME_TAGLINE_ID);
@@ -170,10 +178,13 @@ function ManageLeagueInner() {
           const sb = createClient();
           const { data: row } = await sb
             .from("leagues")
-            .select("is_open")
+            .select("is_open,lobby_visibility")
             .eq("id", lg.id)
             .maybeSingle();
-          setIsOpenRoom(!!(row as { is_open?: boolean } | null)?.is_open);
+          const visibility = (row as { lobby_visibility?: LobbyVisibility } | null)?.lobby_visibility;
+          setLobbyVisibility(visibility || ((row as { is_open?: boolean } | null)?.is_open ? "public" : "hidden"));
+          const requestResult = await listPrivateRoomJoinRequests(lg.id);
+          if (!requestResult.error) setJoinRequests(requestResult.requests);
         }
       } catch {
         /* optional column */
@@ -295,22 +306,33 @@ function ManageLeagueInner() {
     }
   }
 
-  async function toggleOpenRoom() {
+  async function changeLobbyVisibility(next: LobbyVisibility) {
     if (!league?.id || openRoomBusy) return;
     setOpenRoomBusy(true);
     setOpenRoomNote(null);
     try {
-      const { setLeagueOpenListing } = await import("@/lib/open-room");
-      const next = !isOpenRoom;
-      const res = await setLeagueOpenListing(league.id, next);
+      const res = await setLeagueLobbyVisibility(league.id, next);
       if (!res.ok) {
         setOpenRoomNote(res.error || "Could not update listing");
       } else {
-        setIsOpenRoom(next);
-        setOpenRoomNote(next ? "Listed as open room." : "Private — code only.");
+        setLobbyVisibility(next);
+        setOpenRoomNote(next === "public" ? "Public — players can join now." : next === "private" ? "Private — players can request access." : "Hidden — invite code only.");
       }
     } catch (e: unknown) {
       setOpenRoomNote(e instanceof Error ? e.message : "Failed");
+    }
+    setOpenRoomBusy(false);
+  }
+
+  async function reviewLobbyRequest(requestId: string, approve: boolean) {
+    setOpenRoomBusy(true);
+    setOpenRoomNote(null);
+    const result = await reviewPrivateRoomJoin(requestId, approve);
+    if (!result.ok) setOpenRoomNote(result.error);
+    else {
+      setJoinRequests((current) => current.filter((request) => request.id !== requestId));
+      setOpenRoomNote(approve ? "Player approved and added to the room." : "Request declined.");
+      if (approve) void hydrate();
     }
     setOpenRoomBusy(false);
   }
@@ -513,9 +535,11 @@ function ManageLeagueInner() {
   }
 
   const roleLabel = "Commissioner";
-  const accessSummary = isOpenRoom
-    ? "Open room · Invite code active"
-    : "Private league · Invite code active";
+  const accessSummary = lobbyVisibility === "public"
+    ? "Public Lobby room · Join now"
+    : lobbyVisibility === "private"
+      ? `Private Lobby room · ${joinRequests.length} request${joinRequests.length === 1 ? "" : "s"}`
+      : "Hidden room · Invite code active";
   const rulesSummary = [
     sportLabel(league?.sportId),
     "Fair Entry always on",
@@ -586,30 +610,21 @@ function ManageLeagueInner() {
                     className="mt-1 w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm"
                   />
                 </label>
-                <div className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2.5">
-                  <div>
-                    <p className="text-sm font-semibold">Open room listing</p>
-                    <p className="text-xs text-muted">
-                      {isOpenRoom ? "Listed in open lobby" : "Code invite only"}
-                    </p>
+                <div className="rounded-lg border border-border p-3">
+                  <p className="text-sm font-semibold">Lobby access</p>
+                  <p className="mt-1 text-xs text-muted">Public joins instantly. Private requires your approval. Hidden uses invite codes only.</p>
+                  <div className="mt-3 grid grid-cols-3 gap-2">
+                    {(["public", "private", "hidden"] as LobbyVisibility[]).map((option) => (
+                      <button key={option} type="button" disabled={openRoomBusy} onClick={() => void changeLobbyVisibility(option)} className={`min-h-[42px] rounded-lg border text-[10px] font-black uppercase tracking-wider ${lobbyVisibility === option ? "border-primary bg-primary text-black" : "border-border bg-background text-muted"}`}>{option}</button>
+                    ))}
                   </div>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={isOpenRoom}
-                    disabled={openRoomBusy}
-                    onClick={() => void toggleOpenRoom()}
-                    className={`relative shrink-0 w-12 h-7 rounded-full ${
-                      isOpenRoom ? "bg-primary" : "bg-border"
-                    }`}
-                  >
-                    <span
-                      className={`absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-black transition ${
-                        isOpenRoom ? "translate-x-5" : ""
-                      }`}
-                    />
-                  </button>
                 </div>
+                {lobbyVisibility === "private" && (
+                  <div className="rounded-lg border border-amber-300/25 bg-amber-300/5 p-3">
+                    <div className="flex items-center justify-between"><p className="text-sm font-bold">Lobby requests</p><span className="text-xs text-muted">{joinRequests.length} pending</span></div>
+                    {joinRequests.length === 0 ? <p className="mt-2 text-xs text-muted">No one is waiting for clearance.</p> : <div className="mt-2 space-y-2">{joinRequests.map((request) => <div key={request.id} className="flex items-center gap-2 rounded-lg bg-background px-3 py-2"><span className="min-w-0 flex-1 truncate text-sm font-semibold">{request.gameHandle}</span><button type="button" disabled={openRoomBusy} onClick={() => void reviewLobbyRequest(request.id, false)} className="rounded-md border border-border px-2 py-1 text-[10px] font-bold text-muted">DENY</button><button type="button" disabled={openRoomBusy} onClick={() => void reviewLobbyRequest(request.id, true)} className="rounded-md bg-primary px-2 py-1 text-[10px] font-black text-black">APPROVE</button></div>)}</div>}
+                  </div>
+                )}
                 {openRoomNote && (
                   <p className="text-xs text-primary">{openRoomNote}</p>
                 )}

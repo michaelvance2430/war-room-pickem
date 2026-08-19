@@ -1,19 +1,27 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-const card = readFileSync("src/components/RoomDiscoveryCard.tsx", "utf8");
 const lobby = readFileSync("src/app/open-room/page.tsx", "utf8");
+const lobbyData = readFileSync("src/lib/lobby.ts", "utf8");
+const lobbySql = readFileSync("supabase/lobby-v1.sql", "utf8");
 const memberships = readFileSync("src/components/LeagueMembershipCard.tsx", "utf8");
 const join = readFileSync("src/app/join/page.tsx", "utf8");
 
-assert.match(lobby, /<RoomDiscoveryCard/, "open lobby must use intelligence-rich room cards");
-assert.match(card, /pack\.rulesOneLiner/, "room cards must explain the format");
-assert.match(card, /seatsLeft/, "room cards must show remaining capacity");
-assert.match(card, /Private invite code stays hidden/, "public discovery must preserve code privacy");
+assert.match(lobby, /THE LOBBY/, "Lobby needs its command-center identity");
+assert.match(lobby, /Room capacity/, "room cards must show capacity");
+assert.match(lobby, /ROOM FULL/, "full rooms must be visible and disabled");
+assert.match(lobby, /REQUEST ACCESS/, "private rooms must support access requests");
+assert.match(lobby, /Top 10 Players/, "Lobby needs a player Cheevo board");
+assert.match(lobby, /Top 10 Crews/, "Lobby needs a crew Cheevo board");
+assert.match(lobbyData, /request_private_room_join/, "private requests must use the secured RPC");
+assert.match(lobbySql, /auth\.uid\(\)/, "Lobby RPCs must require authenticated identity");
+assert.doesNotMatch(lobbySql, /select[^;]*email/is, "Lobby RPCs must never expose account email");
+assert.match(lobbySql, /m\.is_bot is false/, "leaderboards must exclude bots");
+assert.match(lobbySql, /mode::text, 'production'/, "leaderboards must exclude Foundry");
 assert.match(memberships, /pack\.rulesOneLiner/, "member league cards must retain format context");
 assert.match(join, /Private War Room invitation/, "deep links need a persuasive invitation landing state");
 assert.match(join, /Your seat is waiting/, "deep links must lead with the intended room action");
 assert.match(join, /No ads/, "invite value proposition must preserve the free-first promise");
 assert.match(join, /deepLinkCode \? "Claim your seat"/, "ordinary code entry and texted invites must remain distinct");
 
-console.log("Room discovery verified: rich cards, private codes, persuasive deep-link landing");
+console.log("Lobby verified: public/private/full states, secure requests, live Cheevo boards, privacy guards");

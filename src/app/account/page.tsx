@@ -1516,6 +1516,12 @@ export default function AccountPage() {
           </div>
       <div className="mt-4 flex flex-col gap-2">
             <Link
+              href="/open-room"
+              className="text-center text-sm py-2.5 rounded-lg border border-primary/40 bg-primary/10 text-primary font-bold"
+            >
+              Enter Lobby
+            </Link>
+            <Link
               href="/join"
               className="text-center text-sm py-2.5 rounded-lg bg-primary text-black font-medium"
             >

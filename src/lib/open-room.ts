@@ -467,6 +467,19 @@ export async function setLeagueOpenListing(
     return { ok: false, error: "Supabase is not configured." };
   }
   const supabase = createClient();
+  // Lobby v1 authority. Keep the legacy column fallback until every environment
+  // has the migration, so room creation remains backward-compatible.
+  const { error: lobbyError } = await supabase.rpc(
+    "set_league_lobby_visibility",
+    {
+      p_league_id: leagueId,
+      p_visibility: isOpen ? "public" : "hidden",
+    }
+  );
+  if (!lobbyError) return { ok: true };
+  if (!/could not find the function|does not exist|schema cache|PGRST202/i.test(`${lobbyError.code || ""} ${lobbyError.message || ""}`)) {
+    return { ok: false, error: lobbyError.message };
+  }
   const patch: Record<string, unknown> = {
     is_open: isOpen,
   };

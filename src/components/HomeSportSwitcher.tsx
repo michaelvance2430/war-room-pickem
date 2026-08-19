@@ -780,7 +780,7 @@ function GrowthActions({
         onClick={onNavigate}
         className="block text-[11px] font-bold uppercase tracking-wide text-primary hover:underline py-1.5 min-h-[36px] flex items-center"
       >
-        Browse Open Leagues
+        Enter Lobby
       </Link>
     </div>
   );

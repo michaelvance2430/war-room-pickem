@@ -80,15 +80,15 @@ function LoginPageInner() {
    * knows the league sport (join restore / hub / league-build) — never force
    * CFB declare as a universal default on signup.
    */
-  function afterAuthPath(_opts?: { isNewSignup?: boolean }): string {
+  function afterAuthPath(opts?: { isNewSignup?: boolean }): string {
     const nextRaw = searchParams.get("next");
     const next = nextRaw ? safeWarRoomPath(nextRaw, "") : null;
     const code = peekPendingJoinCode();
-    // Invite/join destination first; no-league users go Home → join/start.
+    // Invite/join destination first; brand-new players enter the Lobby.
     // Allegiance (NFL or CFB) is gated when that sport becomes active.
     return (
       next ||
-      (code ? `/join?code=${encodeURIComponent(code)}` : "/")
+      (code ? `/join?code=${encodeURIComponent(code)}` : opts?.isNewSignup ? "/open-room" : "/")
     );
   }
 

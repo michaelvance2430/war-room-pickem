@@ -351,7 +351,7 @@ export default function Home() {
             return;
           }
           if (restored.status === "no_leagues") {
-            router.replace("/join");
+            router.replace("/open-room");
             return;
           }
           if (restored.status === "pick_league") {

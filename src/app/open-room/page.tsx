@@ -1,387 +1,122 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
-import {
-  OPEN_ROOM_POLL_MS,
-  OPEN_ROOM_WAIT_OFFER_MS,
-  claimNextOpenSeat,
-  listOpenRooms,
-  type OpenRoomListing,
-} from "@/lib/open-room";
-import { MAX_LEAGUE_PLAYERS } from "@/lib/league-limits";
-import OwnershipNotice from "@/components/OwnershipNotice";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import BrandMark from "@/components/BrandMark";
-import RoomDiscoveryCard from "@/components/RoomDiscoveryCard";
+import { createClient, hasSupabaseConfig } from "@/lib/supabase/client";
+import { seatPlayerInLeague } from "@/lib/open-room";
+import { listLobbyLeaderboards, listLobbyRooms, requestPrivateRoomJoin, type LobbyCrewLeader, type LobbyPlayerLeader, type LobbyRoom } from "@/lib/lobby";
 
-type Phase =
-  | "boot"
-  | "searching"
-  | "seating"
-  | "seated"
-  | "waiting"
-  | "error";
+type Filter = "all" | "public" | "private";
+const REFRESH_MS = 15_000;
 
-/**
- * Open-room lobby — fill one public league at a time, then the next.
- * After OPEN_ROOM_WAIT_OFFER_MS, offer to try a different open league.
- */
+function RoomCard({ room, busy, onAction }: { room: LobbyRoom; busy: boolean; onAction: (room: LobbyRoom) => void }) {
+  const fill = Math.min(100, Math.max(3, (room.humanCount / room.maxHumanMembers) * 100));
+  const pending = room.requestStatus === "pending";
+  const label = room.isMember ? "ENTER ROOM" : room.isFull ? "ROOM FULL" : pending ? "REQUEST SENT" : room.accessMode === "private" ? "REQUEST ACCESS" : "JOIN NOW";
+  return (
+    <article className="relative overflow-hidden rounded-2xl border border-emerald-400/20 bg-black/55 p-4 shadow-[0_18px_60px_rgba(0,0,0,.45)] backdrop-blur-sm">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_85%_5%,rgba(34,197,94,.13),transparent_35%)]" />
+      <div className="relative">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2"><span className={`h-2 w-2 rounded-full ${room.isFull ? "bg-red-500" : room.accessMode === "private" ? "bg-amber-300" : "bg-emerald-400 animate-pulse"}`} /><p className={`text-[10px] font-black uppercase tracking-[.2em] ${room.isFull ? "text-red-400" : room.accessMode === "private" ? "text-amber-300" : "text-emerald-300"}`}>{room.isFull ? "FULL" : room.accessMode}</p></div>
+            <h2 className="mt-2 truncate text-lg font-black text-white">{room.name}</h2>
+            <p className="mt-1 text-[11px] font-bold uppercase tracking-widest text-white/40">{room.sportId.toUpperCase()} WAR ROOM</p>
+          </div>
+          <div className="rounded-xl border border-white/10 bg-white/[.04] px-3 py-2 text-right"><p className="text-lg font-black tabular-nums text-white">{room.humanCount}/{room.maxHumanMembers}</p><p className="text-[9px] font-bold uppercase tracking-wider text-white/40">players</p></div>
+        </div>
+        <div className="mt-5">
+          <div className="mb-2 flex justify-between text-[10px] font-bold uppercase tracking-wider"><span className="text-white/45">Room capacity</span><span className={room.isFull ? "text-red-400" : "text-emerald-300"}>{room.isFull ? "No openings" : `${room.seatsLeft} open`}</span></div>
+          <div className="h-2 overflow-hidden rounded-full bg-white/10"><div className={`h-full rounded-full shadow-[0_0_16px_currentColor] ${room.isFull ? "bg-red-500 text-red-500" : room.accessMode === "private" ? "bg-amber-300 text-amber-300" : "bg-emerald-400 text-emerald-400"}`} style={{ width: `${fill}%` }} /></div>
+        </div>
+        <button type="button" disabled={busy || (!room.isMember && (room.isFull || pending))} onClick={() => onAction(room)} className={`mt-5 min-h-[48px] w-full rounded-xl border text-xs font-black tracking-[.14em] ${room.isFull && !room.isMember ? "cursor-not-allowed border-red-500/20 bg-red-500/5 text-red-400/55" : pending ? "cursor-wait border-amber-300/25 bg-amber-300/10 text-amber-200" : "border-emerald-400/40 bg-emerald-400 text-black shadow-[0_0_24px_rgba(34,197,94,.18)] active:scale-[.99]"}`}>{busy ? "WORKING…" : label}</button>
+      </div>
+    </article>
+  );
+}
+
+function Leaderboard({ title, eyebrow, rows, kind }: { title: string; eyebrow: string; rows: LobbyPlayerLeader[] | LobbyCrewLeader[]; kind: "players" | "crews" }) {
+  return (
+    <section className="overflow-hidden rounded-2xl border border-emerald-400/20 bg-black/60">
+      <header className="border-b border-emerald-400/15 bg-emerald-400/[.06] px-4 py-3"><p className="text-[9px] font-black uppercase tracking-[.24em] text-emerald-400">{eyebrow}</p><h2 className="mt-1 text-base font-black text-white">{title}</h2></header>
+      <div className="divide-y divide-white/[.06]">
+        {rows.length === 0 ? <p className="px-4 py-6 text-center text-xs text-white/40">First names hit this board as Cheevos land.</p> : rows.map((entry, index) => {
+          const player = kind === "players" ? entry as LobbyPlayerLeader : null;
+          const crew = kind === "crews" ? entry as LobbyCrewLeader : null;
+          return <div key={`${index}-${player?.gameHandle || crew?.crewName}`} className="grid grid-cols-[28px_1fr_auto] items-center gap-2 px-4 py-3"><span className={`text-sm font-black ${index < 3 ? "text-emerald-300" : "text-white/30"}`}>{index + 1}</span><div className="min-w-0"><p className="truncate text-sm font-black text-white">{player?.gameHandle || crew?.crewName}</p>{player && <p className="truncate text-[10px] font-bold uppercase tracking-wider text-white/35">{player.leagueName}</p>}</div><div className="text-right"><p className="text-sm font-black tabular-nums text-emerald-300">{player?.cheevoPoints ?? crew?.cheevoPoints}</p><p className="text-[8px] font-bold uppercase tracking-wider text-white/30">Cheevo pts</p></div></div>;
+        })}
+      </div>
+    </section>
+  );
+}
+
 export default function OpenRoomPage() {
   const router = useRouter();
-  const [phase, setPhase] = useState<Phase>("boot");
-  const [statusLine, setStatusLine] = useState("Checking your seatbelt…");
-  const [error, setError] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState("Player");
-  const [preview, setPreview] = useState<OpenRoomListing[]>([]);
-  const [excludeIds, setExcludeIds] = useState<string[]>([]);
-  const [showSwitchOffer, setShowSwitchOffer] = useState(false);
-  const [seatedName, setSeatedName] = useState<string | null>(null);
-  const [elapsedSec, setElapsedSec] = useState(0);
-  const startedAt = useRef<number>(Date.now());
-  const busy = useRef(false);
-  const offerShown = useRef(false);
-  const seatedRef = useRef(false);
+  const [rooms, setRooms] = useState<LobbyRoom[]>([]);
+  const [players, setPlayers] = useState<LobbyPlayerLeader[]>([]);
+  const [crews, setCrews] = useState<LobbyCrewLeader[]>([]);
+  const [filter, setFilter] = useState<Filter>("all");
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [notice, setNotice] = useState<string | null>(null);
 
-  // Auth gate
+  const refresh = useCallback(async () => {
+    const [roomResult, boardResult] = await Promise.all([listLobbyRooms(), listLobbyLeaderboards()]);
+    setRooms(roomResult.rooms); setPlayers(boardResult.players); setCrews(boardResult.crews);
+    setNotice(roomResult.error || boardResult.error || null); setLoading(false);
+  }, []);
+
   useEffect(() => {
-    if (!hasSupabaseConfig()) {
-      setError("Supabase is not configured.");
-      setPhase("error");
-      return;
-    }
+    if (!hasSupabaseConfig()) { setNotice("The Lobby is not configured yet."); setLoading(false); return; }
     const supabase = createClient();
     supabase.auth.getSession().then(({ data }) => {
       const user = data.session?.user;
-      if (!user) {
-        router.replace(
-          `/login?next=${encodeURIComponent("/open-room")}`
-        );
-        return;
-      }
-      setUserId(user.id);
-      const meta = user.user_metadata?.display_name as string | undefined;
-      setDisplayName(meta || user.email?.split("@")[0] || "Player");
-      setPhase("searching");
-      startedAt.current = Date.now();
+      if (!user) { router.replace(`/login?next=${encodeURIComponent("/open-room")}`); return; }
+      setUserId(user.id); setDisplayName(String(user.user_metadata?.display_name || "Player")); void refresh();
     });
-  }, [router]);
+    const timer = window.setInterval(() => void refresh(), REFRESH_MS);
+    return () => window.clearInterval(timer);
+  }, [refresh, router]);
 
-  const refreshPreview = useCallback(async () => {
-    const listed = await listOpenRooms({ excludeIds });
-    setPreview(listed.rooms.slice(0, 5));
-    return listed;
-  }, [excludeIds]);
+  const visibleRooms = useMemo(() => rooms.filter((room) => filter === "all" || room.accessMode === filter), [rooms, filter]);
 
-  const tryClaim = useCallback(async () => {
-    if (!userId || busy.current) return;
-    if (seatedRef.current) return;
-    busy.current = true;
-    setError(null);
-    setPhase((p) => (p === "seated" ? p : "seating"));
-    setStatusLine("Looking for an open seat…");
-    try {
-      const res = await claimNextOpenSeat({
-        userId,
-        displayName,
-        excludeIds,
-      });
-      if (res.status === "seated") {
-        seatedRef.current = true;
-        setSeatedName(res.leagueName);
-        setPhase("seated");
-        setStatusLine(
-          res.alreadyMember
-            ? `Welcome back · ${res.leagueName}`
-            : `You’re in · ${res.leagueName}`
-        );
-        setShowSwitchOffer(false);
-        const seatedSport = res.sportId || "cfb";
-        window.setTimeout(() => {
-          void (async () => {
-            let land = "/";
-            try {
-              const {
-                needsAllegianceForSport,
-                declareAllegianceHref,
-              } = await import("@/lib/favorite-teams");
-              if (await needsAllegianceForSport(seatedSport)) {
-                land = declareAllegianceHref(seatedSport, "/");
-              }
-            } catch {
-              /* Home hub still gates team / Super Bowl / weekly */
-            }
-            router.push(land);
-            router.refresh();
-          })();
-        }, 900);
-        return;
-      }
-      if (res.status === "error") {
-        setError(res.error);
-        setPhase("error");
-        setStatusLine(
-          res.rpcMissing
-            ? "Matching isn’t available"
-            : "Couldn’t claim a seat"
-        );
-        return;
-      }
-      // waiting — empty list or rooms filled mid-claim
-      if (res.filledIds?.length) {
-        setExcludeIds((prev) => [...new Set([...prev, ...res.filledIds!])]);
-      }
-      setPhase("waiting");
-      setStatusLine(res.message);
-      if (res.empty) {
-        setPreview([]);
-      } else {
-        await refreshPreview();
-      }
-    } finally {
-      busy.current = false;
-    }
-  }, [userId, displayName, excludeIds, refreshPreview, router]);
-
-  // Elapsed timer + offer popup
-  useEffect(() => {
-    if (phase === "boot" || phase === "seated" || phase === "error") return;
-    const t = window.setInterval(() => {
-      const sec = Math.floor((Date.now() - startedAt.current) / 1000);
-      setElapsedSec(sec);
-      if (
-        !offerShown.current &&
-        Date.now() - startedAt.current >= OPEN_ROOM_WAIT_OFFER_MS
-      ) {
-        offerShown.current = true;
-        setShowSwitchOffer(true);
-      }
-    }, 500);
-    return () => window.clearInterval(t);
-  }, [phase]);
-
-  // Poll matchmaking (stable — don't rebind when phase flips seating↔waiting)
-  useEffect(() => {
+  async function act(room: LobbyRoom) {
     if (!userId) return;
-    seatedRef.current = false;
-    void tryClaim();
-    const id = window.setInterval(() => {
-      if (seatedRef.current) return;
-      void tryClaim();
-    }, OPEN_ROOM_POLL_MS);
-    return () => window.clearInterval(id);
-  }, [userId, excludeIds, tryClaim]);
-
-  function tryDifferentRoom() {
-    // Skip the top listed rooms so we land on the next dude waiting to fill
-    const skip = preview.slice(0, 2).map((r) => r.id);
-    setExcludeIds((prev) => [...new Set([...prev, ...skip])]);
-    setShowSwitchOffer(false);
-    offerShown.current = false;
-    startedAt.current = Date.now();
-    setElapsedSec(0);
-    setPhase("searching");
-    setStatusLine("Looking for a different open league…");
-    setError(null);
-  }
-
-  function keepWaiting() {
-    setShowSwitchOffer(false);
-    // Reset timer so we can offer again later
-    offerShown.current = false;
-    startedAt.current = Date.now();
-    setElapsedSec(0);
-  }
-
-  if (phase === "boot") {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-muted">
-        Loading open lobby…
-      </div>
-    );
+    if (room.isMember) { router.push("/"); return; }
+    if (room.isFull) return;
+    setBusyId(room.id); setNotice(null);
+    if (room.accessMode === "private") {
+      const result = await requestPrivateRoomJoin(room.id);
+      setNotice(result.ok ? `Request sent to ${room.name}. The commissioner can approve you now.` : result.error);
+      await refresh(); setBusyId(null); return;
+    }
+    const result = await seatPlayerInLeague({ leagueId: room.id, userId, displayName });
+    if (!result.ok) { setNotice(result.error); await refresh(); setBusyId(null); return; }
+    router.push("/"); router.refresh();
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-10 pb-[max(2rem,env(safe-area-inset-bottom))]">
-      <div className="max-w-md w-full">
-        <div className="text-center mb-6">
-      <div className="flex justify-center mb-3">
-            <BrandMark size={80} variant="force" className="rounded-xl" />
-      </div>
-          <h1 className="text-2xl font-bold">Open room lobby</h1>
-      <p className="text-sm text-muted mt-2 leading-relaxed">
-            We fill one room at a time so teams form fast — then seat the next
-            person waiting. Cap {MAX_LEAGUE_PLAYERS} per room.
-          </p>
-      </div>
-
-        <div className="rounded-xl border-2 border-primary/40 bg-card p-5 space-y-4">
-      <div className="flex items-center gap-3">
-            {phase !== "seated" && phase !== "error" && (
-              <span className="w-2.5 h-2.5 rounded-full bg-primary animate-pulse shrink-0" />
-            )}
-            <div className="min-w-0">
-      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
-                {phase === "seated"
-                  ? "Seated"
-                  : phase === "error"
-                    ? "Hold up"
-                    : phase === "waiting"
-                      ? "Waiting"
-                      : "Matching"}
-              </p>
-      <p className="text-sm text-foreground mt-0.5 leading-snug">
-                {statusLine}
-              </p>
-              {phase !== "seated" && phase !== "error" && (
-                <p className="text-[11px] text-muted mt-1">
-                  Looking · {elapsedSec}s
-                </p>
-              )}
-            </div>
-      </div>
-
-          {error && (
-            <div className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2.5">
-              <p className="text-sm text-danger leading-relaxed">{error}</p>
-            </div>
-          )}
-
-          {preview.length > 0 && phase !== "seated" && phase !== "error" && (
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted mb-2">
-                Open rooms filling now
-              </p>
-              <div className="space-y-3">
-                {preview.map((r, i) => (
-                  <RoomDiscoveryCard
-                    key={r.id}
-                    name={r.name}
-                    sportId={r.sportId}
-                    memberCount={r.memberCount}
-                    maxMembers={r.maxHumanMembers || MAX_LEAGUE_PLAYERS}
-                    featured={i === 0}
-                  />
-                ))}
-              </div>
-              <p className="text-[11px] text-muted mt-2 leading-relaxed">
-                First in line is the fullest open room — we pack that one before
-                starting the next. Codes stay private.
-              </p>
-            </div>
-          )}
-
-          {preview.length === 0 &&
-            (phase === "waiting" || phase === "searching") && (
-              <div className="rounded-lg border border-border bg-background/50 px-3 py-3 text-sm text-muted leading-relaxed space-y-1.5">
-                <p className="font-semibold text-foreground text-sm">
-                  No open seats right now
-                </p>
-                <p>
-                  Hang tight while we poll for a free chair — or join with a
-                  private code, or host an open room for others.
-                </p>
-              </div>
-            )}
-
-          {phase === "seated" && seatedName && (
-            <p className="text-sm text-primary font-semibold text-center">
-              Welcome to {seatedName}. Taking you home...
-            </p>
-          )}
-
-          <div className="flex flex-col gap-2 pt-1">
-            {phase !== "seated" && phase !== "error" && (
-              <button
-                type="button"
-                onClick={() => void tryClaim()}
-                className="w-full py-3.5 min-h-[52px] rounded-xl bg-primary text-black font-bold touch-manipulation"
-              >
-                {phase === "seating" ? "Claiming seat..." : "Try seat again"}
-              </button>
-            )}
-            {phase === "error" && (
-              <button
-                type="button"
-                onClick={() => {
-                  setError(null);
-                  setPhase("searching");
-                  setStatusLine("Looking for an open seat...");
-                  startedAt.current = Date.now();
-                  offerShown.current = false;
-                  void tryClaim();
-                }}
-                className="w-full py-3.5 min-h-[52px] rounded-xl bg-primary text-black font-bold touch-manipulation"
-              >
-                Try again
-              </button>
-            )}
-            <Link
-              href="/join?mode=join"
-              className="w-full py-3 min-h-[48px] rounded-xl border border-border text-center text-sm font-medium text-muted hover:text-foreground touch-manipulation flex items-center justify-center"
-            >
-              Join with a code instead
-            </Link>
-            <Link
-              href="/join?mode=create&open=1"
-              className="w-full py-3 min-h-[48px] rounded-xl border border-primary/30 text-center text-sm font-medium text-primary touch-manipulation flex items-center justify-center"
-            >
-              Commish an open room
-            </Link>
-            <Link
-              href="/"
-              className="text-center text-xs text-muted py-2"
-            >
-              Back home
-            </Link>
-          </div>
+    <main className="relative min-h-screen overflow-hidden bg-[#020806] px-4 pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))] text-white">
+      <div className="pointer-events-none absolute inset-0 opacity-40 [background-image:linear-gradient(rgba(34,197,94,.08)_1px,transparent_1px),linear-gradient(90deg,rgba(34,197,94,.08)_1px,transparent_1px)] [background-size:42px_42px]" />
+      <div className="pointer-events-none absolute left-1/2 top-[-160px] h-[420px] w-[420px] -translate-x-1/2 rounded-full bg-emerald-500/15 blur-[110px]" />
+      <div className="relative mx-auto w-full max-w-6xl">
+        <header className="flex items-center justify-between gap-3"><div className="flex items-center gap-3"><BrandMark size={54} variant="force" className="rounded-xl shadow-[0_0_30px_rgba(34,197,94,.2)]" /><div><p className="text-[9px] font-black uppercase tracking-[.28em] text-emerald-400">War Room Network</p><h1 className="text-2xl font-black tracking-tight">THE LOBBY</h1></div></div><Link href="/" className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-bold text-white/70">HOME</Link></header>
+        <section className="mt-7 rounded-2xl border border-emerald-400/25 bg-[linear-gradient(135deg,rgba(34,197,94,.12),rgba(0,0,0,.65))] p-5 shadow-[0_0_70px_rgba(34,197,94,.07)]">
+          <p className="text-[10px] font-black uppercase tracking-[.24em] text-emerald-300">Find your next crew</p><h2 className="mt-2 max-w-2xl text-2xl font-black leading-tight sm:text-3xl">Public rooms. Private grudges. One live command center.</h2><p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/55">Join an open room immediately or request clearance from a private room commissioner. Full rooms stay on the board—but nobody can poke their way in.</p>
+          <div className="mt-5 flex flex-wrap gap-2">{(["all", "public", "private"] as Filter[]).map((item) => <button key={item} type="button" onClick={() => setFilter(item)} className={`min-h-[40px] rounded-lg border px-4 text-[10px] font-black uppercase tracking-[.16em] ${filter === item ? "border-emerald-400 bg-emerald-400 text-black" : "border-white/10 bg-black/25 text-white/55"}`}>{item}</button>)}<Link href="/join?mode=join" className="ml-auto flex min-h-[40px] items-center rounded-lg border border-white/10 px-4 text-[10px] font-black uppercase tracking-[.16em] text-white/60">Have a code?</Link></div>
+        </section>
+        {notice && <div role="status" aria-live="polite" className="mt-4 rounded-xl border border-amber-300/25 bg-amber-300/10 px-4 py-3 text-sm text-amber-100">{notice}</div>}
+        <div className="mt-6 grid gap-6 lg:grid-cols-[1.35fr_.9fr]">
+          <section><div className="mb-3 flex items-end justify-between"><div><p className="text-[9px] font-black uppercase tracking-[.22em] text-emerald-400">Live room feed</p><h2 className="mt-1 text-xl font-black">AVAILABLE WAR ROOMS</h2></div><span className="text-[10px] font-bold uppercase tracking-wider text-white/30">Refreshes live</span></div>
+            {loading ? <div className="rounded-2xl border border-white/10 bg-black/40 p-10 text-center text-sm text-white/40">Scanning the network…</div> : visibleRooms.length === 0 ? <div className="rounded-2xl border border-dashed border-emerald-400/25 bg-black/40 p-8 text-center"><p className="font-black">No rooms are broadcasting yet.</p><p className="mt-2 text-sm text-white/45">Be the first commissioner to light one up.</p><Link href="/join?mode=create" className="mt-5 inline-flex min-h-[44px] items-center rounded-xl bg-emerald-400 px-5 text-xs font-black text-black">START A ROOM</Link></div> : <div className="grid gap-3 sm:grid-cols-2">{visibleRooms.map((room) => <RoomCard key={room.id} room={room} busy={busyId === room.id} onAction={(selected) => void act(selected)} />)}</div>}
+          </section>
+          <aside className="space-y-4 lg:sticky lg:top-5 lg:self-start"><Leaderboard title="Top 10 Players" eyebrow="Individual signal" rows={players} kind="players" /><Leaderboard title="Top 10 Crews" eyebrow="Combined firepower" rows={crews} kind="crews" /><p className="px-2 text-center text-[10px] leading-relaxed text-white/30">Boards use current game handles and room/crew names. Account emails never appear.</p></aside>
         </div>
-      <OwnershipNotice className="mt-8" />
       </div>
-
-      {/* Timed offer: try a different open league */}
-      {showSwitchOffer && phase !== "seated" && (
-        <div
-          className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="open-room-switch-title"
-        >
-      <div className="w-full max-w-md rounded-t-2xl sm:rounded-2xl border border-border bg-card p-5 shadow-2xl">
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-2">
-              Still looking
-            </p>
-      <h2
-              id="open-room-switch-title"
-              className="text-lg font-bold text-foreground mb-2"
-            >
-              Want to join a different open league?
-            </h2>
-      <p className="text-sm text-muted leading-relaxed mb-5">
-              You’ve been waiting a bit. We can skip the current fill line and
-              try the next open room — or keep holding this seat.
-            </p>
-      <div className="flex flex-col sm:flex-row gap-2">
-              <button
-                type="button"
-                onClick={tryDifferentRoom}
-                className="flex-1 py-3.5 min-h-[52px] rounded-xl bg-primary text-black font-bold touch-manipulation"
-              >
-                Yes — different open league
-              </button>
-      <button
-                type="button"
-                onClick={keepWaiting}
-                className="flex-1 py-3.5 min-h-[52px] rounded-xl border border-border text-sm font-medium touch-manipulation"
-              >
-                Keep waiting here
-              </button>
-      </div>
-          </div>
-      </div>
-      )}
-    </div>
+    </main>
   );
 }
