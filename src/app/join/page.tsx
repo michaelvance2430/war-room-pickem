@@ -621,11 +621,11 @@ function JoinPageInner() {
               href="/open-room"
               className="w-full py-4 min-h-[56px] rounded-xl border-2 border-primary/40 bg-primary/10 text-base font-bold touch-manipulation flex items-center justify-center text-foreground"
             >
-              Join open room
+              Enter Lobby
             </Link>
       <p className="text-center text-[11px] text-muted pt-1 leading-relaxed">
-              Open lobby fills one room at a time (max {MAX_LEAGUE_PLAYERS}).
-              Full rooms get a friendly “no seats” message — not a scolding.
+              Browse public and private rooms first. You only join after choosing
+              a room yourself (max {MAX_LEAGUE_PLAYERS} players).
             </p>
       <Link href="/login" className="block text-center text-xs text-muted mt-4">Switch account</Link>
       <OwnershipNotice className="mt-6" />
@@ -1006,7 +1006,7 @@ function JoinPageInner() {
               href="/open-room"
               className="block w-full text-center text-sm text-primary font-medium py-2"
             >
-              No code? Try the open room lobby
+              No code? Enter the Lobby
             </Link>
       </div>
         )}

@@ -753,7 +753,7 @@ function GrowthActions({
           onClick={onNavigate}
           className="min-h-[44px] flex items-center justify-center rounded-lg border border-border text-xs font-bold text-foreground hover:bg-card-hover touch-manipulation"
         >
-          BROWSE OPEN LEAGUES
+          ENTER LOBBY
         </Link>
       </div>
     );

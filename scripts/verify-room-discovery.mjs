@@ -29,5 +29,8 @@ assert.match(join, /Private War Room invitation/, "deep links need a persuasive 
 assert.match(join, /Your seat is waiting/, "deep links must lead with the intended room action");
 assert.match(join, /No ads/, "invite value proposition must preserve the free-first promise");
 assert.match(join, /deepLinkCode \? "Claim your seat"/, "ordinary code entry and texted invites must remain distinct");
+assert.match(join, /Enter Lobby/, "league choices must describe Lobby entry without implying automatic assignment");
+assert.match(join, /only join after choosing/, "Lobby entry must promise player-controlled room selection");
+assert.doesNotMatch(join, /Open lobby fills one room at a time/, "legacy matchmaking copy must not imply automatic assignment");
 
 console.log("Lobby verified: public/private/full states, UUID-unique Cheevo boards, secure requests, privacy guards");

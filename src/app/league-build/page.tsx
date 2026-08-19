@@ -551,7 +551,7 @@ function LeagueBuildInner() {
               Private or open room?
             </h2>
       <p className="text-sm text-muted leading-relaxed">
-              Private = invite code only. Open = people using Join open room can
+              Private = invite code only. Open = people browsing the Lobby can
               land here until full.
             </p>
       <div className="grid grid-cols-1 gap-2">
