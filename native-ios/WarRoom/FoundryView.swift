@@ -998,7 +998,7 @@ struct FoundryLeagueMirrorView: View {
                     Text(moment.detail).font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.52)).lineLimit(2).multilineTextAlignment(.leading)
                 }
                 Spacer();Image(systemName:"arrow.up.left.and.arrow.down.right").font(.caption.weight(.black)).foregroundStyle(moment.color)
-            }.padding(15).background(.white.opacity(0.055),in:RoundedRectangle(cornerRadius:14)).overlay(RoundedRectangle(cornerRadius:14).stroke(moment.color.opacity(0.28)))
+            }.padding(15).background(.white.opacity(0.055),in:RoundedRectangle(cornerRadius:isNFL ? 6 : 14)).overlay(RoundedRectangle(cornerRadius:isNFL ? 6 : 14).stroke(moment.color.opacity(0.28)))
         }.buttonStyle(.plain)
     }
 
@@ -1007,15 +1007,20 @@ struct FoundryLeagueMirrorView: View {
     private func moments(for edition: GazetteEditionRow) -> [FoundryKeyMoment] {
         let payload=edition.payload
         var rows:[FoundryKeyMoment]=[]
+        let crownColor: Color = isNFL ? .cyan : .yellow
+        let movementColor: Color = isNFL ? .blue : .green
+        let rivalryColor: Color = isNFL ? .red : .orange
+        let quoteColor: Color = isNFL ? .cyan : .orange
+        let promotionColor: Color = isNFL ? .blue : .yellow
         func add(_ kind:String,_ story:GazetteStory?,_ color:Color,_ icon:String) { guard let story,(story.headline?.isEmpty==false || story.deck?.isEmpty==false) else{return};rows.append(.init(id:"\(edition.id)-\(kind)",editionId:edition.id,week:edition.weekNumber,kind:kind,title:story.headline ?? story.names?.joined(separator:" vs ") ?? "MOMENT CAPTURED",detail:story.deck ?? story.pts.map{"\($0) points"} ?? "Moment receipt filed.",names:story.names ?? [],points:story.pts,color:color,icon:icon)) }
-        add("CROWN",payload.crown,.yellow,"crown.fill");add("SHAME",payload.shame,.red,"hand.thumbsdown.fill");add("STANDINGS DEADLOCK",payload.standingsDeadlock,.purple,"equal.circle.fill");add("NO-LOCK INCIDENT",payload.noLock,.red,"lock.slash.fill")
+        add("CROWN",payload.crown,crownColor,"crown.fill");add("SHAME",payload.shame,.red,"hand.thumbsdown.fill");add("STANDINGS DEADLOCK",payload.standingsDeadlock,isNFL ? .cyan : .purple,"equal.circle.fill");add("NO-LOCK INCIDENT",payload.noLock,.red,"lock.slash.fill")
         if membership.leagues.sportId.lowercased() != "nfl" {
             add("CRYSTAL BALL MISS",payload.crystalBallMiss,.cyan,"sparkles")
             add("CHAOS DETONATION",payload.chaosDetonation,.red,"radiation")
         }
-        add("BIGGEST SWING",payload.swing,.green,"arrow.up.arrow.down.circle.fill");add("RIVALRY WATCH",payload.rivalryWatch,.orange,"bolt.horizontal.circle.fill")
-        if let q=payload.pullQuote,let text=q.text,!text.isEmpty { rows.append(.init(id:"\(edition.id)-quote",editionId:edition.id,week:edition.weekNumber,kind:"LOCKER ROOM RECEIPT",title:q.by ?? "THE ROOM",detail:"“\(text)”",names:[q.by].compactMap{$0},points:nil,color:.orange,icon:"quote.bubble.fill")) }
-        for (index,order) in (payload.promotionOrders ?? []).enumerated() { rows.append(.init(id:"\(edition.id)-promotion-\(index)",editionId:edition.id,week:edition.weekNumber,kind:"PROMOTION ORDER",title:order.name ?? "CLASSIFIED PERSONNEL",detail:"\(order.from ?? "UNKNOWN") → \(order.to ?? "UNKNOWN") · \(order.deck ?? "Promotion filed.")",names:[order.name].compactMap{$0},points:nil,color:.yellow,icon:"chevron.up.2")) }
+        add("BIGGEST SWING",payload.swing,movementColor,"arrow.up.arrow.down.circle.fill");add("RIVALRY WATCH",payload.rivalryWatch,rivalryColor,"bolt.horizontal.circle.fill")
+        if let q=payload.pullQuote,let text=q.text,!text.isEmpty { rows.append(.init(id:"\(edition.id)-quote",editionId:edition.id,week:edition.weekNumber,kind:"LOCKER ROOM RECEIPT",title:q.by ?? "THE ROOM",detail:"“\(text)”",names:[q.by].compactMap{$0},points:nil,color:quoteColor,icon:"quote.bubble.fill")) }
+        for (index,order) in (payload.promotionOrders ?? []).enumerated() { rows.append(.init(id:"\(edition.id)-promotion-\(index)",editionId:edition.id,week:edition.weekNumber,kind:"PROMOTION ORDER",title:order.name ?? "CLASSIFIED PERSONNEL",detail:"\(order.from ?? "UNKNOWN") → \(order.to ?? "UNKNOWN") · \(order.deck ?? "Promotion filed.")",names:[order.name].compactMap{$0},points:nil,color:promotionColor,icon:"chevron.up.2")) }
         if let text=payload.emergencyProtocol,!text.isEmpty { rows.append(.init(id:"\(edition.id)-emergency",editionId:edition.id,week:edition.weekNumber,kind:"EMERGENCY PROTOCOL",title:"THE ROOM TRIPPED A WIRE",detail:text,names:[],points:nil,color:.red,icon:"exclamationmark.triangle.fill")) }
         return rows
     }
