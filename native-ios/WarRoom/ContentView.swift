@@ -1632,12 +1632,18 @@ private struct PlayerProfileRouteView: View {
     @State private var standing: Standing?
     @State private var loading = true
     @State private var errorMessage: String?
-    @State private var sportId = "cfb"
+    @State private var sportId: String
+
+    init(userId: UUID, fallbackName: String, sportId: String = "cfb") {
+        self.userId = userId
+        self.fallbackName = fallbackName
+        _sportId = State(initialValue: sportId.lowercased())
+    }
 
     var body: some View {
         Group {
             if let standing { PublicPlayerProfileView(standing: standing, sportId: sportId) }
-            else if loading { ProgressView("Opening \(fallbackName)’s file…").tint(.green) }
+            else if loading { ProgressView("Opening \(fallbackName)’s file…").tint(SportIdentity(sportId).isNFL ? .cyan : .green) }
             else { ContentUnavailableView("Profile unavailable", systemImage: "person.crop.circle.badge.questionmark", description: Text(errorMessage ?? "That player slipped out through a service tunnel.")) }
         }
         .task { await load() }
@@ -1690,14 +1696,24 @@ struct HomeView: View {
                 CfbRivalryWeekBackdrop()
             } else if let membership, membership.leagues.sportId.lowercased() == "nfl" {
                 NflHomeBackdrop(phase: NflSeasonPhase.phase(week: membership.leagues.currentWeek))
+            } else if let membership {
+                CfbHomePhaseBackdrop(phase: CfbSeasonPhase.phase(week: membership.leagues.currentWeek, regularSeasonWeeks: membership.leagues.regularSeasonWeeks))
             } else {
-                CfbHomePhaseBackdrop(phase: membership.map { CfbSeasonPhase.phase(week: $0.leagues.currentWeek, regularSeasonWeeks: $0.leagues.regularSeasonWeeks) } ?? .regularSeason)
+                LinearGradient(colors: [.black, Color.red.opacity(0.08), .black], startPoint: .topLeading, endPoint: .bottomTrailing).ignoresSafeArea()
             }
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     if loading {
-                        HomeCommandHeader(name: "OPENING WAR ROOM", sport: "SECURE CHANNEL", week: nil, dateRange: nil, commissioner: false)
-                        ProgressView("Decrypting grudges…").tint(.green)
+                        if leagueOverride?.leagues.sportId.lowercased() == "nfl" {
+                            NflBroadcastHeader(leagueName: "OPENING SUNDAY COMMAND", week: leagueOverride?.leagues.currentWeek ?? 1, dateRange: nil, commissioner: false)
+                            ProgressView("Opening the broadcast…").tint(.cyan)
+                        } else {
+                            VStack(alignment: .leading, spacing: 7) {
+                                Text("SECURE CHANNEL").font(.caption2.weight(.black)).tracking(2).foregroundStyle(.red)
+                                Text("OPENING WAR ROOM").font(.system(size: 31, weight: .black)).fontWidth(.condensed)
+                            }.frame(maxWidth: .infinity, alignment: .leading).padding(18).background(.black.opacity(0.82), in: RoundedRectangle(cornerRadius: 8)).overlay(RoundedRectangle(cornerRadius: 8).stroke(.white.opacity(0.16)))
+                            ProgressView("Opening the room…").tint(.white)
+                        }
                     }
                     else if let membership {
                         let isNFL = membership.leagues.sportId.lowercased() == "nfl"
@@ -1744,7 +1760,7 @@ struct HomeView: View {
                                         : isNFL
                                             ? "\(scorecard.weeklyTotal) points. Every Wild Card, Divisional, Conference, Super Bowl, and JDAM decision is itemized."
                                             : "\(scorecard.weeklyTotal) points. Every bowl allocation, Dead Hand adjustment, and bracket point is itemized.",
-                                    icon: "list.clipboard.fill", featured: true, accent: .yellow
+                                    icon: "list.clipboard.fill", featured: true, accent: isNFL ? .cyan : .yellow
                                 )
                             }.buttonStyle(WarRoomCardButtonStyle())
                         }
@@ -1947,7 +1963,7 @@ struct HomeView: View {
                             }
                         }.buttonStyle(WarRoomCardButtonStyle())
                         if let latest = lockerMessages.last {
-                            NavigationLink { PlayerProfileRouteView(userId: latest.userId, fallbackName: latest.authorName) } label: {
+                            NavigationLink { PlayerProfileRouteView(userId: latest.userId, fallbackName: latest.authorName, sportId: membership.leagues.sportId) } label: {
                                 if isNFL {
                                     NflPrimaryActionCard(kicker: "LATEST FROM THE SIDELINE", title: latest.authorName, detail: latest.body, icon: "quote.bubble.fill", urgent: true)
                                 } else {
@@ -4110,7 +4126,7 @@ private struct LockerBubble: View {
             }
             VStack(alignment: isMine ? .trailing : .leading, spacing: 7) {
                 HStack(spacing: 7) {
-                    NavigationLink { PlayerProfileRouteView(userId: message.userId, fallbackName: message.authorName) } label: {
+                    NavigationLink { PlayerProfileRouteView(userId: message.userId, fallbackName: message.authorName, sportId: sportId) } label: {
                         Text(isMine ? "YOU" : message.authorName.uppercased())
                             .font(.system(size: 9, weight: .black)).tracking(1.2).foregroundStyle(isMine ? mineAccent : (isNFL ? .red : .yellow))
                     }.buttonStyle(.plain)
@@ -6460,7 +6476,7 @@ private struct AnnouncementsView: View {
                                 }
                                 Text(item.body).font(.subheadline)
                                 HStack {
-                                    NavigationLink { PlayerProfileRouteView(userId: item.authorId, fallbackName: item.authorName) } label: {
+                                    NavigationLink { PlayerProfileRouteView(userId: item.authorId, fallbackName: item.authorName, sportId: identity.sportId) } label: {
                                         Text(item.authorName).fontWeight(.semibold)
                                     }.buttonStyle(.plain)
                                     Spacer()

@@ -202,7 +202,7 @@ struct LobbyView: View {
             }
             .refreshable { await load() }
         }
-        .navigationTitle("The Muster").navigationBarTitleDisplayMode(.inline)
+        .navigationTitle("").navigationBarTitleDisplayMode(.inline)
         .task { await load() }
     }
 
