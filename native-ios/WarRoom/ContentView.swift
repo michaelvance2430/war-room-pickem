@@ -1741,6 +1741,27 @@ struct HomeView: View {
                                 commissioner: isCommissioner
                             )
                         }
+                        if isCommissioner {
+                            NavigationLink { LeagueManagementView(membership: membership) } label: {
+                                if isNFL {
+                                    NflPrimaryActionCard(
+                                        kicker: "COMMISSIONER CONTROL · LEAGUE OPERATIONS",
+                                        title: "Manage League",
+                                        detail: "Move players across AFC and NFC groups, inspect the roster, and control the season.",
+                                        icon: "person.3.sequence.fill"
+                                    )
+                                } else {
+                                    StatusCard(
+                                        kicker: "COMMISSIONER CONTROL · LEAGUE OPERATIONS",
+                                        title: "Manage League",
+                                        detail: "Manage players, conference assignments, and season controls from one place.",
+                                        icon: "person.3.sequence.fill",
+                                        featured: true,
+                                        accent: .cyan
+                                    )
+                                }
+                            }.buttonStyle(WarRoomCardButtonStyle())
+                        }
                         if membership.leagues.sportId.lowercased() == "cfb" {
                             if isRivalryWeek {
                                 CfbRivalryWeekBanner()
@@ -2224,6 +2245,9 @@ private struct CommissionerCommandCenterView: View {
                     primaryAction
                     if identity.isNFL { NflBroadcastSectionLabel(title: "GAME-DAY CONTROL", detail: "ONE JOB PER DESK · NO MYSTERY BUTTONS") }
                     else { HomeSectionLabel(title: "COMMAND DOORS", detail: "ONE JOB PER ROOM · NO MYSTERY BUTTONS") }
+                    controlDoor(title: "MANAGE LEAGUE", detail: "ROSTER · CONFERENCES · SEASON CONTROL", icon: "person.3.sequence.fill", color: identity.isNFL ? .cyan : .green) {
+                        LeagueManagementView(membership: membership)
+                    }
                     controlDoor(title: "WHO’S IN", detail: "\(submittedCount) OF \(standings.count) CARDS ON FILE", icon: "person.2.fill", color: allSubmitted ? .green : .yellow) {
                         SubmissionStatusView(membership: membership, standings: standings, submittedUserIds: submittedUserIds)
                     }
@@ -2241,9 +2265,6 @@ private struct CommissionerCommandCenterView: View {
                     }
                     controlDoor(title: "RUN IT BACK", detail: "OPEN THE 7-DAY SPORT VOTE · MOVE YES VOTERS WITH ONE BUTTON", icon: "person.3.sequence.fill", color: .orange) {
                         SportPoolView(membership: membership)
-                    }
-                    controlDoor(title: "RESET THE SEASON", detail: "PRESERVE THE PEOPLE AND HARDWARE · ERASE THE ACTIVE SEASON", icon: "arrow.counterclockwise.circle.fill", color: .red) {
-                        LeagueSeasonResetView(membership: membership)
                     }
                 }
                 .padding(16).padding(.bottom, 34)

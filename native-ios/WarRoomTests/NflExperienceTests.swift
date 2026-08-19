@@ -80,4 +80,26 @@ struct NflExperienceTests {
         #expect(!FoundryLabPolicy.accepts(mode: "production", sportId: "nfl", preferredSportId: "nfl"))
         #expect(WeaponStrikeCatalog.presentation(for: "nfl") == nil)
     }
+
+    @Test func nflIdentityRewritesInheritedCollegeVocabulary() {
+        let identity = SportIdentity("nfl")
+        #expect(identity.gameDay == "SUNDAY")
+        #expect(identity.cheevoTitle(code: "saturday_starter", fallback: "Saturday Starter") == "Sunday Starter")
+        let localized = identity.localizedCheevoCopy("College Saturdays belong to the conference campus.")
+        #expect(localized == "Pro Sundays belong to the league stadium.")
+        #expect(!localized.localizedCaseInsensitiveContains("college"))
+        #expect(!localized.localizedCaseInsensitiveContains("saturday"))
+        #expect(!localized.localizedCaseInsensitiveContains("conference"))
+        #expect(!localized.localizedCaseInsensitiveContains("campus"))
+    }
+
+    @Test func everySportUsesItsOwnConferenceLabels() {
+        #expect(SportIdentity("nfl").divisionLabel("North") == "AFC EAST")
+        #expect(SportIdentity("nfl").divisionLabel("South") == "AFC WEST")
+        #expect(SportIdentity("nfl").divisionLabel("East") == "NFC EAST")
+        #expect(SportIdentity("nfl").divisionLabel("West") == "NFC WEST")
+        #expect(SportIdentity("cfb").divisionLabel("North") == "SEC")
+        #expect(SportIdentity("cfb").divisionLabel("South") == "BIG TEN")
+        #expect(SportIdentity("cbb").divisionLabel("North") == "MIDWEST")
+    }
 }

@@ -1347,6 +1347,26 @@ enum SupabaseAPI {
         return try await send(request, as: [Standing].self)
     }
 
+    static func updateMemberDivision(token: String, leagueId: UUID, membershipId: UUID, division: String) async throws {
+        let validDivisions = Set(["North", "South", "East", "West"])
+        guard validDivisions.contains(division) else { throw RequestError(message: "That conference assignment is invalid.") }
+        var components = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/memberships"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "id", value: "eq.\(membershipId.uuidString.lowercased())"),
+            URLQueryItem(name: "league_id", value: "eq.\(leagueId.uuidString.lowercased())"),
+            URLQueryItem(name: "select", value: "id,division"),
+        ]
+        var request = authorizedRequest(url: components.url!, token: token)
+        request.httpMethod = "PATCH"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("return=representation", forHTTPHeaderField: "Prefer")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["division": division])
+        let updated = try await send(request, as: [MembershipDivisionUpdate].self)
+        guard updated.first?.id == membershipId, updated.first?.division == division else {
+            throw RequestError(message: "The server did not confirm that conference move.")
+        }
+    }
+
     static func profile(token: String, userId: UUID) async throws -> Profile? {
         var components = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/profiles"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
@@ -1767,6 +1787,10 @@ enum SupabaseAPI {
             message = try values.decodeIfPresent(String.self, forKey: .message)
                 ?? values.decodeIfPresent(String.self, forKey: .error)
         }
+    }
+    private struct MembershipDivisionUpdate: Decodable {
+        let id: UUID
+        let division: String
     }
     private struct RequestError: LocalizedError { let message: String; var errorDescription: String? { message } }
 }

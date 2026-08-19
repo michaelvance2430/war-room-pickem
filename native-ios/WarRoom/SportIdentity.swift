@@ -87,7 +87,8 @@ struct SportIdentity {
     let sportId: String
 
     init(_ sportId: String?) {
-        self.sportId = sportId?.lowercased() == "nfl" ? "nfl" : "cfb"
+        let normalized = sportId?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? "cfb"
+        self.sportId = normalized.isEmpty ? "cfb" : normalized
     }
 
     var isNFL: Bool { sportId == "nfl" }
@@ -106,15 +107,31 @@ struct SportIdentity {
     var emptyCabinet: String { isNFL ? "PREGAME. THE SUNDAY DESK IS WATCHING." : "PRESEASON. THE CABINET IS JUDGING YOU." }
 
     func divisionLabel(_ division: String?) -> String {
-        if isNFL {
-            let value = division?.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() ?? ""
-            return value.isEmpty ? "NFL" : value
-        }
-        switch division?.lowercased() {
-        case "south": return "B10"
-        case "east": return "ACC"
-        case "west": return "BIG 12"
-        default: return "SEC"
+        let stored = division?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? "north"
+        switch sportId {
+        case "nfl":
+            switch stored {
+            case "south": return "AFC WEST"
+            case "east": return "NFC EAST"
+            case "west": return "NFC WEST"
+            default: return "AFC EAST"
+            }
+        case "cbb":
+            switch stored {
+            case "south": return "SOUTH"
+            case "east": return "EAST"
+            case "west": return "WEST"
+            default: return "MIDWEST"
+            }
+        case "cfb":
+            switch stored {
+            case "south": return "BIG TEN"
+            case "east": return "ACC"
+            case "west": return "BIG 12"
+            default: return "SEC"
+            }
+        default:
+            return stored.uppercased()
         }
     }
 
