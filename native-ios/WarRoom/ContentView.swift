@@ -730,6 +730,8 @@ private struct MissingWeekCardView: View {
     let memberships: [LeagueMembership]
     let isCommissioner: Bool
     let retry: () -> Void
+    private var isNFL: Bool { league?.leagues.sportId.lowercased() == "nfl" }
+    private var accent: Color { isNFL ? .cyan : .yellow }
 
     var body: some View {
         ZStack {
@@ -738,15 +740,15 @@ private struct MissingWeekCardView: View {
                 VStack(spacing: 18) {
                     Image(systemName: "calendar.badge.exclamationmark")
                         .font(.system(size: 58, weight: .black))
-                        .foregroundStyle(.yellow)
-                        .shadow(color: .yellow.opacity(0.35), radius: 16)
+                        .foregroundStyle(accent)
+                        .shadow(color: accent.opacity(0.35), radius: 16)
                     Text("WEEK \(league?.leagues.currentWeek ?? 0) · \((league?.leagues.sportId ?? "SPORT").uppercased())")
-                        .font(.caption2.weight(.black)).tracking(2).foregroundStyle(.yellow)
+                        .font(.caption2.weight(.black)).tracking(2).foregroundStyle(accent)
                     Text("NO CARD\nON THE BOARD")
                         .font(.system(size: 34, weight: .black)).fontWidth(.condensed)
                         .multilineTextAlignment(.center).lineSpacing(-3)
                     Text(league?.leagues.name.uppercased() ?? "WAR ROOM")
-                        .font(.caption.weight(.black)).tracking(1.4).foregroundStyle(.green)
+                        .font(.caption.weight(.black)).tracking(1.4).foregroundStyle(isNFL ? .red : .green)
                     Text(isCommissioner
                          ? "This league does not have a published card for its active week. Build and publish the slate before players enter the room."
                          : "Command has not published this week’s card yet. Your Picks tab will populate automatically when the slate goes live.")
@@ -760,7 +762,7 @@ private struct MissingWeekCardView: View {
                                 .font(.caption.weight(.black)).tracking(0.7)
                                 .frame(maxWidth: .infinity).padding(.vertical, 8)
                         }
-                        .buttonStyle(.borderedProminent).tint(.yellow).foregroundStyle(.black)
+                        .buttonStyle(.borderedProminent).tint(isNFL ? .blue : .yellow).foregroundStyle(isNFL ? .white : .black)
                     }
                     if memberships.count > 1 {
                         NavigationLink {
@@ -770,11 +772,11 @@ private struct MissingWeekCardView: View {
                                 .font(.caption.weight(.black)).tracking(0.7)
                                 .frame(maxWidth: .infinity).padding(.vertical, 8)
                         }
-                        .buttonStyle(.bordered).tint(.yellow)
+                        .buttonStyle(.bordered).tint(isNFL ? .cyan : .yellow)
                     }
                     VStack(spacing: 7) {
                         Text("COMMISH IS DRUNK AGAIN.")
-                            .font(.caption.weight(.black)).tracking(1.2).foregroundStyle(.orange)
+                            .font(.caption.weight(.black)).tracking(1.2).foregroundStyle(isNFL ? .red : .orange)
                         Text("CHECK BACK LATER OR GO MAKE THIS EVERYONE’S PROBLEM.")
                             .font(.system(size: 8, weight: .black)).tracking(0.8).foregroundStyle(.white.opacity(0.42))
                     }
@@ -786,14 +788,14 @@ private struct MissingWeekCardView: View {
                             .font(.caption.weight(.black)).tracking(0.7)
                             .frame(maxWidth: .infinity).padding(.vertical, 8)
                     }
-                    .buttonStyle(.borderedProminent).tint(.orange).foregroundStyle(.black)
+                    .buttonStyle(.borderedProminent).tint(isNFL ? .red : .orange).foregroundStyle(isNFL ? .white : .black)
                     Text("Pull down to check the board again. Hope is not a strategy, but here we are.")
                         .font(.caption2.weight(.bold)).foregroundStyle(.white.opacity(0.38)).multilineTextAlignment(.center)
                 }
                 .padding(24)
                 .frame(maxWidth: 390)
                 .background(.black.opacity(0.82), in: UnevenRoundedRectangle(topLeadingRadius: 4, bottomLeadingRadius: 28, bottomTrailingRadius: 4, topTrailingRadius: 28))
-                .overlay(UnevenRoundedRectangle(topLeadingRadius: 4, bottomLeadingRadius: 28, bottomTrailingRadius: 4, topTrailingRadius: 28).stroke(.yellow.opacity(0.48), lineWidth: 1.5))
+                .overlay(UnevenRoundedRectangle(topLeadingRadius: 4, bottomLeadingRadius: isNFL ? 6 : 28, bottomTrailingRadius: 4, topTrailingRadius: isNFL ? 6 : 28).stroke(accent.opacity(0.48), lineWidth: 1.5))
                 .padding(.horizontal, 18).padding(.top, 70).padding(.bottom, 36)
             }
             .refreshable { retry() }
@@ -884,7 +886,7 @@ private struct LockedPickSummaryView: View {
                                     }
                                     HStack(spacing: 6) {
                                         Text(chosenTeam(game, side: selection.side)).font(.headline.weight(.black))
-                                        if selection.isBestBet { Image(systemName: "star.fill").foregroundStyle(.yellow).accessibilityLabel("Best Bet") }
+                                        if selection.isBestBet { Image(systemName: "star.fill").foregroundStyle(isNFL ? .red : .yellow).accessibilityLabel("Best Bet") }
                                     }
                                     Text("\(game.awayTeam) at \(game.homeTeam)").font(.caption).foregroundStyle(.white.opacity(0.42)).lineLimit(1)
                                 }
@@ -1505,7 +1507,8 @@ private struct PublicPlayerProfileView: View {
                         streak: standing.currentStreak, bestWeek: standing.bestWeek,
                         perfectWeeks: standing.perfectWeeks,
                         bestBetHits: standing.bestBetHits, bestBetTotal: standing.bestBetTotal,
-                        propHits: standing.propHits, propTotal: standing.propTotal
+                        propHits: standing.propHits, propTotal: standing.propTotal,
+                        sportId: sportId
                     )
                     ProfileRivalryCard(player: standing, standings: leagueStandings, sportId: sportId)
 
@@ -2330,7 +2333,7 @@ struct CommissionerScoreWeekView: View {
                         ForEach(card.cardGames) { game in gameResultCard(game) }
                         if let question = card.propQuestion, let a = card.propOptionA, let b = card.propOptionB {
                             VStack(alignment: .leading, spacing: 10) {
-                                Text("PROP RESULT · \(card.propPoints) PTS").font(.caption.weight(.black)).foregroundStyle(.yellow)
+                                Text("PROP RESULT · \(card.propPoints) PTS").font(.caption.weight(.black)).foregroundStyle(identity.isNFL ? .cyan : .yellow)
                                 Text(question).font(.headline.weight(.black))
                                 resultButton(a, selected: propResult == a) { propResult = a }
                                 resultButton(b, selected: propResult == b) { propResult = b }
@@ -2370,7 +2373,7 @@ struct CommissionerScoreWeekView: View {
     private func gameResultCard(_ game: CardGame) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             if game.isRivalry {
-                Label("RIVALRY WEEK · THIS ONE COUNTS FOR THE VAULT", systemImage: "flame.fill")
+                Label(identity.isNFL ? "DIVISION GRUDGE · BAD BLOOD FILED" : "RIVALRY WEEK · THIS ONE COUNTS FOR THE VAULT", systemImage: "flame.fill")
                     .font(.caption2.weight(.black)).foregroundStyle(.red)
             }
             Text("GAME \(game.sortOrder + 1) · ATS RESULT").font(.caption2.weight(.black)).tracking(1).foregroundStyle(.white.opacity(0.4))
@@ -2392,7 +2395,7 @@ struct CommissionerScoreWeekView: View {
                     Text("FILLS EVERY COVER + PROP · DOES NOT SCORE YET").font(.system(size: 8, weight: .black)).tracking(0.7)
                 }
                 Spacer(); Image(systemName: "sparkles")
-            }.foregroundStyle(.black).padding(16).background(.orange, in: RoundedRectangle(cornerRadius: 13))
+            }.foregroundStyle(identity.isNFL ? .white : .black).padding(16).background(identity.isNFL ? Color.blue : Color.orange, in: RoundedRectangle(cornerRadius: identity.isNFL ? 6 : 13))
         }.buttonStyle(.plain)
     }
 
@@ -2414,12 +2417,12 @@ struct CommissionerScoreWeekView: View {
     }
 
     private func resultButton(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) { HStack { Text(title).font(.footnote.weight(.black)); Spacer(); Image(systemName: selected ? "checkmark.circle.fill" : "circle") }.padding(12).background(selected ? Color.yellow : Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 10)).foregroundStyle(selected ? .black : .white) }.buttonStyle(.plain)
+        Button(action: action) { HStack { Text(title).font(.footnote.weight(.black)); Spacer(); Image(systemName: selected ? "checkmark.circle.fill" : "circle") }.padding(12).background(selected ? (identity.isNFL ? Color.blue : Color.yellow) : Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: identity.isNFL ? 5 : 10)).foregroundStyle(selected ? (identity.isNFL ? .white : .black) : .white) }.buttonStyle(.plain)
     }
 
     @ViewBuilder private var fireControl: some View {
         if isFoundry {
-            Button { confirming = true } label: { Label(processing ? "PROCESSING…" : "PROCESS FOUNDRY WEEK", systemImage: "bolt.shield.fill").font(.headline.weight(.black)).frame(maxWidth: .infinity).padding(16).background(complete && submittedCount > 0 ? Color.green : Color.gray, in: RoundedRectangle(cornerRadius: 13)).foregroundStyle(.black) }.buttonStyle(.plain).disabled(!complete || submittedCount == 0 || processing)
+            Button { confirming = true } label: { Label(processing ? "PROCESSING…" : "PROCESS FOUNDRY WEEK", systemImage: "bolt.shield.fill").font(.headline.weight(.black)).frame(maxWidth: .infinity).padding(16).background(complete && submittedCount > 0 ? (identity.isNFL ? Color.blue : Color.green) : Color.gray, in: RoundedRectangle(cornerRadius: identity.isNFL ? 6 : 13)).foregroundStyle(identity.isNFL ? .white : .black) }.buttonStyle(.plain).disabled(!complete || submittedCount == 0 || processing)
         } else {
             Label("SCORING LOCKED · BOT-ONLY LAB REQUIRED", systemImage: "lock.shield.fill").font(.caption.weight(.black)).frame(maxWidth: .infinity).padding(15).foregroundStyle(.red).background(.red.opacity(0.1), in: RoundedRectangle(cornerRadius: 13)).overlay(RoundedRectangle(cornerRadius: 13).stroke(.red.opacity(0.4)))
         }
@@ -2431,29 +2434,29 @@ struct CommissionerScoreWeekView: View {
             Text("The whole room moved.").font(.title2.weight(.black)).fontWidth(.condensed)
             Label("\(value.scoredCount) bot cards scored and standings rebuilt", systemImage: "checkmark.seal.fill").font(.footnote.weight(.bold)).foregroundStyle(accent)
             if let crown = value.crownName, let points = value.crownPoints {
-                damageRow("CROWN", crown, "\(points) PTS", .yellow, "crown.fill")
+                damageRow("CROWN", crown, "\(points) PTS", identity.isNFL ? .cyan : .yellow, "crown.fill")
             }
             if let shame = value.shameName, let points = value.shamePoints {
                 damageRow("SHAME", shame, "\(points) PTS", .red, "hand.thumbsdown.fill")
             }
             if let quote = value.lockerQuote, !quote.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("LOCKER ROOM INFLUENCE").font(.system(size: 8, weight: .black)).tracking(1).foregroundStyle(.orange)
+                    Text("LOCKER ROOM INFLUENCE").font(.system(size: 8, weight: .black)).tracking(1).foregroundStyle(identity.isNFL ? .red : .orange)
                     Text("“\(quote)”").font(.footnote.weight(.semibold)).italic().foregroundStyle(.white.opacity(0.72))
                     Text("Filed into this week's Dispatch.").font(.caption2.weight(.bold)).foregroundStyle(.white.opacity(0.38))
                 }
             }
             NavigationLink { FoundryLeagueMirrorView(seedMembership: membership) } label: {
-                Label("ENTER THE BOT LEAGUE", systemImage: "rectangle.3.group.fill").font(.headline.weight(.black)).frame(maxWidth: .infinity).padding(15).foregroundStyle(.black).background(.yellow, in: RoundedRectangle(cornerRadius: 12))
+                Label(identity.isNFL ? "ENTER SUNDAY SIMULATION" : "ENTER THE BOT LEAGUE", systemImage: "rectangle.3.group.fill").font(.headline.weight(.black)).frame(maxWidth: .infinity).padding(15).foregroundStyle(identity.isNFL ? .white : .black).background(identity.isNFL ? Color.blue : Color.yellow, in: RoundedRectangle(cornerRadius: identity.isNFL ? 6 : 12))
             }.buttonStyle(.plain)
             HStack {
-                Image(systemName: value.phase == "postseason" ? "trophy.fill" : "arrow.right.circle.fill").foregroundStyle(.orange)
+                Image(systemName: value.phase == "postseason" ? "trophy.fill" : "arrow.right.circle.fill").foregroundStyle(identity.isNFL ? .red : .orange)
                 Text(value.phase == "postseason" ? "POSTSEASON SHELL ACTIVE" : "WEEK \(value.nextWeek ?? week + 1) READY").font(.caption.weight(.black)).tracking(0.8)
-                Spacer(); Image(systemName: value.nextCardReady == true ? "checkmark.circle.fill" : "flag.checkered").foregroundStyle(.green)
-            }.padding(12).background(.orange.opacity(0.10), in: RoundedRectangle(cornerRadius: 10))
+                Spacer(); Image(systemName: value.nextCardReady == true ? "checkmark.circle.fill" : "flag.checkered").foregroundStyle(identity.isNFL ? .cyan : .green)
+            }.padding(12).background((identity.isNFL ? Color.blue : Color.orange).opacity(0.10), in: RoundedRectangle(cornerRadius: identity.isNFL ? 5 : 10))
             DisclosureGroup("FULL SCORE LEDGER") {
                 ForEach(value.details.sorted { $0.points > $1.points }) { Text("\($0.name)  ·  \($0.points) PTS").font(.footnote.weight(.bold)).foregroundStyle(.white.opacity(0.7)).padding(.top, 4) }
-            }.font(.caption.weight(.black)).tint(.green)
+            }.font(.caption.weight(.black)).tint(identity.isNFL ? .cyan : .green)
         }.commandPanel(accent: accent, cornerRadius: identity.isNFL ? 6 : 15)
     }
 
@@ -2653,7 +2656,7 @@ private struct ChampionshipTrophyPickerView: View {
                                 .overlay(RoundedRectangle(cornerRadius: membership.leagues.sportId.lowercased() == "nfl" ? 7 : 18).stroke(selectedId == design.id ? (membership.leagues.sportId.lowercased() == "nfl" ? .cyan : .green) : (membership.leagues.sportId.lowercased() == "nfl" ? .blue.opacity(0.55) : .yellow.opacity(0.30)), lineWidth: selectedId == design.id ? 3 : 1))
                                 .overlay(alignment: .topTrailing) {
                                     if selectedId == design.id {
-                                        Text("SELECTED").font(.system(size: 7, weight: .black)).tracking(1).foregroundStyle(.black).padding(.horizontal, 8).padding(.vertical, 5).background(.green, in: Capsule()).padding(8)
+                                        Text("SELECTED").font(.system(size: 7, weight: .black)).tracking(1).foregroundStyle(membership.leagues.sportId.lowercased() == "nfl" ? .white : .black).padding(.horizontal, 8).padding(.vertical, 5).background(membership.leagues.sportId.lowercased() == "nfl" ? Color.blue : Color.green, in: Capsule()).padding(8)
                                     }
                                 }
                             }
@@ -2874,7 +2877,8 @@ private struct KickoffCountdownView: View {
         TimelineView(.periodic(from: .now, by: 1)) { timeline in
             let seconds = max(0, Int(kickoff.timeIntervalSince(timeline.date)))
             let locked = kickoff <= timeline.date
-            let accent: Color = locked || seconds < 3600 ? .red : (seconds < 86400 ? .yellow : .green)
+            let isNFL = sportId.lowercased() == "nfl"
+            let accent: Color = locked || seconds < 3600 ? .red : (seconds < 86400 ? (isNFL ? .cyan : .yellow) : (isNFL ? .blue : .green))
             HStack(spacing: 14) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("MISSION CLOCK · \(sportId.uppercased()) WEEK \(week)")
@@ -3408,7 +3412,7 @@ struct CommissionerCardBuilderView: View {
                 .tint(.red)
                 if !isComplete {
                     Label("Finish all five games and the prop. Almost only counts in horseshoes and bad parlays.", systemImage: "arrow.up.circle.fill")
-                        .font(.footnote).foregroundStyle(.yellow)
+                        .font(.footnote).foregroundStyle(identity.isNFL ? .red : .yellow)
                 }
                 if let errorMessage { Text(errorMessage).font(.footnote).foregroundStyle(.red) }
             }
@@ -4242,7 +4246,8 @@ private struct YouView: View {
                                 streak: membership.currentStreak, bestWeek: membership.bestWeek,
                                 perfectWeeks: membership.perfectWeeks,
                                 bestBetHits: membership.bestBetHits, bestBetTotal: membership.bestBetTotal,
-                                propHits: membership.propHits, propTotal: membership.propTotal
+                                propHits: membership.propHits, propTotal: membership.propTotal,
+                                sportId: identity.sportId
                             )
                             if let user = auth.user, let me = leagueStandings.first(where: { $0.userId == user.id }) {
                                 ProfileRivalryCard(player: me, standings: leagueStandings, sportId: identity.sportId)
@@ -4454,11 +4459,11 @@ private struct YouView: View {
     private func trophyRow(_ trophy: ProfileTrophy) -> some View {
         let isShame = trophy.trophyType == "toilet_bowl"
         return HStack(spacing: 13) {
-            Image(systemName: isShame ? "toilet.fill" : "trophy.fill").font(.title2.weight(.black)).foregroundStyle(isShame ? .brown : .yellow).frame(width: 42)
+            Image(systemName: isShame ? "toilet.fill" : "trophy.fill").font(.title2.weight(.black)).foregroundStyle(isShame ? .brown : (identity.isNFL ? .cyan : .yellow)).frame(width: 42)
             VStack(alignment: .leading, spacing: 3) { Text(trophyTitle(trophy.trophyType)).font(.headline.weight(.black)); Text(trophy.subtitle ?? "\(String(trophy.seasonYear)) · Permanent record").font(.caption).foregroundStyle(.secondary) }
-            Spacer(); Text(verbatim: String(trophy.seasonYear)).font(.headline.weight(.black)).foregroundStyle(.yellow)
+            Spacer(); Text(verbatim: String(trophy.seasonYear)).font(.headline.weight(.black)).foregroundStyle(identity.isNFL ? .cyan : .yellow)
         }
-        .padding(14).background(.black.opacity(0.84), in: RoundedRectangle(cornerRadius: 16)).overlay(RoundedRectangle(cornerRadius: 16).stroke(.yellow.opacity(0.24)))
+        .padding(14).background(.black.opacity(0.84), in: RoundedRectangle(cornerRadius: identity.isNFL ? 7 : 16)).overlay(RoundedRectangle(cornerRadius: identity.isNFL ? 7 : 16).stroke((identity.isNFL ? Color.cyan : Color.yellow).opacity(0.24)))
     }
     private func trophyTitle(_ type: String) -> String {
         switch type { case "championship": return "LEAGUE CHAMPION"; case "toilet_bowl": return "TOILET BOWL"; case "crystal_ball": return "VILLAGE NERD"; default: return type.replacingOccurrences(of: "_", with: " ").uppercased() }
@@ -4543,15 +4548,17 @@ private struct CareerIntelGrid: View {
     let bestBetTotal: Int
     let propHits: Int
     let propTotal: Int
+    let sportId: String
+    private var isNFL: Bool { sportId.lowercased() == "nfl" }
 
     var body: some View {
         LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
-            intelCell("\(atsCorrect)-\(max(0, atsTotal - atsCorrect))", "ATS RECORD", .green)
-            intelCell(streakLabel, "STREAK", streak >= 0 ? .orange : .red)
-            intelCell("\(bestWeek)", "BEST WEEK", .yellow)
-            intelCell("\(perfectWeeks)", "PERFECT", .cyan)
-            intelCell(accuracy(bestBetHits, bestBetTotal), "BEST BET", .purple)
-            intelCell(accuracy(propHits, propTotal), "PROPS", .pink)
+            intelCell("\(atsCorrect)-\(max(0, atsTotal - atsCorrect))", "ATS RECORD", isNFL ? .cyan : .green)
+            intelCell(streakLabel, "STREAK", streak >= 0 ? (isNFL ? .blue : .orange) : .red)
+            intelCell("\(bestWeek)", "BEST WEEK", isNFL ? .cyan : .yellow)
+            intelCell("\(perfectWeeks)", "PERFECT", isNFL ? .white : .cyan)
+            intelCell(accuracy(bestBetHits, bestBetTotal), "BEST BET", isNFL ? .red : .purple)
+            intelCell(accuracy(propHits, propTotal), "PROPS", isNFL ? .blue : .pink)
         }
     }
 
@@ -6185,7 +6192,7 @@ private struct ProfileAvatar: View {
         }
         .fullScreenCover(isPresented: $showingLightbox) {
             if let validURL {
-                AvatarLightboxView(url: validURL, name: name)
+                AvatarLightboxView(url: validURL, name: name, accent: accent)
             }
         }
     }
@@ -6287,6 +6294,7 @@ private struct AvatarLightboxView: View {
     @Environment(\.dismiss) private var dismiss
     let url: URL
     let name: String
+    let accent: Color
 
     var body: some View {
         ZStack {
@@ -6298,13 +6306,13 @@ private struct AvatarLightboxView: View {
                 } else if phase.error != nil {
                     ContentUnavailableView("Photo unavailable", systemImage: "photo.badge.exclamationmark", description: Text("The website image declined its close-up."))
                 } else {
-                    ProgressView("Developing evidence…").tint(.green)
+                    ProgressView("Developing evidence…").tint(accent)
                 }
             }
             VStack {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("PLAYER FILE").font(.caption2.weight(.black)).tracking(2).foregroundStyle(.green)
+                        Text("PLAYER FILE").font(.caption2.weight(.black)).tracking(2).foregroundStyle(accent)
                         Text(name).font(.headline.weight(.black))
                     }
                     Spacer()

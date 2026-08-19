@@ -80,7 +80,7 @@ struct FoundryView: View {
                     if !authorized {
                         lockedPanel
                     } else if loading {
-                        ProgressView("Running quarantine preflight…").tint(.orange).frame(maxWidth: .infinity).padding(40)
+                        ProgressView("Running quarantine preflight…").tint(foundryAccent).frame(maxWidth: .infinity).padding(40)
                     } else {
                         if let lab {
                             weekBanner(lab)
@@ -175,22 +175,24 @@ struct FoundryView: View {
     }
 
     private var noLabPanel: some View {
-        FoundryPanel(accent: .yellow) {
-            FoundrySectionTitle(kicker: "STOP", title: "NO DISPOSABLE LAB FOUND")
+        FoundryPanel(accent: isNFLFoundry ? .cyan : .yellow) {
+            if isNFLFoundry { NflFoundrySectionTitle(kicker: "SIMULATION STOP", title: "NO PRO FOOTBALL LAB FOUND") }
+            else { FoundrySectionTitle(kicker: "STOP", title: "NO DISPOSABLE LAB FOUND") }
             Text(preferredSportId == "nfl" ? "No pro-football bot lab is connected. Sunday Operations will never borrow another sport’s lab or a production room." : "The Foundry will not borrow a production room. Connect a league marked foundry before testing.").font(.subheadline.weight(.semibold)).foregroundStyle(.white.opacity(0.62))
         }
     }
 
     private var connectionErrorPanel: some View {
         FoundryPanel(accent: .red) {
-            FoundrySectionTitle(kicker: "CONNECTION STOP", title: "THE LAB WAS NOT ERASED")
+            if isNFLFoundry { NflFoundrySectionTitle(kicker: "CONNECTION STOP", title: "THE LAB WAS NOT ERASED") }
+            else { FoundrySectionTitle(kicker: "CONNECTION STOP", title: "THE LAB WAS NOT ERASED") }
             Text(errorMessage ?? "The Foundry could not verify the lab.")
                 .font(.subheadline.weight(.semibold)).foregroundStyle(.white.opacity(0.7))
                 .fixedSize(horizontal: false, vertical: true)
             Button { Task { await preflight() } } label: {
                 Label("REFRESH LOGIN & TRY AGAIN", systemImage: "arrow.clockwise.circle.fill")
                     .font(.headline.weight(.black)).frame(maxWidth: .infinity).padding(14)
-                    .foregroundStyle(.black).background(.orange, in: RoundedRectangle(cornerRadius: 13))
+                    .foregroundStyle(isNFLFoundry ? .white : .black).background(isNFLFoundry ? Color.blue : Color.orange, in: RoundedRectangle(cornerRadius: isNFLFoundry ? 6 : 13))
             }.buttonStyle(.plain)
         }
     }
@@ -244,7 +246,7 @@ struct FoundryView: View {
                     Label("OPEN PLAYOFF COMMAND TO STAGE, LOCK, AND SCORE THIS ROUND", systemImage: "arrow.down.right.circle.fill")
                         .font(.caption.weight(.black)).foregroundStyle(.cyan)
                 }
-                if let weekActionNotice { Text(weekActionNotice).font(.caption.weight(.black)).foregroundStyle(.green) }
+                if let weekActionNotice { Text(weekActionNotice).font(.caption.weight(.black)).foregroundStyle(isNFL ? .cyan : .green) }
                 NavigationLink { FoundryLeagueMirrorView(seedMembership: lab) } label: {
                     HStack {
                         VStack(alignment: .leading, spacing: 3) {
@@ -256,13 +258,13 @@ struct FoundryView: View {
                         Image(systemName: "rectangle.3.group.fill").font(.title2)
                     }
                     .foregroundStyle(.white).padding(16)
-                    .background(.orange.opacity(0.18), in: RoundedRectangle(cornerRadius: 13))
-                    .overlay(RoundedRectangle(cornerRadius: 13).stroke(.orange.opacity(0.65)))
+                    .background((isNFL ? Color.blue : Color.orange).opacity(0.18), in: RoundedRectangle(cornerRadius: isNFL ? 6 : 13))
+                    .overlay(RoundedRectangle(cornerRadius: isNFL ? 6 : 13).stroke((isNFL ? Color.cyan : Color.orange).opacity(0.65)))
                 }.buttonStyle(.plain)
                 NavigationLink { isNFL ? AnyView(NflPostseasonCloudView(membership: lab)) : AnyView(CfbPostseasonHubView(membership: lab)) } label: {
                     Label(isNFL ? "OPEN NFL PLAYOFF COMMAND" : phase == .seasonComplete ? "REVIEW POSTSEASON" : "OPEN BOWL / PLAYOFF COMMAND", systemImage: "trophy.fill")
                         .font(.headline.weight(.black)).frame(maxWidth: .infinity).padding(15)
-                        .foregroundStyle(.black).background(.yellow, in: RoundedRectangle(cornerRadius: 13))
+                        .foregroundStyle(isNFL ? .white : .black).background(isNFL ? Color.blue : Color.yellow, in: RoundedRectangle(cornerRadius: isNFL ? 6 : 13))
                 }.buttonStyle(.plain)
             } else {
                 if isNFL { NflFoundrySectionTitle(kicker: "GAME WEEK \(lab.leagues.currentWeek) · CONTROL DESK", title: !seasonReady ? "OPENING BROADCAST REQUIRED" : card == nil ? "STAGING THE GAME SLATE" : weekLocked ? "KICKOFF HAS HIT" : "CHOOSE THE MOMENT") }
@@ -288,7 +290,7 @@ struct FoundryView: View {
                             .foregroundStyle(isNFL ? .white : .black).background(isNFL ? Color.red : Color.green, in: RoundedRectangle(cornerRadius: isNFL ? 7 : 13))
                     }.buttonStyle(.plain).disabled(!safeBotLab || !seasonReady || lockingWeek || scoringWeek)
                 }
-                if let weekActionNotice { Text(weekActionNotice).font(.caption.weight(.black)).foregroundStyle(.green) }
+                if let weekActionNotice { Text(weekActionNotice).font(.caption.weight(.black)).foregroundStyle(isNFL ? .cyan : .green) }
                 if seasonReady {
                     NavigationLink { FoundryLeagueMirrorView(seedMembership: lab) } label: {
                         HStack { VStack(alignment: .leading, spacing: 3) { Text(weekLocked ? "REVIEW THE LOCKED WEEK" : "REVIEW THE LIVE LEAGUE").font(.headline.weight(.black)); Text(weekLocked ? "BOARD · STANDINGS · LOCKER · DISPATCH" : "HOME · SEALED PICKS · STANDINGS · LOCKER").font(.system(size: 7, weight: .black)).tracking(0.5) }; Spacer(); Image(systemName: "rectangle.3.group.fill").font(.title2) }
@@ -317,7 +319,7 @@ struct FoundryView: View {
     private func seasonTimeMachine(_ lab: LeagueMembership) -> some View {
         let phase = cfbPhase(lab)
         let isNFL = lab.leagues.sportId.lowercased() == "nfl"
-        return FoundryPanel(accent: phase == .regularSeason ? .purple : .green) {
+        return FoundryPanel(accent: isNFL ? .blue : (phase == .regularSeason ? .purple : .green)) {
             if isNFL { NflFoundrySectionTitle(kicker: "SEASON SIMULATOR", title: phase == .regularSeason ? "FAST-FORWARD THE TAPE" : "FINAL THIRTEEN UNLOCKED") }
             else { FoundrySectionTitle(kicker: "SEASON TIME MACHINE", title: phase == .regularSeason ? "SKIP THE REPETITION" : phase == .conferenceChampionships ? "CHAMPIONSHIP SATURDAY" : "POSTSEASON UNLOCKED") }
             if phase != .regularSeason {
@@ -326,7 +328,7 @@ struct FoundryView: View {
                 NavigationLink { isNFL ? AnyView(NflPostseasonCloudView(membership: lab)) : phase == .conferenceChampionships ? AnyView(FoundryLeagueMirrorView(seedMembership: lab)) : AnyView(CfbPostseasonHubView(membership: lab)) } label: {
                     Label(isNFL ? "OPEN NFL PLAYOFF COMMAND" : phase == .conferenceChampionships ? "REVIEW CHAMPIONSHIP WEEK" : "OPEN POSTSEASON COMMAND", systemImage: "trophy.fill")
                         .font(.headline.weight(.black)).frame(maxWidth: .infinity).padding(15)
-                        .foregroundStyle(.black).background(.green, in: RoundedRectangle(cornerRadius: 13))
+                        .foregroundStyle(isNFL ? .white : .black).background(isNFL ? Color.blue : Color.green, in: RoundedRectangle(cornerRadius: isNFL ? 6 : 13))
                 }.buttonStyle(.plain)
             } else {
                 if !isNFL && lab.leagues.currentWeek <= 13 {
@@ -360,10 +362,10 @@ struct FoundryView: View {
                         }
                         Spacer()
                         if completingSeason { ProgressView().tint(.black) } else { Image(systemName: "forward.end.fill").font(.title2) }
-                    }.foregroundStyle(.black).padding(16).background(.purple, in: RoundedRectangle(cornerRadius: 13))
+                    }.foregroundStyle(isNFL ? .white : .black).padding(16).background(isNFL ? Color.blue : Color.purple, in: RoundedRectangle(cornerRadius: isNFL ? 6 : 13))
                 }.buttonStyle(.plain).disabled(completingSeason || !safeBotLab)
             }
-            if let seasonSkipNotice { Text(seasonSkipNotice).font(.caption.weight(.black)).foregroundStyle(.green) }
+            if let seasonSkipNotice { Text(seasonSkipNotice).font(.caption.weight(.black)).foregroundStyle(isNFL ? .cyan : .green) }
         }
     }
 
@@ -383,15 +385,15 @@ struct FoundryView: View {
             }.buttonStyle(.plain)
             if emergencyToolsOpen {
                 Divider().overlay(.white.opacity(0.15))
-                FoundryCheck(label: "Creator identity", value: "VERIFIED", color: .green)
-                FoundryCheck(label: "Production rooms", value: "\(productionCount) BLOCKED", color: .green)
-                FoundryCheck(label: "Website", value: "FROZEN", color: .green)
-                FoundryCheck(label: "Server restore", value: "CONNECTED", color: .green)
+                FoundryCheck(label: "Creator identity", value: "VERIFIED", color: isNFLFoundry ? .cyan : .green)
+                FoundryCheck(label: "Production rooms", value: "\(productionCount) BLOCKED", color: isNFLFoundry ? .cyan : .green)
+                FoundryCheck(label: "Website", value: "FROZEN", color: isNFLFoundry ? .cyan : .green)
+                FoundryCheck(label: "Server restore", value: "CONNECTED", color: isNFLFoundry ? .cyan : .green)
                 if let lab {
                     Button { confirmingReset = true } label: {
                         Label(resetting ? "RESTORING…" : "RESTORE BOT LAB TO WEEK \(SportIdentity(lab.leagues.sportId).openingWeek)", systemImage: "arrow.counterclockwise.circle.fill")
                             .font(.caption.weight(.black)).frame(maxWidth: .infinity).padding(13)
-                            .foregroundStyle(.black).background(.orange, in: RoundedRectangle(cornerRadius: 11))
+                            .foregroundStyle(isNFLFoundry ? .white : .black).background(isNFLFoundry ? Color.blue : Color.orange, in: RoundedRectangle(cornerRadius: isNFLFoundry ? 6 : 11))
                     }.buttonStyle(.plain).disabled(resetting)
                     Text("This is a real server restore scoped to \(lab.leagues.name). It cannot target a production room.").font(.caption2.weight(.semibold)).foregroundStyle(.white.opacity(0.4))
                 }
@@ -787,7 +789,7 @@ struct FoundryLeagueMirrorView: View {
         .toolbar(.hidden, for: .tabBar)
         .task { await load() }
         .sheet(item: $selectedKeyMoment) { moment in
-            FoundryKeyMomentDetail(moment: moment) { selectedDispatchId = moment.editionId; section = .audit }
+            FoundryKeyMomentDetail(moment: moment, isNFL: isNFL) { selectedDispatchId = moment.editionId; section = .audit }
                 .presentationDetents([.large]).presentationDragIndicator(.hidden)
         }
     }
@@ -887,7 +889,7 @@ struct FoundryLeagueMirrorView: View {
                 DisclosureGroup {
                     VStack(alignment: .leading, spacing: 7) {
                         ForEach(pick.pickGames.sorted { $0.confidence > $1.confidence }, id: \.cardGameId) { game in
-                            FoundryPickAuditRow(game: game)
+                            FoundryPickAuditRow(game: game, isNFL: isNFL)
                         }
                         Text("PROP · \(pick.propChoice ?? "NO PICK")").font(.caption.weight(.black)).foregroundStyle(mirrorHighlight)
                     }.padding(.top, 8)
@@ -930,7 +932,7 @@ struct FoundryLeagueMirrorView: View {
         VStack(alignment: .leading, spacing: 13) {
             MirrorHero(kicker: "FULL-SEASON COPY DESK", title: "HUNT THE REPEAT", detail: "Open every issue here. Compare jokes, headlines, quotes, Crown & Shame framing, and the facts behind the roast.", color: mirrorHighlight)
             if let edition = selectedEdition {
-                DispatchHistoryControl(editions: editions, selectedId: $selectedDispatchId)
+                DispatchHistoryControl(editions: editions, selectedId: $selectedDispatchId, isNFL: isNFL)
                 Text("WEEK \(edition.weekNumber) · AFTER ACTION EDITION")
                     .font(.caption.weight(.black)).tracking(1.4).foregroundStyle(mirrorAccent)
                 let payload = edition.payload
@@ -954,7 +956,7 @@ struct FoundryLeagueMirrorView: View {
             if momentMode == .vault {
                 vaultMoments
             } else if let edition = selectedEdition {
-                DispatchHistoryControl(editions: editions, selectedId: $selectedDispatchId)
+                DispatchHistoryControl(editions: editions, selectedId: $selectedDispatchId, isNFL: isNFL)
                 HStack(spacing: 8) {
                     MirrorMetric(value: "\(edition.weekNumber)", label: "WEEK", color: mirrorAccent)
                     MirrorMetric(value: "\(moments(for: edition).count)", label: "MOMENTS", color: mirrorAccent)
@@ -1180,6 +1182,7 @@ private struct FoundryKeyMoment: Identifiable {
 private struct FoundryKeyMomentDetail: View {
     @Environment(\.dismiss) private var dismiss
     let moment: FoundryKeyMoment
+    let isNFL: Bool
     let openDispatch: () -> Void
     var body: some View {
         ZStack {
@@ -1191,8 +1194,8 @@ private struct FoundryKeyMomentDetail: View {
                 Text(moment.title.uppercased()).font(.system(size:34,weight:.black)).fontWidth(.condensed)
                 Text(moment.detail).font(.title3.weight(.semibold)).foregroundStyle(.white.opacity(0.72)).fixedSize(horizontal:false,vertical:true)
                 if !moment.names.isEmpty { Label(moment.names.joined(separator:" · "),systemImage:"person.2.fill").font(.headline.weight(.black)).foregroundStyle(.white) }
-                if let points=moment.points { Label("\(points) POINTS",systemImage:"scope").font(.headline.weight(.black)).foregroundStyle(.yellow) }
-                VStack(alignment:.leading,spacing:6) { Text("GENERATION RECEIPT").font(.caption2.weight(.black)).tracking(1.3).foregroundStyle(.green);Text("Filed by the real Week \(moment.week) scoring pipeline and preserved in that week’s Dispatch payload.").font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.52)) }.padding(15).background(.green.opacity(0.08),in:RoundedRectangle(cornerRadius:14)).overlay(RoundedRectangle(cornerRadius:14).stroke(.green.opacity(0.35)))
+                if let points=moment.points { Label("\(points) POINTS",systemImage:"scope").font(.headline.weight(.black)).foregroundStyle(isNFL ? .cyan : .yellow) }
+                VStack(alignment:.leading,spacing:6) { Text("GENERATION RECEIPT").font(.caption2.weight(.black)).tracking(1.3).foregroundStyle(isNFL ? .cyan : .green);Text("Filed by the real Week \(moment.week) scoring pipeline and preserved in that week’s Dispatch payload.").font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.52)) }.padding(15).background((isNFL ? Color.blue : Color.green).opacity(0.08),in:RoundedRectangle(cornerRadius:isNFL ? 6 : 14)).overlay(RoundedRectangle(cornerRadius:isNFL ? 6 : 14).stroke((isNFL ? Color.cyan : Color.green).opacity(0.35)))
                 Button { openDispatch();dismiss() } label: { Label("OPEN WEEK \(moment.week) DISPATCH RECEIPT",systemImage:"newspaper.fill").font(.headline.weight(.black)).frame(maxWidth:.infinity).padding(16).foregroundStyle(.black).background(moment.color,in:RoundedRectangle(cornerRadius:14)) }.buttonStyle(.plain)
             }.padding(20).padding(.bottom,36) }
         }.preferredColorScheme(.dark)
@@ -1236,6 +1239,7 @@ private struct FoundrySealedWeekView: View {
 private struct DispatchHistoryControl: View {
     let editions: [GazetteEditionRow]
     @Binding var selectedId: UUID?
+    let isNFL: Bool
 
     private var selectedIndex: Int { editions.firstIndex { $0.id == selectedId } ?? 0 }
 
@@ -1247,7 +1251,7 @@ private struct DispatchHistoryControl: View {
                 }.disabled(selectedIndex >= editions.count - 1)
                 Spacer()
                 VStack(spacing: 1) {
-                    Text("DISPATCH ARCHIVE").font(.system(size: 8, weight: .black)).tracking(1.3).foregroundStyle(.yellow)
+                    Text("DISPATCH ARCHIVE").font(.system(size: 8, weight: .black)).tracking(1.3).foregroundStyle(isNFL ? .cyan : .yellow)
                     Text("\(editions.count) ISSUES ON FILE").font(.system(size: 7, weight: .black)).foregroundStyle(.white.opacity(0.38))
                 }
                 Spacer()
@@ -1255,27 +1259,36 @@ private struct DispatchHistoryControl: View {
                     Label("NEWER", systemImage: "chevron.right").labelStyle(.titleAndIcon).font(.caption.weight(.black))
                 }.disabled(selectedIndex <= 0)
             }
-            .foregroundStyle(.yellow)
+            .foregroundStyle(isNFL ? .cyan : .yellow)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 7) {
                     ForEach(editions) { edition in
-                        Button { withAnimation(.snappy) { selectedId = edition.id } } label: {
-                            VStack(spacing: 2) {
-                                Text("WEEK").font(.system(size: 7, weight: .black)).tracking(0.7)
-                                Text("\(edition.weekNumber)").font(.headline.weight(.black))
-                            }
-                            .frame(width: 58, height: 48)
-                            .foregroundStyle(selectedId == edition.id ? .black : .white.opacity(0.55))
-                            .background(selectedId == edition.id ? Color.yellow : Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 9))
-                            .overlay(RoundedRectangle(cornerRadius: 9).stroke(.yellow.opacity(selectedId == edition.id ? 1 : 0.22)))
-                        }.buttonStyle(.plain)
+                        editionButton(edition)
                     }
                 }
             }
         }
-        .padding(13).background(.black.opacity(0.8), in: RoundedRectangle(cornerRadius: 14))
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(.yellow.opacity(0.4)))
+        .padding(13).background(.black.opacity(0.8), in: RoundedRectangle(cornerRadius: isNFL ? 6 : 14))
+        .overlay(RoundedRectangle(cornerRadius: isNFL ? 6 : 14).stroke((isNFL ? Color.cyan : Color.yellow).opacity(0.4)))
+    }
+
+    private func editionButton(_ edition: GazetteEditionRow) -> some View {
+        let selected = selectedId == edition.id
+        let accent = isNFL ? Color.cyan : Color.yellow
+        let fill = selected ? (isNFL ? Color.blue : Color.yellow) : Color.white.opacity(0.07)
+        let foreground = selected ? (isNFL ? Color.white : Color.black) : Color.white.opacity(0.55)
+        let radius: CGFloat = isNFL ? 4 : 9
+        return Button { withAnimation(.snappy) { selectedId = edition.id } } label: {
+            VStack(spacing: 2) {
+                Text("WEEK").font(.system(size: 7, weight: .black)).tracking(0.7)
+                Text("\(edition.weekNumber)").font(.headline.weight(.black))
+            }
+            .frame(width: 58, height: 48)
+            .foregroundStyle(foreground)
+            .background(fill, in: RoundedRectangle(cornerRadius: radius))
+            .overlay(RoundedRectangle(cornerRadius: radius).stroke(accent.opacity(selected ? 1 : 0.22)))
+        }.buttonStyle(.plain)
     }
 
     private func move(to index: Int) {
@@ -1301,12 +1314,13 @@ private struct MirrorImpactCard: View {
 
 private struct FoundryPickAuditRow: View {
     let game: PickedGame
+    let isNFL: Bool
     var body: some View {
         HStack {
             Text(game.side.uppercased()).fontWeight(.black)
             Spacer()
             Text("\(game.confidence) CONF")
-            if game.isBestBet { Text("BEST BET").foregroundStyle(.yellow) }
+            if game.isBestBet { Text("BEST BET").foregroundStyle(isNFL ? .red : .yellow) }
         }.font(.caption)
     }
 }

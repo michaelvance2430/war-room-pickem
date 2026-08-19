@@ -251,7 +251,8 @@ private struct GazettePaperView: View {
                     assetName: pageArtwork,
                     caption: pageArtworkCaption,
                     week: edition.weekNumber,
-                    page: page
+                    page: page,
+                    sportId: sportId
                 )
                 pageContent
             }
@@ -545,6 +546,7 @@ private struct DispatchPhotoEvidence: View {
     let caption: String
     let week: Int
     let page: Int
+    let sportId: String
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -558,7 +560,7 @@ private struct DispatchPhotoEvidence: View {
                     Text("WEEK \(week) · FRAME 0\(page + 1) · UNREDACTED")
                         .font(.system(size: 7, weight: .black)).tracking(1)
                         .foregroundStyle(.black).padding(.horizontal, 8).padding(.vertical, 5)
-                        .background(Color.yellow)
+                        .background(SportIdentity(sportId).isNFL ? Color.cyan : Color.yellow)
                         .padding(8)
                 }
                 .overlay(Rectangle().stroke(Color.white.opacity(0.7), lineWidth: 2))
