@@ -194,6 +194,7 @@ declare
   v_league public.leagues%rowtype;
   v_div public.division;
   v_pts int;
+  v_first_joined_at timestamptz;
 begin
   if v_uid is null then raise exception 'lobby:not_authenticated'; end if;
   select * into v_request from public.league_join_requests where id = p_request_id for update;
@@ -214,7 +215,19 @@ begin
     v_pts := public.d1b_b_fair_entry_points(v_league.id, v_request.user_id);
     insert into public.memberships (league_id, user_id, role, division, total_points, weeks_played, is_bot, is_deputy, is_moderator, locker_muted)
     values (v_league.id, v_request.user_id, 'player', v_div, v_pts, 0, false, false, false, false);
-    perform public.record_league_first_join(v_league.id, v_request.user_id);
+    insert into public.league_first_joins (league_id, user_id, first_joined_at)
+    values (v_league.id, v_request.user_id, now())
+    on conflict (league_id, user_id) do nothing;
+
+    select first_joined_at into v_first_joined_at
+    from public.league_first_joins
+    where league_id = v_league.id and user_id = v_request.user_id;
+
+    update public.memberships
+    set joined_at = v_first_joined_at
+    where league_id = v_league.id
+      and user_id = v_request.user_id
+      and joined_at is distinct from v_first_joined_at;
   end if;
   update public.league_join_requests set status = 'approved', resolved_at = now(), resolved_by = v_uid where id = p_request_id;
   return json_build_object('ok', true, 'status', 'approved');

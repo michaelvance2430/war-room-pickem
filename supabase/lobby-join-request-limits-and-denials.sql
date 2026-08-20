@@ -172,6 +172,7 @@ declare
   v_league public.leagues%rowtype;
   v_div public.division;
   v_pts int;
+  v_first_joined_at timestamptz;
   v_reason text := nullif(trim(coalesce(p_denial_reason, '')), '');
 begin
   if v_uid is null then raise exception 'lobby:not_authenticated'; end if;
@@ -203,7 +204,23 @@ begin
       v_league.id, v_request.user_id, 'player', v_div, v_pts, 0,
       false, false, false, false
     );
-    perform public.record_league_first_join(v_league.id, v_request.user_id);
+    -- The commissioner is admitting another user, so the self-service
+    -- record_league_first_join RPC intentionally cannot be used here.
+    -- Stamp the permanent first join inside this already-authorized,
+    -- security-definer transaction and preserve it on the membership.
+    insert into public.league_first_joins (league_id, user_id, first_joined_at)
+    values (v_league.id, v_request.user_id, now())
+    on conflict (league_id, user_id) do nothing;
+
+    select first_joined_at into v_first_joined_at
+    from public.league_first_joins
+    where league_id = v_league.id and user_id = v_request.user_id;
+
+    update public.memberships
+    set joined_at = v_first_joined_at
+    where league_id = v_league.id
+      and user_id = v_request.user_id
+      and joined_at is distinct from v_first_joined_at;
   end if;
 
   update public.league_join_requests
