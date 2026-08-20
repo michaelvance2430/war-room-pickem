@@ -779,6 +779,21 @@ enum SupabaseAPI {
         return try await send(request, as: SignUpResponse.self)
     }
 
+    static func sendPasswordReset(email: String) async throws {
+        var components = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "auth/v1/recover"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "redirect_to", value: "https://app.war-room-picks.com/reset-password")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "POST"
+        request.setValue(SupabaseConfiguration.publishableKey, forHTTPHeaderField: "apikey")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(["email": email])
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            let message = (try? JSONDecoder().decode(APIError.self, from: data).message) ?? "The reset email could not be sent. Try again."
+            throw RequestError(message: message)
+        }
+    }
+
     static func currentUser(token: String) async throws -> AuthUser {
         var request = URLRequest(url: SupabaseConfiguration.baseURL.appending(path: "auth/v1/user"))
         request.setValue(SupabaseConfiguration.publishableKey, forHTTPHeaderField: "apikey")
@@ -1633,8 +1648,9 @@ enum SupabaseAPI {
     }
 
     static func deleteAccount(token: String, password: String) async throws {
-        var request = URLRequest(url: SupabaseConfiguration.appURL.appending(path: "api/account/delete"))
+        var request = URLRequest(url: SupabaseConfiguration.baseURL.appending(path: "functions/v1/delete-account"))
         request.httpMethod = "POST"
+        request.setValue(SupabaseConfiguration.publishableKey, forHTTPHeaderField: "apikey")
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: [

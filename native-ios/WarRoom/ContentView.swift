@@ -12,10 +12,94 @@ struct RootView: View {
             } else if auth.user == nil {
                 LoginView()
             } else {
-                ContentView()
+                MembershipGateView()
             }
         }
         .preferredColorScheme(.dark)
+    }
+}
+
+private struct MembershipGateView: View {
+    @EnvironmentObject private var auth: AuthStore
+    @State private var state: MembershipState = .loading
+
+    private enum MembershipState: Equatable {
+        case loading
+        case member
+        case rookie
+        case failed(String)
+    }
+
+    private var refreshKey: String {
+        "\(auth.user?.id.uuidString ?? "signed-out")|\(auth.selectedLeagueId?.uuidString ?? "none")"
+    }
+
+    var body: some View {
+        Group {
+            switch state {
+            case .loading:
+                ZStack {
+                    WarRoomBackdrop()
+                    ProgressView("Checking the roster…").tint(.green)
+                }
+            case .member:
+                ContentView()
+            case .rookie:
+                RookieMusterShell()
+            case .failed(let message):
+                ZStack {
+                    WarRoomBackdrop()
+                    ContentUnavailableView {
+                        Label("Can’t reach the War Room", systemImage: "antenna.radiowaves.left.and.right.slash")
+                    } description: {
+                        Text(message)
+                    } actions: {
+                        Button("TRY AGAIN") { Task { await loadMemberships() } }
+                            .buttonStyle(.borderedProminent).tint(.green)
+                        Button("SIGN OUT", role: .destructive) { auth.signOut() }
+                    }
+                }
+            }
+        }
+        .task(id: refreshKey) { await loadMemberships() }
+    }
+
+    @MainActor private func loadMemberships() async {
+        guard let token = auth.token, let user = auth.user else { return }
+        state = .loading
+        do {
+            let memberships = try await SupabaseAPI.leagueMemberships(token: token, userId: user.id)
+            state = memberships.isEmpty ? .rookie : .member
+        } catch {
+            state = .failed(error.localizedDescription)
+        }
+    }
+}
+
+private struct RookieMusterShell: View {
+    @EnvironmentObject private var auth: AuthStore
+
+    var body: some View {
+        NavigationStack {
+            LobbyView()
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Menu {
+                            NavigationLink {
+                                SafetyAndSupportView()
+                            } label: {
+                                Label("Privacy & Safety", systemImage: "hand.raised.fill")
+                            }
+                            Button(role: .destructive) { auth.signOut() } label: {
+                                Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
+                            }
+                        } label: {
+                            Image(systemName: "person.crop.circle")
+                                .accessibilityLabel("Account options")
+                        }
+                    }
+                }
+        }
     }
 }
 
@@ -1064,6 +1148,19 @@ private struct LoginView: View {
     @State private var working = false
     @State private var creating = false
 
+    private var cleanEmail: String { email.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var cleanDisplayName: String { displayName.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var validEmail: Bool {
+        let pieces = cleanEmail.split(separator: "@", omittingEmptySubsequences: false)
+        return pieces.count == 2 && !pieces[0].isEmpty && pieces[1].contains(".") && !cleanEmail.contains(" ")
+    }
+    private var validPassword: Bool { password.count >= 8 }
+    private var validDisplayName: Bool { (2...30).contains(cleanDisplayName.count) }
+    private var canSubmit: Bool {
+        if creating { return validEmail && validPassword && validDisplayName }
+        return validEmail && !password.isEmpty
+    }
+
     var body: some View {
         ZStack {
             WarRoomBackdrop()
@@ -1078,26 +1175,41 @@ private struct LoginView: View {
                 if creating {
                     TextField("What friends call you", text: $displayName)
                         .textContentType(.nickname)
+                        .autocorrectionDisabled()
                         .padding().background(.black.opacity(0.65), in: RoundedRectangle(cornerRadius: 12))
                         .overlay(RoundedRectangle(cornerRadius: 12).stroke(.green.opacity(0.32)))
+                    Text("Use 2–30 characters. This is the handle other players will see.")
+                        .font(.caption2.weight(.semibold)).foregroundStyle(validDisplayName || displayName.isEmpty ? Color.secondary : Color.red)
                 }
                 TextField("Email", text: $email)
                 .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
                 .keyboardType(.emailAddress)
                 .textContentType(.username)
                 .padding().background(.black.opacity(0.65), in: RoundedRectangle(cornerRadius: 12))
                 .overlay(RoundedRectangle(cornerRadius: 12).stroke(.green.opacity(0.32)))
                 SecureField("Password", text: $password)
-                .textContentType(.password)
+                .textContentType(creating ? .newPassword : .password)
                 .padding().background(.black.opacity(0.65), in: RoundedRectangle(cornerRadius: 12))
                 .overlay(RoundedRectangle(cornerRadius: 12).stroke(.green.opacity(0.32)))
+                if creating {
+                    Text("Password must be at least 8 characters.")
+                        .font(.caption2.weight(.semibold)).foregroundStyle(validPassword || password.isEmpty ? Color.secondary : Color.red)
+                } else {
+                    Button("Forgot password?") {
+                        Task { await auth.sendPasswordReset(email: cleanEmail) }
+                    }
+                    .font(.footnote.weight(.bold))
+                    .foregroundStyle(.green)
+                    .disabled(!validEmail || working)
+                    .accessibilityHint("Sends a secure password-reset link to the email above")
+                }
                 if let error = auth.errorMessage { Text(error).font(.footnote).foregroundStyle(.red) }
                 if let notice = auth.noticeMessage { Text(notice).font(.footnote).foregroundStyle(.green) }
                 Button {
                 working = true
                 Task {
-                    let cleanEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
-                    if creating { await auth.createAccount(email: cleanEmail, password: password, displayName: displayName.trimmingCharacters(in: .whitespacesAndNewlines)) }
+                    if creating { await auth.createAccount(email: cleanEmail, password: password, displayName: cleanDisplayName) }
                     else { await auth.signIn(email: cleanEmail, password: password) }
                     working = false
                 }
@@ -1107,7 +1219,7 @@ private struct LoginView: View {
             }
             .buttonStyle(.borderedProminent)
             .tint(.green)
-                .disabled(working || email.isEmpty || password.isEmpty || (creating && displayName.isEmpty))
+                .disabled(working || !canSubmit)
                 Button(creating ? "Already have an account? Sign in" : "New here? Create account") {
                 creating.toggle(); auth.errorMessage = nil; auth.noticeMessage = nil
                 }
@@ -1682,6 +1794,7 @@ struct HomeView: View {
     @State private var submittedUserIds: Set<UUID> = []
     @State private var sportPoolPoll: SportPoolPoll?
     @State private var latestScorecard: PostseasonScorecard?
+    @State private var pendingJoinRequests: [LobbyJoinRequest] = []
     @State private var loading = true
     @State private var loadError: String?
     @State private var clock = Date()
@@ -1751,14 +1864,14 @@ struct HomeView: View {
                                     NflPrimaryActionCard(
                                         kicker: "COMMISSIONER CONTROL · LEAGUE OPERATIONS",
                                         title: "Manage League",
-                                        detail: "Move players across AFC and NFC groups, inspect the roster, and control the season.",
+                                        detail: pendingJoinRequests.isEmpty ? "Move players across AFC and NFC groups, inspect the roster, and control the season." : "\(pendingJoinRequests.count) join request\(pendingJoinRequests.count == 1 ? "" : "s") waiting · roster · AFC/NFC groups · season control.",
                                         icon: "person.3.sequence.fill"
                                     )
                                 } else {
                                     StatusCard(
                                         kicker: "COMMISSIONER CONTROL · LEAGUE OPERATIONS",
                                         title: "Manage League",
-                                        detail: "Manage players, conference assignments, and season controls from one place.",
+                                        detail: pendingJoinRequests.isEmpty ? "Manage players, conference assignments, and season controls from one place." : "\(pendingJoinRequests.count) join request\(pendingJoinRequests.count == 1 ? "" : "s") waiting · roster · conferences · season control.",
                                         icon: "person.3.sequence.fill",
                                         featured: true,
                                         accent: .cyan,
@@ -1766,6 +1879,29 @@ struct HomeView: View {
                                     )
                                 }
                             }.buttonStyle(WarRoomCardButtonStyle())
+                            if !pendingJoinRequests.isEmpty {
+                                NavigationLink { JoinRequestsView(membership: membership) } label: {
+                                    if isNFL {
+                                        NflPrimaryActionCard(
+                                            kicker: "FRONT DOOR · ACTION REQUIRED",
+                                            title: "\(pendingJoinRequests.count) Join Request\(pendingJoinRequests.count == 1 ? "" : "s")",
+                                            detail: "Approve or deny each player. A denial reason is optional.",
+                                            icon: "person.crop.circle.badge.questionmark",
+                                            urgent: true
+                                        )
+                                    } else {
+                                        StatusCard(
+                                            kicker: "🚨 FRONT DOOR · ACTION REQUIRED",
+                                            title: "\(pendingJoinRequests.count) Join Request\(pendingJoinRequests.count == 1 ? "" : "s")",
+                                            detail: "Approve or deny each player. A denial reason is optional.",
+                                            icon: "person.crop.circle.badge.questionmark",
+                                            featured: true,
+                                            accent: .orange,
+                                            actionLabel: "REVIEW REQUESTS"
+                                        )
+                                    }
+                                }.buttonStyle(WarRoomCardButtonStyle())
+                            }
                         }
                         if membership.leagues.sportId.lowercased() == "cfb" {
                             if isRivalryWeek {
@@ -2008,17 +2144,17 @@ struct HomeView: View {
                             VStack(alignment: .leading, spacing: 12) {
                                 HStack(spacing: 8) {
                                     Image(systemName: "wrench.and.screwdriver.fill")
-                                    Text("WORK IN PROGRESS · YOUR INPUT MATTERS")
+                                    Text("FIELD REPORTS · YOUR INPUT MATTERS")
                                 }
                                 .font(.system(size: 9, weight: .black))
                                 .tracking(1.35)
                                 .foregroundStyle(isNFL ? .cyan : .yellow)
 
-                                Text("HELP BUILD THE WAR ROOM")
+                                Text("HELP SHAPE THE WAR ROOM")
                                     .font(.headline.weight(.black))
                                     .foregroundStyle(.white)
 
-                                Text("We’re building this with the people who play it. Spot a bug, find something confusing, or have an idea that would make the game better? Send it directly to us.")
+                                Text("Spot a bug, find something confusing, or have an idea that would make the game better? Send it directly to the team.")
                                     .font(.footnote.weight(.semibold))
                                     .foregroundStyle(.white.opacity(0.68))
                                     .fixedSize(horizontal: false, vertical: true)
@@ -2130,6 +2266,11 @@ struct HomeView: View {
                 latestScorecard = nil
             }
             memberships = (try? await loadedMemberships) ?? [active]
+            if active.isCommissioner(userId: user.id) {
+                pendingJoinRequests = (try? await SupabaseAPI.privateRoomJoinRequests(token: token, leagueId: active.leagueId)) ?? []
+            } else {
+                pendingJoinRequests = []
+            }
             loadError = nil
         } catch {
             loadError = error.localizedDescription
@@ -2306,6 +2447,9 @@ private struct CommissionerCommandCenterView: View {
                     else { HomeSectionLabel(title: "COMMAND DOORS", detail: "ONE JOB PER ROOM · NO MYSTERY BUTTONS") }
                     controlDoor(title: "MANAGE LEAGUE", detail: "ROSTER · CONFERENCES · SEASON CONTROL", icon: "person.3.sequence.fill", color: identity.isNFL ? .cyan : .green) {
                         LeagueManagementView(membership: membership)
+                    }
+                    controlDoor(title: "JOIN REQUESTS", detail: "APPROVE · DENY · OPTIONAL REASON · TWO-REQUEST LIMIT", icon: "person.crop.circle.badge.questionmark", color: .orange) {
+                        JoinRequestsView(membership: membership)
                     }
                     controlDoor(title: "WHO’S IN", detail: "\(submittedCount) OF \(standings.count) CARDS ON FILE", icon: "person.2.fill", color: allSubmitted ? .green : .yellow) {
                         SubmissionStatusView(membership: membership, standings: standings, submittedUserIds: submittedUserIds)
@@ -6447,6 +6591,7 @@ struct ProfileAvatar: View {
             if validURL != nil {
                 Button { showingLightbox = true } label: { avatar }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("\(name) profile photo")
                     .accessibilityHint("Opens full-screen photo")
             } else {
                 avatar

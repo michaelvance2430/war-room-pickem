@@ -11,6 +11,8 @@ struct LobbyRoom: Decodable, Identifiable, Sendable {
     let isFull: Bool
     let isMember: Bool
     let requestStatus: String?
+    let requestCount: Int?
+    let denialReason: String?
 
     enum CodingKeys: String, CodingKey {
         case id, name
@@ -22,6 +24,8 @@ struct LobbyRoom: Decodable, Identifiable, Sendable {
         case isFull = "is_full"
         case isMember = "is_member"
         case requestStatus = "request_status"
+        case requestCount = "request_count"
+        case denialReason = "denial_reason"
     }
 }
 
@@ -57,6 +61,24 @@ private struct LobbyBoardsPayload: Decodable {
     let crews: [LobbyCrewLeader]
 }
 
+struct LobbyJoinRequest: Decodable, Identifiable, Sendable {
+    let id: UUID
+    let gameHandle: String
+    let requestedAt: String
+    let requestCount: Int
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case gameHandle = "game_handle"
+        case requestedAt = "requested_at"
+        case requestCount = "request_count"
+    }
+}
+
+private struct LobbyJoinRequestsPayload: Decodable {
+    let requests: [LobbyJoinRequest]
+}
+
 extension SupabaseAPI {
     static func lobbyRooms(token: String) async throws -> [LobbyRoom] {
         let payload: LobbyRoomsPayload = try await lobbyRPC(
@@ -88,6 +110,39 @@ extension SupabaseAPI {
         )
     }
 
+    static func privateRoomJoinRequests(token: String, leagueId: UUID) async throws -> [LobbyJoinRequest] {
+        let payload: LobbyJoinRequestsPayload = try await lobbyRPC(
+            "list_private_room_join_requests",
+            token: token,
+            body: ["p_league_id": leagueId.uuidString.lowercased()]
+        )
+        return payload.requests
+    }
+
+    static func reviewPrivateRoomJoin(
+        token: String,
+        requestId: UUID,
+        approve: Bool,
+        denialReason: String? = nil
+    ) async throws {
+        let reason = denialReason?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let reasonValue: Any
+        if let reason, !reason.isEmpty {
+            reasonValue = reason
+        } else {
+            reasonValue = NSNull()
+        }
+        let _: LobbyActionPayload = try await lobbyRPC(
+            "review_private_room_join_with_reason",
+            token: token,
+            body: [
+                "p_request_id": requestId.uuidString.lowercased(),
+                "p_approve": approve,
+                "p_denial_reason": reasonValue
+            ]
+        )
+    }
+
     private static func lobbyRPC<T: Decodable>(_ name: String, token: String, body: [String: Any]) async throws -> T {
         let url = SupabaseConfiguration.baseURL.appending(path: "rest/v1/rpc/\(name)")
         var request = URLRequest(url: url)
@@ -111,6 +166,19 @@ private struct LobbyActionPayload: Decodable {
     let status: String?
 }
 
+private struct JoinLeaguePayload: Decodable {
+    let ok: Bool
+    let leagueId: UUID
+    let alreadyMember: Bool?
+    let name: String?
+
+    enum CodingKeys: String, CodingKey {
+        case ok, name
+        case leagueId = "league_id"
+        case alreadyMember = "already_member"
+    }
+}
+
 struct LeagueCreationPayload: Decodable, Sendable {
     let ok: Bool
     let leagueId: UUID
@@ -126,6 +194,16 @@ struct LeagueCreationPayload: Decodable, Sendable {
 }
 
 extension SupabaseAPI {
+    static func joinLeagueByCode(token: String, code: String) async throws -> UUID {
+        let payload: JoinLeaguePayload = try await lobbyRPC(
+            "join_league_by_code",
+            token: token,
+            body: ["p_code": code.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()]
+        )
+        guard payload.ok else { throw LobbyRequestError(message: "invalid_code") }
+        return payload.leagueId
+    }
+
     static func createLeague(
         token: String,
         name: String,
@@ -191,6 +269,7 @@ struct LobbyView: View {
                 VStack(spacing: 17) {
                     titleBlock
                     createLeagueDoor
+                    inviteCodeDoor
                     playerBoard
                     crewBoard
                     roomDoors
@@ -206,10 +285,10 @@ struct LobbyView: View {
                         .multilineTextAlignment(.center).padding(.top, 4)
                 }.padding(.horizontal, 15).padding(.top, 12).padding(.bottom, 42)
             }
-            .safeAreaPadding(.top, 8)
+            .safeAreaPadding(.top, 12)
             .refreshable { await load() }
         }
-        .navigationTitle("The Muster")
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
         .toolbarBackground(.black.opacity(0.94), for: .navigationBar)
@@ -249,6 +328,26 @@ struct LobbyView: View {
             }
             .padding(16).background(.green, in: RoundedRectangle(cornerRadius: 18))
         }.buttonStyle(.plain)
+    }
+
+    private var inviteCodeDoor: some View {
+        NavigationLink {
+            JoinByCodeView()
+        } label: {
+            HStack(spacing: 13) {
+                Image(systemName: "key.fill").font(.title2.weight(.black)).foregroundStyle(.yellow)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("ALREADY HAVE ORDERS?").font(.system(size: 8, weight: .black)).tracking(1.5).foregroundStyle(.yellow)
+                    Text("ENTER AN INVITE CODE").font(.headline.weight(.black)).foregroundStyle(.white)
+                }
+                Spacer()
+                Image(systemName: "chevron.right").font(.headline.weight(.black)).foregroundStyle(.yellow)
+            }
+            .padding(16).background(.black.opacity(0.82), in: RoundedRectangle(cornerRadius: 18))
+            .overlay(RoundedRectangle(cornerRadius: 18).stroke(.yellow.opacity(0.48)))
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint("Join a friend’s league using its private code")
     }
 
     private var playerBoard: some View {
@@ -351,8 +450,20 @@ struct LobbyView: View {
 
     private func roomCard(_ room: LobbyRoom) -> some View {
         let pending = room.requestStatus == "pending"
+        let denied = room.requestStatus == "denied"
+        let requestLimitReached = denied && (room.requestCount ?? 0) >= 2
         let color: Color = room.isFull ? .red : room.accessMode == "private" ? .yellow : .green
-        let label = room.isMember ? "ENTER ROOM" : room.isFull ? "ROOM FULL" : pending ? "REQUEST SENT" : room.accessMode == "private" ? "REQUEST TO JOIN" : "JOIN ROOM"
+        let label = room.isMember
+            ? "ENTER ROOM"
+            : room.isFull
+                ? "ROOM FULL"
+                : pending
+                    ? "REQUEST SENT"
+                    : requestLimitReached
+                        ? "REQUEST LIMIT REACHED"
+                        : denied
+                            ? "REQUEST AGAIN · FINAL"
+                            : room.accessMode == "private" ? "REQUEST TO JOIN" : "JOIN ROOM"
         return VStack(alignment: .leading, spacing: 11) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 3) {
@@ -363,13 +474,18 @@ struct LobbyView: View {
                 Text("\(room.humanCount)/\(room.maxHumanMembers)").font(.headline.weight(.black)).monospacedDigit()
             }
             ProgressView(value: Double(room.humanCount), total: Double(max(room.maxHumanMembers, 1))).tint(color)
+            if denied, let reason = room.denialReason, !reason.isEmpty {
+                Label("Commissioner: \(reason)", systemImage: "quote.bubble.fill")
+                    .font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.62))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             HStack {
                 Text(room.isFull ? "NO OPENINGS" : "\(room.seatsLeft) SEATS OPEN").font(.system(size: 8, weight: .black)).tracking(1).foregroundStyle(color)
                 Spacer()
                 Button(label) { Task { await act(on: room) } }
                     .font(.system(size: 9, weight: .black)).tracking(0.8)
                     .buttonStyle(.borderedProminent).tint(color)
-                    .disabled(busyRoom != nil || (!room.isMember && (room.isFull || pending)))
+                    .disabled(busyRoom != nil || (!room.isMember && (room.isFull || pending || requestLimitReached)))
             }
         }.padding(15).background(.black.opacity(0.82), in: RoundedRectangle(cornerRadius: 17))
             .overlay(RoundedRectangle(cornerRadius: 17).stroke(color.opacity(0.28)))
@@ -413,7 +529,208 @@ struct LobbyView: View {
                 auth.selectLeague(room.id)
                 dismiss()
             }
+        } catch {
+            if error.localizedDescription.localizedCaseInsensitiveContains("request_limit_reached") {
+                notice = "That room has already reviewed two requests from you. The request button is now closed."
+            } else {
+                notice = error.localizedDescription
+            }
+        }
+    }
+}
+
+struct JoinRequestsView: View {
+    @EnvironmentObject private var auth: AuthStore
+    let membership: LeagueMembership
+    @State private var requests: [LobbyJoinRequest] = []
+    @State private var loading = true
+    @State private var reviewing: UUID?
+    @State private var denialTarget: LobbyJoinRequest?
+    @State private var denialReason = ""
+    @State private var notice: String?
+
+    private var accent: Color { membership.leagues.sportId.lowercased() == "nfl" ? .cyan : .green }
+
+    var body: some View {
+        ZStack {
+            if membership.leagues.sportId.lowercased() == "nfl" {
+                NflHomeBackdrop(phase: NflSeasonPhase.phase(week: membership.leagues.currentWeek))
+            } else {
+                LinearGradient(colors: [.black, .green.opacity(0.14), .black], startPoint: .topLeading, endPoint: .bottomTrailing).ignoresSafeArea()
+            }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 15) {
+                    Label("COMMISSIONER INBOX", systemImage: "person.crop.circle.badge.questionmark")
+                        .font(.caption2.weight(.black)).tracking(1.8).foregroundStyle(accent)
+                    Text("JOIN\nREQUESTS").font(.system(size: 40, weight: .black)).fontWidth(.condensed)
+                    Text("Approve a player or deny the request. A denial reason is optional and will be shown only to that player.")
+                        .font(.subheadline.weight(.semibold)).foregroundStyle(.white.opacity(0.64))
+
+                    if loading {
+                        ProgressView("Checking the door…").tint(accent).frame(maxWidth: .infinity).padding(30)
+                    } else if requests.isEmpty {
+                        ContentUnavailableView("No requests waiting", systemImage: "checkmark.shield.fill", description: Text("The front door is clear."))
+                            .frame(maxWidth: .infinity).padding(.vertical, 28)
+                    } else {
+                        ForEach(requests) { request in requestCard(request) }
+                    }
+
+                    if let notice {
+                        Text(notice).font(.footnote.weight(.bold)).foregroundStyle(.yellow)
+                            .padding(13).frame(maxWidth: .infinity, alignment: .leading)
+                            .background(.yellow.opacity(0.10), in: RoundedRectangle(cornerRadius: 12))
+                    }
+                }
+                .padding(18).padding(.bottom, 90)
+            }
+            .refreshable { await load() }
+        }
+        .navigationTitle("Join Requests")
+        .navigationBarTitleDisplayMode(.inline)
+        .task { await load() }
+        .alert("Deny \(denialTarget?.gameHandle ?? "this player")?", isPresented: Binding(
+            get: { denialTarget != nil },
+            set: { if !$0 { denialTarget = nil; denialReason = "" } }
+        )) {
+            TextField("Reason (optional)", text: $denialReason)
+            Button("CANCEL", role: .cancel) { denialTarget = nil; denialReason = "" }
+            Button("DENY REQUEST", role: .destructive) {
+                guard let request = denialTarget else { return }
+                let submittedReason = denialReason
+                denialTarget = nil
+                Task { await review(request, approve: false, reason: submittedReason) }
+            }
+        } message: {
+            Text("They may request one more time if this is their first denial. After two denied requests, this room’s button permanently greys out for them.")
+        }
+    }
+
+    private func requestCard(_ request: LobbyJoinRequest) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(request.gameHandle).font(.headline.weight(.black))
+                    Text("REQUEST \(request.requestCount) OF 2")
+                        .font(.system(size: 8, weight: .black)).tracking(1.2).foregroundStyle(request.requestCount >= 2 ? .red : accent)
+                }
+                Spacer()
+                if reviewing == request.id { ProgressView().tint(accent) }
+            }
+            HStack(spacing: 10) {
+                Button("APPROVE") { Task { await review(request, approve: true) } }
+                    .buttonStyle(.borderedProminent).tint(.green)
+                Button("DENY") { denialReason = ""; denialTarget = request }
+                    .buttonStyle(.bordered).tint(.red)
+            }
+            .font(.caption.weight(.black))
+            .disabled(reviewing != nil)
+        }
+        .padding(15).background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 15))
+        .overlay(RoundedRectangle(cornerRadius: 15).stroke(accent.opacity(0.34)))
+    }
+
+    @MainActor private func load() async {
+        guard let token = auth.token else { return }
+        loading = requests.isEmpty
+        do {
+            requests = try await SupabaseAPI.privateRoomJoinRequests(token: token, leagueId: membership.leagueId)
+            notice = nil
         } catch { notice = error.localizedDescription }
+        loading = false
+    }
+
+    @MainActor private func review(_ request: LobbyJoinRequest, approve: Bool, reason: String? = nil) async {
+        guard let token = auth.token else { return }
+        reviewing = request.id
+        defer { reviewing = nil; denialReason = "" }
+        do {
+            try await SupabaseAPI.reviewPrivateRoomJoin(token: token, requestId: request.id, approve: approve, denialReason: reason)
+            notice = approve ? "\(request.gameHandle) is in the room." : "Request denied. The player can see your reason if you included one."
+            requests = try await SupabaseAPI.privateRoomJoinRequests(token: token, leagueId: membership.leagueId)
+        } catch { notice = error.localizedDescription }
+    }
+}
+
+struct JoinByCodeView: View {
+    @EnvironmentObject private var auth: AuthStore
+    @Environment(\.dismiss) private var dismiss
+    @State private var code = ""
+    @State private var joining = false
+    @State private var errorMessage: String?
+
+    private var cleanCode: String {
+        code.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+    }
+    private var validCode: Bool { (4...16).contains(cleanCode.count) }
+
+    var body: some View {
+        ZStack {
+            Image("MusterBackdrop").resizable().scaledToFill().ignoresSafeArea().opacity(0.42)
+            LinearGradient(colors: [.black.opacity(0.38), .black], startPoint: .top, endPoint: .bottom).ignoresSafeArea()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    Label("PRIVATE ORDERS", systemImage: "lock.shield.fill")
+                        .font(.caption2.weight(.black)).tracking(2).foregroundStyle(.yellow)
+                    Text("JOIN YOUR\nCREW").font(.system(size: 38, weight: .black)).fontWidth(.condensed)
+                    Text("Enter the invitation code your commissioner sent you. Codes are not case-sensitive.")
+                        .font(.subheadline.weight(.semibold)).foregroundStyle(.white.opacity(0.65))
+
+                    TextField("INVITE CODE", text: $code)
+                        .textInputAutocapitalization(.characters)
+                        .autocorrectionDisabled()
+                        .font(.title2.weight(.black).monospaced())
+                        .tracking(2)
+                        .padding(17)
+                        .background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 15))
+                        .overlay(RoundedRectangle(cornerRadius: 15).stroke(.yellow.opacity(0.48)))
+                        .accessibilityHint("Enter the code shared by your commissioner")
+
+                    if let errorMessage {
+                        Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
+                            .font(.footnote.weight(.bold)).foregroundStyle(.red)
+                    }
+
+                    Button { Task { await join() } } label: {
+                        HStack {
+                            Spacer()
+                            if joining { ProgressView().tint(.black) }
+                            else { Label("JOIN THIS LEAGUE", systemImage: "door.left.hand.open").font(.headline.weight(.black)) }
+                            Spacer()
+                        }
+                        .padding(16).foregroundStyle(.black)
+                        .background(validCode ? Color.yellow : .gray, in: RoundedRectangle(cornerRadius: 15))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!validCode || joining)
+                }
+                .padding(20)
+                .padding(.bottom, 80)
+            }
+        }
+        .navigationTitle("Invite Code")
+        .navigationBarTitleDisplayMode(.inline)
+        .preferredColorScheme(.dark)
+    }
+
+    @MainActor private func join() async {
+        guard validCode, let token = auth.token else { return }
+        joining = true
+        errorMessage = nil
+        do {
+            let leagueId = try await SupabaseAPI.joinLeagueByCode(token: token, code: cleanCode)
+            auth.selectLeague(leagueId)
+            dismiss()
+        } catch {
+            let raw = error.localizedDescription.lowercased()
+            if raw.contains("invalid_code") || raw.contains("invalid code") {
+                errorMessage = "That invite code was not recognized. Check it and try again."
+            } else if raw.contains("league_full") || raw.contains("league full") {
+                errorMessage = "That league is full. Ask the commissioner to open a seat."
+            } else {
+                errorMessage = error.localizedDescription.replacingOccurrences(of: "d1b:", with: "").replacingOccurrences(of: "_", with: " ")
+            }
+        }
+        joining = false
     }
 }
 
@@ -496,7 +813,7 @@ struct CreateLeagueView: View {
                             Spacer()
                         }.padding(16).foregroundStyle(.black).background(canCreate ? Color.green : .gray, in: RoundedRectangle(cornerRadius: 15))
                     }.buttonStyle(.plain).disabled(!canCreate || creating)
-                }.padding(17).padding(.bottom, 34)
+                }.padding(17).padding(.bottom, 110)
             }
         }
         .navigationTitle("Create League").navigationBarTitleDisplayMode(.inline).preferredColorScheme(.dark)

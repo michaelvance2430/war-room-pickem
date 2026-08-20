@@ -57,6 +57,17 @@ final class AuthStore: ObservableObject {
         } catch { errorMessage = error.localizedDescription }
     }
 
+    func sendPasswordReset(email: String) async {
+        errorMessage = nil
+        noticeMessage = nil
+        do {
+            try await SupabaseAPI.sendPasswordReset(email: email)
+            noticeMessage = "Password reset sent. Check your email for the secure link."
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func signOut() {
         clearSession()
     }

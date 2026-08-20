@@ -39,6 +39,20 @@ struct LeagueManagementView: View {
                 VStack(alignment: .leading, spacing: 18) {
                     header
                     rosterSummary
+                    NavigationLink { JoinRequestsView(membership: membership) } label: {
+                        HStack(spacing: 13) {
+                            Image(systemName: "person.crop.circle.badge.questionmark").font(.title2.weight(.black)).foregroundStyle(.orange)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("JOIN REQUESTS").font(.headline.weight(.black)).foregroundStyle(.white)
+                                Text("APPROVE · DENY · OPTIONAL REASON · TWO REQUESTS MAX")
+                                    .font(.system(size: 8, weight: .black)).tracking(0.65).foregroundStyle(.white.opacity(0.50))
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right").font(.caption.weight(.black)).foregroundStyle(.orange)
+                        }
+                        .padding(15).background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: identity.isNFL ? 6 : 14))
+                        .overlay(RoundedRectangle(cornerRadius: identity.isNFL ? 6 : 14).stroke(.orange.opacity(0.38)))
+                    }.buttonStyle(.plain)
                     if loading {
                         ProgressView("Opening the roster…").tint(accent).frame(maxWidth: .infinity).padding(30)
                     } else if standings.isEmpty {
