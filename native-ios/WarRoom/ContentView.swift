@@ -1665,6 +1665,7 @@ private struct PlayerProfileRouteView: View {
 
 struct HomeView: View {
     @EnvironmentObject private var auth: AuthStore
+    @Environment(\.openURL) private var openURL
     let leagueOverride: LeagueMembership?
     let onOpenPicks: () -> Void
     let onOpenStandings: () -> Void
@@ -1994,6 +1995,47 @@ struct HomeView: View {
                                 }
                             }.buttonStyle(WarRoomCardButtonStyle())
                         }
+
+                        Button {
+                            openURL(AppLinks.issueReport(sportId: membership.leagues.sportId, leagueName: membership.leagues.name))
+                        } label: {
+                            VStack(alignment: .leading, spacing: 12) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "wrench.and.screwdriver.fill")
+                                    Text("WORK IN PROGRESS · YOUR INPUT MATTERS")
+                                }
+                                .font(.system(size: 9, weight: .black))
+                                .tracking(1.35)
+                                .foregroundStyle(isNFL ? .cyan : .yellow)
+
+                                Text("HELP BUILD THE WAR ROOM")
+                                    .font(.headline.weight(.black))
+                                    .foregroundStyle(.white)
+
+                                Text("We’re building this with the people who play it. Spot a bug, find something confusing, or have an idea that would make the game better? Send it directly to us.")
+                                    .font(.footnote.weight(.semibold))
+                                    .foregroundStyle(.white.opacity(0.68))
+                                    .fixedSize(horizontal: false, vertical: true)
+
+                                HStack {
+                                    Text("SUBMIT AN ISSUE OR IDEA")
+                                        .font(.caption.weight(.black))
+                                        .tracking(0.7)
+                                    Spacer()
+                                    Image(systemName: "arrow.up.right")
+                                        .font(.caption.weight(.black))
+                                }
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 13)
+                                .padding(.vertical, 11)
+                                .background((isNFL ? Color.blue : Color.green).opacity(0.72), in: RoundedRectangle(cornerRadius: 8))
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(16)
+                            .background(.black.opacity(0.86), in: RoundedRectangle(cornerRadius: isNFL ? 8 : 16))
+                            .overlay(RoundedRectangle(cornerRadius: isNFL ? 8 : 16).stroke((isNFL ? Color.cyan : Color.green).opacity(0.42)))
+                        }
+                        .buttonStyle(WarRoomCardButtonStyle())
                     } else if let loadError {
                         VStack(spacing: 16) {
                             ContentUnavailableView("Room unavailable", systemImage: "wifi.exclamationmark", description: Text(loadError))

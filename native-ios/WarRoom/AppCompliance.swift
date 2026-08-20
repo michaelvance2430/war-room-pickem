@@ -6,6 +6,38 @@ enum AppLinks {
     static let terms = URL(string: "https://app.war-room-picks.com/terms")!
     static let support = URL(string: "https://app.war-room-picks.com/support")!
     static let supportEmail = "support@war-room-picks.com"
+
+    static func issueReport(sportId: String, leagueName: String) -> URL {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Unknown"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "Unknown"
+        let system = ProcessInfo.processInfo.operatingSystemVersionString
+        var components = URLComponents()
+        components.scheme = "mailto"
+        components.path = supportEmail
+        components.queryItems = [
+            URLQueryItem(name: "subject", value: "War Room Field Report — \(sportId.uppercased())"),
+            URLQueryItem(
+                name: "body",
+                value: """
+                WHAT HAPPENED OR WHAT SHOULD WE BUILD?
+
+
+                WHAT DID YOU EXPECT?
+
+
+                HOW CAN WE RECREATE IT? (OPTIONAL)
+
+
+                — APP DETAILS —
+                League: \(leagueName)
+                Sport: \(sportId.uppercased())
+                Version: \(version) (Build \(build))
+                System: \(system)
+                """
+            )
+        ]
+        return components.url ?? URL(string: "mailto:\(supportEmail)")!
+    }
 }
 
 enum LockerContentSafety {
