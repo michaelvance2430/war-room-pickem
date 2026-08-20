@@ -1,5 +1,6 @@
 
 import SwiftUI
+import UIKit
 
 struct RootView: View {
     @EnvironmentObject private var auth: AuthStore
@@ -1684,6 +1685,7 @@ struct HomeView: View {
     @State private var loading = true
     @State private var loadError: String?
     @State private var clock = Date()
+    @State private var showingFeedbackFallback = false
 
     init(leagueOverride: LeagueMembership? = nil, onOpenPicks: @escaping () -> Void, onOpenStandings: @escaping () -> Void, onOpenLocker: @escaping () -> Void) {
         self.leagueOverride = leagueOverride
@@ -1997,7 +1999,11 @@ struct HomeView: View {
                         }
 
                         Button {
-                            openURL(AppLinks.issueReport(sportId: membership.leagues.sportId, leagueName: membership.leagues.name))
+                            openURL(AppLinks.issueReport(sportId: membership.leagues.sportId, leagueName: membership.leagues.name)) { accepted in
+                                guard !accepted else { return }
+                                UIPasteboard.general.string = AppLinks.supportEmail
+                                showingFeedbackFallback = true
+                            }
                         } label: {
                             VStack(alignment: .leading, spacing: 12) {
                                 HStack(spacing: 8) {
@@ -2016,6 +2022,10 @@ struct HomeView: View {
                                     .font(.footnote.weight(.semibold))
                                     .foregroundStyle(.white.opacity(0.68))
                                     .fixedSize(horizontal: false, vertical: true)
+
+                                Text(AppLinks.supportEmail)
+                                    .font(.caption2.weight(.bold).monospaced())
+                                    .foregroundStyle(.white.opacity(0.52))
 
                                 HStack {
                                     Text("SUBMIT AN ISSUE OR IDEA")
@@ -2065,6 +2075,11 @@ struct HomeView: View {
         }
         .onAppear {
             if !loading { Task { await load() } }
+        }
+        .alert("SUPPORT EMAIL COPIED", isPresented: $showingFeedbackFallback) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("No email app was available, so \(AppLinks.supportEmail) was copied. Paste it into any email app to send your field report.")
         }
     }
 
