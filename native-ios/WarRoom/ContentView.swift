@@ -5451,7 +5451,8 @@ private func trophyFeaturePriority(_ type: String) -> Int {
 
 private func achievementVisual(for code: String) -> AchievementVisual {
     switch code.lowercased() {
-    case "the_creator", "the_commissioner": return AchievementVisual(icon: "crown.fill", glyph: "👑", color: .yellow)
+    case "the_creator": return AchievementVisual(icon: "shield.lefthalf.filled", glyph: "🪖", color: .green)
+    case "the_commissioner": return AchievementVisual(icon: "crown.fill", glyph: "👑", color: .yellow)
     case "two_wolves_of_prestige": return AchievementVisual(icon: "pawprint.fill", glyph: "🐺", color: .yellow)
     case "egg_obsession": return AchievementVisual(icon: "eye.fill", glyph: "🫣", color: .purple)
     case "egg_three_peat": return AchievementVisual(icon: "3.circle.fill", glyph: "3️⃣", color: .purple)
@@ -5582,7 +5583,8 @@ private func achievementVisual(for code: String) -> AchievementVisual {
 
 private func achievementArtifactName(for code: String) -> String? {
     switch code.lowercased() {
-    case "the_creator", "the_commissioner": return "CreatorCheevoArtifact"
+    case "the_creator": return "CreatorRangerCheevoArtifact"
+    case "the_commissioner": return "CreatorCheevoArtifact"
     case "neighborhood_creeper": return "NeighborhoodCreeperCheevoArtifact"
     case "house_dragon_legendary": return "HouseDragonCheevoArtifact"
     case "the_dr": return "DoctorCheevoArtifact"
