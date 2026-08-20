@@ -1,4 +1,4 @@
--- Rank each person once across all production rooms, while displaying one current game handle.
+-- Keep each player UUID unique while carrying the public avatar and selected ring into the Lobby board.
 create or replace function public.list_lobby_leaderboards()
 returns json
 language plpgsql
@@ -84,4 +84,4 @@ $$;
 revoke all on function public.list_lobby_leaderboards() from public, anon;
 grant execute on function public.list_lobby_leaderboards() to authenticated;
 
-comment on function public.list_lobby_leaderboards() is 'Top Cheevo players ranked once per user UUID plus creative crew names; excludes bots, Foundry, and inactive accounts.';
+comment on function public.list_lobby_leaderboards() is 'Top Cheevo players ranked once per user UUID with avatar rings plus creative crew names; excludes bots, Foundry, and inactive accounts.';

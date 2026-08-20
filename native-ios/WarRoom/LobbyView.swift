@@ -26,12 +26,18 @@ struct LobbyRoom: Decodable, Identifiable, Sendable {
 }
 
 struct LobbyPlayerLeader: Decodable, Identifiable, Sendable {
+    let userId: UUID?
     let gameHandle: String
     let cheevoPoints: Int
-    var id: String { gameHandle }
+    let avatarURL: String?
+    let equippedBorderId: String?
+    var id: String { userId?.uuidString ?? gameHandle }
     enum CodingKeys: String, CodingKey {
+        case userId = "user_id"
         case gameHandle = "game_handle"
         case cheevoPoints = "cheevo_points"
+        case avatarURL = "avatar_url"
+        case equippedBorderId = "equipped_border_id"
     }
 }
 
@@ -252,6 +258,7 @@ struct LobbyView: View {
                 ForEach(Array(players.dropFirst(3).prefix(7).enumerated()), id: \.element.id) { offset, player in
                     HStack(spacing: 11) {
                         Text("\(offset + 4)").font(.headline.weight(.black)).foregroundStyle(.white.opacity(0.28)).frame(width: 24)
+                        ProfileAvatar(urlString: player.avatarURL, name: player.gameHandle, size: 32, borderId: player.equippedBorderId, accent: .green)
                         Text(player.gameHandle).font(.subheadline.weight(.black)).lineLimit(1)
                         Spacer()
                         Text("\(player.cheevoPoints)").font(.headline.weight(.black)).monospacedDigit().foregroundStyle(.green)
@@ -265,8 +272,7 @@ struct LobbyView: View {
     private func podiumPlayer(_ player: LobbyPlayerLeader, rank: Int) -> some View {
         VStack(spacing: 7) {
             Text("#\(rank)").font(.caption.weight(.black)).foregroundStyle(rank == 1 ? .yellow : .green)
-            Image(systemName: rank == 1 ? "crown.fill" : rank == 2 ? "bolt.fill" : "flame.fill")
-                .font(.title3.weight(.black)).foregroundStyle(rank == 1 ? .yellow : .green)
+            ProfileAvatar(urlString: player.avatarURL, name: player.gameHandle, size: 48, borderId: player.equippedBorderId, accent: rank == 1 ? .yellow : .green)
             Text(player.gameHandle)
                 .font(.caption.weight(.black)).multilineTextAlignment(.center)
                 .lineLimit(2).minimumScaleFactor(0.7).frame(maxWidth: .infinity, minHeight: 30)

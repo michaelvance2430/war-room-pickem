@@ -228,6 +228,7 @@ private struct PicksView: View {
                                         ready: isComplete(card: card)
                                     )
                                 }
+                                PickOrderAlert()
                                 if league?.leagues.sportId.lowercased() == "nfl" {
                                     NflSundayOperationsPanel(week: card.weekNumber)
                                 } else {
@@ -1481,7 +1482,7 @@ private struct PublicPlayerProfileView: View {
                 VStack(spacing: 15) {
                     VStack(spacing: 10) {
                         Text(identity.isNFL ? "VISITING PRO PERSONNEL FILE" : "VISITING PLAYER FILE").font(.caption2.weight(.black)).tracking(2.4).foregroundStyle(identity.isNFL ? .cyan : .yellow)
-                        ProfileAvatar(urlString: standing.profiles?.avatarURL, name: standing.name, size: 110, accent: identity.isNFL ? .cyan : .green)
+                        ProfileAvatar(urlString: standing.profiles?.avatarURL, name: standing.name, size: 110, borderId: standing.profiles?.equippedBorderId, accent: identity.isNFL ? .cyan : .green)
                         ProfileRankPlacard(progress: profileRankProgress, isOwner: auth.user?.id == standing.userId, sportId: sportId)
                         Text(standing.name).font(.system(size: 32, weight: .black)).fontWidth(.condensed)
                         Text("\(conferenceLabel) · PUBLIC RECORD")
@@ -1836,11 +1837,11 @@ struct HomeView: View {
                             }.buttonStyle(WarRoomCardButtonStyle())
                         } else if card == nil && isCommissioner {
                             NavigationLink { CommissionerCardBuilderView(membership: membership) } label: {
-                                StatusCard(kicker: isRivalryWeek ? "RIVALRY DESK · CHOOSE THE HATE" : "COMMISSIONER · YOUR MOVE", title: isRivalryWeek ? "Build the Rivalry Card" : "Build Card", detail: isRivalryWeek ? "Pick five grudge games. Family, geography, trophies, and good judgment are all suspended." : "Pick five games, add one prop, then give the room something to argue about.", icon: isRivalryWeek ? "bolt.horizontal.fill" : "hammer.fill", featured: true, accent: isRivalryWeek ? .red : .yellow, actionLabel: "OPEN COMMAND")
+                                StatusCard(kicker: isRivalryWeek ? "🚨 DO THIS NEXT · RIVALRY DESK" : "🚨 DO THIS NEXT · COMMISSIONER", title: isRivalryWeek ? "Build the Rivalry Card" : "Build This Week’s Card", detail: isRivalryWeek ? "Pick five grudge games. Family, geography, trophies, and good judgment are all suspended." : "Pick five games, add one prop, then give the room something to argue about.", icon: isRivalryWeek ? "bolt.horizontal.fill" : "hammer.fill", featured: true, accent: .red, emergency: true, actionLabel: "OPEN COMMAND")
                             }.buttonStyle(WarRoomCardButtonStyle())
                         } else if card == nil {
                             Button(action: onOpenLocker) {
-                                StatusCard(kicker: "WAITING ON THE COMMISH", title: "No card. No picks. Outstanding leadership.", detail: "The Locker Room is accepting public complaints.", icon: "bubble.left.fill", featured: true, accent: .yellow, actionLabel: "OPEN LOCKER ROOM")
+                                StatusCard(kicker: "🚨 DO THIS NEXT · WAITING ON THE COMMISH", title: "Open the Locker Room", detail: "No card has been posted. The Locker Room is accepting public complaints.", icon: "bubble.left.fill", featured: true, accent: .red, emergency: true, actionLabel: "OPEN LOCKER ROOM")
                             }.buttonStyle(WarRoomCardButtonStyle())
                         } else if kickoffStarted {
                             Button(action: onOpenPicks) {
@@ -1848,7 +1849,7 @@ struct HomeView: View {
                             }.buttonStyle(WarRoomCardButtonStyle())
                         } else if pick == nil {
                             Button(action: onOpenPicks) {
-                                StatusCard(kicker: isRivalryWeek ? "HATE WEEK · PICK A SIDE" : "DO THIS NOW · WEEK \(membership.leagues.currentWeek)", title: isRivalryWeek ? "Choose your enemies" : "Make your picks", detail: isRivalryWeek ? "Five rivalry games. One Best Bet. Every bad decision becomes family evidence." : "Spreads, confidence, Best Bet, and the weekly prop are ready.", icon: isRivalryWeek ? "flame.fill" : "arrow.right.circle.fill", featured: true, accent: isRivalryWeek ? .red : .green, actionLabel: "MAKE PICKS")
+                                StatusCard(kicker: isRivalryWeek ? "🚨 DO THIS NEXT · HATE WEEK" : "🚨 DO THIS NEXT · WEEK \(membership.leagues.currentWeek)", title: isRivalryWeek ? "Choose Your Enemies" : "Make Your Picks", detail: isRivalryWeek ? "Five rivalry games. One Best Bet. Every bad decision becomes family evidence." : "Spreads, confidence, Best Bet, and the weekly prop are ready.", icon: isRivalryWeek ? "flame.fill" : "arrow.right.circle.fill", featured: true, accent: .red, emergency: true, actionLabel: "MAKE PICKS")
                             }.buttonStyle(WarRoomCardButtonStyle())
                         } else if isCommissioner {
                             NavigationLink {
@@ -1985,7 +1986,7 @@ struct HomeView: View {
                             }
                         }.buttonStyle(WarRoomCardButtonStyle())
                         if let latest = lockerMessages.last {
-                            NavigationLink { PlayerProfileRouteView(userId: latest.userId, fallbackName: latest.authorName, sportId: membership.leagues.sportId) } label: {
+                            Button(action: onOpenLocker) {
                                 if isNFL {
                                     NflPrimaryActionCard(kicker: "LATEST FROM THE SIDELINE", title: latest.authorName, detail: latest.body, icon: "quote.bubble.fill", urgent: true)
                                 } else {
@@ -2844,6 +2845,51 @@ private struct HomeOperationTile: View {
     }
 }
 
+private struct PickOrderAlert: View {
+    @State private var pulse = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                Text("DO THESE THREE THINGS")
+                Spacer()
+                Image(systemName: "exclamationmark.triangle.fill")
+            }
+            .font(.system(size: 15, weight: .black))
+            .tracking(1.4)
+
+            instruction("1", "MAKE YOUR PICKS")
+            instruction("2", "SET EVERY CONFIDENCE POINT")
+            instruction("3", "PICK ONE — AND ONLY ONE — BEST BET")
+        }
+        .foregroundStyle(.yellow)
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.black.opacity(0.94), in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.yellow.opacity(pulse ? 1 : 0.48), lineWidth: pulse ? 5 : 2))
+        .shadow(color: .yellow.opacity(pulse ? 0.62 : 0.22), radius: pulse ? 24 : 10)
+        .animation(.easeInOut(duration: 0.75).repeatForever(autoreverses: true), value: pulse)
+        .onAppear { pulse = true }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Do these three things. One, make your picks. Two, set every confidence point. Three, pick one and only one Best Bet.")
+    }
+
+    private func instruction(_ number: String, _ text: String) -> some View {
+        HStack(spacing: 12) {
+            Text(number)
+                .font(.system(size: 18, weight: .black))
+                .foregroundStyle(.black)
+                .frame(width: 34, height: 34)
+                .background(.yellow, in: Circle())
+            Text(text)
+                .font(.system(size: 17, weight: .black))
+                .tracking(0.6)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
 private func footballWeekDateRangeLabel(sportId: String, week: Int) -> String {
     let nfl = sportId.lowercased() == "nfl"
     let fixed: [Int: (String, String)] = nfl ? [
@@ -3625,7 +3671,7 @@ private struct StatusCard: View {
             Text(detail).font(emergency ? .body.weight(.bold) : .subheadline).foregroundStyle(emergency ? .white.opacity(0.88) : .secondary)
             if featured, emergency || actionLabel != nil {
                 HStack(spacing: 6) {
-                    Text(emergency ? "DO THIS NOW" : actionLabel ?? "").font(.system(size: emergency ? 12 : 9, weight: .black)).tracking(1.5)
+                    Text(emergency ? "DO THIS NEXT" : actionLabel ?? "").font(.system(size: emergency ? 13 : 9, weight: .black)).tracking(1.5)
                     Image(systemName: "arrow.right").font(.caption2.weight(.black))
                 }.foregroundStyle(emergency ? .white : accent)
             }
@@ -3637,7 +3683,7 @@ private struct StatusCard: View {
             in: UnevenRoundedRectangle(topLeadingRadius: 4, bottomLeadingRadius: 22, bottomTrailingRadius: 4, topTrailingRadius: 22)
         )
         .overlay(alignment: .leading) { Rectangle().fill(emergency ? .white : accent).frame(width: emergency ? 7 : (featured ? 4 : 2)).padding(.vertical, emergency ? 8 : 12) }
-        .overlay(UnevenRoundedRectangle(topLeadingRadius: 4, bottomLeadingRadius: 22, bottomTrailingRadius: 4, topTrailingRadius: 22).stroke(emergency ? .white.opacity(0.78) : accent.opacity(featured ? 0.72 : 0.3), lineWidth: emergency ? 2.5 : (featured ? 1.5 : 1)))
+        .overlay(UnevenRoundedRectangle(topLeadingRadius: 4, bottomLeadingRadius: 22, bottomTrailingRadius: 4, topTrailingRadius: 22).stroke(emergency ? .white.opacity(pulse ? 1 : 0.48) : accent.opacity(featured ? 0.72 : 0.3), lineWidth: emergency ? (pulse ? 5 : 2.5) : (featured ? 1.5 : 1)))
         .shadow(color: emergency ? .red.opacity(pulse ? 0.72 : 0.38) : (featured ? accent.opacity(0.24) : .clear), radius: emergency ? (pulse ? 30 : 18) : 26, y: 10)
         .scaleEffect(emergency && pulse ? 1.012 : 1)
         .animation(emergency ? .easeInOut(duration: 0.9).repeatForever(autoreverses: true) : .default, value: pulse)
@@ -3689,11 +3735,11 @@ private struct SituationRoomHomeBackdrop: View {
                     .scaledToFill()
                     .frame(width: proxy.size.width, height: proxy.size.height)
                     .clipped()
-                    .saturation(1.2)
-                    .contrast(1.08)
-                LinearGradient(colors: [.black.opacity(0.02), .black.opacity(0.20), .black.opacity(0.58)], startPoint: .top, endPoint: .bottom)
-                LinearGradient(colors: [Color(red: 0.01, green: 0.09, blue: 0.035), .black, Color(red: 0.08, green: 0.005, blue: 0.005)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                    .blendMode(.multiply).opacity(0.28)
+                    .saturation(0.42)
+                    .contrast(1.16)
+                LinearGradient(colors: [.black.opacity(0.10), Color(red: 0.055, green: 0.075, blue: 0.11).opacity(0.52), .black.opacity(0.72)], startPoint: .top, endPoint: .bottom)
+                LinearGradient(colors: [Color(red: 0.07, green: 0.09, blue: 0.13), .black, Color(red: 0.035, green: 0.045, blue: 0.065)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                    .blendMode(.multiply).opacity(0.42)
                 Path { path in
                     stride(from: 0.0, through: proxy.size.width, by: 38).forEach {
                         path.move(to: CGPoint(x: $0, y: 0)); path.addLine(to: CGPoint(x: $0, y: proxy.size.height))
@@ -3701,9 +3747,9 @@ private struct SituationRoomHomeBackdrop: View {
                     stride(from: 0.0, through: proxy.size.height, by: 38).forEach {
                         path.move(to: CGPoint(x: 0, y: $0)); path.addLine(to: CGPoint(x: proxy.size.width, y: $0))
                     }
-                }.stroke(.green.opacity(0.055), lineWidth: 0.7)
-                RadialGradient(colors: [.green.opacity(0.17), .clear], center: .topTrailing, startRadius: 0, endRadius: proxy.size.width * 0.9)
-                RadialGradient(colors: [.red.opacity(0.09), .clear], center: .bottomLeading, startRadius: 0, endRadius: proxy.size.width * 0.75)
+                }.stroke(Color(red: 0.42, green: 0.55, blue: 0.72).opacity(0.07), lineWidth: 0.7)
+                RadialGradient(colors: [Color(red: 0.30, green: 0.43, blue: 0.62).opacity(0.20), .clear], center: .topTrailing, startRadius: 0, endRadius: proxy.size.width * 0.9)
+                RadialGradient(colors: [Color.white.opacity(0.055), .clear], center: .bottomLeading, startRadius: 0, endRadius: proxy.size.width * 0.75)
                 LinearGradient(colors: [.clear, .black.opacity(0.6)], startPoint: .center, endPoint: .bottom)
             }.ignoresSafeArea()
         }
@@ -4170,7 +4216,7 @@ private struct LockerBubble: View {
         HStack(alignment: .top, spacing: 9) {
             if isMine { Spacer(minLength: 34) }
             if !isMine {
-                ProfileAvatar(urlString: message.profiles?.avatarURL, name: message.authorName, size: 34, accent: mineAccent)
+                ProfileAvatar(urlString: message.profiles?.avatarURL, name: message.authorName, size: 34, borderId: message.profiles?.equippedBorderId, accent: mineAccent)
             }
             VStack(alignment: isMine ? .trailing : .leading, spacing: 7) {
                 HStack(spacing: 7) {
@@ -4216,7 +4262,7 @@ private struct LockerBubble: View {
             .overlay(alignment: isMine ? .trailing : .leading) { Rectangle().fill(isMine ? mineAccent : .red).frame(width: 3).padding(.vertical, 9) }
             .overlay(UnevenRoundedRectangle(topLeadingRadius: isMine ? 18 : 3, bottomLeadingRadius: 18, bottomTrailingRadius: isMine ? 3 : 18, topTrailingRadius: 18).stroke(isMine ? mineAccent.opacity(0.50) : .red.opacity(0.35)))
             if isMine {
-                ProfileAvatar(urlString: message.profiles?.avatarURL, name: message.authorName, size: 34, accent: mineAccent)
+                ProfileAvatar(urlString: message.profiles?.avatarURL, name: message.authorName, size: 34, borderId: message.profiles?.equippedBorderId, accent: mineAccent)
             } else { Spacer(minLength: 34) }
         }
         .sheet(isPresented: $showingTrophy) {
@@ -4275,7 +4321,7 @@ private struct YouView: View {
                     VStack(spacing: 15) {
                         VStack(spacing: 10) {
                             Text(identity.isNFL ? "PRO FOOTBALL PERSONNEL FILE" : "PLAYER DOSSIER").font(.caption2.weight(.black)).tracking(2.4).foregroundStyle(identity.isNFL ? .cyan : .yellow)
-                            ProfileAvatar(urlString: profile?.avatarURL, name: playerName, size: 104, accent: identity.isNFL ? .cyan : .green)
+                            ProfileAvatar(urlString: profile?.avatarURL, name: playerName, size: 104, borderId: profile?.equippedBorderId, accent: identity.isNFL ? .cyan : .green)
                             ProfileRankPlacard(progress: profileRankProgress, isOwner: true, sportId: identity.sportId)
                             Text(playerName).font(.system(size: 32, weight: .black)).fontWidth(.condensed)
                             HStack(spacing: 7) {
@@ -4556,9 +4602,9 @@ private struct ProfileRivalryCard: View {
             }
             if let player, let rival {
                 HStack(spacing: 11) {
-                    ProfileAvatar(urlString: player.profiles?.avatarURL, name: player.name, size: 48, accent: SportIdentity(sportId).isNFL ? .cyan : .green)
+                    ProfileAvatar(urlString: player.profiles?.avatarURL, name: player.name, size: 48, borderId: player.profiles?.equippedBorderId, accent: SportIdentity(sportId).isNFL ? .cyan : .green)
                     Text("VS").font(.caption.weight(.black)).foregroundStyle(.red)
-                    ProfileAvatar(urlString: rival.profiles?.avatarURL, name: rival.name, size: 48, accent: SportIdentity(sportId).isNFL ? .cyan : .green)
+                    ProfileAvatar(urlString: rival.profiles?.avatarURL, name: rival.name, size: 48, borderId: rival.profiles?.equippedBorderId, accent: SportIdentity(sportId).isNFL ? .cyan : .green)
                     VStack(alignment: .leading, spacing: 3) {
                         Text(rival.name.uppercased()).font(.headline.weight(.black)).fontWidth(.condensed)
                         Text(rivalryLine(player: player, rival: rival)).font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.66)).fixedSize(horizontal: false, vertical: true)
@@ -6327,7 +6373,7 @@ private enum ProfileLoadoutError: LocalizedError {
     }
 }
 
-private struct ProfileAvatar: View {
+struct ProfileAvatar: View {
     let urlString: String?
     let name: String
     let size: CGFloat

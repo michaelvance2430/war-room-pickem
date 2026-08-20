@@ -11,6 +11,17 @@ import Foundation
 
 struct WarRoomTests {
 
+    @Test func careerTrophiesCollapseDuplicateHardwareForTheSameSeason() {
+        let ben = UUID(uuidString: "fdddf273-2430-42db-9127-b8fa7efc1572")!
+        let league = UUID(uuidString: "20000000-0000-0000-0000-000000000001")!
+        let first = ProfileTrophy(id: UUID(), leagueId: league, seasonYear: 2025, trophyType: "crystal_ball", winnerName: "Big Balls Ben", winnerUserId: ben, subtitle: "Crystal Ball prophet", notes: nil, awardedAt: "2025-12-31T23:59:59Z", trophyDesignId: nil)
+        let duplicate = ProfileTrophy(id: UUID(), leagueId: league, seasonYear: 2025, trophyType: "crystal_ball", winnerName: "Big Balls Ben", winnerUserId: ben, subtitle: "Crystal Ball prophet", notes: nil, awardedAt: "2025-12-31T23:59:59Z", trophyDesignId: nil)
+
+        let trophies = LegacyCareerRecords.trophies(for: ben, merging: [first, duplicate])
+
+        #expect(trophies.filter { $0.seasonYear == 2025 && $0.trophyType == "crystal_ball" }.count == 1)
+    }
+
     @Test func bettingLinesAlwaysResolveWithoutATie() {
         #expect(noPushSpread(3) == 3.5)
         #expect(noPushSpread(-4) == 4.5)

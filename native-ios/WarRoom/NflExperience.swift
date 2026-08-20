@@ -228,24 +228,30 @@ struct NflPrimaryActionCard: View {
     let detail: String
     let icon: String
     var urgent = false
+    @State private var pulse = false
 
     var body: some View {
         HStack(spacing: 14) {
             ZStack {
-                RoundedRectangle(cornerRadius: 4).fill((urgent ? Color.red : Color.blue).opacity(0.20))
+                RoundedRectangle(cornerRadius: 4).fill((urgent ? Color.white : Color.blue).opacity(urgent ? (pulse ? 0.32 : 0.14) : 0.20))
                 Image(systemName: icon).font(.title2.weight(.black)).foregroundStyle(.white)
             }.frame(width: 54, height: 58)
             VStack(alignment: .leading, spacing: 4) {
-                Text(kicker).font(.system(size: 8, weight: .black)).tracking(1.3).foregroundStyle(urgent ? .red : .cyan)
+                Text(kicker).font(.system(size: urgent ? 10 : 8, weight: .black)).tracking(1.3).foregroundStyle(urgent ? .white : .cyan)
                 Text(title).font(.headline.weight(.black)).foregroundStyle(.white)
                 Text(detail).font(.caption2.weight(.semibold)).foregroundStyle(.white.opacity(0.54)).lineLimit(3)
             }
             Spacer(minLength: 0)
             Image(systemName: "chevron.right").font(.caption.weight(.black)).foregroundStyle(urgent ? .red : .cyan)
         }
-        .padding(14).background(.black.opacity(0.88), in: RoundedRectangle(cornerRadius: 8))
-        .overlay(alignment: .leading) { Rectangle().fill(urgent ? .red : .blue).frame(width: 4).padding(.vertical, 8) }
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke((urgent ? Color.red : Color.blue).opacity(0.55)))
+        .padding(urgent ? 18 : 14)
+        .background(urgent ? Color.red.opacity(pulse ? 0.98 : 0.68) : Color.black.opacity(0.88), in: RoundedRectangle(cornerRadius: 8))
+        .overlay(alignment: .leading) { Rectangle().fill(urgent ? .white : .blue).frame(width: urgent ? 8 : 4).padding(.vertical, 8) }
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(urgent ? Color.white.opacity(pulse ? 1 : 0.48) : Color.blue.opacity(0.55), lineWidth: urgent ? (pulse ? 5 : 2) : 1))
+        .shadow(color: urgent ? .red.opacity(pulse ? 0.9 : 0.4) : .clear, radius: urgent ? (pulse ? 30 : 14) : 0, y: urgent ? 8 : 0)
+        .scaleEffect(urgent && pulse ? 1.012 : 1)
+        .animation(urgent ? .easeInOut(duration: 0.7).repeatForever(autoreverses: true) : .default, value: pulse)
+        .onAppear { if urgent { pulse = true } }
     }
 }
 

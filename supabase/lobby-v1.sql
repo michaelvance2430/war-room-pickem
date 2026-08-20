@@ -255,7 +255,8 @@ begin
            coalesce(nullif(trim(m.display_name_override), ''), nullif(trim(p.display_name), ''), 'Player') as game_handle,
            l.name as league_name,
            p.display_name,
-           p.avatar_url
+           p.avatar_url,
+           p.equipped_border_id
     from public.memberships m
     join public.leagues l on l.id = m.league_id and coalesce(l.mode::text, 'production') = 'production'
     join public.profiles p on p.id = m.user_id and coalesce(p.account_state::text, 'active') = 'active' and p.deleted_at is null
@@ -265,8 +266,11 @@ begin
              m.joined_at desc nulls last,
              m.league_id
   ), ranked as (
-    select ch.game_handle,
+    select ch.user_id,
+           ch.game_handle,
            ch.league_name,
+           ch.avatar_url,
+           ch.equipped_border_id,
            (coalesce(ap.points, 0) + case when nullif(trim(ch.display_name), '') is not null then 10 else 0 end + case when nullif(trim(ch.avatar_url), '') is not null then 10 else 0 end)::int as cheevo_points
     from chosen_handle ch
     left join award_points ap on ap.user_id = ch.user_id

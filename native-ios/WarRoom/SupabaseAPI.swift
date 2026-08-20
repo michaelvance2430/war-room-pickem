@@ -1605,7 +1605,7 @@ enum SupabaseAPI {
     static func lockerMessages(token: String, leagueId: UUID) async throws -> [LockerMessage] {
         var components = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/locker_messages"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
-            URLQueryItem(name: "select", value: "id,league_id,user_id,body,created_at,profiles(display_name,avatar_url),locker_message_reactions(id,user_id,emoji)"),
+            URLQueryItem(name: "select", value: "id,league_id,user_id,body,created_at,profiles(display_name,avatar_url,equipped_border_id),locker_message_reactions(id,user_id,emoji)"),
             URLQueryItem(name: "league_id", value: "eq.\(leagueId.uuidString.lowercased())"),
             URLQueryItem(name: "order", value: "created_at.desc"),
             URLQueryItem(name: "limit", value: "100"),
