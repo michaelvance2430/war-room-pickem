@@ -31,6 +31,8 @@ struct WarRoomTests {
         #expect(isNoPushSpread(-10.5))
         #expect(!isNoPushSpread(3))
         #expect(!isNoPushSpread(7.25))
+        #expect(favoriteSpreadLabel(favorite: "USC", spread: 39.5) == "USC -39.5")
+        #expect(favoriteSpreadLabel(favorite: "USC", spread: -39.5) == "USC -39.5")
     }
 
     @Test func leagueAutoBalanceIsEvenAndMinimizesMoves() {

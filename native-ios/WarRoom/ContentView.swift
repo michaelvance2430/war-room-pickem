@@ -1140,7 +1140,7 @@ private struct EditableGamePickRow: View {
 
     private var line: String {
         let favoriteName = game.favorite == "away" ? game.awayTeam : game.homeTeam
-        return "\(favoriteName) \(String(format: "%.1f", game.spread))"
+        return favoriteSpreadLabel(favorite: favoriteName, spread: game.spread)
     }
     private func team(_ name: String, rank: Int?) -> String { rank.map { "#\($0) \(name)" } ?? name }
 }
@@ -3863,7 +3863,7 @@ struct CommissionerCardBuilderView: View {
     private func oddsLine(_ game: OddsGame) -> String {
         let favorite = game.favorite == "away" ? game.awayTeam : game.homeTeam
         let book = game.bookmaker.map { " · \($0)" } ?? ""
-        return "\(favorite) -\(String(format: "%.1f", noPushSpread(game.spread)))\(book)"
+        return "\(favoriteSpreadLabel(favorite: favorite, spread: game.spread))\(book)"
     }
 
     private func favoriteCount(for game: OddsGame) -> Int {
@@ -3900,6 +3900,10 @@ struct CommissionerCardBuilderView: View {
 func noPushSpread(_ value: Double) -> Double {
     let halfPoint = (abs(value) * 2).rounded() / 2
     return halfPoint.truncatingRemainder(dividingBy: 1) == 0 ? halfPoint + 0.5 : halfPoint
+}
+
+func favoriteSpreadLabel(favorite: String, spread: Double) -> String {
+    "\(favorite) -\(String(format: "%.1f", noPushSpread(spread)))"
 }
 
 func isNoPushSpread(_ value: Double) -> Bool {
