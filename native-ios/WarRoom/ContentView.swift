@@ -3512,6 +3512,7 @@ struct CommissionerCardBuilderView: View {
         .background { if identity.isNFL { NflHomeBackdrop(phase: .regularSeason) } }
         .tint(identity.isNFL ? .blue : .green)
         .task { await loadRoomFavorites() }
+        .contentMargins(.bottom, 36, for: .scrollContent)
         .navigationTitle("Build Card")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)

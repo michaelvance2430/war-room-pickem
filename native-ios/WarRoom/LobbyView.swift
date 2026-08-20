@@ -206,9 +206,15 @@ struct LobbyView: View {
                         .multilineTextAlignment(.center).padding(.top, 4)
                 }.padding(.horizontal, 15).padding(.top, 12).padding(.bottom, 42)
             }
+            .safeAreaPadding(.top, 8)
             .refreshable { await load() }
         }
-        .navigationTitle("").navigationBarTitleDisplayMode(.inline)
+        .navigationTitle("The Muster")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.visible, for: .navigationBar)
+        .toolbarBackground(.black.opacity(0.94), for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .tint(.green)
         .task { await load() }
     }
 
