@@ -4,6 +4,10 @@ import UIKit
 
 struct RootView: View {
     @EnvironmentObject private var auth: AuthStore
+    // This belongs to the running app session, not to a league-specific view.
+    // ContentView is rebuilt when the active league changes; keeping the flag
+    // here prevents a league switch from replaying the launch film.
+    @State private var showOpening = true
 
     var body: some View {
         Group {
@@ -12,7 +16,7 @@ struct RootView: View {
             } else if auth.user == nil {
                 LoginView()
             } else {
-                MembershipGateView()
+                MembershipGateView(showOpening: $showOpening)
             }
         }
         .preferredColorScheme(.dark)
@@ -21,6 +25,7 @@ struct RootView: View {
 
 private struct MembershipGateView: View {
     @EnvironmentObject private var auth: AuthStore
+    @Binding var showOpening: Bool
     @State private var state: MembershipState = .loading
 
     private enum MembershipState: Equatable {
@@ -43,7 +48,7 @@ private struct MembershipGateView: View {
                     ProgressView("Checking the roster…").tint(.green)
                 }
             case .member:
-                ContentView()
+                ContentView(showOpening: $showOpening)
             case .rookie:
                 RookieMusterShell()
             case .failed(let message):
@@ -105,7 +110,7 @@ private struct RookieMusterShell: View {
 
 struct ContentView: View {
     @EnvironmentObject private var auth: AuthStore
-    @State private var showOpening = true
+    @Binding var showOpening: Bool
     @State private var selectedTab = 0
     @State private var tabRootIds = (0..<5).map { _ in UUID() }
     @State private var picksKickoff: Date?
