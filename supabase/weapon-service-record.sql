@@ -30,7 +30,7 @@ create table if not exists public.weapon_service_events (
   constraint weapon_service_events_weapon_sport_check check (
     (weapon_type = 'tactical_nuke' and phase = 'regular_season')
     or (weapon_type = 'dead_hand' and sport_id = 'cfb' and phase = 'postseason')
-    or (weapon_type = 'jdam' and sport_id = 'nfl' and phase = 'postseason')
+    or (weapon_type = 'jdam' and sport_id = 'nfl' and phase in ('regular_season','postseason'))
     or (weapon_type = 'hellfire' and sport_id = 'cbb' and phase = 'postseason')
   )
 );

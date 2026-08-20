@@ -59,6 +59,28 @@ struct NflExperienceTests {
         #expect(games.first { $0.id == "SUPER-BOWL" }.flatMap { NflBracketEngine.winner($0, picks: picks) } != nil)
     }
 
+    @Test func regularSeasonJdamUsesFavoritesAndAConfidenceLadder() throws {
+        let games = [
+            cardGame(order: 0, spread: 2.5, favorite: "away"),
+            cardGame(order: 1, spread: 10.5, favorite: "home"),
+            cardGame(order: 2, spread: 4.5, favorite: "away"),
+            cardGame(order: 3, spread: 7.5, favorite: "home"),
+            cardGame(order: 4, spread: 1.5, favorite: "away"),
+        ]
+        let plan = try #require(RegularSeasonWeaponEngine.plan(for: games))
+        #expect(plan.submissions.map(\.side) == games.map(\.favorite))
+        #expect(Set(plan.submissions.map(\.confidence)) == Set(1...5))
+        #expect(plan.bestBetGameId == games[1].id)
+        #expect(plan.submissions.first { $0.gameId == games[1].id }?.confidence == 5)
+    }
+
+    @Test func leagueInvitationUsesThePermanentAppStoreProductLink() {
+        let message = LeagueInvitation.message(leagueName: "Fourth & Regret", sportId: "nfl", code: "abc123")
+        #expect(message.contains("https://apps.apple.com/app/id6802751064"))
+        #expect(message.contains("Invite code: ABC123"))
+        #expect(!message.contains("app.war-room-picks.com"))
+    }
+
     @Test func divisionalRoundReseedsLowestWildCardSurvivorToOneSeed() {
         var picks = ["AFC-WC-2-7":"afc-7", "AFC-WC-3-6":"afc-3", "AFC-WC-4-5":"afc-4"]
         let games = NflBracketEngine.games(teams: field, picks: picks)
@@ -101,5 +123,14 @@ struct NflExperienceTests {
         #expect(SportIdentity("cfb").divisionLabel("North") == "SEC")
         #expect(SportIdentity("cfb").divisionLabel("South") == "BIG TEN")
         #expect(SportIdentity("cbb").divisionLabel("North") == "MIDWEST")
+    }
+
+    private func cardGame(order: Int, spread: Double, favorite: String) -> CardGame {
+        CardGame(
+            id: UUID(), sortOrder: order,
+            awayTeam: "Away \(order)", homeTeam: "Home \(order)",
+            spread: spread, favorite: favorite, startTime: nil,
+            awayRank: nil, homeRank: nil, isRivalry: false
+        )
     }
 }

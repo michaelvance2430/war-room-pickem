@@ -49,7 +49,7 @@ grudge_veteran|Cash a designated rivalry pick in 2 distinct CFB seasons. Multipl
 dynasty_of_spite|Cash a designated rivalry pick in 3 distinct CFB seasons and hit a rivalry Best Bet in at least one of them. Cannot be earned in one season.
 clutch_gene|Hit 7 Best Bets in a season.
 cheevo_king|Have the most achievement points in your league (checked whenever profiles/standings load). Awarded forever.
-let_them_cook|Lock a Chaos Mode card (robots cook — pure RNG, 2× week points, 2 per season). Permanent flex.
+let_them_cook|Authorize a regular-season catch-up card (posted favorites, 50% bonus on points earned, 2 per season). Permanent flex.
 neighborhood_creeper|Open Deep stats & legacy math on your own profile. One-time permanent. Equip the title if you want the room to know.
 calendar_cosplayer|No spoilers. Dress for the season. Curiosity only.
 egg_anniversary|No spoilers. Curiosity only.

@@ -248,6 +248,37 @@ struct WarRoomScoutSighting: View {
     }
 }
 
+struct RegularSeasonWeaponPlan {
+    let submissions: [PickSubmission]
+    let bestBetGameId: UUID
+}
+
+enum RegularSeasonWeaponEngine {
+    /// Regular-season weapons are deliberately conservative. They take the
+    /// posted favorite in every game and put the largest confidence value on
+    /// the strongest posted favorite. Postseason weapon engines remain random.
+    static func plan(for games: [CardGame]) -> RegularSeasonWeaponPlan? {
+        guard !games.isEmpty else { return nil }
+        let ranked = games.sorted {
+            let left = abs($0.spread)
+            let right = abs($1.spread)
+            return left == right ? $0.id.uuidString < $1.id.uuidString : left < right
+        }
+        let confidenceById = Dictionary(uniqueKeysWithValues: ranked.enumerated().map { index, game in
+            (game.id, index + 1)
+        })
+        guard let strongest = ranked.last else { return nil }
+        let submissions = games.map { game in
+            PickSubmission(
+                gameId: game.id,
+                side: game.favorite.lowercased() == "away" ? "away" : "home",
+                confidence: confidenceById[game.id] ?? 1
+            )
+        }
+        return RegularSeasonWeaponPlan(submissions: submissions, bestBetGameId: strongest.id)
+    }
+}
+
 private struct PicksView: View {
     @EnvironmentObject private var auth: AuthStore
     let onKickoffLoaded: (Date?) -> Void
@@ -265,7 +296,7 @@ private struct PicksView: View {
     @State private var saveNotice: String?
     @State private var editingSubmittedCard = false
     @State private var tacticalNukesUsed = 0
-    @State private var confirmingNuke = false
+    @State private var confirmingRegularSeasonWeapon = false
     @State private var strikePresentation: StrikePresentation?
     @State private var boardPicks: [BoardPick] = []
     @State private var boardLoading = false
@@ -290,7 +321,7 @@ private struct PicksView: View {
                             sportId: league?.leagues.sportId ?? "cfb",
                             card: card,
                             pick: pick,
-                            canEdit: canEdit(card: card),
+                            canEdit: canEdit(card: card) && !pick.isChaos,
                             onEdit: { editingSubmittedCard = true }
                         )
                     } else {
@@ -321,9 +352,16 @@ private struct PicksView: View {
                                 PickOrderAlert()
                                 if league?.leagues.sportId.lowercased() == "nfl" {
                                     NflSundayOperationsPanel(week: card.weekNumber)
-                                } else {
-                                    TacticalNukePanel(remaining: max(0, 2 - tacticalNukesUsed), armed: pick?.isChaos == true) {
-                                        confirmingNuke = true
+                                }
+                                if pick == nil,
+                                   card.weekNumber <= (league?.leagues.regularSeasonWeeks ?? 0),
+                                   ["cfb", "nfl"].contains(league?.leagues.sportId.lowercased() ?? "cfb") {
+                                    RegularSeasonWeaponPanel(
+                                        sportId: league?.leagues.sportId ?? "cfb",
+                                        remaining: max(0, 2 - tacticalNukesUsed),
+                                        armed: false
+                                    ) {
+                                        confirmingRegularSeasonWeapon = true
                                     }
                                 }
                                 if league?.leagues.sportId.lowercased() == "nfl" { NflBroadcastSectionLabel(title: "PRIME-TIME SLATE", detail: "PICK A SIDE · ASSIGN CONFIDENCE · CHOOSE ONE BEST BET") }
@@ -419,11 +457,13 @@ private struct PicksView: View {
                     await loadBoard(card: card)
                 }
             }
-            .alert("GO NUCLEAR?", isPresented: $confirmingNuke) {
+            .alert(regularSeasonWeaponConfirmationTitle, isPresented: $confirmingRegularSeasonWeapon) {
                 Button("KEEP CONTROL", role: .cancel) {}
-                Button("AUTHORIZE ☢", role: .destructive) { if let card { Task { await authorizeTacticalNuke(card: card) } } }
+                Button(regularSeasonWeaponAuthorizationLabel, role: .destructive) {
+                    if let card { Task { await authorizeRegularSeasonWeapon(card: card) } }
+                }
             } message: {
-                Text("The targeting computer takes the entire weekly card. Every point doubles. This immediately spends one of two season uses. No edits. No rerolls. No refunds.")
+                Text(regularSeasonWeaponConfirmationMessage)
             }
             .fullScreenCover(item: $strikePresentation) { strike in
                 WeaponStrikeVideoView(presentation: strike) { strikePresentation = nil }
@@ -445,9 +485,11 @@ private struct PicksView: View {
             let kickoff = card?.cardGames.compactMap { footballKickoffDate($0.startTime) }.min()
             onKickoffLoaded(kickoff)
             pick = try await loadedPick
-            tacticalNukesUsed = active.leagues.sportId.lowercased() == "nfl"
-                ? 0
-                : ((try? await SupabaseAPI.tacticalNukesUsed(token: token, leagueId: active.leagueId, userId: user.id)) ?? 0)
+            tacticalNukesUsed = (try? await SupabaseAPI.tacticalNukesUsed(
+                token: token,
+                leagueId: active.leagueId,
+                userId: user.id
+            )) ?? 0
             memberships = (try? await loadedMemberships) ?? [active]
             hydrateDraft(from: pick)
             editingSubmittedCard = false
@@ -562,24 +604,45 @@ private struct PicksView: View {
         saving = false
     }
 
-    private func authorizeTacticalNuke(card: WeekCard) async {
+    private var isNFL: Bool { league?.leagues.sportId.lowercased() == "nfl" }
+
+    private var regularSeasonWeaponConfirmationTitle: String {
+        isNFL ? "AUTHORIZE JDAM SUPPORT?" : "GO NUCLEAR?"
+    }
+
+    private var regularSeasonWeaponAuthorizationLabel: String {
+        isNFL ? "AUTHORIZE JDAM" : "AUTHORIZE ☢"
+    }
+
+    private var regularSeasonWeaponConfirmationMessage: String {
+        let weapon = isNFL ? "JDAM" : "The targeting computer"
+        return "\(weapon) takes the full regular-season card using the posted favorites and a legal confidence ladder. It adds a 50% bonus to points earned, never subtracts points, and immediately spends one of two season uses. No edits. No rerolls."
+    }
+
+    private func authorizeRegularSeasonWeapon(card: WeekCard) async {
         guard tacticalNukesUsed < 2, pick == nil, let token = auth.token, let league,
-              league.leagues.sportId.lowercased() != "nfl", let user = auth.user,
-              let prop = [card.propOptionA, card.propOptionB].compactMap({ $0 }).randomElement(),
-              let bestBet = card.cardGames.randomElement() else { return }
+              let user = auth.user,
+              card.weekNumber <= league.leagues.regularSeasonWeeks,
+              let prop = card.propOptionA,
+              let plan = RegularSeasonWeaponEngine.plan(for: card.cardGames) else { return }
         saving = true
         saveErrorMessage = nil
-        let confidences = Array(1...card.cardGames.count).shuffled()
-        let submissions = zip(card.cardGames, confidences).map { game, confidence in
-            let side = Bool.random() ? game.awayTeam : game.homeTeam
-            return PickSubmission(gameId: game.id, side: side, confidence: confidence)
-        }
         do {
-            _ = try await SupabaseAPI.saveWeekPicks(token: token, leagueId: league.leagueId, weekNumber: card.weekNumber, picks: submissions, bestBetGameId: bestBet.id, propChoice: prop, isChaos: true)
+            _ = try await SupabaseAPI.saveWeekPicks(
+                token: token,
+                leagueId: league.leagueId,
+                weekNumber: card.weekNumber,
+                picks: plan.submissions,
+                bestBetGameId: plan.bestBetGameId,
+                propChoice: prop,
+                isChaos: true
+            )
             pick = try await SupabaseAPI.playerPick(token: token, leagueId: league.leagueId, userId: user.id, weekNumber: card.weekNumber)
             hydrateDraft(from: pick)
             tacticalNukesUsed = min(2, tacticalNukesUsed + 1)
-            saveNotice = "Nuclear card armed. The computer has custody."
+            saveNotice = isNFL
+                ? "JDAM card sealed. Earned points receive 50% support."
+                : "Nuclear card sealed. Earned points receive 50% support."
             editingSubmittedCard = false
             strikePresentation = WeaponStrikeCatalog.presentation(for: league.leagues.sportId)
         } catch { saveErrorMessage = error.localizedDescription }
@@ -895,33 +958,44 @@ private struct MissingWeekCardView: View {
 
 }
 
-private struct TacticalNukePanel: View {
+private struct RegularSeasonWeaponPanel: View {
+    let sportId: String
     let remaining: Int
     let armed: Bool
     let authorize: () -> Void
 
+    private var isNFL: Bool { sportId.lowercased() == "nfl" }
+    private var accent: Color { isNFL ? .cyan : .red }
+    private var title: String { isNFL ? "JDAM CATCH-UP PACKAGE" : "TACTICAL NUCLEAR BUTTON" }
+    private var action: String { isNFL ? "CALL JDAM" : "GO NUCLEAR" }
+
     var body: some View {
         VStack(spacing: 12) {
             HStack(spacing: 12) {
-                Image(systemName: "aqi.medium").font(.system(size: 32, weight: .black)).foregroundStyle(armed ? .green : .red)
+                Image(systemName: isNFL ? "scope" : "aqi.medium")
+                    .font(.system(size: 32, weight: .black)).foregroundStyle(armed ? .green : accent)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("REGULAR SEASON WEAPON").font(.system(size: 8, weight: .black)).tracking(1.3).foregroundStyle(.red.opacity(0.8))
-                    Text("TACTICAL NUCLEAR BUTTON").font(.headline.weight(.black))
+                    Text("REGULAR SEASON CATCH-UP WEAPON").font(.system(size: 8, weight: .black)).tracking(1.3).foregroundStyle(accent.opacity(0.9))
+                    Text(title).font(.headline.weight(.black))
                 }
                 Spacer()
-                Text("\(remaining)/2").font(.title3.weight(.black)).monospacedDigit().foregroundStyle(armed ? .green : .red)
+                Text("\(remaining)/2").font(.title3.weight(.black)).monospacedDigit().foregroundStyle(armed ? .green : accent)
             }
             if armed {
-                Label("NUCLEAR CARD ARMED · 2× WEEK", systemImage: "checkmark.seal.fill").font(.caption.weight(.black)).foregroundStyle(.green)
+                Label("AI CARD SEALED · EARNED POINTS +50%", systemImage: "checkmark.seal.fill")
+                    .font(.caption.weight(.black)).foregroundStyle(.green)
             } else {
                 Button(action: authorize) {
-                    Text(remaining > 0 ? "GO NUCLEAR · \(remaining)/2" : "ARSENAL EMPTY · 0/2").font(.caption.weight(.black)).frame(maxWidth: .infinity).padding(.vertical, 7)
-                }.buttonStyle(.borderedProminent).tint(.red).disabled(remaining == 0)
+                    Text(remaining > 0 ? "\(action) · \(remaining)/2" : "ARSENAL EMPTY · 0/2")
+                        .font(.caption.weight(.black)).frame(maxWidth: .infinity).padding(.vertical, 7)
+                }.buttonStyle(.borderedProminent).tint(accent).disabled(remaining == 0)
             }
+            Text("The computer takes the posted favorites. Correct picks keep their normal points and add a 50% catch-up bonus. Misses never cost points.")
+                .font(.system(size: 9, weight: .bold)).foregroundStyle(.white.opacity(0.56)).multilineTextAlignment(.center)
         }
         .padding(16)
-        .background(LinearGradient(colors: [.black.opacity(0.9), .red.opacity(0.16)], startPoint: .leading, endPoint: .trailing), in: RoundedRectangle(cornerRadius: 18))
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke((armed ? Color.green : .red).opacity(0.62), lineWidth: 2))
+        .background(LinearGradient(colors: [.black.opacity(0.9), accent.opacity(0.16)], startPoint: .leading, endPoint: .trailing), in: RoundedRectangle(cornerRadius: isNFL ? 7 : 18))
+        .overlay(RoundedRectangle(cornerRadius: isNFL ? 7 : 18).stroke((armed ? Color.green : accent).opacity(0.62), lineWidth: 2))
     }
 }
 
@@ -964,6 +1038,24 @@ private struct LockedPickSummaryView: View {
                     .background(.black.opacity(0.84), in: RoundedRectangle(cornerRadius: isNFL ? 7 : 18))
                     .overlay(alignment: .top) { if isNFL { HStack(spacing: 0) { Color.blue; Color.white; Color.red }.frame(height: 3) } }
                     .overlay(RoundedRectangle(cornerRadius: isNFL ? 7 : 18).stroke(accent.opacity(0.42)))
+
+                    if pick.isChaos {
+                        HStack(spacing: 12) {
+                            Image(systemName: isNFL ? "scope" : "aqi.medium")
+                                .font(.title2.weight(.black)).foregroundStyle(isNFL ? .cyan : .red)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(isNFL ? "JDAM SUPPORT LOCKED" : "NUCLEAR CARD LOCKED")
+                                    .font(.caption.weight(.black)).tracking(1)
+                                Text("POSTED FAVORITES · EARNED POINTS +50% · SEALED")
+                                    .font(.system(size: 8, weight: .black)).foregroundStyle(.white.opacity(0.52))
+                            }
+                            Spacer()
+                            Image(systemName: "lock.fill").foregroundStyle(.green)
+                        }
+                        .padding(14)
+                        .background((isNFL ? Color.cyan : Color.red).opacity(0.10), in: RoundedRectangle(cornerRadius: isNFL ? 6 : 14))
+                        .overlay(RoundedRectangle(cornerRadius: isNFL ? 6 : 14).stroke((isNFL ? Color.cyan : Color.red).opacity(0.42)))
+                    }
 
                     ForEach(card.cardGames) { game in
                         if let selection = pick.pickGames.first(where: { $0.cardGameId == game.id }) {
@@ -2487,6 +2579,22 @@ private struct Parallelogram: Shape {
     }
 }
 
+enum LeagueInvitation {
+    static let appStoreURL = URL(string: "https://apps.apple.com/app/id6802751064")!
+
+    static func message(leagueName: String, sportId: String, code: String) -> String {
+        """
+        You’re invited to \(leagueName) on War Room Pick’Em.
+
+        Download the app: \(appStoreURL.absoluteString)
+        Open War Room Pick’Em → Enter Lobby → Enter an Invite Code
+        Invite code: \(code.uppercased())
+
+        Desk: \(sportId.uppercased())
+        """
+    }
+}
+
 private struct CommissionerCommandCenterView: View {
     let membership: LeagueMembership
     let standings: [Standing]
@@ -2506,6 +2614,28 @@ private struct CommissionerCommandCenterView: View {
                     commandHeader
                     weeklyStatus
                     primaryAction
+                    ShareLink(
+                        item: LeagueInvitation.appStoreURL,
+                        subject: Text("Join \(membership.leagues.name) on War Room Pick’Em"),
+                        message: Text(LeagueInvitation.message(
+                            leagueName: membership.leagues.name,
+                            sportId: membership.leagues.sportId,
+                            code: membership.leagues.code
+                        ))
+                    ) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "square.and.arrow.up.fill").font(.title2.weight(.black))
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("SHARE LEAGUE INVITATION").font(.headline.weight(.black))
+                                Text("APP STORE DOWNLOAD · INVITE CODE \(membership.leagues.code.uppercased())")
+                                    .font(.system(size: 8, weight: .black)).tracking(0.6)
+                            }
+                            Spacer()
+                        }
+                        .foregroundStyle(identity.isNFL ? .cyan : .green)
+                        .padding(16).background(.black.opacity(0.80), in: RoundedRectangle(cornerRadius: identity.isNFL ? 6 : 15))
+                        .overlay(RoundedRectangle(cornerRadius: identity.isNFL ? 6 : 15).stroke((identity.isNFL ? Color.cyan : Color.green).opacity(0.48)))
+                    }
                     if identity.isNFL { NflBroadcastSectionLabel(title: "GAME-DAY CONTROL", detail: "ONE JOB PER DESK · NO MYSTERY BUTTONS") }
                     else { HomeSectionLabel(title: "COMMAND DOORS", detail: "ONE JOB PER ROOM · NO MYSTERY BUTTONS") }
                     controlDoor(title: "MANAGE LEAGUE", detail: "ROSTER · CONFERENCES · SEASON CONTROL", icon: "person.3.sequence.fill", color: identity.isNFL ? .cyan : .green) {
@@ -6828,7 +6958,7 @@ private struct HowToPlayView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Label("NFL CAMPAIGN · WEEK 1 THROUGH SUPER BOWL", systemImage: "football.fill")
                             .font(.caption.weight(.black)).tracking(1).foregroundStyle(.cyan)
-                        Text("No preseason. Pick five games each week through Week 18, call the Super Bowl champion in the Crystal Ball, then build all 13 playoff decisions. JDAM is reserved for the postseason bracket.")
+                        Text("No preseason. Pick five games each week through Week 18, call the Super Bowl champion in the Crystal Ball, then build all 13 playoff decisions. Two regular-season JDAM support calls can add a 50% catch-up bonus; the postseason JDAM remains the unpredictable full-bracket override.")
                             .font(.subheadline.weight(.semibold)).foregroundStyle(.white.opacity(0.72))
                     }
                     .padding(16).background(.blue.opacity(0.12), in: RoundedRectangle(cornerRadius: 16))

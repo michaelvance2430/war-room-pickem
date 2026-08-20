@@ -143,12 +143,15 @@ begin
       and p.week_number = p_week_number
       and p.locked_at is not null
     group by p.id
-  ), totals as (
-    select p.id,
-      ((gp.points + case when p.prop_choice = p_prop_result then v_card.prop_points else 0 end)
-       * case when coalesce(p.is_chaos, false) then 2 else 1 end)::integer as total
+  ), base_scores as (
+    select p.id, coalesce(p.is_chaos, false) is_chaos,
+      (gp.points + case when p.prop_choice = p_prop_result then v_card.prop_points else 0 end)::integer base_points
     from public.picks p
     join game_points gp on gp.pick_id = p.id
+  ), totals as (
+    select id,
+      (base_points + case when is_chaos then (base_points + 1) / 2 else 0 end)::integer total
+    from base_scores
   )
   update public.picks p
   set total_points = totals.total

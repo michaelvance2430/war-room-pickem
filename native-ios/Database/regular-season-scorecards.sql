@@ -61,8 +61,8 @@ begin
           'points',case when s.prop_choice=s.prop_result then s.prop_points else 0 end
         ))
       ||case when s.is_chaos then jsonb_build_array(jsonb_build_object(
-          'label','NUCLEAR CARD · 2X MULTIPLIER',
-          'points',s.total_points/2
+          'label','CATCH-UP WEAPON · 50% EARNED BONUS',
+          'points',s.total_points-floor(s.total_points*2.0/3.0)::integer
         )) else '[]'::jsonb end components
     from scored s
   ), ranked as (

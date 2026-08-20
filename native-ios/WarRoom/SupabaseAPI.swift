@@ -166,6 +166,7 @@ struct LeagueMembership: Decodable, Identifiable, Sendable {
 
 struct LeagueSummary: Decodable, Sendable {
     let name: String
+    let code: String
     let sportId: String
     let currentWeek: Int
     let commissionerId: UUID
@@ -174,7 +175,7 @@ struct LeagueSummary: Decodable, Sendable {
     let mode: String?
     let regularSeasonWeeks: Int
     enum CodingKeys: String, CodingKey {
-        case name
+        case name, code
         case sportId = "sport_id"
         case currentWeek = "current_week"
         case commissionerId = "commissioner_id"
@@ -815,7 +816,7 @@ enum SupabaseAPI {
     static func leagueMemberships(token: String, userId: UUID, includeFoundry: Bool = false) async throws -> [LeagueMembership] {
         var components = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/memberships"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
-            URLQueryItem(name: "select", value: "league_id,role,is_moderator,is_deputy,total_points,weekly_points,weeks_played,division,joined_at,ats_correct,ats_total,current_streak,best_week,worst_week,perfect_weeks,best_bet_hits,best_bet_total,prop_hits,prop_total,leagues(name,sport_id,current_week,regular_season_weeks,commissioner_id,crystal_ball_enabled,championship_trophy_id,mode)"),
+            URLQueryItem(name: "select", value: "league_id,role,is_moderator,is_deputy,total_points,weekly_points,weeks_played,division,joined_at,ats_correct,ats_total,current_streak,best_week,worst_week,perfect_weeks,best_bet_hits,best_bet_total,prop_hits,prop_total,leagues(name,code,sport_id,current_week,regular_season_weeks,commissioner_id,crystal_ball_enabled,championship_trophy_id,mode)"),
             URLQueryItem(name: "user_id", value: "eq.\(userId.uuidString.lowercased())"),
         ]
         var request = URLRequest(url: components.url!)
