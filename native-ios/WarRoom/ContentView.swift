@@ -5448,7 +5448,8 @@ private struct CheevoBriefingView: View {
 private func trophyArtifactName(for trophy: ProfileTrophy) -> String? {
     switch trophy.trophyDesignId ?? trophy.trophyType {
     case "command_cup", "championship": return "ChampionshipArtifact"
-    case "nfc_championship", "afc_championship": return "NflGridironCrownArtifact"
+    case "nfc_championship": return "NfcChampionshipArtifact"
+    case "afc_championship": return "AfcChampionshipArtifact"
     case "golden_gut": return "GoldenGutArtifact"
     case "the_receipt": return "TheReceiptArtifact"
     case "insufferable_crown": return "InsufferableCrownArtifact"

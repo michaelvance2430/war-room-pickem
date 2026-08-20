@@ -96,7 +96,7 @@ struct SafetyAndSupportView: View {
 
             Section("Locker Room Safety") {
                 Text("Press and hold another player’s message to report it or block that player. Blocked players are hidden from your Locker Room.")
-                Link("Contact (AppLinks.supportEmail)", destination: URL(string: "mailto:\(AppLinks.supportEmail)")!)
+                Link("Contact \(AppLinks.supportEmail)", destination: URL(string: "mailto:\(AppLinks.supportEmail)")!)
             }
 
             Section("Account") {

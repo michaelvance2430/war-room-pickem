@@ -75,7 +75,7 @@ struct LeagueManagementView: View {
         .task { await loadRoster() }
         .alert("Auto-balance the roster?", isPresented: $showingAutoBalanceConfirmation) {
             Button("CANCEL", role: .cancel) {}
-            Button("BALANCE (groupNoun)") { Task { await autoBalance() } }
+            Button("BALANCE \(groupNoun)") { Task { await autoBalance() } }
         } message: {
             Text("This evenly redistributes all players across four groups. Existing assignments are preserved whenever the final group sizes allow it. You can still move anyone manually afterward.")
         }
@@ -185,7 +185,7 @@ struct LeagueManagementView: View {
                     }
                 }
                 Button { showingAutoBalanceConfirmation = true } label: {
-                    Label(balancing ? "BALANCING…" : "BALANCE (standings.count) PLAYERS", systemImage: "person.3.sequence.fill")
+                    Label(balancing ? "BALANCING…" : "BALANCE \(standings.count) PLAYERS", systemImage: "person.3.sequence.fill")
                         .font(.subheadline.weight(.black)).frame(maxWidth: .infinity).padding(13)
                         .foregroundStyle(identity.isNFL ? .black : .black)
                         .background(balancing ? Color.gray : accent, in: RoundedRectangle(cornerRadius: identity.isNFL ? 5 : 12))
@@ -277,7 +277,7 @@ struct LeagueManagementView: View {
                 )
             }
             standings = try await SupabaseAPI.standings(token: token, leagueId: membership.leagueId)
-            balanceSummary = moves.isEmpty ? "ROSTER ALREADY BALANCED" : "(moves.count) MOVES COMPLETE · GROUPS BALANCED"
+            balanceSummary = moves.isEmpty ? "ROSTER ALREADY BALANCED" : "\(moves.count) MOVES COMPLETE · GROUPS BALANCED"
         } catch {
             standings = (try? await SupabaseAPI.standings(token: token, leagueId: membership.leagueId)) ?? standings
             self.error = "Auto-balance stopped: \(error.localizedDescription)"
