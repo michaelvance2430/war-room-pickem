@@ -1847,6 +1847,43 @@ struct HomeView: View {
                         let visibleSubmissionCount = visibleSubmittedUserIds.count
                         let firstKickoff = card?.cardGames.compactMap { footballKickoffDate($0.startTime) }.min()
                         let kickoffStarted = firstKickoff.map { clock >= $0 } ?? false
+                        if isCommissioner, !pendingJoinRequests.isEmpty {
+                            NavigationLink { LeagueManagementView(membership: membership) } label: {
+                                HStack(spacing: 11) {
+                                    ZStack(alignment: .topTrailing) {
+                                        Image(systemName: "bell.badge.fill")
+                                            .font(.title2.weight(.black))
+                                            .foregroundStyle(.white)
+                                        Text("\(pendingJoinRequests.count)")
+                                            .font(.system(size: 9, weight: .black, design: .rounded))
+                                            .foregroundStyle(.white)
+                                            .frame(minWidth: 18, minHeight: 18)
+                                            .background(.red, in: Circle())
+                                            .overlay(Circle().stroke(.white, lineWidth: 1.5))
+                                            .offset(x: 10, y: -9)
+                                    }
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("UNREAD · COMMISSIONER INBOX")
+                                            .font(.system(size: 9, weight: .black)).tracking(1.25)
+                                            .foregroundStyle(.red)
+                                        Text("\(pendingJoinRequests.count) join request\(pendingJoinRequests.count == 1 ? "" : "s") waiting")
+                                            .font(.subheadline.weight(.black)).foregroundStyle(.white)
+                                    }
+                                    Spacer()
+                                    Text("OPEN MANAGE LEAGUE")
+                                        .font(.system(size: 8, weight: .black)).tracking(0.8)
+                                        .foregroundStyle(.white.opacity(0.72))
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption.weight(.black)).foregroundStyle(.white)
+                                }
+                                .padding(.horizontal, 16).padding(.vertical, 14)
+                                .background(Color.red.opacity(0.24), in: RoundedRectangle(cornerRadius: isNFL ? 7 : 16))
+                                .overlay(RoundedRectangle(cornerRadius: isNFL ? 7 : 16).stroke(.red, lineWidth: 2))
+                                .shadow(color: .red.opacity(0.55), radius: 14)
+                            }
+                            .buttonStyle(WarRoomCardButtonStyle())
+                            .accessibilityLabel("\(pendingJoinRequests.count) unread league join request\(pendingJoinRequests.count == 1 ? "" : "s"). Open Manage League.")
+                        }
                         if isNFL {
                             NflBroadcastHeader(
                                 leagueName: membership.leagues.name,
@@ -2208,6 +2245,13 @@ struct HomeView: View {
         }
         .toolbar(.hidden, for: .navigationBar)
         .task(id: leagueOverride?.leagueId ?? auth.selectedLeagueId) { await load() }
+        .task(id: membership?.leagueId) {
+            guard membership != nil else { return }
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(20))
+                await refreshPendingJoinRequests()
+            }
+        }
         .task {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(15))
@@ -2281,6 +2325,20 @@ struct HomeView: View {
             loadError = error.localizedDescription
         }
         loading = false
+    }
+
+    @MainActor private func refreshPendingJoinRequests() async {
+        guard let token = auth.token,
+              let user = auth.user,
+              let membership,
+              membership.isCommissioner(userId: user.id)
+        else {
+            pendingJoinRequests = []
+            return
+        }
+        if let requests = try? await SupabaseAPI.privateRoomJoinRequests(token: token, leagueId: membership.leagueId) {
+            pendingJoinRequests = requests
+        }
     }
 }
 
