@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">War Room Pick\'Em</string>
+    <string name="title_activity_main">War Room Pick\'Em</string>
+    <string name="package_name">com.warroompicks.app</string>
+    <string name="custom_url_scheme">com.warroompicks.app</string>
+</resources>

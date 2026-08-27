@@ -12,6 +12,9 @@
     "lint": "eslint",
     "native:sync": "npx cap sync ios",
     "native:open": "npx cap open ios",
+    "android:sync": "npx cap sync android",
+    "android:open": "npx cap open android",
+    "android:bundle": "cd android && ./gradlew bundleRelease",
     "verify:museum-1a": "node scripts/verify-museum-phase1a.mjs",
     "verify:postseason-ps1": "node --import tsx scripts/verify-postseason-ps1.mjs",
     "verify:postseason-routes": "node scripts/verify-postseason-route-retirement.mjs",
@@ -78,6 +81,7 @@
   },
   "dependencies": {
     "@capacitor/app": "^8.1.1",
+    "@capacitor/android": "^8.5.0",
     "@capacitor/core": "^8.5.0",
     "@capacitor/haptics": "^8.0.2",
     "@capacitor/ios": "^8.5.0",
