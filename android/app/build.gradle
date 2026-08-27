@@ -10,7 +10,7 @@ android {
     namespace = "com.warroompicks.app"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.warroompicks.app"
+        applicationId "com.warroompicks.WarRoom"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
