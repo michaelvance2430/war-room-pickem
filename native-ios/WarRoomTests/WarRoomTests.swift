@@ -69,6 +69,20 @@ struct WarRoomTests {
         #expect((counts.values.max() ?? 0) - (counts.values.min() ?? 0) <= 1)
     }
 
+    @Test func leagueAutoBalanceSupportsOneHundredPlayers() {
+        let players = (0..<100).map { index in
+            LeagueDivisionBalanceCandidate(
+                membershipId: UUID(uuidString: String(format: "20000000-0000-0000-0000-%012d", index + 1))!,
+                name: "Player \(index + 1)",
+                currentDivision: nil
+            )
+        }
+        let assignments = LeagueDivisionBalancer.assignments(for: players)
+        let counts = Dictionary(grouping: assignments.values, by: { $0 }).mapValues(\.count)
+        #expect(assignments.count == 100)
+        #expect(LeagueDivisionBalancer.divisions.allSatisfy { counts[$0] == 25 })
+    }
+
     @Test func cfbWeeksTwoThroughFourteenMatchEspnTuesdayBuckets() throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!

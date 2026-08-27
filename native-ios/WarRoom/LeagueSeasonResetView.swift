@@ -18,7 +18,17 @@ struct LeagueManagementView: View {
     @State private var balancing = false
     @State private var showingAutoBalanceConfirmation = false
     @State private var balanceSummary: String?
+    @State private var maxHumanMembers: Int
+    @State private var savedMaxHumanMembers: Int
+    @State private var savingCapacity = false
+    @State private var capacitySummary: String?
     @State private var error: String?
+
+    init(membership: LeagueMembership) {
+        self.membership = membership
+        _maxHumanMembers = State(initialValue: membership.leagues.maxHumanMembers)
+        _savedMaxHumanMembers = State(initialValue: membership.leagues.maxHumanMembers)
+    }
 
     private var identity: SportIdentity { SportIdentity(membership.leagues.sportId) }
     private var accent: Color {
@@ -39,6 +49,7 @@ struct LeagueManagementView: View {
                 VStack(alignment: .leading, spacing: 18) {
                     header
                     rosterSummary
+                    capacityControl
                     NavigationLink { JoinRequestsView(membership: membership) } label: {
                         HStack(spacing: 13) {
                             Image(systemName: "person.crop.circle.badge.questionmark").font(.title2.weight(.black)).foregroundStyle(.orange)
@@ -140,6 +151,35 @@ struct LeagueManagementView: View {
                         .frame(maxWidth: .infinity).padding(.vertical, 9)
                         .background(accent.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
                     }
+                }
+            }
+        }
+    }
+
+    private var capacityControl: some View {
+        managementPanel {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("ROOM CAPACITY").font(.caption2.weight(.black)).tracking(1.35).foregroundStyle(accent)
+                        Text("\(maxHumanMembers) HUMAN SEATS").font(.title3.weight(.black)).foregroundStyle(.white)
+                    }
+                    Spacer()
+                    Image(systemName: "person.3.sequence.fill").font(.title2.weight(.black)).foregroundStyle(accent)
+                }
+                Stepper("SET MAXIMUM", value: $maxHumanMembers, in: max(2, standings.filter { !$0.isBot }.count)...100)
+                    .font(.subheadline.weight(.black))
+                Text("The commissioner can change this during the season. You cannot lower it below the current human roster.")
+                    .font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.55))
+                Button { Task { await saveCapacity() } } label: {
+                    Label(savingCapacity ? "SAVING…" : "SAVE \(maxHumanMembers)-PLAYER CAP", systemImage: "checkmark.shield.fill")
+                        .font(.subheadline.weight(.black)).frame(maxWidth: .infinity).padding(13)
+                        .foregroundStyle(.black).background(savingCapacity ? Color.gray : accent, in: RoundedRectangle(cornerRadius: identity.isNFL ? 5 : 12))
+                }
+                .buttonStyle(.plain)
+                .disabled(savingCapacity || maxHumanMembers == savedMaxHumanMembers)
+                if let capacitySummary {
+                    Label(capacitySummary, systemImage: "checkmark.seal.fill").font(.caption.weight(.black)).foregroundStyle(accent)
                 }
             }
         }
@@ -296,6 +336,20 @@ struct LeagueManagementView: View {
             standings = (try? await SupabaseAPI.standings(token: token, leagueId: membership.leagueId)) ?? standings
             self.error = "Auto-balance stopped: \(error.localizedDescription)"
         }
+    }
+
+    @MainActor private func saveCapacity() async {
+        guard let token = auth.token else { return }
+        savingCapacity = true
+        error = nil
+        capacitySummary = nil
+        defer { savingCapacity = false }
+        do {
+            let result = try await SupabaseAPI.setLeagueCapacity(token: token, leagueId: membership.leagueId, maxHumanMembers: maxHumanMembers)
+            maxHumanMembers = result.maxHumanMembers
+            savedMaxHumanMembers = result.maxHumanMembers
+            capacitySummary = "ROOM CAP SAVED · \(result.humanCount)/\(result.maxHumanMembers) HUMAN SEATS FILLED"
+        } catch { self.error = error.localizedDescription }
     }
 }
 

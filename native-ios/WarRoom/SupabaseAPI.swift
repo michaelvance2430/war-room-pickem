@@ -174,6 +174,7 @@ struct LeagueSummary: Decodable, Sendable {
     let championshipTrophyId: String?
     let mode: String?
     let regularSeasonWeeks: Int
+    let maxHumanMembers: Int
     enum CodingKeys: String, CodingKey {
         case name, code
         case sportId = "sport_id"
@@ -183,6 +184,18 @@ struct LeagueSummary: Decodable, Sendable {
         case championshipTrophyId = "championship_trophy_id"
         case mode
         case regularSeasonWeeks = "regular_season_weeks"
+        case maxHumanMembers = "max_human_members"
+    }
+}
+
+struct LeagueCapacityUpdate: Decodable, Sendable {
+    let ok: Bool
+    let maxHumanMembers: Int
+    let humanCount: Int
+    enum CodingKeys: String, CodingKey {
+        case ok
+        case maxHumanMembers = "max_human_members"
+        case humanCount = "human_count"
     }
 }
 
@@ -821,7 +834,7 @@ enum SupabaseAPI {
     static func leagueMemberships(token: String, userId: UUID, includeFoundry: Bool = false) async throws -> [LeagueMembership] {
         var components = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/memberships"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
-            URLQueryItem(name: "select", value: "league_id,role,is_moderator,is_deputy,total_points,weekly_points,weeks_played,division,joined_at,ats_correct,ats_total,current_streak,best_week,worst_week,perfect_weeks,best_bet_hits,best_bet_total,prop_hits,prop_total,leagues(name,code,sport_id,current_week,regular_season_weeks,commissioner_id,crystal_ball_enabled,championship_trophy_id,mode)"),
+            URLQueryItem(name: "select", value: "league_id,role,is_moderator,is_deputy,total_points,weekly_points,weeks_played,division,joined_at,ats_correct,ats_total,current_streak,best_week,worst_week,perfect_weeks,best_bet_hits,best_bet_total,prop_hits,prop_total,leagues(name,code,sport_id,current_week,regular_season_weeks,commissioner_id,crystal_ball_enabled,championship_trophy_id,mode,max_human_members)"),
             URLQueryItem(name: "user_id", value: "eq.\(userId.uuidString.lowercased())"),
         ]
         var request = URLRequest(url: components.url!)
@@ -1043,6 +1056,17 @@ enum SupabaseAPI {
         request.httpMethod="POST";request.setValue("application/json",forHTTPHeaderField:"Content-Type")
         request.httpBody=try JSONSerialization.data(withJSONObject:["p_league_id":leagueId.uuidString.lowercased(),"p_confirm_name":confirmationName])
         let (data,response)=try await URLSession.shared.data(for:request);guard let http=response as? HTTPURLResponse,(200..<300).contains(http.statusCode) else{let message=(try? JSONDecoder().decode(APIError.self,from:data).message) ?? "Season reset refused to fire.";throw RequestError(message:message)}
+    }
+
+    static func setLeagueCapacity(token: String, leagueId: UUID, maxHumanMembers: Int) async throws -> LeagueCapacityUpdate {
+        var request = authorizedRequest(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/rpc/set_league_capacity"), token: token)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "p_league_id": leagueId.uuidString.lowercased(),
+            "p_max_human_members": maxHumanMembers,
+        ])
+        return try await send(request, as: LeagueCapacityUpdate.self)
     }
 
     static func lockCfbBowlBoard(token: String, leagueId: UUID, seasonKey: Int, picks: [String: String], allocations: [String: Int], deadHand: Bool) async throws -> CfbPostseasonEntry {

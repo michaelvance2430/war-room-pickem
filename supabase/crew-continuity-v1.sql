@@ -260,7 +260,7 @@ begin
     where v.poll_id = v_poll.id and v.response = 'yes'
   ) seat;
 
-  if v_seats > 64 then
+  if v_seats > 100 then
     raise exception 'sport_pool:too_many_seats' using errcode = '23514';
   end if;
 
@@ -311,7 +311,7 @@ begin
     crew_id
   ) values (
     v_name, v_code, v_uid, v_sport, true,
-    0, 50, false, null, greatest(2, v_seats),
+    0, 50, false, null, 100,
     v_crew_id
   ) returning id into v_league_id;
 

@@ -792,7 +792,7 @@ struct CreateLeagueView: View {
 
                     VStack(alignment: .leading, spacing: 12) {
                         createLabel("ROOM RULES")
-                        Stepper("\(maxMembers) HUMAN SEATS", value: $maxMembers, in: 2...64, step: 2).font(.subheadline.weight(.black))
+                        Stepper("\(maxMembers) HUMAN SEATS", value: $maxMembers, in: 2...100, step: 2).font(.subheadline.weight(.black))
                         Toggle("CRYSTAL BALL", isOn: $crystalBallEnabled).font(.subheadline.weight(.black)).tint(.green)
                     }.createLeaguePanel()
 

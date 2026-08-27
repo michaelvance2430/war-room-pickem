@@ -44,7 +44,7 @@ begin
     perform public.d1b_b_raise('validation_failed', 'sport');
   end if;
 
-  if v_max < 2 or v_max > 64 then
+  if v_max < 2 or v_max > 100 then
     perform public.d1b_b_raise('validation_failed', 'max_human');
   end if;
   if v_cut < 10 or v_cut > 75 then
@@ -146,4 +146,3 @@ revoke all on function public.create_league_with_commissioner_seat(
 grant execute on function public.create_league_with_commissioner_seat(
   text, text, boolean, boolean, integer, integer, integer, text
 ) to authenticated;
-
