@@ -1992,6 +1992,34 @@ struct HomeView: View {
                                 commissioner: isCommissioner
                             )
                         }
+                        ShareLink(
+                            item: LeagueInvitation.appStoreURL,
+                            subject: Text("Join \(membership.leagues.name) on War Room Pick’Em"),
+                            message: Text(LeagueInvitation.message(
+                                leagueName: membership.leagues.name,
+                                sportId: membership.leagues.sportId,
+                                code: membership.leagues.code
+                            ))
+                        ) {
+                            HStack(spacing: 10) {
+                                Image(systemName: "square.and.arrow.up.fill")
+                                    .font(.headline.weight(.black))
+                                Text("SHARE")
+                                    .font(.caption.weight(.black))
+                                    .tracking(1.2)
+                                Spacer()
+                                Text("INVITE CODE \(membership.leagues.code.uppercased())")
+                                    .font(.system(size: 8, weight: .black))
+                                    .tracking(0.7)
+                            }
+                            .foregroundStyle(isNFL ? Color.white : Color.black)
+                            .padding(.horizontal, 15)
+                            .padding(.vertical, 12)
+                            .background(isNFL ? Color.blue.opacity(0.92) : Color.green, in: RoundedRectangle(cornerRadius: isNFL ? 7 : 14))
+                            .overlay(RoundedRectangle(cornerRadius: isNFL ? 7 : 14).stroke(.white.opacity(isNFL ? 0.42 : 0.18)))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Share \(membership.leagues.name) invitation")
                         if isCommissioner {
                             NavigationLink { LeagueManagementView(membership: membership) } label: {
                                 if isNFL {

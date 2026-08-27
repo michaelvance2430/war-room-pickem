@@ -287,10 +287,15 @@ struct SportPoolPoll: Decodable, Identifiable, Sendable {
     let expiresAt: String
     let yesCount: Int
     let noCount: Int
+    let eligibleCount: Int
+    let requiredYes: Int
     let myVote: String?
     let yesVoters: [SportPoolVoter]
     let canLaunch: Bool
     let createdLeagueId: UUID?
+    let crewOverlapCount: Int?
+    let crewRequired: Int?
+    let crewQualified: Bool?
 }
 
 struct SportPoolLaunch: Decodable, Sendable {
