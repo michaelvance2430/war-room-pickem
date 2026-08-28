@@ -57,6 +57,9 @@ export function validateSnapshotPlan(plan: SnapshotPlan): ValidationResult {
     if (champ.length < 2) {
       errors.push("Contested plan must have at least 2 championship participants");
     }
+    if (champ.length > 16) {
+      errors.push("Championship field cannot exceed 16 participants");
+    }
   } else {
     if (champ.length > 0) {
       errors.push("Uncontested plan must not list championship participants");
@@ -69,6 +72,9 @@ export function validateSnapshotPlan(plan: SnapshotPlan): ValidationResult {
   if (plan.toiletBowlActive) {
     if (toilet.length < 4) {
       errors.push("Toilet active requires ≥4 toilet participants");
+    }
+    if (toilet.length > 16) {
+      errors.push("Toilet field cannot exceed 16 participants");
     }
   } else if (toilet.length > 0) {
     errors.push("Toilet inactive but toilet participants present");
@@ -100,24 +106,8 @@ export function validateSnapshotPlan(plan: SnapshotPlan): ValidationResult {
   if (allIds.size !== plan.participants.length) {
     errors.push("Duplicate user across participant rows");
   }
-  if (
-    plan.contested &&
-    champ.length + elim.length + (plan.toiletBowlActive ? toilet.length : 0) !==
-      plan.eligibleHumanCount &&
-    // when toilet inactive, non-qualifiers are eliminated
-    champ.length + elim.length !== plan.eligibleHumanCount
-  ) {
-    // Allow elim = non-qualifiers when toilet off; when toilet on elim should be empty
-    if (plan.toiletBowlActive) {
-      if (champ.length + toilet.length !== plan.eligibleHumanCount) {
-        errors.push("Champ + toilet must cover all eligible humans when toilet active");
-      }
-      if (elim.length !== 0) {
-        errors.push("No eliminated rows when toilet active (non-qualifiers are toilet)");
-      }
-    } else if (champ.length + elim.length !== plan.eligibleHumanCount) {
-      errors.push("Champ + eliminated must cover all eligible humans when toilet inactive");
-    }
+  if (plan.participants.length !== plan.eligibleHumanCount) {
+    errors.push("Champ + toilet + eliminated must cover all eligible humans");
   }
 
   return errors.length ? { ok: false, errors } : { ok: true };

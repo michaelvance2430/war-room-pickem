@@ -61,30 +61,13 @@ export function partitionPostseasonFields(
     };
   }
 
-  // Allocate the configured field proportionally through conferences first,
-  // then award any remaining seats as overall wild cards. With the default
-  // 50% cut this is half of each conference plus the best remaining players.
-  const divisions = ["North", "South", "East", "West"] as const;
-  const qualifierIds = new Set<string>();
-  for (const division of divisions) {
-    const conference = ordered.filter((member) => member.division === division);
-    const guaranteed = Math.floor(
-      (conference.length * q.qualifierCount) / ordered.length
-    );
-    for (const member of conference.slice(0, guaranteed)) {
-      qualifierIds.add(member.userId);
-    }
-  }
-  for (const member of ordered) {
-    if (qualifierIds.size >= q.qualifierCount) break;
-    qualifierIds.add(member.userId);
-  }
-  const championship = ordered.filter((member) => qualifierIds.has(member.userId));
-  const nonQualifiers = ordered.filter((member) => !qualifierIds.has(member.userId));
+  // The championship is the best available standings ranks, capped at 16.
+  const championship = ordered.slice(0, q.qualifierCount);
+  const nonQualifiers = ordered.slice(q.qualifierCount);
   const toiletBowlActive = nonQualifiers.length >= 4;
-  // Toilet seeds: worst-first among non-qualifiers (shame bracket energy)
+  // The Toilet Bowl is the worst 16 non-qualifiers, seeded worst-first.
   const toiletParticipants = toiletBowlActive
-    ? sortToiletOrder(nonQualifiers)
+    ? sortToiletOrder(nonQualifiers).slice(0, 16)
     : [];
 
   return {

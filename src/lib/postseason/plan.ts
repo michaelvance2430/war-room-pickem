@@ -136,6 +136,7 @@ export function buildSnapshotPlan(input: BuildSnapshotPlanInput): {
   });
 
   if (part.toiletBowlActive) {
+    const toiletIds = new Set(part.toiletParticipants.map((m) => m.userId));
     const toiletByes = planFirstRoundByes(part.toiletParticipants.length);
     part.toiletParticipants.forEach((m, i) => {
       const seed = i + 1;
@@ -150,6 +151,19 @@ export function buildSnapshotPlan(input: BuildSnapshotPlanInput): {
         seasonPointsAtCut: m.totalPoints,
       });
     });
+    for (const m of part.nonQualifiers) {
+      if (toiletIds.has(m.userId)) continue;
+      participants.push({
+        userId: m.userId,
+        displayName: m.displayName,
+        field: "eliminated",
+        seed: null,
+        firstRoundBye: false,
+        divisionSnapshot: m.division ? String(m.division) : null,
+        standingsRankAtCut: eligible.findIndex((x) => x.userId === m.userId) + 1,
+        seasonPointsAtCut: m.totalPoints,
+      });
+    }
   } else {
     // Non-qualifiers eliminated — Not contested toilet
     for (const m of part.nonQualifiers) {
@@ -188,7 +202,7 @@ export function buildSnapshotPlan(input: BuildSnapshotPlanInput): {
     creationReason: input.creationReason || "cut_week_scored",
     initiatingActorUserId: input.initiatingActorUserId ?? null,
     metadata: {
-      formula: "ceil(n*(100-cut)/100)",
+      formula: "min(16,ceil(n*(100-cut)/100))",
       engine: "ps1-pure",
       toiletLabel: part.toiletBowlActive ? "active" : "Not contested",
     },
