@@ -1603,17 +1603,21 @@ enum SupabaseAPI {
     }
 
     static func selectChampionshipTrophy(token: String, leagueId: UUID, trophyId: String) async throws {
-        var components = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/leagues"), resolvingAgainstBaseURL: false)!
-        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(leagueId.uuidString.lowercased())")]
-        var request = authorizedRequest(url: components.url!, token: token)
-        request.httpMethod = "PATCH"
+        var request = authorizedRequest(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/rpc/select_championship_trophy"), token: token)
+        request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("return=minimal", forHTTPHeaderField: "Prefer")
-        request.httpBody = try JSONSerialization.data(withJSONObject: ["championship_trophy_id": trophyId])
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "p_league_id": leagueId.uuidString.lowercased(),
+            "p_trophy_id": trophyId,
+        ])
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             let message = (try? JSONDecoder().decode(APIError.self, from: data).message) ?? "The hardware vault refused that selection. Dramatic, even for us."
             throw RequestError(message: message)
+        }
+        let saved = try JSONDecoder().decode(String.self, from: data)
+        guard saved == trophyId else {
+            throw RequestError(message: "The hardware vault did not confirm that selection. Try again.")
         }
     }
 
