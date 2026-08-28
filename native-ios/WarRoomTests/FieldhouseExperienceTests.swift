@@ -47,4 +47,21 @@ import XCTest
         FieldhouseBracketEngine.clearDownstream(after: "opening", games: games, picks: &picks)
         XCTAssertEqual(picks, ["opening": "a", "unrelated": "e"])
     }
+
+    func testFieldhouseFixtureMatchesOfficialTournamentShape() {
+        let slate = FieldhouseTournamentFixture.slate
+        XCTAssertEqual(slate.teams.count, 68)
+        XCTAssertEqual(slate.games.count, 67)
+        XCTAssertEqual(slate.games.filter { $0.round == 0 }.count, 4)
+        XCTAssertEqual(slate.games.filter { $0.round == 1 }.count, 32)
+        XCTAssertEqual(slate.games.filter { $0.round == 6 }.count, 1)
+    }
+
+    func testFieldhouseHellfireBuildsCompleteResolvableBracket() {
+        let slate = FieldhouseTournamentFixture.slate
+        let picks = FieldhouseBracketEngine.hellfirePicks(slate: slate)
+        XCTAssertEqual(picks.count, 67)
+        XCTAssertTrue(FieldhouseBracketEngine.isComplete(picks: picks))
+        XCTAssertEqual(FieldhouseBracketEngine.resolvedGames(slate: slate, picks: picks).filter { $0.teams.count == 2 }.count, 67)
+    }
 }

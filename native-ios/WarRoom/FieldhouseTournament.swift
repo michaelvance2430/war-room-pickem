@@ -158,3 +158,46 @@ enum FieldhouseBracketEngine {
         return picks
     }
 }
+
+enum FieldhouseTournamentFixture {
+    static let slate: FieldhouseTournamentSlate = {
+        let regions = ["east", "west", "south", "midwest"]
+        var teams: [FieldhouseTournamentTeam] = []
+        var games: [FieldhouseTournamentGame] = []
+
+        for region in regions {
+            for seed in 1...15 {
+                teams.append(.init(id: "\(region)-\(seed)", name: "\(display(region)) \(seed)", region: region, seed: seed))
+            }
+            teams.append(.init(id: "\(region)-16a", name: "\(display(region)) 16A", region: region, seed: 16))
+            teams.append(.init(id: "\(region)-16b", name: "\(display(region)) 16B", region: region, seed: 16))
+
+            let firstFour = "\(region)-ff-16"
+            games.append(.init(id: firstFour, round: 0, sourceA: "team:\(region)-16a", sourceB: "team:\(region)-16b"))
+            let pairings = [(1,16), (8,9), (5,12), (4,13), (6,11), (3,14), (7,10), (2,15)]
+            for (index, pairing) in pairings.enumerated() {
+                games.append(.init(
+                    id: "\(region)-r64-\(index + 1)",
+                    round: 1,
+                    sourceA: "team:\(region)-\(pairing.0)",
+                    sourceB: pairing.1 == 16 ? "game:\(firstFour)" : "team:\(region)-\(pairing.1)"
+                ))
+            }
+            for index in 0..<4 {
+                games.append(.init(id: "\(region)-r32-\(index + 1)", round: 2, sourceA: "game:\(region)-r64-\(index * 2 + 1)", sourceB: "game:\(region)-r64-\(index * 2 + 2)"))
+            }
+            for index in 0..<2 {
+                games.append(.init(id: "\(region)-s16-\(index + 1)", round: 3, sourceA: "game:\(region)-r32-\(index * 2 + 1)", sourceB: "game:\(region)-r32-\(index * 2 + 2)"))
+            }
+            games.append(.init(id: "\(region)-e8", round: 4, sourceA: "game:\(region)-s16-1", sourceB: "game:\(region)-s16-2"))
+        }
+        games.append(.init(id: "final-four-1", round: 5, sourceA: "game:east-e8", sourceB: "game:west-e8"))
+        games.append(.init(id: "final-four-2", round: 5, sourceA: "game:south-e8", sourceB: "game:midwest-e8"))
+        games.append(.init(id: "national-title", round: 6, sourceA: "game:final-four-1", sourceB: "game:final-four-2"))
+        return .init(leagueId: UUID(uuidString: "00000000-0000-0000-0000-000000000013")!, seasonKey: 2027, teams: teams, games: games, publishedAt: "2027-03-14T22:00:00Z")
+    }()
+
+    private static func display(_ region: String) -> String {
+        region.prefix(1).uppercased() + region.dropFirst()
+    }
+}

@@ -75,6 +75,7 @@ struct FieldhouseSeasonState {
     var regularHellfiresUsed = 0
     var bracketHellfireUsed = false
     var bracketLocked = false
+    var bracketPicks: [String: String] = [:]
     var selectedRegion: FieldhouseRegion = .midwest
 
     var regularHellfiresRemaining: Int { max(0, 2 - regularHellfiresUsed) }
@@ -234,17 +235,109 @@ private struct FieldhouseRegionsPage: View {
 private struct FieldhouseBracketsPage: View {
     @Binding var state: FieldhouseSeasonState
     @Binding var strikePresentation: StrikePresentation?
+    @State private var selectedRound = 0
+    private let slate = FieldhouseTournamentFixture.slate
+
     var body: some View {
         VStack(spacing: 13) {
             FieldhouseHero(kicker: "MARCH COMMAND · 67 DECISIONS", title: "THE NATIONAL BRACKET", detail: "First Four through the title game. Lock the whole sheet before the first tip.", icon: "point.3.connected.trianglepath.dotted")
-            ForEach(FieldhouseRegion.allCases) { region in
-                HStack { Text(region.rawValue).font(.headline.weight(.black)); Spacer(); Text("ROUND OF 64 → SWEET 16 → ELITE 8").font(.system(size: 7, weight: .black)).foregroundStyle(.orange); Image(systemName: "chevron.right.2").foregroundStyle(.yellow) }.padding(15).background(.black.opacity(0.74), in: RoundedRectangle(cornerRadius: 13)).overlay(RoundedRectangle(cornerRadius: 13).stroke(.orange.opacity(0.25)))
+            bracketProgress
+            roundRail
+            let roundGames = FieldhouseBracketEngine.resolvedGames(slate: slate, picks: state.bracketPicks).filter { $0.game.round == selectedRound }
+            if roundGames.isEmpty {
+                Text("No games are staged for this round.").font(.caption.weight(.bold)).foregroundStyle(.secondary)
+            } else {
+                ForEach(roundGames) { game in bracketGame(game) }
             }
-            Button { guard !state.bracketHellfireUsed else { return }; state.bracketHellfireUsed = true; state.bracketLocked = true; strikePresentation = WeaponStrikeCatalog.presentation(for: "cbb") } label: {
+            Button { launchHellfire() } label: {
                 FieldhouseAction(kicker: "BRACKET WEAPON · ONE SHOT", title: state.bracketHellfireUsed ? "Hellfire Bracket Locked" : "Launch the AI Crazy Pick", detail: state.bracketHellfireUsed ? "All 67 picks are sealed. No reroll." : "AI fills a wild but complete bracket, plays the Fieldhouse strike video, then seals every pick.", icon: "wand.and.stars")
-            }.buttonStyle(.plain).disabled(state.bracketHellfireUsed)
+            }.buttonStyle(.plain).disabled(state.bracketLocked).opacity(state.bracketLocked ? 0.55 : 1)
+            Button { state.bracketLocked = true } label: {
+                Label(state.bracketLocked ? "BRACKET SEALED" : "LOCK ALL 67 DECISIONS", systemImage: state.bracketLocked ? "lock.fill" : "checkmark.seal.fill")
+                    .font(.caption.weight(.black)).tracking(1).frame(maxWidth: .infinity).padding(15)
+                    .foregroundStyle(.black).background(state.bracketLocked ? Color.gray : Color.orange, in: RoundedRectangle(cornerRadius: 14))
+            }.buttonStyle(.plain).disabled(state.bracketLocked || !FieldhouseBracketEngine.isComplete(picks: state.bracketPicks))
             Text("REGULAR SEASON HELLFIRE: 2/2 · BRACKET AI HELLFIRE: 1 TOTAL · NO REROLLS").font(.system(size: 8, weight: .black)).tracking(1).foregroundStyle(.white.opacity(0.48))
         }
+    }
+
+    private var bracketProgress: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle().stroke(.white.opacity(0.12), lineWidth: 6)
+                Circle().trim(from: 0, to: CGFloat(state.bracketPicks.count) / 67).stroke(.orange, style: StrokeStyle(lineWidth: 6, lineCap: .round)).rotationEffect(.degrees(-90))
+                Text("\(state.bracketPicks.count)").font(.headline.weight(.black))
+            }.frame(width: 54, height: 54)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(state.bracketLocked ? "THE SHEET IS SEALED" : "\(67 - state.bracketPicks.count) DECISIONS REMAIN").font(.caption.weight(.black)).tracking(1).foregroundStyle(.orange)
+                Text(state.bracketLocked ? "No changes. Full receipt preserved." : "Complete each available matchup to unlock the next round.").font(.caption).foregroundStyle(.white.opacity(0.58))
+            }
+            Spacer()
+            Image(systemName: state.bracketLocked ? "lock.fill" : "lock.open.fill").foregroundStyle(.orange)
+        }.padding(14).background(.black.opacity(0.74), in: RoundedRectangle(cornerRadius: 16)).overlay(RoundedRectangle(cornerRadius: 16).stroke(.orange.opacity(0.28)))
+    }
+
+    private var roundRail: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 7) {
+                ForEach(0..<7, id: \.self) { round in
+                    Button { selectedRound = round } label: {
+                        Text(roundName(round)).font(.system(size: 8, weight: .black)).tracking(0.8).padding(.horizontal, 11).frame(height: 34)
+                            .foregroundStyle(selectedRound == round ? .black : .white)
+                            .background(selectedRound == round ? Color.orange : Color.white.opacity(0.08), in: Capsule())
+                    }.buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private func bracketGame(_ resolved: FieldhouseResolvedGame) -> some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack {
+                Text(gameLabel(resolved.game)).font(.system(size: 8, weight: .black)).tracking(1.1).foregroundStyle(.orange)
+                Spacer()
+                if let winner = state.bracketPicks[resolved.id] { Label("PICKED", systemImage: "checkmark.circle.fill").font(.system(size: 7, weight: .black)).foregroundStyle(winner.isEmpty ? .clear : .green) }
+            }
+            if resolved.teams.count == 2 {
+                ForEach(resolved.teams) { team in
+                    Button { select(team: team, in: resolved.game) } label: {
+                        HStack(spacing: 10) {
+                            Text("#\(team.seed)").font(.caption.weight(.black)).foregroundStyle(.orange).frame(width: 27)
+                            Text(team.name.uppercased()).font(.subheadline.weight(.black))
+                            Spacer()
+                            Image(systemName: state.bracketPicks[resolved.id] == team.id ? "checkmark.circle.fill" : "circle").foregroundStyle(.orange)
+                        }.padding(11).background(state.bracketPicks[resolved.id] == team.id ? Color.orange.opacity(0.16) : Color.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 10))
+                    }.buttonStyle(.plain).disabled(state.bracketLocked)
+                }
+            } else {
+                Label("Waiting on earlier winners", systemImage: "hourglass").font(.caption.weight(.bold)).foregroundStyle(.white.opacity(0.45)).padding(.vertical, 8)
+            }
+        }.padding(14).background(.black.opacity(0.76), in: RoundedRectangle(cornerRadius: 15)).overlay(RoundedRectangle(cornerRadius: 15).stroke(.orange.opacity(0.22)))
+    }
+
+    private func select(team: FieldhouseTournamentTeam, in game: FieldhouseTournamentGame) {
+        guard !state.bracketLocked else { return }
+        if state.bracketPicks[game.id] != team.id {
+            FieldhouseBracketEngine.clearDownstream(after: game.id, games: slate.games, picks: &state.bracketPicks)
+            state.bracketPicks[game.id] = team.id
+        }
+    }
+
+    private func launchHellfire() {
+        guard !state.bracketLocked, !state.bracketHellfireUsed else { return }
+        state.bracketPicks = FieldhouseBracketEngine.hellfirePicks(slate: slate)
+        state.bracketHellfireUsed = true
+        state.bracketLocked = true
+        selectedRound = 6
+        strikePresentation = WeaponStrikeCatalog.presentation(for: "cbb")
+    }
+
+    private func roundName(_ round: Int) -> String {
+        ["FIRST FOUR", "R64", "R32", "SWEET 16", "ELITE 8", "FINAL FOUR", "TITLE"][round]
+    }
+
+    private func gameLabel(_ game: FieldhouseTournamentGame) -> String {
+        "\(roundName(game.round)) · \(game.id.replacingOccurrences(of: "-", with: " ").uppercased())"
     }
 }
 
