@@ -98,6 +98,12 @@ struct FieldhouseNativePreviewView: View {
             VStack(spacing: 0) {
                 FieldhouseHeader(state: state)
                 FieldhouseDeskRail(selection: $desk)
+                if desk == .brackets {
+                    FieldhouseBracketStickyProgress(state: state)
+                        .padding(.horizontal, 14)
+                        .padding(.bottom, 8)
+                        .background(.black.opacity(0.62))
+                }
                 ScrollView {
                     Group {
                         switch desk {
@@ -241,7 +247,6 @@ private struct FieldhouseBracketsPage: View {
     var body: some View {
         VStack(spacing: 13) {
             FieldhouseHero(kicker: "MARCH COMMAND · 67 DECISIONS", title: "THE NATIONAL BRACKET", detail: "First Four through the title game. Lock the whole sheet before the first tip.", icon: "point.3.connected.trianglepath.dotted")
-            bracketProgress
             roundRail
             let roundGames = FieldhouseBracketEngine.resolvedGames(slate: slate, picks: state.bracketPicks).filter { $0.game.round == selectedRound }
             if roundGames.isEmpty {
@@ -259,22 +264,6 @@ private struct FieldhouseBracketsPage: View {
             }.buttonStyle(.plain).disabled(state.bracketLocked || !FieldhouseBracketEngine.isComplete(picks: state.bracketPicks))
             Text("REGULAR SEASON HELLFIRE: 2/2 · BRACKET AI HELLFIRE: 1 TOTAL · NO REROLLS").font(.system(size: 8, weight: .black)).tracking(1).foregroundStyle(.white.opacity(0.48))
         }
-    }
-
-    private var bracketProgress: some View {
-        HStack(spacing: 12) {
-            ZStack {
-                Circle().stroke(.white.opacity(0.12), lineWidth: 6)
-                Circle().trim(from: 0, to: CGFloat(state.bracketPicks.count) / 67).stroke(.orange, style: StrokeStyle(lineWidth: 6, lineCap: .round)).rotationEffect(.degrees(-90))
-                Text("\(state.bracketPicks.count)").font(.headline.weight(.black))
-            }.frame(width: 54, height: 54)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(state.bracketLocked ? "THE SHEET IS SEALED" : "\(67 - state.bracketPicks.count) DECISIONS REMAIN").font(.caption.weight(.black)).tracking(1).foregroundStyle(.orange)
-                Text(state.bracketLocked ? "No changes. Full receipt preserved." : "Complete each available matchup to unlock the next round.").font(.caption).foregroundStyle(.white.opacity(0.58))
-            }
-            Spacer()
-            Image(systemName: state.bracketLocked ? "lock.fill" : "lock.open.fill").foregroundStyle(.orange)
-        }.padding(14).background(.black.opacity(0.74), in: RoundedRectangle(cornerRadius: 16)).overlay(RoundedRectangle(cornerRadius: 16).stroke(.orange.opacity(0.28)))
     }
 
     private var roundRail: some View {
@@ -338,6 +327,34 @@ private struct FieldhouseBracketsPage: View {
 
     private func gameLabel(_ game: FieldhouseTournamentGame) -> String {
         "\(roundName(game.round)) · \(game.id.replacingOccurrences(of: "-", with: " ").uppercased())"
+    }
+}
+
+private struct FieldhouseBracketStickyProgress: View {
+    let state: FieldhouseSeasonState
+
+    var body: some View {
+        HStack(spacing: 10) {
+            ZStack {
+                Circle().stroke(.white.opacity(0.12), lineWidth: 4)
+                Circle()
+                    .trim(from: 0, to: CGFloat(state.bracketPicks.count) / 67)
+                    .stroke(.orange, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                Text("\(state.bracketPicks.count)").font(.caption.weight(.black))
+            }.frame(width: 40, height: 40)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(state.bracketLocked ? "THE SHEET IS SEALED" : "\(67 - state.bracketPicks.count) DECISIONS REMAIN")
+                    .font(.caption.weight(.black)).tracking(1).foregroundStyle(.orange)
+                Text(state.bracketLocked ? "Full receipt preserved." : "Complete matchups to unlock the next round.")
+                    .font(.caption2.weight(.semibold)).foregroundStyle(.white.opacity(0.58))
+            }
+            Spacer()
+            Image(systemName: state.bracketLocked ? "lock.fill" : "lock.open.fill").foregroundStyle(.orange)
+        }
+        .padding(.horizontal, 12).padding(.vertical, 9)
+        .background(.black.opacity(0.94), in: RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(.orange.opacity(0.38)))
     }
 }
 
