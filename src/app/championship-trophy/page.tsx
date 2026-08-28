@@ -5,9 +5,8 @@ import { useRouter } from "next/navigation";
 import HardwareTrophyIcon from "@/components/HardwareTrophyIcon";
 import TrophyLightbox from "@/components/TrophyLightbox";
 import { CHAMPIONSHIP_TROPHIES, championshipTrophiesForSport, type ChampionshipTrophyId } from "@/lib/championship-trophy-catalog";
-import { getLeague, getSession, isActuallyCommissioner } from "@/lib/league";
-import { invalidateLeagueCloudCache, syncLeagueFromCloud } from "@/lib/league-sync";
-import { createClient } from "@/lib/supabase/client";
+import { getLeague, isActuallyCommissioner } from "@/lib/league";
+import { saveLeagueToCloud, syncLeagueFromCloud } from "@/lib/league-sync";
 
 export default function ChampionshipTrophyPage() {
   const router = useRouter();
@@ -26,18 +25,28 @@ export default function ChampionshipTrophyPage() {
 
   async function save() {
     const league = getLeague();
-    const session = getSession();
-    if (!selected || !league?.id || !session?.isCommissioner || !isActuallyCommissioner()) return;
+    if (!selected || !league?.id) return;
+    if (!isActuallyCommissioner()) {
+      setError("Only the commissioner can choose championship hardware.");
+      return;
+    }
     setBusy(true);
     setError(null);
-    const { error: updateError } = await createClient().from("leagues").update({ championship_trophy_id: selected }).eq("id", league.id).eq("commissioner_id", session.playerId);
-    if (updateError) {
-      setError(updateError.message.includes("locked") ? "The trophy locked at opening kickoff. This season already has its hardware." : updateError.message);
+    const result = await saveLeagueToCloud({
+      settings: { championshipTrophyId: selected },
+    });
+    if (!result.ok) {
+      const message = result.error || "The trophy could not be saved. Try again.";
+      setError(message.toLowerCase().includes("locked") ? "The trophy locked at opening kickoff. This season already has its hardware." : message);
       setBusy(false);
       return;
     }
-    invalidateLeagueCloudCache(league.id);
-    await syncLeagueFromCloud();
+    const confirmed = await syncLeagueFromCloud();
+    if (confirmed?.settings?.championshipTrophyId !== selected) {
+      setError("The trophy did not save. Check your connection and try again.");
+      setBusy(false);
+      return;
+    }
     window.dispatchEvent(new Event("warroom-championship-trophy-selected"));
     router.push("/");
   }
