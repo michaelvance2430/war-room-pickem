@@ -103,7 +103,7 @@ begin
   select count(*) into v_n from public.memberships
   where league_id=p_league_id and not coalesce(is_bot,false);
   v_q := case when v_n<2 then 0
-    else least(v_n, greatest(2, ceil(v_n*(100-v_league.cut_percent)/100.0)::integer)) end;
+    else least(16, v_n, greatest(2, ceil(v_n*(100-v_league.cut_percent)/100.0)::integer)) end;
 
   insert into public.league_postseason_snapshots(
     league_id,season_key,sport_id,cut_week,cut_percent,eligible_human_count,
@@ -111,7 +111,7 @@ begin
   ) values (
     p_league_id,v_key,coalesce(v_league.sport_id,'cfb'),v_league.regular_season_weeks,
     v_league.cut_percent,v_n,v_q,(v_n-v_q)>=4,v_uid,
-    jsonb_build_object('formula','ceil(n*(100-cut)/100)','engine','server-v1','immutable',true)
+    jsonb_build_object('formula','min(16,ceil(n*(100-cut)/100))','toilet_cap',16,'engine','server-v2','immutable',true)
   ) returning id into v_snapshot;
 
   with base as (
@@ -140,18 +140,12 @@ begin
         b.earned_points desc,h.h2h_wins desc,b.display_name,b.user_id) division_rank,
       count(*) over(partition by b.division) division_count
     from base b join h2h h using(user_id)
-  ), guaranteed as (
-    select * from ordered where division_rank<=floor(division_count*v_q/greatest(v_n,1))
-  ), wildcards as (
-    select user_id from ordered where user_id not in(select user_id from guaranteed)
-    order by overall_rank limit greatest(0,v_q-(select count(*) from guaranteed))
-  ), selected as (
-    select user_id from guaranteed union select user_id from wildcards
   ), classified as (
     select o.*,
-      case when s.user_id is not null then 'championship'
-           when (v_n-v_q)>=4 then 'toilet' else 'eliminated' end field
-    from ordered o left join selected s using(user_id)
+      case when overall_rank<=v_q then 'championship'
+           when (v_n-v_q)>=4 and overall_rank>v_n-least(16,v_n-v_q) then 'toilet'
+           else 'eliminated' end field
+    from ordered o
   ), seeded as (
     select c.*,
       case when field='championship' then row_number() over(partition by field order by overall_rank)

@@ -30,9 +30,9 @@ Eight is the **minimum size that naturally produces the full two-bracket experie
 |--------|---------|
 | `cutPercent` | Percentage **eliminated** from championship contention (Toilet Bowl cut line in League Build) |
 | `humans` | Count of **eligible active human** memberships at authoritative cut |
-| `qualifierCount` | `ceil(humans × (100 − cutPercent) / 100)` |
+| `qualifierCount` | `min(16, ceil(humans × (100 − cutPercent) / 100))` |
 | Floor | Minimum **2** qualifiers when `humans ≥ 2` |
-| Cap | Qualifiers never exceed `humans` |
+| Cap | Qualifiers never exceed `16` or `humans` |
 | Exactly 2 humans | **Both** qualify for championship regardless of cut math |
 
 ### Illustrative 50% cut table
@@ -76,7 +76,7 @@ Calculate from:
 2. League’s **saved** `cutPercent`  
 3. **Round up** fractional results (`ceil`)  
 4. **Minimum 2** humans in the field when at least 2 eligible humans exist  
-5. **Capped** at eligible human count  
+5. **Capped** at 16 and eligible human count
 
 ### 4. Non-power-of-two fields and byes
 
@@ -94,10 +94,15 @@ If only **2** active eligible humans exist, **both** compete for the championshi
 
 | Rule | Detail |
 |------|--------|
-| Pool | Active humans who **did not** qualify for championship |
+| Pool | The worst 16 active humans who **did not** qualify for championship |
 | Create Toilet Bowl | **≥ 4** non-qualifiers → single-elim Toilet Bowl (legitimate byes OK) |
 | No Toilet Bowl | **&lt; 4** non-qualifiers that season |
 | No Toilet Bowl means | **No** Toilet Bowl trophy · **no** toilet ceremony beat |
+
+For a 100-player league at the default 50% cut: ranks 1–16 enter the
+Championship, ranks 85–100 enter the Toilet Bowl, and ranks 17–84 are removed
+from permanent postseason trophy contention. Eliminated players may continue
+making postseason picks for weekly points, achievements, and bragging rights.
 | Permanent history | May show **“Not contested”** or omit Toilet Bowl |
 | Forbidden | Championship **runner-up** converted/labeled as Toilet Bowl recipient |
 | Forbidden | Add bots, shrink championship field, or change cut % to manufacture Toilet Bowl |

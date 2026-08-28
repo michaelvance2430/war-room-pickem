@@ -2,7 +2,7 @@
  * Cut percent validation + qualifier count (pure).
  *
  * qualifierCount = ceil(activeHumanCount × (100 − cutPercent) / 100)
- * then clamp: min 2 when humans ≥ 2; max humans; 2 humans → both.
+ * then clamp: min 2 when humans ≥ 2; max 16 and max humans; 2 humans → both.
  */
 
 import type { CutPercentResult, QualifierCountResult } from "./types";
@@ -74,6 +74,7 @@ export function computeQualifierCount(
   const raw = Math.ceil((humans * (100 - cut.cutPercent)) / 100);
   let qualifierCount = raw;
   if (qualifierCount < 2) qualifierCount = 2;
+  if (qualifierCount > 16) qualifierCount = 16;
   if (qualifierCount > humans) qualifierCount = humans;
 
   return {

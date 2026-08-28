@@ -4384,6 +4384,7 @@ private struct ProfileShrineBackdrop: View {
 }
 
 struct LockerRoomView: View {
+    private static let bottomAnchor = "locker-room-bottom"
     @EnvironmentObject private var auth: AuthStore
     @Environment(\.openURL) private var openURL
     @StateObject private var safety = LockerSafetyStore()
@@ -4468,13 +4469,22 @@ struct LockerRoomView: View {
                                         }
                                     }
                                 }
+
+                                Color.clear
+                                    .frame(height: 1)
+                                    .id(Self.bottomAnchor)
                             }
                             .padding(.horizontal, 14).padding(.top, 10).padding(.bottom, 24)
                         }
                         .scrollDismissesKeyboard(.interactively)
                         .refreshable { await load() }
-                        .onChange(of: messages.count) { _, _ in
-                            if let last = messages.last { proxy.scrollTo(last.id, anchor: .bottom) }
+                        .onAppear {
+                            DispatchQueue.main.async {
+                                proxy.scrollTo(Self.bottomAnchor, anchor: .bottom)
+                            }
+                        }
+                        .onChange(of: visibleMessages.count) { _, _ in
+                            proxy.scrollTo(Self.bottomAnchor, anchor: .bottom)
                         }
                     }
                 }

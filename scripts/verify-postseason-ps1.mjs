@@ -110,7 +110,7 @@ test("PS-cut 50 ok", () => {
 
 const CUTS = [0, 25, 40, 50, 60, 75, 100];
 for (const cut of CUTS) {
-  for (let n = 0; n <= 32; n++) {
+  for (let n = 0; n <= 100; n++) {
     test(`PS-formula n=${n} cut=${cut}`, () => {
       const r = computeQualifierCount(n, cut);
       assert.equal(r.ok, true);
@@ -127,12 +127,33 @@ for (const cut of CUTS) {
       const raw = Math.ceil((n * (100 - cut)) / 100);
       let q = raw;
       if (q < 2) q = 2;
+      if (q > 16) q = 16;
       if (q > n) q = n;
       assert.equal(r.qualifierCount, q);
       assert.equal(r.contested, true);
     });
   }
 }
+
+test("PS-100 fields top 16, bottom 16, middle 68 eliminated", () => {
+  const members = roster(100);
+  const part = partitionPostseasonFields(members, 50);
+  assert.equal(part.ok, true);
+  assert.equal(part.contested, true);
+  assert.equal(part.championship.length, 16);
+  assert.deepEqual(part.championship.map((m) => m.userId), members.slice(0, 16).map((m) => m.userId));
+  assert.equal(part.toiletParticipants.length, 16);
+  assert.deepEqual(new Set(part.toiletParticipants.map((m) => m.userId)), new Set(members.slice(84).map((m) => m.userId)));
+
+  const { plan, validation } = buildSnapshotPlan({
+    leagueId: "L100", sportId: "cfb", cutWeek: 14, cutPercent: 50,
+    members, seasonKey: "2026",
+  });
+  assert.equal(validation.ok, true);
+  assert.equal(plan.participants.filter((p) => p.field === "championship").length, 16);
+  assert.equal(plan.participants.filter((p) => p.field === "toilet").length, 16);
+  assert.equal(plan.participants.filter((p) => p.field === "eliminated").length, 68);
+});
 
 // —— 50% table from product ——
 const table = [

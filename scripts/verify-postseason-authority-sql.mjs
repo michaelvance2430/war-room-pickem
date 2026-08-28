@@ -23,6 +23,10 @@ for (const fragment of [
 assert.match(sql, /unique \(league_id, season_key\)/);
 assert.match(sql, /field in \('championship','toilet','eliminated'\)/);
 assert.match(sql, /toilet_bowl_active/);
+assert.match(sql, /least\(16, v_n/);
+assert.match(sql, /overall_rank<=v_q/);
+assert.match(sql, /overall_rank>v_n-least\(16,v_n-v_q\)/);
+assert.match(sql, /'toilet_cap',16/);
 assert.match(sql, /Members read postseason snapshots/);
 assert.match(sql, /Members read postseason participants/);
 assert.doesNotMatch(sql, /grant (insert|update|delete)/i);
