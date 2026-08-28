@@ -5,8 +5,8 @@ This native Android project was created from `origin/main` commit `63613cb`.
 ## Release identity
 
 - Application ID: `com.warroompicks.app`
-- Version code: `1`
-- Version name: `1.0.0`
+- Version code: `2`
+- Version name: `1.0.1`
 - Compile SDK: `36`
 - Target SDK: `36`
 - Minimum SDK: `24`
