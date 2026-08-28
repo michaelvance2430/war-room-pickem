@@ -93,6 +93,7 @@ export default function LockerRoomPage() {
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const openedAtBottomRef = useRef(false);
   const lastPostAt = useRef(0);
   const listTopRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -161,8 +162,22 @@ export default function LockerRoomPage() {
   }, [cooldownLeft]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages.length]);
+    if (loading) return;
+
+    const behavior = openedAtBottomRef.current ? "smooth" : "auto";
+    let secondFrame = 0;
+    const firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => {
+        bottomRef.current?.scrollIntoView({ behavior, block: "end" });
+        openedAtBottomRef.current = true;
+      });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(firstFrame);
+      if (secondFrame) window.cancelAnimationFrame(secondFrame);
+    };
+  }, [loading, messages.length]);
 
   const mentionSuggestions = mentionOpen
     ? filterMentionMembers(roster, mentionQuery, 6)
