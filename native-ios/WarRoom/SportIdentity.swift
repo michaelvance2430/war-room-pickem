@@ -92,19 +92,20 @@ struct SportIdentity {
     }
 
     var isNFL: Bool { sportId == "nfl" }
-    var accent: Color { isNFL ? .cyan : .yellow }
-    var secondaryAccent: Color { isNFL ? .blue : .green }
+    var isFieldhouse: Bool { sportId == "cbb" }
+    var accent: Color { isFieldhouse ? .orange : (isNFL ? .cyan : .yellow) }
+    var secondaryAccent: Color { isFieldhouse ? .yellow : (isNFL ? .blue : .green) }
     var gameDay: String { isNFL ? "SUNDAY" : "SATURDAY" }
-    var openingWeek: Int { isNFL ? 1 : 0 }
+    var openingWeek: Int { isNFL ? 1 : (isFieldhouse ? 1 : 0) }
 
-    var boardKicker: String { isNFL ? "SUNDAY INTELLIGENCE" : "DECLASSIFIED" }
-    var boardTitle: String { isNFL ? "THE SUNDAY BOARD" : "THE BOARD" }
-    var boardDetail: String { isNFL ? "KICKOFF HIT. EVERY PRO CARD IS NOW EVIDENCE." : "KICKOFF HIT. EVERY CARD IS NOW EVIDENCE." }
-    var standingsKicker: String { isNFL ? "SUNDAY POWER INDEX" : "PERMANENT RECORD" }
-    var standingsTitle: String { isNFL ? "THE LEAGUE\nTABLE" : "HALL OF\nRECKONING" }
-    var standingsDetail: String { isNFL ? "18 WEEKS. NO COMMITTEE. JUST RECEIPTS." : "GLORY ABOVE. EXCUSES BELOW." }
-    var untestedCampaign: String { isNFL ? "PREGAME · WEEK 1 REPUTATION UNTESTED" : "PRESEASON · REPUTATION CURRENTLY UNTESTED" }
-    var emptyCabinet: String { isNFL ? "PREGAME. THE SUNDAY DESK IS WATCHING." : "PRESEASON. THE CABINET IS JUDGING YOU." }
+    var boardKicker: String { isFieldhouse ? "TIP-OFF RECEIPTS" : (isNFL ? "SUNDAY INTELLIGENCE" : "DECLASSIFIED") }
+    var boardTitle: String { isFieldhouse ? "THE FLOOR\nBOARD" : (isNFL ? "THE SUNDAY BOARD" : "THE BOARD") }
+    var boardDetail: String { isFieldhouse ? "TIP-OFF HIT. EVERY CARD IS NOW ON THE FLOOR." : (isNFL ? "KICKOFF HIT. EVERY PRO CARD IS NOW EVIDENCE." : "KICKOFF HIT. EVERY CARD IS NOW EVIDENCE.") }
+    var standingsKicker: String { isFieldhouse ? "REGIONAL SEED LINE" : (isNFL ? "SUNDAY POWER INDEX" : "PERMANENT RECORD") }
+    var standingsTitle: String { isFieldhouse ? "ROAD TO\nTHE MIDDLE" : (isNFL ? "THE LEAGUE\nTABLE" : "HALL OF\nRECKONING") }
+    var standingsDetail: String { isFieldhouse ? "FOUR REGIONS. THIRTY-TWO BRASS POSITIONS." : (isNFL ? "18 WEEKS. NO COMMITTEE. JUST RECEIPTS." : "GLORY ABOVE. EXCUSES BELOW.") }
+    var untestedCampaign: String { isFieldhouse ? "BEFORE TIP · YOUR SEED LINE IS UNTESTED" : (isNFL ? "PREGAME · WEEK 1 REPUTATION UNTESTED" : "PRESEASON · REPUTATION CURRENTLY UNTESTED") }
+    var emptyCabinet: String { isFieldhouse ? "BEFORE TIP. THE FIELDHOUSE IS WATCHING." : (isNFL ? "PREGAME. THE SUNDAY DESK IS WATCHING." : "PRESEASON. THE CABINET IS JUDGING YOU.") }
 
     func divisionLabel(_ division: String?) -> String {
         let stored = division?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? "north"
@@ -147,6 +148,18 @@ struct SportIdentity {
     }
 
     func localizedCheevoCopy(_ text: String) -> String {
+        if isFieldhouse {
+            return text
+                .replacingOccurrences(of: "football", with: "basketball")
+                .replacingOccurrences(of: "Football", with: "Basketball")
+                .replacingOccurrences(of: "kickoff", with: "tip-off")
+                .replacingOccurrences(of: "Kickoff", with: "Tip-off")
+                .replacingOccurrences(of: "conference", with: "region")
+                .replacingOccurrences(of: "Conference", with: "Region")
+                .replacingOccurrences(of: "campus", with: "court")
+                .replacingOccurrences(of: "Sundays", with: "Saturdays")
+                .replacingOccurrences(of: "Sunday", with: "Saturday")
+        }
         guard isNFL else { return text }
         return text
             .replacingOccurrences(of: "Saturdays", with: "Sundays")

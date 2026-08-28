@@ -158,7 +158,7 @@ struct ContentView: View {
                     .tabItem { Label("You", systemImage: "person.crop.circle.fill") }
                     .tag(4)
             }
-            .tint(activeSportId == "nfl" ? .cyan : .green)
+            .tint(activeSportId == "cbb" ? .orange : (activeSportId == "nfl" ? .cyan : .green))
             .safeAreaInset(edge: .top, spacing: 0) {
                 if let status = platformStatus, status.incidentActive {
                     PlatformIncidentBanner(message: status.incidentMessage)
@@ -204,7 +204,8 @@ struct ContentView: View {
         guard let token = auth.token, let user = auth.user,
               let active = try? await SupabaseAPI.activeLeague(token: token, userId: user.id, preferredLeagueId: auth.selectedLeagueId)
         else { return }
-        activeSportId = active.leagues.sportId.lowercased() == "nfl" ? "nfl" : "cfb"
+        let sport = active.leagues.sportId.lowercased()
+        activeSportId = ["cfb", "nfl", "cbb"].contains(sport) ? sport : "cfb"
     }
 
     @MainActor private func refreshPlatformStatus() async {
@@ -401,7 +402,7 @@ private struct PicksView: View {
                                 }
                                 if pick == nil,
                                    card.weekNumber <= (league?.leagues.regularSeasonWeeks ?? 0),
-                                   ["cfb", "nfl"].contains(league?.leagues.sportId.lowercased() ?? "cfb") {
+                                   ["cfb", "nfl", "cbb"].contains(league?.leagues.sportId.lowercased() ?? "cfb") {
                                     RegularSeasonWeaponPanel(
                                         sportId: league?.leagues.sportId ?? "cfb",
                                         remaining: max(0, 2 - tacticalNukesUsed),
