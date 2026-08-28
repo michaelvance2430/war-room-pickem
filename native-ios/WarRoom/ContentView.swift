@@ -3203,18 +3203,20 @@ private struct ChampionshipTrophyPickerView: View {
         .onAppear { selectedId = membership.leagues.championshipTrophyId }
         .alert("Seal \(pendingTrophy?.name ?? "this trophy") in the vault?", isPresented: Binding(get: { pendingTrophy != nil }, set: { if !$0 { pendingTrophy = nil } })) {
             Button("Not yet", role: .cancel) { pendingTrophy = nil }
-            Button("LOCK THE HARDWARE") { Task { await savePending() } }
+            if let trophy = pendingTrophy {
+                Button("LOCK THE HARDWARE") { Task { await save(trophy) } }
+            }
         } message: {
             Text("This becomes the season’s permanent championship design. The winner gets this exact artifact beside their name and in their profile forever.")
         }
     }
 
-    private func savePending() async {
-        guard let token = auth.token, let pendingTrophy else { return }
+    private func save(_ trophy: TrophyDesign) async {
+        guard let token = auth.token else { return }
         saving = true
         do {
-            try await SupabaseAPI.selectChampionshipTrophy(token: token, leagueId: membership.leagueId, trophyId: pendingTrophy.id)
-            selectedId = pendingTrophy.id
+            try await SupabaseAPI.selectChampionshipTrophy(token: token, leagueId: membership.leagueId, trophyId: trophy.id)
+            selectedId = trophy.id
             errorMessage = nil
         } catch { errorMessage = error.localizedDescription }
         self.pendingTrophy = nil
