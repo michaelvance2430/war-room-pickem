@@ -242,6 +242,7 @@ private struct FieldhouseBracketsPage: View {
     @Binding var state: FieldhouseSeasonState
     @Binding var strikePresentation: StrikePresentation?
     @State private var selectedRound = 0
+    @State private var confirmingHellfire = false
     private let slate = FieldhouseTournamentFixture.slate
 
     var body: some View {
@@ -254,7 +255,7 @@ private struct FieldhouseBracketsPage: View {
             } else {
                 ForEach(roundGames) { game in bracketGame(game) }
             }
-            Button { launchHellfire() } label: {
+            Button { confirmingHellfire = true } label: {
                 FieldhouseAction(kicker: "HELLFIRE · BRACKET WEAPON · ONE SHOT", title: state.bracketHellfireUsed ? "Hellfire Bracket Locked" : "Launch Hellfire Bracket", detail: state.bracketHellfireUsed ? "All 67 picks are sealed. No reroll." : "Hellfire fills a wild but complete bracket, plays the Fieldhouse strike video, then seals every pick.", icon: "scope")
             }.buttonStyle(.plain).disabled(state.bracketLocked).opacity(state.bracketLocked ? 0.55 : 1)
             Button { state.bracketLocked = true } label: {
@@ -263,6 +264,12 @@ private struct FieldhouseBracketsPage: View {
                     .foregroundStyle(.black).background(state.bracketLocked ? Color.gray : Color.orange, in: RoundedRectangle(cornerRadius: 14))
             }.buttonStyle(.plain).disabled(state.bracketLocked || !FieldhouseBracketEngine.isComplete(picks: state.bracketPicks))
             Text("REGULAR SEASON HELLFIRE: 2/2 · BRACKET AI HELLFIRE: 1 TOTAL · NO REROLLS").font(.system(size: 8, weight: .black)).tracking(1).foregroundStyle(.white.opacity(0.48))
+        }
+        .alert("LAUNCH HELLFIRE BRACKET?", isPresented: $confirmingHellfire) {
+            Button("CANCEL", role: .cancel) {}
+            Button("LAUNCH & LOCK", role: .destructive) { launchHellfire() }
+        } message: {
+            Text("Hellfire will replace every current pick, fill all 67 decisions, and permanently lock your bracket. This cannot be undone and there are no rerolls.")
         }
     }
 
