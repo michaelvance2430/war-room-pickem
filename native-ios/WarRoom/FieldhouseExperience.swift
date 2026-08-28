@@ -255,7 +255,7 @@ private struct FieldhouseBracketsPage: View {
                 ForEach(roundGames) { game in bracketGame(game) }
             }
             Button { launchHellfire() } label: {
-                FieldhouseAction(kicker: "BRACKET WEAPON · ONE SHOT", title: state.bracketHellfireUsed ? "Hellfire Bracket Locked" : "Launch the AI Crazy Pick", detail: state.bracketHellfireUsed ? "All 67 picks are sealed. No reroll." : "AI fills a wild but complete bracket, plays the Fieldhouse strike video, then seals every pick.", icon: "wand.and.stars")
+                FieldhouseAction(kicker: "HELLFIRE · BRACKET WEAPON · ONE SHOT", title: state.bracketHellfireUsed ? "Hellfire Bracket Locked" : "Launch Hellfire Bracket", detail: state.bracketHellfireUsed ? "All 67 picks are sealed. No reroll." : "Hellfire fills a wild but complete bracket, plays the Fieldhouse strike video, then seals every pick.", icon: "scope")
             }.buttonStyle(.plain).disabled(state.bracketLocked).opacity(state.bracketLocked ? 0.55 : 1)
             Button { state.bracketLocked = true } label: {
                 Label(state.bracketLocked ? "BRACKET SEALED" : "LOCK ALL 67 DECISIONS", systemImage: state.bracketLocked ? "lock.fill" : "checkmark.seal.fill")
