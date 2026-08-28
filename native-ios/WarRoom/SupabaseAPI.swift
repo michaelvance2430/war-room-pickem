@@ -1194,6 +1194,61 @@ enum SupabaseAPI {
         return try await send(authorizedRequest(url:components.url!,token:token),as:[NflPostseasonScorecard].self).first
     }
 
+    static func fieldhouseTournamentSlate(token: String, leagueId: UUID, seasonKey: Int) async throws -> FieldhouseTournamentSlate? {
+        var components = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/cbb_tournament_slates"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "select", value: "league_id,season_key,teams,games,published_at"), URLQueryItem(name: "league_id", value: "eq.\(leagueId.uuidString.lowercased())"), URLQueryItem(name: "season_key", value: "eq.\(seasonKey)"), URLQueryItem(name: "limit", value: "1")]
+        return try await send(authorizedRequest(url: components.url!, token: token), as: [FieldhouseTournamentSlate].self).first
+    }
+
+    static func publishFieldhouseTournamentSlate(token: String, leagueId: UUID, seasonKey: Int, teams: [FieldhouseTournamentTeam], games: [FieldhouseTournamentGame]) async throws -> FieldhouseTournamentSlate {
+        var request = authorizedRequest(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/rpc/publish_cbb_tournament_slate"), token: token)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let encodedTeams = try JSONEncoder().encode(teams)
+        let encodedGames = try JSONEncoder().encode(games)
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "p_league_id": leagueId.uuidString.lowercased(),
+            "p_season_key": seasonKey,
+            "p_teams": try JSONSerialization.jsonObject(with: encodedTeams),
+            "p_games": try JSONSerialization.jsonObject(with: encodedGames),
+        ])
+        return try await send(request, as: FieldhouseTournamentSlate.self)
+    }
+
+    static func fieldhouseTournamentEntry(token: String, leagueId: UUID, userId: UUID, seasonKey: Int) async throws -> FieldhouseTournamentEntry? {
+        var components = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/cbb_tournament_entries"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "select", value: "league_id,user_id,season_key,picks,used_hellfire,locked_at,score"), URLQueryItem(name: "league_id", value: "eq.\(leagueId.uuidString.lowercased())"), URLQueryItem(name: "user_id", value: "eq.\(userId.uuidString.lowercased())"), URLQueryItem(name: "season_key", value: "eq.\(seasonKey)"), URLQueryItem(name: "limit", value: "1")]
+        return try await send(authorizedRequest(url: components.url!, token: token), as: [FieldhouseTournamentEntry].self).first
+    }
+
+    static func saveFieldhouseTournamentBracket(token: String, leagueId: UUID, seasonKey: Int, picks: [String: String], usedHellfire: Bool, lock: Bool) async throws -> FieldhouseTournamentEntry {
+        var request = authorizedRequest(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/rpc/save_cbb_tournament_bracket"), token: token)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["p_league_id": leagueId.uuidString.lowercased(), "p_season_key": seasonKey, "p_picks": picks, "p_used_hellfire": usedHellfire, "p_lock": lock])
+        return try await send(request, as: FieldhouseTournamentEntry.self)
+    }
+
+    static func fieldhouseTournamentResults(token: String, leagueId: UUID, seasonKey: Int) async throws -> FieldhouseTournamentResults? {
+        var components = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/cbb_tournament_results"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "select", value: "winners"), URLQueryItem(name: "league_id", value: "eq.\(leagueId.uuidString.lowercased())"), URLQueryItem(name: "season_key", value: "eq.\(seasonKey)"), URLQueryItem(name: "limit", value: "1")]
+        return try await send(authorizedRequest(url: components.url!, token: token), as: [FieldhouseTournamentResults].self).first
+    }
+
+    static func saveFieldhouseTournamentResults(token: String, leagueId: UUID, seasonKey: Int, winners: [String: String]) async throws -> FieldhouseTournamentResults {
+        var request = authorizedRequest(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/rpc/save_cbb_tournament_results"), token: token)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["p_league_id": leagueId.uuidString.lowercased(), "p_season_key": seasonKey, "p_winners": winners])
+        return try await send(request, as: FieldhouseTournamentResults.self)
+    }
+
+    static func fieldhouseTournamentScorecard(token: String, leagueId: UUID, userId: UUID, seasonKey: Int) async throws -> FieldhouseTournamentScorecard? {
+        var components = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/cbb_tournament_scorecards"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "select", value: "first_four_points,round_64_points,round_32_points,sweet_16_points,elite_8_points,final_four_points,title_points,total_points,used_hellfire"), URLQueryItem(name: "league_id", value: "eq.\(leagueId.uuidString.lowercased())"), URLQueryItem(name: "user_id", value: "eq.\(userId.uuidString.lowercased())"), URLQueryItem(name: "season_key", value: "eq.\(seasonKey)"), URLQueryItem(name: "limit", value: "1")]
+        return try await send(authorizedRequest(url: components.url!, token: token), as: [FieldhouseTournamentScorecard].self).first
+    }
+
     static func saveCrystalBallPick(token: String, leagueId: UUID, userId: UUID, teamName: String) async throws {
         var components = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/crystal_ball_picks"), resolvingAgainstBaseURL: false)!
         components.queryItems = [URLQueryItem(name: "on_conflict", value: "league_id,user_id")]

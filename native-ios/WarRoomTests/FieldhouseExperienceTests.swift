@@ -29,4 +29,22 @@ import XCTest
         state.regularHellfiresUsed = 2
         XCTAssertEqual(state.regularHellfiresRemaining, 0)
     }
+
+    func testFieldhouseBracketRequiresAllSixtySevenDecisions() {
+        XCTAssertFalse(FieldhouseBracketEngine.isComplete(picks: [:]))
+        let complete = Dictionary(uniqueKeysWithValues: (0..<67).map { ("game-\($0)", "team") })
+        XCTAssertTrue(FieldhouseBracketEngine.isComplete(picks: complete))
+    }
+
+    func testChangingEarlyWinnerClearsEveryDependentDecision() {
+        let games = [
+            FieldhouseTournamentGame(id: "opening", round: 0, sourceA: "team:a", sourceB: "team:b"),
+            FieldhouseTournamentGame(id: "regional", round: 1, sourceA: "game:opening", sourceB: "team:c"),
+            FieldhouseTournamentGame(id: "title", round: 2, sourceA: "game:regional", sourceB: "team:d"),
+            FieldhouseTournamentGame(id: "unrelated", round: 1, sourceA: "team:e", sourceB: "team:f"),
+        ]
+        var picks = ["opening": "a", "regional": "a", "title": "a", "unrelated": "e"]
+        FieldhouseBracketEngine.clearDownstream(after: "opening", games: games, picks: &picks)
+        XCTAssertEqual(picks, ["opening": "a", "unrelated": "e"])
+    }
 }
