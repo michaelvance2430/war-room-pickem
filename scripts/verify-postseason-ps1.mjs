@@ -153,6 +153,29 @@ test("PS-100 fields top 16, bottom 16, middle 68 eliminated", () => {
   assert.equal(plan.participants.filter((p) => p.field === "championship").length, 16);
   assert.equal(plan.participants.filter((p) => p.field === "toilet").length, 16);
   assert.equal(plan.participants.filter((p) => p.field === "eliminated").length, 68);
+  for (const division of ["North", "South", "East", "West"]) {
+    const conference = plan.participants.filter((p) => p.divisionSnapshot === division);
+    assert.equal(conference.filter((p) => p.field === "championship").length, 4);
+    assert.equal(conference.filter((p) => p.field === "toilet").length, 4);
+    assert.equal(conference.filter((p) => p.field === "eliminated").length, 17);
+  }
+});
+
+test("PS-42 qualifies top 4 and bottom 4 from every conference", () => {
+  const members = roster(42);
+  const { plan, validation } = buildSnapshotPlan({
+    leagueId: "L42", sportId: "cfb", cutWeek: 14, cutPercent: 50,
+    members, seasonKey: "2026",
+  });
+  assert.equal(validation.ok, true);
+  assert.equal(plan.participants.filter((p) => p.field === "championship").length, 16);
+  assert.equal(plan.participants.filter((p) => p.field === "toilet").length, 16);
+  assert.equal(plan.participants.filter((p) => p.field === "eliminated").length, 10);
+  for (const division of ["North", "South", "East", "West"]) {
+    const conference = plan.participants.filter((p) => p.divisionSnapshot === division);
+    assert.equal(conference.filter((p) => p.field === "championship").length, 4);
+    assert.equal(conference.filter((p) => p.field === "toilet").length, 4);
+  }
 });
 
 // —— 50% table from product ——

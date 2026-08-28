@@ -28,7 +28,7 @@ Eight is the **minimum size that naturally produces the full two-bracket experie
 
 | Symbol | Meaning |
 |--------|---------|
-| `cutPercent` | Percentage **eliminated** from championship contention (Toilet Bowl cut line in League Build) |
+| `cutPercent` | Fixed at **50%**; commissioners do not choose it |
 | `humans` | Count of **eligible active human** memberships at authoritative cut |
 | `qualifierCount` | `min(16, ceil(humans × (100 − cutPercent) / 100))` |
 | Floor | Minimum **2** qualifiers when `humans ≥ 2` |
@@ -48,6 +48,19 @@ Eight is the **minimum size that naturally produces the full two-bracket experie
 | 8 | 4 | Four-player bracket | 4 | **Yes** |
 
 \*Championship cannot have one participant.
+
+### Large-league conference rule
+
+When a league has more than 32 eligible humans, postseason qualification is
+conference-based. The league must have four conferences with at least eight
+players apiece. Each conference sends its top four to the Championship and its
+bottom four to the Toilet Bowl. Everyone between those two conference cut lines
+continues making weekly picks but enters neither bracket.
+
+Example: a 100-player league with four conferences of 25 produces four
+Championship qualifiers and four Toilet Bowl qualifiers per conference. Each
+conference standings table shows a Championship cut after rank 4 and a Toilet
+Bowl cut before rank 22. Overall standings never determine these fields.
 
 ---
 

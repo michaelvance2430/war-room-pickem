@@ -22,13 +22,16 @@ create policy "platform_status_select_all"
   to anon, authenticated
   using (true);
 
--- Authenticated can update the single row (Founder UI is creator-gated in app)
+-- Only the founder can update the single row. Client-side creator gates are
+-- presentation only; the database remains authoritative.
 drop policy if exists "platform_status_update_auth" on public.platform_status;
-create policy "platform_status_update_auth"
+drop policy if exists "Creator updates platform status" on public.platform_status;
+drop policy if exists "platform_status_update_founder" on public.platform_status;
+create policy "platform_status_update_founder"
   on public.platform_status for update
   to authenticated
-  using (id = 1)
-  with check (id = 1);
+  using (id = 1 and (select auth.uid()) = '09544d2b-6eca-4131-a321-c000586c9029'::uuid)
+  with check (id = 1 and (select auth.uid()) = '09544d2b-6eca-4131-a321-c000586c9029'::uuid);
 
 -- No insert/delete from clients
 drop policy if exists "platform_status_insert_none" on public.platform_status;

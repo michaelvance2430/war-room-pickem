@@ -49,6 +49,7 @@
     "verify:career-ranks": "node --import tsx scripts/verify-career-ranks.mjs",
     "verify:weapon-service-record": "node scripts/verify-weapon-service-record.mjs",
     "verify:trophy-shapes": "node scripts/verify-championship-trophy-shapes.mjs",
+    "verify:trophy-selection": "node scripts/verify-championship-trophy-selection.mjs",
     "verify:account-legendaries": "node scripts/verify-account-legendaries.mjs",
     "verify:foundry-gazette": "node --import tsx scripts/verify-foundry-gazette.mjs",
     "verify:foundry-owner": "node scripts/verify-foundry-owner-perimeter.mjs",
