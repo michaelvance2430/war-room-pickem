@@ -110,11 +110,13 @@ private struct RookieMusterShell: View {
 
 struct ContentView: View {
     @EnvironmentObject private var auth: AuthStore
+    @Environment(\.scenePhase) private var scenePhase
     @Binding var showOpening: Bool
     @State private var selectedTab = 0
     @State private var tabRootIds = (0..<5).map { _ in UUID() }
     @State private var picksKickoff: Date?
     @State private var clock = Date()
+    @State private var platformStatus: PlatformStatus?
     @AppStorage("warroom.activeSportId") private var activeSportId = "cfb"
 
     private var boardIsOpen: Bool { picksKickoff.map { clock >= $0 } ?? false }
@@ -157,6 +159,11 @@ struct ContentView: View {
                     .tag(4)
             }
             .tint(activeSportId == "nfl" ? .cyan : .green)
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if let status = platformStatus, status.incidentActive {
+                    PlatformIncidentBanner(message: status.incidentMessage)
+                }
+            }
             if showOpening {
                 SeasonOpeningView(isPresented: $showOpening)
                     .transition(.opacity)
@@ -169,10 +176,17 @@ struct ContentView: View {
         .preferredColorScheme(.dark)
         .task(id: auth.user?.id) { await recordAppOpenDiscoveries() }
         .task(id: auth.selectedLeagueId) { await refreshActiveSport() }
+        .task(id: auth.user?.id) { await refreshPlatformStatus() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await refreshPlatformStatus() } }
+        }
         .task {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(15))
                 clock = Date()
+                if Calendar.current.component(.second, from: clock) < 15 {
+                    await refreshPlatformStatus()
+                }
             }
         }
     }
@@ -193,10 +207,42 @@ struct ContentView: View {
         activeSportId = active.leagues.sportId.lowercased() == "nfl" ? "nfl" : "cfb"
     }
 
+    @MainActor private func refreshPlatformStatus() async {
+        guard let token = auth.token else { return }
+        if let status = try? await SupabaseAPI.platformStatus(token: token) {
+            platformStatus = status
+        }
+    }
+
     private func openTab(_ tab: Int) {
         guard tabRootIds.indices.contains(tab) else { return }
         tabRootIds[tab] = UUID()
         selectedTab = tab
+    }
+}
+
+private struct PlatformIncidentBanner: View {
+    let message: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.black)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("WE'RE ON IT")
+                    .font(.system(size: 9, weight: .black)).tracking(1.4)
+                Text(message.isEmpty ? "We're aware of the issue and working on it." : message)
+                    .font(.footnote.weight(.semibold))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .foregroundStyle(.black)
+        .padding(.horizontal, 14).padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.yellow)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("App announcement. \(message)")
     }
 }
 
@@ -1407,6 +1453,18 @@ struct StandingsView: View {
                                         onOpenProfile: { selectedProfileUserId = standing.userId },
                                         onOpenTrophy: { selectedTrophy = latestTrophyByUser[standing.userId] }
                                     )
+                                    if activeConference != "OVERALL" && standings.count > 32 {
+                                        if filteredStandings.count == 8 && index + 1 == 4 {
+                                            postseasonCutLine("CHAMPIONSHIP ABOVE · TOILET BOWL BELOW", color: identity.accent)
+                                        } else {
+                                            if index + 1 == 4 {
+                                                postseasonCutLine("CHAMPIONSHIP CUT", color: identity.accent)
+                                            }
+                                            if index + 1 == filteredStandings.count - 4 {
+                                                postseasonCutLine("TOILET BOWL CUT", color: .purple)
+                                            }
+                                        }
+                                    }
                                 }
                             }
                             .padding(.horizontal, 16).padding(.top, 12).padding(.bottom, 36)
@@ -1447,6 +1505,16 @@ struct StandingsView: View {
         case "west": return "BIG 12"
         default: return "SEC"
         }
+    }
+
+    private func postseasonCutLine(_ label: String, color: Color) -> some View {
+        HStack(spacing: 9) {
+            Rectangle().fill(color.opacity(0.85)).frame(height: 1)
+            Text(label).font(.system(size: 8, weight: .black)).tracking(1.1).foregroundStyle(color)
+            Rectangle().fill(color.opacity(0.85)).frame(height: 1)
+        }
+        .accessibilityLabel(label)
+        .padding(.vertical, 2)
     }
 
     private func load() async {

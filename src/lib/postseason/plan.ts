@@ -202,7 +202,9 @@ export function buildSnapshotPlan(input: BuildSnapshotPlanInput): {
     creationReason: input.creationReason || "cut_week_scored",
     initiatingActorUserId: input.initiatingActorUserId ?? null,
     metadata: {
-      formula: "min(16,ceil(n*(100-cut)/100))",
+      formula: eligible.length > 32
+        ? "four-conferences-top-4-bottom-4"
+        : "min(16,ceil(n*(100-cut)/100))",
       engine: "ps1-pure",
       toiletLabel: part.toiletBowlActive ? "active" : "Not contested",
     },

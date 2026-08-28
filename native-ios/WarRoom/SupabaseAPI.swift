@@ -16,6 +16,18 @@ struct AuthSession: Decodable, Sendable {
 
 struct AuthUser: Decodable, Sendable { let id: UUID; let email: String? }
 
+struct PlatformStatus: Decodable, Sendable {
+    let incidentActive: Bool
+    let incidentMessage: String
+    let updatedAt: String?
+
+    enum CodingKeys: String, CodingKey {
+        case incidentActive = "incident_active"
+        case incidentMessage = "incident_message"
+        case updatedAt = "updated_at"
+    }
+}
+
 struct SignUpResponse: Decodable, Sendable {
     let accessToken: String?
     let refreshToken: String?
@@ -777,6 +789,16 @@ struct GazetteEditionRow: Decodable, Identifiable, Sendable {
 }
 
 enum SupabaseAPI {
+    static func platformStatus(token: String) async throws -> PlatformStatus? {
+        var components = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/platform_status"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "incident_active,incident_message,updated_at"),
+            URLQueryItem(name: "id", value: "eq.1"),
+            URLQueryItem(name: "limit", value: "1"),
+        ]
+        return try await send(authorizedRequest(url: components.url!, token: token), as: [PlatformStatus].self).first
+    }
+
     static func signIn(email: String, password: String) async throws -> AuthSession {
         var components = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "auth/v1/token"), resolvingAgainstBaseURL: false)!
         components.queryItems = [URLQueryItem(name: "grant_type", value: "password")]

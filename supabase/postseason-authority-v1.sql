@@ -82,6 +82,9 @@ declare
   v_key text;
   v_n integer;
   v_q integer;
+  v_conference_count integer;
+  v_smallest_conference integer;
+  v_unassigned integer;
 begin
   select * into v_league from public.leagues where id=p_league_id for update;
   if not found then raise exception 'League not found'; end if;
@@ -102,7 +105,22 @@ begin
 
   select count(*) into v_n from public.memberships
   where league_id=p_league_id and not coalesce(is_bot,false);
-  v_q := case when v_n<2 then 0
+  if v_n>32 then
+    select count(distinct division),min(conference_size),count(*) filter(where division is null)
+      into v_conference_count,v_smallest_conference,v_unassigned
+    from (
+      select division,count(*) over(partition by division) conference_size
+      from public.memberships
+      where league_id=p_league_id and not coalesce(is_bot,false)
+    ) conference_roster;
+    if v_unassigned>0 or v_conference_count<>4 then
+      raise exception 'Large leagues require every player assigned across exactly four conferences';
+    end if;
+    if v_smallest_conference<8 then
+      raise exception 'Each conference needs at least eight players before the postseason cut';
+    end if;
+  end if;
+  v_q := case when v_n>32 then 16 when v_n<2 then 0
     else least(16, v_n, greatest(2, ceil(v_n*(100-v_league.cut_percent)/100.0)::integer)) end;
 
   insert into public.league_postseason_snapshots(
@@ -110,8 +128,12 @@ begin
     qualifier_count,toilet_bowl_active,created_by,metadata
   ) values (
     p_league_id,v_key,coalesce(v_league.sport_id,'cfb'),v_league.regular_season_weeks,
-    v_league.cut_percent,v_n,v_q,(v_n-v_q)>=4,v_uid,
-    jsonb_build_object('formula','min(16,ceil(n*(100-cut)/100))','toilet_cap',16,'engine','server-v2','immutable',true)
+    case when v_n>32 then 50 else v_league.cut_percent end,v_n,v_q,
+    case when v_n>32 then true else (v_n-v_q)>=4 end,v_uid,
+    jsonb_build_object(
+      'formula',case when v_n>32 then 'four-conferences-top-4-bottom-4' else 'min(16,ceil(n*(100-cut)/100))' end,
+      'toilet_cap',16,'engine','server-v3','immutable',true,'conference_based',v_n>32
+    )
   ) returning id into v_snapshot;
 
   with base as (
@@ -142,8 +164,10 @@ begin
     from base b join h2h h using(user_id)
   ), classified as (
     select o.*,
-      case when overall_rank<=v_q then 'championship'
-           when (v_n-v_q)>=4 and overall_rank>v_n-least(16,v_n-v_q) then 'toilet'
+      case when v_n>32 and division_rank<=4 then 'championship'
+           when v_n>32 and division_rank>division_count-4 then 'toilet'
+           when v_n<=32 and overall_rank<=v_q then 'championship'
+           when v_n<=32 and (v_n-v_q)>=4 and overall_rank>v_n-least(16,v_n-v_q) then 'toilet'
            else 'eliminated' end field
     from ordered o
   ), seeded as (
