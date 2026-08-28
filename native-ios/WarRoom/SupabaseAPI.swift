@@ -799,6 +799,26 @@ enum SupabaseAPI {
         return try await send(authorizedRequest(url: components.url!, token: token), as: [PlatformStatus].self).first
     }
 
+    static func setPlatformStatus(token: String, active: Bool, message: String) async throws -> PlatformStatus {
+        var components = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/platform_status"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.1")]
+        var request = authorizedRequest(url: components.url!, token: token)
+        request.httpMethod = "PATCH"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("return=representation", forHTTPHeaderField: "Prefer")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "incident_active": active,
+            "incident_message": message,
+            "updated_at": ISO8601DateFormatter().string(from: Date()),
+        ])
+        guard let saved = try await send(request, as: [PlatformStatus].self).first,
+              saved.incidentActive == active,
+              saved.incidentMessage == message else {
+            throw RequestError(message: "The server did not confirm the app announcement.")
+        }
+        return saved
+    }
+
     static func signIn(email: String, password: String) async throws -> AuthSession {
         var components = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "auth/v1/token"), resolvingAgainstBaseURL: false)!
         components.queryItems = [URLQueryItem(name: "grant_type", value: "password")]

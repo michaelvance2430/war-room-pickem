@@ -36,6 +36,10 @@ struct FoundryView: View {
     @State private var seasonChampion = "FOUNDRY CHAMPION"
     @State private var postseasonWeekLocked = false
     @State private var selectedLabId: UUID?
+    @State private var platformStatus: PlatformStatus?
+    @State private var platformMessage = "We're aware of the issue and working on it. Thank you for your patience."
+    @State private var publishingPlatformStatus = false
+    @State private var platformStatusNotice: String?
 
     init(preferredSportId: String? = nil) {
         self.preferredSportId = preferredSportId?.lowercased()
@@ -76,6 +80,7 @@ struct FoundryView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     header
+                    if authorized { platformAnnouncementControl }
                     if authorized && labLeagues.count > 1 { labSwitcher }
                     if !authorized {
                         lockedPanel
@@ -149,6 +154,46 @@ struct FoundryView: View {
         FoundryPanel(accent: .red) {
             Label("FOUNDRY ACCESS DENIED", systemImage: "lock.shield.fill").font(.headline.weight(.black)).foregroundStyle(.red)
             Text("The Foundry accepts the Creator UUID only. Commissioner status is not enough.").font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+        }
+    }
+
+    private var platformAnnouncementControl: some View {
+        FoundryPanel(accent: platformStatus?.incidentActive == true ? .yellow : .cyan) {
+            HStack {
+                FoundrySectionTitle(kicker: "APP-WIDE COMMUNICATION", title: "STATUS BANNER")
+                Spacer()
+                Text(platformStatus?.incidentActive == true ? "LIVE" : "OFF")
+                    .font(.system(size: 8, weight: .black)).tracking(1)
+                    .foregroundStyle(platformStatus?.incidentActive == true ? .yellow : .green)
+            }
+            Text("Only you can publish this. When live, every signed-in iOS user sees the message above every app tab.")
+                .font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.58))
+            TextEditor(text: $platformMessage)
+                .frame(minHeight: 84)
+                .padding(9)
+                .scrollContentBackground(.hidden)
+                .background(.black.opacity(0.42), in: RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(.white.opacity(0.16)))
+            HStack(spacing: 10) {
+                Button { Task { await publishPlatformStatus(active: true) } } label: {
+                    Label(publishingPlatformStatus ? "SAVING…" : "PUBLISH BANNER", systemImage: "megaphone.fill")
+                        .font(.caption.weight(.black)).frame(maxWidth: .infinity).padding(13)
+                        .foregroundStyle(.black).background(.yellow, in: RoundedRectangle(cornerRadius: 10))
+                }
+                .buttonStyle(.plain)
+                .disabled(publishingPlatformStatus || platformMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                Button { Task { await publishPlatformStatus(active: false) } } label: {
+                    Label("TURN OFF", systemImage: "xmark.circle.fill")
+                        .font(.caption.weight(.black)).frame(maxWidth: .infinity).padding(13)
+                        .foregroundStyle(.white).background(.white.opacity(0.09), in: RoundedRectangle(cornerRadius: 10))
+                }
+                .buttonStyle(.plain)
+                .disabled(publishingPlatformStatus || platformStatus?.incidentActive != true)
+            }
+            if let platformStatusNotice {
+                Text(platformStatusNotice).font(.caption.weight(.black))
+                    .foregroundStyle(platformStatusNotice.hasPrefix("Banner") ? .green : .red)
+            }
         }
     }
 
@@ -410,6 +455,12 @@ struct FoundryView: View {
         loading = true
         errorMessage = nil
         do {
+            if let status = try await SupabaseAPI.platformStatus(token: token) {
+                platformStatus = status
+                if !status.incidentMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    platformMessage = status.incidentMessage
+                }
+            }
             memberships = try await SupabaseAPI.leagueMemberships(token: token, userId: user.id, includeFoundry: true)
             let availableLabs = memberships.filter { membership in
                 FoundryLabPolicy.accepts(
@@ -446,6 +497,24 @@ struct FoundryView: View {
         }
         catch { errorMessage = error.localizedDescription }
         loading = false
+    }
+
+    @MainActor private func publishPlatformStatus(active: Bool) async {
+        guard authorized, let token = auth.token else { return }
+        let message = platformMessage.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !message.isEmpty else {
+            platformStatusNotice = "Write a message before publishing."
+            return
+        }
+        publishingPlatformStatus = true
+        platformStatusNotice = nil
+        defer { publishingPlatformStatus = false }
+        do {
+            platformStatus = try await SupabaseAPI.setPlatformStatus(token: token, active: active, message: message)
+            platformStatusNotice = active ? "Banner is live across the app." : "Banner is off."
+        } catch {
+            platformStatusNotice = error.localizedDescription
+        }
     }
 
     @MainActor private func stageRivalryWeek(_ lab: LeagueMembership) async {
