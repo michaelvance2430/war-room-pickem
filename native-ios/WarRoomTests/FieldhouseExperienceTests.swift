@@ -1,19 +1,26 @@
 import XCTest
 @testable import WarRoom
 
-final class FieldhouseExperienceTests: XCTestCase {
+@MainActor final class FieldhouseExperienceTests: XCTestCase {
     func testOneHundredPlayerPostseasonCutIsSixteenSixtyEightSixteen() {
-        let counts = WarRoomPostseasonRule.counts(playerCount: 100)
+        let counts = WarRoomPostseasonRule.leagueCounts(conferencePlayerCounts: [25, 25, 25, 25])
         XCTAssertEqual(counts.championship, 16)
         XCTAssertEqual(counts.activeNoBrass, 68)
         XCTAssertEqual(counts.toilet, 16)
     }
 
-    func testBoundaryRanksKeepPickingButCannotEarnBrass() {
-        XCTAssertEqual(WarRoomPostseasonRule.status(rank: 16, playerCount: 100), .championship(seed: 16))
-        XCTAssertEqual(WarRoomPostseasonRule.status(rank: 17, playerCount: 100), .activeNoBrass)
-        XCTAssertEqual(WarRoomPostseasonRule.status(rank: 84, playerCount: 100), .activeNoBrass)
-        XCTAssertEqual(WarRoomPostseasonRule.status(rank: 85, playerCount: 100), .toilet(seed: 1))
+    func testConferenceBoundaryRanksKeepPickingButCannotEarnBrass() {
+        XCTAssertEqual(WarRoomPostseasonRule.status(conferenceRank: 4, conferencePlayerCount: 25), .championship(seed: 4))
+        XCTAssertEqual(WarRoomPostseasonRule.status(conferenceRank: 5, conferencePlayerCount: 25), .activeNoBrass)
+        XCTAssertEqual(WarRoomPostseasonRule.status(conferenceRank: 21, conferencePlayerCount: 25), .activeNoBrass)
+        XCTAssertEqual(WarRoomPostseasonRule.status(conferenceRank: 22, conferencePlayerCount: 25), .toilet(seed: 1))
+    }
+
+    func testUnevenConferencesStillQualifyIndependently() {
+        let counts = WarRoomPostseasonRule.leagueCounts(conferencePlayerCounts: [11, 10, 10, 11])
+        XCTAssertEqual(counts.championship, 16)
+        XCTAssertEqual(counts.activeNoBrass, 10)
+        XCTAssertEqual(counts.toilet, 16)
     }
 
     func testFieldhouseStartsWithTwoRegularSeasonHellfires() {

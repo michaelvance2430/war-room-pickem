@@ -7,21 +7,34 @@ enum WarRoomPostseasonStatus: Equatable {
 }
 
 enum WarRoomPostseasonRule {
-    static let fieldSize = 16
+    static let qualifiersPerConference = 4
 
-    static func status(rank: Int, playerCount: Int) -> WarRoomPostseasonStatus {
-        let count = max(1, playerCount)
-        let safeRank = min(max(1, rank), count)
-        let field = min(fieldSize, count / 2)
+    static func status(conferenceRank: Int, conferencePlayerCount: Int) -> WarRoomPostseasonStatus {
+        let count = max(1, conferencePlayerCount)
+        let safeRank = min(max(1, conferenceRank), count)
+        let field = min(qualifiersPerConference, count / 2)
         if safeRank <= field { return .championship(seed: safeRank) }
         if safeRank > count - field { return .toilet(seed: safeRank - (count - field)) }
         return .activeNoBrass
     }
 
-    static func counts(playerCount: Int) -> (championship: Int, activeNoBrass: Int, toilet: Int) {
-        let count = max(0, playerCount)
-        let field = min(fieldSize, count / 2)
+    static func counts(conferencePlayerCount: Int) -> (championship: Int, activeNoBrass: Int, toilet: Int) {
+        let count = max(0, conferencePlayerCount)
+        let field = min(qualifiersPerConference, count / 2)
         return (field, count - (field * 2), field)
+    }
+
+    static func leagueCounts(conferencePlayerCounts: [Int]) -> (championship: Int, activeNoBrass: Int, toilet: Int) {
+        var championship = 0
+        var activeNoBrass = 0
+        var toilet = 0
+        for playerCount in conferencePlayerCounts {
+            let conference = counts(conferencePlayerCount: playerCount)
+            championship += conference.championship
+            activeNoBrass += conference.activeNoBrass
+            toilet += conference.toilet
+        }
+        return (championship, activeNoBrass, toilet)
     }
 }
 
@@ -57,8 +70,8 @@ enum FieldhouseDesk: String, CaseIterable, Identifiable {
 
 struct FieldhouseSeasonState {
     var window = 1
-    var playerCount = 100
-    var rank = 17
+    var conferencePlayerCounts = [25, 25, 25, 25]
+    var conferenceRank = 5
     var regularHellfiresUsed = 0
     var bracketHellfireUsed = false
     var bracketLocked = false
@@ -66,7 +79,10 @@ struct FieldhouseSeasonState {
 
     var regularHellfiresRemaining: Int { max(0, 2 - regularHellfiresUsed) }
     var postseasonStatus: WarRoomPostseasonStatus {
-        WarRoomPostseasonRule.status(rank: rank, playerCount: playerCount)
+        WarRoomPostseasonRule.status(
+            conferenceRank: conferenceRank,
+            conferencePlayerCount: conferencePlayerCounts.first ?? 1
+        )
     }
 }
 
@@ -162,7 +178,7 @@ private struct FieldhouseHomePage: View {
         VStack(spacing: 13) {
             FieldhouseHero(kicker: "SEASON COMMAND · OPENING TIP", title: "LOCK THE CARD.\nOWN THE FLOOR.", detail: "Five games. Confidence 5 through 1. One Best Bet. One weekly prop.", icon: "basketball.fill")
             HStack(spacing: 10) {
-                FieldhouseMetric(value: "#\(state.rank)", label: "YOUR SEED LINE")
+                FieldhouseMetric(value: "#\(state.conferenceRank)", label: "CONFERENCE SEED")
                 FieldhouseMetric(value: "\(state.regularHellfiresRemaining)/2", label: "HELLFIRES READY")
             }
             postseasonCard
@@ -172,11 +188,11 @@ private struct FieldhouseHomePage: View {
     }
 
     private var postseasonCard: some View {
-        let counts = WarRoomPostseasonRule.counts(playerCount: state.playerCount)
+        let counts = WarRoomPostseasonRule.leagueCounts(conferencePlayerCounts: state.conferencePlayerCounts)
         return VStack(alignment: .leading, spacing: 8) {
-            Text("THE 100-PLAYER CUT").font(.caption2.weight(.black)).tracking(1.7).foregroundStyle(.orange)
+            Text("THE FOUR-CONFERENCE CUT").font(.caption2.weight(.black)).tracking(1.7).foregroundStyle(.orange)
             HStack { cut("TOP", counts.championship, "CHAMPIONSHIP", .yellow); cut("MIDDLE", counts.activeNoBrass, "PICKS · NO BRASS", .white); cut("BOTTOM", counts.toilet, "TOILET BOWL", .purple) }
-            Text("Everyone keeps picking. Only the top 16 and bottom 16 can leave postseason with permanent hardware.").font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.62))
+            Text("Each conference sends its top 4 and bottom 4. Everyone else keeps making March picks but cannot earn bracket brass.").font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.62))
         }.padding(16).background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 16)).overlay(RoundedRectangle(cornerRadius: 16).stroke(.orange.opacity(0.38)))
     }
     private func cut(_ label: String, _ value: Int, _ note: String, _ color: Color) -> some View { VStack(spacing: 3) { Text("\(value)").font(.title2.weight(.black)).foregroundStyle(color); Text(label).font(.system(size: 7, weight: .black)); Text(note).font(.system(size: 6, weight: .black)).foregroundStyle(.white.opacity(0.42)) }.frame(maxWidth: .infinity) }
@@ -234,7 +250,7 @@ private struct FieldhouseBracketsPage: View {
 
 private struct FieldhouseDispatchPage: View { var body: some View { VStack(spacing: 13) { FieldhouseHero(kicker: "THE FIELDHOUSE DISPATCH", title: "FINAL SCORES.\nFULL RECEIPTS.", detail: "Regional movement, busted chalk, buzzer beaters, and the weekly floor report.", icon: "newspaper.fill"); FieldhouseAction(kicker: "FRONT PAGE", title: "THE PAINT BELONGED TO NOBODY", detail: "Three favorites fell. One Best Bet survived. The Midwest is already hostile.", icon: "doc.text.image.fill") } } }
 private struct FieldhouseLockerPage: View { var body: some View { VStack(spacing: 13) { FieldhouseHero(kicker: "THE FIELDHOUSE TUNNEL", title: "TALK BEFORE THE HORN.", detail: "League-wide chatter, reactions, receipts, and pure hardwood language.", icon: "bubble.left.and.bubble.right.fill"); ForEach(["That bracket has six exits and you found all seven.", "Midwest to the middle. Book it.", "Two Hellfires and still down twelve."], id: \.self) { Text($0).font(.subheadline.weight(.bold)).padding(15).frame(maxWidth: .infinity, alignment: .leading).background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 15)).overlay(alignment: .leading) { Rectangle().fill(.orange).frame(width: 3).padding(.vertical, 8) } } } } }
-private struct FieldhouseProfilePage: View { let state: FieldhouseSeasonState; var body: some View { VStack(spacing: 13) { FieldhouseHero(kicker: "FIELDHOUSE PASSPORT", title: "HARDWOOD SERVICE RECORD", detail: "Regional finishes, bracket crowns, Hellfire authorizations, Cheevos, and permanent brass.", icon: "person.text.rectangle.fill"); HStack(spacing: 10) { FieldhouseMetric(value: "\(state.regularHellfiresUsed)", label: "HELLFIRES"); FieldhouseMetric(value: "\(state.rank)", label: "SEED LINE") }; FieldhouseAction(kicker: "PERMANENT HARDWARE", title: "Championship · Toilet Bowl · Bracket Crown", detail: "Only postseason qualifiers can add Championship or Toilet Bowl brass.", icon: "trophy.fill") } } }
+private struct FieldhouseProfilePage: View { let state: FieldhouseSeasonState; var body: some View { VStack(spacing: 13) { FieldhouseHero(kicker: "FIELDHOUSE PASSPORT", title: "HARDWOOD SERVICE RECORD", detail: "Regional finishes, bracket crowns, Hellfire authorizations, Cheevos, and permanent brass.", icon: "person.text.rectangle.fill"); HStack(spacing: 10) { FieldhouseMetric(value: "\(state.regularHellfiresUsed)", label: "HELLFIRES"); FieldhouseMetric(value: "\(state.conferenceRank)", label: "CONFERENCE SEED") }; FieldhouseAction(kicker: "PERMANENT HARDWARE", title: "Championship · Toilet Bowl · Bracket Crown", detail: "Only postseason qualifiers can add Championship or Toilet Bowl brass.", icon: "trophy.fill") } } }
 
 private struct FieldhouseHero: View { let kicker: String; let title: String; let detail: String; let icon: String; var body: some View { VStack(alignment: .leading, spacing: 10) { Label(kicker, systemImage: icon).font(.system(size: 9, weight: .black)).tracking(1.5).foregroundStyle(.orange); Text(title).font(.system(size: 29, weight: .black)).fontWidth(.condensed); Text(detail).font(.subheadline.weight(.semibold)).foregroundStyle(.white.opacity(0.62)) }.padding(18).frame(maxWidth: .infinity, alignment: .leading).background(LinearGradient(colors: [.orange.opacity(0.24), .black.opacity(0.86)], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 19)).overlay(RoundedRectangle(cornerRadius: 19).stroke(.orange.opacity(0.52))) } }
 private struct FieldhouseAction: View { let kicker: String; let title: String; let detail: String; let icon: String; var body: some View { HStack(spacing: 13) { Image(systemName: icon).font(.title2.weight(.black)).foregroundStyle(.orange).frame(width: 45, height: 45).background(.orange.opacity(0.12), in: Circle()); VStack(alignment: .leading, spacing: 4) { Text(kicker).font(.system(size: 8, weight: .black)).tracking(1.1).foregroundStyle(.orange); Text(title).font(.headline.weight(.black)); Text(detail).font(.caption).foregroundStyle(.white.opacity(0.55)) }; Spacer(); Image(systemName: "chevron.right").foregroundStyle(.orange) }.padding(15).background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 16)).overlay(RoundedRectangle(cornerRadius: 16).stroke(.orange.opacity(0.3))) } }
