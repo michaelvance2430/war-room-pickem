@@ -374,6 +374,28 @@ struct OddsGame: Decodable, Identifiable, Sendable {
     let homeRank: Int?
 }
 
+struct FootballScoreFeed: Decodable, Sendable {
+    let events: [FootballScoreEvent]
+    let remaining: String?
+    let used: String?
+    let last: String?
+}
+
+struct FootballScoreEvent: Decodable, Identifiable, Sendable {
+    let id: String
+    let commenceTime: String?
+    let completed: Bool
+    let homeTeam: String
+    let awayTeam: String
+    let scores: [FootballTeamScore]
+    let lastUpdate: String?
+}
+
+struct FootballTeamScore: Decodable, Sendable {
+    let name: String
+    let score: String
+}
+
 enum AppIdentity {
     static let creatorUserIds: Set<UUID> = [UUID(uuidString: "09544d2b-6eca-4131-a321-c000586c9029")!]
     static func isCreator(_ userId: UUID?) -> Bool { userId.map(creatorUserIds.contains) ?? false }
@@ -1245,8 +1267,9 @@ enum SupabaseAPI {
         }
     }
 
-    static func scoreLeagueWeek(token: String, leagueId: UUID, weekNumber: Int, results: [UUID: String], propResult: String) async throws -> ScoreWeekResponse {
-        var request = authorizedRequest(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/rpc/process_foundry_week"), token: token)
+    static func scoreLeagueWeek(token: String, leagueId: UUID, weekNumber: Int, results: [UUID: String], propResult: String, foundryMode: Bool) async throws -> ScoreWeekResponse {
+        let rpc = foundryMode ? "process_foundry_week" : "score_league_week_atomic"
+        var request = authorizedRequest(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/rpc/\(rpc)"), token: token)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: [
@@ -1391,6 +1414,20 @@ enum SupabaseAPI {
             "week": weekNumber,
         ])
         return try await send(request, as: OddsFeed.self)
+    }
+
+    static func footballScores(token: String, leagueId: UUID, sportId: String, daysFrom: Int = 3) async throws -> FootballScoreFeed {
+        var request = URLRequest(url: SupabaseConfiguration.baseURL.appending(path: "functions/v1/football-scores"))
+        request.httpMethod = "POST"
+        request.setValue(SupabaseConfiguration.publishableKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "leagueId": leagueId.uuidString.lowercased(),
+            "sport": sportId.lowercased() == "nfl" ? "nfl" : "cfb",
+            "daysFrom": min(3, max(1, daysFrom)),
+        ])
+        return try await send(request, as: FootballScoreFeed.self)
     }
 
     static func saveWeekPicks(

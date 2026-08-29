@@ -2140,19 +2140,19 @@ struct HomeView: View {
                         .buttonStyle(.plain)
                         .accessibilityLabel("Share \(membership.leagues.name) invitation")
                         if isCommissioner {
-                            NavigationLink { LeagueManagementView(membership: membership) } label: {
+                            NavigationLink { CommissionerCommandCenterView(membership: membership, standings: standings, submittedUserIds: visibleSubmittedUserIds) } label: {
                                 if isNFL {
                                     NflPrimaryActionCard(
                                         kicker: "COMMISSIONER CONTROL · LEAGUE OPERATIONS",
-                                        title: "Manage League",
-                                        detail: pendingJoinRequests.isEmpty ? "Move players across AFC and NFC groups, inspect the roster, and control the season." : "\(pendingJoinRequests.count) join request\(pendingJoinRequests.count == 1 ? "" : "s") waiting · roster · AFC/NFC groups · season control.",
+                                        title: "Commissioner Command",
+                                        detail: pendingJoinRequests.isEmpty ? "Cards, scores, roster, AFC/NFC groups, and season control." : "\(pendingJoinRequests.count) join request\(pendingJoinRequests.count == 1 ? "" : "s") waiting · cards · scores · roster · season control.",
                                         icon: "person.3.sequence.fill"
                                     )
                                 } else {
                                     StatusCard(
                                         kicker: "COMMISSIONER CONTROL · LEAGUE OPERATIONS",
-                                        title: "Manage League",
-                                        detail: pendingJoinRequests.isEmpty ? "Manage players, conference assignments, and season controls from one place." : "\(pendingJoinRequests.count) join request\(pendingJoinRequests.count == 1 ? "" : "s") waiting · roster · conferences · season control.",
+                                        title: "Commissioner Command",
+                                        detail: pendingJoinRequests.isEmpty ? "Cards, scores, roster, conferences, and season control from one place." : "\(pendingJoinRequests.count) join request\(pendingJoinRequests.count == 1 ? "" : "s") waiting · cards · scores · roster · conferences.",
                                         icon: "person.3.sequence.fill",
                                         featured: true,
                                         accent: .cyan,
@@ -2810,7 +2810,7 @@ private struct CommissionerCommandCenterView: View {
                     controlDoor(title: "CHAMPIONSHIP HARDWARE", detail: membership.leagues.championshipTrophyId == nil ? "THE ROOM STILL NEEDS SOMETHING TO FIGHT OVER" : "VIEW THE TROPHY WAITING AT THE END", icon: "trophy.fill", color: .yellow) {
                         ChampionshipTrophyPickerView(membership: membership)
                     }
-                    controlDoor(title: "FINAL SCORES & WEEK PROCESSING", detail: "PREVIEW THE SCORING DESK · SIMULATION FIRE CONTROL REQUIRED", icon: "lock.shield.fill", color: .red) {
+                    controlDoor(title: "FINAL SCORES & WEEK PROCESSING", detail: "SYNC OFFICIAL SCORES · REVIEW COVERS · CERTIFY THE WEEK", icon: "checkmark.seal.fill", color: .red) {
                         CommissionerScoreWeekView(membership: membership, submittedCount: submittedCount, playerCount: standings.count)
                     }
                     controlDoor(title: "RUN IT BACK", detail: "OPEN THE 7-DAY SPORT VOTE · MOVE YES VOTERS WITH ONE BUTTON", icon: "person.3.sequence.fill", color: .orange) {
@@ -2894,6 +2894,10 @@ struct CommissionerScoreWeekView: View {
     @State private var error: String?
     @State private var receipt: ScoreWeekResponse?
     @State private var confirming = false
+    @State private var syncedScores: [UUID: SyncedFootballScore] = [:]
+    @State private var manuallySetResults: Set<UUID> = []
+    @State private var scoreSyncing = false
+    @State private var scoreSyncNotice: String?
 
     private var week: Int { membership.leagues.currentWeek }
     private var identity: SportIdentity { SportIdentity(membership.leagues.sportId) }
@@ -2917,6 +2921,7 @@ struct CommissionerScoreWeekView: View {
                     if loading { ProgressView("Opening the official ledger…").frame(maxWidth: .infinity).padding(30) }
                     else if let card {
                         if simulationWriteEnabled { simulationControl(card) }
+                        if !isFoundry { liveScoreControl }
                         ForEach(card.cardGames) { game in gameResultCard(game) }
                         if let question = card.propQuestion, let a = card.propOptionA, let b = card.propOptionB {
                             VStack(alignment: .leading, spacing: 10) {
@@ -2937,10 +2942,19 @@ struct CommissionerScoreWeekView: View {
         }
         .navigationTitle("Final Scores").navigationBarTitleDisplayMode(.inline).preferredColorScheme(.dark)
         .task { await load() }
-        .confirmationDialog("Process Week \(week) in the Foundry?", isPresented: $confirming, titleVisibility: .visible) {
-            Button("Score \(submittedCount) locked cards", role: .destructive) { Task { await process() } }
+        .task(id: card?.id) {
+            guard card != nil, !isFoundry else { return }
+            await syncOfficialScores(silent: true)
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(60))
+                guard shouldPollScores else { continue }
+                await syncOfficialScores(silent: true)
+            }
+        }
+        .confirmationDialog(isFoundry ? "Process Week \(week) in the Foundry?" : "Certify Week \(week) results?", isPresented: $confirming, titleVisibility: .visible) {
+            Button(isFoundry ? "Score \(submittedCount) simulation cards" : "Score \(submittedCount) locked cards", role: .destructive) { Task { await process() } }
             Button("Cancel", role: .cancel) {}
-        } message: { Text("This writes official results and rebuilds Foundry standings. Production rooms remain locked.") }
+        } message: { Text(isFoundry ? "This writes simulation results and rebuilds Foundry standings." : "This writes official results for the entire room. Review every cover and the prop before certifying.") }
     }
 
     private var preflight: some View {
@@ -2948,7 +2962,7 @@ struct CommissionerScoreWeekView: View {
             Text("PRE-FLIGHT").font(.caption.weight(.black)).tracking(1.2)
             preflightRow("Published card", good: card != nil)
             preflightRow("Locked cards · \(submittedCount)/\(playerCount)", good: submittedCount > 0)
-            preflightRow(isFoundry ? "Bot-only quarantine confirmed" : "Human roster detected · fire control locked", good: isFoundry)
+            preflightRow(isFoundry ? "Foundry simulation isolated" : "Commissioner scoring authority", good: true)
             preflightRow("Every cover + prop entered", good: complete)
         }.commandPanel(accent: accent, cornerRadius: identity.isNFL ? 6 : 15)
     }
@@ -2965,6 +2979,16 @@ struct CommissionerScoreWeekView: View {
             }
             Text("GAME \(game.sortOrder + 1) · ATS RESULT").font(.caption2.weight(.black)).tracking(1).foregroundStyle(.white.opacity(0.4))
             Text("\(game.awayTeam) @ \(game.homeTeam)").font(.headline.weight(.black))
+            if let live = syncedScores[game.id] {
+                HStack {
+                    Text("\(game.awayTeam) \(live.awayScore) · \(game.homeTeam) \(live.homeScore)")
+                        .font(.caption.weight(.black)).lineLimit(1).minimumScaleFactor(0.65)
+                    Spacer()
+                    Text(live.completed ? "FINAL" : "LIVE")
+                        .font(.system(size: 8, weight: .black)).tracking(0.8)
+                        .foregroundStyle(live.completed ? accent : .yellow)
+                }
+            }
             HStack(spacing: 8) {
                 coverButton(game.awayTeam, value: "away", game: game)
                 coverButton(game.homeTeam, value: "home", game: game)
@@ -2997,7 +3021,7 @@ struct CommissionerScoreWeekView: View {
     }
 
     private func coverButton(_ title: String, value: String, game: CardGame) -> some View {
-        Button { results[game.id] = value } label: {
+        Button { results[game.id] = value; manuallySetResults.insert(game.id) } label: {
             Text(title.uppercased()).font(.system(size: 9, weight: .black)).lineLimit(2).minimumScaleFactor(0.65).frame(maxWidth: .infinity, minHeight: 42).background(results[game.id] == value ? (identity.isNFL ? Color.blue : Color.green) : Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: identity.isNFL ? 4 : 9)).foregroundStyle(results[game.id] == value ? (identity.isNFL ? .white : .black) : .white)
         }.buttonStyle(.plain)
     }
@@ -3007,18 +3031,34 @@ struct CommissionerScoreWeekView: View {
     }
 
     @ViewBuilder private var fireControl: some View {
-        if isFoundry {
-            Button { confirming = true } label: { Label(processing ? "PROCESSING…" : "PROCESS FOUNDRY WEEK", systemImage: "bolt.shield.fill").font(.headline.weight(.black)).frame(maxWidth: .infinity).padding(16).background(complete && submittedCount > 0 ? (identity.isNFL ? Color.blue : Color.green) : Color.gray, in: RoundedRectangle(cornerRadius: identity.isNFL ? 6 : 13)).foregroundStyle(identity.isNFL ? .white : .black) }.buttonStyle(.plain).disabled(!complete || submittedCount == 0 || processing)
-        } else {
-            Label("SCORING LOCKED · FOUNDRY SIMULATION REQUIRED", systemImage: "lock.shield.fill").font(.caption.weight(.black)).frame(maxWidth: .infinity).padding(15).foregroundStyle(.red).background(.red.opacity(0.1), in: RoundedRectangle(cornerRadius: 13)).overlay(RoundedRectangle(cornerRadius: 13).stroke(.red.opacity(0.4)))
-        }
+        Button { confirming = true } label: {
+            Label(processing ? "PROCESSING…" : (isFoundry ? "PROCESS FOUNDRY WEEK" : "CERTIFY OFFICIAL RESULTS"), systemImage: "bolt.shield.fill")
+                .font(.headline.weight(.black)).frame(maxWidth: .infinity).padding(16)
+                .background(complete && submittedCount > 0 ? (identity.isNFL ? Color.blue : Color.green) : Color.gray, in: RoundedRectangle(cornerRadius: identity.isNFL ? 6 : 13))
+                .foregroundStyle(identity.isNFL ? .white : .black)
+        }.buttonStyle(.plain).disabled(!complete || submittedCount == 0 || processing)
+    }
+
+    private var liveScoreControl: some View {
+        Button { Task { await syncOfficialScores(silent: false) } } label: {
+            HStack(spacing: 12) {
+                Image(systemName: scoreSyncing ? "arrow.triangle.2.circlepath" : "dot.radiowaves.left.and.right")
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(scoreSyncing ? "SYNCING OFFICIAL SCORES…" : "SYNC LIVE / FINAL SCORES").font(.headline.weight(.black))
+                    Text(scoreSyncNotice ?? "FINALS AUTO-FILL ATS COVERS · REVIEW BEFORE CERTIFYING")
+                        .font(.system(size: 8, weight: .black)).tracking(0.55)
+                }
+                Spacer()
+            }.foregroundStyle(identity.isNFL ? .white : .black).padding(15)
+                .background(identity.isNFL ? Color.blue : Color.yellow, in: RoundedRectangle(cornerRadius: identity.isNFL ? 6 : 13))
+        }.buttonStyle(.plain).disabled(scoreSyncing)
     }
 
     private func receiptView(_ value: ScoreWeekResponse) -> some View {
         VStack(alignment: .leading, spacing: 13) {
             Text("WEEK \(week) CERTIFIED").font(.caption.weight(.black)).tracking(1.2).foregroundStyle(accent)
             Text("The whole room moved.").font(.title2.weight(.black)).fontWidth(.condensed)
-            Label("\(value.scoredCount) simulation cards scored and standings rebuilt", systemImage: "checkmark.seal.fill").font(.footnote.weight(.bold)).foregroundStyle(accent)
+            Label("\(value.scoredCount) \(isFoundry ? "simulation" : "locked") cards scored and standings rebuilt", systemImage: "checkmark.seal.fill").font(.footnote.weight(.bold)).foregroundStyle(accent)
             if let crown = value.crownName, let points = value.crownPoints {
                 damageRow("CROWN", crown, "\(points) PTS", identity.isNFL ? .cyan : .yellow, "crown.fill")
             }
@@ -3062,12 +3102,75 @@ struct CommissionerScoreWeekView: View {
     }
 
     @MainActor private func process() async {
-        guard isFoundry, complete, let token = auth.token, let propResult else { return }
+        guard complete, let token = auth.token, let propResult else { return }
         processing = true; error = nil
         defer { processing = false }
-        do { receipt = try await SupabaseAPI.scoreLeagueWeek(token: token, leagueId: membership.leagueId, weekNumber: week, results: results, propResult: propResult) }
+        do { receipt = try await SupabaseAPI.scoreLeagueWeek(token: token, leagueId: membership.leagueId, weekNumber: week, results: results, propResult: propResult, foundryMode: isFoundry) }
         catch { self.error = error.localizedDescription }
     }
+
+    private var shouldPollScores: Bool {
+        guard let card else { return false }
+        return card.cardGames.contains { game in
+            guard let start = game.startTime.flatMap({ ISO8601DateFormatter().date(from: $0) }), start <= Date() else { return false }
+            return syncedScores[game.id]?.completed != true
+        }
+    }
+
+    @MainActor private func syncOfficialScores(silent: Bool) async {
+        guard !isFoundry, let token = auth.token, let card else { return }
+        if !silent { scoreSyncing = true; error = nil }
+        defer { if !silent { scoreSyncing = false } }
+        do {
+            let feed = try await SupabaseAPI.footballScores(token: token, leagueId: membership.leagueId, sportId: membership.leagues.sportId)
+            var matched = 0
+            var finals = 0
+            for game in card.cardGames {
+                guard let event = feed.events.first(where: { scoreEvent($0, matches: game) }),
+                      let home = scoreValue(team: event.homeTeam, in: event),
+                      let away = scoreValue(team: event.awayTeam, in: event) else { continue }
+                matched += 1
+                syncedScores[game.id] = SyncedFootballScore(homeScore: home, awayScore: away, completed: event.completed)
+                if event.completed {
+                    finals += 1
+                    if !manuallySetResults.contains(game.id) { results[game.id] = atsWinner(game: game, homeScore: home, awayScore: away) }
+                }
+            }
+            scoreSyncNotice = "\(finals) FINAL · \(max(0, matched - finals)) LIVE · \(max(0, card.cardGames.count - matched)) WAITING"
+        } catch {
+            if !silent { self.error = error.localizedDescription }
+        }
+    }
+
+    private func scoreEvent(_ event: FootballScoreEvent, matches game: CardGame) -> Bool {
+        normalizedTeam(event.homeTeam) == normalizedTeam(game.homeTeam)
+            && normalizedTeam(event.awayTeam) == normalizedTeam(game.awayTeam)
+    }
+
+    private func normalizedTeam(_ value: String) -> String {
+        value.lowercased().unicodeScalars.map { CharacterSet.alphanumerics.contains($0) ? Character(String($0)) : " " }
+            .reduce(into: "") { $0.append($1) }
+            .split(separator: " ").joined(separator: " ")
+    }
+
+    private func scoreValue(team: String, in event: FootballScoreEvent) -> Int? {
+        event.scores.first(where: { normalizedTeam($0.name) == normalizedTeam(team) }).flatMap { Int($0.score) }
+    }
+
+    private func atsWinner(game: CardGame, homeScore: Int, awayScore: Int) -> String {
+        let favorite = game.favorite == "away" ? "away" : "home"
+        let margin = favorite == "away" ? Double(awayScore - homeScore) : Double(homeScore - awayScore)
+        let line = abs(game.spread)
+        if abs(margin - line) < 0.000_1 { return "push" }
+        if margin > line { return favorite }
+        return favorite == "home" ? "away" : "home"
+    }
+}
+
+private struct SyncedFootballScore {
+    let homeScore: Int
+    let awayScore: Int
+    let completed: Bool
 }
 
 extension View {
