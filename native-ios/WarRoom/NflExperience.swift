@@ -283,9 +283,9 @@ struct NflSundayOperationsPanel: View {
                 Image(systemName: "football.fill").font(.title2.weight(.black)).foregroundStyle(.white)
             }.frame(width: 50, height: 50)
             VStack(alignment: .leading, spacing: 4) {
-                Text("NFL WEEK \(week) · HUMAN COMMAND")
+                Text("NFL WEEK \(week) · PLAYER COMMAND")
                     .font(.system(size: 8, weight: .black)).tracking(1.35).foregroundStyle(.cyan)
-                Text("HUMAN PICKS ONLY").font(.headline.weight(.black))
+                Text("PLAYER PICKS ONLY").font(.headline.weight(.black))
                 Text("You own every regular-season call. JDAM stays sealed until the playoff bracket.")
                     .font(.caption2.weight(.semibold)).foregroundStyle(.white.opacity(0.55)).fixedSize(horizontal: false, vertical: true)
             }

@@ -32,7 +32,7 @@ struct NflPostseasonCloudView: View {
                     else if let slate {
                         if let scorecard { scorecardPanel(scorecard) }
                         if let foundryBotsSeeded {
-                            Label("\(foundryBotsSeeded) BOT BRACKETS SEALED · 13 DECISIONS EACH", systemImage: "checkmark.shield.fill")
+                            Label("\(foundryBotsSeeded) SIMULATION BRACKETS SEALED · 13 DECISIONS EACH", systemImage: "checkmark.shield.fill")
                                 .font(.caption.weight(.black)).foregroundStyle(.cyan)
                                 .frame(maxWidth: .infinity).padding(12)
                                 .background(.blue.opacity(0.12), in: RoundedRectangle(cornerRadius: 7))
@@ -76,7 +76,7 @@ struct NflPostseasonCloudView: View {
             loading = true
             Task { await load() }
         }
-        .alert("AUTHORIZE JDAM?",isPresented:$confirmingJdam){Button("KEEP CONTROL",role:.cancel){};Button("AUTHORIZE",role:.destructive){Task{await deployJdam()}}}message:{Text("JDAM replaces every human decision, fills all 13 picks, records the authorization in your permanent service history, and seals the bracket. No rerolls.")}
+        .alert("AUTHORIZE JDAM?",isPresented:$confirmingJdam){Button("KEEP CONTROL",role:.cancel){};Button("AUTHORIZE",role:.destructive){Task{await deployJdam()}}}message:{Text("JDAM replaces every open decision, fills all 13 picks, records the authorization in your permanent service history, and seals the bracket. No rerolls.")}
     }
 
     private var hero: some View {

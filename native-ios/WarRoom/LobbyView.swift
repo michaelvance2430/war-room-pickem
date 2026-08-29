@@ -254,6 +254,7 @@ struct LobbyView: View {
     @State private var loading = true
     @State private var busyRoom: UUID?
     @State private var notice: String?
+    @State private var expansionSport = "football"
 
     private var publicRooms: [LobbyRoom] { rooms.filter { $0.accessMode == "public" } }
     private var privateRooms: [LobbyRoom] { rooms.filter { $0.accessMode == "private" } }
@@ -268,17 +269,20 @@ struct LobbyView: View {
             ScrollView {
                 VStack(spacing: 17) {
                     titleBlock
-                    createLeagueDoor
-                    inviteCodeDoor
-                    playerBoard
-                    crewBoard
-                    roomDoors
-                    if let selection { roomList(title: selection) }
-                    if let notice {
-                        Text(notice).font(.footnote.weight(.bold)).foregroundStyle(.yellow)
-                            .frame(maxWidth: .infinity, alignment: .leading).padding(13)
-                            .background(.yellow.opacity(0.10), in: RoundedRectangle(cornerRadius: 13))
-                            .overlay(RoundedRectangle(cornerRadius: 13).stroke(.yellow.opacity(0.32)))
+                    expansionTabs
+                    if expansionSport == "football" {
+                        createLeagueDoor
+                        inviteCodeDoor
+                        playerBoard
+                        crewBoard
+                        roomDoors
+                        if let selection { roomList(title: selection) }
+                        if let notice {
+                            Text(notice).font(.footnote.weight(.bold)).foregroundStyle(.yellow)
+                                .frame(maxWidth: .infinity, alignment: .leading).padding(13)
+                                .background(.yellow.opacity(0.10), in: RoundedRectangle(cornerRadius: 13))
+                                .overlay(RoundedRectangle(cornerRadius: 13).stroke(.yellow.opacity(0.32)))
+                        }
                     }
                     Text("YOU BROWSE FIRST. A SEAT IS NEVER ASSIGNED UNTIL YOU CHOOSE A ROOM.")
                         .font(.system(size: 8, weight: .black)).tracking(1.15).foregroundStyle(.white.opacity(0.35))
@@ -295,6 +299,43 @@ struct LobbyView: View {
         .toolbarBackground(.visible, for: .navigationBar)
         .tint(.green)
         .task { await load() }
+    }
+
+    private var expansionTabs: some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 8) {
+                expansionTab("FOOTBALL", icon: "football.fill", key: "football", color: .green)
+                expansionTab("FIELDHOUSE", icon: "basketball.fill", key: "fieldhouse", color: .orange)
+            }
+            if expansionSport == "fieldhouse" {
+                VStack(spacing: 8) {
+                    Label("FIELDHOUSE · COMING SOON", systemImage: "basketball.fill")
+                        .font(.headline.weight(.black)).foregroundStyle(.orange)
+                    Text("NCAA basketball rooms are being built now. Football remains live while we finish the Fieldhouse season.")
+                        .font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.62)).multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity).padding(16)
+                .background(.black.opacity(0.84), in: RoundedRectangle(cornerRadius: 16))
+                .overlay(RoundedRectangle(cornerRadius: 16).stroke(.orange.opacity(0.42)))
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    private func expansionTab(_ title: String, icon: String, key: String, color: Color) -> some View {
+        let selected = expansionSport == key
+        return Button {
+            withAnimation(.snappy) { expansionSport = key }
+        } label: {
+            Label(title, systemImage: icon)
+                .font(.caption.weight(.black)).frame(maxWidth: .infinity).padding(.vertical, 12)
+                .foregroundStyle(selected ? .black : color)
+                .background(selected ? color : color.opacity(0.10), in: RoundedRectangle(cornerRadius: 13))
+                .overlay(RoundedRectangle(cornerRadius: 13).stroke(color.opacity(selected ? 0 : 0.42)))
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint(key == "fieldhouse" ? "Shows Fieldhouse availability" : "Shows live football Muster options")
     }
 
     private var titleBlock: some View {
@@ -792,7 +833,7 @@ struct CreateLeagueView: View {
 
                     VStack(alignment: .leading, spacing: 12) {
                         createLabel("ROOM RULES")
-                        Stepper("\(maxMembers) HUMAN SEATS", value: $maxMembers, in: 2...100, step: 2).font(.subheadline.weight(.black))
+                        Stepper("\(maxMembers) PLAYER SEATS", value: $maxMembers, in: 2...100, step: 2).font(.subheadline.weight(.black))
                         Toggle("CRYSTAL BALL", isOn: $crystalBallEnabled).font(.subheadline.weight(.black)).tint(.green)
                     }.createLeaguePanel()
 

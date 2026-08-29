@@ -107,7 +107,7 @@ struct FoundryView: View {
         .preferredColorScheme(.dark)
         .task { await preflight() }
         .confirmationDialog("Restore the Foundry Bot Lab to Week \(SportIdentity(lab?.leagues.sportId).openingWeek)?", isPresented: $confirmingReset, titleVisibility: .visible) {
-            Button("RESTORE BOT LAB", role: .destructive) { Task { await resetLab() } }
+            Button("RESTORE SIMULATION LAB", role: .destructive) { Task { await resetLab() } }
             Button("Cancel", role: .cancel) {}
         } message: { Text("Only disposable Foundry scores, Dispatch editions, cards, picks, and bot chatter are cleared. Production leagues remain untouched.") }
         .confirmationDialog("Complete the Foundry regular season?", isPresented: $confirmingSeasonSkip, titleVisibility: .visible) {
@@ -436,7 +436,7 @@ struct FoundryView: View {
                 FoundryCheck(label: "Server restore", value: "CONNECTED", color: isNFLFoundry ? .cyan : .green)
                 if let lab {
                     Button { confirmingReset = true } label: {
-                        Label(resetting ? "RESTORING…" : "RESTORE BOT LAB TO WEEK \(SportIdentity(lab.leagues.sportId).openingWeek)", systemImage: "arrow.counterclockwise.circle.fill")
+                        Label(resetting ? "RESTORING…" : "RESTORE SIMULATION LAB TO WEEK \(SportIdentity(lab.leagues.sportId).openingWeek)", systemImage: "arrow.counterclockwise.circle.fill")
                             .font(.caption.weight(.black)).frame(maxWidth: .infinity).padding(13)
                             .foregroundStyle(isNFLFoundry ? .white : .black).background(isNFLFoundry ? Color.blue : Color.orange, in: RoundedRectangle(cornerRadius: isNFLFoundry ? 6 : 11))
                     }.buttonStyle(.plain).disabled(resetting)
@@ -866,7 +866,7 @@ struct FoundryLeagueMirrorView: View {
     private var mirrorHeader: some View {
         HStack(spacing: 11) {
             Button { dismiss() } label: {
-                Label(isNFL ? "EXIT SIMULATION" : "EXIT BOT LEAGUE", systemImage: "chevron.backward")
+                Label("EXIT SIMULATION", systemImage: "chevron.backward")
                     .font(.system(size: 9, weight: .black))
                     .padding(.horizontal, 11)
                     .frame(height: 40)
@@ -936,15 +936,15 @@ struct FoundryLeagueMirrorView: View {
 
     private var homePage: some View {
         VStack(alignment: .leading, spacing: 14) {
-            MirrorHero(kicker: isNFL ? "SUNDAY SIMULATION · MEMBER VIEW" : "BOT LEAGUE · MEMBER VIEW", title: "WEEK \(reviewedWeek) AFTERMATH", detail: "Nothing is hidden behind a receipt. Walk every league page and inspect what actually moved.", color: mirrorAccent)
+            MirrorHero(kicker: isNFL ? "SUNDAY SIMULATION · MEMBER VIEW" : "FOUNDRY SIMULATION · MEMBER VIEW", title: "WEEK \(reviewedWeek) AFTERMATH", detail: "Nothing is hidden behind a receipt. Walk every league page and inspect what actually moved.", color: mirrorAccent)
             HStack(spacing: 9) {
-                MirrorMetric(value: "\(bots.count)", label: "BOTS", color: mirrorAccent)
+                MirrorMetric(value: "\(bots.count)", label: "SIMULATED PLAYERS", color: mirrorAccent)
                 MirrorMetric(value: "\(picks.count)", label: "SCORED", color: mirrorAccent)
                 MirrorMetric(value: "\(editions.count)", label: "DISPATCHES", color: mirrorAccent)
             }
             if let leader = bots.first { MirrorImpactCard(kicker: "LEAGUE LEADER", title: leader.name, detail: "\(leader.totalPoints) total · \(leader.weeklyPoints.last ?? 0) this week", color: mirrorHighlight, icon: "crown.fill") }
             pageButton(.standings, "SEE EVERY STANDINGS MOVE", "Before rank → after rank · weekly points", mirrorSecondary)
-            pageButton(.picks, "AUDIT EVERY BOT CARD", "Picks, confidence, Best Bet, prop, score", .blue)
+            pageButton(.picks, "AUDIT EVERY SIMULATED CARD", "Picks, confidence, Best Bet, prop, score", .blue)
             pageButton(.locker, "READ THE ROOM", "See the exact bullshit available to Dispatch", .red)
             pageButton(.moments, "INSPECT KEY MOMENTS", "Every trigger · every week · every receipt", mirrorSignal)
             pageButton(.audit, "OPEN THE DISPATCH AUDIT", "Compare every issue and hunt repeated copy", mirrorHighlight)
@@ -1279,7 +1279,7 @@ private struct FoundryKeyMomentDetail: View {
 private enum MirrorSection: String, CaseIterable, Identifiable {
     case home, picks, standings, locker, dispatch, moments, postseason, audit
     var id: String { rawValue }
-    var label: String { self == .home ? "BOT HOME" : rawValue.uppercased() }
+    var label: String { self == .home ? "SIMULATION HOME" : rawValue.uppercased() }
     var icon: String { switch self { case .home: "house.fill"; case .picks: "checkmark.seal.fill"; case .standings: "list.number"; case .locker: "bubble.left.and.bubble.right.fill"; case .dispatch: "newspaper.fill"; case .moments: "waveform.path.ecg"; case .postseason: "trophy.fill"; case .audit: "magnifyingglass" } }
 }
 

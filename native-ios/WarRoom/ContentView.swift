@@ -117,6 +117,9 @@ struct ContentView: View {
     @State private var picksKickoff: Date?
     @State private var clock = Date()
     @State private var platformStatus: PlatformStatus?
+    @State private var showingNotificationPrimer = false
+    @State private var showingPushAnnouncements = false
+    @AppStorage("warroom.notifications.primer-seen") private var notificationPrimerSeen = false
     @AppStorage("warroom.activeSportId") private var activeSportId = "cfb"
 
     private var boardIsOpen: Bool { picksKickoff.map { clock >= $0 } ?? false }
@@ -177,6 +180,34 @@ struct ContentView: View {
         .task(id: auth.user?.id) { await recordAppOpenDiscoveries() }
         .task(id: auth.selectedLeagueId) { await refreshActiveSport() }
         .task(id: auth.user?.id) { await refreshPlatformStatus() }
+        .task(id: auth.user?.id) { await prepareNotifications() }
+        .onReceive(NotificationCenter.default.publisher(for: .warRoomNotificationDestination)) { notification in
+            guard let destination = notification.object as? String else { return }
+            showOpening = false
+            if destination == "announcements" {
+                openTab(0)
+                showingPushAnnouncements = true
+            } else if destination == "picks" {
+                openTab(1)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .warRoomDeviceTokenChanged)) { _ in
+            Task { await registerPushToken() }
+        }
+        .sheet(isPresented: $showingPushAnnouncements) { NavigationStack { AnnouncementsView() } }
+        .alert("Stay ahead of the lock", isPresented: $showingNotificationPrimer) {
+            Button("Not now", role: .cancel) { notificationPrimerSeen = true }
+            Button("Enable alerts") {
+                notificationPrimerSeen = true
+                Task {
+                    if await WarRoomNotificationCenter.requestAuthorization() {
+                        await registerPushToken()
+                    }
+                }
+            }
+        } message: {
+            Text("War Room can alert you when a card is built, 12 hours before it locks, one hour before it locks, and when your commissioner posts an announcement. You can change this anytime in Settings.")
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await refreshPlatformStatus() } }
         }
@@ -198,6 +229,26 @@ struct ContentView: View {
            EasterEggEngine.hasThreePeat(trophies.filter { $0.trophyType.lowercased() == "championship" }.map(\.seasonYear)) {
             _ = try? await SupabaseAPI.recordEasterEggFind(token: token, discoveryId: "egg_three_peat")
         }
+    }
+
+    @MainActor private func prepareNotifications() async {
+        guard auth.user != nil else { return }
+        let status = await WarRoomNotificationCenter.authorizationStatus()
+        if status == .authorized || status == .provisional {
+            UIApplication.shared.registerForRemoteNotifications()
+            await registerPushToken()
+        } else if status == .notDetermined, !notificationPrimerSeen {
+            showingNotificationPrimer = true
+        }
+    }
+
+    private func registerPushToken() async {
+        guard let token = auth.token,
+              let user = auth.user,
+              let deviceToken = UserDefaults.standard.string(forKey: WarRoomNotificationCenter.deviceTokenKey),
+              !deviceToken.isEmpty
+        else { return }
+        try? await SupabaseAPI.registerPushDevice(token: token, userId: user.id, deviceToken: deviceToken)
     }
 
     private func refreshActiveSport() async {
@@ -2508,6 +2559,13 @@ struct HomeView: View {
             } else {
                 pendingJoinRequests = []
             }
+            await WarRoomNotificationCenter.sync(
+                leagueId: active.leagueId,
+                leagueName: active.leagues.name,
+                week: active.leagues.currentWeek,
+                card: card,
+                announcements: announcements
+            )
             loadError = nil
         } catch {
             loadError = error.localizedDescription
@@ -2752,7 +2810,7 @@ private struct CommissionerCommandCenterView: View {
                     controlDoor(title: "CHAMPIONSHIP HARDWARE", detail: membership.leagues.championshipTrophyId == nil ? "THE ROOM STILL NEEDS SOMETHING TO FIGHT OVER" : "VIEW THE TROPHY WAITING AT THE END", icon: "trophy.fill", color: .yellow) {
                         ChampionshipTrophyPickerView(membership: membership)
                     }
-                    controlDoor(title: "FINAL SCORES & WEEK PROCESSING", detail: "PREVIEW THE SCORING DESK · BOT-ONLY FIRE CONTROL REQUIRED", icon: "lock.shield.fill", color: .red) {
+                    controlDoor(title: "FINAL SCORES & WEEK PROCESSING", detail: "PREVIEW THE SCORING DESK · SIMULATION FIRE CONTROL REQUIRED", icon: "lock.shield.fill", color: .red) {
                         CommissionerScoreWeekView(membership: membership, submittedCount: submittedCount, playerCount: standings.count)
                     }
                     controlDoor(title: "RUN IT BACK", detail: "OPEN THE 7-DAY SPORT VOTE · MOVE YES VOTERS WITH ONE BUTTON", icon: "person.3.sequence.fill", color: .orange) {
@@ -2919,7 +2977,7 @@ struct CommissionerScoreWeekView: View {
             HStack(spacing: 12) {
                 Image(systemName: "dice.fill").font(.title2)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("SIMULATE BOT FINALS").font(.headline.weight(.black))
+                    Text("SIMULATE FINAL SCORES").font(.headline.weight(.black))
                     Text("FILLS EVERY COVER + PROP · DOES NOT SCORE YET").font(.system(size: 8, weight: .black)).tracking(0.7)
                 }
                 Spacer(); Image(systemName: "sparkles")
@@ -2952,7 +3010,7 @@ struct CommissionerScoreWeekView: View {
         if isFoundry {
             Button { confirming = true } label: { Label(processing ? "PROCESSING…" : "PROCESS FOUNDRY WEEK", systemImage: "bolt.shield.fill").font(.headline.weight(.black)).frame(maxWidth: .infinity).padding(16).background(complete && submittedCount > 0 ? (identity.isNFL ? Color.blue : Color.green) : Color.gray, in: RoundedRectangle(cornerRadius: identity.isNFL ? 6 : 13)).foregroundStyle(identity.isNFL ? .white : .black) }.buttonStyle(.plain).disabled(!complete || submittedCount == 0 || processing)
         } else {
-            Label("SCORING LOCKED · BOT-ONLY LAB REQUIRED", systemImage: "lock.shield.fill").font(.caption.weight(.black)).frame(maxWidth: .infinity).padding(15).foregroundStyle(.red).background(.red.opacity(0.1), in: RoundedRectangle(cornerRadius: 13)).overlay(RoundedRectangle(cornerRadius: 13).stroke(.red.opacity(0.4)))
+            Label("SCORING LOCKED · FOUNDRY SIMULATION REQUIRED", systemImage: "lock.shield.fill").font(.caption.weight(.black)).frame(maxWidth: .infinity).padding(15).foregroundStyle(.red).background(.red.opacity(0.1), in: RoundedRectangle(cornerRadius: 13)).overlay(RoundedRectangle(cornerRadius: 13).stroke(.red.opacity(0.4)))
         }
     }
 
@@ -2960,7 +3018,7 @@ struct CommissionerScoreWeekView: View {
         VStack(alignment: .leading, spacing: 13) {
             Text("WEEK \(week) CERTIFIED").font(.caption.weight(.black)).tracking(1.2).foregroundStyle(accent)
             Text("The whole room moved.").font(.title2.weight(.black)).fontWidth(.condensed)
-            Label("\(value.scoredCount) bot cards scored and standings rebuilt", systemImage: "checkmark.seal.fill").font(.footnote.weight(.bold)).foregroundStyle(accent)
+            Label("\(value.scoredCount) simulation cards scored and standings rebuilt", systemImage: "checkmark.seal.fill").font(.footnote.weight(.bold)).foregroundStyle(accent)
             if let crown = value.crownName, let points = value.crownPoints {
                 damageRow("CROWN", crown, "\(points) PTS", identity.isNFL ? .cyan : .yellow, "crown.fill")
             }
@@ -2975,7 +3033,7 @@ struct CommissionerScoreWeekView: View {
                 }
             }
             NavigationLink { FoundryLeagueMirrorView(seedMembership: membership) } label: {
-                Label(identity.isNFL ? "ENTER SUNDAY SIMULATION" : "ENTER THE BOT LEAGUE", systemImage: "rectangle.3.group.fill").font(.headline.weight(.black)).frame(maxWidth: .infinity).padding(15).foregroundStyle(identity.isNFL ? .white : .black).background(identity.isNFL ? Color.blue : Color.yellow, in: RoundedRectangle(cornerRadius: identity.isNFL ? 6 : 12))
+                Label(identity.isNFL ? "ENTER SUNDAY SIMULATION" : "ENTER FOUNDRY SIMULATION", systemImage: "rectangle.3.group.fill").font(.headline.weight(.black)).frame(maxWidth: .infinity).padding(15).foregroundStyle(identity.isNFL ? .white : .black).background(identity.isNFL ? Color.blue : Color.yellow, in: RoundedRectangle(cornerRadius: identity.isNFL ? 6 : 12))
             }.buttonStyle(.plain)
             HStack {
                 Image(systemName: value.phase == "postseason" ? "trophy.fill" : "arrow.right.circle.fill").foregroundStyle(identity.isNFL ? .red : .orange)
@@ -3943,7 +4001,7 @@ struct CommissionerCardBuilderView: View {
             Section { Button("BACK") { step = 1 } }
             }
             if step == 3 { Section("Automatic weekly prop") {
-                Label("NO HUMAN SCORING REQUIRED", systemImage: "checkmark.seal.fill")
+                Label("AUTOMATED SCORING READY", systemImage: "checkmark.seal.fill")
                     .font(.caption.weight(.black)).foregroundStyle(deskAccent)
                 Text("Every option below settles from official final scores and the spreads already locked on the card.")
                     .font(.caption).foregroundStyle(.secondary)

@@ -242,6 +242,17 @@ struct WarRoomTests {
         #expect(closestRival(for: player, in: [closeBehind, movedMaria, player])?.userId == movedMaria.userId)
     }
 
+    @Test func cardReminderScheduleUsesTwelveAndOneHourWarnings() throws {
+        let leagueId = try #require(UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE"))
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let lockAt = now.addingTimeInterval(24 * 60 * 60)
+        let reminders = CardReminderSchedule.pending(lockAt: lockAt, now: now, leagueId: leagueId, week: 4)
+        #expect(reminders.map(\.kind) == ["12h", "1h"])
+        #expect(reminders[0].fireAt == lockAt.addingTimeInterval(-12 * 60 * 60))
+        #expect(reminders[1].fireAt == lockAt.addingTimeInterval(-60 * 60))
+        #expect(CardReminderSchedule.pending(lockAt: now.addingTimeInterval(30 * 60), now: now, leagueId: leagueId, week: 4).isEmpty)
+    }
+
     private func standing(name: String, points: Int, id: Int) -> Standing {
         Standing(
             id: UUID(uuidString: String(format: "00000000-0000-0000-0000-%012d", id))!,

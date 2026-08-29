@@ -162,14 +162,14 @@ struct LeagueManagementView: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("ROOM CAPACITY").font(.caption2.weight(.black)).tracking(1.35).foregroundStyle(accent)
-                        Text("\(maxHumanMembers) HUMAN SEATS").font(.title3.weight(.black)).foregroundStyle(.white)
+                        Text("\(maxHumanMembers) PLAYER SEATS").font(.title3.weight(.black)).foregroundStyle(.white)
                     }
                     Spacer()
                     Image(systemName: "person.3.sequence.fill").font(.title2.weight(.black)).foregroundStyle(accent)
                 }
                 Stepper("SET MAXIMUM", value: $maxHumanMembers, in: max(2, standings.filter { !$0.isBot }.count)...100)
                     .font(.subheadline.weight(.black))
-                Text("The commissioner can change this during the season. You cannot lower it below the current human roster.")
+                Text("The commissioner can change this during the season. You cannot lower it below the current player count.")
                     .font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.55))
                 Button { Task { await saveCapacity() } } label: {
                     Label(savingCapacity ? "SAVING…" : "SAVE \(maxHumanMembers)-PLAYER CAP", systemImage: "checkmark.shield.fill")
@@ -348,7 +348,7 @@ struct LeagueManagementView: View {
             let result = try await SupabaseAPI.setLeagueCapacity(token: token, leagueId: membership.leagueId, maxHumanMembers: maxHumanMembers)
             maxHumanMembers = result.maxHumanMembers
             savedMaxHumanMembers = result.maxHumanMembers
-            capacitySummary = "ROOM CAP SAVED · \(result.humanCount)/\(result.maxHumanMembers) HUMAN SEATS FILLED"
+            capacitySummary = "ROOM CAP SAVED · \(result.humanCount)/\(result.maxHumanMembers) PLAYER SEATS FILLED"
         } catch { self.error = error.localizedDescription }
     }
 }
