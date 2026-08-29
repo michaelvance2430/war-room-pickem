@@ -842,7 +842,11 @@ enum SupabaseAPI {
 
     static func sendPasswordReset(email: String) async throws {
         var components = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "auth/v1/recover"), resolvingAgainstBaseURL: false)!
-        components.queryItems = [URLQueryItem(name: "redirect_to", value: "https://app.war-room-picks.com/reset-password")]
+        // Keep password recovery in the browser. The app.war-room-picks.com
+        // host is a Universal Link, so iOS opens the native app before the web
+        // reset page can exchange the recovery token. The native login screen
+        // cannot complete that exchange and strands the player back at login.
+        components.queryItems = [URLQueryItem(name: "redirect_to", value: "https://www.war-room-picks.com/reset-password")]
         var request = URLRequest(url: components.url!)
         request.httpMethod = "POST"
         request.setValue(SupabaseConfiguration.publishableKey, forHTTPHeaderField: "apikey")
