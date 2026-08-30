@@ -855,7 +855,9 @@ export const PROP_PRESETS: PropPreset[] = [
 export const CUSTOM_PROP_ID = "custom";
 
 export function presetsForSport(sportId?: string | null): PropPreset[] {
-  return PROP_PRESETS.filter((p) => presetFitsSport(p, sportId));
+  return PROP_PRESETS.filter(
+    (p) => p.settle === "auto" && presetFitsSport(p, sportId)
+  );
 }
 
 export function presetsForCategory(
@@ -863,7 +865,10 @@ export function presetsForCategory(
   sportId?: string | null
 ): PropPreset[] {
   return PROP_PRESETS.filter(
-    (p) => p.category === cat && presetFitsSport(p, sportId)
+    (p) =>
+      p.settle === "auto" &&
+      p.category === cat &&
+      presetFitsSport(p, sportId)
   );
 }
 

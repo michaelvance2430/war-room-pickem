@@ -302,6 +302,8 @@ struct ContentView: View {
             showingPushAnnouncements = true
         } else if destination == "picks" {
             openTab(1)
+        } else if destination == "results" {
+            openTab(0)
         }
     }
 }
@@ -3475,18 +3477,18 @@ struct CommissionerScoreWeekView: View {
                 await syncOfficialScores(silent: true)
             }
         }
-        .confirmationDialog(isFoundry ? "Process Week \(week) in the Foundry?" : "Certify Week \(week) results?", isPresented: $confirming, titleVisibility: .visible) {
+        .confirmationDialog(isFoundry ? "Process Week \(week) in the Foundry?" : "Override Week \(week) automatic results?", isPresented: $confirming, titleVisibility: .visible) {
             Button(isFoundry ? "Score \(submittedCount) simulation cards" : "Score \(submittedCount) locked cards", role: .destructive) { Task { await process() } }
             Button("Cancel", role: .cancel) {}
-        } message: { Text(isFoundry ? "This writes simulation results and rebuilds Foundry standings." : "This writes official results for the entire room. Review every cover and the prop before certifying.") }
+        } message: { Text(isFoundry ? "This writes simulation results and rebuilds Foundry standings." : "Use this only to correct an API failure or an official scoring correction. It rewrites results for the entire room.") }
     }
 
     private var preflight: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("PRE-FLIGHT").font(.caption.weight(.black)).tracking(1.2)
+            Text(isFoundry ? "PRE-FLIGHT" : "AUTOMATIC RESULTS STATUS").font(.caption.weight(.black)).tracking(1.2)
             preflightRow("Published card", good: card != nil)
             preflightRow("Locked cards · \(submittedCount)/\(playerCount)", good: submittedCount > 0)
-            preflightRow(isFoundry ? "Foundry simulation isolated" : "Commissioner scoring authority", good: true)
+            preflightRow(isFoundry ? "Foundry simulation isolated" : "Official finals score automatically", good: true)
             preflightRow("Every cover + prop entered", good: complete)
         }.commandPanel(accent: accent, cornerRadius: identity.isNFL ? 6 : 15)
     }
@@ -3556,7 +3558,7 @@ struct CommissionerScoreWeekView: View {
 
     @ViewBuilder private var fireControl: some View {
         Button { confirming = true } label: {
-            Label(processing ? "PROCESSING…" : (isFoundry ? "PROCESS FOUNDRY WEEK" : "CERTIFY OFFICIAL RESULTS"), systemImage: "bolt.shield.fill")
+            Label(processing ? "PROCESSING…" : (isFoundry ? "PROCESS FOUNDRY WEEK" : "EMERGENCY SCORE CORRECTION"), systemImage: "bolt.shield.fill")
                 .font(.headline.weight(.black)).frame(maxWidth: .infinity).padding(16)
                 .background(complete && submittedCount > 0 ? (identity.isNFL ? Color.blue : Color.green) : Color.gray, in: RoundedRectangle(cornerRadius: identity.isNFL ? 6 : 13))
                 .foregroundStyle(identity.isNFL ? .white : .black)
@@ -3569,7 +3571,7 @@ struct CommissionerScoreWeekView: View {
                 Image(systemName: scoreSyncing ? "arrow.triangle.2.circlepath" : "dot.radiowaves.left.and.right")
                 VStack(alignment: .leading, spacing: 3) {
                     Text(scoreSyncing ? "SYNCING OFFICIAL SCORES…" : "SYNC LIVE / FINAL SCORES").font(.headline.weight(.black))
-                    Text(scoreSyncNotice ?? "FINALS AUTO-FILL ATS COVERS · REVIEW BEFORE CERTIFYING")
+                    Text(scoreSyncNotice ?? "FINALS AUTO-SCORE PICKS · STANDINGS · DISPATCH")
                         .font(.system(size: 8, weight: .black)).tracking(0.55)
                 }
                 Spacer()
@@ -4486,7 +4488,6 @@ private let automaticFootballProps: [AutomaticPropPreset] = [
     .init(id: "cfbhomedogs", label: "2+ home underdogs win", question: "Will at least 2 home underdogs win straight up?", yes: "Yes — 2+ home dogs win", no: "No — 1 or fewer", sport: "cfb"),
     .init(id: "hateweekdogs", label: "Rivalry dogs bite twice", question: "Will at least 2 rivalry underdogs win outright during Hate Week?", yes: "Yes — 2+ grudges erupt", no: "No — chalk survives", sport: "cfb", week: 13),
     .init(id: "hateweekknife", label: "One grudge decided by 3", question: "Will a designated rivalry game be decided by 3 points or fewer?", yes: "Yes — family therapy required", no: "No — somebody runs away", sport: "cfb", week: 13),
-    .init(id: "hateweekovertime", label: "Rivalry overtime chaos", question: "Will any designated rivalry game go to overtime?", yes: "Yes — hatred needs extras", no: "No — regulation settles it", sport: "cfb", week: 13),
     .init(id: "nfl35", label: "Any game totals 35 or fewer", question: "Will any game finish with a combined score of 35 or fewer?", yes: "Yes — a total is 35 or fewer", no: "No — every total is 36+", sport: "nfl"),
     .init(id: "nfl13", label: "Any team scores 13 or fewer", question: "Will any team finish with 13 or fewer points?", yes: "Yes — a team scores 13 or fewer", no: "No — every team scores 14+", sport: "nfl"),
     .init(id: "nfl51", label: "Any game totals 51+", question: "Will any game finish with a combined score of 51 or more?", yes: "Yes — a total reaches 51+", no: "No — every total is 50 or less", sport: "nfl"),

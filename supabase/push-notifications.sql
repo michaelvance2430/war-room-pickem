@@ -35,10 +35,10 @@ create table if not exists private.push_notification_outbox (
   id uuid primary key default gen_random_uuid(),
   event_key text not null unique,
   league_id uuid not null references public.leagues(id) on delete cascade,
-  kind text not null check (kind in ('card_built', 'card_lock_12h', 'card_lock_1h', 'announcement')),
+  kind text not null check (kind in ('card_built', 'card_lock_12h', 'card_lock_1h', 'announcement', 'results_in')),
   title text not null,
   body text not null,
-  destination text not null check (destination in ('picks', 'announcements')),
+  destination text not null check (destination in ('picks', 'announcements', 'results')),
   week_number integer,
   deliver_at timestamptz not null,
   status text not null default 'pending' check (status in ('pending', 'processing', 'sent', 'failed')),
@@ -118,6 +118,37 @@ drop trigger if exists queue_announcement_notification on public.announcements;
 create trigger queue_announcement_notification
 after insert on public.announcements
 for each row execute function private.queue_announcement_notification();
+
+create or replace function private.queue_results_notification()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare v_league_name text;
+begin
+  select l.name into v_league_name from public.leagues l where l.id = new.league_id;
+  insert into private.push_notification_outbox(
+    event_key, league_id, kind, title, body, destination, week_number, deliver_at
+  ) values (
+    'results-in:' || new.league_id || ':' || new.week_number,
+    new.league_id,
+    'results_in',
+    'Week ' || new.week_number || ' results are in',
+    v_league_name || ' has been scored. Open your Scorecard, updated standings, and the new Dispatch.',
+    'results',
+    new.week_number,
+    clock_timestamp()
+  )
+  on conflict (event_key) do nothing;
+  return new;
+end;
+$$;
+
+drop trigger if exists queue_results_notification on public.week_results;
+create trigger queue_results_notification
+after insert on public.week_results
+for each row execute function private.queue_results_notification();
 
 create or replace function public.claim_push_notification_batch(p_limit integer default 20)
 returns table (

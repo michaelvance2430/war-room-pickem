@@ -24,11 +24,15 @@ declare
   v_positive boolean;
   v_streak integer;
   v_details jsonb;
+  v_service boolean := coalesce(
+    current_setting('request.jwt.claims', true)::jsonb ->> 'role',
+    ''
+  ) = 'service_role';
 begin
-  if auth.uid() is null then
+  if auth.uid() is null and not v_service then
     raise exception 'Authentication required';
   end if;
-  if not public.is_league_ops(p_league_id) then
+  if not v_service and not public.is_league_ops(p_league_id) then
     raise exception 'Commissioner or deputy only';
   end if;
   if p_week_number < 0 then
@@ -309,3 +313,4 @@ $$;
 revoke all on function public.score_league_week_atomic(uuid, integer, jsonb, text) from public;
 revoke all on function public.score_league_week_atomic(uuid, integer, jsonb, text) from anon;
 grant execute on function public.score_league_week_atomic(uuid, integer, jsonb, text) to authenticated;
+grant execute on function public.score_league_week_atomic(uuid, integer, jsonb, text) to service_role;

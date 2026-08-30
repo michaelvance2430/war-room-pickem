@@ -7,7 +7,7 @@ type PushJob = {
   kind: string;
   title: string;
   body: string;
-  destination: "picks" | "announcements";
+  destination: "picks" | "announcements" | "results";
   week_number: number | null;
 };
 
