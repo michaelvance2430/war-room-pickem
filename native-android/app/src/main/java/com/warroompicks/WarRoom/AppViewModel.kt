@@ -80,6 +80,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         _state.value = _state.value.copy(busy = false, notice = "Password reset sent. Check your email.")
     }
 
+    fun updateRecoveredPassword(token: String, password: String, completed: () -> Unit) = launchBusy {
+        require(password.length >= 8) { "Use at least 8 characters for the new password." }
+        api.updateRecoveredPassword(token, password)
+        completed()
+        _state.value = AppState(restoring = false, notice = "Password updated. Sign in with the new password.")
+    }
+
     fun signOut() {
         secureStore.clear()
         _state.value = AppState(restoring = false)

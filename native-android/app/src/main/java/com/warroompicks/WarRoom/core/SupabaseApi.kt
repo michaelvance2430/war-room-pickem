@@ -66,6 +66,10 @@ class SupabaseApi {
         )
     }
 
+    suspend fun updateRecoveredPassword(recoveryToken: String, password: String) {
+        raw("/auth/v1/user", "PUT", recoveryToken, JSONObject().put("password", password), null)
+    }
+
     suspend fun refresh(refreshToken: String): UserSession = session(
         request(
             "/auth/v1/token?grant_type=refresh_token",

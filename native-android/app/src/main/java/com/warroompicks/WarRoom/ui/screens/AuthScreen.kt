@@ -53,3 +53,26 @@ fun AuthScreen(
         if (!create) TextButton(onClick = { recover(email) }, enabled = email.isNotBlank(), modifier = Modifier.fillMaxWidth()) { Text("FORGOT PASSWORD?") }
     }
 }
+
+@Composable
+fun ResetPasswordScreen(busy: Boolean, error: String?, update: (String) -> Unit) {
+    var password by remember { mutableStateOf("") }
+    var confirm by remember { mutableStateOf("") }
+    Column(
+        Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF06371D), WarBlack, Color.Black)))
+            .navigationBarsPadding().padding(24.dp), verticalArrangement = Arrangement.Center,
+    ) {
+        Text("ACCOUNT RECOVERY", color = WarGreen, fontWeight = FontWeight.Black, letterSpacing = 3.sp)
+        Text("SET A NEW PASSWORD", color = Color.White, fontSize = 36.sp, lineHeight = 39.sp, fontWeight = FontWeight.Black)
+        Text("The recovery link is verified. Choose a new War Room password.", color = Color.White.copy(alpha = .62f))
+        Spacer(Modifier.height(24.dp))
+        OutlinedTextField(password, { password = it }, label = { Text("NEW PASSWORD") }, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(confirm, { confirm = it }, label = { Text("CONFIRM PASSWORD") }, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+        if (confirm.isNotEmpty() && password != confirm) Text("Passwords do not match.", color = MaterialTheme.colorScheme.error)
+        error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        Button(
+            onClick = { update(password) }, enabled = !busy && password.length >= 8 && password == confirm,
+            modifier = Modifier.fillMaxWidth().height(54.dp),
+        ) { if (busy) CircularProgressIndicator(Modifier.size(22.dp)) else Text("UPDATE PASSWORD", fontWeight = FontWeight.Black) }
+    }
+}

@@ -24,7 +24,7 @@ private enum class AppTab(val label: String, val icon: ImageVector) {
 }
 
 @Composable
-fun WarRoomApp(viewModel: AppViewModel, notificationDestination: String? = null) {
+fun WarRoomApp(viewModel: AppViewModel, notificationDestination: String? = null, recoveryToken: String? = null, clearRecovery: () -> Unit = {}) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     var tab by remember { mutableStateOf(AppTab.Home) }
     LaunchedEffect(notificationDestination) {
@@ -36,6 +36,7 @@ fun WarRoomApp(viewModel: AppViewModel, notificationDestination: String? = null)
     }
 
     when {
+        recoveryToken != null -> ResetPasswordScreen(state.busy, state.error) { password -> viewModel.updateRecoveredPassword(recoveryToken, password, clearRecovery) }
         state.restoring -> LoadingScreen()
         state.session == null -> AuthScreen(state.busy, state.error, state.notice, viewModel::signIn, viewModel::signUp, viewModel::recover)
         state.league == null -> NoLeagueScreen(state.busy, viewModel::joinLeague, viewModel::createLeague, viewModel::signOut)
