@@ -11,6 +11,34 @@ import Foundation
 
 struct WarRoomTests {
 
+    @Test func newestUnseenDispatchOpensOnlyOncePerMemberAndLeague() throws {
+        let userId = UUID(uuidString: "10000000-0000-0000-0000-000000000001")!
+        let leagueId = UUID(uuidString: "20000000-0000-0000-0000-000000000001")!
+        let suite = "warroom-tests-dispatch-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let data = Data("""
+        [{"id":"30000000-0000-0000-0000-000000000002","week_number":1,"week_label":"Week 1","volume_label":"Vol. 1","payload":{},"created_at":"2026-09-07T05:00:00Z"},
+         {"id":"30000000-0000-0000-0000-000000000001","week_number":0,"week_label":"Week 0","volume_label":"Vol. 0","payload":{},"created_at":"2026-08-30T05:00:00Z"}]
+        """.utf8)
+        let editions = try JSONDecoder().decode([GazetteEditionRow].self, from: data)
+
+        let first = try #require(DispatchPresentationPolicy.newestUnread(
+            editions: editions,
+            userId: userId,
+            leagueId: leagueId,
+            defaults: defaults
+        ))
+        #expect(first.weekNumber == 1)
+        DispatchPresentationPolicy.markSeen(first, userId: userId, leagueId: leagueId, defaults: defaults)
+        #expect(DispatchPresentationPolicy.newestUnread(
+            editions: editions,
+            userId: userId,
+            leagueId: leagueId,
+            defaults: defaults
+        ) == nil)
+    }
+
     @Test func careerTrophiesCollapseDuplicateHardwareForTheSameSeason() {
         let ben = UUID(uuidString: "fdddf273-2430-42db-9127-b8fa7efc1572")!
         let league = UUID(uuidString: "20000000-0000-0000-0000-000000000001")!

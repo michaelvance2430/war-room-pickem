@@ -1,6 +1,31 @@
 import SwiftUI
 import UIKit
 
+enum DispatchPresentationPolicy {
+    static func seenKey(userId: UUID, leagueId: UUID, editionId: UUID) -> String {
+        "warroom.dispatch.seen.\(userId.uuidString).\(leagueId.uuidString).\(editionId.uuidString)"
+    }
+
+    static func newestUnread(
+        editions: [GazetteEditionRow],
+        userId: UUID,
+        leagueId: UUID,
+        defaults: UserDefaults = .standard
+    ) -> GazetteEditionRow? {
+        guard let newest = editions.first else { return nil }
+        return defaults.bool(forKey: seenKey(userId: userId, leagueId: leagueId, editionId: newest.id)) ? nil : newest
+    }
+
+    static func markSeen(
+        _ edition: GazetteEditionRow,
+        userId: UUID,
+        leagueId: UUID,
+        defaults: UserDefaults = .standard
+    ) {
+        defaults.set(true, forKey: seenKey(userId: userId, leagueId: leagueId, editionId: edition.id))
+    }
+}
+
 struct GazetteView: View {
     @EnvironmentObject private var auth: AuthStore
     let membership: LeagueMembership

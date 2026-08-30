@@ -2194,6 +2194,7 @@ struct HomeView: View {
     @State private var regularScorecards: [RegularSeasonScorecard] = []
     @State private var showingRegularScorecard = false
     @State private var regularScorecardToShowID: String?
+    @State private var showingNewDispatch = false
     @State private var loading = true
     @State private var loadError: String?
     @State private var clock = Date()
@@ -2639,6 +2640,11 @@ struct HomeView: View {
                 RegularSeasonScorecardView(scorecard: scorecard, sportId: membership?.leagues.sportId ?? "cfb")
             }
         }
+        .navigationDestination(isPresented: $showingNewDispatch) {
+            if let membership {
+                GazetteView(membership: membership)
+            }
+        }
         .task(id: leagueOverride?.leagueId ?? auth.selectedLeagueId) { await load() }
         .task(id: membership?.leagueId) {
             guard membership != nil else { return }
@@ -2693,6 +2699,7 @@ struct HomeView: View {
             async let loadedLocker = SupabaseAPI.lockerMessages(token: token, leagueId: active.leagueId)
             async let loadedSubmissions = SupabaseAPI.weekSubmittedUserIds(token: token, leagueId: active.leagueId, weekNumber: active.leagues.currentWeek)
             async let loadedSportPool = SupabaseAPI.sportPoolPoll(token: token, leagueId: active.leagueId)
+            async let loadedDispatches = SupabaseAPI.gazetteEditions(token: token, leagueId: active.leagueId)
             card = try await loadedCard
             homeScores = [:]
             homeScoreStatus = nil
@@ -2703,6 +2710,7 @@ struct HomeView: View {
             lockerMessages = try await loadedLocker
             submittedUserIds = try await loadedSubmissions
             sportPoolPoll = try? await loadedSportPool
+            let dispatches = (try? await loadedDispatches) ?? []
             regularScorecards = (try? await SupabaseAPI.regularSeasonScorecards(token: token, leagueId: active.leagueId, userId: user.id)) ?? []
             if active.leagues.sportId.lowercased() == "cfb" {
                 let scorecards = try? await SupabaseAPI.postseasonScorecards(
@@ -2734,6 +2742,18 @@ struct HomeView: View {
                 card: card,
                 announcements: announcements
             )
+            if let edition = DispatchPresentationPolicy.newestUnread(
+                editions: dispatches,
+                userId: user.id,
+                leagueId: active.leagueId
+            ) {
+                DispatchPresentationPolicy.markSeen(
+                    edition,
+                    userId: user.id,
+                    leagueId: active.leagueId
+                )
+                showingNewDispatch = true
+            }
             loadError = nil
         } catch {
             loadError = error.localizedDescription
