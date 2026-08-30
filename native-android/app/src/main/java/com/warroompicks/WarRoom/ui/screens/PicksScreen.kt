@@ -24,8 +24,22 @@ import com.warroompicks.WarRoom.ui.theme.*
 import java.util.UUID
 
 @Composable
-fun PicksScreen(state: AppState, lockPicks: (List<GameSelection>, UUID?, String?) -> Unit) {
+fun PicksScreen(
+    state: AppState,
+    lockPicks: (List<GameSelection>, UUID?, String?) -> Unit,
+    lockNflPostseason: (Map<String, String>, Boolean) -> Unit,
+    lockCfbBowl: (Map<String, String>, Map<String, Int>, Boolean) -> Unit,
+    lockCfbPlayoff: (Map<String, String>) -> Unit,
+) {
     val league = state.league ?: return
+    if (league.sport == Sport.NFL && league.currentWeek >= 19) {
+        NflPostseasonScreen(state, lockNflPostseason)
+        return
+    }
+    if (league.sport == Sport.CFB && league.currentWeek >= league.regularSeasonWeeks + 2) {
+        CfbPostseasonScreen(state, lockCfbBowl, lockCfbPlayoff)
+        return
+    }
     val card = state.card
     val accent = if (league.sport == Sport.NFL) NflCyan else WarGreen
     var sides by remember(card?.id) { mutableStateOf<Map<UUID, String>>(emptyMap()) }

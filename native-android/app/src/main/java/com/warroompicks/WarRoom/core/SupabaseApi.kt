@@ -228,6 +228,85 @@ class SupabaseApi {
         )
     }
 
+    suspend fun nflPostseasonSlate(token: String, leagueId: UUID, seasonKey: Int): NflPostseasonSlate? {
+        val rows = requestArray("/rest/v1/nfl_postseason_slates?select=league_id,season_key,teams,published_at&league_id=eq.$leagueId&season_key=eq.$seasonKey&limit=1", token)
+        val row = rows.optJSONObject(0) ?: return null
+        return NflPostseasonSlate(
+            row.optInt("season_key"),
+            row.arrayOrEmpty("teams").objects().map { NflPostseasonTeam(it.optString("id"), it.optString("name"), it.optString("conference"), it.optInt("seed")) },
+        )
+    }
+
+    suspend fun nflPostseasonEntry(token: String, leagueId: UUID, userId: UUID, seasonKey: Int): NflPostseasonEntry? {
+        val select = "picks,used_jdam,locked_at,score"
+        val rows = requestArray("/rest/v1/nfl_postseason_entries?select=$select&league_id=eq.$leagueId&user_id=eq.$userId&season_key=eq.$seasonKey&limit=1", token)
+        val row = rows.optJSONObject(0) ?: return null
+        return NflPostseasonEntry(row.objectStringMap("picks"), row.optBoolean("used_jdam"), instant(row.stringOrNull("locked_at")), if (row.isNull("score")) null else row.optInt("score"))
+    }
+
+    suspend fun nflPostseasonResults(token: String, leagueId: UUID, seasonKey: Int): Map<String, String> {
+        val rows = requestArray("/rest/v1/nfl_postseason_results?select=winners&league_id=eq.$leagueId&season_key=eq.$seasonKey&limit=1", token)
+        return rows.optJSONObject(0)?.objectStringMap("winners").orEmpty()
+    }
+
+    suspend fun nflPostseasonScorecard(token: String, leagueId: UUID, userId: UUID, seasonKey: Int): NflPostseasonScorecard? {
+        val select = "wild_card_points,divisional_points,conference_points,super_bowl_points,total_points,used_jdam"
+        val rows = requestArray("/rest/v1/nfl_postseason_scorecards?select=$select&league_id=eq.$leagueId&user_id=eq.$userId&season_key=eq.$seasonKey&limit=1", token)
+        val row = rows.optJSONObject(0) ?: return null
+        return NflPostseasonScorecard(row.optInt("wild_card_points"), row.optInt("divisional_points"), row.optInt("conference_points"), row.optInt("super_bowl_points"), row.optInt("total_points"), row.optBoolean("used_jdam"))
+    }
+
+    suspend fun lockNflPostseasonBracket(token: String, leagueId: UUID, seasonKey: Int, picks: Map<String, String>, usedJdam: Boolean): NflPostseasonEntry {
+        val row = request(
+            "/rest/v1/rpc/save_nfl_postseason_bracket", "POST", token,
+            JSONObject().put("p_league_id", leagueId.toString()).put("p_season_key", seasonKey).put("p_picks", JSONObject(picks)).put("p_used_jdam", usedJdam),
+        )
+        return NflPostseasonEntry(row.objectStringMap("picks"), row.optBoolean("used_jdam"), instant(row.stringOrNull("locked_at")), if (row.isNull("score")) null else row.optInt("score"))
+    }
+
+    suspend fun cfbPostseasonSlate(token: String, leagueId: UUID, seasonKey: Int): CfbPostseasonSlate? {
+        val rows = requestArray("/rest/v1/cfb_postseason_slates?select=league_id,season_key,bowl_games,cfp_seeds,published_at&league_id=eq.$leagueId&season_key=eq.$seasonKey&limit=1", token)
+        val row = rows.optJSONObject(0) ?: return null
+        val bowls = row.arrayOrEmpty("bowl_games").objects().map { game ->
+            CfbBowlGame(game.optString("id"), game.optString("name"), if (game.optString("tier") == "sicko") CfbBowlTier.SICKO else CfbBowlTier.MARQUEE, game.optInt("rank"), game.optString("away"), game.optString("home"))
+        }
+        val seeds = row.arrayOrEmpty("cfp_seeds").let { array -> (0 until array.length()).map { array.optString(it) } }
+        return CfbPostseasonSlate(row.optInt("season_key"), bowls, seeds)
+    }
+
+    suspend fun cfbPostseasonEntry(token: String, leagueId: UUID, userId: UUID, seasonKey: Int): CfbPostseasonEntry? {
+        val select = "bowl_picks,bowl_allocations,dead_hand,bowl_locked_at,cfp_picks,cfp_locked_at,bowl_score,cfp_score"
+        val rows = requestArray("/rest/v1/cfb_postseason_entries?select=$select&league_id=eq.$leagueId&user_id=eq.$userId&season_key=eq.$seasonKey&limit=1", token)
+        val row = rows.optJSONObject(0) ?: return null
+        return CfbPostseasonEntry(
+            row.objectStringMap("bowl_picks"), row.objectIntMap("bowl_allocations"), row.optBoolean("dead_hand"), instant(row.stringOrNull("bowl_locked_at")),
+            row.objectStringMap("cfp_picks"), instant(row.stringOrNull("cfp_locked_at")),
+            if (row.isNull("bowl_score")) null else row.optInt("bowl_score"), if (row.isNull("cfp_score")) null else row.optInt("cfp_score"),
+        )
+    }
+
+    suspend fun cfbPostseasonResults(token: String, leagueId: UUID, seasonKey: Int): CfbPostseasonResults {
+        val rows = requestArray("/rest/v1/cfb_postseason_results?select=bowl_results,cfp_results&league_id=eq.$leagueId&season_key=eq.$seasonKey&limit=1", token)
+        val row = rows.optJSONObject(0) ?: return CfbPostseasonResults(emptyMap(), emptyMap())
+        return CfbPostseasonResults(row.objectStringMap("bowl_results"), row.objectStringMap("cfp_results"))
+    }
+
+    suspend fun lockCfbBowlBoard(token: String, leagueId: UUID, seasonKey: Int, picks: Map<String, String>, allocations: Map<String, Int>, deadHand: Boolean): CfbPostseasonEntry {
+        val row = request(
+            "/rest/v1/rpc/save_cfb_bowl_board", "POST", token,
+            JSONObject().put("p_league_id", leagueId.toString()).put("p_season_key", seasonKey).put("p_picks", JSONObject(picks)).put("p_allocations", JSONObject(allocations)).put("p_dead_hand", deadHand),
+        )
+        return row.toCfbEntry()
+    }
+
+    suspend fun lockCfbPlayoffBracket(token: String, leagueId: UUID, seasonKey: Int, picks: Map<String, String>): CfbPostseasonEntry {
+        val row = request(
+            "/rest/v1/rpc/save_cfb_playoff_bracket", "POST", token,
+            JSONObject().put("p_league_id", leagueId.toString()).put("p_season_key", seasonKey).put("p_picks", JSONObject(picks)),
+        )
+        return row.toCfbEntry()
+    }
+
     suspend fun lockerMessages(token: String, leagueId: UUID): List<LockerMessage> {
         val select = "id,user_id,body,created_at,profiles(display_name,avatar_url)"
         val rows = requestArray("/rest/v1/locker_messages?select=${encode(select)}&league_id=eq.$leagueId&order=created_at.asc&limit=100", token)
@@ -346,4 +425,20 @@ class SupabaseApi {
     private fun encode(value: String) = URLEncoder.encode(value, StandardCharsets.UTF_8.toString())
     private fun instant(value: String?) = value?.let { runCatching { Instant.parse(it) }.getOrNull() }
     private fun normalize(value: String) = value.lowercase().replace(Regex("[^a-z0-9]"), "")
+
+    private fun JSONObject.objectStringMap(key: String): Map<String, String> {
+        val value = optJSONObject(key) ?: return emptyMap()
+        return value.keys().asSequence().associateWith { value.optString(it) }
+    }
+
+    private fun JSONObject.objectIntMap(key: String): Map<String, Int> {
+        val value = optJSONObject(key) ?: return emptyMap()
+        return value.keys().asSequence().associateWith { value.optInt(it) }
+    }
+
+    private fun JSONObject.toCfbEntry() = CfbPostseasonEntry(
+        objectStringMap("bowl_picks"), objectIntMap("bowl_allocations"), optBoolean("dead_hand"), instant(stringOrNull("bowl_locked_at")),
+        objectStringMap("cfp_picks"), instant(stringOrNull("cfp_locked_at")),
+        if (isNull("bowl_score")) null else optInt("bowl_score"), if (isNull("cfp_score")) null else optInt("cfp_score"),
+    )
 }

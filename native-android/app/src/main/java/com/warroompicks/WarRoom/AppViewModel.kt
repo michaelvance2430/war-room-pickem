@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.time.Instant
+import java.time.LocalDate
 import java.util.UUID
 import com.google.firebase.FirebaseApp
 import com.google.firebase.messaging.FirebaseMessaging
@@ -31,6 +32,13 @@ data class AppState(
     val availableOdds: List<OddsGame> = emptyList(),
     val history: List<HistoryWeek> = emptyList(),
     val trophies: List<Trophy> = emptyList(),
+    val nflPostseasonSlate: NflPostseasonSlate? = null,
+    val nflPostseasonEntry: NflPostseasonEntry? = null,
+    val nflPostseasonResults: Map<String, String> = emptyMap(),
+    val nflPostseasonScorecard: NflPostseasonScorecard? = null,
+    val cfbPostseasonSlate: CfbPostseasonSlate? = null,
+    val cfbPostseasonEntry: CfbPostseasonEntry? = null,
+    val cfbPostseasonResults: CfbPostseasonResults = CfbPostseasonResults(emptyMap(), emptyMap()),
     val favoriteTeam: String? = null,
     val crystalBallTeam: String? = null,
     val error: String? = null,
@@ -42,6 +50,9 @@ private data class LeagueSnapshot(
     val favorite: String?, val crystal: String?, val standings: List<Standing>,
     val messages: List<LockerMessage>, val announcements: List<Announcement>,
     val history: List<HistoryWeek>, val trophies: List<Trophy>,
+    val nflSlate: NflPostseasonSlate?, val nflEntry: NflPostseasonEntry?,
+    val nflResults: Map<String, String>, val nflScorecard: NflPostseasonScorecard?,
+    val cfbSlate: CfbPostseasonSlate?, val cfbEntry: CfbPostseasonEntry?, val cfbResults: CfbPostseasonResults,
 )
 
 class AppViewModel(application: Application) : AndroidViewModel(application) {
@@ -117,6 +128,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val league = state.league ?: return@launch
         runCatching {
             val card = api.weekCard(session.accessToken, league)
+            val nflSeasonKey = nflSeasonKey()
+            val nflPostseason = league.sport == Sport.NFL && league.currentWeek >= 19
+            val cfbPostseason = league.sport == Sport.CFB && league.currentWeek >= league.regularSeasonWeeks + 2
+            val cfbSeasonKey = LocalDate.now().year
             LeagueSnapshot(
                 card = card,
                 games = runCatching { api.liveScores(session.accessToken, league, card?.second.orEmpty()) }.getOrDefault(card?.second.orEmpty()),
@@ -128,6 +143,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 announcements = runCatching { api.announcements(session.accessToken, league.id) }.getOrDefault(state.announcements),
                 history = runCatching { api.history(session.accessToken, league.id, session.userId) }.getOrDefault(state.history),
                 trophies = runCatching { api.trophies(session.accessToken, session.userId) }.getOrDefault(state.trophies),
+                nflSlate = if (nflPostseason) runCatching { api.nflPostseasonSlate(session.accessToken, league.id, nflSeasonKey) }.getOrNull() else null,
+                nflEntry = if (nflPostseason) runCatching { api.nflPostseasonEntry(session.accessToken, league.id, session.userId, nflSeasonKey) }.getOrNull() else null,
+                nflResults = if (nflPostseason) runCatching { api.nflPostseasonResults(session.accessToken, league.id, nflSeasonKey) }.getOrDefault(emptyMap()) else emptyMap(),
+                nflScorecard = if (nflPostseason) runCatching { api.nflPostseasonScorecard(session.accessToken, league.id, session.userId, nflSeasonKey) }.getOrNull() else null,
+                cfbSlate = if (cfbPostseason) runCatching { api.cfbPostseasonSlate(session.accessToken, league.id, cfbSeasonKey) }.getOrNull() else null,
+                cfbEntry = if (cfbPostseason) runCatching { api.cfbPostseasonEntry(session.accessToken, league.id, session.userId, cfbSeasonKey) }.getOrNull() else null,
+                cfbResults = if (cfbPostseason) runCatching { api.cfbPostseasonResults(session.accessToken, league.id, cfbSeasonKey) }.getOrDefault(CfbPostseasonResults(emptyMap(), emptyMap())) else CfbPostseasonResults(emptyMap(), emptyMap()),
             )
         }.onSuccess { loaded ->
             _state.value = _state.value.copy(
@@ -136,6 +158,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 standings = loaded.standings, messages = loaded.messages,
                 announcements = loaded.announcements, error = null,
                 history = loaded.history, trophies = loaded.trophies,
+                nflPostseasonSlate = loaded.nflSlate, nflPostseasonEntry = loaded.nflEntry,
+                nflPostseasonResults = loaded.nflResults, nflPostseasonScorecard = loaded.nflScorecard,
+                cfbPostseasonSlate = loaded.cfbSlate, cfbPostseasonEntry = loaded.cfbEntry, cfbPostseasonResults = loaded.cfbResults,
             )
         }.onFailure(::showError)
     }
@@ -190,6 +215,36 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         api.updateDisplayName(session.accessToken, session.userId, name)
         val standings = _state.value.standings.map { if (it.userId == session.userId) it.copy(displayName = name.trim()) else it }
         _state.value = _state.value.copy(busy = false, standings = standings, notice = "Personnel file updated.")
+    }
+
+    fun lockNflPostseason(picks: Map<String, String>, usedJdam: Boolean = false) = launchBusy {
+        val session = _state.value.session ?: return@launchBusy
+        val league = _state.value.league ?: return@launchBusy
+        require(league.sport == Sport.NFL && league.currentWeek >= 19) { "NFL postseason command is not open." }
+        require(_state.value.nflPostseasonEntry?.lockedAt == null) { "This bracket is already sealed." }
+        require(NflBracketEngine.requiredKeys.all { picks[it] != null }) { "Complete all 13 playoff decisions before sealing the bracket." }
+        val saved = api.lockNflPostseasonBracket(session.accessToken, league.id, nflSeasonKey(), picks, usedJdam)
+        _state.value = _state.value.copy(busy = false, nflPostseasonEntry = saved, notice = if (usedJdam) "JDAM BRACKET SEALED" else "ALL 13 PICKS SEALED")
+    }
+
+    fun lockCfbBowlBoard(picks: Map<String, String>, allocations: Map<String, Int>, deadHand: Boolean) = launchBusy {
+        val session = _state.value.session ?: return@launchBusy
+        val league = _state.value.league ?: return@launchBusy
+        val slate = _state.value.cfbPostseasonSlate ?: error("The commissioner has not published the Bowl Mania field.")
+        require(_state.value.cfbPostseasonEntry?.bowlLockedAt == null) { "This Bowl Mania board is already sealed." }
+        require(picks.keys == slate.bowlGames.map { it.id }.toSet()) { "Pick all 25 bowl games." }
+        require(allocations.keys == picks.keys && allocations.values.all { it > 0 } && allocations.values.sum() == 100) { "Allocate all 100 confidence points across the 25 bowls." }
+        val saved = api.lockCfbBowlBoard(session.accessToken, league.id, LocalDate.now().year, picks, allocations, deadHand)
+        _state.value = _state.value.copy(busy = false, cfbPostseasonEntry = saved, notice = if (deadHand) "DEAD HAND BOWL BOARD SEALED" else "BOWL BOARD SEALED")
+    }
+
+    fun lockCfbPlayoff(picks: Map<String, String>) = launchBusy {
+        val session = _state.value.session ?: return@launchBusy
+        val league = _state.value.league ?: return@launchBusy
+        require(_state.value.cfbPostseasonEntry?.cfpLockedAt == null) { "This CFP bracket is already sealed." }
+        require(CfbBracketEngine.order.all { picks[it] != null }) { "Complete all 11 CFP decisions." }
+        val saved = api.lockCfbPlayoffBracket(session.accessToken, league.id, LocalDate.now().year, picks)
+        _state.value = _state.value.copy(busy = false, cfbPostseasonEntry = saved, notice = "CFP BRACKET SEALED")
     }
 
     fun postAnnouncement(title: String, body: String) = launchBusy {
@@ -269,4 +324,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private fun showError(error: Throwable) {
         _state.value = _state.value.copy(busy = false, error = error.message ?: "The War Room could not complete that command.")
     }
+
+    private fun nflSeasonKey(date: LocalDate = LocalDate.now()): Int = if (date.monthValue <= 3) date.year - 1 else date.year
 }

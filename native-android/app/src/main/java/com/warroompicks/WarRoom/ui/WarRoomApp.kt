@@ -70,7 +70,7 @@ fun WarRoomApp(viewModel: AppViewModel, notificationDestination: String? = null,
                 Box(Modifier.padding(padding)) {
                     when (tab) {
                         AppTab.Home -> HomeScreen(state, viewModel::selectLeague, viewModel::postAnnouncement, viewModel::pullOdds, viewModel::publishCard, viewModel::selectTrophy) { tab = AppTab.Picks }
-                        AppTab.Picks -> PicksScreen(state, viewModel::lockPicks)
+                        AppTab.Picks -> PicksScreen(state, viewModel::lockPicks, viewModel::lockNflPostseason, viewModel::lockCfbBowlBoard, viewModel::lockCfbPlayoff)
                         AppTab.Standings -> StandingsScreen(state)
                         AppTab.Locker -> LockerScreen(state, viewModel::postMessage)
                         AppTab.You -> YouScreen(state, viewModel::saveFavorite, viewModel::saveCrystalBall, viewModel::updateDisplayName, viewModel::signOut)
