@@ -20,12 +20,14 @@ import com.warroompicks.WarRoom.ui.components.WarHeader
 import com.warroompicks.WarRoom.ui.theme.*
 
 @Composable
-fun NflPostseasonScreen(state: AppState, lock: (Map<String, String>, Boolean) -> Unit) {
+fun NflPostseasonScreen(state: AppState, lock: (Map<String, String>, Boolean) -> Unit, publishField: (List<NflPostseasonTeam>) -> Unit, saveResults: (Map<String, String>) -> Unit) {
     val slate = state.nflPostseasonSlate
     val entry = state.nflPostseasonEntry
     var picks by remember(slate?.seasonKey, entry?.lockedAt) { mutableStateOf(entry?.picks.orEmpty()) }
     var confirming by remember { mutableStateOf(false) }
     var confirmingJdam by remember { mutableStateOf(false) }
+    var editingField by remember { mutableStateOf(false) }
+    var editingResults by remember { mutableStateOf(false) }
     val games = remember(slate?.teams, picks) { NflBracketEngine.games(slate?.teams.orEmpty(), picks) }
     val complete = NflBracketEngine.requiredKeys.all { picks[it] != null }
     val locked = entry?.lockedAt != null
@@ -37,6 +39,7 @@ fun NflPostseasonScreen(state: AppState, lock: (Map<String, String>, Boolean) ->
                 item {
                     postseasonPanel("THE FIELD IS NOT OFFICIAL YET", "The commissioner must publish seven AFC and seven NFC seeds. The verified bracket opens for everyone the moment it arrives.", NflCyan)
                 }
+                if (state.session?.let { state.league?.isCommissioner(it.userId) } == true) item { Button(onClick = { editingField = true }, modifier = Modifier.fillMaxWidth()) { Text("PUBLISH OFFICIAL 14-TEAM FIELD", fontWeight = FontWeight.Black) } }
             } else {
                 state.nflPostseasonScorecard?.let { score ->
                     item { postseasonPanel("CERTIFIED PLAYOFF RECEIPT", "${score.totalPoints} POINTS · WC ${score.wildCardPoints} · DIV ${score.divisionalPoints} · CONF ${score.conferencePoints} · SB ${score.superBowlPoints}", NflCyan) }
@@ -81,6 +84,7 @@ fun NflPostseasonScreen(state: AppState, lock: (Map<String, String>, Boolean) ->
                         }
                     }
                 }
+                if (state.session?.let { state.league?.isCommissioner(it.userId) } == true) item { OutlinedButton(onClick = { editingResults = true }, modifier = Modifier.fillMaxWidth()) { Text("COMMISSIONER RESULTS CONTROL", fontWeight = FontWeight.Black) } }
             }
         }
     }
@@ -100,6 +104,32 @@ fun NflPostseasonScreen(state: AppState, lock: (Map<String, String>, Boolean) ->
             picks = generated
             if (NflBracketEngine.requiredKeys.all { generated[it] != null }) lock(generated, true)
         }, colors = ButtonDefaults.buttonColors(containerColor = Color.Red)) { Text("AUTHORIZE") } },
+    )
+    if (editingField) NflFieldEditorDialog(state.busy, { editingField = false }) { editingField = false; publishField(it) }
+    if (editingResults && slate != null) NflResultsDialog(slate.teams, state.nflPostseasonResults, state.busy, { editingResults = false }) { editingResults = false; saveResults(it) }
+}
+
+private val afcTeams = setOf("Baltimore Ravens","Buffalo Bills","Cincinnati Bengals","Cleveland Browns","Denver Broncos","Houston Texans","Indianapolis Colts","Jacksonville Jaguars","Kansas City Chiefs","Las Vegas Raiders","Los Angeles Chargers","Miami Dolphins","New England Patriots","New York Jets","Pittsburgh Steelers","Tennessee Titans")
+
+@Composable private fun NflFieldEditorDialog(busy: Boolean, dismiss: () -> Unit, publish: (List<NflPostseasonTeam>) -> Unit) {
+    var selections by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    val valid = selections.size == 14 && selections.values.toSet().size == 14
+    AlertDialog(
+        onDismissRequest = dismiss, title = { Text("OFFICIAL 14-TEAM FIELD") },
+        text = { LazyColumn(Modifier.heightIn(max = 520.dp)) { listOf("AFC", "NFC").forEach { conference -> item { Text(conference, color = NflCyan, fontWeight = FontWeight.Black) }; items((1..7).toList()) { seed -> var open by remember { mutableStateOf(false) }; val key = "$conference-$seed"; Box { OutlinedButton(onClick = { open = true }, modifier = Modifier.fillMaxWidth()) { Text("#$seed  ${selections[key] ?: "Select team"}") }; DropdownMenu(open, { open = false }) { TeamCatalog.nfl.filter { if (conference == "AFC") it in afcTeams else it !in afcTeams }.forEach { team -> DropdownMenuItem({ Text(team) }, { selections = selections + (key to team); open = false }) } } } } } } },
+        dismissButton = { TextButton(onClick = dismiss) { Text("CANCEL") } },
+        confirmButton = { Button(onClick = { publish(listOf("AFC", "NFC").flatMap { conference -> (1..7).map { seed -> val name = selections["$conference-$seed"]!!; NflPostseasonTeam(TeamCatalog.slug(name), name, conference, seed) } }) }, enabled = valid && !busy) { Text("PUBLISH FIELD") } },
+    )
+}
+
+@Composable private fun NflResultsDialog(teams: List<NflPostseasonTeam>, saved: Map<String, String>, busy: Boolean, dismiss: () -> Unit, save: (Map<String, String>) -> Unit) {
+    var winners by remember(saved) { mutableStateOf(saved) }
+    val games = NflBracketEngine.games(teams, winners)
+    AlertDialog(
+        onDismissRequest = dismiss, title = { Text("OFFICIAL NFL RESULTS") },
+        text = { LazyColumn(Modifier.heightIn(max = 520.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { items(games, key = { it.id }) { game -> Column { Text("${game.round} · ${game.title}", color = NflCyan, fontWeight = FontWeight.Black); game.teams.forEach { team -> FilterChip(winners[game.id] == team.id, { if (game.id !in saved) winners = NflBracketEngine.select(winners, game.id, team.id) }, { Text(team.name) }, enabled = game.id !in saved) } } } } },
+        dismissButton = { TextButton(onClick = dismiss) { Text("CANCEL") } },
+        confirmButton = { Button(onClick = { save(winners) }, enabled = winners != saved && !busy) { Text("CERTIFY NEW RESULTS") } },
     )
 }
 

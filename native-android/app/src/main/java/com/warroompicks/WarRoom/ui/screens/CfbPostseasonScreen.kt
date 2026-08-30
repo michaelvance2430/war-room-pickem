@@ -20,7 +20,13 @@ import com.warroompicks.WarRoom.ui.components.WarHeader
 import com.warroompicks.WarRoom.ui.theme.*
 
 @Composable
-fun CfbPostseasonScreen(state: AppState, lockBowl: (Map<String, String>, Map<String, Int>, Boolean) -> Unit, lockCfp: (Map<String, String>) -> Unit) {
+fun CfbPostseasonScreen(
+    state: AppState,
+    lockBowl: (Map<String, String>, Map<String, Int>, Boolean) -> Unit,
+    lockCfp: (Map<String, String>) -> Unit,
+    publishField: (List<CfbBowlGame>, List<String>) -> Unit,
+    saveResults: (Map<String, String>, Map<String, String>) -> Unit,
+) {
     val slate = state.cfbPostseasonSlate
     val entry = state.cfbPostseasonEntry
     var page by remember { mutableStateOf("bowl") }
@@ -33,6 +39,9 @@ fun CfbPostseasonScreen(state: AppState, lockBowl: (Map<String, String>, Map<Str
     var confirmBowl by remember { mutableStateOf(false) }
     var confirmDeadHand by remember { mutableStateOf(false) }
     var confirmCfp by remember { mutableStateOf(false) }
+    var editingField by remember { mutableStateOf(false) }
+    var editingResults by remember { mutableStateOf(false) }
+    val isCommissioner = state.session?.let { state.league?.isCommissioner(it.userId) } == true
     val bowlLocked = entry?.bowlLockedAt != null
     val cfpLocked = entry?.cfpLockedAt != null
     val allocated = allocations.values.sum()
@@ -51,6 +60,7 @@ fun CfbPostseasonScreen(state: AppState, lockBowl: (Map<String, String>, Map<Str
             }
             if (slate == null) {
                 item { cfbPanel("THE FIELD IS NOT OFFICIAL YET", "The commissioner must publish the 25 bowl matchups and official 12-team CFP field.", WarYellow) }
+                if (isCommissioner) item { Button(onClick = { editingField = true }, modifier = Modifier.fillMaxWidth()) { Text("BUILD POSTSEASON FIELD", fontWeight = FontWeight.Black) } }
             } else if (page == "bowl") {
                 entry?.bowlScore?.let { item { cfbPanel("BOWL MANIA FINAL", "$it POINTS · permanent postseason receipt", WarYellow) } }
                 item {
@@ -83,6 +93,7 @@ fun CfbPostseasonScreen(state: AppState, lockBowl: (Map<String, String>, Map<Str
                 if (!cfpLocked) item { Button(onClick = { confirmCfp = true }, enabled = cfpReady && !state.busy, modifier = Modifier.fillMaxWidth().height(56.dp), colors = ButtonDefaults.buttonColors(containerColor = WarYellow, contentColor = Color.Black)) { Text("LOCK THIS CHAMPIONSHIP BRACKET", fontWeight = FontWeight.Black) } }
                 else item { cfbPanel("CFP BRACKET SEALED", "Eleven decisions are permanently on file.", WarYellow) }
             }
+            if (slate != null && isCommissioner) item { OutlinedButton(onClick = { editingResults = true }, modifier = Modifier.fillMaxWidth()) { Text("COMMISSIONER RESULTS DESK", fontWeight = FontWeight.Black) } }
         }
     }
     if (confirmBowl) ConfirmPostseason("SEAL BOWL MANIA?", "All 25 winners and all 100 confidence points become permanent.", { confirmBowl = false }) { confirmBowl = false; lockBowl(bowlPicks, allocations, false) }
@@ -93,6 +104,46 @@ fun CfbPostseasonScreen(state: AppState, lockBowl: (Map<String, String>, Map<Str
         val generatedAllocations = slate?.bowlGames.orEmpty().associate { it.id to 4 }
         bowlPicks = generatedPicks; allocations = generatedAllocations; lockBowl(generatedPicks, generatedAllocations, true)
     }
+    if (editingField) CfbFieldEditorDialog(state.busy, { editingField = false }) { bowls, seeds -> editingField = false; publishField(bowls, seeds) }
+    if (editingResults && slate != null) CfbResultsDialog(slate, state.cfbPostseasonResults, state.busy, { editingResults = false }) { bowls, cfp -> editingResults = false; saveResults(bowls, cfp) }
+}
+
+private val marqueeBowls = listOf("Citrus Bowl","Alamo Bowl","Music City Bowl","Gator Bowl","Texas Bowl","ReliaQuest Bowl","Las Vegas Bowl","Sun Bowl","Pop-Tarts Bowl","Holiday Bowl","Liberty Bowl","Duke's Mayo Bowl","Pinstripe Bowl","Independence Bowl","Armed Forces Bowl")
+private val sickoBowls = listOf("68 Ventures Bowl","Salute to Veterans Bowl","Cure Bowl","Myrtle Beach Bowl","Frisco Bowl","Famous Idaho Potato Bowl","New Orleans Bowl","New Mexico Bowl","Birmingham Bowl","First Responder Bowl")
+
+@Composable private fun CfbFieldEditorDialog(busy: Boolean, dismiss: () -> Unit, publish: (List<CfbBowlGame>, List<String>) -> Unit) {
+    val names = marqueeBowls + sickoBowls
+    var away by remember { mutableStateOf<Map<Int, String>>(emptyMap()) }
+    var home by remember { mutableStateOf<Map<Int, String>>(emptyMap()) }
+    var seeds by remember { mutableStateOf<Map<Int, String>>(emptyMap()) }
+    val valid = (0 until 25).all { !away[it].isNullOrBlank() && !home[it].isNullOrBlank() } && (0 until 12).all { !seeds[it].isNullOrBlank() } && seeds.values.map { it.trim().lowercase() }.toSet().size == 12
+    AlertDialog(
+        onDismissRequest = dismiss, title = { Text("BUILD BOWL MANIA + CFP") },
+        text = { LazyColumn(Modifier.heightIn(max = 560.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(names.indices.toList()) { index -> Column { Text("${index + 1}. ${names[index]}", color = if (index < 15) WarYellow else WarGreen, fontWeight = FontWeight.Black); Row { OutlinedTextField(away[index].orEmpty(), { away = away + (index to it) }, label = { Text("Away") }, modifier = Modifier.weight(1f)); OutlinedTextField(home[index].orEmpty(), { home = home + (index to it) }, label = { Text("Home") }, modifier = Modifier.weight(1f)) } } }
+            item { Text("OFFICIAL 12-TEAM CFP SEEDING", color = NflCyan, fontWeight = FontWeight.Black) }
+            items((0 until 12).toList()) { index -> OutlinedTextField(seeds[index].orEmpty(), { seeds = seeds + (index to it) }, label = { Text("#${index + 1} team") }, modifier = Modifier.fillMaxWidth()) }
+        } },
+        dismissButton = { TextButton(onClick = dismiss) { Text("CANCEL") } },
+        confirmButton = { Button(onClick = { val bowls = names.mapIndexed { index, name -> CfbBowlGame("${if (index < 15) "marquee" else "sicko"}-${index + 1}", name, if (index < 15) CfbBowlTier.MARQUEE else CfbBowlTier.SICKO, if (index < 15) index + 1 else index - 14, away[index]!!.trim(), home[index]!!.trim()) }; publish(bowls, (0 until 12).map { seeds[it]!!.trim() }) }, enabled = valid && !busy) { Text("PUBLISH FIELD") } },
+    )
+}
+
+@Composable private fun CfbResultsDialog(slate: CfbPostseasonSlate, saved: CfbPostseasonResults, busy: Boolean, dismiss: () -> Unit, save: (Map<String, String>, Map<String, String>) -> Unit) {
+    var bowls by remember(saved) { mutableStateOf(saved.bowlResults) }
+    var cfp by remember(saved) { mutableStateOf(saved.cfpResults) }
+    val cfpGames = CfbBracketEngine.games(slate.cfpSeeds, cfp)
+    AlertDialog(
+        onDismissRequest = dismiss, title = { Text("CFB OFFICIAL RESULTS") },
+        text = { LazyColumn(Modifier.heightIn(max = 560.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            item { Text("BOWL RESULTS", color = WarYellow, fontWeight = FontWeight.Black) }
+            items(slate.bowlGames, key = { it.id }) { game -> Column { Text(game.name, fontWeight = FontWeight.Black); Row { listOf(game.away, game.home).forEach { team -> FilterChip(bowls[game.id] == team, { if (game.id !in saved.bowlResults) bowls = bowls + (game.id to team) }, { Text(team) }, enabled = game.id !in saved.bowlResults) } } } }
+            item { Text("CFP RESULTS", color = NflCyan, fontWeight = FontWeight.Black) }
+            items(cfpGames, key = { it.id }) { game -> Column { Text(game.label, fontWeight = FontWeight.Black); Row { listOf(game.first, game.second).filter { it != "TBD" }.forEach { team -> FilterChip(cfp[game.id] == team, { if (game.id !in saved.cfpResults) cfp = CfbBracketEngine.select(slate.cfpSeeds, cfp, game.id, team) }, { Text(team) }, enabled = game.id !in saved.cfpResults) } } } }
+        } },
+        dismissButton = { TextButton(onClick = dismiss) { Text("CANCEL") } },
+        confirmButton = { Button(onClick = { save(bowls, cfp) }, enabled = (bowls != saved.bowlResults || cfp != saved.cfpResults) && !busy) { Text("CERTIFY NEW RESULTS") } },
+    )
 }
 
 @Composable private fun BowlCard(game: CfbBowlGame, selected: String?, points: Int, remaining: Int, locked: Boolean, choose: (String) -> Unit, adjust: (Int) -> Unit) {

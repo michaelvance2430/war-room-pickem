@@ -247,6 +247,43 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         _state.value = _state.value.copy(busy = false, cfbPostseasonEntry = saved, notice = "CFP BRACKET SEALED")
     }
 
+    fun publishNflPostseason(teams: List<NflPostseasonTeam>) = launchBusy {
+        val session = _state.value.session ?: return@launchBusy
+        val league = _state.value.league ?: return@launchBusy
+        require(league.isCommissioner(session.userId)) { "Only the commissioner can publish the playoff field." }
+        require(teams.size == 14 && teams.map { it.id }.toSet().size == 14 && listOf("AFC", "NFC").all { conference -> teams.count { it.conference == conference } == 7 }) { "Publish seven unique teams in each conference." }
+        api.publishNflPostseasonSlate(session.accessToken, league.id, nflSeasonKey(), teams)
+        _state.value = _state.value.copy(busy = false, notice = "OFFICIAL NFL PLAYOFF FIELD PUBLISHED")
+        refreshLeague()
+    }
+
+    fun saveNflPostseasonResults(winners: Map<String, String>) = launchBusy {
+        val session = _state.value.session ?: return@launchBusy
+        val league = _state.value.league ?: return@launchBusy
+        require(league.isCommissioner(session.userId)) { "Only the commissioner can certify playoff results." }
+        val saved = api.saveNflPostseasonResults(session.accessToken, league.id, nflSeasonKey(), winners)
+        _state.value = _state.value.copy(busy = false, nflPostseasonResults = saved, notice = "NFL PLAYOFF RESULTS CERTIFIED")
+    }
+
+    fun publishCfbPostseason(bowls: List<CfbBowlGame>, seeds: List<String>) = launchBusy {
+        val session = _state.value.session ?: return@launchBusy
+        val league = _state.value.league ?: return@launchBusy
+        require(league.isCommissioner(session.userId)) { "Only the commissioner can publish the postseason field." }
+        require(bowls.size == 25 && bowls.all { it.away.isNotBlank() && it.home.isNotBlank() }) { "Complete all 25 bowl matchups." }
+        require(seeds.size == 12 && seeds.all { it.isNotBlank() } && seeds.map { it.lowercase() }.toSet().size == 12) { "Publish 12 unique CFP seeds." }
+        api.publishCfbPostseasonSlate(session.accessToken, league.id, LocalDate.now().year, bowls, seeds)
+        _state.value = _state.value.copy(busy = false, notice = "BOWL MANIA + CFP FIELD PUBLISHED")
+        refreshLeague()
+    }
+
+    fun saveCfbPostseasonResults(bowlResults: Map<String, String>, cfpResults: Map<String, String>) = launchBusy {
+        val session = _state.value.session ?: return@launchBusy
+        val league = _state.value.league ?: return@launchBusy
+        require(league.isCommissioner(session.userId)) { "Only the commissioner can certify postseason results." }
+        val saved = api.saveCfbPostseasonResults(session.accessToken, league.id, LocalDate.now().year, bowlResults, cfpResults)
+        _state.value = _state.value.copy(busy = false, cfbPostseasonResults = saved, notice = "CFB POSTSEASON RESULTS CERTIFIED")
+    }
+
     fun postAnnouncement(title: String, body: String) = launchBusy {
         val session = _state.value.session ?: return@launchBusy
         val league = _state.value.league ?: return@launchBusy

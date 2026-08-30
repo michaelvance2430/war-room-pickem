@@ -307,6 +307,32 @@ class SupabaseApi {
         return row.toCfbEntry()
     }
 
+    suspend fun publishNflPostseasonSlate(token: String, leagueId: UUID, seasonKey: Int, teams: List<NflPostseasonTeam>) {
+        val encoded = JSONArray().apply { teams.forEach { put(JSONObject().put("id", it.id).put("name", it.name).put("conference", it.conference).put("seed", it.seed)) } }
+        raw("/rest/v1/rpc/publish_nfl_postseason_slate", "POST", token, JSONObject().put("p_league_id", leagueId.toString()).put("p_season_key", seasonKey).put("p_teams", encoded), null)
+    }
+
+    suspend fun saveNflPostseasonResults(token: String, leagueId: UUID, seasonKey: Int, winners: Map<String, String>): Map<String, String> {
+        val row = request("/rest/v1/rpc/save_nfl_postseason_results", "POST", token, JSONObject().put("p_league_id", leagueId.toString()).put("p_season_key", seasonKey).put("p_winners", JSONObject(winners)))
+        return row.objectStringMap("winners")
+    }
+
+    suspend fun publishCfbPostseasonSlate(token: String, leagueId: UUID, seasonKey: Int, bowlGames: List<CfbBowlGame>, seeds: List<String>) {
+        val bowls = JSONArray().apply { bowlGames.forEach { game -> put(JSONObject().put("id", game.id).put("name", game.name).put("tier", game.tier.name.lowercase()).put("rank", game.rank).put("away", game.away).put("home", game.home).put("hosts_cfp", false)) } }
+        val cfp = JSONArray().apply { seeds.forEach(::put) }
+        raw("/rest/v1/rpc/publish_cfb_postseason_slate", "POST", token, JSONObject().put("p_league_id", leagueId.toString()).put("p_season_key", seasonKey).put("p_bowl_games", bowls).put("p_cfp_seeds", cfp), null)
+    }
+
+    suspend fun saveCfbPostseasonResults(token: String, leagueId: UUID, seasonKey: Int, bowlResults: Map<String, String>, cfpResults: Map<String, String>): CfbPostseasonResults {
+        val raw = raw(
+            "/rest/v1/cfb_postseason_results?on_conflict=league_id,season_key", "POST", token,
+            JSONObject().put("league_id", leagueId.toString()).put("season_key", seasonKey).put("bowl_results", JSONObject(bowlResults)).put("cfp_results", JSONObject(cfpResults)),
+            "resolution=merge-duplicates,return=representation",
+        )
+        val row = JSONArray(raw).optJSONObject(0) ?: throw ApiException("Postseason results were not returned.")
+        return CfbPostseasonResults(row.objectStringMap("bowl_results"), row.objectStringMap("cfp_results"))
+    }
+
     suspend fun lockerMessages(token: String, leagueId: UUID): List<LockerMessage> {
         val select = "id,user_id,body,created_at,profiles(display_name,avatar_url)"
         val rows = requestArray("/rest/v1/locker_messages?select=${encode(select)}&league_id=eq.$leagueId&order=created_at.asc&limit=100", token)

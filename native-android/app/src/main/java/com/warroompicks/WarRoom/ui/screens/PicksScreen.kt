@@ -30,14 +30,18 @@ fun PicksScreen(
     lockNflPostseason: (Map<String, String>, Boolean) -> Unit,
     lockCfbBowl: (Map<String, String>, Map<String, Int>, Boolean) -> Unit,
     lockCfbPlayoff: (Map<String, String>) -> Unit,
+    publishNflPostseason: (List<NflPostseasonTeam>) -> Unit,
+    saveNflPostseasonResults: (Map<String, String>) -> Unit,
+    publishCfbPostseason: (List<CfbBowlGame>, List<String>) -> Unit,
+    saveCfbPostseasonResults: (Map<String, String>, Map<String, String>) -> Unit,
 ) {
     val league = state.league ?: return
     if (league.sport == Sport.NFL && league.currentWeek >= 19) {
-        NflPostseasonScreen(state, lockNflPostseason)
+        NflPostseasonScreen(state, lockNflPostseason, publishNflPostseason, saveNflPostseasonResults)
         return
     }
     if (league.sport == Sport.CFB && league.currentWeek >= league.regularSeasonWeeks + 2) {
-        CfbPostseasonScreen(state, lockCfbBowl, lockCfbPlayoff)
+        CfbPostseasonScreen(state, lockCfbBowl, lockCfbPlayoff, publishCfbPostseason, saveCfbPostseasonResults)
         return
     }
     val card = state.card
