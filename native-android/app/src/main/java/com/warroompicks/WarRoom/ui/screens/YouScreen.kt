@@ -15,6 +15,7 @@ import com.warroompicks.WarRoom.model.TeamCatalog
 import com.warroompicks.WarRoom.ui.components.CommandPanel
 import com.warroompicks.WarRoom.ui.components.WarBackdrop
 import com.warroompicks.WarRoom.ui.components.WarHeader
+import com.warroompicks.WarRoom.ui.components.PlayerAvatar
 import com.warroompicks.WarRoom.ui.theme.NflCyan
 import com.warroompicks.WarRoom.ui.theme.WarGreen
 
@@ -28,7 +29,13 @@ fun YouScreen(state: AppState, saveFavorite: (String) -> Unit, saveCrystal: (Str
     var editName by remember { mutableStateOf(false) }
     WarBackdrop(league.sport) {
         LazyColumn(contentPadding = PaddingValues(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            item { WarHeader("PERSONNEL FILE", standing?.displayName ?: session.email.substringBefore('@'), "One identity across every league and sport.", league.sport) }
+            item {
+                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    PlayerAvatar(standing?.displayName ?: session.email, standing?.avatarUrl, accent, Modifier.size(56.dp))
+                    Spacer(Modifier.width(12.dp))
+                    Box(Modifier.weight(1f)) { WarHeader("PERSONNEL FILE", standing?.displayName ?: session.email.substringBefore('@'), "One identity across every league and sport.", league.sport) }
+                }
+            }
             item { CommandPanel("CALL SIGN", standing?.displayName ?: session.email.substringBefore('@'), "Your account name follows you across every sport. Tap to edit.", league.sport, onClick = { editName = true }) }
             item { CommandPanel("CAMPAIGN RECORD", "${standing?.points?.toInt() ?: 0} career points", "Current rank: ${standing?.rank ?: "—"} · Historical weekly scorecards remain on file.", league.sport) }
             item { CommandPanel("TEAM ALLEGIANCE", state.favoriteTeam ?: "Choose favorite team", "Editable at any time. Your favorite appears on commissioner boards.", league.sport, onClick = { editFavorite = true }) }

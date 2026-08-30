@@ -3,6 +3,7 @@ package com.warroompicks.WarRoom.ui
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.FactCheck
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -15,10 +16,9 @@ import com.warroompicks.WarRoom.model.Sport
 import com.warroompicks.WarRoom.ui.screens.*
 import com.warroompicks.WarRoom.ui.theme.NflCyan
 import com.warroompicks.WarRoom.ui.theme.WarGreen
-import kotlinx.coroutines.delay
 
 private enum class AppTab(val label: String, val icon: ImageVector) {
-    Home("Home", Icons.Default.Home), Picks("Picks", Icons.Default.FactCheck),
+    Home("Home", Icons.Default.Home), Picks("Picks", Icons.AutoMirrored.Filled.FactCheck),
     Standings("Standings", Icons.Default.FormatListNumbered), Locker("Locker", Icons.Default.Forum),
     You("You", Icons.Default.AccountCircle),
 }
@@ -42,6 +42,7 @@ fun WarRoomApp(viewModel: AppViewModel, notificationDestination: String? = null,
         state.league == null -> NoLeagueScreen(state.busy, viewModel::joinLeague, viewModel::createLeague, viewModel::signOut)
         else -> {
             val sport = state.league!!.sport
+            val snackbarHostState = remember { SnackbarHostState() }
             Scaffold(
                 containerColor = Color.Transparent,
                 bottomBar = {
@@ -63,9 +64,7 @@ fun WarRoomApp(viewModel: AppViewModel, notificationDestination: String? = null,
                         }
                     }
                 },
-                snackbarHost = {
-                    SnackbarHost(remember { SnackbarHostState() })
-                },
+                snackbarHost = { SnackbarHost(snackbarHostState) },
             ) { padding ->
                 Box(Modifier.padding(padding)) {
                     when (tab) {
@@ -83,10 +82,13 @@ fun WarRoomApp(viewModel: AppViewModel, notificationDestination: String? = null,
                 }
             }
             LaunchedEffect(state.error, state.notice) {
-                if (state.error != null || state.notice != null) {
-                    delay(4_000)
-                    viewModel.clearMessage()
-                }
+                val message = state.error ?: state.notice ?: return@LaunchedEffect
+                snackbarHostState.showSnackbar(
+                    message = message,
+                    withDismissAction = true,
+                    duration = if (state.error != null) SnackbarDuration.Long else SnackbarDuration.Short,
+                )
+                viewModel.clearMessage()
             }
             LaunchedEffect(state.league?.id) { viewModel.refreshLive() }
             if ((state.favoriteTeam == null || state.crystalBallTeam == null) && !state.busy) {

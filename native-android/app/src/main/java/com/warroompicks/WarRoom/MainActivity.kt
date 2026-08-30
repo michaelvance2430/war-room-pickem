@@ -9,10 +9,16 @@ import com.warroompicks.WarRoom.ui.WarRoomApp
 import com.warroompicks.WarRoom.ui.theme.WarRoomTheme
 import android.content.Intent
 import androidx.compose.runtime.mutableStateOf
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 
 class MainActivity : ComponentActivity() {
     private val destination = mutableStateOf<String?>(null)
     private val recoveryToken = mutableStateOf<String?>(null)
+    private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -20,6 +26,9 @@ class MainActivity : ComponentActivity() {
         recoveryToken.value = intent.recoveryAccessToken()
         enableEdgeToEdge()
         setContent { WarRoomTheme { WarRoomApp(viewModel(), destination.value, recoveryToken.value) { recoveryToken.value = null } } }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
     }
 
     override fun onNewIntent(intent: Intent) {

@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.testTag
 import com.warroompicks.WarRoom.AppState
 import com.warroompicks.WarRoom.model.*
 import com.warroompicks.WarRoom.ui.components.WarBackdrop
@@ -55,7 +56,7 @@ fun PicksScreen(
     val lockedPick = state.currentPick?.takeIf { it.lockedAt != null }
 
     WarBackdrop(league.sport) {
-        LazyColumn(contentPadding = PaddingValues(bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        LazyColumn(Modifier.testTag("picks-list"), contentPadding = PaddingValues(bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item { WarHeader(if (league.sport == Sport.NFL) "SUNDAY DECISION DESK" else "SATURDAY DECISION DESK", "MAKE YOUR PICKS", "Everything begins blank. Confirm every decision.", league.sport) }
             if (card == null) {
                 item { Text("The commissioner has not published this week's card.", color = Color.White) }

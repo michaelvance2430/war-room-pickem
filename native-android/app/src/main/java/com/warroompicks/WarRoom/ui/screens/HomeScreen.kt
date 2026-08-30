@@ -24,10 +24,13 @@ import com.warroompicks.WarRoom.ui.components.*
 import com.warroompicks.WarRoom.ui.theme.*
 import java.time.Duration
 import java.time.Instant
+import android.content.Intent
+import androidx.compose.ui.platform.LocalContext
 
 @Composable
 fun HomeScreen(state: AppState, selectLeague: (League) -> Unit, postAnnouncement: (String, String) -> Unit, pullOdds: () -> Unit, publishCard: (List<OddsGame>, String, String, String) -> Unit, selectTrophy: (String) -> Unit, openPicks: () -> Unit) {
     val league = state.league ?: return
+    val context = LocalContext.current
     var switchOpen by remember { mutableStateOf(false) }
     var announcementComposer by remember { mutableStateOf(false) }
     var cardBuilder by remember { mutableStateOf(false) }
@@ -53,6 +56,12 @@ fun HomeScreen(state: AppState, selectLeague: (League) -> Unit, postAnnouncement
                         }
                     }
                 }
+            }
+            item {
+                CommandPanel("INVITE CODE · ${league.inviteCode}", "Share ${league.name}", "Send the league code and Android download link to your players.", league.sport, onClick = {
+                    val text = "Join ${league.name} in War Room Pick'em. Invite code: ${league.inviteCode}\nhttps://play.google.com/store/apps/details?id=com.warroompicks.WarRoom"
+                    context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text), "Share War Room league"))
+                })
             }
             item {
                 val card = state.card

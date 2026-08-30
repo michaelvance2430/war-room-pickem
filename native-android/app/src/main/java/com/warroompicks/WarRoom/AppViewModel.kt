@@ -138,7 +138,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 pick = runCatching { api.currentPick(session.accessToken, league, session.userId) }.getOrNull(),
                 favorite = runCatching { api.favoriteTeam(session.accessToken, session.userId, league.sport) }.getOrNull(),
                 crystal = runCatching { api.crystalBall(session.accessToken, league.id, session.userId) }.getOrNull(),
-                standings = runCatching { api.standings(session.accessToken, league.id) }.getOrDefault(state.standings),
+                standings = runCatching { api.standings(session.accessToken, league) }.getOrDefault(state.standings),
                 messages = runCatching { api.lockerMessages(session.accessToken, league.id) }.getOrDefault(state.messages),
                 announcements = runCatching { api.announcements(session.accessToken, league.id) }.getOrDefault(state.announcements),
                 history = runCatching { api.history(session.accessToken, league.id, session.userId) }.getOrDefault(state.history),

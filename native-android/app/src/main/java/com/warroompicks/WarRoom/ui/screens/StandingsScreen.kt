@@ -2,7 +2,7 @@ package com.warroompicks.WarRoom.ui.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -28,9 +28,9 @@ fun StandingsScreen(state: AppState) {
             val grouped = state.standings.groupBy { it.division ?: "Unassigned" }
             grouped.forEach { (division, players) ->
                 item {
-                    Text(divisionLabel(league.sport, division), color = accent, fontWeight = FontWeight.Black, letterSpacing = 2.sp, modifier = Modifier.padding(top = 10.dp, bottom = 3.dp))
+                    Text(division.uppercase(), color = accent, fontWeight = FontWeight.Black, letterSpacing = 2.sp, modifier = Modifier.padding(top = 10.dp, bottom = 3.dp))
                 }
-                items(players, key = { it.userId }) { player ->
+                itemsIndexed(players, key = { _, player -> player.userId }) { index, player ->
                     Surface(color = PanelBlack, shape = MaterialTheme.shapes.medium) {
                         Row(Modifier.fillMaxWidth().padding(13.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text("${player.rank}", color = accent, fontSize = 22.sp, fontWeight = FontWeight.Black, modifier = Modifier.width(38.dp))
@@ -44,15 +44,25 @@ fun StandingsScreen(state: AppState) {
                             Text(" PTS", color = accent, fontSize = 8.sp, fontWeight = FontWeight.Black)
                         }
                     }
+                    if (state.standings.size > 32) {
+                        when {
+                            players.size == 8 && index + 1 == 4 -> CutLine("CHAMPIONSHIP ABOVE · TOILET BOWL BELOW", accent)
+                            index + 1 == 4 -> CutLine("CHAMPIONSHIP CUT", accent)
+                            index + 1 == players.size - 4 -> CutLine("TOILET BOWL CUT", Color(0xFFB56CFF))
+                        }
+                    }
                 }
             }
         }
     }
 }
 
-private fun divisionLabel(sport: Sport, value: String): String = when (sport) {
-    Sport.NFL -> when (value.lowercase()) { "north" -> "AFC EAST"; "south" -> "AFC WEST"; "east" -> "NFC EAST"; "west" -> "NFC WEST"; else -> value.uppercase() }
-    Sport.CFB -> when (value.lowercase()) { "north" -> "SEC"; "south" -> "BIG TEN"; "east" -> "ACC"; "west" -> "BIG 12"; else -> value.uppercase() }
+@Composable private fun CutLine(label: String, color: Color) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+        HorizontalDivider(Modifier.weight(1f), color = color)
+        Text(label, color = color, fontSize = 8.sp, fontWeight = FontWeight.Black, letterSpacing = .7.sp, modifier = Modifier.padding(horizontal = 8.dp))
+        HorizontalDivider(Modifier.weight(1f), color = color)
+    }
 }
 
 private fun formatPoints(value: Double) = if (value % 1.0 == 0.0) value.toInt().toString() else "%.1f".format(value)

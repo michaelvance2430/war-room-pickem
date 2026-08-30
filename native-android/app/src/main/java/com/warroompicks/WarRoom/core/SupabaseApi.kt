@@ -159,15 +159,22 @@ class SupabaseApi {
         )
     }
 
-    suspend fun standings(token: String, leagueId: UUID): List<Standing> {
+    suspend fun standings(token: String, league: League): List<Standing> {
         val select = "user_id,total_points,division,display_name_override,profiles(display_name,avatar_url),is_bot"
-        val rows = requestArray("/rest/v1/memberships?select=${encode(select)}&league_id=eq.$leagueId&is_bot=eq.false&order=total_points.desc", token)
+        val rows = requestArray("/rest/v1/memberships?select=${encode(select)}&league_id=eq.${league.id}&is_bot=eq.false&order=total_points.desc", token)
+        val ids = rows.objects().mapNotNull { it.stringOrNull("user_id") }
+        val favorites = if (ids.isEmpty()) emptyMap() else {
+            val filter = ids.joinToString(",")
+            requestArray("/rest/v1/profile_favorite_teams?select=user_id,team_id&sport_id=eq.${league.sport.id}&user_id=in.(${encode(filter)})", token)
+                .objects().associate { UUID.fromString(it.getString("user_id")) to it.optString("team_id") }
+        }
         return rows.objects().mapIndexed { index, row ->
             val profile = row.optJSONObject("profiles")
             Standing(
                 UUID.fromString(row.getString("user_id")),
                 row.stringOrNull("display_name_override") ?: profile?.optString("display_name")?.takeIf(String::isNotBlank) ?: "Player",
-                row.stringOrNull("division"), row.optDouble("total_points"), index + 1, null, profile?.stringOrNull("avatar_url"),
+                row.stringOrNull("division"), row.optDouble("total_points"), index + 1,
+                favorites[UUID.fromString(row.getString("user_id"))], profile?.stringOrNull("avatar_url"),
             )
         }
     }
