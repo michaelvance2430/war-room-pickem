@@ -7,6 +7,27 @@ const defaultKey = (jsonName: string, legacyName: string) => {
   try { const value = JSON.parse(Deno.env.get(jsonName) || "{}").default; if (value) return String(value); } catch { /* fallback */ }
   return Deno.env.get(legacyName) || "";
 };
+type CachedScoreEvent = { id:string; commenceTime:string|null; completed:boolean; homeTeam:string; awayTeam:string; scores:{name:string;score:string}[]; lastUpdate:string|null };
+const normalizeScoreEvent = (event: any): CachedScoreEvent => ({
+  id: String(event?.id || ""),
+  commenceTime: event?.commenceTime || event?.commence_time || null,
+  completed: event?.completed === true,
+  homeTeam: String(event?.homeTeam || event?.home_team || ""),
+  awayTeam: String(event?.awayTeam || event?.away_team || ""),
+  scores: Array.isArray(event?.scores) ? event.scores.map((score: any) => ({ name: String(score?.name || ""), score: String(score?.score ?? "") })) : [],
+  lastUpdate: event?.lastUpdate || event?.last_update || null,
+});
+const mergeWeeklyEvents = (cached: any[], fresh: CachedScoreEvent[]) => {
+  const cutoff = Date.now() - 10 * 86_400_000;
+  const retained = cached.map(normalizeScoreEvent).filter((event) => {
+    if (!event.id || !event.completed) return false;
+    const timestamp = Date.parse(event.commenceTime || event.lastUpdate || "");
+    return !Number.isFinite(timestamp) || timestamp >= cutoff;
+  });
+  const merged = new Map(retained.map((event) => [event.id, event]));
+  fresh.forEach((event) => { if (event.id) merged.set(event.id, event); });
+  return [...merged.values()];
+};
 
 Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return reply({ error: "POST required" }, 405);
@@ -57,11 +78,12 @@ Deno.serve(async (req: Request) => {
     remaining = numericHeader(provider.headers.get("x-requests-remaining")); used = numericHeader(provider.headers.get("x-requests-used")); last = numericHeader(provider.headers.get("x-requests-last"));
     if (!provider.ok) throw new Error(`Scores provider error ${provider.status}`);
     const raw = await provider.json();
-    const events = (Array.isArray(raw) ? raw : []).map((event: any) => ({
-      id: String(event.id || ""), commenceTime: event.commence_time || null, completed: event.completed === true,
-      homeTeam: String(event.home_team || ""), awayTeam: String(event.away_team || ""),
-      scores: Array.isArray(event.scores) ? event.scores.map((score: any) => ({ name: String(score.name || ""), score: String(score.score ?? "") })) : [], lastUpdate: event.last_update || null,
-    }));
+    const freshEvents = (Array.isArray(raw) ? raw : []).map(normalizeScoreEvent);
+    const cacheResponse = await fetch(cacheUrl, { headers: serviceHeaders });
+    const cache = cacheResponse.ok ? (await cacheResponse.json())?.[0] : null;
+    // The provider exposes at most three prior score days. Preserve completed
+    // Thursday games until a Monday final so one NFL card can settle atomically.
+    const events = mergeWeeklyEvents(Array.isArray(cache?.events) ? cache.events : [], freshEvents);
     const fetchedAt = new Date().toISOString();
     await fetch(cacheUrl, { method: "PATCH", headers: { ...serviceHeaders, Prefer: "return=minimal" }, body: JSON.stringify({ events, fetched_at: fetchedAt, provider_remaining: remaining, provider_used: used, provider_last_cost: last, last_http_status: providerStatus, last_error: null }) });
     await logUsage(true);

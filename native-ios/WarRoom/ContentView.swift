@@ -230,7 +230,7 @@ struct ContentView: View {
                 }
             }
         } message: {
-            Text("War Room can alert you when a card is built, 12 hours before it locks, one hour before it locks, and when your commissioner posts an announcement. You can change this anytime in Settings.")
+            Text("War Room can alert you when a card is built, 12 hours before it locks, one hour before it locks, when results are in, and when your commissioner posts an announcement. You can change this anytime in Settings.")
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await refreshPlatformStatus() } }
@@ -1583,7 +1583,7 @@ struct StandingsView: View {
                                     VStack(alignment: .leading, spacing: 4) {
                                         Label(liveProjectionStale ? "SCORE FEED STALE · LAST PROJECTION" : "LIVE · PROJECTED STANDINGS", systemImage: liveProjectionStale ? "exclamationmark.triangle.fill" : "dot.radiowaves.left.and.right")
                                             .font(.system(size: 10, weight: .black)).tracking(1.4)
-                                        Text("ATS + BEST BET INCLUDED · PROP POSTS WHEN THE WEEK IS CERTIFIED")
+                                        Text("ATS + BEST BET INCLUDED · PROP POSTS WHEN ALL FIVE GAMES ARE FINAL")
                                             .font(.system(size: 8, weight: .black)).tracking(0.65)
                                             .foregroundStyle(.white.opacity(0.58))
                                     }
@@ -1592,7 +1592,7 @@ struct StandingsView: View {
                                     .padding(12)
                                     .background((liveProjectionStale ? Color.orange : identity.accent).opacity(0.10), in: RoundedRectangle(cornerRadius: 12))
                                     .overlay(RoundedRectangle(cornerRadius: 12).stroke((liveProjectionStale ? Color.orange : identity.accent).opacity(0.38)))
-                                    .accessibilityHint("These ATS and Best Bet totals are temporary. Prop points post after commissioner certification.")
+                                    .accessibilityHint("These ATS and Best Bet totals are temporary. Prop points post automatically after all five games are final.")
                                 }
 
                                 ForEach(Array(displayStandings.enumerated()), id: \.element.id) { index, standing in

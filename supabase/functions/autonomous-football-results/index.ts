@@ -2,14 +2,16 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 type Game = { id:string; away_team:string; home_team:string; spread:number; favorite:"home"|"away"; is_rivalry?:boolean|null };
-type Score = { id:string; completed:boolean; home_team:string; away_team:string; scores?:{name:string;score:string}[] };
+type Score = { id:string; completed:boolean; homeTeam:string; awayTeam:string; commenceTime?:string|null; lastUpdate?:string|null; scores:{name:string;score:string}[] };
 type Final = Game & { homeScore:number; awayScore:number; ats:"home"|"away"|"push" };
 type CardRow = { league_id:string; week_number:number; prop_question?:string|null; prop_option_a:string; prop_option_b:string; leagues:{sport_id?:string|null}|{sport_id?:string|null}[]; card_games:Game[] };
 type ScoredRow = { league_id:string; week_number:number };
 
 const required=(name:string)=>{const value=Deno.env.get(name);if(!value)throw new Error(`Missing ${name}`);return value;};
 const norm=(value:string)=>value.toLowerCase().replace(/[^a-z0-9]+/g," ").trim().replace(/\s+/g," ");
-const score=(event:Score,team:string)=>Number(event.scores?.find((row)=>norm(row.name)===norm(team))?.score);
+const normalizeScore=(event:any):Score=>({id:String(event?.id||""),completed:event?.completed===true,homeTeam:String(event?.homeTeam||event?.home_team||""),awayTeam:String(event?.awayTeam||event?.away_team||""),commenceTime:event?.commenceTime||event?.commence_time||null,lastUpdate:event?.lastUpdate||event?.last_update||null,scores:Array.isArray(event?.scores)?event.scores.map((row:any)=>({name:String(row?.name||""),score:String(row?.score??"")})):[]});
+const mergeWeeklyScores=(cached:any[],fresh:Score[])=>{const cutoff=Date.now()-10*86400000;const retained=cached.map(normalizeScore).filter((event)=>{if(!event.id||!event.completed)return false;const timestamp=Date.parse(event.commenceTime||event.lastUpdate||"");return !Number.isFinite(timestamp)||timestamp>=cutoff;});const merged=new Map(retained.map((event)=>[event.id,event]));fresh.forEach((event)=>{if(event.id)merged.set(event.id,event);});return [...merged.values()];};
+const score=(event:Score,team:string)=>Number(event.scores.find((row)=>norm(row.name)===norm(team))?.score);
 const total=(game:Final)=>game.homeScore+game.awayScore;
 const margin=(game:Final)=>Math.abs(game.homeScore-game.awayScore);
 const dog=(game:Final)=>game.ats!=="push"&&game.ats!==game.favorite;
@@ -86,22 +88,23 @@ Deno.serve(async(request:Request)=>{
       const sport=relation?.sport_id==="nfl"?"nfl":"cfb";
       if(!feeds.has(sport)){
         const {data:claimed}=await db.rpc("claim_live_football_score_refresh",{p_sport:sport,p_min_age_seconds:50});
+        const {data:cache}=await db.from("live_football_score_cache").select("events").eq("sport",sport).maybeSingle();
+        const cachedEvents=Array.isArray(cache?.events)?cache.events:[];
         if(!claimed){
-          const {data:cache}=await db.from("live_football_score_cache").select("events").eq("sport",sport).maybeSingle();
-          feeds.set(sport,(cache?.events||[]) as Score[]);
+          feeds.set(sport,cachedEvents.map(normalizeScore));
         }else{
           const sportKey=sport==="nfl"?"americanfootball_nfl":"americanfootball_ncaaf";
           const url=new URL(`https://api.the-odds-api.com/v4/sports/${sportKey}/scores`);
           url.searchParams.set("apiKey",required("ODDS_API_KEY"));url.searchParams.set("daysFrom","3");url.searchParams.set("dateFormat","iso");
           const response=await fetch(url);if(!response.ok)throw new Error(`Scores provider ${sport} returned ${response.status}`);
-          const events=(await response.json()) as Score[];feeds.set(sport,events);
+          const raw=await response.json();const fresh=(Array.isArray(raw)?raw:[]).map(normalizeScore);const events=mergeWeeklyScores(cachedEvents,fresh);feeds.set(sport,events);
           await db.from("live_football_score_cache").update({events,fetched_at:new Date().toISOString(),last_http_status:response.status,last_error:null}).eq("sport",sport);
         }
       }
       const games=(card.card_games||[]) as Game[];if(games.length!==5){waiting.push(`${card.league_id}:${card.week_number}:invalid-card`);continue;}
       const finals:Final[]=[];
       for(const game of games){
-        const event=feeds.get(sport)?.find((row)=>norm(row.home_team)===norm(game.home_team)&&norm(row.away_team)===norm(game.away_team));
+        const event=feeds.get(sport)?.find((row)=>norm(row.homeTeam)===norm(game.home_team)&&norm(row.awayTeam)===norm(game.away_team));
         if(!event?.completed)continue;
         const home=score(event,game.home_team),away=score(event,game.away_team);if(!Number.isFinite(home)||!Number.isFinite(away))continue;
         finals.push({...game,homeScore:home,awayScore:away,ats:ats(game,home,away)});
