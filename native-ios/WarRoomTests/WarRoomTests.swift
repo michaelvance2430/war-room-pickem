@@ -253,6 +253,14 @@ struct WarRoomTests {
         #expect(CardReminderSchedule.pending(lockAt: now.addingTimeInterval(30 * 60), now: now, leagueId: leagueId, week: 4).isEmpty)
     }
 
+    @Test func liveScorecardUsesCertifiedAuthorityWhenWeekIsOfficial() {
+        #expect(LiveScorecardOfficialState.total(gamePoints: 8, certifiedTotal: nil) == 8)
+        #expect(LiveScorecardOfficialState.total(gamePoints: 8, certifiedTotal: 11) == 11)
+        #expect(LiveScorecardOfficialState.propStatus(choice: "Yes", officialResult: nil, points: 3) == "PENDING")
+        #expect(LiveScorecardOfficialState.propStatus(choice: "Yes", officialResult: "Yes", points: 3) == "HIT +3")
+        #expect(LiveScorecardOfficialState.propStatus(choice: "No", officialResult: "Yes", points: 3) == "MISS +0")
+    }
+
     private func standing(name: String, points: Int, id: Int) -> Standing {
         Standing(
             id: UUID(uuidString: String(format: "00000000-0000-0000-0000-%012d", id))!,

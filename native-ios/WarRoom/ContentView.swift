@@ -2366,7 +2366,14 @@ struct HomeView: View {
                             }.buttonStyle(WarRoomCardButtonStyle())
                         } else if isNFL && kickoffStarted, let activeCard = card {
                             Button(action: onOpenPicks) {
-                                HomeLivePlayerScorecard(card: activeCard, pick: pick, scores: homeScores, sportId: membership.leagues.sportId, status: homeScoreStatus)
+                                HomeLivePlayerScorecard(
+                                    card: activeCard,
+                                    pick: pick,
+                                    scores: homeScores,
+                                    sportId: membership.leagues.sportId,
+                                    status: homeScoreStatus,
+                                    certifiedScorecard: regularScorecards.first(where: { $0.weekNumber == activeCard.weekNumber })
+                                )
                             }
                             .buttonStyle(WarRoomCardButtonStyle())
                             .accessibilityLabel("Live Week \(membership.leagues.currentWeek) scoreboard. Open the Board.")
@@ -2399,7 +2406,8 @@ struct HomeView: View {
                                     pick: pick,
                                     scores: homeScores,
                                     sportId: membership.leagues.sportId,
-                                    status: homeScoreStatus
+                                    status: homeScoreStatus,
+                                    certifiedScorecard: regularScorecards.first(where: { $0.weekNumber == activeCard.weekNumber })
                                 )
                             }
                             .buttonStyle(WarRoomCardButtonStyle())
@@ -2999,6 +3007,7 @@ private struct HomeLivePlayerScorecard: View {
     let scores: [UUID: SyncedFootballScore]
     let sportId: String
     let status: String?
+    let certifiedScorecard: RegularSeasonScorecard?
 
     private var isNFL: Bool { sportId.lowercased() == "nfl" }
     private var accent: Color { isNFL ? .cyan : .green }
@@ -3045,7 +3054,9 @@ private struct HomeLivePlayerScorecard: View {
                             Text("YOUR CALL · \(pick?.propChoice?.uppercased() ?? "NO PICK")").font(.system(size: 8, weight: .black)).foregroundStyle(.white.opacity(0.48))
                         }
                         Spacer()
-                        Text("PENDING").font(.system(size: 9, weight: .black)).foregroundStyle(.yellow)
+                        Text(propStatus)
+                            .font(.system(size: 9, weight: .black))
+                            .foregroundStyle(certifiedScorecard == nil ? .yellow : (propHit ? accent : .red))
                     }.padding(.horizontal, 15).padding(.vertical, 11)
                 }
             }
@@ -3086,10 +3097,24 @@ private struct HomeLivePlayerScorecard: View {
     }
 
     private var livePoints: Int {
-        card.cardGames.reduce(0) { total, game in
+        let gamePoints = card.cardGames.reduce(0) { total, game in
             let selection = pick?.pickGames.first(where: { $0.cardGameId == game.id })
             return total + (pointsEarned(for: game, selection: selection, score: scores[game.id]) ?? 0)
         }
+        return LiveScorecardOfficialState.total(gamePoints: gamePoints, certifiedTotal: certifiedScorecard?.totalPoints)
+    }
+
+    private var propHit: Bool {
+        guard let result = certifiedScorecard?.result.propResult else { return false }
+        return pick?.propChoice == result
+    }
+
+    private var propStatus: String {
+        LiveScorecardOfficialState.propStatus(
+            choice: pick?.propChoice,
+            officialResult: certifiedScorecard?.result.propResult,
+            points: card.propPoints
+        )
     }
 
     private func pointsEarned(for game: CardGame, selection: PickedGame?, score: SyncedFootballScore?) -> Int? {
@@ -3111,6 +3136,17 @@ private struct HomeLivePlayerScorecard: View {
         guard let date = game.startTime.flatMap({ footballKickoffDate($0) }) else { return "WAITING" }
         if date <= Date() { return "AWAITING UPDATE" }
         return date.formatted(date: .omitted, time: .shortened).uppercased()
+    }
+}
+
+struct LiveScorecardOfficialState {
+    static func total(gamePoints: Int, certifiedTotal: Int?) -> Int {
+        certifiedTotal ?? gamePoints
+    }
+
+    static func propStatus(choice: String?, officialResult: String?, points: Int) -> String {
+        guard let officialResult else { return "PENDING" }
+        return choice == officialResult ? "HIT +\(points)" : "MISS +0"
     }
 }
 
