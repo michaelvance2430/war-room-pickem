@@ -13,6 +13,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.util.UUID
+import com.google.firebase.FirebaseApp
+import com.google.firebase.messaging.FirebaseMessaging
 
 data class AppState(
     val restoring: Boolean = true,
@@ -25,10 +27,21 @@ data class AppState(
     val currentPick: CurrentPick? = null,
     val standings: List<Standing> = emptyList(),
     val messages: List<LockerMessage> = emptyList(),
+    val announcements: List<Announcement> = emptyList(),
+    val availableOdds: List<OddsGame> = emptyList(),
+    val history: List<HistoryWeek> = emptyList(),
+    val trophies: List<Trophy> = emptyList(),
     val favoriteTeam: String? = null,
     val crystalBallTeam: String? = null,
     val error: String? = null,
     val notice: String? = null,
+)
+
+private data class LeagueSnapshot(
+    val card: Pair<WeekCard, List<CardGame>>?, val games: List<CardGame>, val pick: CurrentPick?,
+    val favorite: String?, val crystal: String?, val standings: List<Standing>,
+    val messages: List<LockerMessage>, val announcements: List<Announcement>,
+    val history: List<HistoryWeek>, val trophies: List<Trophy>,
 )
 
 class AppViewModel(application: Application) : AndroidViewModel(application) {
@@ -72,6 +85,20 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         _state.value = AppState(restoring = false)
     }
 
+    fun joinLeague(code: String) = launchBusy {
+        val session = _state.value.session ?: return@launchBusy
+        val id = api.joinLeague(session.accessToken, code)
+        loadLeagues(session)
+        _state.value.leagues.firstOrNull { it.id == id }?.let(::selectLeague)
+    }
+
+    fun createLeague(name: String, sport: Sport, public: Boolean, maxMembers: Int) = launchBusy {
+        val session = _state.value.session ?: return@launchBusy
+        val id = api.createLeague(session.accessToken, name, sport, public, maxMembers)
+        loadLeagues(session)
+        _state.value.leagues.firstOrNull { it.id == id }?.let(::selectLeague)
+    }
+
     fun selectLeague(league: League) = viewModelScope.launch {
         _state.value = _state.value.copy(league = league, card = null, games = emptyList(), standings = emptyList(), messages = emptyList())
         refreshLeague()
@@ -83,20 +110,25 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val league = state.league ?: return@launch
         runCatching {
             val card = api.weekCard(session.accessToken, league)
-            val pick = api.currentPick(session.accessToken, league, session.userId)
-            val favorite = api.favoriteTeam(session.accessToken, session.userId, league.sport)
-            val crystal = api.crystalBall(session.accessToken, league.id, session.userId)
-            val standings = api.standings(session.accessToken, league.id)
-            val messages = api.lockerMessages(session.accessToken, league.id)
-            listOf(card, pick, favorite, crystal, standings, messages)
+            LeagueSnapshot(
+                card = card,
+                games = runCatching { api.liveScores(session.accessToken, league, card?.second.orEmpty()) }.getOrDefault(card?.second.orEmpty()),
+                pick = runCatching { api.currentPick(session.accessToken, league, session.userId) }.getOrNull(),
+                favorite = runCatching { api.favoriteTeam(session.accessToken, session.userId, league.sport) }.getOrNull(),
+                crystal = runCatching { api.crystalBall(session.accessToken, league.id, session.userId) }.getOrNull(),
+                standings = runCatching { api.standings(session.accessToken, league.id) }.getOrDefault(state.standings),
+                messages = runCatching { api.lockerMessages(session.accessToken, league.id) }.getOrDefault(state.messages),
+                announcements = runCatching { api.announcements(session.accessToken, league.id) }.getOrDefault(state.announcements),
+                history = runCatching { api.history(session.accessToken, league.id, session.userId) }.getOrDefault(state.history),
+                trophies = runCatching { api.trophies(session.accessToken, session.userId) }.getOrDefault(state.trophies),
+            )
         }.onSuccess { loaded ->
-            @Suppress("UNCHECKED_CAST")
             _state.value = _state.value.copy(
-                card = (loaded[0] as? Pair<WeekCard, List<CardGame>>)?.first,
-                games = (loaded[0] as? Pair<WeekCard, List<CardGame>>)?.second.orEmpty(),
-                currentPick = loaded[1] as? CurrentPick,
-                favoriteTeam = loaded[2] as? String, crystalBallTeam = loaded[3] as? String,
-                standings = loaded[4] as List<Standing>, messages = loaded[5] as List<LockerMessage>, error = null,
+                card = loaded.card?.first, games = loaded.games, currentPick = loaded.pick,
+                favoriteTeam = loaded.favorite, crystalBallTeam = loaded.crystal,
+                standings = loaded.standings, messages = loaded.messages,
+                announcements = loaded.announcements, error = null,
+                history = loaded.history, trophies = loaded.trophies,
             )
         }.onFailure(::showError)
     }
@@ -104,7 +136,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun refreshLive() = viewModelScope.launch {
         while (true) {
             refreshLeague()
-            delay(30_000)
+            delay(15_000)
         }
     }
 
@@ -131,6 +163,57 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         _state.value = _state.value.copy(busy = false, crystalBallTeam = team, notice = "CRYSTAL BALL LOCKED · $team")
     }
 
+    fun selectTrophy(trophyId: String) = launchBusy {
+        val session = _state.value.session ?: return@launchBusy
+        val league = _state.value.league ?: return@launchBusy
+        require(league.isCommissioner(session.userId)) { "Only the commissioner can choose championship hardware." }
+        require(league.championshipTrophyId == null) { "This season's championship hardware is already sealed." }
+        val saved = api.selectChampionshipTrophy(session.accessToken, league.id, trophyId)
+        val updated = league.copy(championshipTrophyId = saved)
+        _state.value = _state.value.copy(
+            busy = false, league = updated,
+            leagues = _state.value.leagues.map { if (it.id == updated.id) updated else it },
+            notice = "CHAMPIONSHIP HARDWARE SEALED",
+        )
+    }
+
+    fun updateDisplayName(name: String) = launchBusy {
+        val session = _state.value.session ?: return@launchBusy
+        require(name.trim().length in 2..40) { "Your name must be between 2 and 40 characters." }
+        api.updateDisplayName(session.accessToken, session.userId, name)
+        val standings = _state.value.standings.map { if (it.userId == session.userId) it.copy(displayName = name.trim()) else it }
+        _state.value = _state.value.copy(busy = false, standings = standings, notice = "Personnel file updated.")
+    }
+
+    fun postAnnouncement(title: String, body: String) = launchBusy {
+        val session = _state.value.session ?: return@launchBusy
+        val league = _state.value.league ?: return@launchBusy
+        require(league.isCommissioner(session.userId)) { "Only the commissioner can issue a league announcement." }
+        require(title.isNotBlank() && body.isNotBlank()) { "Announcement title and message are required." }
+        api.postAnnouncement(session.accessToken, league.id, session.userId, title, body)
+        val announcements = api.announcements(session.accessToken, league.id)
+        _state.value = _state.value.copy(busy = false, announcements = announcements, notice = "Announcement issued to ${league.name}.")
+    }
+
+    fun pullOdds() = launchBusy {
+        val session = _state.value.session ?: return@launchBusy
+        val league = _state.value.league ?: return@launchBusy
+        require(league.isCommissioner(session.userId)) { "Only the commissioner can pull the weekly slate." }
+        val odds = api.footballOdds(session.accessToken, league)
+        _state.value = _state.value.copy(busy = false, availableOdds = odds, notice = "${odds.size} eligible games received.")
+    }
+
+    fun publishCard(games: List<OddsGame>, prop: String, optionA: String, optionB: String) = launchBusy {
+        val session = _state.value.session ?: return@launchBusy
+        val league = _state.value.league ?: return@launchBusy
+        require(league.isCommissioner(session.userId)) { "Only the commissioner can publish the weekly card." }
+        require(games.size == 5) { "Choose exactly five games." }
+        require(prop.isNotBlank() && optionA.isNotBlank() && optionB.isNotBlank()) { "Complete the prop question and both answers." }
+        api.publishWeekCard(session.accessToken, league, games, prop, optionA, optionB)
+        _state.value = _state.value.copy(busy = false, availableOdds = emptyList(), notice = "WEEK ${league.currentWeek} IS LIVE")
+        refreshLeague()
+    }
+
     fun lockPicks(selections: List<GameSelection>, bestBet: UUID?, propChoice: String?) = launchBusy {
         val state = _state.value
         val session = state.session ?: return@launchBusy
@@ -152,6 +235,18 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val selected = leagues.firstOrNull()
         _state.value = AppState(restoring = false, session = session, leagues = leagues, league = selected)
         if (selected != null) refreshLeague()
+        registerPush(session)
+    }
+
+    private fun registerPush(session: UserSession) {
+        val app = getApplication<Application>()
+        val prefs = app.getSharedPreferences("war_room_push", Application.MODE_PRIVATE)
+        fun upload(value: String) = viewModelScope.launch {
+            runCatching { api.registerPushToken(session.accessToken, session.userId, value) }
+                .onSuccess { prefs.edit().remove("pending_fcm_token").apply() }
+        }
+        prefs.getString("pending_fcm_token", null)?.let(::upload)
+        if (FirebaseApp.getApps(app).isNotEmpty()) FirebaseMessaging.getInstance().token.addOnSuccessListener(::upload)
     }
 
     private suspend fun validSession(session: UserSession): UserSession {

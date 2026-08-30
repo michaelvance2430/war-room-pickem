@@ -61,6 +61,14 @@ fun PicksScreen(state: AppState, lockPicks: (List<GameSelection>, UUID?, String?
                             if (lockedPick.bestBetGameId == game.id) Text("★ ", color = WarYellow)
                             Text("${selection?.confidence ?: 0} PTS", color = accent, fontWeight = FontWeight.Black)
                         }
+                        if (game.homeScore != null || game.awayScore != null) {
+                            Text(
+                                "${game.awayTeam} ${game.awayScore ?: 0}  ·  ${game.homeTeam} ${game.homeScore ?: 0}${if (game.final) "  FINAL" else "  LIVE"}",
+                                color = if (game.final) Muted else WarGreen,
+                                fontSize = 10.sp, fontWeight = FontWeight.Black,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp),
+                            )
+                        }
                     }
                 }
             } else {

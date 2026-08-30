@@ -15,6 +15,7 @@ import com.warroompicks.WarRoom.AppState
 import com.warroompicks.WarRoom.model.Sport
 import com.warroompicks.WarRoom.ui.components.WarBackdrop
 import com.warroompicks.WarRoom.ui.components.WarHeader
+import com.warroompicks.WarRoom.ui.components.PlayerAvatar
 import com.warroompicks.WarRoom.ui.theme.*
 
 @Composable
@@ -33,6 +34,8 @@ fun StandingsScreen(state: AppState) {
                     Surface(color = PanelBlack, shape = MaterialTheme.shapes.medium) {
                         Row(Modifier.fillMaxWidth().padding(13.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text("${player.rank}", color = accent, fontSize = 22.sp, fontWeight = FontWeight.Black, modifier = Modifier.width(38.dp))
+                            PlayerAvatar(player.displayName, player.avatarUrl, accent)
+                            Spacer(Modifier.width(10.dp))
                             Column(Modifier.weight(1f)) {
                                 Text(player.displayName, color = Color.White, fontWeight = FontWeight.Black)
                                 player.favoriteTeam?.let { Text(it, color = Muted, fontSize = 10.sp) }

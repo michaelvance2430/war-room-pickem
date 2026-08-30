@@ -19,19 +19,35 @@ import com.warroompicks.WarRoom.ui.theme.NflCyan
 import com.warroompicks.WarRoom.ui.theme.WarGreen
 
 @Composable
-fun YouScreen(state: AppState, saveFavorite: (String) -> Unit, saveCrystal: (String) -> Unit, signOut: () -> Unit) {
+fun YouScreen(state: AppState, saveFavorite: (String) -> Unit, saveCrystal: (String) -> Unit, updateDisplayName: (String) -> Unit, signOut: () -> Unit) {
     val league = state.league ?: return
     val session = state.session ?: return
     val standing = state.standings.firstOrNull { it.userId == session.userId }
     val accent = if (league.sport == Sport.NFL) NflCyan else WarGreen
     var editFavorite by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    var editName by remember { mutableStateOf(false) }
     WarBackdrop(league.sport) {
         LazyColumn(contentPadding = PaddingValues(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item { WarHeader("PERSONNEL FILE", standing?.displayName ?: session.email.substringBefore('@'), "One identity across every league and sport.", league.sport) }
+            item { CommandPanel("CALL SIGN", standing?.displayName ?: session.email.substringBefore('@'), "Your account name follows you across every sport. Tap to edit.", league.sport, onClick = { editName = true }) }
             item { CommandPanel("CAMPAIGN RECORD", "${standing?.points?.toInt() ?: 0} career points", "Current rank: ${standing?.rank ?: "—"} · Historical weekly scorecards remain on file.", league.sport) }
             item { CommandPanel("TEAM ALLEGIANCE", state.favoriteTeam ?: "Choose favorite team", "Editable at any time. Your favorite appears on commissioner boards.", league.sport, onClick = { editFavorite = true }) }
             item { CommandPanel("CRYSTAL BALL", state.crystalBallTeam ?: "Preseason champion pick", "Required once at the start of this campaign and displayed on your profile.", league.sport) }
             item { CommandPanel("HARDWARE", "Trophy cabinet", "Championships, conference titles, Crystal Ball and Toilet Bowl evidence.", league.sport, onClick = {}) }
+            if (state.trophies.isNotEmpty()) {
+                item { Text("HARDWARE", color = accent, fontWeight = FontWeight.Black) }
+                items(state.trophies.size) { index ->
+                    val trophy = state.trophies[index]
+                    CommandPanel(trophy.type.replace('_', ' '), trophy.winnerName, "${trophy.seasonYear} · ${trophy.subtitle ?: "Permanent evidence"}", league.sport)
+                }
+            }
+            if (state.history.isNotEmpty()) {
+                item { Text("WEEKLY SCORECARDS", color = accent, fontWeight = FontWeight.Black) }
+                items(state.history.size) { index ->
+                    val week = state.history[index]
+                    CommandPanel("WEEK ${week.week}", "${week.points} points", "Locked card and certified weekly result.", league.sport)
+                }
+            }
             item {
                 OutlinedButton(onClick = signOut, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)) {
                     Text("SIGN OUT", fontWeight = FontWeight.Black)
@@ -44,6 +60,15 @@ fun YouScreen(state: AppState, saveFavorite: (String) -> Unit, saveCrystal: (Str
         saveFavorite = { saveFavorite(it); editFavorite = false }, saveCrystal = saveCrystal,
         dismissAllowed = true, onDismiss = { editFavorite = false },
     )
+    if (editName) {
+        var name by remember { mutableStateOf(standing?.displayName ?: "") }
+        AlertDialog(
+            onDismissRequest = { editName = false }, title = { Text("EDIT CALL SIGN") },
+            text = { OutlinedTextField(name, { name = it.take(40) }, label = { Text("DISPLAY NAME") }, singleLine = true) },
+            dismissButton = { TextButton(onClick = { editName = false }) { Text("CANCEL") } },
+            confirmButton = { Button(onClick = { updateDisplayName(name); editName = false }, enabled = name.trim().length >= 2) { Text("CONFIRM") } },
+        )
+    }
 }
 
 @Composable

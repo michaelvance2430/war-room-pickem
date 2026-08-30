@@ -15,6 +15,7 @@ import com.warroompicks.WarRoom.AppState
 import com.warroompicks.WarRoom.model.Sport
 import com.warroompicks.WarRoom.ui.components.WarBackdrop
 import com.warroompicks.WarRoom.ui.components.WarHeader
+import com.warroompicks.WarRoom.ui.components.PlayerAvatar
 import com.warroompicks.WarRoom.ui.theme.*
 
 @Composable
@@ -32,9 +33,13 @@ fun LockerScreen(state: AppState, postMessage: (String) -> Unit) {
             items(state.messages.size, key = { state.messages[it].id }) { index ->
                 val message = state.messages[index]
                 Surface(color = PanelBlack, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(12.dp)) {
-                        Text(message.displayName.uppercase(), color = accent, fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
-                        Text(message.body, color = Color.White)
+                    Row(Modifier.padding(12.dp), verticalAlignment = Alignment.Top) {
+                        PlayerAvatar(message.displayName, message.avatarUrl, accent)
+                        Spacer(Modifier.width(10.dp))
+                        Column {
+                            Text(message.displayName.uppercase(), color = accent, fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+                            Text(message.body, color = Color.White)
+                        }
                     }
                 }
             }

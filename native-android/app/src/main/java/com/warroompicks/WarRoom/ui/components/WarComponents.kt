@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -16,6 +17,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.warroompicks.WarRoom.model.Sport
 import com.warroompicks.WarRoom.ui.theme.*
+import coil3.compose.AsyncImage
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 
 @Composable
 fun WarBackdrop(sport: Sport, content: @Composable ColumnScope.() -> Unit) {
@@ -68,3 +72,11 @@ fun CommandPanel(
 
 @Composable
 fun EmptyCommand(title: String, detail: String, sport: Sport) = CommandPanel("AWAITING ORDERS", title, detail, sport)
+
+@Composable
+fun PlayerAvatar(name: String, url: String?, accent: Color, modifier: Modifier = Modifier) {
+    Box(modifier.size(42.dp).clip(CircleShape).background(accent.copy(alpha = .18f)).border(2.dp, accent, CircleShape), contentAlignment = Alignment.Center) {
+        if (url.isNullOrBlank()) Text(name.trim().take(1).uppercase(), color = accent, fontWeight = FontWeight.Black)
+        else AsyncImage(model = url, contentDescription = "$name profile picture", contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().clip(CircleShape))
+    }
+}

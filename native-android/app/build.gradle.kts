@@ -16,6 +16,10 @@ android {
         versionName = "1.1.0-native"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
+        buildConfigField("String", "FIREBASE_APPLICATION_ID", "\"${providers.gradleProperty("WARROOM_FIREBASE_APP_ID").orNull ?: ""}\"")
+        buildConfigField("String", "FIREBASE_API_KEY", "\"${providers.gradleProperty("WARROOM_FIREBASE_API_KEY").orNull ?: ""}\"")
+        buildConfigField("String", "FIREBASE_PROJECT_ID", "\"${providers.gradleProperty("WARROOM_FIREBASE_PROJECT_ID").orNull ?: ""}\"")
+        buildConfigField("String", "FIREBASE_SENDER_ID", "\"${providers.gradleProperty("WARROOM_FIREBASE_SENDER_ID").orNull ?: ""}\"")
     }
 
     buildFeatures {
@@ -29,6 +33,20 @@ android {
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
+    }
+
+    val keystorePath = providers.environmentVariable("WAR_ROOM_ANDROID_KEYSTORE").orNull
+    val keystorePassword = providers.environmentVariable("WAR_ROOM_ANDROID_KEYSTORE_PASSWORD").orNull
+    val keyAliasValue = providers.environmentVariable("WAR_ROOM_ANDROID_KEY_ALIAS").orNull
+    val keyPasswordValue = providers.environmentVariable("WAR_ROOM_ANDROID_KEY_PASSWORD").orNull
+    if (keystorePath != null && keystorePassword != null && keyAliasValue != null && keyPasswordValue != null) {
+        signingConfigs.create("playRelease") {
+            storeFile = file(keystorePath)
+            storePassword = keystorePassword
+            keyAlias = keyAliasValue
+            keyPassword = keyPasswordValue
+        }
+        buildTypes.getByName("release").signingConfig = signingConfigs.getByName("playRelease")
     }
 
     compileOptions {
@@ -57,6 +75,10 @@ dependencies {
     implementation("androidx.navigation:navigation-compose:2.9.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     implementation("androidx.security:security-crypto:1.1.0")
+    implementation("io.coil-kt.coil3:coil-compose:3.3.0")
+    implementation("io.coil-kt.coil3:coil-network-okhttp:3.3.0")
+    implementation(platform("com.google.firebase:firebase-bom:34.2.0"))
+    implementation("com.google.firebase:firebase-messaging")
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")

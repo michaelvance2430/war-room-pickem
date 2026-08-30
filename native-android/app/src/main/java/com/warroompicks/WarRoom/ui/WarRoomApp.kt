@@ -24,14 +24,21 @@ private enum class AppTab(val label: String, val icon: ImageVector) {
 }
 
 @Composable
-fun WarRoomApp(viewModel: AppViewModel) {
+fun WarRoomApp(viewModel: AppViewModel, notificationDestination: String? = null) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     var tab by remember { mutableStateOf(AppTab.Home) }
+    LaunchedEffect(notificationDestination) {
+        tab = when (notificationDestination) {
+            "picks", "results" -> AppTab.Picks
+            "announcements" -> AppTab.Home
+            else -> tab
+        }
+    }
 
     when {
         state.restoring -> LoadingScreen()
         state.session == null -> AuthScreen(state.busy, state.error, state.notice, viewModel::signIn, viewModel::signUp, viewModel::recover)
-        state.league == null -> NoLeagueScreen(viewModel::signOut)
+        state.league == null -> NoLeagueScreen(state.busy, viewModel::joinLeague, viewModel::createLeague, viewModel::signOut)
         else -> {
             val sport = state.league!!.sport
             Scaffold(
@@ -61,11 +68,11 @@ fun WarRoomApp(viewModel: AppViewModel) {
             ) { padding ->
                 Box(Modifier.padding(padding)) {
                     when (tab) {
-                        AppTab.Home -> HomeScreen(state, viewModel::selectLeague) { tab = AppTab.Picks }
+                        AppTab.Home -> HomeScreen(state, viewModel::selectLeague, viewModel::postAnnouncement, viewModel::pullOdds, viewModel::publishCard, viewModel::selectTrophy) { tab = AppTab.Picks }
                         AppTab.Picks -> PicksScreen(state, viewModel::lockPicks)
                         AppTab.Standings -> StandingsScreen(state)
                         AppTab.Locker -> LockerScreen(state, viewModel::postMessage)
-                        AppTab.You -> YouScreen(state, viewModel::saveFavorite, viewModel::saveCrystalBall, viewModel::signOut)
+                        AppTab.You -> YouScreen(state, viewModel::saveFavorite, viewModel::saveCrystalBall, viewModel::updateDisplayName, viewModel::signOut)
                     }
                 }
             }
@@ -96,11 +103,19 @@ private fun LoadingScreen() = Box(Modifier.fillMaxSize(), contentAlignment = and
 }
 
 @Composable
-private fun NoLeagueScreen(signOut: () -> Unit) {
+private fun NoLeagueScreen(busy: Boolean, join: (String) -> Unit, create: (String, Sport, Boolean, Int) -> Unit, signOut: () -> Unit) {
+    var code by remember { mutableStateOf("") }
+    var name by remember { mutableStateOf("") }
+    var sport by remember { mutableStateOf(Sport.CFB) }
     Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.Center) {
         Text("NO ACTIVE LEAGUE", style = MaterialTheme.typography.headlineLarge)
-        Text("Join a CFB or NFL league with an invite code, then return to the War Room.")
+        Text("Join a CFB or NFL league with an invite code or commission a new room.")
+        OutlinedTextField(code, { code = it.uppercase() }, label = { Text("INVITE CODE") }, modifier = Modifier.fillMaxWidth())
+        Button(onClick = { join(code) }, enabled = code.isNotBlank() && !busy, modifier = Modifier.fillMaxWidth()) { Text("JOIN LEAGUE") }
         Spacer(Modifier.height(20.dp))
+        OutlinedTextField(name, { name = it }, label = { Text("NEW LEAGUE NAME") }, modifier = Modifier.fillMaxWidth())
+        Row { Sport.entries.forEach { option -> FilterChip(selected = sport == option, onClick = { sport = option }, label = { Text(option.id.uppercase()) }); Spacer(Modifier.width(8.dp)) } }
+        Button(onClick = { create(name, sport, false, 100) }, enabled = name.isNotBlank() && !busy, modifier = Modifier.fillMaxWidth()) { Text("CREATE PRIVATE LEAGUE") }
         Button(onClick = signOut) { Text("SIGN OUT") }
     }
 }
