@@ -8,6 +8,10 @@ final class WarRoomAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificat
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         UNUserNotificationCenter.current().delegate = self
+        if let userInfo = launchOptions?[.remoteNotification] as? [AnyHashable: Any],
+           let destination = userInfo["destination"] as? String {
+            WarRoomNotificationCenter.savePendingDestination(destination)
+        }
         return true
     }
 
@@ -38,6 +42,7 @@ final class WarRoomAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificat
     ) {
         let userInfo = response.notification.request.content.userInfo
         if let destination = userInfo["destination"] as? String {
+            WarRoomNotificationCenter.savePendingDestination(destination)
             NotificationCenter.default.post(name: .warRoomNotificationDestination, object: destination)
         }
         completionHandler()
@@ -52,6 +57,22 @@ extension Notification.Name {
 enum WarRoomNotificationCenter {
     private static let center = UNUserNotificationCenter.current()
     static let deviceTokenKey = "warroom.apns.device-token"
+    static let pendingDestinationKey = "warroom.notification.pending-destination"
+
+    static func savePendingDestination(_ destination: String) {
+        UserDefaults.standard.set(destination, forKey: pendingDestinationKey)
+        UserDefaults.standard.synchronize()
+    }
+
+    static func takePendingDestination() -> String? {
+        let destination = UserDefaults.standard.string(forKey: pendingDestinationKey)
+        // An empty tombstone is more reliable than removing a key while the app
+        // is launching and CFPreferences is synchronizing across processes.
+        UserDefaults.standard.set("", forKey: pendingDestinationKey)
+        UserDefaults.standard.synchronize()
+        guard let destination, !destination.isEmpty else { return nil }
+        return destination
+    }
 
     static func authorizationStatus() async -> UNAuthorizationStatus {
         await center.notificationSettings().authorizationStatus

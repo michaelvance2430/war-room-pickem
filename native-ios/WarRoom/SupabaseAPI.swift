@@ -379,6 +379,9 @@ struct FootballScoreFeed: Decodable, Sendable {
     let remaining: String?
     let used: String?
     let last: String?
+    let cachedAt: String?
+    let cacheHit: Bool?
+    let stale: Bool?
 }
 
 struct FootballScoreEvent: Decodable, Identifiable, Sendable {
@@ -607,6 +610,62 @@ struct PlayerPick: Decodable, Identifiable, Sendable {
         case isChaos = "is_chaos"
         case pickGames = "pick_games"
     }
+}
+
+struct SeasonPlayerPick: Decodable, Identifiable, Sendable {
+    let id: UUID
+    let weekNumber: Int
+    let propChoice: String?
+    let lockedAt: String?
+    let totalPoints: Int?
+    let isChaos: Bool
+    let pickGames: [PickedGame]
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case weekNumber = "week_number"
+        case propChoice = "prop_choice"
+        case lockedAt = "locked_at"
+        case totalPoints = "total_points"
+        case isChaos = "is_chaos"
+        case pickGames = "pick_games"
+    }
+}
+
+struct CertifiedWeekResult: Decodable, Identifiable, Sendable {
+    let id: UUID
+    let weekNumber: Int
+    let propResult: String?
+    let scoredAt: String
+    let gameResults: [CertifiedGameResult]
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case weekNumber = "week_number"
+        case propResult = "prop_result"
+        case scoredAt = "scored_at"
+        case gameResults = "game_results"
+    }
+}
+
+struct CertifiedGameResult: Decodable, Sendable {
+    let cardGameId: UUID
+    let winner: String
+    enum CodingKeys: String, CodingKey {
+        case cardGameId = "card_game_id"
+        case winner
+    }
+}
+
+struct RegularSeasonScorecard: Identifiable, Sendable {
+    let card: WeekCard
+    let pick: SeasonPlayerPick
+    let result: CertifiedWeekResult
+    let seasonTotalBefore: Int
+    let seasonTotalAfter: Int
+    var id: String { "\(card.id.uuidString)-\(pick.id.uuidString)" }
+    var weekNumber: Int { card.weekNumber }
+    var totalPoints: Int { pick.totalPoints ?? 0 }
 }
 
 struct PickedGame: Decodable, Sendable {
@@ -944,6 +1003,60 @@ enum SupabaseAPI {
         ]
         let request = authorizedRequest(url: components.url!, token: token)
         return try await send(request, as: [PlayerPick].self).first
+    }
+
+    static func regularSeasonScorecards(token: String, leagueId: UUID, userId: UUID) async throws -> [RegularSeasonScorecard] {
+        var pickComponents = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/picks"), resolvingAgainstBaseURL: false)!
+        pickComponents.queryItems = [
+            URLQueryItem(name: "select", value: "id,week_number,prop_choice,locked_at,total_points,is_chaos,pick_games(card_game_id,side,confidence,is_best_bet)"),
+            URLQueryItem(name: "league_id", value: "eq.\(leagueId.uuidString.lowercased())"),
+            URLQueryItem(name: "user_id", value: "eq.\(userId.uuidString.lowercased())"),
+            URLQueryItem(name: "locked_at", value: "not.is.null"),
+            URLQueryItem(name: "total_points", value: "not.is.null"),
+            URLQueryItem(name: "order", value: "week_number.desc"),
+        ]
+
+        var resultComponents = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/week_results"), resolvingAgainstBaseURL: false)!
+        resultComponents.queryItems = [
+            URLQueryItem(name: "select", value: "id,week_number,prop_result,scored_at,game_results(card_game_id,winner)"),
+            URLQueryItem(name: "league_id", value: "eq.\(leagueId.uuidString.lowercased())"),
+            URLQueryItem(name: "order", value: "week_number.desc"),
+        ]
+
+        var cardComponents = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/week_cards"), resolvingAgainstBaseURL: false)!
+        cardComponents.queryItems = [
+            URLQueryItem(name: "select", value: "id,week_number,lock_time,prop_question,prop_option_a,prop_option_b,prop_points,card_games(id,sort_order,away_team,home_team,spread,favorite,start_time,away_rank,home_rank,is_rivalry)"),
+            URLQueryItem(name: "league_id", value: "eq.\(leagueId.uuidString.lowercased())"),
+            URLQueryItem(name: "card_games.order", value: "sort_order.asc"),
+            URLQueryItem(name: "order", value: "week_number.desc"),
+        ]
+
+        let pickURL = pickComponents.url!
+        let resultURL = resultComponents.url!
+        let cardURL = cardComponents.url!
+        async let picks: [SeasonPlayerPick] = send(authorizedRequest(url: pickURL, token: token), as: [SeasonPlayerPick].self)
+        async let results: [CertifiedWeekResult] = send(authorizedRequest(url: resultURL, token: token), as: [CertifiedWeekResult].self)
+        async let cards: [WeekCard] = send(authorizedRequest(url: cardURL, token: token), as: [WeekCard].self)
+        let (loadedPicks, loadedResults, loadedCards) = try await (picks, results, cards)
+        let resultsByWeek = Dictionary(uniqueKeysWithValues: loadedResults.map { ($0.weekNumber, $0) })
+        let cardsByWeek = Dictionary(uniqueKeysWithValues: loadedCards.map { ($0.weekNumber, $0) })
+        let rows = loadedPicks.compactMap { pick -> RegularSeasonScorecard? in
+            guard let result = resultsByWeek[pick.weekNumber], let card = cardsByWeek[pick.weekNumber] else { return nil }
+            return RegularSeasonScorecard(card: card, pick: pick, result: result, seasonTotalBefore: 0, seasonTotalAfter: 0)
+        }
+        var running = 0
+        let withTotals = rows.sorted { $0.weekNumber < $1.weekNumber }.map { row in
+            let before = running
+            running += row.totalPoints
+            return RegularSeasonScorecard(
+                card: row.card,
+                pick: row.pick,
+                result: row.result,
+                seasonTotalBefore: before,
+                seasonTotalAfter: running
+            )
+        }
+        return withTotals.sorted { $0.weekNumber > $1.weekNumber }
     }
 
     static func tacticalNukesUsed(token: String, leagueId: UUID, userId: UUID) async throws -> Int {

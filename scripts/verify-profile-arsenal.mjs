@@ -14,7 +14,7 @@ assert.match(preview, /Dead Hand Protocol/);
 assert.match(preview, /JDAM Protocol/);
 assert.match(preview, /Hellfire Mode/);
 assert.match(profile, /WEAPONS SERVICE RECORD/);
-assert.match(profile, /Foundry is rehearsal\. Production becomes history\./);
+assert.match(profile, /Rehearsal is temporary\. Production becomes history\./);
 assert.match(profile, /Tactical Nuke/);
 assert.match(profile, /Dead Hand/);
 assert.match(profile, /JDAM/);

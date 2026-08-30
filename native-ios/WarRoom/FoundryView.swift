@@ -106,15 +106,15 @@ struct FoundryView: View {
         .navigationTitle("The Foundry").navigationBarTitleDisplayMode(.inline)
         .preferredColorScheme(.dark)
         .task { await preflight() }
-        .confirmationDialog("Restore the Foundry Bot Lab to Week \(SportIdentity(lab?.leagues.sportId).openingWeek)?", isPresented: $confirmingReset, titleVisibility: .visible) {
+        .confirmationDialog("Restore the Foundry Simulation Lab to Week \(SportIdentity(lab?.leagues.sportId).openingWeek)?", isPresented: $confirmingReset, titleVisibility: .visible) {
             Button("RESTORE SIMULATION LAB", role: .destructive) { Task { await resetLab() } }
             Button("Cancel", role: .cancel) {}
-        } message: { Text("Only disposable Foundry scores, Dispatch editions, cards, picks, and bot chatter are cleared. Production leagues remain untouched.") }
+        } message: { Text("Only disposable Foundry scores, Dispatch editions, cards, picks, and simulated chatter are cleared. Production leagues remain untouched.") }
         .confirmationDialog("Complete the Foundry regular season?", isPresented: $confirmingSeasonSkip, titleVisibility: .visible) {
             Button("COMPLETE REGULAR SEASON") { Task { await completeRegularSeason() } }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Every remaining bot week will be scored through the real weekly pipeline. Standings, Crown & Shame, Dispatch editions, and cards will all be created before the Foundry enters postseason.")
+            Text("Every remaining simulated week will be scored through the real weekly pipeline. Standings, Crown & Shame, Dispatch editions, and cards will all be created before the Foundry enters postseason.")
         }
         .fullScreenCover(isPresented: $showingSeasonOpening, onDismiss: { Task { await finishPresentation("season_opening") } }) {
             if lab?.leagues.sportId.lowercased() == "nfl" {
@@ -223,7 +223,7 @@ struct FoundryView: View {
         FoundryPanel(accent: isNFLFoundry ? .cyan : .yellow) {
             if isNFLFoundry { NflFoundrySectionTitle(kicker: "SIMULATION STOP", title: "NO PRO FOOTBALL LAB FOUND") }
             else { FoundrySectionTitle(kicker: "STOP", title: "NO DISPOSABLE LAB FOUND") }
-            Text(preferredSportId == "nfl" ? "No pro-football bot lab is connected. Sunday Operations will never borrow another sport’s lab or a production room." : "The Foundry will not borrow a production room. Connect a league marked foundry before testing.").font(.subheadline.weight(.semibold)).foregroundStyle(.white.opacity(0.62))
+            Text(preferredSportId == "nfl" ? "No pro-football simulation lab is connected. Sunday Operations will never borrow another sport’s lab or a production room." : "The Foundry will not borrow a production room. Connect a league marked foundry before testing.").font(.subheadline.weight(.semibold)).foregroundStyle(.white.opacity(0.62))
         }
     }
 
@@ -262,7 +262,7 @@ struct FoundryView: View {
             if nflPostseason || phase.isPostseasonScoring || phase == .seasonComplete {
                 if isNFL { NflFoundrySectionTitle(kicker: nflPhase.kicker, title: nflPhase.title) }
                 else { FoundrySectionTitle(kicker: phase == .seasonComplete ? "SEASON COMPLETE" : phase.isCfp ? "PLAYOFF WEEK CONTROL" : "BOWL WEEK CONTROL", title: phase == .seasonComplete ? "POSTSEASON CERTIFIED" : phase.isCfp ? "THE PLAYOFFS ARE LIVE" : "BOWL MANIA IS LIVE") }
-                Text(isNFL ? "Wild Card through the Super Bowl lives on the NFL bracket. JDAM is the only postseason weapon on this desk." : phase == .seasonComplete ? "The Foundry postseason is complete. Review the Dispatch, standings, and final board." : "Same Foundry rhythm. Lock Week freezes every bot card for inspection. Score Week certifies this phase, creates its Dispatch, and advances the room.")
+                Text(isNFL ? "Wild Card through the Super Bowl lives on the NFL bracket. JDAM is the only postseason weapon on this desk." : phase == .seasonComplete ? "The Foundry postseason is complete. Review the Dispatch, standings, and final board." : "Same Foundry rhythm. Lock Week freezes every simulated card for inspection. Score Week certifies this phase, creates its Dispatch, and advances the room.")
                     .font(.subheadline.weight(.semibold)).foregroundStyle(.white.opacity(0.64)).fixedSize(horizontal: false, vertical: true)
                 if phase != .seasonComplete && !isNFL {
                     HStack(spacing: 10) {
@@ -314,7 +314,7 @@ struct FoundryView: View {
             } else {
                 if isNFL { NflFoundrySectionTitle(kicker: "GAME WEEK \(lab.leagues.currentWeek) · CONTROL DESK", title: !seasonReady ? "OPENING BROADCAST REQUIRED" : card == nil ? "STAGING THE GAME SLATE" : weekLocked ? "KICKOFF HAS HIT" : "CHOOSE THE MOMENT") }
                 else { FoundrySectionTitle(kicker: "WEEK \(lab.leagues.currentWeek) CONTROL", title: !seasonReady ? "OPENING CEREMONY REQUIRED" : card == nil ? "STAGING THE TEST WEEK" : weekLocked ? "KICKOFF HAS HIT" : phase == .conferenceChampionships ? "CHAMPIONSHIP SATURDAY" : "CHOOSE THE MOMENT") }
-                Text(card == nil ? "The Foundry is creating this week and filling every bot card automatically. No commissioner setup required." : safeBotLab ? "Lock Week stops before scoring so you can inspect the Board. Score Week runs the finals, standings, Crown & Shame, Dispatch, and progression." : "Safety stop: this room is not a verified bot lab. Both controls stay sealed.")
+                Text(card == nil ? "The Foundry is creating this week and filling every simulated card automatically. No commissioner setup required." : safeBotLab ? "Lock Week stops before scoring so you can inspect the Board. Score Week runs the finals, standings, Crown & Shame, Dispatch, and progression." : "Safety stop: this room is not a verified simulation lab. Both controls stay sealed.")
                     .font(.subheadline.weight(.semibold)).foregroundStyle(.white.opacity(0.64)).fixedSize(horizontal: false, vertical: true)
                 if card != nil {
                 HStack(spacing: 10) {
@@ -353,7 +353,7 @@ struct FoundryView: View {
             else { FoundrySectionTitle(kicker: "THIS WEEK", title: "FOLLOW THE LIGHTS") }
             trailRow("1", "Quarantine", "Production blocked", done: true, active: false)
             trailRow("2", isNFLFoundry ? "Game slate" : "Test card", card == nil ? "Auto-staging" : "Published", done: card != nil, active: card == nil)
-            trailRow("3", "Bot roster", safeBotLab ? "\(submittedCount)/\(bots.count) bots submitted" : "Bot quarantine failed", done: safeBotLab && submittedCount == bots.count, active: !safeBotLab || submittedCount < bots.count)
+            trailRow("3", "Simulated field", safeBotLab ? "\(submittedCount)/\(bots.count) cards submitted" : "Simulation quarantine failed", done: safeBotLab && submittedCount == bots.count, active: !safeBotLab || submittedCount < bots.count)
             trailRow("4", isNFLFoundry ? "Kickoff" : "Kickoff lock", weekLocked ? "Board declassified" : "Picks still sealed", done: weekLocked, active: !weekLocked)
             trailRow("5", "Score week", "Standings · Crown · Shame · Dispatch", done: false, active: weekLocked)
             trailRow("6", "Review the damage", "Standings · Crown · Shame · Dispatch", done: false, active: false)
@@ -571,7 +571,7 @@ struct FoundryView: View {
         lockingWeek = true; errorMessage = nil; weekActionNotice = nil
         do {
             let result = try await SupabaseAPI.lockFoundryWeek(token: token, leagueId: lab.leagueId, weekNumber: lab.leagues.currentWeek)
-            weekActionNotice = "Week \(result.week) locked. \(result.lockedCards) bot cards are now visible on the Board. Nothing has been scored."
+            weekActionNotice = "Week \(result.week) locked. \(result.lockedCards) simulated cards are now visible on the Board. Nothing has been scored."
             loading = true
             await preflight()
         } catch { errorMessage = error.localizedDescription }
@@ -597,7 +597,7 @@ struct FoundryView: View {
             let seasonKey = Calendar.current.component(.year, from: Date())
             let result = try await SupabaseAPI.lockFoundryPostseasonWeek(token: token, leagueId: lab.leagueId, seasonKey: seasonKey)
             postseasonWeekLocked = true
-            weekActionNotice = "Week \(result.week) locked. \(result.lockedCards ?? 0) bot cards are frozen for review. Nothing has been scored."
+            weekActionNotice = "Week \(result.week) locked. \(result.lockedCards ?? 0) simulated cards are frozen for review. Nothing has been scored."
         } catch { errorMessage = error.localizedDescription }
         lockingWeek = false
     }
@@ -608,7 +608,7 @@ struct FoundryView: View {
         do {
             let seasonKey = Calendar.current.component(.year, from: Date())
             let result = try await SupabaseAPI.scoreFoundryPostseasonWeek(token: token, leagueId: lab.leagueId, seasonKey: seasonKey)
-            weekActionNotice = "Week \(result.week) scored. \(result.scoredCards ?? 0) bot cards certified; the phase Dispatch and Week \(result.nextWeek ?? result.week + 1) are ready."
+            weekActionNotice = "Week \(result.week) scored. \(result.scoredCards ?? 0) simulated cards certified; the phase Dispatch and Week \(result.nextWeek ?? result.week + 1) are ready."
             if result.phase == "championship" {
                 await presentSeasonFinale(lab)
             }
@@ -848,7 +848,7 @@ struct FoundryLeagueMirrorView: View {
                 mirrorHeader
                 sectionRail
                 Group {
-                    if loading { ProgressView(isNFL ? "Opening Sunday simulation…" : "Entering the bot league…").tint(mirrorAccent).frame(maxWidth: .infinity, maxHeight: .infinity) }
+                    if loading { ProgressView(isNFL ? "Opening Sunday simulation…" : "Entering the simulation…").tint(mirrorAccent).frame(maxWidth: .infinity, maxHeight: .infinity) }
                     else if let errorMessage { ContentUnavailableView("Mirror unavailable", systemImage: "exclamationmark.triangle.fill", description: Text(errorMessage)) }
                     else { sectionBody }
                 }
@@ -913,7 +913,7 @@ struct FoundryLeagueMirrorView: View {
             } else if membership.leagues.currentWeek >= membership.leagues.regularSeasonWeeks + 2 {
                 FoundryPostseasonBoardView(membership: membership)
             } else if boardDeclassified, let card {
-                WeekBoardView(card: card, picks: picks, sportId: membership.leagues.sportId, loading: false, errorMessage: errorMessage) { Task { await load() } }
+                WeekBoardView(card: card, picks: picks, scores: [:], scoreStatus: "SIMULATION SCORE FEED", sportId: membership.leagues.sportId, loading: false, errorMessage: errorMessage) { Task { await load() } }
             } else if let card {
                 mirrorScroll { FoundrySealedWeekView(card: card, lockedCount: submittedCount, sportId: membership.leagues.sportId) }
             } else {
@@ -953,7 +953,7 @@ struct FoundryLeagueMirrorView: View {
 
     private var picksPage: some View {
         VStack(alignment: .leading, spacing: 12) {
-            MirrorHero(kicker: "WEEK \(reviewedWeek) · SCORE AUDIT", title: "EVERY CARD. EVERY RECEIPT.", detail: card.map { "\($0.cardGames.count) games · \(picks.count) bot slips · prop included" } ?? "Scored bot slips", color: .blue)
+            MirrorHero(kicker: "WEEK \(reviewedWeek) · SCORE AUDIT", title: "EVERY CARD. EVERY RECEIPT.", detail: card.map { "\($0.cardGames.count) games · \(picks.count) simulated slips · prop included" } ?? "Scored simulated slips", color: .blue)
             ForEach(picks) { pick in
                 DisclosureGroup {
                     VStack(alignment: .leading, spacing: 7) {

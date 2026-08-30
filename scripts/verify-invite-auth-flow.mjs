@@ -21,7 +21,7 @@ assert.match(
 );
 assert.match(
   login,
-  /next \|\|\s*\(code \? `\/join\?code=\$\{encodeURIComponent\(code\)\}` : "\/"\)/,
+  /next \|\|\s*\(code \? `\/join\?code=\$\{encodeURIComponent\(code\)\}` : opts\?\.isNewSignup \? "\/open-room" : "\/"\)/,
   "login must return to the invite join URL after authentication"
 );
 assert.match(

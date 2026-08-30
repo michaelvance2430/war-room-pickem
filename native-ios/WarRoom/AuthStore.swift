@@ -12,6 +12,7 @@ final class AuthStore: ObservableObject {
 
     private let tokenAccount = "supabase-access-token"
     private let refreshAccount = "supabase-refresh-token"
+    private var refreshTask: Task<String, Error>?
 
     func restore() async {
         defer { isRestoring = false }
@@ -79,17 +80,45 @@ final class AuthStore: ObservableObject {
     }
 
     func refreshAccessToken() async throws -> String {
+        if let refreshTask { return try await refreshTask.value }
         guard let refresh = KeychainStore.read(account: refreshAccount) else {
             clearSession()
             throw AuthRefreshError.missingRefreshToken
         }
-        do {
+        let task = Task { @MainActor in
             let session = try await SupabaseAPI.refreshSession(refreshToken: refresh)
             try persist(session)
             return session.accessToken
-        } catch {
-            clearSession()
+        }
+        refreshTask = task
+        defer { refreshTask = nil }
+        do { return try await task.value }
+        catch {
+            if refreshCredentialIsInvalid(error) { clearSession() }
             throw error
+        }
+    }
+
+    /// Returns a token with enough life for a complete request. Supabase access
+    /// tokens are JWTs, so the expiry can be checked locally without a network call.
+    func validAccessToken(minimumValidity: TimeInterval = 300) async throws -> String {
+        guard let token else { throw AuthRefreshError.missingAccessToken }
+        guard let expiration = jwtExpiration(token) else { return token }
+        if expiration.timeIntervalSinceNow > minimumValidity { return token }
+        return try await refreshAccessToken()
+    }
+
+    /// RootView owns this task for the signed-in session. It renews credentials
+    /// before they expire even when the player leaves the app open all afternoon.
+    func maintainSession() async {
+        while !Task.isCancelled, user != nil {
+            do {
+                _ = try await validAccessToken()
+                errorMessage = nil
+            } catch {
+                if user != nil { errorMessage = "Your session could not be renewed. We’ll try again automatically." }
+            }
+            try? await Task.sleep(for: .seconds(60))
         }
     }
 
@@ -113,8 +142,29 @@ final class AuthStore: ObservableObject {
     }
 
     private enum AuthRefreshError: LocalizedError {
+        case missingAccessToken
         case missingRefreshToken
-        var errorDescription: String? { "Your login expired. Sign in again to reopen the Foundry." }
+        var errorDescription: String? { "Your login expired. Sign in again to reopen the War Room." }
+    }
+
+    private func refreshCredentialIsInvalid(_ error: Error) -> Bool {
+        let message = error.localizedDescription.lowercased()
+        return message.contains("invalid refresh")
+            || message.contains("refresh token not found")
+            || message.contains("refresh token has expired")
+    }
+
+    private func jwtExpiration(_ token: String) -> Date? {
+        let pieces = token.split(separator: ".")
+        guard pieces.count > 1 else { return nil }
+        var payload = String(pieces[1]).replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
+        let remainder = payload.count % 4
+        if remainder > 0 { payload += String(repeating: "=", count: 4 - remainder) }
+        guard let data = Data(base64Encoded: payload),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let expiration = object["exp"] as? TimeInterval
+        else { return nil }
+        return Date(timeIntervalSince1970: expiration)
     }
 
     private enum AccountDeletionError: LocalizedError {

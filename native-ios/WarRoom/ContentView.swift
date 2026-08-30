@@ -7,7 +7,14 @@ struct RootView: View {
     // This belongs to the running app session, not to a league-specific view.
     // ContentView is rebuilt when the active league changes; keeping the flag
     // here prevents a league switch from replaying the launch film.
-    @State private var showOpening = true
+    @State private var showOpening: Bool
+    @State private var pendingNotificationDestination: String?
+
+    init() {
+        let destination = WarRoomNotificationCenter.takePendingDestination()
+        _showOpening = State(initialValue: destination == nil)
+        _pendingNotificationDestination = State(initialValue: destination)
+    }
 
     var body: some View {
         Group {
@@ -16,16 +23,27 @@ struct RootView: View {
             } else if auth.user == nil {
                 LoginView()
             } else {
-                MembershipGateView(showOpening: $showOpening)
+                MembershipGateView(showOpening: $showOpening, pendingNotificationDestination: $pendingNotificationDestination)
             }
         }
         .preferredColorScheme(.dark)
+        .task(id: auth.token) {
+            guard auth.token != nil else { return }
+            await auth.maintainSession()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .warRoomNotificationDestination)) { notification in
+            showOpening = false
+            if let destination = notification.object as? String {
+                pendingNotificationDestination = destination
+            }
+        }
     }
 }
 
 private struct MembershipGateView: View {
     @EnvironmentObject private var auth: AuthStore
     @Binding var showOpening: Bool
+    @Binding var pendingNotificationDestination: String?
     @State private var state: MembershipState = .loading
 
     private enum MembershipState: Equatable {
@@ -48,7 +66,7 @@ private struct MembershipGateView: View {
                     ProgressView("Checking the roster…").tint(.green)
                 }
             case .member:
-                ContentView(showOpening: $showOpening)
+                ContentView(showOpening: $showOpening, pendingNotificationDestination: $pendingNotificationDestination)
             case .rookie:
                 RookieMusterShell()
             case .failed(let message):
@@ -70,9 +88,10 @@ private struct MembershipGateView: View {
     }
 
     @MainActor private func loadMemberships() async {
-        guard let token = auth.token, let user = auth.user else { return }
+        guard let user = auth.user else { return }
         state = .loading
         do {
+            let token = try await auth.validAccessToken()
             let memberships = try await SupabaseAPI.leagueMemberships(token: token, userId: user.id)
             state = memberships.isEmpty ? .rookie : .member
         } catch {
@@ -112,6 +131,7 @@ struct ContentView: View {
     @EnvironmentObject private var auth: AuthStore
     @Environment(\.scenePhase) private var scenePhase
     @Binding var showOpening: Bool
+    @Binding var pendingNotificationDestination: String?
     @State private var selectedTab = 0
     @State private var tabRootIds = (0..<5).map { _ in UUID() }
     @State private var picksKickoff: Date?
@@ -181,15 +201,19 @@ struct ContentView: View {
         .task(id: auth.selectedLeagueId) { await refreshActiveSport() }
         .task(id: auth.user?.id) { await refreshPlatformStatus() }
         .task(id: auth.user?.id) { await prepareNotifications() }
+        .task(id: auth.user?.id) {
+            if let destination = pendingNotificationDestination ?? WarRoomNotificationCenter.takePendingDestination() {
+                pendingNotificationDestination = nil
+                // The in-memory launch route wins, but always clear its persisted
+                // handoff too so a later cold launch cannot replay the same tap.
+                _ = WarRoomNotificationCenter.takePendingDestination()
+                handleNotificationDestination(destination)
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .warRoomNotificationDestination)) { notification in
             guard let destination = notification.object as? String else { return }
-            showOpening = false
-            if destination == "announcements" {
-                openTab(0)
-                showingPushAnnouncements = true
-            } else if destination == "picks" {
-                openTab(1)
-            }
+            _ = WarRoomNotificationCenter.takePendingDestination()
+            handleNotificationDestination(destination)
         }
         .onReceive(NotificationCenter.default.publisher(for: .warRoomDeviceTokenChanged)) { _ in
             Task { await registerPushToken() }
@@ -269,6 +293,16 @@ struct ContentView: View {
         guard tabRootIds.indices.contains(tab) else { return }
         tabRootIds[tab] = UUID()
         selectedTab = tab
+    }
+
+    private func handleNotificationDestination(_ destination: String) {
+        showOpening = false
+        if destination == "announcements" {
+            openTab(0)
+            showingPushAnnouncements = true
+        } else if destination == "picks" {
+            openTab(1)
+        }
     }
 }
 
@@ -396,6 +430,8 @@ private struct PicksView: View {
     @State private var confirmingRegularSeasonWeapon = false
     @State private var strikePresentation: StrikePresentation?
     @State private var boardPicks: [BoardPick] = []
+    @State private var boardScores: [UUID: SyncedFootballScore] = [:]
+    @State private var boardScoreStatus: String?
     @State private var boardLoading = false
     @State private var boardError: String?
 
@@ -409,7 +445,7 @@ private struct PicksView: View {
                 } else if let card {
                     let completedGames = card.cardGames.filter { draft[$0.id]?.side != nil && draft[$0.id]?.confidence != nil }.count
                     if !canEdit(card: card) {
-                    WeekBoardView(card: card, picks: boardPicks, sportId: league?.leagues.sportId ?? "cfb", loading: boardLoading, errorMessage: boardError) {
+                    WeekBoardView(card: card, picks: boardPicks, scores: boardScores, scoreStatus: boardScoreStatus, sportId: league?.leagues.sportId ?? "cfb", loading: boardLoading, errorMessage: boardError) {
                             Task { await loadBoard(card: card) }
                         }
                     } else if let pick, !editingSubmittedCard {
@@ -602,10 +638,32 @@ private struct PicksView: View {
         guard let token = auth.token, let league else { return }
         boardLoading = true
         do {
-            boardPicks = try await SupabaseAPI.weekBoard(token: token, leagueId: league.leagueId, weekNumber: card.weekNumber)
+            async let loadedPicks = SupabaseAPI.weekBoard(token: token, leagueId: league.leagueId, weekNumber: card.weekNumber)
+            async let loadedScores = SupabaseAPI.footballScores(token: token, leagueId: league.leagueId, sportId: league.leagues.sportId)
+            boardPicks = try await loadedPicks
+            let feed = try await loadedScores
+            var matched = 0
+            var finals = 0
+            var live = 0
+            for game in card.cardGames {
+                guard let event = feed.events.first(where: {
+                    normalizedFootballTeam($0.homeTeam) == normalizedFootballTeam(game.homeTeam)
+                        && normalizedFootballTeam($0.awayTeam) == normalizedFootballTeam(game.awayTeam)
+                }),
+                let home = event.scores.first(where: { normalizedFootballTeam($0.name) == normalizedFootballTeam(event.homeTeam) }).flatMap({ Int($0.score) }),
+                let away = event.scores.first(where: { normalizedFootballTeam($0.name) == normalizedFootballTeam(event.awayTeam) }).flatMap({ Int($0.score) })
+                else { continue }
+                matched += 1
+                if event.completed { finals += 1 } else { live += 1 }
+                boardScores[game.id] = SyncedFootballScore(homeScore: home, awayScore: away, completed: event.completed)
+            }
+            boardScoreStatus = feed.stale == true
+                ? "SCORE FEED STALE · \(finals) FINAL · \(live) LIVE"
+                : (matched == 0 ? "AWAITING FIRST KICKOFF" : "\(finals) FINAL · \(live) LIVE")
             boardError = nil
         } catch {
             boardError = error.localizedDescription
+            boardScoreStatus = boardScores.isEmpty ? "LIVE SCORES UNAVAILABLE" : "SCORE FEED STALE"
         }
         boardLoading = false
     }
@@ -750,6 +808,8 @@ private struct PicksView: View {
 struct WeekBoardView: View {
     let card: WeekCard
     let picks: [BoardPick]
+    let scores: [UUID: SyncedFootballScore]
+    let scoreStatus: String?
     let sportId: String
     let loading: Bool
     let errorMessage: String?
@@ -803,8 +863,11 @@ struct WeekBoardView: View {
 
                         if identity.isNFL { NflBroadcastSectionLabel(title: "CONSENSUS BOARD", detail: "WHO TOOK WHAT · CONFIDENCE ATTACHED") }
                         else { HomeSectionLabel(title: "CONSENSUS MAP", detail: "WHO TOOK WHAT · CONFIDENCE ATTACHED") }
+                        Label(scoreStatus ?? "SYNCING LIVE SCORES", systemImage: "dot.radiowaves.left.and.right")
+                            .font(.system(size: 9, weight: .black)).tracking(1.1)
+                            .foregroundStyle(identity.isNFL ? .cyan : .green)
                         ForEach(visibleGames) { game in
-                            BoardGamePanel(game: game, picks: picks, sportId: sportId)
+                            BoardGamePanel(game: game, picks: picks, score: scores[game.id], sportId: sportId)
                         }
                         if let nextKickoff, !scored {
                             Label("NEXT PICKS DECLASSIFY AT \(nextKickoff.formatted(date: .omitted, time: .shortened))", systemImage: "lock.fill")
@@ -848,6 +911,7 @@ private struct BoardMetric: View {
 private struct BoardGamePanel: View {
     let game: CardGame
     let picks: [BoardPick]
+    let score: SyncedFootballScore?
     let sportId: String
     private var identity: SportIdentity { SportIdentity(sportId) }
     private func selections(for team: String, sideKey: String) -> [(String, PickedGame, Bool)] {
@@ -868,8 +932,14 @@ private struct BoardGamePanel: View {
             HStack {
                 Text("GAME \(game.sortOrder + 1)").font(.caption2.weight(.black)).tracking(1.5).foregroundStyle(identity.isNFL ? .cyan : .green)
                 Spacer()
-                Text("\(away.count) — \(home.count)").font(.caption.weight(.black)).foregroundStyle(identity.isNFL ? .red : .orange)
+                Text(score?.completed == true ? "FINAL" : (score == nil ? "WAITING" : "LIVE"))
+                    .font(.system(size: 8, weight: .black)).tracking(1).foregroundStyle(score?.completed == true ? (identity.isNFL ? .cyan : .green) : .yellow)
             }.padding(12).background(.white.opacity(0.055))
+            HStack(spacing: 1) {
+                boardScoreTeam(game.awayTeam, value: score?.awayScore, leading: true)
+                Rectangle().fill((identity.isNFL ? Color.cyan : Color.green).opacity(0.28)).frame(width: 1)
+                boardScoreTeam(game.homeTeam, value: score?.homeScore, leading: false)
+            }.background(.white.opacity(0.025))
             HStack(alignment: .top, spacing: 1) {
                 BoardTeamColumn(team: game.awayTeam, selections: away, leading: true, accent: identity.isNFL ? .cyan : .green, bestBetAccent: identity.isNFL ? .red : .yellow)
                 Rectangle().fill((identity.isNFL ? Color.cyan : Color.green).opacity(0.28)).frame(width: 1)
@@ -879,6 +949,16 @@ private struct BoardGamePanel: View {
         .background(.black.opacity(0.83), in: RoundedRectangle(cornerRadius: identity.isNFL ? 6 : 14))
         .overlay(RoundedRectangle(cornerRadius: identity.isNFL ? 6 : 14).stroke((identity.isNFL ? Color.cyan : Color.green).opacity(0.42)))
         .clipShape(RoundedRectangle(cornerRadius: identity.isNFL ? 6 : 14))
+    }
+
+    private func boardScoreTeam(_ team: String, value: Int?, leading: Bool) -> some View {
+        HStack {
+            if !leading { Text(value.map(String.init) ?? "—").font(.title2.weight(.black)).monospacedDigit() }
+            Text(team.uppercased()).font(.system(size: 9, weight: .black)).lineLimit(1).minimumScaleFactor(0.6)
+            if leading { Text(value.map(String.init) ?? "—").font(.title2.weight(.black)).monospacedDigit() }
+        }
+        .frame(maxWidth: .infinity, alignment: leading ? .leading : .trailing)
+        .padding(.horizontal, 12).padding(.vertical, 9)
     }
 }
 
@@ -1441,6 +1521,10 @@ struct StandingsView: View {
     @State private var selectedProfileUserId: UUID?
     @State private var selectedTrophy: ProfileTrophy?
     @State private var sportId = "cfb"
+    @State private var liveProjectionByUser: [UUID: Int] = [:]
+    @State private var liveProjectionActive = false
+    @State private var liveProjectionStale = false
+    @State private var activeMembership: LeagueMembership?
     private var identity: SportIdentity { SportIdentity(sportId) }
 
     private var conferences: [String] {
@@ -1493,7 +1577,23 @@ struct StandingsView: View {
                                     }
                                 }
 
-                                ForEach(Array(filteredStandings.enumerated()), id: \.element.id) { index, standing in
+                                if liveProjectionActive {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Label(liveProjectionStale ? "SCORE FEED STALE · LAST PROJECTION" : "LIVE · PROJECTED STANDINGS", systemImage: liveProjectionStale ? "exclamationmark.triangle.fill" : "dot.radiowaves.left.and.right")
+                                            .font(.system(size: 10, weight: .black)).tracking(1.4)
+                                        Text("ATS + BEST BET INCLUDED · PROP POSTS WHEN THE WEEK IS CERTIFIED")
+                                            .font(.system(size: 8, weight: .black)).tracking(0.65)
+                                            .foregroundStyle(.white.opacity(0.58))
+                                    }
+                                    .foregroundStyle(liveProjectionStale ? Color.orange : identity.accent)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(12)
+                                    .background((liveProjectionStale ? Color.orange : identity.accent).opacity(0.10), in: RoundedRectangle(cornerRadius: 12))
+                                    .overlay(RoundedRectangle(cornerRadius: 12).stroke((liveProjectionStale ? Color.orange : identity.accent).opacity(0.38)))
+                                    .accessibilityHint("These ATS and Best Bet totals are temporary. Prop points post after commissioner certification.")
+                                }
+
+                                ForEach(Array(displayStandings.enumerated()), id: \.element.id) { index, standing in
                                     StandingRankCard(
                                         rank: index + 1,
                                         standing: standing,
@@ -1501,6 +1601,7 @@ struct StandingsView: View {
                                         trophy: latestTrophyByUser[standing.userId],
                                         careerRank: careerRankByUser[standing.userId] ?? CareerRanks.resolve(points: 0, seasons: 0, sports: 1),
                                         postseasonScore: postseasonScoreByUser[standing.userId],
+                                        projectedPoints: liveProjectionActive ? liveProjectionByUser[standing.userId] : nil,
                                         onOpenProfile: { selectedProfileUserId = standing.userId },
                                         onOpenTrophy: { selectedTrophy = latestTrophyByUser[standing.userId] }
                                     )
@@ -1538,6 +1639,12 @@ struct StandingsView: View {
                     .presentationDetents([.large]).presentationDragIndicator(.hidden)
             }
             .task(id: leagueOverride?.leagueId ?? auth.selectedLeagueId) { await load() }
+            .task(id: activeMembership?.leagueId) {
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .seconds(30))
+                    await refreshLiveProjection()
+                }
+            }
         }
     }
 
@@ -1547,6 +1654,16 @@ struct StandingsView: View {
             return standings.filter { $0.division?.uppercased() == activeConference }
         }
         return standings.filter { conferenceLabel(for: $0.division) == activeConference }
+    }
+
+    private var displayStandings: [Standing] {
+        let rows = filteredStandings
+        guard liveProjectionActive else { return rows }
+        return rows.sorted {
+            let left = liveProjectionByUser[$0.userId] ?? $0.totalPoints
+            let right = liveProjectionByUser[$1.userId] ?? $1.totalPoints
+            return left == right ? $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending : left > right
+        }
     }
 
     private func conferenceLabel(for division: String?) -> String {
@@ -1579,6 +1696,7 @@ struct StandingsView: View {
                 membership = try await SupabaseAPI.activeLeague(token: token, userId: user.id, preferredLeagueId: auth.selectedLeagueId)
             }
             sportId = membership.leagues.sportId.lowercased()
+            activeMembership = membership
             activeConference = "OVERALL"
             try? await SupabaseAPI.touchLastSeen(token: token, userId: user.id)
             async let loadedStandings = SupabaseAPI.standings(token: token, leagueId: membership.leagueId)
@@ -1617,10 +1735,67 @@ struct StandingsView: View {
                 return left.userId.uuidString < right.userId.uuidString
             }
             careerRankByUser = ranks
+            await refreshLiveProjection()
             errorMessage = nil
         }
         catch { errorMessage = error.localizedDescription }
         loading = false
+    }
+
+    @MainActor private func refreshLiveProjection() async {
+        guard let token = auth.token, let membership = activeMembership else { return }
+        do {
+            guard let card = try await SupabaseAPI.weekCard(token: token, leagueId: membership.leagueId, weekNumber: membership.leagues.currentWeek),
+                  card.cardGames.contains(where: { $0.startTime.flatMap { ISO8601DateFormatter().date(from: $0) }.map { $0 <= Date() } == true })
+            else { liveProjectionActive = false; liveProjectionStale = false; return }
+            async let feed = SupabaseAPI.footballScores(token: token, leagueId: membership.leagueId, sportId: membership.leagues.sportId)
+            async let board = SupabaseAPI.weekBoard(token: token, leagueId: membership.leagueId, weekNumber: membership.leagues.currentWeek)
+            let (scores, picks) = try await (feed, board)
+            let eventsByGame = Dictionary(uniqueKeysWithValues: card.cardGames.compactMap { game in
+                scores.events.first(where: { scoreEvent($0, matches: game) }).map { (game.id, $0) }
+            })
+            var projections: [UUID: Int] = [:]
+            for standing in standings {
+                guard let player = picks.first(where: { $0.userId == standing.userId }), player.totalPoints == nil else {
+                    projections[standing.userId] = standing.totalPoints
+                    continue
+                }
+                var liveWeek = 0
+                for selected in player.pickGames {
+                    guard let game = card.cardGames.first(where: { $0.id == selected.cardGameId }),
+                          let event = eventsByGame[game.id],
+                          let home = scoreValue(team: event.homeTeam, in: event),
+                          let away = scoreValue(team: event.awayTeam, in: event),
+                          let leader = projectedATSWinner(game: game, homeScore: home, awayScore: away),
+                          leader == selected.side else { continue }
+                    liveWeek += selected.confidence * (selected.isBestBet ? 2 : 1)
+                }
+                projections[standing.userId] = standing.totalPoints + liveWeek
+            }
+            liveProjectionByUser = projections
+            liveProjectionActive = true
+            liveProjectionStale = scores.stale == true
+        } catch {
+            // Keep the last projection visible, but never present it as current.
+            if liveProjectionActive { liveProjectionStale = true }
+        }
+    }
+
+    private func scoreEvent(_ event: FootballScoreEvent, matches game: CardGame) -> Bool {
+        normalizedFootballTeam(event.homeTeam) == normalizedFootballTeam(game.homeTeam)
+            && normalizedFootballTeam(event.awayTeam) == normalizedFootballTeam(game.awayTeam)
+    }
+
+    private func scoreValue(team: String, in event: FootballScoreEvent) -> Int? {
+        Int(event.scores.first(where: { normalizedFootballTeam($0.name) == normalizedFootballTeam(team) })?.score ?? "")
+    }
+
+    private func projectedATSWinner(game: CardGame, homeScore: Int, awayScore: Int) -> String? {
+        let favorite = game.favorite == "away" ? "away" : "home"
+        let margin = favorite == "away" ? Double(awayScore - homeScore) : Double(homeScore - awayScore)
+        let line = abs(game.spread)
+        guard abs(margin - line) >= 0.000_1 else { return nil }
+        return margin > line ? favorite : (favorite == "home" ? "away" : "home")
     }
 }
 
@@ -1631,6 +1806,7 @@ private struct StandingRankCard: View {
     let trophy: ProfileTrophy?
     let careerRank: CareerRankProgress
     let postseasonScore: CfbPostseasonScore?
+    let projectedPoints: Int?
     let onOpenProfile: () -> Void
     let onOpenTrophy: () -> Void
     private var identity: SportIdentity { SportIdentity(sportId) }
@@ -1705,8 +1881,8 @@ private struct StandingRankCard: View {
                         .accessibilityHint("Opens the trophy in the Hardware Vault")
                     }
                     VStack(alignment: .trailing, spacing: 1) {
-                        Text("\(standing.totalPoints + (postseasonScore?.postseasonTotal ?? 0))").font(rank == 1 ? .system(size: 30, weight: .black) : .title2.weight(.black)).monospacedDigit().foregroundStyle(medal)
-                        Text("PTS").font(.system(size: 8, weight: .black)).tracking(1.4).foregroundStyle(.secondary)
+                        Text("\((projectedPoints ?? standing.totalPoints) + (postseasonScore?.postseasonTotal ?? 0))").font(rank == 1 ? .system(size: 30, weight: .black) : .title2.weight(.black)).monospacedDigit().foregroundStyle(medal)
+                        Text(projectedPoints == nil ? "PTS" : "PROJ").font(.system(size: 8, weight: .black)).tracking(1.4).foregroundStyle(projectedPoints == nil ? .secondary : identity.accent)
                     }
                 }
                 HStack(spacing: 7) {
@@ -2011,6 +2187,11 @@ struct HomeView: View {
     @State private var sportPoolPoll: SportPoolPoll?
     @State private var latestScorecard: PostseasonScorecard?
     @State private var pendingJoinRequests: [LobbyJoinRequest] = []
+    @State private var homeScores: [UUID: SyncedFootballScore] = [:]
+    @State private var homeScoreStatus: String?
+    @State private var regularScorecards: [RegularSeasonScorecard] = []
+    @State private var showingRegularScorecard = false
+    @State private var regularScorecardToShowID: String?
     @State private var loading = true
     @State private var loadError: String?
     @State private var clock = Date()
@@ -2060,37 +2241,7 @@ struct HomeView: View {
                         let kickoffStarted = firstKickoff.map { clock >= $0 } ?? false
                         if isCommissioner, !pendingJoinRequests.isEmpty {
                             NavigationLink { LeagueManagementView(membership: membership) } label: {
-                                HStack(spacing: 11) {
-                                    ZStack(alignment: .topTrailing) {
-                                        Image(systemName: "bell.badge.fill")
-                                            .font(.title2.weight(.black))
-                                            .foregroundStyle(.white)
-                                        Text("\(pendingJoinRequests.count)")
-                                            .font(.system(size: 9, weight: .black, design: .rounded))
-                                            .foregroundStyle(.white)
-                                            .frame(minWidth: 18, minHeight: 18)
-                                            .background(.red, in: Circle())
-                                            .overlay(Circle().stroke(.white, lineWidth: 1.5))
-                                            .offset(x: 10, y: -9)
-                                    }
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("UNREAD · COMMISSIONER INBOX")
-                                            .font(.system(size: 9, weight: .black)).tracking(1.25)
-                                            .foregroundStyle(.red)
-                                        Text("\(pendingJoinRequests.count) join request\(pendingJoinRequests.count == 1 ? "" : "s") waiting")
-                                            .font(.subheadline.weight(.black)).foregroundStyle(.white)
-                                    }
-                                    Spacer()
-                                    Text("OPEN MANAGE LEAGUE")
-                                        .font(.system(size: 8, weight: .black)).tracking(0.8)
-                                        .foregroundStyle(.white.opacity(0.72))
-                                    Image(systemName: "chevron.right")
-                                        .font(.caption.weight(.black)).foregroundStyle(.white)
-                                }
-                                .padding(.horizontal, 16).padding(.vertical, 14)
-                                .background(Color.red.opacity(0.24), in: RoundedRectangle(cornerRadius: isNFL ? 7 : 16))
-                                .overlay(RoundedRectangle(cornerRadius: isNFL ? 7 : 16).stroke(.red, lineWidth: 2))
-                                .shadow(color: .red.opacity(0.55), radius: 14)
+                                PendingJoinRequestBanner(count: pendingJoinRequests.count, isNFL: isNFL)
                             }
                             .buttonStyle(WarRoomCardButtonStyle())
                             .accessibilityLabel("\(pendingJoinRequests.count) unread league join request\(pendingJoinRequests.count == 1 ? "" : "s"). Open Manage League.")
@@ -2120,22 +2271,7 @@ struct HomeView: View {
                                 code: membership.leagues.code
                             ))
                         ) {
-                            HStack(spacing: 10) {
-                                Image(systemName: "square.and.arrow.up.fill")
-                                    .font(.headline.weight(.black))
-                                Text("SHARE")
-                                    .font(.caption.weight(.black))
-                                    .tracking(1.2)
-                                Spacer()
-                                Text("INVITE CODE \(membership.leagues.code.uppercased())")
-                                    .font(.system(size: 8, weight: .black))
-                                    .tracking(0.7)
-                            }
-                            .foregroundStyle(isNFL ? Color.white : Color.black)
-                            .padding(.horizontal, 15)
-                            .padding(.vertical, 12)
-                            .background(isNFL ? Color.blue.opacity(0.92) : Color.green, in: RoundedRectangle(cornerRadius: isNFL ? 7 : 14))
-                            .overlay(RoundedRectangle(cornerRadius: isNFL ? 7 : 14).stroke(.white.opacity(isNFL ? 0.42 : 0.18)))
+                            InviteShareLabel(code: membership.leagues.code, isNFL: isNFL)
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("Share \(membership.leagues.name) invitation")
@@ -2208,24 +2344,13 @@ struct HomeView: View {
                             }.buttonStyle(WarRoomCardButtonStyle())
                         }
                         NavigationLink { LeagueCommandCenterView(memberships: memberships) } label: {
-                            HStack(spacing: 12) {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(isNFL ? "ACTIVE FRANCHISE · PRO FOOTBALL" : "ACTIVE FREQUENCY · \(membership.leagues.sportId.uppercased())")
-                                        .font(.system(size: 8, weight: .black)).tracking(1.4).foregroundStyle(isNFL ? .cyan : .green)
-                                    Text(membership.leagues.name).font(.headline.weight(.black)).foregroundStyle(.white)
-                                    Text(isNFL ? "CHANGE FRANCHISE OR ENTER THE LOBBY" : "SWITCH LEAGUE OR SPORT").font(.system(size: 9, weight: .black)).tracking(1).foregroundStyle(isNFL ? .white.opacity(0.52) : .yellow)
-                                }
-                                Spacer()
-                                Image(systemName: isNFL ? "football.fill" : "antenna.radiowaves.left.and.right")
-                                    .font(.title2.weight(.black)).foregroundStyle(isNFL ? .white : .green)
-                                Image(systemName: "chevron.right").font(.caption.weight(.black)).foregroundStyle(isNFL ? .red : .yellow)
-                            }
-                            .padding(15)
-                            .background(isNFL ? Color.black.opacity(0.9) : Color.black.opacity(0.78), in: RoundedRectangle(cornerRadius: isNFL ? 8 : 18))
-                            .overlay(alignment: .leading) { if isNFL { Rectangle().fill(.blue).frame(width: 4).padding(.vertical, 8) } }
-                            .overlay(RoundedRectangle(cornerRadius: isNFL ? 8 : 18).stroke(isNFL ? .blue.opacity(0.55) : .green.opacity(0.45)))
+                            ActiveLeagueSwitchCard(membership: membership, isNFL: isNFL)
                         }.buttonStyle(WarRoomCardButtonStyle())
-                        if isNFL && needsCrystalBall {
+                        if let scorecard = unreadRegularScorecard {
+                            Button { openRegularScorecard(scorecard) } label: {
+                                UnreadWeekResultCard(scorecard: scorecard, sportId: membership.leagues.sportId)
+                            }.buttonStyle(WarRoomCardButtonStyle())
+                        } else if isNFL && needsCrystalBall {
                             NavigationLink { CrystalBallView(membership: membership) } label: {
                                 NflPrimaryActionCard(kicker: "SEASON-LONG CALL · REQUIRED", title: "Name Your Champion", detail: "Make the call before the evidence arrives. The receipt follows you all season.", icon: "sparkles", urgent: true)
                             }.buttonStyle(WarRoomCardButtonStyle())
@@ -2237,10 +2362,12 @@ struct HomeView: View {
                             Button(action: onOpenLocker) {
                                 NflPrimaryActionCard(kicker: "SLATE NOT POSTED", title: "The commissioner is on the clock", detail: "Hit the locker room while leadership discovers urgency.", icon: "clock.badge.exclamationmark", urgent: true)
                             }.buttonStyle(WarRoomCardButtonStyle())
-                        } else if isNFL && kickoffStarted {
+                        } else if isNFL && kickoffStarted, let activeCard = card {
                             Button(action: onOpenPicks) {
-                                NflPrimaryActionCard(kicker: "LIVE WINDOW · PICKS DECLASSIFY AT KICKOFF", title: "Open the Game Board", detail: "Follow every side, confidence play, and Best Bet as each game goes live.", icon: "play.rectangle.on.rectangle.fill")
-                            }.buttonStyle(WarRoomCardButtonStyle())
+                                HomeLivePlayerScorecard(card: activeCard, pick: pick, scores: homeScores, sportId: membership.leagues.sportId, status: homeScoreStatus)
+                            }
+                            .buttonStyle(WarRoomCardButtonStyle())
+                            .accessibilityLabel("Live Week \(membership.leagues.currentWeek) scoreboard. Open the Board.")
                         } else if isNFL && pick == nil {
                             Button(action: onOpenPicks) {
                                 NflPrimaryActionCard(kicker: "YOU ARE ON THE CLOCK · WEEK \(membership.leagues.currentWeek)", title: "Build Your Sunday Card", detail: "Five games. Confidence points. One Best Bet. No preseason excuses.", icon: "football.fill", urgent: true)
@@ -2263,10 +2390,18 @@ struct HomeView: View {
                             Button(action: onOpenLocker) {
                                 StatusCard(kicker: "🚨 DO THIS NEXT · WAITING ON THE COMMISH", title: "Open the Locker Room", detail: "No card has been posted. The Locker Room is accepting public complaints.", icon: "bubble.left.fill", featured: true, accent: .red, emergency: true, actionLabel: "OPEN LOCKER ROOM")
                             }.buttonStyle(WarRoomCardButtonStyle())
-                        } else if kickoffStarted {
+                        } else if kickoffStarted, let activeCard = card {
                             Button(action: onOpenPicks) {
-                                StatusCard(kicker: "KICKOFF HIT · THE BOARD IS LIVE", title: "Scout the competition", detail: "Each matchup declassifies at its own kickoff. See who backed whom—and how much confidence they put on it.", icon: "binoculars.fill", featured: true, accent: .orange, actionLabel: "OPEN BOARD")
-                            }.buttonStyle(WarRoomCardButtonStyle())
+                                HomeLivePlayerScorecard(
+                                    card: activeCard,
+                                    pick: pick,
+                                    scores: homeScores,
+                                    sportId: membership.leagues.sportId,
+                                    status: homeScoreStatus
+                                )
+                            }
+                            .buttonStyle(WarRoomCardButtonStyle())
+                            .accessibilityLabel("Live Week \(membership.leagues.currentWeek) scoreboard. Open the Board.")
                         } else if pick == nil {
                             Button(action: onOpenPicks) {
                                 StatusCard(kicker: isRivalryWeek ? "🚨 DO THIS NEXT · HATE WEEK" : "🚨 DO THIS NEXT · WEEK \(membership.leagues.currentWeek)", title: isRivalryWeek ? "Choose Your Enemies" : "Make Your Picks", detail: isRivalryWeek ? "Five rivalry games. One Best Bet. Every bad decision becomes family evidence." : "Spreads, confidence, Best Bet, and the weekly prop are ready.", icon: isRivalryWeek ? "flame.fill" : "arrow.right.circle.fill", featured: true, accent: .red, emergency: true, actionLabel: "MAKE PICKS")
@@ -2279,6 +2414,12 @@ struct HomeView: View {
                             }.buttonStyle(WarRoomCardButtonStyle())
                         } else {
                             StatusCard(kicker: "YOU’RE CAUGHT UP", title: "Week \(membership.leagues.currentWeek) is locked", detail: "Your work here is done. Suspicious, but true.", icon: "checkmark.seal.fill", featured: true)
+                        }
+
+                        if let scorecard = regularScorecards.first, !isUnread(scorecard) {
+                            Button { openRegularScorecard(scorecard) } label: {
+                                LastWeekScorecardLink(scorecard: scorecard, sportId: membership.leagues.sportId)
+                            }.buttonStyle(WarRoomCardButtonStyle())
                         }
 
                         if sportPoolPoll != nil || isCommissioner {
@@ -2483,12 +2624,26 @@ struct HomeView: View {
             }
         }
         .toolbar(.hidden, for: .navigationBar)
+        .navigationDestination(isPresented: $showingRegularScorecard) {
+            if let scorecard = regularScorecards.first(where: { $0.id == regularScorecardToShowID }) {
+                RegularSeasonScorecardView(scorecard: scorecard, sportId: membership?.leagues.sportId ?? "cfb")
+            }
+        }
         .task(id: leagueOverride?.leagueId ?? auth.selectedLeagueId) { await load() }
         .task(id: membership?.leagueId) {
             guard membership != nil else { return }
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(20))
                 await refreshPendingJoinRequests()
+            }
+        }
+        .task(id: card?.id) {
+            guard card != nil else { return }
+            await refreshHomeScores()
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(30))
+                guard homeScorePollingNeeded else { continue }
+                await refreshHomeScores()
             }
         }
         .task {
@@ -2529,6 +2684,8 @@ struct HomeView: View {
             async let loadedSubmissions = SupabaseAPI.weekSubmittedUserIds(token: token, leagueId: active.leagueId, weekNumber: active.leagues.currentWeek)
             async let loadedSportPool = SupabaseAPI.sportPoolPoll(token: token, leagueId: active.leagueId)
             card = try await loadedCard
+            homeScores = [:]
+            homeScoreStatus = nil
             pick = try await loadedPick
             crystalBallPick = try await loadedCrystal
             standings = try await loadedStandings
@@ -2536,6 +2693,7 @@ struct HomeView: View {
             lockerMessages = try await loadedLocker
             submittedUserIds = try await loadedSubmissions
             sportPoolPoll = try? await loadedSportPool
+            regularScorecards = (try? await SupabaseAPI.regularSeasonScorecards(token: token, leagueId: active.leagueId, userId: user.id)) ?? []
             if active.leagues.sportId.lowercased() == "cfb" {
                 let scorecards = try? await SupabaseAPI.postseasonScorecards(
                     token: token,
@@ -2573,6 +2731,65 @@ struct HomeView: View {
         loading = false
     }
 
+    private var unreadRegularScorecard: RegularSeasonScorecard? {
+        regularScorecards.first(where: isUnread)
+    }
+
+    private func scorecardReadKey(_ scorecard: RegularSeasonScorecard) -> String {
+        "warroom.scorecard.seen.\(auth.user?.id.uuidString ?? "unknown").\(membership?.leagueId.uuidString ?? "unknown").\(scorecard.weekNumber)"
+    }
+
+    private func isUnread(_ scorecard: RegularSeasonScorecard) -> Bool {
+        !UserDefaults.standard.bool(forKey: scorecardReadKey(scorecard))
+    }
+
+    private func openRegularScorecard(_ scorecard: RegularSeasonScorecard) {
+        UserDefaults.standard.set(true, forKey: scorecardReadKey(scorecard))
+        regularScorecardToShowID = scorecard.id
+        showingRegularScorecard = true
+    }
+
+    private var homeScorePollingNeeded: Bool {
+        guard let card else { return false }
+        return card.cardGames.contains { game in
+            guard let start = game.startTime.flatMap({ footballKickoffDate($0) }), start <= Date() else { return false }
+            return homeScores[game.id]?.completed != true
+        }
+    }
+
+    @MainActor private func refreshHomeScores() async {
+        guard let token = auth.token, let membership, let card else { return }
+        do {
+            let feed = try await SupabaseAPI.footballScores(
+                token: token,
+                leagueId: membership.leagueId,
+                sportId: membership.leagues.sportId
+            )
+            var matched = 0
+            var finals = 0
+            var live = 0
+            for game in card.cardGames {
+                guard let event = feed.events.first(where: {
+                    normalizedFootballTeam($0.homeTeam) == normalizedFootballTeam(game.homeTeam)
+                        && normalizedFootballTeam($0.awayTeam) == normalizedFootballTeam(game.awayTeam)
+                }),
+                let home = event.scores.first(where: { normalizedFootballTeam($0.name) == normalizedFootballTeam(event.homeTeam) }).flatMap({ Int($0.score) }),
+                let away = event.scores.first(where: { normalizedFootballTeam($0.name) == normalizedFootballTeam(event.awayTeam) }).flatMap({ Int($0.score) })
+                else { continue }
+                matched += 1
+                if event.completed { finals += 1 } else { live += 1 }
+                homeScores[game.id] = SyncedFootballScore(homeScore: home, awayScore: away, completed: event.completed)
+            }
+            if feed.stale == true {
+                homeScoreStatus = matched == 0 ? "SCORE FEED STALE · RETRYING" : "STALE · \(finals) FINAL · \(live) LIVE"
+            } else {
+                homeScoreStatus = matched == 0 ? "AWAITING FIRST KICKOFF" : "\(finals) FINAL · \(live) LIVE"
+            }
+        } catch {
+            homeScoreStatus = homeScores.isEmpty ? "LIVE SCORES UNAVAILABLE · RETRYING" : "SCORE FEED STALE · RETRYING"
+        }
+    }
+
     @MainActor private func refreshPendingJoinRequests() async {
         guard let token = auth.token,
               let user = auth.user,
@@ -2585,6 +2802,313 @@ struct HomeView: View {
         if let requests = try? await SupabaseAPI.privateRoomJoinRequests(token: token, leagueId: membership.leagueId) {
             pendingJoinRequests = requests
         }
+    }
+}
+
+private struct PendingJoinRequestBanner: View {
+    let count: Int
+    let isNFL: Bool
+
+    var body: some View {
+        HStack(spacing: 11) {
+            ZStack(alignment: .topTrailing) {
+                Image(systemName: "bell.badge.fill").font(.title2.weight(.black)).foregroundStyle(.white)
+                Text("\(count)").font(.system(size: 9, weight: .black, design: .rounded)).foregroundStyle(.white)
+                    .frame(minWidth: 18, minHeight: 18).background(.red, in: Circle())
+                    .overlay(Circle().stroke(.white, lineWidth: 1.5)).offset(x: 10, y: -9)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text("UNREAD · COMMISSIONER INBOX").font(.system(size: 9, weight: .black)).tracking(1.25).foregroundStyle(.red)
+                Text("\(count) join request\(count == 1 ? "" : "s") waiting").font(.subheadline.weight(.black)).foregroundStyle(.white)
+            }
+            Spacer()
+            Text("OPEN MANAGE LEAGUE").font(.system(size: 8, weight: .black)).tracking(0.8).foregroundStyle(.white.opacity(0.72))
+            Image(systemName: "chevron.right").font(.caption.weight(.black)).foregroundStyle(.white)
+        }
+        .padding(.horizontal, 16).padding(.vertical, 14)
+        .background(Color.red.opacity(0.24), in: RoundedRectangle(cornerRadius: isNFL ? 7 : 16))
+        .overlay(RoundedRectangle(cornerRadius: isNFL ? 7 : 16).stroke(.red, lineWidth: 2))
+        .shadow(color: .red.opacity(0.55), radius: 14)
+    }
+}
+
+private struct InviteShareLabel: View {
+    let code: String
+    let isNFL: Bool
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "square.and.arrow.up.fill").font(.headline.weight(.black))
+            Text("SHARE").font(.caption.weight(.black)).tracking(1.2)
+            Spacer()
+            Text("INVITE CODE \(code.uppercased())").font(.system(size: 8, weight: .black)).tracking(0.7)
+        }
+        .foregroundStyle(isNFL ? Color.white : Color.black)
+        .padding(.horizontal, 15).padding(.vertical, 12)
+        .background(isNFL ? Color.blue.opacity(0.92) : Color.green, in: RoundedRectangle(cornerRadius: isNFL ? 7 : 14))
+        .overlay(RoundedRectangle(cornerRadius: isNFL ? 7 : 14).stroke(.white.opacity(isNFL ? 0.42 : 0.18)))
+    }
+}
+
+private struct ActiveLeagueSwitchCard: View {
+    let membership: LeagueMembership
+    let isNFL: Bool
+
+    var body: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(isNFL ? "ACTIVE FRANCHISE · PRO FOOTBALL" : "ACTIVE FREQUENCY · \(membership.leagues.sportId.uppercased())")
+                    .font(.system(size: 8, weight: .black)).tracking(1.4).foregroundStyle(isNFL ? .cyan : .green)
+                Text(membership.leagues.name).font(.headline.weight(.black)).foregroundStyle(.white)
+                Text(isNFL ? "CHANGE FRANCHISE OR ENTER THE LOBBY" : "SWITCH LEAGUE OR SPORT")
+                    .font(.system(size: 9, weight: .black)).tracking(1).foregroundStyle(isNFL ? .white.opacity(0.52) : .yellow)
+            }
+            Spacer()
+            Image(systemName: isNFL ? "football.fill" : "antenna.radiowaves.left.and.right").font(.title2.weight(.black)).foregroundStyle(isNFL ? .white : .green)
+            Image(systemName: "chevron.right").font(.caption.weight(.black)).foregroundStyle(isNFL ? .red : .yellow)
+        }
+        .padding(15)
+        .background(isNFL ? Color.black.opacity(0.9) : Color.black.opacity(0.78), in: RoundedRectangle(cornerRadius: isNFL ? 8 : 18))
+        .overlay(alignment: .leading) { if isNFL { Rectangle().fill(.blue).frame(width: 4).padding(.vertical, 8) } }
+        .overlay(RoundedRectangle(cornerRadius: isNFL ? 8 : 18).stroke(isNFL ? .blue.opacity(0.55) : .green.opacity(0.45)))
+    }
+}
+
+private struct UnreadWeekResultCard: View {
+    let scorecard: RegularSeasonScorecard
+    let sportId: String
+    private var isNFL: Bool { sportId.lowercased() == "nfl" }
+    private var accent: Color { isNFL ? .cyan : .yellow }
+
+    var body: some View {
+        HStack(spacing: 14) {
+            ZStack {
+                RoundedRectangle(cornerRadius: isNFL ? 5 : 13).fill(accent)
+                VStack(spacing: 0) {
+                    Text("+\(scorecard.totalPoints)").font(.system(size: 24, weight: .black, design: .rounded))
+                    Text("PTS").font(.system(size: 8, weight: .black)).tracking(1)
+                }.foregroundStyle(.black)
+            }.frame(width: 68, height: 68)
+            VStack(alignment: .leading, spacing: 5) {
+                Text("NEW · WEEK \(scorecard.weekNumber) RESULTS")
+                    .font(.system(size: 9, weight: .black)).tracking(1.4).foregroundStyle(accent)
+                Text("You earned \(scorecard.totalPoints) points")
+                    .font(.title3.weight(.black)).fontWidth(.condensed).foregroundStyle(.white)
+                Text("OPEN YOUR CERTIFIED RECEIPT")
+                    .font(.system(size: 8, weight: .black)).tracking(0.8).foregroundStyle(.white.opacity(0.55))
+            }
+            Spacer()
+            Image(systemName: "chevron.right").font(.headline.weight(.black)).foregroundStyle(accent)
+        }
+        .padding(15)
+        .background(.black.opacity(0.94), in: RoundedRectangle(cornerRadius: isNFL ? 8 : 18))
+        .overlay(RoundedRectangle(cornerRadius: isNFL ? 8 : 18).stroke(accent, lineWidth: 2))
+        .shadow(color: accent.opacity(0.32), radius: 18)
+    }
+}
+
+private struct LastWeekScorecardLink: View {
+    let scorecard: RegularSeasonScorecard
+    let sportId: String
+    private var isNFL: Bool { sportId.lowercased() == "nfl" }
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "list.clipboard.fill").font(.title3.weight(.black)).foregroundStyle(isNFL ? .cyan : .yellow)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("LAST CERTIFIED SCORECARD").font(.system(size: 8, weight: .black)).tracking(1.2).foregroundStyle(.white.opacity(0.45))
+                Text("Week \(scorecard.weekNumber) · \(scorecard.totalPoints) points").font(.subheadline.weight(.black)).foregroundStyle(.white)
+            }
+            Spacer()
+            Text("VIEW  ›").font(.system(size: 9, weight: .black)).tracking(0.8).foregroundStyle(isNFL ? .red : .green)
+        }
+        .padding(14).background(.black.opacity(0.8), in: RoundedRectangle(cornerRadius: isNFL ? 7 : 15))
+        .overlay(RoundedRectangle(cornerRadius: isNFL ? 7 : 15).stroke((isNFL ? Color.cyan : Color.green).opacity(0.35)))
+    }
+}
+
+private struct RegularSeasonScorecardView: View {
+    let scorecard: RegularSeasonScorecard
+    let sportId: String
+    private var isNFL: Bool { sportId.lowercased() == "nfl" }
+    private var accent: Color { isNFL ? .cyan : .green }
+
+    var body: some View {
+        ZStack {
+            if isNFL { NflHomeBackdrop(phase: .regularSeason) } else { CfbHomePhaseBackdrop(phase: .regularSeason) }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("CERTIFIED · WEEK \(scorecard.weekNumber)").font(.caption2.weight(.black)).tracking(2).foregroundStyle(accent)
+                        HStack(alignment: .lastTextBaseline) {
+                            Text("+\(scorecard.totalPoints)").font(.system(size: 58, weight: .black, design: .rounded)).foregroundStyle(.white)
+                            Text("POINTS").font(.headline.weight(.black)).foregroundStyle(accent)
+                            Spacer()
+                        }
+                        Text("SEASON TOTAL · \(scorecard.seasonTotalAfter)").font(.caption.weight(.black)).tracking(1.2).foregroundStyle(.white.opacity(0.58))
+                    }.padding(18).background(.black.opacity(0.9), in: RoundedRectangle(cornerRadius: isNFL ? 7 : 18)).overlay(RoundedRectangle(cornerRadius: isNFL ? 7 : 18).stroke(accent.opacity(0.55)))
+
+                    Text("YOUR CARD").font(.caption.weight(.black)).tracking(1.8).foregroundStyle(isNFL ? .red : .yellow)
+                    ForEach(scorecard.card.cardGames) { game in receiptGame(game) }
+
+                    if let question = scorecard.card.propQuestion {
+                        let hit = scorecard.pick.propChoice == scorecard.result.propResult
+                        VStack(alignment: .leading, spacing: 7) {
+                            Text("WEEKLY PROP · \(hit ? "+\(scorecard.card.propPoints)" : "+0")").font(.caption2.weight(.black)).tracking(1.3).foregroundStyle(hit ? accent : .red)
+                            Text(question).font(.headline.weight(.black))
+                            Text("YOUR CALL · \(scorecard.pick.propChoice?.uppercased() ?? "NO PICK")").font(.caption.weight(.bold)).foregroundStyle(.white.opacity(0.65))
+                            Text("OFFICIAL · \(scorecard.result.propResult?.uppercased() ?? "PENDING")").font(.caption.weight(.bold)).foregroundStyle(.white.opacity(0.48))
+                        }.padding(15).background(.black.opacity(0.82), in: RoundedRectangle(cornerRadius: isNFL ? 6 : 14)).overlay(RoundedRectangle(cornerRadius: isNFL ? 6 : 14).stroke((hit ? accent : Color.red).opacity(0.4)))
+                    }
+
+                    HStack {
+                        Text("BEFORE \(scorecard.seasonTotalBefore)").foregroundStyle(.white.opacity(0.5))
+                        Spacer(); Image(systemName: "arrow.right").foregroundStyle(accent); Spacer()
+                        Text("AFTER \(scorecard.seasonTotalAfter)").foregroundStyle(accent)
+                    }.font(.caption.weight(.black)).padding(14).background(.black.opacity(0.82), in: RoundedRectangle(cornerRadius: 12))
+                }.padding(16).padding(.bottom, 36)
+            }
+        }.navigationTitle("Week \(scorecard.weekNumber) Scorecard").navigationBarTitleDisplayMode(.inline).preferredColorScheme(.dark)
+    }
+
+    private func receiptGame(_ game: CardGame) -> some View {
+        let pick = scorecard.pick.pickGames.first { $0.cardGameId == game.id }
+        let result = scorecard.result.gameResults.first { $0.cardGameId == game.id }
+        let selected = pick?.side == "away" ? game.awayTeam : game.homeTeam
+        let hit = result?.winner != "push" && pick?.side == result?.winner
+        let base = hit ? (pick?.confidence ?? 0) * (pick?.isBestBet == true ? 2 : 1) : 0
+        return HStack(spacing: 12) {
+            ZStack {
+                Circle().fill((hit ? accent : Color.red).opacity(0.16)).frame(width: 42, height: 42)
+                Image(systemName: hit ? "checkmark.seal.fill" : "xmark.seal.fill").foregroundStyle(hit ? accent : .red)
+            }
+            VStack(alignment: .leading, spacing: 3) {
+                Text(selected.uppercased()).font(.subheadline.weight(.black)).lineLimit(1).minimumScaleFactor(0.7)
+                Text("CONF \(pick?.confidence ?? 0)\(pick?.isBestBet == true ? " · BEST BET ×2" : "")").font(.system(size: 8, weight: .black)).tracking(0.7).foregroundStyle(.white.opacity(0.48))
+            }
+            Spacer()
+            Text("+\(base)").font(.title3.weight(.black)).foregroundStyle(hit ? accent : .white.opacity(0.35))
+        }.padding(14).background(.black.opacity(0.82), in: RoundedRectangle(cornerRadius: isNFL ? 6 : 14)).overlay(RoundedRectangle(cornerRadius: isNFL ? 6 : 14).stroke((hit ? accent : Color.red).opacity(0.28)))
+    }
+}
+
+private struct HomeLivePlayerScorecard: View {
+    let card: WeekCard
+    let pick: PlayerPick?
+    let scores: [UUID: SyncedFootballScore]
+    let sportId: String
+    let status: String?
+
+    private var isNFL: Bool { sportId.lowercased() == "nfl" }
+    private var accent: Color { isNFL ? .cyan : .green }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 10) {
+                ZStack {
+                    Circle().fill(accent.opacity(0.16)).frame(width: 38, height: 38)
+                    Image(systemName: "dot.radiowaves.left.and.right")
+                        .font(.headline.weight(.black)).foregroundStyle(accent)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(isNFL ? "YOUR GAME-DAY SCORECARD" : "YOUR LIVE SCORECARD")
+                        .font(.system(size: 9, weight: .black)).tracking(1.6).foregroundStyle(accent)
+                    Text("WEEK \(card.weekNumber) · \(livePoints) POINTS")
+                        .font(.title3.weight(.black)).fontWidth(.condensed).foregroundStyle(.white)
+                }
+                Spacer()
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(status ?? "SYNCING SCORES")
+                        .font(.system(size: 8, weight: .black)).tracking(0.7).foregroundStyle(.white.opacity(0.72))
+                    Text("OPEN BOARD + SCORES  ›")
+                        .font(.system(size: 8, weight: .black)).tracking(0.8).foregroundStyle(isNFL ? .red : .yellow)
+                }
+            }
+            .padding(15)
+
+            Rectangle().fill(accent.opacity(0.35)).frame(height: 1)
+
+            VStack(spacing: 0) {
+                ForEach(card.cardGames) { game in
+                    scoreRow(game)
+                    if game.id != card.cardGames.last?.id {
+                        Rectangle().fill(.white.opacity(0.08)).frame(height: 1).padding(.horizontal, 12)
+                    }
+                }
+                if let prop = card.propQuestion {
+                    Rectangle().fill(.white.opacity(0.08)).frame(height: 1).padding(.horizontal, 12)
+                    HStack {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("WEEKLY PROP · \(card.propPoints) POINTS").font(.system(size: 8, weight: .black)).tracking(0.8).foregroundStyle(accent)
+                            Text(prop).font(.system(size: 10, weight: .bold)).lineLimit(2)
+                            Text("YOUR CALL · \(pick?.propChoice?.uppercased() ?? "NO PICK")").font(.system(size: 8, weight: .black)).foregroundStyle(.white.opacity(0.48))
+                        }
+                        Spacer()
+                        Text("PENDING").font(.system(size: 9, weight: .black)).foregroundStyle(.yellow)
+                    }.padding(.horizontal, 15).padding(.vertical, 11)
+                }
+            }
+        }
+        .background(
+            LinearGradient(
+                colors: [accent.opacity(0.16), .black.opacity(0.96), (isNFL ? Color.blue : Color.green).opacity(0.08)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(cornerRadius: isNFL ? 8 : 18)
+        )
+        .overlay(alignment: .leading) { Rectangle().fill(accent).frame(width: 4).padding(.vertical, 10) }
+        .overlay(RoundedRectangle(cornerRadius: isNFL ? 8 : 18).stroke(accent.opacity(0.52), lineWidth: 1.4))
+        .shadow(color: accent.opacity(0.14), radius: 18)
+    }
+
+    private func scoreRow(_ game: CardGame) -> some View {
+        let value = scores[game.id]
+        let selected = pick?.pickGames.first(where: { $0.cardGameId == game.id })
+        let selectedTeam = selected?.side == "away" ? game.awayTeam : selected?.side == "home" ? game.homeTeam : "NO PICK"
+        let points = pointsEarned(for: game, selection: selected, score: value)
+        return HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(selectedTeam.uppercased()).font(.system(size: 11, weight: .black)).lineLimit(1).minimumScaleFactor(0.65)
+                Text("CONF \(selected?.confidence ?? 0)\(selected?.isBestBet == true ? " · BEST BET ×2" : "")")
+                    .font(.system(size: 8, weight: .black)).tracking(0.7).foregroundStyle(.white.opacity(0.48))
+            }
+            Spacer(minLength: 6)
+            VStack(alignment: .trailing, spacing: 3) {
+                Text(points.map { "+\($0)" } ?? "PENDING")
+                    .font(.title3.weight(.black)).monospacedDigit()
+                    .foregroundStyle(points.map { $0 > 0 ? accent : Color.white.opacity(0.38) } ?? .yellow)
+                Text(gameStatus(game, score: value)).font(.system(size: 8, weight: .black)).tracking(0.8).foregroundStyle(.white.opacity(0.45))
+            }
+        }
+        .padding(.horizontal, 15).padding(.vertical, 11)
+    }
+
+    private var livePoints: Int {
+        card.cardGames.reduce(0) { total, game in
+            let selection = pick?.pickGames.first(where: { $0.cardGameId == game.id })
+            return total + (pointsEarned(for: game, selection: selection, score: scores[game.id]) ?? 0)
+        }
+    }
+
+    private func pointsEarned(for game: CardGame, selection: PickedGame?, score: SyncedFootballScore?) -> Int? {
+        guard let selection, let score else { return nil }
+        let favorite = game.favorite.lowercased() == "away" ? "away" : "home"
+        let margin = favorite == "away" ? Double(score.awayScore - score.homeScore) : Double(score.homeScore - score.awayScore)
+        let line = abs(game.spread)
+        let leader: String
+        if abs(margin - line) < 0.000_1 { leader = "push" }
+        else if margin > line { leader = favorite }
+        else { leader = favorite == "home" ? "away" : "home" }
+        guard leader != "push", leader == selection.side.lowercased() else { return 0 }
+        return selection.confidence * (selection.isBestBet ? 2 : 1)
+    }
+
+    private func gameStatus(_ game: CardGame, score: SyncedFootballScore?) -> String {
+        if score?.completed == true { return "FINAL" }
+        if score != nil { return "LIVE" }
+        guard let date = game.startTime.flatMap({ footballKickoffDate($0) }) else { return "WAITING" }
+        if date <= Date() { return "AWAITING UPDATE" }
+        return date.formatted(date: .omitted, time: .shortened).uppercased()
     }
 }
 
@@ -3167,7 +3691,13 @@ struct CommissionerScoreWeekView: View {
     }
 }
 
-private struct SyncedFootballScore {
+private func normalizedFootballTeam(_ value: String) -> String {
+    value.lowercased().unicodeScalars.map { CharacterSet.alphanumerics.contains($0) ? Character(String($0)) : " " }
+        .reduce(into: "") { $0.append($1) }
+        .split(separator: " ").joined(separator: " ")
+}
+
+struct SyncedFootballScore {
     let homeScore: Int
     let awayScore: Int
     let completed: Bool
@@ -4972,6 +5502,7 @@ private struct YouView: View {
     @State private var favoriteTeam: FavoriteTeam?
     @State private var leagueStandings: [Standing] = []
     @State private var postseasonScorecards: [PostseasonScorecard] = []
+    @State private var regularSeasonScorecards: [RegularSeasonScorecard] = []
     @State private var selectedAchievement: ProfileAchievement?
     @State private var selectedTrophy: ProfileTrophy?
 
@@ -5009,6 +5540,14 @@ private struct YouView: View {
                             if let user = auth.user { CampaignDogTagsView(userId: user.id) }
                             if let user = auth.user { ProfilePassportView(userId: user.id, isOwner: true) }
                         currentCampaignCard
+                        if !regularSeasonScorecards.isEmpty {
+                            dossierLabel("SEASON SCORECARDS", detail: "EVERY CERTIFIED WEEK. EVERY PICK. PERMANENT RECEIPTS.")
+                            ForEach(regularSeasonScorecards) { scorecard in
+                                NavigationLink { RegularSeasonScorecardView(scorecard: scorecard, sportId: identity.sportId) } label: {
+                                    dossierRow("Week \(scorecard.weekNumber) · \(scorecard.totalPoints) points", "SEASON TOTAL · \(scorecard.seasonTotalAfter)", "checklist.checked", identity.isNFL ? .cyan : .green)
+                                }.buttonStyle(.plain)
+                            }
+                        }
                         if !postseasonScorecards.isEmpty {
                             dossierLabel("POSTSEASON SCORECARDS", detail: "EVERY POINT. EVERY WEEK. NO MYSTERY MATH.")
                             ForEach(postseasonScorecards) { scorecard in
@@ -5137,6 +5676,7 @@ private struct YouView: View {
                 favoriteTeam = try? await SupabaseAPI.favoriteTeam(token: token, userId: user.id, sportId: identity.sportId)
                 if let leagueId = (leagues.first { $0.leagueId == auth.selectedLeagueId } ?? leagues.first)?.leagueId {
                     leagueStandings = (try? await SupabaseAPI.standings(token: token, leagueId: leagueId)) ?? []
+                    regularSeasonScorecards = (try? await SupabaseAPI.regularSeasonScorecards(token: token, leagueId: leagueId, userId: user.id)) ?? []
                     postseasonScorecards = (try? await SupabaseAPI.postseasonScorecards(token: token, leagueId: leagueId, seasonKey: Calendar.current.component(.year, from: Date()), userId: user.id)) ?? []
                 }
             }
