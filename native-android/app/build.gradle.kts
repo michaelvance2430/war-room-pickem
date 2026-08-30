@@ -5,6 +5,11 @@ plugins {
 }
 
 android {
+    fun firebaseValue(name: String): String = providers.gradleProperty(name)
+        .orElse(providers.environmentVariable(name))
+        .orNull
+        .orEmpty()
+
     namespace = "com.warroompicks.WarRoom"
     compileSdk = 36
 
@@ -16,10 +21,10 @@ android {
         versionName = "3.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
-        buildConfigField("String", "FIREBASE_APPLICATION_ID", "\"${providers.gradleProperty("WARROOM_FIREBASE_APP_ID").orNull ?: ""}\"")
-        buildConfigField("String", "FIREBASE_API_KEY", "\"${providers.gradleProperty("WARROOM_FIREBASE_API_KEY").orNull ?: ""}\"")
-        buildConfigField("String", "FIREBASE_PROJECT_ID", "\"${providers.gradleProperty("WARROOM_FIREBASE_PROJECT_ID").orNull ?: ""}\"")
-        buildConfigField("String", "FIREBASE_SENDER_ID", "\"${providers.gradleProperty("WARROOM_FIREBASE_SENDER_ID").orNull ?: ""}\"")
+        buildConfigField("String", "FIREBASE_APPLICATION_ID", "\"${firebaseValue("WARROOM_FIREBASE_APP_ID")}\"")
+        buildConfigField("String", "FIREBASE_API_KEY", "\"${firebaseValue("WARROOM_FIREBASE_API_KEY")}\"")
+        buildConfigField("String", "FIREBASE_PROJECT_ID", "\"${firebaseValue("WARROOM_FIREBASE_PROJECT_ID")}\"")
+        buildConfigField("String", "FIREBASE_SENDER_ID", "\"${firebaseValue("WARROOM_FIREBASE_SENDER_ID")}\"")
     }
 
     buildFeatures {
