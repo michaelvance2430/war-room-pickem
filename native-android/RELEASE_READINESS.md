@@ -11,7 +11,7 @@ Last audited: 2026-08-30
 - Minimum SDK: `26`
 - Target / compile SDK: `36`
 - Release bundle: `app/build/outputs/bundle/release/app-release.aab`
-- Bundle SHA-256: `0358dc121f6cb4c908c588350ed2faaa4526cce714045060957929ade3fe4c14`
+- Bundle SHA-256: `2f28007f875df7b85740473cc582cfa8c4b16706e202816113e4afc6383fc861`
 
 ## Verification completed
 
@@ -37,6 +37,12 @@ Last audited: 2026-08-30
   login. A controlled FCM HTTP v1 message was accepted, received, and posted by Android.
 - The final Firebase-enabled release gate passed all unit tests, all three emulator UI
   tests, lint-vital, R8, signing, and bundle generation.
+- Regular-season scorecards now load the same certified `week_results.prop_result` used
+  by iOS, display `PENDING`, `HIT +N`, or `MISS +0`, and retain the official
+  `picks.total_points` total used by standings. Regression coverage includes the live
+  8-point subtotal becoming the certified 11-point score after a three-point prop hit.
+- Android prop picks now display and store the published answer text, matching iOS and
+  the autonomous scorer, rather than persisting incompatible `A` / `B` markers.
 
 ## Blocking items before upload
 
@@ -45,7 +51,8 @@ Last audited: 2026-08-30
    Its private key is not present in the available workspaces.
 2. The retained upload keystore and the newly signed bundle use SHA-256
    `9C:00:6A:16:3D:EE:05:27:49:41:CC:AC:74:38:AB:F0:E3:73:64:62:60:FA:E1:7B:36:BA:1D:E3:6E:97:F9:82`.
-   The Play Console upload-key reset request has been submitted and remains pending.
+   Play accepted the reset request; this key becomes valid on September 1, 2026 at
+   18:47 UTC. Google blocks all bundle and APK uploads until that activation time.
 3. An authenticated end-to-end test against the production Supabase project still requires a
    test account/session. Automated fixture-based CFB/NFL coverage has passed.
 4. The signed bundle has not been uploaded to the closed-testing track. No review, rollout, or

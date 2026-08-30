@@ -102,7 +102,17 @@ class SupabaseApi {
         val rows = requestArray("/rest/v1/week_cards?select=${encode(select)}&league_id=eq.${league.id}&week_number=eq.${league.currentWeek}&card_games.order=sort_order.asc&limit=1", token)
         val row = rows.optJSONObject(0) ?: return null
         val id = UUID.fromString(row.getString("id"))
-        val card = WeekCard(id, league.id, row.optInt("week_number"), "published", instant(row.stringOrNull("lock_time")), row.stringOrNull("prop_question"))
+        val card = WeekCard(
+            id = id,
+            leagueId = league.id,
+            week = row.optInt("week_number"),
+            status = "published",
+            locksAt = instant(row.stringOrNull("lock_time")),
+            propQuestion = row.stringOrNull("prop_question"),
+            propOptionA = row.stringOrNull("prop_option_a"),
+            propOptionB = row.stringOrNull("prop_option_b"),
+            propPoints = row.optInt("prop_points", 1),
+        )
         val games = row.arrayOrEmpty("card_games").objects().map { game ->
             CardGame(
                 id = UUID.fromString(game.getString("id")), cardId = id,
@@ -191,6 +201,19 @@ class SupabaseApi {
             propChoice = row.stringOrNull("prop_choice"),
             lockedAt = instant(row.stringOrNull("locked_at")),
             totalPoints = if (row.isNull("total_points")) null else row.optInt("total_points"),
+        )
+    }
+
+    suspend fun certifiedWeekResult(token: String, league: League): CertifiedWeekResult? {
+        val select = "prop_result,scored_at"
+        val rows = requestArray(
+            "/rest/v1/week_results?select=${encode(select)}&league_id=eq.${league.id}&week_number=eq.${league.currentWeek}&limit=1",
+            token,
+        )
+        val row = rows.optJSONObject(0) ?: return null
+        return CertifiedWeekResult(
+            propResult = row.stringOrNull("prop_result"),
+            scoredAt = instant(row.stringOrNull("scored_at")),
         )
     }
 

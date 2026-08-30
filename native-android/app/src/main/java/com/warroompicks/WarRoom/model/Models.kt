@@ -40,6 +40,9 @@ data class WeekCard(
     val status: String,
     val locksAt: Instant?,
     val propQuestion: String?,
+    val propOptionA: String? = null,
+    val propOptionB: String? = null,
+    val propPoints: Int = 1,
 )
 
 data class TrophyDesign(val id: String, val name: String, val line: String)
@@ -104,6 +107,25 @@ data class CurrentPick(
     val lockedAt: Instant?,
     val totalPoints: Int?,
 )
+
+data class CertifiedWeekResult(
+    val propResult: String?,
+    val scoredAt: Instant?,
+)
+
+object ScorecardOfficialState {
+    fun total(gamePoints: Int, certifiedTotal: Int?): Int = certifiedTotal ?: gamePoints
+
+    fun propStatus(choice: String?, officialResult: String?, points: Int): String {
+        if (officialResult == null) return "PENDING"
+        return if (choice == officialResult) "HIT +$points" else "MISS +0"
+    }
+
+    fun propOptions(card: WeekCard): List<String> = listOfNotNull(
+        card.propOptionA?.takeIf(String::isNotBlank),
+        card.propOptionB?.takeIf(String::isNotBlank),
+    )
+}
 
 data class Standing(
     val userId: UUID,

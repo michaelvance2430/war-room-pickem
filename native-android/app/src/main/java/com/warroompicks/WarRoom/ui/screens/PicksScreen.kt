@@ -67,6 +67,20 @@ fun PicksScreen(
                             Text("CARD LOCKED", color = accent, fontSize = 11.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp)
                             Text("${lockedPick.totalPoints ?: 0} POINTS", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.Black)
                             Text("Your weekly scorecard updates as official results arrive.", color = Muted)
+                            card.propQuestion?.let { question ->
+                                Spacer(Modifier.height(12.dp))
+                                Text("WEEKLY PROP · ${card.propPoints} POINTS", color = WarYellow, fontSize = 10.sp, fontWeight = FontWeight.Black)
+                                Text(question, color = Color.White, fontWeight = FontWeight.Bold)
+                                Text(
+                                    ScorecardOfficialState.propStatus(
+                                        choice = lockedPick.propChoice,
+                                        officialResult = state.certifiedWeekResult?.propResult,
+                                        points = card.propPoints,
+                                    ),
+                                    color = if (state.certifiedWeekResult?.propResult == null) WarYellow else accent,
+                                    fontWeight = FontWeight.Black,
+                                )
+                            }
                         }
                     }
                 }
@@ -130,9 +144,13 @@ fun PicksScreen(
                             Column(Modifier.padding(15.dp)) {
                                 Text("PROP ORDER", color = WarYellow, fontWeight = FontWeight.Black)
                                 Text(question, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    listOf("A", "B").forEach { answer ->
-                                        FilterChip(selected = prop == answer, onClick = { prop = if (prop == answer) null else answer }, label = { Text(answer) })
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    ScorecardOfficialState.propOptions(card).forEach { answer ->
+                                        FilterChip(
+                                            selected = prop == answer,
+                                            onClick = { prop = if (prop == answer) null else answer },
+                                            label = { Text(answer) },
+                                        )
                                     }
                                 }
                             }

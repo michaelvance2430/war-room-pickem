@@ -26,6 +26,7 @@ data class AppState(
     val card: WeekCard? = null,
     val games: List<CardGame> = emptyList(),
     val currentPick: CurrentPick? = null,
+    val certifiedWeekResult: CertifiedWeekResult? = null,
     val standings: List<Standing> = emptyList(),
     val messages: List<LockerMessage> = emptyList(),
     val announcements: List<Announcement> = emptyList(),
@@ -47,6 +48,7 @@ data class AppState(
 
 private data class LeagueSnapshot(
     val card: Pair<WeekCard, List<CardGame>>?, val games: List<CardGame>, val pick: CurrentPick?,
+    val certifiedWeekResult: CertifiedWeekResult?,
     val favorite: String?, val crystal: String?, val standings: List<Standing>,
     val messages: List<LockerMessage>, val announcements: List<Announcement>,
     val history: List<HistoryWeek>, val trophies: List<Trophy>,
@@ -136,6 +138,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 card = card,
                 games = runCatching { api.liveScores(session.accessToken, league, card?.second.orEmpty()) }.getOrDefault(card?.second.orEmpty()),
                 pick = runCatching { api.currentPick(session.accessToken, league, session.userId) }.getOrNull(),
+                certifiedWeekResult = runCatching { api.certifiedWeekResult(session.accessToken, league) }.getOrNull(),
                 favorite = runCatching { api.favoriteTeam(session.accessToken, session.userId, league.sport) }.getOrNull(),
                 crystal = runCatching { api.crystalBall(session.accessToken, league.id, session.userId) }.getOrNull(),
                 standings = runCatching { api.standings(session.accessToken, league) }.getOrDefault(state.standings),
@@ -154,6 +157,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }.onSuccess { loaded ->
             _state.value = _state.value.copy(
                 card = loaded.card?.first, games = loaded.games, currentPick = loaded.pick,
+                certifiedWeekResult = loaded.certifiedWeekResult,
                 favoriteTeam = loaded.favorite, crystalBallTeam = loaded.crystal,
                 standings = loaded.standings, messages = loaded.messages,
                 announcements = loaded.announcements, error = null,
