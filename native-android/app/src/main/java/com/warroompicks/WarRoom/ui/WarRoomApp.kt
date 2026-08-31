@@ -51,6 +51,17 @@ fun WarRoomApp(viewModel: AppViewModel, notificationDestination: String? = null,
             val snackbarHostState = remember { SnackbarHostState() }
             Scaffold(
                 containerColor = Color.Transparent,
+                topBar = {
+                    if (tab != AppTab.Home) {
+                        Surface(color = Color(0xFF090B0A), tonalElevation = 4.dp) {
+                            Row(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                                IconButton(onClick = { tab = AppTab.Home }) {
+                                    Icon(Icons.Default.ArrowBack, contentDescription = "Back to Home", tint = Color.White)
+                                }
+                            }
+                        }
+                    }
+                },
                 bottomBar = {
                     NavigationBar(containerColor = Color(0xFF090B0A), tonalElevation = 8.dp) {
                         AppTab.entries.forEach { destination ->
