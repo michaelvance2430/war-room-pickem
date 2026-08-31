@@ -646,7 +646,10 @@ export default function HomeWeekHero() {
     <>
     {state.hasCard && state.games.length > 0 ? (
       <>
-        <LeagueLockTimer games={state.games} />
+        <LeagueLockTimer
+          games={state.games}
+          portalTargetId="home-mission-clock-slot"
+        />
         <WeeklyParticipationPulse weekNumber={state.week} games={state.games} />
       </>
     ) : null}
