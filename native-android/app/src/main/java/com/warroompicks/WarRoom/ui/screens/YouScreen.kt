@@ -16,6 +16,8 @@ import com.warroompicks.WarRoom.ui.components.CommandPanel
 import com.warroompicks.WarRoom.ui.components.WarBackdrop
 import com.warroompicks.WarRoom.ui.components.WarHeader
 import com.warroompicks.WarRoom.ui.components.PlayerAvatar
+import com.warroompicks.WarRoom.ui.components.AchievementArtifact
+import com.warroompicks.WarRoom.ui.components.AchievementDetail
 import com.warroompicks.WarRoom.ui.theme.NflCyan
 import com.warroompicks.WarRoom.ui.theme.WarGreen
 
@@ -28,6 +30,7 @@ fun YouScreen(state: AppState, saveFavorite: (String) -> Unit, saveCrystal: (Str
     var editFavorite by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     var editName by remember { mutableStateOf(false) }
     var earnedSwagExpanded by remember { mutableStateOf(false) }
+    var selectedAchievement by remember { mutableStateOf<com.warroompicks.WarRoom.model.Achievement?>(null) }
     WarBackdrop(league.sport) {
         LazyColumn(contentPadding = PaddingValues(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item {
@@ -41,7 +44,14 @@ fun YouScreen(state: AppState, saveFavorite: (String) -> Unit, saveCrystal: (Str
             item { CommandPanel("CAMPAIGN RECORD", "${standing?.points?.toInt() ?: 0} career points", "Current rank: ${standing?.rank ?: "—"} · Historical weekly scorecards remain on file.", league.sport) }
             item { CommandPanel("TEAM ALLEGIANCE", state.favoriteTeam ?: "Choose favorite team", "Editable at any time. Your favorite appears on commissioner boards.", league.sport, onClick = { editFavorite = true }) }
             item { CommandPanel("CRYSTAL BALL", state.crystalBallTeam ?: "Preseason champion pick", "Required once at the start of this campaign and displayed on your profile.", league.sport) }
-            item { CommandPanel("EARNED SWAG · ${state.trophies.size}", if (earnedSwagExpanded) "Close the cabinet" else "Open the cabinet", "Championships, conference titles, Crystal Ball and Toilet Bowl evidence.", league.sport, onClick = { earnedSwagExpanded = !earnedSwagExpanded }) }
+            item { CommandPanel("EARNED SCHWAG · ${state.trophies.size + state.achievements.size}", if (earnedSwagExpanded) "Close the cabinet" else "Open the cabinet", "Cheevos, championships, conference titles, Crystal Ball and Toilet Bowl evidence.", league.sport, onClick = { earnedSwagExpanded = !earnedSwagExpanded }) }
+            if (earnedSwagExpanded && state.achievements.isNotEmpty()) {
+                item { Text("CHEEVO PERSONNEL RECORDS", color = accent, fontWeight = FontWeight.Black) }
+                items(state.achievements.size) { index ->
+                    val achievement = state.achievements[index]
+                    AchievementArtifact(achievement, Modifier.fillMaxWidth(), onClick = { selectedAchievement = achievement })
+                }
+            }
             if (earnedSwagExpanded && state.trophies.isNotEmpty()) {
                 items(state.trophies.size) { index ->
                     val trophy = state.trophies[index]
@@ -76,6 +86,7 @@ fun YouScreen(state: AppState, saveFavorite: (String) -> Unit, saveCrystal: (Str
             confirmButton = { Button(onClick = { updateDisplayName(name); editName = false }, enabled = name.trim().length >= 2) { Text("CONFIRM") } },
         )
     }
+    selectedAchievement?.let { AchievementDetail(it, onDismiss = { selectedAchievement = null }) }
 }
 
 @Composable

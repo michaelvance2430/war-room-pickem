@@ -159,6 +159,14 @@ data class Trophy(
     val subtitle: String?,
 )
 
+data class Achievement(
+    val leagueId: UUID,
+    val code: String,
+    val title: String,
+    val flavor: String,
+    val earnedAt: Instant?,
+)
+
 data class NflPostseasonTeam(val id: String, val name: String, val conference: String, val seed: Int)
 data class NflPostseasonSlate(val seasonKey: Int, val teams: List<NflPostseasonTeam>)
 data class NflPostseasonEntry(val picks: Map<String, String>, val usedJdam: Boolean, val lockedAt: Instant?, val score: Int?)

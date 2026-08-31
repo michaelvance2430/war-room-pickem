@@ -390,6 +390,19 @@ class SupabaseApi {
         return rows.objects().map { Trophy(UUID.fromString(it.getString("id")), it.optInt("season_year"), it.optString("trophy_type"), it.optString("winner_name"), it.stringOrNull("subtitle")) }
     }
 
+    suspend fun achievements(token: String, userId: UUID): List<Achievement> {
+        val rows = requestArray("/rest/v1/achievements?select=league_id,code,title,flavor,earned_at&user_id=eq.$userId&order=earned_at.desc", token)
+        return rows.objects().map {
+            Achievement(
+                leagueId = UUID.fromString(it.getString("league_id")),
+                code = it.optString("code"),
+                title = it.optString("title"),
+                flavor = it.optString("flavor"),
+                earnedAt = instant(it.stringOrNull("earned_at")),
+            )
+        }
+    }
+
     suspend fun postLockerMessage(token: String, leagueId: UUID, userId: UUID, body: String) {
         request(
             "/rest/v1/locker_messages", "POST", token,
