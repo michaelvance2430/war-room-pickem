@@ -234,6 +234,12 @@ export function formatRankedTeam(
   return name;
 }
 
+/** Individual team-name emphasis: Top 10 gold, ranks 11–25 violet. */
+export function rankedTeamTextClass(rank?: number | null): string {
+  if (typeof rank !== "number" || rank < 1 || rank > 25) return "";
+  return rank <= 10 ? "text-amber-200" : "text-violet-200";
+}
+
 /**
  * Rank heat for card builder + picks:
  * - legendary: both top 10 (gold)
