@@ -6787,7 +6787,8 @@ private struct CheevoBriefingView: View {
                                 .overlay(RoundedRectangle(cornerRadius: 22).stroke(visual.color.opacity(0.45), lineWidth: 2))
                         } else {
                             GeneratedCheevoArtifactView(code: definition.id, locked: !isEarned)
-                                .frame(maxWidth: 310, maxHeight: 310)
+                                .frame(maxWidth: 310)
+                                .aspectRatio(1, contentMode: .fit)
                                 .clipShape(RoundedRectangle(cornerRadius: 22))
                                 .overlay(RoundedRectangle(cornerRadius: 22).stroke(visual.color.opacity(0.45), lineWidth: 2))
                         }
@@ -7188,7 +7189,51 @@ private struct GeneratedCheevoArtifactView: View {
                     .scaledToFill()
                     .saturation(locked ? 0.35 : 1)
                     .opacity(locked ? 0.68 : 1)
-                if locked && rarity != .common {
+                if rarity == .common {
+                    RoundedRectangle(cornerRadius: edge * 0.12)
+                        .fill(
+                            RadialGradient(
+                                colors: [visual.color.opacity(locked ? 0.13 : 0.34), .black.opacity(0.08)],
+                                center: .center,
+                                startRadius: edge * 0.04,
+                                endRadius: edge * 0.48
+                            )
+                        )
+                        .padding(edge * 0.055)
+                    Circle()
+                        .fill(.black.opacity(locked ? 0.72 : 0.60))
+                        .frame(width: edge * 0.58, height: edge * 0.58)
+                        .overlay(
+                            Circle().stroke(
+                                visual.color.opacity(locked ? 0.30 : 0.96),
+                                style: StrokeStyle(lineWidth: max(2, edge * 0.024), dash: locked ? [edge * 0.035, edge * 0.025] : [])
+                            )
+                        )
+                        .shadow(color: visual.color.opacity(locked ? 0.12 : 0.72), radius: edge * 0.09)
+                    AchievementGlyph(visual: visual, size: edge * 0.34)
+                        .saturation(locked ? 0 : 1)
+                        .opacity(locked ? 0.40 : 1)
+                        .shadow(color: visual.color.opacity(locked ? 0 : 0.95), radius: edge * 0.055)
+                    VStack {
+                        HStack {
+                            Text("COMMON // \(code.replacingOccurrences(of: "_", with: " ").uppercased())")
+                                .font(.system(size: max(7, edge * 0.034), weight: .black, design: .monospaced))
+                                .foregroundStyle(visual.color.opacity(locked ? 0.45 : 0.92))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.55)
+                            Spacer()
+                        }
+                        Spacer()
+                        HStack {
+                            Image(systemName: locked ? "lock.fill" : "checkmark.seal.fill")
+                            Text(locked ? "CLASSIFIED" : "PERMANENT RECORD")
+                            Spacer()
+                        }
+                        .font(.system(size: max(7, edge * 0.032), weight: .black, design: .monospaced))
+                        .foregroundStyle(locked ? .white.opacity(0.38) : visual.color.opacity(0.9))
+                    }
+                    .padding(edge * 0.105)
+                } else if locked {
                     Image(systemName: "lock.fill")
                         .font(.system(size: edge * 0.18, weight: .black))
                         .foregroundStyle(.white.opacity(0.72))
@@ -7204,6 +7249,7 @@ private struct GeneratedCheevoArtifactView: View {
                 }
             }
         }
+        .aspectRatio(1, contentMode: .fit)
         .accessibilityHidden(true)
     }
 }
