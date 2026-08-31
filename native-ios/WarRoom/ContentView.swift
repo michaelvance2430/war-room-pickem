@@ -8,10 +8,10 @@ struct RootView: View {
     // ContentView is rebuilt when the active league changes; keeping the flag
     // here prevents a league switch from replaying the launch film.
     @State private var showOpening: Bool
-    @State private var pendingNotificationDestination: String?
+    @State private var pendingNotificationDestination: WarRoomNotificationRoute?
 
     init() {
-        let destination = WarRoomNotificationCenter.takePendingDestination()
+        let destination = WarRoomNotificationCenter.takePendingRoute()
         _showOpening = State(initialValue: destination == nil)
         _pendingNotificationDestination = State(initialValue: destination)
     }
@@ -31,19 +31,13 @@ struct RootView: View {
             guard auth.token != nil else { return }
             await auth.maintainSession()
         }
-        .onReceive(NotificationCenter.default.publisher(for: .warRoomNotificationDestination)) { notification in
-            showOpening = false
-            if let destination = notification.object as? String {
-                pendingNotificationDestination = destination
-            }
-        }
     }
 }
 
 private struct MembershipGateView: View {
     @EnvironmentObject private var auth: AuthStore
     @Binding var showOpening: Bool
-    @Binding var pendingNotificationDestination: String?
+    @Binding var pendingNotificationDestination: WarRoomNotificationRoute?
     @State private var state: MembershipState = .loading
 
     private enum MembershipState: Equatable {
@@ -131,7 +125,7 @@ struct ContentView: View {
     @EnvironmentObject private var auth: AuthStore
     @Environment(\.scenePhase) private var scenePhase
     @Binding var showOpening: Bool
-    @Binding var pendingNotificationDestination: String?
+    @Binding var pendingNotificationDestination: WarRoomNotificationRoute?
     @State private var selectedTab = 0
     @State private var tabRootIds = (0..<5).map { _ in UUID() }
     @State private var picksKickoff: Date?
@@ -139,6 +133,7 @@ struct ContentView: View {
     @State private var platformStatus: PlatformStatus?
     @State private var showingNotificationPrimer = false
     @State private var showingPushAnnouncements = false
+    @State private var notificationDispatchTarget: NotificationDispatchTarget?
     @AppStorage("warroom.notifications.primer-seen") private var notificationPrimerSeen = false
     @AppStorage("warroom.activeSportId") private var activeSportId = "cfb"
 
@@ -202,23 +197,28 @@ struct ContentView: View {
         .task(id: auth.user?.id) { await refreshPlatformStatus() }
         .task(id: auth.user?.id) { await prepareNotifications() }
         .task(id: auth.user?.id) {
-            if let destination = pendingNotificationDestination ?? WarRoomNotificationCenter.takePendingDestination() {
+            if let destination = pendingNotificationDestination ?? WarRoomNotificationCenter.takePendingRoute() {
                 pendingNotificationDestination = nil
                 // The in-memory launch route wins, but always clear its persisted
                 // handoff too so a later cold launch cannot replay the same tap.
-                _ = WarRoomNotificationCenter.takePendingDestination()
-                handleNotificationDestination(destination)
+                _ = WarRoomNotificationCenter.takePendingRoute()
+                await handleNotificationDestination(destination)
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .warRoomNotificationDestination)) { notification in
-            guard let destination = notification.object as? String else { return }
-            _ = WarRoomNotificationCenter.takePendingDestination()
-            handleNotificationDestination(destination)
+            guard let destination = notification.object as? WarRoomNotificationRoute else { return }
+            _ = WarRoomNotificationCenter.takePendingRoute()
+            Task { await handleNotificationDestination(destination) }
         }
         .onReceive(NotificationCenter.default.publisher(for: .warRoomDeviceTokenChanged)) { _ in
             Task { await registerPushToken() }
         }
         .sheet(isPresented: $showingPushAnnouncements) { NavigationStack { AnnouncementsView() } }
+        .sheet(item: $notificationDispatchTarget) { target in
+            NavigationStack {
+                GazetteView(membership: target.membership, initialWeek: target.week)
+            }
+        }
         .alert("Stay ahead of the lock", isPresented: $showingNotificationPrimer) {
             Button("Not now", role: .cancel) { notificationPrimerSeen = true }
             Button("Enable alerts") {
@@ -295,17 +295,41 @@ struct ContentView: View {
         selectedTab = tab
     }
 
-    private func handleNotificationDestination(_ destination: String) {
+    @MainActor private func handleNotificationDestination(_ route: WarRoomNotificationRoute) async {
         showOpening = false
-        if destination == "announcements" {
+        if route.destination == "announcements" {
             openTab(0)
             showingPushAnnouncements = true
-        } else if destination == "picks" {
+        } else if route.destination == "picks" {
+            if let leagueId = route.leagueId { auth.selectLeague(leagueId) }
             openTab(1)
-        } else if destination == "results" {
+        } else if route.destination == "results" {
             openTab(0)
+            guard let leagueId = route.leagueId,
+                  let week = route.week,
+                  let token = auth.token,
+                  let user = auth.user,
+                  let membership = try? await SupabaseAPI.activeLeague(
+                    token: token,
+                    userId: user.id,
+                    preferredLeagueId: leagueId
+                  ),
+                  membership.leagueId == leagueId
+            else { return }
+            auth.selectLeague(leagueId)
+            if let editions = try? await SupabaseAPI.gazetteEditions(token: token, leagueId: leagueId),
+               let edition = editions.first(where: { $0.weekNumber == week }) {
+                DispatchPresentationPolicy.markSeen(edition, userId: user.id, leagueId: leagueId)
+            }
+            notificationDispatchTarget = NotificationDispatchTarget(membership: membership, week: week)
         }
     }
+}
+
+private struct NotificationDispatchTarget: Identifiable {
+    let membership: LeagueMembership
+    let week: Int
+    var id: String { "\(membership.leagueId.uuidString):\(week)" }
 }
 
 private struct PlatformIncidentBanner: View {
@@ -2173,6 +2197,7 @@ private struct PlayerProfileRouteView: View {
 struct HomeView: View {
     @EnvironmentObject private var auth: AuthStore
     @Environment(\.openURL) private var openURL
+    @Environment(\.scenePhase) private var scenePhase
     let leagueOverride: LeagueMembership?
     let onOpenPicks: () -> Void
     let onOpenStandings: () -> Void
@@ -2670,6 +2695,9 @@ struct HomeView: View {
         }
         .onAppear {
             if !loading { Task { await load() } }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active, !loading { Task { await load() } }
         }
         .alert("SUPPORT EMAIL COPIED", isPresented: $showingFeedbackFallback) {
             Button("OK", role: .cancel) { }

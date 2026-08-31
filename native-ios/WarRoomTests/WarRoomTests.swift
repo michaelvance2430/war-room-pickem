@@ -11,6 +11,23 @@ import Foundation
 
 struct WarRoomTests {
 
+    @Test func resultNotificationPreservesExactDispatchRoute() throws {
+        let leagueId = UUID(uuidString: "76730ee3-d440-4a91-9616-a768ffc03189")!
+        let route = try #require(WarRoomNotificationRoute(userInfo: [
+            "destination": "results",
+            "league_id": leagueId.uuidString.lowercased(),
+            "week": 0,
+        ]))
+        #expect(route.destination == "results")
+        #expect(route.leagueId == leagueId)
+        #expect(route.week == 0)
+        #expect(try JSONDecoder().decode(WarRoomNotificationRoute.self, from: JSONEncoder().encode(route)) == route)
+    }
+
+    @Test func dispatchAlwaysExposesExactlyFourOrderedPages() {
+        #expect(DispatchPageCatalog.names == ["FRONT", "SPORTS", "RIVALRIES", "BACK"])
+    }
+
     @Test func newestUnseenDispatchOpensOnlyOncePerMemberAndLeague() throws {
         let userId = UUID(uuidString: "10000000-0000-0000-0000-000000000001")!
         let leagueId = UUID(uuidString: "20000000-0000-0000-0000-000000000001")!

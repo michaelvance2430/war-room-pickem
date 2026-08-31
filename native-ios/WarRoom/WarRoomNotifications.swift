@@ -2,6 +2,28 @@ import Foundation
 import UserNotifications
 import UIKit
 
+struct WarRoomNotificationRoute: Codable, Equatable, Sendable {
+    let destination: String
+    let leagueId: UUID?
+    let week: Int?
+
+    init(destination: String, leagueId: UUID? = nil, week: Int? = nil) {
+        self.destination = destination
+        self.leagueId = leagueId
+        self.week = week
+    }
+
+    init?(userInfo: [AnyHashable: Any]) {
+        guard let destination = userInfo["destination"] as? String else { return nil }
+        self.destination = destination
+        self.leagueId = (userInfo["league_id"] as? String).flatMap(UUID.init(uuidString:))
+        if let week = userInfo["week"] as? Int { self.week = week }
+        else if let week = userInfo["week"] as? NSNumber { self.week = week.intValue }
+        else if let week = userInfo["week"] as? String { self.week = Int(week) }
+        else { self.week = nil }
+    }
+}
+
 final class WarRoomAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     func application(
         _ application: UIApplication,
@@ -9,8 +31,8 @@ final class WarRoomAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificat
     ) -> Bool {
         UNUserNotificationCenter.current().delegate = self
         if let userInfo = launchOptions?[.remoteNotification] as? [AnyHashable: Any],
-           let destination = userInfo["destination"] as? String {
-            WarRoomNotificationCenter.savePendingDestination(destination)
+           let route = WarRoomNotificationRoute(userInfo: userInfo) {
+            WarRoomNotificationCenter.savePendingRoute(route)
         }
         return true
     }
@@ -41,9 +63,9 @@ final class WarRoomAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificat
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
         let userInfo = response.notification.request.content.userInfo
-        if let destination = userInfo["destination"] as? String {
-            WarRoomNotificationCenter.savePendingDestination(destination)
-            NotificationCenter.default.post(name: .warRoomNotificationDestination, object: destination)
+        if let route = WarRoomNotificationRoute(userInfo: userInfo) {
+            WarRoomNotificationCenter.savePendingRoute(route)
+            NotificationCenter.default.post(name: .warRoomNotificationDestination, object: route)
         }
         completionHandler()
     }
@@ -57,21 +79,22 @@ extension Notification.Name {
 enum WarRoomNotificationCenter {
     private static let center = UNUserNotificationCenter.current()
     static let deviceTokenKey = "warroom.apns.device-token"
-    static let pendingDestinationKey = "warroom.notification.pending-destination"
+    static let pendingDestinationKey = "warroom.notification.pending-route"
 
-    static func savePendingDestination(_ destination: String) {
-        UserDefaults.standard.set(destination, forKey: pendingDestinationKey)
+    static func savePendingRoute(_ route: WarRoomNotificationRoute) {
+        guard let data = try? JSONEncoder().encode(route) else { return }
+        UserDefaults.standard.set(data, forKey: pendingDestinationKey)
         UserDefaults.standard.synchronize()
     }
 
-    static func takePendingDestination() -> String? {
-        let destination = UserDefaults.standard.string(forKey: pendingDestinationKey)
+    static func takePendingRoute() -> WarRoomNotificationRoute? {
+        let data = UserDefaults.standard.data(forKey: pendingDestinationKey)
         // An empty tombstone is more reliable than removing a key while the app
         // is launching and CFPreferences is synchronizing across processes.
-        UserDefaults.standard.set("", forKey: pendingDestinationKey)
+        UserDefaults.standard.set(Data(), forKey: pendingDestinationKey)
         UserDefaults.standard.synchronize()
-        guard let destination, !destination.isEmpty else { return nil }
-        return destination
+        guard let data, !data.isEmpty else { return nil }
+        return try? JSONDecoder().decode(WarRoomNotificationRoute.self, from: data)
     }
 
     static func authorizationStatus() async -> UNAuthorizationStatus {

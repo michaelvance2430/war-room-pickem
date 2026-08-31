@@ -60,6 +60,15 @@ Deno.serve(async (request) => {
 
     const failures: string[] = [];
     for (const device of devices ?? []) {
+      const { data: alreadyDelivered, error: deliveryCheckError } = await supabase.rpc(
+        "push_notification_was_delivered",
+        { p_job_id: job.id, p_device_token: device.device_token },
+      );
+      if (deliveryCheckError) {
+        failures.push(`delivery-check:${deliveryCheckError.message}`);
+        continue;
+      }
+      if (alreadyDelivered === true) continue;
       const host = device.environment === "development" ? "api.sandbox.push.apple.com" : "api.push.apple.com";
       const response = await fetch(`https://${host}/3/device/${device.device_token}`, {
         method: "POST",
@@ -68,6 +77,7 @@ Deno.serve(async (request) => {
           "apns-topic": "com.warroompicks.WarRoom",
           "apns-push-type": "alert",
           "apns-priority": "10",
+          "apns-collapse-id": job.id,
           "content-type": "application/json",
         },
         body: JSON.stringify({
@@ -78,7 +88,14 @@ Deno.serve(async (request) => {
           week: job.week_number,
         }),
       });
-      if (response.ok) sent += 1;
+      if (response.ok) {
+        const { error: deliveryRecordError } = await supabase.rpc(
+          "record_push_notification_delivery",
+          { p_job_id: job.id, p_device_token: device.device_token },
+        );
+        if (deliveryRecordError) failures.push(`delivery-record:${deliveryRecordError.message}`);
+        else sent += 1;
+      }
       else {
         const reason = await response.text();
         failures.push(`${response.status}:${reason}`);

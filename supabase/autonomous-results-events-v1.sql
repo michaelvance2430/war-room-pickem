@@ -55,6 +55,7 @@ declare
   v_league public.leagues%rowtype;
   v_crown_names text[];
   v_shame_names text[];
+  v_nuclear_names text[];
   v_crown_points integer := 0;
   v_shame_points integer := 0;
   v_week_label text;
@@ -75,6 +76,19 @@ begin
       where league_id = new.league_id and week_number = new.week_number
         and locked_at is not null and total_points is not null
     );
+
+  select coalesce(
+      array_agg(coalesce(m.display_name_override, p.display_name) order by coalesce(m.display_name_override, p.display_name)),
+      array[]::text[]
+    )
+    into v_nuclear_names
+  from public.picks pk
+  join public.memberships m on m.league_id = pk.league_id and m.user_id = pk.user_id
+  join public.profiles p on p.id = pk.user_id
+  where pk.league_id = new.league_id
+    and pk.week_number = new.week_number
+    and pk.locked_at is not null
+    and coalesce(pk.is_chaos, false);
 
   select coalesce(array_agg(coalesce(m.display_name_override, p.display_name) order by coalesce(m.display_name_override, p.display_name)), array[]::text[]),
          coalesce(min(pk.total_points), 0)
@@ -97,6 +111,13 @@ begin
     'coverageLine', 'Official results · ' || v_week_label,
     'crown', jsonb_build_object('names', v_crown_names, 'pts', v_crown_points, 'headline', upper(array_to_string(v_crown_names, ' & ')) || ' TAKES THE WEEK', 'deck', 'The official ledger has spoken.', 'kind', case when cardinality(v_crown_names) > 1 then 'tie' else 'clear' end),
     'shame', jsonb_build_object('names', v_shame_names, 'pts', v_shame_points, 'headline', upper(array_to_string(v_shame_names, ' & ')) || ' REPORTS TO FILM STUDY', 'deck', 'There will be questions. None will be gentle.', 'kind', case when cardinality(v_shame_names) > 1 then 'tie' else 'clear' end),
+    'chaosDetonation', case when cardinality(v_nuclear_names) > 0 then jsonb_build_object(
+      'names', v_nuclear_names,
+      'pts', null,
+      'headline', upper(array_to_string(v_nuclear_names, ' · ')) || ' WENT NUCLEAR',
+      'deck', 'Every Nuclear authorization is on the permanent record.',
+      'kind', 'nuclear_roll_call'
+    ) else null end,
     'masthead', 'THE WAR ROOM DISPATCH',
     'tagline', 'THE OFFICIAL PAPER OF BAD DECISIONS',
     'printedLine', to_char(clock_timestamp() at time zone 'America/New_York', 'FMMonth DD, YYYY'),

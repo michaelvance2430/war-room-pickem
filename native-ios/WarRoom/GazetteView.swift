@@ -26,9 +26,14 @@ enum DispatchPresentationPolicy {
     }
 }
 
+enum DispatchPageCatalog {
+    static let names = ["FRONT", "SPORTS", "RIVALRIES", "BACK"]
+}
+
 struct GazetteView: View {
     @EnvironmentObject private var auth: AuthStore
     let membership: LeagueMembership
+    let initialWeek: Int?
     @State private var editions: [GazetteEditionRow] = []
     @State private var selectedId: UUID?
     @State private var page = 0
@@ -40,6 +45,11 @@ struct GazetteView: View {
         editions.first { $0.id == selectedId } ?? editions.first
     }
     private var isNFL: Bool { membership.leagues.sportId.lowercased() == "nfl" }
+
+    init(membership: LeagueMembership, initialWeek: Int? = nil) {
+        self.membership = membership
+        self.initialWeek = initialWeek
+    }
 
     var body: some View {
         ZStack {
@@ -105,7 +115,7 @@ struct GazetteView: View {
         guard let token = auth.token else { return }
         do {
             editions = try await SupabaseAPI.gazetteEditions(token: token, leagueId: membership.leagueId)
-            selectedId = editions.first?.id
+            selectedId = editions.first(where: { $0.weekNumber == initialWeek })?.id ?? editions.first?.id
             errorMessage = nil
             await recordSelectedSecrets()
         } catch { errorMessage = error.localizedDescription }
@@ -186,7 +196,7 @@ private struct GazettePaperView: View {
     let sportId: String
     let regularSeasonWeeks: Int
     @Binding var page: Int
-    private let pageNames = ["FRONT", "SPORTS", "RIVALRIES", "BACK"]
+    private let pageNames = DispatchPageCatalog.names
     private var payload: GazettePayload { edition.payload }
     private let ink = Color.white
     private let paper = Color(red: 0.035, green: 0.03, blue: 0.025)
@@ -260,6 +270,7 @@ private struct GazettePaperView: View {
                             .foregroundStyle(page == index ? .black : ink.opacity(0.55))
                             .background(page == index ? Color.red : .clear)
                     }
+                    .accessibilityIdentifier("dispatch.page.\(index + 1)")
                 }
             }
             .padding(4).background(.black).overlay(Rectangle().stroke(Color.red.opacity(0.6)))
@@ -453,7 +464,21 @@ private struct GazettePaperView: View {
     private var backPage: some View {
         VStack(alignment: .leading, spacing: 15) {
             GazetteBanner(text: "PERSONNEL ORDERS · SEIZED PROPERTY · TERRIBLE OPPORTUNITIES")
-            if let chaos = payload.chaosDetonation { GazetteBrief(kicker: "BUTTON PUSHED", story: chaos, color: .red) }
+            if let chaos = payload.chaosDetonation {
+                GazetteBrief(kicker: "BUTTON PUSHED", story: chaos, color: .red)
+                if let names = chaos.names, !names.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("NUCLEAR ROLL CALL").font(.caption2.weight(.black)).tracking(1.4).foregroundStyle(.red)
+                        ForEach(names, id: \.self) { name in
+                            Text("☢ \(name.uppercased())").font(.headline.weight(.black))
+                        }
+                    }
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.red.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.red.opacity(0.7)))
+                }
+            }
             if let orders = payload.promotionOrders, !orders.isEmpty {
                 Text("PROMOTION ORDERS").font(.headline.weight(.black))
                 ForEach(Array(orders.enumerated()), id: \.offset) { _, order in
