@@ -4825,7 +4825,6 @@ struct CommissionerCardBuilderView: View {
         .contentMargins(.bottom, 36, for: .scrollContent)
         .navigationTitle("Build Card")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.hidden, for: .tabBar)
     }
 
     private var isComplete: Bool {
