@@ -91,7 +91,21 @@ private struct ArsenalInsignia: View {
             HStack(spacing: 1) { Rectangle(); Rectangle().opacity(0.55); Rectangle() }.rotationEffect(.degrees(-8))
                 .overlay(Path { p in p.move(to: .init(x: 3, y: 22)); p.addLine(to: .init(x: 15, y: 10)); p.addLine(to: .init(x: 27, y: 17)) }.stroke(.red, lineWidth: 3))
         case .nuke:
-            ZStack { Capsule().frame(width: 11); Circle().stroke(lineWidth: 3).frame(width: 28, height: 28); Circle().frame(width: 7, height: 7) }
+            ZStack {
+                // The Nuclear Option is always represented by its mushroom
+                // cloud—not a target, button, or generic radiation callout.
+                VStack(spacing: -3) {
+                    ZStack {
+                        Circle().frame(width: 16, height: 16).offset(x: -8, y: 3)
+                        Circle().frame(width: 20, height: 20).offset(y: -2)
+                        Circle().frame(width: 16, height: 16).offset(x: 8, y: 3)
+                        Capsule().frame(width: 31, height: 10).offset(y: 7)
+                    }
+                    UnevenRoundedRectangle(topLeadingRadius: 5, bottomLeadingRadius: 2, bottomTrailingRadius: 2, topTrailingRadius: 5)
+                        .frame(width: 11, height: 19)
+                    Capsule().frame(width: 25, height: 5)
+                }
+            }
         case .deadHand:
             Image(systemName: "hand.raised.fill").resizable().scaledToFit()
         case .jdam:
@@ -102,7 +116,7 @@ private struct ArsenalInsignia: View {
     }
 
     private var label: String {
-        switch kind { case .maps: return "M.A.P.'s insignia"; case .nuke: return "Tactical Nuclear Button insignia"; case .deadHand: return "Dead Hand insignia"; case .jdam: return "JDAM insignia"; case .hellfire: return "Hellfire insignia" }
+        switch kind { case .maps: return "M.A.P.'s insignia"; case .nuke: return "Tactical Nuke mushroom cloud insignia"; case .deadHand: return "Dead Hand insignia"; case .jdam: return "JDAM insignia"; case .hellfire: return "Hellfire insignia" }
     }
 }
 
