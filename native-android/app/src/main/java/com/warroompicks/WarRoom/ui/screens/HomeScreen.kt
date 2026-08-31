@@ -33,6 +33,7 @@ fun HomeScreen(state: AppState, selectLeague: (League) -> Unit, postAnnouncement
     val league = state.league ?: return
     val context = LocalContext.current
     var switchOpen by remember { mutableStateOf(false) }
+    var expandedSport by remember { mutableStateOf<Sport?>(null) }
     var announcementComposer by remember { mutableStateOf(false) }
     var cardBuilder by remember { mutableStateOf(false) }
     var trophyPicker by remember { mutableStateOf(false) }
@@ -62,11 +63,19 @@ fun HomeScreen(state: AppState, selectLeague: (League) -> Unit, postAnnouncement
             if (switchOpen) {
                 Sport.entries.forEach { sport ->
                     val leagues = state.leagues.filter { it.sport == sport }
-                    if (leagues.isNotEmpty()) {
-                        item { Text(sport.id.uppercase(), color = if (sport == Sport.NFL) NflCyan else WarYellow, fontWeight = FontWeight.Black, letterSpacing = 2.sp) }
-                        items(leagues) { candidate ->
-                            CommandPanel("ACTIVE FREQUENCY", candidate.name, "Week ${candidate.currentWeek} · Tap to enter", sport, onClick = { switchOpen = false; selectLeague(candidate) })
+                    item {
+                        Row(Modifier.fillMaxWidth().clickable { expandedSport = if (expandedSport == sport) null else sport }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text("${sport.id.uppercase()} · ${leagues.size}", color = if (sport == Sport.NFL) NflCyan else WarYellow, fontWeight = FontWeight.Black, letterSpacing = 2.sp, modifier = Modifier.weight(1f))
+                            Icon(Icons.Default.ExpandMore, null)
                         }
+                    }
+                    if (expandedSport == sport) items(leagues) { candidate ->
+                            CommandPanel("ACTIVE FREQUENCY", candidate.name, "Week ${candidate.currentWeek} · Tap to enter", sport, onClick = { switchOpen = false; selectLeague(candidate) })
+                    }
+                }
+                item {
+                    Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("FIELDHOUSE · COMING SOON", color = WarYellow, fontWeight = FontWeight.Black, letterSpacing = 2.sp, modifier = Modifier.weight(1f))
                     }
                 }
             }
@@ -143,6 +152,16 @@ private fun TrophyPickerDialog(sport: Sport, selectedId: String?, onDismiss: () 
         title = { Text(if (selectedId == null) "CHOOSE CHAMPIONSHIP HARDWARE" else "THE VAULT IS SEALED") },
         text = {
             LazyColumn(Modifier.heightIn(max = 480.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                item {
+                    val featured = pending ?: designs.firstOrNull { it.id == selectedId } ?: designs.first()
+                    Surface(color = WarYellow.copy(alpha = .16f), shape = MaterialTheme.shapes.large, modifier = Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("🏆", fontSize = 68.sp)
+                            Text(featured.name.uppercase(), fontWeight = FontWeight.Black, color = if (sport == Sport.NFL) NflCyan else WarYellow)
+                            Text(featured.line, color = Color.White.copy(alpha = .78f))
+                        }
+                    }
+                }
                 items(designs) { design ->
                     Surface(
                         modifier = Modifier.fillMaxWidth().clickable(enabled = selectedId == null) { pending = design },

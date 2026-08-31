@@ -17,15 +17,17 @@ import androidx.core.content.ContextCompat
 
 class MainActivity : ComponentActivity() {
     private val destination = mutableStateOf<String?>(null)
+    private val notificationLeagueId = mutableStateOf<String?>(null)
     private val recoveryToken = mutableStateOf<String?>(null)
     private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         destination.value = intent.getStringExtra("notification_destination")
+        notificationLeagueId.value = intent.getStringExtra("notification_league_id")
         recoveryToken.value = intent.recoveryAccessToken()
         enableEdgeToEdge()
-        setContent { WarRoomTheme { WarRoomApp(viewModel(), destination.value, recoveryToken.value) { recoveryToken.value = null } } }
+        setContent { WarRoomTheme { WarRoomApp(viewModel(), destination.value, notificationLeagueId.value, recoveryToken.value) { recoveryToken.value = null } } }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
@@ -34,6 +36,7 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         destination.value = intent.getStringExtra("notification_destination")
+        notificationLeagueId.value = intent.getStringExtra("notification_league_id")
         recoveryToken.value = intent.recoveryAccessToken()
     }
 

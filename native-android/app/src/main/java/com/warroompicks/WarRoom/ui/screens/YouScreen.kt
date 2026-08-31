@@ -27,6 +27,7 @@ fun YouScreen(state: AppState, saveFavorite: (String) -> Unit, saveCrystal: (Str
     val accent = if (league.sport == Sport.NFL) NflCyan else WarGreen
     var editFavorite by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     var editName by remember { mutableStateOf(false) }
+    var earnedSwagExpanded by remember { mutableStateOf(false) }
     WarBackdrop(league.sport) {
         LazyColumn(contentPadding = PaddingValues(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item {
@@ -40,9 +41,8 @@ fun YouScreen(state: AppState, saveFavorite: (String) -> Unit, saveCrystal: (Str
             item { CommandPanel("CAMPAIGN RECORD", "${standing?.points?.toInt() ?: 0} career points", "Current rank: ${standing?.rank ?: "—"} · Historical weekly scorecards remain on file.", league.sport) }
             item { CommandPanel("TEAM ALLEGIANCE", state.favoriteTeam ?: "Choose favorite team", "Editable at any time. Your favorite appears on commissioner boards.", league.sport, onClick = { editFavorite = true }) }
             item { CommandPanel("CRYSTAL BALL", state.crystalBallTeam ?: "Preseason champion pick", "Required once at the start of this campaign and displayed on your profile.", league.sport) }
-            item { CommandPanel("HARDWARE", "Trophy cabinet", "Championships, conference titles, Crystal Ball and Toilet Bowl evidence.", league.sport, onClick = {}) }
-            if (state.trophies.isNotEmpty()) {
-                item { Text("HARDWARE", color = accent, fontWeight = FontWeight.Black) }
+            item { CommandPanel("EARNED SWAG · ${state.trophies.size}", if (earnedSwagExpanded) "Close the cabinet" else "Open the cabinet", "Championships, conference titles, Crystal Ball and Toilet Bowl evidence.", league.sport, onClick = { earnedSwagExpanded = !earnedSwagExpanded }) }
+            if (earnedSwagExpanded && state.trophies.isNotEmpty()) {
                 items(state.trophies.size) { index ->
                     val trophy = state.trophies[index]
                     CommandPanel(trophy.type.replace('_', ' '), trophy.winnerName, "${trophy.seasonYear} · ${trophy.subtitle ?: "Permanent evidence"}", league.sport)

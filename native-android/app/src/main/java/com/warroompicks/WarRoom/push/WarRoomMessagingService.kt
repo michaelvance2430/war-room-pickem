@@ -16,9 +16,11 @@ class WarRoomMessagingService : FirebaseMessagingService() {
 
     override fun onMessageReceived(message: RemoteMessage) {
         val destination = message.data["destination"] ?: "home"
+        val leagueId = message.data["league_id"]
         val intent = Intent(this, MainActivity::class.java).putExtra("notification_destination", destination)
+            .putExtra("notification_league_id", leagueId)
             .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-        val pending = PendingIntent.getActivity(this, destination.hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val pending = PendingIntent.getActivity(this, "$destination:$leagueId".hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val notification = NotificationCompat.Builder(this, "war_room_live")
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(message.notification?.title ?: "War Room Pick'em")

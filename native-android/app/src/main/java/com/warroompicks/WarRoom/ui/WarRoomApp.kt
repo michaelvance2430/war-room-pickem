@@ -24,15 +24,21 @@ private enum class AppTab(val label: String, val icon: ImageVector) {
 }
 
 @Composable
-fun WarRoomApp(viewModel: AppViewModel, notificationDestination: String? = null, recoveryToken: String? = null, clearRecovery: () -> Unit = {}) {
+fun WarRoomApp(viewModel: AppViewModel, notificationDestination: String? = null, notificationLeagueId: String? = null, recoveryToken: String? = null, clearRecovery: () -> Unit = {}) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     var tab by remember { mutableStateOf(AppTab.Home) }
-    LaunchedEffect(notificationDestination) {
+    var handledRoute by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(notificationDestination, notificationLeagueId, state.leagues) {
+        val routeKey = "$notificationDestination:$notificationLeagueId"
+        if (notificationDestination == null || handledRoute == routeKey) return@LaunchedEffect
+        notificationLeagueId?.let { id -> state.leagues.firstOrNull { it.id.toString() == id }?.let(viewModel::selectLeague) }
         tab = when (notificationDestination) {
-            "picks", "results" -> AppTab.Picks
+            "picks" -> AppTab.Picks
+            "results" -> AppTab.Home
             "announcements" -> AppTab.Home
             else -> tab
         }
+        handledRoute = routeKey
     }
 
     when {
@@ -123,7 +129,8 @@ private fun NoLeagueScreen(busy: Boolean, join: (String) -> Unit, create: (Strin
         Spacer(Modifier.height(20.dp))
         OutlinedTextField(name, { name = it }, label = { Text("NEW LEAGUE NAME") }, modifier = Modifier.fillMaxWidth())
         Row { Sport.entries.forEach { option -> FilterChip(selected = sport == option, onClick = { sport = option }, label = { Text(option.id.uppercase()) }); Spacer(Modifier.width(8.dp)) } }
-        Button(onClick = { create(name, sport, false, 100) }, enabled = name.isNotBlank() && !busy, modifier = Modifier.fillMaxWidth()) { Text("CREATE PRIVATE LEAGUE") }
+        Text("CRYSTAL BALL · REQUIRED", color = WarGreen, style = MaterialTheme.typography.labelLarge)
+        Button(onClick = { create(name, sport, true, 100) }, enabled = name.isNotBlank() && !busy, modifier = Modifier.fillMaxWidth()) { Text("CREATE PRIVATE LEAGUE") }
         Button(onClick = signOut) { Text("SIGN OUT") }
     }
 }
