@@ -109,8 +109,11 @@ Deno.serve(async (request) => {
           if (error) failures.push(`android:delivery-record:${error.message}`); else sent += 1;
         } else {
           const reason = await response.text();
-          failures.push(`android:${response.status}:${reason}`);
-          if (response.status === 404) await supabase.from("push_device_tokens").delete().eq("device_token", device.device_token);
+          if (response.status === 404) {
+            await supabase.from("push_device_tokens").delete().eq("device_token", device.device_token);
+          } else {
+            failures.push(`android:${response.status}:${reason}`);
+          }
         }
         continue;
       }
@@ -143,8 +146,13 @@ Deno.serve(async (request) => {
       }
       else {
         const reason = await response.text();
-        failures.push(`${response.status}:${reason}`);
-        if (response.status === 410) await supabase.from("push_device_tokens").delete().eq("device_token", device.device_token);
+        const invalidToken = response.status === 410 ||
+          (response.status === 400 && reason.includes("BadDeviceToken"));
+        if (invalidToken) {
+          await supabase.from("push_device_tokens").delete().eq("device_token", device.device_token);
+        } else {
+          failures.push(`${response.status}:${reason}`);
+        }
       }
     }
     await supabase.rpc("complete_push_notification", {
