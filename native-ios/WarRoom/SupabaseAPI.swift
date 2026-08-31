@@ -651,9 +651,13 @@ struct CertifiedWeekResult: Decodable, Identifiable, Sendable {
 struct CertifiedGameResult: Decodable, Sendable {
     let cardGameId: UUID
     let winner: String
+    let awayScore: Int?
+    let homeScore: Int?
     enum CodingKeys: String, CodingKey {
         case cardGameId = "card_game_id"
         case winner
+        case awayScore = "away_score"
+        case homeScore = "home_score"
     }
 }
 
@@ -1018,7 +1022,7 @@ enum SupabaseAPI {
 
         var resultComponents = URLComponents(url: SupabaseConfiguration.baseURL.appending(path: "rest/v1/week_results"), resolvingAgainstBaseURL: false)!
         resultComponents.queryItems = [
-            URLQueryItem(name: "select", value: "id,week_number,prop_result,scored_at,game_results(card_game_id,winner)"),
+            URLQueryItem(name: "select", value: "id,week_number,prop_result,scored_at,game_results(card_game_id,winner,away_score,home_score)"),
             URLQueryItem(name: "league_id", value: "eq.\(leagueId.uuidString.lowercased())"),
             URLQueryItem(name: "order", value: "week_number.desc"),
         ]

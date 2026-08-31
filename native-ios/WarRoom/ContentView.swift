@@ -3134,10 +3134,26 @@ private struct RegularSeasonScorecardView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(selected.uppercased()).font(.subheadline.weight(.black)).lineLimit(1).minimumScaleFactor(0.7)
                 Text("CONF \(pick?.confidence ?? 0)\(pick?.isBestBet == true ? " · BEST BET ×2" : "")").font(.system(size: 8, weight: .black)).tracking(0.7).foregroundStyle(.white.opacity(0.48))
+                certifiedGameLine(game, result: result)
             }
             Spacer()
             Text("+\(base)").font(.title3.weight(.black)).foregroundStyle(hit ? accent : .white.opacity(0.35))
         }.padding(14).background(.black.opacity(0.82), in: RoundedRectangle(cornerRadius: isNFL ? 6 : 14)).overlay(RoundedRectangle(cornerRadius: isNFL ? 6 : 14).stroke((hit ? accent : Color.red).opacity(0.28)))
+    }
+
+    @ViewBuilder private func certifiedGameLine(_ game: CardGame, result: CertifiedGameResult?) -> some View {
+        let favorite = game.favorite.lowercased() == "away" ? game.awayTeam : game.homeTeam
+        let atsWinner = result?.winner == "away" ? game.awayTeam : result?.winner == "home" ? game.homeTeam : "AWAITING OFFICIAL"
+        let spread = abs(game.spread).formatted(.number.precision(.fractionLength(1)))
+        if let away = result?.awayScore, let home = result?.homeScore {
+            Text("\(game.awayTeam.uppercased()) \(away) · \(game.homeTeam.uppercased()) \(home)")
+                .font(.system(size: 8, weight: .bold)).foregroundStyle(.white.opacity(0.64)).lineLimit(1).minimumScaleFactor(0.62)
+        }
+        HStack(spacing: 4) {
+            Text("LINE · \(favorite.uppercased()) −\(spread)").foregroundStyle(.white.opacity(0.48))
+            Text("· ATS · \(atsWinner.uppercased())").foregroundStyle(result == nil ? .yellow : accent)
+        }
+        .font(.system(size: 8, weight: .black)).lineLimit(1).minimumScaleFactor(0.58)
     }
 }
 
@@ -3224,6 +3240,7 @@ private struct HomeLivePlayerScorecard: View {
                 Text(selectedTeam.uppercased()).font(.system(size: 11, weight: .black)).lineLimit(1).minimumScaleFactor(0.65)
                 Text("CONF \(selected?.confidence ?? 0)\(selected?.isBestBet == true ? " · BEST BET ×2" : "")")
                     .font(.system(size: 8, weight: .black)).tracking(0.7).foregroundStyle(.white.opacity(0.48))
+                liveGameLine(game, score: value)
             }
             Spacer(minLength: 6)
             VStack(alignment: .trailing, spacing: 3) {
@@ -3234,6 +3251,24 @@ private struct HomeLivePlayerScorecard: View {
             }
         }
         .padding(.horizontal, 15).padding(.vertical, 11)
+    }
+
+    @ViewBuilder private func liveGameLine(_ game: CardGame, score: SyncedFootballScore?) -> some View {
+        let favoriteSide = game.favorite.lowercased() == "away" ? "away" : "home"
+        let favorite = favoriteSide == "away" ? game.awayTeam : game.homeTeam
+        let spread = abs(game.spread).formatted(.number.precision(.fractionLength(1)))
+        if let score {
+            let margin = favoriteSide == "away" ? Double(score.awayScore - score.homeScore) : Double(score.homeScore - score.awayScore)
+            let atsSide = abs(margin - abs(game.spread)) < 0.0001 ? nil : (margin > abs(game.spread) ? favoriteSide : (favoriteSide == "away" ? "home" : "away"))
+            let atsWinner = atsSide == "away" ? game.awayTeam : atsSide == "home" ? game.homeTeam : "AWAITING OFFICIAL"
+            Text("\(game.awayTeam.uppercased()) \(score.awayScore) · \(game.homeTeam.uppercased()) \(score.homeScore)")
+                .font(.system(size: 8, weight: .bold)).foregroundStyle(.white.opacity(0.64)).lineLimit(1).minimumScaleFactor(0.62)
+            Text("LINE · \(favorite.uppercased()) −\(spread) · ATS · \(atsWinner.uppercased())")
+                .font(.system(size: 8, weight: .black)).foregroundStyle(accent).lineLimit(1).minimumScaleFactor(0.55)
+        } else {
+            Text("LINE · \(favorite.uppercased()) −\(spread) · ATS PENDING")
+                .font(.system(size: 8, weight: .black)).foregroundStyle(.white.opacity(0.46)).lineLimit(1).minimumScaleFactor(0.58)
+        }
     }
 
     private var livePoints: Int {
