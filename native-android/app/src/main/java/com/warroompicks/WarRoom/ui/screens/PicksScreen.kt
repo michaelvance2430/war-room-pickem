@@ -99,10 +99,10 @@ fun PicksScreen(
                                 Text(
                                     "${game.awayTeam.uppercase()} ${game.awayScore}  ·  ${game.homeTeam.uppercase()} ${game.homeScore}  ${if (game.final) "FINAL" else "LIVE"}",
                                     color = if (game.final) Muted else WarGreen,
-                                    fontSize = 10.sp, fontWeight = FontWeight.Black,
+                                    fontSize = 12.sp, fontWeight = FontWeight.Black,
                                 )
                             }
-                            Text(atsResultLine(game), color = if (game.awayScore != null && game.homeScore != null) accent else Muted, fontSize = 10.sp, fontWeight = FontWeight.Black)
+                            Text(atsResultLine(game), color = if (game.awayScore != null && game.homeScore != null) accent else Muted, fontSize = 12.sp, fontWeight = FontWeight.Black)
                         }
                     }
                 }
