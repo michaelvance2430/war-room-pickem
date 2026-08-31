@@ -1,30 +1,5 @@
--- Apple/TestFlight user-generated content reporting queue.
--- Apply as a single production migration after verification.
-
-create table if not exists public.locker_message_reports (
-  id uuid primary key default gen_random_uuid(),
-  message_id uuid not null references public.locker_messages(id) on delete cascade,
-  league_id uuid not null references public.leagues(id) on delete cascade,
-  reporter_user_id uuid not null references public.profiles(id) on delete restrict,
-  reported_user_id uuid not null references public.profiles(id) on delete restrict,
-  reason text not null default 'abuse' check (char_length(reason) between 1 and 500),
-  status text not null default 'open' check (status in ('open', 'reviewing', 'resolved', 'dismissed')),
-  created_at timestamptz not null default now(),
-  resolved_at timestamptz,
-  unique (message_id, reporter_user_id)
-);
-
-alter table public.locker_message_reports enable row level security;
-
-revoke all on table public.locker_message_reports from public, anon, authenticated;
-grant select, insert on table public.locker_message_reports to authenticated;
-
-drop policy if exists "Players can read their own locker reports" on public.locker_message_reports;
-create policy "Players can read their own locker reports"
-on public.locker_message_reports
-for select
-to authenticated
-using ((select auth.uid()) = reporter_user_id);
+-- Correct Locker Room reporting membership validation.
+-- The production membership table is public.memberships.
 
 create or replace function public.report_locker_message(
   p_message_id uuid,
