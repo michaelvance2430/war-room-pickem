@@ -11,6 +11,15 @@ import Foundation
 
 struct WarRoomTests {
 
+    @Test func rankedTeamsUseDistinctTopTenAndTopTwentyFiveTiers() {
+        #expect(RankedTeamTier(rank: 1) == .topTen)
+        #expect(RankedTeamTier(rank: 10) == .topTen)
+        #expect(RankedTeamTier(rank: 11) == .ranked)
+        #expect(RankedTeamTier(rank: 25) == .ranked)
+        #expect(RankedTeamTier(rank: 26) == .unranked)
+        #expect(RankedTeamTier(rank: nil) == .unranked)
+    }
+
     @Test func resultNotificationPreservesExactDispatchRoute() throws {
         let leagueId = UUID(uuidString: "76730ee3-d440-4a91-9616-a768ffc03189")!
         let route = try #require(WarRoomNotificationRoute(userInfo: [

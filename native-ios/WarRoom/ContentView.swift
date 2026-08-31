@@ -1386,8 +1386,11 @@ private struct EditableGamePickRow: View {
             }
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(team(game.awayTeam, rank: game.awayRank)).font(.headline.weight(.black))
-                    Text("AT  \(team(game.homeTeam, rank: game.homeRank))").font(.subheadline.weight(.bold)).foregroundStyle(.secondary)
+                    rankedTeamLabel(game.awayTeam, rank: game.awayRank, font: .headline.weight(.black))
+                    HStack(spacing: 5) {
+                        Text("AT").font(.subheadline.weight(.bold)).foregroundStyle(.secondary)
+                        rankedTeamLabel(game.homeTeam, rank: game.homeRank, font: .subheadline.weight(.bold))
+                    }
                 }
                 Spacer()
                 Text(line).font(.caption.weight(.black).monospacedDigit()).foregroundStyle(accent)
@@ -1437,7 +1440,33 @@ private struct EditableGamePickRow: View {
         let favoriteName = game.favorite == "away" ? game.awayTeam : game.homeTeam
         return favoriteSpreadLabel(favorite: favoriteName, spread: game.spread)
     }
-    private func team(_ name: String, rank: Int?) -> String { rank.map { "#\($0) \(name)" } ?? name }
+    private func rankedTeamLabel(_ name: String, rank: Int?, font: Font) -> some View {
+        Text(rank.map { "#\($0) \(name)" } ?? name)
+            .font(font)
+            .foregroundStyle(RankedTeamTier(rank: rank).color)
+    }
+}
+
+enum RankedTeamTier: Equatable {
+    case topTen
+    case ranked
+    case unranked
+
+    init(rank: Int?) {
+        guard let rank, (1...25).contains(rank) else {
+            self = .unranked
+            return
+        }
+        self = rank <= 10 ? .topTen : .ranked
+    }
+
+    var color: Color {
+        switch self {
+        case .topTen: .yellow
+        case .ranked: .orange
+        case .unranked: .primary
+        }
+    }
 }
 
 private struct LoginView: View {
@@ -2303,6 +2332,9 @@ struct HomeView: View {
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("Share \(membership.leagues.name) invitation")
+                        if let firstKickoff {
+                            KickoffCountdownView(kickoff: firstKickoff, sportId: membership.leagues.sportId, week: membership.leagues.currentWeek)
+                        }
                         if isCommissioner {
                             NavigationLink { CommissionerCommandCenterView(membership: membership, standings: standings, submittedUserIds: visibleSubmittedUserIds) } label: {
                                 if isNFL {
@@ -2517,10 +2549,6 @@ struct HomeView: View {
                                 .overlay(alignment: .leading) { Rectangle().fill(foundryColor).frame(width: 3).padding(.vertical, 10) }
                                 .overlay(UnevenRoundedRectangle(topLeadingRadius: 4, bottomLeadingRadius: 18, bottomTrailingRadius: 4, topTrailingRadius: 18).stroke(foundryColor.opacity(0.42)))
                             }.buttonStyle(WarRoomCardButtonStyle())
-                        }
-
-                        if let firstKickoff = card?.cardGames.compactMap({ footballKickoffDate($0.startTime) }).min() {
-                            KickoffCountdownView(kickoff: firstKickoff, sportId: membership.leagues.sportId, week: membership.leagues.currentWeek)
                         }
 
                         if isNFL {
@@ -4656,6 +4684,16 @@ struct CommissionerCardBuilderView: View {
             }
             if step == 2 && !availableOdds.isEmpty {
                 Section("Choose five · \(selectedOddsIds.count)/5") {
+                    if !identity.isNFL {
+                        HStack(spacing: 14) {
+                            Label("TOP 10", systemImage: "star.fill").foregroundStyle(.yellow)
+                            Label("11–25", systemImage: "number.circle.fill").foregroundStyle(.orange)
+                            Label("ROOM FAVORITE", systemImage: "heart.fill").foregroundStyle(.blue)
+                        }
+                        .font(.caption2.weight(.black))
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel("Rank colors: Top 10 gold, ranks 11 through 25 orange, room favorites blue")
+                    }
                     ForEach(availableOdds) { odds in
                         let rivalry = RivalryMatchupCatalog.match(away: odds.awayTeam, home: odds.homeTeam)
                         Button {
@@ -4665,8 +4703,12 @@ struct CommissionerCardBuilderView: View {
                                 Image(systemName: selectedOddsIds.contains(odds.id) ? "checkmark.circle.fill" : "circle")
                                     .foregroundStyle(selectedOddsIds.contains(odds.id) ? deskAccent : .secondary)
                                 VStack(alignment: .leading, spacing: 4) {
-                                    Text("\(rank(odds.awayTeam, odds.awayRank)) at \(rank(odds.homeTeam, odds.homeRank))")
-                                        .fontWeight(.semibold).foregroundStyle(favoriteCount(for: odds) > 0 ? Color.blue : Color.primary)
+                                    HStack(spacing: 5) {
+                                        rankedOddsTeam(odds.awayTeam, rank: odds.awayRank)
+                                        Text("at").foregroundStyle(.secondary)
+                                        rankedOddsTeam(odds.homeTeam, rank: odds.homeRank)
+                                    }
+                                    .fontWeight(.semibold)
                                     Text(oddsLine(odds)).font(.caption).foregroundStyle(.secondary)
                                     if let rivalry, isRivalryWeek {
                                         Label("\(rivalry.glyph) \(rivalry.name.uppercased()) · CERTIFIED GRUDGE", systemImage: "flame.fill")
@@ -4863,7 +4905,10 @@ struct CommissionerCardBuilderView: View {
         }
     }
 
-    private func rank(_ team: String, _ rank: Int?) -> String { rank.map { "#\($0) \(team)" } ?? team }
+    private func rankedOddsTeam(_ team: String, rank: Int?) -> some View {
+        Text(rank.map { "#\($0) \(team)" } ?? team)
+            .foregroundStyle(RankedTeamTier(rank: rank).color)
+    }
     private func oddsLine(_ game: OddsGame) -> String {
         let favorite = game.favorite == "away" ? game.awayTeam : game.homeTeam
         let book = game.bookmaker.map { " · \($0)" } ?? ""

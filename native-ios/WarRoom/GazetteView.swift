@@ -270,10 +270,12 @@ private struct GazettePaperView: View {
                             .foregroundStyle(page == index ? .black : ink.opacity(0.55))
                             .background(page == index ? Color.red : .clear)
                     }
+                    .buttonStyle(.plain)
+                    .contentShape(Rectangle())
                     .accessibilityIdentifier("dispatch.page.\(index + 1)")
                 }
             }
-            .padding(4).background(.black).overlay(Rectangle().stroke(Color.red.opacity(0.6)))
+            .padding(4).background(.black).overlay(Rectangle().stroke(Color.red.opacity(0.6)).allowsHitTesting(false))
 
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
@@ -299,11 +301,14 @@ private struct GazettePaperView: View {
                 .frame(maxWidth: .infinity).padding(10).background(.red.opacity(0.16)).overlay(Rectangle().stroke(Color.red.opacity(0.7)))
         }
         .background(paper)
-        .overlay(Rectangle().stroke(Color.red, lineWidth: 2))
+        .overlay(Rectangle().stroke(Color.red, lineWidth: 2).allowsHitTesting(false))
         .shadow(color: .red.opacity(0.55), radius: 22)
     }
 
     private var pageTitle: String {
+        if page == 0, payload.chaosDetonation?.names?.isEmpty == false {
+            return "THE NUCLEAR OPTION"
+        }
         let titles = [
             ["THE WEEK DETONATED", "WINNERS, LOSERS & WAR CRIMES", "BEEF SURVEILLANCE", "EVIDENCE LOCKER"],
             ["CROWN UNDER INVESTIGATION", "THE CASUALTY LEDGER", "HOSTILE WITNESSES", "SEIZED PROPERTY"],
@@ -321,6 +326,7 @@ private struct GazettePaperView: View {
     private var blastRadius: Int { max(0, crownPoints - shamePoints) }
 
     private var pageArtwork: String {
+        if page == 0, payload.chaosDetonation?.names?.isEmpty == false { return "NationalNightmareArtifact" }
         if page == 0, let announcement = phaseAnnouncement { return announcement.artwork }
         let rotations = [
             ["SituationRoomBunker", "WarRoomGeneralEpic", "NationalNightmareArtifact", "TheCloserArtifact", "LastOneStandingArtifact", "ChampionshipArtifact"],
@@ -402,6 +408,32 @@ private struct GazettePaperView: View {
     }
 
     private var frontPage: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            if let chaos = payload.chaosDetonation, let names = chaos.names, !names.isEmpty {
+                Text("☢ NUCLEAR AUTHORIZATION CONFIRMED").font(.system(size: 9, weight: .black)).tracking(1.8).foregroundStyle(.red)
+                Text(chaos.headline ?? "\(names.map { $0.uppercased() }.joined(separator: " · ")) WENT NUCLEAR")
+                    .font(.system(size: 34, weight: .black, design: .serif)).fontWidth(.condensed).fixedSize(horizontal: false, vertical: true)
+                Text(chaos.deck ?? "Every Nuclear authorization is now part of the permanent record.")
+                    .font(.system(size: 16, weight: .bold, design: .serif)).italic().foregroundStyle(.white.opacity(0.76))
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("NUCLEAR ROLL CALL").font(.caption2.weight(.black)).tracking(1.4).foregroundStyle(.red)
+                    ForEach(names, id: \.self) { name in
+                        Text("☢ \(name.uppercased())").font(.headline.weight(.black))
+                    }
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.red.opacity(0.14), in: RoundedRectangle(cornerRadius: 8))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.red.opacity(0.8)).allowsHitTesting(false))
+                Text("THE FALLOUT CONTINUES IN SPORTS.")
+                    .font(.system(size: 8, weight: .black)).tracking(1.25).foregroundStyle(.red)
+            } else {
+                standardFrontPage
+            }
+        }
+    }
+
+    private var standardFrontPage: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("CATASTROPHIC VICTORY CONFIRMED").font(.system(size: 9, weight: .black)).tracking(1.8).foregroundStyle(dispatchAccent)
             if let emergency = payload.emergencyProtocol {
