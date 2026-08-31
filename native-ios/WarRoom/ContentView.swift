@@ -3147,13 +3147,13 @@ private struct RegularSeasonScorecardView: View {
         let spread = abs(game.spread).formatted(.number.precision(.fractionLength(1)))
         if let away = result?.awayScore, let home = result?.homeScore {
             Text("\(game.awayTeam.uppercased()) \(away) · \(game.homeTeam.uppercased()) \(home)")
-                .font(.system(size: 8, weight: .bold)).foregroundStyle(.white.opacity(0.64)).lineLimit(1).minimumScaleFactor(0.62)
+                .font(.system(size: 10, weight: .bold)).foregroundStyle(.white.opacity(0.68)).lineLimit(1).minimumScaleFactor(0.72)
         }
         HStack(spacing: 4) {
             Text("LINE · \(favorite.uppercased()) −\(spread)").foregroundStyle(.white.opacity(0.48))
             Text("· ATS · \(atsWinner.uppercased())").foregroundStyle(result == nil ? .yellow : accent)
         }
-        .font(.system(size: 8, weight: .black)).lineLimit(1).minimumScaleFactor(0.58)
+        .font(.system(size: 10, weight: .black)).lineLimit(1).minimumScaleFactor(0.68)
     }
 }
 
@@ -3262,12 +3262,12 @@ private struct HomeLivePlayerScorecard: View {
             let atsSide = abs(margin - abs(game.spread)) < 0.0001 ? nil : (margin > abs(game.spread) ? favoriteSide : (favoriteSide == "away" ? "home" : "away"))
             let atsWinner = atsSide == "away" ? game.awayTeam : atsSide == "home" ? game.homeTeam : "AWAITING OFFICIAL"
             Text("\(game.awayTeam.uppercased()) \(score.awayScore) · \(game.homeTeam.uppercased()) \(score.homeScore)")
-                .font(.system(size: 8, weight: .bold)).foregroundStyle(.white.opacity(0.64)).lineLimit(1).minimumScaleFactor(0.62)
+                .font(.system(size: 10, weight: .bold)).foregroundStyle(.white.opacity(0.68)).lineLimit(1).minimumScaleFactor(0.72)
             Text("LINE · \(favorite.uppercased()) −\(spread) · ATS · \(atsWinner.uppercased())")
-                .font(.system(size: 8, weight: .black)).foregroundStyle(accent).lineLimit(1).minimumScaleFactor(0.55)
+                .font(.system(size: 10, weight: .black)).foregroundStyle(accent).lineLimit(1).minimumScaleFactor(0.65)
         } else {
             Text("LINE · \(favorite.uppercased()) −\(spread) · ATS PENDING")
-                .font(.system(size: 8, weight: .black)).foregroundStyle(.white.opacity(0.46)).lineLimit(1).minimumScaleFactor(0.58)
+                .font(.system(size: 10, weight: .black)).foregroundStyle(.white.opacity(0.52)).lineLimit(1).minimumScaleFactor(0.68)
         }
     }
 
