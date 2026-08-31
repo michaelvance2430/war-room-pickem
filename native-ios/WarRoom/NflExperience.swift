@@ -122,6 +122,7 @@ struct NflBroadcastHeader: View {
     let week: Int
     let dateRange: String?
     let commissioner: Bool
+    var kickoff: Date? = nil
 
     var body: some View {
         VStack(spacing: 0) {
@@ -165,6 +166,12 @@ struct NflBroadcastHeader: View {
             .font(.system(size: 7, weight: .black)).tracking(0.65).foregroundStyle(.white.opacity(0.55))
             .padding(.horizontal, 12).padding(.vertical, 7)
             .background(Color(red: 0.13, green: 0.015, blue: 0.035))
+
+            if let kickoff {
+                CompactMissionClockRow(kickoff: kickoff, sportId: "nfl", week: week)
+                    .padding(.horizontal, 12).padding(.vertical, 8)
+                    .background(.black.opacity(0.96))
+            }
         }
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(RoundedRectangle(cornerRadius: 8).stroke(.white.opacity(0.16)))

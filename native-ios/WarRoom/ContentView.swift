@@ -2253,7 +2253,8 @@ struct HomeView: View {
                                 leagueName: membership.leagues.name,
                                 week: membership.leagues.currentWeek,
                                 dateRange: footballWeekDateRangeLabel(sportId: membership.leagues.sportId, week: membership.leagues.currentWeek),
-                                commissioner: isCommissioner
+                                commissioner: isCommissioner,
+                                kickoff: firstKickoff
                             )
                         } else {
                             HomeCommandHeader(
@@ -2261,7 +2262,8 @@ struct HomeView: View {
                                 sport: membership.leagues.sportId.uppercased(),
                                 week: membership.leagues.currentWeek,
                                 dateRange: footballWeekDateRangeLabel(sportId: membership.leagues.sportId, week: membership.leagues.currentWeek),
-                                commissioner: isCommissioner
+                                commissioner: isCommissioner,
+                                kickoff: firstKickoff
                             )
                         }
                         ShareLink(
@@ -2496,10 +2498,6 @@ struct HomeView: View {
                                 .overlay(alignment: .leading) { Rectangle().fill(foundryColor).frame(width: 3).padding(.vertical, 10) }
                                 .overlay(UnevenRoundedRectangle(topLeadingRadius: 4, bottomLeadingRadius: 18, bottomTrailingRadius: 4, topTrailingRadius: 18).stroke(foundryColor.opacity(0.42)))
                             }.buttonStyle(WarRoomCardButtonStyle())
-                        }
-
-                        if let firstKickoff = card?.cardGames.compactMap({ footballKickoffDate($0.startTime) }).min() {
-                            KickoffCountdownView(kickoff: firstKickoff, sportId: membership.leagues.sportId, week: membership.leagues.currentWeek)
                         }
 
                         if isNFL {
@@ -4022,6 +4020,7 @@ private struct HomeCommandHeader: View {
     let week: Int?
     let dateRange: String?
     let commissioner: Bool
+    var kickoff: Date? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -4054,6 +4053,9 @@ private struct HomeCommandHeader: View {
                     }
                 }
             }
+            if let kickoff, let week {
+                CompactMissionClockRow(kickoff: kickoff, sportId: sport, week: week)
+            }
         }
         .padding(18)
         .background {
@@ -4066,6 +4068,45 @@ private struct HomeCommandHeader: View {
         .overlay(alignment: .leading) { Rectangle().fill(.green).frame(width: 3).padding(.vertical, 12) }
         .overlay(UnevenRoundedRectangle(topLeadingRadius: 5, bottomLeadingRadius: 24, bottomTrailingRadius: 5, topTrailingRadius: 24).stroke(.green.opacity(0.36)))
         .shadow(color: .green.opacity(0.15), radius: 24, y: 10)
+    }
+}
+
+struct CompactMissionClockRow: View {
+    let kickoff: Date
+    let sportId: String
+    let week: Int
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { timeline in
+            let seconds = max(0, Int(kickoff.timeIntervalSince(timeline.date)))
+            let locked = kickoff <= timeline.date
+            let isNFL = sportId.lowercased() == "nfl"
+            let accent: Color = locked || seconds < 3600 ? .red : (seconds < 86400 ? (isNFL ? .cyan : .yellow) : (isNFL ? .blue : .green))
+            let accessibilityText = locked ? "Mission clock locked" : "Mission clock, \(countdown(seconds)) until first kickoff"
+            HStack(spacing: 9) {
+                Image(systemName: locked ? "lock.fill" : "timer")
+                Text("MISSION CLOCK")
+                    .font(.system(size: 8, weight: .black)).tracking(1.2)
+                Spacer()
+                Text(locked ? "LOCKED" : countdown(seconds))
+                    .font(.caption.weight(.black).monospacedDigit())
+                Text("·")
+                Text(locked ? "GAMES UNDERWAY" : "FIRST KICKOFF")
+                    .font(.system(size: 8, weight: .black)).tracking(0.6)
+            }
+            .foregroundStyle(accent)
+            .padding(.top, 10)
+            .overlay(alignment: .top) { Rectangle().fill(accent.opacity(0.38)).frame(height: 1) }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(accessibilityText)
+        }
+    }
+
+    private func countdown(_ total: Int) -> String {
+        let days = total / 86_400
+        let hours = (total % 86_400) / 3_600
+        let minutes = (total % 3_600) / 60
+        return days > 0 ? "\(days)d \(hours)h \(minutes)m" : String(format: "%02d:%02d:%02d", hours, minutes, total % 60)
     }
 }
 
