@@ -6,7 +6,8 @@
  * Personality shifts as kickoff approaches — story of the week.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import type { Game } from "@/lib/types";
 import {
   firstKickoffOnCardMs,
@@ -18,6 +19,8 @@ type Props = {
   games: Game[];
   /** Hide for practice / archive / no card */
   hidden?: boolean;
+  /** Optional Home masthead slot. Picks omits this and renders in place. */
+  portalTargetId?: string;
 };
 
 function tickMs(lockAt: number, now: number): number {
@@ -29,12 +32,25 @@ function tickMs(lockAt: number, now: number): number {
   return 60_000;
 }
 
-export default function LeagueLockTimer({ games, hidden }: Props) {
+export default function LeagueLockTimer({
+  games,
+  hidden,
+  portalTargetId,
+}: Props) {
   const [now, setNow] = useState(() => Date.now());
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
   const lockAt = firstKickoffOnCardMs(games);
   const countdown = formatLeagueLockCountdown(games, now);
   const remaining = Math.max(0, lockAt - now);
   const urgent = remaining > 0 && remaining <= 12 * 60 * 60_000;
+
+  useLayoutEffect(() => {
+    if (!portalTargetId) {
+      setPortalTarget(null);
+      return;
+    }
+    setPortalTarget(document.getElementById(portalTargetId));
+  }, [portalTargetId]);
 
   useEffect(() => {
     if (hidden || !lockAt) return;
@@ -61,23 +77,19 @@ export default function LeagueLockTimer({ games, hidden }: Props) {
       ? formatKickoff(new Date(lockAt).toISOString()).full
       : null;
 
-  if (countdown.locked) {
-    return (
-      <div
-        className="home-mission-countdown picks-lock-control is-live"
-        role="status"
-        aria-live="polite"
-      >
-        <div className="home-mission-countdown-topline">
-          <span>Game feed</span><i aria-hidden /><span>First kickoff</span>
-        </div>
-        <strong>LIVE</strong>
-        <p>{lockLabel ? `Card froze · ${lockLabel}` : "Games underway"}</p>
+  const content = countdown.locked ? (
+    <div
+      className="home-mission-countdown picks-lock-control is-live"
+      role="status"
+      aria-live="polite"
+    >
+      <div className="home-mission-countdown-topline">
+        <span>Game feed</span><i aria-hidden /><span>First kickoff</span>
       </div>
-    );
-  }
-
-  return (
+      <strong>LIVE</strong>
+      <p>{lockLabel ? `Card froze · ${lockLabel}` : "Games underway"}</p>
+    </div>
+  ) : (
     <div
       className={`home-mission-countdown picks-lock-control ${urgent ? "is-urgent" : ""}`}
       role="timer"
@@ -97,4 +109,6 @@ export default function LeagueLockTimer({ games, hidden }: Props) {
       <p>{lockLabel ? `Card freezes · ${lockLabel}` : "Card freezes at zero"}</p>
     </div>
   );
+
+  return portalTarget ? createPortal(content, portalTarget) : content;
 }
