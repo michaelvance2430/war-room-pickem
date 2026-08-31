@@ -5,6 +5,7 @@ enum AppLinks {
     static let privacy = URL(string: "https://app.war-room-picks.com/privacy")!
     static let terms = URL(string: "https://app.war-room-picks.com/terms")!
     static let support = URL(string: "https://app.war-room-picks.com/support")!
+    static let patreon = URL(string: "https://www.patreon.com/c/WarRoomPickem?utm_campaign=creatorshare_creator")!
     static let supportEmail = "support@war-room-picks.com"
 
     static func issueReport(sportId: String, leagueName: String) -> URL {

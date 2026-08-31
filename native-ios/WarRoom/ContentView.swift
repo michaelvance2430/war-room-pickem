@@ -2277,6 +2277,11 @@ struct HomeView: View {
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("Share \(membership.leagues.name) invitation")
+                        Link(destination: AppLinks.patreon) {
+                            PatreonSupportCard(sportId: membership.leagues.sportId)
+                        }
+                        .buttonStyle(WarRoomCardButtonStyle())
+                        .accessibilityHint("Opens the War Room Pick’em Patreon page outside the app")
                         if isCommissioner {
                             NavigationLink { CommissionerCommandCenterView(membership: membership, standings: standings, submittedUserIds: visibleSubmittedUserIds) } label: {
                                 if isNFL {
@@ -2857,6 +2862,43 @@ private struct InviteShareLabel: View {
         .padding(.horizontal, 15).padding(.vertical, 12)
         .background(isNFL ? Color.blue.opacity(0.92) : Color.green, in: RoundedRectangle(cornerRadius: isNFL ? 7 : 14))
         .overlay(RoundedRectangle(cornerRadius: isNFL ? 7 : 14).stroke(.white.opacity(isNFL ? 0.42 : 0.18)))
+    }
+}
+
+private struct PatreonSupportCard: View {
+    let sportId: String
+
+    private var accent: Color {
+        switch sportId.lowercased() {
+        case "nfl": return .cyan
+        case "cbb": return .orange
+        default: return .green
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 12).fill(accent.opacity(0.16))
+                RoundedRectangle(cornerRadius: 12).stroke(accent.opacity(0.48))
+                Image(systemName: "heart.fill").font(.title3.weight(.black)).foregroundStyle(accent)
+            }
+            .frame(width: 46, height: 46)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("KEEP THE LIGHTS ON")
+                    .font(.system(size: 8, weight: .black)).tracking(1.5).foregroundStyle(accent)
+                Text("Support War Room on Patreon")
+                    .font(.subheadline.weight(.black)).foregroundStyle(.white)
+                Text("Optional support for operating costs · no gameplay advantage")
+                    .font(.caption2.weight(.semibold)).foregroundStyle(.white.opacity(0.55))
+            }
+            Spacer(minLength: 8)
+            Image(systemName: "arrow.up.right").font(.caption.weight(.black)).foregroundStyle(accent)
+        }
+        .padding(14)
+        .background(.black.opacity(0.84), in: RoundedRectangle(cornerRadius: sportId.lowercased() == "nfl" ? 8 : 16))
+        .overlay(RoundedRectangle(cornerRadius: sportId.lowercased() == "nfl" ? 8 : 16).stroke(accent.opacity(0.38)))
     }
 }
 
