@@ -17,8 +17,8 @@ android {
         applicationId = "com.warroompicks.WarRoom"
         minSdk = 26
         targetSdk = 36
-        versionCode = 3
-        versionName = "3.1"
+        versionCode = 4
+        versionName = "3.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
         buildConfigField("String", "FIREBASE_APPLICATION_ID", "\"${firebaseValue("WARROOM_FIREBASE_APP_ID")}\"")
