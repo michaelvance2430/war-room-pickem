@@ -88,19 +88,21 @@ fun PicksScreen(
                     val selection = lockedPick.selections.firstOrNull { it.gameId == game.id }
                     val team = if (selection?.side == "away") game.awayTeam else game.homeTeam
                     Surface(color = PanelBlack, shape = RoundedCornerShape(10.dp)) {
-                        Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text("${index + 1}", color = accent, fontWeight = FontWeight.Black, modifier = Modifier.width(30.dp))
-                            Text(team, color = Color.White, fontWeight = FontWeight.Black, modifier = Modifier.weight(1f))
-                            if (lockedPick.bestBetGameId == game.id) Text("★ ", color = WarYellow)
-                            Text("${selection?.confidence ?: 0} PTS", color = accent, fontWeight = FontWeight.Black)
-                        }
-                        if (game.homeScore != null || game.awayScore != null) {
-                            Text(
-                                "${game.awayTeam} ${game.awayScore ?: 0}  ·  ${game.homeTeam} ${game.homeScore ?: 0}${if (game.final) "  FINAL" else "  LIVE"}",
-                                color = if (game.final) Muted else WarGreen,
-                                fontSize = 10.sp, fontWeight = FontWeight.Black,
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp),
-                            )
+                        Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("${index + 1}", color = accent, fontWeight = FontWeight.Black, modifier = Modifier.width(30.dp))
+                                Text(team, color = Color.White, fontWeight = FontWeight.Black, modifier = Modifier.weight(1f))
+                                if (lockedPick.bestBetGameId == game.id) Text("★ ", color = WarYellow)
+                                Text("${selection?.confidence ?: 0} PTS", color = accent, fontWeight = FontWeight.Black)
+                            }
+                            if (game.homeScore != null && game.awayScore != null) {
+                                Text(
+                                    "${game.awayTeam.uppercase()} ${game.awayScore}  ·  ${game.homeTeam.uppercase()} ${game.homeScore}  ${if (game.final) "FINAL" else "LIVE"}",
+                                    color = if (game.final) Muted else WarGreen,
+                                    fontSize = 10.sp, fontWeight = FontWeight.Black,
+                                )
+                            }
+                            Text(atsResultLine(game), color = if (game.awayScore != null && game.homeScore != null) accent else Muted, fontSize = 10.sp, fontWeight = FontWeight.Black)
                         }
                     }
                 }
@@ -193,3 +195,24 @@ private fun sideButton(name: String, selected: Boolean, modifier: Modifier, acce
 }
 
 private fun spreadLine(game: CardGame): String = game.favorite?.let { "$it ${if (game.spread > 0) "+" else ""}${game.spread}" } ?: "Spread pending"
+
+private fun atsResultLine(game: CardGame): String {
+    val favoriteSide = when {
+        game.favorite.equals("away", true) || game.favorite.equals(game.awayTeam, true) -> "away"
+        else -> "home"
+    }
+    val favoriteTeam = if (favoriteSide == "away") game.awayTeam else game.homeTeam
+    val line = kotlin.math.abs(game.spread)
+    val spread = if (line % 1.0 == 0.0) "${line.toInt()}.0" else "$line"
+    val away = game.awayScore ?: return "LINE · ${favoriteTeam.uppercase()} −$spread · ATS PENDING"
+    val home = game.homeScore ?: return "LINE · ${favoriteTeam.uppercase()} −$spread · ATS PENDING"
+    val margin = if (favoriteSide == "away") away - home else home - away
+    val atsSide = when {
+        kotlin.math.abs(margin.toDouble() - line) < .0001 -> "unresolved"
+        margin > line -> favoriteSide
+        favoriteSide == "away" -> "home"
+        else -> "away"
+    }
+    val atsWinner = when (atsSide) { "away" -> game.awayTeam; "home" -> game.homeTeam; else -> "AWAITING OFFICIAL" }
+    return "LINE · ${favoriteTeam.uppercase()} −$spread · ATS WINNER · ${atsWinner.uppercase()}"
+}
