@@ -18,6 +18,7 @@ import com.warroompicks.WarRoom.AppState
 import com.warroompicks.WarRoom.model.League
 import com.warroompicks.WarRoom.model.Sport
 import com.warroompicks.WarRoom.model.OddsGame
+import com.warroompicks.WarRoom.model.TeamCatalog
 import com.warroompicks.WarRoom.model.TrophyCatalog
 import com.warroompicks.WarRoom.model.TrophyDesign
 import com.warroompicks.WarRoom.ui.components.*
@@ -37,6 +38,18 @@ fun HomeScreen(state: AppState, selectLeague: (League) -> Unit, postAnnouncement
     var trophyPicker by remember { mutableStateOf(false) }
     val identity = if (league.sport == Sport.NFL) "SUNDAY COMMAND" else "SATURDAY SITUATION ROOM"
     val accent = if (league.sport == Sport.NFL) NflCyan else WarGreen
+    if (cardBuilder) {
+        CardBuilderPage(
+            sport = league.sport,
+            week = league.currentWeek,
+            odds = state.availableOdds,
+            roomFavoriteSlugs = state.standings.mapNotNull { it.favoriteTeam },
+            busy = state.busy,
+            onDismiss = { cardBuilder = false },
+            onPublish = { games, prop, a, b -> cardBuilder = false; publishCard(games, prop, a, b) },
+        )
+        return
+    }
     WarBackdrop(league.sport) {
         LazyColumn(contentPadding = PaddingValues(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item {
@@ -113,11 +126,6 @@ fun HomeScreen(state: AppState, selectLeague: (League) -> Unit, postAnnouncement
         onDismiss = { announcementComposer = false },
         onPost = { title, body -> announcementComposer = false; postAnnouncement(title, body) },
     )
-    if (cardBuilder) CardBuilderDialog(
-        odds = state.availableOdds, busy = state.busy,
-        onDismiss = { cardBuilder = false },
-        onPublish = { games, prop, a, b -> cardBuilder = false; publishCard(games, prop, a, b) },
-    )
     if (trophyPicker) TrophyPickerDialog(
         sport = league.sport,
         selectedId = league.championshipTrophyId,
@@ -176,38 +184,84 @@ private fun AnnouncementDialog(onDismiss: () -> Unit, onPost: (String, String) -
 }
 
 @Composable
-private fun CardBuilderDialog(odds: List<OddsGame>, busy: Boolean, onDismiss: () -> Unit, onPublish: (List<OddsGame>, String, String, String) -> Unit) {
+private fun CardBuilderPage(sport: Sport, week: Int, odds: List<OddsGame>, roomFavoriteSlugs: List<String>, busy: Boolean, onDismiss: () -> Unit, onPublish: (List<OddsGame>, String, String, String) -> Unit) {
     var selected by remember(odds) { mutableStateOf<Set<String>>(emptySet()) }
     var prop by remember { mutableStateOf("") }
     var optionA by remember { mutableStateOf("") }
     var optionB by remember { mutableStateOf("") }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("BUILD THE WEEKLY CARD") },
-        text = {
-            Column {
-                Text(if (busy) "Pulling the eligible slate…" else "${selected.size}/5 games selected")
-                LazyColumn(Modifier.heightIn(max = 300.dp)) {
-                    items(odds.size) { index ->
-                        val game = odds[index]
-                        val checked = game.id in selected
-                        ListItem(
-                            headlineContent = { Text("${game.awayTeam} @ ${game.homeTeam}", fontWeight = FontWeight.Bold) },
-                            supportingContent = { Text("${game.favorite} ${game.spread}") },
-                            trailingContent = { Checkbox(checked, onCheckedChange = null) },
-                            modifier = Modifier.clickable {
-                                selected = if (checked) selected - game.id else if (selected.size < 5) selected + game.id else selected
-                            },
-                        )
+    val accent = if (sport == Sport.NFL) NflCyan else WarGreen
+    WarBackdrop(sport) {
+        LazyColumn(
+            contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 28.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            item {
+                Text("COMMISSIONER MODE", color = accent, fontWeight = FontWeight.Black, letterSpacing = 1.5.sp)
+                Text("Build ${sport.id.uppercase()} Week $week", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Black)
+                Text(if (busy) "Pulling the eligible slate…" else "${selected.size}/5 games selected", color = Color.White.copy(alpha = .72f))
+                if (sport == Sport.CFB) {
+                    Text("TOP 10 GOLD  ·  11–25 ORANGE", color = Color.White.copy(alpha = .72f), fontSize = 11.sp, fontWeight = FontWeight.Black)
+                }
+            }
+            items(odds) { game ->
+                val checked = game.id in selected
+                val favoriteCount = roomFavoriteSlugs.count { favorite -> teamMatchesFavorite(game.awayTeam, favorite) || teamMatchesFavorite(game.homeTeam, favorite) }
+                Surface(
+                    color = Color.Black.copy(alpha = .72f),
+                    shape = MaterialTheme.shapes.medium,
+                    modifier = Modifier.fillMaxWidth().clickable {
+                        selected = if (checked) selected - game.id else if (selected.size < 5) selected + game.id else selected
+                    },
+                ) {
+                    Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            RankedTeamLabel(game.awayTeam, game.awayRank)
+                            Text("AT", color = Color.White.copy(alpha = .45f), fontSize = 10.sp, fontWeight = FontWeight.Black)
+                            RankedTeamLabel(game.homeTeam, game.homeRank)
+                            Text("${game.favorite} ${game.spread}", color = Color.White.copy(alpha = .64f), fontSize = 12.sp)
+                            if (favoriteCount > 0) {
+                                Text("♥ $favoriteCount ROOM FAVORITE${if (favoriteCount == 1) "" else "S"}", color = Color(0xFF42A5F5), fontSize = 10.sp, fontWeight = FontWeight.Black)
+                            }
+                        }
+                        Checkbox(checked, onCheckedChange = null)
                     }
                 }
-                OutlinedTextField(prop, { prop = it }, label = { Text("PROP QUESTION") })
-                Row { OutlinedTextField(optionA, { optionA = it }, label = { Text("OPTION A") }, modifier = Modifier.weight(1f)); OutlinedTextField(optionB, { optionB = it }, label = { Text("OPTION B") }, modifier = Modifier.weight(1f)) }
             }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("CANCEL") } },
-        confirmButton = { Button(onClick = { onPublish(odds.filter { it.id in selected }, prop, optionA, optionB) }, enabled = selected.size == 5 && prop.isNotBlank() && optionA.isNotBlank() && optionB.isNotBlank() && !busy) { Text("PUBLISH") } },
+            item {
+                OutlinedTextField(prop, { prop = it }, label = { Text("PROP QUESTION") }, modifier = Modifier.fillMaxWidth())
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(optionA, { optionA = it }, label = { Text("OPTION A") }, modifier = Modifier.weight(1f))
+                    OutlinedTextField(optionB, { optionB = it }, label = { Text("OPTION B") }, modifier = Modifier.weight(1f))
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    TextButton(onClick = onDismiss) { Text("BACK") }
+                    Button(
+                        onClick = { onPublish(odds.filter { it.id in selected }, prop, optionA, optionB) },
+                        enabled = selected.size == 5 && prop.isNotBlank() && optionA.isNotBlank() && optionB.isNotBlank() && !busy,
+                    ) { Text("PUBLISH", fontWeight = FontWeight.Black) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RankedTeamLabel(team: String, rank: Int?) {
+    val color = when (rank ?: Int.MAX_VALUE) {
+        in 1..10 -> WarYellow
+        in 11..25 -> Color(0xFFFF8A3D)
+        else -> Color.White
+    }
+    Text(
+        text = rank?.takeIf { it in 1..25 }?.let { "#$it $team" } ?: team,
+        color = color,
+        fontWeight = FontWeight.Black,
     )
+}
+
+private fun teamMatchesFavorite(team: String, favoriteSlug: String): Boolean {
+    val teamSlug = TeamCatalog.slug(team)
+    return teamSlug == favoriteSlug || teamSlug.startsWith("$favoriteSlug-")
 }
 
 @Composable

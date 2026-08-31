@@ -85,6 +85,8 @@ data class OddsGame(
     val spread: Double,
     val favorite: String,
     val startsAt: Instant?,
+    val awayRank: Int? = null,
+    val homeRank: Int? = null,
 )
 
 data class GameSelection(val gameId: UUID, val side: String, val confidence: Int?)

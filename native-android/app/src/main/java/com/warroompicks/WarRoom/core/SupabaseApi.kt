@@ -152,6 +152,8 @@ class SupabaseApi {
             OddsGame(
                 game.optString("id"), game.optString("awayTeam"), game.optString("homeTeam"),
                 game.optDouble("spread"), game.optString("favorite"), instant(game.stringOrNull("commenceTime")),
+                game.optInt("awayRank").takeIf { game.has("awayRank") && !game.isNull("awayRank") && it in 1..25 },
+                game.optInt("homeRank").takeIf { game.has("homeRank") && !game.isNull("homeRank") && it in 1..25 },
             )
         }
     }
