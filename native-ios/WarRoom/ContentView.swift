@@ -184,7 +184,7 @@ struct ContentView: View {
                     .id(tabRootIds[1])
                     .tabItem { Label(boardIsOpen ? "Board" : "Picks", systemImage: boardIsOpen ? "rectangle.grid.2x2.fill" : "checkmark.seal.fill") }
                     .tag(1)
-                StandingsView()
+                StandingsView(onBack: { openTab(0) })
                     .id(tabRootIds[2])
                     .tabItem { Label("Standings", systemImage: "list.number") }
                     .tag(2)
@@ -1594,6 +1594,7 @@ private struct LoginView: View {
 struct StandingsView: View {
     @EnvironmentObject private var auth: AuthStore
     let leagueOverride: LeagueMembership?
+    let onBack: (() -> Void)?
     @State private var standings: [Standing] = []
     @State private var errorMessage: String?
     @State private var loading = true
@@ -1618,7 +1619,10 @@ struct StandingsView: View {
         return ["OVERALL", "B10", "BIG 12", "SEC", "ACC"]
     }
 
-    init(leagueOverride: LeagueMembership? = nil) { self.leagueOverride = leagueOverride }
+    init(leagueOverride: LeagueMembership? = nil, onBack: (() -> Void)? = nil) {
+        self.leagueOverride = leagueOverride
+        self.onBack = onBack
+    }
 
     var body: some View {
         NavigationStack {
@@ -1709,7 +1713,17 @@ struct StandingsView: View {
                 }
             }
             .toolbar {
-                Button("Sign Out") { auth.signOut() }
+                if let onBack {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button(action: onBack) {
+                            Image(systemName: "chevron.left")
+                                .font(.headline.weight(.black))
+                                .frame(width: 44, height: 44)
+                                .contentShape(Rectangle())
+                        }
+                        .accessibilityLabel("Back to Home")
+                    }
+                }
             }
             .navigationDestination(item: $selectedProfileUserId) { userId in
                 if let standing = standings.first(where: { $0.userId == userId }) {
