@@ -29,7 +29,10 @@ import {
   isCardLockDeadlinePassed,
   weekTitle,
 } from "@/lib/dates";
-import { formatRankedTeam } from "@/lib/rankings";
+import {
+  formatRankedTeam,
+  rankedTeamTextClass,
+} from "@/lib/rankings";
 import {
   defaultPropPreset,
   propFromPreset,
@@ -566,8 +569,13 @@ export default function WeekOpsClient() {
                   className="rounded-xl border border-border bg-card p-3 space-y-2"
                 >
                   <p className="text-sm font-semibold leading-snug">
-                    {formatRankedTeam(g.awayTeam, g.awayRank)} @{" "}
-                    {formatRankedTeam(g.homeTeam, g.homeRank)}
+                    <span className={rankedTeamTextClass(g.awayRank)}>
+                      {formatRankedTeam(g.awayTeam, g.awayRank)}
+                    </span>{" "}
+                    @{" "}
+                    <span className={rankedTeamTextClass(g.homeRank)}>
+                      {formatRankedTeam(g.homeTeam, g.homeRank)}
+                    </span>
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {(
@@ -782,7 +790,7 @@ export default function WeekOpsClient() {
                           </span>
                         )}
                       </div>
-                      <p className="text-base sm:text-[17px] font-bold text-foreground leading-snug mt-0.5">
+                      <p className={`text-base sm:text-[17px] font-bold leading-snug mt-0.5 ${rankedTeamTextClass(g.awayRank) || "text-foreground"}`}>
                         {formatRankedTeam(g.awayTeam, g.awayRank)}
                       </p>
                     </div>
@@ -799,7 +807,7 @@ export default function WeekOpsClient() {
                           </span>
                         )}
                       </div>
-                      <p className="text-base sm:text-[17px] font-bold text-foreground leading-snug mt-0.5">
+                      <p className={`text-base sm:text-[17px] font-bold leading-snug mt-0.5 ${rankedTeamTextClass(g.homeRank) || "text-foreground"}`}>
                         {formatRankedTeam(g.homeTeam, g.homeRank)}
                       </p>
                     </div>
