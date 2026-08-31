@@ -33,6 +33,7 @@ struct LeagueCommandCenterView: View {
     let memberships: [LeagueMembership]
     @State private var attention: [LeagueAttention] = []
     @State private var loading = true
+    @State private var expandedSports: Set<String> = []
 
     var body: some View {
         ZStack {
@@ -69,12 +70,26 @@ struct LeagueCommandCenterView: View {
                     if loading { ProgressView("Scanning every room…").tint(.green).padding(30) }
                     else {
                         ForEach(sportIds, id: \.self) { sportId in
-                            HStack {
-                                Text(sportId.uppercased()).font(.caption.weight(.black)).tracking(2).foregroundStyle(.yellow)
-                                Rectangle().fill(.yellow.opacity(0.35)).frame(height: 1)
-                            }.padding(.top, 4)
-                            ForEach(attention.filter { $0.membership.leagues.sportId.lowercased() == sportId }.sorted(by: priorityOrder)) { item in
-                                Button { auth.selectLeague(item.id); dismiss() } label: { leagueCard(item) }.buttonStyle(.plain)
+                            let sportRooms = attention.filter { $0.membership.leagues.sportId.lowercased() == sportId }.sorted(by: priorityOrder)
+                            Button {
+                                withAnimation(.snappy) {
+                                    if expandedSports.contains(sportId) { expandedSports.remove(sportId) }
+                                    else { expandedSports.insert(sportId) }
+                                }
+                            } label: {
+                                HStack {
+                                    Text(sportId == "cbb" ? "FIELDHOUSE · COMING SOON" : sportId.uppercased()).font(.caption.weight(.black)).tracking(2)
+                                    Spacer()
+                                    Text("\(sportRooms.count)").font(.caption.weight(.black))
+                                    Image(systemName: expandedSports.contains(sportId) ? "chevron.up" : "chevron.down")
+                                }
+                                .foregroundStyle(sportId == "cbb" ? .orange : .yellow)
+                                .padding(14).background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 14))
+                            }.buttonStyle(.plain)
+                            if expandedSports.contains(sportId) {
+                                ForEach(sportRooms) { item in
+                                    Button { auth.selectLeague(item.id); dismiss() } label: { leagueCard(item) }.buttonStyle(.plain)
+                                }
                             }
                         }
                     }
@@ -126,7 +141,7 @@ struct LeagueCommandCenterView: View {
     private var sportIds: [String] {
         let ids = Set(attention.map { $0.membership.leagues.sportId.lowercased() })
         let preferred = ["cfb", "nfl", "cbb"]
-        return preferred.filter(ids.contains) + ids.filter { !preferred.contains($0) }.sorted()
+        return preferred + ids.filter { !preferred.contains($0) }.sorted()
     }
 
     private func loadAttention() async {
@@ -147,7 +162,7 @@ struct LeagueCommandCenterView: View {
                     var tasks: [String] = []
                     if loadedCard == nil && membership.isCommissioner(userId: user.id) { tasks.append("Build Week \(membership.leagues.currentWeek) card") }
                     if loadedCard != nil && loadedPick == nil { tasks.append("Make Week \(membership.leagues.currentWeek) picks") }
-                    if membership.leagues.crystalBallEnabled && loadedCrystal == nil { tasks.append(membership.leagues.sportId.lowercased() == "nfl" ? "Call the Super Bowl champion" : "Lock Crystal Ball") }
+                    if loadedCrystal == nil { tasks.append(membership.leagues.sportId.lowercased() == "nfl" ? "Call the Super Bowl champion" : "Lock Crystal Ball") }
                     if membership.isCommissioner(userId: user.id) && membership.leagues.championshipTrophyId == nil { tasks.append("Choose championship hardware") }
                     return LeagueAttention(membership: membership, unreadLocker: LeagueAttentionStore.unreadLockerMessages(loadedLocker, leagueId: membership.leagueId, userId: user.id), unreadAnnouncements: loadedAnnouncements.filter(\.isUnread).count, tasks: tasks)
                 }

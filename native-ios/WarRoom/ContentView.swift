@@ -301,7 +301,6 @@ struct ContentView: View {
         let openingKey = [
             "warroom", "opening", "seen",
             user.id.uuidString,
-            active.leagueId.uuidString,
             active.leagues.sportId.lowercased(),
             String(active.leagues.currentWeek)
         ].joined(separator: ".")
@@ -328,14 +327,13 @@ struct ContentView: View {
     @MainActor private func handleNotificationDestination(_ route: WarRoomNotificationRoute) async {
         suppressOpeningForLaunch = true
         showOpening = false
+        if let leagueId = route.leagueId { auth.selectLeague(leagueId) }
         if route.destination == "announcements" {
             openTab(0)
             showingPushAnnouncements = true
         } else if route.destination == "picks" {
-            if let leagueId = route.leagueId { auth.selectLeague(leagueId) }
             openTab(1)
         } else if route.destination == "results" {
-            openTab(0)
             guard let leagueId = route.leagueId,
                   let week = route.week,
                   let token = auth.token,
@@ -347,7 +345,7 @@ struct ContentView: View {
                   ),
                   membership.leagueId == leagueId
             else { return }
-            auth.selectLeague(leagueId)
+            openTab(0)
             if let editions = try? await SupabaseAPI.gazetteEditions(token: token, leagueId: leagueId),
                let edition = editions.first(where: { $0.weekNumber == week }) {
                 DispatchPresentationPolicy.markSeen(edition, userId: user.id, leagueId: leagueId)
@@ -2061,6 +2059,7 @@ private struct PublicPlayerProfileView: View {
     @State private var selectedAchievement: ProfileAchievement?
     @State private var selectedTrophy: ProfileTrophy?
     @State private var loading = true
+    @State private var earnedSwagExpanded = false
     private var identity: SportIdentity { SportIdentity(sportId) }
 
     var body: some View {
@@ -2102,18 +2101,25 @@ private struct PublicPlayerProfileView: View {
                     )
                     ProfileRivalryCard(player: standing, standings: leagueStandings, sportId: sportId)
 
-                    sectionLabel("EARNED CHEEVOS", detail: "NO LOCKED SHELLS. ONLY RECEIPTS.")
-                    if loading {
-                        ProgressView("Opening the evidence locker…").tint(identity.isNFL ? .cyan : .green).padding(26)
-                    } else if displayAchievements.isEmpty {
-                        Text("No cheevos on file. Their publicist has declined to comment.")
-                            .font(.subheadline.weight(.bold)).foregroundStyle(.white.opacity(0.64))
-                            .frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 8)
-                    } else {
-                        LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
-                            ForEach(displayAchievements) { achievement in
-                                Button { selectedAchievement = achievement } label: { AchievementArtifactTile(achievement: achievement, sportId: sportId) }
-                                    .buttonStyle(.plain)
+                    Button { withAnimation(.snappy) { earnedSwagExpanded.toggle() } } label: {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("EARNED SWAG").font(.caption.weight(.black)).tracking(1.7)
+                                Text("\(displayAchievements.count) RECEIPT\(displayAchievements.count == 1 ? "" : "S") · TAP TO \(earnedSwagExpanded ? "CLOSE" : "SNOOP")").font(.system(size: 8, weight: .black)).tracking(0.8).foregroundStyle(.white.opacity(0.5))
+                            }
+                            Spacer(); Image(systemName: earnedSwagExpanded ? "chevron.up" : "chevron.down")
+                        }.foregroundStyle(identity.accent).padding(14).background(.black.opacity(0.82), in: RoundedRectangle(cornerRadius: 14))
+                    }.buttonStyle(.plain)
+                    if earnedSwagExpanded {
+                        if loading {
+                            ProgressView("Opening the evidence locker…").tint(identity.accent).padding(26)
+                        } else if displayAchievements.isEmpty {
+                            Text("No swag on file. Their publicist has declined to comment.").font(.subheadline.weight(.bold)).foregroundStyle(.white.opacity(0.64)).frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 8)
+                        } else {
+                            LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                                ForEach(displayAchievements) { achievement in
+                                    Button { selectedAchievement = achievement } label: { AchievementArtifactTile(achievement: achievement, sportId: sportId) }.buttonStyle(.plain)
+                                }
                             }
                         }
                     }
@@ -2265,6 +2271,7 @@ struct HomeView: View {
     @State private var card: WeekCard?
     @State private var pick: PlayerPick?
     @State private var crystalBallPick: CrystalBallPick?
+    @State private var favoriteTeamId: String?
     @State private var standings: [Standing] = []
     @State private var announcements: [Announcement] = []
     @State private var lockerMessages: [LockerMessage] = []
@@ -2319,7 +2326,8 @@ struct HomeView: View {
                         let isNFL = membership.leagues.sportId.lowercased() == "nfl"
                         let isCommissioner = auth.user.map { membership.isCommissioner(userId: $0.id) } ?? false
                         let isRivalryWeek = membership.leagues.sportId.lowercased() == "cfb" && membership.leagues.currentWeek == 13
-                        let needsCrystalBall = membership.leagues.crystalBallEnabled && crystalBallPick == nil
+                        let needsFavoriteTeam = favoriteTeamId == nil
+                        let needsCrystalBall = crystalBallPick == nil
                         let ownSubmittedUserIds: Set<UUID> = pick != nil ? Set(auth.user.map { [$0.id] } ?? []) : []
                         let visibleSubmittedUserIds = submittedUserIds.union(ownSubmittedUserIds)
                         let visibleSubmissionCount = visibleSubmittedUserIds.count
@@ -2418,7 +2426,15 @@ struct HomeView: View {
                         } else if isNFL {
                             NflPhaseHomeBanner(phase: NflSeasonPhase.phase(week: membership.leagues.currentWeek))
                         }
-                        if let scorecard = latestScorecard {
+                        if needsFavoriteTeam {
+                            NavigationLink { FavoriteTeamPickerView(sportId: membership.leagues.sportId, selectedTeamId: $favoriteTeamId) } label: {
+                                if isNFL {
+                                    NflPrimaryActionCard(kicker: "REQUIRED · TEAM LOYALTY", title: "Choose Your NFL Team", detail: "Declare it once. You can change it later from Profile.", icon: "heart.fill", urgent: true)
+                                } else {
+                                    StatusCard(kicker: "🚨 REQUIRED · TEAM LOYALTY", title: "CHOOSE YOUR FAVORITE TEAM", detail: "Declare it once. It follows you across every CFB league and stays editable in Profile.", icon: "heart.fill", featured: true, accent: .red, emergency: true)
+                                }
+                            }.buttonStyle(WarRoomCardButtonStyle())
+                        } else if let scorecard = latestScorecard {
                             NavigationLink { PostseasonScorecardView(scorecard: scorecard, sportId: membership.leagues.sportId) } label: {
                                 StatusCard(
                                     kicker: "WEEK \(scorecard.weekNumber) RESULTS · CERTIFIED RECEIPT",
@@ -2539,7 +2555,7 @@ struct HomeView: View {
                                 }
                             }.buttonStyle(WarRoomCardButtonStyle())
                         }
-                        if membership.leagues.crystalBallEnabled, let crystalBallPick {
+                        if let crystalBallPick {
                             NavigationLink { CrystalBallView(membership: membership) } label: {
                                 if isNFL {
                                     NflPrimaryActionCard(kicker: "SUPER BOWL FUTURES · PICK SEALED", title: crystalBallPick.teamName, detail: "Your preseason call is on tape. Open the futures desk to inspect it.", icon: "sparkles")
@@ -2778,6 +2794,7 @@ struct HomeView: View {
             async let loadedCard = SupabaseAPI.weekCard(token: token, leagueId: active.leagueId, weekNumber: active.leagues.currentWeek)
             async let loadedPick = SupabaseAPI.playerPick(token: token, leagueId: active.leagueId, userId: user.id, weekNumber: active.leagues.currentWeek)
             async let loadedCrystal = SupabaseAPI.crystalBallPick(token: token, leagueId: active.leagueId, userId: user.id)
+            async let loadedFavorite = SupabaseAPI.favoriteTeam(token: token, userId: user.id, sportId: active.leagues.sportId)
             async let loadedStandings = SupabaseAPI.standings(token: token, leagueId: active.leagueId)
             async let loadedAnnouncements = SupabaseAPI.announcements(token: token, leagueId: active.leagueId)
             async let loadedLocker = SupabaseAPI.lockerMessages(token: token, leagueId: active.leagueId)
@@ -2789,6 +2806,7 @@ struct HomeView: View {
             homeScoreStatus = nil
             pick = try await loadedPick
             crystalBallPick = try await loadedCrystal
+            favoriteTeamId = (try? await loadedFavorite)?.teamId
             standings = try await loadedStandings
             announcements = try await loadedAnnouncements
             lockerMessages = try await loadedLocker
@@ -3989,6 +4007,10 @@ private struct ChampionshipTrophyPickerView: View {
         ]
     }
 
+    private var heroDesign: TrophyDesign {
+        pendingTrophy ?? designs.first(where: { $0.id == selectedId }) ?? designs[0]
+    }
+
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
@@ -3999,6 +4021,14 @@ private struct ChampionshipTrophyPickerView: View {
                     Text(selectedId == nil ? (membership.leagues.sportId.lowercased() == "nfl" ? "CHOOSE THE FINAL ARTIFACT" : "CHOOSE THE THRONE") : "THE VAULT IS SEALED").font(.system(size: 34, weight: .black)).fontWidth(.condensed)
                     Text(selectedId == nil ? "One design becomes this season’s permanent championship identity. Pick like people will complain about it—because they will." : "This season’s artifact is locked. Future champions inherit the exact hardware selected here.")
                         .font(.subheadline.weight(.semibold)).foregroundStyle(.white.opacity(0.58))
+
+                    VStack(spacing: 10) {
+                        Image(heroDesign.image).resizable().scaledToFit().frame(maxWidth: .infinity).frame(height: 270)
+                        Text(heroDesign.name.uppercased()).font(.title2.weight(.black)).multilineTextAlignment(.center)
+                        Text(heroDesign.line).font(.subheadline.weight(.semibold)).foregroundStyle(.white.opacity(0.58)).multilineTextAlignment(.center)
+                    }
+                    .padding(16).background(.black.opacity(0.88), in: RoundedRectangle(cornerRadius: membership.leagues.sportId.lowercased() == "nfl" ? 7 : 20))
+                    .overlay(RoundedRectangle(cornerRadius: membership.leagues.sportId.lowercased() == "nfl" ? 7 : 20).stroke((membership.leagues.sportId.lowercased() == "nfl" ? Color.cyan : Color.yellow).opacity(0.55), lineWidth: 2))
 
                     LazyVGrid(columns: [GridItem(.flexible(), spacing: 11), GridItem(.flexible(), spacing: 11)], spacing: 11) {
                         ForEach(designs) { design in
@@ -5661,6 +5691,7 @@ private struct YouView: View {
     @State private var regularSeasonScorecards: [RegularSeasonScorecard] = []
     @State private var selectedAchievement: ProfileAchievement?
     @State private var selectedTrophy: ProfileTrophy?
+    @State private var earnedSwagExpanded = false
 
     private var selectedMembership: LeagueMembership? {
         leagues.first { $0.leagueId == auth.selectedLeagueId } ?? leagues.first
@@ -5729,8 +5760,16 @@ private struct YouView: View {
                             }
                         }
 
-                        dossierLabel("CHEEVO CABINET", detail: displayAchievements.isEmpty ? identity.emptyCabinet : "PERMANENT EVIDENCE OF QUESTIONABLE EXCELLENCE")
-                        if displayAchievements.isEmpty {
+                        Button { withAnimation(.snappy) { earnedSwagExpanded.toggle() } } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text("EARNED SWAG").font(.caption.weight(.black)).tracking(1.7)
+                                    Text("\(displayAchievements.count) RECEIPT\(displayAchievements.count == 1 ? "" : "S") · \(earnedSwagExpanded ? "CLOSE CABINET" : "OPEN CABINET")").font(.system(size: 8, weight: .black)).tracking(0.8).foregroundStyle(.white.opacity(0.5))
+                                }
+                                Spacer(); Image(systemName: earnedSwagExpanded ? "chevron.up" : "chevron.down")
+                            }.foregroundStyle(identity.accent).padding(14).background(.black.opacity(0.82), in: RoundedRectangle(cornerRadius: 14))
+                        }.buttonStyle(.plain)
+                        if earnedSwagExpanded && displayAchievements.isEmpty {
                             HStack(spacing: 12) {
                                 Image(systemName: "lock.shield.fill").font(.title2).foregroundStyle(identity.isNFL ? .cyan : .yellow)
                                 VStack(alignment: .leading, spacing: 3) {
@@ -5740,7 +5779,7 @@ private struct YouView: View {
                                 Spacer()
                             }
                             .padding(15).background(.black.opacity(0.82), in: RoundedRectangle(cornerRadius: identity.isNFL ? 7 : 16)).overlay(RoundedRectangle(cornerRadius: identity.isNFL ? 7 : 16).stroke((identity.isNFL ? Color.cyan : Color.yellow).opacity(0.28)))
-                        } else {
+                        } else if earnedSwagExpanded {
                             LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
                                 ForEach(displayAchievements) { achievement in
                                     Button { selectedAchievement = achievement } label: { AchievementArtifactTile(achievement: achievement, sportId: identity.sportId) }

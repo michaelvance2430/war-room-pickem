@@ -12,7 +12,9 @@ const FBS_SCHOOLS = `Alabama|Arkansas|Auburn|Florida|Georgia|Kentucky|LSU|Missis
 const normalizeTeam = (value: string) => value.toLowerCase()
   .replace(/&/g, "and").replace(/\(oh\)/g, "ohio")
   .replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
-const SCHOOL_MODIFIERS = new Set(["state", "tech", "central", "eastern", "western", "northern", "southern", "international", "christian", "pine", "bluff", "ohio"]);
+// Words that indicate the provider name is a different institution, not the
+// ranked/FBS school followed by its mascot (Houston Baptist is not Houston).
+const SCHOOL_MODIFIERS = new Set(["state", "tech", "central", "eastern", "western", "northern", "southern", "international", "christian", "baptist", "pine", "bluff", "ohio"]);
 function isFbsTeam(value: string) {
   const team = normalizeTeam(value);
   return FBS_SCHOOLS.some((school) => {

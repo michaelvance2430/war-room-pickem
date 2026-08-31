@@ -781,7 +781,6 @@ struct CreateLeagueView: View {
     @State private var name = ""
     @State private var sportId = "cfb"
     @State private var visibility = "private"
-    @State private var crystalBallEnabled = true
     @State private var maxMembers = 16
     @State private var creating = false
     @State private var errorMessage: String?
@@ -834,7 +833,8 @@ struct CreateLeagueView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         createLabel("ROOM RULES")
                         Stepper("\(maxMembers) PLAYER SEATS", value: $maxMembers, in: 2...100, step: 2).font(.subheadline.weight(.black))
-                        Toggle("CRYSTAL BALL", isOn: $crystalBallEnabled).font(.subheadline.weight(.black)).tint(.green)
+                        Label("CRYSTAL BALL · REQUIRED", systemImage: "sparkles")
+                            .font(.subheadline.weight(.black)).foregroundStyle(.green)
                     }.createLeaguePanel()
 
                     if let errorMessage {
@@ -872,7 +872,7 @@ struct CreateLeagueView: View {
         do {
             let created = try await SupabaseAPI.createLeague(
                 token: token, name: cleanName, sportId: sportId, visibility: visibility,
-                crystalBallEnabled: crystalBallEnabled, maxMembers: maxMembers
+                crystalBallEnabled: true, maxMembers: maxMembers
             )
             createdCode = created.code
             auth.selectLeague(created.leagueId)
