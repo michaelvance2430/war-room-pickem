@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-type Game = { id:string; away_team:string; home_team:string; spread:number; favorite:"home"|"away"; is_rivalry?:boolean|null };
+type Game = { id:string; away_team:string; home_team:string; spread:number; favorite:"home"|"away"; start_time?:string|null; is_rivalry?:boolean|null };
 type Score = { id:string; completed:boolean; homeTeam:string; awayTeam:string; commenceTime?:string|null; lastUpdate?:string|null; scores:{name:string;score:string}[] };
 type Final = Game & { homeScore:number; awayScore:number; ats:"home"|"away"|"push" };
 type CardRow = { league_id:string; week_number:number; prop_question?:string|null; prop_option_a:string; prop_option_b:string; leagues:{sport_id?:string|null}|{sport_id?:string|null}[]; card_games:Game[] };
@@ -20,6 +20,18 @@ const homeWon=(game:Final)=>game.homeScore>game.awayScore;
 const awayWon=(game:Final)=>game.awayScore>game.homeScore;
 const homeDog=(game:Final)=>game.favorite==="away";
 const awayDog=(game:Final)=>game.favorite==="home";
+const numericHeader=(value:string|null)=>value==null||value===""?null:Number(value);
+
+export function scoreRefreshPlan(cards:CardRow[],now=Date.now()):{minAgeSeconds:number;daysFrom:number}|null{
+  const starts=cards.flatMap((card)=>card.card_games||[]).map((game)=>Date.parse(game.start_time||"")).filter(Number.isFinite);
+  if(!starts.length)return null;
+  const liveWindow=starts.some((start)=>now>=start-5*60_000&&now<=start+6*60*60_000);
+  if(liveWindow)return {minAgeSeconds:50,daysFrom:1};
+  const last=Math.max(...starts);
+  if(now<=last+6*60*60_000)return null;
+  if(now<=last+3*86_400_000)return {minAgeSeconds:15*60,daysFrom:3};
+  return {minAgeSeconds:6*60*60,daysFrom:3};
+}
 
 export function settleAutomaticProp(question:string,finals:Final[]):boolean|null{
   const q=norm(question);if(finals.length!==5)return null;
@@ -83,24 +95,27 @@ Deno.serve(async(request:Request)=>{
     const done=new Set(((scored||[]) as ScoredRow[]).map((row:ScoredRow)=>`${row.league_id}:${row.week_number}`));
     const pending=cardRows.filter((card:CardRow)=>!done.has(`${card.league_id}:${card.week_number}`));
     const feeds=new Map<string,Score[]>();let scoredCount=0;const waiting:string[]=[];
+    const cardsBySport=new Map<string,CardRow[]>();
+    for(const card of pending){const relation=Array.isArray(card.leagues)?card.leagues[0]:card.leagues;const sport=relation?.sport_id==="nfl"?"nfl":"cfb";cardsBySport.set(sport,[...(cardsBySport.get(sport)||[]),card]);}
+    for(const [sport,sportCards] of cardsBySport){
+      const {data:cache}=await db.from("live_football_score_cache").select("events").eq("sport",sport).maybeSingle();
+      const cachedEvents=Array.isArray(cache?.events)?cache.events:[];
+      const plan=scoreRefreshPlan(sportCards);
+      if(!plan){feeds.set(sport,cachedEvents.map(normalizeScore));continue;}
+      const {data:claimed}=await db.rpc("claim_live_football_score_refresh",{p_sport:sport,p_min_age_seconds:plan.minAgeSeconds});
+      if(!claimed){feeds.set(sport,cachedEvents.map(normalizeScore));continue;}
+      const sportKey=sport==="nfl"?"americanfootball_nfl":"americanfootball_ncaaf";
+      const url=new URL(`https://api.the-odds-api.com/v4/sports/${sportKey}/scores`);
+      url.searchParams.set("apiKey",required("ODDS_API_KEY"));url.searchParams.set("daysFrom",String(plan.daysFrom));url.searchParams.set("dateFormat","iso");
+      const response=await fetch(url);const remaining=numericHeader(response.headers.get("x-requests-remaining")),used=numericHeader(response.headers.get("x-requests-used")),last=numericHeader(response.headers.get("x-requests-last"));
+      await db.from("platform_odds_api_usage").insert({league_id:null,user_id:null,sport,action:"score_sync",endpoint:"/scores/autonomous",provider_remaining:remaining,provider_used:used,provider_last_cost:last,estimated_credit_cost:last??1,success:response.ok,http_status:response.status,error_code:response.ok?null:`Scores provider ${sport} returned ${response.status}`,duration_ms:0,dry_run:false});
+      if(!response.ok)throw new Error(`Scores provider ${sport} returned ${response.status}`);
+      const raw=await response.json();const fresh=(Array.isArray(raw)?raw:[]).map(normalizeScore);const events=mergeWeeklyScores(cachedEvents,fresh);feeds.set(sport,events);
+      await db.from("live_football_score_cache").update({events,fetched_at:new Date().toISOString(),provider_remaining:remaining,provider_used:used,provider_last_cost:last,last_http_status:response.status,last_error:null}).eq("sport",sport);
+    }
     for(const card of pending){
       const relation=Array.isArray(card.leagues)?card.leagues[0]:card.leagues;
       const sport=relation?.sport_id==="nfl"?"nfl":"cfb";
-      if(!feeds.has(sport)){
-        const {data:claimed}=await db.rpc("claim_live_football_score_refresh",{p_sport:sport,p_min_age_seconds:50});
-        const {data:cache}=await db.from("live_football_score_cache").select("events").eq("sport",sport).maybeSingle();
-        const cachedEvents=Array.isArray(cache?.events)?cache.events:[];
-        if(!claimed){
-          feeds.set(sport,cachedEvents.map(normalizeScore));
-        }else{
-          const sportKey=sport==="nfl"?"americanfootball_nfl":"americanfootball_ncaaf";
-          const url=new URL(`https://api.the-odds-api.com/v4/sports/${sportKey}/scores`);
-          url.searchParams.set("apiKey",required("ODDS_API_KEY"));url.searchParams.set("daysFrom","3");url.searchParams.set("dateFormat","iso");
-          const response=await fetch(url);if(!response.ok)throw new Error(`Scores provider ${sport} returned ${response.status}`);
-          const raw=await response.json();const fresh=(Array.isArray(raw)?raw:[]).map(normalizeScore);const events=mergeWeeklyScores(cachedEvents,fresh);feeds.set(sport,events);
-          await db.from("live_football_score_cache").update({events,fetched_at:new Date().toISOString(),last_http_status:response.status,last_error:null}).eq("sport",sport);
-        }
-      }
       const games=(card.card_games||[]) as Game[];if(games.length!==5){waiting.push(`${card.league_id}:${card.week_number}:invalid-card`);continue;}
       const finals:Final[]=[];
       for(const game of games){

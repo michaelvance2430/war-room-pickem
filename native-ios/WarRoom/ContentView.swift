@@ -9,11 +9,18 @@ struct RootView: View {
     // here prevents a league switch from replaying the launch film.
     @State private var showOpening: Bool
     @State private var pendingNotificationDestination: WarRoomNotificationRoute?
+    @State private var suppressOpeningForLaunch: Bool
 
     init() {
+        // Keep the system back control readable against every sport skin. The
+        // navigation bar sits directly below the app-wide incident banner.
+        UINavigationBar.appearance().tintColor = .white
         let destination = WarRoomNotificationCenter.takePendingRoute()
-        _showOpening = State(initialValue: destination == nil)
+        // The weekly presentation decision is made only after the active league
+        // and week are known. Notification launches always bypass the film.
+        _showOpening = State(initialValue: false)
         _pendingNotificationDestination = State(initialValue: destination)
+        _suppressOpeningForLaunch = State(initialValue: destination != nil)
     }
 
     var body: some View {
@@ -23,7 +30,11 @@ struct RootView: View {
             } else if auth.user == nil {
                 LoginView()
             } else {
-                MembershipGateView(showOpening: $showOpening, pendingNotificationDestination: $pendingNotificationDestination)
+                MembershipGateView(
+                    showOpening: $showOpening,
+                    pendingNotificationDestination: $pendingNotificationDestination,
+                    suppressOpeningForLaunch: $suppressOpeningForLaunch
+                )
             }
         }
         .preferredColorScheme(.dark)
@@ -38,6 +49,7 @@ private struct MembershipGateView: View {
     @EnvironmentObject private var auth: AuthStore
     @Binding var showOpening: Bool
     @Binding var pendingNotificationDestination: WarRoomNotificationRoute?
+    @Binding var suppressOpeningForLaunch: Bool
     @State private var state: MembershipState = .loading
 
     private enum MembershipState: Equatable {
@@ -60,7 +72,11 @@ private struct MembershipGateView: View {
                     ProgressView("Checking the roster…").tint(.green)
                 }
             case .member:
-                ContentView(showOpening: $showOpening, pendingNotificationDestination: $pendingNotificationDestination)
+                ContentView(
+                    showOpening: $showOpening,
+                    pendingNotificationDestination: $pendingNotificationDestination,
+                    suppressOpeningForLaunch: $suppressOpeningForLaunch
+                )
             case .rookie:
                 RookieMusterShell()
             case .failed(let message):
@@ -126,6 +142,7 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Binding var showOpening: Bool
     @Binding var pendingNotificationDestination: WarRoomNotificationRoute?
+    @Binding var suppressOpeningForLaunch: Bool
     @State private var selectedTab = 0
     @State private var tabRootIds = (0..<5).map { _ in UUID() }
     @State private var picksKickoff: Date?
@@ -148,7 +165,11 @@ struct ContentView: View {
 
     var body: some View {
         ZStack {
-            TabView(selection: tabSelection) {
+            VStack(spacing: 0) {
+                if let status = platformStatus, status.incidentActive {
+                    PlatformIncidentBanner(message: status.incidentMessage)
+                }
+                TabView(selection: tabSelection) {
                 NavigationStack {
                     HomeView(
                         onOpenPicks: { openTab(1) },
@@ -175,12 +196,8 @@ struct ContentView: View {
                     .id(tabRootIds[4])
                     .tabItem { Label("You", systemImage: "person.crop.circle.fill") }
                     .tag(4)
-            }
-            .tint(activeSportId == "nfl" ? .cyan : .green)
-            .safeAreaInset(edge: .top, spacing: 0) {
-                if let status = platformStatus, status.incidentActive {
-                    PlatformIncidentBanner(message: status.incidentMessage)
                 }
+                .tint(activeSportId == "nfl" ? .cyan : .green)
             }
             if showOpening {
                 SeasonOpeningView(isPresented: $showOpening)
@@ -280,6 +297,19 @@ struct ContentView: View {
               let active = try? await SupabaseAPI.activeLeague(token: token, userId: user.id, preferredLeagueId: auth.selectedLeagueId)
         else { return }
         activeSportId = active.leagues.sportId.lowercased() == "nfl" ? "nfl" : "cfb"
+        guard !suppressOpeningForLaunch else { return }
+        let openingKey = [
+            "warroom", "opening", "seen",
+            user.id.uuidString,
+            active.leagueId.uuidString,
+            active.leagues.sportId.lowercased(),
+            String(active.leagues.currentWeek)
+        ].joined(separator: ".")
+        guard !UserDefaults.standard.bool(forKey: openingKey) else { return }
+        // Record at presentation time so force-quitting during the film does not
+        // make it replay on every launch for the rest of the week.
+        UserDefaults.standard.set(true, forKey: openingKey)
+        showOpening = true
     }
 
     @MainActor private func refreshPlatformStatus() async {
@@ -296,6 +326,7 @@ struct ContentView: View {
     }
 
     @MainActor private func handleNotificationDestination(_ route: WarRoomNotificationRoute) async {
+        suppressOpeningForLaunch = true
         showOpening = false
         if route.destination == "announcements" {
             openTab(0)
@@ -607,7 +638,6 @@ private struct PicksView: View {
                     )
                 }
             }
-            .toolbar(.hidden, for: .navigationBar)
             .task(id: auth.selectedLeagueId) { await load() }
             .task(id: card?.id) {
                 while !Task.isCancelled {
@@ -1680,7 +1710,6 @@ struct StandingsView: View {
                     }
                 }
             }
-            .toolbar(.hidden, for: .navigationBar)
             .toolbar {
                 Button("Sign Out") { auth.signOut() }
             }
@@ -2687,7 +2716,6 @@ struct HomeView: View {
                 .padding(.bottom, 34)
             }
         }
-        .toolbar(.hidden, for: .navigationBar)
         .navigationDestination(isPresented: $showingRegularScorecard) {
             if let scorecard = regularScorecards.first(where: { $0.id == regularScorecardToShowID }) {
                 RegularSeasonScorecardView(scorecard: scorecard, sportId: membership?.leagues.sportId ?? "cfb")
@@ -5379,7 +5407,6 @@ struct LockerRoomView: View {
                     }
                 }
             }
-            .toolbar(.hidden, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     VStack(spacing: 1) {
@@ -5780,7 +5807,6 @@ private struct YouView: View {
                     .padding(.horizontal, 16).padding(.top, 12).padding(.bottom, 36)
                 }
             }
-            .toolbar(.hidden, for: .navigationBar)
             .sheet(item: $selectedAchievement) { achievement in
                 AchievementEvidenceView(achievement: achievement, visual: achievementVisual(for: achievement.code), sportId: identity.sportId)
                     .presentationDetents([.large])

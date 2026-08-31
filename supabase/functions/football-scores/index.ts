@@ -28,6 +28,15 @@ const mergeWeeklyEvents = (cached: any[], fresh: CachedScoreEvent[]) => {
   fresh.forEach((event) => { if (event.id) merged.set(event.id, event); });
   return [...merged.values()];
 };
+const scoreRefreshPlan = (starts: number[], now = Date.now()) => {
+  if (!starts.length) return null;
+  const liveWindow = starts.some((start) => now >= start - 5 * 60_000 && now <= start + 6 * 60 * 60_000);
+  if (liveWindow) return { minAgeSeconds: 50, daysFrom: 1 };
+  const last = Math.max(...starts);
+  if (now <= last + 6 * 60 * 60_000) return null;
+  if (now <= last + 3 * 86_400_000) return { minAgeSeconds: 15 * 60, daysFrom: 3 };
+  return { minAgeSeconds: 6 * 60 * 60, daysFrom: 3 };
+};
 
 Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return reply({ error: "POST required" }, 405);
@@ -53,23 +62,29 @@ Deno.serve(async (req: Request) => {
   if (!membership || !user?.id) return reply({ error: "League membership required" }, 403);
 
   const serviceHeaders = { apikey: secret, Authorization: `Bearer ${secret}`, "Content-Type": "application/json" };
+  const cacheUrl = `${supabaseUrl}/rest/v1/live_football_score_cache?sport=eq.${sport}&select=*`;
+  const cacheResponse = await fetch(cacheUrl, { headers: serviceHeaders });
+  const cached = cacheResponse.ok ? (await cacheResponse.json())?.[0] : null;
+  const cardUrl = `${supabaseUrl}/rest/v1/week_cards?select=week_number,card_games(start_time)&league_id=eq.${encodeURIComponent(leagueId)}&order=week_number.desc&limit=1`;
+  const cardResponse = await fetch(cardUrl, { headers: serviceHeaders });
+  const card = cardResponse.ok ? (await cardResponse.json())?.[0] : null;
+  const starts = (card?.card_games || []).map((game: any) => Date.parse(game?.start_time || "")).filter(Number.isFinite);
+  const plan = scoreRefreshPlan(starts);
+  if (!plan) return reply({ events: cached?.events || [], remaining: cached?.provider_remaining?.toString() ?? null, used: cached?.provider_used?.toString() ?? null, last: cached?.provider_last_cost?.toString() ?? null, cachedAt: cached?.fetched_at, cacheHit: true, gated: true, sport });
   const claimResponse = await fetch(`${supabaseUrl}/rest/v1/rpc/claim_live_football_score_refresh`, {
-    method: "POST", headers: serviceHeaders, body: JSON.stringify({ p_sport: sport, p_min_age_seconds: 25 }),
+    method: "POST", headers: serviceHeaders, body: JSON.stringify({ p_sport: sport, p_min_age_seconds: plan.minAgeSeconds }),
   });
   if (!claimResponse.ok) return reply({ error: "Live score cache is not ready" }, 503);
   const claimed = (await claimResponse.json()) === true;
-  const cacheUrl = `${supabaseUrl}/rest/v1/live_football_score_cache?sport=eq.${sport}&select=*`;
   if (!claimed) {
-    const cacheResponse = await fetch(cacheUrl, { headers: serviceHeaders });
-    const cache = cacheResponse.ok ? (await cacheResponse.json())?.[0] : null;
-    if (cache?.events) return reply({ events: cache.events, remaining: cache.provider_remaining?.toString() ?? null, used: cache.provider_used?.toString() ?? null, last: cache.provider_last_cost?.toString() ?? null, cachedAt: cache.fetched_at, cacheHit: true, sport });
+    if (cached?.events) return reply({ events: cached.events, remaining: cached.provider_remaining?.toString() ?? null, used: cached.provider_used?.toString() ?? null, last: cached.provider_last_cost?.toString() ?? null, cachedAt: cached.fetched_at, cacheHit: true, sport });
   }
 
   const apiKey = (Deno.env.get("ODDS_API_KEY") || "").trim();
   if (!apiKey) return reply({ error: "Odds API secret is not configured in Supabase" }, 503);
   const sportKey = sport === "nfl" ? "americanfootball_nfl" : "americanfootball_ncaaf";
   const providerUrl = new URL(`https://api.the-odds-api.com/v4/sports/${sportKey}/scores`);
-  providerUrl.searchParams.set("apiKey", apiKey); providerUrl.searchParams.set("daysFrom", String(daysFrom)); providerUrl.searchParams.set("dateFormat", "iso");
+  providerUrl.searchParams.set("apiKey", apiKey); providerUrl.searchParams.set("daysFrom", String(Math.min(daysFrom, plan.daysFrom))); providerUrl.searchParams.set("dateFormat", "iso");
   const started = Date.now();
   let providerStatus = 502, remaining: number | null = null, used: number | null = null, last: number | null = null, errorMessage: string | null = null;
   try {
@@ -79,11 +94,9 @@ Deno.serve(async (req: Request) => {
     if (!provider.ok) throw new Error(`Scores provider error ${provider.status}`);
     const raw = await provider.json();
     const freshEvents = (Array.isArray(raw) ? raw : []).map(normalizeScoreEvent);
-    const cacheResponse = await fetch(cacheUrl, { headers: serviceHeaders });
-    const cache = cacheResponse.ok ? (await cacheResponse.json())?.[0] : null;
     // The provider exposes at most three prior score days. Preserve completed
     // Thursday games until a Monday final so one NFL card can settle atomically.
-    const events = mergeWeeklyEvents(Array.isArray(cache?.events) ? cache.events : [], freshEvents);
+    const events = mergeWeeklyEvents(Array.isArray(cached?.events) ? cached.events : [], freshEvents);
     const fetchedAt = new Date().toISOString();
     await fetch(cacheUrl, { method: "PATCH", headers: { ...serviceHeaders, Prefer: "return=minimal" }, body: JSON.stringify({ events, fetched_at: fetchedAt, provider_remaining: remaining, provider_used: used, provider_last_cost: last, last_http_status: providerStatus, last_error: null }) });
     await logUsage(true);
