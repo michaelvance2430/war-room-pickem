@@ -180,7 +180,7 @@ struct ContentView: View {
                     .id(tabRootIds[0])
                     .tabItem { Label("Home", systemImage: "house.fill") }
                     .tag(0)
-                PicksView(onKickoffLoaded: { picksKickoff = $0 })
+                PicksView(onKickoffLoaded: { picksKickoff = $0 }, onBack: { openTab(0) })
                     .id(tabRootIds[1])
                     .tabItem { Label(boardIsOpen ? "Board" : "Picks", systemImage: boardIsOpen ? "rectangle.grid.2x2.fill" : "checkmark.seal.fill") }
                     .tag(1)
@@ -188,11 +188,11 @@ struct ContentView: View {
                     .id(tabRootIds[2])
                     .tabItem { Label("Standings", systemImage: "list.number") }
                     .tag(2)
-                LockerRoomView()
+                LockerRoomView(onBack: { openTab(0) })
                     .id(tabRootIds[3])
                     .tabItem { Label("Locker", systemImage: "bubble.left.and.bubble.right.fill") }
                     .tag(3)
-                YouView()
+                YouView(onBack: { openTab(0) })
                     .id(tabRootIds[4])
                     .tabItem { Label("You", systemImage: "person.crop.circle.fill") }
                     .tag(4)
@@ -468,6 +468,7 @@ enum RegularSeasonWeaponEngine {
 private struct PicksView: View {
     @EnvironmentObject private var auth: AuthStore
     let onKickoffLoaded: (Date?) -> Void
+    let onBack: () -> Void
     @State private var league: LeagueMembership?
     @State private var memberships: [LeagueMembership] = []
     @State private var card: WeekCard?
@@ -637,6 +638,9 @@ private struct PicksView: View {
                 }
             }
             .task(id: auth.selectedLeagueId) { await load() }
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) { RootBackButton(action: onBack) }
+            }
             .task(id: card?.id) {
                 while !Task.isCancelled {
                     try? await Task.sleep(for: .seconds(15))
@@ -5351,6 +5355,7 @@ struct LockerRoomView: View {
     @Environment(\.openURL) private var openURL
     @StateObject private var safety = LockerSafetyStore()
     let leagueOverride: LeagueMembership?
+    let onBack: (() -> Void)?
     @State private var league: LeagueMembership?
     @State private var messages: [LockerMessage] = []
     @State private var draft = ""
@@ -5368,7 +5373,10 @@ struct LockerRoomView: View {
         messages.filter { !safety.blockedUserIDs.contains($0.userId) }
     }
 
-    init(leagueOverride: LeagueMembership? = nil) { self.leagueOverride = leagueOverride }
+    init(leagueOverride: LeagueMembership? = nil, onBack: (() -> Void)? = nil) {
+        self.leagueOverride = leagueOverride
+        self.onBack = onBack
+    }
 
     var body: some View {
         NavigationStack {
@@ -5452,6 +5460,9 @@ struct LockerRoomView: View {
                 }
             }
             .toolbar {
+                if let onBack {
+                    ToolbarItem(placement: .topBarLeading) { RootBackButton(action: onBack) }
+                }
                 ToolbarItem(placement: .principal) {
                     VStack(spacing: 1) {
                         Text(identity.isNFL ? "NFL LOCKER ROOM" : "LOCKER ROOM").font(.caption.weight(.black)).foregroundStyle(identity.isNFL ? .cyan : .green)
@@ -5706,6 +5717,9 @@ private struct YouView: View {
     @State private var selectedAchievement: ProfileAchievement?
     @State private var selectedTrophy: ProfileTrophy?
     @State private var earnedSwagExpanded = false
+    let onBack: (() -> Void)?
+
+    init(onBack: (() -> Void)? = nil) { self.onBack = onBack }
 
     private var selectedMembership: LeagueMembership? {
         leagues.first { $0.leagueId == auth.selectedLeagueId } ?? leagues.first
@@ -5870,6 +5884,11 @@ private struct YouView: View {
                     .presentationDetents([.large])
                     .presentationDragIndicator(.hidden)
             }
+            .toolbar {
+                if let onBack {
+                    ToolbarItem(placement: .topBarLeading) { RootBackButton(action: onBack) }
+                }
+            }
             .task {
                 guard let token = auth.token, let user = auth.user else { return }
                 async let loadedLeagues = SupabaseAPI.leagueMemberships(token: token, userId: user.id)
@@ -5993,6 +6012,19 @@ private struct YouView: View {
     }
     private func trophyTitle(_ type: String) -> String {
         switch type { case "championship": return "LEAGUE CHAMPION"; case "toilet_bowl": return "TOILET BOWL"; case "crystal_ball": return "VILLAGE NERD"; default: return type.replacingOccurrences(of: "_", with: " ").uppercased() }
+    }
+}
+
+private struct RootBackButton: View {
+    let action: () -> Void
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "chevron.left")
+                .font(.headline.weight(.black))
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .accessibilityLabel("Back to Home")
     }
 }
 
