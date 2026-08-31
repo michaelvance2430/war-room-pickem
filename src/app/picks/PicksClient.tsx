@@ -41,6 +41,7 @@ import {
   getRankedMatchupTier,
   rankedMatchupBadge,
   rankedMatchupShellClass,
+  rankedTeamTextClass,
 } from "@/lib/rankings";
 import {
   formatKickoff,
@@ -2837,8 +2838,13 @@ export default function PicksClient() {
                                     : ""
                             }`}
                           >
-                            {formatRankedTeam(game.awayTeam, game.awayRank)} @{" "}
-                            {formatRankedTeam(game.homeTeam, game.homeRank)}
+                            <span className={rankedTeamTextClass(game.awayRank)}>
+                              {formatRankedTeam(game.awayTeam, game.awayRank)}
+                            </span>{" "}
+                            @{" "}
+                            <span className={rankedTeamTextClass(game.homeRank)}>
+                              {formatRankedTeam(game.homeTeam, game.homeRank)}
+                            </span>
                           </div>
                           {rankBadge && (
                             <span className={rankBadge.className}>
@@ -2957,9 +2963,11 @@ export default function PicksClient() {
                           )}
                         </div>
                         <div
-                          className="font-semibold text-[15px] sm:text-base leading-snug"
+                          className={`font-semibold text-[15px] sm:text-base leading-snug ${rankedTeamTextClass(game.awayRank)}`}
                           style={
-                            favAway ? { color: favAway.colors.primary } : undefined
+                            !rankedTeamTextClass(game.awayRank) && favAway
+                              ? { color: favAway.colors.primary }
+                              : undefined
                           }
                         >
                           {formatRankedTeam(game.awayTeam, game.awayRank)}
@@ -3014,9 +3022,11 @@ export default function PicksClient() {
                           )}
                         </div>
                         <div
-                          className="font-semibold text-[15px] sm:text-base leading-snug"
+                          className={`font-semibold text-[15px] sm:text-base leading-snug ${rankedTeamTextClass(game.homeRank)}`}
                           style={
-                            favHome ? { color: favHome.colors.primary } : undefined
+                            !rankedTeamTextClass(game.homeRank) && favHome
+                              ? { color: favHome.colors.primary }
+                              : undefined
                           }
                         >
                           {formatRankedTeam(game.homeTeam, game.homeRank)}
