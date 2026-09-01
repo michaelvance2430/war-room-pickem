@@ -2315,6 +2315,7 @@ struct HomeView: View {
     @State private var loadError: String?
     @State private var clock = Date()
     @State private var showingFeedbackFallback = false
+    @State private var showingMoreFromWarRoom = false
 
     init(leagueOverride: LeagueMembership? = nil, onOpenPicks: @escaping () -> Void, onOpenStandings: @escaping () -> Void, onOpenLocker: @escaping () -> Void) {
         self.leagueOverride = leagueOverride
@@ -2384,44 +2385,41 @@ struct HomeView: View {
                                 kickoff: firstKickoff
                             )
                         }
-                        ShareLink(
-                            item: LeagueInvitation.appStoreURL,
-                            subject: Text("Join \(membership.leagues.name) on War Room Pick’Em"),
-                            message: Text(LeagueInvitation.message(
-                                leagueName: membership.leagues.name,
-                                sportId: membership.leagues.sportId,
-                                code: membership.leagues.code
-                            ))
-                        ) {
-                            InviteShareLabel(code: membership.leagues.code, isNFL: isNFL)
+                        HStack(spacing: 10) {
+                            ShareLink(
+                                item: LeagueInvitation.appStoreURL,
+                                subject: Text("Join \(membership.leagues.name) on War Room Pick’Em"),
+                                message: Text(LeagueInvitation.message(
+                                    leagueName: membership.leagues.name,
+                                    sportId: membership.leagues.sportId,
+                                    code: membership.leagues.code
+                                ))
+                            ) {
+                                CompactHomeUtilityButton(
+                                    title: "SHARE · \(membership.leagues.code.uppercased())",
+                                    icon: "square.and.arrow.up",
+                                    accent: isNFL ? .cyan : .green
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Share \(membership.leagues.name) invitation")
+                            NavigationLink { LeagueCommandCenterView(memberships: memberships) } label: {
+                                CompactHomeUtilityButton(
+                                    title: "SWITCH LEAGUE",
+                                    icon: isNFL ? "football.fill" : "antenna.radiowaves.left.and.right",
+                                    accent: isNFL ? .cyan : .green
+                                )
+                            }
+                            .buttonStyle(WarRoomCardButtonStyle())
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Share \(membership.leagues.name) invitation")
-                        Link(destination: AppLinks.patreon) {
-                            PatreonSupportCard(sportId: membership.leagues.sportId)
-                        }
-                        .buttonStyle(WarRoomCardButtonStyle())
-                        .accessibilityHint("Opens the War Room Pick’em Patreon page outside the app")
                         if isCommissioner {
                             NavigationLink { CommissionerCommandCenterView(membership: membership, standings: standings, submittedUserIds: visibleSubmittedUserIds) } label: {
-                                if isNFL {
-                                    NflPrimaryActionCard(
-                                        kicker: "COMMISSIONER CONTROL · LEAGUE OPERATIONS",
-                                        title: "Commissioner Command",
-                                        detail: pendingJoinRequests.isEmpty ? "Cards, scores, roster, AFC/NFC groups, and season control." : "\(pendingJoinRequests.count) join request\(pendingJoinRequests.count == 1 ? "" : "s") waiting · cards · scores · roster · season control.",
-                                        icon: "person.3.sequence.fill"
-                                    )
-                                } else {
-                                    StatusCard(
-                                        kicker: "COMMISSIONER CONTROL · LEAGUE OPERATIONS",
-                                        title: "Commissioner Command",
-                                        detail: pendingJoinRequests.isEmpty ? "Cards, scores, roster, conferences, and season control from one place." : "\(pendingJoinRequests.count) join request\(pendingJoinRequests.count == 1 ? "" : "s") waiting · cards · scores · roster · conferences.",
-                                        icon: "person.3.sequence.fill",
-                                        featured: true,
-                                        accent: .cyan,
-                                        actionLabel: "OPEN COMMAND"
-                                    )
-                                }
+                                CompactHomeRow(
+                                    kicker: "COMMISSIONER COMMAND",
+                                    title: pendingJoinRequests.isEmpty ? "Manage your league" : "\(pendingJoinRequests.count) join request\(pendingJoinRequests.count == 1 ? "" : "s") waiting",
+                                    icon: "person.3.sequence.fill",
+                                    accent: .cyan
+                                )
                             }.buttonStyle(WarRoomCardButtonStyle())
                             if !pendingJoinRequests.isEmpty {
                                 NavigationLink { JoinRequestsView(membership: membership) } label: {
@@ -2478,9 +2476,6 @@ struct HomeView: View {
                                 )
                             }.buttonStyle(WarRoomCardButtonStyle())
                         }
-                        NavigationLink { LeagueCommandCenterView(memberships: memberships) } label: {
-                            ActiveLeagueSwitchCard(membership: membership, isNFL: isNFL)
-                        }.buttonStyle(WarRoomCardButtonStyle())
                         if let scorecard = unreadRegularScorecard {
                             Button { openRegularScorecard(scorecard) } label: {
                                 UnreadWeekResultCard(scorecard: scorecard, sportId: membership.leagues.sportId)
@@ -2512,14 +2507,14 @@ struct HomeView: View {
                             .accessibilityLabel("Live Week \(membership.leagues.currentWeek) scoreboard. Open the Board.")
                         } else if isNFL && pick == nil {
                             Button(action: onOpenPicks) {
-                                NflPrimaryActionCard(kicker: "YOU ARE ON THE CLOCK · WEEK \(membership.leagues.currentWeek)", title: "Build Your Sunday Card", detail: "Five games. Confidence points. One Best Bet. No preseason excuses.", icon: "football.fill", urgent: true)
+                                CompactWeekReadyCard(week: membership.leagues.currentWeek, submitted: visibleSubmissionCount, total: standings.count, isNFL: true, commissioner: false)
                             }.buttonStyle(WarRoomCardButtonStyle())
                         } else if isNFL && isCommissioner {
                             NavigationLink { CommissionerCommandCenterView(membership: membership, standings: standings, submittedUserIds: visibleSubmittedUserIds) } label: {
-                                NflPrimaryActionCard(kicker: "COMMISSIONER GAME-DAY DESK", title: "\(visibleSubmissionCount) of \(standings.count) cards are in", detail: "Open attendance, chase the holdouts, and verify the room before kickoff.", icon: "person.2.badge.gearshape.fill")
+                                CompactWeekReadyCard(week: membership.leagues.currentWeek, submitted: visibleSubmissionCount, total: standings.count, isNFL: true, commissioner: true)
                             }.buttonStyle(WarRoomCardButtonStyle())
                         } else if isNFL {
-                            NflPrimaryActionCard(kicker: "CARD FILED · WEEK \(membership.leagues.currentWeek)", title: "You’re set for kickoff", detail: "Your card is saved. The board opens game by game.", icon: "checkmark.seal.fill")
+                            CompactHomeRow(kicker: "CARD FILED · WEEK \(membership.leagues.currentWeek)", title: "You’re set for kickoff", icon: "checkmark.seal.fill", accent: .cyan)
                         } else if needsCrystalBall {
                             NavigationLink { CrystalBallView(membership: membership) } label: {
                                 StatusCard(kicker: "🚨 REQUIRED · LOOK HERE FIRST", title: "PICK CRYSTAL BALL NOW", detail: "Choose the champion before you do anything else. Revisionist history is not a feature.", icon: "exclamationmark.triangle.fill", featured: true, accent: .red, emergency: true)
@@ -2547,16 +2542,16 @@ struct HomeView: View {
                             .accessibilityLabel("Live Week \(membership.leagues.currentWeek) scoreboard. Open the Board.")
                         } else if pick == nil {
                             Button(action: onOpenPicks) {
-                                StatusCard(kicker: isRivalryWeek ? "🚨 DO THIS NEXT · HATE WEEK" : "🚨 DO THIS NEXT · WEEK \(membership.leagues.currentWeek)", title: isRivalryWeek ? "Choose Your Enemies" : "Make Your Picks", detail: isRivalryWeek ? "Five rivalry games. One Best Bet. Every bad decision becomes family evidence." : "Spreads, confidence, Best Bet, and the weekly prop are ready.", icon: isRivalryWeek ? "flame.fill" : "arrow.right.circle.fill", featured: true, accent: .red, emergency: true, actionLabel: "MAKE PICKS")
+                                CompactWeekReadyCard(week: membership.leagues.currentWeek, submitted: visibleSubmissionCount, total: standings.count, isNFL: false, commissioner: false)
                             }.buttonStyle(WarRoomCardButtonStyle())
                         } else if isCommissioner {
                             NavigationLink {
                                 CommissionerCommandCenterView(membership: membership, standings: standings, submittedUserIds: visibleSubmittedUserIds)
                             } label: {
-                                StatusCard(kicker: "CARD IS LIVE · COMMISSIONER VIEW", title: "Week \(membership.leagues.currentWeek) is ready", detail: "\(visibleSubmissionCount) of \(standings.count) have submitted. Tap for the attendance sheet.", icon: "person.2.badge.gearshape.fill", featured: true, actionLabel: "OPEN COMMAND")
+                                CompactWeekReadyCard(week: membership.leagues.currentWeek, submitted: visibleSubmissionCount, total: standings.count, isNFL: false, commissioner: true)
                             }.buttonStyle(WarRoomCardButtonStyle())
                         } else {
-                            StatusCard(kicker: "YOU’RE CAUGHT UP", title: "Week \(membership.leagues.currentWeek) is locked", detail: "Your work here is done. Suspicious, but true.", icon: "checkmark.seal.fill", featured: true)
+                            CompactHomeRow(kicker: "CARD FILED · WEEK \(membership.leagues.currentWeek)", title: "You’re set for kickoff", icon: "checkmark.seal.fill", accent: .green)
                         }
 
                         if let scorecard = regularScorecards.first, !isUnread(scorecard) {
@@ -2567,63 +2562,62 @@ struct HomeView: View {
 
                         if sportPoolPoll != nil || isCommissioner {
                             NavigationLink { SportPoolView(membership: membership) } label: {
-                                if isNFL {
-                                    NflPrimaryActionCard(
-                                        kicker: sportPoolPoll == nil ? "FRANCHISE EXPANSION · 7-DAY VOTE" : "EXPANSION VOTE · \(sportPoolPoll!.yesCount) IN",
-                                        title: sportPoolPoll.map { "Open a \($0.targetSportId.uppercased()) room" } ?? "Recruit the roster for another sport",
-                                        detail: sportPoolPoll.map { $0.status == "open" ? "The roster is voting. The window closes in seven days." : "The vote is closed. The willing are ready for a new room." } ?? "Let the roster decide, then move only the players who opt in.",
-                                        icon: "person.3.sequence.fill"
-                                    )
-                                } else {
-                                    StatusCard(
-                                        kicker: sportPoolPoll == nil ? "COMMISSIONER · OPEN A 7-DAY VOTE" : "RUN IT BACK · \(sportPoolPoll!.yesCount) YES",
-                                        title: sportPoolPoll.map { "\($0.targetSportId.uppercased()) wants the smoke" } ?? "Recruit this room for another sport",
-                                        detail: sportPoolPoll.map { $0.status == "open" ? "Vote before the seven-day window slams shut." : "Voting is closed. The willing are ready for extraction." } ?? "Players choose. You see who said yes. One button moves the volunteers.",
-                                        icon: "person.3.sequence.fill",
-                                        accent: .orange
-                                    )
-                                }
+                                CompactHomeRow(
+                                    kicker: "RUN IT BACK",
+                                    title: sportPoolPoll.map { "\($0.targetSportId.uppercased()) · \($0.yesCount) yes" } ?? "Recruit for another sport",
+                                    icon: "person.3.sequence.fill",
+                                    accent: .orange
+                                )
                             }.buttonStyle(WarRoomCardButtonStyle())
                         }
                         if let crystalBallPick {
                             NavigationLink { CrystalBallView(membership: membership) } label: {
-                                if isNFL {
-                                    NflPrimaryActionCard(kicker: "SUPER BOWL FUTURES · PICK SEALED", title: crystalBallPick.teamName, detail: "Your preseason call is on tape. Open the futures desk to inspect it.", icon: "sparkles")
-                                } else {
-                                    StatusCard(
-                                        kicker: "SEALED PROPHECY · PERMANENT RECEIPT",
-                                        title: crystalBallPick.teamName,
-                                        detail: "The Crystal Ball remembers. Tap to inspect your prediction.",
-                                        icon: "sparkles",
-                                        accent: .green
-                                    )
-                                }
+                                CompactHomeRow(kicker: "CRYSTAL BALL", title: crystalBallPick.teamName, icon: "sparkles", accent: isNFL ? .cyan : .green)
                             }.buttonStyle(WarRoomCardButtonStyle())
                         }
-                        if AppIdentity.isCreator(auth.user?.id) && leagueOverride == nil {
-                            NavigationLink { FoundryView(preferredSportId: membership.leagues.sportId) } label: {
-                                let foundryColor: Color = membership.leagues.sportId.lowercased() == "nfl" ? .cyan : .orange
-                                HStack(spacing: 13) {
-                                    ZStack {
-                                        RoundedRectangle(cornerRadius: 10).fill(foundryColor.opacity(0.14))
-                                        RoundedRectangle(cornerRadius: 10).stroke(foundryColor.opacity(0.65))
-                                        Image(systemName: membership.leagues.sportId.lowercased() == "nfl" ? "football.fill" : "flame.fill").font(.title2.weight(.black)).foregroundStyle(foundryColor)
-                                    }.frame(width: 48, height: 48)
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text("CREATOR ACCESS · QUARANTINED")
-                                            .font(.system(size: 8, weight: .black)).tracking(1.3).foregroundStyle(foundryColor)
-                                        Text(membership.leagues.sportId.lowercased() == "nfl" ? "SUNDAY FOUNDRY" : "THE FOUNDRY").font(.headline.weight(.black)).foregroundStyle(.white)
-                                        Text("TEST THE ROOM WITHOUT TOUCHING REAL HISTORY")
-                                            .font(.system(size: 8, weight: .black)).tracking(0.6).foregroundStyle(.white.opacity(0.42))
+                        if leagueOverride == nil {
+                            let moreAccent: Color = isNFL ? .cyan : .green
+                            VStack(spacing: 0) {
+                                Button {
+                                    withAnimation(.easeInOut(duration: 0.2)) { showingMoreFromWarRoom.toggle() }
+                                } label: {
+                                    HStack(spacing: 11) {
+                                        Image(systemName: "ellipsis.circle.fill")
+                                            .font(.title3.weight(.black))
+                                            .foregroundStyle(moreAccent)
+                                        Text("MORE FROM WAR ROOM")
+                                            .font(.system(size: 12, weight: .black))
+                                            .tracking(1.1)
+                                            .foregroundStyle(.white)
+                                        Spacer()
+                                        Image(systemName: showingMoreFromWarRoom ? "chevron.up" : "chevron.down")
+                                            .font(.caption.weight(.black))
+                                            .foregroundStyle(moreAccent)
                                     }
-                                    Spacer()
-                                    Image(systemName: "chevron.right").font(.caption.weight(.black)).foregroundStyle(foundryColor)
+                                    .padding(.horizontal, 15)
+                                    .padding(.vertical, 14)
+                                    .contentShape(Rectangle())
                                 }
-                                .padding(14)
-                                .background(.black.opacity(0.84), in: UnevenRoundedRectangle(topLeadingRadius: 4, bottomLeadingRadius: 18, bottomTrailingRadius: 4, topTrailingRadius: 18))
-                                .overlay(alignment: .leading) { Rectangle().fill(foundryColor).frame(width: 3).padding(.vertical, 10) }
-                                .overlay(UnevenRoundedRectangle(topLeadingRadius: 4, bottomLeadingRadius: 18, bottomTrailingRadius: 4, topTrailingRadius: 18).stroke(foundryColor.opacity(0.42)))
-                            }.buttonStyle(WarRoomCardButtonStyle())
+                                .buttonStyle(.plain)
+
+                                if showingMoreFromWarRoom {
+                                    Divider().overlay(moreAccent.opacity(0.25))
+                                    Link(destination: AppLinks.patreon) {
+                                        CompactHomeRow(kicker: "KEEP THE LIGHTS ON", title: "Support on Patreon", icon: "heart.fill", accent: .green, embedded: true)
+                                    }
+                                    .buttonStyle(WarRoomCardButtonStyle())
+
+                                    if AppIdentity.isCreator(auth.user?.id) {
+                                        Divider().overlay(moreAccent.opacity(0.18)).padding(.horizontal, 14)
+                                        NavigationLink { FoundryView(preferredSportId: membership.leagues.sportId) } label: {
+                                            CompactHomeRow(kicker: "CREATOR ACCESS · QUARANTINED", title: isNFL ? "Sunday Foundry" : "The Foundry", icon: isNFL ? "football.fill" : "flame.fill", accent: .orange, embedded: true)
+                                        }
+                                        .buttonStyle(WarRoomCardButtonStyle())
+                                    }
+                                }
+                            }
+                            .background(.black.opacity(0.86), in: RoundedRectangle(cornerRadius: 16))
+                            .overlay(RoundedRectangle(cornerRadius: 16).stroke(moreAccent.opacity(0.42), lineWidth: 1))
                         }
 
                         if isNFL {
@@ -3009,6 +3003,113 @@ private struct InviteShareLabel: View {
         .padding(.horizontal, 15).padding(.vertical, 12)
         .background(isNFL ? Color.blue.opacity(0.92) : Color.green, in: RoundedRectangle(cornerRadius: isNFL ? 7 : 14))
         .overlay(RoundedRectangle(cornerRadius: isNFL ? 7 : 14).stroke(.white.opacity(isNFL ? 0.42 : 0.18)))
+    }
+}
+
+private struct CompactHomeUtilityButton: View {
+    let title: String
+    let icon: String
+    let accent: Color
+
+    var body: some View {
+        HStack(spacing: 9) {
+            Image(systemName: icon).font(.subheadline.weight(.black))
+            Text(title)
+                .font(.system(size: 10, weight: .black))
+                .tracking(0.65)
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
+            Spacer(minLength: 0)
+        }
+        .foregroundStyle(accent)
+        .padding(.horizontal, 13)
+        .frame(maxWidth: .infinity, minHeight: 52)
+        .background(.black.opacity(0.88), in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(accent.opacity(0.45)))
+    }
+}
+
+private struct CompactHomeRow: View {
+    let kicker: String
+    let title: String
+    let icon: String
+    let accent: Color
+    var embedded = false
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 10).fill(accent.opacity(0.14))
+                RoundedRectangle(cornerRadius: 10).stroke(accent.opacity(0.48))
+                Image(systemName: icon).font(.headline.weight(.black)).foregroundStyle(accent)
+            }
+            .frame(width: 44, height: 44)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(kicker.uppercased())
+                    .font(.system(size: 9, weight: .black))
+                    .tracking(1.15)
+                    .foregroundStyle(accent)
+                Text(title)
+                    .font(.subheadline.weight(.black))
+                    .foregroundStyle(.white)
+                    .lineLimit(2)
+            }
+            Spacer(minLength: 8)
+            Image(systemName: "chevron.right").font(.caption.weight(.black)).foregroundStyle(accent)
+        }
+        .padding(.horizontal, 14).padding(.vertical, embedded ? 10 : 12)
+        .background(embedded ? Color.clear : Color.black.opacity(0.86), in: RoundedRectangle(cornerRadius: 14))
+        .overlay {
+            if !embedded {
+                RoundedRectangle(cornerRadius: 14).stroke(accent.opacity(0.42))
+            }
+        }
+    }
+}
+
+private struct CompactWeekReadyCard: View {
+    let week: Int
+    let submitted: Int
+    let total: Int
+    let isNFL: Bool
+    let commissioner: Bool
+
+    private var accent: Color { isNFL ? .cyan : .green }
+    private var progress: Double { total > 0 ? min(1, Double(submitted) / Double(total)) : 0 }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("THIS WEEK").font(.system(size: 9, weight: .black)).tracking(1.5).foregroundStyle(accent)
+                    Text("Week \(week) is ready").font(.title3.weight(.black)).fontWidth(.condensed).foregroundStyle(.white)
+                }
+                Spacer()
+                Image(systemName: commissioner ? "person.2.badge.gearshape.fill" : "checkmark.seal.fill")
+                    .font(.title2.weight(.black)).foregroundStyle(accent)
+            }
+            Text("\(submitted) / \(total) SUBMITTED")
+                .font(.caption.weight(.black)).tracking(0.8).foregroundStyle(.white.opacity(0.62))
+            GeometryReader { proxy in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(.white.opacity(0.14))
+                    Capsule().fill(accent).frame(width: proxy.size.width * progress)
+                }
+            }
+            .frame(height: 7)
+            HStack {
+                Text(commissioner ? "OPEN ATTENDANCE" : "OPEN PICKS")
+                    .font(.caption.weight(.black)).tracking(1)
+                Spacer()
+                Image(systemName: "arrow.right").font(.caption.weight(.black))
+            }
+            .foregroundStyle(.black)
+            .padding(.horizontal, 14).frame(height: 44)
+            .background(accent, in: RoundedRectangle(cornerRadius: 10))
+        }
+        .padding(16)
+        .background(.black.opacity(0.86), in: RoundedRectangle(cornerRadius: isNFL ? 9 : 16))
+        .overlay(RoundedRectangle(cornerRadius: isNFL ? 9 : 16).stroke(accent.opacity(0.52)))
     }
 }
 
@@ -4256,7 +4357,7 @@ private struct HomeCommandHeader: View {
         .padding(18)
         .background {
             ZStack(alignment: .trailing) {
-                LinearGradient(colors: [.black.opacity(0.76), Color(red: 0.02, green: 0.16, blue: 0.07).opacity(0.60)], startPoint: .leading, endPoint: .trailing)
+                LinearGradient(colors: [.black.opacity(0.52), Color(red: 0.02, green: 0.16, blue: 0.07).opacity(0.36)], startPoint: .leading, endPoint: .trailing)
                 Text("WR").font(.system(size: 90, weight: .black)).fontWidth(.condensed).foregroundStyle(.white.opacity(0.025)).offset(x: 8)
             }
             .clipShape(UnevenRoundedRectangle(topLeadingRadius: 5, bottomLeadingRadius: 24, bottomTrailingRadius: 5, topTrailingRadius: 24))
