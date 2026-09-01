@@ -2389,11 +2389,6 @@ struct HomeView: View {
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("Share \(membership.leagues.name) invitation")
-                        if let firstKickoff {
-                            KickoffCountdownView(kickoff: firstKickoff, sportId: membership.leagues.sportId, week: membership.leagues.currentWeek)
-                        } else if card != nil {
-                            MissionClockUnavailableView(sportId: membership.leagues.sportId, week: membership.leagues.currentWeek)
-                        }
                         Link(destination: AppLinks.patreon) {
                             PatreonSupportCard(sportId: membership.leagues.sportId)
                         }
