@@ -9,7 +9,7 @@ const picksClock = readFileSync("src/components/LeagueLockTimer.tsx", "utf8");
 const foundry = readFileSync("src/app/foundry/preview/page.tsx", "utf8");
 const foundryState = readFileSync("src/lib/foundry-walkthrough.ts", "utf8");
 
-assert.match(homeHero, /<LeagueLockTimer games=\{state\.games\}/, "Home must render from its already-verified published card");
+assert.match(homeHero, /<LeagueLockTimer\s+games=\{state\.games\}/, "Home must render from its already-verified published card");
 assert.match(picks, /<LeagueLockTimer[\s\S]*?games=\{games\}/, "Picks must mount its lock clock");
 assert.doesNotMatch(
   picks,

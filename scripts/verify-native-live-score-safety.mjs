@@ -32,7 +32,7 @@ assert.match(content, /ATS \+ BEST BET INCLUDED · PROP POSTS WHEN ALL FIVE GAME
 assert.match(content, /SCORE FEED STALE · RETRYING/);
 assert.ok(content.includes('Live Week \\(membership.leagues.currentWeek) scoreboard. Open the Board.'));
 assert.match(content, /while !Task\.isCancelled[\s\S]*homeScorePollingNeeded[\s\S]*refreshHomeScores\(\)/);
-assert.match(content, /takePendingDestination\(\)/);
+assert.match(content, /takePendingRoute\(\)/);
 assert.match(content, /handleNotificationDestination\(destination\)/);
 assert.match(content, /AUTOMATIC RESULTS STATUS/);
 assert.match(content, /FINALS AUTO-SCORE PICKS · STANDINGS · DISPATCH/);
@@ -72,8 +72,8 @@ assert.match(auth, /validAccessToken\(minimumValidity:/);
 assert.match(auth, /maintainSession\(\)/);
 assert.match(auth, /refreshCredentialIsInvalid/);
 assert.match(notifications, /launchOptions\?\[\.remoteNotification\]/);
-assert.match(notifications, /savePendingDestination\(destination\)/);
-assert.match(notifications, /takePendingDestination\(\)/);
+assert.match(notifications, /savePendingRoute\(route\)/);
+assert.match(notifications, /takePendingRoute\(\)/);
 assert.doesNotMatch(foundry, /"[^"]*(?:bot lab|bot card|bot roster|bot league|bot slips)[^"]*"/i);
 
 const scorecardFunction = api.match(/static func regularSeasonScorecards[\s\S]*?\n    \}/)?.[0] ?? "";
