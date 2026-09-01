@@ -62,6 +62,11 @@ assert.match(autonomous, /mergeWeeklyScores/);
 assert.match(autonomous, /cachedEvents\.map\(normalizeScore\)/);
 assert.match(autonomous, /row\.homeTeam/);
 assert.doesNotMatch(autonomous, /row\.home_team/);
+assert.match(autonomous, /isScheduleEligible/);
+assert.match(autonomous, /SCORE_LOOKAHEAD_MS/);
+assert.match(autonomous, /starts\.length!==5/);
+assert.doesNotMatch(autonomous, /\.gte\("published_at",cutoff\)/);
+assert.match(autonomous, /order\("published_at",\{ascending:false\}\)\.limit\(100\)/);
 
 assert.match(cacheSchema, /enable row level security/);
 assert.match(cacheSchema, /revoke all on public\.live_football_score_cache from anon, authenticated/);

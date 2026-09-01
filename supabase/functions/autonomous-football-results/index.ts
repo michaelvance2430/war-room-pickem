@@ -7,6 +7,10 @@ type Final = Game & { homeScore:number; awayScore:number; ats:"home"|"away"|"pus
 type CardRow = { league_id:string; week_number:number; prop_question?:string|null; prop_option_a:string; prop_option_b:string; leagues:{sport_id?:string|null}|{sport_id?:string|null}[]; card_games:Game[] };
 type ScoredRow = { league_id:string; week_number:number };
 
+const DAY_MS=86_400_000;
+const SCORE_LOOKBACK_MS=10*DAY_MS;
+const SCORE_LOOKAHEAD_MS=45*DAY_MS;
+
 const required=(name:string)=>{const value=Deno.env.get(name);if(!value)throw new Error(`Missing ${name}`);return value;};
 const norm=(value:string)=>value.toLowerCase().replace(/[^a-z0-9]+/g," ").trim().replace(/\s+/g," ");
 const normalizeScore=(event:any):Score=>({id:String(event?.id||""),completed:event?.completed===true,homeTeam:String(event?.homeTeam||event?.home_team||""),awayTeam:String(event?.awayTeam||event?.away_team||""),commenceTime:event?.commenceTime||event?.commence_time||null,lastUpdate:event?.lastUpdate||event?.last_update||null,scores:Array.isArray(event?.scores)?event.scores.map((row:any)=>({name:String(row?.name||""),score:String(row?.score??"")})):[]});
@@ -21,6 +25,12 @@ const awayWon=(game:Final)=>game.awayScore>game.homeScore;
 const homeDog=(game:Final)=>game.favorite==="away";
 const awayDog=(game:Final)=>game.favorite==="home";
 const numericHeader=(value:string|null)=>value==null||value===""?null:Number(value);
+
+export function isScheduleEligible(card:CardRow,now=Date.now()):boolean{
+  const starts=(card.card_games||[]).map((game)=>Date.parse(game.start_time||"")).filter(Number.isFinite);
+  if(starts.length!==5)return false;
+  return Math.max(...starts)>=now-SCORE_LOOKBACK_MS&&Math.min(...starts)<=now+SCORE_LOOKAHEAD_MS;
+}
 
 export function scoreRefreshPlan(cards:CardRow[],now=Date.now()):{minAgeSeconds:number;daysFrom:number}|null{
   const starts=cards.flatMap((card)=>card.card_games||[]).map((game)=>Date.parse(game.start_time||"")).filter(Number.isFinite);
@@ -86,10 +96,9 @@ Deno.serve(async(request:Request)=>{
   if(request.method!=="POST")return new Response("Method not allowed",{status:405});
   try{
     const db=createClient(required("SUPABASE_URL"),required("SUPABASE_SERVICE_ROLE_KEY"),{auth:{persistSession:false,autoRefreshToken:false}});
-    const cutoff=new Date(Date.now()-10*86400000).toISOString();
-    const {data:cards,error}=await db.from("week_cards").select("id,league_id,week_number,prop_question,prop_option_a,prop_option_b,published_at,leagues!inner(sport_id),card_games(id,away_team,home_team,spread,favorite,start_time,is_rivalry)").gte("published_at",cutoff).order("published_at").limit(100);
+    const {data:cards,error}=await db.from("week_cards").select("id,league_id,week_number,prop_question,prop_option_a,prop_option_b,published_at,leagues!inner(sport_id),card_games(id,away_team,home_team,spread,favorite,start_time,is_rivalry)").order("published_at",{ascending:false}).limit(100);
     if(error)throw error;
-    const cardRows=(cards||[]) as CardRow[];
+    const cardRows=((cards||[]) as CardRow[]).filter((card)=>isScheduleEligible(card));
     const leagueIds=[...new Set(cardRows.map((card:CardRow)=>card.league_id))];
     const {data:scored}=leagueIds.length?await db.from("week_results").select("league_id,week_number").in("league_id",leagueIds):{data:[]};
     const done=new Set(((scored||[]) as ScoredRow[]).map((row:ScoredRow)=>`${row.league_id}:${row.week_number}`));
