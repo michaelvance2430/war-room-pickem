@@ -542,9 +542,9 @@ private struct PicksView: View {
                                 if league?.leagues.sportId.lowercased() == "nfl" {
                                     NflSundayOperationsPanel(week: card.weekNumber)
                                 }
-                                if pick == nil,
+                                if pick?.isChaos != true,
                                    card.weekNumber <= (league?.leagues.regularSeasonWeeks ?? 0),
-                                   ["cfb", "nfl"].contains(league?.leagues.sportId.lowercased() ?? "cfb") {
+                                   ["cfb", "nfl", "cbb"].contains(league?.leagues.sportId.lowercased() ?? "cfb") {
                                     RegularSeasonWeaponPanel(
                                         sportId: league?.leagues.sportId ?? "cfb",
                                         remaining: max(0, 2 - tacticalNukesUsed),
@@ -818,22 +818,27 @@ private struct PicksView: View {
     }
 
     private var isNFL: Bool { league?.leagues.sportId.lowercased() == "nfl" }
+    private var isFieldhouse: Bool { league?.leagues.sportId.lowercased() == "cbb" }
 
     private var regularSeasonWeaponConfirmationTitle: String {
-        isNFL ? "AUTHORIZE JDAM SUPPORT?" : "GO NUCLEAR?"
+        if isNFL { return "AUTHORIZE JDAM SUPPORT?" }
+        if isFieldhouse { return "AUTHORIZE HELLFIRE SUPPORT?" }
+        return "GO NUCLEAR?"
     }
 
     private var regularSeasonWeaponAuthorizationLabel: String {
-        isNFL ? "AUTHORIZE JDAM" : "AUTHORIZE ☢"
+        if isNFL { return "AUTHORIZE JDAM" }
+        if isFieldhouse { return "AUTHORIZE HELLFIRE" }
+        return "AUTHORIZE ☢"
     }
 
     private var regularSeasonWeaponConfirmationMessage: String {
-        let weapon = isNFL ? "JDAM" : "The targeting computer"
-        return "\(weapon) takes the full regular-season card using the posted favorites and a legal confidence ladder. It adds a 50% bonus to points earned, never subtracts points, and immediately spends one of two season uses. No edits. No rerolls."
+        let weapon = isNFL ? "JDAM" : (isFieldhouse ? "Hellfire" : "The targeting computer")
+        return "\(weapon) replaces this week’s reopened card using the posted favorites and a legal confidence ladder. It adds a 50% bonus to points earned, never subtracts points, and immediately spends one of two season uses. This cannot be undone. No edits. No rerolls."
     }
 
     private func authorizeRegularSeasonWeapon(card: WeekCard) async {
-        guard tacticalNukesUsed < 2, pick == nil, let token = auth.token, let league,
+        guard tacticalNukesUsed < 2, pick?.isChaos != true, let token = auth.token, let league,
               let user = auth.user,
               card.weekNumber <= league.leagues.regularSeasonWeeks,
               let prop = card.propOptionA,
@@ -855,7 +860,9 @@ private struct PicksView: View {
             tacticalNukesUsed = min(2, tacticalNukesUsed + 1)
             saveNotice = isNFL
                 ? "JDAM card sealed. Earned points receive 50% support."
-                : "Nuclear card sealed. Earned points receive 50% support."
+                : (isFieldhouse
+                    ? "Hellfire card sealed. Earned points receive 50% support."
+                    : "Nuclear card sealed. Earned points receive 50% support.")
             editingSubmittedCard = false
             strikePresentation = WeaponStrikeCatalog.presentation(for: league.leagues.sportId)
         } catch { saveErrorMessage = error.localizedDescription }
@@ -1200,14 +1207,15 @@ private struct RegularSeasonWeaponPanel: View {
     let authorize: () -> Void
 
     private var isNFL: Bool { sportId.lowercased() == "nfl" }
-    private var accent: Color { isNFL ? .cyan : .red }
-    private var title: String { isNFL ? "JDAM CATCH-UP PACKAGE" : "TACTICAL NUCLEAR BUTTON" }
-    private var action: String { isNFL ? "CALL JDAM" : "GO NUCLEAR" }
+    private var isFieldhouse: Bool { sportId.lowercased() == "cbb" }
+    private var accent: Color { isNFL ? .cyan : (isFieldhouse ? .orange : .red) }
+    private var title: String { isNFL ? "JDAM CATCH-UP PACKAGE" : (isFieldhouse ? "HELLFIRE CATCH-UP PACKAGE" : "TACTICAL NUCLEAR BUTTON") }
+    private var action: String { isNFL ? "CALL JDAM" : (isFieldhouse ? "CALL HELLFIRE" : "GO NUCLEAR") }
 
     var body: some View {
         VStack(spacing: 12) {
             HStack(spacing: 12) {
-                Image(systemName: isNFL ? "scope" : "aqi.medium")
+                Image(systemName: isNFL ? "scope" : (isFieldhouse ? "flame.fill" : "aqi.medium"))
                     .font(.system(size: 32, weight: .black)).foregroundStyle(armed ? .green : accent)
                 VStack(alignment: .leading, spacing: 3) {
                     Text("REGULAR SEASON CATCH-UP WEAPON").font(.system(size: 8, weight: .black)).tracking(1.3).foregroundStyle(accent.opacity(0.9))

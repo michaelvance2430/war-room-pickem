@@ -134,11 +134,8 @@ begin
   end if;
 
   if coalesce(p_is_chaos, false) then
-    if v_pick_id is not null then
-      raise exception 'Authorize a catch-up weapon before making this week''s picks';
-    end if;
-    if lower(v_league.sport_id) not in ('cfb','nfl') then
-      raise exception 'This regular-season weapon is available only in CFB and NFL rooms';
+    if lower(v_league.sport_id) not in ('cfb','nfl','cbb') then
+      raise exception 'This regular-season weapon is not available in this sport';
     end if;
     if p_week_number > v_league.regular_season_weeks then
       raise exception 'Regular-season catch-up weapons cannot be used in the postseason';
@@ -215,8 +212,12 @@ begin
       weapon_type,phase,source_event_id,decisions_changed,fact_payload
     ) values (
       v_uid,p_league_id,v_league.name,lower(v_league.sport_id),extract(year from now())::integer,p_week_number,
-      case when lower(v_league.sport_id)='nfl' then 'jdam' else 'tactical_nuke' end,
-      'regular_season','regular-weapon-'||p_league_id||'-'||v_uid||'-'||p_week_number,5,
+      case
+        when lower(v_league.sport_id)='nfl' then 'jdam'
+        when lower(v_league.sport_id)='cbb' then 'hellfire'
+        else 'tactical_nuke'
+      end,
+      'regular_season','regular-weapon-'||p_league_id||'-'||v_uid||'-'||p_week_number,v_game_count,
       jsonb_build_object('bonusPercent',50,'selectionMode','posted_favorites','penaltyPoints',0)
     ) on conflict(source_event_id) do nothing;
   end if;
