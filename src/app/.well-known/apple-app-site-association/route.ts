@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-const bundleId = "com.warroompicks.app";
 const teamId = "XWW458P3J7";
 const supportedPaths = [
   "/join",
@@ -26,7 +25,16 @@ export function GET() {
     {
       applinks: {
         apps: [],
-        details: [{ appID: `${teamId}.${bundleId}`, paths: supportedPaths }],
+        details: [
+          {
+            appID: `${teamId}.com.warroompicks.WarRoom`,
+            components: [
+              { "/": "/invite/*", comment: "Native Build 20 opaque league invitations" },
+              { "/": "/join", "?": { code: "?*" }, comment: "Legacy invite-code compatibility" },
+            ],
+          },
+          { appID: `${teamId}.com.warroompicks.app`, paths: supportedPaths },
+        ],
       },
     },
     {
